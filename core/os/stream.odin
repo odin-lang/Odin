@@ -19,8 +19,8 @@ _file_stream_vtable := &io.Stream_VTable{
 		return;
 	},
 	impl_read_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		fd := Handle(uintptr(s.stream_data));
 		when ODIN_OS == "windows" {
+			fd := Handle(uintptr(s.stream_data));
 			os_err: Errno;
 			n, os_err = read_at(fd, p, offset);
 		}
@@ -33,8 +33,8 @@ _file_stream_vtable := &io.Stream_VTable{
 		return;
 	},
 	impl_write_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		fd := Handle(uintptr(s.stream_data));
 		when ODIN_OS == "windows" {
+			fd := Handle(uintptr(s.stream_data));
 			os_err: Errno;
 			n, os_err = write_at(fd, p, offset);
 			_ = os_err;
@@ -53,8 +53,8 @@ _file_stream_vtable := &io.Stream_VTable{
 		return sz;
 	},
 	impl_flush = proc(s: io.Stream) -> io.Error {
-		fd := Handle(uintptr(s.stream_data));
 		when ODIN_OS == "windows" {
+			fd := Handle(uintptr(s.stream_data));
 			flush(fd);
 		} else {
 			// TOOD(bill): other operating systems
