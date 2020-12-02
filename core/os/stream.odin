@@ -10,6 +10,7 @@ stream_from_handle :: proc(fd: Handle) -> io.Stream {
 }
 
 
+@(private)
 _file_stream_vtable := &io.Stream_VTable{
 	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		fd := Handle(uintptr(s.stream_data));
