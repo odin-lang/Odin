@@ -4,7 +4,6 @@ import "core:runtime"
 
 @(private)
 Multi_Reader :: struct {
-	using stream: Stream,
 	readers: [dynamic]Reader,
 }
 
@@ -37,11 +36,9 @@ _multi_reader_vtable := &Stream_VTable{
 	},
 };
 
-mutlti_reader :: proc(readers: ..Reader, allocator := context.allocator) -> Reader {
+mutlti_reader :: proc(readers: ..Reader, allocator := context.allocator) -> (r: Reader) {
 	context.allocator = allocator;
 	mr := new(Multi_Reader);
-	mr.stream_vtable = _multi_reader_vtable;
-	mr.stream_data = mr;
 	all_readers := make([dynamic]Reader, 0, len(readers));
 
 	for w in readers {
@@ -54,14 +51,15 @@ mutlti_reader :: proc(readers: ..Reader, allocator := context.allocator) -> Read
 	}
 
 	mr.readers = all_readers;
-	res, _ := to_reader(mr^);
-	return res;
+
+	r.stream_vtable = _multi_reader_vtable;
+	r.stream_data = mr;
+	return;
 }
 
 
 @(private)
 Multi_Writer :: struct {
-	using stream: Stream,
 	writers:      []Writer,
 	allocator:    runtime.Allocator,
 }
@@ -92,11 +90,9 @@ _multi_writer_vtable := &Stream_VTable{
 	},
 };
 
-mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> Writer {
+mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> (w: Writer) {
 	context.allocator = allocator;
 	mw := new(Multi_Writer);
-	mw.stream_vtable = _multi_writer_vtable;
-	mw.stream_data = mw;
 	mw.allocator = allocator;
 	all_writers := make([dynamic]Writer, 0, len(writers));
 
@@ -110,6 +106,8 @@ mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> Writ
 	}
 
 	mw.writers = all_writers[:];
-	res, _ := to_writer(mw^);
-	return res;
+
+	w.stream_vtable = _multi_writer_vtable;
+	w.stream_data = mw;
+	return;
 }
