@@ -14,7 +14,8 @@ Marshal_Error :: enum {
 }
 
 marshal :: proc(v: any, allocator := context.allocator) -> ([]byte, Marshal_Error) {
-	b := strings.make_builder(allocator);
+	b: strings.Builder;
+	strings.init_builder(&b, allocator);
 
 	err := marshal_arg(&b, v);
 
@@ -129,7 +130,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		case b32:  val = bool(b);
 		case b64:  val = bool(b);
 		}
-		write_string(b, val ? "true" : "false");
+		write_string_builder(b, val ? "true" : "false");
 
 	case Type_Info_Any:
 		return .Unsupported_Type;

@@ -3,6 +3,7 @@ package strings
 import "core:mem"
 import "core:unicode/utf8"
 import "core:strconv"
+import "core:io"
 
 Builder_Flush_Proc :: #type proc(b: ^Builder) -> (do_reset: bool);
 
@@ -49,6 +50,39 @@ init_builder :: proc{
 	init_builder_len,
 	init_builder_len_cap,
 };
+
+@(private)
+_builder_stream_vtable := &io.Stream_VTable{
+	impl_flush = proc(s: io.Stream) -> io.Error {
+		b := (^Builder)(s.stream_data);
+		flush_builder(b);
+		return nil;
+	},
+	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
+		b := (^Builder)(s.stream_data);
+		n = write_bytes(b, p);
+		if len(b.buf) == cap(b.buf) {
+			err = .EOF;
+		}
+		return;
+	},
+	impl_write_byte = proc(s: io.Stream, c: byte) -> io.Error {
+		b := (^Builder)(s.stream_data);
+		_ = write_byte(b, c);
+		if len(b.buf) == cap(b.buf) {
+			return .EOF;
+		}
+		return nil;
+	},
+};
+
+to_stream :: proc(b: ^Builder) -> io.Stream {
+	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b};
+}
+to_writer :: proc(b: ^Builder) -> io.Writer {
+	w, _ := io.to_writer(to_stream(b));
+	return w;
+}
 
 
 
@@ -139,35 +173,74 @@ write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
 	return;
 }
 
-write_rune :: proc(b: ^Builder, r: rune) -> int {
+write_rune :: proc{
+	write_rune_builder,
+	write_rune_writer,
+};
+write_rune_builder :: proc(b: ^Builder, r: rune) -> int {
+	return write_rune_writer(to_writer(b), r);
+}
+write_rune_writer :: proc(w: io.Writer, r: rune) -> int {
 	if r < utf8.RUNE_SELF {
-		return write_byte(b, byte(r));
+		return _write_byte(w, byte(r));
 	}
 
 	s, n := utf8.encode_rune(r);
-	write_bytes(b, s[:n]);
+	n, _ = io.write(w, s[:n]);
 	return n;
 }
 
-write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
+
+
+write_quoted_rune :: proc{
+	write_quoted_rune_builder,
+	write_quoted_rune_writer,
+};
+
+write_quoted_rune_builder :: proc(b: ^Builder, r: rune) -> (n: int) {
+	return write_quoted_rune_writer(to_writer(b), r);
+}
+
+@(private)
+_write_byte :: proc(w: io.Writer, r: byte) -> int {
+	err := io.write_byte(w, r);
+	return 1 if err == nil else 0;
+}
+
+write_quoted_rune_writer :: proc(w: io.Writer, r: rune) -> (n: int) {
+
 	quote := byte('\'');
-	n += write_byte(b, quote);
+	n += _write_byte(w, quote);
 	buf, width := utf8.encode_rune(r);
 	if width == 1 && r == utf8.RUNE_ERROR {
-		n += write_byte(b, '\\');
-		n += write_byte(b, 'x');
-		n += write_byte(b, DIGITS_LOWER[buf[0]>>4]);
-		n += write_byte(b, DIGITS_LOWER[buf[0]&0xf]);
+		n += _write_byte(w, '\\');
+		n += _write_byte(w, 'x');
+		n += _write_byte(w, DIGITS_LOWER[buf[0]>>4]);
+		n += _write_byte(w, DIGITS_LOWER[buf[0]&0xf]);
 	} else {
-		n += write_escaped_rune(b, r, quote);
+		n += write_escaped_rune(w, r, quote);
 	}
-	n += write_byte(b, quote);
+	n += _write_byte(w, quote);
 	return;
 }
 
-write_string :: proc(b: ^Builder, s: string) -> (n: int) {
-	return write_bytes(b, transmute([]byte)s);
+
+write_string :: proc{
+	write_string_builder,
+	write_string_writer,
+};
+
+write_string_builder :: proc(b: ^Builder, s: string) -> (n: int) {
+	return write_string_writer(to_writer(b), s);
 }
+
+write_string_writer :: proc(w: io.Writer, s: string) -> (n: int) {
+	n, _ = io.write(w, transmute([]byte)s);
+	return;
+}
+
+
+
 
 pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	if len(b.buf) == 0 {
@@ -190,8 +263,17 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 @(private, static)
 DIGITS_LOWER := "0123456789abcdefx";
 
-write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
-	n += write_byte(b, quote);
+write_quoted_string :: proc{
+	write_quoted_string_builder,
+	write_quoted_string_writer,
+};
+
+write_quoted_string_builder :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
+	return write_quoted_string_writer(to_writer(b), str, quote);
+}
+
+write_quoted_string_writer :: proc(w: io.Writer, str: string, quote: byte = '"') -> (n: int) {
+	n += _write_byte(w, quote);
 	for width, s := 0, str; len(s) > 0; s = s[width:] {
 		r := rune(s[0]);
 		width = 1;
@@ -199,57 +281,74 @@ write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: 
 			r, width = utf8.decode_rune_in_string(s);
 		}
 		if width == 1 && r == utf8.RUNE_ERROR {
-			n += write_byte(b, '\\');
-			n += write_byte(b, 'x');
-			n += write_byte(b, DIGITS_LOWER[s[0]>>4]);
-			n += write_byte(b, DIGITS_LOWER[s[0]&0xf]);
+			n += _write_byte(w, '\\');
+			n += _write_byte(w, 'x');
+			n += _write_byte(w, DIGITS_LOWER[s[0]>>4]);
+			n += _write_byte(w, DIGITS_LOWER[s[0]&0xf]);
 			continue;
 		}
 
-		n += write_escaped_rune(b, r, quote);
+		n += write_escaped_rune(w, r, quote);
 
 	}
-	n += write_byte(b, quote);
+	n += _write_byte(w, quote);
 	return;
 }
 
+write_encoded_rune :: proc{
+	write_encoded_rune_builder,
+	write_encoded_rune_writer,
+};
 
-write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
+write_encoded_rune_builder :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
+	return write_encoded_rune_writer(to_writer(b), r, write_quote);
+
+}
+write_encoded_rune_writer :: proc(w: io.Writer, r: rune, write_quote := true) -> (n: int) {
 	if write_quote {
-		n += write_byte(b, '\'');
+		n += _write_byte(w, '\'');
 	}
 	switch r {
-	case '\a': n += write_string(b, `\a"`);
-	case '\b': n += write_string(b, `\b"`);
-	case '\e': n += write_string(b, `\e"`);
-	case '\f': n += write_string(b, `\f"`);
-	case '\n': n += write_string(b, `\n"`);
-	case '\r': n += write_string(b, `\r"`);
-	case '\t': n += write_string(b, `\t"`);
-	case '\v': n += write_string(b, `\v"`);
+	case '\a': n += write_string(w, `\a"`);
+	case '\b': n += write_string(w, `\b"`);
+	case '\e': n += write_string(w, `\e"`);
+	case '\f': n += write_string(w, `\f"`);
+	case '\n': n += write_string(w, `\n"`);
+	case '\r': n += write_string(w, `\r"`);
+	case '\t': n += write_string(w, `\t"`);
+	case '\v': n += write_string(w, `\v"`);
 	case:
 		if r < 32 {
-			n += write_string(b, `\x`);
+			n += write_string(w, `\x`);
 			buf: [2]byte;
 			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil);
 			switch len(s) {
-			case 0: n += write_string(b, "00");
-			case 1: n += write_byte(b, '0');
-			case 2: n += write_string(b, s);
+			case 0: n += write_string(w, "00");
+			case 1: n += _write_byte(w, '0');
+			case 2: n += write_string(w, s);
 			}
 		} else {
-			n += write_rune(b, r);
+			n += write_rune(w, r);
 		}
 
 	}
 	if write_quote {
-		n += write_byte(b, '\'');
+		n += _write_byte(w, '\'');
 	}
 	return;
 }
 
 
-write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
+write_escaped_rune :: proc{
+	write_escaped_rune_builder,
+	write_escaped_rune_writer,
+};
+
+write_escaped_rune_builder :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
+	return write_escaped_rune_writer(to_writer(b), r, quote, html_safe);
+}
+
+write_escaped_rune_writer :: proc(w: io.Writer, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	is_printable :: proc(r: rune) -> bool {
 		if r <= 0xff {
 			switch r {
@@ -267,54 +366,54 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false
 	if html_safe {
 		switch r {
 		case '<', '>', '&':
-			n += write_byte(b, '\\');
-			n += write_byte(b, 'u');
+			n += _write_byte(w, '\\');
+			n += _write_byte(w, 'u');
 			for s := 12; s >= 0; s -= 4 {
-				n += write_byte(b, DIGITS_LOWER[r>>uint(s) & 0xf]);
+				n += _write_byte(w, DIGITS_LOWER[r>>uint(s) & 0xf]);
 			}
 			return;
 		}
 	}
 
 	if r == rune(quote) || r == '\\' {
-		n += write_byte(b, '\\');
-		n += write_byte(b, byte(r));
+		n += _write_byte(w, '\\');
+		n += _write_byte(w, byte(r));
 		return;
 	} else if is_printable(r) {
-		n += write_encoded_rune(b, r, false);
+		n += write_encoded_rune(w, r, false);
 		return;
 	}
 	switch r {
-	case '\a': n += write_string(b, `\a`);
-	case '\b': n += write_string(b, `\b`);
-	case '\e': n += write_string(b, `\e`);
-	case '\f': n += write_string(b, `\f`);
-	case '\n': n += write_string(b, `\n`);
-	case '\r': n += write_string(b, `\r`);
-	case '\t': n += write_string(b, `\t`);
-	case '\v': n += write_string(b, `\v`);
+	case '\a': n += write_string(w, `\a`);
+	case '\b': n += write_string(w, `\b`);
+	case '\e': n += write_string(w, `\e`);
+	case '\f': n += write_string(w, `\f`);
+	case '\n': n += write_string(w, `\n`);
+	case '\r': n += write_string(w, `\r`);
+	case '\t': n += write_string(w, `\t`);
+	case '\v': n += write_string(w, `\v`);
 	case:
 		switch c := r; {
 		case c < ' ':
-			n += write_byte(b, '\\');
-			n += write_byte(b, 'x');
-			n += write_byte(b, DIGITS_LOWER[byte(c)>>4]);
-			n += write_byte(b, DIGITS_LOWER[byte(c)&0xf]);
+			n += _write_byte(w, '\\');
+			n += _write_byte(w, 'x');
+			n += _write_byte(w, DIGITS_LOWER[byte(c)>>4]);
+			n += _write_byte(w, DIGITS_LOWER[byte(c)&0xf]);
 
 		case c > utf8.MAX_RUNE:
 			c = 0xfffd;
 			fallthrough;
 		case c < 0x10000:
-			n += write_byte(b, '\\');
-			n += write_byte(b, 'u');
+			n += _write_byte(w, '\\');
+			n += _write_byte(w, 'u');
 			for s := 12; s >= 0; s -= 4 {
-				n += write_byte(b, DIGITS_LOWER[c>>uint(s) & 0xf]);
+				n += _write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf]);
 			}
 		case:
-			n += write_byte(b, '\\');
-			n += write_byte(b, 'U');
+			n += _write_byte(w, '\\');
+			n += _write_byte(w, 'U');
 			for s := 28; s >= 0; s -= 4 {
-				n += write_byte(b, DIGITS_LOWER[c>>uint(s) & 0xf]);
+				n += _write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf]);
 			}
 		}
 	}

@@ -8,7 +8,8 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 		return "";
 	}
 
-	b := make_builder_len_cap(0, 0, allocator);
+	b: Builder;
+	init_builder(&b, 0, 0, allocator);
 
 	s := s;
 	for c, i in s {
@@ -57,14 +58,16 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 }
 
 to_lower :: proc(s: string, allocator := context.allocator) -> string {
-	b := make_builder(0, len(s), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 	for r in s {
 		write_rune(&b, unicode.to_lower(r));
 	}
 	return to_string(b);
 }
 to_upper :: proc(s: string, allocator := context.allocator) -> string {
-	b := make_builder(0, len(s), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 	for r in s {
 		write_rune(&b, unicode.to_upper(r));
 	}
@@ -123,7 +126,8 @@ to_lower_camel_case :: to_camel_case;
 to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s;
 	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 
 	string_case_iterator(&b, s, proc(b: ^Builder, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
@@ -144,7 +148,8 @@ to_upper_camel_case :: to_pascal_case;
 to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s;
 	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 
 	string_case_iterator(&b, s, proc(b: ^Builder, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
@@ -164,7 +169,8 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allocator := context.allocator) -> string {
 	s := s;
 	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 
 	adjust_case := unicode.to_upper if all_upper_case else unicode.to_lower;
 
@@ -221,7 +227,8 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 
 	s := s;
 	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 
 	prev, curr: rune;
 

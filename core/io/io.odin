@@ -96,6 +96,9 @@ Read_Writer        :: struct {using stream: Stream};
 Read_Closer        :: struct {using stream: Stream};
 Read_Write_Closer  :: struct {using stream: Stream};
 Read_Write_Seeker  :: struct {using stream: Stream};
+
+Write_Closer       :: struct {using stream: Stream};
+Write_Seeker       :: struct {using stream: Stream};
 Write_Flusher      :: struct {using stream: Stream};
 Write_Flush_Closer :: struct {using stream: Stream};
 
@@ -117,7 +120,6 @@ destroy :: proc(s: Stream) -> Error {
 	if s.stream_vtable != nil && s.impl_destroy != nil {
 		return s->impl_destroy();
 	}
-	// Instead of .Empty, .None is fine in this case
 	return close_err;
 }
 
@@ -205,9 +207,14 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if err != nil {
 		return 0, err;
 	}
-	defer r->impl_seek(current_offset, .Start);
 
-	return r->impl_read(p);
+	n, err = r->impl_read(p);
+	if err != nil {
+		return;
+	}
+	_, err = r->impl_seek(current_offset, .Start);
+	return;
+
 }
 
 write_at :: proc(w: Writer_At, p: []byte, offset: i64) -> (n: int, err: Error) {
