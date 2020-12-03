@@ -1,5 +1,6 @@
 package strings
 
+import "core:io"
 import "core:mem"
 import "core:unicode/utf8"
 
@@ -814,6 +815,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 
 	b: Builder;
 	init_builder(&b, allocator);
+	writer := to_writer(&b);
 	str := s;
 	column: int;
 
@@ -824,7 +826,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 			expand := tab_size - column%tab_size;
 
 			for i := 0; i < expand; i += 1 {
-				write_byte(&b, ' ');
+				io.write_byte(writer, ' ');
 			}
 
 			column += expand;
@@ -835,7 +837,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 				column += w;
 			}
 
-			write_rune(&b, r);
+			io.write_rune(writer, r);
 		}
 
 		str = str[w:];
@@ -874,9 +876,11 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
-	write_pad_string(&b, pad, pad_len, remains/2);
-	write_string(&b, str);
-	write_pad_string(&b, pad, pad_len, (remains+1)/2);
+	w := to_writer(&b);
+
+	write_pad_string(w, pad, pad_len, remains/2);
+	io.write_string(w, str);
+	write_pad_string(w, pad, pad_len, (remains+1)/2);
 
 	return to_string(b);
 }
@@ -895,8 +899,10 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
-	write_string(&b, str);
-	write_pad_string(&b, pad, pad_len, remains);
+	w := to_writer(&b);
+
+	io.write_string(w, str);
+	write_pad_string(w, pad, pad_len, remains);
 
 	return to_string(b);
 }
@@ -915,8 +921,10 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
-	write_pad_string(&b, pad, pad_len, remains);
-	write_string(&b, str);
+	w := to_writer(&b);
+
+	write_pad_string(w, pad, pad_len, remains);
+	io.write_string(w, str);
 
 	return to_string(b);
 }
@@ -925,19 +933,19 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 
 
 @private
-write_pad_string :: proc(b: ^Builder, pad: string, pad_len, remains: int) {
+write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 	repeats := remains / pad_len;
 
 	for i := 0; i < repeats; i += 1 {
-		write_string(b, pad);
+		io.write_string(w, pad);
 	}
 
 	n := remains % pad_len;
 	p := pad;
 
 	for i := 0; i < n; i += 1 {
-		r, w := utf8.decode_rune_in_string(p);
-		write_rune(b, r);
-		p = p[w:];
+		r, width := utf8.decode_rune_in_string(p);
+		io.write_rune(w, r);
+		p = p[width:];
 	}
 }
