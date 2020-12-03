@@ -1636,8 +1636,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		} else if (operands.count != result_count) {
 			error(node, "Expected %td return values, got %td", result_count, operands.count);
 		} else {
-			isize max_count = rs->results.count;
-			for (isize i = 0; i < max_count; i++) {
+			for (isize i = 0; i < result_count; i++) {
 				Entity *e = pt->results->Tuple.variables[i];
 				check_assignment(ctx, &operands[i], e->type, str_lit("return statement"));
 			}
