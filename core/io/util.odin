@@ -23,7 +23,6 @@ write_int :: proc(w: Writer, i: int, base: int = 10) -> (n: int, err: Error) {
 
 @(private)
 Tee_Reader :: struct {
-	using stream: Stream,
 	r: Reader,
 	w: Writer,
 	allocator: runtime.Allocator,
@@ -51,14 +50,14 @@ _tee_reader_vtable := &Stream_VTable{
 
 // tee_reader
 // tee_reader must call io.destroy when done with
-tee_reader :: proc(r: Reader, w: Writer, allocator := context.allocator) -> Reader {
+tee_reader :: proc(r: Reader, w: Writer, allocator := context.allocator) -> (out: Reader) {
 	t := new(Tee_Reader, allocator);
 	t.r, t.w = r, w;
 	t.allocator = allocator;
-	t.stream_data = t;
-	t.stream_vtable = _tee_reader_vtable;
-	res, _ := to_reader(t^);
-	return res;
+
+	out.stream_data = t;
+	out.stream_vtable = _tee_reader_vtable;
+	return;
 }
 
 
@@ -67,7 +66,6 @@ tee_reader :: proc(r: Reader, w: Writer, allocator := context.allocator) -> Read
 // updates n to reflect the new amount remaining.
 // read returns EOF when n <= 0 or when the underlying r returns EOF.
 Limited_Reader :: struct {
-	using stream: Stream,
 	r: Reader, // underlying reader
 	n: i64,    // max_bytes
 }
@@ -91,19 +89,20 @@ _limited_reader_vtable := &Stream_VTable{
 
 new_limited_reader :: proc(r: Reader, n: i64) -> ^Limited_Reader {
 	l := new(Limited_Reader);
-	l.stream_vtable = _limited_reader_vtable;
-	l.stream_data = l;
 	l.r = r;
 	l.n = n;
 	return l;
 }
 
+limited_reader_to_reader :: proc(l: ^Limited_Reader) -> (r: Reader) {
+	r.stream_vtable = _limited_reader_vtable;
+	r.stream_data = l;
+	return;
+}
+
 @(private="package")
 inline_limited_reader :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
-	l.stream_vtable = _limited_reader_vtable;
-	l.stream_data = l;
 	l.r = r;
 	l.n = n;
-	res, _ := to_reader(l^);
-	return res;
+	return limited_reader_to_reader(l);
 }
