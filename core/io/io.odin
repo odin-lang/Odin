@@ -150,7 +150,7 @@ close :: proc(s: Closer) -> Error {
 	return .None;
 }
 
-flush :: proc(s: Flusher, p: []byte) -> Error {
+flush :: proc(s: Flusher) -> Error {
 	if s.stream_vtable != nil && s.impl_flush != nil {
 		return s->impl_flush();
 	}
@@ -158,7 +158,7 @@ flush :: proc(s: Flusher, p: []byte) -> Error {
 	return .None;
 }
 
-size :: proc(s: Stream, p: []byte) -> i64 {
+size :: proc(s: Stream) -> i64 {
 	if s.stream_vtable == nil {
 		return 0;
 	}
@@ -267,7 +267,21 @@ read_byte :: proc(r: Byte_Reader) -> (byte, Error) {
 	return b[0], err;
 }
 
-write_byte :: proc(w: Byte_Writer, c: byte) -> Error {
+write_byte :: proc{
+	write_byte_to_byte_writer,
+	write_byte_to_writer,
+};
+
+write_byte_to_byte_writer :: proc(w: Byte_Writer, c: byte) -> Error {
+	return _write_byte(auto_cast w, c);
+}
+
+write_byte_to_writer :: proc(w: Writer, c: byte) -> Error {
+	return _write_byte(auto_cast w, c);
+}
+
+@(private)
+_write_byte :: proc(w: Byte_Writer, c: byte) -> Error {
 	if w.stream_vtable == nil {
 		return .Empty;
 	}
