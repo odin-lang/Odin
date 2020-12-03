@@ -1,5 +1,6 @@
 package reflect
 
+import "core:io"
 import "core:strings"
 
 are_types_identical :: proc(a, b: ^Type_Info) -> bool {
@@ -360,258 +361,273 @@ is_relative_slice :: proc(info: ^Type_Info) -> bool {
 
 
 
-write_typeid :: proc(buf: ^strings.Builder, id: typeid) {
+write_typeid_builder :: proc(buf: ^strings.Builder, id: typeid) {
 	write_type(buf, type_info_of(id));
 }
+write_typeid_writer :: proc(writer: io.Writer, id: typeid) {
+	write_type(writer, type_info_of(id));
+}
 
-write_type :: proc(buf: ^strings.Builder, ti: ^Type_Info) {
+write_typeid :: proc{
+	write_typeid_builder,
+	write_typeid_writer,
+};
+
+write_type :: proc{
+	write_type_builder,
+	write_type_writer,
+};
+
+write_type_builder :: proc(buf: ^strings.Builder, ti: ^Type_Info) {
+	write_type_writer(strings.to_writer(buf), ti);
+}
+write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) {
 	using strings;
 	if ti == nil {
-		write_string(buf, "nil");
+		write_string(w, "nil");
 		return;
 	}
 
 	switch info in ti.variant {
 	case Type_Info_Named:
-		write_string(buf, info.name);
+		write_string(w, info.name);
 	case Type_Info_Integer:
 		switch ti.id {
-		case int:     write_string(buf, "int");
-		case uint:    write_string(buf, "uint");
-		case uintptr: write_string(buf, "uintptr");
+		case int:     write_string(w, "int");
+		case uint:    write_string(w, "uint");
+		case uintptr: write_string(w, "uintptr");
 		case:
-			write_byte(buf, 'i' if info.signed else 'u');
-			write_i64(buf, i64(8*ti.size), 10);
+			io.write_byte(w, 'i' if info.signed else 'u');
+			io.write_i64(w, i64(8*ti.size), 10);
 			switch info.endianness {
 			case .Platform: // Okay
-			case .Little: write_string(buf, "le");
-			case .Big:    write_string(buf, "be");
+			case .Little: write_string(w, "le");
+			case .Big:    write_string(w, "be");
 			}
 		}
 	case Type_Info_Rune:
-		write_string(buf, "rune");
+		io.write_string(w, "rune");
 	case Type_Info_Float:
-		write_byte(buf, 'f');
-		write_i64(buf, i64(8*ti.size), 10);
+		io.write_byte(w, 'f');
+		io.write_i64(w, i64(8*ti.size), 10);
 		switch info.endianness {
 		case .Platform: // Okay
-		case .Little: write_string(buf, "le");
-		case .Big:    write_string(buf, "be");
+		case .Little: write_string(w, "le");
+		case .Big:    write_string(w, "be");
 		}
 	case Type_Info_Complex:
-		write_string(buf, "complex");
-		write_i64(buf, i64(8*ti.size), 10);
+		io.write_string(w, "complex");
+		io.write_i64(w, i64(8*ti.size), 10);
 	case Type_Info_Quaternion:
-		write_string(buf, "quaternion");
-		write_i64(buf, i64(8*ti.size), 10);
+		io.write_string(w, "quaternion");
+		io.write_i64(w, i64(8*ti.size), 10);
 	case Type_Info_String:
 		if info.is_cstring {
-			write_string(buf, "cstring");
+			write_string(w, "cstring");
 		} else {
-			write_string(buf, "string");
+			write_string(w, "string");
 		}
 	case Type_Info_Boolean:
 		switch ti.id {
-		case bool: write_string(buf, "bool");
+		case bool: write_string(w, "bool");
 		case:
-			write_byte(buf, 'b');
-			write_i64(buf, i64(8*ti.size), 10);
+			io.write_byte(w, 'b');
+			io.write_i64(w, i64(8*ti.size), 10);
 		}
 	case Type_Info_Any:
-		write_string(buf, "any");
+		write_string(w, "any");
 
 	case Type_Info_Type_Id:
-		write_string(buf, "typeid");
+		write_string(w, "typeid");
 
 	case Type_Info_Pointer:
 		if info.elem == nil {
-			write_string(buf, "rawptr");
+			write_string(w, "rawptr");
 		} else {
-			write_string(buf, "^");
-			write_type(buf, info.elem);
+			write_string(w, "^");
+			write_type(w, info.elem);
 		}
 	case Type_Info_Procedure:
-		write_string(buf, "proc");
+		write_string(w, "proc");
 		if info.params == nil {
-			write_string(buf, "()");
+			write_string(w, "()");
 		} else {
 			t := info.params.variant.(Type_Info_Tuple);
-			write_string(buf, "(");
+			write_string(w, "(");
 			for t, i in t.types {
 				if i > 0 {
-					write_string(buf, ", ");
+					write_string(w, ", ");
 				}
-				write_type(buf, t);
+				write_type(w, t);
 			}
-			write_string(buf, ")");
+			write_string(w, ")");
 		}
 		if info.results != nil {
-			write_string(buf, " -> ");
-			write_type(buf, info.results);
+			write_string(w, " -> ");
+			write_type(w, info.results);
 		}
 	case Type_Info_Tuple:
 		count := len(info.names);
-		if count != 1 { write_string(buf, "("); }
+		if count != 1 { write_string(w, "("); }
 		for name, i in info.names {
-			if i > 0 { write_string(buf, ", "); }
+			if i > 0 { write_string(w, ", "); }
 
 			t := info.types[i];
 
 			if len(name) > 0 {
-				write_string(buf, name);
-				write_string(buf, ": ");
+				write_string(w, name);
+				write_string(w, ": ");
 			}
-			write_type(buf, t);
+			write_type(w, t);
 		}
-		if count != 1 { write_string(buf, ")"); }
+		if count != 1 { write_string(w, ")"); }
 
 	case Type_Info_Array:
-		write_string(buf, "[");
-		write_i64(buf, i64(info.count), 10);
-		write_string(buf, "]");
-		write_type(buf, info.elem);
+		io.write_string(w, "[");
+		io.write_i64(w, i64(info.count), 10);
+		io.write_string(w, "]");
+		write_type(w, info.elem);
 
 	case Type_Info_Enumerated_Array:
-		write_string(buf, "[");
-		write_type(buf, info.index);
-		write_string(buf, "]");
-		write_type(buf, info.elem);
+		write_string(w, "[");
+		write_type(w, info.index);
+		write_string(w, "]");
+		write_type(w, info.elem);
 
 	case Type_Info_Dynamic_Array:
-		write_string(buf, "[dynamic]");
-		write_type(buf, info.elem);
+		io.write_string(w, "[dynamic]");
+		write_type(w, info.elem);
 	case Type_Info_Slice:
-		write_string(buf, "[]");
-		write_type(buf, info.elem);
+		io.write_string(w, "[]");
+		write_type(w, info.elem);
 
 	case Type_Info_Map:
-		write_string(buf, "map[");
-		write_type(buf, info.key);
-		write_byte(buf, ']');
-		write_type(buf, info.value);
+		io.write_string(w, "map[");
+		write_type(w, info.key);
+		io.write_byte(w, ']');
+		write_type(w, info.value);
 
 	case Type_Info_Struct:
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
-			write_string(buf, "#soa[");
-			write_i64(buf, i64(info.soa_len));
-			write_byte(buf, ']');
-			write_type(buf, info.soa_base_type);
+			io.write_string(w, "#soa[");
+			io.write_i64(w, i64(info.soa_len));
+			io.write_byte(w, ']');
+			write_type(w, info.soa_base_type);
 			return;
 		case .Slice:
-			write_string(buf, "#soa[]");
-			write_type(buf, info.soa_base_type);
+			io.write_string(w, "#soa[]");
+			write_type(w, info.soa_base_type);
 			return;
 		case .Dynamic:
-			write_string(buf, "#soa[dynamic]");
-			write_type(buf, info.soa_base_type);
+			io.write_string(w, "#soa[dynamic]");
+			write_type(w, info.soa_base_type);
 			return;
 		}
 
-		write_string(buf, "struct ");
-		if info.is_packed    { write_string(buf, "#packed "); }
-		if info.is_raw_union { write_string(buf, "#raw_union "); }
+		write_string(w, "struct ");
+		if info.is_packed    { write_string(w, "#packed "); }
+		if info.is_raw_union { write_string(w, "#raw_union "); }
 		if info.custom_align {
-			write_string(buf, "#align ");
-			write_i64(buf, i64(ti.align), 10);
-			write_byte(buf, ' ');
+			io.write_string(w, "#align ");
+			io.write_i64(w, i64(ti.align), 10);
+			io.write_byte(w, ' ');
 		}
-		write_byte(buf, '{');
+		io.write_byte(w, '{');
 		for name, i in info.names {
-			if i > 0 { write_string(buf, ", "); }
-			write_string(buf, name);
-			write_string(buf, ": ");
-			write_type(buf, info.types[i]);
+			if i > 0 { write_string(w, ", "); }
+			io.write_string(w, name);
+			io.write_string(w, ": ");
+			write_type(w, info.types[i]);
 		}
-		write_byte(buf, '}');
+		io.write_byte(w, '}');
 
 	case Type_Info_Union:
-		write_string(buf, "union ");
+		write_string(w, "union ");
 		if info.custom_align {
-			write_string(buf, "#align ");
-			write_i64(buf, i64(ti.align), 10);
-			write_byte(buf, ' ');
+			write_string(w, "#align ");
+			io.write_i64(w, i64(ti.align), 10);
+			io.write_byte(w, ' ');
 		}
-		write_byte(buf, '{');
+		io.write_byte(w, '{');
 		for variant, i in info.variants {
-			if i > 0 { write_string(buf, ", "); }
-			write_type(buf, variant);
+			if i > 0 { write_string(w, ", "); }
+			write_type(w, variant);
 		}
-		write_byte(buf, '}');
+		io.write_byte(w, '}');
 
 	case Type_Info_Enum:
-		write_string(buf, "enum ");
-		write_type(buf, info.base);
-		write_string(buf, " {");
+		write_string(w, "enum ");
+		write_type(w, info.base);
+		write_string(w, " {");
 		for name, i in info.names {
-			if i > 0 { write_string(buf, ", "); }
-			write_string(buf, name);
+			if i > 0 { write_string(w, ", "); }
+			write_string(w, name);
 		}
-		write_byte(buf, '}');
+		io.write_byte(w, '}');
 
 	case Type_Info_Bit_Field:
-		write_string(buf, "bit_field ");
+		write_string(w, "bit_field ");
 		if ti.align != 1 {
-			write_string(buf, "#align ");
-			write_i64(buf, i64(ti.align), 10);
-			write_byte(buf, ' ');
+			write_string(w, "#align ");
+			io.write_i64(w, i64(ti.align), 10);
+			io.write_byte(w, ' ');
 		}
-		write_string(buf, " {");
+		write_string(w, " {");
 		for name, i in info.names {
-			if i > 0 { write_string(buf, ", "); }
-			write_string(buf, name);
-			write_string(buf, ": ");
-			write_i64(buf, i64(info.bits[i]), 10);
+			if i > 0 { write_string(w, ", "); }
+			write_string(w, name);
+			write_string(w, ": ");
+			io.write_i64(w, i64(info.bits[i]), 10);
 		}
-		write_byte(buf, '}');
+		io.write_byte(w, '}');
 
 	case Type_Info_Bit_Set:
-		write_string(buf, "bit_set[");
+		write_string(w, "bit_set[");
 		switch {
 		case is_enum(info.elem):
-			write_type(buf, info.elem);
+			write_type(w, info.elem);
 		case is_rune(info.elem):
-			write_encoded_rune(buf, rune(info.lower));
-			write_string(buf, "..");
-			write_encoded_rune(buf, rune(info.upper));
+			write_encoded_rune(w, rune(info.lower));
+			write_string(w, "..");
+			write_encoded_rune(w, rune(info.upper));
 		case:
-			write_i64(buf, info.lower, 10);
-			write_string(buf, "..");
-			write_i64(buf, info.upper, 10);
+			io.write_i64(w, info.lower, 10);
+			write_string(w, "..");
+			io.write_i64(w, info.upper, 10);
 		}
 		if info.underlying != nil {
-			write_string(buf, "; ");
-			write_type(buf, info.underlying);
+			write_string(w, "; ");
+			write_type(w, info.underlying);
 		}
-		write_byte(buf, ']');
+		io.write_byte(w, ']');
 
 	case Type_Info_Opaque:
-		write_string(buf, "opaque ");
-		write_type(buf, info.elem);
+		write_string(w, "opaque ");
+		write_type(w, info.elem);
 
 	case Type_Info_Simd_Vector:
 		if info.is_x86_mmx {
-			write_string(buf, "intrinsics.x86_mmx");
+			write_string(w, "intrinsics.x86_mmx");
 		} else {
-			write_string(buf, "#simd[");
-			write_i64(buf, i64(info.count));
-			write_byte(buf, ']');
-			write_type(buf, info.elem);
+			write_string(w, "#simd[");
+			io.write_i64(w, i64(info.count));
+			io.write_byte(w, ']');
+			write_type(w, info.elem);
 		}
 
 	case Type_Info_Relative_Pointer:
-		write_string(buf, "#relative(");
-		write_type(buf, info.base_integer);
-		write_string(buf, ") ");
-		write_type(buf, info.pointer);
+		write_string(w, "#relative(");
+		write_type(w, info.base_integer);
+		write_string(w, ") ");
+		write_type(w, info.pointer);
 
 	case Type_Info_Relative_Slice:
-		write_string(buf, "#relative(");
-		write_type(buf, info.base_integer);
-		write_string(buf, ") ");
-		write_type(buf, info.slice);
-
+		write_string(w, "#relative(");
+		write_type(w, info.base_integer);
+		write_string(w, ") ");
+		write_type(w, info.slice);
 	}
 }
 

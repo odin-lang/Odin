@@ -14,6 +14,13 @@ write_i64 :: proc(w: Writer, i: i64, base: int = 10) -> (n: int, err: Error) {
 	return write_string(w, s);
 }
 
+write_uint :: proc(w: Writer, i: uint, base: int = 10) -> (n: int, err: Error) {
+	return write_u64(w, u64(i), base);
+}
+write_int :: proc(w: Writer, i: int, base: int = 10) -> (n: int, err: Error) {
+	return write_i64(w, i64(i), base);
+}
+
 @(private)
 Tee_Reader :: struct {
 	using stream: Stream,

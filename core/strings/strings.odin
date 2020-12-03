@@ -756,7 +756,8 @@ split_multi :: proc(s: string, substrs: []string, skip_empty := false, allocator
 // Adjacent invalid bytes are only replaced once
 scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> string {
 	str := s;
-	b := make_builder(0, len(str), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 
 	has_error := false;
 	cursor := 0;
@@ -811,7 +812,8 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 		return "";
 	}
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	str := s;
 	column: int;
 
@@ -868,7 +870,8 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
 	write_pad_string(&b, pad, pad_len, remains/2);
@@ -888,7 +891,8 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
 	write_string(&b, str);
@@ -907,7 +911,8 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
 	write_pad_string(&b, pad, pad_len, remains);
