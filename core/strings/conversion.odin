@@ -1,5 +1,6 @@
 package strings
 
+import "core:io"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -61,7 +62,7 @@ to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder;
 	init_builder(&b, 0, len(s), allocator);
 	for r in s {
-		write_rune(&b, unicode.to_lower(r));
+		write_rune_builder(&b, unicode.to_lower(r));
 	}
 	return to_string(b);
 }
@@ -69,7 +70,7 @@ to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder;
 	init_builder(&b, 0, len(s), allocator);
 	for r in s {
-		write_rune(&b, unicode.to_upper(r));
+		write_rune_builder(&b, unicode.to_upper(r));
 	}
 	return to_string(b);
 }
@@ -101,7 +102,7 @@ is_separator :: proc(r: rune) -> bool {
 }
 
 
-string_case_iterator :: proc(b: ^Builder, s: string, callback: proc(b: ^Builder, prev, curr, next: rune)) {
+string_case_iterator :: proc(w: io.Writer, s: string, callback: proc(w: io.Writer, prev, curr, next: rune)) {
 	prev, curr: rune;
 	for next in s {
 		if curr == 0 {
@@ -110,14 +111,14 @@ string_case_iterator :: proc(b: ^Builder, s: string, callback: proc(b: ^Builder,
 			continue;
 		}
 
-		callback(b, prev, curr, next);
+		callback(w, prev, curr, next);
 
 		prev = curr;
 		curr = next;
 	}
 
 	if len(s) > 0 {
-		callback(b, prev, curr, 0);
+		callback(w, prev, curr, 0);
 	}
 }
 
@@ -128,15 +129,16 @@ to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 	s = trim_space(s);
 	b: Builder;
 	init_builder(&b, 0, len(s), allocator);
+	w := to_writer(&b);
 
-	string_case_iterator(&b, s, proc(b: ^Builder, prev, curr, next: rune) {
+	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
 			if is_delimiter(prev) {
-				write_rune(b, unicode.to_upper(curr));
+				io.write_rune(w, unicode.to_upper(curr));
 			} else if unicode.is_lower(prev) {
-				write_rune(b, curr);
+				io.write_rune(w, curr);
 			} else {
-				write_rune(b, unicode.to_lower(curr));
+				io.write_rune(w, unicode.to_lower(curr));
 			}
 		}
 	});
@@ -150,15 +152,16 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	s = trim_space(s);
 	b: Builder;
 	init_builder(&b, 0, len(s), allocator);
+	w := to_writer(&b);
 
-	string_case_iterator(&b, s, proc(b: ^Builder, prev, curr, next: rune) {
+	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
 			if is_delimiter(prev) || prev == 0 {
-				write_rune(b, unicode.to_upper(curr));
+				io.write_rune(w, unicode.to_upper(curr));
 			} else if unicode.is_lower(prev) {
-				write_rune(b, curr);
+				io.write_rune(w, curr);
 			} else {
-				write_rune(b, unicode.to_lower(curr));
+				io.write_rune(w, unicode.to_lower(curr));
 			}
 		}
 	});
@@ -171,6 +174,7 @@ to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allo
 	s = trim_space(s);
 	b: Builder;
 	init_builder(&b, 0, len(s), allocator);
+	w := to_writer(&b);
 
 	adjust_case := unicode.to_upper if all_upper_case else unicode.to_lower;
 
@@ -179,15 +183,15 @@ to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allo
 	for next in s {
 		if is_delimiter(curr) {
 			if !is_delimiter(prev) {
-				write_rune(&b, delimiter);
+				io.write_rune(w, delimiter);
 			}
 		} else if unicode.is_upper(curr) {
 			if unicode.is_lower(prev) || (unicode.is_upper(prev) && unicode.is_lower(next)) {
-				write_rune(&b, delimiter);
+				io.write_rune(w, delimiter);
 			}
-			write_rune(&b, adjust_case(curr));
+			io.write_rune(w, adjust_case(curr));
 		} else if curr != 0 {
-			write_rune(&b, adjust_case(curr));
+			io.write_rune(w, adjust_case(curr));
 		}
 
 		prev = curr;
@@ -196,9 +200,9 @@ to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allo
 
 	if len(s) > 0 {
 		if unicode.is_upper(curr) && unicode.is_lower(prev) && prev != 0 {
-			write_rune(&b, delimiter);
+			io.write_rune(w, delimiter);
 		}
-		write_rune(&b, adjust_case(curr));
+		io.write_rune(w, adjust_case(curr));
 	}
 
 	return to_string(b);
@@ -229,21 +233,22 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 	s = trim_space(s);
 	b: Builder;
 	init_builder(&b, 0, len(s), allocator);
+	w := to_writer(&b);
 
 	prev, curr: rune;
 
 	for next in s {
 		if is_delimiter(curr) {
 			if !is_delimiter(prev) {
-				write_rune(&b, delimiter);
+				io.write_rune(w, delimiter);
 			}
 		} else if unicode.is_upper(curr) {
 			if unicode.is_lower(prev) || (unicode.is_upper(prev) && unicode.is_lower(next)) {
-				write_rune(&b, delimiter);
+				io.write_rune(w, delimiter);
 			}
-			write_rune(&b, unicode.to_upper(curr));
+			io.write_rune(w, unicode.to_upper(curr));
 		} else if curr != 0 {
-			write_rune(&b, unicode.to_lower(curr));
+			io.write_rune(w, unicode.to_lower(curr));
 		}
 
 		prev = curr;
@@ -252,10 +257,10 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 
 	if len(s) > 0 {
 		if unicode.is_upper(curr) && unicode.is_lower(prev) && prev != 0 {
-			write_rune(&b, delimiter);
-			write_rune(&b, unicode.to_upper(curr));
+			io.write_rune(w, delimiter);
+			io.write_rune(w, unicode.to_upper(curr));
 		} else {
-			write_rune(&b, unicode.to_lower(curr));
+			io.write_rune(w, unicode.to_lower(curr));
 		}
 	}
 

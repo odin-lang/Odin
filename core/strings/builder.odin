@@ -74,6 +74,16 @@ _builder_stream_vtable := &io.Stream_VTable{
 		}
 		return nil;
 	},
+	impl_size = proc(s: io.Stream) -> i64 {
+		b := (^Builder)(s.stream_data);
+		return i64(len(b.buf));
+	},
+	impl_destroy = proc(s: io.Stream) -> io.Error {
+		b := (^Builder)(s.stream_data);
+		flush_builder(b);
+		delete(b.buf);
+		return .None;
+	},
 };
 
 to_stream :: proc(b: ^Builder) -> io.Stream {
@@ -173,42 +183,23 @@ write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
 	return;
 }
 
-write_rune :: proc{
-	write_rune_builder,
-	write_rune_writer,
-};
-write_rune_builder :: proc(b: ^Builder, r: rune) -> int {
-	return write_rune_writer(to_writer(b), r);
-}
-write_rune_writer :: proc(w: io.Writer, r: rune) -> int {
-	if r < utf8.RUNE_SELF {
-		return _write_byte(w, byte(r));
-	}
-
-	s, n := utf8.encode_rune(r);
-	n, _ = io.write(w, s[:n]);
-	return n;
+write_rune_builder :: proc(b: ^Builder, r: rune) -> (int, io.Error) {
+	return io.write_rune(to_writer(b), r);
 }
 
-
-
-write_quoted_rune :: proc{
-	write_quoted_rune_builder,
-	write_quoted_rune_writer,
-};
 
 write_quoted_rune_builder :: proc(b: ^Builder, r: rune) -> (n: int) {
-	return write_quoted_rune_writer(to_writer(b), r);
+	return write_quoted_rune(to_writer(b), r);
 }
 
 @(private)
-_write_byte :: proc(w: io.Writer, r: byte) -> int {
-	err := io.write_byte(w, r);
+_write_byte :: proc(w: io.Writer, c: byte) -> int {
+	err := io.write_byte(w, c);
 	return 1 if err == nil else 0;
 }
 
-write_quoted_rune_writer :: proc(w: io.Writer, r: rune) -> (n: int) {
 
+write_quoted_rune :: proc(w: io.Writer, r: rune) -> (n: int) {
 	quote := byte('\'');
 	n += _write_byte(w, quote);
 	buf, width := utf8.encode_rune(r);
@@ -328,7 +319,8 @@ write_encoded_rune_writer :: proc(w: io.Writer, r: rune, write_quote := true) ->
 			case 2: n += write_string(w, s);
 			}
 		} else {
-			n += write_rune(w, r);
+			rn, _ := io.write_rune(w, r);
+			n += rn;
 		}
 
 	}

@@ -35,13 +35,16 @@ Error :: enum i32 {
 	Invalid_Offset,
 	Invalid_Unread,
 
+	Negative_Read,
+	Negative_Write,
+
 	// Empty is returned when a procedure has not been implemented for an io.Stream
 	Empty = -1,
 }
 
 Close_Proc       :: distinct proc(using s: Stream) -> Error;
 Flush_Proc       :: distinct proc(using s: Stream) -> Error;
-Seek_Proc        :: distinct proc(using s: Stream, offset: i64, whence: Seek_From) -> (i64, Error);
+Seek_Proc        :: distinct proc(using s: Stream, offset: i64, whence: Seek_From) -> (n: i64, err: Error);
 Size_Proc        :: distinct proc(using s: Stream) -> i64;
 Read_Proc        :: distinct proc(using s: Stream, p: []byte) -> (n: int, err: Error);
 Read_At_Proc     :: distinct proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error);
@@ -120,7 +123,10 @@ destroy :: proc(s: Stream) -> Error {
 	if s.stream_vtable != nil && s.impl_destroy != nil {
 		return s->impl_destroy();
 	}
-	return close_err;
+	if close_err != .None {
+		return close_err;
+	}
+	return .Empty;
 }
 
 read :: proc(s: Reader, p: []byte) -> (n: int, err: Error) {
@@ -364,6 +370,11 @@ write_string :: proc(s: Writer, str: string) -> (n: int, err: Error) {
 }
 
 write_rune :: proc(s: Writer, r: rune) -> (n: int, err: Error) {
+	if r < utf8.RUNE_SELF {
+		err = write_byte(s, byte(r));
+		n = 1 if err == nil else 0;
+		return;
+	}
 	buf, w := utf8.encode_rune(r);
 	return write(s, buf[:w]);
 }
