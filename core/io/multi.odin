@@ -90,7 +90,7 @@ _multi_writer_vtable := &Stream_VTable{
 	},
 };
 
-mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> (w: Writer) {
+mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> (out: Writer) {
 	context.allocator = allocator;
 	mw := new(Multi_Writer);
 	mw.allocator = allocator;
@@ -107,7 +107,7 @@ mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> (w: 
 
 	mw.writers = all_writers[:];
 
-	w.stream_vtable = _multi_writer_vtable;
-	w.stream_data = mw;
+	out.stream_vtable = _multi_writer_vtable;
+	out.stream_data = mw;
 	return;
 }
