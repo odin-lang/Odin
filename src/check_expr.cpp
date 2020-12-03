@@ -3407,7 +3407,7 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 		return value;
 	} else if (value.kind == ExactValue_Quaternion) {
 		// @QuaternionLayout
-		Quaternion256 q = value.value_quaternion;
+		Quaternion256 q = *value.value_quaternion;
 		GB_ASSERT(sel.index.count == 1);
 
 		switch (sel.index[0]) {
@@ -3432,7 +3432,7 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 		return empty_exact_value;
 	} else if (value.kind == ExactValue_Complex) {
 		// @QuaternionLayout
-		Complex128 c = value.value_complex;
+		Complex128 c = *value.value_complex;
 		GB_ASSERT(sel.index.count == 1);
 
 		switch (sel.index[0]) {
@@ -4727,8 +4727,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (is_type_complex(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_complex(x->value);
-				f64 r = v.value_complex.real;
-				f64 i = -v.value_complex.imag;
+				f64 r = v.value_complex->real;
+				f64 i = -v.value_complex->imag;
 				x->value = exact_value_complex(r, i);
 				x->mode = Addressing_Constant;
 			} else {
@@ -4737,10 +4737,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		} else if (is_type_quaternion(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_quaternion(x->value);
-				f64 r = v.value_quaternion.real;
-				f64 i = -v.value_quaternion.imag;
-				f64 j = -v.value_quaternion.jmag;
-				f64 k = -v.value_quaternion.kmag;
+				f64 r = +v.value_quaternion->real;
+				f64 i = -v.value_quaternion->imag;
+				f64 j = -v.value_quaternion->jmag;
+				f64 k = -v.value_quaternion->kmag;
 				x->value = exact_value_quaternion(r, i, j, k);
 				x->mode = Addressing_Constant;
 			} else {
@@ -5157,8 +5157,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				operand->value.value_float = gb_abs(operand->value.value_float);
 				break;
 			case ExactValue_Complex: {
-				f64 r = operand->value.value_complex.real;
-				f64 i = operand->value.value_complex.imag;
+				f64 r = operand->value.value_complex->real;
+				f64 i = operand->value.value_complex->imag;
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i));
 
 				break;

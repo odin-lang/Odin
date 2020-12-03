@@ -953,9 +953,9 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_write_byte(f, ' ');
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, ft); ir_write_byte(f, ' ');
-		ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_complex->real), ft);
 		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
-		ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_complex->imag), ft);
 		ir_write_byte(f, '}');
 		break;
 	}
@@ -968,13 +968,13 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_write_byte(f, ' ');
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, ft); ir_write_byte(f, ' ');
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.imag), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion->imag), ft);
 		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.jmag), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion->jmag), ft);
 		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.kmag), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion->kmag), ft);
 		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.real), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion->real), ft);
 		ir_write_byte(f, '}');
 		break;
 	}
