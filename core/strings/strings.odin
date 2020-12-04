@@ -467,10 +467,12 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 	return;
 }
 
+@(private) _ascii_space := [256]u8{'\t' = 1, '\n' = 1, '\v' = 1, '\f' = 1, '\r' = 1, ' ' = 1};
+
+
 is_ascii_space :: proc(r: rune) -> bool {
-	switch r {
-	case '\t', '\n', '\v', '\f', '\r', ' ':
-		return true;
+	if r < utf8.RUNE_SELF {
+		return _ascii_space[u8(r)] != 0;
 	}
 	return false;
 }
@@ -948,4 +950,95 @@ write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 		io.write_rune(w, r);
 		p = p[width:];
 	}
+}
+
+
+// fields splits the string s around each instance of one or more consecutive white space character, defined by unicode.is_space
+// returning a slice of substrings of s or an empty slice if s only contains white space
+fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds_check {
+	n := 0;
+	was_space := 1;
+	set_bits := u8(0);
+
+	// check to see
+	for i in 0..<len(s) {
+		r := s[i];
+		set_bits |= r;
+		is_space := int(_ascii_space[r]);
+		n += was_space & ~is_space;
+		was_space = is_space;
+	}
+
+	if set_bits >= utf8.RUNE_SELF {
+		return fields_proc(s, unicode.is_space, allocator);
+	}
+
+	if n == 0 {
+		return nil;
+	}
+
+	a := make([]string, n, allocator);
+	na := 0;
+	field_start := 0;
+	i := 0;
+	for i < len(s) && _ascii_space[s[i]] != 0 {
+		i += 1;
+	}
+	field_start = i;
+	for i < len(s) {
+		if _ascii_space[s[i]] == 0 {
+			i += 1;
+			continue;
+		}
+		a[na] = s[field_start : i];
+		na += 1;
+		i += 1;
+		for i < len(s) && _ascii_space[s[i]] != 0 {
+			i += 1;
+		}
+		field_start = i;
+	}
+	if field_start < len(s) {
+		a[na] = s[field_start:];
+	}
+	return a;
+}
+
+
+// fields_proc splits the string s at each run of unicode code points `ch` satisfying f(ch)
+// returns a slice of substrings of s
+// If all code points in s satisfy f(ch) or string is empty, an empty slice is returned
+//
+// fields_proc makes no guarantee about the order in which it calls f(ch)
+// it assumes that `f` always returns the same value for a given ch
+fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> []string #no_bounds_check {
+	Span :: struct {
+		start: int,
+		end:   int,
+	};
+
+	spans := make([dynamic]string, 0, 32, allocator);
+
+	start := -1;
+
+	for end, r in s {
+		if f(r) {
+			if start >= 0 {
+				append(&spans, s[start : end]);
+				// -1 could be used, but just speed it up through bitwise not
+				// gotta love 2's complement
+				start = ~start;
+			}
+		} else {
+			if start < 0 {
+				start = end;
+			}
+		}
+	}
+
+	if start >= 0 {
+		append(&spans, s[start : end]);
+	}
+
+	return spans[:];
 }
