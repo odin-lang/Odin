@@ -1,3 +1,3 @@
 package dynlib
 
-Library :: opaque rawptr;
+Library :: #opaque rawptr;

@@ -607,7 +607,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		n += _n(io.write_byte(w, ']'));
 
 	case Type_Info_Opaque:
-		n += write_string(w, "opaque ");
+		n += write_string(w, "#opaque ");
 		n += write_type(w, info.elem);
 
 	case Type_Info_Simd_Vector:
