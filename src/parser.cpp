@@ -3259,11 +3259,10 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 				return FieldPrefix_no_alias;
 			} else if (f->curr_token.string == "c_vararg") {
 				return FieldPrefix_c_var_arg;
+			} else if (f->curr_token.string == "const") {
+				return FieldPrefix_const;
 			}
 			break;
-
-		case Token_const:
-			return FieldPrefix_const;
 		}
 		return FieldPrefix_Unknown;
 	}
