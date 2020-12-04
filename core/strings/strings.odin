@@ -1012,19 +1012,14 @@ fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds
 // fields_proc makes no guarantee about the order in which it calls f(ch)
 // it assumes that `f` always returns the same value for a given ch
 fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> []string #no_bounds_check {
-	Span :: struct {
-		start: int,
-		end:   int,
-	};
-
-	spans := make([dynamic]string, 0, 32, allocator);
+	substrings := make([dynamic]string, 0, 32, allocator);
 
 	start := -1;
 
 	for end, r in s {
 		if f(r) {
 			if start >= 0 {
-				append(&spans, s[start : end]);
+				append(&substrings, s[start : end]);
 				// -1 could be used, but just speed it up through bitwise not
 				// gotta love 2's complement
 				start = ~start;
@@ -1037,8 +1032,8 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&spans, s[start : end]);
+		append(&substrings, s[start : end]);
 	}
 
-	return spans[:];
+	return substrings[:];
 }
