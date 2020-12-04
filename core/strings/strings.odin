@@ -2,6 +2,7 @@ package strings
 
 import "core:io"
 import "core:mem"
+import "core:unicode"
 import "core:unicode/utf8"
 
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> string {
@@ -1014,9 +1015,9 @@ fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds
 fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> []string #no_bounds_check {
 	substrings := make([dynamic]string, 0, 32, allocator);
 
-	start := -1;
-
-	for end, r in s {
+	start, end := -1, -1;
+	for r, offset in s {
+		end = offset;
 		if f(r) {
 			if start >= 0 {
 				append(&substrings, s[start : end]);
