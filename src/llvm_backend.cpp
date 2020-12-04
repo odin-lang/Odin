@@ -12875,6 +12875,7 @@ void lb_generate_code(lbGenerator *gen) {
 		lbValue var;
 		lbValue init;
 		DeclInfo *decl;
+		bool is_initialized;
 	};
 	auto global_variables = array_make<GlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
 
@@ -12937,14 +12938,21 @@ void lb_generate_code(lbGenerator *gen) {
 		var.var = g;
 		var.decl = decl;
 
-		if (decl->init_expr != nullptr && !is_type_any(e->type)) {
+		if (decl->init_expr != nullptr) {
 			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
-			if (tav.mode != Addressing_Invalid) {
-				if (tav.value.kind != ExactValue_Invalid) {
-					ExactValue v = tav.value;
-					lbValue init = lb_const_value(m, tav.type, v);
-					LLVMSetInitializer(g.value, init.value);
+			if (!is_type_any(e->type)) {
+				if (tav.mode != Addressing_Invalid) {
+					if (tav.value.kind != ExactValue_Invalid) {
+						ExactValue v = tav.value;
+						lbValue init = lb_const_value(m, tav.type, v);
+						LLVMSetInitializer(g.value, init.value);
+						var.is_initialized = true;
+					}
 				}
+			}
+			if (!var.is_initialized &&
+			    (is_type_untyped_nil(tav.type) || is_type_untyped_undef(tav.type))) {
+				var.is_initialized = true;
 			}
 		}
 
@@ -13146,10 +13154,13 @@ void lb_generate_code(lbGenerator *gen) {
 			auto *var = &global_variables[i];
 			if (var->decl->init_expr != nullptr)  {
 				lbValue init = lb_build_expr(p, var->decl->init_expr);
-				if (!lb_is_const(init)) {
-					var->init = init;
+				if (lb_is_const(init)) {
+					if (!var->is_initialized) {
+						LLVMSetInitializer(var->var.value, init.value);
+						var->is_initialized = true;
+					}
 				} else {
-					LLVMSetInitializer(var->var.value, init.value);
+					var->init = init;
 				}
 			}
 
@@ -13166,6 +13177,7 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 
 			if (var->init.value != nullptr) {
+				GB_ASSERT(!var->is_initialized);
 				Type *t = type_deref(var->var.type);
 
 				if (is_type_any(t)) {
@@ -13182,6 +13194,8 @@ void lb_generate_code(lbGenerator *gen) {
 				} else {
 					lb_emit_store(p, var->var, lb_emit_conv(p, var->init, t));
 				}
+
+				var->is_initialized = true;
 			}
 		}
 

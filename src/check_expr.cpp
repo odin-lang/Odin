@@ -1075,8 +1075,10 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	if (e->parent_proc_decl != nullptr &&
 	    e->parent_proc_decl != c->curr_proc_decl) {
 		if (e->kind == Entity_Variable) {
-			error(n, "Nested procedures do not capture its parent's variables: %.*s", LIT(name));
-			return nullptr;
+			if ((e->flags & EntityFlag_Static) == 0) {
+				error(n, "Nested procedures do not capture its parent's variables: %.*s", LIT(name));
+				return nullptr;
+			}
 		} else if (e->kind == Entity_Label) {
 			error(n, "Nested procedures do not capture its parent's labels: %.*s", LIT(name));
 			return nullptr;
