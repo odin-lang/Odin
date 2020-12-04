@@ -1833,12 +1833,18 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_opaque: {
 		Token token = expect_token(f, Token_opaque);
+		warning(token, "opaque is deprecated, please use #opaque");
 		Ast *type = parse_type(f);
 		return ast_opaque_type(f, token, type);
 	}
 
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
+		if (allow_token(f, Token_opaque)) {
+			Ast *type = parse_type(f);
+			return ast_opaque_type(f, token, type);
+		}
+
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
