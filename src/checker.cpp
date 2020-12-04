@@ -368,9 +368,14 @@ void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entit
 				if (e->kind == Entity_Label) {
 					continue;
 				}
-				if (e->kind == Entity_Variable &&
-				    !(e->scope->flags&ScopeFlag_File)) {
-					continue;
+				if (e->kind == Entity_Variable) {
+					if (e->scope->flags&ScopeFlag_File) {
+						// Global variables are file to access
+					} else if (e->flags&EntityFlag_Static) {
+						// Allow static/thread_local variables to be referenced
+					} else {
+						continue;
+					}
 				}
 			}
 
