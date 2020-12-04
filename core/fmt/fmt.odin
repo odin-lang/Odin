@@ -63,55 +63,28 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 }
 
 
-Flush_Data :: struct {
-	handle: os.Handle,
-	bytes_written: int,
-}
-
-fmt_file_builder :: proc(data: []byte, fd: ^Flush_Data) -> strings.Builder {
-	b := strings.builder_from_slice(data);
-	b.flush_data = rawptr(fd);
-	b.flush_proc = proc(b: ^strings.Builder) -> (do_reset: bool) {
-		fd := (^Flush_Data)(b.flush_data);
-		res := strings.to_string(b^);
-		n, _ := os.write_string(fd.handle, res);
-		fd.bytes_written += max(n, 0);
-		return true;
-	};
-
-	return b;
-}
-
 fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
-	flush_data := Flush_Data{handle=fd};
-	buf := fmt_file_builder(data[:], &flush_data);
-	_ = sbprint(buf=&buf, args=args, sep=sep);
-	return flush_data.bytes_written;
+	w, _ := io.to_writer(os.stream_from_handle(fd));
+	return wprint(w=w, args=args, sep=sep);
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
-	flush_data := Flush_Data{handle=fd};
-	buf := fmt_file_builder(data[:], &flush_data);
-	_ = sbprintln(buf=&buf, args=args, sep=sep);
-	return flush_data.bytes_written;
+	w, _ := io.to_writer(os.stream_from_handle(fd));
+	return wprintln(w=w, args=args, sep=sep);
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
-	flush_data := Flush_Data{handle=fd};
-	buf := fmt_file_builder(data[:], &flush_data);
-	_ = sbprintf(&buf, fmt, ..args);
-	return flush_data.bytes_written;
+	w, _ := io.to_writer(os.stream_from_handle(fd));
+	return wprintf(w, fmt, ..args);
 }
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
-	flush_data := Flush_Data{handle=fd};
-	buf := fmt_file_builder(data[:], &flush_data);
-	reflect.write_type(&buf, info);
-	strings.flush_builder(&buf);
-	return flush_data.bytes_written;
+	w, _ := io.to_writer(os.stream_from_handle(fd));
+	return wprint_type(w, info);
 }
+fprint_typeid :: proc(fd: os.Handle, id: typeid) -> int {
+	w, _ := io.to_writer(os.stream_from_handle(fd));
+	return wprint_typeid(w, id);
+}
+
 // print* procedures return the number of bytes written
 print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep); }
 println :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stdout, args=args, sep=sep); }
@@ -212,19 +185,16 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 
 sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	wprint(w=strings.to_writer(buf), args=args, sep=sep);
-	strings.flush_builder(buf);
 	return strings.to_string(buf^);
 }
 
 sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	wprintln(w=strings.to_writer(buf), args=args, sep=sep);
-	strings.flush_builder(buf);
 	return strings.to_string(buf^);
 }
 
 sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any) -> string {
 	wprintf(w=strings.to_writer(buf), fmt=fmt, args=args);
-	strings.flush_builder(buf);
 	return strings.to_string(buf^);
 }
 
@@ -246,6 +216,10 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	// NOTE(bill, 2020-06-19): I have found that the previous approach was not what people were expecting
 	// and were expecting `*print` to be the same `*println` except for the added newline
 	// so I am going to keep the same behaviour as `*println` for `*print`
+
+
+	size0 := io.size(auto_cast w);
+
 	for _, i in args {
 		if i > 0 {
 			io.write_string(fi.writer, sep);
@@ -254,12 +228,14 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 		fmt_value(&fi, args[i], 'v');
 	}
 	io.flush(auto_cast w);
-	return int(io.size(auto_cast w));
+	return int(io.size(auto_cast w) - size0);
 }
 
 wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	fi: Info;
 	fi.writer = w;
+
+	size0 := io.size(auto_cast w);
 
 	for _, i in args {
 		if i > 0 {
@@ -270,7 +246,7 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	}
 	io.write_byte(fi.writer, '\n');
 	io.flush(auto_cast w);
-	return int(io.size(auto_cast w));
+	return int(io.size(auto_cast w) - size0);
 }
 
 wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
@@ -278,6 +254,8 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	arg_index: int = 0;
 	end := len(fmt);
 	was_prev_index := false;
+
+	size0 := io.size(auto_cast w);
 
 	loop: for i := 0; i < end; /**/ {
 		fi = Info{writer = w, good_arg_index = true, reordered = fi.reordered};
@@ -544,12 +522,20 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 		io.write_string(fi.writer, ")");
 	}
 
-	io.flush(auto_cast fi.writer);
-	return int(io.size(auto_cast fi.writer));
+	io.flush(auto_cast w);
+	return int(io.size(auto_cast w) - size0);
 }
 
-
-
+wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info) -> int {
+	n := reflect.write_type(w, info);
+	io.flush(auto_cast w);
+	return n;
+}
+wprint_typeid :: proc(w: io.Writer, id: typeid) -> int {
+	n := reflect.write_type(w, type_info_of(id));
+	io.flush(auto_cast w);
+	return n;
+}
 
 
 

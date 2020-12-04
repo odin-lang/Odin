@@ -9,10 +9,6 @@ Builder_Flush_Proc :: #type proc(b: ^Builder) -> (do_reset: bool);
 
 Builder :: struct {
 	buf: [dynamic]byte,
-
-	// The custom flush procedure allows for the ability to flush the buffer, i.e. write to file
-	flush_proc: Builder_Flush_Proc,
-	flush_data: rawptr,
 }
 
 make_builder_none :: proc(allocator := context.allocator) -> Builder {
@@ -53,11 +49,6 @@ init_builder :: proc{
 
 @(private)
 _builder_stream_vtable := &io.Stream_VTable{
-	impl_flush = proc(s: io.Stream) -> io.Error {
-		b := (^Builder)(s.stream_data);
-		flush_builder(b);
-		return nil;
-	},
 	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		b := (^Builder)(s.stream_data);
 		n = write_bytes(b, p);
@@ -80,7 +71,6 @@ _builder_stream_vtable := &io.Stream_VTable{
 	},
 	impl_destroy = proc(s: io.Stream) -> io.Error {
 		b := (^Builder)(s.stream_data);
-		flush_builder(b);
 		delete(b.buf);
 		return .None;
 	},
@@ -108,24 +98,6 @@ grow_builder :: proc(b: ^Builder, cap: int) {
 
 reset_builder :: proc(b: ^Builder) {
 	clear(&b.buf);
-}
-
-flush_builder :: proc(b: ^Builder) -> (was_reset: bool) {
-	if b.flush_proc != nil {
-		was_reset = b.flush_proc(b);
-		if was_reset {
-			reset_builder(b);
-
-		}
-	}
-	return;
-}
-
-flush_builder_check_space :: proc(b: ^Builder, required: int) -> (was_reset: bool) {
-	if n := max(cap(b.buf) - len(b.buf), 0); n < required {
-		was_reset = flush_builder(b);
-	}
-	return;
 }
 
 
@@ -156,7 +128,6 @@ builder_space :: proc(b: Builder) -> int {
 }
 
 write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
-	flush_builder_check_space(b, 1);
 	if builder_space(b^) > 0 {
 		append(&b.buf, x);
 		n += 1;
@@ -167,7 +138,6 @@ write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
 write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
 	x := x;
 	for len(x) != 0 {
-		flush_builder_check_space(b, len(x));
 		space := builder_space(b^);
 		if space == 0 {
 			break; // No need to append
