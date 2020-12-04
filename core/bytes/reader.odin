@@ -4,9 +4,9 @@ import "core:io"
 import "core:unicode/utf8"
 
 Reader :: struct {
-	s:         []byte,
-	i:         i64, // current reading index
-	prev_rune: int, // previous reading index of rune or < 0
+	s:         []byte, // read-only buffer
+	i:         i64,    // current reading index
+	prev_rune: int,    // previous reading index of rune or < 0
 }
 
 reader_init :: proc(r: ^Reader, s: []byte) {
