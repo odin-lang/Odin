@@ -36,7 +36,7 @@ _multi_reader_vtable := &Stream_VTable{
 	},
 };
 
-mutlti_reader :: proc(readers: ..Reader, allocator := context.allocator) -> (r: Reader) {
+multi_reader :: proc(readers: ..Reader, allocator := context.allocator) -> (r: Reader) {
 	context.allocator = allocator;
 	mr := new(Multi_Reader);
 	all_readers := make([dynamic]Reader, 0, len(readers));
@@ -90,7 +90,7 @@ _multi_writer_vtable := &Stream_VTable{
 	},
 };
 
-mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> (out: Writer) {
+multi_writer :: proc(writers: ..Writer, allocator := context.allocator) -> (out: Writer) {
 	context.allocator = allocator;
 	mw := new(Multi_Writer);
 	mw.allocator = allocator;
