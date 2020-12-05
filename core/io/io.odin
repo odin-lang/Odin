@@ -37,6 +37,8 @@ Error :: enum i32 {
 
 	Negative_Read,
 	Negative_Write,
+	Negative_Count,
+	Buffer_Full,
 
 	// Empty is returned when a procedure has not been implemented for an io.Stream
 	Empty = -1,
@@ -244,7 +246,7 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64) -> (n: int, err: Error) {
 	return w->impl_write(p);
 }
 
-write_to :: proc(r: Reader, w: Writer) -> (n: i64, err: Error) {
+write_to :: proc(r: Writer_To, w: Writer) -> (n: i64, err: Error) {
 	if r.stream_vtable == nil || w.stream_vtable == nil {
 		return 0, .Empty;
 	}
@@ -253,7 +255,7 @@ write_to :: proc(r: Reader, w: Writer) -> (n: i64, err: Error) {
 	}
 	return 0, .Empty;
 }
-read_from :: proc(w: Writer, r: Reader) -> (n: i64, err: Error) {
+read_from :: proc(w: Reader_From, r: Reader) -> (n: i64, err: Error) {
 	if r.stream_vtable == nil || w.stream_vtable == nil {
 		return 0, .Empty;
 	}
