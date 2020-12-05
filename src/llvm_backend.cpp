@@ -11973,9 +11973,30 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		switch (t->kind) {
 		case Type_Named: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_named_ptr);
-			LLVMValueRef vals[2] = {
+
+			LLVMValueRef pkg_name = nullptr;
+			if (t->Named.type_name->pkg) {
+				pkg_name = lb_const_string(m, t->Named.type_name->pkg->name).value;
+			} else {
+				pkg_name = LLVMConstNull(lb_type(m, t_string));
+			}
+
+			String proc_name = {};
+			if (t->Named.type_name->parent_proc_decl) {
+				DeclInfo *decl = t->Named.type_name->parent_proc_decl;
+				if (decl->entity && decl->entity->kind == Entity_Procedure) {
+					proc_name = decl->entity->token.string;
+				}
+			}
+			TokenPos pos = t->Named.type_name->token.pos;
+
+			lbValue loc = lb_emit_source_code_location(p, proc_name, pos);
+
+			LLVMValueRef vals[4] = {
 				lb_const_string(p->module, t->Named.type_name->token.string).value,
 				lb_get_type_info_ptr(m, t->Named.base).value,
+				pkg_name,
+				loc.value
 			};
 
 			lbValue res = {};
