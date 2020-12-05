@@ -1339,6 +1339,15 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Named:
 		// Built-in Custom Formatters for core library types
 		switch a in v {
+		case runtime.Source_Code_Location:
+			io.write_string(fi.writer, a.file_path);
+			io.write_byte(fi.writer, '(');
+			io.write_int(fi.writer, a.line);
+			io.write_byte(fi.writer, ':');
+			io.write_int(fi.writer, a.column);
+			io.write_byte(fi.writer, ')');
+			return;
+
 		case time.Duration:
 			ffrac :: proc(buf: []byte, v: u64, prec: int) -> (nw: int, nv: u64) {
 				v := v;
