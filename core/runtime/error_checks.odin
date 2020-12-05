@@ -23,7 +23,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	}
 	handle_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 		context = default_context();
-		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Index ");
 		print_i64(i64(index));
 		print_string(" is out of bounds range 0:");
@@ -36,7 +36,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 
 slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) -> ! {
 	context = default_context();
-	print_caller_location(Source_Code_Location{file, line, column, "", 0});
+	print_caller_location(Source_Code_Location{file, line, column, ""});
 	print_string(" Invalid slice indices: ");
 	print_i64(i64(lo));
 	print_string(":");
@@ -67,7 +67,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 	}
 	handle_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 		context = default_context();
-		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Invalid dynamic array values: ");
 		print_i64(i64(low));
 		print_string(":");
@@ -87,7 +87,7 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 	}
 	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid) {
 		context = default_context();
-		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Invalid type assertion from ");
 		print_typeid(from);
 		print_string(" to ");
@@ -135,7 +135,7 @@ type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, colum
 
 		actual := variant_type(from, from_data);
 
-		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Invalid type assertion from ");
 		print_typeid(from);
 		print_string(" to ");

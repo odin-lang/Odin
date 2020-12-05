@@ -5667,28 +5667,17 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 	return lb_const_nil(m, original_type);
 }
 
-u64 lb_generate_source_code_location_hash(TokenPos const &pos) {
-	u64 h = 0xcbf29ce484222325;
-	for (isize i = 0; i < pos.file.len; i++) {
-		h = (h ^ u64(pos.file[i])) * 0x100000001b3;
-	}
-	h = h ^ (u64(pos.line) * 0x100000001b3);
-	h = h ^ (u64(pos.column) * 0x100000001b3);
-	return h;
-}
-
 lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	lbModule *m = p->module;
 
-	LLVMValueRef fields[5] = {};
+	LLVMValueRef fields[4] = {};
 	fields[0]/*file*/      = lb_find_or_add_entity_string(p->module, pos.file).value;
 	fields[1]/*line*/      = lb_const_int(m, t_int, pos.line).value;
 	fields[2]/*column*/    = lb_const_int(m, t_int, pos.column).value;
 	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
-	fields[4]/*hash*/      = lb_const_int(m, t_u64, lb_generate_source_code_location_hash(pos)).value;
 
 	lbValue res = {};
-	res.value = LLVMConstNamedStruct(lb_type(m, t_source_code_location), fields, 5);
+	res.value = LLVMConstNamedStruct(lb_type(m, t_source_code_location), fields, gb_count_of(fields));
 	res.type = t_source_code_location;
 	return res;
 }
