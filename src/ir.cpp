@@ -7064,6 +7064,9 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (!ir_min_dep_entity(m, e)) {
 		return;
 	}
+	if (is_type_proc(e->type)) {
+		return;
+	}
 	irValue *t = ir_value_type_name(name, e->type);
 	ir_module_add_value(m, e, t);
 	string_map_set(&m->members, name, t);
