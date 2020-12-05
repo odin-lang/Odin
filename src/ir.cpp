@@ -12172,6 +12172,21 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), name);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), gtip);
+
+			if (t->Named.type_name->pkg) {
+				irValue *name = ir_const_string(proc->module, t->Named.type_name->pkg->name);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), name);
+			}
+
+			String proc_name = {};
+			if (t->Named.type_name->parent_proc_decl) {
+				DeclInfo *decl = t->Named.type_name->parent_proc_decl;
+				if (decl->entity && decl->entity->kind == Entity_Procedure) {
+					proc_name = decl->entity->token.string;
+				}
+			}
+			irValue *loc = ir_emit_source_code_location(proc, proc_name, t->Named.type_name->token.pos);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), loc);
 			break;
 		}
 
