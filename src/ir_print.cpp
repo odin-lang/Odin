@@ -1430,7 +1430,6 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		irValue *line      = value->SourceCodeLocation.line;
 		irValue *column    = value->SourceCodeLocation.column;
 		irValue *procedure = value->SourceCodeLocation.procedure;
-		u64      hash      = value->SourceCodeLocation.hash;
 
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, t_string); ir_write_byte(f, ' '); ir_print_value(f, m, file, t_string);
@@ -1440,8 +1439,6 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		ir_print_type(f, m, t_int);    ir_write_byte(f, ' '); ir_print_value(f, m, column, t_int);
 		ir_write_string(f, str_lit(", "));
 		ir_print_type(f, m, t_string); ir_write_byte(f, ' '); ir_print_value(f, m, procedure, t_string);
-		ir_write_string(f, str_lit(", "));
-		ir_print_type(f, m, t_u64);    ir_write_byte(f, ' '); ir_write_u64(f, hash);
 		ir_write_byte(f, '}');
 		break;
 	}

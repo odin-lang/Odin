@@ -257,7 +257,6 @@ Source_Code_Location :: struct {
 	file_path:    string,
 	line, column: int,
 	procedure:    string,
-	hash:         u64,
 }
 
 Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
