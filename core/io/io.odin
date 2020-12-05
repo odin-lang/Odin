@@ -44,22 +44,23 @@ Error :: enum i32 {
 	Empty = -1,
 }
 
-Close_Proc       :: distinct proc(using s: Stream) -> Error;
-Flush_Proc       :: distinct proc(using s: Stream) -> Error;
-Seek_Proc        :: distinct proc(using s: Stream, offset: i64, whence: Seek_From) -> (n: i64, err: Error);
-Size_Proc        :: distinct proc(using s: Stream) -> i64;
-Read_Proc        :: distinct proc(using s: Stream, p: []byte) -> (n: int, err: Error);
-Read_At_Proc     :: distinct proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error);
-Read_From_Proc   :: distinct proc(using s: Stream, r: Reader) -> (n: i64, err: Error);
-Read_Byte_Proc   :: distinct proc(using s: Stream) -> (byte, Error);
-Read_Rune_Proc   :: distinct proc(using s: Stream) -> (ch: rune, size: int, err: Error);
-Unread_Byte_Proc :: distinct proc(using s: Stream) -> Error;
-Unread_Rune_Proc :: distinct proc(using s: Stream) -> Error;
-Write_Proc       :: distinct proc(using s: Stream, p: []byte) -> (n: int, err: Error);
-Write_At_Proc    :: distinct proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error);
-Write_To_Proc    :: distinct proc(using s: Stream, w: Writer) -> (n: i64, err: Error);
-Write_Byte_Proc  :: distinct proc(using s: Stream, c: byte) -> Error;
-Destroy_Proc     :: distinct proc(using s: Stream) -> Error;
+Close_Proc       :: proc(using s: Stream) -> Error;
+Flush_Proc       :: proc(using s: Stream) -> Error;
+Seek_Proc        :: proc(using s: Stream, offset: i64, whence: Seek_From) -> (n: i64, err: Error);
+Size_Proc        :: proc(using s: Stream) -> i64;
+Read_Proc        :: proc(using s: Stream, p: []byte) -> (n: int, err: Error);
+Read_At_Proc     :: proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error);
+Read_From_Proc   :: proc(using s: Stream, r: Reader) -> (n: i64, err: Error);
+Read_Byte_Proc   :: proc(using s: Stream) -> (byte, Error);
+Read_Rune_Proc   :: proc(using s: Stream) -> (ch: rune, size: int, err: Error);
+Unread_Byte_Proc :: proc(using s: Stream) -> Error;
+Unread_Rune_Proc :: proc(using s: Stream) -> Error;
+Write_Proc       :: proc(using s: Stream, p: []byte) -> (n: int, err: Error);
+Write_At_Proc    :: proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error);
+Write_To_Proc    :: proc(using s: Stream, w: Writer) -> (n: i64, err: Error);
+Write_Byte_Proc  :: proc(using s: Stream, c: byte) -> Error;
+Write_Rune_Proc  :: proc(using s: Stream, r: rune) -> (size: int, err: Error);
+Destroy_Proc     :: proc(using s: Stream) -> Error;
 
 
 Stream :: struct {
@@ -82,6 +83,7 @@ Stream_VTable :: struct {
 	impl_write:      Write_Proc,
 	impl_write_at:   Write_At_Proc,
 	impl_write_byte: Write_Byte_Proc,
+	impl_write_rune: Write_Rune_Proc,
 	impl_read_from:  Read_From_Proc,
 
 	impl_unread_byte: Unread_Byte_Proc,
@@ -371,10 +373,16 @@ write_string :: proc(s: Writer, str: string) -> (n: int, err: Error) {
 	return write(s, transmute([]byte)str);
 }
 
-write_rune :: proc(s: Writer, r: rune) -> (n: int, err: Error) {
+write_rune :: proc(s: Writer, r: rune) -> (size: int, err: Error) {
+	if s.stream_vtable != nil && s.impl_write_rune != nil {
+		return s->impl_write_rune(r);
+	}
+
 	if r < utf8.RUNE_SELF {
 		err = write_byte(s, byte(r));
-		n = 1 if err == nil else 0;
+		if err == nil {
+			size = 1;
+		}
 		return;
 	}
 	buf, w := utf8.encode_rune(r);

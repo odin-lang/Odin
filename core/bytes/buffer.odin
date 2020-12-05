@@ -310,6 +310,10 @@ _buffer_vtable := &io.Stream_VTable{
 		b := (^Buffer)(s.stream_data);
 		return buffer_write_byte(b, c);
 	},
+	impl_write_rune = proc(s: io.Stream, r: rune) -> (int, io.Error) {
+		b := (^Buffer)(s.stream_data);
+		return buffer_write_rune(b, r);
+	},
 	impl_unread_byte = proc(s: io.Stream) -> io.Error {
 		b := (^Buffer)(s.stream_data);
 		return buffer_unread_byte(b);
