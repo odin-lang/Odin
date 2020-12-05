@@ -114,14 +114,14 @@ to_writer_to :: proc(s: Stream) -> (w: Writer_To, err: Conversion_Error) {
 	}
 	return;
 }
-to_Write_Closer :: proc(s: Stream) -> (w: Write_Closer, err: Conversion_Error) {
+to_write_closer :: proc(s: Stream) -> (w: Write_Closer, err: Conversion_Error) {
 	w.stream = s;
 	if s.stream_vtable == nil || s.impl_write == nil || s.impl_close == nil {
 		err = .Missing_Procedure;
 	}
 	return;
 }
-to_Write_Seeker :: proc(s: Stream) -> (w: Write_Seeker, err: Conversion_Error) {
+to_write_seeker :: proc(s: Stream) -> (w: Write_Seeker, err: Conversion_Error) {
 	w.stream = s;
 	if s.stream_vtable == nil || s.impl_write == nil || s.impl_seek == nil {
 		err = .Missing_Procedure;
