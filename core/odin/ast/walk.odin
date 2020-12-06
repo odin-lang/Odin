@@ -2,41 +2,57 @@ package odin_ast
 
 import "core:fmt"
 
+// A Visitor's visit procedure is invoked for each node encountered by walk
+// If the result visitor is not nil, walk visits each of the children of node with the new visitor,
+// followed by a call of v.visit(v, nil)
 Visitor :: struct {
 	visit: proc(visitor: ^Visitor, node: ^Node) -> ^Visitor,
 	data:  rawptr,
 }
 
-walk_ident_list :: proc(v: ^Visitor, list: []^Ident) {
-	for x in list {
-		walk(v, x);
-	}
-}
 
-walk_expr_list :: proc(v: ^Visitor, list: []^Expr) {
-	for x in list {
-		walk(v, x);
-	}
-}
-
-walk_stmt_list :: proc(v: ^Visitor, list: []^Stmt) {
-	for x in list {
-		walk(v, x);
-	}
-}
-walk_decl_list :: proc(v: ^Visitor, list: []^Decl) {
-	for x in list {
-		walk(v, x);
-	}
-}
-walk_attribute_list :: proc(v: ^Visitor, list: []^Attribute) {
-	for x in list {
-		walk(v, x);
-	}
+// inspect traverses an AST in depth-first order
+// It starts by calling f(node), and node must be non-nil
+// If f returns true, inspect invokes f recursively for each of the non-nil children of node,
+// followed by a call of f(nil)
+inspect :: proc(node: ^Node, f: proc(^Node) -> bool) {
+	v := &Visitor{
+		visit = proc(v: ^Visitor, node: ^Node) -> ^Visitor {
+			f := (proc(^Node) -> bool)(v.data);
+			if f(node) {
+				return v;
+			}
+			return nil
+		},
+		data = rawptr(f),
+	};
+	walk(v, node);
 }
 
 
+
+// walk traverses an AST in depth-first order: It starts by calling v.visit(v, node), and node must not be nil
+// If the visitor returned by v.visit(v, node) is not nil, walk is invoked recursively with the new visitor for
+// each of the non-nil children of node, followed by a call of the new visit procedure
 walk :: proc(v: ^Visitor, node: ^Node) {
+	walk_expr_list :: proc(v: ^Visitor, list: []^Expr) {
+		for x in list {
+			walk(v, x);
+		}
+	}
+
+	walk_stmt_list :: proc(v: ^Visitor, list: []^Stmt) {
+		for x in list {
+			walk(v, x);
+		}
+	}
+	walk_attribute_list :: proc(v: ^Visitor, list: []^Attribute) {
+		for x in list {
+			walk(v, x);
+		}
+	}
+
+
 	v := v;
 	if v = v->visit(node); v == nil {
 		return;
@@ -352,18 +368,3 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 	v->visit(nil);
 }
 
-
-
-inspect :: proc(node: ^Node, f: proc(^Node) -> bool) {
-	v := &Visitor{
-		visit = proc(v: ^Visitor, node: ^Node) -> ^Visitor {
-			f := (proc(^Node) -> bool)(v.data);
-			if f(node) {
-				return v;
-			}
-			return nil
-		},
-		data = rawptr(f),
-	};
-	walk(v, node);
-}
