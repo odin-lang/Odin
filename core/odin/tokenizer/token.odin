@@ -149,6 +149,7 @@ Token_Kind :: enum u32 {
 		Inline,
 		No_Inline,
 		Context,
+		Asm,
 	B_Keyword_End,
 
 	COUNT,
@@ -278,6 +279,7 @@ tokens := [Token_Kind.COUNT]string {
 	"inline",
 	"no_inline",
 	"context",
+	"asm",
 	"",
 };
 
