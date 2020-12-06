@@ -10,7 +10,7 @@ Float_Class :: enum {
 	Neg_Zero,  // the negative zero
 	NaN,       // Not-A-Number (NaN)
 	Inf,       // positive infinity
-	Neg_Inf    // negative infinity
+	Neg_Inf,   // negative infinity
 };
 
 TAU          :: 6.28318530717958647692528676655900576;

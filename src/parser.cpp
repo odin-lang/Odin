@@ -1264,11 +1264,69 @@ bool peek_token_kind(AstFile *f, TokenKind kind) {
 	return false;
 }
 
+Token peek_token(AstFile *f) {
+	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
+		Token tok = f->tokens[i];
+		if (tok.kind == Token_Comment) {
+			continue;
+		}
+		return tok;
+	}
+	return {};
+}
+
+
+bool token_is_newline(Token const &tok) {
+	return tok.kind == Token_Semicolon && tok.string == "\n";
+}
+
+bool skip_possible_newline(AstFile *f) {
+	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
+		return false;
+	}
+	Token *prev = &f->curr_token;
+	if (prev->kind == Token_Semicolon && prev->string == "\n") {
+		advance_token(f);
+		return true;
+	}
+	return false;
+}
+
+bool skip_possible_newline_for_literal(AstFile *f) {
+	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
+		return false;
+	}
+	TokenPos curr_pos = f->curr_token.pos;
+	if (token_is_newline(f->curr_token)) {
+		Token next = peek_token(f);
+		if (curr_pos.line+1 >= next.pos.line) {
+			switch (next.kind) {
+			case Token_OpenBrace:
+			case Token_else:
+			case Token_where:
+				advance_token(f);
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+String token_to_string(Token const &tok) {
+	String p = token_strings[tok.kind];
+	if (token_is_newline(tok)) {
+		p = str_lit("newline");
+	}
+	return p;
+}
+
+
 Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		String c = token_strings[kind];
-		String p = token_strings[prev.kind];
+		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected '%.*s', got '%.*s'", LIT(c), LIT(p));
 		if (prev.kind == Token_EOF) {
 			gb_exit(1);
@@ -1282,7 +1340,7 @@ Token expect_token(AstFile *f, TokenKind kind) {
 Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
-		String p = token_strings[prev.kind];
+		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected '%.*s' after %s, got '%.*s'",
 		             LIT(token_strings[kind]),
 		             msg,
@@ -1313,11 +1371,13 @@ Token expect_operator(AstFile *f) {
 	} else if (prev.kind == Token_if || prev.kind == Token_when) {
 		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
+		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
-		             LIT(token_strings[prev.kind]));
+		             LIT(p));
 	} else if (!f->allow_range && is_token_range(prev)) {
+		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
-		             LIT(token_strings[prev.kind]));
+		             LIT(p));
 	}
 	advance_token(f);
 	return prev;
@@ -1326,8 +1386,9 @@ Token expect_operator(AstFile *f) {
 Token expect_keyword(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
+		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected a keyword, got '%.*s'",
-		             LIT(token_strings[prev.kind]));
+		             LIT(p));
 	}
 	advance_token(f);
 	return prev;
@@ -1487,7 +1548,22 @@ void expect_semicolon(AstFile *f, Ast *s) {
 
 
 	if (s != nullptr) {
-		if (prev_token.pos.line != f->curr_token.pos.line) {
+		bool insert_semi = (f->tokenizer.flags & TokenizerFlag_InsertSemicolon) != 0;
+		if (insert_semi) {
+			switch (f->curr_token.kind) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+			case Token_else:
+			case Token_EOF:
+				return;
+
+			default:
+				if (is_semicolon_optional_for_node(f, s)) {
+					return;
+				}
+				break;
+			}
+		} else if (prev_token.pos.line != f->curr_token.pos.line) {
 			if (is_semicolon_optional_for_node(f, s)) {
 				return;
 			}
@@ -1505,14 +1581,16 @@ void expect_semicolon(AstFile *f, Ast *s) {
 			}
 		}
 		String node_string = ast_strings[s->kind];
+		String p = token_to_string(f->curr_token);
 		syntax_error(prev_token, "Expected ';' after %.*s, got %.*s",
-		             LIT(node_string), LIT(token_strings[f->curr_token.kind]));
+		             LIT(node_string), LIT(p));
 	} else {
 		switch (f->curr_token.kind) {
 		case Token_EOF:
 			return;
 		}
-		syntax_error(prev_token, "Expected ';'");
+		String p = token_to_string(f->curr_token);
+		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
 	}
 	fix_advance_to_next_stmt(f);
 }
@@ -2013,6 +2091,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
 		u64 tags = 0;
+		skip_possible_newline_for_literal(f);
 
 		if (f->curr_token.kind == Token_where) {
 			where_token = expect_token(f, Token_where);
@@ -2189,6 +2268,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
 
+		skip_possible_newline_for_literal(f);
+
 		if (f->curr_token.kind == Token_where) {
 			where_token = expect_token(f, Token_where);
 			isize prev_level = f->expr_level;
@@ -2260,6 +2341,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
 		}
 
+		skip_possible_newline_for_literal(f);
 
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
@@ -3390,7 +3472,8 @@ bool parse_expect_field_separator(AstFile *f, Ast *param) {
 		return true;
 	}
 	if (token.kind == Token_Semicolon) {
-		syntax_error(f->curr_token, "Expected a comma, got a semicolon");
+		String p = token_to_string(token);
+		syntax_error(f->curr_token, "Expected a comma, got a %.*s", LIT(p));
 		advance_token(f);
 		return true;
 	}
@@ -3713,6 +3796,7 @@ Ast *parse_if_stmt(AstFile *f) {
 		}
 	} else {
 		body = parse_block_stmt(f, false);
+		skip_possible_newline_for_literal(f);
 	}
 
 	if (allow_token(f, Token_else)) {
@@ -3768,6 +3852,7 @@ Ast *parse_when_stmt(AstFile *f) {
 		}
 	} else {
 		body = parse_block_stmt(f, true);
+		skip_possible_newline_for_literal(f);
 	}
 
 	if (allow_token(f, Token_else)) {
@@ -3873,6 +3958,7 @@ Ast *parse_for_stmt(AstFile *f) {
 				}
 			} else {
 				body = parse_block_stmt(f, false);
+				skip_possible_newline_for_literal(f);
 			}
 			return ast_range_stmt(f, token, nullptr, nullptr, in_token, rhs, body);
 		}
@@ -3908,6 +3994,7 @@ Ast *parse_for_stmt(AstFile *f) {
 		}
 	} else {
 		body = parse_block_stmt(f, false);
+		skip_possible_newline_for_literal(f);
 	}
 
 	if (is_range) {
@@ -4189,6 +4276,8 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 	}
 	Ast *attribute = ast_attribute(f, token, open, close, elems);
 
+	skip_possible_newline(f);
+
 	Ast *decl = parse_stmt(f);
 	if (decl->kind == Ast_ValueDecl) {
 		array_add(&decl->ValueDecl.attributes, attribute);
@@ -4257,6 +4346,7 @@ Ast *parse_stmt(AstFile *f) {
 				}
 			} else {
 				body = parse_block_stmt(f, false);
+				skip_possible_newline_for_literal(f);
 			}
 			if (bad_stmt) {
 				return ast_bad_stmt(f, inline_token, f->curr_token);
@@ -4461,7 +4551,11 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath);
+	TokenizerFlags tokenizer_flags = TokenizerFlag_None;
+	if (build_context.insert_semicolon) {
+		tokenizer_flags = TokenizerFlag_InsertSemicolon;
+	}
+	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath, tokenizer_flags);
 	if (err != TokenizerInit_None) {
 		switch (err) {
 		case TokenizerInit_Empty:

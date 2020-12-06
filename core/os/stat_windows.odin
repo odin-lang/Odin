@@ -114,10 +114,10 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	buf = buf[:N];
 
 	if len(buf) >= 4 {
-		if buf[0] == '\\'
-		&& buf[1] == '\\'
-		&& buf[2] == '?'
-		&& buf[3] == '\\' {
+		if buf[0] == '\\' &&
+		   buf[1] == '\\' &&
+		   buf[2] == '?'  &&
+		   buf[3] == '\\' {
 			buf = buf[4:];
 		}
 	}

@@ -71,7 +71,7 @@ Type_Info_Boolean    :: struct {};
 Type_Info_Any        :: struct {};
 Type_Info_Type_Id    :: struct {};
 Type_Info_Pointer :: struct {
-	elem: ^Type_Info // nil -> rawptr
+	elem: ^Type_Info, // nil -> rawptr
 };
 Type_Info_Procedure :: struct {
 	params:     ^Type_Info, // Type_Info_Tuple
@@ -312,7 +312,7 @@ Logger_Option :: enum {
 	Line,
 	Procedure,
 	Terminal_Color,
-	Thread_Id
+	Thread_Id,
 }
 
 Logger_Options :: bit_set[Logger_Option];
