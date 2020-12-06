@@ -43,8 +43,8 @@ Comment_Group :: struct {
 Node :: struct {
 	pos:         tokenizer.Pos,
 	end:         tokenizer.Pos,
-	derived:     any,
 	state_flags: Node_State_Flags,
+	derived:     any,
 }
 
 
@@ -266,11 +266,11 @@ Inline_Asm_Expr :: struct {
 	tok:                tokenizer.Token,
 	param_types:        []^Expr,
 	return_type:        ^Expr,
-	constraints_string: ^Expr,
 	has_side_effects:   bool,
 	is_align_stack:     bool,
 	dialect:            Inline_Asm_Dialect,
 	open:               tokenizer.Pos,
+	constraints_string: ^Expr,
 	asm_string:         ^Expr,
 	close:              tokenizer.Pos,
 }
@@ -471,12 +471,12 @@ Foreign_Block_Decl :: struct {
 Foreign_Import_Decl :: struct {
 	using node: Decl,
 	docs:            ^Comment_Group,
+	attributes:      [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	foreign_tok:     tokenizer.Token,
 	import_tok:      tokenizer.Token,
 	name:            ^Ident,
 	collection_name: string,
 	fullpaths:       []string,
-	attributes:      [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	comment:         ^Comment_Group,
 }
 
@@ -641,23 +641,23 @@ Struct_Type :: struct {
 	tok_pos:       tokenizer.Pos,
 	poly_params:   ^Field_List,
 	align:         ^Expr,
-	fields:        ^Field_List,
-	name_count:    int,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 	is_packed:     bool,
 	is_raw_union:  bool,
+	fields:        ^Field_List,
+	name_count:    int,
 }
 
 Union_Type :: struct {
 	using node: Expr,
-	tok_pos:     tokenizer.Pos,
-	poly_params: ^Field_List,
-	align:       ^Expr,
-	variants:    []^Expr,
-	where_token: tokenizer.Token,
+	tok_pos:       tokenizer.Pos,
+	poly_params:   ^Field_List,
+	align:         ^Expr,
+	is_maybe:      bool,
+	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
-	is_maybe:	 bool,
+	variants:      []^Expr,
 }
 
 Enum_Type :: struct {
