@@ -1659,7 +1659,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 	                     seen_ellipsis: ^bool, fields: ^[dynamic]^ast.Field,
 	                     docs: ^ast.Comment_Group,
 	                     names: []^ast.Expr,
-	                     allowed_flags, set_flags: ast.Field_Flags
+	                     allowed_flags, set_flags: ast.Field_Flags,
 	                     ) -> bool {
 
 		expect_field_separator :: proc(p: ^Parser, param: ^ast.Expr) -> bool {
