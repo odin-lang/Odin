@@ -52,8 +52,6 @@ TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_CmpOrEq,  "||="), \
 TOKEN_KIND(Token__AssignOpEnd, ""), \
 	TOKEN_KIND(Token_ArrowRight,       "->"), \
-	TOKEN_KIND(Token_ArrowLeft,        "<-"), \
-	TOKEN_KIND(Token_DoubleArrowRight, "=>"), \
 	TOKEN_KIND(Token_Undef,            "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, ""), \
@@ -1160,10 +1158,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 			break;
 		case '=':
 			token->kind = Token_Eq;
-			if (t->curr_rune == '>') {
-				advance_to_next_rune(t);
-				token->kind = Token_DoubleArrowRight;
-			} else if (t->curr_rune == '=') {
+			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token->kind = Token_CmpEq;
 			}
@@ -1259,10 +1254,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 
 		case '<':
 			token->kind = Token_Lt;
-			if (t->curr_rune == '-') {
-				advance_to_next_rune(t);
-				token->kind = Token_ArrowLeft;
-			} else if (t->curr_rune == '=') {
+			if (t->curr_rune == '=') {
 				token->kind = Token_LtEq;
 				advance_to_next_rune(t);
 			} else if (t->curr_rune == '<') {
