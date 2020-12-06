@@ -283,6 +283,19 @@ tokens := [Token_Kind.COUNT]string {
 
 custom_keyword_tokens: []string;
 
+
+is_newline :: proc(tok: Token) -> bool {
+	return tok.kind == .Semicolon && tok.text == "\n";
+}
+
+
+token_to_string :: proc(tok: Token) -> string {
+	if is_newline(tok) {
+		return "newline";
+	}
+	return to_string(tok.kind);
+}
+
 to_string :: proc(kind: Token_Kind) -> string {
 	if Token_Kind.Invalid <= kind && kind < Token_Kind.COUNT {
 		return tokens[kind];
