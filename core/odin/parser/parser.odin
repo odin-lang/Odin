@@ -300,7 +300,9 @@ expect_token_after :: proc(p: ^Parser, kind: tokenizer.Token_Kind, msg: string) 
 
 expect_operator :: proc(p: ^Parser) -> tokenizer.Token {
 	prev := p.curr_tok;
-	if !tokenizer.is_operator(prev.kind) {
+	if prev.kind == .If || prev.kind == .When {
+		// okay
+	} else if !tokenizer.is_operator(prev.kind) {
 		g := tokenizer.to_string(prev.kind);
 		error(p, prev.pos, "expected an operator, got '%s'", g);
 	}
@@ -1957,13 +1959,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	     bl.tok = tok;
 	     return bl;
 
-
-	case .Size_Of, .Align_Of, .Offset_Of:
-		tok := advance_token(p);
-		expr := ast.new(ast.Implicit, tok.pos, end_pos(tok));
-		expr.tok = tok;
-		return parse_call_expr(p, expr);
-
 	case .Open_Brace:
 		if !lhs {
 			return parse_literal_value(p, nil);
@@ -1992,15 +1987,22 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Opaque:
 		tok := advance_token(p);
+		warn(p, tok.pos, "opaque is deprecated in favour of #opaque");
 		type := parse_type(p);
 		ot := ast.new(ast.Opaque_Type, tok.pos, type.end);
-		ot.tok  = tok.kind;
 		ot.type = type;
 		return ot;
+
 	case .Hash:
 		tok := expect_token(p, .Hash);
 		name := expect_token(p, .Ident);
 		switch name.text {
+		case "opaque":
+			type := parse_type(p);
+			ot := ast.new(ast.Opaque_Type, tok.pos, type.end);
+			ot.type = type;
+			return ot;
+
 		case "type":
 			type := parse_type(p);
 			hp := ast.new(ast.Helper_Type, tok.pos, type.end);
@@ -2224,25 +2226,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		ti.tok = tok.kind;
 		ti.specialization = nil;
 		return ti;
-
-	case .Type_Of:
-		tok := advance_token(p);
-		i := ast.new(ast.Implicit, tok.pos, end_pos(tok));
-		i.tok = tok;
-		type: ^ast.Expr = parse_call_expr(p, i);
-		for p.curr_tok.kind == .Period {
-			period := advance_token(p);
-
-			field := parse_ident(p);
-			sel := ast.new(ast.Selector_Expr, period.pos, field.end);
-			sel.expr = type;
-			sel.field = field;
-
-			type = sel;
-		}
-
-		return type;
-
 
 	case .Pointer:
 		tok := expect_token(p, .Pointer);

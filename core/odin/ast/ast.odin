@@ -214,9 +214,9 @@ Ternary_Expr :: struct {
 
 Ternary_If_Expr :: struct {
 	using node: Expr,
-	x: ^Expr,
+	x:    ^Expr,
 	op1:  tokenizer.Token,
-	cond:    ^Expr,
+	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
@@ -225,7 +225,7 @@ Ternary_When_Expr :: struct {
 	using node: Expr,
 	x: ^Expr,
 	op1:  tokenizer.Token,
-	cond:    ^Expr,
+	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
@@ -569,7 +569,6 @@ Distinct_Type :: struct {
 
 Opaque_Type :: struct {
 	using node: Expr,
-	tok:  tokenizer.Token_Kind,
 	type: ^Expr,
 }
 
