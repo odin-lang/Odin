@@ -2353,10 +2353,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		where_clauses: []^ast.Expr;
 		if (p.curr_tok.kind == .Where) {
 			where_token = expect_token(p, .Where);
-			prev_level := p.expr_level;
+			where_prev_level := p.expr_level;
 			p.expr_level = -1;
 			where_clauses = parse_rhs_expr_list(p);
-			p.expr_level = prev_level;
+			p.expr_level = where_prev_level;
 		}
 
 		expect_token(p, .Open_Brace);
@@ -2416,10 +2416,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		where_clauses: []^ast.Expr;
 		if (p.curr_tok.kind == .Where) {
 			where_token = expect_token(p, .Where);
-			prev_level := p.expr_level;
+			where_prev_level := p.expr_level;
 			p.expr_level = -1;
 			where_clauses = parse_rhs_expr_list(p);
-			p.expr_level = prev_level;
+			p.expr_level = where_prev_level;
 		}
 
 		variants: [dynamic]^ast.Expr;
@@ -2628,7 +2628,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	return lit;
 }
 
-parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Call_Expr {
+parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 	args: [dynamic]^ast.Expr;
 
 	ellipsis: tokenizer.Token;
@@ -2685,6 +2685,14 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Call_Expr {
 	ce.args     = args[:];
 	ce.ellipsis = ellipsis;
 	ce.close    = close.pos;
+
+	o := ast.unparen_expr(operand);
+	if se, ok := o.derived.(ast.Selector_Expr); ok && se.op.kind == .Arrow_Right {
+		sce := ast.new(ast.Selector_Call_Expr, ce.pos, ce.end);
+		sce.expr = o;
+		sce.call = ce;
+		return sce;
+	}
 
 	return ce;
 }
@@ -2776,6 +2784,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 				sel := ast.new(ast.Selector_Expr, operand.pos, field.end);
 				sel.expr  = operand;
+				sel.op = tok;
 				sel.field = field;
 
 				operand = sel;
@@ -2805,6 +2814,24 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 				operand = ta;
 
+			case:
+				error(p, p.curr_tok.pos, "expected a selector");
+				advance_token(p);
+				operand = ast.new(ast.Bad_Expr, operand.pos, end_pos(tok));
+			}
+
+		case .Arrow_Right:
+			tok := expect_token(p, .Arrow_Right);
+			#partial switch p.curr_tok.kind {
+			case .Ident:
+				field := parse_ident(p);
+
+				sel := ast.new(ast.Selector_Expr, operand.pos, field.end);
+				sel.expr  = operand;
+				sel.op = tok;
+				sel.field = field;
+
+				operand = sel;
 			case:
 				error(p, p.curr_tok.pos, "expected a selector");
 				advance_token(p);
