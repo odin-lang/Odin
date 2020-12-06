@@ -115,6 +115,9 @@ queue_pop_front :: proc(q: ^$Q/Queue($T)) -> T {
 	item := queue_get(q^, 0);
 	q.offset = (q.offset + 1) % array_len(q.data);
 	q.len -= 1;
+	if q.len == 0 {
+		q.offset = 0;
+	}
 	return item;
 }
 

@@ -49,10 +49,14 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 
 
 	thread := new(Thread);
+	if thread == nil {
+		return nil;
+	}
+	thread.creation_allocator = context.allocator;
 
 	win32_thread := win32.CreateThread(nil, 0, __windows_thread_entry_proc, thread, win32.CREATE_SUSPENDED, &win32_thread_id);
 	if win32_thread == nil {
-		free(thread);
+		free(thread, thread.creation_allocator);
 		return nil;
 	}
 	thread.procedure       = procedure;
@@ -92,7 +96,7 @@ join_multiple :: proc(threads: ..^Thread) {
 
 	for k := 0; k < len(threads); k += MAXIMUM_WAIT_OBJECTS {
 		count := min(len(threads) - k, MAXIMUM_WAIT_OBJECTS);
-		n, j := u32(0), 0;
+		j := 0;
 		for i in 0..<count {
 			handle := threads[i+k].win32_thread;
 			if handle != win32.INVALID_HANDLE {
@@ -100,7 +104,7 @@ join_multiple :: proc(threads: ..^Thread) {
 				j += 1;
 			}
 		}
-		win32.WaitForMultipleObjects(n, &handles[0], true, win32.INFINITE);
+		win32.WaitForMultipleObjects(u32(j), &handles[0], true, win32.INFINITE);
 	}
 
 	for t in threads {
@@ -111,7 +115,7 @@ join_multiple :: proc(threads: ..^Thread) {
 
 destroy :: proc(thread: ^Thread) {
 	join(thread);
-	free(thread);
+	free(thread, thread.creation_allocator);
 }
 
 terminate :: proc(using thread : ^Thread, exit_code: u32) {

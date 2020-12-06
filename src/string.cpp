@@ -164,6 +164,7 @@ int string_compare(String const &x, String const &y) {
 				return cast(int)x[offset] - cast(int)y[offset];
 			}
 		}
+		return cast(int)(x.len - y.len);
 	}
 	return 0;
 }

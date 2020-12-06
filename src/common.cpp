@@ -56,6 +56,14 @@ gb_inline isize align_formula_isize(isize size, isize align) {
 	}
 	return size;
 }
+gb_inline void *align_formula_ptr(void *ptr, isize align) {
+	if (align > 0) {
+		uintptr result = (cast(uintptr)ptr) + align-1;
+		return (void *)(result - result%align);
+	}
+	return ptr;
+}
+
 
 GB_ALLOCATOR_PROC(heap_allocator_proc);
 
@@ -373,12 +381,15 @@ typedef struct Arena {
 	gbAllocator backing;
 	isize       block_size;
 	gbMutex     mutex;
-
 	isize total_used;
+	bool   use_mutex;
 } Arena;
 
 #define ARENA_MIN_ALIGNMENT 16
 #define ARENA_DEFAULT_BLOCK_SIZE (8*1024*1024)
+
+
+gb_global Arena permanent_arena = {};
 
 void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
 	arena->backing = backing;
@@ -388,8 +399,9 @@ void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAUL
 }
 
 void arena_grow(Arena *arena, isize min_size) {
-	// gb_mutex_lock(&arena->mutex);
-	// defer (gb_mutex_unlock(&arena->mutex));
+	if (arena->use_mutex) {
+		gb_mutex_lock(&arena->mutex);
+	}
 
 	isize size = gb_max(arena->block_size, min_size);
 	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
@@ -399,11 +411,16 @@ void arena_grow(Arena *arena, isize min_size) {
 	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
 	arena->end = arena->ptr + size;
 	array_add(&arena->blocks, arena->ptr);
+
+	if (arena->use_mutex) {
+		gb_mutex_unlock(&arena->mutex);
+	}
 }
 
 void *arena_alloc(Arena *arena, isize size, isize alignment) {
-	// gb_mutex_lock(&arena->mutex);
-	// defer (gb_mutex_unlock(&arena->mutex));
+	if (arena->use_mutex) {
+		gb_mutex_lock(&arena->mutex);
+	}
 
 	arena->total_used += size;
 
@@ -419,12 +436,17 @@ void *arena_alloc(Arena *arena, isize size, isize alignment) {
 	GB_ASSERT(arena->ptr <= arena->end);
 	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
 	// zero_size(ptr, size);
+
+	if (arena->use_mutex) {
+		gb_mutex_unlock(&arena->mutex);
+	}
 	return ptr;
 }
 
 void arena_free_all(Arena *arena) {
-	// gb_mutex_lock(&arena->mutex);
-	// defer (gb_mutex_unlock(&arena->mutex));
+	if (arena->use_mutex) {
+		gb_mutex_lock(&arena->mutex);
+	}
 
 	for_array(i, arena->blocks) {
 		gb_free(arena->backing, arena->blocks[i]);
@@ -432,8 +454,11 @@ void arena_free_all(Arena *arena) {
 	array_clear(&arena->blocks);
 	arena->ptr = nullptr;
 	arena->end = nullptr;
-}
 
+	if (arena->use_mutex) {
+		gb_mutex_unlock(&arena->mutex);
+	}
+}
 
 
 
@@ -460,7 +485,14 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 		// GB_PANIC("gbAllocation_Free not supported");
 		break;
 	case gbAllocation_Resize:
-		GB_PANIC("gbAllocation_Resize: not supported");
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = arena_alloc(arena, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
 		break;
 	case gbAllocation_FreeAll:
 		arena_free_all(arena);
@@ -471,6 +503,97 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 }
 
 
+gbAllocator permanent_allocator() {
+	return arena_allocator(&permanent_arena);
+	// return heap_allocator();
+}
+
+
+
+struct Temp_Allocator {
+	u8 *data;
+	isize len;
+	isize curr_offset;
+	gbAllocator backup_allocator;
+	Array<void *> leaked_allocations;
+};
+
+gb_global Temp_Allocator temporary_allocator_data = {};
+
+void temp_allocator_init(Temp_Allocator *s, isize size) {
+	s->backup_allocator = heap_allocator();
+	s->data = cast(u8 *)gb_alloc_align(s->backup_allocator, size, 16);
+	s->curr_offset = 0;
+	s->leaked_allocations.allocator = s->backup_allocator;
+}
+
+void *temp_allocator_alloc(Temp_Allocator *s, isize size, isize alignment) {
+	size = align_formula_isize(size, alignment);
+	if (s->curr_offset+size <= s->len) {
+		u8 *start = s->data;
+		u8 *ptr = start + s->curr_offset;
+		ptr = cast(u8 *)align_formula_ptr(ptr, alignment);
+		// assume memory is zero
+
+		isize offset = ptr - start;
+		s->curr_offset = offset + size;
+		return ptr;
+	} else if (size <= s->len) {
+		u8 *start = s->data;
+		u8 *ptr = cast(u8 *)align_formula_ptr(start, alignment);
+		// assume memory is zero
+
+		isize offset = ptr - start;
+		s->curr_offset = offset + size;
+		return ptr;
+	}
+
+	void *ptr = gb_alloc_align(s->backup_allocator, size, alignment);
+	array_add(&s->leaked_allocations, ptr);
+	return ptr;
+}
+
+void temp_allocator_free_all(Temp_Allocator *s) {
+	s->curr_offset = 0;
+	for_array(i, s->leaked_allocations) {
+		gb_free(s->backup_allocator, s->leaked_allocations[i]);
+	}
+	array_clear(&s->leaked_allocations);
+	gb_zero_size(s->data, s->len);
+}
+
+GB_ALLOCATOR_PROC(temp_allocator_proc) {
+	void *ptr = nullptr;
+	Temp_Allocator *s = cast(Temp_Allocator *)allocator_data;
+	GB_ASSERT_NOT_NULL(s);
+
+	switch (type) {
+	case gbAllocation_Alloc:
+		return temp_allocator_alloc(s, size, alignment);
+	case gbAllocation_Free:
+		break;
+	case gbAllocation_Resize:
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = temp_allocator_alloc(s, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
+		break;
+	case gbAllocation_FreeAll:
+		temp_allocator_free_all(s);
+		break;
+	}
+
+	return ptr;
+}
+
+
+gbAllocator temporary_allocator() {
+	return {temp_allocator_proc, &temporary_allocator_data};
+}
 
 
 

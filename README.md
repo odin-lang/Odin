@@ -60,7 +60,7 @@ main :: proc() {
 
 #### [Getting Started](https://odin-lang.org/docs/install)
 
-Instructions for downloading and install the Odin compiler and libraries.
+Instructions for downloading and installing the Odin compiler and libraries.
 
 ### Learning Odin
 

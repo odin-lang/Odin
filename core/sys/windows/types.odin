@@ -36,6 +36,7 @@ ULONG_PTR :: uint;
 DWORD_PTR :: ULONG_PTR;
 ULONG :: c_ulong;
 UCHAR :: BYTE;
+NTSTATUS :: c.long;
 
 PDWORD_PTR :: ^DWORD_PTR;
 ATOM :: distinct WORD;
@@ -117,12 +118,12 @@ SYNCHRONIZE: DWORD : 0x00100000;
 GENERIC_READ: DWORD : 0x80000000;
 GENERIC_WRITE: DWORD : 0x40000000;
 STANDARD_RIGHTS_WRITE: DWORD : READ_CONTROL;
-FILE_GENERIC_WRITE: DWORD : STANDARD_RIGHTS_WRITE
-	| FILE_WRITE_DATA
-	| FILE_WRITE_ATTRIBUTES
-	| FILE_WRITE_EA
-	| FILE_APPEND_DATA
-	| SYNCHRONIZE;
+FILE_GENERIC_WRITE: DWORD : STANDARD_RIGHTS_WRITE |
+	FILE_WRITE_DATA |
+	FILE_WRITE_ATTRIBUTES |
+	FILE_WRITE_EA |
+	FILE_APPEND_DATA |
+	SYNCHRONIZE;
 
 FILE_FLAG_OPEN_REPARSE_POINT: DWORD : 0x00200000;
 FILE_FLAG_BACKUP_SEMANTICS: DWORD : 0x02000000;
@@ -721,15 +722,15 @@ SYSTEM_INFO :: struct {
 
 // https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_osversioninfoexw
 OSVERSIONINFOEXW :: struct {
-	os_version_info_size: ULONG,
-	major_version:        ULONG,
-	minor_version:        ULONG,
-	build_number:         ULONG,
-	platform_id :         ULONG,
-	service_pack_string:  [128]WCHAR,
-	service_pack_major:   USHORT,
-	service_pack_minor:   USHORT,
-	suite_mask:           USHORT,
-	product_type:         UCHAR,
-	reserved:             UCHAR,
-}
+    dwOSVersionInfoSize: ULONG,
+    dwMajorVersion:      ULONG,
+    dwMinorVersion:      ULONG,
+    dwBuildNumber:       ULONG,
+    dwPlatformId:        ULONG,
+    szCSDVersion:        [128]WCHAR,
+    wServicePackMajor:   USHORT,
+    wServicePackMinor:   USHORT,
+    wSuiteMask:          USHORT,
+    wProductType:        UCHAR,
+    wReserved:           UCHAR,
+};

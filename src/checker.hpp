@@ -45,7 +45,7 @@ enum StmtFlag {
 
 	Stmt_TypeSwitch = 1<<4,
 
-	Stmt_CheckScopeDecls    = 1<<5,
+	Stmt_CheckScopeDecls = 1<<5,
 };
 
 enum BuiltinProcPkg {
@@ -132,6 +132,7 @@ struct DeclInfo {
 
 	Entity *entity;
 
+	Ast *         decl_node;
 	Ast *         type_expr;
 	Ast *         init_expr;
 	Array<Ast *>  attributes;
@@ -139,6 +140,9 @@ struct DeclInfo {
 	Type *        gen_proc_type; // Precalculated
 	bool          is_using;
 	bool          where_clauses_evaluated;
+
+	CommentGroup *comment;
+	CommentGroup *docs;
 
 	PtrSet<Entity *>  deps;
 	PtrSet<Type *>    type_info_deps;
@@ -160,12 +164,13 @@ struct ProcInfo {
 
 
 enum ScopeFlag : i32 {
-	ScopeFlag_Pkg    = 1<<1,
-	ScopeFlag_Global = 1<<2,
-	ScopeFlag_File   = 1<<3,
-	ScopeFlag_Init   = 1<<4,
-	ScopeFlag_Proc   = 1<<5,
-	ScopeFlag_Type   = 1<<6,
+	ScopeFlag_Pkg     = 1<<1,
+	ScopeFlag_Builtin = 1<<2,
+	ScopeFlag_Global  = 1<<3,
+	ScopeFlag_File    = 1<<4,
+	ScopeFlag_Init    = 1<<5,
+	ScopeFlag_Proc    = 1<<6,
+	ScopeFlag_Type    = 1<<7,
 
 	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
 
@@ -247,8 +252,12 @@ struct AtomOpMapEntry {
 };
 
 
+struct CheckerContext;
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
+	Checker *checker;
+
 	Map<ExprInfo>         untyped; // Key: Ast * | Expression -> ExprInfo
 	                               // NOTE(bill): This needs to be a map and not on the Ast
 	                               // as it needs to be iterated across
@@ -268,6 +277,7 @@ struct CheckerInfo {
 
 	AstPackage *          builtin_package;
 	AstPackage *          runtime_package;
+	AstPackage *          init_package;
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
@@ -278,6 +288,7 @@ struct CheckerInfo {
 
 	Map<AtomOpMapEntry>   atom_op_map; // Key: Ast *
 
+	Array<Entity *> testing_procedures;
 
 	bool allow_identifier_uses;
 	Array<Ast *> identifier_uses; // only used by 'odin query'
@@ -301,7 +312,6 @@ struct CheckerContext {
 	ProcCallingConvention curr_proc_calling_convention;
 	bool           in_proc_sig;
 	ForeignContext foreign_context;
-	gbAllocator    allocator;
 
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
@@ -317,6 +327,7 @@ struct CheckerContext {
 	bool       no_polymorphic_errors;
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
+	bool       allow_arrow_right_selector_expr;
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
@@ -331,11 +342,8 @@ struct Checker {
 	Array<Entity *> procs_with_deferred_to_check;
 
 	CheckerContext *curr_ctx;
-	gbAllocator    allocator;
 	CheckerContext init_ctx;
 };
-
-
 
 
 
@@ -387,7 +395,7 @@ void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 
 bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global = false);
-void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes);
+void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes);
 void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
 void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 

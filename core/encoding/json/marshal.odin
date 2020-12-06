@@ -14,7 +14,8 @@ Marshal_Error :: enum {
 }
 
 marshal :: proc(v: any, allocator := context.allocator) -> ([]byte, Marshal_Error) {
-	b := strings.make_builder(allocator);
+	b: strings.Builder;
+	strings.init_builder(&b, allocator);
 
 	err := marshal_arg(&b, v);
 
@@ -129,7 +130,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		case b32:  val = bool(b);
 		case b64:  val = bool(b);
 		}
-		write_string(b, val ? "true" : "false");
+		write_string_builder(b, val ? "true" : "false");
 
 	case Type_Info_Any:
 		return .Unsupported_Type;
@@ -208,14 +209,12 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 				if i > 0 { write_string(b, ", "); }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
-				header := cast(^Map_Entry_Header)data;
+				key   := rawptr(data + entry_type.offsets[2]);
+				value := rawptr(data + entry_type.offsets[3]);
 
-				marshal_arg(b, any{rawptr(&header.key.key.val), info.key.id});
-
+				marshal_arg(b, any{key, info.key.id});
 				write_string(b, ": ");
-
-				value := data + entry_type.offsets[2];
-				marshal_arg(b, any{rawptr(value), info.value.id});
+				marshal_arg(b, any{value, info.value.id});
 			}
 		}
 		write_byte(b, '}');

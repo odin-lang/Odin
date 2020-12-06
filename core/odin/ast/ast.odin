@@ -146,12 +146,20 @@ Paren_Expr :: struct {
 Selector_Expr :: struct {
 	using node: Expr,
 	expr:  ^Expr,
+	op:    tokenizer.Token,
 	field: ^Ident,
 }
 
 Implicit_Selector_Expr :: struct {
 	using node: Expr,
 	field: ^Ident,
+}
+
+Selector_Call_Expr :: struct {
+	using node: Expr,
+	expr: ^Expr,
+	call: ^Call_Expr,
+	modified_call: bool,
 }
 
 Index_Expr :: struct {
@@ -206,9 +214,9 @@ Ternary_Expr :: struct {
 
 Ternary_If_Expr :: struct {
 	using node: Expr,
-	x: ^Expr,
+	x:    ^Expr,
 	op1:  tokenizer.Token,
-	cond:    ^Expr,
+	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
@@ -217,7 +225,7 @@ Ternary_When_Expr :: struct {
 	using node: Expr,
 	x: ^Expr,
 	op1:  tokenizer.Token,
-	cond:    ^Expr,
+	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
@@ -244,6 +252,27 @@ Auto_Cast :: struct {
 	using node: Expr,
 	op:   tokenizer.Token,
 	expr: ^Expr,
+}
+
+Inline_Asm_Dialect :: enum u8 {
+	Default = 0,
+	ATT     = 1,
+	Intel   = 2,
+}
+
+
+Inline_Asm_Expr :: struct {
+	using node: Expr,
+	tok:                tokenizer.Token,
+	param_types:        []^Expr,
+	return_type:        ^Expr,
+	constraints_string: ^Expr,
+	has_side_effects:   bool,
+	is_align_stack:     bool,
+	dialect:            Inline_Asm_Dialect,
+	open:               tokenizer.Pos,
+	asm_string:         ^Expr,
+	close:              tokenizer.Pos,
 }
 
 
@@ -561,7 +590,6 @@ Distinct_Type :: struct {
 
 Opaque_Type :: struct {
 	using node: Expr,
-	tok:  tokenizer.Token_Kind,
 	type: ^Expr,
 }
 

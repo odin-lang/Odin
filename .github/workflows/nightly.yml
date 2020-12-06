@@ -1,6 +1,7 @@
 name:  Nightly
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: 0 20 * * *
 
@@ -50,7 +51,7 @@ jobs:
       - name: (Linux) Download LLVM
         run: sudo apt-get install llvm
       - name: build odin
-        run: make release
+        run: make nightly
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
@@ -72,10 +73,11 @@ jobs:
       - name: Download LLVM and setup PATH
         run: |
           brew install llvm
-          echo ::add-path::/usr/local/opt/llvm/bin
-          echo ::set-env name=CPATH::`xcrun --show-sdk-path`/usr/include
+          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+          TMP_PATH=$(xcrun --show-sdk-path)/user/include
+          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
-        run: make release
+        run: make nightly
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
@@ -95,10 +97,18 @@ jobs:
     needs: [build_windows, build_macos, build_ubuntu]
     steps:
       - uses: actions/checkout@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
       
       - name: Install B2 CLI
         shell: bash
-        run: sudo pip install --upgrade b2
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade b2
+      
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
       
       - name: Download Windows artifacts
         uses: actions/download-artifact@v1

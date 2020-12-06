@@ -160,40 +160,39 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return arg_list;
 }
 
-get_windows_version_ansi :: proc() -> win32.OSVERSIONINFOEXW {
+get_windows_version_w :: proc() -> win32.OSVERSIONINFOEXW {
 	osvi : win32.OSVERSIONINFOEXW;
-	osvi.os_version_info_size = size_of(win32.OSVERSIONINFOEXW);
-    win32.GetVersionExW(&osvi);
+	osvi.dwOSVersionInfoSize = size_of(win32.OSVERSIONINFOEXW);
+    win32.RtlGetVersion(&osvi);
     return osvi;
 }
 
 is_windows_xp :: proc() -> bool {
-	osvi := get_windows_version_ansi();
-	return (osvi.major_version == 5 && osvi.minor_version == 1);
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1);
 }
 
 is_windows_vista :: proc() -> bool {
-	osvi := get_windows_version_ansi();
-	return (osvi.major_version == 6 && osvi.minor_version == 0);
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0);
 }
 
 is_windows_7 :: proc() -> bool {
-	osvi := get_windows_version_ansi();
-	return (osvi.major_version == 6 && osvi.minor_version == 1);
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1);
 }
 
 is_windows_8 :: proc() -> bool {
-	osvi := get_windows_version_ansi();
-	return (osvi.major_version == 6 && osvi.minor_version == 2);
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2);
 }
 
 is_windows_8_1 :: proc() -> bool {
-	osvi := get_windows_version_ansi();
-	return (osvi.major_version == 6 && osvi.minor_version == 3);
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3);
 }
 
 is_windows_10 :: proc() -> bool {
-	osvi := get_windows_version_ansi();
-	return (osvi.major_version == 10 && osvi.minor_version == 0);
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0);
 }
-

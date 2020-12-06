@@ -133,7 +133,6 @@ Token_Kind :: enum u32 {
 		Defer,
 		Return,
 		Proc,
-		Macro,
 		Struct,
 		Union,
 		Enum,
@@ -150,11 +149,7 @@ Token_Kind :: enum u32 {
 		Inline,
 		No_Inline,
 		Context,
-		Size_Of,
-		Align_Of,
-		Offset_Of,
-		Type_Of,
-		Const,
+		Asm,
 	B_Keyword_End,
 
 	COUNT,
@@ -268,7 +263,6 @@ tokens := [Token_Kind.COUNT]string {
 	"defer",
 	"return",
 	"proc",
-	"macro",
 	"struct",
 	"union",
 	"enum",
@@ -285,15 +279,24 @@ tokens := [Token_Kind.COUNT]string {
 	"inline",
 	"no_inline",
 	"context",
-	"size_of",
-	"align_of",
-	"offset_of",
-	"type_of",
-	"const",
+	"asm",
 	"",
 };
 
 custom_keyword_tokens: []string;
+
+
+is_newline :: proc(tok: Token) -> bool {
+	return tok.kind == .Semicolon && tok.text == "\n";
+}
+
+
+token_to_string :: proc(tok: Token) -> string {
+	if is_newline(tok) {
+		return "newline";
+	}
+	return to_string(tok.kind);
+}
 
 to_string :: proc(kind: Token_Kind) -> string {
 	if Token_Kind.Invalid <= kind && kind < Token_Kind.COUNT {
