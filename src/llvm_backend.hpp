@@ -1,3 +1,5 @@
+#if defined(LLVM_BACKEND_SUPPORT)
+#if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Core.h"
 #include "llvm-c/ExecutionEngine.h"
 #include "llvm-c/Target.h"
@@ -12,6 +14,23 @@
 #include "llvm-c/Transforms/Scalar.h"
 #include "llvm-c/Transforms/Utils.h"
 #include "llvm-c/Transforms/Vectorize.h"
+#else
+#include <llvm-c/Core.h>
+#include <llvm-c/ExecutionEngine.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/Analysis.h>
+#include <llvm-c/Object.h>
+#include <llvm-c/BitWriter.h>
+#include <llvm-c/DebugInfo.h>
+#include <llvm-c/Transforms/AggressiveInstCombine.h>
+#include <llvm-c/Transforms/InstCombine.h>
+#include <llvm-c/Transforms/IPO.h>
+#include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/Scalar.h>
+#include <llvm-c/Transforms/Utils.h>
+#include <llvm-c/Transforms/Vectorize.h>
+#endif
+#endif
 
 struct lbProcedure;
 
@@ -74,6 +93,8 @@ struct lbModule {
 	gbMutex mutex;
 
 	Map<LLVMTypeRef> types; // Key: Type *
+	Map<Type *> llvm_types; // Key: LLVMTypeRef
+	i32 internal_type_level;
 
 	Map<lbValue>  values;           // Key: Entity *
 	StringMap<lbValue>  members;
@@ -83,6 +104,10 @@ struct lbModule {
 	StringMap<LLVMValueRef> const_strings;
 
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
+	Map<struct lbFunctionType *> function_type_map; // Key: Type *
+
+	Map<lbProcedure *> equal_procs; // Key: Type *
+	Map<lbProcedure *> hasher_procs; // Key: Type *
 
 	u32 global_array_index;
 	u32 global_generated_index;
@@ -199,6 +224,7 @@ struct lbProcedure {
 	bool         is_entry_point;
 	bool         is_startup;
 
+	lbFunctionType *abi_function_type;
 
 	LLVMValueRef    value;
 	LLVMBuilderRef  builder;
@@ -301,7 +327,7 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_ini
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
-lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type=t_typeid);
+lbValue lb_typeid(lbModule *m, Type *type);
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 lbValue lb_address_from_load(lbProcedure *p, lbValue value);
@@ -344,7 +370,7 @@ String lb_get_const_string(lbModule *m, lbValue value);
 lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
 lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
-lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type);
+lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type);
 void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value, Ast *node);
 
 
@@ -354,6 +380,9 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 
 lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
+lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type);
+lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type);
+lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"

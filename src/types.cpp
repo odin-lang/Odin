@@ -323,6 +323,8 @@ String const type_strings[] = {
 enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
+	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
+	TypeFlag_InProcessOfCheckingABI = 1<<4,
 };
 
 struct Type {
@@ -371,7 +373,28 @@ enum Typeid_Kind : u8 {
 	Typeid_Relative_Slice,
 };
 
+// IMPORTANT NOTE(bill): This must match the same as the in core.odin
+enum TypeInfoFlag : u32 {
+	TypeInfoFlag_Comparable     = 1<<0,
+	TypeInfoFlag_Simple_Compare = 1<<1,
+};
 
+bool is_type_comparable(Type *t);
+bool is_type_simple_compare(Type *t);
+
+u32 type_info_flags_of_type(Type *type) {
+	if (type == nullptr) {
+		return 0;
+	}
+	u32 flags = 0;
+	if (is_type_comparable(type)) {
+		flags |= TypeInfoFlag_Comparable;
+	}
+	if (is_type_simple_compare(type)) {
+		flags |= TypeInfoFlag_Comparable;
+	}
+	return flags;
+}
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?
@@ -661,11 +684,14 @@ gb_global Type *t_context_ptr                    = nullptr;
 gb_global Type *t_source_code_location           = nullptr;
 gb_global Type *t_source_code_location_ptr       = nullptr;
 
-gb_global Type *t_map_key                        = nullptr;
+gb_global Type *t_map_hash                       = nullptr;
 gb_global Type *t_map_header                     = nullptr;
 
 gb_global Type *t_vector_x86_mmx                 = nullptr;
 
+
+gb_global Type *t_equal_proc  = nullptr;
+gb_global Type *t_hasher_proc = nullptr;
 
 
 i64      type_size_of               (Type *t);
@@ -769,7 +795,8 @@ void set_base_type(Type *t, Type *base) {
 
 
 Type *alloc_type(TypeKind kind) {
-	gbAllocator a = heap_allocator();
+	// gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	Type *t = gb_alloc_item(a, Type);
 	zero_item(t);
 	t->kind = kind;
@@ -884,6 +911,25 @@ Type *alloc_type_named(String name, Type *base, Entity *type_name) {
 	return t;
 }
 
+bool is_calling_convention_none(ProcCallingConvention calling_convention) {
+	switch (calling_convention) {
+	case ProcCC_None:
+	case ProcCC_PureNone:
+	case ProcCC_InlineAsm:
+		return true;
+	}
+	return false;
+}
+
+bool is_calling_convention_odin(ProcCallingConvention calling_convention) {
+	switch (calling_convention) {
+	case ProcCC_Odin:
+	case ProcCC_Contextless:
+		return true;
+	}
+	return false;
+}
+
 Type *alloc_type_tuple() {
 	Type *t = alloc_type(Type_Tuple);
 	return t;
@@ -918,7 +964,6 @@ bool is_type_valid_for_keys(Type *t);
 
 Type *alloc_type_map(i64 count, Type *key, Type *value) {
 	if (key != nullptr) {
-		GB_ASSERT(is_type_valid_for_keys(key));
 		GB_ASSERT(value != nullptr);
 	}
 	Type *t = alloc_type(Type_Map);
@@ -1192,20 +1237,6 @@ bool is_type_slice(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Slice;
 }
-bool is_type_u8_slice(Type *t) {
-	t = base_type(t);
-	if (t->kind == Type_Slice) {
-		return is_type_u8(t->Slice.elem);
-	}
-	return false;
-}
-bool is_type_u8_ptr(Type *t) {
-	t = base_type(t);
-	if (t->kind == Type_Pointer) {
-		return is_type_u8(t->Slice.elem);
-	}
-	return false;
-}
 bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
@@ -1249,6 +1280,37 @@ bool is_type_relative_slice(Type *t) {
 	return t->kind == Type_RelativeSlice;
 }
 
+bool is_type_u8_slice(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Slice) {
+		return is_type_u8(t->Slice.elem);
+	}
+	return false;
+}
+bool is_type_u8_array(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return is_type_u8(t->Array.elem);
+	}
+	return false;
+}
+bool is_type_u8_ptr(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Pointer) {
+		return is_type_u8(t->Slice.elem);
+	}
+	return false;
+}
+bool is_type_rune_array(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return is_type_rune(t->Array.elem);
+	}
+	return false;
+}
+
+
+
 
 Type *core_array_type(Type *t) {
 	for (;;) {
@@ -1261,53 +1323,7 @@ Type *core_array_type(Type *t) {
 	return t;
 }
 
-// NOTE(bill): type can be easily compared using memcmp
-bool is_type_simple_compare(Type *t) {
-	t = core_type(t);
-	switch (t->kind) {
-	case Type_Array:
-		return is_type_simple_compare(t->Array.elem);
 
-	case Type_EnumeratedArray:
-		return is_type_simple_compare(t->EnumeratedArray.elem);
-
-	case Type_Basic:
-		if (t->Basic.flags & BasicFlag_SimpleCompare) {
-			return true;
-		}
-		return false;
-
-	case Type_Pointer:
-	case Type_Proc:
-	case Type_BitSet:
-	case Type_BitField:
-		return true;
-
-	case Type_Struct:
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (!is_type_simple_compare(f->type)) {
-				return false;
-			}
-		}
-		return true;
-
-	case Type_Union:
-		for_array(i, t->Union.variants) {
-			Type *v = t->Union.variants[i];
-			if (!is_type_simple_compare(v)) {
-				return false;
-			}
-		}
-		return true;
-
-	case Type_SimdVector:
-		return is_type_simple_compare(t->SimdVector.elem);
-
-	}
-
-	return false;
-}
 
 Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);
@@ -1526,6 +1542,8 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_untyped(t)) {
 		return false;
 	}
+	return is_type_comparable(t);
+#if 0
 	if (is_type_integer(t)) {
 		return true;
 	}
@@ -1541,8 +1559,15 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_typeid(t)) {
 		return true;
 	}
+	if (is_type_simple_compare(t)) {
+		return true;
+	}
+	if (is_type_comparable(t)) {
+		return true;
+	}
 
 	return false;
+#endif
 }
 
 bool is_type_valid_bit_set_elem(Type *t) {
@@ -1695,12 +1720,23 @@ TypeTuple *get_record_polymorphic_params(Type *t) {
 
 
 bool is_type_polymorphic(Type *t, bool or_specialized=false) {
+	if (t->flags & TypeFlag_InProcessOfCheckingPolymorphic) {
+		return false;
+	}
+
 	switch (t->kind) {
 	case Type_Generic:
 		return true;
 
 	case Type_Named:
-		return is_type_polymorphic(t->Named.base, or_specialized);
+		{
+			u32 flags = t->flags;
+			t->flags |= TypeFlag_InProcessOfCheckingPolymorphic;
+			bool ok = is_type_polymorphic(t->Named.base, or_specialized);
+			t->flags = flags;
+			return ok;
+		}
+
 	case Type_Opaque:
 		return is_type_polymorphic(t->Opaque.elem, or_specialized);
 	case Type_Pointer:
@@ -1892,9 +1928,76 @@ bool is_type_comparable(Type *t) {
 
 	case Type_Opaque:
 		return is_type_comparable(t->Opaque.elem);
+
+	case Type_Struct:
+		if (type_size_of(t) == 0) {
+			return false;
+		}
+		if (t->Struct.is_raw_union) {
+			return is_type_simple_compare(t);
+		}
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_comparable(f->type)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }
+
+// NOTE(bill): type can be easily compared using memcmp
+bool is_type_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_simple_compare(t->Array.elem);
+
+	case Type_EnumeratedArray:
+		return is_type_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & BasicFlag_SimpleCompare) {
+			return true;
+		}
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_Proc:
+	case Type_BitSet:
+	case Type_BitField:
+		return true;
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_simple_compare(f->type)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_Union:
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_simple_compare(v)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_SimdVector:
+		return is_type_simple_compare(t->SimdVector.elem);
+
+	}
+
+	return false;
+}
+
 
 Type *strip_type_aliasing(Type *x) {
 	if (x == nullptr) {
@@ -2317,7 +2420,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 	GB_ASSERT(is_type_struct(type) || is_type_union(type) || is_type_tuple(type));
 	type = base_type(type);
 
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:   max_count = type->Struct.fields.count;   break;
@@ -2365,7 +2468,6 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 	return empty_selection;
 }
 
-
 Entity *scope_lookup_current(Scope *s, String const &name);
 
 Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident) {
@@ -2375,7 +2477,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		return empty_selection;
 	}
 
-	gbAllocator a = heap_allocator();
 	Type *type = type_deref(type_);
 	bool is_ptr = type != type_;
 	sel.indirect = sel.indirect || is_ptr;
@@ -2964,7 +3065,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 }
 
 Array<i64> type_set_offsets_of(Array<Entity *> const &fields, bool is_packed, bool is_raw_union) {
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	auto offsets = array_make<i64>(a, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {
@@ -3353,6 +3454,58 @@ Type *reduce_tuple_to_single_type(Type *original_type) {
 }
 
 
+Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, bool is_packed) {
+	Type *t = alloc_type_struct();
+	t->Struct.fields = array_make<Entity *>(heap_allocator(), field_count);
+
+	Scope *scope = nullptr;
+	for_array(i, t->Struct.fields) {
+		t->Struct.fields[i] = alloc_entity_field(scope, blank_token, field_types[i], false, cast(i32)i, EntityState_Resolved);
+	}
+	t->Struct.is_packed = is_packed;
+
+	return t;
+}
+
+Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed, bool must_be_tuple) {
+	if (field_count == 0) {
+		return nullptr;
+	}
+	if (!must_be_tuple && field_count == 1) {
+		return field_types[0];
+	}
+
+	Type *t = alloc_type_tuple();
+	t->Tuple.variables = array_make<Entity *>(heap_allocator(), field_count);
+
+	Scope *scope = nullptr;
+	for_array(i, t->Tuple.variables) {
+		t->Tuple.variables[i] = alloc_entity_param(scope, blank_token, field_types[i], false, false);
+	}
+	t->Tuple.is_packed = is_packed;
+
+	return t;
+}
+
+Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type *results, bool is_c_vararg, ProcCallingConvention calling_convention) {
+
+	Type *params  = alloc_type_tuple_from_field_types(param_types, param_count, false, true);
+	isize results_count = 0;
+	if (results != nullptr) {
+		if (results->kind != Type_Tuple) {
+			results = alloc_type_tuple_from_field_types(&results, 1, false, true);
+		}
+		results_count = results->Tuple.variables.count;
+	}
+
+	Scope *scope = nullptr;
+	Type *t = alloc_type_proc(scope, params, param_count, results, results_count, false, calling_convention);
+	t->Proc.c_vararg = is_c_vararg;
+	return t;
+}
+
+
+
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
@@ -3670,4 +3823,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 gbString type_to_string(Type *type) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }
+
+
+
 

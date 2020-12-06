@@ -54,17 +54,17 @@ reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
 
 // TODO(bill): Should `sort_by_key` exist or is `sort_by` more than enough?
 sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	context.user_ptr = rawptr(key);
+	context._internal = rawptr(key);
 	sort_by(data, proc(i, j: E) -> bool {
-		k := (proc(E) -> K)(context.user_ptr);
+		k := (proc(E) -> K)(context._internal);
 		return k(i) < k(j);
 	});
 }
 
 reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	context.user_ptr = rawptr(key);
+	context._internal = rawptr(key);
 	sort_by(data, proc(i, j: E) -> bool {
-		k := (proc(E) -> K)(context.user_ptr);
+		k := (proc(E) -> K)(context._internal);
 		return k(j) < k(i);
 	});
 }

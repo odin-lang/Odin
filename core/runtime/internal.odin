@@ -93,18 +93,18 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 		when ODIN_USE_LLVM_API {
 			when size_of(rawptr) == 8 {
 				@(link_name="llvm.memmove.p0i8.p0i8.i64")
-				llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+				llvm_memmove :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 			} else {
 				@(link_name="llvm.memmove.p0i8.p0i8.i32")
-				llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+				llvm_memmove :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 			}
 		} else {
 			when size_of(rawptr) == 8 {
 				@(link_name="llvm.memmove.p0i8.p0i8.i64")
-				llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				llvm_memmove :: proc "none" (dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
 			} else {
 				@(link_name="llvm.memmove.p0i8.p0i8.i32")
-				llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				llvm_memmove :: proc "none" (dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
 			}
 		}
 	}
@@ -121,18 +121,18 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 		when ODIN_USE_LLVM_API {
 			when size_of(rawptr) == 8 {
 				@(link_name="llvm.memcpy.p0i8.p0i8.i64")
-				llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+				llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 			} else {
 				@(link_name="llvm.memcpy.p0i8.p0i8.i32")
-				llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+				llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 			}
 		} else {
 			when size_of(rawptr) == 8 {
 				@(link_name="llvm.memcpy.p0i8.p0i8.i64")
-				llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
 			} else {
 				@(link_name="llvm.memcpy.p0i8.p0i8.i32")
-				llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
 			}
 		}
 	}
@@ -180,9 +180,16 @@ mem_resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int =
 	}
 	return allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
-
-
+memory_equal :: proc "contextless" (a, b: rawptr, n: int) -> bool {
+	return memory_compare(a, b, n) == 0;
+}
 memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
+	switch {
+	case a == b:   return 0;
+	case a == nil: return -1;
+	case b == nil: return +1;
+	}
+
 	x := uintptr(a);
 	y := uintptr(b);
 	n := uintptr(n);
@@ -389,45 +396,45 @@ string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4;
 }
 
-@(default_calling_convention = "c")
+@(default_calling_convention = "none")
 foreign {
 	@(link_name="llvm.sqrt.f32") _sqrt_f32 :: proc(x: f32) -> f32 ---
 	@(link_name="llvm.sqrt.f64") _sqrt_f64 :: proc(x: f64) -> f64 ---
 }
 abs_f32 :: inline proc "contextless" (x: f32) -> f32 {
 	foreign {
-		@(link_name="llvm.fabs.f32") _abs :: proc "c" (x: f32) -> f32 ---
+		@(link_name="llvm.fabs.f32") _abs :: proc "none" (x: f32) -> f32 ---
 	}
 	return _abs(x);
 }
 abs_f64 :: inline proc "contextless" (x: f64) -> f64 {
 	foreign {
-		@(link_name="llvm.fabs.f64") _abs :: proc "c" (x: f64) -> f64 ---
+		@(link_name="llvm.fabs.f64") _abs :: proc "none" (x: f64) -> f64 ---
 	}
 	return _abs(x);
 }
 
 min_f32 :: proc(a, b: f32) -> f32 {
 	foreign {
-		@(link_name="llvm.minnum.f32") _min :: proc "c" (a, b: f32) -> f32 ---
+		@(link_name="llvm.minnum.f32") _min :: proc "none" (a, b: f32) -> f32 ---
 	}
 	return _min(a, b);
 }
 min_f64 :: proc(a, b: f64) -> f64 {
 	foreign {
-		@(link_name="llvm.minnum.f64") _min :: proc "c" (a, b: f64) -> f64 ---
+		@(link_name="llvm.minnum.f64") _min :: proc "none" (a, b: f64) -> f64 ---
 	}
 	return _min(a, b);
 }
 max_f32 :: proc(a, b: f32) -> f32 {
 	foreign {
-		@(link_name="llvm.maxnum.f32") _max :: proc "c" (a, b: f32) -> f32 ---
+		@(link_name="llvm.maxnum.f32") _max :: proc "none" (a, b: f32) -> f32 ---
 	}
 	return _max(a, b);
 }
 max_f64 :: proc(a, b: f64) -> f64 {
 	foreign {
-		@(link_name="llvm.maxnum.f64") _max :: proc "c" (a, b: f64) -> f64 ---
+		@(link_name="llvm.maxnum.f64") _max :: proc "none" (a, b: f64) -> f64 ---
 	}
 	return _max(a, b);
 }

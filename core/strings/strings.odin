@@ -1,5 +1,6 @@
 package strings
 
+import "core:io"
 import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -225,7 +226,7 @@ index_byte :: proc(s: string, c: byte) -> int {
 	return -1;
 }
 
-// Returns i1 if c is not present
+// Returns -1 if c is not present
 last_index_byte :: proc(s: string, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
@@ -467,10 +468,12 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 	return;
 }
 
+@(private) _ascii_space := [256]u8{'\t' = 1, '\n' = 1, '\v' = 1, '\f' = 1, '\r' = 1, ' ' = 1};
+
+
 is_ascii_space :: proc(r: rune) -> bool {
-	switch r {
-	case '\t', '\n', '\v', '\f', '\r', ' ':
-		return true;
+	if r < utf8.RUNE_SELF {
+		return _ascii_space[u8(r)] != 0;
 	}
 	return false;
 }
@@ -757,7 +760,8 @@ split_multi :: proc(s: string, substrs: []string, skip_empty := false, allocator
 // Adjacent invalid bytes are only replaced once
 scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> string {
 	str := s;
-	b := make_builder(0, len(str), allocator);
+	b: Builder;
+	init_builder(&b, 0, len(s), allocator);
 
 	has_error := false;
 	cursor := 0;
@@ -787,207 +791,6 @@ scrub :: proc(s: string, replacement: string, allocator := context.allocator) ->
 }
 
 
-to_lower :: proc(s: string, allocator := context.allocator) -> string {
-	b := make_builder(0, len(s), allocator);
-	for r in s {
-		write_rune(&b, unicode.to_lower(r));
-	}
-	return to_string(b);
-}
-to_upper :: proc(s: string, allocator := context.allocator) -> string {
-	b := make_builder(0, len(s), allocator);
-	for r in s {
-		write_rune(&b, unicode.to_upper(r));
-	}
-	return to_string(b);
-}
-
-
-
-
-is_delimiter :: proc(c: rune) -> bool {
-	return c == '-' || c == '_' || is_space(c);
-}
-
-is_separator :: proc(r: rune) -> bool {
-	if r <= 0x7f {
-		switch r {
-		case '0'..'9': return false;
-		case 'a'..'z': return false;
-		case 'A'..'Z': return false;
-		case '_': return false;
-		}
-		return true;
-	}
-
-	// TODO(bill): unicode categories
-	// if unicode.is_letter(r) || unicode.is_digit(r) {
-	// 	return false;
-	// }
-
-	return unicode.is_space(r);
-}
-
-
-string_case_iterator :: proc(b: ^Builder, s: string, callback: proc(b: ^Builder, prev, curr, next: rune)) {
-	prev, curr: rune;
-	for next in s {
-		if curr == 0 {
-			prev = curr;
-			curr = next;
-			continue;
-		}
-
-		callback(b, prev, curr, next);
-
-		prev = curr;
-		curr = next;
-	}
-
-	if len(s) > 0 {
-		callback(b, prev, curr, 0);
-	}
-}
-
-
-to_lower_camel_case :: to_camel_case;
-to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
-	s := s;
-	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
-
-	string_case_iterator(&b, s, proc(b: ^Builder, prev, curr, next: rune) {
-		if !is_delimiter(curr) {
-			if is_delimiter(prev) {
-				write_rune(b, unicode.to_upper(curr));
-			} else if unicode.is_lower(prev) {
-				write_rune(b, curr);
-			} else {
-				write_rune(b, unicode.to_lower(curr));
-			}
-		}
-	});
-
-	return to_string(b);
-}
-
-to_upper_camel_case :: to_pascal_case;
-to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
-	s := s;
-	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
-
-	string_case_iterator(&b, s, proc(b: ^Builder, prev, curr, next: rune) {
-		if !is_delimiter(curr) {
-			if is_delimiter(prev) || prev == 0 {
-				write_rune(b, unicode.to_upper(curr));
-			} else if unicode.is_lower(prev) {
-				write_rune(b, curr);
-			} else {
-				write_rune(b, unicode.to_lower(curr));
-			}
-		}
-	});
-
-	return to_string(b);
-}
-
-to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allocator := context.allocator) -> string {
-	s := s;
-	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
-
-	adjust_case := unicode.to_upper if all_upper_case else unicode.to_lower;
-
-	prev, curr: rune;
-
-	for next in s {
-		if is_delimiter(curr) {
-			if !is_delimiter(prev) {
-				write_rune(&b, delimiter);
-			}
-		} else if unicode.is_upper(curr) {
-			if unicode.is_lower(prev) || (unicode.is_upper(prev) && unicode.is_lower(next)) {
-				write_rune(&b, delimiter);
-			}
-			write_rune(&b, adjust_case(curr));
-		} else if curr != 0 {
-			write_rune(&b, adjust_case(curr));
-		}
-
-		prev = curr;
-		curr = next;
-	}
-
-	if len(s) > 0 {
-		if unicode.is_upper(curr) && unicode.is_lower(prev) && prev != 0 {
-			write_rune(&b, delimiter);
-		}
-		write_rune(&b, adjust_case(curr));
-	}
-
-	return to_string(b);
-}
-
-
-to_snake_case :: proc(s: string, allocator := context.allocator) -> string {
-	return to_delimiter_case(s, '_', false, allocator);
-}
-
-to_screaming_snake_case :: to_upper_snake_case;
-to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> string {
-	return to_delimiter_case(s, '_', true, allocator);
-}
-
-to_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
-	return to_delimiter_case(s, '-', false, allocator);
-}
-
-to_upper_case :: proc(s: string, allocator := context.allocator) -> string {
-	return to_delimiter_case(s, '-', true, allocator);
-}
-
-to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
-	delimiter :: '_';
-
-	s := s;
-	s = trim_space(s);
-	b := make_builder(0, len(s), allocator);
-
-	prev, curr: rune;
-
-	for next in s {
-		if is_delimiter(curr) {
-			if !is_delimiter(prev) {
-				write_rune(&b, delimiter);
-			}
-		} else if unicode.is_upper(curr) {
-			if unicode.is_lower(prev) || (unicode.is_upper(prev) && unicode.is_lower(next)) {
-				write_rune(&b, delimiter);
-			}
-			write_rune(&b, unicode.to_upper(curr));
-		} else if curr != 0 {
-			write_rune(&b, unicode.to_lower(curr));
-		}
-
-		prev = curr;
-		curr = next;
-	}
-
-	if len(s) > 0 {
-		if unicode.is_upper(curr) && unicode.is_lower(prev) && prev != 0 {
-			write_rune(&b, delimiter);
-			write_rune(&b, unicode.to_upper(curr));
-		} else {
-			write_rune(&b, unicode.to_lower(curr));
-		}
-	}
-
-	return to_string(b);
-}
-
-
-
 reverse :: proc(s: string, allocator := context.allocator) -> string {
 	str := s;
 	n := len(str);
@@ -1013,7 +816,9 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 		return "";
 	}
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
+	writer := to_writer(&b);
 	str := s;
 	column: int;
 
@@ -1024,7 +829,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 			expand := tab_size - column%tab_size;
 
 			for i := 0; i < expand; i += 1 {
-				write_byte(&b, ' ');
+				io.write_byte(writer, ' ');
 			}
 
 			column += expand;
@@ -1035,7 +840,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 				column += w;
 			}
 
-			write_rune(&b, r);
+			io.write_rune(writer, r);
 		}
 
 		str = str[w:];
@@ -1070,12 +875,15 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
-	write_pad_string(&b, pad, pad_len, remains/2);
-	write_string(&b, str);
-	write_pad_string(&b, pad, pad_len, (remains+1)/2);
+	w := to_writer(&b);
+
+	write_pad_string(w, pad, pad_len, remains/2);
+	io.write_string(w, str);
+	write_pad_string(w, pad, pad_len, (remains+1)/2);
 
 	return to_string(b);
 }
@@ -1090,11 +898,14 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
-	write_string(&b, str);
-	write_pad_string(&b, pad, pad_len, remains);
+	w := to_writer(&b);
+
+	io.write_string(w, str);
+	write_pad_string(w, pad, pad_len, remains);
 
 	return to_string(b);
 }
@@ -1109,86 +920,121 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b := make_builder(allocator);
+	b: Builder;
+	init_builder(&b, allocator);
 	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
 
-	write_pad_string(&b, pad, pad_len, remains);
-	write_string(&b, str);
+	w := to_writer(&b);
+
+	write_pad_string(w, pad, pad_len, remains);
+	io.write_string(w, str);
 
 	return to_string(b);
 }
 
-
-
-to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> string {
-	if len(s) == 0 {
-		return "";
-	}
-
-	b := make_builder_len_cap(0, 0, allocator);
-
-	s := s;
-	for c, i in s {
-		if c != utf8.RUNE_ERROR {
-			continue;
-		}
-
-		_, w := utf8.decode_rune_in_string(s[i:]);
-		if w == 1 {
-			grow_builder(&b, len(s) + len(replacement));
-			write_string(&b, s[:i]);
-			s = s[i:];
-			break;
-		}
-	}
-
-	if builder_cap(b) == 0 {
-		return clone(s, allocator);
-	}
-
-	invalid := false;
-
-	for i := 0; i < len(s); /**/ {
-		c := s[i];
-		if c < utf8.RUNE_SELF {
-			i += 1;
-			invalid = false;
-			write_byte(&b, c);
-			continue;
-		}
-
-		_, w := utf8.decode_rune_in_string(s[i:]);
-		if w == 1 {
-			i += 1;
-			if !invalid {
-				invalid = true;
-				write_string(&b, replacement);
-			}
-			continue;
-		}
-		invalid = false;
-		write_string(&b, s[i:][:w]);
-		i += w;
-	}
-	return to_string(b);
-}
 
 
 
 @private
-write_pad_string :: proc(b: ^Builder, pad: string, pad_len, remains: int) {
+write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 	repeats := remains / pad_len;
 
 	for i := 0; i < repeats; i += 1 {
-		write_string(b, pad);
+		io.write_string(w, pad);
 	}
 
 	n := remains % pad_len;
 	p := pad;
 
 	for i := 0; i < n; i += 1 {
-		r, w := utf8.decode_rune_in_string(p);
-		write_rune(b, r);
-		p = p[w:];
+		r, width := utf8.decode_rune_in_string(p);
+		io.write_rune(w, r);
+		p = p[width:];
 	}
+}
+
+
+// fields splits the string s around each instance of one or more consecutive white space character, defined by unicode.is_space
+// returning a slice of substrings of s or an empty slice if s only contains white space
+fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds_check {
+	n := 0;
+	was_space := 1;
+	set_bits := u8(0);
+
+	// check to see
+	for i in 0..<len(s) {
+		r := s[i];
+		set_bits |= r;
+		is_space := int(_ascii_space[r]);
+		n += was_space & ~is_space;
+		was_space = is_space;
+	}
+
+	if set_bits >= utf8.RUNE_SELF {
+		return fields_proc(s, unicode.is_space, allocator);
+	}
+
+	if n == 0 {
+		return nil;
+	}
+
+	a := make([]string, n, allocator);
+	na := 0;
+	field_start := 0;
+	i := 0;
+	for i < len(s) && _ascii_space[s[i]] != 0 {
+		i += 1;
+	}
+	field_start = i;
+	for i < len(s) {
+		if _ascii_space[s[i]] == 0 {
+			i += 1;
+			continue;
+		}
+		a[na] = s[field_start : i];
+		na += 1;
+		i += 1;
+		for i < len(s) && _ascii_space[s[i]] != 0 {
+			i += 1;
+		}
+		field_start = i;
+	}
+	if field_start < len(s) {
+		a[na] = s[field_start:];
+	}
+	return a;
+}
+
+
+// fields_proc splits the string s at each run of unicode code points `ch` satisfying f(ch)
+// returns a slice of substrings of s
+// If all code points in s satisfy f(ch) or string is empty, an empty slice is returned
+//
+// fields_proc makes no guarantee about the order in which it calls f(ch)
+// it assumes that `f` always returns the same value for a given ch
+fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> []string #no_bounds_check {
+	substrings := make([dynamic]string, 0, 32, allocator);
+
+	start, end := -1, -1;
+	for r, offset in s {
+		end = offset;
+		if f(r) {
+			if start >= 0 {
+				append(&substrings, s[start : end]);
+				// -1 could be used, but just speed it up through bitwise not
+				// gotta love 2's complement
+				start = ~start;
+			}
+		} else {
+			if start < 0 {
+				start = end;
+			}
+		}
+	}
+
+	if start >= 0 {
+		append(&substrings, s[start : end]);
+	}
+
+	return substrings[:];
 }

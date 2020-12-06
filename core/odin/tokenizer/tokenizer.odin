@@ -1,9 +1,15 @@
 package odin_tokenizer
 
 import "core:fmt"
+import "core:unicode"
 import "core:unicode/utf8"
 
 Error_Handler :: #type proc(pos: Pos, fmt: string, args: ..any);
+
+Flag :: enum {
+	Insert_Semicolon,
+}
+Flags :: distinct bit_set[Flag; u32];
 
 Tokenizer :: struct {
 	// Immutable data
@@ -11,12 +17,15 @@ Tokenizer :: struct {
 	src:  []byte,
 	err:  Error_Handler,
 
+	flags: Flags,
+
 	// Tokenizing state
 	ch:          rune,
 	offset:      int,
 	read_offset: int,
 	line_offset: int,
 	line_count:  int,
+	insert_semicolon: bool,
 
 	// Mutable data
 	error_count: int,
@@ -105,11 +114,18 @@ peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 }
 
 skip_whitespace :: proc(t: ^Tokenizer) {
-	for t.ch == ' '  ||
-	    t.ch == '\t' ||
-	    t.ch == '\n' ||
-	    t.ch == '\r' {
-		advance_rune(t);
+	for {
+		switch t.ch {
+		case ' ', '\t', '\r':
+			advance_rune(t);
+		case '\n':
+			if t.insert_semicolon {
+				return;
+			}
+			advance_rune(t);
+		case:
+			return;
+		}
 	}
 }
 
@@ -122,12 +138,13 @@ is_letter :: proc(r: rune) -> bool {
 			return true;
 		}
 	}
-	// TODO(bill): Add unicode lookup tables
-	return false;
+	return unicode.is_letter(r);
 }
 is_digit :: proc(r: rune) -> bool {
-	// TODO(bill): Add unicode lookup tables
-	return '0' <= r && r <= '9';
+	if '0' <= r && r <= '9' {
+		return true;
+	}
+	return unicode.is_digit(r);
 }
 
 
@@ -491,6 +508,8 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	lit:  string;
 	pos := offset_to_pos(t, offset);
 
+	insert_semicolon := false;
+
 	switch ch := t.ch; true {
 	case is_letter(ch):
 		lit = scan_identifier(t);
@@ -509,24 +528,39 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					break check_keyword;
 				}
 			}
-			if kind == .Ident && lit == "notin" {
-				kind = .Not_In;
+
+			#partial switch kind {
+			case .Ident, .Context, .Typeid, .Break, .Continue, .Fallthrough, .Return:
+				insert_semicolon = true;
 			}
 		}
 	case '0' <= ch && ch <= '9':
+		insert_semicolon = true;
 		kind, lit = scan_number(t, false);
 	case:
 		advance_rune(t);
 		switch ch {
 		case -1:
 			kind = .EOF;
+			if t.insert_semicolon {
+				t.insert_semicolon = false;
+				kind = .Semicolon;
+				lit = "\n";
+			}
+		case '\n':
+			t.insert_semicolon = false;
+			kind = .Semicolon;
+			lit = "\n";
 		case '"':
+			insert_semicolon = true;
 			kind = .String;
 			lit = scan_string(t);
 		case '\'':
+			insert_semicolon = true;
 			kind = .Rune;
 			lit = scan_rune(t);
 		case '`':
+			insert_semicolon = true;
 			kind = .String;
 			lit = scan_raw_string(t);
 		case '=':
@@ -540,10 +574,13 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '#':
 			kind = .Hash;
 			if t.ch == '!' {
+				insert_semicolon = t.insert_semicolon;
 				kind = .Comment;
 				lit = scan_comment(t);
 			}
-		case '?': kind = .Question;
+		case '?':
+			insert_semicolon = true;
+			kind = .Question;
 		case '@': kind = .At;
 		case '$': kind = .Dollar;
 		case '^': kind = .Pointer;
@@ -562,6 +599,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '*': kind = switch2(t, .Mul, .Mul_Eq);
 		case '/':
 			if t.ch == '/' || t.ch == '*' {
+				insert_semicolon = t.insert_semicolon;
 				kind = .Comment;
 				lit = scan_comment(t);
 			} else {
@@ -604,11 +642,17 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case ',': kind = .Comma;
 		case ';': kind = .Semicolon;
 		case '(': kind = .Open_Paren;
-		case ')': kind = .Close_Paren;
+		case ')':
+			insert_semicolon = true;
+			kind = .Close_Paren;
 		case '[': kind = .Open_Bracket;
-		case ']': kind = .Close_Bracket;
+		case ']':
+			insert_semicolon = true;
+			kind = .Close_Bracket;
 		case '{': kind = .Open_Brace;
-		case '}': kind = .Close_Brace;
+		case '}':
+			insert_semicolon = true;
+			kind = .Close_Brace;
 
 		case '\\': kind = .Back_Slash;
 
@@ -616,8 +660,13 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			if ch != utf8.RUNE_BOM {
 				error(t, t.offset, "illegal character '%r': %d", ch, ch);
 			}
+			insert_semicolon = t.insert_semicolon; // preserve insert_semicolon info
 			kind = .Invalid;
 		}
+	}
+
+	if .Insert_Semicolon in t.flags {
+		t.insert_semicolon = insert_semicolon;
 	}
 
 	if lit == "" {
