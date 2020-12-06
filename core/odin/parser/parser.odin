@@ -2599,7 +2599,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Asm:
 		tok := expect_token(p, .Asm);
 
-		param_types: [dynamic]^ast.Expr
+		param_types: [dynamic]^ast.Expr;
 		return_type: ^ast.Expr;
 		if allow_token(p, .Open_Paren) {
 			for p.curr_tok.kind != .Close_Paren && p.curr_tok.kind != .EOF {

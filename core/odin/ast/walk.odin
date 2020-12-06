@@ -22,7 +22,7 @@ inspect :: proc(node: ^Node, f: proc(^Node) -> bool) {
 			if f(node) {
 				return v;
 			}
-			return nil
+			return nil;
 		},
 		data = rawptr(f),
 	};
