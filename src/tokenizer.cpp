@@ -525,6 +525,12 @@ struct TokenizerState {
 	u8 *  read_curr;   // pos from start
 	u8 *  line;        // current line pos
 	isize line_count;
+	bool  insert_semicolon;
+};
+
+enum TokenizerFlags {
+	TokenizerFlag_None = 0,
+	TokenizerFlag_InsertSemicolon = 1<<0,
 };
 
 struct Tokenizer {
@@ -540,6 +546,9 @@ struct Tokenizer {
 
 	isize error_count;
 	Array<String> allocated_strings;
+
+	TokenizerFlags flags;
+	bool insert_semicolon;
 };
 
 
@@ -550,15 +559,17 @@ TokenizerState save_tokenizer_state(Tokenizer *t) {
 	state.read_curr  = t->read_curr;
 	state.line       = t->line;
 	state.line_count = t->line_count;
+	state.insert_semicolon = t->insert_semicolon;
 	return state;
 }
 
 void restore_tokenizer_state(Tokenizer *t, TokenizerState *state) {
-	 t->curr_rune  = state->curr_rune;
-	 t->curr       = state->curr;
-	 t->read_curr  = state->read_curr;
-	 t->line       = state->line;
-	 t->line_count = state->line_count;
+	t->curr_rune  = state->curr_rune;
+	t->curr       = state->curr;
+	t->read_curr  = state->read_curr;
+	t->line       = state->line;
+	t->line_count = state->line_count;
+	t->insert_semicolon = state->insert_semicolon;
 }
 
 
@@ -613,7 +624,7 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
+TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath, TokenizerFlags flags = TokenizerFlag_None) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = alloc_cstring(heap_allocator(), fullpath);
@@ -623,6 +634,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 	gb_zero_item(t);
 
+	t->flags = flags;
 	t->fullpath = fullpath;
 	t->line_count = 1;
 
@@ -886,9 +898,13 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 	// Skip whitespace
 	for (;;) {
 		switch (t->curr_rune) {
+		case '\n':
+			if (t->insert_semicolon) {
+				break;
+			}
+			/*fallthrough*/
 		case ' ':
 		case '\t':
-		case '\n':
 		case '\r':
 			advance_to_next_rune(t);
 			continue;
@@ -904,6 +920,8 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 	token->pos.line = t->line_count;
 	token->pos.offset = t->curr - t->start;
 	token->pos.column = t->curr - t->line + 1;
+
+	bool insert_semicolon = false;
 
 	Rune curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
@@ -928,19 +946,51 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 				}
 			}
 		}
+
+		switch (token->kind) {
+		case Token_Ident:
+		case Token_context:
+		case Token_typeid: // Dunno?
+		case Token_break:
+		case Token_continue:
+		case Token_fallthrough:
+		case Token_return:
+			insert_semicolon = true;
+			break;
+		}
+
+
+		if (t->flags & TokenizerFlag_InsertSemicolon) {
+			t->insert_semicolon = insert_semicolon;
+		}
 		return;
 
 	} else if (gb_is_between(curr_rune, '0', '9')) {
+		insert_semicolon = true;
 		scan_number_to_token(t, token, false);
 	} else {
 		advance_to_next_rune(t);
 		switch (curr_rune) {
 		case GB_RUNE_EOF:
 			token->kind = Token_EOF;
+			if (t->insert_semicolon) {
+				t->insert_semicolon = false; // EOF consumed
+				token->string = str_lit("\n");
+				token->kind = Token_Semicolon;
+				return;
+			}
 			break;
+
+		case '\n':
+			t->insert_semicolon = false;
+			token->string = str_lit("\n");
+			token->kind = Token_Semicolon;
+			return;
 
 		case '\'': // Rune Literal
 		{
+			insert_semicolon = true;
+
 			token->kind = Token_Rune;
 			Rune quote = curr_rune;
 			bool valid = true;
@@ -976,12 +1026,19 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 			} else {
 				tokenizer_err(t, "Invalid rune literal");
 			}
+
+			if (t->flags & TokenizerFlag_InsertSemicolon) {
+				t->insert_semicolon = insert_semicolon;
+			}
+
 			return;
 		} break;
 
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
+			insert_semicolon = true;
+
 			bool has_carriage_return = false;
 			i32 success;
 			Rune quote = curr_rune;
@@ -1026,6 +1083,11 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 			} else {
 				tokenizer_err(t, "Invalid string literal");
 			}
+
+			if (t->flags & TokenizerFlag_InsertSemicolon) {
+				t->insert_semicolon = insert_semicolon;
+			}
+
 			return;
 		} break;
 
@@ -1046,17 +1108,32 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 
 		case '@':  token->kind = Token_At;           break;
 		case '$':  token->kind = Token_Dollar;       break;
-		case '?':  token->kind = Token_Question;     break;
-		case '^':  token->kind = Token_Pointer;      break;
+		case '?':
+			insert_semicolon = true;
+			token->kind = Token_Question;
+			break;
+		case '^':
+			insert_semicolon = true;
+			token->kind = Token_Pointer;
+			break;
 		case ';':  token->kind = Token_Semicolon;    break;
 		case ',':  token->kind = Token_Comma;        break;
 		case ':':  token->kind = Token_Colon;        break;
 		case '(':  token->kind = Token_OpenParen;    break;
-		case ')':  token->kind = Token_CloseParen;   break;
-		case '[':  token->kind = Token_OpenBracket;  break;
-		case ']':  token->kind = Token_CloseBracket; break;
+		case ')':
+			insert_semicolon = true;
+			token->kind = Token_CloseParen;
+			break;
+		case '[': token->kind = Token_OpenBracket;  break;
+		case ']':
+			insert_semicolon = true;
+			token->kind = Token_CloseBracket;
+			break;
 		case '{':  token->kind = Token_OpenBrace;    break;
-		case '}':  token->kind = Token_CloseBrace;   break;
+		case '}':
+			insert_semicolon = true;
+			token->kind = Token_CloseBrace;
+			break;
 		case '\\': token->kind = Token_BackSlash;    break;
 
 		case '%':
@@ -1129,10 +1206,12 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 
 		case '#':
 			if (t->curr_rune == '!') {
+				insert_semicolon = t->insert_semicolon;
+				token->kind = Token_Comment;
+
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 					advance_to_next_rune(t);
 				}
-				token->kind = Token_Comment;
 			} else {
 				token->kind = Token_Hash;
 			}
@@ -1142,6 +1221,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 		case '/': {
 			token->kind = Token_Quo;
 			if (t->curr_rune == '/') {
+				insert_semicolon = t->insert_semicolon;
 				token->kind = Token_Comment;
 
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
@@ -1253,11 +1333,18 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
 			}
+			insert_semicolon = t->insert_semicolon; // Preserve insert_semicolon info
 			token->kind = Token_Invalid;
 			break;
 		}
 	}
 
+	if (t->flags & TokenizerFlag_InsertSemicolon) {
+		t->insert_semicolon = insert_semicolon;
+	}
+
 	token->string.len = t->curr - token->string.text;
+
+
 	return;
 }
