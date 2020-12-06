@@ -1040,6 +1040,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	case .Context, // Also allows for 'context = '
 	     .Proc,
 	     .Inline, .No_Inline,
+	     .Asm, // Inline assembly
 	     .Ident,
 	     .Integer, .Float, .Imag,
 	     .Rune, .String,
@@ -2594,6 +2595,89 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		bst.underlying = underlying;
 		bst.close = close.pos;
 		return bst;
+
+	case .Asm:
+		tok := expect_token(p, .Asm);
+
+		param_types: [dynamic]^ast.Expr
+		return_type: ^ast.Expr;
+		if allow_token(p, .Open_Paren) {
+			for p.curr_tok.kind != .Close_Paren && p.curr_tok.kind != .EOF {
+				t := parse_type(p);
+				append(&param_types, t);
+				if p.curr_tok.kind != .Comma ||
+				   p.curr_tok.kind == .EOF {
+					break;
+				}
+				advance_token(p);
+			}
+			expect_token(p, .Close_Paren);
+
+			if allow_token(p, .Arrow_Right) {
+				return_type = parse_type(p);
+			}
+		}
+
+		has_side_effects := false;
+		is_align_stack := false;
+		dialect := ast.Inline_Asm_Dialect.Default;
+		for allow_token(p, .Hash) {
+			if p.curr_tok.kind == .Ident {
+				name := advance_token(p);
+				switch name.text {
+				case "side_effects":
+					if has_side_effects {
+						error(p, tok.pos, "duplicate directive on inline asm expression: '#side_effects'");
+					}
+					has_side_effects = true;
+				case "align_stack":
+					if is_align_stack {
+						error(p, tok.pos, "duplicate directive on inline asm expression: '#align_stack'");
+					}
+					is_align_stack = true;
+				case "att":
+					if dialect == .ATT {
+						error(p, tok.pos, "duplicate directive on inline asm expression: '#att'");
+					} else if dialect != .Default {
+						error(p, tok.pos, "conflicting asm dialects");
+					} else {
+						dialect = .ATT;
+					}
+				case "intel":
+					if dialect == .Intel {
+						error(p, tok.pos, "duplicate directive on inline asm expression: '#intel'");
+					} else if dialect != .Default {
+						error(p, tok.pos, "conflicting asm dialects");
+					} else {
+						dialect = .Intel;
+					}
+				}
+
+			} else {
+				error(p, p.curr_tok.pos, "expected an identifier after hash");
+			}
+		}
+
+		open := expect_token(p, .Open_Brace);
+		asm_string := parse_expr(p, false);
+		expect_token(p, .Comma);
+		constraints_string := parse_expr(p, false);
+		allow_token(p, .Comma);
+		close := expect_token(p, .Close_Brace);
+
+		e := ast.new(ast.Inline_Asm_Expr, tok.pos, end_pos(close));
+		e.tok                = tok;
+		e.param_types        = param_types[:];
+		e.return_type        = return_type;
+		e.constraints_string = constraints_string;
+		e.has_side_effects   = has_side_effects;
+		e.is_align_stack     = is_align_stack;
+		e.dialect            = dialect;
+		e.open               = open.pos;
+		e.asm_string         = asm_string;
+		e.close              = close.pos;
+
+		return e;
 
 	}
 

@@ -254,6 +254,27 @@ Auto_Cast :: struct {
 	expr: ^Expr,
 }
 
+Inline_Asm_Dialect :: enum u8 {
+	Default = 0,
+	ATT     = 1,
+	Intel   = 2,
+}
+
+
+Inline_Asm_Expr :: struct {
+	using node: Expr,
+	tok:                tokenizer.Token,
+	param_types:        []^Expr,
+	return_type:        ^Expr,
+	constraints_string: ^Expr,
+	has_side_effects:   bool,
+	is_align_stack:     bool,
+	dialect:            Inline_Asm_Dialect,
+	open:               tokenizer.Pos,
+	asm_string:         ^Expr,
+	close:              tokenizer.Pos,
+}
+
 
 
 
