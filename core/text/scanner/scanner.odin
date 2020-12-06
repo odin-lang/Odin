@@ -487,7 +487,7 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 			}
 
 		} else if is_decimal(ch) {
-			if s.flags >= {.Scan_Ints, .Scan_Floats} {
+			if .Scan_Ints in s.flags || .Scan_Floats in s.flags {
 				tok, ch = scan_number(s, ch, false);
 			} else {
 				ch = advance(s);
