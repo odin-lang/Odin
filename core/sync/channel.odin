@@ -2,60 +2,89 @@ package sync
 
 import "core:mem"
 import "core:time"
-import "core:intrinsics"
+import "intrinsics"
 import "core:math/rand"
 
 _, _ :: time, rand;
 
+Channel_Direction :: enum i8 {
+	Both =  0,
+	Send = +1,
+	Recv = -1,
+}
 
-Channel :: struct(T: typeid) {
+Channel :: struct(T: typeid, Direction := Channel_Direction.Both) {
 	using _internal: ^Raw_Channel,
 }
 
-channel_init :: proc(ch: ^$C/Channel($T), cap := 0, allocator := context.allocator) {
+channel_init :: proc(ch: ^$C/Channel($T, $D), cap := 0, allocator := context.allocator) {
 	context.allocator = allocator;
 	ch._internal = raw_channel_create(size_of(T), align_of(T), cap);
 	return;
 }
 
-channel_make :: proc($T: typeid, cap := 0, allocator := context.allocator) -> (ch: Channel(T)) {
+channel_make :: proc($T: typeid, cap := 0, allocator := context.allocator) -> (ch: Channel(T, .Both)) {
 	context.allocator = allocator;
 	ch._internal = raw_channel_create(size_of(T), align_of(T), cap);
 	return;
 }
 
-channel_destroy :: proc(ch: $C/Channel($T)) {
+channel_make_send :: proc($T: typeid, cap := 0, allocator := context.allocator) -> (ch: Channel(T, .Send)) {
+	context.allocator = allocator;
+	ch._internal = raw_channel_create(size_of(T), align_of(T), cap);
+	return;
+}
+channel_make_recv :: proc($T: typeid, cap := 0, allocator := context.allocator) -> (ch: Channel(T, .Recv)) {
+	context.allocator = allocator;
+	ch._internal = raw_channel_create(size_of(T), align_of(T), cap);
+	return;
+}
+
+channel_destroy :: proc(ch: $C/Channel($T, $D)) {
 	raw_channel_destroy(ch._internal);
 }
 
-
-channel_len :: proc(ch: $C/Channel($T)) -> int {
-	return ch._internal.len;
-}
-channel_cap :: proc(ch: $C/Channel($T)) -> int {
-	return ch._internal.cap;
+channel_as_send :: proc(ch: $C/Channel($T, .Both)) -> (res: Channel(T, .Send)) {
+	res._internal = ch._internal;
+	return;
 }
 
+channel_as_recv :: proc(ch: $C/Channel($T, .Both)) -> (res: Channel(T, .Recv)) {
+	res._internal = ch._internal;
+	return;
+}
 
-channel_send :: proc(ch: $C/Channel($T), msg: T, loc := #caller_location) {
+
+channel_len :: proc(ch: $C/Channel($T, $D)) -> int {
+	return ch._internal.len if ch._internal != nil else 0;
+}
+channel_cap :: proc(ch: $C/Channel($T, $D)) -> int {
+	return ch._internal.cap if ch._internal != nil else 0;
+}
+
+
+channel_send :: proc(ch: $C/Channel($T, $D), msg: T, loc := #caller_location) where D >= .Both {
 	msg := msg;
 	_ = raw_channel_send_impl(ch._internal, &msg, /*block*/true, loc);
 }
-channel_try_send :: proc(ch: $C/Channel($T), msg: T, loc := #caller_location) -> bool {
+channel_try_send :: proc(ch: $C/Channel($T, $D), msg: T, loc := #caller_location) -> bool where D >= .Both {
 	msg := msg;
 	return raw_channel_send_impl(ch._internal, &msg, /*block*/false, loc);
 }
 
-channel_recv :: proc(ch: $C/Channel($T), loc := #caller_location) -> (msg: T) {
+channel_recv :: proc(ch: $C/Channel($T, $D), loc := #caller_location) -> (msg: T) where D <= .Both {
 	c := ch._internal;
+	if c == nil {
+		panic(message="cannot recv message; channel is nil", loc=loc);
+	}
 	mutex_lock(&c.mutex);
 	raw_channel_recv_impl(c, &msg, loc);
 	mutex_unlock(&c.mutex);
 	return;
 }
-channel_try_recv :: proc(ch: $C/Channel($T), loc := #caller_location) -> (msg: T, ok: bool) {
+channel_try_recv :: proc(ch: $C/Channel($T, $D), loc := #caller_location) -> (msg: T, ok: bool) where D <= .Both {
 	c := ch._internal;
-	if mutex_try_lock(&c.mutex) {
+	if c != nil && mutex_try_lock(&c.mutex) {
 		if c.len > 0 {
 			raw_channel_recv_impl(c, &msg, loc);
 			ok = true;
@@ -64,7 +93,7 @@ channel_try_recv :: proc(ch: $C/Channel($T), loc := #caller_location) -> (msg: T
 	}
 	return;
 }
-channel_try_recv_ptr :: proc(ch: $C/Channel($T), msg: ^T, loc := #caller_location) -> (ok: bool) {
+channel_try_recv_ptr :: proc(ch: $C/Channel($T, $D), msg: ^T, loc := #caller_location) -> (ok: bool) where D <= .Both {
 	res: T;
 	res, ok = channel_try_recv(ch, loc);
 	if ok && msg != nil {
@@ -74,32 +103,32 @@ channel_try_recv_ptr :: proc(ch: $C/Channel($T), msg: ^T, loc := #caller_locatio
 }
 
 
-channel_is_nil :: proc(ch: $C/Channel($T)) -> bool {
+channel_is_nil :: proc(ch: $C/Channel($T, $D)) -> bool {
 	return ch._internal == nil;
 }
-channel_is_open :: proc(ch: $C/Channel($T)) -> bool {
+channel_is_open :: proc(ch: $C/Channel($T, $D)) -> bool {
 	c := ch._internal;
 	return c != nil && !c.closed;
 }
 
 
-channel_eq :: proc(a, b: $C/Channel($T)) -> bool {
+channel_eq :: proc(a, b: $C/Channel($T, $D)) -> bool {
 	return a._internal == b._internal;
 }
-channel_ne :: proc(a, b: $C/Channel($T)) -> bool {
+channel_ne :: proc(a, b: $C/Channel($T, $D)) -> bool {
 	return a._internal != b._internal;
 }
 
 
-channel_can_send :: proc(ch: $C/Channel($T)) -> (ok: bool) {
+channel_can_send :: proc(ch: $C/Channel($T, $D)) -> (ok: bool) where D >= .Both {
 	return raw_channel_can_send(ch._internal);
 }
-channel_can_recv :: proc(ch: $C/Channel($T)) -> (ok: bool) {
+channel_can_recv :: proc(ch: $C/Channel($T, $D)) -> (ok: bool) where D <= .Both {
 	return raw_channel_can_recv(ch._internal);
 }
 
 
-channel_peek :: proc(ch: $C/Channel($T)) -> int {
+channel_peek :: proc(ch: $C/Channel($T, $D)) -> int {
 	c := ch._internal;
 	if c == nil {
 		return -1;
@@ -111,12 +140,12 @@ channel_peek :: proc(ch: $C/Channel($T)) -> int {
 }
 
 
-channel_close :: proc(ch: $C/Channel($T), loc := #caller_location) {
+channel_close :: proc(ch: $C/Channel($T, $D), loc := #caller_location) {
 	raw_channel_close(ch._internal, loc);
 }
 
 
-channel_iterator :: proc(ch: $C/Channel($T)) -> (msg: T, ok: bool) {
+channel_iterator :: proc(ch: $C/Channel($T, $D)) -> (msg: T, ok: bool) where D <= .Both {
 	c := ch._internal;
 	if c == nil {
 		return;
@@ -127,12 +156,12 @@ channel_iterator :: proc(ch: $C/Channel($T)) -> (msg: T, ok: bool) {
 	}
 	return;
 }
-channel_drain :: proc(ch: $C/Channel($T)) {
+channel_drain :: proc(ch: $C/Channel($T, $D)) where D >= .Both {
 	raw_channel_drain(ch._internal);
 }
 
 
-channel_move :: proc(dst, src: $C/Channel($T)) {
+channel_move :: proc(dst: $C1/Channel($T, $D1) src: $C2/Channel(T, $D2)) where D1 <= .Both, D2 >= .Both {
 	for msg in channel_iterator(src) {
 		channel_send(dst, msg);
 	}
@@ -258,17 +287,18 @@ raw_channel_send_impl :: proc(c: ^Raw_Channel, msg: rawptr, block: bool, loc := 
 		for c.len >= c.cap {
 			condition_wait_for(&c.cond);
 		}
-	} else if c.len > 0 {
+	} else if c.len > 0 { // TODO(bill): determine correct behaviour
 		if !block {
 			return false;
 		}
 		condition_wait_for(&c.cond);
+	} else if c.len == 0 && !block {
+		return false;
 	}
 
 	send(c, msg);
 	condition_signal(&c.cond);
 	raw_channel_wait_queue_signal(c.recvq);
-
 
 	return true;
 }
@@ -509,7 +539,7 @@ select_recv :: proc(channels: ..^Raw_Channel) -> (index: int) {
 	return;
 }
 
-select_recv_msg :: proc(channels: ..$C/Channel($T)) -> (msg: T, index: int) {
+select_recv_msg :: proc(channels: ..$C/Channel($T, $D)) -> (msg: T, index: int) {
 	switch len(channels) {
 	case 0:
 		panic("sync: select with no channels");
@@ -535,7 +565,7 @@ select_recv_msg :: proc(channels: ..$C/Channel($T)) -> (msg: T, index: int) {
 			q.state = &state;
 			raw_channel_wait_queue_insert(&c.recvq, q);
 		}
-		raw_channel_wait_queue_wait_on(&state);
+		raw_channel_wait_queue_wait_on(&state, SELECT_MAX_TIMEOUT);
 		for c, i in channels {
 			q := &queues[i];
 			raw_channel_wait_queue_remove(&c.recvq, q);
@@ -560,7 +590,7 @@ select_recv_msg :: proc(channels: ..$C/Channel($T)) -> (msg: T, index: int) {
 	return;
 }
 
-select_send_msg :: proc(msg: $T, channels: ..$C/Channel(T)) -> (index: int) {
+select_send_msg :: proc(msg: $T, channels: ..$C/Channel(T, $D)) -> (index: int) {
 	switch len(channels) {
 	case 0:
 		panic("sync: select with no channels");
@@ -589,7 +619,7 @@ select_send_msg :: proc(msg: $T, channels: ..$C/Channel(T)) -> (index: int) {
 			q.state = &state;
 			raw_channel_wait_queue_insert(&c.recvq, q);
 		}
-		raw_channel_wait_queue_wait_on(&state);
+		raw_channel_wait_queue_wait_on(&state, SELECT_MAX_TIMEOUT);
 		for c, i in channels {
 			q := &queues[i];
 			raw_channel_wait_queue_remove(&c.recvq, q);
@@ -781,16 +811,15 @@ select_try_send :: proc(channels: ..^Raw_Channel) -> (index: int) #no_bounds_che
 	return;
 }
 
-select_try_recv_msg :: proc(channels: ..$C/Channel($T)) -> (msg: T, index: int) {
+select_try_recv_msg :: proc(channels: ..$C/Channel($T, $D)) -> (msg: T, index: int) {
 	switch len(channels) {
 	case 0:
-		index = 0;
+		index = -1;
 		return;
 	case 1:
-		if c := channels[0]; channel_can_recv(c) {
+		ok: bool;
+		if msg, ok = channel_try_recv(channels[0]); ok {
 			index = 0;
-			msg = channel_recv(c);
-			return;
 		}
 		return;
 	}
@@ -820,16 +849,14 @@ select_try_recv_msg :: proc(channels: ..$C/Channel($T)) -> (msg: T, index: int) 
 	return;
 }
 
-select_try_send_msg :: proc(msg: $T, channels: ..$C/Channel(T)) -> (index: int) {
+select_try_send_msg :: proc(msg: $T, channels: ..$C/Channel(T, $D)) -> (index: int) {
+	index = -1;
 	switch len(channels) {
 	case 0:
-		index = 0;
 		return;
 	case 1:
-		if c := channels[0]; channel_can_send(c) {
+		if channel_try_send(channels[0], msg) {
 			index = 0;
-			channel_send(c, msg);
-			return;
 		}
 		return;
 	}

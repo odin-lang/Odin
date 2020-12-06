@@ -15,7 +15,7 @@ bool is_divigering_stmt(Ast *stmt) {
 	return t->kind == Type_Proc && t->Proc.diverging;
 }
 
-void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) {
+void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -78,7 +78,7 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 	}
 }
 
-bool check_is_terminating_list(Array<Ast *> const &stmts, String const &label) {
+bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		Ast *stmt = stmts[n];
@@ -96,7 +96,7 @@ bool check_is_terminating_list(Array<Ast *> const &stmts, String const &label) {
 	return false;
 }
 
-bool check_has_break_list(Array<Ast *> const &stmts, String const &label, bool implicit) {
+bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
 		if (check_has_break(stmt, label, implicit)) {
@@ -641,8 +641,7 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 	TypeAndToken *found = map_get(seen, key);
 	if (found != nullptr) {
 		isize count = multi_map_count(seen, key);
-		TypeAndToken *taps = gb_alloc_array(ctx->allocator, TypeAndToken, count);
-		defer (gb_free(ctx->allocator, taps));
+		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
 
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
@@ -859,8 +858,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
 
-		x.expr = gb_alloc_item(ctx->allocator, Ast);
-		x.expr->kind = Ast_Ident;
+		x.expr = alloc_ast_node(nullptr, Ast_Ident);
 		x.expr->Ident.token = token;
 	}
 
@@ -1025,8 +1023,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		GB_ASSERT(is_type_enum(et));
 		auto fields = et->Enum.fields;
 
-		auto unhandled = array_make<Entity *>(ctx->allocator, 0, fields.count);
-		defer (array_free(&unhandled));
+		auto unhandled = array_make<Entity *>(temporary_allocator(), 0, fields.count);
 
 		for_array(i, fields) {
 			Entity *f = fields[i];
@@ -1265,8 +1262,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		GB_ASSERT(is_type_union(ut));
 		auto variants = ut->Union.variants;
 
-		auto unhandled = array_make<Type *>(ctx->allocator, 0, variants.count);
-		defer (array_free(&unhandled));
+		auto unhandled = array_make<Type *>(temporary_allocator(), 0, variants.count);
 
 		for_array(i, variants) {
 			Type *t = variants[i];
@@ -1433,12 +1429,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				return;
 			}
 
+
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			auto lhs_operands = array_make<Operand>(ctx->allocator, lhs_count);
-			auto rhs_operands = array_make<Operand>(ctx->allocator, 0, 2*lhs_count);
-			defer (array_free(&lhs_operands));
-			defer (array_free(&rhs_operands));
+			auto lhs_operands = array_make<Operand>(temporary_allocator(), lhs_count);
+			auto rhs_operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
 
 			for_array(i, as->lhs) {
 				if (is_blank_ident(as->lhs[i])) {
@@ -1462,8 +1457,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				}
 			}
 
-			auto lhs_to_ignore = array_make<bool>(ctx->allocator, lhs_count);
-			defer (array_free(&lhs_to_ignore));
+			auto lhs_to_ignore = array_make<bool>(temporary_allocator(), lhs_count);
 
 			isize max = gb_min(lhs_count, rhs_count);
 			// NOTE(bill, 2020-05-02): This is an utter hack to get these custom atom operations working
@@ -1642,8 +1636,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		} else if (operands.count != result_count) {
 			error(node, "Expected %td return values, got %td", result_count, operands.count);
 		} else {
-			isize max_count = rs->results.count;
-			for (isize i = 0; i < max_count; i++) {
+			for (isize i = 0; i < result_count; i++) {
 				Entity *e = pt->results->Tuple.variables[i];
 				check_assignment(ctx, &operands[i], e->type, str_lit("return statement"));
 			}
@@ -1878,7 +1871,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			DeclInfo *d = decl_info_of_entity(e);
 			GB_ASSERT(d == nullptr);
 			add_entity(ctx->checker, ctx->scope, e->identifier, e);
-			d = make_decl_info(ctx->allocator, ctx->scope, ctx->decl);
+			d = make_decl_info(ctx->scope, ctx->decl);
 			add_entity_and_decl_info(ctx, e->identifier, e, d);
 		}
 
@@ -2036,7 +2029,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_mutable) {
-			Entity **entities = gb_alloc_array(ctx->allocator, Entity *, vd->names.count);
+			Entity **entities = gb_alloc_array(permanent_allocator(), Entity *, vd->names.count);
 			isize entity_count = 0;
 
 			isize new_name_count = 0;

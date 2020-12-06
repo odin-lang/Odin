@@ -146,12 +146,20 @@ Paren_Expr :: struct {
 Selector_Expr :: struct {
 	using node: Expr,
 	expr:  ^Expr,
+	op:    tokenizer.Token,
 	field: ^Ident,
 }
 
 Implicit_Selector_Expr :: struct {
 	using node: Expr,
 	field: ^Ident,
+}
+
+Selector_Call_Expr :: struct {
+	using node: Expr,
+	expr: ^Expr,
+	call: ^Call_Expr,
+	modified_call: bool,
 }
 
 Index_Expr :: struct {
@@ -206,9 +214,9 @@ Ternary_Expr :: struct {
 
 Ternary_If_Expr :: struct {
 	using node: Expr,
-	x: ^Expr,
+	x:    ^Expr,
 	op1:  tokenizer.Token,
-	cond:    ^Expr,
+	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
@@ -217,7 +225,7 @@ Ternary_When_Expr :: struct {
 	using node: Expr,
 	x: ^Expr,
 	op1:  tokenizer.Token,
-	cond:    ^Expr,
+	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
@@ -561,7 +569,6 @@ Distinct_Type :: struct {
 
 Opaque_Type :: struct {
 	using node: Expr,
-	tok:  tokenizer.Token_Kind,
 	type: ^Expr,
 }
 

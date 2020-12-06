@@ -49,10 +49,14 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 
 
 	thread := new(Thread);
+	if thread == nil {
+		return nil;
+	}
+	thread.creation_allocator = context.allocator;
 
 	win32_thread := win32.CreateThread(nil, 0, __windows_thread_entry_proc, thread, win32.CREATE_SUSPENDED, &win32_thread_id);
 	if win32_thread == nil {
-		free(thread);
+		free(thread, thread.creation_allocator);
 		return nil;
 	}
 	thread.procedure       = procedure;
@@ -111,7 +115,7 @@ join_multiple :: proc(threads: ..^Thread) {
 
 destroy :: proc(thread: ^Thread) {
 	join(thread);
-	free(thread);
+	free(thread, thread.creation_allocator);
 }
 
 terminate :: proc(using thread : ^Thread, exit_code: u32) {

@@ -85,6 +85,7 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	if thread == nil {
 		return nil;
 	}
+	thread.creation_allocator = context.allocator;
 
 	// Set thread priority.
 	policy: i32;
@@ -106,7 +107,7 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	sync.mutex_init(&thread.start_mutex);
 	sync.condition_init(&thread.start_gate, &thread.start_mutex);
 	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
-		free(thread);
+		free(thread, thread.creation_allocator);
 		return nil;
 	}
 	thread.procedure = procedure;
@@ -172,7 +173,7 @@ join_multiple :: proc(threads: ..^Thread) {
 destroy :: proc(t: ^Thread) {
 	join(t);
 	t.unix_thread = {};
-	free(t);
+	free(t, t.creation_allocator);
 }
 
 

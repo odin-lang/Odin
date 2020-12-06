@@ -216,7 +216,7 @@ split_last :: proc(array: $T/[]$E) -> (rest: T, last: E) {
 first :: proc(array: $T/[]$E) -> E {
 	return array[0];
 }
-last :: proc(array: $T/[]$E) -> ^E {
+last :: proc(array: $T/[]$E) -> E {
 	return array[len(array)-1];
 }
 
@@ -251,4 +251,45 @@ get_ptr :: proc(array: $T/[]$E, index: int) -> (value: ^E, ok: bool) {
 
 as_ptr :: proc(array: $T/[]$E) -> ^E {
 	return raw_data(array);
+}
+
+
+mapper :: proc(s: $S/[]$U, f: proc(U) -> $V, allocator := context.allocator) -> []V {
+	r := make([]V, len(s), allocator);
+	for v, i in s {
+		r[i] = f(v);
+	}
+	return r;
+}
+
+reduce :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
+	r := initializer;
+	for v in s {
+		r = f(r, v);
+	}
+	return r;
+}
+
+filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> S {
+	r := make([dynamic]S, 0, 0, allocator);
+	for v in s {
+		if f(v) {
+			append(&r, v);
+		}
+	}
+	return r[:];
+}
+
+
+
+dot_product :: proc(a, b: $S/[]$T) -> T
+	where intrinsics.type_is_numeric(T) {
+	if len(a) != len(b) {
+		panic("slice.dot_product: slices of unequal length");
+	}
+	r: T;
+	#no_bounds_check for _, i in a {
+		r += a[i] * b[i];
+	}
+	return r;
 }

@@ -593,6 +593,30 @@ is_inf :: proc{is_inf_f32, is_inf_f64};
 
 
 
+inf_f32 :: proc(sign: int) -> f32 {
+	return f32(inf_f64(sign));
+}
+inf_f64 :: proc(sign: int) -> f64 {
+	v: u64;
+	if sign >= 0 {
+		v = 0x7ff00000_00000000;
+	} else {
+		v = 0xfff00000_00000000;
+	}
+	return transmute(f64)v;
+}
+
+
+nan_f32 :: proc() -> f32 {
+	return f32(nan_f64());
+}
+nan_f64 :: proc() -> f64 {
+	v: u64 = 0x7ff80000_00000001;
+	return transmute(f64)v;
+}
+
+
+
 is_power_of_two :: proc(x: int) -> bool {
 	return x > 0 && (x & (x-1)) == 0;
 }

@@ -350,7 +350,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_byte(']');
 
 	case Type_Info_Opaque:
-		print_string("opaque ");
+		print_string("#opaque ");
 		print_type(info.elem);
 
 	case Type_Info_Simd_Vector:
