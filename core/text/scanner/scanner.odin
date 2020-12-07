@@ -175,6 +175,16 @@ peek_n :: proc(s: ^Scanner, n: int) -> rune {
 	return ch;
 }
 
+scan_peek_n :: proc(s: ^Scanner, n: int) -> (tok: rune) {
+	assert(n >= 0);
+	prev_s := s^;
+	for in 0..<n {
+		tok = scan(s);
+	}
+	tok = scan(s);
+	s^ = prev_s;
+	return;
+}
 
 error :: proc(s: ^Scanner, msg: string) {
 	s.error_count += 1;
