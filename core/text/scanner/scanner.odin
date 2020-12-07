@@ -160,6 +160,21 @@ peek :: proc(s: ^Scanner) -> rune {
 	return s.ch;
 }
 
+peek_n :: proc(s: ^Scanner, n: int) -> rune {
+	assert(n >= 0);
+	if n == 0 {
+		return peek(s);
+	}
+
+	prev_s := s^;
+	for in 0..<n {
+		next(s);
+	}
+	ch := peek(s);
+	s^ = prev_s;
+	return ch;
+}
+
 
 error :: proc(s: ^Scanner, msg: string) {
 	s.error_count += 1;
