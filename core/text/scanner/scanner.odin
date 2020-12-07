@@ -150,32 +150,26 @@ next :: proc(s: ^Scanner) -> rune {
 	return ch;
 }
 
-peek :: proc(s: ^Scanner) -> rune {
+peek :: proc(s: ^Scanner, n := 0) -> (ch: rune) {
 	if s.ch == -2 {
 		s.ch = advance(s);
 		if s.ch == '\ufeff' { // Ignore BOM
 			s.ch = advance(s);
 		}
 	}
-	return s.ch;
-}
-
-peek_n :: proc(s: ^Scanner, n: int) -> rune {
-	assert(n >= 0);
-	if n == 0 {
-		return peek(s);
+	ch = s.ch;
+	if n > 0 {
+		prev_s := s^;
+		for in 0..<n {
+			next(s);
+		}
+		ch = s.ch;
+		s^ = prev_s;
 	}
-
-	prev_s := s^;
-	for in 0..<n {
-		next(s);
-	}
-	ch := peek(s);
-	s^ = prev_s;
 	return ch;
 }
 
-scan_peek_n :: proc(s: ^Scanner, n: int) -> (tok: rune) {
+peek_token :: proc(s: ^Scanner, n := 0) -> (tok: rune) {
 	assert(n >= 0);
 	prev_s := s^;
 	for in 0..<n {
