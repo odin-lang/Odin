@@ -3190,7 +3190,7 @@ bool ir_type_requires_mem_zero(Type *t) {
 		} else {
 			i64 packed_sized = 0;
 			for_array(i, t->Struct.fields) {
-				Type *f = t->Struct.fields[i];
+				Entity *f = t->Struct.fields[i];
 				if (f->kind == Entity_Variable) {
 					packed_sized += type_size_of(f->type);
 				}
