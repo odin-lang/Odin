@@ -3162,14 +3162,76 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 	}
 }
 
+bool ir_type_requires_mem_zero(Type *t) {
+	t = core_type(t);
+	isize sz = type_size_of(t);
+	if (t->kind == Type_SimdVector) {
+		return false;
+	}
+
+	if (!(gb_is_power_of_two(sz) && sz <= build_context.max_align)) {
+		return true;
+	}
+
+	enum : i64 {LARGE_SIZE = 64};
+	if (sz > LARGE_SIZE) {
+		return true;
+	}
+
+	switch (t->kind) {
+	case Type_Union:
+		return true;
+	case Type_Struct:
+		if (t->Struct.is_raw_union) {
+			return true;
+		}
+		if (t->Struct.is_packed) {
+			return false;
+		} else {
+			i64 packed_sized = 0;
+			for_array(i, t->Struct.fields) {
+				Type *f = t->Struct.fields[i];
+				if (f->kind == Entity_Variable) {
+					packed_sized += type_size_of(f->type);
+				}
+			}
+			return sz != packed_sized;
+		}
+		break;
+	case Type_Tuple:
+		if (t->Tuple.is_packed) {
+			return false;
+		} else {
+			i64 packed_sized = 0;
+			for_array(i, t->Tuple.variables) {
+				Entity *f = t->Tuple.variables[i];
+				if (f->kind == Entity_Variable) {
+					packed_sized += type_size_of(f->type);
+				}
+			}
+			return sz != packed_sized;
+		}
+		break;
+
+	case Type_DynamicArray:
+	case Type_Map:
+	case Type_BitField:
+		return true;
+	case Type_Array:
+		return ir_type_requires_mem_zero(t->Array.elem);
+	case Type_EnumeratedArray:
+		return ir_type_requires_mem_zero(t->EnumeratedArray.elem);
+	}
+	return false;
+}
+
 void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	gbAllocator a = ir_allocator();
 	Type *t = type_deref(ir_type(address));
-	isize sz = type_size_of(t);
 
 	if (address) address->uses += 1;
 
-	if (!(gb_is_power_of_two(sz) && sz <= build_context.max_align)) {
+	if (ir_type_requires_mem_zero(t)) {
 		// TODO(bill): Is this a good idea?
 		auto args = array_make<irValue *>(a, 2);
 		args[0] = ir_emit_conv(p, address, t_rawptr);
