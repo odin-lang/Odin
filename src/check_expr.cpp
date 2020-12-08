@@ -10279,6 +10279,71 @@ void check_expr_or_type(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) 
 }
 
 
+
+bool is_exact_value_zero(ExactValue const &v) {
+	switch (v.kind) {
+	case ExactValue_Invalid:
+		return true;
+	case ExactValue_Bool:
+		return !v.value_bool;
+	case ExactValue_String:
+		return v.value_string.len == 0;
+	case ExactValue_Integer:
+		return big_int_is_zero(&v.value_integer);
+	case ExactValue_Float:
+		return v.value_float == 0.0;
+	case ExactValue_Complex:
+		if (v.value_complex) {
+			return v.value_complex->real == 0.0 && v.value_complex->imag == 0.0;
+		}
+		return true;
+	case ExactValue_Quaternion:
+		if (v.value_quaternion) {
+			return v.value_quaternion->real == 0.0 &&
+			       v.value_quaternion->imag == 0.0 &&
+			       v.value_quaternion->jmag == 0.0 &&
+			       v.value_quaternion->kmag == 0.0;
+		}
+		return true;
+	case ExactValue_Pointer:
+		return v.value_pointer == 0;
+	case ExactValue_Compound:
+		if (v.value_compound == nullptr) {
+			return true;
+		} else {
+			ast_node(cl, CompoundLit, v.value_compound);
+			if (cl->elems.count == 0) {
+				return true;
+			} else {
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->tav.mode != Addressing_Constant) {
+						// if (elem->tav.value.kind != ExactValue_Invalid) {
+						return false;
+						// }
+					}
+					if (!is_exact_value_zero(elem->tav.value)) {
+						return false;
+					}
+				}
+				return true;
+			}
+		}
+	case ExactValue_Procedure:
+		return v.value_procedure == nullptr;
+	case ExactValue_Typeid:
+		return v.value_typeid == nullptr;
+	}
+	return true;
+
+}
+
+
+
+
+
+
+
 gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
 gbString write_struct_fields_to_string(gbString str, Slice<Ast *> const &params) {
