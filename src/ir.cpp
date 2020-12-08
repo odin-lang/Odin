@@ -901,7 +901,7 @@ Array<irValue *> *ir_value_referrers(irValue *v) {
 ////////////////////////////////////////////////////////////////
 
 void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
-void     ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
+irValue *ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value, bool is_volatile=false);
 irValue *ir_emit_load           (irProcedure *p, irValue *address, i64 custom_align=0);
@@ -3091,77 +3091,6 @@ void ir_pop_debug_location(irModule *m) {
 irValue *ir_emit_runtime_call(irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr, ProcInlining inlining = ProcInlining_none);
 irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr = nullptr, ProcInlining inlining = ProcInlining_none);
 
-
-irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value, bool is_volatile) {
-	Type *a = type_deref(ir_type(address));
-
-	if (is_type_boolean(a)) {
-		// NOTE(bill): There are multiple sized booleans, thus force a conversion (if necessarily)
-		value = ir_emit_conv(p, value, a);
-	}
-
-	if (address) address->uses += 1;
-	if (value) value->uses += 1;
-
-
-	Type *b = ir_type(value);
-	if (!is_type_untyped(b)) {
-		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
-	}
-	return ir_emit(p, ir_instr_store(p, address, value, is_volatile));
-}
-irValue *ir_emit_load(irProcedure *p, irValue *address, i64 custom_align) {
-	GB_ASSERT(address != nullptr);
-	Type *t = type_deref(ir_type(address));
-	// if (is_type_boolean(t)) {
-		// return ir_emit(p, ir_instr_load_bool(p, address));
-	// }
-	if (address) address->uses += 1;
-	auto instr = ir_instr_load(p, address);
-	instr->Instr.Load.custom_align = custom_align;
-	return ir_emit(p, instr);
-}
-irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
-	if (cond) cond->uses += 1;
-	if (t) t->uses += 1;
-	if (f) f->uses += 1;
-
-	return ir_emit(p, ir_instr_select(p, cond, t, f));
-}
-
-void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
-	GB_ASSERT_NOT_NULL(proc);
-	GB_ASSERT_NOT_NULL(v);
-
-	if (v->loc != nullptr) {
-		return; // Already set
-	}
-
-	if (proc->is_startup) {
-		// ignore startup procedures
-		return;
-	}
-
-	irModule *m = proc->module;
-	GB_ASSERT(m->debug_location_stack.count > 0);
-	v->loc = *array_end_ptr(&m->debug_location_stack);
-
-	if (v->loc == nullptr && proc->entity != nullptr) {
-		if (proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0)) {
-			// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
-		} else {
-			if (v->kind == irValue_Instr) {
-				auto *instr = &v->Instr;
-				gb_printf_err("Instruction kind: %.*s\n", LIT(ir_instr_strings[instr->kind]));
-				if (instr->kind == irInstr_DebugDeclare) {
-					gb_printf_err("\t%.*s\n", LIT(instr->DebugDeclare.entity->token.string));
-				}
-			}
-			GB_PANIC("Value without debug location: %.*s %p; %p :: %s", LIT(proc->name), proc->entity, v, type_to_string(proc->type));
-		}
-	}
-}
-
 bool ir_type_requires_mem_zero(Type *t) {
 	t = core_type(t);
 	isize sz = type_size_of(t);
@@ -3225,28 +3154,135 @@ bool ir_type_requires_mem_zero(Type *t) {
 	return false;
 }
 
-void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
+irValue *ir_call_mem_zero(irProcedure *p, irValue *address, Ast *expr = nullptr) {
+	Type *t = type_deref(ir_type(address));
+	// TODO(bill): Is this a good idea?
+	auto args = array_make<irValue *>(ir_allocator(), 2);
+	args[0] = ir_emit_conv(p, address, t_rawptr);
+	args[1] = ir_const_int(type_size_of(t));
+	AstPackage *pkg_runtime = get_core_package(p->module->info, str_lit("runtime"));
+	if (p->entity != nullptr) {
+		String name = p->entity->token.string;
+		if (p->entity->pkg != pkg_runtime && !(name == "mem_zero" || name == "memset")) {
+			ir_emit_comment(p, str_lit("ZeroInit"));
+			return ir_emit_package_call(p, "runtime", "mem_zero", args, expr);
+		}
+	}
+	return nullptr;
+}
+
+irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value, bool is_volatile) {
+	Type *a = type_deref(ir_type(address));
+
+	if (is_type_boolean(a)) {
+		// NOTE(bill): There are multiple sized booleans, thus force a conversion (if necessarily)
+		value = ir_emit_conv(p, value, a);
+	}
+
+	if (address) address->uses += 1;
+	if (value) value->uses += 1;
+
+
+	Type *b = ir_type(value);
+	if (!is_type_untyped(b)) {
+		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
+	}
+
+
+	if (value->kind == irValue_Constant) {
+		ExactValue const &v = value->Constant.value;
+		irValue *res = nullptr;
+		switch (v.kind) {
+		case ExactValue_Invalid:
+			res = ir_call_mem_zero(p, address);
+			if (res) {
+				return res;
+			}
+			goto end;
+
+		case ExactValue_Compound:
+			// NOTE(bill): This is to enforce the zeroing of the padding
+			if (ir_type_requires_mem_zero(a)) {
+				res = ir_call_mem_zero(p, address);
+				if (res == nullptr || v.value_compound == nullptr) {
+					goto end;
+				}
+				if (is_exact_value_zero(v)) {
+					return res;
+				}
+			}
+			goto end;
+		}
+	}
+
+end:;
+	return ir_emit(p, ir_instr_store(p, address, value, is_volatile));
+}
+irValue *ir_emit_load(irProcedure *p, irValue *address, i64 custom_align) {
+	GB_ASSERT(address != nullptr);
+	Type *t = type_deref(ir_type(address));
+	// if (is_type_boolean(t)) {
+		// return ir_emit(p, ir_instr_load_bool(p, address));
+	// }
+	if (address) address->uses += 1;
+	auto instr = ir_instr_load(p, address);
+	instr->Instr.Load.custom_align = custom_align;
+	return ir_emit(p, instr);
+}
+irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
+	if (cond) cond->uses += 1;
+	if (t) t->uses += 1;
+	if (f) f->uses += 1;
+
+	return ir_emit(p, ir_instr_select(p, cond, t, f));
+}
+
+void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
+	GB_ASSERT_NOT_NULL(proc);
+	GB_ASSERT_NOT_NULL(v);
+
+	if (v->loc != nullptr) {
+		return; // Already set
+	}
+
+	if (proc->is_startup) {
+		// ignore startup procedures
+		return;
+	}
+
+	irModule *m = proc->module;
+	GB_ASSERT(m->debug_location_stack.count > 0);
+	v->loc = *array_end_ptr(&m->debug_location_stack);
+
+	if (v->loc == nullptr && proc->entity != nullptr) {
+		if (proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0)) {
+			// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
+		} else {
+			if (v->kind == irValue_Instr) {
+				auto *instr = &v->Instr;
+				gb_printf_err("Instruction kind: %.*s\n", LIT(ir_instr_strings[instr->kind]));
+				if (instr->kind == irInstr_DebugDeclare) {
+					gb_printf_err("\t%.*s\n", LIT(instr->DebugDeclare.entity->token.string));
+				}
+			}
+			GB_PANIC("Value without debug location: %.*s %p; %p :: %s", LIT(proc->name), proc->entity, v, type_to_string(proc->type));
+		}
+	}
+}
+
+irValue *ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	gbAllocator a = ir_allocator();
 	Type *t = type_deref(ir_type(address));
 
 	if (address) address->uses += 1;
 
 	if (ir_type_requires_mem_zero(t)) {
-		// TODO(bill): Is this a good idea?
-		auto args = array_make<irValue *>(a, 2);
-		args[0] = ir_emit_conv(p, address, t_rawptr);
-		args[1] = ir_const_int(type_size_of(t));
-		AstPackage *pkg_runtime = get_core_package(p->module->info, str_lit("runtime"));
-		if (p->entity != nullptr) {
-			String name = p->entity->token.string;
-			if (p->entity->pkg != pkg_runtime && !(name == "mem_zero" || name == "memset")) {
-				ir_emit_comment(p, str_lit("ZeroInit"));
-				irValue *v = ir_emit_package_call(p, "runtime", "mem_zero", args, expr);
-				return;
-			}
+		irValue *res = ir_call_mem_zero(p, address, expr);
+		if (res) {
+			return res;
 		}
 	}
-	ir_emit(p, ir_instr_zero_init(p, address));
+	return ir_emit(p, ir_instr_zero_init(p, address));
 }
 
 irValue *ir_emit_comment(irProcedure *p, String text) {
