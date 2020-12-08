@@ -47,7 +47,7 @@ print_strings :: proc "contextless" (args: ..string) -> (n: int, err: _OS_Errno)
 		m: int;
 		m, err = os_write(transmute([]byte)str);
 		n += m;
-		if err != nil {
+		if err != 0 {
 			break;
 		}
 	}
