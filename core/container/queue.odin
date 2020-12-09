@@ -163,8 +163,11 @@ _queue_increase_capacity :: proc(q: ^$Q/Queue($T), new_capacity: int) {
 	end := array_len(q.data);
 	array_resize(&q.data, new_capacity);
 	if q.offset + q.len > end {
+		end_items := end - q.offset;
+		new_offset := new_capacity - end_items;
 		data := array_slice(q.data);
-		copy(data[end:][:q.offset], data[0:][:q.offset]);
+		copy(data[new_offset:], data[q.offset:][:end_items]);
+		q.offset = new_offset;
 	}
 }
 _queue_grow :: proc(q: ^$Q/Queue($T), min_capacity: int = 0) {
