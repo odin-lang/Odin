@@ -545,8 +545,8 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
-		body = parse_block_stmt(p, true);
 		skip_possible_newline_for_literal(p);
+		body = parse_block_stmt(p, true);
 	}
 
 	if allow_token(p, .Else) {
@@ -621,8 +621,8 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
-		body = parse_block_stmt(p, false);
 		skip_possible_newline_for_literal(p);
+		body = parse_block_stmt(p, false);
 	}
 
 	if allow_token(p, .Else) {
@@ -630,6 +630,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 		case .If:
 			else_stmt = parse_if_stmt(p);
 		case .Open_Brace:
+			skip_possible_newline_for_literal(p);
 			else_stmt = parse_block_stmt(p, false);
 		case .Do:
 			expect_token(p, .Do);
@@ -683,8 +684,8 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			if allow_token(p, .Do) {
 				body = convert_stmt_to_body(p, parse_stmt(p));
 			} else {
-				body = parse_body(p);
 				skip_possible_newline_for_literal(p);
+				body = parse_body(p);
 			}
 
 			range_stmt := ast.new(ast.Range_Stmt, tok.pos, body.end);
@@ -718,8 +719,8 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
-		body = parse_body(p);
 		skip_possible_newline_for_literal(p);
+		body = parse_body(p);
 	}
 
 
@@ -1087,8 +1088,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	    	if allow_token(p, .Do) {
 	    		body = convert_stmt_to_body(p, parse_stmt(p));
 	    	} else {
-	    		body = parse_block_stmt(p, false);
 			skip_possible_newline_for_literal(p);
+	    		body = parse_block_stmt(p, false);
 	    	}
 
 	    	if bad_stmt {
