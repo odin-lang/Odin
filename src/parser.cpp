@@ -1284,8 +1284,7 @@ bool skip_possible_newline(AstFile *f) {
 	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
 		return false;
 	}
-	Token *prev = &f->curr_token;
-	if (prev->kind == Token_Semicolon && prev->string == "\n") {
+	if (token_is_newline(f->curr_token)) {
 		advance_token(f);
 		return true;
 	}
@@ -1296,10 +1295,10 @@ bool skip_possible_newline_for_literal(AstFile *f) {
 	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
 		return false;
 	}
-	TokenPos curr_pos = f->curr_token.pos;
-	if (token_is_newline(f->curr_token)) {
+	Token curr = f->curr_token;
+	if (token_is_newline(curr)) {
 		Token next = peek_token(f);
-		if (curr_pos.line+1 >= next.pos.line) {
+		if (curr.pos.line+1 >= next.pos.line) {
 			switch (next.kind) {
 			case Token_OpenBrace:
 			case Token_else:
@@ -3795,8 +3794,8 @@ Ast *parse_if_stmt(AstFile *f) {
 			syntax_error(body, "The body of a 'do' be on the same line as if condition");
 		}
 	} else {
-		body = parse_block_stmt(f, false);
 		skip_possible_newline_for_literal(f);
+		body = parse_block_stmt(f, false);
 	}
 
 	if (allow_token(f, Token_else)) {
@@ -3805,6 +3804,7 @@ Ast *parse_if_stmt(AstFile *f) {
 			else_stmt = parse_if_stmt(f);
 			break;
 		case Token_OpenBrace:
+			skip_possible_newline_for_literal(f);
 			else_stmt = parse_block_stmt(f, false);
 			break;
 		case Token_do: {
@@ -3851,8 +3851,8 @@ Ast *parse_when_stmt(AstFile *f) {
 			syntax_error(body, "The body of a 'do' be on the same line as when statement");
 		}
 	} else {
-		body = parse_block_stmt(f, true);
 		skip_possible_newline_for_literal(f);
+		body = parse_block_stmt(f, true);
 	}
 
 	if (allow_token(f, Token_else)) {
@@ -3957,8 +3957,8 @@ Ast *parse_for_stmt(AstFile *f) {
 					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 				}
 			} else {
-				body = parse_block_stmt(f, false);
 				skip_possible_newline_for_literal(f);
+				body = parse_block_stmt(f, false);
 			}
 			return ast_range_stmt(f, token, nullptr, nullptr, in_token, rhs, body);
 		}
@@ -3993,8 +3993,8 @@ Ast *parse_for_stmt(AstFile *f) {
 			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 		}
 	} else {
-		body = parse_block_stmt(f, false);
 		skip_possible_newline_for_literal(f);
+		body = parse_block_stmt(f, false);
 	}
 
 	if (is_range) {
@@ -4345,8 +4345,8 @@ Ast *parse_stmt(AstFile *f) {
 					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 				}
 			} else {
-				body = parse_block_stmt(f, false);
 				skip_possible_newline_for_literal(f);
+				body = parse_block_stmt(f, false);
 			}
 			if (bad_stmt) {
 				return ast_bad_stmt(f, inline_token, f->curr_token);
