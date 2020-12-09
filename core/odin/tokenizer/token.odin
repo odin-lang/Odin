@@ -317,6 +317,8 @@ is_operator :: proc(kind: Token_Kind) -> bool {
 		return true;
 	case .In, .Not_In:
 		return true;
+	case .If:
+		return true;
 	}
 	return false;
 }
