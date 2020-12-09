@@ -121,7 +121,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	}
 
 	p.file = file;
-	tokenizer.init(&p.tok, file.src, file.fullpath);
+	tokenizer.init(&p.tok, file.src, file.fullpath, p.err);
 	if p.tok.ch <= 0 {
 		return true;
 	}
@@ -625,6 +625,8 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 		body = parse_block_stmt(p, false);
 	}
 
+	else_tok := p.curr_tok.pos;
+
 	if allow_token(p, .Else) {
 		#partial switch p.curr_tok.kind {
 		case .If:
@@ -651,6 +653,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	if_stmt.cond      = cond;
 	if_stmt.body      = body;
 	if_stmt.else_stmt = else_stmt;
+	if_stmt.else_pos = else_tok;
 	return if_stmt;
 }
 
@@ -785,6 +788,7 @@ parse_case_clause :: proc(p: ^Parser, is_type_switch: bool) -> ^ast.Case_Clause 
 	cc.list = list;
 	cc.terminator = terminator;
 	cc.body = stmts;
+	cc.case_pos = tok.pos;
 	return cc;
 }
 
@@ -846,6 +850,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		ts := ast.new(ast.Type_Switch_Stmt, tok.pos, body.end);
 		ts.tag  = tag;
 		ts.body = body;
+		ts.switch_pos = tok.pos;
 		return ts;
 	} else {
 		cond := convert_stmt_to_expr(p, tag, "switch expression");
@@ -853,6 +858,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		ts.init = init;
 		ts.cond = cond;
 		ts.body = body;
+		ts.switch_pos = tok.pos;
 		return ts;
 	}
 }
@@ -1156,7 +1162,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		end := end_pos(tok);
 		if len(results) > 0 {
-			end = results[len(results)-1].pos;
+			end = results[len(results)-1].end;
 		}
 
 		rs := ast.new(ast.Return_Stmt, tok.pos, end);
