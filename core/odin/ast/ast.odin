@@ -325,6 +325,7 @@ If_Stmt :: struct {
 	init:      ^Stmt,
 	cond:      ^Expr,
 	body:      ^Stmt,
+	else_pos:  tokenizer.Pos,
 	else_stmt: ^Stmt,
 }
 
@@ -490,7 +491,7 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 	}
 	for {
 		e, ok := val.derived.(Paren_Expr);
-		if !ok {
+		if !ok || e.expr == nil {
 			break;
 		}
 		val = e.expr;
