@@ -3181,6 +3181,7 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 
 
 Ast *parse_block_stmt(AstFile *f, b32 is_when) {
+	skip_possible_newline_for_literal(f);
 	if (!is_when && f->curr_proc == nullptr) {
 		syntax_error(f->curr_token, "You cannot use a block statement in the file scope");
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
@@ -3794,17 +3795,16 @@ Ast *parse_if_stmt(AstFile *f) {
 			syntax_error(body, "The body of a 'do' be on the same line as if condition");
 		}
 	} else {
-		skip_possible_newline_for_literal(f);
 		body = parse_block_stmt(f, false);
 	}
 
+	skip_possible_newline_for_literal(f);
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
 		case Token_if:
 			else_stmt = parse_if_stmt(f);
 			break;
 		case Token_OpenBrace:
-			skip_possible_newline_for_literal(f);
 			else_stmt = parse_block_stmt(f, false);
 			break;
 		case Token_do: {
@@ -3851,10 +3851,10 @@ Ast *parse_when_stmt(AstFile *f) {
 			syntax_error(body, "The body of a 'do' be on the same line as when statement");
 		}
 	} else {
-		skip_possible_newline_for_literal(f);
 		body = parse_block_stmt(f, true);
 	}
 
+	skip_possible_newline_for_literal(f);
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
 		case Token_when:
@@ -3957,7 +3957,6 @@ Ast *parse_for_stmt(AstFile *f) {
 					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 				}
 			} else {
-				skip_possible_newline_for_literal(f);
 				body = parse_block_stmt(f, false);
 			}
 			return ast_range_stmt(f, token, nullptr, nullptr, in_token, rhs, body);
@@ -3993,7 +3992,6 @@ Ast *parse_for_stmt(AstFile *f) {
 			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 		}
 	} else {
-		skip_possible_newline_for_literal(f);
 		body = parse_block_stmt(f, false);
 	}
 
@@ -4345,7 +4343,6 @@ Ast *parse_stmt(AstFile *f) {
 					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 				}
 			} else {
-				skip_possible_newline_for_literal(f);
 				body = parse_block_stmt(f, false);
 			}
 			if (bad_stmt) {

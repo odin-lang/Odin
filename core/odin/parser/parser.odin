@@ -521,6 +521,7 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
 }
 
 parse_block_stmt :: proc(p: ^Parser, is_when: bool) -> ^ast.Stmt {
+	skip_possible_newline_for_literal(p);
 	if !is_when && p.curr_proc == nil {
 		error(p, p.curr_tok.pos, "you cannot use a block statement in the file scope");
 	}
@@ -545,10 +546,10 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
-		skip_possible_newline_for_literal(p);
 		body = parse_block_stmt(p, true);
 	}
 
+	skip_possible_newline_for_literal(p);
 	if allow_token(p, .Else) {
 		#partial switch p.curr_tok.kind {
 		case .When:
@@ -621,18 +622,17 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
-		skip_possible_newline_for_literal(p);
 		body = parse_block_stmt(p, false);
 	}
 
 	else_tok := p.curr_tok.pos;
 
+	skip_possible_newline_for_literal(p);
 	if allow_token(p, .Else) {
 		#partial switch p.curr_tok.kind {
 		case .If:
 			else_stmt = parse_if_stmt(p);
 		case .Open_Brace:
-			skip_possible_newline_for_literal(p);
 			else_stmt = parse_block_stmt(p, false);
 		case .Do:
 			expect_token(p, .Do);
@@ -687,7 +687,6 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			if allow_token(p, .Do) {
 				body = convert_stmt_to_body(p, parse_stmt(p));
 			} else {
-				skip_possible_newline_for_literal(p);
 				body = parse_body(p);
 			}
 
@@ -722,7 +721,6 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
-		skip_possible_newline_for_literal(p);
 		body = parse_body(p);
 	}
 
@@ -1094,7 +1092,6 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	    	if allow_token(p, .Do) {
 	    		body = convert_stmt_to_body(p, parse_stmt(p));
 	    	} else {
-			skip_possible_newline_for_literal(p);
 	    		body = parse_block_stmt(p, false);
 	    	}
 
