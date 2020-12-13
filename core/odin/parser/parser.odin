@@ -107,6 +107,14 @@ default_parser :: proc() -> Parser {
 	};
 }
 
+is_package_name_reserved :: proc(name: string) -> bool {
+	switch name {
+	case "builtin", "intrinsics":
+		return true;
+	}
+	return false;
+}
+
 parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	zero_parser: {
 		p.prev_tok         = {};
@@ -139,8 +147,11 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 
 	pkg_name := expect_token_after(p, .Ident, "package");
 	if pkg_name.kind == .Ident {
-		if is_blank_ident(pkg_name) {
+		switch name := pkg_name.text; {
+		case is_blank_ident(name):
 			error(p, pkg_name.pos, "invalid package name '_'");
+		case is_package_name_reserved(name), file.pkg.kind != .Runtime && name == "runtime":
+			error(p, pkg_name.pos, "use of reserved package name '%s'", name);
 		}
 	}
 	p.file.pkg_name = pkg_name.text;
@@ -276,7 +287,7 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 	}
 
 	if len(list) > 0 {
-		comments = new(ast.Comment_Group);
+		comments = ast.new(ast.Comment_Group, list[0].pos, end_pos(list[len(list)-1]));
 		comments.list = list[:];
 		append(&p.file.comments, comments);
 	}

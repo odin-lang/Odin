@@ -59,6 +59,18 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 	}
 
 	switch n in &node.derived {
+	case File:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
+		walk_stmt_list(v, n.decls[:]);
+	case Package:
+		for _, f in n.files {
+			walk(v, f);
+		}
+
+	case Comment_Group:
+		// empty
 	case Bad_Expr:
 	case Ident:
 	case Implicit:
@@ -252,35 +264,68 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 
 	case Bad_Decl:
 	case Value_Decl:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
 		walk_attribute_list(v, n.attributes[:]);
 		walk_expr_list(v, n.names);
 		if n.type != nil {
 			walk(v, n.type);
 		}
 		walk_expr_list(v, n.values);
+		if n.comment != nil {
+			walk(v, n.comment);
+		}
 	case Package_Decl:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
+		if n.comment != nil {
+			walk(v, n.comment);
+		}
 	case Import_Decl:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
+		if n.comment != nil {
+			walk(v, n.comment);
+		}
 	case Foreign_Block_Decl:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
 		walk_attribute_list(v, n.attributes[:]);
 		if n.foreign_library != nil {
 			walk(v, n.foreign_library);
 		}
 		walk(v, n.body);
 	case Foreign_Import_Decl:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
 		walk_attribute_list(v, n.attributes[:]);
 		walk(v, n.name);
+		if n.comment != nil {
+			walk(v, n.comment);
+		}
 
 	case Proc_Group:
 		walk_expr_list(v, n.args);
 	case Attribute:
 		walk_expr_list(v, n.elems);
 	case Field:
+		if n.docs != nil {
+			walk(v, n.docs);
+		}
 		walk_expr_list(v, n.names);
 		if n.type != nil {
 			walk(v, n.type);
 		}
 		if n.default_value != nil {
 			walk(v, n.default_value);
+		}
+		if n.comment != nil {
+			walk(v, n.comment);
 		}
 	case Field_List:
 		for x in n.list {
