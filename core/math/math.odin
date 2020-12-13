@@ -508,7 +508,7 @@ factorial :: proc(n: int) -> int {
 
 	assert(n >= 0, "parameter must not be negative");
 	assert(n < len(table), "parameter is too large to lookup in the table");
-	return 0;
+	return table[n];
 }
 
 classify_f32 :: proc(x: f32) -> Float_Class {
