@@ -95,12 +95,6 @@ limited_reader_to_reader :: proc(l: ^Limited_Reader) -> (r: Reader) {
 	return;
 }
 
-@(private="package")
-inline_limited_reader :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
-	l.r = r;
-	l.n = n;
-	return limited_reader_to_reader(l);
-}
 
 // Section_Reader implements read, seek, and read_at on a section of an underlying Reader_At
 Section_Reader :: struct {
