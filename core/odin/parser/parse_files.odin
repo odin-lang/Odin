@@ -10,8 +10,8 @@ import "core:slice"
 collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	NO_POS :: tokenizer.Pos{};
 
-	pkg_path, ok := filepath.abs(path);
-	if !ok {
+	pkg_path, pkg_path_ok := filepath.abs(path);
+	if !pkg_path_ok {
 		return;
 	}
 

@@ -41,7 +41,8 @@ is_abs :: proc(path: string) -> bool {
 		return false;
 	}
 
-	path := path[l:];
+	path := path;
+	path = path[l:];
 	if path == "" {
 		return false;
 	}
@@ -123,8 +124,8 @@ split_list :: proc(path: string, allocator := context.allocator) -> []string {
 	}
 	assert(index == count);
 
-	for s, i in list {
-		s, new := strings.replace_all(s, `"`, ``, allocator);
+	for s0, i in list {
+		s, new := strings.replace_all(s0, `"`, ``, allocator);
 		if !new {
 			s = strings.clone(s, allocator);
 		}

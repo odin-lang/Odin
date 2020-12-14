@@ -272,13 +272,13 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 	}
 	defer os.close(d);
 
-	fi, ferr := os.fstat(d);
+	file_info, ferr := os.fstat(d);
 	if ferr != 0 {
-		os.file_info_delete(fi);
+		os.file_info_delete(file_info);
 		return;
 	}
-	if !fi.is_dir {
-		os.file_info_delete(fi);
+	if !file_info.is_dir {
+		os.file_info_delete(file_info);
 		return;
 	}
 
