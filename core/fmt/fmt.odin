@@ -12,8 +12,6 @@ import "core:time"
 import "core:unicode/utf8"
 import "intrinsics"
 
-DEFAULT_BUFFER_SIZE :: #config(FMT_DEFAULT_BUFFER_SIZE, 1<<10);
-
 Info :: struct {
 	minus:     bool,
 	plus:      bool,
