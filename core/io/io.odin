@@ -436,7 +436,7 @@ copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, err
 // It returns the number of bytes copied and the first error that occurred whilst copying, if any.
 // On return, written == n IFF err == nil
 copy_n :: proc(dst: Writer, src: Reader, n: i64) -> (written: i64, err: Error) {
-	nsrc := inline_limited_reader(&Limited_Reader{}, src, n);
+	nsrc := limited_reader_init(&Limited_Reader{}, src, n);
 	written, err = copy(dst, nsrc);
 	if written == n {
 		return n, nil;
