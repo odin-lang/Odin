@@ -1087,6 +1087,8 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 
 stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.Type_Info_Enum_Value, offset: int = 0) -> (string, bool) {
 	et := runtime.type_info_base(enum_type);
+	ev := ev;
+	ev += runtime.Type_Info_Enum_Value(offset);
 	#partial switch e in et.variant {
 	case: return "", false;
 	case runtime.Type_Info_Enum:
@@ -1110,18 +1112,6 @@ stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.T
 
 	return "", false;
 }
-
-fmt_write_i64 :: proc(w: io.Writer, i: i64, base: int = 10) {
-	buf: [32]byte;
-	s := strconv.append_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil);
-	io.write_string(w, s);
-}
-fmt_write_u64 :: proc(w: io.Writer, i: u64, base: int) {
-	buf: [32]byte;
-	s := strconv.append_bits(buf[:], u64(i), base, false, 64, strconv.digits, nil);
-	io.write_string(w, s);
-}
-
 
 fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 	is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
@@ -1211,7 +1201,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 				}
 			}
 			v := i64(i) + info.lower;
-			fmt_write_i64(fi.writer, v, 10);
+			io.write_i64(fi.writer, v, 10);
 			commas += 1;
 		}
 	}
@@ -1253,7 +1243,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, bit_field_name: string = "") {
 			u <<= sa;
 			u >>= sa;
 
-			fmt_write_u64(fi.writer, u, 10);
+			io.write_u64(fi.writer, u, 10);
 
 		}
 		io.write_byte(fi.writer, '}');
@@ -1312,7 +1302,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		for in 0..<n {
 			io.write_byte(fi.writer, '0');
 		}
-		fmt_write_i64(fi.writer, i, 10);
+		io.write_i64(fi.writer, i, 10);
 	}
 
 
@@ -1654,7 +1644,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				io.write_byte(fi.writer, '.');
 				io.write_string(fi.writer, idx);
 			} else {
-				fmt_write_i64(fi.writer, i64(info.min_value)+i64(i));
+				io.write_i64(fi.writer, i64(info.min_value)+i64(i));
 			}
 			io.write_string(fi.writer, " = ");
 
@@ -2060,9 +2050,9 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		if fi.hash && verb == 'v' {
 			io.write_string(fi.writer, a.file_path);
 			io.write_byte(fi.writer, '(');
-			fmt_write_i64(fi.writer, i64(a.line), 10);
+			io.write_i64(fi.writer, i64(a.line), 10);
 			io.write_byte(fi.writer, ':');
-			fmt_write_i64(fi.writer, i64(a.column), 10);
+			io.write_i64(fi.writer, i64(a.column), 10);
 			io.write_byte(fi.writer, ')');
 			return;
 		}
