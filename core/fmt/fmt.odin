@@ -798,7 +798,7 @@ fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
 	case 'o': _fmt_int(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
-	case 'd': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'i', 'd': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'z': _fmt_int(fi, u, 12, is_signed, bit_size, __DIGITS_LOWER);
 	case 'x': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
 	case 'X': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
@@ -823,7 +823,7 @@ fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: ru
 	case 'v': _fmt_int_128(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _fmt_int_128(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
 	case 'o': _fmt_int_128(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
-	case 'd': _fmt_int_128(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'i', 'd': _fmt_int_128(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'z': _fmt_int_128(fi, u, 12, is_signed, bit_size, __DIGITS_LOWER);
 	case 'x': _fmt_int_128(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
 	case 'X': _fmt_int_128(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
@@ -1007,7 +1007,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 
 	case 'b': _fmt_int(fi, u,  2, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'o': _fmt_int(fi, u,  8, false, 8*size_of(rawptr), __DIGITS_UPPER);
-	case 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'i', 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'X': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 
@@ -1072,7 +1072,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Enum:
 		switch verb {
 		case: fmt_bad_verb(fi, verb);
-		case 'd', 'f':
+		case 'i', 'd', 'f':
 			fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, verb);
 		case 's', 'v':
 			str, ok := enum_value_to_string(v);
