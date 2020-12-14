@@ -1,6 +1,5 @@
 package io
 
-import "core:runtime"
 import "core:strconv"
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10) -> (n: int, err: Error) {

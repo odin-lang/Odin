@@ -2,7 +2,6 @@
 // To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
 package filepath
 
-import "core:os"
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
@@ -265,7 +264,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		}
 		buf := make([]byte, size);
 		n := copy(buf, "..");
-		for i in 0..<seps {
+		for in 0..<seps {
 			buf[n] = SEPARATOR;
 			copy(buf[n+1:], "..");
 			n += 3;
