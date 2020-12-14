@@ -237,7 +237,8 @@ align_backward_uint :: proc(ptr, align: uint) -> uint {
 }
 
 is_aligned_to :: inline proc(ptr: rawptr, align: int) -> bool {
-	return align_forward(ptr, uintptr(align)) == ptr;
+	assert(is_power_of_two(uintptr(align)));
+	return uintptr(ptr) & uintptr(align-1) == 0;
 }
 
 context_from_allocator :: proc(a: Allocator) -> type_of(context) {
