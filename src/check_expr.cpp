@@ -8760,8 +8760,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 							i64 lo = exact_value_to_i64(x.value);
 							i64 hi = exact_value_to_i64(y.value);
 							i64 max_index = hi;
-							if (op.kind == Token_RangeHalf) {
+							if (op.kind == Token_RangeHalf) { // ..< (exclusive)
 								hi -= 1;
+							} else { // .. (inclusive)
+								max_index += 1;
 							}
 
 							bool new_range = range_cache_add_range(&rc, lo, hi);
