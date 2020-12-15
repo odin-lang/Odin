@@ -61,14 +61,17 @@ Scan_Flag :: enum u32 {
 	Scan_Comments,
 	Skip_Comments, // if set with .Scan_Comments, comments become white space
 }
-Scan_Flags :: bit_set[Scan_Flag; u32];
+Scan_Flags :: distinct bit_set[Scan_Flag; u32];
 
 Odin_Like_Tokens :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments};
 C_Like_Tokens    :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_C_Int_Prefixes, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments};
 
+// Only allows for ASCII whitespace
+Whitespace :: distinct bit_set['\x00'..<utf8.RUNE_SELF; u128];
+
 // Odin_Whitespace is the default value for the Scanner's whitespace field
-Odin_Whitespace :: 1<<'\t' | 1<<'\n' | 1<<'\r' | 1<<' ';
-C_Whitespace    :: 1<<'\t' | 1<<'\n' | 1<<'\r' | 1<<'\v' | 1<<'\f' | 1<<' ';
+Odin_Whitespace :: Whitespace{'\t', '\n', '\r', ' '};
+C_Whitespace    :: Whitespace{'\t', '\n', '\r', '\v', '\f', ' '};
 
 
 // Scanner allows for the reading of Unicode characters and tokens from a string
@@ -102,7 +105,7 @@ Scanner :: struct {
 
 	// The whitespace field controls which characters are recognized as white space
 	// This field may be changed by the user at any time during scanning
-	whitespace: u64,
+	whitespace: Whitespace,
 
 	// is_ident_rune is a predicate controlling the characters accepted as the ith rune in an identifier
 	// The valid characters must not conflict with the set of white space characters
@@ -523,7 +526,7 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 	s.pos.line = 0;
 
 	redo: for {
-		for s.whitespace & (1<<uint(ch)) != 0 {
+		for (ch < utf8.RUNE_SELF && ch in s.whitespace) {
 			ch = advance(s);
 		}
 
