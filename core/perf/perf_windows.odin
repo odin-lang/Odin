@@ -3,7 +3,8 @@ package perf
 
 import "core:sys/win32"
 
-@(private="file")
+@private
+@thread_local
 qpc_freq : i64;
 
 /**
