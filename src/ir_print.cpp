@@ -787,6 +787,11 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 
 	switch (value.kind) {
+	case ExactValue_Typeid:
+		GB_ASSERT(is_type_typeid(type));
+		ir_write_u64(f, ir_typeid_as_integer(m, value.value_typeid));
+		break;
+
 	case ExactValue_Bool:
 		if (value.value_bool) {
 			ir_write_string(f, are_types_identical(type, t_llvm_bool) ? str_lit("true") : str_lit("1"));
