@@ -7910,7 +7910,9 @@ void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 		err_str = "used as a value";
 		break;
 	case Addressing_Type:
-		err_str = "is not an expression but a type";
+		if (t == nullptr || !is_type_typeid(t)) {
+			err_str = "is not an expression but a type";
+		}
 		break;
 	case Addressing_Builtin:
 		err_str = "must be called";
