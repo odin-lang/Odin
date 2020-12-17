@@ -743,13 +743,12 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 	return buf;
 }
 
-/*
 // scrub scruvs invalid utf-8 characters and replaces them with the replacement string
 // Adjacent invalid bytes are only replaced once
 scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator) -> []byte {
 	str := s;
-	b: Builder;
-	init_builder(&b, 0, len(s), allocator);
+	b: Buffer;
+	buffer_init_allocator(&b, 0, len(s), allocator);
 
 	has_error := false;
 	cursor := 0;
@@ -761,11 +760,11 @@ scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator) ->
 		if r == utf8.RUNE_ERROR {
 			if !has_error {
 				has_error = true;
-				write(&b, origin[:cursor]);
+				buffer_write(&b, origin[:cursor]);
 			}
 		} else if has_error {
 			has_error = false;
-			write(&b, replacement);
+			buffer_write(&b, replacement);
 
 			origin = origin[cursor:];
 			cursor = 0;
@@ -775,9 +774,8 @@ scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator) ->
 		str = str[w:];
 	}
 
-	return to_string(b);
+	return buffer_to_bytes(&b);
 }
-*/
 
 
 reverse :: proc(s: []byte, allocator := context.allocator) -> []byte {
@@ -795,8 +793,7 @@ reverse :: proc(s: []byte, allocator := context.allocator) -> []byte {
 	return buf;
 }
 
-/*
-expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> string {
+expand_tabs :: proc(s: []byte, tab_size: int, allocator := context.allocator) -> []byte {
 	if tab_size <= 0 {
 		panic("tab size must be positive");
 	}
@@ -806,20 +803,20 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 		return nil;
 	}
 
-	b: Builder;
-	init_builder(&b, allocator);
-	writer := to_writer(&b);
+	b: Buffer;
+	buffer_init_allocator(&b, 0, len(s), allocator);
+
 	str := s;
 	column: int;
 
 	for len(str) > 0 {
-		r, w := utf8.decode_rune_in_string(str);
+		r, w := utf8.decode_rune(str);
 
 		if r == '\t' {
 			expand := tab_size - column%tab_size;
 
 			for i := 0; i < expand; i += 1 {
-				io.write_byte(writer, ' ');
+				buffer_write_byte(&b, ' ');
 			}
 
 			column += expand;
@@ -830,15 +827,14 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 				column += w;
 			}
 
-			io.write_rune(writer, r);
+			buffer_write_rune(&b, r);
 		}
 
 		str = str[w:];
 	}
 
-	return to_string(b);
+	return buffer_to_bytes(&b);
 }
-*/
 
 partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
 	i := index(str, sep);
@@ -853,11 +849,10 @@ partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
 	return;
 }
 
-/*
 center_justify :: centre_justify; // NOTE(bill): Because Americans exist
 
-// centre_justify returns a string with a pad string at boths sides if the str's rune length is smaller than length
-centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+// centre_justify returns a byte slice with a pad byte slice at boths sides if the str's rune length is smaller than length
+centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str);
 	if n >= length || pad == nil {
 		return clone(str, allocator);
@@ -866,21 +861,18 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b: Builder;
-	init_builder(&b, allocator);
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+	b: Buffer;
+	buffer_init_allocator(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator);
 
-	w := to_writer(&b);
+	write_pad_string(&b, pad, pad_len, remains/2);
+	buffer_write(&b, str);
+	write_pad_string(&b, pad, pad_len, (remains+1)/2);
 
-	write_pad_string(w, pad, pad_len, remains/2);
-	io.write_string(w, str);
-	write_pad_string(w, pad, pad_len, (remains+1)/2);
-
-	return to_string(b);
+	return buffer_to_bytes(&b);
 }
 
-// left_justify returns a string with a pad string at left side if the str's rune length is smaller than length
-left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+// left_justify returns a byte slice with a pad byte slice at left side if the str's rune length is smaller than length
+left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str);
 	if n >= length || pad == nil {
 		return clone(str, allocator);
@@ -889,20 +881,17 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b: Builder;
-	init_builder(&b, allocator);
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+	b: Buffer;
+	buffer_init_allocator(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator);
 
-	w := to_writer(&b);
+	buffer_write(&b, str);
+	write_pad_string(&b, pad, pad_len, remains);
 
-	io.write_string(w, str);
-	write_pad_string(w, pad, pad_len, remains);
-
-	return to_string(b);
+	return buffer_to_bytes(&b);
 }
 
-// right_justify returns a string with a pad string at right side if the str's rune length is smaller than length
-right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+// right_justify returns a byte slice with a pad byte slice at right side if the str's rune length is smaller than length
+right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str);
 	if n >= length || pad == nil {
 		return clone(str, allocator);
@@ -911,39 +900,35 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	remains := length-1;
 	pad_len := rune_count(pad);
 
-	b: Builder;
-	init_builder(&b, allocator);
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+	b: Buffer;
+	buffer_init_allocator(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator);
 
-	w := to_writer(&b);
+	write_pad_string(&b, pad, pad_len, remains);
+	buffer_write(&b, str);
 
-	write_pad_string(w, pad, pad_len, remains);
-	io.write_string(w, str);
-
-	return to_string(b);
+	return buffer_to_bytes(&b);
 }
 
 
 
 
 @private
-write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
+write_pad_string :: proc(b: ^Buffer, pad: []byte, pad_len, remains: int) {
 	repeats := remains / pad_len;
 
 	for i := 0; i < repeats; i += 1 {
-		io.write_string(w, pad);
+		buffer_write(b, pad);
 	}
 
 	n := remains % pad_len;
 	p := pad;
 
 	for i := 0; i < n; i += 1 {
-		r, width := utf8.decode_rune_in_string(p);
-		io.write_rune(w, r);
+		r, width := utf8.decode_rune(p);
+		buffer_write_rune(b, r);
 		p = p[width:];
 	}
 }
-*/
 
 
 // fields splits the byte slice s around each instance of one or more consecutive white space character, defined by unicode.is_space
