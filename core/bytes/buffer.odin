@@ -35,6 +35,11 @@ buffer_init_string :: proc(b: ^Buffer, s: string) {
 	copy(b.buf[:], s);
 }
 
+buffer_init_allocator :: proc(b: ^Buffer, len, cap: int, allocator := context.allocator) {
+	b.buf.allocator = allocator;
+	reserve(&b.buf, cap);
+	resize(&b.buf, len);
+}
 
 buffer_destroy :: proc(b: ^Buffer) {
 	delete(b.buf);
@@ -279,6 +284,11 @@ buffer_read_string :: proc(b: ^Buffer, delim: byte) -> (line: string, err: io.Er
 
 
 buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
+	s.stream_data = b;
+	s.stream_vtable = _buffer_vtable;
+	return;
+}
+buffer_to_writer :: proc(b: ^Buffer) -> (s: io.Writer) {
 	s.stream_data = b;
 	s.stream_vtable = _buffer_vtable;
 	return;
