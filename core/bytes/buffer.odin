@@ -8,6 +8,8 @@ MIN_READ :: 512;
 @(private)
 SMALL_BUFFER_SIZE :: 64;
 
+// A Buffer is a variable-sized buffer of bytes with a io.Stream interface
+// The zero value for Buffer is an empty buffer ready to use.
 Buffer :: struct {
 	buf: [dynamic]byte,
 	off: int,
@@ -281,14 +283,54 @@ buffer_read_string :: proc(b: ^Buffer, delim: byte) -> (line: string, err: io.Er
 	return string(slice), err;
 }
 
+buffer_write_to :: proc(b: ^Buffer, w: io.Writer) -> (n: i64, err: io.Error) {
+	b.last_read = .Invalid;
+	if byte_count := buffer_length(b); byte_count > 0 {
+		m, e := io.write(w, b.buf[b.off:]);
+		if m > byte_count {
+			panic("bytes.buffer_write_to: invalid io.write count");
+		}
+		b.off += m;
+		n = i64(m);
+		if e != nil {
+			err = e;
+			return;
+		}
+		if m != byte_count {
+			err = .Short_Write;
+			return;
+		}
+	}
+	buffer_reset(b);
+	return;
+}
+
+buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #no_bounds_check {
+	b.last_read = .Invalid;
+	for {
+		i := _buffer_grow(b, MIN_READ);
+		resize(&b.buf, i);
+		m, e := io.read(r, b.buf[i:cap(b.buf)]);
+		if m < 0 {
+			err = .Negative_Read;
+			return;
+		}
+
+		resize(&b.buf, i+m);
+		n += i64(m);
+		if e == .EOF {
+			return;
+		}
+		if e != nil {
+			err = e;
+			return;
+		}
+	}
+	return;
+}
 
 
 buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
-	s.stream_data = b;
-	s.stream_vtable = _buffer_vtable;
-	return;
-}
-buffer_to_writer :: proc(b: ^Buffer) -> (s: io.Writer) {
 	s.stream_data = b;
 	s.stream_vtable = _buffer_vtable;
 	return;
@@ -337,9 +379,13 @@ _buffer_vtable := &io.Stream_VTable{
 		buffer_destroy(b);
 		return nil;
 	},
-
-	// TODO(bill): write_to and read_from
-	// impl_write_to = nil,
-	// impl_read_from = nil,
+	impl_write_to = proc(s: io.Stream, w: io.Writer) -> (n: i64, err: io.Error) {
+		b := (^Buffer)(s.stream_data);
+		return buffer_write_to(b, w);
+	},
+	impl_read_from = proc(s: io.Stream, r: io.Reader) -> (n: i64, err: io.Error) {
+		b := (^Buffer)(s.stream_data);
+		return buffer_read_from(b, r);
+	},
 };
 
