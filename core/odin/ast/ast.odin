@@ -35,11 +35,6 @@ Node_State_Flag :: enum {
 }
 Node_State_Flags :: distinct bit_set[Node_State_Flag];
 
-
-Comment_Group :: struct {
-	list: []tokenizer.Token,
-}
-
 Node :: struct {
 	pos:         tokenizer.Pos,
 	end:         tokenizer.Pos,
@@ -47,6 +42,54 @@ Node :: struct {
 	derived:     any,
 }
 
+Comment_Group :: struct {
+	using node: Node,
+	list: []tokenizer.Token,
+}
+
+Package_Kind :: enum {
+	Normal,
+	Runtime,
+	Init,
+}
+
+Package :: struct {
+	using node: Node,
+	kind:     Package_Kind,
+	id:       int,
+	name:     string,
+	fullpath: string,
+	files:    map[string]^File,
+
+	user_data: rawptr,
+}
+
+File :: struct {
+	using node: Node,
+	id: int,
+	pkg: ^Package,
+
+	fullpath: string,
+	src:      []byte,
+
+	docs: ^Comment_Group,
+
+	pkg_decl:  ^Package_Decl,
+	pkg_token: tokenizer.Token,
+	pkg_name:  string,
+
+	decls:   [dynamic]^Stmt,
+	imports: [dynamic]^Import_Decl,
+	directive_count: int,
+
+	comments: [dynamic]^Comment_Group,
+
+	syntax_warning_count: int,
+	syntax_error_count:   int,
+}
+
+
+// Base Types
 
 Expr :: struct {
 	using expr_base: Node,

@@ -1638,6 +1638,7 @@ irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 	if (expr == nullptr) {
 		return nullptr;
 	}
+
 	if (expr->kind == Ast_CompoundLit) {
 		ast_node(cl, CompoundLit, expr);
 		for_array(i, cl->elems) {
@@ -1660,6 +1661,7 @@ irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 			return ir_add_module_constant(m, tav.type, tav.value);
 		}
 	}
+
 
 	return 	nullptr;
 }
@@ -6743,7 +6745,10 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(id));
 }
 
-irValue *ir_typeid(irModule *m, Type *type) {
+u64 ir_typeid_as_integer(irModule *m, Type *type) {
+	if (type == nullptr) {
+		return 0;
+	}
 	type = default_type(type);
 
 	u64 id = cast(u64)ir_type_info_index(m->info, type);
@@ -6808,8 +6813,11 @@ irValue *ir_typeid(irModule *m, Type *type) {
 		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
 	}
 
+	return id;
+}
 
-	return ir_value_constant(t_typeid, exact_value_u64(data));
+irValue *ir_typeid(irModule *m, Type *type) {
+	return ir_value_constant(t_typeid, exact_value_u64(ir_typeid_as_integer(m, type)));
 }
 
 
