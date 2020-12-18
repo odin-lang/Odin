@@ -168,18 +168,6 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 		return;
 	}
 
-#if 0
-	if (!is_type_constant_type(operand->type)) {
-		gbString type_str = type_to_string(operand->type);
-		error(operand->expr, "Invalid constant type: '%s'", type_str);
-		gb_string_free(type_str);
-		if (e->type == nullptr) {
-			e->type = t_invalid;
-		}
-		return;
-	}
-#endif
-
 	if (e->type == nullptr) { // NOTE(bill): type inference
 		e->type = operand->type;
 	}
@@ -388,15 +376,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 	e->flags |= EntityFlag_Visited;
 
 	if (type_expr) {
-		Type *t = check_type(ctx, type_expr);
-		if (!is_type_constant_type(t) && !is_type_proc(t)) {
-			gbString str = type_to_string(t);
-			error(type_expr, "Invalid constant type '%s'", str);
-			gb_string_free(str);
-			e->type = t_invalid;
-			return;
-		}
-		e->type = t;
+		e->type = check_type(ctx, type_expr);
 	}
 
 	Operand operand = {};

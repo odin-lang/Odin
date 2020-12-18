@@ -1,14 +1,18 @@
 package container
 
+import "intrinsics"
+_ :: intrinsics;
 
-Map :: struct(Value: typeid) {
+
+Map :: struct(Key, Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
 	hash: Array(int),
-	entries: Array(Map_Entry(Value)),
+	entries: Array(Map_Entry(Key, Value)),
 }
 
-Map_Entry :: struct(Value: typeid) {
-	key:   u64,
+Map_Entry :: struct(Key, Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
+	hash:  uintptr,
 	next:  int,
+	key:   Key,
 	value: Value,
 }
 
@@ -47,28 +51,28 @@ multi_map_remove_all
 
 map_init :: proc{map_init_none, map_init_cap};
 
-map_init_none :: proc(m: ^$M/Map($Value), allocator := context.allocator) {
+map_init_none :: proc(m: ^$M/Map($Key, $Value), allocator := context.allocator) {
 	m.hash.allocator = allocator;
 	m.entries.allocator = allocator;
 }
 
-map_init_cap :: proc(m: ^$M/Map($Value), cap: int, allocator := context.allocator) {
+map_init_cap :: proc(m: ^$M/Map($Key, $Value), cap: int, allocator := context.allocator) {
 	m.hash.allocator = allocator;
 	m.entries.allocator = allocator;
 	map_reserve(m, cap);
 }
 
-map_delete :: proc(m: $M/Map($Value)) {
+map_delete :: proc(m: $M/Map($Key, $Value)) {
 	array_delete(m.hash);
 	array_delete(m.entries);
 }
 
 
-map_has :: proc(m: $M/Map($Value), key: u64) -> bool {
+map_has :: proc(m: $M/Map($Key, $Value), key: Key) -> bool {
 	return _map_find_or_fail(m, key) >= 0;
 }
 
-map_get :: proc(m: $M/Map($Value), key: u64) -> (res: Value, ok: bool) #optional_ok {
+map_get :: proc(m: $M/Map($Key, $Value), key: Key) -> (res: Value, ok: bool) #optional_ok {
 	i := _map_find_or_fail(m, key);
 	if i < 0 {
 		return {}, false;
@@ -76,7 +80,7 @@ map_get :: proc(m: $M/Map($Value), key: u64) -> (res: Value, ok: bool) #optional
 	return array_get(m.entries, i).value, true;
 }
 
-map_get_default :: proc(m: $M/Map($Value), key: u64, default: Value) -> (res: Value, ok: bool) #optional_ok {
+map_get_default :: proc(m: $M/Map($Key, $Value), key: Key, default: Value) -> (res: Value, ok: bool) #optional_ok {
 	i := _map_find_or_fail(m, key);
 	if i < 0 {
 		return default, false;
@@ -84,7 +88,7 @@ map_get_default :: proc(m: $M/Map($Value), key: u64, default: Value) -> (res: Va
 	return array_get(m.entries, i).value, true;
 }
 
-map_get_ptr :: proc(m: $M/Map($Value), key: u64) -> ^Value {
+map_get_ptr :: proc(m: $M/Map($Key, $Value), key: Key) -> ^Value {
 	i := _map_find_or_fail(m, key);
 	if i < 0 {
 		return nil;
@@ -92,7 +96,7 @@ map_get_ptr :: proc(m: $M/Map($Value), key: u64) -> ^Value {
 	return array_get_ptr(m.entries, i).value;
 }
 
-map_set :: proc(m: ^$M/Map($Value), key: u64, value: Value) {
+map_set :: proc(m: ^$M/Map($Key, $Value), key: Key, value: Value) {
 	if array_len(m.hash) == 0 {
 		_map_grow(m);
 	}
@@ -104,7 +108,7 @@ map_set :: proc(m: ^$M/Map($Value), key: u64, value: Value) {
 	}
 }
 
-map_remove :: proc(m: ^$M/Map($Value), key: u64) {
+map_remove :: proc(m: ^$M/Map($Key, $Value), key: Key) {
 	fr := _map_find_key(m^, key);
 	if fr.entry_index >= 0 {
 		_map_erase(m, fr);
@@ -112,7 +116,7 @@ map_remove :: proc(m: ^$M/Map($Value), key: u64) {
 }
 
 
-map_reserve :: proc(m: ^$M/Map($Value), new_size: int) {
+map_reserve :: proc(m: ^$M/Map($Key, $Value), new_size: int) {
 	nm: M;
 	map_init(&nm, m.hash.allocator);
 	array_resize(&nm.hash, new_size);
@@ -130,14 +134,14 @@ map_reserve :: proc(m: ^$M/Map($Value), new_size: int) {
 	m^ = nm;
 }
 
-map_clear :: proc(m: ^$M/Map($Value)) {
+map_clear :: proc(m: ^$M/Map($Key, $Value)) {
 	array_clear(&m.hash);
 	array_clear(&m.entries);
 }
 
 
 
-multi_map_find_first :: proc(m: $M/Map($Value), key: u64) -> ^Map_Entry(Value) {
+multi_map_find_first :: proc(m: $M/Map($Key, $Value), key: Key) -> ^Map_Entry(Value) {
 	i := _map_find_or_fail(m, key);
 	if i < 0 {
 		return nil;
@@ -145,11 +149,11 @@ multi_map_find_first :: proc(m: $M/Map($Value), key: u64) -> ^Map_Entry(Value) {
 	return array_get_ptr(m.entries, i);
 }
 
-multi_map_find_next :: proc(m: $M/Map($Value), e: ^Map_Entry(Value)) -> ^Map_Entry(Value) {
+multi_map_find_next :: proc(m: $M/Map($Key, $Value), e: ^Map_Entry(Value)) -> ^Map_Entry(Value) {
 	i := e.next;
 	for i >= 0 {
 		it := array_get_ptr(m.entries, i);
-		if it.key == e.key {
+		if it.hash == e.hash && it.key == e.key {
 			return it;
 		}
 		i = it.next;
@@ -157,7 +161,7 @@ multi_map_find_next :: proc(m: $M/Map($Value), e: ^Map_Entry(Value)) -> ^Map_Ent
 	return nil;
 }
 
-multi_map_count :: proc(m: $M/Map($Value), key: u64) -> int {
+multi_map_count :: proc(m: $M/Map($Key, $Value), key: Key) -> int {
 	n := 0;
 	e := multi_map_find_first(m, key);
 	for e != nil {
@@ -169,7 +173,7 @@ multi_map_count :: proc(m: $M/Map($Value), key: u64) -> int {
 
 multi_map_get :: proc{multi_map_get_array, multi_map_get_slice};
 
-multi_map_get_array :: proc(m: $M/Map($Value), key: u64, items: ^Array(Value)) {
+multi_map_get_array :: proc(m: $M/Map($Key, $Value), key: Key, items: ^Array(Value)) {
 	if items == nil {
 		return;
 	}
@@ -180,7 +184,7 @@ multi_map_get_array :: proc(m: $M/Map($Value), key: u64, items: ^Array(Value)) {
 	}
 }
 
-multi_map_get_slice :: proc(m: $M/Map($Value), key: u64, items: []Value) {
+multi_map_get_slice :: proc(m: $M/Map($Key, $Value), key: Key, items: []Value) {
 	e := multi_map_find_first(m, key);
 	i := 0;
 	for e != nil && i < len(items) {
@@ -190,7 +194,7 @@ multi_map_get_slice :: proc(m: $M/Map($Value), key: u64, items: []Value) {
 	}
 }
 
-multi_map_get_as_slice :: proc(m: $M/Map($Value), key: u64) -> []Value {
+multi_map_get_as_slice :: proc(m: $M/Map($Key, $Value), key: Key) -> []Value {
 	items: Array(Value);
 	array_init(&items, 0);
 
@@ -204,7 +208,7 @@ multi_map_get_as_slice :: proc(m: $M/Map($Value), key: u64) -> []Value {
 }
 
 
-multi_map_insert :: proc(m: ^$M/Map($Value), key: u64, value: Value) {
+multi_map_insert :: proc(m: ^$M/Map($Key, $Value), key: Key, value: Value) {
 	if array_len(m.hash) == 0 {
 		_map_grow(m);
 	}
@@ -216,14 +220,14 @@ multi_map_insert :: proc(m: ^$M/Map($Value), key: u64, value: Value) {
 	}
 }
 
-multi_map_remove :: proc(m: ^$M/Map($Value), e: ^Map_Entry(Value)) {
+multi_map_remove :: proc(m: ^$M/Map($Key, $Value), e: ^Map_Entry(Value)) {
 	fr := _map_find_entry(m, e);
 	if fr.entry_index >= 0 {
 		_map_erase(m, fr);
 	}
 }
 
-multi_map_remove_all :: proc(m: ^$M/Map($Value), key: u64) {
+multi_map_remove_all :: proc(m: ^$M/Map($Key, $Value), key: Key) {
 	for map_exist(m^, key) {
 		map_remove(m, key);
 	}
@@ -239,9 +243,12 @@ Map_Find_Result :: struct {
 	entry_index: int,
 }
 
-_map_add_entry :: proc(m: ^$M/Map($Value), key: u64) -> int {
-	e: Map_Entry(Value);
+_map_add_entry :: proc(m: ^$M/Map($Key, $Value), key: Key) -> int where intrinsics.type_is_valid_map_key(Key) {
+	hasher := intrinsics.type_hasher_proc(Key);
+
+	e: Map_Entry(Key, Value);
 	e.key = key;
+	e.hash = hasher(&e.key, 0);
 	e.next = -1;
 	idx := array_len(m.entries);
 	array_push(&m.entries, e);
@@ -271,7 +278,7 @@ _map_erase :: proc(m: ^$M/Map, fr: Map_Find_Result) {
 }
 
 
-_map_find_key :: proc(m: $M/Map($Value), key: u64) -> Map_Find_Result {
+_map_find_key :: proc(m: $M/Map($Key, $Value), key: Key) -> Map_Find_Result where intrinsics.type_is_valid_map_key(Key) {
 	fr: Map_Find_Result;
 	fr.hash_index = -1;
 	fr.entry_prev = -1;
@@ -281,11 +288,16 @@ _map_find_key :: proc(m: $M/Map($Value), key: u64) -> Map_Find_Result {
 		return fr;
 	}
 
-	fr.hash_index = int(key % u64(array_len(m.hash)));
+	hasher := intrinsics.type_hasher_proc(Key);
+
+	key := key;
+	hash := hasher(&key, 0);
+
+	fr.hash_index = int(hash % uintptr(array_len(m.hash)));
 	fr.entry_index = array_get(m.hash, fr.hash_index);
 	for fr.entry_index >= 0 {
 		it := array_get_ptr(m.entries, fr.entry_index);
-		if it.key == key {
+		if it.hash == hash && it.key == key {
 			return fr;
 		}
 		fr.entry_prev = fr.entry_index;
@@ -294,7 +306,7 @@ _map_find_key :: proc(m: $M/Map($Value), key: u64) -> Map_Find_Result {
 	return fr;
 }
 
-_map_find_entry :: proc(m: ^$M/Map($Value), e: ^Map_Entry(Value)) -> Map_Find_Result {
+_map_find_entry :: proc(m: ^$M/Map($Key, $Value), e: ^Map_Entry(Value)) -> Map_Find_Result {
 	fr: Map_Find_Result;
 	fr.hash_index = -1;
 	fr.entry_prev = -1;
@@ -304,7 +316,7 @@ _map_find_entry :: proc(m: ^$M/Map($Value), e: ^Map_Entry(Value)) -> Map_Find_Re
 		return fr;
 	}
 
-	fr.hash_index = int(e.key % u64(array_len(m.hash)));
+	fr.hash_index = int(e.hash % uintptr(array_len(m.hash)));
 	fr.entry_index = array_get(m.hash, fr.hash_index);
 	for fr.entry_index >= 0 {
 		it := array_get_ptr(m.entries, fr.entry_index);
@@ -317,10 +329,10 @@ _map_find_entry :: proc(m: ^$M/Map($Value), e: ^Map_Entry(Value)) -> Map_Find_Re
 	return fr;
 }
 
-_map_find_or_fail :: proc(m: $M/Map($Value), key: u64) -> int {
+_map_find_or_fail :: proc(m: $M/Map($Key, $Value), key: Key) -> int {
 	return _map_find_key(m, key).entry_index;
 }
-_map_find_or_make :: proc(m: ^$M/Map($Value), key: u64) -> int {
+_map_find_or_make :: proc(m: ^$M/Map($Key, $Value), key: Key) -> int {
 	fr := _map_find_key(m^, key);
 	if fr.entry_index >= 0 {
 		return fr.entry_index;
@@ -336,7 +348,7 @@ _map_find_or_make :: proc(m: ^$M/Map($Value), key: u64) -> int {
 }
 
 
-_map_make :: proc(m: ^$M/Map($Value), key: u64) -> int {
+_map_make :: proc(m: ^$M/Map($Key, $Value), key: Key) -> int {
 	fr := _map_find_key(m^, key);
 	i := _map_add_entry(m, key);
 
@@ -352,12 +364,12 @@ _map_make :: proc(m: ^$M/Map($Value), key: u64) -> int {
 }
 
 
-_map_full :: proc(m: $M/Map($Value)) -> bool {
+_map_full :: proc(m: $M/Map($Key, $Value)) -> bool {
 	// TODO(bill): Determine good max load factor
 	return array_len(m.entries) >= (array_len(m.hash) / 4)*3;
 }
 
-_map_grow :: proc(m: ^$M/Map($Value)) {
+_map_grow :: proc(m: ^$M/Map($Key, $Value)) {
 	new_size := array_len(m.entries) * 4 + 7; // TODO(bill): Determine good grow rate
 	map_reserve(m, new_size);
 }

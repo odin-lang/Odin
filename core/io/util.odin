@@ -1,6 +1,5 @@
 package io
 
-import "core:runtime"
 import "core:strconv"
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10) -> (n: int, err: Error) {
@@ -21,11 +20,9 @@ write_int :: proc(w: Writer, i: int, base: int = 10) -> (n: int, err: Error) {
 	return write_i64(w, i64(i), base);
 }
 
-@(private)
 Tee_Reader :: struct {
 	r: Reader,
 	w: Writer,
-	allocator: runtime.Allocator,
 }
 
 @(private)
@@ -40,27 +37,22 @@ _tee_reader_vtable := &Stream_VTable{
 		}
 		return;
 	},
-	impl_destroy = proc(s: Stream) -> Error {
-		t := (^Tee_Reader)(s.stream_data);
-		allocator := t.allocator;
-		free(t, allocator);
-		return .None;
-	},
 };
 
-// tee_reader returns a Reader that writes to 'w' what it reads from 'r'
+// tee_reader_init returns a Reader that writes to 'w' what it reads from 'r'
 // All reads from 'r' performed through it are matched with a corresponding write to 'w'
 // There is no internal buffering done
 // The write must complete before th read completes
 // Any error encountered whilst writing is reported as a 'read' error
-// tee_reader must call io.destroy when done with
-tee_reader :: proc(r: Reader, w: Writer, allocator := context.allocator) -> (out: Reader) {
-	t := new(Tee_Reader, allocator);
+// tee_reader_init must call io.destroy when done with
+tee_reader_init :: proc(t: ^Tee_Reader, r: Reader, w: Writer, allocator := context.allocator) -> Reader {
 	t.r, t.w = r, w;
-	t.allocator = allocator;
+	return tee_reader_to_reader(t);
+}
 
-	out.stream_data = t;
-	out.stream_vtable = _tee_reader_vtable;
+tee_reader_to_reader :: proc(t: ^Tee_Reader) -> (r: Reader) {
+	r.stream_data = t;
+	r.stream_vtable = _tee_reader_vtable;
 	return;
 }
 
@@ -90,24 +82,16 @@ _limited_reader_vtable := &Stream_VTable{
 	},
 };
 
-new_limited_reader :: proc(r: Reader, n: i64) -> ^Limited_Reader {
-	l := new(Limited_Reader);
+limited_reader_init :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
 	l.r = r;
 	l.n = n;
-	return l;
+	return limited_reader_to_reader(l);
 }
 
 limited_reader_to_reader :: proc(l: ^Limited_Reader) -> (r: Reader) {
 	r.stream_vtable = _limited_reader_vtable;
 	r.stream_data = l;
 	return;
-}
-
-@(private="package")
-inline_limited_reader :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
-	l.r = r;
-	l.n = n;
-	return limited_reader_to_reader(l);
 }
 
 // Section_Reader implements read, seek, and read_at on a section of an underlying Reader_At
@@ -118,7 +102,7 @@ Section_Reader :: struct {
 	limit: i64,
 }
 
-init_section_reader :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) {
+section_reader_init :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) {
 	s.r = r;
 	s.off = off;
 	s.limit = off + n;

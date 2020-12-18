@@ -1720,6 +1720,9 @@ TypeTuple *get_record_polymorphic_params(Type *t) {
 
 
 bool is_type_polymorphic(Type *t, bool or_specialized=false) {
+	if (t == nullptr) {
+		return false;
+	}
 	if (t->flags & TypeFlag_InProcessOfCheckingPolymorphic) {
 		return false;
 	}

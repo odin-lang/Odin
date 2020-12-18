@@ -67,6 +67,11 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		align = ti.align;
 	}
 
+	switch in node.derived {
+	case Package, File:
+		panic("Cannot clone this node type");
+	}
+
 	res := cast(^Node)mem.alloc(size, align);
 	src: rawptr = node;
 	if node.derived != nil {
