@@ -128,14 +128,17 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator);
 	rec: ^win.DNS_RECORD;
 	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil);
-	if res == win.ERROR_INVALID_NAME {
+	switch res {
+	case 0:
+		// okay
+	case win.ERROR_INVALID_NAME:
 		return;
-	}
-	if res == win.DNS_INFO_NO_RECORDS {
+	case win.DNS_INFO_NO_RECORDS:
 		ok = true;
 		return;
+	case:
+		unreachable("DnsQuery_UTF8 returned an error we did not expect");
 	}
-	if res != 0 do return;
 	defer win.DnsRecordListFree(rec, 1); // 1 means that we're freeing a list... because the proc name isn't enough.
 
 	count := 0;
