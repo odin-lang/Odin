@@ -86,12 +86,12 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 
 // TODO: Support SRV records.
 Dns_Record_Type :: enum u16 {
-    Ipv4 = win.DNS_TYPE_A,    // Ipv4 address.
-    Ipv6 = win.DNS_TYPE_AAAA, // Ipv6 address.
-    Cname = win.DNS_TYPE_CNAME, // Another host name.
-    Txt = win.DNS_TYPE_TEXT,  // Arbitrary binary data or text.
-    Ns = win.DNS_TYPE_NS,     // Address of a name server. TODO(tetra): .. Name server for what?
-    Mx = win.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
+	Ipv4 = win.DNS_TYPE_A,    // Ipv4 address.
+	Ipv6 = win.DNS_TYPE_AAAA, // Ipv6 address.
+	Cname = win.DNS_TYPE_CNAME, // Another host name.
+	Txt = win.DNS_TYPE_TEXT,  // Arbitrary binary data or text.
+	Ns = win.DNS_TYPE_NS,     // Address of a name (DNS) server.
+	Mx = win.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
 }
 
 Dns_Record_Ipv4  :: distinct Ipv4_Address;
@@ -116,19 +116,22 @@ Dns_Record :: union {
 
 // Performs a recursive DNS query for records of a particular type for the hostname.
 //
-// This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
+// NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
 // meaning that DNS queries for a hostname will resolve through CNAME records until an
 // IP address is reached.
 //
-// Returns records and their data in temporary storage, unless otherwise specified by `allocator`.
-get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.temp_allocator) -> (records: []Dns_Record, ok: bool) {
+// WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
+// See `destroy_records`.
+get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.allocator) -> (records: []Dns_Record, ok: bool) {
 	context.allocator = allocator;
 
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator);
 	rec: ^win.DNS_RECORD;
 	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil);
-	if res == win.DNS_INFO_NO_RECORDS || res == win.ERROR_INVALID_NAME {
-		// NOTE(tetra): ERROR_INVALID_NAME is returned if there are no such CNAME or TXT records???
+	if res == win.ERROR_INVALID_NAME {
+		return;
+	}
+	if res == win.DNS_INFO_NO_RECORDS {
 		ok = true;
 		return;
 	}
@@ -148,43 +151,68 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	for r := rec; r != nil; r = r.pNext {
 		if r.wType != u16(type) do continue; // NOTE(tetra): Should never happen, but...
 
-		new_rec: Dns_Record;
-
 		switch Dns_Record_Type(r.wType) {
 		case .Ipv4:
 			addr := Ipv4_Address(transmute([4]u8) r.Data.A);
-			new_rec = Dns_Record_Ipv4(addr); // NOTE(tetra): value copy
+			new_rec := Dns_Record_Ipv4(addr); // NOTE(tetra): value copy
+			append(&recs, new_rec);
 		case .Ipv6:
 			addr := Ipv6_Address(transmute([8]u16be) r.Data.AAAA);
-			new_rec = Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
+			new_rec := Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
+			append(&recs, new_rec);
 		case .Cname:
 			host := string(r.Data.CNAME);
-			new_rec = Dns_Record_Cname(strings.clone(host));
+			new_rec := Dns_Record_Cname(strings.clone(host));
+			append(&recs, new_rec);
 		case .Txt:
 			n := r.Data.TXT.dwStringCount;
 			ptr := &r.Data.TXT.pStringArray;
 			c_strs := mem.slice_ptr(ptr, int(n));
 			for cstr in c_strs {
 				s := string(cstr);
-				new_rec = Dns_Record_Text(strings.clone(s));
+				new_rec := Dns_Record_Text(strings.clone(s));
+				append(&recs, new_rec);
 			}
 		case .Ns:
 			host := string(r.Data.NS);
-			new_rec = Dns_Record_Ns(strings.clone(host));
+			new_rec := Dns_Record_Ns(strings.clone(host));
+			append(&recs, new_rec);
 		case .Mx:
 			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
 			// Or maybe not because you're supposed to just use the first one that works
-			// and which order they're in changes between after every few calls.
+			// and which order they're in changes every few calls.
 			host := string(r.Data.MX.pNameExchange);
 			preference := int(r.Data.MX.wPreference);
-			new_rec = Dns_Record_Mx { host       = strings.clone(host),
-			                          preference = preference };
+			new_rec := Dns_Record_Mx {
+				host       = strings.clone(host),
+				preference = preference };
+			append(&recs, new_rec);
 		}
-
-		append(&recs, new_rec);
 	}
 
 	records = recs[:];
 	ok = true;
 	return;
+}
+
+// `records` slice is also destroyed.
+destroy_dns_records :: proc(records: []Dns_Record, allocator := context.allocator) {
+	context.allocator = allocator;
+
+	for rec in records {
+		switch r in rec {
+		case Dns_Record_Ipv4:  // nothing to do
+		case Dns_Record_Ipv6:  // nothing to do
+		case Dns_Record_Cname:
+			delete(string(r));
+		case Dns_Record_Text:
+			delete(string(r));
+		case Dns_Record_Ns:
+			delete(string(r));
+		case Dns_Record_Mx:
+			delete(r.host);
+		}
+	}
+
+	delete(records);
 }
