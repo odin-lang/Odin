@@ -25,19 +25,18 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 			for q in queries_parts {
 				parts := strings.split(q, "=");
 				switch len(parts) {
-				case 1:  queries[parts[0]] = "";
-				case 2:  queries[parts[0]] = parts[1];
+				case 1:  queries[parts[0]] = "";        // NOTE(tetra): Query not set to anything, was but present.
+				case 2:  queries[parts[0]] = parts[1];  // NOTE(tetra): Query set to something.
 				case:    break;
 				}
 			}
 		}
 	}
 
-	i = strings.last_index(s, "/");
+	i = strings.index(s, "/");
 	if i == -1 {
 		host = s;
 		path = "/";
-		return;
 	} else {
 		host = s[:i];
 		path = s[i:];
