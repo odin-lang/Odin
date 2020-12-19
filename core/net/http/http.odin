@@ -296,7 +296,7 @@ request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
 	write_string(&b, r.path);
 
 	if r.queries != nil {
-		write_rune(&b, '?');
+		write_rune_builder(&b, '?');
 		for query_name, query_value in r.queries {
 			write_string(&b, query_name);
 			if query_value != "" {
