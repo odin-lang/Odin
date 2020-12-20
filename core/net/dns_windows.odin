@@ -94,12 +94,30 @@ Dns_Record_Type :: enum u16 {
 	Mx = win.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
 }
 
-Dns_Record_Ipv4  :: distinct Ipv4_Address;
-Dns_Record_Ipv6  :: distinct Ipv6_Address;
-Dns_Record_Cname :: distinct string;
-Dns_Record_Text  :: distinct string;
-Dns_Record_Ns    :: distinct string;
+// An IPv4 address that the domain name maps to.
+// There can be any number of these.
+Dns_Record_Ipv4 :: distinct Ipv4_Address;
 
+// An IPv6 address that the domain name maps to.
+// There can be any number of these.
+Dns_Record_Ipv6 :: distinct Ipv6_Address;
+
+// Another domain name that the domain name maps to.
+// Domains can be pointed to another domain instead of directly to an IP address.
+// `get_dns_records` will recursively follow these if you request this type of record.
+Dns_Record_Cname :: distinct string;
+
+// Arbitrary string data that is associated with the domain name.
+// Commonly of the form `key=value` to be parsed, though there is no specific format for them.
+// These can be used for any purpose.
+Dns_Record_Text :: distinct string;
+
+// Domain names of other DNS servers that are associated with the domain name.
+// TODO(tetra): Expand on what these records are used for, and when you should use pay attention to these.
+Dns_Record_Ns :: distinct string;
+
+// Domain names for email servers that are associated with the domain name.
+// These records also have values which ranks them in the order they should be preferred. Lower is more-preferred.
 Dns_Record_Mx :: struct {
 	host: string,
 	preference: int,
