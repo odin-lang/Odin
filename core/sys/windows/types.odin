@@ -685,6 +685,7 @@ DNS_TYPE_CNAME :: 0x5
 DNS_TYPE_MX    :: 0xf
 DNS_TYPE_AAAA  :: 0x1c
 DNS_TYPE_TEXT  :: 0x10
+DNS_TYPE_SRV   :: 0x21
 
 DNS_INFO_NO_RECORDS :: 9501
 DNS_QUERY_NO_RECURSION :: 0x00000004
@@ -704,6 +705,7 @@ DNS_RECORD :: struct {
         TXT: DNS_TXT_DATAA,
         NS: DNS_PTR_DATAA,
         MX: DNS_MX_DATAA,
+        SRV: DNS_SRV_DATAA,
     },
 }
 
@@ -716,8 +718,16 @@ DNS_PTR_DATAA :: cstring
 
 DNS_MX_DATAA :: struct {
     pNameExchange: cstring, // the hostname
-    wPreference: WORD,
+    wPreference: WORD, // lower values preferred
     _: WORD, // padding.
+}
+
+DNS_SRV_DATAA :: struct {
+	pNameTarget: cstring,
+	wPriority: u16be,
+	wWeight: u16be,
+	wPort: u16be,
+	_: WORD, // padding
 }
 
 EXCEPTION_DISPOSITION :: enum c_int {
