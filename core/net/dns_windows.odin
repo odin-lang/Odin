@@ -92,6 +92,7 @@ Dns_Record_Type :: enum u16 {
 	Txt = win.DNS_TYPE_TEXT,  // Arbitrary binary data or text.
 	Ns = win.DNS_TYPE_NS,     // Address of a name (DNS) server.
 	Mx = win.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
+	Srv = win.DNS_TYPE_SRV,   // Address, port, priority, and weight of a host that provides a particular service.
 }
 
 // An IPv4 address that the domain name maps to.
@@ -123,6 +124,22 @@ Dns_Record_Mx :: struct {
 	preference: int,
 }
 
+// An endpoint for a service that is available through the domain name.
+// This is the way to discover the services that a domain name provides.
+//
+// Clients MUST attempt to contact the host with the lowest priority that they can reach.
+// If two hosts have the same priority, they should be contacted in the order according to their weight.
+// Hosts with larger weights should have a proportionally higher chance of being contacted by clients.
+// A weight of zero indicates a very low weight, or, when there is no choice (to reduce visual noise).
+//
+// The host may be "." to indicate that it is "decidedly not available" on this domain.
+Dns_Record_Srv :: struct {
+	service_name, protocol, host: string,
+	port: int,
+	priority: int, // lower is higher priority
+	weight: int, // relative weight of this host compared to other of same priority; the chance of using this host should be proporitional to this weight.
+}
+
 Dns_Record :: union {
 	Dns_Record_Ipv4,
 	Dns_Record_Ipv6,
@@ -130,6 +147,7 @@ Dns_Record :: union {
 	Dns_Record_Text,
 	Dns_Record_Ns,
 	Dns_Record_Mx,
+	Dns_Record_Srv,
 }
 
 // Performs a recursive DNS query for records of a particular type for the hostname.
@@ -155,7 +173,7 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 		ok = true;
 		return;
 	case:
-		unreachable("DnsQuery_UTF8 returned an error we did not expect");
+		return;
 	}
 	defer win.DnsRecordListFree(rec, 1); // 1 means that we're freeing a list... because the proc name isn't enough.
 
@@ -177,14 +195,17 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 			addr := Ipv4_Address(transmute([4]u8) r.Data.A);
 			new_rec := Dns_Record_Ipv4(addr); // NOTE(tetra): value copy
 			append(&recs, new_rec);
+
 		case .Ipv6:
 			addr := Ipv6_Address(transmute([8]u16be) r.Data.AAAA);
 			new_rec := Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
 			append(&recs, new_rec);
+
 		case .Cname:
 			host := string(r.Data.CNAME);
 			new_rec := Dns_Record_Cname(strings.clone(host));
 			append(&recs, new_rec);
+
 		case .Txt:
 			n := r.Data.TXT.dwStringCount;
 			ptr := &r.Data.TXT.pStringArray;
@@ -194,10 +215,12 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 				new_rec := Dns_Record_Text(strings.clone(s));
 				append(&recs, new_rec);
 			}
+
 		case .Ns:
 			host := string(r.Data.NS);
 			new_rec := Dns_Record_Ns(strings.clone(host));
 			append(&recs, new_rec);
+
 		case .Mx:
 			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
 			// Or maybe not because you're supposed to just use the first one that works
@@ -208,6 +231,33 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 				host       = strings.clone(host),
 				preference = preference };
 			append(&recs, new_rec);
+
+		case .Srv:
+			name := strings.clone(string(r.Data.SRV.pNameTarget));
+			priority := int(r.Data.SRV.wPriority);
+			weight := int(r.Data.SRV.wWeight);
+			port := int(r.Data.SRV.wPort);
+
+			parts := strings.split(name, ".", context.temp_allocator);
+			defer delete(parts);
+			assert(len(parts) == 3, "Srv record name should be of the form _servicename._protocol.domain");
+			service_name, protocol, host := parts[0], parts[1], parts[2];
+
+			if service_name[0] == '_' {
+				service_name = service_name[1:];
+			}
+			if protocol[0] == '_' {
+				protocol = protocol[1:];
+			}
+
+			append(&recs, Dns_Record_Srv {
+				service_name = service_name,
+				protocol     = protocol,
+				host         = host,
+				priority     = priority,
+				weight       = weight,
+				port         = port,
+			});
 		}
 	}
 
@@ -232,6 +282,8 @@ destroy_dns_records :: proc(records: []Dns_Record, allocator := context.allocato
 			delete(string(r));
 		case Dns_Record_Mx:
 			delete(r.host);
+		case Dns_Record_Srv:
+			delete(r.service_name); // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
 		}
 	}
 
