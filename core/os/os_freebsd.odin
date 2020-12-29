@@ -144,7 +144,7 @@ RTLD_NOLOAD       :: 0x02000;
 
 args := _alloc_command_line_arguments();
 
-_File_Time :: struct {
+Unix_File_Time :: struct {
 	seconds: i64,
 	nanoseconds: c.long,
 }
@@ -162,10 +162,10 @@ Stat :: struct {
 	_padding1: i32,
 	rdev: u64,
 
-	last_access: File_Time,
-	modified: File_Time,
-	status_change: File_Time,
-	birthtime: File_Time,
+	last_access: Unix_File_Time,
+	modified: Unix_File_Time,
+	status_change: Unix_File_Time,
+	birthtime: Unix_File_Time,
 
 	size: i64,
 	blocks: i64,
@@ -328,7 +328,8 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	if err != ERROR_NONE {
 		return 0, err;
 	}
-	return File_Time(s.modified), ERROR_NONE;
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds;
+	return File_Time(modified), ERROR_NONE;
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
@@ -336,7 +337,8 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	if err != ERROR_NONE {
 		return 0, err;
 	}
-	return File_Time(s.modified), ERROR_NONE;
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds;
+	return File_Time(modified), ERROR_NONE;
 }
 
 stat :: inline proc(path: string) -> (Stat, Errno) {
