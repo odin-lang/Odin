@@ -186,7 +186,7 @@ RTLD_FIRST    :: 0x100;
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments();
 
-_File_Time :: struct {
+Unix_File_Time :: struct {
 	seconds: i64,
 	nanoseconds: i64,
 }
@@ -200,10 +200,10 @@ Stat :: struct {
 	gid:           u32, // Group ID of the file's group
 	rdev:          i32, // Device ID, if device
 
-	last_access:   _File_Time, // Time of last access
-	modified:      _File_Time, // Time of last modification
-	status_change: _File_Time, // Time of last status change
-	created:       _File_Time, // Time of creation
+	last_access:   Unix_File_Time, // Time of last access
+	modified:      Unix_File_Time, // Time of last modification
+	status_change: Unix_File_Time, // Time of last status change
+	created:       Unix_File_Time, // Time of creation
 
 	size:          i64,  // Size of the file, in bytes
 	blocks:        i64,  // Number of blocks allocated for the file
