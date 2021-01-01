@@ -3469,6 +3469,12 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 		}
 	}
 
+	if (is_c_vararg) {
+			for (isize i = param_count; i < args.count; i++) {
+				array_add(&processed_args, args[i]);
+			}
+	}
+
 	if (inlining == ProcInlining_none) {
 		inlining = p->inlining;
 	}
