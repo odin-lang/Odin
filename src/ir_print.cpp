@@ -2310,7 +2310,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_print_type(f, m, t);
 					ir_write_byte(f, ' ');
 					ir_print_value(f, m, arg, t);
-					param_index++;
+					arg_index++;
 				}
 			} else {
 				// GB_ASSERT(call->args.count == params->variables.count);
