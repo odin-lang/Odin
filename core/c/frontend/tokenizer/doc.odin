@@ -14,9 +14,9 @@ main :: proc() {
 	cpp.warn, cpp.err = t.warn, t.err;
 	preprocessor.init_lookup_tables(cpp);
 	preprocessor.init_default_macros(cpp);
-	cpp.include_paths = {"W:/Odin/core/c/frontend/include"};
+	cpp.include_paths = {"my/path/to/include"};
 
-	tok := tokenizer.tokenize_file(t, match_path, 1);
+	tok := tokenizer.tokenize_file(t, "the/source/file.c", 1);
 
 	tok = preprocessor.preprocess(cpp, tok);
 	if tok != nil {
@@ -26,8 +26,7 @@ main :: proc() {
 	}
 
 	fmt.println("[Done]");
-}
-*/
+}*/
 
 
 package c_frontend_tokenizer
