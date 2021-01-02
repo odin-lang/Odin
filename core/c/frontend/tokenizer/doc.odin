@@ -4,7 +4,6 @@ package demo
 import tokenizer "core:c/frontend/tokenizer"
 import preprocessor "core:c/frontend/preprocessor"
 import "core:fmt"
-import "core:path/filepath"
 
 main :: proc() {
 	t := &tokenizer.Tokenizer{};
@@ -26,7 +25,8 @@ main :: proc() {
 	}
 
 	fmt.println("[Done]");
-}*/
+}
+*/
 
 
 package c_frontend_tokenizer
