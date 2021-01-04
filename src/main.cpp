@@ -1668,6 +1668,12 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Ignores unknown attributes");
 		print_usage_line(2, "This can be used with metaprogramming tools");
 		print_usage_line(0, "");
+
+		if (command != "test") {
+			print_usage_line(1, "-no-entry-point");
+			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure)");
+			print_usage_line(0, "");
+		}
 	}
 
 	if (run_or_build) {
