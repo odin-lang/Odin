@@ -241,7 +241,7 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 	n: int;
 	base, max: u32;
 	switch esc {
-	case 'a', 'b', 'e', 'f', 'n', 't', 'v', 'r', '\\', '\'', '\"':
+	case 'a', 'b', 'e', 'f', 'n', 't', 'v', 'r', '\\', '\'', '"':
 		advance_rune(t);
 		return true;
 

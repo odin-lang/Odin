@@ -1496,3 +1496,15 @@ init_lookup_tables :: proc(cpp: ^Preprocessor, allocator := context.allocator) {
 	reserve(&cpp.include_guards, max(16, cap(cpp.include_guards)));
 	reserve(&cpp.filepath_cache, max(16, cap(cpp.filepath_cache)));
 }
+
+
+init_defaults :: proc(cpp: ^Preprocessor, lookup_tables_allocator := context.allocator) {
+	if cpp.warn == nil {
+		cpp.warn = tokenizer.default_warn_handler;
+	}
+	if cpp.err == nil {
+		cpp.err = tokenizer.default_error_handler;
+	}
+	init_lookup_tables(cpp, lookup_tables_allocator);
+	init_default_macros(cpp);
+}
