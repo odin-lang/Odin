@@ -42,6 +42,18 @@ print_string :: proc "contextless" (str: string) -> (int, _OS_Errno) {
 	return os_write(transmute([]byte)str);
 }
 
+print_strings :: proc "contextless" (args: ..string) -> (n: int, err: _OS_Errno) {
+	for str in args {
+		m: int;
+		m, err = os_write(transmute([]byte)str);
+		n += m;
+		if err != 0 {
+			break;
+		}
+	}
+	return;
+}
+
 print_byte :: proc "contextless" (b: byte) -> (int, _OS_Errno) {
 	return os_write([]byte{b});
 }

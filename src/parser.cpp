@@ -1284,8 +1284,7 @@ bool skip_possible_newline(AstFile *f) {
 	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
 		return false;
 	}
-	Token *prev = &f->curr_token;
-	if (prev->kind == Token_Semicolon && prev->string == "\n") {
+	if (token_is_newline(f->curr_token)) {
 		advance_token(f);
 		return true;
 	}
@@ -1296,10 +1295,10 @@ bool skip_possible_newline_for_literal(AstFile *f) {
 	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
 		return false;
 	}
-	TokenPos curr_pos = f->curr_token.pos;
-	if (token_is_newline(f->curr_token)) {
+	Token curr = f->curr_token;
+	if (token_is_newline(curr)) {
 		Token next = peek_token(f);
-		if (curr_pos.line+1 >= next.pos.line) {
+		if (curr.pos.line+1 >= next.pos.line) {
 			switch (next.kind) {
 			case Token_OpenBrace:
 			case Token_else:
@@ -3182,6 +3181,7 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 
 
 Ast *parse_block_stmt(AstFile *f, b32 is_when) {
+	skip_possible_newline_for_literal(f);
 	if (!is_when && f->curr_proc == nullptr) {
 		syntax_error(f->curr_token, "You cannot use a block statement in the file scope");
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
@@ -3796,9 +3796,9 @@ Ast *parse_if_stmt(AstFile *f) {
 		}
 	} else {
 		body = parse_block_stmt(f, false);
-		skip_possible_newline_for_literal(f);
 	}
 
+	skip_possible_newline_for_literal(f);
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
 		case Token_if:
@@ -3852,9 +3852,9 @@ Ast *parse_when_stmt(AstFile *f) {
 		}
 	} else {
 		body = parse_block_stmt(f, true);
-		skip_possible_newline_for_literal(f);
 	}
 
+	skip_possible_newline_for_literal(f);
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
 		case Token_when:
@@ -3958,7 +3958,6 @@ Ast *parse_for_stmt(AstFile *f) {
 				}
 			} else {
 				body = parse_block_stmt(f, false);
-				skip_possible_newline_for_literal(f);
 			}
 			return ast_range_stmt(f, token, nullptr, nullptr, in_token, rhs, body);
 		}
@@ -3994,7 +3993,6 @@ Ast *parse_for_stmt(AstFile *f) {
 		}
 	} else {
 		body = parse_block_stmt(f, false);
-		skip_possible_newline_for_literal(f);
 	}
 
 	if (is_range) {
@@ -4346,7 +4344,6 @@ Ast *parse_stmt(AstFile *f) {
 				}
 			} else {
 				body = parse_block_stmt(f, false);
-				skip_possible_newline_for_literal(f);
 			}
 			if (bad_stmt) {
 				return ast_bad_stmt(f, inline_token, f->curr_token);

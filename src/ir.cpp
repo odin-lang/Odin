@@ -901,7 +901,7 @@ Array<irValue *> *ir_value_referrers(irValue *v) {
 ////////////////////////////////////////////////////////////////
 
 void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
-void     ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
+irValue *ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value, bool is_volatile=false);
 irValue *ir_emit_load           (irProcedure *p, irValue *address, i64 custom_align=0);
@@ -1638,6 +1638,7 @@ irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 	if (expr == nullptr) {
 		return nullptr;
 	}
+
 	if (expr->kind == Ast_CompoundLit) {
 		ast_node(cl, CompoundLit, expr);
 		for_array(i, cl->elems) {
@@ -1660,6 +1661,7 @@ irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 			return ir_add_module_constant(m, tav.type, tav.value);
 		}
 	}
+
 
 	return 	nullptr;
 }
@@ -3091,6 +3093,85 @@ void ir_pop_debug_location(irModule *m) {
 irValue *ir_emit_runtime_call(irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr, ProcInlining inlining = ProcInlining_none);
 irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr = nullptr, ProcInlining inlining = ProcInlining_none);
 
+bool ir_type_requires_mem_zero(Type *t) {
+	t = core_type(t);
+	isize sz = type_size_of(t);
+	if (t->kind == Type_SimdVector) {
+		return false;
+	}
+
+	if (!(gb_is_power_of_two(sz) && sz <= build_context.max_align)) {
+		return true;
+	}
+
+	enum : i64 {LARGE_SIZE = 64};
+	if (sz > LARGE_SIZE) {
+		return true;
+	}
+
+	switch (t->kind) {
+	case Type_Union:
+		return true;
+	case Type_Struct:
+		if (t->Struct.is_raw_union) {
+			return true;
+		}
+		if (t->Struct.is_packed) {
+			return false;
+		} else {
+			i64 packed_sized = 0;
+			for_array(i, t->Struct.fields) {
+				Entity *f = t->Struct.fields[i];
+				if (f->kind == Entity_Variable) {
+					packed_sized += type_size_of(f->type);
+				}
+			}
+			return sz != packed_sized;
+		}
+		break;
+	case Type_Tuple:
+		if (t->Tuple.is_packed) {
+			return false;
+		} else {
+			i64 packed_sized = 0;
+			for_array(i, t->Tuple.variables) {
+				Entity *f = t->Tuple.variables[i];
+				if (f->kind == Entity_Variable) {
+					packed_sized += type_size_of(f->type);
+				}
+			}
+			return sz != packed_sized;
+		}
+		break;
+
+	case Type_DynamicArray:
+	case Type_Map:
+	case Type_BitField:
+		return true;
+	case Type_Array:
+		return ir_type_requires_mem_zero(t->Array.elem);
+	case Type_EnumeratedArray:
+		return ir_type_requires_mem_zero(t->EnumeratedArray.elem);
+	}
+	return false;
+}
+
+irValue *ir_call_mem_zero(irProcedure *p, irValue *address, Ast *expr = nullptr) {
+	Type *t = type_deref(ir_type(address));
+	// TODO(bill): Is this a good idea?
+	auto args = array_make<irValue *>(ir_allocator(), 2);
+	args[0] = ir_emit_conv(p, address, t_rawptr);
+	args[1] = ir_const_int(type_size_of(t));
+	AstPackage *pkg_runtime = get_core_package(p->module->info, str_lit("runtime"));
+	if (p->entity != nullptr) {
+		String name = p->entity->token.string;
+		if (p->entity->pkg != pkg_runtime && !(name == "mem_zero" || name == "memset")) {
+			ir_emit_comment(p, str_lit("ZeroInit"));
+			return ir_emit_package_call(p, "runtime", "mem_zero", args, expr);
+		}
+	}
+	return nullptr;
+}
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value, bool is_volatile) {
 	Type *a = type_deref(ir_type(address));
@@ -3108,6 +3189,35 @@ irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value, bool is
 	if (!is_type_untyped(b)) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
+
+
+	if (value->kind == irValue_Constant) {
+		ExactValue const &v = value->Constant.value;
+		irValue *res = nullptr;
+		switch (v.kind) {
+		case ExactValue_Invalid:
+			res = ir_call_mem_zero(p, address);
+			if (res) {
+				return res;
+			}
+			goto end;
+
+		case ExactValue_Compound:
+			// NOTE(bill): This is to enforce the zeroing of the padding
+			if (ir_type_requires_mem_zero(a)) {
+				res = ir_call_mem_zero(p, address);
+				if (res == nullptr || v.value_compound == nullptr) {
+					goto end;
+				}
+				if (is_exact_value_zero(v)) {
+					return res;
+				}
+			}
+			goto end;
+		}
+	}
+
+end:;
 	return ir_emit(p, ir_instr_store(p, address, value, is_volatile));
 }
 irValue *ir_emit_load(irProcedure *p, irValue *address, i64 custom_align) {
@@ -3162,29 +3272,19 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 	}
 }
 
-void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
+irValue *ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	gbAllocator a = ir_allocator();
 	Type *t = type_deref(ir_type(address));
-	isize sz = type_size_of(t);
 
 	if (address) address->uses += 1;
 
-	if (!(gb_is_power_of_two(sz) && sz <= build_context.max_align)) {
-		// TODO(bill): Is this a good idea?
-		auto args = array_make<irValue *>(a, 2);
-		args[0] = ir_emit_conv(p, address, t_rawptr);
-		args[1] = ir_const_int(type_size_of(t));
-		AstPackage *pkg_runtime = get_core_package(p->module->info, str_lit("runtime"));
-		if (p->entity != nullptr) {
-			String name = p->entity->token.string;
-			if (p->entity->pkg != pkg_runtime && !(name == "mem_zero" || name == "memset")) {
-				ir_emit_comment(p, str_lit("ZeroInit"));
-				irValue *v = ir_emit_package_call(p, "runtime", "mem_zero", args, expr);
-				return;
-			}
+	if (ir_type_requires_mem_zero(t)) {
+		irValue *res = ir_call_mem_zero(p, address, expr);
+		if (res) {
+			return res;
 		}
 	}
-	ir_emit(p, ir_instr_zero_init(p, address));
+	return ir_emit(p, ir_instr_zero_init(p, address));
 }
 
 irValue *ir_emit_comment(irProcedure *p, String text) {
@@ -6645,7 +6745,10 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(id));
 }
 
-irValue *ir_typeid(irModule *m, Type *type) {
+u64 ir_typeid_as_integer(irModule *m, Type *type) {
+	if (type == nullptr) {
+		return 0;
+	}
 	type = default_type(type);
 
 	u64 id = cast(u64)ir_type_info_index(m->info, type);
@@ -6710,8 +6813,11 @@ irValue *ir_typeid(irModule *m, Type *type) {
 		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
 	}
 
+	return id;
+}
 
-	return ir_value_constant(t_typeid, exact_value_u64(data));
+irValue *ir_typeid(irModule *m, Type *type) {
+	return ir_value_constant(t_typeid, exact_value_u64(ir_typeid_as_integer(m, type)));
 }
 
 

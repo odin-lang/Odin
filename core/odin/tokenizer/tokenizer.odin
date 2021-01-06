@@ -266,7 +266,7 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 	n: int;
 	base, max: u32;
 	switch t.ch {
-	case 'a', 'b', 'e', 'f', 'n', 't', 'v', '\\', '\'', '\"':
+	case 'a', 'b', 'e', 'f', 'n', 't', 'v', 'r', '\\', '\'', '\"':
 		advance_rune(t);
 		return true;
 
@@ -563,13 +563,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			insert_semicolon = true;
 			kind = .String;
 			lit = scan_raw_string(t);
-		case '=':
-			if t.ch == '>' {
-				advance_rune(t);
-				kind = .Double_Arrow_Right;
-			} else {
-				kind = switch2(t, .Eq, .Cmp_Eq);
-			}
+		case '=': kind = switch2(t, .Eq, .Cmp_Eq);
 		case '!': kind = switch2(t, .Not, .Not_Eq);
 		case '#':
 			kind = .Hash;
@@ -615,13 +609,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			}
 		case '|': kind = switch3(t, .Or, .Or_Eq, '|', .Cmp_Or);
 		case '~': kind = .Xor;
-		case '<':
-			if t.ch == '-' {
-				advance_rune(t);
-				kind = .Arrow_Left;
-			} else {
-				kind = switch4(t, .Lt, .Lt_Eq, '<', .Shl, .Shl_Eq);
-			}
+		case '<': kind = switch4(t, .Lt, .Lt_Eq, '<', .Shl, .Shl_Eq);
 		case '>': kind = switch4(t, .Gt, .Gt_Eq, '>', .Shr,.Shr_Eq);
 
 		case '.':

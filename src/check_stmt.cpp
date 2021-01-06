@@ -1803,9 +1803,19 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			if (val0 == nullptr) {
 				gbString s = expr_to_string(operand.expr);
 				gbString t = type_to_string(operand.type);
+				defer (gb_string_free(s));
+				defer (gb_string_free(t));
+
 				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
-				gb_string_free(t);
-				gb_string_free(s);
+
+				if (rs->val0 != nullptr && rs->val1 == nullptr) {
+					if (is_type_map(operand.type) || is_type_bit_set(operand.type)) {
+						gbString v = expr_to_string(rs->val0);
+						defer (gb_string_free(v));
+						error_line("\tSuggestion: place parentheses around the expression\n");
+						error_line("\t            for (%s in %s) {\n", v, s);
+					}
+				}
 			}
 		}
 

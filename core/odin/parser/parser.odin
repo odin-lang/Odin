@@ -107,6 +107,14 @@ default_parser :: proc() -> Parser {
 	};
 }
 
+is_package_name_reserved :: proc(name: string) -> bool {
+	switch name {
+	case "builtin", "intrinsics":
+		return true;
+	}
+	return false;
+}
+
 parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	zero_parser: {
 		p.prev_tok         = {};
@@ -121,7 +129,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	}
 
 	p.file = file;
-	tokenizer.init(&p.tok, file.src, file.fullpath);
+	tokenizer.init(&p.tok, file.src, file.fullpath, p.err);
 	if p.tok.ch <= 0 {
 		return true;
 	}
@@ -139,8 +147,11 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 
 	pkg_name := expect_token_after(p, .Ident, "package");
 	if pkg_name.kind == .Ident {
-		if is_blank_ident(pkg_name) {
+		switch name := pkg_name.text; {
+		case is_blank_ident(name):
 			error(p, pkg_name.pos, "invalid package name '_'");
+		case is_package_name_reserved(name), file.pkg.kind != .Runtime && name == "runtime":
+			error(p, pkg_name.pos, "use of reserved package name '%s'", name);
 		}
 	}
 	p.file.pkg_name = pkg_name.text;
@@ -276,7 +287,7 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 	}
 
 	if len(list) > 0 {
-		comments = new(ast.Comment_Group);
+		comments = ast.new(ast.Comment_Group, list[0].pos, end_pos(list[len(list)-1]));
 		comments.list = list[:];
 		append(&p.file.comments, comments);
 	}
@@ -521,6 +532,7 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
 }
 
 parse_block_stmt :: proc(p: ^Parser, is_when: bool) -> ^ast.Stmt {
+	skip_possible_newline_for_literal(p);
 	if !is_when && p.curr_proc == nil {
 		error(p, p.curr_tok.pos, "you cannot use a block statement in the file scope");
 	}
@@ -546,9 +558,9 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
 		body = parse_block_stmt(p, true);
-		skip_possible_newline_for_literal(p);
 	}
 
+	skip_possible_newline_for_literal(p);
 	if allow_token(p, .Else) {
 		#partial switch p.curr_tok.kind {
 		case .When:
@@ -622,9 +634,11 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
 		body = parse_block_stmt(p, false);
-		skip_possible_newline_for_literal(p);
 	}
 
+	else_tok := p.curr_tok.pos;
+
+	skip_possible_newline_for_literal(p);
 	if allow_token(p, .Else) {
 		#partial switch p.curr_tok.kind {
 		case .If:
@@ -650,6 +664,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	if_stmt.cond      = cond;
 	if_stmt.body      = body;
 	if_stmt.else_stmt = else_stmt;
+	if_stmt.else_pos = else_tok;
 	return if_stmt;
 }
 
@@ -684,7 +699,6 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				body = convert_stmt_to_body(p, parse_stmt(p));
 			} else {
 				body = parse_body(p);
-				skip_possible_newline_for_literal(p);
 			}
 
 			range_stmt := ast.new(ast.Range_Stmt, tok.pos, body.end);
@@ -719,7 +733,6 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		body = convert_stmt_to_body(p, parse_stmt(p));
 	} else {
 		body = parse_body(p);
-		skip_possible_newline_for_literal(p);
 	}
 
 
@@ -784,6 +797,7 @@ parse_case_clause :: proc(p: ^Parser, is_type_switch: bool) -> ^ast.Case_Clause 
 	cc.list = list;
 	cc.terminator = terminator;
 	cc.body = stmts;
+	cc.case_pos = tok.pos;
 	return cc;
 }
 
@@ -845,6 +859,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		ts := ast.new(ast.Type_Switch_Stmt, tok.pos, body.end);
 		ts.tag  = tag;
 		ts.body = body;
+		ts.switch_pos = tok.pos;
 		return ts;
 	} else {
 		cond := convert_stmt_to_expr(p, tag, "switch expression");
@@ -852,6 +867,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		ts.init = init;
 		ts.cond = cond;
 		ts.body = body;
+		ts.switch_pos = tok.pos;
 		return ts;
 	}
 }
@@ -1088,7 +1104,6 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	    		body = convert_stmt_to_body(p, parse_stmt(p));
 	    	} else {
 	    		body = parse_block_stmt(p, false);
-			skip_possible_newline_for_literal(p);
 	    	}
 
 	    	if bad_stmt {
@@ -1155,7 +1170,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		end := end_pos(tok);
 		if len(results) > 0 {
-			end = results[len(results)-1].pos;
+			end = results[len(results)-1].end;
 		}
 
 		rs := ast.new(ast.Return_Stmt, tok.pos, end);
@@ -2599,7 +2614,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Asm:
 		tok := expect_token(p, .Asm);
 
-		param_types: [dynamic]^ast.Expr
+		param_types: [dynamic]^ast.Expr;
 		return_type: ^ast.Expr;
 		if allow_token(p, .Open_Paren) {
 			for p.curr_tok.kind != .Close_Paren && p.curr_tok.kind != .EOF {

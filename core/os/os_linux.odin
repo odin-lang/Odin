@@ -179,7 +179,7 @@ RTLD_GLOBAL       :: 0x100;
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments();
 
-_File_Time :: struct {
+Unix_File_Time :: struct {
 	seconds:     i64,
 	nanoseconds: i64,
 }
@@ -197,9 +197,9 @@ Stat :: struct {
 	block_size:    i64, // Optimal bllocksize for I/O
 	blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   File_Time, // Time of last access
-	status_change: File_Time, // Time of last status change
-	modified:      File_Time, // Time of last modification
+	last_access:   Unix_File_Time, // Time of last access
+	modified:      Unix_File_Time, // Time of last modification
+	status_change: Unix_File_Time, // Time of last status change
 
 	_reserve1,
 	_reserve2,
@@ -364,7 +364,8 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	if err != ERROR_NONE {
 		return 0, err;
 	}
-	return File_Time(s.modified), ERROR_NONE;
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds;
+	return File_Time(modified), ERROR_NONE;
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
@@ -372,7 +373,8 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	if err != ERROR_NONE {
 		return 0, err;
 	}
-	return File_Time(s.modified), ERROR_NONE;
+	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds;
+	return File_Time(modified), ERROR_NONE;
 }
 
 stat :: inline proc(path: string) -> (Stat, Errno) {

@@ -1,3 +1,11 @@
+// package text/scanner provides a scanner and tokenizer for UTF-8-encoded text.
+// It takes a string providing the source, which then can be tokenized through
+// repeated calls to the scan procedure.
+// For compatibility with existing tooling and languages, the NUL character is not allowed.
+// If an UTF-8 encoded byte order mark (BOM) is the first character in the first character in the source, it will be discarded.
+//
+// By default, a Scanner skips white space and Odin comments and recognizes all literals defined by the Odin programming language specification.
+// A Scanner may be customized to recognize only a subset of those literals and to recognize different identifiers and white space characters.
 package text_scanner
 
 import "core:fmt"
@@ -5,6 +13,8 @@ import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
+// Position represents a source position
+// A position is valid if line > 0
 Position :: struct {
 	filename: string, // filename, if present
 	offset:   int,    // byte offset, starting @ 0
@@ -12,6 +22,7 @@ Position :: struct {
 	column:   int,    // column number, starting @ 1 (character count per line)
 }
 
+// position_is_valid reports where the position is valid
 position_is_valid :: proc(pos: Position) -> bool {
 	return pos.line > 0;
 }
@@ -43,22 +54,27 @@ Scan_Flag :: enum u32 {
 	Scan_Idents,
 	Scan_Ints,
 	Scan_C_Int_Prefixes,
-	Scan_Floats,
+	Scan_Floats, // Includes integers and hexadecimal floats
 	Scan_Chars,
 	Scan_Strings,
 	Scan_Raw_Strings,
 	Scan_Comments,
-	Skip_Comments,
+	Skip_Comments, // if set with .Scan_Comments, comments become white space
 }
-Scan_Flags :: bit_set[Scan_Flag; u32];
+Scan_Flags :: distinct bit_set[Scan_Flag; u32];
 
 Odin_Like_Tokens :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments};
 C_Like_Tokens    :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_C_Int_Prefixes, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments};
 
-Odin_Whitespace :: 1<<'\t' | 1<<'\n' | 1<<'\r' | 1<<' ';
-C_Whitespace    :: 1<<'\t' | 1<<'\n' | 1<<'\r' | 1<<'\v' | 1<<'\f' | 1<<' ';
+// Only allows for ASCII whitespace
+Whitespace :: distinct bit_set['\x00'..<utf8.RUNE_SELF; u128];
+
+// Odin_Whitespace is the default value for the Scanner's whitespace field
+Odin_Whitespace :: Whitespace{'\t', '\n', '\r', ' '};
+C_Whitespace    :: Whitespace{'\t', '\n', '\r', '\v', '\f', ' '};
 
 
+// Scanner allows for the reading of Unicode characters and tokens from a string
 Scanner :: struct {
 	src: string,
 
@@ -75,20 +91,39 @@ Scanner :: struct {
 	prev_line_len: int,
 	prev_char_len: int,
 
+	// error is called for each error encountered
+	// If no error procedure is set, the error is reported to os.stderr
 	error: proc(s: ^Scanner, msg: string),
+
+	// error_count is incremented by one for each error encountered
 	error_count: int,
 
+	// flags controls which tokens are recognized
+	// e.g. to recognize integers, set the .Scan_Ints flag
+	// This field may be changed by the user at any time during scanning
 	flags: Scan_Flags,
-	whitespace: u64,
 
+	// The whitespace field controls which characters are recognized as white space
+	// This field may be changed by the user at any time during scanning
+	whitespace: Whitespace,
+
+	// is_ident_rune is a predicate controlling the characters accepted as the ith rune in an identifier
+	// The valid characters must not conflict with the set of white space characters
+	// If is_ident_rune is not set, regular Odin-like identifiers are accepted
+	// This field may be changed by the user at any time during scanning
 	is_ident_rune: proc(ch: rune, i: int) -> bool,
 
+	// Start position of most recently scanned token (set by scan(s))
+	// Call init or next invalidates the position
 	pos: Position,
 }
 
+// init initializes a scanner with a new source and returns itself.
+// error_count is set to 0, flags is set to Odin_Like_Tokens, whitespace is set to Odin_Whitespace
 init :: proc(s: ^Scanner, src: string, filename := "") -> ^Scanner {
 	s^ = {};
 
+	s.error_count = 0;
 	s.src = src;
 	s.pos.filename = filename;
 
@@ -140,6 +175,8 @@ advance :: proc(s: ^Scanner) -> rune {
 	return ch;
 }
 
+// next reads and returns the next Unicode character. It returns EOF at the end of the source.
+// next does not update the Scanner's pos field. Use 'position(s)' to get the current position
 next :: proc(s: ^Scanner) -> rune {
 	s.tok_pos = -1;
 	s.pos.line = 0;
@@ -150,16 +187,40 @@ next :: proc(s: ^Scanner) -> rune {
 	return ch;
 }
 
-peek :: proc(s: ^Scanner) -> rune {
+// peek returns the next Unicode character in the source without advancing the scanner
+// It returns EOF if the scanner's position is at least the last character of the source
+// if n > 0, it call next n times and return the nth Unicode character and then restore the Scanner's state
+peek :: proc(s: ^Scanner, n := 0) -> (ch: rune) {
 	if s.ch == -2 {
 		s.ch = advance(s);
 		if s.ch == '\ufeff' { // Ignore BOM
 			s.ch = advance(s);
 		}
 	}
-	return s.ch;
+	ch = s.ch;
+	if n > 0 {
+		prev_s := s^;
+		for in 0..<n {
+			next(s);
+		}
+		ch = s.ch;
+		s^ = prev_s;
+	}
+	return ch;
 }
-
+// peek returns the next token in the source
+// It returns EOF if the scanner's position is at least the last character of the source
+// if n > 0, it call next n times and return the nth token and then restore the Scanner's state
+peek_token :: proc(s: ^Scanner, n := 0) -> (tok: rune) {
+	assert(n >= 0);
+	prev_s := s^;
+	for in 0..<n {
+		tok = scan(s);
+	}
+	tok = scan(s);
+	s^ = prev_s;
+	return;
+}
 
 error :: proc(s: ^Scanner, msg: string) {
 	s.error_count += 1;
@@ -450,6 +511,10 @@ scan_comment :: proc(s: ^Scanner, ch: rune) -> rune {
 	return ch;
 }
 
+// scan reads the next token or Unicode character from source and returns it
+// It only recognizes tokens for which the respective flag that is set
+// It returns EOF at the end of the source
+// It reports Scanner errors by calling s.error, if not nil; otherwise it will print the error message to os.stderr
 scan :: proc(s: ^Scanner) -> (tok: rune) {
 	ch := peek(s);
 	if ch == EOF {
@@ -461,7 +526,7 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 	s.pos.line = 0;
 
 	redo: for {
-		for s.whitespace & (1<<uint(ch)) != 0 {
+		for (ch < utf8.RUNE_SELF && ch in s.whitespace) {
 			ch = advance(s);
 		}
 
@@ -544,6 +609,8 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 	return tok;
 }
 
+// position returns the position of the character immediately after the character or token returns by the previous call to next or scan
+// Use the Scanner's position field for the most recently scanned token position
 position :: proc(s: ^Scanner) -> Position {
 	pos: Position;
 	pos.filename = s.pos.filename;
@@ -562,6 +629,7 @@ position :: proc(s: ^Scanner) -> Position {
 	return pos;
 }
 
+// token_text returns the string of the most recently scanned token
 token_text :: proc(s: ^Scanner) -> string {
 	if s.tok_pos < 0 {
 		return "";
@@ -569,6 +637,8 @@ token_text :: proc(s: ^Scanner) -> string {
 	return string(s.src[s.tok_pos:s.tok_end]);
 }
 
+// token_string returns a printable string for a token or Unicode character
+// By default, it uses the context.temp_allocator to produce the string
 token_string :: proc(tok: rune, allocator := context.temp_allocator) -> string {
 	context.allocator = allocator;
 	switch tok {
