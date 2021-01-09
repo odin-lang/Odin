@@ -14,3 +14,24 @@ now :: proc() -> Time {
 sleep :: proc(d: Duration) {
 	win32.Sleep(win32.DWORD(d/Millisecond));
 }
+
+
+
+_tick_now :: proc() -> Tick {
+	mul_div_u64 :: proc(val, num, den: i64) -> i64 {
+		q := val / den;
+		r := val % den;
+		return q * num + r * num / den;
+	}
+
+	@thread_local qpc_frequency: win32.LARGE_INTEGER;
+
+	if qpc_frequency == 0 {
+		win32.QueryPerformanceFrequency(&qpc_frequency);
+	}
+	now: win32.LARGE_INTEGER;
+	win32.QueryPerformanceCounter(&now);
+
+	_nsec := i64(mul_div_u64(i64(now), 1e9, i64(qpc_frequency)));
+	return Tick{_nsec = _nsec};
+}
