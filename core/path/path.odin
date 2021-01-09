@@ -6,8 +6,6 @@
 package path
 
 import "core:strings"
-import "core:runtime"
-import "core:unicode/utf8"
 
 // is_separator checks whether the byte is a valid separator character
 is_separator :: inline proc(c: byte) -> bool {

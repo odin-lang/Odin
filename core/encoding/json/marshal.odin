@@ -5,7 +5,6 @@ import "core:math/bits"
 import "core:runtime"
 import "core:strconv"
 import "core:strings"
-import "core:reflect"
 
 Marshal_Error :: enum {
 	None,

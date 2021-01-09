@@ -172,7 +172,7 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 		return 0, b.err;
 	}
 	if writer_buffered(b) == 0 {
-		if w, cerr := io.to_reader_from(b.wr); cerr != nil {
+		if w, ok := io.to_reader_from(b.wr); !ok {
 			n, err = io.read_from(w, r);
 			b.err = err;
 			return;

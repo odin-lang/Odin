@@ -677,9 +677,9 @@ match_values :: proc(left, right: ^Value) -> bool {
 	return false;
 }
 
-calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, bool) {
+calculate_binary_value :: proc(p: ^Parser, op: Kind, a_, b_: Value) -> (Value, bool) {
 	// TODO(bill): Calculate value as you go!
-	x, y := a, b;
+	x, y := a_, b_;
 	match_values(&x, &y);
 
 
