@@ -83,3 +83,10 @@ nanosleep :: proc(nanoseconds: i64) -> int {
 	remaining: TimeSpec; // NOTE(tetra): Do we need to initialize this?
 	return int(_unix_nanosleep(&requested, &remaining));
 }
+
+
+_tick_now :: proc() -> Tick {
+	t := clock_gettime(CLOCK_MONOTONIC_RAW);
+	_nsec := t.tv_sec*1e9 + t.tv_nsec;
+	return Tick{_nsec = _nsec};
+}

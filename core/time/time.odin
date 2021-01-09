@@ -46,8 +46,19 @@ diff :: proc(start, end: Time) -> Duration {
 	return Duration(d);
 }
 
+since :: proc(start: Time) -> Duration {
+	return diff(start, now());
+}
+
+
 duration_nanoseconds :: proc(d: Duration) -> i64 {
 	return i64(d);
+}
+duration_microseconds :: proc(d: Duration) -> f64 {
+	return duration_seconds(d) * 1e6;
+}
+duration_milliseconds :: proc(d: Duration) -> f64 {
+	return duration_seconds(d) * 1e3;
 }
 duration_seconds :: proc(d: Duration) -> f64 {
 	sec := d / Second;
