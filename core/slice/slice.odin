@@ -42,6 +42,15 @@ linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	return -1, false;
 }
 
+linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) #no_bounds_check {
+	for x, i in array {
+		if f(x) {
+			return i, true;
+		}
+	}
+	return -1, false;
+}
+
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	where intrinsics.type_is_ordered(T) #no_bounds_check {
 
@@ -63,7 +72,7 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 			// NOTE(bill): This is technically interpolation search
 			m := lo + int((key - array[lo]) * T(hi - lo) / (array[hi] - array[lo]));
 		} else {
-			m := (lo + hi)/2;
+			m := lo + (hi - lo)/2;
 		}
 		switch {
 		case array[m] < key:
@@ -80,6 +89,7 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	}
 	return -1, false;
 }
+
 
 equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
 	if len(a) != len(b) {
