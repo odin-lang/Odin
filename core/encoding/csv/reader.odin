@@ -56,22 +56,22 @@ Reader :: struct {
 }
 
 
-Parser_Error_Kind :: enum {
+Reader_Error_Kind :: enum {
 	Bare_Quote,
 	Quote,
 	Field_Count,
 	Invalid_Delim,
 }
 
-parser_error_kind_string := [Parser_Error_Kind]string{
+reader_error_kind_string := [Reader_Error_Kind]string{
 	.Bare_Quote     = "bare \" in non-quoted field",
 	.Quote          = "extra or missing \" in quoted field",
 	.Field_Count    = "wrong field count",
 	.Invalid_Delim  = "invalid delimiter",
 };
 
-Parser_Error :: struct {
-	kind:          Parser_Error_Kind,
+Reader_Error :: struct {
+	kind:          Reader_Error_Kind,
 	start_line:    int,
 	line:          int,
 	column:        int,
@@ -79,7 +79,7 @@ Parser_Error :: struct {
 }
 
 Error :: union {
-	Parser_Error,
+	Reader_Error,
 	io.Error,
 }
 
@@ -182,6 +182,14 @@ read_all_from_string :: proc(input: string, records_allocator := context.allocat
 	return read_all(&r, records_allocator);
 }
 
+@private
+is_valid_delim :: proc(r: rune) -> bool {
+	switch r {
+	case 0, '"', '\r', '\n', utf8.RUNE_ERROR:
+		return false;
+	}
+	return utf8.valid_rune(r);
+}
 
 @private
 _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.allocator) -> ([]string, Error) {
@@ -214,14 +222,6 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 		return line, err;
 	}
 
-	is_valid_delim :: proc(r: rune) -> bool {
-		switch r {
-		case 0, '"', '\r', '\n', utf8.RUNE_ERROR:
-			return false;
-		}
-		return utf8.valid_rune(r);
-	}
-
 	length_newline :: proc(b: []byte) -> int {
 		if len(b) > 0 && b[len(b)-1] == '\n' {
 			return 1;
@@ -237,7 +237,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 	if r.comma == r.comment ||
 	   !is_valid_delim(r.comma) ||
 	   (r.comment != 0 && !is_valid_delim(r.comment)) {
-		err := Parser_Error{
+		err := Reader_Error{
 			kind = .Invalid_Delim,
 			line = r.line_count,
 		};
@@ -287,7 +287,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 			if !r.lazy_quotes {
 				if j := bytes.index_byte(field, '"'); j >= 0 {
 					column := utf8.rune_count(full_line[:len(full_line) - len(line[j:])]);
-					err = Parser_Error{
+					err = Reader_Error{
 						kind = .Bare_Quote,
 						start_line = record_line,
 						line = r.line_count,
@@ -327,7 +327,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 						append(&r.record_buffer, '"');
 					case: // invalid non-escaped quote
 						column := utf8.rune_count(full_line[:len(full_line) - len(line) - quote_len]);
-						err = Parser_Error{
+						err = Reader_Error{
 							kind = .Quote,
 							start_line = record_line,
 							line = r.line_count,
@@ -350,7 +350,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 				case:
 					if !r.lazy_quotes && err_read == nil {
 						column := utf8.rune_count(full_line);
-						err = Parser_Error{
+						err = Reader_Error{
 							kind = .Quote,
 							start_line = record_line,
 							line = r.line_count,
@@ -390,7 +390,7 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 
 	if r.fields_per_record > 0 {
 		if len(dst) != r.fields_per_record && err == nil {
-			err = Parser_Error{
+			err = Reader_Error{
 				kind = .Field_Count,
 				start_line = record_line,
 				line = r.line_count,
