@@ -305,13 +305,13 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	}
 
 	m: i64;
-	if nr, cerr := io.to_writer_to(b.rd); cerr == nil {
+	if nr, ok := io.to_writer_to(b.rd); ok {
 		m, err = io.write_to(nr, w);
 		n += m;
 		return n, err;
 	}
 
-	if nw, cerr := io.to_reader_from(w); cerr == nil {
+	if nw, ok := io.to_reader_from(w); ok {
 		m, err = io.read_from(nw, b.rd);
 		n += m;
 		return n, err;

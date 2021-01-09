@@ -2,7 +2,6 @@ package log
 
 import "core:runtime"
 import "core:fmt"
-import "core:sync"
 
 
 // NOTE(bill, 2019-12-31): These are defined in `package runtime` as they are used in the `context`. This is to prevent an import definition cycle.
