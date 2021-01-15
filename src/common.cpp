@@ -523,6 +523,7 @@ gb_global Temp_Allocator temporary_allocator_data = {};
 void temp_allocator_init(Temp_Allocator *s, isize size) {
 	s->backup_allocator = heap_allocator();
 	s->data = cast(u8 *)gb_alloc_align(s->backup_allocator, size, 16);
+	s->len = size;
 	s->curr_offset = 0;
 	s->leaked_allocations.allocator = s->backup_allocator;
 }
