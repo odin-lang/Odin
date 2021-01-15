@@ -5320,6 +5320,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 	TokenPos err_pos = {0};
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
 	err_pos.file = fi->fullpath;
+	file->last_error = err;
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -5426,6 +5427,18 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 	}
 
+	for (isize i = p->packages.count-1; i >= 0; i--) {
+		AstPackage *pkg = p->packages[i];
+		for (isize j = pkg->files.count-1; j >= 0; j--) {
+			AstFile *file = pkg->files[j];
+			if (file->error_count != 0) {
+				if (file->last_error != ParseFile_None) {
+					return file->last_error;
+				}
+				return ParseFile_GeneralError;
+			}
+		}
+	}
 	return ParseFile_None;
 }
 

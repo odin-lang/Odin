@@ -41,6 +41,7 @@ enum ParseFileError {
 	ParseFile_Permission,
 	ParseFile_NotFound,
 	ParseFile_InvalidToken,
+	ParseFile_GeneralError,
 
 	ParseFile_Count,
 };
@@ -102,10 +103,11 @@ struct AstFile {
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;
 
-	Ast *        curr_proc;
-	isize        error_count;
-	f64          time_to_tokenize; // seconds
-	f64          time_to_parse;    // seconds
+	Ast *          curr_proc;
+	isize          error_count;
+	ParseFileError last_error;
+	f64            time_to_tokenize; // seconds
+	f64            time_to_parse;    // seconds
 
 	bool is_test;
 
