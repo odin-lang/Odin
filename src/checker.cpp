@@ -3419,6 +3419,8 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 
 	GB_ASSERT(ctx.pkg != nullptr);
 	GB_ASSERT(e->pkg != nullptr);
+	ctx.decl = d;
+	ctx.scope = d->scope;
 
 	if (!e->pkg->used) {
 		return;
@@ -3437,8 +3439,6 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	ctx.decl = d;
-	ctx.scope = d->scope;
 	check_entity_decl(&ctx, e, d, nullptr);
 }
 
@@ -4438,6 +4438,8 @@ void check_parsed_files(Checker *c) {
 			add_curr_ast_file(&ctx, f);
 			check_collect_entities(&ctx, f->decls);
 		}
+
+		pkg->used = true;
 	}
 
 	TIME_SECTION("import entities");
