@@ -1999,6 +1999,10 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
+	if (any_errors()) {
+		return 1;
+	}
+
 	temp_allocator_free_all(&temporary_allocator_data);
 
 	timings_start_section(timings, str_lit("type check"));
@@ -2012,6 +2016,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (checked_inited) {
 		check_parsed_files(&checker);
+	}
+	if (any_errors()) {
+		return 1;
 	}
 
 	temp_allocator_free_all(&temporary_allocator_data);
