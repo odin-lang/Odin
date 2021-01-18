@@ -250,6 +250,10 @@ gb_global ErrorCollector global_error_collector;
 #define MAX_ERROR_COLLECTOR_COUNT (36)
 
 
+bool any_errors(void) {
+	return global_error_collector.error_buffer.count > 0;
+}
+
 void init_global_error_collector(void) {
 	gb_mutex_init(&global_error_collector.mutex);
 	array_init(&global_error_collector.errors, heap_allocator());
