@@ -836,19 +836,26 @@ Tracking_Allocator_Entry :: struct {
 	alignment: int,
 	location: runtime.Source_Code_Location,
 }
+Tracking_Allocator_Bad_Free_Entry :: struct {
+	memory:   rawptr,
+	location: runtime.Source_Code_Location,	
+}
 Tracking_Allocator :: struct {
 	backing:           Allocator,
 	allocation_map:    map[rawptr]Tracking_Allocator_Entry,
+	bad_free_array:    [dynamic]Tracking_Allocator_Bad_Free_Entry,
 	clear_on_free_all: bool,
 }
 
-tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, allocation_map_allocator := context.allocator) {
+tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, internals_allocator := context.allocator) {
 	t.backing = backing_allocator;
-	t.allocation_map.allocator = allocation_map_allocator;
+	t.allocation_map.allocator = internals_allocator;
+	t.bad_free_array.allocator = internals_allocator;
 }
 
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map);
+	delete(t.bad_free_array);
 }
 
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
@@ -874,7 +881,15 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 		return nil;
 	}
 
-	result := data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, flags, loc);
+	result: rawptr;
+	if mode == .Free && old_memory not_in data.allocation_map {
+		append(&data.bad_free_array, Tracking_Allocator_Bad_Free_Entry{
+			memory = old_memory,
+			location = loc,
+		});
+	} else {
+		result = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, flags, loc);
+	}
 
 	if data.allocation_map.allocator.procedure == nil {
 		data.allocation_map.allocator = context.allocator;
