@@ -3064,7 +3064,13 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	return parse_atom_expr(p, parse_operand(p, lhs), lhs);
 }
 parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
+	start_pos := p.curr_tok.pos;
 	expr := parse_unary_expr(p, lhs);
+
+	if expr == nil {
+		return ast.new(ast.Bad_Expr, start_pos, end_pos(p.prev_tok));
+	}
+	
 	for prec := token_precedence(p, p.curr_tok.kind); prec >= prec_in; prec -= 1 {
 		for {
 			op := p.curr_tok;
