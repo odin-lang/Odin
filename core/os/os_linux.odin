@@ -5,9 +5,8 @@ foreign import libc "system:c"
 
 import "core:runtime"
 import "core:strings"
-import "core:strconv"
 import "core:c"
-import "core:mem"
+import "core:strconv"
 
 Handle    :: distinct i32;
 File_Time :: distinct u64;
@@ -492,7 +491,7 @@ _readlink :: inline proc(path: string) -> (string, Errno) {
 			// NOTE(laleksic, 2021-01-21): Any cleaner way to resize the slice?
 			bufsz *= 2;
 			delete(buf);
-			buf := make([]byte, bufsz);
+			buf = make([]byte, bufsz);
 		} else {
 			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE;
 		}
@@ -500,7 +499,7 @@ _readlink :: inline proc(path: string) -> (string, Errno) {
 }
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	buf: [256]byte;
+	buf : [256]byte;
 	fd_str := strconv.itoa( buf[:], cast(int)fd );
 
 	procfs_path := strings.concatenate( []string{ "/proc/self/fd/", fd_str } ); 
@@ -510,8 +509,6 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
-	ta := context.temp_allocator;
-
 	rel := rel;
 	if rel == "" {
 		rel = ".";

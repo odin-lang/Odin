@@ -1,6 +1,5 @@
 package os
 
-import "core:strconv"
 import "core:strings"
 import "core:mem"
 
@@ -53,8 +52,8 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 		fi_, err = stat(fullpath);
 		if err != ERROR_NONE {
-			for fi_ in dfi {
-				file_info_delete(fi_);
+			for fi__ in dfi {
+				file_info_delete(fi__);
 			}
 			delete(dfi);
 			return;
