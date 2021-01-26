@@ -218,6 +218,7 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 //
 // glob ignores file system errors
 //
+
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Match_Error) {
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
@@ -272,14 +273,15 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 	}
 	defer os.close(d);
 
-	file_info, ferr := os.fstat(d);
-	if ferr != 0 {
-		os.file_info_delete(file_info);
-		return;
-	}
-	if !file_info.is_dir {
-		os.file_info_delete(file_info);
-		return;
+	{
+		file_info, ferr := os.fstat(d);
+		defer os.file_info_delete(file_info);
+		if ferr != 0 {
+			return;
+		}
+		if !file_info.is_dir {
+			return;
+		}
 	}
 
 
