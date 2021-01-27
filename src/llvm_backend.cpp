@@ -5070,6 +5070,34 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	return value;
 }
 
+LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_type, isize count, LLVMValueRef *values, bool allow_local) {
+	bool is_local = allow_local && m->curr_procedure != nullptr;
+	bool is_const = true;
+	if (is_local) {
+		for (isize i = 0; i < count; i++) {
+			GB_ASSERT(values[i] != nullptr);
+			if (!LLVMIsConstant(values[i])) {
+				is_const = false;
+				break;
+			}
+		}
+	}
+
+	if (!is_const) {
+		lbProcedure *p = m->curr_procedure;
+		GB_ASSERT(p != nullptr);
+		lbAddr v = lb_add_local_generated(p, type, false);
+		lbValue ptr = lb_addr_get_ptr(p, v);
+		for (isize i = 0; i < count; i++) {
+			lbValue elem = lb_emit_array_epi(p, ptr, i);
+			LLVMBuildStore(p->builder, values[i], elem.value);
+		}
+		return lb_addr_load(p, v).value;
+	}
+
+	return LLVMConstArray(lb_type(m, elem_type), values, cast(unsigned int)count);
+}
+
 
 lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
 	LLVMContextRef ctx = m->ctx;
@@ -5106,6 +5134,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		GB_PANIC("Error in: %.*s(%td:%td), missing procedure %.*s\n", LIT(e->token.pos.file), e->token.pos.line, e->token.pos.column, LIT(e->token.string));
 	}
 
+	bool is_local = allow_local && m->curr_procedure != nullptr;
+
 	// GB_ASSERT_MSG(is_type_typed(type), "%s", type_to_string(type));
 
 	if (is_type_slice(type)) {
@@ -5127,7 +5157,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 			LLVMValueRef array_data = nullptr;
 
-			if (allow_local && m->curr_procedure != nullptr) {
+			if (is_local) {
 				// NOTE(bill, 2020-06-08): This is a bit of a hack but a "constant" slice needs
 				// its backing data on the stack
 				lbProcedure *p = m->curr_procedure;
@@ -5422,7 +5452,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					}
 				}
 
-				res.value = LLVMConstArray(lb_type(m, elem_type), values, cast(unsigned int)type->Array.count);
+				res.value = lb_build_constant_array_values(m, type, elem_type, type->Array.count, values, allow_local);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
@@ -5438,7 +5468,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					values[i] = LLVMConstNull(lb_type(m, elem_type));
 				}
 
-				res.value = LLVMConstArray(lb_type(m, elem_type), values, cast(unsigned int)type->Array.count);
+				res.value = lb_build_constant_array_values(m, type, elem_type, type->Array.count, values, allow_local);
 				return res;
 			}
 		} else if (is_type_enumerated_array(type)) {
@@ -5506,7 +5536,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					}
 				}
 
-				res.value = LLVMConstArray(lb_type(m, elem_type), values, cast(unsigned int)type->EnumeratedArray.count);
+				res.value = lb_build_constant_array_values(m, type, elem_type, type->EnumeratedArray.count, values, allow_local);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == type->EnumeratedArray.count, "%td != %td", elem_count, type->EnumeratedArray.count);
@@ -5522,7 +5552,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					values[i] = LLVMConstNull(lb_type(m, elem_type));
 				}
 
-				res.value = LLVMConstArray(lb_type(m, elem_type), values, cast(unsigned int)type->EnumeratedArray.count);
+				res.value = lb_build_constant_array_values(m, type, elem_type, type->EnumeratedArray.count, values, allow_local);
 				return res;
 			}
 		} else if (is_type_simd_vector(type)) {
