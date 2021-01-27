@@ -108,7 +108,6 @@ duration_truncate :: proc(d, m: Duration) -> Duration {
 	return d if m <= 0 else d - d%m;
 }
 
-
 date :: proc(t: Time) -> (year: int, month: Month, day: int) {
 	year, month, day, _ = _abs_date(_time_abs(t), true);
 	return;
@@ -160,6 +159,17 @@ unix :: proc(sec: i64, nsec: i64) -> Time {
 	return Time{(sec*1e9 + nsec) + UNIX_TO_INTERNAL};
 }
 
+time_to_unix :: proc(t: Time) -> i64 {
+	return t._nsec/1e9;
+}
+
+time_to_unix_nano :: proc(t: Time) -> i64 {
+	return t._nsec;
+}
+
+time_add :: proc(t: Time, d: Duration) -> Time {
+	return Time{t._nsec + i64(d)};
+}
 
 
 ABSOLUTE_ZERO_YEAR :: i64(-292277022399); // Day is chosen so that 2001-01-01 is Monday in the calculations

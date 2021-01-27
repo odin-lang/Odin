@@ -344,24 +344,29 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 
 
 
-
+// Struct_Tag represents the type of the string of a struct field
+//
+// Through convention, tags are the concatenation of optionally space separationed key:"value" pairs.
+// Each key is a non-empty string which contains no control characters other than space, quotes, and colon.
 Struct_Tag :: distinct string;
 
 Struct_Field :: struct {
-	name:   string,
-	type:   typeid,
-	tag:    Struct_Tag,
-	offset: uintptr,
+	name:     string,
+	type:     typeid,
+	tag:      Struct_Tag,
+	offset:   uintptr,
+	is_using: bool,
 }
 
 struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T));
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		if 0 <= i && i < len(s.names) {
-			field.name   = s.names[i];
-			field.type   = s.types[i].id;
-			field.tag    = Struct_Tag(s.tags[i]);
-			field.offset = s.offsets[i];
+			field.name     = s.names[i];
+			field.type     = s.types[i].id;
+			field.tag      = Struct_Tag(s.tags[i]);
+			field.offset   = s.offsets[i];
+			field.is_using = s.usings[i];
 		}
 	}
 	return;
@@ -372,10 +377,11 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		for fname, i in s.names {
 			if fname == name {
-				field.name   = s.names[i];
-				field.type   = s.types[i].id;
-				field.tag    = Struct_Tag(s.tags[i]);
-				field.offset = s.offsets[i];
+				field.name     = s.names[i];
+				field.type     = s.types[i].id;
+				field.tag      = Struct_Tag(s.tags[i]);
+				field.offset   = s.offsets[i];
+				field.is_using = s.usings[i];
 				break;
 			}
 		}
@@ -531,22 +537,40 @@ enum_string :: proc(a: any) -> string {
 
 // Given a enum type and a value name, get the enum value.
 enum_from_name :: proc($EnumType: typeid, name: string) -> (value: EnumType, ok: bool) {
-    ti := type_info_base(type_info_of(EnumType));
-    if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
-        for value_name, i in eti.names {
-            if value_name != name {
-            	continue;
-            }
-            v := eti.values[i];
-            value = EnumType(v);
-            ok = true;
-            return;
-        }
-    } else {
-        panic("expected enum type to reflect.enum_from_name");
-    }
-    return;
+	ti := type_info_base(type_info_of(EnumType));
+	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
+		for value_name, i in eti.names {
+			if value_name != name {
+				continue;
+			}
+			v := eti.values[i];
+			value = EnumType(v);
+			ok = true;
+			return;
+		}
+	} else {
+		panic("expected enum type to reflect.enum_from_name");
+	}
+	return;
 }
+
+enum_from_name_any :: proc(EnumType: typeid, name: string) -> (value: runtime.Type_Info_Enum_Value, ok: bool) {
+	ti := runtime.type_info_base(type_info_of(EnumType));
+	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
+		for value_name, i in eti.names {
+			if value_name != name {
+				continue;
+			}
+			value = eti.values[i];
+			ok = true;
+			return;
+		}
+	} else {
+		panic("expected enum type to reflect.enum_from_name_any");
+	}
+	return;
+}
+
 
 union_variant_type_info :: proc(a: any) -> ^runtime.Type_Info {
 	id := union_variant_typeid(a);
