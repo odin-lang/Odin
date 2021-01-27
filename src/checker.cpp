@@ -3,7 +3,7 @@
 
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
-
+void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -648,8 +648,8 @@ void add_package_dependency(CheckerContext *c, char const *package_name, char co
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
+	GB_ASSERT(c->decl != nullptr);
 	ptr_set_add(&c->decl->deps, e);
-	// add_type_info_type(c, e->type);
 }
 
 void add_declaration_dependency(CheckerContext *c, Entity *e) {
@@ -1425,6 +1425,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type(c, f->type);
 		}
+		add_comparison_procedures_for_fields(c, bt);
 		break;
 
 	case Type_BitFieldValue:
@@ -4453,6 +4454,7 @@ void check_parsed_files(Checker *c) {
 
 	CheckerContext prev_context = c->init_ctx;
 	defer (c->init_ctx = prev_context);
+	c->init_ctx.decl = make_decl_info(nullptr, nullptr);
 
 	TIME_SECTION("check procedure bodies");
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
@@ -4514,6 +4516,7 @@ void check_parsed_files(Checker *c) {
 			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
 				add_type_info_type(&c->init_ctx, e->type);
 			}
+
 		} else if (e->kind == Entity_Procedure) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);

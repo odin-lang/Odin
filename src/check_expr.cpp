@@ -1801,6 +1801,50 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	o->mode = Addressing_Value;
 }
 
+void add_comparison_procedures_for_fields(CheckerContext *c, Type *t) {
+	if (t == nullptr) {
+		return;
+	}
+	t = base_type(t);
+	if (!is_type_comparable(t)) {
+		return;
+	}
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_complex64:
+			add_package_dependency(c, "runtime", "complex64_eq");
+			add_package_dependency(c, "runtime", "complex64_ne");
+			break;
+		case Basic_complex128:
+			add_package_dependency(c, "runtime", "complex128_eq");
+			add_package_dependency(c, "runtime", "complex128_ne");
+			break;
+		case Basic_quaternion128:
+			add_package_dependency(c, "runtime", "quaternion128_eq");
+			add_package_dependency(c, "runtime", "quaternion128_ne");
+			break;
+		case Basic_quaternion256:
+			add_package_dependency(c, "runtime", "quaternion256_eq");
+			add_package_dependency(c, "runtime", "quaternion256_ne");
+			break;
+		case Basic_cstring:
+			add_package_dependency(c, "runtime", "cstring_to_string");
+			/*fallthrough*/
+		case Basic_string:
+			add_package_dependency(c, "runtime", "string_eq");
+			add_package_dependency(c, "runtime", "string_ne");
+			break;
+		}
+		break;
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			add_comparison_procedures_for_fields(c, t->Struct.fields[i]->type);
+		}
+		break;
+	}
+}
+
 
 void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
@@ -1867,6 +1911,13 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 			defer (gb_string_free(type_string));
 			err_str = gb_string_make(temporary_allocator(),
 				gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
+		} else {
+			Type *comparison_type = x->type;
+			if (x->type == err_type && is_operand_nil(*x)) {
+				comparison_type = y->type;
+			}
+
+			add_comparison_procedures_for_fields(c, comparison_type);
 		}
 	} else {
 		gbString xt, yt;
