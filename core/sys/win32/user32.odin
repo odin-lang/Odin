@@ -222,8 +222,8 @@ foreign user32 {
 	@(link_name="InsertMenuA")     insert_menu_a :: proc(menu: Hmenu, position: u32, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
 	@(link_name="InsertMenuW")     insert_menu_w :: proc(menu: Hmenu, position: u32, flags: u32, id_new_item: Uint_Ptr, new_item: Wstring) -> Bool ---
 
-	@(link_name="InsertMenuItemA") insert_menu_item_a :: proc(hmenu: Hmenu, item: u32, fByPosition: Bool, lpmi: LPCMENUITEMINFOA) -> Bool ---
-	@(link_name="InsertMenuItemW") insert_menu_item_w :: proc(hmenu: Hmenu, item: u32, fByPosition: Bool, lpmi: LPCMENUITEMINFOW) -> Bool ---
+	@(link_name="InsertMenuItemA") insert_menu_item_a :: proc(hmenu: Hmenu, item: u32, fByPosition: Bool, lpmi: ^Menu_Item_Info_A) -> Bool ---
+	@(link_name="InsertMenuItemW") insert_menu_item_w :: proc(hmenu: Hmenu, item: u32, fByPosition: Bool, lpmi: ^Menu_Item_Info_W) -> Bool ---
 
 	@(link_name="AppendMenuA") append_menu_a :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
 	@(link_name="AppendMenuW") append_menu_w :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: Wstring) -> Bool ---
