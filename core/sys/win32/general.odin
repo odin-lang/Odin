@@ -1,7 +1,8 @@
 // +build windows
 package win32
 
-Uint_Ptr :: distinct uint;
+Uint_Ptr :: distinct uintptr;
+Int_Ptr :: distinct int;
 Long_Ptr :: distinct int;
 
 Handle    :: distinct rawptr;

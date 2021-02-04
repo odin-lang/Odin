@@ -95,7 +95,7 @@ MB_SERVICE_NOTIFICATION :: 0x00200000;
 @(default_calling_convention = "std")
 foreign user32 {
 	@(link_name="GetDesktopWindow") get_desktop_window  :: proc() -> Hwnd ---;
-	@(link_name="ShowCursor")       show_cursor         :: proc(show: Bool) ---;
+	@(link_name="ShowCursor")       show_cursor         :: proc(show: Bool) -> i32 ---;
 	@(link_name="GetCursorPos")     get_cursor_pos      :: proc(p: ^Point) -> Bool ---;
 	@(link_name="SetCursorPos")     set_cursor_pos      :: proc(x, y: i32) -> Bool ---;
 	@(link_name="ScreenToClient")   screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool ---;
@@ -138,8 +138,8 @@ foreign user32 {
 
 	@(link_name="PostMessageA") post_message_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---;
 	@(link_name="PostMessageW") post_message_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---;
-	@(link_name="SendMessageA") send_message_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---;
-	@(link_name="SendMessageW") send_message_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---;
+	@(link_name="SendMessageA") send_message_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
+	@(link_name="SendMessageW") send_message_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
 
 	@(link_name="DefWindowProcA") def_window_proc_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
 	@(link_name="DefWindowProcW") def_window_proc_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
@@ -153,7 +153,7 @@ foreign user32 {
 	@(link_name="GetMonitorInfoA")  get_monitor_info_a  :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool ---;
 	@(link_name="MonitorFromWindow") monitor_from_window :: proc(wnd: Hwnd, flags: u32) -> Hmonitor ---;
 
-	@(link_name="SetWindowPos") set_window_pos :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) ---;
+	@(link_name="SetWindowPos") set_window_pos :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) -> Bool ---;
 
 	@(link_name="GetWindowPlacement") get_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool ---;
 	@(link_name="SetWindowPlacement") set_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool ---;
@@ -181,12 +181,12 @@ foreign user32 {
 	@(link_name="SetFocus")            set_focus             :: proc(h: Hwnd) -> Hwnd ---;
 
 
-    @(link_name="LoadImageA")       load_image_a        :: proc(instance: Hinstance, name: cstring, type_: u32, x_desired, y_desired : i32, load : u32) -> Handle ---;
-    @(link_name="LoadIconA")        load_icon_a         :: proc(instance: Hinstance, icon_name: cstring) -> Hicon ---;
-    @(link_name="DestroyIcon")      destroy_icon        :: proc(icon: Hicon) -> Bool ---;
+	@(link_name="LoadImageA")       load_image_a        :: proc(instance: Hinstance, name: cstring, type_: u32, x_desired, y_desired : i32, load : u32) -> Handle ---;
+	@(link_name="LoadIconA")        load_icon_a         :: proc(instance: Hinstance, icon_name: cstring) -> Hicon ---;
+	@(link_name="DestroyIcon")      destroy_icon        :: proc(icon: Hicon) -> Bool ---;
 
-    @(link_name="LoadCursorA")      load_cursor_a       :: proc(instance: Hinstance, cursor_name: cstring) -> Hcursor ---;
-    @(link_name="LoadCursorW")      load_cursor_w       :: proc(instance: Hinstance, cursor_name: Wstring) -> Hcursor ---;
+	@(link_name="LoadCursorA")      load_cursor_a       :: proc(instance: Hinstance, cursor_name: cstring) -> Hcursor ---;
+	@(link_name="LoadCursorW")      load_cursor_w       :: proc(instance: Hinstance, cursor_name: Wstring) -> Hcursor ---;
 	@(link_name="GetCursor")        get_cursor          :: proc() -> Hcursor ---;
 	@(link_name="SetCursor")        set_cursor          :: proc(cursor: Hcursor) -> Hcursor ---;
 
@@ -194,13 +194,13 @@ foreign user32 {
 
 	@(link_name="GetRawInputData") get_raw_input_data :: proc(raw_input: Hrawinput, command: u32, data: rawptr, size: ^u32, size_header: u32) -> u32 ---;
 
-	@(link_name="MapVirtualKeyExW") map_virtual_key_ex_w :: proc(code, map_type: u32, hkl: HKL) ---;
-	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a :: proc(code, map_type: u32, hkl: HKL) ---;
+	@(link_name="MapVirtualKeyExW") map_virtual_key_ex_w :: proc(code, map_type: u32, hkl: HKL) -> u32 ---;
+	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a :: proc(code, map_type: u32, hkl: HKL) -> u32 ---;
 
 	@(link_name="EnumDisplayMonitors") enum_display_monitors :: proc(hdc: Hdc,  rect: ^Rect, enum_proc: Monitor_Enum_Proc, lparam: Lparam) -> bool ---;
 }
 
-@(default_calling_convention = "c")
+@(default_calling_convention = "std")
 foreign user32 {
 	@(link_name="CreateMenu")      create_menu   :: proc() -> Hmenu ---
 	@(link_name="CreatePopupMenu") create_popup_menu :: proc() -> Hmenu ---
@@ -208,22 +208,22 @@ foreign user32 {
 	@(link_name="DeleteMenu")      delete_menu :: proc(menu: Hmenu, position: u32, flags: u32) -> Bool ---
 
 	@(link_name="EnableMenuItem")  enable_menu_item :: proc(menu: Hmenu, id_enable_itme: i32, enable: u32) -> Bool ---
-	@(link_name="EndMenu")         end_menu :: proc() -> Bool ---
+	@(link_name="EndMenu")         end_menu :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
 	@(link_name="GetMenu")         get_menu :: proc(wnd: Hwnd) -> Hmenu ---
 	@(link_name="GetMenuBarInfo")  get_menu_bar_info :: proc(wnd: Hwnd, id_object, id_item: u32, mbi: ^Menu_Bar_Info) -> Hmenu ---
-	@(link_name="GetMenuStringA")  get_menu_string_a :: proc(menu: Hmenu, id_item: u32, s: string,  cch_max: i32, flags: u32) -> i32 ---
+	@(link_name="GetMenuStringA")  get_menu_string_a :: proc(menu: Hmenu, id_item: u32, s: cstring, cch_max: i32, flags: u32) -> i32 ---
 	@(link_name="GetMenuStringW")  get_menu_string_w :: proc(menu: Hmenu, id_item: u32, s: Wstring, cch_max: i32, flags: u32) -> i32 ---
 	@(link_name="GetMenuState")    get_menu_state :: proc(menu: Hmenu, id: u32, flags: u32) -> u32 ---
 	@(link_name="GetMenuItemRect") get_menu_item_rect :: proc(wnd: Hwnd, menu: Hmenu, id_item: u32, item: ^Rect) -> Bool ---
 
-	@(link_name="SetMenu")         set_menu :: proc(wnd: Hwnd, menu: Hmenu) -> Hmenu ---
+	@(link_name="SetMenu")         set_menu :: proc(wnd: Hwnd, menu: Hmenu) -> Bool ---
 
 	@(link_name="DrawMenuBar")     draw_menu_bar :: proc(wnd: Hwnd) -> Bool ---
 	@(link_name="InsertMenuA")     insert_menu_a :: proc(menu: Hmenu, position: u32, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
 	@(link_name="InsertMenuW")     insert_menu_w :: proc(menu: Hmenu, position: u32, flags: u32, id_new_item: Uint_Ptr, new_item: Wstring) -> Bool ---
 
-	@(link_name="InsertMenuItemA") insert_menu_item_a :: proc(menu: Hmenu, item: u32, by_position: bool, mi: ^Menu_Item_Info_A) -> Bool ---
-	@(link_name="InsertMenuItemW") insert_menu_item_w :: proc(menu: Hmenu, item: u32, by_position: bool, mi: ^Menu_Item_Info_W) -> Bool ---
+	@(link_name="InsertMenuItemA") insert_menu_item_a :: proc(hmenu: Hmenu, item: u32, fByPosition: Bool, lpmi: LPCMENUITEMINFOA) -> Bool ---
+	@(link_name="InsertMenuItemW") insert_menu_item_w :: proc(hmenu: Hmenu, item: u32, fByPosition: Bool, lpmi: LPCMENUITEMINFOW) -> Bool ---
 
 	@(link_name="AppendMenuA") append_menu_a :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
 	@(link_name="AppendMenuW") append_menu_w :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: Wstring) -> Bool ---

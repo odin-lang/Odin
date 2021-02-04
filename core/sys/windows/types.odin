@@ -3,6 +3,7 @@ package sys_windows
 import "core:c"
 
 c_char     :: c.char;
+c_uchar    :: c.uchar;
 c_int      :: c.int;
 c_uint     :: c.uint;
 c_long     :: c.long;
@@ -27,24 +28,40 @@ GROUP :: distinct c_uint;
 LARGE_INTEGER :: distinct c_longlong;
 LONG :: c_long;
 UINT :: c_uint;
-WCHAR :: wchar_t;
+INT  :: c_int;
+SHORT :: c_short;
 USHORT :: c_ushort;
+WCHAR :: wchar_t;
 SIZE_T :: uint;
 WORD :: u16;
 CHAR :: c_char;
 ULONG_PTR :: uint;
 DWORD_PTR :: ULONG_PTR;
+LONG_PTR :: int;
 ULONG :: c_ulong;
 UCHAR :: BYTE;
 NTSTATUS :: c.long;
+
+UINT8  ::  u8;
+UINT16 :: u16;
+UINT32 :: u32;
+UINT64 :: u64;
+
+INT8  ::  i8;
+INT16 :: i16;
+INT32 :: i32;
+INT64 :: i64;
+
 
 PDWORD_PTR :: ^DWORD_PTR;
 ATOM :: distinct WORD;
 
 wstring :: ^WCHAR;
 
-LPBOOL :: ^BOOL;
+PBYTE :: ^BYTE;
 LPBYTE :: ^BYTE;
+PBOOL :: ^BOOL;
+LPBOOL :: ^BOOL;
 LPCSTR :: cstring;
 LPCWSTR :: wstring;
 LPDWORD :: ^DWORD;
@@ -55,7 +72,13 @@ LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES;
 LPSTARTUPINFO :: ^STARTUPINFO;
 PVOID  :: rawptr;
 LPVOID :: rawptr;
+PINT :: ^INT;
+LPINT :: ^INT;
+PUINT :: ^UINT;
+LPUINT :: ^UINT;
 LPWCH :: ^WCHAR;
+LPWORD :: ^WORD;
+PULONG :: ^ULONG;
 LPWIN32_FIND_DATAW :: ^WIN32_FIND_DATAW;
 LPWSADATA :: ^WSADATA;
 LPWSAPROTOCOL_INFO :: ^WSAPROTOCOL_INFO;
@@ -77,6 +100,13 @@ ADDRESS_FAMILY :: USHORT;
 
 TRUE  :: BOOL(true);
 FALSE :: BOOL(false);
+
+SIZE :: struct {
+	cx: LONG,
+	cy: LONG,
+}
+PSIZE  :: ^SIZE;
+LPSIZE :: ^SIZE;
 
 FILE_ATTRIBUTE_READONLY: DWORD : 0x00000001;
 FILE_ATTRIBUTE_HIDDEN: DWORD : 0x00000002;
@@ -498,6 +528,19 @@ GUID :: struct {
 	Data3: WORD,
 	Data4: [8]BYTE,
 }
+
+LUID :: struct {
+	LowPart:  DWORD,
+	HighPart: LONG,
+}
+
+PLUID :: ^LUID;
+
+PGUID   :: ^GUID;
+PCGUID  :: ^GUID;
+LPGUID  :: ^GUID;
+LPCGUID :: ^GUID;
+
 
 WSAPROTOCOLCHAIN :: struct {
 	ChainLen: c_int,
