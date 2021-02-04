@@ -1250,30 +1250,32 @@ fmt_bit_field :: proc(fi: ^Info, v: any, bit_field_name: string = "") {
 
 
 fmt_write_indent :: proc(fi: ^Info) {
-	for in 0..<fi.indent { io.write_byte(fi.writer, '\t'); }
+	for in 0..<fi.indent {
+		io.write_byte(fi.writer, '\t');
+	}
 }
 
-fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: int, elem_id: typeid, verb: rune)   {
+fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: int, elem_id: typeid, verb: rune) {
+	io.write_byte(fi.writer, '[');
+	defer io.write_byte(fi.writer, ']');
+
 	if fi.hash {
-		io.write_string(fi.writer, "[\n");
-		defer {
-			fmt_write_indent(fi);
-			io.write_byte(fi.writer, ']');
-		}
+		io.write_byte(fi.writer, '\n');
+		defer fmt_write_indent(fi);
+
 		indent := fi.indent;
 		fi.indent += 1;
 		defer fi.indent = indent;
 
 		for i in 0..<count {
 			fmt_write_indent(fi);
+
 			data := uintptr(array_data) + uintptr(i*elem_size);
 			fmt_arg(fi, any{rawptr(data), elem_id}, verb);
+
 			io.write_string(fi.writer, ",\n");
 		}
 	} else {
-		io.write_byte(fi.writer, '[');
-		defer io.write_byte(fi.writer, ']');
-
 		for i in 0..<count {
 			if i > 0 { io.write_string(fi.writer, ", "); }
 
