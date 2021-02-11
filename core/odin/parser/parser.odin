@@ -150,7 +150,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		switch name := pkg_name.text; {
 		case is_blank_ident(name):
 			error(p, pkg_name.pos, "invalid package name '_'");
-		case is_package_name_reserved(name), file.pkg.kind != .Runtime && name == "runtime":
+		case is_package_name_reserved(name), file.pkg != nil && file.pkg.kind != .Runtime && name == "runtime":
 			error(p, pkg_name.pos, "use of reserved package name '%s'", name);
 		}
 	}
@@ -3070,7 +3070,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 	if expr == nil {
 		return ast.new(ast.Bad_Expr, start_pos, end_pos(p.prev_tok));
 	}
-	
+
 	for prec := token_precedence(p, p.curr_tok.kind); prec >= prec_in; prec -= 1 {
 		for {
 			op := p.curr_tok;
