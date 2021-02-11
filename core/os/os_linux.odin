@@ -362,9 +362,9 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	s, err := _fstat(fd);
 	if err != ERROR_NONE {
-		return -1, err;
+		return 0, err;
 	}
-	return s.size, ERROR_NONE;
+	return max(s.size, 0), ERROR_NONE;
 }
 
 
@@ -459,7 +459,7 @@ _rewinddir :: inline proc(dirp: Dir) {
 _readdir :: inline proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
 	result: ^Dirent;
 	rc := _unix_readdir_r(dirp, &entry, &result);
-	
+
 	if rc != 0 {
 		err = Errno(get_last_error());
 		return;
@@ -502,9 +502,9 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	buf : [256]byte;
 	fd_str := strconv.itoa( buf[:], cast(int)fd );
 
-	procfs_path := strings.concatenate( []string{ "/proc/self/fd/", fd_str } ); 
+	procfs_path := strings.concatenate( []string{ "/proc/self/fd/", fd_str } );
 	defer delete(procfs_path);
-	
+
 	return _readlink(procfs_path);
 }
 

@@ -226,7 +226,9 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 		fmt_value(&fi, args[i], 'v');
 	}
 	io.flush(auto_cast w);
-	return int(io.size(auto_cast w) - size0);
+
+	size1 := io.size(auto_cast w);
+	return int(size1 - size0);
 }
 
 wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
@@ -244,7 +246,9 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	}
 	io.write_byte(fi.writer, '\n');
 	io.flush(auto_cast w);
-	return int(io.size(auto_cast w) - size0);
+
+	size1 := io.size(auto_cast w);
+	return int(size1 - size0);
 }
 
 wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
@@ -521,7 +525,9 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	}
 
 	io.flush(auto_cast w);
-	return int(io.size(auto_cast w) - size0);
+
+	size1 := io.size(auto_cast w);
+	return int(size1 - size0);
 }
 
 wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info) -> int {
