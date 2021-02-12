@@ -63,14 +63,17 @@ _fill_file_info_from_stat :: proc(fi: ^File_Info, s: Stat) {
 	fi.mode = cast(File_Mode)s.mode;
 	fi.is_dir = S_ISDIR(s.mode);
 
-	// NOTE(laleksic, 2021-01-21): Not really creation time, but closest we can get (maybe better to leave it 0?) 
-	fi.creation_time = _make_time_from_unix_file_time(s.status_change); 
-	
+	// NOTE(laleksic, 2021-01-21): Not really creation time, but closest we can get (maybe better to leave it 0?)
+	fi.creation_time = _make_time_from_unix_file_time(s.status_change);
+
 	fi.modification_time = _make_time_from_unix_file_time(s.modified);
 	fi.access_time = _make_time_from_unix_file_time(s.last_access);
 }
 
 lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
+
+	context.allocator = allocator;
+
 	s: Stat;
 	s, err = _lstat(name);
 	if err != ERROR_NONE {
@@ -80,12 +83,15 @@ lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, e
 	fi.fullpath, err = absolute_path_from_relative(name);
 	if err != ERROR_NONE {
 		return;
-	}	
+	}
 	fi.name = path.base(fi.fullpath);
 	return fi, ERROR_NONE;
 }
 
 stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
+
+	context.allocator = allocator;
+
 	s: Stat;
 	s, err = _stat(name);
 	if err != ERROR_NONE {
@@ -101,6 +107,9 @@ stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, er
 }
 
 fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
+
+	context.allocator = allocator;
+
 	s: Stat;
 	s, err = _fstat(fd);
 	if err != ERROR_NONE {
@@ -110,7 +119,7 @@ fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err
 	fi.fullpath, err = absolute_path_from_handle(fd);
 	if err != ERROR_NONE {
 		return;
-	}	
+	}
 	fi.name = path.base(fi.fullpath);
 	return fi, ERROR_NONE;
 }
