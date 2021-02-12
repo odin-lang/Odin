@@ -28,7 +28,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		size = 100;
 	}
 
-	dfi := make([dynamic]File_Info, 0, size);
+	dfi := make([dynamic]File_Info, 0, size, allocator);
 
 	for {
 		entry: Dirent;
@@ -36,7 +36,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		entry, err, end_of_stream = _readdir(dirp);
 		if err != ERROR_NONE {
 			for fi_ in dfi {
-				file_info_delete(fi_);
+				file_info_delete(fi_, allocator);
 			}
 			delete(dfi);
 			return;
@@ -45,15 +45,19 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		}
 
 		fi_: File_Info;
-		
 		filename := cast(string)(transmute(cstring)mem.Raw_Cstring{ data = &entry.name[0] });
-		fullpath := strings.join( []string{ dirpath, filename }, "/" );
-		defer delete(fullpath);
 
-		fi_, err = stat(fullpath);
+		if filename == "." || filename == ".." {
+			continue;
+		}
+
+		fullpath := strings.join( []string{ dirpath, filename }, "/", context.temp_allocator);
+		defer delete(fullpath, context.temp_allocator);
+
+		fi_, err = stat(fullpath, allocator);
 		if err != ERROR_NONE {
 			for fi__ in dfi {
-				file_info_delete(fi__);
+				file_info_delete(fi__, allocator);
 			}
 			delete(dfi);
 			return;
