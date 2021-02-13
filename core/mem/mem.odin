@@ -236,7 +236,7 @@ align_backward_uint :: proc(ptr, align: uint) -> uint {
 	return uint(align_backward_uintptr(uintptr(ptr), uintptr(align)));
 }
 
-is_aligned_to :: inline proc(ptr: rawptr, align: int) -> bool {
+is_aligned_to :: #force_inline proc(ptr: rawptr, align: int) -> bool {
 	assert(is_power_of_two(uintptr(align)));
 	return uintptr(ptr) & uintptr(align-1) == 0;
 }
