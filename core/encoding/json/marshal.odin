@@ -258,34 +258,6 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case Type_Info_Enum:
 		return marshal_arg(b, any{v.data, info.base.id});
 
-	case Type_Info_Bit_Field:
-		data: u64 = 0;
-		switch ti.size {
-		case 1: data = cast(u64) (^u8)(v.data)^;
-		case 2: data = cast(u64)(^u16)(v.data)^;
-		case 4: data = cast(u64)(^u32)(v.data)^;
-		case 8: data = cast(u64)(^u64)(v.data)^;
-		}
-
-		write_byte(b, '{');
-		for name, i in info.names {
-			if i > 0 { write_string(b, ", "); }
-
-			bits := u64(info.bits[i]);
-			offset := u64(info.offsets[i]);
-			marshal_arg(b, name);
-			write_string(b, ": ");
-
-			n := 8*u64(size_of(u64));
-			sa := n - bits;
-			u := data>>offset;
-			u <<= sa;
-			u >>= sa;
-
-			write_u64(b, u, 10);
-		}
-		write_byte(b, '}');
-
 	case Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
 			if ti == nil {

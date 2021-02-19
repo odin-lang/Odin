@@ -136,11 +136,6 @@ Type_Info_Map :: struct {
 	key_equal:        Equal_Proc,
 	key_hasher:       Hasher_Proc,
 };
-Type_Info_Bit_Field :: struct {
-	names:   []string,
-	bits:    []i32,
-	offsets: []i32,
-};
 Type_Info_Bit_Set :: struct {
 	elem:       ^Type_Info,
 	underlying: ^Type_Info, // Possibly nil
@@ -199,7 +194,6 @@ Type_Info :: struct {
 		Type_Info_Union,
 		Type_Info_Enum,
 		Type_Info_Map,
-		Type_Info_Bit_Field,
 		Type_Info_Bit_Set,
 		Type_Info_Opaque,
 		Type_Info_Simd_Vector,
@@ -231,7 +225,6 @@ Typeid_Kind :: enum u8 {
 	Union,
 	Enum,
 	Map,
-	Bit_Field,
 	Bit_Set,
 	Opaque,
 	Simd_Vector,

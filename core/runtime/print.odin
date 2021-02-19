@@ -324,22 +324,6 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		}
 		print_string("}");
 
-	case Type_Info_Bit_Field:
-		print_string("bit_field ");
-		if ti.align != 1 {
-			print_string("#align ");
-			print_u64(u64(ti.align));
-			print_byte(' ');
-		}
-		print_string(" {");
-		for name, i in info.names {
-			if i > 0 { print_string(", "); }
-			print_string(name);
-			print_string(": ");
-			print_u64(u64(info.bits[i]));
-		}
-		print_string("}");
-
 	case Type_Info_Bit_Set:
 		print_string("bit_set[");
 

@@ -2209,7 +2209,6 @@ void init_core_type_info(Checker *c) {
 	t_type_info_union            = find_core_type(c, str_lit("Type_Info_Union"));
 	t_type_info_enum             = find_core_type(c, str_lit("Type_Info_Enum"));
 	t_type_info_map              = find_core_type(c, str_lit("Type_Info_Map"));
-	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_opaque           = find_core_type(c, str_lit("Type_Info_Opaque"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
@@ -2237,7 +2236,6 @@ void init_core_type_info(Checker *c) {
 	t_type_info_union_ptr            = alloc_type_pointer(t_type_info_union);
 	t_type_info_enum_ptr             = alloc_type_pointer(t_type_info_enum);
 	t_type_info_map_ptr              = alloc_type_pointer(t_type_info_map);
-	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_opaque_ptr           = alloc_type_pointer(t_type_info_opaque);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
