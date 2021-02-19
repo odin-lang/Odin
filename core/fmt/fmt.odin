@@ -1210,50 +1210,6 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		}
 	}
 }
-fmt_bit_field :: proc(fi: ^Info, v: any, bit_field_name: string = "") {
-	type_info := type_info_of(v.id);
-	#partial switch info in type_info.variant {
-	case runtime.Type_Info_Named:
-		val := v;
-		val.id = info.base.id;
-		fmt_bit_field(fi, val, info.name);
-	case runtime.Type_Info_Bit_Field:
-		data: u64 = 0;
-		switch type_info.size {
-		case 1: data = cast(u64) (^u8)(v.data)^;
-		case 2: data = cast(u64)(^u16)(v.data)^;
-		case 4: data = cast(u64)(^u32)(v.data)^;
-		case 8: data = cast(u64)(^u64)(v.data)^;
-		}
-
-		if bit_field_name != "" {
-			io.write_string(fi.writer, bit_field_name);
-			io.write_byte(fi.writer, '{');
-		} else {
-			io.write_string(fi.writer, "bit_field{");
-		}
-		for name, i in info.names {
-			if i > 0 {
-				io.write_string(fi.writer, ", ");
-			}
-			bits := u64(info.bits[i]);
-			offset := u64(info.offsets[i]);
-			io.write_string(fi.writer, name);
-			io.write_string(fi.writer, " = ");
-
-			n := 8*u64(size_of(u64));
-			sa := n - bits;
-			u := data>>offset;
-			u <<= sa;
-			u >>= sa;
-
-			io.write_u64(fi.writer, u, 10);
-
-		}
-		io.write_byte(fi.writer, '}');
-	}
-}
-
 
 fmt_write_indent :: proc(fi: ^Info) {
 	for in 0..<fi.indent {
@@ -1597,8 +1553,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		case runtime.Type_Info_Bit_Set:
 			fmt_bit_set(fi, v);
-		case runtime.Type_Info_Bit_Field:
-			fmt_bit_field(fi, v);
 		case runtime.Type_Info_Opaque:
 			fmt_opaque(fi, v);
 		case:
@@ -1966,9 +1920,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Type_Id:
 		id := (^typeid)(v.data)^;
 		reflect.write_typeid(fi.writer, id);
-
-	case runtime.Type_Info_Bit_Field:
-		fmt_bit_field(fi, v);
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v);

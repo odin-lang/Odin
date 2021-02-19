@@ -157,22 +157,6 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		if !ok { return false; }
 		return are_types_identical(x.key, y.key) && are_types_identical(x.value, y.value);
 
-	case Type_Info_Bit_Field:
-		y, ok := b.variant.(Type_Info_Bit_Field);
-		if !ok { return false; }
-		if len(x.names) != len(y.names) { return false; }
-
-		for _, i in x.names {
-			xb, yb := x.bits[i], y.bits[i];
-			xo, yo := x.offsets[i], y.offsets[i];
-			xn, yn := x.names[i], y.names[i];
-
-			if xb != yb { return false; }
-			if xo != yo { return false; }
-			if xn != yn { return false; }
-		}
-		return true;
-
 	case Type_Info_Bit_Set:
 		y, ok := b.variant.(Type_Info_Bit_Set);
 		if !ok { return false; }
@@ -567,22 +551,6 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		for name, i in info.names {
 			if i > 0 { n += write_string(w, ", "); }
 			n += write_string(w, name);
-		}
-		n += _n(io.write_byte(w, '}'));
-
-	case Type_Info_Bit_Field:
-		n += write_string(w, "bit_field ");
-		if ti.align != 1 {
-			n += write_string(w, "#align ");
-			n += _n(io.write_i64(w, i64(ti.align), 10));
-			n += _n(io.write_byte(w, ' '));
-		}
-		n += write_string(w, " {");
-		for name, i in info.names {
-			if i > 0 { n += write_string(w, ", "); }
-			n += write_string(w, name);
-			n += write_string(w, ": ");
-			n += _n(io.write_i64(w, i64(info.bits[i]), 10));
 		}
 		n += _n(io.write_byte(w, '}'));
 

@@ -28,7 +28,6 @@ Type_Info_Struct           :: runtime.Type_Info_Struct;
 Type_Info_Union            :: runtime.Type_Info_Union;
 Type_Info_Enum             :: runtime.Type_Info_Enum;
 Type_Info_Map              :: runtime.Type_Info_Map;
-Type_Info_Bit_Field        :: runtime.Type_Info_Bit_Field;
 Type_Info_Bit_Set          :: runtime.Type_Info_Bit_Set;
 Type_Info_Opaque           :: runtime.Type_Info_Opaque;
 Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector;
@@ -60,7 +59,6 @@ Type_Kind :: enum {
 	Union,
 	Enum,
 	Map,
-	Bit_Field,
 	Bit_Set,
 	Opaque,
 	Simd_Vector,
@@ -94,7 +92,6 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Union:            return .Union;
 		case Type_Info_Enum:             return .Enum;
 		case Type_Info_Map:              return .Map;
-		case Type_Info_Bit_Field:        return .Bit_Field;
 		case Type_Info_Bit_Set:          return .Bit_Set;
 		case Type_Info_Opaque:           return .Opaque;
 		case Type_Info_Simd_Vector:      return .Simd_Vector;

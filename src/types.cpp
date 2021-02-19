@@ -357,7 +357,6 @@ enum Typeid_Kind : u8 {
 	Typeid_Union,
 	Typeid_Enum,
 	Typeid_Map,
-	Typeid_Bit_Field,
 	Typeid_Bit_Set,
 	Typeid_Opaque,
 	Typeid_Simd_Vector,
@@ -633,7 +632,6 @@ gb_global Type *t_type_info_struct               = nullptr;
 gb_global Type *t_type_info_union                = nullptr;
 gb_global Type *t_type_info_enum                 = nullptr;
 gb_global Type *t_type_info_map                  = nullptr;
-gb_global Type *t_type_info_bit_field            = nullptr;
 gb_global Type *t_type_info_bit_set              = nullptr;
 gb_global Type *t_type_info_opaque               = nullptr;
 gb_global Type *t_type_info_simd_vector          = nullptr;
@@ -661,7 +659,6 @@ gb_global Type *t_type_info_struct_ptr           = nullptr;
 gb_global Type *t_type_info_union_ptr            = nullptr;
 gb_global Type *t_type_info_enum_ptr             = nullptr;
 gb_global Type *t_type_info_map_ptr              = nullptr;
-gb_global Type *t_type_info_bit_field_ptr        = nullptr;
 gb_global Type *t_type_info_bit_set_ptr          = nullptr;
 gb_global Type *t_type_info_opaque_ptr           = nullptr;
 gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
