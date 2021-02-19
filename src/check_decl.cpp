@@ -96,9 +96,6 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 			e->type = t_invalid;
 			return nullptr;
 		}
-		if (is_type_bit_field_value(t)) {
-			t = default_bit_field_value_type(t);
-		}
 		GB_ASSERT(is_type_typed(t));
 		e->type = t;
 	}

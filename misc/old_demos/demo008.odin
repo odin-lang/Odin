@@ -98,7 +98,7 @@ general_stuff :: proc() {
 	{ // `distinct` types
 		// Originally, all type declarations would create a distinct type unless #type_alias was present.
 		// Now the behaviour has been reversed. All type declarations create a type alias unless `distinct` is present.
-		// If the type expression is `struct`, `union`, `enum`, `proc`, or `bit_field`, the types will always been distinct.
+		// If the type expression is `struct`, `union`, `enum`, or `proc`, the types will always been distinct.
 
 		Int32 :: i32;
 		#assert(Int32 == i32);

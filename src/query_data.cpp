@@ -606,13 +606,11 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 					case Type_Union:        type_kind = str_lit("union");         break;
 					case Type_Enum:         type_kind = str_lit("enum");          break;
 					case Type_Proc:         type_kind = str_lit("procedure");     break;
-					case Type_BitField:     type_kind = str_lit("bit field");     break;
 					case Type_BitSet:       type_kind = str_lit("bit set");       break;
 					case Type_SimdVector:   type_kind = str_lit("simd vector");   break;
 
 					case Type_Generic:
 					case Type_Tuple:
-					case Type_BitFieldValue:
 						GB_PANIC("Invalid definition type");
 						break;
 					}

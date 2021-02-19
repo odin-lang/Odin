@@ -108,15 +108,6 @@ lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_expr) {
 	return v;
 }
 
-lbAddr lb_addr_bit_field(lbValue value, i32 index) {
-	lbAddr addr = {};
-	addr.kind = lbAddr_BitField;
-	addr.addr = value;
-	addr.bit_field.value_index = index;
-	return addr;
-}
-
-
 Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		return nullptr;
@@ -174,11 +165,6 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		lbValue nil_ptr = lb_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
 		lbValue final_ptr = lb_emit_select(p, cond, nil_ptr, absolute_ptr);
 		return final_ptr;
-	}
-
-	case lbAddr_BitField: {
-		lbValue v = lb_addr_load(p, addr);
-		return lb_address_from_load_or_generate_local(p, v);
 	}
 
 	case lbAddr_Context:
@@ -403,24 +389,6 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	} else if (addr.kind == lbAddr_Map) {
 		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
-	} else if (addr.kind == lbAddr_BitField) {
-		Type *bft = base_type(type_deref(addr.addr.type));
-		GB_ASSERT(is_type_bit_field(bft));
-
-		unsigned value_index = cast(unsigned)addr.bit_field.value_index;
-		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
-		if (size_in_bits == 0) {
-			return;
-		}
-		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
-
-		LLVMTypeRef dst_type = LLVMIntTypeInContext(p->module->ctx, size_in_bits);
-		LLVMValueRef src = LLVMBuildIntCast2(p->builder, value.value, dst_type, false, "");
-
-		LLVMValueRef internal_data = LLVMBuildStructGEP(p->builder, addr.addr.value, 1, "");
-		LLVMValueRef field_ptr = LLVMBuildStructGEP(p->builder, internal_data, value_index, "");
-		LLVMBuildStore(p->builder, src, field_ptr);
-		return;
 	} else if (addr.kind == lbAddr_Context) {
 		lbValue old = lb_addr_load(p, lb_find_or_generate_context_ptr(p));
 		lbAddr next_addr = lb_add_local_generated(p, t_context, true);
@@ -622,41 +590,6 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			lbValue single = lb_emit_struct_ep(p, v.addr, 0);
 			return lb_emit_load(p, single);
 		}
-
-	} else if (addr.kind == lbAddr_BitField) {
-		Type *bft = base_type(type_deref(addr.addr.type));
-		GB_ASSERT(is_type_bit_field(bft));
-
-		unsigned value_index = cast(unsigned)addr.bit_field.value_index;
-		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
-
-		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
-		if (size_in_bytes == 0) {
-			GB_ASSERT(size_in_bits == 0);
-			lbValue res = {};
-			res.type = t_i32;
-			res.value = LLVMConstInt(lb_type(p->module, res.type), 0, false);
-			return res;
-		}
-
-		Type *int_type = nullptr;
-		switch (size_in_bytes) {
-		case 1:  int_type = t_u8;   break;
-		case 2:  int_type = t_u16;  break;
-		case 4:  int_type = t_u32;  break;
-		case 8:  int_type = t_u64;  break;
-		case 16: int_type = t_u128; break;
-		}
-		GB_ASSERT(int_type != nullptr);
-
-		LLVMValueRef internal_data = LLVMBuildStructGEP(p->builder, addr.addr.value, 1, "");
-		LLVMValueRef field_ptr = LLVMBuildStructGEP(p->builder, internal_data, value_index, "");
-		LLVMValueRef field = LLVMBuildLoad(p->builder, field_ptr, "");
-
-		lbValue res = {};
-		res.type = int_type;
-		res.value = LLVMBuildZExtOrBitCast(p->builder, field, lb_type(p->module, int_type), "");
-		return res;
 	} else if (addr.kind == lbAddr_Context) {
 		lbValue a = addr.addr;
 		a.value = LLVMBuildPointerCast(p->builder, a.value, lb_type(p->module, t_context_ptr), "");
@@ -1159,7 +1092,6 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 			case Type_Named:
 			case Type_Generic:
-			case Type_BitFieldValue:
 				GB_PANIC("INVALID TYPE");
 				break;
 
@@ -1204,7 +1136,6 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			switch (base->kind) {
 			case Type_Struct:
 			case Type_Union:
-			case Type_BitField:
 				{
 					char const *name = alloc_cstring(permanent_allocator(), lb_get_entity_name(m, type->Named.type_name));
 					LLVMTypeRef llvm_type = LLVMGetTypeByName(m->mod, name);
@@ -1497,37 +1428,6 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 		}
 
-		break;
-	case Type_BitFieldValue:
-		return LLVMIntTypeInContext(m->ctx, type->BitFieldValue.bits);
-
-	case Type_BitField:
-		{
-			LLVMTypeRef internal_type = nullptr;
-			{
-				GB_ASSERT(type->BitField.fields.count == type->BitField.sizes.count);
-				unsigned field_count = cast(unsigned)type->BitField.fields.count;
-				LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
-
-				for_array(i, type->BitField.sizes) {
-					u32 size = type->BitField.sizes[i];
-					fields[i] = LLVMIntTypeInContext(m->ctx, size);
-				}
-
-				internal_type = LLVMStructTypeInContext(ctx, fields, field_count, true);
-			}
-			unsigned field_count = 2;
-			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
-
-			i64 alignment = 1;
-			if (type->BitField.custom_align > 0) {
-				alignment = type->BitField.custom_align;
-			}
-			fields[0] = lb_alignment_prefix_type_hack(m, alignment);
-			fields[1] = internal_type;
-
-			return LLVMStructTypeInContext(ctx, fields, field_count, true);
-		}
 		break;
 	case Type_BitSet:
 		{
@@ -2015,40 +1915,6 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 			// LLVMTypeRef t = LLVMFunctionType(return_type, param_types, cast(unsigned)param_index, type->Proc.c_vararg);
 			// return LLVMPointerType(t, 0);
-		}
-		break;
-	case Type_BitFieldValue:
-		return nullptr;
-		// return LLVMIntTypeInContext(m->ctx, type->BitFieldValue.bits);
-
-	case Type_BitField:
-		{
-			return nullptr;
-			// LLVMTypeRef internal_type = nullptr;
-			// {
-			// 	GB_ASSERT(type->BitField.fields.count == type->BitField.sizes.count);
-			// 	unsigned field_count = cast(unsigned)type->BitField.fields.count;
-			// 	LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
-			// 	defer (gb_free(heap_allocator(), fields));
-
-			// 	for_array(i, type->BitField.sizes) {
-			// 		u32 size = type->BitField.sizes[i];
-			// 		fields[i] = LLVMIntTypeInContext(m->ctx, size);
-			// 	}
-
-			// 	internal_type = LLVMStructTypeInContext(ctx, fields, field_count, true);
-			// }
-			// unsigned field_count = 2;
-			// LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
-
-			// i64 alignment = 1;
-			// if (type->BitField.custom_align > 0) {
-			// 	alignment = type->BitField.custom_align;
-			// }
-			// fields[0] = lb_alignment_prefix_type_hack(m, alignment);
-			// fields[1] = internal_type;
-
-			// return LLVMStructTypeInContext(ctx, fields, field_count, true);
 		}
 		break;
 	case Type_BitSet:
@@ -5014,7 +4880,6 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_Union:           kind = Typeid_Union;            break;
 	case Type_Tuple:           kind = Typeid_Tuple;            break;
 	case Type_Proc:            kind = Typeid_Procedure;        break;
-	case Type_BitField:        kind = Typeid_Bit_Field;        break;
 	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
 	case Type_Opaque:          kind = Typeid_Opaque;           break;
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
@@ -6836,7 +6701,6 @@ bool lb_is_type_aggregate(Type *t) {
 	case Type_Tuple:
 	case Type_DynamicArray:
 	case Type_Map:
-	case Type_BitField:
 	case Type_SimdVector:
 		return true;
 
@@ -9152,14 +9016,6 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	} else if (is_type_typeid(t)) {
 		lbValue invalid_typeid = lb_const_value(p->module, t_typeid, exact_value_i64(0));
 		return lb_emit_comp(p, op_kind, x, invalid_typeid);
-	} else if (is_type_bit_field(t)) {
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		lbValue lhs = lb_address_from_load_or_generate_local(p, x);
-		args[0] = lb_emit_conv(p, lhs, t_rawptr);
-		args[1] = lb_const_int(p->module, t_int, type_size_of(t));
-		lbValue val = lb_emit_runtime_call(p, "memory_compare_zero", args);
-		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_int(p->module, t_int, 0));
-		return res;
 	} else if (is_type_soa_struct(t)) {
 		Type *bt = base_type(t);
 		if (bt->Struct.soa_kind == StructSoa_Slice) {
@@ -9444,33 +9300,31 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		Type *lt = left.type;
 		Type *rt = right.type;
 
-		if (is_type_bit_set(lt) && is_type_bit_set(rt)) {
-			Type *blt = base_type(lt);
-			Type *brt = base_type(rt);
-			GB_ASSERT(is_type_bit_field_value(blt));
-			GB_ASSERT(is_type_bit_field_value(brt));
-			i64 bits = gb_max(blt->BitFieldValue.bits, brt->BitFieldValue.bits);
-			i64 bytes = bits / 8;
-			switch (bytes) {
-			case 1:
-				left = lb_emit_conv(p, left, t_u8);
-				right = lb_emit_conv(p, right, t_u8);
-				break;
-			case 2:
-				left = lb_emit_conv(p, left, t_u16);
-				right = lb_emit_conv(p, right, t_u16);
-				break;
-			case 4:
-				left = lb_emit_conv(p, left, t_u32);
-				right = lb_emit_conv(p, right, t_u32);
-				break;
-			case 8:
-				left = lb_emit_conv(p, left, t_u64);
-				right = lb_emit_conv(p, right, t_u64);
-				break;
-			default: GB_PANIC("Unknown integer size"); break;
-			}
-		}
+		// if (is_type_bit_set(lt) && is_type_bit_set(rt)) {
+		// 	Type *blt = base_type(lt);
+		// 	Type *brt = base_type(rt);
+		// 	i64 bits = gb_max(blt->BitSet.bits, brt->BitSet.bits);
+		// 	i64 bytes = bits / 8;
+		// 	switch (bytes) {
+		// 	case 1:
+		// 		left = lb_emit_conv(p, left, t_u8);
+		// 		right = lb_emit_conv(p, right, t_u8);
+		// 		break;
+		// 	case 2:
+		// 		left = lb_emit_conv(p, left, t_u16);
+		// 		right = lb_emit_conv(p, right, t_u16);
+		// 		break;
+		// 	case 4:
+		// 		left = lb_emit_conv(p, left, t_u32);
+		// 		right = lb_emit_conv(p, right, t_u32);
+		// 		break;
+		// 	case 8:
+		// 		left = lb_emit_conv(p, left, t_u64);
+		// 		right = lb_emit_conv(p, right, t_u64);
+		// 		break;
+		// 	default: GB_PANIC("Unknown integer size"); break;
+		// 	}
+		// }
 
 		lt = left.type;
 		rt = right.type;
@@ -10632,23 +10486,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
 
-
-			if (sel.entity->type->kind == Type_BitFieldValue) {
-				lbAddr addr = lb_build_addr(p, se->expr);
-				Type *bft = type_deref(lb_addr_type(addr));
-				if (sel.index.count == 1) {
-					GB_ASSERT(is_type_bit_field(bft));
-					i32 index = sel.index[0];
-					return lb_addr_bit_field(lb_addr_get_ptr(p, addr), index);
-				} else {
-					Selection s = sel;
-					s.index.count--;
-					i32 index = s.index[s.index.count-1];
-					lbValue a = lb_addr_get_ptr(p, addr);
-					a = lb_emit_deep_field_gep(p, a, s);
-					return lb_addr_bit_field(a, index);
-				}
-			} else {
+			{
 				lbAddr addr = lb_build_addr(p, se->expr);
 				if (addr.kind == lbAddr_Map) {
 					lbValue v = lb_addr_load(p, addr);
@@ -12544,52 +12382,6 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			res.type = type_deref(tag.type);
 			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
-			break;
-		}
-
-		case Type_BitField: {
-			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_bit_field_ptr);
-			// names:   []string;
-			// bits:    []u32;
-			// offsets: []u32;
-			isize count = t->BitField.fields.count;
-			if (count > 0) {
-				auto fields = t->BitField.fields;
-				lbValue name_array   = lb_generate_global_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
-				lbValue bit_array    = lb_generate_global_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
-				lbValue offset_array = lb_generate_global_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
-
-				for (isize i = 0; i < count; i++) {
-					Entity *f = fields[i];
-					GB_ASSERT(f->type != nullptr);
-					GB_ASSERT(f->type->kind == Type_BitFieldValue);
-					lbValue name_ep   = lb_emit_array_epi(p, name_array,   cast(i32)i);
-					lbValue bit_ep    = lb_emit_array_epi(p, bit_array,    cast(i32)i);
-					lbValue offset_ep = lb_emit_array_epi(p, offset_array, cast(i32)i);
-
-					lb_emit_store(p, name_ep,   lb_const_string(m, f->token.string));
-					lb_emit_store(p, bit_ep,    lb_const_int(m, t_i32, f->type->BitFieldValue.bits));
-					lb_emit_store(p, offset_ep, lb_const_int(m, t_i32, t->BitField.offsets[i]));
-
-				}
-
-				lbValue v_count = lb_const_int(m, t_int, count);
-				lbValue name_array_elem = lb_array_elem(p, name_array);
-				lbValue bit_array_elem = lb_array_elem(p, bit_array);
-				lbValue offset_array_elem = lb_array_elem(p, offset_array);
-
-
-				LLVMValueRef vals[3] = {
-					llvm_const_slice(name_array_elem, v_count),
-					llvm_const_slice(bit_array_elem, v_count),
-					llvm_const_slice(offset_array_elem, v_count),
-				};
-
-				lbValue res = {};
-				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
-				lb_emit_store(p, tag, res);
-			}
 			break;
 		}
 

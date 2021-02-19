@@ -240,14 +240,14 @@ Typeid_Kind :: enum u8 {
 }
 #assert(len(Typeid_Kind) < 32);
 
-Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
-	index:    8*size_of(uintptr) - 8,
-	kind:     5, // Typeid_Kind
-	named:    1,
-	special:  1, // signed, cstring, etc
-	reserved: 1,
-}
-#assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
+// Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
+// 	index:    8*size_of(uintptr) - 8,
+// 	kind:     5, // Typeid_Kind
+// 	named:    1,
+// 	special:  1, // signed, cstring, etc
+// 	reserved: 1,
+// }
+// #assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
@@ -417,8 +417,9 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 type_info_base_without_enum :: type_info_core;
 
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
-	data := transmute(Typeid_Bit_Field)id;
-	n := int(data.index);
+	MASK :: 1<<(8*size_of(typeid) - 8) - 1;
+	data := transmute(uintptr)id;
+	n := int(data & MASK);
 	if n < 0 || n >= len(type_table) {
 		n = 0;
 	}
