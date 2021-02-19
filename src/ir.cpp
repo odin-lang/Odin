@@ -494,7 +494,6 @@ gb_global irValue *v_raw_nil = nullptr;
 enum irAddrKind {
 	irAddr_Default,
 	irAddr_Map,
-	irAddr_BitField,
 	irAddr_Context,
 	irAddr_SoaVariable,
 	irAddr_RelativePointer,
@@ -561,12 +560,6 @@ irAddr ir_addr_context(irValue *addr, Selection sel = empty_selection) {
 	return v;
 }
 
-
-irAddr ir_addr_bit_field(irValue *addr, i32 bit_field_value_index) {
-	irAddr v = {irAddr_BitField, addr};
-	v.bit_field_value_index = bit_field_value_index;
-	return v;
-}
 
 irAddr ir_addr_soa_variable(irValue *addr, irValue *index, Ast *index_expr) {
 	irAddr v = {irAddr_SoaVariable, addr};
@@ -2246,49 +2239,6 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 	return di;
 }
 
-irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Entity *e, irDebugInfo *scope) {
-	GB_ASSERT(type->kind == Type_BitField || (type->kind == Type_Named && type->Named.base->kind == Type_BitField));
-
-	Type *bf_type = base_type(type);
-
-	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-	di->CompositeType.name = is_type_named(type) ? type->Named.name : str_lit("bit_field");
-	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-	di->CompositeType.size = ir_debug_size_bits(bf_type);
-	map_set(&module->debug_info, hash_type(type), di);
-
-	GB_ASSERT(bf_type->BitField.fields.count == bf_type->BitField.offsets.count &&
-	          bf_type->BitField.fields.count == bf_type->BitField.sizes.count);
-
-	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, bf_type->BitField.fields.count);
-	di->CompositeType.elements = elements_di;
-	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
-
-	for_array(field_index, bf_type->BitField.fields) {
-		Entity *field = bf_type->BitField.fields[field_index];
-		u32 offset    = bf_type->BitField.offsets[field_index];
-		u32 size      = bf_type->BitField.sizes[field_index];
-		String name = str_lit("field_todo");
-		if (field != nullptr && field->token.string.len > 0) {
-			name = field->token.string;
-		}
-		// TODO(lachsinc): t_i64 may not be safe to use for all bitfields?
-		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_i64,
-		                                                         0,
-		                                                         nullptr,
-		                                                         di);
-		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits,
-		// replace with its true bit value here..
-		field_di->DerivedType.size = size;
-		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
-		field_di->DerivedType.flags = irDebugInfoFlag_Bitfield;
-		map_set(&module->debug_info, hash_pointer(field_di), field_di);
-		array_add(&elements_di->DebugInfoArray.elements, field_di);
-	}
-
-	return di;
-}
-
 irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity *e, irDebugInfo *scope) {
 	GB_ASSERT(type->kind == Type_BitSet || type->kind == Type_Named);
 
@@ -2579,7 +2529,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		if (named_base->kind != Type_Struct &&
 			named_base->kind != Type_Union &&
 			named_base->kind != Type_Enum &&
-			named_base->kind != Type_BitField &&
 			named_base->kind != Type_Tuple) {
 			// distinct / typedef etc.
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
@@ -2844,10 +2793,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 	*/
-
-	if (is_type_bit_field(type)) {
-		return ir_add_debug_info_type_bit_field(module, type, e, scope);
-	}
 
 	if (is_type_bit_set(type)) {
 		return ir_add_debug_info_type_bit_set(module, type, e, scope);
@@ -3146,7 +3091,6 @@ bool ir_type_requires_mem_zero(Type *t) {
 
 	case Type_DynamicArray:
 	case Type_Map:
-	case Type_BitField:
 		return true;
 	case Type_Array:
 		return ir_type_requires_mem_zero(t->Array.elem);
@@ -3971,96 +3915,6 @@ void ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 	} else if (addr.kind == irAddr_Map) {
 		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value, proc->curr_stmt);
 		return;
-	} else if (addr.kind == irAddr_BitField) {
-		gbAllocator a = ir_allocator();
-
-		Type *bft = base_type(type_deref(ir_type(addr.addr)));
-		GB_ASSERT(is_type_bit_field(bft));
-		i32 value_index = addr.bit_field_value_index;
-		i32 offset = bft->BitField.offsets[value_index];
-		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
-
-
-		i32 byte_index = offset / 8;
-		i32 bit_inset = offset % 8;
-
-		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
-		if (size_in_bytes == 0) {
-			GB_ASSERT(size_in_bits == 0);
-			return;
-		}
-
-		Type *int_type = nullptr;
-		switch (size_in_bytes) {
-		case 1:  int_type = t_u8;   break;
-		case 2:  int_type = t_u16;  break;
-		case 4:  int_type = t_u32;  break;
-		case 8:  int_type = t_u64;  break;
-		}
-		GB_ASSERT(int_type != nullptr);
-
-		value = ir_emit_conv(proc, value, int_type);
-
-		irValue *bytes = ir_emit_conv(proc, addr.addr, t_u8_ptr);
-		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(byte_index));
-
-
-		if (bit_inset == 0) {
-			irValue *v = value;
-			i32 sa = 8*size_in_bytes - size_in_bits;
-			if (sa > 0) {
-				irValue *shift_amount = ir_const_int(sa);
-				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
-				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
-			}
-			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(int_type));
-
-
-			irValue *sv = ir_emit_load(proc, ptr, 1);
-			// NOTE(bill): Zero out the lower bits that need to be stored to
-			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(size_in_bits), int_type);
-			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(size_in_bits), int_type);
-
-			v = ir_emit_arith(proc, Token_Or, sv, v, int_type);
-			ir_emit_store(proc, ptr, v, true);
-			return;
-		}
-
-		GB_ASSERT(0 < bit_inset && bit_inset < 8);
-
-		// First byte
-		{
-			irValue *shift_amount = ir_const_int(bit_inset);
-
-			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(t_u8));
-
-			irValue *v = ir_emit_conv(proc, value, t_u8);
-			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, t_u8);
-
-			irValue *sv = ir_emit_load(proc, bytes, 1);
-			// NOTE(bill): Zero out the upper bits that need to be stored to
-			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(8-bit_inset), t_u8);
-			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(8-bit_inset), t_u8);
-
-			v = ir_emit_arith(proc, Token_Or, sv, v, t_u8);
-			ir_emit_store(proc, ptr, v, true);
-		}
-
-		// Remaining bytes
-		if (bit_inset+size_in_bits > 8) {
-			irValue *ptr = ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), alloc_type_pointer(int_type));
-			irValue *v = ir_emit_conv(proc, value, int_type);
-			v = ir_emit_arith(proc, Token_Shr, v, ir_const_int(8-bit_inset), int_type);
-
-			irValue *sv = ir_emit_load(proc, ptr, 1);
-			// NOTE(bill): Zero out the lower bits that need to be stored to
-			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(size_in_bits-bit_inset), int_type);
-			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(size_in_bits-bit_inset), int_type);
-
-			v = ir_emit_arith(proc, Token_Or, sv, v, int_type);
-			ir_emit_store(proc, ptr, v, true);
-		}
-		return;
 	} else if (addr.kind == irAddr_Context) {
 		irValue *old = ir_emit_load(proc, ir_find_or_generate_context_ptr(proc));
 		irValue *next = ir_add_local_generated(proc, t_context, true);
@@ -4206,62 +4060,6 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 			irValue *single = ir_emit_struct_ep(proc, v, 0);
 			return ir_emit_load(proc, single);
 		}
-	} else if (addr.kind == irAddr_BitField) {
-		gbAllocator a = ir_allocator();
-
-
-		Type *bft = base_type(type_deref(ir_type(addr.addr)));
-		GB_ASSERT(is_type_bit_field(bft));
-		i32 value_index = addr.bit_field_value_index;
-		i32 offset = bft->BitField.offsets[value_index];
-		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
-
-		i32 byte_index = offset / 8;
-		i32 bit_inset = offset % 8;
-
-		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
-		if (size_in_bytes == 0) {
-			GB_ASSERT(size_in_bits == 0);
-			return v_zero32;
-		}
-
-		Type *int_type = nullptr;
-		switch (size_in_bytes) {
-		case 1:  int_type = t_u8;   break;
-		case 2:  int_type = t_u16;  break;
-		case 4:  int_type = t_u32;  break;
-		case 8:  int_type = t_u64;  break;
-		}
-		GB_ASSERT(int_type != nullptr);
-
-
-		irValue *bytes = ir_emit_conv(proc, addr.addr, t_u8_ptr);
-		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(byte_index));
-
-		Type *int_ptr = alloc_type_pointer(int_type);
-
-		i32 sa = 8*size_in_bytes - size_in_bits;
-		if (bit_inset == 0) {
-			irValue *v = ir_emit_load(proc, ir_emit_conv(proc, bytes, int_ptr), 1);
-			if (sa > 0) {
-				irValue *shift_amount = ir_const_int(sa);
-				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
-				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
-			}
-			return v;
-		}
-
-		GB_ASSERT(8 > bit_inset);
-
-		irValue *ptr = ir_emit_conv(proc, bytes, int_ptr);
-		irValue *v = ir_emit_load(proc, ptr, 1);
-		v = ir_emit_arith(proc, Token_Shr, v, ir_const_int(bit_inset), int_type);
-		if (sa > 0) {
-			irValue *shift_amount = ir_const_int(sa);
-			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
-			v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
-		}
-		return v;
 	} else if (addr.kind == irAddr_Context) {
 		if (addr.ctx.sel.index.count > 0) {
 			irValue *a = addr.addr;
@@ -4379,11 +4177,6 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr, bool allow_refer
 		irValue *nil_ptr = ir_value_nil(rel_ptr->RelativePointer.pointer_type);
 		irValue *final_ptr = ir_emit_select(proc, cond, nil_ptr, absolute_ptr);
 		return final_ptr;
-	}
-
-	case irAddr_BitField: {
-		irValue *v = ir_addr_load(proc, addr);
-		return ir_address_from_load_or_generate_local(proc, v);
 	}
 
 	case irAddr_Context:
@@ -4945,14 +4738,6 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 	} else if (is_type_typeid(t)) {
 		irValue *invalid_typeid = ir_value_constant(t_typeid, exact_value_i64(0));
 		return ir_emit_comp(proc, op_kind, x, invalid_typeid);
-	} else if (is_type_bit_field(t)) {
-		auto args = array_make<irValue *>(permanent_allocator(), 2);
-		irValue *lhs = ir_address_from_load_or_generate_local(proc, x);
-		args[0] = ir_emit_conv(proc, lhs, t_rawptr);
-		args[1] = ir_const_int(type_size_of(t));
-		irValue *val = ir_emit_runtime_call(proc, "memory_compare_zero", args);
-		irValue *res = ir_emit_comp(proc, op_kind, val, v_zero);
-		return ir_emit_conv(proc, res, t_bool);
 	} else if (is_type_soa_struct(t)) {
 		Type *bt = base_type(t);
 		if (bt->Struct.soa_kind == StructSoa_Slice) {
@@ -5243,33 +5028,31 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		Type *lt = ir_type(left);
 		Type *rt = ir_type(right);
 
-		if (is_type_bit_set(lt) && is_type_bit_set(rt)) {
-			Type *blt = base_type(lt);
-			Type *brt = base_type(rt);
-			GB_ASSERT(is_type_bit_field_value(blt));
-			GB_ASSERT(is_type_bit_field_value(brt));
-			i64 bits = gb_max(blt->BitFieldValue.bits, brt->BitFieldValue.bits);
-			i64 bytes = bits / 8;
-			switch (bytes) {
-			case 1:
-				left = ir_emit_conv(proc, left, t_u8);
-				right = ir_emit_conv(proc, right, t_u8);
-				break;
-			case 2:
-				left = ir_emit_conv(proc, left, t_u16);
-				right = ir_emit_conv(proc, right, t_u16);
-				break;
-			case 4:
-				left = ir_emit_conv(proc, left, t_u32);
-				right = ir_emit_conv(proc, right, t_u32);
-				break;
-			case 8:
-				left = ir_emit_conv(proc, left, t_u64);
-				right = ir_emit_conv(proc, right, t_u64);
-				break;
-			default: GB_PANIC("Unknown integer size"); break;
-			}
-		}
+		// if (is_type_bit_set(lt) && is_type_bit_set(rt)) {
+		// 	Type *blt = base_type(lt);
+		// 	Type *brt = base_type(rt);
+		// 	i64 bits = gb_max(blt->BitFieldValue.bits, brt->BitFieldValue.bits);
+		// 	i64 bytes = bits / 8;
+		// 	switch (bytes) {
+		// 	case 1:
+		// 		left = ir_emit_conv(proc, left, t_u8);
+		// 		right = ir_emit_conv(proc, right, t_u8);
+		// 		break;
+		// 	case 2:
+		// 		left = ir_emit_conv(proc, left, t_u16);
+		// 		right = ir_emit_conv(proc, right, t_u16);
+		// 		break;
+		// 	case 4:
+		// 		left = ir_emit_conv(proc, left, t_u32);
+		// 		right = ir_emit_conv(proc, right, t_u32);
+		// 		break;
+		// 	case 8:
+		// 		left = ir_emit_conv(proc, left, t_u64);
+		// 		right = ir_emit_conv(proc, right, t_u64);
+		// 		break;
+		// 	default: GB_PANIC("Unknown integer size"); break;
+		// 	}
+		// }
 
 		lt = ir_type(left);
 		rt = ir_type(right);
@@ -6493,7 +6276,6 @@ bool ir_is_type_aggregate(Type *t) {
 	case Type_Tuple:
 	case Type_DynamicArray:
 	case Type_Map:
-	case Type_BitField:
 	case Type_SimdVector:
 		return true;
 
@@ -6790,7 +6572,6 @@ u64 ir_typeid_as_integer(irModule *m, Type *type) {
 	case Type_Union:           kind = Typeid_Union;            break;
 	case Type_Tuple:           kind = Typeid_Tuple;            break;
 	case Type_Proc:            kind = Typeid_Procedure;        break;
-	case Type_BitField:        kind = Typeid_Bit_Field;        break;
 	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
@@ -8826,22 +8607,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			GB_ASSERT(sel.entity != nullptr);
 
 
-			if (sel.entity->type->kind == Type_BitFieldValue) {
-				irAddr addr = ir_build_addr(proc, se->expr);
-				Type *bft = type_deref(ir_addr_type(addr));
-				if (sel.index.count == 1) {
-					GB_ASSERT(is_type_bit_field(bft));
-					i32 index = sel.index[0];
-					return ir_addr_bit_field(ir_addr_get_ptr(proc, addr), index);
-				} else {
-					Selection s = sel;
-					s.index.count--;
-					i32 index = s.index[s.index.count-1];
-					irValue *a = ir_addr_get_ptr(proc, addr);
-					a = ir_emit_deep_field_gep(proc, a, s);
-					return ir_addr_bit_field(a, index);
-				}
-			} else {
+			{
 				irAddr addr = ir_build_addr(proc, se->expr);
 				if (addr.kind == irAddr_Context) {
 					GB_ASSERT(sel.index.count > 0);
@@ -12723,50 +12489,6 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			ir_emit_store(proc, generated_struct, ir_get_type_info_ptr(proc, t->Map.generated_struct_type));
 			ir_emit_store(proc, key_equal,        ir_get_equal_proc_for_type(proc->module, t->Map.key));
 			ir_emit_store(proc, key_hasher,       ir_get_hasher_proc_for_type(proc->module, t->Map.key));
-			break;
-		}
-
-		case Type_BitField: {
-			ir_emit_comment(proc, str_lit("Type_Info_Bit_Field"));
-			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_field_ptr);
-			// names:   []string;
-			// bits:    []u32;
-			// offsets: []u32;
-			isize count = t->BitField.fields.count;
-			if (count > 0) {
-				auto fields = t->BitField.fields;
-				irValue *name_array   = ir_generate_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
-				irValue *bit_array    = ir_generate_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
-				irValue *offset_array = ir_generate_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
-
-				for (isize i = 0; i < count; i++) {
-					Entity *f = fields[i];
-					GB_ASSERT(f->type != nullptr);
-					GB_ASSERT(f->type->kind == Type_BitFieldValue);
-					irValue *name_ep   = ir_emit_array_epi(proc, name_array,   cast(i32)i);
-					irValue *bit_ep    = ir_emit_array_epi(proc, bit_array,    cast(i32)i);
-					irValue *offset_ep = ir_emit_array_epi(proc, offset_array, cast(i32)i);
-
-					ir_emit_store(proc, name_ep, ir_const_string(proc->module, f->token.string));
-					ir_emit_store(proc, bit_ep, ir_const_i32(f->type->BitFieldValue.bits));
-					ir_emit_store(proc, offset_ep, ir_const_i32(t->BitField.offsets[i]));
-
-				}
-
-				irValue *v_count = ir_const_int(count);
-
-				irValue *names = ir_emit_struct_ep(proc, tag, 0);
-				irValue *name_array_elem = ir_array_elem(proc, name_array);
-				ir_fill_slice(proc, names, name_array_elem, v_count);
-
-				irValue *bits = ir_emit_struct_ep(proc, tag, 1);
-				irValue *bit_array_elem = ir_array_elem(proc, bit_array);
-				ir_fill_slice(proc, bits, bit_array_elem, v_count);
-
-				irValue *offsets = ir_emit_struct_ep(proc, tag, 2);
-				irValue *offset_array_elem = ir_array_elem(proc, offset_array);
-				ir_fill_slice(proc, offsets, offset_array_elem, v_count);
-			}
 			break;
 		}
 

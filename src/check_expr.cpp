@@ -549,15 +549,6 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 	}
 
-	if (is_type_bit_field_value(operand->type) && is_type_integer(type)) {
-		return 1;
-	}
-
-	if (is_type_bit_field_value(operand->type) && is_type_bit_field_value(type)) {
-		return 1;
-	}
-
-
 
 	{
 		isize subtype_level = check_is_assignable_to_using_subtype(operand->type, type);
@@ -1701,9 +1692,6 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 	if (o->mode != Addressing_Variable) {
 		return true;
 	}
-	if (is_type_bit_field_value(o->type)) {
-		return true;
-	}
 
 	return false;
 }
@@ -2269,13 +2257,6 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
-	if (is_type_bit_field_value(src) && is_type_integer(dst)) {
-		return true;
-	}
-
-	if (is_type_bit_field_value(src) && is_type_boolean(dst)) {
-		return src->BitFieldValue.bits == 1;
-	}
 
 	// Cast between pointers
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
@@ -2899,45 +2880,6 @@ ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 	return v;
 }
 
-Type *check_assignment_bit_field(CheckerContext *ctx, Operand *operand, Type *target_type) {
-	if (is_type_bit_field_value(target_type)) {
-		Type *lt = base_type(target_type);
-		i64 lhs_bits = lt->BitFieldValue.bits;
-		if (operand->mode == Addressing_Constant) {
-			ExactValue v = exact_value_to_integer(operand->value);
-			if (v.kind == ExactValue_Integer) {
-				BigInt i = v.value_integer;
-				if (!i.neg) {
-					u64 imax_ = ~cast(u64)0ull;
-					if (lhs_bits < 64) {
-						imax_ = (1ull << cast(u64)lhs_bits) - 1ull;
-					}
-
-					BigInt imax = big_int_make_u64(imax_);
-					if (big_int_cmp(&i, &imax) <= 0) {
-						return operand->type;
-					}
-				}
-			} else if (operand->value.kind == ExactValue_Bool) {
-				bool b = operand->value.value_bool;
-				if (lhs_bits == 1) {
-					return operand->type;
-				}
-			}
-		} else if (is_type_integer(operand->type)) {
-			// TODO(bill): Any other checks?
-			return operand->type;
-		} else if (is_type_boolean(operand->type)) {
-			if (lhs_bits == 1) {
-				return operand->type;
-			}
-		}
-		return nullptr;
-	}
-
-	return nullptr;
-}
-
 void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
@@ -3037,14 +2979,6 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			return;
 		}
 
-		break;
-	}
-
-	case Type_BitFieldValue: {
-		Type *res = check_assignment_bit_field(c, operand, target_type);
-		if (res == nullptr) {
-			convert_untyped_error(c, operand, target_type);
-		}
 		break;
 	}
 
@@ -3875,8 +3809,6 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_union,
 	is_type_enum,
 	is_type_proc,
-	is_type_bit_field,
-	is_type_bit_field_value,
 	is_type_bit_set,
 	is_type_simd_vector,
 

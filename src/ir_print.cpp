@@ -635,15 +635,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		ir_print_type(f, m, t->Map.internal_type);
 		break;
 
-	case Type_BitField: {
-		i64 align = type_align_of(t);
-		i64 size  = type_size_of(t);
-		ir_write_string(f, str_lit("<{"));
-		ir_print_alignment_prefix_hack(f, align);
-		ir_fprintf(f, ", [%lld x i8]}>", size);
-		break;
-	}
-
 	case Type_BitSet: {
 		i64 size = type_size_of(t);
 		if (size == 0) {
@@ -2641,7 +2632,6 @@ bool ir_print_global_type_allowed(Type *t) {
 	case Type_DynamicArray:
 	case Type_Map:
 	case Type_Union:
-	case Type_BitField:
 		return false;
 	}
 

@@ -330,17 +330,6 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 		return nullptr;
 
 	case Addressing_Variable:
-		if (is_type_bit_field_value(lhs->type)) {
-			Type *res = check_assignment_bit_field(ctx, rhs, lhs->type);
-			if (res == nullptr) {
-				gbString lhs_expr = expr_to_string(lhs->expr);
-				gbString rhs_expr = expr_to_string(rhs->expr);
-				error(rhs->expr, "Cannot assign '%s' to bit field '%s'", rhs_expr, lhs_expr);
-				gb_string_free(rhs_expr);
-				gb_string_free(lhs_expr);
-			}
-			return res;
-		}
 		break;
 
 	case Addressing_MapIndex: {

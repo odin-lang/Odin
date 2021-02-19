@@ -1258,9 +1258,6 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		return;
 	}
 	t = default_type(t);
-	if (is_type_bit_field_value(t)) {
-		t = default_bit_field_value_type(t);
-	}
 	if (is_type_untyped(t)) {
 		return; // Could be nil
 	}
@@ -1428,11 +1425,6 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		add_comparison_procedures_for_fields(c, bt);
 		break;
 
-	case Type_BitFieldValue:
-		break;
-	case Type_BitField:
-		break;
-
 	case Type_Map:
 		init_map_internal_types(bt);
 		add_type_info_type(c, bt->Map.key);
@@ -1505,9 +1497,6 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 	t = default_type(t);
-	if (is_type_bit_field_value(t)) {
-		t = default_bit_field_value_type(t);
-	}
 	if (is_type_untyped(t)) {
 		return; // Could be nil
 	}
@@ -1645,11 +1634,6 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add_min_dep_type_info(c, f->type);
 		}
-		break;
-
-	case Type_BitFieldValue:
-		break;
-	case Type_BitField:
 		break;
 
 	case Type_Map:

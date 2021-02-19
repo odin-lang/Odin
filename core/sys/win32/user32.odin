@@ -9,10 +9,9 @@ Menu_Bar_Info :: struct {
 	bar: Rect,
 	menu: Hmenu,
 	wnd_menu: Hwnd,
-	using fields: bit_field {
-		bar_focused: 1,
-		focuses:     1,
-	},
+	fields: u8,
+	// field.bar_focused: 1,
+	// field.focuses:     1,
 }
 
 Menu_Item_Info_A :: struct {

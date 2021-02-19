@@ -4446,10 +4446,10 @@ gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
 
 #elif defined(GB_CPU_ARM)
 
-gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a) { 
+gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a) {
 	return __atomic_load_n(&a->value, __ATOMIC_SEQ_CST);
 }
-gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) { 
+gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) {
 	__atomic_store_n(&a->value, value, __ATOMIC_SEQ_CST);
 }
 
@@ -8903,7 +8903,7 @@ gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) 
  		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
  		return virtual_timer_value;
 	}
-#else 
+#else
 #error "gb_rdtsc not supported"
 #endif
 

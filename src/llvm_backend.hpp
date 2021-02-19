@@ -43,7 +43,6 @@ struct lbValue {
 enum lbAddrKind {
 	lbAddr_Default,
 	lbAddr_Map,
-	lbAddr_BitField,
 	lbAddr_Context,
 	lbAddr_SoaVariable,
 
