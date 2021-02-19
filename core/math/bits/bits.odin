@@ -529,3 +529,128 @@ len_u8_table := [256]u8{
 };
 
 
+bitfield_extract_u8   :: proc(value:   u8, offset, bits: uint) ->   u8 { return (value >> offset) &   u8(1<<bits - 1); }
+bitfield_extract_u16  :: proc(value:  u16, offset, bits: uint) ->  u16 { return (value >> offset) &  u16(1<<bits - 1); }
+bitfield_extract_u32  :: proc(value:  u32, offset, bits: uint) ->  u32 { return (value >> offset) &  u32(1<<bits - 1); }
+bitfield_extract_u64  :: proc(value:  u64, offset, bits: uint) ->  u64 { return (value >> offset) &  u64(1<<bits - 1); }
+bitfield_extract_u128 :: proc(value: u128, offset, bits: uint) -> u128 { return (value >> offset) & u128(1<<bits - 1); }
+bitfield_extract_uint :: proc(value: uint, offset, bits: uint) -> uint { return (value >> offset) & uint(1<<bits - 1); }
+
+bitfield_extract_i8 :: proc(value: i8, offset, bits: uint) -> i8 {
+	v := (u8(value) >> offset) & u8(1<<bits - 1);
+	m := u8(1<<(bits-1));
+	r := (v~m) - m;
+	return i8(r);
+}
+bitfield_extract_i16 :: proc(value: i16, offset, bits: uint) -> i16 {
+	v := (u16(value) >> offset) & u16(1<<bits - 1);
+	m := u16(1<<(bits-1));
+	r := (v~m) - m;
+	return i16(r);
+}
+bitfield_extract_i32 :: proc(value: i32, offset, bits: uint) -> i32 {
+	v := (u32(value) >> offset) & u32(1<<bits - 1);
+	m := u32(1<<(bits-1));
+	r := (v~m) - m;
+	return i32(r);
+}
+bitfield_extract_i64 :: proc(value: i64, offset, bits: uint) -> i64 {
+	v := (u64(value) >> offset) & u64(1<<bits - 1);
+	m := u64(1<<(bits-1));
+	r := (v~m) - m;
+	return i64(r);
+}
+bitfield_extract_i128 :: proc(value: i128, offset, bits: uint) -> i128 {
+	v := (u128(value) >> offset) & u128(1<<bits - 1);
+	m := u128(1<<(bits-1));
+	r := (v~m) - m;
+	return i128(r);
+}
+bitfield_extract_int :: proc(value: int, offset, bits: uint) -> int {
+	v := (uint(value) >> offset) & uint(1<<bits - 1);
+	m := uint(1<<(bits-1));
+	r := (v~m) - m;
+	return int(r);
+}
+
+
+bitfield_extract :: proc{
+	bitfield_extract_u8,
+	bitfield_extract_u16,
+	bitfield_extract_u32,
+	bitfield_extract_u64,
+	bitfield_extract_u128,
+	bitfield_extract_uint,
+	bitfield_extract_i8,
+	bitfield_extract_i16,
+	bitfield_extract_i32,
+	bitfield_extract_i64,
+	bitfield_extract_i128,
+	bitfield_extract_int,
+};
+
+
+bitfield_insert_u8 :: proc(base, insert: u8, offset, bits: uint) -> u8 {
+	mask := u8(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_u16 :: proc(base, insert: u16, offset, bits: uint) -> u16 {
+	mask := u16(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_u32 :: proc(base, insert: u32, offset, bits: uint) -> u32 {
+	mask := u32(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_u64 :: proc(base, insert: u64, offset, bits: uint) -> u64 {
+	mask := u64(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_u128 :: proc(base, insert: u128, offset, bits: uint) -> u128 {
+	mask := u128(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_uint :: proc(base, insert: uint, offset, bits: uint) -> uint {
+	mask := uint(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+
+bitfield_insert_i8 :: proc(base, insert: i8, offset, bits: uint) -> i8 {
+	mask := i8(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_i16 :: proc(base, insert: i16, offset, bits: uint) -> i16 {
+	mask := i16(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_i32 :: proc(base, insert: i32, offset, bits: uint) -> i32 {
+	mask := i32(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_i64 :: proc(base, insert: i64, offset, bits: uint) -> i64 {
+	mask := i64(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_i128 :: proc(base, insert: i128, offset, bits: uint) -> i128 {
+	mask := i128(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+bitfield_insert_int :: proc(base, insert: int, offset, bits: uint) -> int {
+	mask := int(1<<bits - 1);
+	return (base &~ (mask<<offset)) | ((insert&mask) << offset);
+}
+
+bitfield_insert :: proc{
+	bitfield_insert_u8,
+	bitfield_insert_u16,
+	bitfield_insert_u32,
+	bitfield_insert_u64,
+	bitfield_insert_u128,
+	bitfield_insert_uint,
+	bitfield_insert_i8,
+	bitfield_insert_i16,
+	bitfield_insert_i32,
+	bitfield_insert_i64,
+	bitfield_insert_i128,
+	bitfield_insert_int,
+};
