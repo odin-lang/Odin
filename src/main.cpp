@@ -597,6 +597,9 @@ enum BuildFlagKind {
 	BuildFlag_Short,
 	BuildFlag_AllPackages,
 
+	BuildFlag_IgnoreWarnings,
+	BuildFlag_WarningsAsErrors,
+
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
@@ -706,7 +709,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
 
-
+	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_doc);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
@@ -1205,8 +1209,22 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
 							break;
-
-
+						case BuildFlag_IgnoreWarnings:
+							if (build_context.warnings_as_errors) {
+								gb_printf_err("-ignore-warnings cannot be used with -warnings-as-errors\n");
+								bad_flags = true;
+							} else {
+								build_context.ignore_warnings = true;
+							}
+							break;
+						case BuildFlag_WarningsAsErrors:
+							if (build_context.ignore_warnings) {
+								gb_printf_err("-warnings-as-errors cannot be used with -ignore-warnings\n");
+								bad_flags = true;
+							} else {
+								build_context.warnings_as_errors = true;
+							}
+							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch:
@@ -1696,6 +1714,14 @@ void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-default-to-nil-allocator");
 		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-ignore-warnings");
+		print_usage_line(2, "Ignores warning messages");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-warnings-as-errors");
+		print_usage_line(2, "Treats warning messages as error messages");
 		print_usage_line(0, "");
 	}
 

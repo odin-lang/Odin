@@ -194,6 +194,9 @@ struct BuildContext {
 	bool   disallow_do;
 	bool   insert_semicolon;
 
+	bool   ignore_warnings;
+	bool   warnings_as_errors;
+
 	bool   use_llvm_api;
 
 	bool   use_subsystem_windows;
@@ -214,6 +217,13 @@ struct BuildContext {
 
 
 gb_global BuildContext build_context = {0};
+
+bool global_warnings_as_errors(void) {
+	return build_context.warnings_as_errors;
+}
+bool global_ignore_warnings(void) {
+	return build_context.ignore_warnings;
+}
 
 
 gb_global TargetMetrics target_windows_386 = {
