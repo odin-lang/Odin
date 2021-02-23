@@ -713,15 +713,6 @@ Enum_Type :: struct {
 	is_using:  bool,
 }
 
-Bit_Field_Type :: struct {
-	using node: Expr,
-	tok_pos: tokenizer.Pos,
-	align:   ^Expr,
-	open:    tokenizer.Pos,
-	fields:  []^Field_Value, // Field_Value with ':' rather than '='
-	close:   tokenizer.Pos,
-}
-
 Bit_Set_Type :: struct {
 	using node: Expr,
 	tok_pos:    tokenizer.Pos,

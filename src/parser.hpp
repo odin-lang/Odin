@@ -594,11 +594,6 @@ AST_KIND(_TypeBegin, "", bool) \
 		Slice<Ast *> fields; /* FieldValue */ \
 		bool         is_using; \
 	}) \
-	AST_KIND(BitFieldType, "bit field type", struct { \
-		Token        token; \
-		Slice<Ast *> fields; /* FieldValue with : */ \
-		Ast *        align; \
-	}) \
 	AST_KIND(BitSetType, "bit set type", struct { \
 		Token token; \
 		Ast * elem;  \

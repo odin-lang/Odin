@@ -415,7 +415,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return is_semicolon_optional_for_node(p, n.type);
 	case ast.Pointer_Type:
 		return is_semicolon_optional_for_node(p, n.elem);
-	case ast.Struct_Type, ast.Union_Type, ast.Enum_Type, ast.Bit_Field_Type:
+	case ast.Struct_Type, ast.Union_Type, ast.Enum_Type:
 		// Require semicolon within a procedure body
 		return p.curr_proc == nil;
 	case ast.Proc_Lit:
@@ -2538,59 +2538,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		et.close = close.pos;
 		return et;
 
-	case .Bit_Field:
-		tok := expect_token(p, .Bit_Field);
-
-		fields: [dynamic]^ast.Field_Value;
-		align: ^ast.Expr;
-
-		prev_level := p.expr_level;
-		p.expr_level = -1;
-
-		for allow_token(p, .Hash) {
-			tag := expect_token_after(p, .Ident, "#");
-			switch tag.text {
-			case "align":
-				if align != nil {
-					error(p, tag.pos, "duplicate bit_field tag '#%s", tag.text);
-				}
-				align = parse_expr(p, true);
-			case:
-				error(p, tag.pos, "invalid bit_field tag '#%s", tag.text);
-			}
-		}
-
-		p.expr_level = prev_level;
-
-		open := expect_token_after(p, .Open_Brace, "bit_field");
-
-		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
-			name := parse_ident(p);
-			colon := expect_token(p, .Colon);
-			value := parse_expr(p, true);
-
-			fv := ast.new(ast.Field_Value, name.pos, value.end);
-			fv.field = name;
-			fv.sep   = colon.pos;
-			fv.value = value;
-			append(&fields, fv);
-
-			if !allow_token(p, .Comma) {
-				break;
-			}
-		}
-
-		close := expect_token(p, .Close_Brace);
-
-		bft := ast.new(ast.Bit_Field_Type, tok.pos, end_pos(close));
-		bft.tok_pos = tok.pos;
-		bft.open    = open.pos;
-		bft.fields  = fields[:];
-		bft.close   = close.pos;
-		bft.align   = align;
-
-		return bft;
-
 	case .Bit_Set:
 		tok := expect_token(p, .Bit_Set);
 		open := expect_token(p, .Open_Bracket);
@@ -2719,7 +2666,6 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		ast.Enum_Type,
 		ast.Dynamic_Array_Type,
 		ast.Map_Type,
-		ast.Bit_Field_Type,
 		ast.Bit_Set_Type,
 		ast.Call_Expr:
 		return true;

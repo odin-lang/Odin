@@ -269,8 +269,6 @@ clone_node :: proc(node: ^Node) -> ^Node {
 	case Enum_Type:
 		r.base_type = clone(r.base_type);
 		r.fields = clone(r.fields);
-	case Bit_Field_Type:
-		r.fields = clone(r.fields);
 	case Bit_Set_Type:
 		r.elem = clone(r.elem);
 		r.underlying = clone(r.underlying);
