@@ -709,8 +709,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
 
-	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_doc);
-	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
