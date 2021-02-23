@@ -836,11 +836,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 		}
 		return true;
 	}
-	case Type_Opaque:
-		if (source->kind == Type_Opaque) {
-			return is_polymorphic_type_assignable(c, poly->Opaque.elem, source->Opaque.elem, true, modify_type);
-		}
-		return false;
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
 			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem);
@@ -2312,14 +2307,6 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
 		return true;
 	}
-
-	if (is_type_opaque(src)) {
-		return are_types_identical(dst, src->Opaque.elem);
-	}
-	if (is_type_opaque(dst)) {
-		return are_types_identical(dst->Opaque.elem, src);
-	}
-
 	return false;
 }
 
@@ -3793,7 +3780,6 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 
 	is_type_named,
 	is_type_pointer,
-	is_type_opaque,
 	is_type_array,
 	is_type_enumerated_array,
 	is_type_slice,
@@ -5640,7 +5626,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 				break;
 			case Type_Pointer:         operand->type = bt->Pointer.elem;         break;
-			case Type_Opaque:          operand->type = bt->Opaque.elem;          break;
 			case Type_Array:           operand->type = bt->Array.elem;           break;
 			case Type_EnumeratedArray: operand->type = bt->EnumeratedArray.elem; break;
 			case Type_Slice:           operand->type = bt->Slice.elem;           break;
@@ -5674,7 +5659,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_valid_map_key:
 	case BuiltinProc_type_is_named:
 	case BuiltinProc_type_is_pointer:
-	case BuiltinProc_type_is_opaque:
 	case BuiltinProc_type_is_array:
 	case BuiltinProc_type_is_slice:
 	case BuiltinProc_type_is_dynamic_array:
@@ -10173,7 +10157,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_UnionType:
 	case Ast_EnumType:
 	case Ast_MapType:
-	case Ast_OpaqueType:
 	case Ast_BitSetType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
@@ -10553,11 +10536,6 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 
 	case_ast_node(ht, DistinctType, node);
 		str = gb_string_appendc(str, "distinct ");
-		str = write_expr_to_string(str, ht->type, shorthand);
-	case_end;
-
-	case_ast_node(ht, OpaqueType, node);
-		str = gb_string_appendc(str, "opaque ");
 		str = write_expr_to_string(str, ht->type, shorthand);
 	case_end;
 

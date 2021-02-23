@@ -1346,10 +1346,6 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		}
 		break;
 
-	case Type_Opaque:
-		add_type_info_type(c, bt->Opaque.elem);
-		break;
-
 	case Type_BitSet:
 		add_type_info_type(c, bt->BitSet.elem);
 		add_type_info_type(c, bt->BitSet.underlying);
@@ -1557,10 +1553,6 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			add_min_dep_type_info(c, t_f64);
 			break;
 		}
-		break;
-
-	case Type_Opaque:
-		add_min_dep_type_info(c, bt->Opaque.elem);
 		break;
 
 	case Type_BitSet:
@@ -2209,7 +2201,6 @@ void init_core_type_info(Checker *c) {
 	t_type_info_enum             = find_core_type(c, str_lit("Type_Info_Enum"));
 	t_type_info_map              = find_core_type(c, str_lit("Type_Info_Map"));
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
-	t_type_info_opaque           = find_core_type(c, str_lit("Type_Info_Opaque"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
 	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
@@ -2236,7 +2227,6 @@ void init_core_type_info(Checker *c) {
 	t_type_info_enum_ptr             = alloc_type_pointer(t_type_info_enum);
 	t_type_info_map_ptr              = alloc_type_pointer(t_type_info_map);
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
-	t_type_info_opaque_ptr           = alloc_type_pointer(t_type_info_opaque);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
 	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);

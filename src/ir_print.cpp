@@ -645,10 +645,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		return;
 	}
 
-	case Type_Opaque:
-		ir_print_type(f, m, strip_opaque_type(t));
-		return;
-
 	case Type_SimdVector:
 		if (t->SimdVector.is_x86_mmx) {
 			ir_write_str_lit(f, "x86_mmx");

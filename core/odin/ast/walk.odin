@@ -339,8 +339,6 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.type);
 	case Distinct_Type:
 		walk(v, n.type);
-	case Opaque_Type:
-		walk(v, n.type);
 	case Poly_Type:
 		walk(v, n.type);
 		if n.specialization != nil {

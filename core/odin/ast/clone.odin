@@ -243,8 +243,6 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.type = clone(r.type);
 	case Distinct_Type:
 		r.type = clone(r.type);
-	case Opaque_Type:
-		r.type = clone(r.type);
 	case Poly_Type:
 		r.type = auto_cast clone(r.type);
 		r.specialization = clone(r.specialization);

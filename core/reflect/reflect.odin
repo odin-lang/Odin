@@ -29,7 +29,6 @@ Type_Info_Union            :: runtime.Type_Info_Union;
 Type_Info_Enum             :: runtime.Type_Info_Enum;
 Type_Info_Map              :: runtime.Type_Info_Map;
 Type_Info_Bit_Set          :: runtime.Type_Info_Bit_Set;
-Type_Info_Opaque           :: runtime.Type_Info_Opaque;
 Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector;
 Type_Info_Relative_Pointer :: runtime.Type_Info_Relative_Pointer;
 Type_Info_Relative_Slice   :: runtime.Type_Info_Relative_Slice;
@@ -60,7 +59,6 @@ Type_Kind :: enum {
 	Enum,
 	Map,
 	Bit_Set,
-	Opaque,
 	Simd_Vector,
 	Relative_Pointer,
 	Relative_Slice,
@@ -93,7 +91,6 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Enum:             return .Enum;
 		case Type_Info_Map:              return .Map;
 		case Type_Info_Bit_Set:          return .Bit_Set;
-		case Type_Info_Opaque:           return .Opaque;
 		case Type_Info_Simd_Vector:      return .Simd_Vector;
 		case Type_Info_Relative_Pointer: return .Relative_Pointer;
 		case Type_Info_Relative_Slice:   return .Relative_Slice;
@@ -136,7 +133,6 @@ type_info_core :: proc(info: ^runtime.Type_Info) -> ^runtime.Type_Info {
 		#partial switch i in base.variant {
 		case Type_Info_Named:  base = i.base;
 		case Type_Info_Enum:   base = i.base;
-		case Type_Info_Opaque: base = i.elem;
 		case: break loop;
 		}
 	}
@@ -174,7 +170,6 @@ typeid_elem :: proc(id: typeid) -> typeid {
 		case 256: return f64;
 		}
 	case Type_Info_Pointer:          return v.elem.id;
-	case Type_Info_Opaque:           return v.elem.id;
 	case Type_Info_Array:            return v.elem.id;
 	case Type_Info_Enumerated_Array: return v.elem.id;
 	case Type_Info_Slice:            return v.elem.id;

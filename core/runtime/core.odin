@@ -140,9 +140,6 @@ Type_Info_Bit_Set :: struct {
 	lower:      i64,
 	upper:      i64,
 };
-Type_Info_Opaque :: struct {
-	elem: ^Type_Info,
-};
 Type_Info_Simd_Vector :: struct {
 	elem:       ^Type_Info,
 	elem_size:  int,
@@ -193,7 +190,6 @@ Type_Info :: struct {
 		Type_Info_Enum,
 		Type_Info_Map,
 		Type_Info_Bit_Set,
-		Type_Info_Opaque,
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
 		Type_Info_Relative_Slice,
@@ -224,7 +220,6 @@ Typeid_Kind :: enum u8 {
 	Enum,
 	Map,
 	Bit_Set,
-	Opaque,
 	Simd_Vector,
 	Relative_Pointer,
 	Relative_Slice,
@@ -399,7 +394,6 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 		#partial switch i in base.variant {
 		case Type_Info_Named:  base = i.base;
 		case Type_Info_Enum:   base = i.base;
-		case Type_Info_Opaque: base = i.elem;
 		case: break loop;
 		}
 	}

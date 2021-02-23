@@ -209,9 +209,6 @@ bool is_type_distinct(Ast *node) {
 	case Ast_DynamicArrayType:
 	case Ast_MapType:
 		return false;
-
-	case Ast_OpaqueType:
-		return true;
 	}
 	return false;
 }

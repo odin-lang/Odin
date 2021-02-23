@@ -630,11 +630,6 @@ Distinct_Type :: struct {
 	type: ^Expr,
 }
 
-Opaque_Type :: struct {
-	using node: Expr,
-	type: ^Expr,
-}
-
 Poly_Type :: struct {
 	using node: Expr,
 	dollar:         tokenizer.Pos,

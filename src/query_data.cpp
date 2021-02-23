@@ -597,7 +597,6 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 					Type *bt = base_type(t);
 					switch (bt->kind) {
 					case Type_Pointer:      type_kind = str_lit("pointer");       break;
-					case Type_Opaque:       type_kind = str_lit("opaque");        break;
 					case Type_Array:        type_kind = str_lit("array");         break;
 					case Type_Slice:        type_kind = str_lit("slice");         break;
 					case Type_DynamicArray: type_kind = str_lit("dynamic array"); break;
