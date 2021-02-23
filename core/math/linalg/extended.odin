@@ -421,7 +421,7 @@ face_forward :: proc(N, I, N_ref: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(EL
 	return dot(N_ref, I) < 0 ? N : -N;
 }
 
-distance :: proc(p0, p1: $V/[$N]$E) -> V where IS_NUMERIC(E) {
+distance :: proc(p0, p1: $V/[$N]$E) -> E where IS_NUMERIC(E) {
 	return length(p1 - p0);
 }
 
