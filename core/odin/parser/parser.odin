@@ -2186,6 +2186,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			rt.type = type;
 			return rt;
 
+		case "force_inline", "force_no_inline":
+			return parse_inlining_operand(p, lhs, tok);
 		case:
 			expr := parse_expr(p, lhs);
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos);
