@@ -3517,12 +3517,6 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		return true;
 	case_end;
 
-	case_ast_node(et, BitFieldType, e);
-		error(e, "'bit_field' types have now been removed");
-		error_line("\tSuggestion: package math/bits 'bitfield_extract' and 'bitfield_insert' are better replacements\n");
-		return false;
-	case_end;
-
 	case_ast_node(bs, BitSetType, e);
 		*type = alloc_type_bit_set();
 		set_base_type(named_type, *type);

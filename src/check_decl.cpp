@@ -201,7 +201,6 @@ bool is_type_distinct(Ast *node) {
 	case Ast_StructType:
 	case Ast_UnionType:
 	case Ast_EnumType:
-	case Ast_BitFieldType:
 	case Ast_ProcType:
 		return true;
 

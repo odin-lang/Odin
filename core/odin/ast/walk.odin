@@ -387,13 +387,6 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.base_type);
 		}
 		walk_expr_list(v, n.fields);
-	case Bit_Field_Type:
-		if n.align != nil {
-			walk(v, n.align);
-		}
-		for x in n.fields {
-			walk(v, x);
-		}
 	case Bit_Set_Type:
 		walk(v, n.elem);
 		if n.underlying != nil {

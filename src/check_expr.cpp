@@ -10175,7 +10175,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_MapType:
 	case Ast_OpaqueType:
 	case Ast_BitSetType:
-	case Ast_BitFieldType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
@@ -10592,21 +10591,6 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 	case_ast_node(at, DynamicArrayType, node);
 		str = gb_string_appendc(str, "[dynamic]");
 		str = write_expr_to_string(str, at->elem, shorthand);
-	case_end;
-
-	case_ast_node(bf, BitFieldType, node);
-		str = gb_string_appendc(str, "bit_field ");
-		if (bf->align) {
-			str = gb_string_appendc(str, "#align ");
-			str = write_expr_to_string(str, bf->align, shorthand);
-		}
-		str = gb_string_appendc(str, "{");
-		if (shorthand) {
-			str = gb_string_appendc(str, "...");
-		} else {
-			str = write_struct_fields_to_string(str, bf->fields);
-		}
-		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(bs, BitSetType, node);

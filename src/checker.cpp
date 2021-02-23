@@ -333,7 +333,6 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	case Ast_StructType:
 	case Ast_EnumType:
 	case Ast_UnionType:
-	case Ast_BitFieldType:
 	case Ast_BitSetType:
 		scope->flags |= ScopeFlag_Type;
 		break;
