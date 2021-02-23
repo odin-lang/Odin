@@ -11021,7 +11021,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				}
 				break;
 			default:
-				GB_PANIC("Invalid inline for type");
+				GB_PANIC("Invalid '#unroll for' type");
 				break;
 			}
 		}

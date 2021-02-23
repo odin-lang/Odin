@@ -731,11 +731,11 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		if (val0 == nullptr) {
 			gbString s = expr_to_string(operand.expr);
 			gbString t = type_to_string(operand.type);
-			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an 'inline for' statement", s, t);
+			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
 			gb_string_free(t);
 			gb_string_free(s);
 		} else if (operand.mode != Addressing_Constant) {
-			error(operand.expr, "An 'inline for' expression must be known at compile time");
+			error(operand.expr, "An '#unroll for' expression must be known at compile time");
 		}
 	}
 
@@ -793,7 +793,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 
 
-	// NOTE(bill): Minimize the amount of nesting of an 'inline for'
+	// NOTE(bill): Minimize the amount of nesting of an '#unroll for'
 	i64 prev_inline_for_depth = ctx->inline_for_depth;
 	defer (ctx->inline_for_depth = prev_inline_for_depth);
 	{
@@ -806,9 +806,9 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
 			if (prev_inline_for_depth > 0) {
-				error(node, "Nested 'inline for' loop cannot be inlined as it exceeds the maximum inline for depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
 			} else {
-				error(node, "'inline for' loop cannot be inlined as it exceeds the maximum inline for depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
 			}
 			error_line("\tUse a normal 'for' loop instead by removing the 'inline' prefix\n");
 			ctx->inline_for_depth = MAX_INLINE_FOR_DEPTH;

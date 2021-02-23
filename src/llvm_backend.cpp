@@ -3764,7 +3764,7 @@ void lb_build_inline_range_stmt(lbProcedure *p, AstInlineRangeStmt *rs) {
 			}
 			break;
 		default:
-			GB_PANIC("Invalid inline for type");
+			GB_PANIC("Invalid '#unroll for' type");
 			break;
 		}
 	}
