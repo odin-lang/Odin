@@ -22,9 +22,7 @@ Proc_Calling_Convention :: enum i32 {
 	C_Decl,
 	Std_Call,
 	Fast_Call,
-	Pure,
 	None,
-	Pure_None,
 
 	Foreign_Block_Default = -1,
 }

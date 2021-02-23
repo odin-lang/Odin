@@ -1907,13 +1907,8 @@ string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	case "fast", "fastcall":
 		return .Fast_Call;
 
-	case "pure":
-		return .Pure;
 	case "none":
 		return .None;
-	case "pure_none":
-		return .Pure_None;
-
 	}
 	return .Invalid;
 }

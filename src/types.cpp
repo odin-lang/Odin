@@ -903,7 +903,6 @@ Type *alloc_type_named(String name, Type *base, Entity *type_name) {
 bool is_calling_convention_none(ProcCallingConvention calling_convention) {
 	switch (calling_convention) {
 	case ProcCC_None:
-	case ProcCC_PureNone:
 	case ProcCC_InlineAsm:
 		return true;
 	}
@@ -3610,14 +3609,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 		case ProcCC_FastCall:
 			str = gb_string_appendc(str, " \"fastcall\" ");
 			break;
-		case ProcCC_PureNone:
-			str = gb_string_appendc(str, " \"pure_none\" ");
 			break;
 		case ProcCC_None:
 			str = gb_string_appendc(str, " \"none\" ");
-			break;
-		case ProcCC_Pure:
-			str = gb_string_appendc(str, " \"pure\" ");
 			break;
 		// case ProcCC_VectorCall:
 		// 	str = gb_string_appendc(str, " \"vectorcall\" ");

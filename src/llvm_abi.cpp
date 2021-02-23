@@ -924,7 +924,6 @@ namespace lbAbiAarch64 {
 LB_ABI_INFO(lb_get_abi_info) {
 	switch (calling_convention) {
 	case ProcCC_None:
-	case ProcCC_PureNone:
 	case ProcCC_InlineAsm:
 		{
 			lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
