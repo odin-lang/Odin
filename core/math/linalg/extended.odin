@@ -114,10 +114,10 @@ abs :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 sign :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = inline math.sign(a[i]);
+			out[i] = #force_inline math.sign(a[i]);
 		}
 	} else {
-		out = inline math.sign(a);
+		out = #force_inline math.sign(a);
 	}
 	return;
 }
@@ -376,10 +376,10 @@ pow :: proc(x, e: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 ceil :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = inline math.ceil(x[i]);
+			out[i] = #force_inline math.ceil(x[i]);
 		}
 	} else {
-		out = inline math.ceil(x);
+		out = #force_inline math.ceil(x);
 	}
 	return;
 }
@@ -387,10 +387,10 @@ ceil :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 floor :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = inline math.floor(x[i]);
+			out[i] = #force_inline math.floor(x[i]);
 		}
 	} else {
-		out = inline math.floor(x);
+		out = #force_inline math.floor(x);
 	}
 	return;
 }
@@ -398,21 +398,21 @@ floor :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 round :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = inline math.round(x[i]);
+			out[i] = #force_inline math.round(x[i]);
 		}
 	} else {
-		out = inline math.round(x);
+		out = #force_inline math.round(x);
 	}
 	return;
 }
 
 fract :: proc(x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
-	f := inline floor(x);
+	f := #force_inline floor(x);
 	return x - f;
 }
 
 mod :: proc(x, m: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
-	f := inline floor(x / m);
+	f := #force_inline floor(x / m);
 	return x - f * m;
 }
 
@@ -441,34 +441,34 @@ refract :: proc(I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) 
 
 
 is_nan_single :: proc(x: $T) -> bool where IS_FLOAT(T) {
-	return inline math.is_nan(x);
+	return #force_inline math.is_nan(x);
 }
 
 is_nan_array :: proc(x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
 	for i in 0..<N {
-		out[i] = inline is_nan(x[i]);
+		out[i] = #force_inline is_nan(x[i]);
 	}
 	return;
 }
 
 is_inf_single :: proc(x: $T) -> bool where IS_FLOAT(T) {
-	return inline math.is_inf(x);
+	return #force_inline math.is_inf(x);
 }
 
 is_inf_array :: proc(x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
 	for i in 0..<N {
-		out[i] = inline is_inf(x[i]);
+		out[i] = #force_inline is_inf(x[i]);
 	}
 	return;
 }
 
 classify_single :: proc(x: $T) -> math.Float_Class where IS_FLOAT(T) {
-	return inline math.classify(x);
+	return #force_inline math.classify(x);
 }
 
 classify_array :: proc(x: $A/[$N]$T) -> (out: [N]math.Float_Class) where IS_FLOAT(T) {
 	for i in 0..<N {
-		out[i] = inline classify_single(x[i]);
+		out[i] = #force_inline classify_single(x[i]);
 	}
 	return;
 }

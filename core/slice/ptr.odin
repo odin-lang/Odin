@@ -6,7 +6,7 @@ ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
 	return (^T)(uintptr(p) + size_of(T)*x);
 }
 ptr_sub :: proc(p: $P/^$T, x: int) -> ^T {
-	return inline ptr_add(p, -x);
+	return #force_inline ptr_add(p, -x);
 }
 
 ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
