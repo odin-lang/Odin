@@ -25,13 +25,11 @@ Calling_Convention :: enum u8 {
 	Invalid     = 0,
 	Odin        = 1,
 	Contextless = 2,
-	Pure        = 3,
-	CDecl       = 4,
-	Std_Call    = 5,
-	Fast_Call   = 6,
+	CDecl       = 3,
+	Std_Call    = 4,
+	Fast_Call   = 5,
 
-	None        = 7,
-	Pure_None   = 8,
+	None        = 6,
 }
 
 Type_Info_Enum_Value :: distinct i64;

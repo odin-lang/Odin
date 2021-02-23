@@ -36,7 +36,7 @@ RAD_PER_DEG :: TAU/360.0;
 DEG_PER_RAD :: 360.0/TAU;
 
 
-@(default_calling_convention="pure_none")
+@(default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.sqrt.f32")
 	sqrt_f32 :: proc(x: f32) -> f32 ---;

@@ -1180,9 +1180,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		case ProcCC_None:
 			error(body, "Procedures with the calling convention \"none\" are not allowed a body");
 			break;
-		case ProcCC_PureNone:
-			error(body, "Procedures with the calling convention \"pure_none\" are not allowed a body");
-			break;
 		}
 	}
 

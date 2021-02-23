@@ -1971,22 +1971,6 @@ relative_data_types :: proc() {
 	fmt.println(rel_slice[1])
 }
 
-pure_procedures :: proc() {
-	fmt.println("\n#pure procedures")
-
-	square :: proc "pure" (x: int) -> int {
-		return x*x + 1
-	}
-
-	do_math :: proc "pure" (x: int) -> int {
-		// Only "pure" procedure calls are allowed within a "pure" procedure
-		return square(x) + 1
-	}
-
-	x := do_math(5)
-	fmt.println(x)
-}
-
 main :: proc() {
 	when true {
 		the_basics()
@@ -2019,6 +2003,5 @@ main :: proc() {
 		union_maybe()
 		explicit_context_definition()
 		relative_data_types()
-		pure_procedures()
 	}
 }

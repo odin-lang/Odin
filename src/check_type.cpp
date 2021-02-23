@@ -2172,7 +2172,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		return t_rawptr;
 	}
 
-	if (cc == ProcCC_None || cc == ProcCC_PureNone || cc == ProcCC_InlineAsm) {
+	if (is_calling_convention_none(cc)) {
 		return new_type;
 	}
 
@@ -2312,7 +2312,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 	if (build_context.ODIN_OS == "windows") {
 		if (build_context.ODIN_ARCH == "amd64") {
 			if (is_type_integer_128bit(single_type)) {
-				if (cc == ProcCC_None || cc == ProcCC_PureNone) {
+				if (is_calling_convention_none(cc)) {
 					return original_type;
 				} else {
 					return alloc_type_simd_vector(2, t_u64);
@@ -2378,7 +2378,7 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 	if (abi_return_type == nullptr) {
 		return false;
 	}
-	if (cc == ProcCC_None || cc == ProcCC_PureNone || cc == ProcCC_InlineAsm) {
+	if (is_calling_convention_none(cc)) {
 		return false;
 	}
 
@@ -2442,7 +2442,6 @@ void set_procedure_abi_types(Type *type) {
 			switch (type->Proc.calling_convention) {
 			case ProcCC_Odin:
 			case ProcCC_Contextless:
-			case ProcCC_Pure:
 				if (is_type_pointer(new_type) && !is_type_pointer(e->type) && !is_type_proc(e->type)) {
 					e->flags |= EntityFlag_ImplicitReference;
 				}
@@ -2539,11 +2538,6 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 		Entity *first = results->Tuple.variables[0];
 		type->Proc.has_named_results = first->token.string != "";
 	}
-
-	if (result_count == 0 && cc == ProcCC_Pure) {
-		error(proc_type_node, "\"pure\" procedures must have at least 1 return value");
-	}
-
 
 	bool optional_ok = (pt->tags & ProcTag_optional_ok) != 0;
 	if (optional_ok) {

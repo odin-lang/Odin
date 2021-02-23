@@ -3218,8 +3218,6 @@ Ast *parse_results(AstFile *f, bool *diverging) {
 ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "odin")        return ProcCC_Odin;
 	if (s == "contextless") return ProcCC_Contextless;
-	if (s == "pure")        return ProcCC_Pure;
-	if (s == "pure_none")   return ProcCC_PureNone;
 	if (s == "cdecl")       return ProcCC_CDecl;
 	if (s == "c")           return ProcCC_CDecl;
 	if (s == "stdcall")     return ProcCC_StdCall;
