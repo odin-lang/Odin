@@ -163,14 +163,14 @@ delete :: proc{
 // The new built-in procedure allocates memory. The first argument is a type, not a value, and the value
 // return is a pointer to a newly allocated value of that type using the specified allocator, default is context.allocator
 @builtin
-new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
+new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
 	if ptr != nil { ptr^ = T{}; }
 	return ptr;
 }
 
 @builtin
-new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
+new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
 	if ptr != nil { ptr^ = data; }
 	return ptr;
@@ -188,7 +188,7 @@ make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, alloca
 }
 
 @builtin
-make_slice :: inline proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_slice :: proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
 	return make_aligned(T, len, align_of(E), allocator, loc);
 }
 
@@ -240,7 +240,7 @@ make :: proc{
 
 
 @builtin
-clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
+clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil {
 		return;
 	}
@@ -626,7 +626,7 @@ insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string
 
 
 @builtin
-clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
+clear_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) {
 	if array != nil {
 		(^Raw_Dynamic_Array)(array).len = 0;
 	}
@@ -703,36 +703,36 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 
 
 @builtin
-incl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
+incl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 	s^ |= {elem};
 	return s^;
 }
 @builtin
-incl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
+incl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
 	for elem in elems {
 		s^ |= {elem};
 	}
 	return s^;
 }
 @builtin
-incl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
+incl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 	s^ |= other;
 	return s^;
 }
 @builtin
-excl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
+excl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 	s^ &~= {elem};
 	return s^;
 }
 @builtin
-excl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
+excl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
 	for elem in elems {
 		s^ &~= {elem};
 	}
 	return s^;
 }
 @builtin
-excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
+excl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 	s^ &~= other;
 	return s^;
 }

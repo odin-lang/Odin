@@ -201,7 +201,7 @@ as_bytes :: proc(v: any) -> []byte {
 	return nil;
 }
 
-any_data :: inline proc(v: any) -> (data: rawptr, id: typeid) {
+any_data :: #force_inline proc(v: any) -> (data: rawptr, id: typeid) {
 	return v.data, v.id;
 }
 

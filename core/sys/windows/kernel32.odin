@@ -690,7 +690,7 @@ foreign kernel32 {
 
 NUMA_NO_PREFERRED_NODE :: 0xffffffff;
 
-MapViewOfFile2 :: inline proc(
+MapViewOfFile2 :: #force_inline proc(
 	FileMappingHandle: HANDLE,
 	ProcessHandle: HANDLE,
 	Offset: ULONG64,

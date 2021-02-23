@@ -185,19 +185,19 @@ _split :: proc(s, sep: []byte, sep_save, n: int, allocator := context.allocator)
 	return res[:i+1];
 }
 
-split :: inline proc(s, sep: []byte, allocator := context.allocator) -> [][]byte {
+split :: proc(s, sep: []byte, allocator := context.allocator) -> [][]byte {
 	return _split(s, sep, 0, -1, allocator);
 }
 
-split_n :: inline proc(s, sep: []byte, n: int, allocator := context.allocator) -> [][]byte {
+split_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) -> [][]byte {
 	return _split(s, sep, 0, n, allocator);
 }
 
-split_after :: inline proc(s, sep: []byte, allocator := context.allocator) -> [][]byte {
+split_after :: proc(s, sep: []byte, allocator := context.allocator) -> [][]byte {
 	return _split(s, sep, len(sep), -1, allocator);
 }
 
-split_after_n :: inline proc(s, sep: []byte, n: int, allocator := context.allocator) -> [][]byte {
+split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) -> [][]byte {
 	return _split(s, sep, len(sep), n, allocator);
 }
 

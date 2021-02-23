@@ -65,19 +65,19 @@ _fnv64a :: proc "contextless" (data: []byte, seed: u64 = INITIAL_HASH_SEED) -> u
 	return h;
 }
 
-default_hash :: inline proc "contextless" (data: []byte) -> uintptr {
+default_hash :: #force_inline proc "contextless" (data: []byte) -> uintptr {
 	return uintptr(_fnv64a(data));
 }
-default_hash_string :: inline proc "contextless" (s: string) -> uintptr {
+default_hash_string :: #force_inline proc "contextless" (s: string) -> uintptr {
 	return default_hash(transmute([]byte)(s));
 }
-default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> uintptr {
+default_hash_ptr :: #force_inline proc "contextless" (data: rawptr, size: int) -> uintptr {
 	s := Raw_Slice{data, size};
 	return default_hash(transmute([]byte)(s));
 }
 
 @(private)
-_default_hasher_const :: inline proc "contextless" (data: rawptr, seed: uintptr, $N: uint) -> uintptr where N <= 16 {
+_default_hasher_const :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, $N: uint) -> uintptr where N <= 16 {
 	h := u64(seed) + 0xcbf29ce484222325;
 	p := uintptr(data);
 	#unroll for _ in 0..<N {
@@ -88,7 +88,7 @@ _default_hasher_const :: inline proc "contextless" (data: rawptr, seed: uintptr,
 	return uintptr(h);
 }
 
-default_hasher_n :: inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
+default_hasher_n :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
 	h := u64(seed) + 0xcbf29ce484222325;
 	p := uintptr(data);
 	for _ in 0..<N {
@@ -307,7 +307,7 @@ __dynamic_map_grow :: proc(using h: Map_Header, loc := #caller_location) {
 	__dynamic_map_rehash(h, new_count, loc);
 }
 
-__dynamic_map_full :: inline proc "contextless" (using h: Map_Header) -> bool {
+__dynamic_map_full :: #force_inline proc "contextless" (using h: Map_Header) -> bool {
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 

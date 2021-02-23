@@ -1,10 +1,10 @@
 package sys_windows
 
-LOWORD :: inline proc "contextless" (x: DWORD) -> WORD {
+LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x & 0xffff);
 }
 
-HIWORD :: inline proc "contextless" (x: DWORD) -> WORD {
+HIWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x >> 16);
 }
 

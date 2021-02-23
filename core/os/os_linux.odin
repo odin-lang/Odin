@@ -252,13 +252,13 @@ S_ISGID :: 0o2000; // Set group id on execution
 S_ISVTX :: 0o1000; // Directory restrcted delete
 
 
-S_ISLNK  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK;  }
-S_ISREG  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG;  }
-S_ISDIR  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR;  }
-S_ISCHR  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR;  }
-S_ISBLK  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK;  }
-S_ISFIFO :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO;  }
-S_ISSOCK :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK; }
+S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK;  }
+S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG;  }
+S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR;  }
+S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR;  }
+S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK;  }
+S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO;  }
+S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK; }
 
 F_OK :: 0; // Test for file existance
 X_OK :: 1; // Test for execute permission
@@ -397,7 +397,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 }
 
 @private
-_stat :: inline proc(path: string) -> (Stat, Errno) {
+_stat :: proc(path: string) -> (Stat, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
@@ -410,7 +410,7 @@ _stat :: inline proc(path: string) -> (Stat, Errno) {
 }
 
 @private
-_lstat :: inline proc(path: string) -> (Stat, Errno) {
+_lstat :: proc(path: string) -> (Stat, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
@@ -423,7 +423,7 @@ _lstat :: inline proc(path: string) -> (Stat, Errno) {
 }
 
 @private
-_fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
+_fstat :: proc(fd: Handle) -> (Stat, Errno) {
 	s: Stat;
 	result := _unix_fstat(fd, &s);
 	if result == -1 {
@@ -433,7 +433,7 @@ _fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
 }
 
 @private
-_fdopendir :: inline proc(fd: Handle) -> (Dir, Errno) {
+_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
 	dirp := _unix_fdopendir(fd);
 	if dirp == cast(Dir)nil {
 		return nil, Errno(get_last_error());
@@ -442,7 +442,7 @@ _fdopendir :: inline proc(fd: Handle) -> (Dir, Errno) {
 }
 
 @private
-_closedir :: inline proc(dirp: Dir) -> Errno {
+_closedir :: proc(dirp: Dir) -> Errno {
 	rc := _unix_closedir(dirp);
 	if rc != 0 {
 		return Errno(get_last_error());
@@ -451,12 +451,12 @@ _closedir :: inline proc(dirp: Dir) -> Errno {
 }
 
 @private
-_rewinddir :: inline proc(dirp: Dir) {
+_rewinddir :: proc(dirp: Dir) {
 	_unix_rewinddir(dirp);
 }
 
 @private
-_readdir :: inline proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
 	result: ^Dirent;
 	rc := _unix_readdir_r(dirp, &entry, &result);
 
@@ -476,7 +476,7 @@ _readdir :: inline proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream:
 }
 
 @private
-_readlink :: inline proc(path: string) -> (string, Errno) {
+_readlink :: proc(path: string) -> (string, Errno) {
 	path_cstr := strings.clone_to_cstring(path);
 	defer delete(path_cstr);
 
@@ -529,7 +529,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	return path, ERROR_NONE;
 }
 
-access :: inline proc(path: string, mask: int) -> (bool, Errno) {
+access :: proc(path: string, mask: int) -> (bool, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 	result := _unix_access(cstr, c.int(mask));
@@ -598,20 +598,20 @@ current_thread_id :: proc "contextless" () -> int {
 	return syscall(SYS_GETTID);
 }
 
-dlopen :: inline proc(filename: string, flags: int) -> rawptr {
+dlopen :: proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.clone_to_cstring(filename);
 	defer delete(cstr);
 	handle := _unix_dlopen(cstr, c.int(flags));
 	return handle;
 }
-dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
+dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
 	cstr := strings.clone_to_cstring(symbol);
 	defer delete(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
-dlclose :: inline proc(handle: rawptr) -> bool {
+dlclose :: proc(handle: rawptr) -> bool {
 	assert(handle != nil);
 	return _unix_dlclose(handle) == 0;
 }

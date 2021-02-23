@@ -76,7 +76,7 @@ duration_hours :: proc(d: Duration) -> f64 {
 	return f64(hour) + f64(nsec)/(60*60*1e9);
 }
 
-_less_than_half :: inline proc(x, y: Duration) -> bool {
+_less_than_half :: #force_inline proc(x, y: Duration) -> bool {
 	return u64(x)+u64(x) < u64(y);
 }
 

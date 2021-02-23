@@ -545,7 +545,7 @@ wprint_typeid :: proc(w: io.Writer, id: typeid) -> int {
 
 
 _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok: bool) {
-	is_digit :: inline proc(r: byte) -> bool { return '0' <= r && r <= '9' }
+	is_digit :: #force_inline proc(r: byte) -> bool { return '0' <= r && r <= '9' }
 
 	new_offset = offset;
 	for new_offset <= len(s) {

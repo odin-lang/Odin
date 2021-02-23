@@ -248,13 +248,13 @@ S_ISUID :: 0o4000; // Set user id on execution
 S_ISGID :: 0o2000; // Set group id on execution
 S_ISVTX :: 0o1000; // Directory restrcted delete
 
-S_ISLNK  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK;  }
-S_ISREG  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG;  }
-S_ISDIR  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR;  }
-S_ISCHR  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR;  }
-S_ISBLK  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK;  }
-S_ISFIFO :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO;  }
-S_ISSOCK :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK; }
+S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK;  }
+S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG;  }
+S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR;  }
+S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR;  }
+S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK;  }
+S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO;  }
+S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK; }
 
 R_OK :: 4; // Test for read permission
 W_OK :: 2; // Test for write permission
@@ -366,7 +366,7 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/';
 }
 
-stat :: inline proc(path: string) -> (Stat, Errno) {
+stat :: proc(path: string) -> (Stat, Errno) {
 	s: Stat;
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
@@ -374,20 +374,20 @@ stat :: inline proc(path: string) -> (Stat, Errno) {
 	return s, Errno(ret_int);
 }
 
-access :: inline proc(path: string, mask: int) -> bool {
+access :: proc(path: string, mask: int) -> bool {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 	return _unix_access(cstr, mask) == 0;
 }
 
-heap_alloc :: inline proc(size: int) -> rawptr {
+heap_alloc :: proc(size: int) -> rawptr {
 	assert(size > 0);
 	return _unix_calloc(1, size);
 }
-heap_resize :: inline proc(ptr: rawptr, new_size: int) -> rawptr {
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	return _unix_realloc(ptr, new_size);
 }
-heap_free :: inline proc(ptr: rawptr) {
+heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr);
 }
 
@@ -426,7 +426,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	return ERROR_NONE;
 }
 
-exit :: inline proc(code: int) -> ! {
+exit :: proc(code: int) -> ! {
 	_unix_exit(code);
 }
 
@@ -440,20 +440,20 @@ current_thread_id :: proc "contextless" () -> int {
 	return int(tid);
 }
 
-dlopen :: inline proc(filename: string, flags: int) -> rawptr {
+dlopen :: proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.clone_to_cstring(filename);
 	defer delete(cstr);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
-dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
+dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
 	cstr := strings.clone_to_cstring(symbol);
 	defer delete(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
-dlclose :: inline proc(handle: rawptr) -> bool {
+dlclose :: proc(handle: rawptr) -> bool {
 	assert(handle != nil);
 	return _unix_dlclose(handle) == 0;
 }
