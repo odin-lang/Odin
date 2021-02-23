@@ -1050,12 +1050,74 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 }
 
 
+parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast.Stmt {
+	for_tok := expect_token(p, .For);
+	val0, val1: ^ast.Expr;
+	in_tok: tokenizer.Token;
+	expr: ^ast.Expr;
+	body: ^ast.Stmt;
+
+	bad_stmt := false;
+
+	if p.curr_tok.kind != .In {
+		idents := parse_ident_list(p, false);
+		switch len(idents) {
+		case 1:
+			val0 = idents[0];
+		case 2:
+			val0, val1 = idents[0], idents[1];
+		case:
+			error(p, for_tok.pos, "expected either 1 or 2 identifiers");
+			bad_stmt = true;
+		}
+	}
+
+	in_tok = expect_token(p, .In);
+
+	prev_allow_range := p.allow_range;
+	prev_level := p.expr_level;
+	p.allow_range = true;
+	p.expr_level = -1;
+
+	expr = parse_expr(p, false);
+
+	p.expr_level = prev_level;
+	p.allow_range = prev_allow_range;
+
+	if allow_token(p, .Do) {
+		body = convert_stmt_to_body(p, parse_stmt(p));
+	} else {
+		body = parse_block_stmt(p, false);
+	}
+
+	if bad_stmt {
+		return ast.new(ast.Bad_Stmt, inline_tok.pos, end_pos(p.prev_tok));
+	}
+
+	range_stmt := ast.new(ast.Inline_Range_Stmt, inline_tok.pos, body.end);
+	range_stmt.inline_pos = inline_tok.pos;
+	range_stmt.for_pos = for_tok.pos;
+	range_stmt.val0 = val0;
+	range_stmt.val1 = val1;
+	range_stmt.in_pos = in_tok.pos;
+	range_stmt.expr = expr;
+	range_stmt.body = body;
+	return range_stmt;
+}
+
 parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	#partial switch p.curr_tok.kind {
+
+	case .Inline:
+		if peek_token_kind(p, .For) {
+			inline_tok := expect_token(p, .Inline);
+			return parse_unrolled_for_loop(p, inline_tok);
+		}
+		fallthrough;
 	// Operands
 	case .Context, // Also allows for 'context = '
 	     .Proc,
-	     .Inline, .No_Inline,
+	     .No_Inline,
 	     .Asm, // Inline assembly
 	     .Ident,
 	     .Integer, .Float, .Imag,
@@ -1064,63 +1126,6 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	     .Pointer,
 	     // Unary Expressions
 	     .Add, .Sub, .Xor, .Not, .And:
-
-	    if peek_token_kind(p, .For) {
-	    	inline_tok := expect_token(p, .Inline);
-	    	for_tok := expect_token(p, .For);
-	    	val0, val1: ^ast.Expr;
-	    	in_tok: tokenizer.Token;
-	    	expr: ^ast.Expr;
-	    	body: ^ast.Stmt;
-
-	    	bad_stmt := false;
-
-	    	if p.curr_tok.kind != .In {
-	    		idents := parse_ident_list(p, false);
-	    		switch len(idents) {
-	    		case 1:
-	    			val0 = idents[0];
-	    		case 2:
-	    			val0, val1 = idents[0], idents[1];
-	    		case:
-	    			error(p, for_tok.pos, "expected either 1 or 2 identifiers");
-	    			bad_stmt = true;
-	    		}
-	    	}
-
-	    	in_tok = expect_token(p, .In);
-
-	    	prev_allow_range := p.allow_range;
-	    	prev_level := p.expr_level;
-	    	p.allow_range = true;
-	    	p.expr_level = -1;
-
-	    	expr = parse_expr(p, false);
-
-	    	p.expr_level = prev_level;
-	    	p.allow_range = prev_allow_range;
-
-	    	if allow_token(p, .Do) {
-	    		body = convert_stmt_to_body(p, parse_stmt(p));
-	    	} else {
-	    		body = parse_block_stmt(p, false);
-	    	}
-
-	    	if bad_stmt {
-			return ast.new(ast.Bad_Stmt, inline_tok.pos, end_pos(p.prev_tok));
-	    	}
-
-	    	range_stmt := ast.new(ast.Inline_Range_Stmt, inline_tok.pos, body.end);
-	    	range_stmt.inline_pos = inline_tok.pos;
-	    	range_stmt.for_pos = for_tok.pos;
-	    	range_stmt.val0 = val0;
-	    	range_stmt.val1 = val1;
-	    	range_stmt.in_pos = in_tok.pos;
-	    	range_stmt.expr = expr;
-	    	range_stmt.body = body;
-	    	return range_stmt;
-	    }
-
 
 	    s := parse_simple_stmt(p, {Stmt_Allow_Flag.Label});
 	    expect_semicolon(p, s);
@@ -1261,6 +1266,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			es := ast.new(ast.Expr_Stmt, ce.pos, ce.end);
 			es.expr = ce;
 			return es;
+		case "unroll":
+			return parse_unrolled_for_loop(p, tag);
 		case "include":
 			error(p, tag.pos, "#include is not a valid import declaration kind. Did you meant 'import'?");
 			return ast.new(ast.Bad_Stmt, tok.pos, end_pos(tag));
@@ -2004,7 +2011,41 @@ check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok
 	}
 }
 
+parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
+	expr := parse_unary_expr(p, lhs);
 
+	pi := ast.Proc_Inlining.None;
+	#partial switch tok.kind {
+	case .Inline:
+		pi = .Inline;
+	case .No_Inline:
+		pi = .No_Inline;
+	case .Ident:
+		switch tok.text {
+		case "force_inline":
+			pi = .Inline;
+		case "force_no_inline":
+			pi = .No_Inline;
+		}
+	}
+
+	switch e in &ast.unparen_expr(expr).derived {
+	case ast.Proc_Lit:
+		if e.inlining != .None && e.inlining != pi {
+			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal");
+		}
+		e.inlining = pi;
+	case ast.Call_Expr:
+		if e.inlining != .None && e.inlining != pi {
+			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call");
+		}
+		e.inlining = pi;
+	case:
+		error(p, tok.pos, "'%s' must be followed by a procedure literal or call", tok.text);
+		return ast.new(ast.Bad_Expr, tok.pos, expr.end);
+	}
+	return expr;
+}
 
 parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	#partial switch p.curr_tok.kind {
@@ -2055,14 +2096,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		dt.tok  = tok.kind;
 		dt.type = type;
 		return dt;
-
-	case .Opaque:
-		tok := advance_token(p);
-		warn(p, tok.pos, "opaque is deprecated in favour of #opaque");
-		type := parse_type(p);
-		ot := ast.new(ast.Opaque_Type, tok.pos, type.end);
-		ot.type = type;
-		return ot;
 
 	case .Hash:
 		tok := expect_token(p, .Hash);
@@ -2164,32 +2197,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Inline, .No_Inline:
 		tok := advance_token(p);
-		expr := parse_unary_expr(p, lhs);
-
-		pi := ast.Proc_Inlining.None;
-		#partial switch tok.kind {
-		case .Inline:
-			pi = ast.Proc_Inlining.Inline;
-		case .No_Inline:
-			pi = ast.Proc_Inlining.No_Inline;
-		}
-
-		switch e in &ast.unparen_expr(expr).derived {
-		case ast.Proc_Lit:
-			if e.inlining != ast.Proc_Inlining.None && e.inlining != pi {
-				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal");
-			}
-			e.inlining = pi;
-		case ast.Call_Expr:
-			if e.inlining != ast.Proc_Inlining.None && e.inlining != pi {
-				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call");
-			}
-			e.inlining = pi;
-		case:
-			error(p, tok.pos, "'%s' must be followed by a procedure literal or call", tok.text);
-			return ast.new(ast.Bad_Expr, tok.pos, expr.end);
-		}
-		return expr;
+		return parse_inlining_operand(p, lhs, tok);
 
 	case .Proc:
 		tok := expect_token(p, .Proc);

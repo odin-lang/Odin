@@ -142,7 +142,6 @@ Token_Kind :: enum u32 {
 		Cast,        // cast
 		Transmute,   // transmute
 		Distinct,    // distinct
-		Opaque,      // opaque
 		Using,       // using
 		Inline,      // inline
 		No_Inline,   // no_inline
@@ -270,7 +269,6 @@ tokens := [Token_Kind.COUNT]string {
 	"cast",
 	"transmute",
 	"distinct",
-	"opaque",
 	"using",
 	"inline",
 	"no_inline",
