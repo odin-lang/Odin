@@ -1908,19 +1908,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		return ast_distinct_type(f, token, type);
 	}
 
-	case Token_opaque: {
-		Token token = expect_token(f, Token_opaque);
-		warning(token, "opaque is deprecated, please use #opaque");
-		Ast *type = parse_type(f);
-		return ast_opaque_type(f, token, type);
-	}
-
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
-		if (allow_token(f, Token_opaque)) {
-			Ast *type = parse_type(f);
-			return ast_opaque_type(f, token, type);
-		}
 
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
@@ -1994,6 +1983,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			tag = parse_call_expr(f, tag);
 			Ast *type = parse_type(f);
 			return ast_relative_type(f, tag, type);
+		} else if (name.string == "opaque") {
+			Ast *type = parse_type(f);
+			return ast_opaque_type(f, token, type);
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
