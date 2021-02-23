@@ -14,44 +14,44 @@ PTHREAD_ONCE_SIZE      :: 8;
 PTHREAD_RWLOCK_SIZE    :: 192;
 PTHREAD_RWLOCKATTR_SIZE :: 16;
 
-pthread_t :: #opaque u64;
+pthread_t :: distinct u64;
 
-pthread_attr_t :: #opaque struct #align 16 {
+pthread_attr_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_ATTR_SIZE] c.char,
 };
 
-pthread_cond_t :: #opaque struct #align 16 {
+pthread_cond_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_COND_SIZE] c.char,
 };
 
-pthread_condattr_t :: #opaque struct #align 16 {
+pthread_condattr_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_CONDATTR_SIZE] c.char,
 };
 
-pthread_mutex_t :: #opaque struct #align 16 {
+pthread_mutex_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_MUTEX_SIZE] c.char,
 };
 
-pthread_mutexattr_t :: #opaque struct #align 16 {
+pthread_mutexattr_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_MUTEXATTR_SIZE] c.char,
 };
 
-pthread_once_t :: #opaque struct #align 16 {
+pthread_once_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_ONCE_SIZE] c.char,
 };
 
-pthread_rwlock_t :: #opaque struct #align 16 {
+pthread_rwlock_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_RWLOCK_SIZE] c.char,
 };
 
-pthread_rwlockattr_t :: #opaque struct #align 16 {
+pthread_rwlockattr_t :: struct #align 16 {
 	sig: c.long,
 	_: [PTHREAD_RWLOCKATTR_SIZE] c.char,
 };
