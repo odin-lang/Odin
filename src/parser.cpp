@@ -2067,29 +2067,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 
 			return ast_proc_group(f, token, open, close, args);
-		} else if (f->curr_token.kind == Token_OpenBracket) { // ProcGroup
-			Token open = expect_token(f, Token_OpenBracket);
-			warning(open, "Procedure groups using [] are now deprecated, please use {} instead");
-
-			auto args = array_make<Ast *>(heap_allocator());
-
-			while (f->curr_token.kind != Token_CloseBracket &&
-			       f->curr_token.kind != Token_EOF) {
-				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
-
-				if (!allow_token(f, Token_Comma)) {
-					break;
-				}
-			}
-
-			Token close = expect_token(f, Token_CloseBracket);
-
-			if (args.count == 0) {
-				syntax_error(token, "Expected a least 1 argument in a procedure group");
-			}
-
-			return ast_proc_group(f, token, open, close, args);
 		}
 
 		Ast *type = parse_proc_type(f, token);
@@ -4297,6 +4274,9 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 
 
 Ast *parse_unrolled_for_loop(AstFile *f, Token inline_token) {
+	if (inline_token.kind == Token_inline) {
+		syntax_warning(inline_token, "'inline for' is deprecated in favour of `#unroll for'");
+	}
 	Token for_token = expect_token(f, Token_for);
 	Ast *val0 = nullptr;
 	Ast *val1 = nullptr;

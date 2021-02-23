@@ -80,7 +80,7 @@ default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> uintp
 _default_hasher_const :: inline proc "contextless" (data: rawptr, seed: uintptr, $N: uint) -> uintptr where N <= 16 {
 	h := u64(seed) + 0xcbf29ce484222325;
 	p := uintptr(data);
-	inline for _ in 0..<N {
+	#unroll for _ in 0..<N {
 		b := u64((^byte)(p)^);
 		h = (h ~ b) * 0x100000001b3;
 		p += 1;

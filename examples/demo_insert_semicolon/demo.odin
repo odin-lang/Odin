@@ -1491,25 +1491,25 @@ quaternions :: proc() {
 	}
 }
 
-inline_for_statement :: proc() {
-	fmt.println("\n#inline for statements")
+unroll_for_statement :: proc() {
+	fmt.println("\n#'#unroll for' statements")
 
-	// 'inline for' works the same as if the 'inline' prefix did not
+	// '#unroll for' works the same as if the 'inline' prefix did not
 	// exist but these ranged loops are explicitly unrolled which can
 	// be very very useful for certain optimizations
 
 	fmt.println("Ranges")
-	inline for x, i in 1..<4 {
+	#unroll for x, i in 1..<4 {
 		fmt.println(x, i)
 	}
 
 	fmt.println("Strings")
-	inline for r, i in "Hello, 世界" {
+	#unroll for r, i in "Hello, 世界" {
 		fmt.println(r, i)
 	}
 
 	fmt.println("Arrays")
-	inline for elem, idx in ([4]int{1, 4, 9, 16}) {
+	#unroll for elem, idx in ([4]int{1, 4, 9, 16}) {
 		fmt.println(elem, idx)
 	}
 
@@ -1521,7 +1521,7 @@ inline_for_statement :: proc() {
 		D,
 	}
 	fmt.println("Enum types")
-	inline for elem, idx in Foo_Enum {
+	#unroll for elem, idx in Foo_Enum {
 		fmt.println(elem, idx)
 	}
 }
@@ -1991,7 +1991,7 @@ main :: proc() {
 		deferred_procedure_associations()
 		reflection()
 		quaternions()
-		inline_for_statement()
+		unroll_for_statement()
 		where_clauses()
 		foreign_system()
 		ranged_fields_for_array_compound_literals()
