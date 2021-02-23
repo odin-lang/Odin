@@ -3503,9 +3503,10 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 				gbString sel_str = expr_to_string(selector);
 				error(op_expr, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
 				gb_string_free(sel_str);
-				operand->mode = Addressing_Invalid;
-				operand->expr = node;
-				return nullptr;
+				// NOTE(bill): make the state valid still, even if it's "invalid"
+				// operand->mode = Addressing_Invalid;
+				// operand->expr = node;
+				// return nullptr;
 			}
 
 			if (entity->kind == Entity_ProcGroup) {
