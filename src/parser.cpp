@@ -1865,6 +1865,45 @@ bool ast_on_same_line(Ast *x, Ast *y) {
 	return ast_on_same_line(ast_token(x), y);
 }
 
+Ast *parse_force_inlining_operand(AstFile *f, Token token) {
+	Ast *expr = parse_unary_expr(f, false);
+	Ast *e = unparen_expr(expr);
+	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
+		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
+		return ast_bad_expr(f, token, f->curr_token);
+	}
+	ProcInlining pi = ProcInlining_none;
+	if (token.kind == Token_inline) {
+		pi = ProcInlining_inline;
+	} else if (token.kind == Token_no_inline) {
+		pi = ProcInlining_no_inline;
+	} else if (token.kind == Token_Ident) {
+		if (token.string == "force_inline") {
+			pi = ProcInlining_inline;
+		} else if (token.string == "force_no_inline") {
+			pi = ProcInlining_no_inline;
+		}
+	}
+
+	if (pi != ProcInlining_none) {
+		if (e->kind == Ast_ProcLit) {
+			if (expr->ProcLit.inlining != ProcInlining_none &&
+			    expr->ProcLit.inlining != pi) {
+				syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
+			}
+			expr->ProcLit.inlining = pi;
+		} else if (e->kind == Ast_CallExpr) {
+			if (expr->CallExpr.inlining != ProcInlining_none &&
+			    expr->CallExpr.inlining != pi) {
+				syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure call");
+			}
+			expr->CallExpr.inlining = pi;
+		}
+	}
+
+	return expr;
+}
+
 
 Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
@@ -1986,6 +2025,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "opaque") {
 			Ast *type = parse_type(f);
 			return ast_opaque_type(f, token, type);
+		} else if (name.string == "force_inline" ||
+		           name.string == "force_no_inline") {
+			return parse_force_inlining_operand(f, name);
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
@@ -1996,35 +2038,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_no_inline:
 	{
 		Token token = advance_token(f);
-		Ast *expr = parse_unary_expr(f, false);
-		Ast *e = unparen_expr(expr);
-		if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
-			syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
-			return ast_bad_expr(f, token, f->curr_token);
-		}
-		ProcInlining pi = ProcInlining_none;
-		if (token.kind == Token_inline) {
-			pi = ProcInlining_inline;
-		} else if (token.kind == Token_no_inline) {
-			pi = ProcInlining_no_inline;
-		}
-		if (pi != ProcInlining_none) {
-			if (e->kind == Ast_ProcLit) {
-				if (expr->ProcLit.inlining != ProcInlining_none &&
-				    expr->ProcLit.inlining != pi) {
-					syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
-				}
-				expr->ProcLit.inlining = pi;
-			} else if (e->kind == Ast_CallExpr) {
-				if (expr->CallExpr.inlining != ProcInlining_none &&
-				    expr->CallExpr.inlining != pi) {
-					syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure call");
-				}
-				expr->CallExpr.inlining = pi;
-			}
-		}
-
-		return expr;
+		return parse_force_inlining_operand(f, token);
 	} break;
 
 	// Parse Procedure Type or Literal or Group
@@ -4282,6 +4296,58 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 }
 
 
+Ast *parse_unrolled_for_loop(AstFile *f, Token inline_token) {
+	Token for_token = expect_token(f, Token_for);
+	Ast *val0 = nullptr;
+	Ast *val1 = nullptr;
+	Token in_token = {};
+	Ast *expr = nullptr;
+	Ast *body = nullptr;
+
+	bool bad_stmt = false;
+
+	if (f->curr_token.kind != Token_in) {
+		Array<Ast *> idents = parse_ident_list(f, false);
+		switch (idents.count) {
+		case 1:
+			val0 = idents[0];
+			break;
+		case 2:
+			val0 = idents[0];
+			val1 = idents[1];
+			break;
+		default:
+			syntax_error(for_token, "Expected either 1 or 2 identifiers");
+			bad_stmt = true;
+			break;
+		}
+	}
+	in_token = expect_token(f, Token_in);
+
+	bool prev_allow_range = f->allow_range;
+	isize prev_level = f->expr_level;
+	f->allow_range = true;
+	f->expr_level = -1;
+	expr = parse_expr(f, false);
+	f->expr_level = prev_level;
+	f->allow_range = prev_allow_range;
+
+	if (allow_token(f, Token_do)) {
+		body = convert_stmt_to_body(f, parse_stmt(f));
+		if (build_context.disallow_do) {
+			syntax_error(body, "'do' has been disallowed");
+		} else if (!ast_on_same_line(for_token, body)) {
+			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+		}
+	} else {
+		body = parse_block_stmt(f, false);
+	}
+	if (bad_stmt) {
+		return ast_bad_stmt(f, inline_token, f->curr_token);
+	}
+	return ast_inline_range_stmt(f, inline_token, for_token, val0, val1, in_token, expr, body);
+}
+
 Ast *parse_stmt(AstFile *f) {
 	Ast *s = nullptr;
 	Token token = f->curr_token;
@@ -4290,55 +4356,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_inline:
 		if (peek_token_kind(f, Token_for)) {
 			Token inline_token = expect_token(f, Token_inline);
-			Token for_token = expect_token(f, Token_for);
-			Ast *val0 = nullptr;
-			Ast *val1 = nullptr;
-			Token in_token = {};
-			Ast *expr = nullptr;
-			Ast *body = nullptr;
-
-			bool bad_stmt = false;
-
-			if (f->curr_token.kind != Token_in) {
-				Array<Ast *> idents = parse_ident_list(f, false);
-				switch (idents.count) {
-				case 1:
-					val0 = idents[0];
-					break;
-				case 2:
-					val0 = idents[0];
-					val1 = idents[1];
-					break;
-				default:
-					syntax_error(for_token, "Expected either 1 or 2 identifiers");
-					bad_stmt = true;
-					break;
-				}
-			}
-			in_token = expect_token(f, Token_in);
-
-			bool prev_allow_range = f->allow_range;
-			isize prev_level = f->expr_level;
-			f->allow_range = true;
-			f->expr_level = -1;
-			expr = parse_expr(f, false);
-			f->expr_level = prev_level;
-			f->allow_range = prev_allow_range;
-
-			if (allow_token(f, Token_do)) {
-				body = convert_stmt_to_body(f, parse_stmt(f));
-				if (build_context.disallow_do) {
-					syntax_error(body, "'do' has been disallowed");
-				} else if (!ast_on_same_line(for_token, body)) {
-					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
-				}
-			} else {
-				body = parse_block_stmt(f, false);
-			}
-			if (bad_stmt) {
-				return ast_bad_stmt(f, inline_token, f->curr_token);
-			}
-			return ast_inline_range_stmt(f, inline_token, for_token, val0, val1, in_token, expr, body);
+			return parse_unrolled_for_loop(f, inline_token);
 		}
 		/* fallthrough */
 	case Token_no_inline:
@@ -4484,6 +4502,8 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, tag);
 			return ast_expr_stmt(f, parse_call_expr(f, t));
+		} else if (tag == "unroll" || tag == "force_inline") {
+			return parse_unrolled_for_loop(f, name);
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
