@@ -397,7 +397,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Token_Kind, str
 		scan_exponent(t, &kind);
 	} else {
 		if t.ch == '0' {
-			int_base :: inline proc(t: ^Tokenizer, kind: ^Token_Kind, base: int, msg: string) {
+			int_base :: proc(t: ^Tokenizer, kind: ^Token_Kind, base: int, msg: string) {
 				prev := t.offset;
 				advance_rune(t);
 				scan_mantissa(t, base);

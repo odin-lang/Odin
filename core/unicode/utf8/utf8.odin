@@ -90,7 +90,7 @@ encode_rune :: proc(c: rune) -> ([4]u8, int) {
 	return buf, 4;
 }
 
-decode_rune_in_string :: inline proc(s: string) -> (rune, int) {
+decode_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
 	return decode_rune(transmute([]u8)s);
 }
 decode_rune :: proc(s: []u8) -> (rune, int) {
@@ -161,7 +161,7 @@ runes_to_string :: proc(runes: []rune, allocator := context.allocator) -> string
 }
 
 
-decode_last_rune_in_string :: inline proc(s: string) -> (rune, int) {
+decode_last_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
 	return decode_last_rune(transmute([]u8)s);
 }
 decode_last_rune :: proc(s: []u8) -> (rune, int) {
@@ -293,11 +293,11 @@ valid_string :: proc(s: string) -> bool {
 	return true;
 }
 
-rune_start :: inline proc(b: u8) -> bool {
+rune_start :: #force_inline proc(b: u8) -> bool {
 	return b&0xc0 != 0x80;
 }
 
-rune_count_in_string :: inline proc(s: string) -> int {
+rune_count_in_string :: #force_inline proc(s: string) -> int {
 	return rune_count(transmute([]u8)s);
 }
 rune_count :: proc(s: []u8) -> int {

@@ -45,7 +45,7 @@ Allocator :: struct {
 
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
-alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if size == 0 {
 		return nil;
 	}
@@ -55,7 +55,7 @@ alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator :=
 	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
 }
 
-free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
+free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
 	if ptr == nil {
 		return;
 	}
@@ -65,13 +65,13 @@ free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_
 	allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
 }
 
-free_all :: inline proc(allocator := context.allocator, loc := #caller_location) {
+free_all :: proc(allocator := context.allocator, loc := #caller_location) {
 	if allocator.procedure != nil {
 		allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
 	}
 }
 
-resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if allocator.procedure == nil {
 		return nil;
 	}
@@ -132,22 +132,22 @@ delete :: proc{
 };
 
 
-new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
+new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
 	return new_aligned(T, align_of(T), allocator, loc);
 }
-new_aligned :: inline proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> ^T {
+new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), alignment, allocator, loc));
 	if ptr != nil { ptr^ = T{}; }
 	return ptr;
 }
-new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
+new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
 	if ptr != nil { ptr^ = data; }
 	return ptr;
 }
 
 
-make_slice :: inline proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_slice :: proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
 	return make_aligned(T, len, align_of(E), allocator, loc);
 }
 make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {

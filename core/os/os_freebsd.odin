@@ -211,13 +211,13 @@ S_ISGID :: 0o2000; // Set group id on execution
 S_ISVTX :: 0o1000; // Directory restrcted delete
 
 
-S_ISLNK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFLNK;
-S_ISREG  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFREG;
-S_ISDIR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFDIR;
-S_ISCHR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFCHR;
-S_ISBLK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFBLK;
-S_ISFIFO :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFIFO;
-S_ISSOCK :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFSOCK;
+S_ISLNK  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFLNK;
+S_ISREG  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFREG;
+S_ISDIR  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFDIR;
+S_ISCHR  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFCHR;
+S_ISBLK  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFBLK;
+S_ISFIFO :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFIFO;
+S_ISSOCK :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFSOCK;
 
 F_OK :: 0; // Test for file existance
 X_OK :: 1; // Test for execute permission
@@ -341,7 +341,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	return File_Time(modified), ERROR_NONE;
 }
 
-stat :: inline proc(path: string) -> (Stat, Errno) {
+stat :: proc(path: string) -> (Stat, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
@@ -353,7 +353,7 @@ stat :: inline proc(path: string) -> (Stat, Errno) {
 	return s, ERROR_NONE;
 }
 
-fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
+fstat :: proc(fd: Handle) -> (Stat, Errno) {
 	s: Stat;
 	result := _unix_fstat(fd, &s);
 	if result == -1 {
@@ -362,7 +362,7 @@ fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
 	return s, ERROR_NONE;
 }
 
-access :: inline proc(path: string, mask: int) -> (bool, Errno) {
+access :: proc(path: string, mask: int) -> (bool, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 	result := _unix_access(cstr, c.int(mask));
@@ -429,20 +429,20 @@ current_thread_id :: proc "contextless" () -> int {
 	return cast(int) pthread_getthreadid_np();
 }
 
-dlopen :: inline proc(filename: string, flags: int) -> rawptr {
+dlopen :: proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.clone_to_cstring(filename);
 	defer delete(cstr);
 	handle := _unix_dlopen(cstr, c.int(flags));
 	return handle;
 }
-dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
+dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
 	cstr := strings.clone_to_cstring(symbol);
 	defer delete(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
-dlclose :: inline proc(handle: rawptr) -> bool {
+dlclose :: proc(handle: rawptr) -> bool {
 	assert(handle != nil);
 	return _unix_dlclose(handle) == 0;
 }

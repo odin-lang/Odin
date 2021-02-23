@@ -198,19 +198,19 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 	return res[:i+1];
 }
 
-split :: inline proc(s, sep: string, allocator := context.allocator) -> []string {
+split :: proc(s, sep: string, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, -1, allocator);
 }
 
-split_n :: inline proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
+split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, n, allocator);
 }
 
-split_after :: inline proc(s, sep: string, allocator := context.allocator) -> []string {
+split_after :: proc(s, sep: string, allocator := context.allocator) -> []string {
 	return _split(s, sep, len(sep), -1, allocator);
 }
 
-split_after_n :: inline proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
+split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
 	return _split(s, sep, len(sep), n, allocator);
 }
 

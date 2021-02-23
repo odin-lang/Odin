@@ -379,16 +379,16 @@ is_blank_ident :: proc{
 	is_blank_ident_token,
 	is_blank_ident_node,
 };
-is_blank_ident_string :: inline proc(str: string) -> bool {
+is_blank_ident_string :: proc(str: string) -> bool {
 	return str == "_";
 }
-is_blank_ident_token :: inline proc(tok: tokenizer.Token) -> bool {
+is_blank_ident_token :: proc(tok: tokenizer.Token) -> bool {
 	if tok.kind == .Ident {
 		return is_blank_ident_string(tok.text);
 	}
 	return false;
 }
-is_blank_ident_node :: inline proc(node: ^ast.Node) -> bool {
+is_blank_ident_node :: proc(node: ^ast.Node) -> bool {
 	if ident, ok := node.derived.(ast.Ident); ok {
 		return is_blank_ident(ident.name);
 	}

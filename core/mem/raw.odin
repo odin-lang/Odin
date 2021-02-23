@@ -38,20 +38,20 @@ Raw_Quaternion256 :: struct {imag, jmag, kmag: f64, real: f64};
 Raw_Quaternion128_Vector_Scalar :: struct {vector: [3]f32, scalar: f32};
 Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64};
 
-make_any :: inline proc(data: rawptr, id: typeid) -> any {
+make_any :: proc(data: rawptr, id: typeid) -> any {
 	return transmute(any)Raw_Any{data, id};
 }
 
 raw_array_data :: proc(a: $P/^($T/[$N]$E)) -> ^E {
 	return (^E)(a);
 }
-raw_string_data :: inline proc(s: $T/string) -> ^byte {
+raw_string_data :: proc(s: $T/string) -> ^byte {
 	return (transmute(Raw_String)s).data;
 }
-raw_slice_data :: inline proc(a: $T/[]$E) -> ^E {
+raw_slice_data :: proc(a: $T/[]$E) -> ^E {
 	return cast(^E)(transmute(Raw_Slice)a).data;
 }
-raw_dynamic_array_data :: inline proc(a: $T/[dynamic]$E) -> ^E {
+raw_dynamic_array_data :: proc(a: $T/[dynamic]$E) -> ^E {
 	return cast(^E)(transmute(Raw_Dynamic_Array)a).data;
 }
 

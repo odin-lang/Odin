@@ -8,13 +8,13 @@ package path
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
-is_separator :: inline proc(c: byte) -> bool {
+is_separator :: proc(c: byte) -> bool {
 	return c == '/';
 }
 
 
 // is_abs checks whether the path is absolute
-is_abs :: inline proc(path: string) -> bool {
+is_abs :: proc(path: string) -> bool {
 	return len(path) > 0 && path[0] == '/';
 }
 

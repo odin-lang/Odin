@@ -458,7 +458,7 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 
 quote :: proc(buf: []byte, str: string) -> string {
-	write_byte :: inline proc(buf: []byte, i: ^int, bytes: ..byte) {
+	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
 		if i^ >= len(buf) {
 			return;
 		}
@@ -496,19 +496,19 @@ quote :: proc(buf: []byte, str: string) -> string {
 }
 
 quote_rune :: proc(buf: []byte, r: rune) -> string {
-	write_byte :: inline proc(buf: []byte, i: ^int, bytes: ..byte) {
+	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
 		if i^ < len(buf) {
 			n := copy(buf[i^:], bytes[:]);
 			i^ += n;
 		}
 	}
-	write_string :: inline proc(buf: []byte, i: ^int, s: string) {
+	write_string :: proc(buf: []byte, i: ^int, s: string) {
 		if i^ < len(buf) {
 			n := copy(buf[i^:], s);
 			i^ += n;
 		}
 	}
-	write_rune :: inline proc(buf: []byte, i: ^int, r: rune) {
+	write_rune :: proc(buf: []byte, i: ^int, r: rune) {
 		if i^ < len(buf) {
 			b, w := utf8.encode_rune(r);
 			n := copy(buf[i^:], b[:w]);
