@@ -2507,19 +2507,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		return ast_inline_asm_expr(f, token, open, close, param_types, return_type, asm_string, constraints_string, has_side_effects, is_align_stack, dialect);
 	}
 
-	default: {
-		#if 0
-		Ast *type = parse_type_or_ident(f);
-		if (type != nullptr) {
-			// TODO(bill): Is this correct???
-			// NOTE(bill): Sanity check as identifiers should be handled already
-			TokenPos pos = ast_token(type).pos;
-			GB_ASSERT_MSG(type->kind != Ast_Ident, "Type cannot be identifier %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
-			return type;
-		}
-		#endif
-		break;
-	}
 	}
 
 	return nullptr;
@@ -2659,9 +2646,6 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		}
 
 		case Token_OpenBracket: {
-			if (lhs) {
-				// TODO(bill): Handle this
-			}
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = false;
 
