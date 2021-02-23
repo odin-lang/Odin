@@ -1850,8 +1850,10 @@ Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 	}
 	ProcInlining pi = ProcInlining_none;
 	if (token.kind == Token_inline) {
+		syntax_warning(token, "'inline' is deprecated in favour of '#force_inline'");
 		pi = ProcInlining_inline;
 	} else if (token.kind == Token_no_inline) {
+		syntax_warning(token, "'no_inline' is deprecated in favour of '#force_no_inline'");
 		pi = ProcInlining_no_inline;
 	} else if (token.kind == Token_Ident) {
 		if (token.string == "force_inline") {
