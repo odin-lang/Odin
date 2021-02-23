@@ -5176,6 +5176,8 @@ bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
+					} else if (lc == "+private") {
+						f->is_private = true;
 					}
 				}
 			}

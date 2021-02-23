@@ -199,6 +199,9 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
+	if (e->file != nullptr && e->file->is_private) {
+		return false;
+	}
 
 	String name = e->token.string;
 	switch (name.len) {
