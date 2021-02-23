@@ -2603,10 +2603,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
-	if (is_type_opaque(type)) {
-		return ir_add_debug_info_type(module, strip_opaque_type(type), e, scope, file);
-	}
-
 	if (is_type_struct(type) ||
 	    is_type_union(type) || is_type_enum(type) || is_type_tuple(type)) {
 		if (type->kind == Type_Named) {
@@ -5302,10 +5298,6 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	Type *t = base_type(type_deref(ir_type(s)));
 	Type *result_type = nullptr;
 
-	if (t->kind == Type_Opaque) {
-		t = t->Opaque.elem;
-	}
-
 	if (is_type_relative_pointer(t)) {
 		s = ir_addr_get_ptr(proc, ir_addr(s));
 	}
@@ -5498,9 +5490,6 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 			// e = ir_emit_ptr_offset(proc, e, v_zero); // TODO(bill): Do I need these copies?
 		}
 		type = core_type(type);
-		if (type->kind == Type_Opaque) {
-			type = type->Opaque.elem;
-		}
 
 		if (is_type_quaternion(type)) {
 			e = ir_emit_struct_ep(proc, e, index);
@@ -12503,12 +12492,6 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			}
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_i64(t->BitSet.lower));
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_i64(t->BitSet.upper));
-			break;
-
-		case Type_Opaque:
-			ir_emit_comment(proc, str_lit("Type_Opaque"));
-			tag = ir_emit_conv(proc, variant_ptr, t_type_info_opaque_ptr);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->Opaque.elem));
 			break;
 
 		case Type_SimdVector:

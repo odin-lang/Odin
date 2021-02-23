@@ -1095,9 +1095,6 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				GB_PANIC("INVALID TYPE");
 				break;
 
-			case Type_Opaque:
-				return lb_type_internal(m, base->Opaque.elem);
-
 			case Type_Pointer:
 			case Type_Array:
 			case Type_EnumeratedArray:
@@ -1155,9 +1152,6 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Pointer:
 		return LLVMPointerType(lb_type(m, type_deref(type)), 0);
-
-	case Type_Opaque:
-		return lb_type(m, base_type(type));
 
 	case Type_Array:
 		return LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
@@ -1741,10 +1735,6 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	case Type_Pointer:
 		return nullptr;
 		// return LLVMPointerType(lb_type(m, type_deref(type)), 0);
-
-	case Type_Opaque:
-		return nullptr;
-		// return lb_type(m, base_type(type));
 
 	case Type_Array:
 		return nullptr;
@@ -4881,7 +4871,6 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_Tuple:           kind = Typeid_Tuple;            break;
 	case Type_Proc:            kind = Typeid_Procedure;        break;
 	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
-	case Type_Opaque:          kind = Typeid_Opaque;           break;
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
 	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
@@ -6861,10 +6850,6 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	Type *t = base_type(type_deref(s.type));
 	Type *result_type = nullptr;
 
-	if (t->kind == Type_Opaque) {
-		t = t->Opaque.elem;
-	}
-
 	if (is_type_relative_pointer(t)) {
 		s = lb_addr_get_ptr(p, lb_addr(s));
 	}
@@ -7077,9 +7062,6 @@ lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel) {
 			e = lb_emit_load(p, e);
 		}
 		type = core_type(type);
-		if (type->kind == Type_Opaque) {
-			type = type->Opaque.elem;
-		}
 
 		if (is_type_quaternion(type)) {
 			e = lb_emit_struct_ep(p, e, index);
@@ -12409,19 +12391,6 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			}
 			break;
 
-		case Type_Opaque:
-			{
-				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_opaque_ptr);
-				LLVMValueRef vals[1] = {
-					lb_get_type_info_ptr(m, t->Opaque.elem).value,
-				};
-
-				lbValue res = {};
-				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
-				lb_emit_store(p, tag, res);
-			}
-			break;
 		case Type_SimdVector:
 			{
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_simd_vector_ptr);

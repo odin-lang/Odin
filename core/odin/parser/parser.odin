@@ -2101,12 +2101,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		tok := expect_token(p, .Hash);
 		name := expect_token(p, .Ident);
 		switch name.text {
-		case "opaque":
-			type := parse_type(p);
-			ot := ast.new(ast.Opaque_Type, tok.pos, type.end);
-			ot.type = type;
-			return ot;
-
 		case "type":
 			type := parse_type(p);
 			hp := ast.new(ast.Helper_Type, tok.pos, type.end);

@@ -227,7 +227,6 @@ struct TypeProc {
 		Entity *entity;                                   \
 	})                                                    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
-	TYPE_KIND(Opaque,  struct { Type *elem; })            \
 	TYPE_KIND(Array,   struct {                           \
 		Type *elem;                                       \
 		i64   count;                                      \
@@ -358,7 +357,6 @@ enum Typeid_Kind : u8 {
 	Typeid_Enum,
 	Typeid_Map,
 	Typeid_Bit_Set,
-	Typeid_Opaque,
 	Typeid_Simd_Vector,
 	Typeid_Relative_Pointer,
 	Typeid_Relative_Slice,
@@ -633,7 +631,6 @@ gb_global Type *t_type_info_union                = nullptr;
 gb_global Type *t_type_info_enum                 = nullptr;
 gb_global Type *t_type_info_map                  = nullptr;
 gb_global Type *t_type_info_bit_set              = nullptr;
-gb_global Type *t_type_info_opaque               = nullptr;
 gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_relative_pointer     = nullptr;
 gb_global Type *t_type_info_relative_slice       = nullptr;
@@ -660,7 +657,6 @@ gb_global Type *t_type_info_union_ptr            = nullptr;
 gb_global Type *t_type_info_enum_ptr             = nullptr;
 gb_global Type *t_type_info_map_ptr              = nullptr;
 gb_global Type *t_type_info_bit_set_ptr          = nullptr;
-gb_global Type *t_type_info_opaque_ptr           = nullptr;
 gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
 gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
@@ -729,19 +725,6 @@ Type *base_type(Type *t) {
 	return t;
 }
 
-Type *strip_opaque_type(Type *t) {
-	for (;;) {
-		if (t == nullptr) {
-			break;
-		}
-		if (t->kind != Type_Opaque) {
-			break;
-		}
-		t = t->Opaque.elem;
-	}
-	return t;
-}
-
 Type *base_enum_type(Type *t) {
 	Type *bt = base_type(t);
 	if (bt != nullptr &&
@@ -766,9 +749,6 @@ Type *core_type(Type *t) {
 			continue;
 		case Type_Enum:
 			t = t->Enum.base_type;
-			continue;
-		case Type_Opaque:
-			t = t->Opaque.elem;
 			continue;
 		}
 		break;
@@ -801,12 +781,6 @@ Type *alloc_type_generic(Scope *scope, i64 id, String name, Type *specialized) {
 	t->Generic.name = name;
 	t->Generic.specialized = specialized;
 	t->Generic.scope = scope;
-	return t;
-}
-
-Type *alloc_type_opaque(Type *elem) {
-	Type *t = alloc_type(Type_Opaque);
-	t->Opaque.elem = elem;
 	return t;
 }
 
@@ -1176,10 +1150,6 @@ bool is_type_pointer(Type *t) {
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
-}
-bool is_type_opaque(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Opaque;
 }
 bool is_type_uintptr(Type *t) {
 	if (t->kind == Type_Basic) {
@@ -1710,8 +1680,6 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 			return ok;
 		}
 
-	case Type_Opaque:
-		return is_type_polymorphic(t->Opaque.elem, or_specialized);
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem, or_specialized);
 
@@ -1841,8 +1809,6 @@ bool type_has_nil(Type *t) {
 			}
 		}
 		return false;
-	case Type_Opaque:
-		return true;
 
 	case Type_RelativePointer:
 	case Type_RelativeSlice:
@@ -1894,9 +1860,6 @@ bool is_type_comparable(Type *t) {
 
 	case Type_BitSet:
 		return true;
-
-	case Type_Opaque:
-		return is_type_comparable(t->Opaque.elem);
 
 	case Type_Struct:
 		if (type_size_of(t) == 0) {
@@ -1997,12 +1960,6 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Generic:
 		if (y->kind == Type_Generic) {
 			return are_types_identical(x->Generic.specialized, y->Generic.specialized);
-		}
-		break;
-
-	case Type_Opaque:
-		if (y->kind == Type_Opaque) {
-			return are_types_identical(x->Opaque.elem, y->Opaque.elem);
 		}
 		break;
 
@@ -2832,9 +2789,6 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return align;
 	}
 
-	case Type_Opaque:
-		return type_align_of_internal(t->Opaque.elem, path);
-
 	case Type_DynamicArray:
 		// data, count, capacity, allocator
 		return build_context.word_size;
@@ -3048,9 +3002,6 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_Pointer:
 		return build_context.word_size;
-
-	case Type_Opaque:
-		return type_size_of_internal(t->Opaque.elem, path);
 
 	case Type_Array: {
 		i64 count, align, size, alignment;
@@ -3423,11 +3374,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Pointer:
 		str = gb_string_append_rune(str, '^');
 		str = write_type_to_string(str, type->Pointer.elem);
-		break;
-
-	case Type_Opaque:
-		str = gb_string_appendc(str, "opaque ");
-		str = write_type_to_string(str, type->Opaque.elem);
 		break;
 
 	case Type_EnumeratedArray:

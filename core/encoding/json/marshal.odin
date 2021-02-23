@@ -309,9 +309,6 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 
 
 		return .Unsupported_Type;
-
-	case Type_Info_Opaque:
-		return .Unsupported_Type;
 	}
 
 	return .None;

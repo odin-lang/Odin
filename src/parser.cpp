@@ -90,7 +90,6 @@ Token ast_token(Ast *node) {
 	case Ast_TypeidType:       return node->TypeidType.token;
 	case Ast_HelperType:       return node->HelperType.token;
 	case Ast_DistinctType:     return node->DistinctType.token;
-	case Ast_OpaqueType:       return node->OpaqueType.token;
 	case Ast_PolyType:         return node->PolyType.token;
 	case Ast_ProcType:         return node->ProcType.token;
 	case Ast_RelativeType:     return ast_token(node->RelativeType.tag);
@@ -379,9 +378,6 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_DistinctType:
 		n->DistinctType.type = clone_ast(n->DistinctType.type);
-		break;
-	case Ast_OpaqueType:
-		n->OpaqueType.type = clone_ast(n->OpaqueType.type);
 		break;
 	case Ast_ProcType:
 		n->ProcType.params  = clone_ast(n->ProcType.params);
@@ -952,12 +948,6 @@ Ast *ast_distinct_type(AstFile *f, Token token, Ast *type) {
 	return result;
 }
 
-Ast *ast_opaque_type(AstFile *f, Token token, Ast *type) {
-	Ast *result = alloc_ast_node(f, Ast_OpaqueType);
-	result->OpaqueType.token = token;
-	result->OpaqueType.type  = type;
-	return result;
-}
 
 Ast *ast_poly_type(AstFile *f, Token token, Ast *type, Ast *specialization) {
 	Ast *result = alloc_ast_node(f, Ast_PolyType);
@@ -2009,8 +1999,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			Ast *type = parse_type(f);
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "opaque") {
-			Ast *type = parse_type(f);
-			return ast_opaque_type(f, token, type);
+			syntax_warning(token, "'#opaque' has been removed and will do nothing to the applied type");
+			return parse_type(f);
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
 			return parse_force_inlining_operand(f, name);

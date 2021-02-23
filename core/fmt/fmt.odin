@@ -1247,49 +1247,6 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	}
 }
 
-fmt_opaque :: proc(fi: ^Info, v: any) {
-	is_nil :: proc(data: rawptr, n: int) -> bool {
-		if data == nil { return true; }
-		if n == 0 { return true; }
-
-		a := (^byte)(data);
-		for i in 0..<n {
-			if mem.ptr_offset(a, i)^ != 0 {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	rt :: runtime;
-
-	type_info := type_info_of(v.id);
-
-	if is_nil(v.data, type_info.size) {
-		io.write_string(fi.writer, "nil");
-		return;
-	}
-
-	if ot, ok := rt.type_info_base(type_info).variant.(rt.Type_Info_Opaque); ok {
-		elem := rt.type_info_base(ot.elem);
-		if elem == nil { return; }
-		reflect.write_type(fi.writer, type_info);
-		io.write_byte(fi.writer, '{');
-		defer io.write_byte(fi.writer, '}');
-
-		#partial switch in elem.variant {
-		case rt.Type_Info_Integer, rt.Type_Info_Pointer, rt.Type_Info_Float:
-			fmt_value(fi, any{v.data, elem.id}, 'v');
-		case:
-			// Okay
-		}
-	} else {
-		reflect.write_type(fi.writer, type_info);
-		io.write_byte(fi.writer, '{');
-		io.write_byte(fi.writer, '}');
-	}
-}
-
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
 		n := width-1;
@@ -1553,8 +1510,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		case runtime.Type_Info_Bit_Set:
 			fmt_bit_set(fi, v);
-		case runtime.Type_Info_Opaque:
-			fmt_opaque(fi, v);
 		case:
 			fmt_value(fi, any{v.data, info.base.id}, verb);
 		}
@@ -1923,9 +1878,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v);
-
-	case runtime.Type_Info_Opaque:
-		fmt_opaque(fi, v);
 
 	case runtime.Type_Info_Relative_Pointer:
 		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id);
