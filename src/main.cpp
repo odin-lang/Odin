@@ -28,6 +28,14 @@ gb_global Timings global_timings = {0};
 
 #if defined(LLVM_BACKEND_SUPPORT)
 #include "llvm_backend.cpp"
+
+#if defined(GB_SYSTEM_OSX)
+	#include <llvm/Config/llvm-config.h>
+	#if LLVM_VERSION_MAJOR < 11 
+	#error LLVM Version 11+ is required => "brew install llvm@11"
+	#endif
+#endif
+
 #endif
 
 #include "ir.cpp"
