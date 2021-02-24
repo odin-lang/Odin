@@ -2423,6 +2423,8 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 	if (src_kind == dst_kind) {
 		if (src_kind == LLVMPointerTypeKind) {
 			return LLVMBuildPointerCast(p->builder, val, dst_type, "");
+		} else if (src_kind == LLVMArrayTypeKind) {
+			// ignore
 		} else if (src_kind != LLVMStructTypeKind) {
 			return LLVMBuildBitCast(p->builder, val, dst_type, "");
 		}
@@ -8203,7 +8205,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_cpu_relax:
-		{
+		if (build_context.metrics.arch == TargetArch_386 ||
+		    build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
 			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
 				cast(char *)"pause", 5,

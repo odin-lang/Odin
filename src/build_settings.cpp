@@ -23,6 +23,7 @@ enum TargetArchKind {
 
 	TargetArch_amd64,
 	TargetArch_386,
+	TargetArch_aarch64,
 	TargetArch_wasm32,
 
 	TargetArch_COUNT,
@@ -53,6 +54,7 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
 	str_lit("386"),
+	str_lit("aarch64"),
 	str_lit("wasm32"),
 };
 
@@ -268,6 +270,15 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
+gb_global TargetMetrics target_darwin_aarch64 = {
+	TargetOs_darwin,
+	TargetArch_aarch64,
+	8,
+	16,
+	str_lit("aarch64-apple-darwin"),
+	str_lit("e-m:o-i64:64-f64:128-n8:16:32:64-S128"), // TODO(bill): Is this correct?
+};
+
 gb_global TargetMetrics target_freebsd_386 = {
 	TargetOs_freebsd,
 	TargetArch_386,
@@ -303,21 +314,23 @@ gb_global TargetMetrics target_js_wasm32 = {
 };
 
 
+
 struct NamedTargetMetrics {
 	String name;
 	TargetMetrics *metrics;
 };
 
 gb_global NamedTargetMetrics named_targets[] = {
-	{ str_lit("darwin_amd64"),  &target_darwin_amd64 },
-	{ str_lit("essence_amd64"), &target_essence_amd64 },
-	{ str_lit("js_wasm32"),     &target_js_wasm32 },
-	{ str_lit("linux_386"),     &target_linux_386 },
-	{ str_lit("linux_amd64"),   &target_linux_amd64 },
-	{ str_lit("windows_386"),   &target_windows_386 },
-	{ str_lit("windows_amd64"), &target_windows_amd64 },
-	{ str_lit("freebsd_386"),   &target_freebsd_386 },
-	{ str_lit("freebsd_amd64"), &target_freebsd_amd64 },
+	{ str_lit("darwin_amd64"),   &target_darwin_amd64   },
+	{ str_lit("darwin_aarch64"), &target_darwin_aarch64 },
+	{ str_lit("essence_amd64"),  &target_essence_amd64  },
+	{ str_lit("js_wasm32"),      &target_js_wasm32      },
+	{ str_lit("linux_386"),      &target_linux_386      },
+	{ str_lit("linux_amd64"),    &target_linux_amd64    },
+	{ str_lit("windows_386"),    &target_windows_386    },
+	{ str_lit("windows_amd64"),  &target_windows_amd64  },
+	{ str_lit("freebsd_386"),    &target_freebsd_386    },
+	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -807,6 +820,21 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86 ");
 			break;
 		}
+	} else if (bc->metrics.arch == TargetArch_aarch64) {
+		if (bc->microarch.len == 0) {
+			llc_flags = gb_string_appendc(llc_flags, "-march=aarch64 ");
+		}
+
+		switch (bc->metrics.os) {
+		case TargetOs_darwin:
+			bc->link_flags = str_lit("-arch aarch64 ");
+			break;
+		}
+		if (!bc->use_llvm_api) {
+			gb_printf_err("The aarch64 architecture is only supported with -llvm-api\n");;
+			gb_exit(1);
+		}
+
 	} else if (bc->metrics.arch == TargetArch_wasm32) {
 		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined ");
 	} else {
@@ -819,10 +847,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
 	gbString opt_flags = gb_string_make_reserve(heap_allocator(), 64);
-
-	if (bc->microarch.len == 0) {
-		bc->microarch = str_lit("generic");
-	}
 
 	if (bc->microarch.len != 0) {
 		opt_flags = gb_string_appendc(opt_flags, "-march=");
@@ -845,7 +869,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	if (bc->ODIN_DEBUG == false) {
 		opt_flags = gb_string_appendc(opt_flags, "-mem2reg -memcpyopt -die ");
 	}
-
 
 
 

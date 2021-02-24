@@ -446,10 +446,10 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 	lbCallingConvention_C,            // ProcCC_Invalid,
 	lbCallingConvention_C,            // ProcCC_Odin,
 	lbCallingConvention_C,            // ProcCC_Contextless,
-	lbCallingConvention_C,            // ProcCC_Pure,
 	lbCallingConvention_C,            // ProcCC_CDecl,
 	lbCallingConvention_X86_StdCall,  // ProcCC_StdCall,
 	lbCallingConvention_X86_FastCall, // ProcCC_FastCall,
 
 	lbCallingConvention_C,            // ProcCC_None,
+	lbCallingConvention_C,            // ProcCC_InlineAsm,
 };
