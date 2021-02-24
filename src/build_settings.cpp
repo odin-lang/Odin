@@ -820,6 +820,9 @@ void init_build_context(TargetMetrics *cross_target) {
 
 	gbString opt_flags = gb_string_make_reserve(heap_allocator(), 64);
 
+	if (bc->microarch.len == 0) {
+		bc->microarch = str_lit("generic");
+	}
 
 	if (bc->microarch.len != 0) {
 		opt_flags = gb_string_appendc(opt_flags, "-march=");
