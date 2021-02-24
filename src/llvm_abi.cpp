@@ -910,13 +910,186 @@ namespace lbAbiAmd64SysV {
 
 
 namespace lbAbiAarch64 {
+	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
+
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
 		ft->ctx = c;
-		// ft->args = compute_arg_types(c, arg_types, arg_count);
-		// ft->ret = lbAbi386::compute_return_type(c, return_type, return_is_defined);
-		// ft->calling_convention = calling_convention;
+		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft -> args = compute_arg_types(c, arg_types, arg_count);
+		ft->calling_convention = calling_convention;
 		return ft;
+	}
+
+	bool is_register(LLVMTypeRef type) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		switch (kind) {
+		case LLVMIntegerTypeKind:
+		case LLVMFloatTypeKind:
+		case LLVMDoubleTypeKind:
+		case LLVMPointerTypeKind:
+			return true;
+		}
+		return false;
+	}
+
+	lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type) {
+		LLVMAttributeRef attr = nullptr;
+		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
+		if (type == i1) {
+			attr = lb_create_enum_attribute(c, "zeroext", true);
+		}
+		return lb_arg_type_direct(type, nullptr, nullptr, attr);
+	}
+
+	bool is_homogenous_array(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_) {
+		GB_ASSERT(lb_is_type_kind(type, LLVMArrayTypeKind));
+		unsigned len = LLVMGetArrayLength(type);
+		if (len == 0) {
+			return false;
+		}
+		LLVMTypeRef elem = LLVMGetElementType(type);
+		LLVMTypeRef base_type = nullptr;
+		unsigned member_count = 0;
+		if (is_homogenous_aggregate(c, elem, &base_type, &member_count)) {
+			if (base_type_) *base_type_ = base_type;
+			if (member_count_) *member_count_ = member_count * len;
+			return true;
+
+		}
+		return false;
+	}
+	bool is_homogenous_struct(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_) {
+		GB_ASSERT(lb_is_type_kind(type, LLVMStructTypeKind));
+		unsigned elem_count = LLVMCountStructElementTypes(type);
+		if (elem_count == 0) {
+			return false;
+		}
+		LLVMTypeRef base_type = nullptr;
+		unsigned member_count = 0;
+
+		for (unsigned i = 0; i < elem_count; i++) {
+			LLVMTypeRef field_type = nullptr;
+			unsigned field_member_count = 0;
+
+			LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
+			if (!is_homogenous_aggregate(c, elem, &field_type, &field_member_count)) {
+				return false;
+			}
+
+			if (base_type == nullptr) {
+				base_type = field_type;
+				member_count = field_member_count;
+			} else {
+				if (base_type != field_type) {
+					return false;
+				}
+				member_count += field_member_count;
+			}
+		}
+
+		if (base_type == nullptr) {
+			return false;
+		}
+
+		if (lb_sizeof(type) == lb_sizeof(base_type) * member_count) {
+			if (base_type_) *base_type_ = base_type;
+			if (member_count_) *member_count_ = member_count;
+			return true;
+		}
+
+		return false;
+	}
+
+
+	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		switch (kind) {
+		case LLVMFloatTypeKind:
+		case LLVMDoubleTypeKind:
+			if (base_type_) *base_type_ = type;
+			if (member_count_) *member_count_ = 1;
+			return true;
+		case LLVMArrayTypeKind:
+			return is_homogenous_array(c, type, base_type_, member_count_);
+		case LLVMStructTypeKind:
+			return is_homogenous_struct(c, type, base_type_, member_count_);
+		}
+		return false;
+	}
+
+	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef type, bool return_is_defined) {
+		LLVMTypeRef homo_base_type = {};
+		unsigned homo_member_count = 0;
+
+		if (!return_is_defined) {
+			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (is_register(type)) {
+			return non_struct(c, type);
+		} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
+			return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+		} else {
+			i64 size = lb_sizeof(type);
+			if (size <= 16) {
+				LLVMTypeRef cast_type = nullptr;
+				if (size <= 1) {
+					cast_type = LLVMIntTypeInContext(c, 8);
+				} else if (size <= 2) {
+					cast_type = LLVMIntTypeInContext(c, 16);
+				} else if (size <= 4) {
+					cast_type = LLVMIntTypeInContext(c, 32);
+				} else if (size <= 8) {
+					cast_type = LLVMIntTypeInContext(c, 64);
+				} else {
+					unsigned count = cast(unsigned)((size+7)/8);
+					cast_type = LLVMArrayType(LLVMIntTypeInContext(c, 64), count);
+				}
+				return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+			} else {
+				LLVMAttributeRef attr = lb_create_enum_attribute(c, "sret", true);
+				return lb_arg_type_indirect(type, attr);
+			}
+		}
+	}
+
+	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+
+		for (unsigned i = 0; i < arg_count; i++) {
+			LLVMTypeRef type = arg_types[i];
+
+			LLVMTypeRef homo_base_type = {};
+			unsigned homo_member_count = 0;
+
+			if (is_register(type)) {
+				args[i] = non_struct(c, type);
+			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
+				args[i] = lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+			} else {
+				i64 size = lb_sizeof(type);
+				if (size <= 16) {
+					LLVMTypeRef cast_type = nullptr;
+					if (size <= 1) {
+						cast_type = LLVMIntTypeInContext(c, 8);
+					} else if (size <= 2) {
+						cast_type = LLVMIntTypeInContext(c, 16);
+					} else if (size <= 4) {
+						cast_type = LLVMIntTypeInContext(c, 32);
+					} else if (size <= 8) {
+						cast_type = LLVMIntTypeInContext(c, 64);
+					} else {
+						unsigned count = cast(unsigned)((size+7)/8);
+						cast_type = LLVMArrayType(LLVMIntTypeInContext(c, 64), count);
+					}
+					args[i] = lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+				} else {
+					args[i] = lb_arg_type_indirect(type, nullptr);
+				}
+			}
+		}
+		return args;
 	}
 }
 
@@ -950,6 +1123,8 @@ LB_ABI_INFO(lb_get_abi_info) {
 		}
 	} else if (build_context.metrics.arch == TargetArch_386) {
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+	} else if (build_context.metrics.arch == TargetArch_aarch64) {
+		return lbAbiAarch64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	} else if (build_context.metrics.arch == TargetArch_wasm32) {
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	}

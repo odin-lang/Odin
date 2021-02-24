@@ -213,7 +213,7 @@ enum ProcCallingConvention {
 
 	ProcCC_None = 6,
 
-	ProcCC_InlineAsm = 9,
+	ProcCC_InlineAsm = 7,
 
 	ProcCC_MAX,
 
