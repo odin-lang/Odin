@@ -20,7 +20,7 @@ if "%2" == "1" (
 )
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
-set compiler_defines= -DLLVM_BACKEND_SUPPORT 
+set compiler_defines= -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
