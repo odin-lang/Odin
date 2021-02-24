@@ -909,7 +909,7 @@ namespace lbAbiAmd64SysV {
 };
 
 
-namespace lbAbiAarch64 {
+namespace lbAbiArm64 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
 	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
@@ -1123,8 +1123,8 @@ LB_ABI_INFO(lb_get_abi_info) {
 		}
 	} else if (build_context.metrics.arch == TargetArch_386) {
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
-	} else if (build_context.metrics.arch == TargetArch_aarch64) {
-		return lbAbiAarch64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+	} else if (build_context.metrics.arch == TargetArch_arm64) {
+		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	} else if (build_context.metrics.arch == TargetArch_wasm32) {
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	}

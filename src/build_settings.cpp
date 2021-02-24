@@ -23,7 +23,7 @@ enum TargetArchKind {
 
 	TargetArch_amd64,
 	TargetArch_386,
-	TargetArch_aarch64,
+	TargetArch_arm64,
 	TargetArch_wasm32,
 
 	TargetArch_COUNT,
@@ -54,7 +54,7 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
 	str_lit("386"),
-	str_lit("aarch64"),
+	str_lit("arm64"),
 	str_lit("wasm32"),
 };
 
@@ -270,13 +270,13 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
-gb_global TargetMetrics target_darwin_aarch64 = {
+gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
-	TargetArch_aarch64,
+	TargetArch_arm64,
 	8,
 	16,
-	str_lit("aarch64-apple-darwin"),
-	str_lit("e-m:o-i64:64-f64:128-n8:16:32:64-S128"), // TODO(bill): Is this correct?
+	str_lit("arm64-apple-macosx11.0.0"),
+	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
 
 gb_global TargetMetrics target_freebsd_386 = {
@@ -322,7 +322,7 @@ struct NamedTargetMetrics {
 
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),   &target_darwin_amd64   },
-	{ str_lit("darwin_aarch64"), &target_darwin_aarch64 },
+	{ str_lit("darwin_arm64"), &target_darwin_arm64 },
 	{ str_lit("essence_amd64"),  &target_essence_amd64  },
 	{ str_lit("js_wasm32"),      &target_js_wasm32      },
 	{ str_lit("linux_386"),      &target_linux_386      },
@@ -733,7 +733,11 @@ void init_build_context(TargetMetrics *cross_target) {
 		#if defined(GB_SYSTEM_WINDOWS)
 			metrics = &target_windows_amd64;
 		#elif defined(GB_SYSTEM_OSX)
-			metrics = &target_darwin_amd64;
+			#if defined(GB_CPU_ARM)
+				metrics = &target_darwin_arm64;
+			#else
+				metrics = &target_darwin_amd64;
+			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
 			metrics = &target_freebsd_amd64;
 		#else
@@ -820,18 +824,18 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86 ");
 			break;
 		}
-	} else if (bc->metrics.arch == TargetArch_aarch64) {
+	} else if (bc->metrics.arch == TargetArch_arm64) {
 		if (bc->microarch.len == 0) {
-			llc_flags = gb_string_appendc(llc_flags, "-march=aarch64 ");
+			llc_flags = gb_string_appendc(llc_flags, "-march=arm64 ");
 		}
 
 		switch (bc->metrics.os) {
 		case TargetOs_darwin:
-			bc->link_flags = str_lit("-arch aarch64 ");
+			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		}
 		if (!bc->use_llvm_api) {
-			gb_printf_err("The aarch64 architecture is only supported with -llvm-api\n");;
+			gb_printf_err("The arm64 architecture is only supported with -llvm-api\n");;
 			gb_exit(1);
 		}
 
