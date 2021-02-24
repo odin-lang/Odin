@@ -2394,7 +2394,8 @@ int main(int arg_count, char const **arg_ptr) {
 				// so use ld instead.
 				// :UseLDForShared
 				linker = "ld";
-				link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
+				// NOTE(tetra, 2021-02-24): On Darwin, the symbol has _3_ underscores; on Linux, it only has 2.
+				link_settings = gb_string_append_fmt(link_settings, "-init '%s$startup_runtime' ", build_context.metrics.os == TargetOs_darwin ? "___" : "__");
 				// Shared libraries are .dylib on MacOS and .so on Linux.
 				#if defined(GB_SYSTEM_OSX)
 					output_ext = STR_LIT(".dylib");
