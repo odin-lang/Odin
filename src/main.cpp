@@ -28,6 +28,14 @@ gb_global Timings global_timings = {0};
 
 #if defined(LLVM_BACKEND_SUPPORT)
 #include "llvm_backend.cpp"
+
+#if defined(GB_SYSTEM_OSX)
+	#include <llvm/Config/llvm-config.h>
+	#if LLVM_VERSION_MAJOR < 11 
+	#error LLVM Version 11+ is required => "brew install llvm@11"
+	#endif
+#endif
+
 #endif
 
 #include "ir.cpp"
@@ -431,7 +439,11 @@ void linker_stage(lbGenerator *gen) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 				//       make sure to also change the 'mtriple' param passed to 'opt'
+				#if defined(GB_CPU_ARM)
+				" -macosx_version_min 11.0.0 "
+				#else
 				" -macosx_version_min 10.8.0 "
+				#endif
 				// This points the linker to where the entry point is
 				" -e _main "
 			#endif
@@ -1830,6 +1842,15 @@ void print_show_unused(Checker *c) {
 	print_usage_line(0, "");
 }
 
+void enforce_platform_settings(void) {
+#if defined(GB_SYSTEM_OSX) && defined(GB_CPU_ARM)
+	#if defined(USE_NEW_LLVM_ABI_SYSTEM)
+		build_context.use_llvm_api = true;
+	#endif
+#endif
+}
+
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -1983,7 +2004,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-
+	enforce_platform_settings();
 
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
