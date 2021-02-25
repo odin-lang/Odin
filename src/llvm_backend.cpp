@@ -1977,7 +1977,22 @@ lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
 }
 
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value) {
-	unsigned kind = LLVMGetEnumAttributeKindForName(name, gb_strlen(name));
+	String s = make_string_c(name);
+
+	// NOTE(2021-02-25, bill); All this attributes require a type associated with them
+	// and the current LLVM C API does not expose this functionality yet.
+	// It is better to ignore the attributes for the time being
+	if (s == "byval") {
+		return nullptr;
+	} else if (s == "byref") {
+		return nullptr;
+	} else if (s == "preallocated") {
+		return nullptr;
+	} else if (s == "sret") {
+		return nullptr;
+	}
+
+	unsigned kind = LLVMGetEnumAttributeKindForName(name, s.len);
 	GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
 	return LLVMCreateEnumAttribute(ctx, kind, value);
 }
