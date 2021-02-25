@@ -443,7 +443,10 @@ namespace lbAbi386 {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
-			return lb_arg_type_indirect(return_type, lb_create_enum_attribute(c, "sret", true));
+			LLVMAttributeRef attr = nullptr;
+			// TODO(bill): sret doesn't work correct for LLVM C API
+			// attr = lb_create_enum_attribute(c, "sret", true);
+			return lb_arg_type_indirect(return_type, attr);
 		}
 		return non_struct(c, return_type, true);
 	}
@@ -601,7 +604,8 @@ namespace lbAbiAmd64SysV {
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
 				attribute = lb_create_enum_attribute(c, "byval", true);
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
-				attribute = lb_create_enum_attribute(c, "sret", true);
+				// TODO(bill): sret doesn't work correct for LLVM C API
+				// attribute = lb_create_enum_attribute(c, "sret", true);
 			}
 			return lb_arg_type_indirect(type, attribute);
 		} else {
@@ -900,7 +904,10 @@ namespace lbAbiAmd64SysV {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
-			return lb_arg_type_indirect(return_type, lb_create_enum_attribute(c, "sret", true));
+			LLVMAttributeRef attr = nullptr;
+			// TODO(bill): sret doesn't work correct for LLVM C API
+			// attr = lb_create_enum_attribute(c, "sret", true);
+			return lb_arg_type_indirect(return_type, attr);
 		} else if (build_context.metrics.os == TargetOs_windows && lb_is_type_kind(return_type, LLVMIntegerTypeKind) && lb_sizeof(return_type) == 16) {
 			return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 128), nullptr, nullptr);
 		}
@@ -1048,7 +1055,9 @@ namespace lbAbiArm64 {
 				}
 				return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 			} else {
-				LLVMAttributeRef attr = lb_create_enum_attribute(c, "sret", true);
+				LLVMAttributeRef attr = nullptr;
+				// TODO(bill): sret doesn't work correct for LLVM C API
+				// attr = lb_create_enum_attribute(c, "sret", true);
 				return lb_arg_type_indirect(type, attr);
 			}
 		}

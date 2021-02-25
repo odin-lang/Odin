@@ -439,7 +439,11 @@ void linker_stage(lbGenerator *gen) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 				//       make sure to also change the 'mtriple' param passed to 'opt'
+				#if defined(GB_CPU_ARM)
+				" -macosx_version_min 11.0.0 "
+				#else
 				" -macosx_version_min 10.8.0 "
+				#endif
 				// This points the linker to where the entry point is
 				" -e _main "
 			#endif
