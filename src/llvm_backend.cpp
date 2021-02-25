@@ -6965,9 +6965,6 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer d) {
 		lb_emit_jump(p, b);
 	}
 
-	if (last_instr == nullptr || !LLVMIsATerminatorInst(last_instr)) {
-		lb_emit_jump(p, b);
-	}
 	lb_start_block(p, b);
 	if (d.kind == lbDefer_Node) {
 		lb_build_stmt(p, d.stmt);
