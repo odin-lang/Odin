@@ -4398,7 +4398,7 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, tag);
 			return ast_expr_stmt(f, parse_call_expr(f, t));
-		} else if (tag == "unroll" || tag == "force_inline") {
+		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
