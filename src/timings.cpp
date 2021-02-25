@@ -42,7 +42,13 @@ u64 osx_time_stamp__freq(void) {
 	data.numer = 0;
 	data.denom = 0;
 	mach_timebase_info(&data);
-	return (data.numer / data.denom) * 1000000000;
+#if defined(GB_CPU_ARM)
+	// NOTE(bill, 2021-02-25): M1 Chip seems to have a different freq count
+	// TODO(bill): Is this truly correct?
+	return (1000000llu * cast(u64)data.numer) / cast(u64)data.denom;
+#else
+	return (1000000000llu * cast(u64)data.numer) / cast(u64)data.denom;
+#endif
 }
 
 #elif defined(GB_SYSTEM_UNIX)
