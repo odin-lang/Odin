@@ -1842,6 +1842,15 @@ void print_show_unused(Checker *c) {
 	print_usage_line(0, "");
 }
 
+void enforce_platform_settings(void) {
+#if defined(GB_SYSTEM_OSX) && defined(GB_CPU_ARM)
+	#if defined(USE_NEW_LLVM_ABI_SYSTEM)
+		build_context.use_llvm_api = true;
+	#endif
+#endif
+}
+
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -1995,7 +2004,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-
+	enforce_platform_settings();
 
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
