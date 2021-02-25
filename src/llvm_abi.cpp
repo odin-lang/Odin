@@ -443,7 +443,10 @@ namespace lbAbi386 {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
-			return lb_arg_type_indirect(return_type, lb_create_enum_attribute(c, "sret", true));
+			LLVMAttributeRef attr = nullptr;
+			// TODO(bill): sret doesn't work correct for LLVM C API
+			// attr = lb_create_enum_attribute(c, "sret", true);
+			return lb_arg_type_indirect(return_type, attr);
 		}
 		return non_struct(c, return_type, true);
 	}
@@ -601,7 +604,8 @@ namespace lbAbiAmd64SysV {
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
 				attribute = lb_create_enum_attribute(c, "byval", true);
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
-				attribute = lb_create_enum_attribute(c, "sret", true);
+				// TODO(bill): sret doesn't work correct for LLVM C API
+				// attribute = lb_create_enum_attribute(c, "sret", true);
 			}
 			return lb_arg_type_indirect(type, attribute);
 		} else {
@@ -900,7 +904,10 @@ namespace lbAbiAmd64SysV {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
-			return lb_arg_type_indirect(return_type, lb_create_enum_attribute(c, "sret", true));
+			LLVMAttributeRef attr = nullptr;
+			// TODO(bill): sret doesn't work correct for LLVM C API
+			// attr = lb_create_enum_attribute(c, "sret", true);
+			return lb_arg_type_indirect(return_type, attr);
 		} else if (build_context.metrics.os == TargetOs_windows && lb_is_type_kind(return_type, LLVMIntegerTypeKind) && lb_sizeof(return_type) == 16) {
 			return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 128), nullptr, nullptr);
 		}
@@ -909,7 +916,7 @@ namespace lbAbiAmd64SysV {
 };
 
 
-namespace lbAbiAarch64 {
+namespace lbAbiArm64 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
 	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
@@ -1048,7 +1055,9 @@ namespace lbAbiAarch64 {
 				}
 				return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 			} else {
-				LLVMAttributeRef attr = lb_create_enum_attribute(c, "sret", true);
+				LLVMAttributeRef attr = nullptr;
+				// TODO(bill): sret doesn't work correct for LLVM C API
+				// attr = lb_create_enum_attribute(c, "sret", true);
 				return lb_arg_type_indirect(type, attr);
 			}
 		}
@@ -1123,8 +1132,8 @@ LB_ABI_INFO(lb_get_abi_info) {
 		}
 	} else if (build_context.metrics.arch == TargetArch_386) {
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
-	} else if (build_context.metrics.arch == TargetArch_aarch64) {
-		return lbAbiAarch64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+	} else if (build_context.metrics.arch == TargetArch_arm64) {
+		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	} else if (build_context.metrics.arch == TargetArch_wasm32) {
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	}
