@@ -31,7 +31,7 @@ gb_global Timings global_timings = {0};
 
 #if defined(GB_SYSTEM_OSX)
 	#include <llvm/Config/llvm-config.h>
-	#if LLVM_VERSION_MAJOR < 11 
+	#if LLVM_VERSION_MAJOR < 11
 	#error LLVM Version 11+ is required => "brew install llvm@11"
 	#endif
 #endif
@@ -1844,9 +1844,7 @@ void print_show_unused(Checker *c) {
 
 void enforce_platform_settings(void) {
 #if defined(GB_SYSTEM_OSX) && defined(GB_CPU_ARM)
-	#if defined(USE_NEW_LLVM_ABI_SYSTEM)
-		build_context.use_llvm_api = true;
-	#endif
+	build_context.use_llvm_api = true;
 #endif
 }
 
