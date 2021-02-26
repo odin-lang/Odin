@@ -50,3 +50,6 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	return (int) (0), (Errno) (1);
 }
 
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+	return (i64) (0), (Errno) (1);
+}
