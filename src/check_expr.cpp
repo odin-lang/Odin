@@ -45,7 +45,6 @@ struct CallArgumentData {
 	Entity *gen_entity;
 	i64     score;
 	Type *  result_type;
-	Type *  proc_type;
 };
 
 struct PolyProcData {
@@ -7016,10 +7015,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				// handle error
 			}
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-			if (entity_to_use != nullptr) {
-				add_entity_use(c, ident, entity_to_use);
-				data.proc_type = entity_to_use->type;
-			}
+			add_entity_use(c, ident, entity_to_use);
 
 			return data;
 		}
@@ -7095,7 +7091,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		auto valids = array_make<ValidIndexAndScore>(heap_allocator(), 0, procs.count);
 		defer (array_free(&valids));
 
-		auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2);
+		auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2 + 1);
 		defer (array_free(&proc_entities));
 		for_array(i, procs) {
 			array_add(&proc_entities, procs[i]);
@@ -7152,6 +7148,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			gb_sort_array(valids.data, valids.count, valid_index_and_score_cmp);
 			i64 best_score = valids[0].score;
 			Entity *best_entity = proc_entities[valids[0].index];
+			GB_ASSERT(best_entity != nullptr);
 			for (isize i = 1; i < valids.count; i++) {
 				if (best_score > valids[i].score) {
 					valids.count = i;
@@ -7236,6 +7233,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 			for (isize i = 0; i < valids.count; i++) {
 				Entity *proc = proc_entities[valids[i].index];
+				GB_ASSERT(proc != nullptr);
 				TokenPos pos = proc->token.pos;
 				Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
 				gbString pt = nullptr;
@@ -7284,15 +7282,13 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 
 			Entity *e = proc_entities[valids[0].index];
+			GB_ASSERT(e != nullptr);
 
 			proc_type = e->type;
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-			if (entity_to_use != nullptr) {
-				add_entity_use(c, ident, entity_to_use);
-				data.proc_type = entity_to_use->type;
-			}
+			add_entity_use(c, ident, entity_to_use);
 
 			if (data.gen_entity != nullptr) {
 				Entity *e = data.gen_entity;
@@ -7323,10 +7319,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-		if (entity_to_use != nullptr) {
-			add_entity_use(c, ident, entity_to_use);
-			data.proc_type = entity_to_use->type;
-		}
+		add_entity_use(c, ident, entity_to_use);
 
 		if (data.gen_entity != nullptr) {
 			Entity *e = data.gen_entity;
@@ -7830,25 +7823,12 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	}
 
 	Type *pt = base_type(proc_type);
-	if (data.proc_type != nullptr) {
-		pt = base_type(data.proc_type);
-	}
-
 
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
 			error(call, "'context' has not been defined within this scope, but is required for this procedure call");
 		}
 	}
-
-	#if 0
-	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
-		init_core_context(c->checker);
-		GB_ASSERT(t_context != nullptr);
-		GB_ASSERT(t_context->kind == Type_Named);
-		add_declaration_dependency(c, t_context->Named.type_name);
-	}
-	#endif
 
 	if (result_type == nullptr) {
 		operand->mode = Addressing_NoValue;
@@ -7897,7 +7877,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		operand->mode = Addressing_OptionalOk;
 	}
 
-	add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+	// add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
 
 	return Expr_Expr;
 }

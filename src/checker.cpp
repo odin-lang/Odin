@@ -4387,23 +4387,27 @@ void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Actually fix this race condition
 	for_array(i, c->info.minimum_dependency_set.entries) {
 		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
-		if (e != nullptr && e->kind == Entity_Procedure) {
-			if (!e->Procedure.is_foreign && (e->flags & EntityFlag_ProcBodyChecked) == 0) {
-				GB_ASSERT(e->decl_info != nullptr);
+		if (e == nullptr || e->kind != Entity_Procedure) {
+			continue;
+		}
+		if (e->Procedure.is_foreign) {
+			continue;
+		}
+		if ((e->flags & EntityFlag_ProcBodyChecked) == 0) {
+			GB_ASSERT(e->decl_info != nullptr);
 
-				ProcInfo pi = {};
-				pi.file  = e->file;
-				pi.token = e->token;
-				pi.decl  = e->decl_info;
-				pi.type  = e->type;
+			ProcInfo pi = {};
+			pi.file  = e->file;
+			pi.token = e->token;
+			pi.decl  = e->decl_info;
+			pi.type  = e->type;
 
-				Ast *pl = e->decl_info->proc_lit;
-				GB_ASSERT(pl != nullptr);
-				pi.body  = pl->ProcLit.body;
-				pi.tags  = pl->ProcLit.tags;
+			Ast *pl = e->decl_info->proc_lit;
+			GB_ASSERT(pl != nullptr);
+			pi.body  = pl->ProcLit.body;
+			pi.tags  = pl->ProcLit.tags;
 
-				check_proc_info(c, pi);
-			}
+			check_proc_info(c, pi);
 		}
 	}
 }
