@@ -4381,10 +4381,16 @@ GB_THREAD_PROC(check_proc_info_worker_proc) {
 }
 
 void check_unchecked_bodies(Checker *c) {
+#if !defined(GB_SYSTEM_WINDOWS)
+	// HACK TODO(2021-02-26, bill): THIS IS A FUCKING HACK
+	if (true) {
+		return;
+	}
+#endif
 	// NOTE(2021-02-26, bill): Sanity checker
 	// This is a partial hack to make sure all procedure bodies have been checked
 	// even ones which should not exist, due to the multithreaded nature of the parser
-	// NOTE(2021-02-26, bill): Actually fix this race condition
+	// HACK TODO(2021-02-26, bill): Actually fix this race condition
 	for_array(i, c->info.minimum_dependency_set.entries) {
 		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
 		if (e == nullptr || e->kind != Entity_Procedure) {
@@ -4406,6 +4412,7 @@ void check_unchecked_bodies(Checker *c) {
 			GB_ASSERT(pl != nullptr);
 			pi.body  = pl->ProcLit.body;
 			pi.tags  = pl->ProcLit.tags;
+			GB_ASSERT(pi.body != nullptr);
 
 			check_proc_info(c, pi);
 		}
