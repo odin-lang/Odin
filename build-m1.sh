@@ -5,7 +5,7 @@ release_mode=$1
 warnings_to_disable="-std=c++11 -Wno-switch"
 
 libraries="-pthread -ldl -lm -lstdc++ -lz -lcurses -lxml2"
-other_args="-DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM"
+other_args="-DLLVM_BACKEND_SUPPORT"
 compiler="clang"
 
 if [ -z "$release_mode" ]; then release_mode="0"; fi
@@ -33,5 +33,5 @@ elif [[ "$(uname)" == "FreeBSD" ]]; then
 	compiler="clang"
 fi
 
-${compiler} src/main.cpp ${warnings_to_disable} ${libraries} ${other_args} -o odin 
+${compiler} src/main.cpp ${warnings_to_disable} ${libraries} ${other_args} -o odin
 	# && ./odin run examples/demo/demo.odin -llvm-api
