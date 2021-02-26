@@ -370,6 +370,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			if (p->module != e->code_gen_module) {
 				gb_mutex_lock(&p->module->mutex);
 			}
+			GB_ASSERT(e->code_gen_module != nullptr);
 			found = map_get(&e->code_gen_module->values, hash_entity(e));
 			if (p->module != e->code_gen_module) {
 				gb_mutex_unlock(&p->module->mutex);
@@ -7109,6 +7110,7 @@ lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> 
 	if (p->module != e->code_gen_module) {
 		gb_mutex_lock(&p->module->mutex);
 	}
+	GB_ASSERT(e->code_gen_module != nullptr);
 	found = map_get(&e->code_gen_module->values, hash_entity(e));
 	if (p->module != e->code_gen_module) {
 		gb_mutex_unlock(&p->module->mutex);
@@ -8564,6 +8566,7 @@ LLVMValueRef lb_lookup_runtime_procedure(lbModule *m, String const &name) {
 	if (m != e->code_gen_module) {
 		gb_mutex_lock(&m->mutex);
 	}
+	GB_ASSERT(e->code_gen_module != nullptr);
 	found = map_get(&e->code_gen_module->values, hash_entity(e));
 	if (m != e->code_gen_module) {
 		gb_mutex_unlock(&m->mutex);
@@ -9554,9 +9557,9 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	expr = unparen_expr(expr);
 
+	TokenPos expr_pos = ast_token(expr).pos;
 	TypeAndValue tv = type_and_value_of_expr(expr);
-	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "%s", expr_to_string(expr));
-	GB_ASSERT(tv.mode != Addressing_Type);
+	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %.*s(%td:%td)\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), LIT(expr_pos.file), expr_pos.line, expr_pos.column, LIT(p->name), type_to_string(p->type));
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Short on constant values

@@ -646,6 +646,7 @@ void add_package_dependency(CheckerContext *c, char const *package_name, char co
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
+	e->flags |= EntityFlag_Used;
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	ptr_set_add(&c->decl->deps, e);
@@ -1721,6 +1722,13 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 	}
 }
 
+void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
+	Entity *e = scope_lookup(scope, name);
+	e->flags |= EntityFlag_Used;
+	add_dependency_to_set(c, e);
+}
+
+
 
 void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize entity_count = c->info.entities.count;
@@ -1775,7 +1783,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("bswap_f64"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
-		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_runtime_entities[i]));
+		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
 	}
 
 	if (build_context.no_crt) {
@@ -1787,7 +1795,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			str_lit("_fltused"),
 		};
 		for (isize i = 0; i < gb_count_of(required_no_crt_entities); i++) {
-			add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_no_crt_entities[i]));
+			force_add_dependency_entity(c, c->info.runtime_package->scope, required_no_crt_entities[i]);
 		}
 	}
 
@@ -1796,7 +1804,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("heap_allocator"),
 	};
 	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
-		add_dependency_to_set(c, scope_lookup(os->scope, required_os_entities[i]));
+		force_add_dependency_entity(c, os->scope, required_os_entities[i]);
 	}
 
 
@@ -1808,7 +1816,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			str_lit("dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
-			add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, bounds_check_entities[i]));
+			force_add_dependency_entity(c, c->info.runtime_package->scope, bounds_check_entities[i]);
 		}
 	}
 
@@ -1896,6 +1904,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			}
 		}
 	} else {
+		start->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, start);
 	}
 }
@@ -4358,6 +4367,9 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 	}
 
 	check_proc_body(&ctx, pi.token, pi.decl, pi.type, pi.body);
+	if (pi.body != nullptr && pi.decl->entity != nullptr) {
+		pi.decl->entity->flags |= EntityFlag_ProcBodyChecked;
+	}
 }
 
 GB_THREAD_PROC(check_proc_info_worker_proc) {
@@ -4368,6 +4380,33 @@ GB_THREAD_PROC(check_proc_info_worker_proc) {
 	return 0;
 }
 
+void check_unchecked_bodies(Checker *c) {
+	// NOTE(2021-02-26, bill): Sanity checker
+	// This is a partial hack to make sure all procedure bodies have been checked
+	// even ones which should not exist, due to the multithreaded nature of the parser
+	// NOTE(2021-02-26, bill): Actually fix this race condition
+	for_array(i, c->info.minimum_dependency_set.entries) {
+		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
+		if (e != nullptr && e->kind == Entity_Procedure) {
+			if (!e->Procedure.is_foreign && (e->flags & EntityFlag_ProcBodyChecked) == 0) {
+				GB_ASSERT(e->decl_info != nullptr);
+
+				ProcInfo pi = {};
+				pi.file  = e->file;
+				pi.token = e->token;
+				pi.decl  = e->decl_info;
+				pi.type  = e->type;
+
+				Ast *pl = e->decl_info->proc_lit;
+				GB_ASSERT(pl != nullptr);
+				pi.body  = pl->ProcLit.body;
+				pi.tags  = pl->ProcLit.tags;
+
+				check_proc_info(c, pi);
+			}
+		}
+	}
+}
 
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
@@ -4447,6 +4486,8 @@ void check_parsed_files(Checker *c) {
 	// Calculate initialization order of global variables
 	calculate_global_init_order(c);
 
+	TIME_SECTION("check bodies have all been checked");
+	check_unchecked_bodies(c);
 
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
