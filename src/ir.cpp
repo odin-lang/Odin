@@ -7939,11 +7939,11 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	Ast *original_expr = expr;
 	expr = unparen_expr(expr);
-	// ir_push_debug_location(proc->module, expr, proc->debug_scope);
-	// defer (ir_pop_debug_location(proc->module));
+
+	TokenPos expr_pos = ast_token(expr).pos;
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
-	GB_ASSERT(tv.mode != Addressing_Invalid);
+	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' @ %.*s(%td:%td)", expr_to_string(expr), LIT(expr_pos.file), expr_pos.line, expr_pos.column);
 	if (tv.mode == Addressing_Type) {
 		// HACK TODO(bill): This is hack but it should be safe in virtually all cases
 		irValue *v = ir_typeid(proc->module, tv.type);
