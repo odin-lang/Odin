@@ -363,6 +363,7 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str);
 lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
 
 bool lb_is_const(lbValue value);
+bool lb_is_const_or_global(lbValue value);
 bool lb_is_const_nil(lbValue value);
 String lb_get_const_string(lbModule *m, lbValue value);
 
