@@ -185,7 +185,7 @@ Unix_File_Time :: struct {
 	nanoseconds: i64,
 }
 
-Stat :: struct {
+OS_Stat :: struct {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
 	nlink:         u64, // Number of hard links
@@ -207,7 +207,7 @@ Stat :: struct {
 	_reserve3:     i64,
 };
 
-// NOTE(laleksic, 2021-01-21): Comment and rename these to match Stat above
+// NOTE(laleksic, 2021-01-21): Comment and rename these to match OS_Stat above
 Dirent :: struct {
 	ino:    u64,
 	off:    u64,
@@ -278,9 +278,9 @@ foreign libc {
 	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---;
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---;
-	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^Stat) -> c.int ---;
-	@(link_name="lstat")            _unix_lstat         :: proc(path: cstring, stat: ^Stat) -> c.int ---;
-	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> c.int ---;
+	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---;
+	@(link_name="lstat")            _unix_lstat         :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---;
+	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---;
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---;
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---;
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---;
@@ -397,11 +397,11 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 }
 
 @private
-_stat :: proc(path: string) -> (Stat, Errno) {
+_stat :: proc(path: string) -> (OS_Stat, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
-	s: Stat;
+	s: OS_Stat;
 	result := _unix_stat(cstr, &s);
 	if result == -1 {
 		return s, Errno(get_last_error());
@@ -410,11 +410,11 @@ _stat :: proc(path: string) -> (Stat, Errno) {
 }
 
 @private
-_lstat :: proc(path: string) -> (Stat, Errno) {
+_lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
-	s: Stat;
+	s: OS_Stat;
 	result := _unix_lstat(cstr, &s);
 	if result == -1 {
 		return s, Errno(get_last_error());
@@ -423,8 +423,8 @@ _lstat :: proc(path: string) -> (Stat, Errno) {
 }
 
 @private
-_fstat :: proc(fd: Handle) -> (Stat, Errno) {
-	s: Stat;
+_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+	s: OS_Stat;
 	result := _unix_fstat(fd, &s);
 	if result == -1 {
 		return s, Errno(get_last_error());
