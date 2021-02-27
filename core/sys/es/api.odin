@@ -1,7 +1,16 @@
 package es
-Element :: rawptr;
+ElementPublic :: struct {
+	userCallback :   UICallbackFunction,
+	cName :   cstring  ,
+	userData :   Generic,
+	accessKey :   i8  ,
+	window :   ^Window,
+	instance :   ^INSTANCE_TYPE,
+	flags :   u64     ,
+}
 Generic :: rawptr;
 INSTANCE_TYPE :: Instance;
+Element :: ElementPublic;
 Panel :: Element;
 Window :: Element;
 Scrollbar :: Element;
@@ -15,11 +24,11 @@ Choice :: Element;
 ColorWell :: Element;
 Splitter :: Element;
 ImageDisplay :: Element;
-ElementGroup :: Element;
-TextPlan :: Element;
-Store :: Element;
-DirectoryMonitor :: Element;
-NodeType :: u64     ;
+TextPlan :: rawptr;
+Store :: rawptr;
+PaintTarget :: rawptr;
+DirectoryMonitor :: rawptr;
+NodeType :: u8     ;
 Error :: int     ;
 Handle :: uint     ;
 Response :: i32;
@@ -248,10 +257,11 @@ SCANCODE_WWW_STARRED :: 			(0x111);
 PROCESS_STATE_ALL_THREADS_TERMINATED :: 	(1);
 PROCESS_STATE_TERMINATING :: 		(2);
 PROCESS_STATE_CRASHED :: 			(4);
+PROCESS_STATE_PINGED :: 			(8);
 FLAGS_DEFAULT ::  (0);
 SUCCESS ::  	(-1);
 ERROR_BUFFER_TOO_SMALL :: 		(-2);
-ERROR_UNKNOWN_OPERATION_FAILURE ::  	(-7);
+ERROR_UNKNOWN ::  	(-7);
 ERROR_NO_MESSAGES_AVAILABLE :: 		(-9);
 ERROR_MESSAGE_QUEUE_FULL :: 		(-10);
 ERROR_PATH_NOT_WITHIN_MOUNTED_VOLUME :: 	(-14);
@@ -265,6 +275,7 @@ ERROR_FILE_IN_EXCLUSIVE_USE :: 		(-24);
 ERROR_FILE_CANNOT_GET_EXCLUSIVE_USE :: 	(-25);
 ERROR_INCORRECT_NODE_TYPE :: 		(-26);
 ERROR_EVENT_NOT_SET :: 			(-27);
+ERROR_FILE_HAS_WRITERS :: 		(-28);
 ERROR_TIMEOUT_REACHED :: 			(-29);
 ERROR_FILE_ON_READ_ONLY_VOLUME :: 	(-32);
 ERROR_INVALID_DIMENSIONS :: 		(-34);
@@ -273,13 +284,10 @@ ERROR_COULD_NOT_ISSUE_PACKET :: 		(-36);
 ERROR_HANDLE_TABLE_FULL :: 		(-37);
 ERROR_COULD_NOT_RESIZE_FILE :: 		(-38);
 ERROR_DIRECTORY_NOT_EMPTY :: 		(-39);
-ERROR_UNSUPPORTED_FILESYSTEM :: 		(-40);
-ERROR_NODE_ALREADY_DELETED :: 		(-41);
-ERROR_NODE_IS_ROOT :: 			(-42);
+ERROR_NODE_DELETED :: 			(-41);
 ERROR_VOLUME_MISMATCH :: 			(-43);
 ERROR_TARGET_WITHIN_SOURCE :: 		(-44);
 ERROR_TARGET_INVALID_TYPE :: 		(-45);
-ERROR_NOTHING_TO_DRAW :: 			(-46);
 ERROR_MALFORMED_NODE_PATH :: 		(-47);
 ERROR_OUT_OF_CACHE_RESOURCES :: 		(-48);
 ERROR_TARGET_IS_SOURCE :: 		(-49);
@@ -295,18 +303,22 @@ ERROR_EVENT_SINK_OVERFLOW ::  		(-58);
 ERROR_EVENT_SINK_DUPLICATE :: 		(-59);
 ERROR_UNSUPPORTED_CONVERSION :: 		(-60);
 ERROR_SOURCE_EMPTY :: 			(-61);
+ERROR_UNSUPPORTED_EXECUTABLE :: 		(-62);
+ERROR_NO_ADDRESS_FOR_DOMAIN_NAME :: 	(-63);
+ERROR_NO_CONNECTED_NETWORK_INTERFACES :: 	(-64);
+ERROR_BAD_DOMAIN_NAME :: 			(-65);
+ERROR_LOST_IP_ADDRESS :: 			(-66);
+ERROR_CONNECTION_RESET :: 		(-67);
+ERROR_CONNECTION_REFUSED :: 		(-68);
 SYSTEM_CONSTANT_TIME_STAMP_UNITS_PER_MICROSECOND ::  (0);
 SYSTEM_CONSTANT_NO_FANCY_GRAPHICS :: 		   (1);
 SYSTEM_CONSTANT_REPORTED_PROBLEMS :: 		   (2);
 SYSTEM_CONSTANT_RIGHT_TO_LEFT :: 		    	   (3);
 SYSTEM_CONSTANT_WINDOW_INSET ::  		    	   (4);
 SYSTEM_CONSTANT_CONTAINER_TAB_BAND_HEIGHT ::         (5);
-SYSTEM_CONSTANT_WINDOW_BORDER_THICKNESS ::           (6);
 INVALID_HANDLE ::  		((  Handle) (0));
 CURRENT_THREAD :: 	 	((  Handle) (0x10));
 CURRENT_PROCESS :: 	 	((  Handle) (0x11));
-SURFACE_UI_SHEET :: 		((  Handle) (0x20));
-SURFACE_WALLPAPER :: 		((  Handle) (0x21));
 DRAW_ALPHA_OVERWRITE :: 		(0x100);
 DRAW_ALPHA_FULL :: 		(0x200) ;
 WAIT_NO_TIMEOUT ::             (-1);
@@ -333,25 +345,19 @@ TEXT_V_BOTTOM ::  		(8);
 TEXT_V_CENTER ::  		(12);
 TEXT_WRAP ::  			(16);
 TEXT_ELLIPSIS :: 			(32);
-NODE_READ_NONE :: 		(0x0);
-NODE_READ_BLOCK :: 		(0x1);
-NODE_READ_ACCESS :: 		(0x2);
-NODE_READ_EXCLUSIVE :: 		(0x3);
-NODE_WRITE_NONE :: 		(0x00);
-NODE_WRITE_BLOCK :: 		(0x10);
-NODE_WRITE_ACCESS :: 		(0x20);
-NODE_WRITE_EXCLUSIVE :: 		(0x30);
-NODE_RESIZE_NONE :: 		(0x000);
-NODE_RESIZE_BLOCK :: 		(0x100);
-NODE_RESIZE_ACCESS :: 		(0x200);
-NODE_RESIZE_EXCLUSIVE :: 		(0x300);
+NODE_ACCESS_READ_SHARED :: 	(0x1) ;
+NODE_ACCESS_READ :: 		(0x2) ;
+NODE_ACCESS_WRITE :: 		(0x4) ;
+NODE_ACCESS_WRITE_EXCLUSIVE ::  	(0x8) ;
+NODE_FILE :: 			(0);
+NODE_DIRECTORY :: 		(0x10);
+NODE_INVALID :: 			(0x20);
 NODE_FAIL_IF_FOUND :: 		(0x1000);
 NODE_FAIL_IF_NOT_FOUND :: 	(0x2000);
+NODE_PREVENT_RESIZE :: 		(0x4000);
 NODE_CREATE_DIRECTORIES :: 	(0x8000)  ;
 NODE_POSIX_NAMESPACE :: 		(0x10000) ;
-NODE_FILE :: 			(0);
-NODE_DIRECTORY :: 		(0x40000);
-NODE_INVALID :: 			(0x80000);
+_ES_NODE_FROM_WRITE_EXCLUSIVE :: 	(0x20000);
 DIRECTORY_CHILDREN_UNKNOWN :: 	((  FileOffsetDifference) (-1));
 MEMORY_OPEN_FAIL_IF_FOUND ::      (0x1000);
 MEMORY_OPEN_FAIL_IF_NOT_FOUND ::  (0x2000);
@@ -359,6 +365,7 @@ MAP_OBJECT_READ_WRITE ::          (0);
 MAP_OBJECT_READ_ONLY ::           (1);
 MAP_OBJECT_COPY_ON_WRITE ::       (2);
 STRING_FORMAT_ENOUGH_SPACE :: 	(                  (-1));
+STRING_FORMAT_SIMPLE :: 		(1 << 0);
 POSIX_SYSCALL_GET_POSIX_FD_PATH ::  	(0x10000);
 PERMISSION_ACCESS_SYSTEM_FILES ::   	(1 << 0);
 PERMISSION_ACCESS_USER_FILES ::   	(1 << 1);
@@ -373,6 +380,7 @@ PERMISSION_INHERIT :: 			(                  (1) << 63);
 PANEL_STYLE_DEFAULT :: 			"Panel.Default";
 PANEL_STYLE_TRANSPARENT :: 		"Panel.Transparent";
 PANEL_STYLE_WINDOW_BACKGROUND :: 		"Panel.WindowBackground";
+PANEL_STYLE_WINDOW_DIVIDER :: 		"Panel.WindowDivider";
 PANEL_STYLE_SHEET :: 			"Panel.Sheet";
 PANEL_STYLE_GROUP_BOX :: 			"Panel.GroupBox";
 PANEL_STYLE_INDENT :: 			"Panel.Indent";
@@ -387,6 +395,9 @@ ELEMENT_NO_HOVER :: 			(                  (1) << 38) ;
 ELEMENT_BLOCK_FOCUS :: 			(                  (1) << 39) ;
 ELEMENT_NOT_TAB_TRAVERSABLE :: 		(                  (1) << 40) ;
 ELEMENT_NO_INFORM_PARENT :: 		(                  (1) << 41) ;
+ELEMENT_CENTER_ACCESS_KEY_HINT :: 	(                  (1) << 42) ;
+ELEMENT_LAYOUT_HINT_HORIZONTAL :: 	(                  (1) << 43) ;
+ELEMENT_STICKY_ACCESS_KEY :: 		(                  (1) << 44) ;
 CELL_NEW_BAND :: 		(                  (1) << 51);
 CELL_COLLAPSABLE :: 	(                  (1) << 51);
 CELL_H_PUSH ::            (                  (1) << 54);
@@ -488,8 +499,6 @@ SAMPLE_FORMAT_U8 ::     (1);
 SAMPLE_FORMAT_S16LE ::  (2);
 SAMPLE_FORMAT_S32LE ::  (3);
 SAMPLE_FORMAT_F32LE ::  (4) ;
-STYLED_BOX_BLEND_MODE_NORMAL ::  (0);
-STYLED_BOX_BLEND_MODE_XOR ::     (1);
 CELL_FILL :: 	 (   CELL_H_FILL |    CELL_V_FILL);
 CELL_H_FILL :: 	 (   CELL_H_PUSH |    CELL_H_EXPAND |    CELL_H_SHRINK);
 CELL_V_FILL :: 	 (   CELL_V_PUSH |    CELL_V_EXPAND |    CELL_V_SHRINK);
@@ -500,7 +509,64 @@ CELL_CORNER :: 	 (   CELL_H_LEFT |    CELL_V_TOP);
 CELL_SHRINK :: 	 (   CELL_H_SHRINK |    CELL_V_SHRINK);
 CELL_H_CENTER ::   (   CELL_H_LEFT |    CELL_H_RIGHT);
 CELL_V_CENTER ::   (   CELL_V_TOP |    CELL_V_BOTTOM);
-StandardIcon :: enum {
+THEME_METRICS_INSETS ::  (1 << 0);
+THEME_METRICS_CLIP_INSETS ::  (1 << 1);
+THEME_METRICS_GLOBAL_OFFSET ::  (1 << 2)	;
+THEME_METRICS_CLIP_ENABLED ::  (1 << 3);
+THEME_METRICS_CURSOR ::  (1 << 4);
+THEME_METRICS_ENTRANCE_TRANSITION ::  (1 << 5);
+THEME_METRICS_EXIT_TRANSITION ::  (1 << 6);
+THEME_METRICS_ENTRANCE_DURATION ::  (1 << 7);
+THEME_METRICS_EXIT_DURATION ::  (1 << 8);
+THEME_METRICS_PREFERRED_WIDTH ::  (1 << 9);
+THEME_METRICS_PREFERRED_HEIGHT ::  (1 << 10);
+THEME_METRICS_MINIMUM_WIDTH ::  (1 << 11);
+THEME_METRICS_MINIMUM_HEIGHT ::  (1 << 12);
+THEME_METRICS_MAXIMUM_WIDTH ::  (1 << 13);
+THEME_METRICS_MAXIMUM_HEIGHT ::  (1 << 14);
+THEME_METRICS_GAP_MAJOR ::  (1 << 15);
+THEME_METRICS_GAP_MINOR ::  (1 << 16);
+THEME_METRICS_GAP_WRAP ::  (1 << 17);
+THEME_METRICS_GAP_ALL ::  (   THEME_METRICS_GAP_MAJOR |    THEME_METRICS_GAP_MINOR |    THEME_METRICS_GAP_WRAP);
+THEME_METRICS_TEXT_COLOR ::  (1 << 18);
+THEME_METRICS_SELECTED_BACKGROUND ::  (1 << 19);
+THEME_METRICS_SELECTED_TEXT ::  (1 << 20);
+THEME_METRICS_ICON_COLOR ::  (1 << 21);
+THEME_METRICS_TEXT_ALIGN ::  (1 << 22);
+THEME_METRICS_TEXT_SIZE ::  (1 << 23);
+THEME_METRICS_FONT_FAMILY ::  (1 << 24);
+THEME_METRICS_FONT_WEIGHT ::  (1 << 25);
+THEME_METRICS_ICON_SIZE ::  (1 << 26);
+THEME_METRICS_IS_ITALIC ::  (1 << 27);
+THEME_METRICS_ELLIPSIS ::  (1 << 28);
+THEME_METRICS_WRAP_TEXT ::  (1 << 29);
+MOVE_WINDOW_MAXIMISED ::  (1 << 0);
+MOVE_WINDOW_ADJUST_TO_FIT_SCREEN ::  (1 << 1);
+MOVE_WINDOW_HIDDEN ::  (1 << 2);
+MOVE_WINDOW_ALWAYS_ON_TOP ::  (1 << 3);
+MOVE_WINDOW_AT_BOTTOM ::  (1 << 4);
+MOVE_WINDOW_UPDATE_SCREEN ::  (1 << 5);
+WINDOW_SOLID_TRUE ::  (1 << 0);
+WINDOW_SOLID_NO_ACTIVATE ::  (1 << 1);
+THEME_BITMAP_WIDTH ::  (400);
+THEME_BITMAP_HEIGHT ::  (200);
+THEME_BITMAP_NAME ::  "Desktop.ThemeBitmap";
+TEXTBOX_MOVE_CARET_SINGLE ::  (2);
+TEXTBOX_MOVE_CARET_WORD ::  (3);
+TEXTBOX_MOVE_CARET_LINE ::  (4);
+TEXTBOX_MOVE_CARET_VERTICAL ::  (5);
+TEXTBOX_MOVE_CARET_ALL ::  (6);
+TEXTBOX_MOVE_CARET_FIRST_ONLY ::  (1 << 8);
+TEXTBOX_MOVE_CARET_SECOND_ONLY ::  (1 << 9);
+TEXTBOX_MOVE_CARET_BACKWARDS ::  (1 << 10);
+TEXTBOX_MOVE_CARET_STRONG_WHITESPACE ::  (1 << 11);
+GAME_CONTROLLER_MAX_COUNT ::  (16);
+DOMAIN_NAME_MAX_LENGTH ::  (255);
+ECHO_REQUEST_MAX_LENGTH ::  (48);
+CONNECTION_OPEN_WAIT ::  (1 << 0);
+FILE_CONTROL_NOTIFY_MONITORS ::  (1 << 0);
+FILE_CONTROL_FLUSH ::  (1 << 1);
+using StandardIcon :: enum i32 {
 	ICON_NONE,
 	ICON_ACTION_UNAVAILABLE_SYMBOLIC,
 	ICON_ADDRESS_BOOK_NEW,
@@ -1565,32 +1631,8 @@ StandardIcon :: enum {
 	ICON_WEATHER_STORM_TORNADO_NIGHT_SYMBOLIC,
 	ICON_WEATHER_STORM_TORNADO_SYMBOLIC,
 	ICON_WEATHER_WINDY_SYMBOLIC,
-	ICON_CHECKBOX_CHECKED_DISABLED,
-	ICON_CHECKBOX_CHECKED_HOVER,
-	ICON_CHECKBOX_CHECKED_NORMAL,
-	ICON_CHECKBOX_CHECKED_PRESSED,
-	ICON_CHECKBOX_EXCLUDED_DISABLED,
-	ICON_CHECKBOX_EXCLUDED_HOVER,
-	ICON_CHECKBOX_EXCLUDED_NORMAL,
-	ICON_CHECKBOX_EXCLUDED_PRESSED,
-	ICON_CHECKBOX_INDETERMINATE_DISABLED,
-	ICON_CHECKBOX_INDETERMINATE_HOVER,
-	ICON_CHECKBOX_INDETERMINATE_NORMAL,
-	ICON_CHECKBOX_INDETERMINATE_PRESSED,
-	ICON_CHECKBOX_UNCHECKED_DISABLED,
-	ICON_CHECKBOX_UNCHECKED_HOVER,
-	ICON_CHECKBOX_UNCHECKED_NORMAL,
-	ICON_CHECKBOX_UNCHECKED_PRESSED,
-	ICON_RADIOBOX_CHECKED_DISABLED,
-	ICON_RADIOBOX_CHECKED_HOVER,
-	ICON_RADIOBOX_CHECKED_NORMAL,
-	ICON_RADIOBOX_CHECKED_PRESSED,
-	ICON_RADIOBOX_UNCHECKED_DISABLED,
-	ICON_RADIOBOX_UNCHECKED_HOVER,
-	ICON_RADIOBOX_UNCHECKED_NORMAL,
-	ICON_RADIOBOX_UNCHECKED_PRESSED,
 }
-FatalError :: enum {
+using FatalError :: enum i32 {
 	FATAL_ERROR_INVALID_BUFFER,
 	FATAL_ERROR_UNKNOWN_SYSCALL,
 	FATAL_ERROR_INVALID_MEMORY_REGION,
@@ -1615,12 +1657,13 @@ FatalError :: enum {
 	FATAL_ERROR_ABORT,
 	FATAL_ERROR_COUNT,
 }
-SyscallType :: enum {
+using SyscallType :: enum i32 {
 	SYSCALL_ALLOCATE,
 	SYSCALL_FREE,
 	SYSCALL_SHARE_MEMORY,
 	SYSCALL_MAP_OBJECT,
 	SYSCALL_OPEN_SHARED_MEMORY,
+	SYSCALL_MEMORY_COMMIT,
 	SYSCALL_CREATE_PROCESS,
 	SYSCALL_GET_CREATION_ARGUMENT,
 	SYSCALL_TERMINATE_THREAD,
@@ -1647,48 +1690,42 @@ SyscallType :: enum {
 	SYSCALL_EVENT_SINK_CREATE,
 	SYSCALL_EVENT_SINK_POP,
 	SYSCALL_EVENT_SINK_PUSH,
-	SYSCALL_CREATE_SURFACE,
-	SYSCALL_GET_LINEAR_BUFFER,
-	SYSCALL_COPY_TO_SCREEN,
-	SYSCALL_FORCE_SCREEN_UPDATE,
-	SYSCALL_COPY_SURFACE,
-	SYSCALL_DRAW_SURFACE,
-	SYSCALL_REDRAW_ALL,
-	SYSCALL_DRAW_BITMAP,
-	SYSCALL_SURFACE_RESET,
-	SYSCALL_SURFACE_SHARE,
-	SYSCALL_RESIZE_SURFACE,
 	SYSCALL_AUDIO_STREAM_OPEN,
 	SYSCALL_AUDIO_STREAM_NOTIFY,
 	SYSCALL_GET_MESSAGE,
 	SYSCALL_POST_MESSAGE,
 	SYSCALL_POST_MESSAGE_REMOTE,
 	SYSCALL_WAIT_MESSAGE,
-	SYSCALL_CREATE_WINDOW,
-	SYSCALL_UPDATE_WINDOW,
-	SYSCALL_SET_CURSOR_STYLE,
-	SYSCALL_MOVE_WINDOW,
-	SYSCALL_GET_WINDOW_BOUNDS,
-	SYSCALL_RESET_CLICK_CHAIN,
 	SYSCALL_GET_CURSOR_POSITION,
 	SYSCALL_SET_CURSOR_POSITION,
+	SYSCALL_GAME_CONTROLLER_STATE_POLL,
 	SYSCALL_COPY,
 	SYSCALL_GET_CLIPBOARD_HEADER,
 	SYSCALL_PASTE_TEXT,
-	SYSCALL_SET_FOCUSED_WINDOW,
-	SYSCALL_SET_WINDOW_METADATA,
-	SYSCALL_GET_SCREEN_BOUNDS,
-	SYSCALL_WINDOW_OPEN,
-	SYSCALL_WINDOW_SET_BLEND_BOUNDS,
-	SYSCALL_WINDOW_GET_ID,
-	SYSCALL_SET_WINDOW_ALPHA,
-	SYSCALL_DOCKED_WINDOW_CREATE,
-	SYSCALL_WINDOW_SHARE,
-	SYSCALL_SET_EMBED_WINDOW,
-	SYSCALL_WINDOW_SET_BLUR_BOUNDS,
 	SYSCALL_START_EYEDROP,
+	SYSCALL_SET_SCREEN_WORK_AREA,
+	SYSCALL_GET_SCREEN_WORK_AREA,
+	SYSCALL_GET_SCREEN_BOUNDS,
+	SYSCALL_FORCE_SCREEN_UPDATE,
+	SYSCALL_SET_WINDOW_FRAME_BITMAP,
+	SYSCALL_WINDOW_CREATE,
+	SYSCALL_WINDOW_CLOSE,
+	SYSCALL_WINDOW_REDRAW,
+	SYSCALL_WINDOW_MOVE,
+	SYSCALL_WINDOW_GET_ID,
+	SYSCALL_WINDOW_GET_BOUNDS,
 	SYSCALL_WINDOW_SET_SOLID,
-	SYSCALL_RESIZE_WINDOW_SURFACE,
+	SYSCALL_WINDOW_SET_BITS,
+	SYSCALL_WINDOW_SET_OPAQUE_BOUNDS,
+	SYSCALL_WINDOW_SET_BLUR_BOUNDS,
+	SYSCALL_WINDOW_SET_ALPHA,
+	SYSCALL_WINDOW_SET_FOCUSED,
+	SYSCALL_WINDOW_SET_METADATA,
+	SYSCALL_WINDOW_SET_EMBED,
+	SYSCALL_WINDOW_SET_CURSOR,
+	SYSCALL_WINDOW_SET_OBJECT,
+	SYSCALL_WINDOW_SET_EMBED_OWNER,
+	SYSCALL_WINDOW_SET_RESIZE_CLEAR_COLOR,
 	SYSCALL_OPEN_NODE,
 	SYSCALL_OPEN_NODE_RELATIVE,
 	SYSCALL_READ_FILE_SYNC,
@@ -1699,7 +1736,12 @@ SyscallType :: enum {
 	SYSCALL_DELETE_NODE,
 	SYSCALL_MOVE_NODE,
 	SYSCALL_DIRECTORY_MONITOR,
-	SYSCALL_FILE_WRITE_COMPLETE,
+	SYSCALL_FILE_CONTROL,
+	SYSCALL_DOMAIN_NAME_RESOLVE,
+	SYSCALL_ECHO_REQUEST,
+	SYSCALL_CONNECTION_OPEN,
+	SYSCALL_CONNECTION_POLL,
+	SYSCALL_CONNECTION_NOTIFY,
 	SYSCALL_READ_CONSTANT_BUFFER,
 	SYSCALL_SHARE_CONSTANT_BUFFER,
 	SYSCALL_CREATE_CONSTANT_BUFFER,
@@ -1726,133 +1768,130 @@ SyscallType :: enum {
 	SYSCALL_DEBUG_COMMAND,
 	SYSCALL_COUNT,
 }
-MessageType :: enum {
-	MESSAGE_WM_START =  0x1000,
-	MESSAGE_MOUSE_MOVED =  0x1001,
-	MESSAGE_WINDOW_ACTIVATED =  0x1002,
-	MESSAGE_WINDOW_DEACTIVATED =  0x1003,
-	MESSAGE_WINDOW_DESTROYED =  0x1004,
-	MESSAGE_MOUSE_EXIT =  0x1005 ,
-	MESSAGE_WINDOW_RESIZED =  0x1007,
-	MESSAGE_MOUSE_LEFT_PRESSED =  0x1008	,
-	MESSAGE_MOUSE_LEFT_RELEASED =  0x1009,
-	MESSAGE_MOUSE_RIGHT_PRESSED =  0x100A,
-	MESSAGE_MOUSE_RIGHT_RELEASED =  0x100B,
-	MESSAGE_MOUSE_MIDDLE_PRESSED =  0x100C,
-	MESSAGE_MOUSE_MIDDLE_RELEASED =  0x100D ,
-	MESSAGE_KEY_PRESSED =  0x100E,
-	MESSAGE_KEY_RELEASED =  0x100F,
-	MESSAGE_UPDATE_WINDOW =  0x1010,
-	MESSAGE_WM_END =  0x13FF,
-	MESSAGE_PAINT =  0x2000	,
-	MESSAGE_PAINT_BACKGROUND =  0x2001	,
-	MESSAGE_PAINT_FOREGROUND =  0x2002	,
-	MESSAGE_GET_CURSOR =  0x2003	,
-	MESSAGE_ANIMATE =  0x2004	,
-	MESSAGE_Z_ORDER =  0x2005	,
-	MESSAGE_DESTROY =  0x2006	,
-	MESSAGE_MEASURE =  0x2008	,
-	MESSAGE_LAYOUT =  0x2009	,
-	MESSAGE_ENSURE_VISIBLE =  0x200A	,
-	MESSAGE_ADD_CHILD =  0x200B	,
-	MESSAGE_REMOVE_CHILD =  0x200C	,
-	MESSAGE_PRE_ADD_CHILD =  0x200D	,
-	MESSAGE_HIT_TEST =  0x200E	,
-	MESSAGE_MOUSE_DRAGGED =  0x200F	,
-	MESSAGE_CLICKED =  0x2010	,
-	MESSAGE_KEY_TYPED =  0x2011	,
-	MESSAGE_SCROLL_X =  0x2012	,
-	MESSAGE_SCROLL_Y =  0x2013	,
-	MESSAGE_STRONG_FOCUS_END =  0x2014	,
-	MESSAGE_BEFORE_Z_ORDER =  0x2015	,
-	MESSAGE_AFTER_Z_ORDER =  0x2016	,
-	MESSAGE_PAINT_CHILDREN =  0x2017	,
-	MESSAGE_STATE_CHANGE_MESSAGE_START =  0x2080,
-	MESSAGE_HOVERED_START =  0x2081	,
-	MESSAGE_HOVERED_END =  0x2082	,
-	MESSAGE_PRESSED_START =  0x2083	,
-	MESSAGE_PRESSED_END =  0x2084	,
-	MESSAGE_FOCUSED_START =  0x2085	,
-	MESSAGE_FOCUSED_END =  0x2086	,
-	MESSAGE_FOCUS_WITHIN_START =  0x2087	,
-	MESSAGE_FOCUS_WITHIN_END =  0x2088	,
-	MESSAGE_STATE_CHANGE_MESSAGE_END =  0x20FF,
-	MESSAGE_SCROLLBAR_MOVED =  0x3000	,
-	MESSAGE_CHECK_UPDATED =  0x3001	,
-	MESSAGE_RADIO_GROUP_UPDATED =  0x3002	,
-	MESSAGE_COLOR_CHANGED =  0x3003	,
-	MESSAGE_DESKTOP_START_PROGRAM =  0x4800,
-	MESSAGE_POWER_BUTTON_PRESSED =  0x4801,
-	MESSAGE_SET_WINDOW_METADATA =  0x4802,
-	MESSAGE_EMBED_WINDOW_CREATE =  0x4803,
-	MESSAGE_FS_EVENT_START =  0x4B80,
-	MESSAGE_FS_CREATE =  0x4B81,
-	MESSAGE_FS_DELETE =  0x4B82,
-	MESSAGE_FS_MOVE =  0x4B83,
-	MESSAGE_FS_MODIFY =  0x4B84,
-	MESSAGE_FS_EVENT_END =  0x4B85,
-	MESSAGE_FS_MONITOR_DESTROY =  0x4B86	,
-	MESSAGE_PROGRAM_CRASH =  0x4C00,
-	MESSAGE_PROGRAM_FAILED_TO_START =  0x4C01,
-	MESSAGE_CLIPBOARD_UPDATED =  0x5001,
-	MESSAGE_EYEDROP_REPORT =  0x5002,
-	MESSAGE_SYSTEM_CONSTANT_UPDATED =  0x5004,
-	MESSAGE_TIMER =  0x5006,
-	MESSAGE_RECEIVE_DATA =  0x5080,
-	MESSAGE_MAILSLOT_CLOSED =  0x5081,
-	MESSAGE_CHOICE_ADD_ITEMS =  0x5180,
-	MESSAGE_CHOICE_ITEM_TO_STRING =  0x5181,
-	MESSAGE_CHOICE_UPDATE =  0x5182,
-	MESSAGE_TEXTBOX_UPDATED =  0x5200,
-	MESSAGE_TEXTBOX_EDIT_START =  0x5201 ,
-	MESSAGE_TEXTBOX_EDIT_END =  0x5202 ,
-	MESSAGE_TEXTBOX_NUMBER_DRAG_START =  0x5203 ,
-	MESSAGE_TEXTBOX_NUMBER_DRAG_END =  0x5204 ,
-	MESSAGE_TEXTBOX_NUMBER_DRAG_DELTA =  0x5205 ,
-	MESSAGE_TEXTBOX_NUMBER_UPDATED =  0x5206 ,
-	MESSAGE_TEXTBOX_GET_BREADCRUMB =  0x5207 ,
-	MESSAGE_TEXTBOX_ACTIVATE_BREADCRUMB =  0x5208 ,
-	MESSAGE_LIST_VIEW_COMPARE_INDICES =  0x5300,
-	MESSAGE_LIST_VIEW_NEXT_INDEX =  0x5301,
-	MESSAGE_LIST_VIEW_PREVIOUS_INDEX =  0x5302,
-	MESSAGE_LIST_VIEW_FIRST_INDEX =  0x5303,
-	MESSAGE_LIST_VIEW_LAST_INDEX =  0x5304,
-	MESSAGE_LIST_VIEW_FIND_INDEX =  0x5305,
-	MESSAGE_LIST_VIEW_COUNT_ITEMS =  0x5306,
-	MESSAGE_LIST_VIEW_MEASURE_RANGE =  0x5307,
-	MESSAGE_LIST_VIEW_MEASURE_ITEM =  0x5308,
-	MESSAGE_LIST_VIEW_CREATE_ITEM =  0x5309,
-	MESSAGE_LIST_VIEW_GET_CONTENT =  0x530A,
-	MESSAGE_LIST_VIEW_GET_INDENT =  0x530B,
-	MESSAGE_LIST_VIEW_FIND_POSITION =  0x530C,
-	MESSAGE_LIST_VIEW_IS_SELECTED =  0x530D,
-	MESSAGE_LIST_VIEW_SELECT =  0x530E,
-	MESSAGE_LIST_VIEW_SELECT_RANGE =  0x530F,
-	MESSAGE_LIST_VIEW_CHOOSE_ITEM =  0x5310,
-	MESSAGE_LIST_VIEW_SEARCH =  0x5311,
-	MESSAGE_PROGRAM_START =  0x7000,
-	MESSAGE_PROGRAM_EXIT =  0x7001,
-	MESSAGE_INSTANCE_CREATE =  0x7002,
-	MESSAGE_INSTANCE_OPEN =  0x7003,
-	MESSAGE_INSTANCE_SAVE =  0x7004,
-	MESSAGE_USER_START =  0x8000,
-	MESSAGE_USER_END =  0xBFFF,
+using MessageType :: enum i32 {
+	MSG_WM_START =  0x1000,
+	MSG_MOUSE_MOVED =  0x1001,
+	MSG_WINDOW_ACTIVATED =  0x1002,
+	MSG_WINDOW_DEACTIVATED =  0x1003,
+	MSG_WINDOW_DESTROYED =  0x1004,
+	MSG_MOUSE_EXIT =  0x1006 ,
+	MSG_WINDOW_RESIZED =  0x1007,
+	MSG_MOUSE_LEFT_PRESSED =  0x1008	,
+	MSG_MOUSE_LEFT_RELEASED =  0x1009,
+	MSG_MOUSE_RIGHT_PRESSED =  0x100A,
+	MSG_MOUSE_RIGHT_RELEASED =  0x100B,
+	MSG_MOUSE_MIDDLE_PRESSED =  0x100C,
+	MSG_MOUSE_MIDDLE_RELEASED =  0x100D ,
+	MSG_KEY_PRESSED =  0x100E,
+	MSG_KEY_RELEASED =  0x100F,
+	MSG_UPDATE_WINDOW =  0x1010,
+	MSG_WM_END =  0x13FF,
+	MSG_PAINT =  0x2000	,
+	MSG_PAINT_BACKGROUND =  0x2001	,
+	MSG_PAINT_FOREGROUND =  0x2002	,
+	MSG_GET_CURSOR =  0x2003	,
+	MSG_ANIMATE =  0x2004	,
+	MSG_Z_ORDER =  0x2005	,
+	MSG_DESTROY =  0x2006	,
+	MSG_MEASURE =  0x2008	,
+	MSG_LAYOUT =  0x2009	,
+	MSG_ENSURE_VISIBLE =  0x200A	,
+	MSG_ADD_CHILD =  0x200B	,
+	MSG_REMOVE_CHILD =  0x200C	,
+	MSG_PRE_ADD_CHILD =  0x200D	,
+	MSG_HIT_TEST =  0x200E	,
+	MSG_MOUSE_DRAGGED =  0x200F	,
+	MSG_CLICKED =  0x2010	,
+	MSG_KEY_TYPED =  0x2011	,
+	MSG_SCROLL_X =  0x2012	,
+	MSG_SCROLL_Y =  0x2013	,
+	MSG_STRONG_FOCUS_END =  0x2014	,
+	MSG_BEFORE_Z_ORDER =  0x2015	,
+	MSG_AFTER_Z_ORDER =  0x2016	,
+	MSG_PAINT_CHILDREN =  0x2017	,
+	MSG_DESTROY_CONTENTS =  0x2018	,
+	MSG_STATE_CHANGE_MESSAGE_START =  0x2080,
+	MSG_HOVERED_START =  0x2081	,
+	MSG_HOVERED_END =  0x2082	,
+	MSG_PRESSED_START =  0x2083	,
+	MSG_PRESSED_END =  0x2084	,
+	MSG_FOCUSED_START =  0x2085	,
+	MSG_FOCUSED_END =  0x2086	,
+	MSG_FOCUS_WITHIN_START =  0x2087	,
+	MSG_FOCUS_WITHIN_END =  0x2088	,
+	MSG_STATE_CHANGE_MESSAGE_END =  0x20FF,
+	MSG_SCROLLBAR_MOVED =  0x3000	,
+	MSG_CHECK_UPDATED =  0x3001	,
+	MSG_RADIO_GROUP_UPDATED =  0x3002	,
+	MSG_COLOR_CHANGED =  0x3003	,
+	MSG_DESKTOP_START_PROGRAM =  0x4800,
+	MSG_POWER_BUTTON_PRESSED =  0x4801,
+	MSG_SET_WINDOW_METADATA =  0x4802,
+	MSG_EMBEDDED_WINDOW_DESTROYED =  0x4803,
+	MSG_FS_EVENT_START =  0x4B80,
+	MSG_FS_CREATE =  0x4B81,
+	MSG_FS_DELETE =  0x4B82,
+	MSG_FS_MOVE =  0x4B83,
+	MSG_FS_MODIFY =  0x4B84,
+	MSG_FS_EVENT_END =  0x4B85,
+	MSG_FS_MONITOR_DESTROY =  0x4B86 	,
+	MSG_PROGRAM_CRASH =  0x4C00,
+	MSG_CLIPBOARD_UPDATED =  0x5001,
+	MSG_EYEDROP_REPORT =  0x5002,
+	MSG_SYSTEM_CONSTANT_UPDATED =  0x5004,
+	MSG_TIMER =  0x5006,
+	MSG_PING =  0x5007	,
+	MSG_RECEIVE_DATA =  0x5080,
+	MSG_MAILSLOT_CLOSED =  0x5081,
+	MSG_CHOICE_ADD_ITEMS =  0x5180,
+	MSG_CHOICE_ITEM_TO_STRING =  0x5181,
+	MSG_CHOICE_UPDATE =  0x5182,
+	MSG_TEXTBOX_UPDATED =  0x5200,
+	MSG_TEXTBOX_EDIT_START =  0x5201 	,
+	MSG_TEXTBOX_EDIT_END =  0x5202 	,
+	MSG_TEXTBOX_NUMBER_DRAG_START =  0x5203 	,
+	MSG_TEXTBOX_NUMBER_DRAG_END =  0x5204 	,
+	MSG_TEXTBOX_NUMBER_DRAG_DELTA =  0x5205 	,
+	MSG_TEXTBOX_NUMBER_UPDATED =  0x5206 	,
+	MSG_TEXTBOX_GET_BREADCRUMB =  0x5207 	,
+	MSG_TEXTBOX_ACTIVATE_BREADCRUMB =  0x5208 	,
+	MSG_LIST_VIEW_COMPARE_INDICES =  0x5300,
+	MSG_LIST_VIEW_NEXT_INDEX =  0x5301,
+	MSG_LIST_VIEW_PREVIOUS_INDEX =  0x5302,
+	MSG_LIST_VIEW_FIRST_INDEX =  0x5303,
+	MSG_LIST_VIEW_LAST_INDEX =  0x5304,
+	MSG_LIST_VIEW_FIND_INDEX =  0x5305,
+	MSG_LIST_VIEW_COUNT_ITEMS =  0x5306,
+	MSG_LIST_VIEW_MEASURE_RANGE =  0x5307,
+	MSG_LIST_VIEW_MEASURE_ITEM =  0x5308,
+	MSG_LIST_VIEW_CREATE_ITEM =  0x5309,
+	MSG_LIST_VIEW_GET_CONTENT =  0x530A,
+	MSG_LIST_VIEW_GET_INDENT =  0x530B,
+	MSG_LIST_VIEW_FIND_POSITION =  0x530C,
+	MSG_LIST_VIEW_IS_SELECTED =  0x530D,
+	MSG_LIST_VIEW_SELECT =  0x530E,
+	MSG_LIST_VIEW_SELECT_RANGE =  0x530F,
+	MSG_LIST_VIEW_CHOOSE_ITEM =  0x5310,
+	MSG_LIST_VIEW_SEARCH =  0x5311,
+	MSG_PROGRAM_EXIT =  0x7001,
+	MSG_INSTANCE_CREATE =  0x7002,
+	MSG_INSTANCE_OPEN =  0x7003,
+	MSG_INSTANCE_SAVE =  0x7004,
+	MSG_USER_START =  0x8000,
+	MSG_USER_END =  0xBFFF,
 }
-DrawMode :: enum {
+using DrawMode :: enum i32 {
 	DRAW_MODE_REPEAT_FIRST =  1 ,
 	DRAW_MODE_STRECH,
 	DRAW_MODE_REPEAT,
 	DRAW_MODE_NONE,
 }
-ClipboardFormat :: enum {
+using ClipboardFormat :: enum i32 {
 	CLIPBOARD_FORMAT_EMPTY,
 	CLIPBOARD_FORMAT_TEXT,
 	CLIPBOARD_FORMAT_FILE_LIST,
 }
-ColorFormat :: enum {
-	COLOR_FORMAT_32_XRGB,
-}
-CursorStyle :: enum {
+using CursorStyle :: enum i32 {
 	CURSOR_NORMAL,
 	CURSOR_TEXT,
 	CURSOR_RESIZE_VERTICAL,
@@ -1884,29 +1923,30 @@ CursorStyle :: enum {
 	CURSOR_BLANK,
 	CURSOR_COUNT,
 }
-WindowStyle :: enum {
+using WindowStyle :: enum i32 {
 	WINDOW_NORMAL,
 	WINDOW_CONTAINER,
 	WINDOW_MENU,
 	WINDOW_TIP,
+	WINDOW_PLAIN,
 }
-FormatValueType :: enum {
+using FormatValueType :: enum i32 {
 	FORMAT_VALUE_INVALID,
 	FORMAT_VALUE_STRING,
 	FORMAT_VALUE_NUMBER,
 	FORMAT_VALUE_TIME,
 }
-CheckState :: enum {
+using CheckState :: enum i32 {
 	CHECK_UNCHECKED =  0,
 	CHECK_CHECKED =  1,
 	CHECK_INDETERMINATE =  2,
 }
-DocumentState :: enum {
+using DocumentState :: enum i32 {
 	DOCUMENT_STATE_EMPTY,
 	DOCUMENT_STATE_UNSAVED,
 	DOCUMENT_STATE_FILE,
 }
-TransitionType :: enum {
+using TransitionType :: enum i32 {
 	TRANSITION_NONE,
 	TRANSITION_SLIDE_UP,
 	TRANSITION_SLIDE_DOWN,
@@ -1923,6 +1963,12 @@ TransitionType :: enum {
 	TRANSITION_FADE_IN,
 	TRANSITION_FADE_OUT,
 }
+using MemoryProtection :: enum i32 {
+	MEMORY_PROTECTION_READ_ONLY,
+	MEMORY_PROTECTION_READ_WRITE,
+	MEMORY_PROTECTION_EXECUTABLE,
+}
+UICallbackFunction :: distinct #type proc "c" (  ^Element,   ^Message,   ^Response);
 BatchCall :: struct {
 	index :   SyscallType,
 	stopBatchIfError :   bool,
@@ -1944,9 +1990,7 @@ ProcessInformation :: struct {
 	mainThread :   ThreadInformation,
 }
 UniqueIdentifier :: struct {
-	using _ : struct #raw_union {
-		d : [16]u8     ,
-	},
+	d : [16]u8     ,
 }
 NodeInformation :: struct {
 	handle :   Handle,
@@ -1964,29 +2008,10 @@ Point :: struct {
 	y :   i32    ,
 }
 Rectangle :: struct {
-	left :   i32    ,
-	right :   i32    ,
-	top :   i32    ,
-	bottom :   i32    ,
-}
-Rectangle16 :: struct {
-	left :   i16    ,
-	right :   i16    ,
-	top :   i16    ,
-	bottom :   i16    ,
-}
-LinearBuffer :: struct {
-	width :   int   ,
-	height :   int   ,
-	stride :   int   ,
-	colorFormat :   ColorFormat,
-	handle :   Handle,
-}
-_EsDrawSurfaceArguments :: struct {
-	source :   Rectangle,
-	destination :   Rectangle,
-	border :   Rectangle,
-	alpha :   u16     ,
+	l :   i32    ,
+	r :   i32    ,
+	t :   i32    ,
+	b :   i32    ,
 }
 Spinlock :: struct {
 	state :   u8     ,
@@ -2012,13 +2037,6 @@ ClipboardHeader :: struct {
 	format :   ClipboardFormat,
 	textBytes :   int   ,
 	unused :   uint     ,
-}
-PaintTarget :: struct {
-	surface :   Handle,
-	fullAlpha :   bool,
-	linearBuffer :   LinearBuffer,
-	linearBitmap :   rawptr,
-	active :   bool,
 }
 Painter :: struct {
 	clip :   Rectangle,
@@ -2063,6 +2081,7 @@ Message :: struct {
 			alt :   u8     ,
 			ctrl :   u8     ,
 			shift :   u8     ,
+			activationClick :   u8     ,
 		},
 		keyboard : struct {
 			scancode :   u32     ,
@@ -2075,8 +2094,6 @@ Message :: struct {
 		crash : struct {
 			reason :   CrashReason,
 			process :   Handle,
-			processNameBuffer :   Handle,
-			processNameBytes :   int   ,
 			pid :   uint     ,
 		},
 		clipboard :   ClipboardHeader,
@@ -2101,17 +2118,10 @@ Message :: struct {
 			argumentBytes :   int   ,
 			modalWindowParent :   u64     ,
 		},
-		dockedWindowCreate : struct {
-			pipe :   Handle,
-		},
 		windowMetadata : struct {
 			id :   u64     ,
 			buffer :   Handle,
 			bytes :   int   ,
-		},
-		createEmbeddedWindow : struct {
-			id :   u64     ,
-			handle :   Handle,
 		},
 		windowResized : struct {
 			content :   Rectangle,
@@ -2152,7 +2162,7 @@ Message :: struct {
 		},
 		itemToString : struct {
 			item :   Generic,
-			text : ^u8, textBytes : int,
+			text : string,
 		},
 		choiceUpdated : struct {
 			newItem :   Generic,
@@ -2169,7 +2179,7 @@ Message :: struct {
 		},
 		getBreadcrumb : struct {
 			index :   uint     ,
-			text : ^u8, textBytes : int,
+			text : string,
 		},
 		activateBreadcrumb :   uint     ,
 		checkState :   CheckState,
@@ -2183,16 +2193,17 @@ Message :: struct {
 			_context :   Generic,
 		},
 		createInstance : struct {
+			window :   Handle,
 			data :   Handle,
 			dataBytes :   int   ,
 		},
 		instanceOpen : struct {
 			instance :   ^INSTANCE_TYPE,
-			path : ^u8, pathBytes : int,
+			path : string,
 		},
 		instanceSave : struct {
 			instance :   ^INSTANCE_TYPE,
-			path : ^u8, pathBytes : int,
+			path : string,
 		},
 		compareIndices : struct {
 			group :   i32    ,
@@ -2226,7 +2237,7 @@ Message :: struct {
 			group :   i32    ,
 			column :   u8     ,
 			icon :   u32     ,
-			text : ^u8, textBytes : int,
+			text : string,
 		},
 		getIndent : struct {
 			group :   i32    ,
@@ -2252,7 +2263,7 @@ Message :: struct {
 		searchItem : struct {
 			group :   i32    ,
 			index :   Generic,
-			query : ^u8, queryBytes : int,
+			query : string,
 		},
 		layout : struct {
 			sizeChanged :   bool,
@@ -2307,15 +2318,15 @@ _EsPOSIXSyscall :: struct {
 	arguments : [7]int     ,
 }
 ProcessCreationArguments :: struct {
-	executablePath : ^u8, executablePathBytes : int,
+	executablePath : string,
 	environmentBlock :   rawptr,
 	environmentBlockBytes :   int   ,
 	creationArgument :   Generic,
 	permissions :   u64     ,
 }
 _EsUserLoginArguments :: struct {
-	name : ^u8, nameBytes : int,
-	home : ^u8, homeBytes : int,
+	name : string,
+	home : string,
 }
 Instance :: struct {
 	_private :   rawptr,
@@ -2329,16 +2340,38 @@ PanelBand :: struct {
 	grow :   i32,
 	shrink :   i32,
 }
-UICallbackFunction :: distinct proc "c" (  ^Element,   ^Message,   ^Response);
-ElementProperties :: struct {
-	cStyle :   cstring  ,
-	cStyleOverride :   cstring  ,
-	callback :   UICallbackFunction,
-	cDescription :   cstring  ,
-	cName :   cstring  ,
-	cAutomationID :   cstring  ,
-	cAccessKey :   cstring  ,
-	data :   Generic,
+ThemeMetrics :: struct {
+	mask :   u64     ,
+	insets :   Rectangle,
+	clipInsets :   Rectangle,
+	globalOffset :   Rectangle,
+	clipEnabled :   i32,
+	cursor :   i32,
+	entranceTransition :   i32,
+	exitTransition :   i32,
+	entranceDuration :   i32,
+	exitDuration :   i32,
+	preferredWidth :   i32,
+	preferredHeight :   i32,
+	minimumWidth :   i32,
+	minimumHeight :   i32,
+	maximumWidth :   i32,
+	maximumHeight :   i32,
+	gapMajor :   i32,
+	gapMinor :   i32,
+	gapWrap :   i32,
+	textColor :   i32,
+	selectedBackground :   i32,
+	selectedText :   i32,
+	iconColor :   i32,
+	textAlign :   i32,
+	textSize :   i32,
+	fontFamily :   i32,
+	fontWeight :   i32,
+	iconSize :   i32,
+	isItalic :   bool,
+	ellipsis :   bool,
+	wrapText :   bool,
 }
 Font :: struct {
 	family :   u16     ,
@@ -2376,6 +2409,7 @@ TextSelection :: struct {
 }
 FormatValue :: struct {
 	type :   FormatValueType,
+	isCString :   bool,
 	isStringLiteral :   bool,
 	using _ : struct #raw_union {
 		string :   ^i8  ,
@@ -2383,38 +2417,34 @@ FormatValue :: struct {
 		time :   u64     ,
 	},
 }
-FragmentShaderCallbackFunction :: distinct proc "c" (  i32,   i32,   ^StyledBox) ->   u32     ;
+FragmentShaderCallbackFunction :: distinct #type proc "c" (  i32,   i32,   ^StyledBox) ->   u32     ;
 StyledBox :: struct {
-	ox :   i32,
-	oy :   i32,
-	width :   i32,
-	height :   i32,
+	bounds :   Rectangle,
 	clip :   Rectangle,
-	exclude :   Rectangle,
 	backgroundColor :   u32     ,
 	backgroundColor2 :   u32     ,
 	fragmentShader :   FragmentShaderCallbackFunction,
 	borderColor :   u32     ,
-	borders :   Rectangle16,
+	borders :   Rectangle,
 	cornerRadiusTopLeft :   i32,
 	cornerRadiusTopRight :   i32,
 	cornerRadiusBottomLeft :   i32,
 	cornerRadiusBottomRight :   i32,
 	blur :   bool,
-	hasBackgroundGradient :   bool,
-	hasExclusionRegion :   bool,
-	blendMode :   i32,
+	overwriteAlpha :   bool,
 }
 Arena :: struct {
 	firstEmptySlot :   rawptr,
+	firstBlock :   rawptr,
 	slotsPerBlock :   int   ,
 	slotSize :   int   ,
+	blockSize :   int   ,
 }
 CalculationValue :: struct {
 	error :   bool,
-	number :   [16]u8      ,
+	number :   f64   ,
 }
-CommandCallbackFunction :: distinct proc "c" (  ^INSTANCE_TYPE,   ^Element,   ^Command);
+CommandCallbackFunction :: distinct #type proc "c" (  ^INSTANCE_TYPE,   ^Element,   ^Command);
 Command :: struct {
 	elements :   ^^Element,
 	callback :   CommandCallbackFunction,
@@ -2422,11 +2452,11 @@ Command :: struct {
 	registered :   bool,
 	allocated :   bool,
 	stableID :   u32     ,
-	cKeyboardShortcut :   ^i8  ,
+	cKeyboardShortcut :   cstring  ,
 	data :   Generic,
 }
 ListViewColumn :: struct {
-	title : ^u8, titleBytes : int,
+	title : string,
 	flags :   u64     ,
 	width :   i32,
 }
@@ -2447,16 +2477,107 @@ AudioStream :: struct {
 	control :   u16     ,
 	clock :   u64     ,
 }
-ThreadEntryFunction :: distinct proc "c" (  Generic);
-ComparisonCallbackFunction :: distinct proc "c" (  rawptr,   rawptr,   Generic) ->   i32;
-SwapCallbackFunction :: distinct proc "c" (  rawptr,   rawptr,   Generic);
-CRTComparisonCallback :: distinct proc "c" (  rawptr,   rawptr) ->   i32;
-TimerCallbackFunction :: distinct proc "c" (  Generic);
-MenuCallbackFunction :: distinct proc "c" (  ^Menu,   Generic);
-StorePullCallbackFunction :: distinct proc "c" (  ^Store,   ^INSTANCE_TYPE,   Generic,   i32,   Generic,   ^FormatValue);
-StoreCallbackFunction :: distinct proc "c" (  ^Store,   ^INSTANCE_TYPE,   Generic,   Generic);
-DirectoryMonitorCallbackFunction :: distinct proc "c" (  ^DirectoryMonitor,   i32,   ^i8  ,   int   ,   ^i8  ,   int   ,   Generic);
-MessageLoopCallbackFunction :: distinct proc "c" (  ^Message);
+ApplicationStartupInformation :: struct {
+	id :   i64    ,
+	filePath : string,
+	targetWindow :   ^Window,
+	flags :   u64     ,
+}
+INIState :: struct {
+	buffer :   ^i8  ,
+	sectionClass :   ^i8  ,
+	section :   ^i8  ,
+	key :   ^i8  ,
+	value :   ^i8  ,
+	bytes :   int   ,
+	sectionClassBytes :   int   ,
+	sectionBytes :   int   ,
+	keyBytes :   int   ,
+	valueBytes :   int   ,
+}
+SystemConfigurationItem :: struct {
+	key :   ^i8  ,
+	value :   ^i8  ,
+	keyBytes :   int   ,
+	valueBytes :   int   ,
+}
+SystemConfigurationGroup :: struct {
+	section :   ^i8  ,
+	sectionClass :   ^i8  ,
+	sectionBytes :   int   ,
+	sectionClassBytes :   int   ,
+	items :   ^SystemConfigurationItem,
+	itemCount :   int   ,
+}
+AnalogInput :: struct {
+	x :   u8     ,
+	y :   u8     ,
+	z :   u8     ,
+}
+GameControllerState :: struct {
+	id :   u64     ,
+	buttonCount :   u8     ,
+	analogCount :   u8     ,
+	directionalPad :   u8     ,
+	buttons :   u32     ,
+	analog : [8]AnalogInput,
+}
+SchedulerLogEntry :: struct {
+	path : [64]i8  ,
+	thread : [16]i8  ,
+	pathBytes :   u8     ,
+	threadBytes :   u8     ,
+	cpu :   u8     ,
+	count :   u32     ,
+	timeMs :   u64     ,
+}
+PCIDevice :: struct {
+	deviceID :   u32     ,
+	classCode :   u8     ,
+	subclassCode :   u8     ,
+	progIF :   u8     ,
+	bus :   u8     ,
+	slot :   u8     ,
+	function :   u8     ,
+	interruptPin :   u8     ,
+	interruptLine :   u8     ,
+	baseAddressesSizes : [6]int   ,
+	baseAddresses : [6]u32     ,
+	driverName : [64]i8  ,
+	driverNameBytes :   int   ,
+}
+Address :: struct {
+	using _ : struct #raw_union {
+		using _  : struct {
+			ipv4 :   u32     ,
+			port :   u16     ,
+		},
+		d : [20]u8     ,
+	},
+}
+Connection :: struct {
+	address :   Address,
+	receiveBufferBytes :   int   ,
+	sendBufferBytes :   int   ,
+	receiveBuffer :   ^u8     ,
+	sendBuffer :   ^u8     ,
+	receiveWritePointer :   uint     ,
+	sendReadPointer :   uint     ,
+	open :   bool,
+	error :   Error,
+	receiveReadPointer :   uint     ,
+	sendWritePointer :   uint     ,
+	handle :   Handle,
+}
+ThreadEntryFunction :: distinct #type proc "c" (  Generic);
+ComparisonCallbackFunction :: distinct #type proc "c" (  rawptr,   rawptr,   Generic) ->   i32;
+SwapCallbackFunction :: distinct #type proc "c" (  rawptr,   rawptr,   Generic);
+CRTComparisonCallback :: distinct #type proc "c" (  rawptr,   rawptr) ->   i32;
+TimerCallbackFunction :: distinct #type proc "c" (  Generic);
+MenuCallbackFunction :: distinct #type proc "c" (  ^Menu,   Generic);
+StorePullCallbackFunction :: distinct #type proc "c" (  ^Store,   ^INSTANCE_TYPE,   Generic,   i32,   Generic,   ^FormatValue);
+StoreCallbackFunction :: distinct #type proc "c" (  ^Store,   ^INSTANCE_TYPE,   Generic,   Generic);
+DirectoryMonitorCallbackFunction :: distinct #type proc "c" (  ^DirectoryMonitor,   i32,   ^i8  ,   int   ,   ^i8  ,   int   ,   Generic);
 Batch :: #force_inline proc "c" (calls_ :   ^BatchCall, count_ :   int   ){ addr := 0x1000 + 0 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^BatchCall,   int   )) (fp))(calls_, count_); }
 GetCreationArgument :: #force_inline proc "c" (object_ :   Handle) ->   Generic{ addr := 0x1000 + 1 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle) ->   Generic) (fp))(object_); }
 GetSystemInformation :: #force_inline proc "c" (systemInformation_ :   ^SystemInformation){ addr := 0x1000 + 2 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^SystemInformation)) (fp))(systemInformation_); }
@@ -2464,56 +2585,64 @@ HandleClose :: #force_inline proc "c" (handle_ :   Handle) ->   Error{ addr := 0
 InitialiseCStandardLibrary :: #force_inline proc "c" (argc_ :   ^i32, argv_ :   ^^^i8  ){ addr := 0x1000 + 4 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^i32,   ^^^i8  )) (fp))(argc_, argv_); }
 MailslotSendData :: #force_inline proc "c" (mailslot_ :   Handle, data_ :   rawptr, bytes_ :   int   ) ->   bool{ addr := 0x1000 + 5 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   rawptr,   int   ) ->   bool) (fp))(mailslot_, data_, bytes_); }
 MakeLinuxSystemCall2 :: #force_inline proc "c" (n_ :   int     , a1_ :   int     , a2_ :   int     , a3_ :   int     , a4_ :   int     , a5_ :   int     , a6_ :   int     ) ->   int     { addr := 0x1000 + 6 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int     ,   int     ,   int     ,   int     ,   int     ,   int     ,   int     ) ->   int     ) (fp))(n_, a1_, a2_, a3_, a4_, a5_, a6_); }
-SystemConfigurationRead :: #force_inline proc "c" (cKey_ :   ^i8  , bytes_ :   ^int   ) ->   rawptr{ addr := 0x1000 + 7 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^int   ) ->   rawptr) (fp))(cKey_, bytes_); }
 SystemGetConstant :: #force_inline proc "c" (index_ :   uint     ) ->   u64     { addr := 0x1000 + 8 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  uint     ) ->   u64     ) (fp))(index_); }
 TakeSystemSnapshot :: #force_inline proc "c" (type_ :   i32, bufferSize_ :   ^int   ) ->   Handle{ addr := 0x1000 + 9 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32,   ^int   ) ->   Handle) (fp))(type_, bufferSize_); }
 UserGetHomeFolder :: #force_inline proc "c" (buffer_ :   ^i8  , bufferBytes_ :   int   ) ->   int   { addr := 0x1000 + 10 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ) ->   int   ) (fp))(buffer_, bufferBytes_); }
-_EsInstanceCreate :: #force_inline proc "c" (bytes_ :   int   , message_ :   ^Message) ->   ^Instance{ addr := 0x1000 + 11 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   ^Message) ->   ^Instance) (fp))(bytes_, message_); }
+_EsInstanceCreate :: #force_inline proc "c" (bytes_ :   int   , message_ :   ^Message, cName_ :   cstring  ) ->   ^Instance{ addr := 0x1000 + 11 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   ^Message,   cstring  ) ->   ^Instance) (fp))(bytes_, message_, cName_); }
 _EsSyscall :: #force_inline proc "c" (a_ :   uint     , b_ :   uint     , c_ :   uint     , d_ :   uint     , e_ :   uint     , f_ :   uint     ) ->   uint     { addr := 0x1000 + 12 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  uint     ,   uint     ,   uint     ,   uint     ,   uint     ,   uint     ) ->   uint     ) (fp))(a_, b_, c_, d_, e_, f_); }
+ApplicationStart :: #force_inline proc "c" (information_ :   ^ApplicationStartupInformation){ addr := 0x1000 + 124 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ApplicationStartupInformation)) (fp))(information_); }
+SystemConfigurationReadAll :: #force_inline proc "c" (groupCount_ :   ^int   ) ->   ^SystemConfigurationGroup{ addr := 0x1000 + 164 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^int   ) ->   ^SystemConfigurationGroup) (fp))(groupCount_); }
+SystemConfigurationReadInteger :: #force_inline proc "c" (section_ : string, key_ : string, defaultValue_ :   i64     = 0) ->   i64    { addr := 0x1000 + 295 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int,   i64    ) ->   i64    ) (fp))(raw_data(section_), len(section_), raw_data(key_), len(key_), defaultValue_); }
+SystemConfigurationGroupReadInteger :: #force_inline proc "c" (group_ :   ^SystemConfigurationGroup, key_ : string, defaultValue_ :   i64     = 0) ->   i64    { addr := 0x1000 + 296 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^SystemConfigurationGroup, ^u8, int,   i64    ) ->   i64    ) (fp))(group_, raw_data(key_), len(key_), defaultValue_); }
+SystemConfigurationReadString :: #force_inline proc "c" (section_ : string, key_ : string, valueBytes_ :   ^int    = nil) ->   ^i8  { addr := 0x1000 + 297 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int,   ^int   ) ->   ^i8  ) (fp))(raw_data(section_), len(section_), raw_data(key_), len(key_), valueBytes_); }
+SystemConfigurationGroupReadString :: #force_inline proc "c" (group_ :   ^SystemConfigurationGroup, key_ : string, valueBytes_ :   ^int    = nil) ->   ^i8  { addr := 0x1000 + 298 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^SystemConfigurationGroup, ^u8, int,   ^int   ) ->   ^i8  ) (fp))(group_, raw_data(key_), len(key_), valueBytes_); }
+INIParse :: #force_inline proc "c" (s_ :   ^INIState) ->   bool{ addr := 0x1000 + 7 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INIState) ->   bool) (fp))(s_); }
+INIPeek :: #force_inline proc "c" (s_ :   ^INIState) ->   bool{ addr := 0x1000 + 87 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INIState) ->   bool) (fp))(s_); }
+INIFormat :: #force_inline proc "c" (s_ :   ^INIState, buffer_ :   ^i8  , bytes_ :   int   ) ->   int   { addr := 0x1000 + 125 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INIState,   ^i8  ,   int   ) ->   int   ) (fp))(s_, buffer_, bytes_); }
+INIZeroTerminate :: #force_inline proc "c" (s_ :   ^INIState){ addr := 0x1000 + 126 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^INIState)) (fp))(s_); }
 CommandAddButton :: #force_inline proc "c" (command_ :   ^Command, button_ :   ^Button){ addr := 0x1000 + 13 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Command,   ^Button)) (fp))(command_, button_); }
 CommandByID :: #force_inline proc "c" (instance_ :   ^Instance, stableID_ :   u32     ) ->   ^Command{ addr := 0x1000 + 14 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Instance,   u32     ) ->   ^Command) (fp))(instance_, stableID_); }
-CommandRegister :: #force_inline proc "c" (command_ :   ^Command, instance_ :   ^Instance, callback_ :   CommandCallbackFunction, stableID_ :   u32     , cDefaultKeyboardShortcut_ :   cstring  , enabled_ :   bool) ->   ^Command{ addr := 0x1000 + 15 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Command,   ^Instance,   CommandCallbackFunction,   u32     ,   cstring  ,   bool) ->   ^Command) (fp))(command_, instance_, callback_, stableID_, cDefaultKeyboardShortcut_, enabled_); }
+CommandRegister :: #force_inline proc "c" (command_ :   ^Command, instance_ :   ^Instance, callback_ :   CommandCallbackFunction, stableID_ :   u32     , cDefaultKeyboardShortcut_ :   cstring   = nil, enabled_ :   bool = false) ->   ^Command{ addr := 0x1000 + 15 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Command,   ^Instance,   CommandCallbackFunction,   u32     ,   cstring  ,   bool) ->   ^Command) (fp))(command_, instance_, callback_, stableID_, cDefaultKeyboardShortcut_, enabled_); }
 CommandSetCallback :: #force_inline proc "c" (command_ :   ^Command, callback_ :   CommandCallbackFunction){ addr := 0x1000 + 16 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Command,   CommandCallbackFunction)) (fp))(command_, callback_); }
 CommandSetDisabled :: #force_inline proc "c" (command_ :   ^Command, disabled_ :   bool){ addr := 0x1000 + 17 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Command,   bool)) (fp))(command_, disabled_); }
 DialogClose :: #force_inline proc "c" (window_ :   ^Window){ addr := 0x1000 + 18 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window)) (fp))(window_); }
 DialogShow :: #force_inline proc "c" (window_ :   ^Window) ->   ^Element{ addr := 0x1000 + 19 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window) ->   ^Element) (fp))(window_); }
-DialogShowAlert :: #force_inline proc "c" (window_ :   ^Window, title_ : string, content_ : string, iconID_ :   u32     ) ->   ^Element{ addr := 0x1000 + 20 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window, ^u8, int, ^u8, int,   u32     ) ->   ^Element) (fp))(window_, raw_data(title_), len(title_), raw_data(content_), len(content_), iconID_); }
+DialogShowAlert :: #force_inline proc "c" (window_ :   ^Window, title_ : string, content_ : string, iconID_ :   u32     , addOKButton_ :   bool = false) ->   ^Element{ addr := 0x1000 + 20 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window, ^u8, int, ^u8, int,   u32     ,   bool) ->   ^Element) (fp))(window_, raw_data(title_), len(title_), raw_data(content_), len(content_), iconID_, addOKButton_); }
+InstanceDestroy :: #force_inline proc "c" (instance_ :   ^INSTANCE_TYPE){ addr := 0x1000 + 300 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^INSTANCE_TYPE)) (fp))(instance_); }
 KeyboardIsAltHeld :: #force_inline proc "c" () ->   bool{ addr := 0x1000 + 21 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   bool) (fp))(); }
 KeyboardIsCtrlHeld :: #force_inline proc "c" () ->   bool{ addr := 0x1000 + 22 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   bool) (fp))(); }
 KeyboardIsShiftHeld :: #force_inline proc "c" () ->   bool{ addr := 0x1000 + 23 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   bool) (fp))(); }
 MessageGetInputText :: #force_inline proc "c" (message_ :   ^Message, buffer_ :   ^i8  ) ->   int   { addr := 0x1000 + 24 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Message,   ^i8  ) ->   int   ) (fp))(message_, buffer_); }
-MessageLoopEnter :: #force_inline proc "c" (callback_ :   MessageLoopCallbackFunction){ addr := 0x1000 + 25 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  MessageLoopCallbackFunction)) (fp))(callback_); }
 MessageMutexAcquire :: #force_inline proc "c" (){ addr := 0x1000 + 26 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
 MessageMutexCheck :: #force_inline proc "c" (){ addr := 0x1000 + 27 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
 MessageMutexRelease :: #force_inline proc "c" (){ addr := 0x1000 + 28 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
 MessagePost :: #force_inline proc "c" (target_ :   ^Element, message_ :   ^Message) ->   Error{ addr := 0x1000 + 29 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   ^Message) ->   Error) (fp))(target_, message_); }
 MessagePostRemote :: #force_inline proc "c" (process_ :   Handle, message_ :   ^Message) ->   Error{ addr := 0x1000 + 30 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   ^Message) ->   Error) (fp))(process_, message_); }
 MessageSend :: #force_inline proc "c" (object_ :   ^Element, message_ :   ^Message) ->   Response{ addr := 0x1000 + 31 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   ^Message) ->   Response) (fp))(object_, message_); }
-MouseGetPosition :: #force_inline proc "c" (relativeElement_ :   ^Element) ->   Point{ addr := 0x1000 + 32 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Point) (fp))(relativeElement_); }
+MessageReceive :: #force_inline proc "c" () ->   ^Message{ addr := 0x1000 + 318 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   ^Message) (fp))(); }
+MouseGetPosition :: #force_inline proc "c" (relativeElement_ :   ^Element = nil) ->   Point{ addr := 0x1000 + 32 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Point) (fp))(relativeElement_); }
 MouseSetPosition :: #force_inline proc "c" (relativeWindow_ :   ^Window, x_ :   i32, y_ :   i32){ addr := 0x1000 + 33 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window,   i32,   i32)) (fp))(relativeWindow_, x_, y_); }
-PaintTargetClear :: #force_inline proc "c" (target_ :   ^PaintTarget){ addr := 0x1000 + 34 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^PaintTarget)) (fp))(target_); }
-PaintTargetTake :: #force_inline proc "c" (window_ :   ^Window, target_ :   ^PaintTarget, width_ :   int   , height_ :   int   ) ->   bool{ addr := 0x1000 + 35 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window,   ^PaintTarget,   int   ,   int   ) ->   bool) (fp))(window_, target_, width_, height_); }
-PaintTargetReturn :: #force_inline proc "c" (window_ :   ^Window, target_ :   ^PaintTarget){ addr := 0x1000 + 36 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window,   ^PaintTarget)) (fp))(window_, target_); }
+StyleInheritRegister :: #force_inline proc "c" (cStyle_ :   cstring  , cParent_ :   cstring  , customMetrics_ :   ^ThemeMetrics){ addr := 0x1000 + 239 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  cstring  ,   cstring  ,   ^ThemeMetrics)) (fp))(cStyle_, cParent_, customMetrics_); }
 StyleRefreshAll :: #force_inline proc "c" (window_ :   ^Element){ addr := 0x1000 + 37 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(window_); }
 UISetDPI :: #force_inline proc "c" (dpiScale_ :   i32){ addr := 0x1000 + 38 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  i32)) (fp))(dpiScale_); }
 DirectoryEnumerateChildren :: #force_inline proc "c" (path_ : string, buffer_ :   ^^DirectoryChild) ->   int      { addr := 0x1000 + 39 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   ^^DirectoryChild) ->   int      ) (fp))(raw_data(path_), len(path_), buffer_); }
 DirectoryEnumerateChildrenFromHandle :: #force_inline proc "c" (directory_ :   Handle, buffer_ :   ^DirectoryChild, bufferCount_ :   int   ) ->   int      { addr := 0x1000 + 40 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   ^DirectoryChild,   int   ) ->   int      ) (fp))(directory_, buffer_, bufferCount_); }
-DirectoryMonitorCreate :: #force_inline proc "c" (path_ : string, flags_ :   u64     , callback_ :   DirectoryMonitorCallbackFunction, _context_ :   Generic) ->   ^DirectoryMonitor{ addr := 0x1000 + 41 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   u64     ,   DirectoryMonitorCallbackFunction,   Generic) ->   ^DirectoryMonitor) (fp))(raw_data(path_), len(path_), flags_, callback_, _context_); }
-DirectoryMonitorCreateFromHandle :: #force_inline proc "c" (directory_ :   Handle, flags_ :   u64     , callback_ :   DirectoryMonitorCallbackFunction, _context_ :   Generic) ->   ^DirectoryMonitor{ addr := 0x1000 + 42 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   u64     ,   DirectoryMonitorCallbackFunction,   Generic) ->   ^DirectoryMonitor) (fp))(directory_, flags_, callback_, _context_); }
+DirectoryMonitorCreate :: #force_inline proc "c" (path_ : string, flags_ :   u32     , callback_ :   DirectoryMonitorCallbackFunction, _context_ :   Generic) ->   ^DirectoryMonitor{ addr := 0x1000 + 41 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   u32     ,   DirectoryMonitorCallbackFunction,   Generic) ->   ^DirectoryMonitor) (fp))(raw_data(path_), len(path_), flags_, callback_, _context_); }
+DirectoryMonitorCreateFromHandle :: #force_inline proc "c" (directory_ :   Handle, flags_ :   u32     , callback_ :   DirectoryMonitorCallbackFunction, _context_ :   Generic) ->   ^DirectoryMonitor{ addr := 0x1000 + 42 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   u32     ,   DirectoryMonitorCallbackFunction,   Generic) ->   ^DirectoryMonitor) (fp))(directory_, flags_, callback_, _context_); }
 DirectoryMonitorDestroy :: #force_inline proc "c" (monitor_ :   ^DirectoryMonitor){ addr := 0x1000 + 43 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^DirectoryMonitor)) (fp))(monitor_); }
+FileControl :: #force_inline proc "c" (file_ :   Handle, flags_ :   u32     ) ->   Error{ addr := 0x1000 + 96 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   u32     ) ->   Error) (fp))(file_, flags_); }
 FileReadAll :: #force_inline proc "c" (filePath_ : string, fileSize_ :   ^int   ) ->   rawptr{ addr := 0x1000 + 44 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   ^int   ) ->   rawptr) (fp))(raw_data(filePath_), len(filePath_), fileSize_); }
 FileReadSync :: #force_inline proc "c" (file_ :   Handle, offset_ :   FileOffset, size_ :   int   , buffer_ :   rawptr) ->   int   { addr := 0x1000 + 45 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   FileOffset,   int   ,   rawptr) ->   int   ) (fp))(file_, offset_, size_, buffer_); }
 FileResize :: #force_inline proc "c" (file_ :   Handle, newSize_ :   FileOffset) ->   Error{ addr := 0x1000 + 46 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   FileOffset) ->   Error) (fp))(file_, newSize_); }
 FileWriteAll :: #force_inline proc "c" (filePath_ : string, data_ :   rawptr, fileSize_ :   int   ) ->   Error{ addr := 0x1000 + 47 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   rawptr,   int   ) ->   Error) (fp))(raw_data(filePath_), len(filePath_), data_, fileSize_); }
 FileWriteAllGather :: #force_inline proc "c" (filePath_ : string, data_ :   ^rawptr, fileSize_ :   ^int   , gatherCount_ :   int   ) ->   Error{ addr := 0x1000 + 48 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   ^rawptr,   ^int   ,   int   ) ->   Error) (fp))(raw_data(filePath_), len(filePath_), data_, fileSize_, gatherCount_); }
-FileWriteComplete :: #force_inline proc "c" (file_ :   Handle){ addr := 0x1000 + 49 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(file_); }
 FileWriteSync :: #force_inline proc "c" (file_ :   Handle, offset_ :   FileOffset, size_ :   int   , buffer_ :   rawptr) ->   int   { addr := 0x1000 + 50 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   FileOffset,   int   ,   rawptr) ->   int   ) (fp))(file_, offset_, size_, buffer_); }
 NodeDelete :: #force_inline proc "c" (node_ :   Handle) ->   Error{ addr := 0x1000 + 51 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle) ->   Error) (fp))(node_); }
 NodeDeleteByPath :: #force_inline proc "c" (filePath_ : string) ->   Error{ addr := 0x1000 + 52 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int) ->   Error) (fp))(raw_data(filePath_), len(filePath_)); }
 NodeFindUniqueName :: #force_inline proc "c" (buffer_ :   ^i8  , originalBytes_ :   int   , bufferBytes_ :   int   ) ->   int   { addr := 0x1000 + 53 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   int   ) ->   int   ) (fp))(buffer_, originalBytes_, bufferBytes_); }
 NodeMove :: #force_inline proc "c" (node_ :   Handle, newDirectory_ :   Handle, newName_ : string) ->   Error{ addr := 0x1000 + 54 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Handle, ^u8, int) ->   Error) (fp))(node_, newDirectory_, raw_data(newName_), len(newName_)); }
-NodeOpen :: #force_inline proc "c" (path_ : string, flags_ :   u64     , information_ :   ^NodeInformation) ->   Error{ addr := 0x1000 + 55 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   u64     ,   ^NodeInformation) ->   Error) (fp))(raw_data(path_), len(path_), flags_, information_); }
-NodeOpenRelative :: #force_inline proc "c" (directory_ :   Handle, path_ : string, flags_ :   u64     , information_ :   ^NodeInformation) ->   Error{ addr := 0x1000 + 56 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle, ^u8, int,   u64     ,   ^NodeInformation) ->   Error) (fp))(directory_, raw_data(path_), len(path_), flags_, information_); }
+NodeOpen :: #force_inline proc "c" (path_ : string, flags_ :   u32     , information_ :   ^NodeInformation) ->   Error{ addr := 0x1000 + 55 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   u32     ,   ^NodeInformation) ->   Error) (fp))(raw_data(path_), len(path_), flags_, information_); }
+NodeOpenRelative :: #force_inline proc "c" (directory_ :   Handle, path_ : string, flags_ :   u32     , information_ :   ^NodeInformation) ->   Error{ addr := 0x1000 + 56 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle, ^u8, int,   u32     ,   ^NodeInformation) ->   Error) (fp))(directory_, raw_data(path_), len(path_), flags_, information_); }
 NodeRefreshInformation :: #force_inline proc "c" (information_ :   ^NodeInformation){ addr := 0x1000 + 57 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^NodeInformation)) (fp))(information_); }
 ProcessCrash :: #force_inline proc "c" (error_ :   Error, message_ : string){ addr := 0x1000 + 58 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Error, ^u8, int)) (fp))(error_, raw_data(message_), len(message_)); }
 ProcessCreate :: #force_inline proc "c" (executablePath_ : string, information_ :   ^ProcessInformation, argument_ :   Generic) ->   Error{ addr := 0x1000 + 59 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   ^ProcessInformation,   Generic) ->   Error) (fp))(raw_data(executablePath_), len(executablePath_), information_, argument_); }
@@ -2527,11 +2656,10 @@ ProcessTerminate :: #force_inline proc "c" (process_ :   Handle, status_ :   i32
 ProcessTerminateCurrent :: #force_inline proc "c" (){ addr := 0x1000 + 67 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
 ThreadCreate :: #force_inline proc "c" (entryFunction_ :   ThreadEntryFunction, information_ :   ^ThreadInformation, argument_ :   Generic) ->   Error{ addr := 0x1000 + 68 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ThreadEntryFunction,   ^ThreadInformation,   Generic) ->   Error) (fp))(entryFunction_, information_, argument_); }
 ThreadGetID :: #force_inline proc "c" (thread_ :   Handle) ->   uint     { addr := 0x1000 + 69 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle) ->   uint     ) (fp))(thread_); }
-ThreadLocalStorageSetAddress :: #force_inline proc "c" (address_ :   rawptr){ addr := 0x1000 + 70 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr)) (fp))(address_); }
 ThreadTerminate :: #force_inline proc "c" (thread_ :   Handle){ addr := 0x1000 + 71 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(thread_); }
 ArenaAllocate :: #force_inline proc "c" (arena_ :   ^Arena, zero_ :   bool) ->   rawptr{ addr := 0x1000 + 72 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Arena,   bool) ->   rawptr) (fp))(arena_, zero_); }
-ArenaFree :: #force_inline proc "c" (pointer_ :   rawptr){ addr := 0x1000 + 73 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr)) (fp))(pointer_); }
-ArenaInitialise :: #force_inline proc "c" (arena_ :   ^Arena, slotsPerBlock_ :   int   , itemSize_ :   int   ){ addr := 0x1000 + 74 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Arena,   int   ,   int   )) (fp))(arena_, slotsPerBlock_, itemSize_); }
+ArenaFree :: #force_inline proc "c" (arena_ :   ^Arena, pointer_ :   rawptr){ addr := 0x1000 + 73 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Arena,   rawptr)) (fp))(arena_, pointer_); }
+ArenaInitialise :: #force_inline proc "c" (arena_ :   ^Arena, blockSize_ :   int   , itemSize_ :   int   ){ addr := 0x1000 + 74 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Arena,   int   ,   int   )) (fp))(arena_, blockSize_, itemSize_); }
 ConstantBufferCreate :: #force_inline proc "c" (data_ :   rawptr, dataBytes_ :   int   , targetProcess_ :   Handle) ->   Handle{ addr := 0x1000 + 75 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   int   ,   Handle) ->   Handle) (fp))(data_, dataBytes_, targetProcess_); }
 ConstantBufferRead :: #force_inline proc "c" (constantBuffer_ :   Handle, output_ :   rawptr){ addr := 0x1000 + 76 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle,   rawptr)) (fp))(constantBuffer_, output_); }
 ConstantBufferShare :: #force_inline proc "c" (constantBuffer_ :   Handle, targetProcess_ :   Handle) ->   Handle{ addr := 0x1000 + 77 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Handle) ->   Handle) (fp))(constantBuffer_, targetProcess_); }
@@ -2539,234 +2667,234 @@ HeapAllocate :: #force_inline proc "c" (size_ :   int   , zeroMemory_ :   bool) 
 HeapFree :: #force_inline proc "c" (address_ :   rawptr){ addr := 0x1000 + 79 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr)) (fp))(address_); }
 HeapReallocate :: #force_inline proc "c" (oldAddress_ :   rawptr, newAllocationSize_ :   int   , zeroNewSpace_ :   bool) ->   rawptr{ addr := 0x1000 + 80 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   int   ,   bool) ->   rawptr) (fp))(oldAddress_, newAllocationSize_, zeroNewSpace_); }
 HeapValidate :: #force_inline proc "c" (){ addr := 0x1000 + 81 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
-MemoryAllocate :: #force_inline proc "c" (size_ :   int   ) ->   rawptr{ addr := 0x1000 + 82 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ) ->   rawptr) (fp))(size_); }
+MemoryCommit :: #force_inline proc "c" (pointer_ :   rawptr, bytes_ :   int   ) ->   bool{ addr := 0x1000 + 82 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   int   ) ->   bool) (fp))(pointer_, bytes_); }
 MemoryCompare :: #force_inline proc "c" (a_ :   rawptr, b_ :   rawptr, bytes_ :   int   ) ->   i32{ addr := 0x1000 + 83 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   i32) (fp))(a_, b_, bytes_); }
 MemoryCopy :: #force_inline proc "c" (destination_ :   rawptr, source_ :   rawptr, bytes_ :   int   ){ addr := 0x1000 + 84 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   rawptr,   int   )) (fp))(destination_, source_, bytes_); }
 MemoryCopyReverse :: #force_inline proc "c" (_destination_ :   rawptr, _source_ :   rawptr, bytes_ :   int   ){ addr := 0x1000 + 85 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   rawptr,   int   )) (fp))(_destination_, _source_, bytes_); }
+MemoryDecommit :: #force_inline proc "c" (pointer_ :   rawptr, bytes_ :   int   ) ->   bool{ addr := 0x1000 + 320 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   int   ) ->   bool) (fp))(pointer_, bytes_); }
 MemoryFill :: #force_inline proc "c" (from_ :   rawptr, to_ :   rawptr, byte_ :   u8     ){ addr := 0x1000 + 86 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   rawptr,   u8     )) (fp))(from_, to_, byte_); }
-MemoryFree :: #force_inline proc "c" (address_ :   rawptr) ->   Error{ addr := 0x1000 + 87 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr) ->   Error) (fp))(address_); }
 MemoryMove :: #force_inline proc "c" (_start_ :   rawptr, _end_ :   rawptr, amount_ :   int     , zeroEmptySpace_ :   bool){ addr := 0x1000 + 88 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   rawptr,   int     ,   bool)) (fp))(_start_, _end_, amount_, zeroEmptySpace_); }
 MemoryOpen :: #force_inline proc "c" (size_ :   int   , name_ : string, flags_ :   u32     ) ->   Handle{ addr := 0x1000 + 89 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   , ^u8, int,   u32     ) ->   Handle) (fp))(size_, raw_data(name_), len(name_), flags_); }
+MemoryReserve :: #force_inline proc "c" (size_ :   int   , protection_ :   MemoryProtection = MEMORY_PROTECTION_READ_WRITE, commitAll_ :   bool = true) ->   rawptr{ addr := 0x1000 + 25 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   MemoryProtection,   bool) ->   rawptr) (fp))(size_, protection_, commitAll_); }
 MemoryShare :: #force_inline proc "c" (sharedMemoryRegion_ :   Handle, targetProcess_ :   Handle, readOnly_ :   bool) ->   Handle{ addr := 0x1000 + 90 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Handle,   bool) ->   Handle) (fp))(sharedMemoryRegion_, targetProcess_, readOnly_); }
 MemorySumBytes :: #force_inline proc "c" (data_ :   ^u8     , bytes_ :   int   ) ->   u8     { addr := 0x1000 + 91 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^u8     ,   int   ) ->   u8     ) (fp))(data_, bytes_); }
+MemoryUnreserve :: #force_inline proc "c" (pointer_ :   rawptr, size_ :   int    = 0){ addr := 0x1000 + 319 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   )) (fp))(pointer_, size_); }
 MemoryZero :: #force_inline proc "c" (destination_ :   rawptr, bytes_ :   int   ){ addr := 0x1000 + 92 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   )) (fp))(destination_, bytes_); }
 ObjectMap :: #force_inline proc "c" (object_ :   Handle, offset_ :   uint     , size_ :   int   , flags_ :   u32     ) ->   rawptr{ addr := 0x1000 + 93 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   uint     ,   int   ,   u32     ) ->   rawptr) (fp))(object_, offset_, size_, flags_); }
-Abort :: #force_inline proc "c" (){ addr := 0x1000 + 94 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
-Assert :: #force_inline proc "c" (expression_ :   bool, failureMessage_ :   cstring  ){ addr := 0x1000 + 95 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  bool,   cstring  )) (fp))(expression_, failureMessage_); }
-CalculateFromUserExpression :: #force_inline proc "c" (cExpression_ :   cstring  ) ->   CalculationValue{ addr := 0x1000 + 96 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  ) ->   CalculationValue) (fp))(cExpression_); }
+AssertionFailure :: #force_inline proc "c" (cFile_ :   cstring  , line_ :   i32){ addr := 0x1000 + 94 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  cstring  ,   i32)) (fp))(cFile_, line_); }
 DoubleParse :: #force_inline proc "c" (string_ : string, endptr_ :   ^^i8  ) ->   f64   { addr := 0x1000 + 97 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   ^^i8  ) ->   f64   ) (fp))(raw_data(string_), len(string_), endptr_); }
 ExtractArguments :: #force_inline proc "c" (string_ :   ^i8  , bytes_ :   int   , delimiterByte_ :   u8     , replacementDelimiter_ :   u8     , argvAllocated_ :   int   , argv_ :   ^^i8  , argc_ :   ^int   ) ->   bool{ addr := 0x1000 + 98 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   u8     ,   u8     ,   int   ,   ^^i8  ,   ^int   ) ->   bool) (fp))(string_, bytes_, delimiterByte_, replacementDelimiter_, argvAllocated_, argv_, argc_); }
-GetRandomU8 :: #force_inline proc "c" () ->   u8     { addr := 0x1000 + 99 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   u8     ) (fp))(); }
-GetRandomU64 :: #force_inline proc "c" () ->   u64     { addr := 0x1000 + 100 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   u64     ) (fp))(); }
+RandomU8 :: #force_inline proc "c" () ->   u8     { addr := 0x1000 + 301 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   u8     ) (fp))(); }
+RandomU64 :: #force_inline proc "c" () ->   u64     { addr := 0x1000 + 302 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   u64     ) (fp))(); }
 IntegerParse :: #force_inline proc "c" (text_ : string) ->   i64    { addr := 0x1000 + 101 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int) ->   i64    ) (fp))(raw_data(text_), len(text_)); }
 Print :: #force_inline proc "c" (format_ :   cstring  , _varargs_ : ..any){ addr := 0x1000 + 102 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  cstring  , ..any)) (fp))(format_, _varargs_); }
 PrintDirect :: #force_inline proc "c" (string_ : string){ addr := 0x1000 + 103 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (^u8, int)) (fp))(raw_data(string_), len(string_)); }
 PrintHelloWorld :: #force_inline proc "c" (){ addr := 0x1000 + 104 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
-ProcessorReadTimeStamp :: #force_inline proc "c" () ->   u64     { addr := 0x1000 + 105 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   u64     ) (fp))(); }
 RandomAddEntropy :: #force_inline proc "c" (x_ :   u64     ){ addr := 0x1000 + 106 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  u64     )) (fp))(x_); }
 RandomSeed :: #force_inline proc "c" (x_ :   u64     ){ addr := 0x1000 + 107 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  u64     )) (fp))(x_); }
 RectangleClip :: #force_inline proc "c" (parent_ :   Rectangle, rectangle_ :   Rectangle, output_ :   ^Rectangle) ->   bool{ addr := 0x1000 + 108 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Rectangle,   Rectangle,   ^Rectangle) ->   bool) (fp))(parent_, rectangle_, output_); }
 Sort :: #force_inline proc "c" (_base_ :   rawptr, nmemb_ :   int   , size_ :   int   , compar_ :   ComparisonCallbackFunction, argument_ :   Generic){ addr := 0x1000 + 109 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   ,   int   ,   ComparisonCallbackFunction,   Generic)) (fp))(_base_, nmemb_, size_, compar_, argument_); }
 SortWithSwapCallback :: #force_inline proc "c" (_base_ :   rawptr, nmemb_ :   int   , size_ :   int   , compar_ :   ComparisonCallbackFunction, argument_ :   Generic, swap_ :   SwapCallbackFunction){ addr := 0x1000 + 110 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   ,   int   ,   ComparisonCallbackFunction,   Generic,   SwapCallbackFunction)) (fp))(_base_, nmemb_, size_, compar_, argument_, swap_); }
-StringLoadRaw :: #force_inline proc "c" (cRule_ :   cstring  , formatValues_ :   ^FormatValue, formatValueCount_ :   int   ) ->   FormatValue{ addr := 0x1000 + 111 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  ,   ^FormatValue,   int   ) ->   FormatValue) (fp))(cRule_, formatValues_, formatValueCount_); }
-StringZeroTerminate :: #force_inline proc "c" (string_ : string) ->   ^i8  { addr := 0x1000 + 112 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int) ->   ^i8  ) (fp))(raw_data(string_), len(string_)); }
-ColorBlend :: #force_inline proc "c" (under_ :   u32     , over_ :   u32     , fullAlpha_ :   bool) ->   u32     { addr := 0x1000 + 113 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  u32     ,   u32     ,   bool) ->   u32     ) (fp))(under_, over_, fullAlpha_); }
-ColorConvertToRGB :: #force_inline proc "c" (h_ :   f32  , s_ :   f32  , v_ :   f32  ) ->   u32     { addr := 0x1000 + 114 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ,   f32  ) ->   u32     ) (fp))(h_, s_, v_); }
-ColorConvertToHSV :: #force_inline proc "c" (color_ :   u32     , h_ :   ^f32  , s_ :   ^f32  , v_ :   ^f32  ) ->   bool{ addr := 0x1000 + 115 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  u32     ,   ^f32  ,   ^f32  ,   ^f32  ) ->   bool) (fp))(color_, h_, s_, v_); }
-ColorParse :: #force_inline proc "c" (string_ :   ^i8  , bytes_ :   int   ) ->   u32     { addr := 0x1000 + 116 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ) ->   u32     ) (fp))(string_, bytes_); }
-DrawStandardIcon :: #force_inline proc "c" (painter_ :   ^Painter, id_ :   u32     , size_ :   i32, region_ :   Rectangle, color_ :   u32     ) ->   bool{ addr := 0x1000 + 117 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Painter,   u32     ,   i32,   Rectangle,   u32     ) ->   bool) (fp))(painter_, id_, size_, region_, color_); }
-DrawStyledBox :: #force_inline proc "c" (painter_ :   ^Painter, box_ :   StyledBox){ addr := 0x1000 + 118 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   StyledBox)) (fp))(painter_, box_); }
-DrawSurface :: #force_inline proc "c" (destination_ :   Handle, source_ :   Handle, destinationRegion_ :   Rectangle, sourceRegion_ :   Rectangle, borderRegion_ :   Rectangle, mode_ :   DrawMode, alpha_ :   u16     ) ->   Error{ addr := 0x1000 + 119 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Handle,   Rectangle,   Rectangle,   Rectangle,   DrawMode,   u16     ) ->   Error) (fp))(destination_, source_, destinationRegion_, sourceRegion_, borderRegion_, mode_, alpha_); }
-DrawSurface2 :: #force_inline proc "c" (painter_ :   ^Painter, source_ :   Handle, destinationRegion_ :   Rectangle, sourceRegion_ :   Rectangle, alpha_ :   u16     ){ addr := 0x1000 + 120 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   Handle,   Rectangle,   Rectangle,   u16     )) (fp))(painter_, source_, destinationRegion_, sourceRegion_, alpha_); }
-DrawSurfaceClipped :: #force_inline proc "c" (destination_ :   Handle, source_ :   Handle, destinationRegion_ :   Rectangle, sourceRegion_ :   Rectangle, borderRegion_ :   Rectangle, mode_ :   DrawMode, alpha_ :   u16     , clipRegion_ :   Rectangle) ->   Error{ addr := 0x1000 + 121 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Handle,   Rectangle,   Rectangle,   Rectangle,   DrawMode,   u16     ,   Rectangle) ->   Error) (fp))(destination_, source_, destinationRegion_, sourceRegion_, borderRegion_, mode_, alpha_, clipRegion_); }
-DrawText :: #force_inline proc "c" (painter_ :   ^Painter, plan_ :   ^TextPlan, bounds_ :   Rectangle, clip_ :   ^Rectangle, selectionProperties_ :   ^TextSelection){ addr := 0x1000 + 122 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   ^TextPlan,   Rectangle,   ^Rectangle,   ^TextSelection)) (fp))(painter_, plan_, bounds_, clip_, selectionProperties_); }
-FontGetName :: #force_inline proc "c" (family_ :   u16     , buffer_ :   ^i8  , bufferBytes_ :   int   ) ->   int   { addr := 0x1000 + 123 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  u16     ,   ^i8  ,   int   ) ->   int   ) (fp))(family_, buffer_, bufferBytes_); }
-PainterBoundsClient :: #force_inline proc "c" (painter_ :   ^Painter) ->   Rectangle{ addr := 0x1000 + 124 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Painter) ->   Rectangle) (fp))(painter_); }
-PainterBoundsInset :: #force_inline proc "c" (painter_ :   ^Painter) ->   Rectangle{ addr := 0x1000 + 125 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Painter) ->   Rectangle) (fp))(painter_); }
-RedrawAll :: #force_inline proc "c" (){ addr := 0x1000 + 126 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
-SurfaceCreate :: #force_inline proc "c" (width_ :   int   , height_ :   int   , flags_ :   u32     ) ->   Handle{ addr := 0x1000 + 127 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   int   ,   u32     ) ->   Handle) (fp))(width_, height_, flags_); }
-SurfaceGetLinearBuffer :: #force_inline proc "c" (surface_ :   Handle, linearBuffer_ :   ^LinearBuffer){ addr := 0x1000 + 128 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle,   ^LinearBuffer)) (fp))(surface_, linearBuffer_); }
-SurfaceReset :: #force_inline proc "c" (surface_ :   Handle){ addr := 0x1000 + 129 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(surface_); }
-AudioStreamClose :: #force_inline proc "c" (stream_ :   ^AudioStream){ addr := 0x1000 + 130 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^AudioStream)) (fp))(stream_); }
-AudioStreamOpen :: #force_inline proc "c" (device_ :   AudioDeviceID, bufferLengthUs_ :   int   ) ->   ^AudioStream{ addr := 0x1000 + 131 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  AudioDeviceID,   int   ) ->   ^AudioStream) (fp))(device_, bufferLengthUs_); }
-AudioStreamNotify :: #force_inline proc "c" (stream_ :   ^AudioStream){ addr := 0x1000 + 132 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^AudioStream)) (fp))(stream_); }
-AudioStreamSend :: #force_inline proc "c" (destination_ :   ^AudioStream, source_ :   ^AudioStream, time_ :   ^f64   ) ->   Error{ addr := 0x1000 + 133 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^AudioStream,   ^AudioStream,   ^f64   ) ->   Error) (fp))(destination_, source_, time_); }
-EventCreate :: #force_inline proc "c" (autoReset_ :   bool) ->   Handle{ addr := 0x1000 + 134 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  bool) ->   Handle) (fp))(autoReset_); }
-EventForward :: #force_inline proc "c" (event_ :   Handle, eventSink_ :   Handle, data_ :   Generic){ addr := 0x1000 + 135 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle,   Handle,   Generic)) (fp))(event_, eventSink_, data_); }
-EventPoll :: #force_inline proc "c" (event_ :   Handle) ->   Error{ addr := 0x1000 + 136 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle) ->   Error) (fp))(event_); }
-EventReset :: #force_inline proc "c" (event_ :   Handle){ addr := 0x1000 + 137 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(event_); }
-EventSet :: #force_inline proc "c" (event_ :   Handle){ addr := 0x1000 + 138 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(event_); }
-EventSinkCreate :: #force_inline proc "c" (ignoreDuplicates_ :   bool) ->   Handle{ addr := 0x1000 + 139 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  bool) ->   Handle) (fp))(ignoreDuplicates_); }
-EventSinkPop :: #force_inline proc "c" (eventSink_ :   Handle, data_ :   ^Generic) ->   Error{ addr := 0x1000 + 140 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   ^Generic) ->   Error) (fp))(eventSink_, data_); }
-EventSinkPush :: #force_inline proc "c" (eventSink_ :   Handle, data_ :   Generic) ->   Error{ addr := 0x1000 + 141 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Generic) ->   Error) (fp))(eventSink_, data_); }
-MutexAcquire :: #force_inline proc "c" (mutex_ :   ^Mutex){ addr := 0x1000 + 142 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Mutex)) (fp))(mutex_); }
-MutexDestroy :: #force_inline proc "c" (mutex_ :   ^Mutex){ addr := 0x1000 + 143 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Mutex)) (fp))(mutex_); }
-MutexRelease :: #force_inline proc "c" (mutex_ :   ^Mutex){ addr := 0x1000 + 144 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Mutex)) (fp))(mutex_); }
-PerformanceTimerPush :: #force_inline proc "c" (){ addr := 0x1000 + 145 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
-PerformanceTimerPop :: #force_inline proc "c" () ->   f64   { addr := 0x1000 + 146 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   f64   ) (fp))(); }
-SchedulerYield :: #force_inline proc "c" (){ addr := 0x1000 + 147 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
-Sleep :: #force_inline proc "c" (milliseconds_ :   u64     ){ addr := 0x1000 + 148 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  u64     )) (fp))(milliseconds_); }
-SpinlockAcquire :: #force_inline proc "c" (spinlock_ :   ^Spinlock){ addr := 0x1000 + 149 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Spinlock)) (fp))(spinlock_); }
-SpinlockRelease :: #force_inline proc "c" (spinlock_ :   ^Spinlock){ addr := 0x1000 + 150 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Spinlock)) (fp))(spinlock_); }
-TimerCreate :: #force_inline proc "c" () ->   Handle{ addr := 0x1000 + 151 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   Handle) (fp))(); }
-TimerSet :: #force_inline proc "c" (handle_ :   Handle, afterMs_ :   u64     , callback_ :   TimerCallbackFunction, argument_ :   Generic){ addr := 0x1000 + 152 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle,   u64     ,   TimerCallbackFunction,   Generic)) (fp))(handle_, afterMs_, callback_, argument_); }
-Wait :: #force_inline proc "c" (objects_ :   ^Handle, objectCount_ :   int   , timeoutMs_ :   uint     ) ->   uint     { addr := 0x1000 + 153 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Handle,   int   ,   uint     ) ->   uint     ) (fp))(objects_, objectCount_, timeoutMs_); }
-CStringLength :: #force_inline proc "c" (string_ :   cstring  ) ->   int   { addr := 0x1000 + 154 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  ) ->   int   ) (fp))(string_); }
-StringAllocateAndFormat :: #force_inline proc "c" (bytes_ :   ^int   , format_ :   cstring  , _varargs_ : ..any) ->   ^i8  { addr := 0x1000 + 155 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^int   ,   cstring  , ..any) ->   ^i8  ) (fp))(bytes_, format_, _varargs_); }
-StringCompare :: #force_inline proc "c" (s1_ : string, s2_ : string) ->   i32{ addr := 0x1000 + 157 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int) ->   i32) (fp))(raw_data(s1_), len(s1_), raw_data(s2_), len(s2_)); }
-StringCompareRaw :: #force_inline proc "c" (s1_ : string, s2_ : string) ->   i32{ addr := 0x1000 + 158 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int) ->   i32) (fp))(raw_data(s1_), len(s1_), raw_data(s2_), len(s2_)); }
-StringFormat :: #force_inline proc "c" (buffer_ :   ^i8  , bufferLength_ :   int   , format_ :   cstring  , _varargs_ : ..any) ->   int      { addr := 0x1000 + 159 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   cstring  , ..any) ->   int      ) (fp))(buffer_, bufferLength_, format_, _varargs_); }
-StringFormatTemporary :: #force_inline proc "c" (format_ :   cstring  , _varargs_ : ..any) ->   ^i8  { addr := 0x1000 + 160 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  , ..any) ->   ^i8  ) (fp))(format_, _varargs_); }
-StringFormatAppend :: #force_inline proc "c" (buffer_ :   ^i8  , bufferLength_ :   int   , bufferPosition_ :   ^int   , format_ :   cstring  , _varargs_ : ..any){ addr := 0x1000 + 162 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^i8  ,   int   ,   ^int   ,   cstring  , ..any)) (fp))(buffer_, bufferLength_, bufferPosition_, format_, _varargs_); }
-StringLength :: #force_inline proc "c" (string_ :   ^i8  , end_ :   u8     ) ->   int   { addr := 0x1000 + 164 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   u8     ) ->   int   ) (fp))(string_, end_); }
-StringLoad :: #force_inline proc "c" (cRule_ :   cstring  , formatValues_ :   ^FormatValue, formatValueCount_ :   int   , bytes_ :   ^int   ) ->   ^i8  { addr := 0x1000 + 165 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  ,   ^FormatValue,   int   ,   ^int   ) ->   ^i8  ) (fp))(cRule_, formatValues_, formatValueCount_, bytes_); }
+TimeStamp :: #force_inline proc "c" () ->   u64     { addr := 0x1000 + 252 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   u64     ) (fp))(); }
+TimeStampMs :: #force_inline proc "c" () ->   f64   { addr := 0x1000 + 261 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   f64   ) (fp))(); }
+ColorBlend :: #force_inline proc "c" (under_ :   u32     , over_ :   u32     , fullAlpha_ :   bool) ->   u32     { addr := 0x1000 + 111 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  u32     ,   u32     ,   bool) ->   u32     ) (fp))(under_, over_, fullAlpha_); }
+ColorConvertToRGB :: #force_inline proc "c" (h_ :   f32  , s_ :   f32  , v_ :   f32  ) ->   u32     { addr := 0x1000 + 112 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ,   f32  ) ->   u32     ) (fp))(h_, s_, v_); }
+ColorConvertToHSV :: #force_inline proc "c" (color_ :   u32     , h_ :   ^f32  , s_ :   ^f32  , v_ :   ^f32  ) ->   bool{ addr := 0x1000 + 113 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  u32     ,   ^f32  ,   ^f32  ,   ^f32  ) ->   bool) (fp))(color_, h_, s_, v_); }
+ColorParse :: #force_inline proc "c" (string_ : string) ->   u32     { addr := 0x1000 + 114 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int) ->   u32     ) (fp))(raw_data(string_), len(string_)); }
+DrawBitmap :: #force_inline proc "c" (painter_ :   ^Painter, region_ :   Rectangle, bits_ :   ^u32     , stride_ :   uint     ){ addr := 0x1000 + 324 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   Rectangle,   ^u32     ,   uint     )) (fp))(painter_, region_, bits_, stride_); }
+DrawInvert :: #force_inline proc "c" (painter_ :   ^Painter, bounds_ :   Rectangle){ addr := 0x1000 + 95 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   Rectangle)) (fp))(painter_, bounds_); }
+DrawStandardIcon :: #force_inline proc "c" (painter_ :   ^Painter, id_ :   u32     , size_ :   i32, region_ :   Rectangle, color_ :   u32     ) ->   bool{ addr := 0x1000 + 115 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Painter,   u32     ,   i32,   Rectangle,   u32     ) ->   bool) (fp))(painter_, id_, size_, region_, color_); }
+DrawStyledBox :: #force_inline proc "c" (painter_ :   ^Painter, box_ :   StyledBox){ addr := 0x1000 + 116 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   StyledBox)) (fp))(painter_, box_); }
+DrawPaintTarget :: #force_inline proc "c" (painter_ :   ^Painter, source_ :   ^PaintTarget, destinationRegion_ :   Rectangle, sourceRegion_ :   Rectangle, borderRegion_ :   Rectangle, mode_ :   DrawMode, alpha_ :   u16     , clipRegion_ :   Rectangle){ addr := 0x1000 + 263 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   ^PaintTarget,   Rectangle,   Rectangle,   Rectangle,   DrawMode,   u16     ,   Rectangle)) (fp))(painter_, source_, destinationRegion_, sourceRegion_, borderRegion_, mode_, alpha_, clipRegion_); }
+DrawText :: #force_inline proc "c" (painter_ :   ^Painter, plan_ :   ^TextPlan, bounds_ :   Rectangle, clip_ :   ^Rectangle = nil, selectionProperties_ :   ^TextSelection = nil){ addr := 0x1000 + 120 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter,   ^TextPlan,   Rectangle,   ^Rectangle,   ^TextSelection)) (fp))(painter_, plan_, bounds_, clip_, selectionProperties_); }
+FontGetName :: #force_inline proc "c" (family_ :   u16     , buffer_ :   ^i8  , bufferBytes_ :   int   ) ->   int   { addr := 0x1000 + 121 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  u16     ,   ^i8  ,   int   ) ->   int   ) (fp))(family_, buffer_, bufferBytes_); }
+IconIDFromString :: #force_inline proc "c" (string_ : string = "") ->   u32     { addr := 0x1000 + 127 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int) ->   u32     ) (fp))(raw_data(string_), len(string_)); }
+ImageLoad :: #force_inline proc "c" (file_ :   ^u8     , fileSize_ :   int   , width_ :   ^u32     , height_ :   ^u32     , imageChannels_ :   i32) ->   ^u8     { addr := 0x1000 + 165 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^u8     ,   int   ,   ^u32     ,   ^u32     ,   i32) ->   ^u8     ) (fp))(file_, fileSize_, width_, height_, imageChannels_); }
+PainterBoundsClient :: #force_inline proc "c" (painter_ :   ^Painter) ->   Rectangle{ addr := 0x1000 + 122 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Painter) ->   Rectangle) (fp))(painter_); }
+PainterBoundsInset :: #force_inline proc "c" (painter_ :   ^Painter) ->   Rectangle{ addr := 0x1000 + 123 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Painter) ->   Rectangle) (fp))(painter_); }
+PainterDrawStandardContent :: #force_inline proc "c" (painter_ :   ^Painter, text_ : string, iconID_ :   u32     ){ addr := 0x1000 + 117 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Painter, ^u8, int,   u32     )) (fp))(painter_, raw_data(text_), len(text_), iconID_); }
+PaintTargetClear :: #force_inline proc "c" (target_ :   ^PaintTarget){ addr := 0x1000 + 34 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^PaintTarget)) (fp))(target_); }
+PaintTargetEndDirectAccess :: #force_inline proc "c" (target_ :   ^PaintTarget){ addr := 0x1000 + 264 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^PaintTarget)) (fp))(target_); }
+PaintTargetStartDirectAccess :: #force_inline proc "c" (target_ :   ^PaintTarget, bits_ :   ^^u32     , width_ :   ^int   , height_ :   ^int   , stride_ :   ^int   ){ addr := 0x1000 + 276 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^PaintTarget,   ^^u32     ,   ^int   ,   ^int   ,   ^int   )) (fp))(target_, bits_, width_, height_, stride_); }
+PaintTargetTake :: #force_inline proc "c" (target_ :   ^PaintTarget, width_ :   int   , height_ :   int   ) ->   bool{ addr := 0x1000 + 35 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^PaintTarget,   int   ,   int   ) ->   bool) (fp))(target_, width_, height_); }
+PaintTargetReturn :: #force_inline proc "c" (target_ :   ^PaintTarget){ addr := 0x1000 + 36 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^PaintTarget)) (fp))(target_); }
+TextGetLineHeight :: #force_inline proc "c" (font_ :   Font, size_ :   u16     ) ->   i32{ addr := 0x1000 + 157 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Font,   u16     ) ->   i32) (fp))(font_, size_); }
+TextGetPartialStringWidth :: #force_inline proc "c" (font_ :   Font, size_ :   u16     , fullString_ :   ^i8  , fullStringBytes_ :   int   , measureOffset_ :   uint     , measureBytes_ :   int   ) ->   i32{ addr := 0x1000 + 171 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Font,   u16     ,   ^i8  ,   int   ,   uint     ,   int   ) ->   i32) (fp))(font_, size_, fullString_, fullStringBytes_, measureOffset_, measureBytes_); }
+TextGetCharacterAtPoint :: #force_inline proc "c" (font_ :   Font, size_ :   u16     , fullString_ :   ^i8  , fullStringBytes_ :   int   , measureOffset_ :   uint     , measureBytes_ :   int   , pointX_ :   ^i32, reverse_ :   bool, middle_ :   bool) ->   int      { addr := 0x1000 + 237 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Font,   u16     ,   ^i8  ,   int   ,   uint     ,   int   ,   ^i32,   bool,   bool) ->   int      ) (fp))(font_, size_, fullString_, fullStringBytes_, measureOffset_, measureBytes_, pointX_, reverse_, middle_); }
+AudioStreamClose :: #force_inline proc "c" (stream_ :   ^AudioStream){ addr := 0x1000 + 128 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^AudioStream)) (fp))(stream_); }
+AudioStreamOpen :: #force_inline proc "c" (device_ :   AudioDeviceID, bufferLengthUs_ :   int   ) ->   ^AudioStream{ addr := 0x1000 + 129 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  AudioDeviceID,   int   ) ->   ^AudioStream) (fp))(device_, bufferLengthUs_); }
+AudioStreamNotify :: #force_inline proc "c" (stream_ :   ^AudioStream){ addr := 0x1000 + 130 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^AudioStream)) (fp))(stream_); }
+AudioStreamSend :: #force_inline proc "c" (destination_ :   ^AudioStream, source_ :   ^AudioStream, time_ :   ^f64   ) ->   Error{ addr := 0x1000 + 131 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^AudioStream,   ^AudioStream,   ^f64   ) ->   Error) (fp))(destination_, source_, time_); }
+AddressResolve :: #force_inline proc "c" (domain_ : string, flags_ :   u32     , address_ :   ^Address) ->   Error{ addr := 0x1000 + 99 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int,   u32     ,   ^Address) ->   Error) (fp))(raw_data(domain_), len(domain_), flags_, address_); }
+ConnectionClose :: #force_inline proc "c" (connection_ :   ^Connection){ addr := 0x1000 + 321 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Connection)) (fp))(connection_); }
+ConnectionNotify :: #force_inline proc "c" (connection_ :   ^Connection){ addr := 0x1000 + 322 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Connection)) (fp))(connection_); }
+ConnectionOpen :: #force_inline proc "c" (connection_ :   ^Connection, flags_ :   u32     ) ->   Error{ addr := 0x1000 + 100 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Connection,   u32     ) ->   Error) (fp))(connection_, flags_); }
+ConnectionPoll :: #force_inline proc "c" (connection_ :   ^Connection){ addr := 0x1000 + 303 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Connection)) (fp))(connection_); }
+ConnectionRead :: #force_inline proc "c" (connection_ :   ^Connection, buffer_ :   rawptr, bufferBytes_ :   int   , bytesRead_ :   ^int   ) ->   Error{ addr := 0x1000 + 325 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Connection,   rawptr,   int   ,   ^int   ) ->   Error) (fp))(connection_, buffer_, bufferBytes_, bytesRead_); }
+ConnectionWriteSync :: #force_inline proc "c" (connection_ :   ^Connection, data_ :   rawptr, dataBytes_ :   int   ) ->   Error{ addr := 0x1000 + 323 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Connection,   rawptr,   int   ) ->   Error) (fp))(connection_, data_, dataBytes_); }
+GameControllerStatePoll :: #force_inline proc "c" (buffer_ :   ^GameControllerState) ->   int   { addr := 0x1000 + 299 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^GameControllerState) ->   int   ) (fp))(buffer_); }
+EventCreate :: #force_inline proc "c" (autoReset_ :   bool) ->   Handle{ addr := 0x1000 + 132 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  bool) ->   Handle) (fp))(autoReset_); }
+EventForward :: #force_inline proc "c" (event_ :   Handle, eventSink_ :   Handle, data_ :   Generic){ addr := 0x1000 + 133 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle,   Handle,   Generic)) (fp))(event_, eventSink_, data_); }
+EventPoll :: #force_inline proc "c" (event_ :   Handle) ->   Error{ addr := 0x1000 + 134 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle) ->   Error) (fp))(event_); }
+EventReset :: #force_inline proc "c" (event_ :   Handle){ addr := 0x1000 + 135 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(event_); }
+EventSet :: #force_inline proc "c" (event_ :   Handle){ addr := 0x1000 + 136 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle)) (fp))(event_); }
+EventSinkCreate :: #force_inline proc "c" (ignoreDuplicates_ :   bool) ->   Handle{ addr := 0x1000 + 137 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  bool) ->   Handle) (fp))(ignoreDuplicates_); }
+EventSinkPop :: #force_inline proc "c" (eventSink_ :   Handle, data_ :   ^Generic) ->   Error{ addr := 0x1000 + 138 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   ^Generic) ->   Error) (fp))(eventSink_, data_); }
+EventSinkPush :: #force_inline proc "c" (eventSink_ :   Handle, data_ :   Generic) ->   Error{ addr := 0x1000 + 139 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Generic) ->   Error) (fp))(eventSink_, data_); }
+MutexAcquire :: #force_inline proc "c" (mutex_ :   ^Mutex){ addr := 0x1000 + 140 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Mutex)) (fp))(mutex_); }
+MutexDestroy :: #force_inline proc "c" (mutex_ :   ^Mutex){ addr := 0x1000 + 141 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Mutex)) (fp))(mutex_); }
+MutexRelease :: #force_inline proc "c" (mutex_ :   ^Mutex){ addr := 0x1000 + 142 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Mutex)) (fp))(mutex_); }
+PerformanceTimerPush :: #force_inline proc "c" (){ addr := 0x1000 + 143 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
+PerformanceTimerPop :: #force_inline proc "c" () ->   f64   { addr := 0x1000 + 144 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   f64   ) (fp))(); }
+SchedulerYield :: #force_inline proc "c" (){ addr := 0x1000 + 145 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" ()) (fp))(); }
+Sleep :: #force_inline proc "c" (milliseconds_ :   u64     ){ addr := 0x1000 + 146 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  u64     )) (fp))(milliseconds_); }
+SpinlockAcquire :: #force_inline proc "c" (spinlock_ :   ^Spinlock){ addr := 0x1000 + 147 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Spinlock)) (fp))(spinlock_); }
+SpinlockRelease :: #force_inline proc "c" (spinlock_ :   ^Spinlock){ addr := 0x1000 + 148 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Spinlock)) (fp))(spinlock_); }
+TimerCreate :: #force_inline proc "c" () ->   Handle{ addr := 0x1000 + 149 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" () ->   Handle) (fp))(); }
+TimerSet :: #force_inline proc "c" (handle_ :   Handle, afterMs_ :   u64     , callback_ :   TimerCallbackFunction, argument_ :   Generic){ addr := 0x1000 + 150 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  Handle,   u64     ,   TimerCallbackFunction,   Generic)) (fp))(handle_, afterMs_, callback_, argument_); }
+Wait :: #force_inline proc "c" (objects_ :   ^Handle, objectCount_ :   int   , timeoutMs_ :   uint     ) ->   uint     { addr := 0x1000 + 151 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Handle,   int   ,   uint     ) ->   uint     ) (fp))(objects_, objectCount_, timeoutMs_); }
+CStringLength :: #force_inline proc "c" (string_ :   cstring  ) ->   int   { addr := 0x1000 + 152 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  ) ->   int   ) (fp))(string_); }
+StringAllocateAndFormat :: #force_inline proc "c" (bytes_ :   ^int   , format_ :   cstring  , _varargs_ : ..any) ->   ^i8  { addr := 0x1000 + 153 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^int   ,   cstring  , ..any) ->   ^i8  ) (fp))(bytes_, format_, _varargs_); }
+StringCompare :: #force_inline proc "c" (s1_ : string, s2_ : string) ->   i32{ addr := 0x1000 + 155 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int) ->   i32) (fp))(raw_data(s1_), len(s1_), raw_data(s2_), len(s2_)); }
+StringCompareRaw :: #force_inline proc "c" (s1_ : string, s2_ : string) ->   i32{ addr := 0x1000 + 156 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int) ->   i32) (fp))(raw_data(s1_), len(s1_), raw_data(s2_), len(s2_)); }
+StringFormat :: #force_inline proc "c" (buffer_ :   ^i8  , bufferLength_ :   int   , format_ :   cstring  , _varargs_ : ..any) ->   int      { addr := 0x1000 + 158 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   cstring  , ..any) ->   int      ) (fp))(buffer_, bufferLength_, format_, _varargs_); }
+StringFormatTemporary :: #force_inline proc "c" (format_ :   cstring  , _varargs_ : ..any) ->   ^i8  { addr := 0x1000 + 159 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  cstring  , ..any) ->   ^i8  ) (fp))(format_, _varargs_); }
+StringFormatAppend :: #force_inline proc "c" (buffer_ :   ^i8  , bufferLength_ :   int   , bufferPosition_ :   ^int   , format_ :   cstring  , _varargs_ : ..any) ->   bool{ addr := 0x1000 + 161 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   ^int   ,   cstring  , ..any) ->   bool) (fp))(buffer_, bufferLength_, bufferPosition_, format_, _varargs_); }
+StringLength :: #force_inline proc "c" (string_ :   ^i8  , end_ :   u8     ) ->   int   { addr := 0x1000 + 163 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   u8     ) ->   int   ) (fp))(string_, end_); }
 StringStartsWith :: #force_inline proc "c" (string_ : string, prefix_ : string, caseInsensitive_ :   bool) ->   bool{ addr := 0x1000 + 166 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int, ^u8, int,   bool) ->   bool) (fp))(raw_data(string_), len(string_), raw_data(prefix_), len(prefix_), caseInsensitive_); }
-CRTabs :: #force_inline proc "c" (n_ :   i32) ->   i32{ addr := 0x1000 + 167 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(n_); }
-CRTacosf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 168 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTasinf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 169 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTassert :: #force_inline proc "c" (test_ :   bool){ addr := 0x1000 + 170 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  bool)) (fp))(test_); }
-CRTatan2f :: #force_inline proc "c" (y_ :   f32  , x_ :   f32  ) ->   f32  { addr := 0x1000 + 171 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ) ->   f32  ) (fp))(y_, x_); }
-CRTatanf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 172 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTatoi :: #force_inline proc "c" (string_ :   ^i8  ) ->   i32{ addr := 0x1000 + 173 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   i32) (fp))(string_); }
-CRTcalloc :: #force_inline proc "c" (num_ :   int   , size_ :   int   ) ->   rawptr{ addr := 0x1000 + 174 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   int   ) ->   rawptr) (fp))(num_, size_); }
-CRTceil :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 175 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
-CRTceilf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 176 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTcosf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 177 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTfabs :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 178 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
-CRTfabsl :: #force_inline proc "c" (x_ :   [16]u8      ) ->   [16]u8      { addr := 0x1000 + 179 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  [16]u8      ) ->   [16]u8      ) (fp))(x_); }
-CRTfloor :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 180 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
-CRTfloorf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 181 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTfmodf :: #force_inline proc "c" (x_ :   f32  , y_ :   f32  ) ->   f32  { addr := 0x1000 + 182 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ) ->   f32  ) (fp))(x_, y_); }
-CRTfree :: #force_inline proc "c" (ptr_ :   rawptr){ addr := 0x1000 + 183 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr)) (fp))(ptr_); }
-CRTgetenv :: #force_inline proc "c" (name_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 184 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   ^i8  ) (fp))(name_); }
-CRTisalpha :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 185 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
-CRTisdigit :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 186 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
-CRTisspace :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 187 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
-CRTisupper :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 188 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
-CRTisxdigit :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 189 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
-CRTmalloc :: #force_inline proc "c" (size_ :   int   ) ->   rawptr{ addr := 0x1000 + 190 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ) ->   rawptr) (fp))(size_); }
-CRTmemchr :: #force_inline proc "c" (_s_ :   rawptr, _c_ :   i32, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 191 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   i32,   int   ) ->   rawptr) (fp))(_s_, _c_, n_); }
-CRTmemcmp :: #force_inline proc "c" (s1_ :   rawptr, s2_ :   rawptr, n_ :   int   ) ->   i32{ addr := 0x1000 + 192 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   i32) (fp))(s1_, s2_, n_); }
-CRTmemcpy :: #force_inline proc "c" (dest_ :   rawptr, src_ :   rawptr, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 193 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   rawptr) (fp))(dest_, src_, n_); }
-CRTmemmove :: #force_inline proc "c" (dest_ :   rawptr, src_ :   rawptr, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 194 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   rawptr) (fp))(dest_, src_, n_); }
-CRTmemset :: #force_inline proc "c" (s_ :   rawptr, c_ :   i32, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 195 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   i32,   int   ) ->   rawptr) (fp))(s_, c_, n_); }
-CRTqsort :: #force_inline proc "c" (_base_ :   rawptr, nmemb_ :   int   , size_ :   int   , compar_ :   CRTComparisonCallback){ addr := 0x1000 + 196 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   ,   int   ,   CRTComparisonCallback)) (fp))(_base_, nmemb_, size_, compar_); }
-CRTrealloc :: #force_inline proc "c" (ptr_ :   rawptr, size_ :   int   ) ->   rawptr{ addr := 0x1000 + 197 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   int   ) ->   rawptr) (fp))(ptr_, size_); }
-CRTsinf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 198 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTsnprintf :: #force_inline proc "c" (buffer_ :   ^i8  , bufferSize_ :   int   , format_ :   ^i8  , _varargs_ : ..any) ->   i32{ addr := 0x1000 + 199 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   ^i8  , ..any) ->   i32) (fp))(buffer_, bufferSize_, format_, _varargs_); }
-CRTsprintf :: #force_inline proc "c" (buffer_ :   ^i8  , format_ :   ^i8  , _varargs_ : ..any) ->   i32{ addr := 0x1000 + 200 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  , ..any) ->   i32) (fp))(buffer_, format_, _varargs_); }
-CRTsqrt :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 201 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
-CRTsqrtf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 202 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
-CRTsqrtl :: #force_inline proc "c" (x_ :   [16]u8      ) ->   [16]u8      { addr := 0x1000 + 203 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  [16]u8      ) ->   [16]u8      ) (fp))(x_); }
-CRTstrcat :: #force_inline proc "c" (dest_ :   ^i8  , src_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 204 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   ^i8  ) (fp))(dest_, src_); }
-CRTstrchr :: #force_inline proc "c" (s_ :   ^i8  , c_ :   i32) ->   ^i8  { addr := 0x1000 + 205 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   i32) ->   ^i8  ) (fp))(s_, c_); }
-CRTstrcmp :: #force_inline proc "c" (s1_ :   ^i8  , s2_ :   ^i8  ) ->   i32{ addr := 0x1000 + 206 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   i32) (fp))(s1_, s2_); }
-CRTstrcpy :: #force_inline proc "c" (dest_ :   ^i8  , src_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 207 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   ^i8  ) (fp))(dest_, src_); }
-CRTstrerror :: #force_inline proc "c" (errnum_ :   i32) ->   ^i8  { addr := 0x1000 + 208 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   ^i8  ) (fp))(errnum_); }
-CRTstrlen :: #force_inline proc "c" (s_ :   ^i8  ) ->   int   { addr := 0x1000 + 209 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   int   ) (fp))(s_); }
-CRTstrncmp :: #force_inline proc "c" (s1_ :   ^i8  , s2_ :   ^i8  , n_ :   int   ) ->   i32{ addr := 0x1000 + 210 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ,   int   ) ->   i32) (fp))(s1_, s2_, n_); }
-CRTstrncpy :: #force_inline proc "c" (dest_ :   ^i8  , src_ :   ^i8  , n_ :   int   ) ->   ^i8  { addr := 0x1000 + 211 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ,   int   ) ->   ^i8  ) (fp))(dest_, src_, n_); }
-CRTstrnlen :: #force_inline proc "c" (s_ :   ^i8  , maxlen_ :   int   ) ->   int   { addr := 0x1000 + 212 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ) ->   int   ) (fp))(s_, maxlen_); }
-CRTstrstr :: #force_inline proc "c" (haystack_ :   ^i8  , needle_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 213 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   ^i8  ) (fp))(haystack_, needle_); }
-CRTstrtol :: #force_inline proc "c" (nptr_ :   ^i8  , endptr_ :   ^^i8  , base_ :   i32) ->   i64 { addr := 0x1000 + 214 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^^i8  ,   i32) ->   i64 ) (fp))(nptr_, endptr_, base_); }
-CRTstrtoul :: #force_inline proc "c" (nptr_ :   ^i8  , endptr_ :   ^^i8  , base_ :   i32) ->   u64     { addr := 0x1000 + 215 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^^i8  ,   i32) ->   u64     ) (fp))(nptr_, endptr_, base_); }
-CRTtolower :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 216 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
-NewPanel :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties) ->   ^Panel{ addr := 0x1000 + 218 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties) ->   ^Panel) (fp))(parent_, flags_, properties_); }
-NewSplitter :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties) ->   ^Splitter{ addr := 0x1000 + 219 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties) ->   ^Splitter) (fp))(parent_, flags_, properties_); }
-NewButton :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties, label_ : string) ->   ^Button{ addr := 0x1000 + 220 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties, ^u8, int) ->   ^Button) (fp))(parent_, flags_, properties_, raw_data(label_), len(label_)); }
-NewChoice :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties) ->   ^Choice{ addr := 0x1000 + 221 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties) ->   ^Choice) (fp))(parent_, flags_, properties_); }
-NewColorWell :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties, colorRGB_ :   u32     ) ->   ^ColorWell{ addr := 0x1000 + 222 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties,   u32     ) ->   ^ColorWell) (fp))(parent_, flags_, properties_, colorRGB_); }
-NewTextDisplay :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties, label_ : string) ->   ^TextDisplay{ addr := 0x1000 + 223 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties, ^u8, int) ->   ^TextDisplay) (fp))(parent_, flags_, properties_, raw_data(label_), len(label_)); }
-NewIconDisplay :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties, iconID_ :   u32     ) ->   ^IconDisplay{ addr := 0x1000 + 224 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties,   u32     ) ->   ^IconDisplay) (fp))(parent_, flags_, properties_, iconID_); }
-NewImageDisplay :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties) ->   ^ImageDisplay{ addr := 0x1000 + 225 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties) ->   ^ImageDisplay) (fp))(parent_, flags_, properties_); }
-NewListView :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties, cItemStyle_ :   cstring  , cHeaderItemStyle_ :   cstring  , cFooterItemStyle_ :   cstring  ) ->   ^ListView{ addr := 0x1000 + 226 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties,   cstring  ,   cstring  ,   cstring  ) ->   ^ListView) (fp))(parent_, flags_, properties_, cItemStyle_, cHeaderItemStyle_, cFooterItemStyle_); }
-NewTextbox :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties) ->   ^Textbox{ addr := 0x1000 + 227 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties) ->   ^Textbox) (fp))(parent_, flags_, properties_); }
-NewCustomElement :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , properties_ :   ElementProperties) ->   ^Element{ addr := 0x1000 + 228 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   ElementProperties) ->   ^Element) (fp))(parent_, flags_, properties_); }
-NewWindow :: #force_inline proc "c" (instance_ :   ^INSTANCE_TYPE, style_ :   WindowStyle) ->   ^Window{ addr := 0x1000 + 229 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INSTANCE_TYPE,   WindowStyle) ->   ^Window) (fp))(instance_, style_); }
-NewMenu :: #force_inline proc "c" (source_ :   ^Element, flags_ :   u64     , userCallback_ :   MenuCallbackFunction, _context_ :   Generic, fixedWidth_ :   i32, fixedHeight_ :   i32) ->   ^Menu{ addr := 0x1000 + 230 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   MenuCallbackFunction,   Generic,   i32,   i32) ->   ^Menu) (fp))(source_, flags_, userCallback_, _context_, fixedWidth_, fixedHeight_); }
-NewMenuItem :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , label_ : string, callback_ :   MenuCallbackFunction, _context_ :   Generic){ addr := 0x1000 + 231 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   u64     , ^u8, int,   MenuCallbackFunction,   Generic)) (fp))(parent_, flags_, raw_data(label_), len(label_), callback_, _context_); }
-NewMenuCommand :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , label_ : string, command_ :   ^Command){ addr := 0x1000 + 232 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   u64     , ^u8, int,   ^Command)) (fp))(parent_, flags_, raw_data(label_), len(label_), command_); }
-NewMenuColumn :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     ) ->   ^Element{ addr := 0x1000 + 233 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ) ->   ^Element) (fp))(parent_, flags_); }
-NewMenuSeparator :: #force_inline proc "c" (parent_ :   ^Element){ addr := 0x1000 + 234 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(parent_); }
-NewSpacer :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     ) ->   ^Element{ addr := 0x1000 + 235 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ) ->   ^Element) (fp))(parent_, flags_); }
-NewElementGroup :: #force_inline proc "c" (instance_ :   ^INSTANCE_TYPE) ->   ^ElementGroup{ addr := 0x1000 + 236 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INSTANCE_TYPE) ->   ^ElementGroup) (fp))(instance_); }
-NewTextPlan :: #force_inline proc "c" (properties_ :   ^TextDisplayProperties, bounds_ :   Rectangle, string_ :   ^i8  , textRuns_ :   ^TextRun, textRunCount_ :   int   , singleUse_ :   bool) ->   ^TextPlan{ addr := 0x1000 + 237 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextDisplayProperties,   Rectangle,   ^i8  ,   ^TextRun,   int   ,   bool) ->   ^TextPlan) (fp))(properties_, bounds_, string_, textRuns_, textRunCount_, singleUse_); }
-NewStore :: #force_inline proc "c" (instance_ :   ^INSTANCE_TYPE, pullCallback_ :   StorePullCallbackFunction, pullCallbackContext_ :   Generic) ->   ^Store{ addr := 0x1000 + 238 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INSTANCE_TYPE,   StorePullCallbackFunction,   Generic) ->   ^Store) (fp))(instance_, pullCallback_, pullCallbackContext_); }
-ElementDraw :: #force_inline proc "c" (element_ :   ^Element, painter_ :   ^Painter){ addr := 0x1000 + 239 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   ^Painter)) (fp))(element_, painter_); }
-ElementGetInstance :: #force_inline proc "c" (element_ :   ^Element) ->   ^INSTANCE_TYPE{ addr := 0x1000 + 240 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   ^INSTANCE_TYPE) (fp))(element_); }
-ElementGetWindow :: #force_inline proc "c" (element_ :   ^Element) ->   ^Window{ addr := 0x1000 + 241 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   ^Window) (fp))(element_); }
-ElementFocus :: #force_inline proc "c" (element_ :   ^Element, ensureVisible_ :   bool){ addr := 0x1000 + 242 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool)) (fp))(element_, ensureVisible_); }
-ElementSetDisabled :: #force_inline proc "c" (element_ :   ^Element, disabled_ :   bool){ addr := 0x1000 + 243 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool)) (fp))(element_, disabled_); }
-ElementSetHidden :: #force_inline proc "c" (element_ :   ^Element, hidden_ :   bool){ addr := 0x1000 + 244 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool)) (fp))(element_, hidden_); }
-ElementSetCallback :: #force_inline proc "c" (element_ :   ^Element, callback_ :   UICallbackFunction){ addr := 0x1000 + 245 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   UICallbackFunction)) (fp))(element_, callback_); }
-ElementGetSize :: #force_inline proc "c" (element_ :   ^Element, width_ :   ^i32, height_ :   ^i32){ addr := 0x1000 + 246 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   ^i32,   ^i32)) (fp))(element_, width_, height_); }
-ElementRepaint :: #force_inline proc "c" (element_ :   ^Element, all_ :   bool, region_ :   Rectangle){ addr := 0x1000 + 247 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool,   Rectangle)) (fp))(element_, all_, region_); }
-ElementSetData :: #force_inline proc "c" (element_ :   ^Element, data_ :   Generic){ addr := 0x1000 + 248 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   Generic)) (fp))(element_, data_); }
-ElementGetData :: #force_inline proc "c" (element_ :   ^Element) ->   Generic{ addr := 0x1000 + 249 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Generic) (fp))(element_); }
-ElementSetCellRange :: #force_inline proc "c" (element_ :   ^Element, xFrom_ :   i32, yFrom_ :   i32, xTo_ :   i32, yTo_ :   i32){ addr := 0x1000 + 250 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   i32,   i32,   i32,   i32)) (fp))(element_, xFrom_, yFrom_, xTo_, yTo_); }
-ElementAddGroup :: #force_inline proc "c" (element_ :   ^Element, group_ :   ^ElementGroup){ addr := 0x1000 + 251 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   ^ElementGroup)) (fp))(element_, group_); }
-ElementGetInsets :: #force_inline proc "c" (element_ :   ^Element) ->   Rectangle{ addr := 0x1000 + 252 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Rectangle) (fp))(element_); }
-ElementGetInsetSize :: #force_inline proc "c" (element_ :   ^Element) ->   Rectangle{ addr := 0x1000 + 253 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Rectangle) (fp))(element_); }
-ElementGetPreferredSize :: #force_inline proc "c" (element_ :   ^Element) ->   Rectangle{ addr := 0x1000 + 254 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Rectangle) (fp))(element_); }
-ElementMove :: #force_inline proc "c" (element_ :   ^Element, x_ :   i32, y_ :   i32, width_ :   i32, height_ :   i32){ addr := 0x1000 + 255 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   i32,   i32,   i32,   i32)) (fp))(element_, x_, y_, width_, height_); }
-ElementGetLayoutParent :: #force_inline proc "c" (element_ :   ^Element) ->   ^Element{ addr := 0x1000 + 256 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   ^Element) (fp))(element_); }
-ElementDestroy :: #force_inline proc "c" (element_ :   ^Element){ addr := 0x1000 + 257 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(element_); }
-ElementDestroyContents :: #force_inline proc "c" (element_ :   ^Element){ addr := 0x1000 + 258 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(element_); }
-ElementStartAnimating :: #force_inline proc "c" (element_ :   ^Element) ->   bool{ addr := 0x1000 + 259 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   bool) (fp))(element_); }
-ElementGroupSetCallback :: #force_inline proc "c" (group_ :   ^ElementGroup, callback_ :   UICallbackFunction){ addr := 0x1000 + 260 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ElementGroup,   UICallbackFunction)) (fp))(group_, callback_); }
-ElementGroupSetDisabled :: #force_inline proc "c" (group_ :   ^ElementGroup, disabled_ :   bool){ addr := 0x1000 + 261 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ElementGroup,   bool)) (fp))(group_, disabled_); }
-ElementGroupSetHidden :: #force_inline proc "c" (group_ :   ^ElementGroup, hidden_ :   bool){ addr := 0x1000 + 262 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ElementGroup,   bool)) (fp))(group_, hidden_); }
-ElementGroupRepaintAll :: #force_inline proc "c" (group_ :   ^ElementGroup){ addr := 0x1000 + 263 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ElementGroup)) (fp))(group_); }
-WindowGetBounds :: #force_inline proc "c" (window_ :   ^Window) ->   Rectangle{ addr := 0x1000 + 264 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window) ->   Rectangle) (fp))(window_); }
-WindowGetToolbar :: #force_inline proc "c" (window_ :   ^Window) ->   ^Element{ addr := 0x1000 + 265 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window) ->   ^Element) (fp))(window_); }
-WindowSetIcon :: #force_inline proc "c" (window_ :   ^Window, iconID_ :   u32     ){ addr := 0x1000 + 266 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window,   u32     )) (fp))(window_, iconID_); }
-WindowSetTitle :: #force_inline proc "c" (window_ :   ^Window, title_ : string){ addr := 0x1000 + 267 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window, ^u8, int)) (fp))(window_, raw_data(title_), len(title_)); }
-MenuGetSource :: #force_inline proc "c" (menu_ :   ^Menu) ->   ^Element{ addr := 0x1000 + 268 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Menu) ->   ^Element) (fp))(menu_); }
-ButtonSetIcon :: #force_inline proc "c" (button_ :   ^Button, iconID_ :   u32     ){ addr := 0x1000 + 269 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   u32     )) (fp))(button_, iconID_); }
-ButtonSetCheck :: #force_inline proc "c" (button_ :   ^Button, checkState_ :   CheckState, sendUpdatedMessage_ :   bool){ addr := 0x1000 + 270 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CheckState,   bool)) (fp))(button_, checkState_, sendUpdatedMessage_); }
-ButtonGetCheck :: #force_inline proc "c" (button_ :   ^Button) ->   CheckState{ addr := 0x1000 + 271 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Button) ->   CheckState) (fp))(button_); }
-ButtonOnCommand :: #force_inline proc "c" (button_ :   ^Button, callback_ :   CommandCallbackFunction, command_ :   ^Command){ addr := 0x1000 + 272 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CommandCallbackFunction,   ^Command)) (fp))(button_, callback_, command_); }
-ButtonSetCheckBuddy :: #force_inline proc "c" (button_ :   ^Button, checkBuddy_ :   ^Element){ addr := 0x1000 + 273 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   ^Element)) (fp))(button_, checkBuddy_); }
-ButtonGetCheckBuddy :: #force_inline proc "c" (button_ :   ^Button) ->   ^Element{ addr := 0x1000 + 274 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Button) ->   ^Element) (fp))(button_); }
-ButtonBindLabel :: #force_inline proc "c" (button_ :   ^Button, cRule_ :   ^i8  ){ addr := 0x1000 + 275 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   ^i8  )) (fp))(button_, cRule_); }
-TextboxFind :: #force_inline proc "c" (textbox_ :   ^Textbox, string_ : string, line_ :   ^i32    , byte_ :   ^i32    , flags_ :   u32     ) ->   bool{ addr := 0x1000 + 276 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Textbox, ^u8, int,   ^i32    ,   ^i32    ,   u32     ) ->   bool) (fp))(textbox_, raw_data(string_), len(string_), line_, byte_, flags_); }
-TextboxInsert :: #force_inline proc "c" (textbox_ :   ^Textbox, string_ : string, sendUpdatedMessage_ :   bool){ addr := 0x1000 + 277 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox, ^u8, int,   bool)) (fp))(textbox_, raw_data(string_), len(string_), sendUpdatedMessage_); }
-TextboxGetContents :: #force_inline proc "c" (textbox_ :   ^Textbox, bytes_ :   ^int   ) ->   ^i8  { addr := 0x1000 + 278 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Textbox,   ^int   ) ->   ^i8  ) (fp))(textbox_, bytes_); }
-TextboxGetLineLength :: #force_inline proc "c" (textbox_ :   ^Textbox, line_ :   uint     ) ->   int   { addr := 0x1000 + 279 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Textbox,   uint     ) ->   int   ) (fp))(textbox_, line_); }
-TextboxGetSelection :: #force_inline proc "c" (textbox_ :   ^Textbox, fromLine_ :   ^i32    , fromByte_ :   ^i32    , toLine_ :   ^i32    , toByte_ :   ^i32    ){ addr := 0x1000 + 280 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   ^i32    ,   ^i32    ,   ^i32    ,   ^i32    )) (fp))(textbox_, fromLine_, fromByte_, toLine_, toByte_); }
-TextboxMoveCaret :: #force_inline proc "c" (textbox_ :   ^Textbox, line_ :   i32    , byte_ :   i32    ){ addr := 0x1000 + 281 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   i32    ,   i32    )) (fp))(textbox_, line_, byte_); }
-TextboxSetSelection :: #force_inline proc "c" (textbox_ :   ^Textbox, fromLine_ :   i32    , fromByte_ :   i32    , toLine_ :   i32    , toByte_ :   i32    ){ addr := 0x1000 + 282 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   i32    ,   i32    ,   i32    ,   i32    )) (fp))(textbox_, fromLine_, fromByte_, toLine_, toByte_); }
-TextboxSelectAll :: #force_inline proc "c" (textbox_ :   ^Textbox){ addr := 0x1000 + 283 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox)) (fp))(textbox_); }
-TextboxClear :: #force_inline proc "c" (textbox_ :   ^Textbox, sendUpdatedMessage_ :   bool){ addr := 0x1000 + 284 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   bool)) (fp))(textbox_, sendUpdatedMessage_); }
-TextboxUseNumberOverlay :: #force_inline proc "c" (textbox_ :   ^Textbox, defaultBehaviour_ :   bool){ addr := 0x1000 + 285 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   bool)) (fp))(textbox_, defaultBehaviour_); }
-TextboxUseBreadcrumbOverlay :: #force_inline proc "c" (textbox_ :   ^Textbox){ addr := 0x1000 + 286 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox)) (fp))(textbox_); }
-PanelSetBands :: #force_inline proc "c" (panel_ :   ^Panel, columnCount_ :   int   , rowCount_ :   int   , columns_ :   ^PanelBand, rows_ :   ^PanelBand){ addr := 0x1000 + 287 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Panel,   int   ,   int   ,   ^PanelBand,   ^PanelBand)) (fp))(panel_, columnCount_, rowCount_, columns_, rows_); }
-PanelSwitchTo :: #force_inline proc "c" (panel_ :   ^Panel, targetChild_ :   ^Element, transitionType_ :   TransitionType){ addr := 0x1000 + 288 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Panel,   ^Element,   TransitionType)) (fp))(panel_, targetChild_, transitionType_); }
-TextPlanGetWidth :: #force_inline proc "c" (plan_ :   ^TextPlan) ->   i32{ addr := 0x1000 + 289 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextPlan) ->   i32) (fp))(plan_); }
-TextPlanGetHeight :: #force_inline proc "c" (plan_ :   ^TextPlan) ->   i32{ addr := 0x1000 + 290 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextPlan) ->   i32) (fp))(plan_); }
-TextPlanGetLineCount :: #force_inline proc "c" (plan_ :   ^TextPlan) ->   int   { addr := 0x1000 + 291 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextPlan) ->   int   ) (fp))(plan_); }
-TextPlanDestroy :: #force_inline proc "c" (plan_ :   ^TextPlan){ addr := 0x1000 + 292 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^TextPlan)) (fp))(plan_); }
-TextDisplaySetContents :: #force_inline proc "c" (display_ :   ^TextDisplay, contents_ : string){ addr := 0x1000 + 293 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^TextDisplay, ^u8, int)) (fp))(display_, raw_data(contents_), len(contents_)); }
-TextDisplayBindContents :: #force_inline proc "c" (display_ :   ^TextDisplay, cRule_ :   ^i8  , store_ :   ^Store, id_ :   Generic, values_ :   ^i32, valueCount_ :   int   ){ addr := 0x1000 + 294 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^TextDisplay,   ^i8  ,   ^Store,   Generic,   ^i32,   int   )) (fp))(display_, cRule_, store_, id_, values_, valueCount_); }
-TextDisplayUnbindContents :: #force_inline proc "c" (display_ :   ^TextDisplay){ addr := 0x1000 + 295 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^TextDisplay)) (fp))(display_); }
-StoreDestroy :: #force_inline proc "c" (store_ :   ^Store){ addr := 0x1000 + 296 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Store)) (fp))(store_); }
-StoreObserve :: #force_inline proc "c" (store_ :   ^Store, id_ :   Generic, tag_ :   i32, callback_ :   StoreCallbackFunction, _context_ :   Generic, callNow_ :   bool){ addr := 0x1000 + 297 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Store,   Generic,   i32,   StoreCallbackFunction,   Generic,   bool)) (fp))(store_, id_, tag_, callback_, _context_, callNow_); }
-StoreUnobserve :: #force_inline proc "c" (store_ :   ^Store, id_ :   Generic, callback_ :   StoreCallbackFunction, _context_ :   Generic){ addr := 0x1000 + 298 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Store,   Generic,   StoreCallbackFunction,   Generic)) (fp))(store_, id_, callback_, _context_); }
-StoreNotify :: #force_inline proc "c" (store_ :   ^Store, id_ :   Generic, tag_ :   i32){ addr := 0x1000 + 299 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Store,   Generic,   i32)) (fp))(store_, id_, tag_); }
-StoreSet :: #force_inline proc "c" (store_ :   ^Store, id_ :   Generic, tag_ :   i32, value_ :   FormatValue){ addr := 0x1000 + 300 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Store,   Generic,   i32,   FormatValue)) (fp))(store_, id_, tag_, value_); }
-StoreGet :: #force_inline proc "c" (store_ :   ^Store, id_ :   Generic, tag_ :   i32, defaultValue_ :   FormatValue) ->   FormatValue{ addr := 0x1000 + 301 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Store,   Generic,   i32,   FormatValue) ->   FormatValue) (fp))(store_, id_, tag_, defaultValue_); }
-StoreDispatchNotifications :: #force_inline proc "c" (store_ :   ^Store){ addr := 0x1000 + 302 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Store)) (fp))(store_); }
-ColorWellGetRGB :: #force_inline proc "c" (well_ :   ^ColorWell) ->   u32     { addr := 0x1000 + 303 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^ColorWell) ->   u32     ) (fp))(well_); }
-ColorWellSetRGB :: #force_inline proc "c" (well_ :   ^ColorWell, colorRGB_ :   u32     , sendChangedMessage_ :   bool){ addr := 0x1000 + 304 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ColorWell,   u32     ,   bool)) (fp))(well_, colorRGB_, sendChangedMessage_); }
-ColorWellSetIndeterminate :: #force_inline proc "c" (well_ :   ^ColorWell){ addr := 0x1000 + 305 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ColorWell)) (fp))(well_); }
-ChoiceAddMenuItem :: #force_inline proc "c" (choice_ :   ^Choice, item_ :   Generic){ addr := 0x1000 + 306 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Choice,   Generic)) (fp))(choice_, item_); }
-ChoiceSetItem :: #force_inline proc "c" (choice_ :   ^Choice, item_ :   Generic, sendUpdatedMessage_ :   bool){ addr := 0x1000 + 307 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Choice,   Generic,   bool)) (fp))(choice_, item_, sendUpdatedMessage_); }
-ChoiceGetItem :: #force_inline proc "c" (choice_ :   ^Choice) ->   Generic{ addr := 0x1000 + 308 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Choice) ->   Generic) (fp))(choice_); }
-ListViewInsertGroup :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , flags_ :   u32     ){ addr := 0x1000 + 309 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   u32     )) (fp))(view_, group_, flags_); }
-ListViewInsert :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , firstIndex_ :   Generic, lastIndex_ :   Generic, count_ :   i64    ){ addr := 0x1000 + 310 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   Generic,   Generic,   i64    )) (fp))(view_, group_, firstIndex_, lastIndex_, count_); }
-ListViewRemove :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , firstIndex_ :   Generic, lastIndex_ :   Generic, count_ :   i64    ){ addr := 0x1000 + 311 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   Generic,   Generic,   i64    )) (fp))(view_, group_, firstIndex_, lastIndex_, count_); }
-ListViewRemoveAll :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    ){ addr := 0x1000 + 312 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    )) (fp))(view_, group_); }
-ListViewGetIndex :: #force_inline proc "c" (view_ :   ^ListView, item_ :   ^Element) ->   Generic{ addr := 0x1000 + 313 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^ListView,   ^Element) ->   Generic) (fp))(view_, item_); }
-ListViewSetColumns :: #force_inline proc "c" (view_ :   ^ListView, columns_ :   ^ListViewColumn, columnCount_ :   int   ){ addr := 0x1000 + 314 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   ^ListViewColumn,   int   )) (fp))(view_, columns_, columnCount_); }
-ListViewSelect :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , index_ :   Generic){ addr := 0x1000 + 315 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   Generic)) (fp))(view_, group_, index_); }
-ListViewResetSearchBuffer :: #force_inline proc "c" (view_ :   ^ListView){ addr := 0x1000 + 316 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView)) (fp))(view_); }
+StringZeroTerminate :: #force_inline proc "c" (string_ : string) ->   ^i8  { addr := 0x1000 + 167 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (^u8, int) ->   ^i8  ) (fp))(raw_data(string_), len(string_)); }
+CRTabs :: #force_inline proc "c" (n_ :   i32) ->   i32{ addr := 0x1000 + 168 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(n_); }
+CRTacosf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 169 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTasinf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 170 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTatan2f :: #force_inline proc "c" (y_ :   f32  , x_ :   f32  ) ->   f32  { addr := 0x1000 + 172 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ) ->   f32  ) (fp))(y_, x_); }
+CRTatanf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 173 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTatoi :: #force_inline proc "c" (string_ :   ^i8  ) ->   i32{ addr := 0x1000 + 174 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   i32) (fp))(string_); }
+CRTcalloc :: #force_inline proc "c" (num_ :   int   , size_ :   int   ) ->   rawptr{ addr := 0x1000 + 175 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   int   ) ->   rawptr) (fp))(num_, size_); }
+CRTceil :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 176 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
+CRTceilf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 177 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTcosf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 178 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTexp :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 326 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
+CRTexp2f :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 327 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTfabs :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 179 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
+CRTfabsf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 344 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTfloor :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 181 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
+CRTfloorf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 182 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTfmodf :: #force_inline proc "c" (x_ :   f32  , y_ :   f32  ) ->   f32  { addr := 0x1000 + 183 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ) ->   f32  ) (fp))(x_, y_); }
+CRTfree :: #force_inline proc "c" (ptr_ :   rawptr){ addr := 0x1000 + 184 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr)) (fp))(ptr_); }
+CRTgetenv :: #force_inline proc "c" (name_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 185 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   ^i8  ) (fp))(name_); }
+CRTisalpha :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 186 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
+CRTisdigit :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 187 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
+CRTisnanf :: #force_inline proc "c" (f_ :   f32  ) ->   bool{ addr := 0x1000 + 345 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   bool) (fp))(f_); }
+CRTisspace :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 188 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
+CRTisupper :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 189 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
+CRTisxdigit :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 190 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
+CRTmalloc :: #force_inline proc "c" (size_ :   int   ) ->   rawptr{ addr := 0x1000 + 191 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ) ->   rawptr) (fp))(size_); }
+CRTmemchr :: #force_inline proc "c" (_s_ :   rawptr, _c_ :   i32, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 192 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   i32,   int   ) ->   rawptr) (fp))(_s_, _c_, n_); }
+CRTmemcmp :: #force_inline proc "c" (s1_ :   rawptr, s2_ :   rawptr, n_ :   int   ) ->   i32{ addr := 0x1000 + 193 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   i32) (fp))(s1_, s2_, n_); }
+CRTmemcpy :: #force_inline proc "c" (dest_ :   rawptr, src_ :   rawptr, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 194 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   rawptr) (fp))(dest_, src_, n_); }
+CRTmemmove :: #force_inline proc "c" (dest_ :   rawptr, src_ :   rawptr, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 195 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   rawptr,   int   ) ->   rawptr) (fp))(dest_, src_, n_); }
+CRTmemset :: #force_inline proc "c" (s_ :   rawptr, c_ :   i32, n_ :   int   ) ->   rawptr{ addr := 0x1000 + 196 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   i32,   int   ) ->   rawptr) (fp))(s_, c_, n_); }
+CRTpowf :: #force_inline proc "c" (x_ :   f32  , y_ :   f32  ) ->   f32  { addr := 0x1000 + 328 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ,   f32  ) ->   f32  ) (fp))(x_, y_); }
+CRTqsort :: #force_inline proc "c" (_base_ :   rawptr, nmemb_ :   int   , size_ :   int   , compar_ :   CRTComparisonCallback){ addr := 0x1000 + 197 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   ,   int   ,   CRTComparisonCallback)) (fp))(_base_, nmemb_, size_, compar_); }
+CRTrealloc :: #force_inline proc "c" (ptr_ :   rawptr, size_ :   int   ) ->   rawptr{ addr := 0x1000 + 198 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  rawptr,   int   ) ->   rawptr) (fp))(ptr_, size_); }
+CRTsinf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 199 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTsnprintf :: #force_inline proc "c" (buffer_ :   ^i8  , bufferSize_ :   int   , format_ :   ^i8  , _varargs_ : ..any) ->   i32{ addr := 0x1000 + 200 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ,   ^i8  , ..any) ->   i32) (fp))(buffer_, bufferSize_, format_, _varargs_); }
+CRTsprintf :: #force_inline proc "c" (buffer_ :   ^i8  , format_ :   ^i8  , _varargs_ : ..any) ->   i32{ addr := 0x1000 + 201 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  , ..any) ->   i32) (fp))(buffer_, format_, _varargs_); }
+CRTsqrt :: #force_inline proc "c" (x_ :   f64   ) ->   f64   { addr := 0x1000 + 202 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f64   ) ->   f64   ) (fp))(x_); }
+CRTsqrtf :: #force_inline proc "c" (x_ :   f32  ) ->   f32  { addr := 0x1000 + 203 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  f32  ) ->   f32  ) (fp))(x_); }
+CRTstrcat :: #force_inline proc "c" (dest_ :   ^i8  , src_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 205 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   ^i8  ) (fp))(dest_, src_); }
+CRTstrchr :: #force_inline proc "c" (s_ :   ^i8  , c_ :   i32) ->   ^i8  { addr := 0x1000 + 206 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   i32) ->   ^i8  ) (fp))(s_, c_); }
+CRTstrcmp :: #force_inline proc "c" (s1_ :   ^i8  , s2_ :   ^i8  ) ->   i32{ addr := 0x1000 + 207 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   i32) (fp))(s1_, s2_); }
+CRTstrcpy :: #force_inline proc "c" (dest_ :   ^i8  , src_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 208 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   ^i8  ) (fp))(dest_, src_); }
+CRTstrdup :: #force_inline proc "c" (string_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 70 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   ^i8  ) (fp))(string_); }
+CRTstrerror :: #force_inline proc "c" (errnum_ :   i32) ->   ^i8  { addr := 0x1000 + 209 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   ^i8  ) (fp))(errnum_); }
+CRTstrlen :: #force_inline proc "c" (s_ :   ^i8  ) ->   int   { addr := 0x1000 + 210 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ) ->   int   ) (fp))(s_); }
+CRTstrncmp :: #force_inline proc "c" (s1_ :   ^i8  , s2_ :   ^i8  , n_ :   int   ) ->   i32{ addr := 0x1000 + 211 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ,   int   ) ->   i32) (fp))(s1_, s2_, n_); }
+CRTstrncpy :: #force_inline proc "c" (dest_ :   ^i8  , src_ :   ^i8  , n_ :   int   ) ->   ^i8  { addr := 0x1000 + 212 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ,   int   ) ->   ^i8  ) (fp))(dest_, src_, n_); }
+CRTstrnlen :: #force_inline proc "c" (s_ :   ^i8  , maxlen_ :   int   ) ->   int   { addr := 0x1000 + 213 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   int   ) ->   int   ) (fp))(s_, maxlen_); }
+CRTstrstr :: #force_inline proc "c" (haystack_ :   ^i8  , needle_ :   ^i8  ) ->   ^i8  { addr := 0x1000 + 214 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^i8  ) ->   ^i8  ) (fp))(haystack_, needle_); }
+CRTstrtol :: #force_inline proc "c" (nptr_ :   ^i8  , endptr_ :   ^^i8  , base_ :   i32) ->   i64 { addr := 0x1000 + 215 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^^i8  ,   i32) ->   i64 ) (fp))(nptr_, endptr_, base_); }
+CRTstrtoul :: #force_inline proc "c" (nptr_ :   ^i8  , endptr_ :   ^^i8  , base_ :   i32) ->   u64     { addr := 0x1000 + 216 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^i8  ,   ^^i8  ,   i32) ->   u64     ) (fp))(nptr_, endptr_, base_); }
+CRTtolower :: #force_inline proc "c" (c_ :   i32) ->   i32{ addr := 0x1000 + 217 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  i32) ->   i32) (fp))(c_); }
+NewPanel :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil) ->   ^Panel{ addr := 0x1000 + 219 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ) ->   ^Panel) (fp))(parent_, flags_, cStyle_); }
+NewSplitter :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil) ->   ^Splitter{ addr := 0x1000 + 220 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ) ->   ^Splitter) (fp))(parent_, flags_, cStyle_); }
+NewButton :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil, label_ : string = "") ->   ^Button{ addr := 0x1000 + 221 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  , ^u8, int) ->   ^Button) (fp))(parent_, flags_, cStyle_, raw_data(label_), len(label_)); }
+NewChoice :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil) ->   ^Choice{ addr := 0x1000 + 222 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ) ->   ^Choice) (fp))(parent_, flags_, cStyle_); }
+NewColorWell :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil, colorRGB_ :   u32      = 0) ->   ^ColorWell{ addr := 0x1000 + 223 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ,   u32     ) ->   ^ColorWell) (fp))(parent_, flags_, cStyle_, colorRGB_); }
+NewTextDisplay :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil, label_ : string = "") ->   ^TextDisplay{ addr := 0x1000 + 224 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  , ^u8, int) ->   ^TextDisplay) (fp))(parent_, flags_, cStyle_, raw_data(label_), len(label_)); }
+NewIconDisplay :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil, iconID_ :   u32      = 0) ->   ^IconDisplay{ addr := 0x1000 + 225 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ,   u32     ) ->   ^IconDisplay) (fp))(parent_, flags_, cStyle_, iconID_); }
+NewImageDisplay :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil) ->   ^ImageDisplay{ addr := 0x1000 + 226 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ) ->   ^ImageDisplay) (fp))(parent_, flags_, cStyle_); }
+NewListView :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil, cItemStyle_ :   cstring   = nil, cHeaderItemStyle_ :   cstring   = nil, cFooterItemStyle_ :   cstring   = nil) ->   ^ListView{ addr := 0x1000 + 227 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ,   cstring  ,   cstring  ,   cstring  ) ->   ^ListView) (fp))(parent_, flags_, cStyle_, cItemStyle_, cHeaderItemStyle_, cFooterItemStyle_); }
+NewTextbox :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil) ->   ^Textbox{ addr := 0x1000 + 228 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ) ->   ^Textbox) (fp))(parent_, flags_, cStyle_); }
+NewCustomElement :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, cStyle_ :   cstring   = nil) ->   ^Element{ addr := 0x1000 + 229 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   cstring  ) ->   ^Element) (fp))(parent_, flags_, cStyle_); }
+NewWindow :: #force_inline proc "c" (instance_ :   ^INSTANCE_TYPE, style_ :   WindowStyle) ->   ^Window{ addr := 0x1000 + 230 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^INSTANCE_TYPE,   WindowStyle) ->   ^Window) (fp))(instance_, style_); }
+NewMenu :: #force_inline proc "c" (source_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT, userCallback_ :   MenuCallbackFunction = nil, _context_ :   Generic = nil, fixedWidth_ :   i32 = 0, fixedHeight_ :   i32 = 0) ->   ^Menu{ addr := 0x1000 + 231 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ,   MenuCallbackFunction,   Generic,   i32,   i32) ->   ^Menu) (fp))(source_, flags_, userCallback_, _context_, fixedWidth_, fixedHeight_); }
+NewMenuItem :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , label_ : string = "", callback_ :   MenuCallbackFunction = nil, _context_ :   Generic = nil){ addr := 0x1000 + 232 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   u64     , ^u8, int,   MenuCallbackFunction,   Generic)) (fp))(parent_, flags_, raw_data(label_), len(label_), callback_, _context_); }
+NewMenuCommand :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     , label_ : string, command_ :   ^Command){ addr := 0x1000 + 233 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   u64     , ^u8, int,   ^Command)) (fp))(parent_, flags_, raw_data(label_), len(label_), command_); }
+NewMenuColumn :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64      = FLAGS_DEFAULT) ->   ^Element{ addr := 0x1000 + 234 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ) ->   ^Element) (fp))(parent_, flags_); }
+NewMenuSeparator :: #force_inline proc "c" (parent_ :   ^Element){ addr := 0x1000 + 235 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(parent_); }
+NewSpacer :: #force_inline proc "c" (parent_ :   ^Element, flags_ :   u64     ) ->   ^Element{ addr := 0x1000 + 236 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element,   u64     ) ->   ^Element) (fp))(parent_, flags_); }
+NewTextPlan :: #force_inline proc "c" (properties_ :   ^TextDisplayProperties, bounds_ :   Rectangle, string_ :   ^i8  , textRuns_ :   ^TextRun, textRunCount_ :   int   , singleUse_ :   bool) ->   ^TextPlan{ addr := 0x1000 + 238 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextDisplayProperties,   Rectangle,   ^i8  ,   ^TextRun,   int   ,   bool) ->   ^TextPlan) (fp))(properties_, bounds_, string_, textRuns_, textRunCount_, singleUse_); }
+ElementDraw :: #force_inline proc "c" (element_ :   ^Element, painter_ :   ^Painter){ addr := 0x1000 + 240 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   ^Painter)) (fp))(element_, painter_); }
+ElementFocus :: #force_inline proc "c" (element_ :   ^Element, ensureVisible_ :   bool = false){ addr := 0x1000 + 243 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool)) (fp))(element_, ensureVisible_); }
+ElementSetDisabled :: #force_inline proc "c" (element_ :   ^Element, disabled_ :   bool = true){ addr := 0x1000 + 244 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool)) (fp))(element_, disabled_); }
+ElementSetHidden :: #force_inline proc "c" (element_ :   ^Element, hidden_ :   bool = true){ addr := 0x1000 + 245 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool)) (fp))(element_, hidden_); }
+ElementSetCallback :: #force_inline proc "c" (element_ :   ^Element, callback_ :   UICallbackFunction){ addr := 0x1000 + 246 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   UICallbackFunction)) (fp))(element_, callback_); }
+ElementGetSize :: #force_inline proc "c" (element_ :   ^Element, width_ :   ^i32, height_ :   ^i32){ addr := 0x1000 + 247 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   ^i32,   ^i32)) (fp))(element_, width_, height_); }
+ElementRepaint :: #force_inline proc "c" (element_ :   ^Element, all_ :   bool, region_ :   Rectangle){ addr := 0x1000 + 248 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   bool,   Rectangle)) (fp))(element_, all_, region_); }
+ElementSetCellRange :: #force_inline proc "c" (element_ :   ^Element, xFrom_ :   i32, yFrom_ :   i32, xTo_ :   i32 = -1, yTo_ :   i32 = -1){ addr := 0x1000 + 251 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   i32,   i32,   i32,   i32)) (fp))(element_, xFrom_, yFrom_, xTo_, yTo_); }
+ElementGetInsets :: #force_inline proc "c" (element_ :   ^Element) ->   Rectangle{ addr := 0x1000 + 253 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Rectangle) (fp))(element_); }
+ElementGetInsetSize :: #force_inline proc "c" (element_ :   ^Element) ->   Rectangle{ addr := 0x1000 + 254 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Rectangle) (fp))(element_); }
+ElementGetMetrics :: #force_inline proc "c" (element_ :   ^Element) ->   ThemeMetrics{ addr := 0x1000 + 105 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   ThemeMetrics) (fp))(element_); }
+ElementGetPreferredSize :: #force_inline proc "c" (element_ :   ^Element) ->   Rectangle{ addr := 0x1000 + 255 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   Rectangle) (fp))(element_); }
+ElementMove :: #force_inline proc "c" (element_ :   ^Element, x_ :   i32, y_ :   i32, width_ :   i32, height_ :   i32){ addr := 0x1000 + 256 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element,   i32,   i32,   i32,   i32)) (fp))(element_, x_, y_, width_, height_); }
+ElementGetLayoutParent :: #force_inline proc "c" (element_ :   ^Element) ->   ^Element{ addr := 0x1000 + 257 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   ^Element) (fp))(element_); }
+ElementDestroy :: #force_inline proc "c" (element_ :   ^Element){ addr := 0x1000 + 258 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(element_); }
+ElementDestroyContents :: #force_inline proc "c" (element_ :   ^Element){ addr := 0x1000 + 259 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Element)) (fp))(element_); }
+ElementStartAnimating :: #force_inline proc "c" (element_ :   ^Element) ->   bool{ addr := 0x1000 + 260 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Element) ->   bool) (fp))(element_); }
+WindowGetBounds :: #force_inline proc "c" (window_ :   ^Window) ->   Rectangle{ addr := 0x1000 + 265 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window) ->   Rectangle) (fp))(window_); }
+WindowGetToolbar :: #force_inline proc "c" (window_ :   ^Window) ->   ^Element{ addr := 0x1000 + 266 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Window) ->   ^Element) (fp))(window_); }
+WindowSetIcon :: #force_inline proc "c" (window_ :   ^Window, iconID_ :   u32     ){ addr := 0x1000 + 267 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window,   u32     )) (fp))(window_, iconID_); }
+WindowSetTitle :: #force_inline proc "c" (window_ :   ^Window, title_ : string = ""){ addr := 0x1000 + 268 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window, ^u8, int)) (fp))(window_, raw_data(title_), len(title_)); }
+MenuGetSource :: #force_inline proc "c" (menu_ :   ^Menu) ->   ^Element{ addr := 0x1000 + 269 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Menu) ->   ^Element) (fp))(menu_); }
+ButtonSetIcon :: #force_inline proc "c" (button_ :   ^Button, iconID_ :   u32     ){ addr := 0x1000 + 270 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   u32     )) (fp))(button_, iconID_); }
+ButtonSetCheck :: #force_inline proc "c" (button_ :   ^Button, checkState_ :   CheckState = CHECK_CHECKED, sendUpdatedMessage_ :   bool = true){ addr := 0x1000 + 271 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CheckState,   bool)) (fp))(button_, checkState_, sendUpdatedMessage_); }
+ButtonGetCheck :: #force_inline proc "c" (button_ :   ^Button) ->   CheckState{ addr := 0x1000 + 272 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Button) ->   CheckState) (fp))(button_); }
+ButtonOnCommand :: #force_inline proc "c" (button_ :   ^Button, callback_ :   CommandCallbackFunction, command_ :   ^Command = nil){ addr := 0x1000 + 273 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CommandCallbackFunction,   ^Command)) (fp))(button_, callback_, command_); }
+ButtonSetCheckBuddy :: #force_inline proc "c" (button_ :   ^Button, checkBuddy_ :   ^Element){ addr := 0x1000 + 274 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   ^Element)) (fp))(button_, checkBuddy_); }
+ButtonGetCheckBuddy :: #force_inline proc "c" (button_ :   ^Button) ->   ^Element{ addr := 0x1000 + 275 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Button) ->   ^Element) (fp))(button_); }
+TextboxFind :: #force_inline proc "c" (textbox_ :   ^Textbox, string_ : string, line_ :   ^i32    , byte_ :   ^i32    , flags_ :   u32     ) ->   bool{ addr := 0x1000 + 277 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Textbox, ^u8, int,   ^i32    ,   ^i32    ,   u32     ) ->   bool) (fp))(textbox_, raw_data(string_), len(string_), line_, byte_, flags_); }
+TextboxInsert :: #force_inline proc "c" (textbox_ :   ^Textbox, string_ : string = "", sendUpdatedMessage_ :   bool = true){ addr := 0x1000 + 278 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox, ^u8, int,   bool)) (fp))(textbox_, raw_data(string_), len(string_), sendUpdatedMessage_); }
+TextboxGetContents :: #force_inline proc "c" (textbox_ :   ^Textbox, bytes_ :   ^int    = nil) ->   ^i8  { addr := 0x1000 + 279 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Textbox,   ^int   ) ->   ^i8  ) (fp))(textbox_, bytes_); }
+TextboxGetLineLength :: #force_inline proc "c" (textbox_ :   ^Textbox, line_ :   uint      = 0) ->   int   { addr := 0x1000 + 280 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Textbox,   uint     ) ->   int   ) (fp))(textbox_, line_); }
+TextboxGetSelection :: #force_inline proc "c" (textbox_ :   ^Textbox, fromLine_ :   ^i32    , fromByte_ :   ^i32    , toLine_ :   ^i32    , toByte_ :   ^i32    ){ addr := 0x1000 + 281 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   ^i32    ,   ^i32    ,   ^i32    ,   ^i32    )) (fp))(textbox_, fromLine_, fromByte_, toLine_, toByte_); }
+TextboxMoveCaret :: #force_inline proc "c" (textbox_ :   ^Textbox, line_ :   i32    , byte_ :   i32    ){ addr := 0x1000 + 282 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   i32    ,   i32    )) (fp))(textbox_, line_, byte_); }
+TextboxSetSelection :: #force_inline proc "c" (textbox_ :   ^Textbox, fromLine_ :   i32    , fromByte_ :   i32    , toLine_ :   i32    , toByte_ :   i32    ){ addr := 0x1000 + 283 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   i32    ,   i32    ,   i32    ,   i32    )) (fp))(textbox_, fromLine_, fromByte_, toLine_, toByte_); }
+TextboxSelectAll :: #force_inline proc "c" (textbox_ :   ^Textbox){ addr := 0x1000 + 284 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox)) (fp))(textbox_); }
+TextboxClear :: #force_inline proc "c" (textbox_ :   ^Textbox, sendUpdatedMessage_ :   bool){ addr := 0x1000 + 285 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   bool)) (fp))(textbox_, sendUpdatedMessage_); }
+TextboxUseNumberOverlay :: #force_inline proc "c" (textbox_ :   ^Textbox, defaultBehaviour_ :   bool){ addr := 0x1000 + 286 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   bool)) (fp))(textbox_, defaultBehaviour_); }
+TextboxUseBreadcrumbOverlay :: #force_inline proc "c" (textbox_ :   ^Textbox){ addr := 0x1000 + 287 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox)) (fp))(textbox_); }
+TextboxMoveCaretRelative :: #force_inline proc "c" (textbox_ :   ^Textbox, flags_ :   u32     ){ addr := 0x1000 + 118 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox,   u32     )) (fp))(textbox_, flags_); }
+TextboxEnsureCaretVisible :: #force_inline proc "c" (textbox_ :   ^Textbox){ addr := 0x1000 + 119 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Textbox)) (fp))(textbox_); }
+PanelSetBands :: #force_inline proc "c" (panel_ :   ^Panel, columnCount_ :   int   , rowCount_ :   int    = 0, columns_ :   ^PanelBand = nil, rows_ :   ^PanelBand = nil){ addr := 0x1000 + 288 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Panel,   int   ,   int   ,   ^PanelBand,   ^PanelBand)) (fp))(panel_, columnCount_, rowCount_, columns_, rows_); }
+PanelSwitchTo :: #force_inline proc "c" (panel_ :   ^Panel, targetChild_ :   ^Element, transitionType_ :   TransitionType, destroyPreviousAfterTransitionCompletes_ :   bool = false){ addr := 0x1000 + 289 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Panel,   ^Element,   TransitionType,   bool)) (fp))(panel_, targetChild_, transitionType_, destroyPreviousAfterTransitionCompletes_); }
+TextPlanGetWidth :: #force_inline proc "c" (plan_ :   ^TextPlan) ->   i32{ addr := 0x1000 + 290 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextPlan) ->   i32) (fp))(plan_); }
+TextPlanGetHeight :: #force_inline proc "c" (plan_ :   ^TextPlan) ->   i32{ addr := 0x1000 + 291 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextPlan) ->   i32) (fp))(plan_); }
+TextPlanGetLineCount :: #force_inline proc "c" (plan_ :   ^TextPlan) ->   int   { addr := 0x1000 + 292 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^TextPlan) ->   int   ) (fp))(plan_); }
+TextPlanDestroy :: #force_inline proc "c" (plan_ :   ^TextPlan){ addr := 0x1000 + 293 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^TextPlan)) (fp))(plan_); }
+TextDisplaySetContents :: #force_inline proc "c" (display_ :   ^TextDisplay, contents_ : string = ""){ addr := 0x1000 + 294 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^TextDisplay, ^u8, int)) (fp))(display_, raw_data(contents_), len(contents_)); }
+ColorWellGetRGB :: #force_inline proc "c" (well_ :   ^ColorWell) ->   u32     { addr := 0x1000 + 304 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^ColorWell) ->   u32     ) (fp))(well_); }
+ColorWellSetRGB :: #force_inline proc "c" (well_ :   ^ColorWell, colorRGB_ :   u32     , sendChangedMessage_ :   bool){ addr := 0x1000 + 305 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ColorWell,   u32     ,   bool)) (fp))(well_, colorRGB_, sendChangedMessage_); }
+ColorWellSetIndeterminate :: #force_inline proc "c" (well_ :   ^ColorWell){ addr := 0x1000 + 306 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ColorWell)) (fp))(well_); }
+ChoiceAddMenuItem :: #force_inline proc "c" (choice_ :   ^Choice, item_ :   Generic){ addr := 0x1000 + 307 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Choice,   Generic)) (fp))(choice_, item_); }
+ChoiceSetItem :: #force_inline proc "c" (choice_ :   ^Choice, item_ :   Generic, sendUpdatedMessage_ :   bool = true){ addr := 0x1000 + 308 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Choice,   Generic,   bool)) (fp))(choice_, item_, sendUpdatedMessage_); }
+ChoiceGetItem :: #force_inline proc "c" (choice_ :   ^Choice) ->   Generic{ addr := 0x1000 + 309 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Choice) ->   Generic) (fp))(choice_); }
+ListViewInsertGroup :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , flags_ :   u32      = FLAGS_DEFAULT){ addr := 0x1000 + 310 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   u32     )) (fp))(view_, group_, flags_); }
+ListViewInsert :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , firstIndex_ :   Generic, lastIndex_ :   Generic, count_ :   i64     = -1){ addr := 0x1000 + 311 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   Generic,   Generic,   i64    )) (fp))(view_, group_, firstIndex_, lastIndex_, count_); }
+ListViewRemove :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , firstIndex_ :   Generic, lastIndex_ :   Generic, count_ :   i64     = -1){ addr := 0x1000 + 312 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   Generic,   Generic,   i64    )) (fp))(view_, group_, firstIndex_, lastIndex_, count_); }
+ListViewRemoveAll :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    ){ addr := 0x1000 + 313 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    )) (fp))(view_, group_); }
+ListViewGetIndex :: #force_inline proc "c" (view_ :   ^ListView, item_ :   ^Element) ->   Generic{ addr := 0x1000 + 314 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^ListView,   ^Element) ->   Generic) (fp))(view_, item_); }
+ListViewSetColumns :: #force_inline proc "c" (view_ :   ^ListView, columns_ :   ^ListViewColumn, columnCount_ :   int   ){ addr := 0x1000 + 315 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   ^ListViewColumn,   int   )) (fp))(view_, columns_, columnCount_); }
+ListViewSetEmptyMessage :: #force_inline proc "c" (view_ :   ^ListView, message_ : string = ""){ addr := 0x1000 + 262 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView, ^u8, int)) (fp))(view_, raw_data(message_), len(message_)); }
+ListViewSelect :: #force_inline proc "c" (view_ :   ^ListView, group_ :   i32    , index_ :   Generic){ addr := 0x1000 + 316 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView,   i32    ,   Generic)) (fp))(view_, group_, index_); }
+ListViewResetSearchBuffer :: #force_inline proc "c" (view_ :   ^ListView){ addr := 0x1000 + 317 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^ListView)) (fp))(view_); }
