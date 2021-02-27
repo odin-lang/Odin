@@ -429,6 +429,14 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	value = lb_emit_conv(p, value, lb_addr_type(addr));
 
+	if (lb_is_const_or_global(value)) {
+		// NOTE(bill): Just bypass the actual storage and set the initializer
+		if (LLVMGetValueKind(addr.addr.value) == LLVMGlobalVariableValueKind) {
+			LLVMSetInitializer(addr.addr.value, value.value);
+			return;
+		}
+	}
+
 	lb_emit_store(p, addr.addr, value);
 }
 
@@ -882,10 +890,6 @@ String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
 	}
 
 	if (e->kind == Entity_TypeName) {
-		if ((e->scope->flags & ScopeFlag_File) == 0) {
-			gb_printf_err("<<< %.*s %.*s %p\n", LIT(e->token.string), LIT(name), e);
-		}
-
 		e->TypeName.ir_mangled_name = name;
 	} else if (e->kind == Entity_Procedure) {
 		e->Procedure.link_name = name;
@@ -1200,7 +1204,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 			for_array(i, type->Struct.fields) {
 				Entity *field = type->Struct.fields[i];
-				fields[i+offset] = lb_type(m, field->type);
+				fields[i+offset] = lb_type(m, field->type);				
 			}
 
 
@@ -1271,7 +1275,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Proc:
-		if (m->internal_type_level > 256) { // TODO HACK(bill): is this really enough?
+		// if (m->internal_type_level > 256) { // TODO HACK(bill): is this really enough?
+		if (m->internal_type_level > 1) { // TODO HACK(bill): is this really enough?
 			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 		} else {
 			unsigned param_count = 0;
@@ -8511,6 +8516,13 @@ bool lb_is_const(lbValue value) {
 	}
 	return false;
 }
+
+
+bool lb_is_const_or_global(lbValue value) {
+	return (LLVMGetValueKind(value.value) == LLVMGlobalVariableValueKind) || lb_is_const(value);
+}
+
+
 bool lb_is_const_nil(lbValue value) {
 	LLVMValueRef v = value.value;
 	if (LLVMIsConstant(v)) {
@@ -10048,7 +10060,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 			LLVMValueRef len  = LLVMConstExtractValue(key.value, len_indices,  gb_count_of(len_indices));
 			isize length = LLVMConstIntGetSExtValue(len);
 			char const *text = nullptr;
-			if (length != 0) {
+			if (false && length != 0) {
 				if (LLVMGetConstOpcode(data) != LLVMGetElementPtr) {
 					return {};
 				}
@@ -12452,12 +12464,17 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 		if (is_foreign) {
 			LLVMSetExternallyInitialized(g.value, true);
+			lb_add_foreign_library_path(m, e->Variable.foreign_library);
 		} else {
 			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
 		}
 		if (is_export) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
+		}
+
+		if (e->flags & EntityFlag_Static) {
+			LLVMSetLinkage(g.value, LLVMInternalLinkage);
 		}
 
 		GlobalVariable var = {};
@@ -12678,28 +12695,28 @@ void lb_generate_code(lbGenerator *gen) {
 
 		for_array(i, global_variables) {
 			auto *var = &global_variables[i];
-			if (var->decl->init_expr != nullptr)  {
-				lbValue init = lb_build_expr(p, var->decl->init_expr);
-				if (lb_is_const(init)) {
-					if (!var->is_initialized) {
-						LLVMSetInitializer(var->var.value, init.value);
-						var->is_initialized = true;
-					}
-				} else {
-					var->init = init;
-				}
+			if (var->is_initialized) {
+				continue;
 			}
 
 			Entity *e = var->decl->entity;
 			GB_ASSERT(e->kind == Entity_Variable);
 
-			if (e->Variable.is_foreign) {
-				Entity *fl = e->Procedure.foreign_library;
-				lb_add_foreign_library_path(m, fl);
-			}
+			if (var->decl->init_expr != nullptr)  {
+				// gb_printf_err("%s\n", expr_to_string(var->decl->init_expr));
+				lbValue init = lb_build_expr(p, var->decl->init_expr);
+				LLVMValueKind value_kind = LLVMGetValueKind(init.value);
+				// gb_printf_err("%s %d\n", LLVMPrintValueToString(init.value));
 
-			if (e->flags & EntityFlag_Static) {
-				LLVMSetLinkage(var->var.value, LLVMInternalLinkage);
+				if (lb_is_const_or_global(init)) {
+					if (!var->is_initialized) {
+						LLVMSetInitializer(var->var.value, init.value);
+						var->is_initialized = true;
+						continue;
+					}
+				} else {
+					var->init = init;
+				}
 			}
 
 			if (var->init.value != nullptr) {
@@ -12718,7 +12735,12 @@ void lb_generate_code(lbGenerator *gen) {
 					lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
 					lb_emit_store(p, ti,   lb_type_info(m, var_type));
 				} else {
-					lb_emit_store(p, var->var, lb_emit_conv(p, var->init, t));
+					LLVMTypeRef pvt = LLVMTypeOf(var->var.value);
+					LLVMTypeRef vt = LLVMGetElementType(pvt);
+					lbValue src0 = lb_emit_conv(p, var->init, t);
+					LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
+					LLVMValueRef dst = var->var.value;
+					LLVMBuildStore(p->builder, src, dst);
 				}
 
 				var->is_initialized = true;
