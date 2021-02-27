@@ -1674,6 +1674,25 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 							}
 						}
 					}
+					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type)) {
+						bool ok = true;
+						if (p->flags&FieldFlag_auto_cast) {
+							if (!check_is_castable_to(ctx, &op, type)) {
+								ok = false;
+							}
+						}
+						if (!ok) {
+							success = false;
+							#if 0
+								gbString got = type_to_string(op.type);
+								gbString expected = type_to_string(type);
+								error(op.expr, "Cannot assigned type to parameter, got type '%s', expected '%s'", got, expected);
+								gb_string_free(expected);
+								gb_string_free(got);
+							#endif
+						}
+					}
+
 					if (is_type_untyped(default_type(type))) {
 						gbString str = type_to_string(type);
 						error(op.expr, "Cannot determine type from the parameter, got '%s'", str);

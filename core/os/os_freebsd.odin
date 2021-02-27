@@ -151,7 +151,7 @@ Unix_File_Time :: struct {
 
 pid_t :: u32;
 
-Stat :: struct {
+OS_Stat :: struct {
 	device_id: u64,
 	serial: u64,
 	nlink: u64,
@@ -235,8 +235,8 @@ foreign libc {
 	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---;
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---;
-	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^Stat) -> c.int ---;
-	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> c.int ---;
+	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---;
+	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---;
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---;
 
 	@(link_name="malloc")           _unix_malloc        :: proc(size: c.size_t) -> rawptr ---;
@@ -341,11 +341,11 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	return File_Time(modified), ERROR_NONE;
 }
 
-stat :: proc(path: string) -> (Stat, Errno) {
+stat :: proc(path: string) -> (OS_Stat, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
-	s: Stat;
+	s: OS_Stat;
 	result := _unix_stat(cstr, &s);
 	if result == -1 {
 		return s, Errno(get_last_error());
@@ -353,8 +353,8 @@ stat :: proc(path: string) -> (Stat, Errno) {
 	return s, ERROR_NONE;
 }
 
-fstat :: proc(fd: Handle) -> (Stat, Errno) {
-	s: Stat;
+fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+	s: OS_Stat;
 	result := _unix_fstat(fd, &s);
 	if result == -1 {
 		return s, Errno(get_last_error());

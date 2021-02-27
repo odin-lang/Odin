@@ -14,7 +14,27 @@ enum CallArgumentError {
 	CallArgumentError_ParameterMissing,
 	CallArgumentError_DuplicateParameter,
 	CallArgumentError_NoneConstantParameter,
+
+	CallArgumentError_MAX,
 };
+char const *CallArgumentError_strings[CallArgumentError_MAX] = {
+	"None",
+	"NoneProcedureType",
+	"WrongTypes",
+	"NonVariadicExpand",
+	"VariadicTuple",
+	"MultipleVariadicExpand",
+	"AmbiguousPolymorphicVariadic",
+	"ArgumentCount",
+	"TooFewArguments",
+	"TooManyArguments",
+	"InvalidFieldValue",
+	"ParameterNotFound",
+	"ParameterMissing",
+	"DuplicateParameter",
+	"NoneConstantParameter",
+};
+
 
 enum CallArgumentErrorMode {
 	CallArgumentMode_NoErrors,
@@ -243,7 +263,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
-
 	gbAllocator a = heap_allocator();
 
 	Array<Operand> operands = {};
@@ -342,7 +361,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 			}
 		}
 	}
-
 
 
 	Ast *proc_lit = clone_ast(old_decl->proc_lit);
@@ -6993,6 +7011,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, e->type, e, operands, CallArgumentMode_ShowErrors, &data);
+			if (err != CallArgumentError_None) {
+				// handle error
+			}
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
 
@@ -7070,6 +7091,13 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		auto valids = array_make<ValidIndexAndScore>(heap_allocator(), 0, procs.count);
 		defer (array_free(&valids));
 
+		auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2 + 1);
+		defer (array_free(&proc_entities));
+		for_array(i, procs) {
+			array_add(&proc_entities, procs[i]);
+		}
+
+
 		gbString expr_name = expr_to_string(operand->expr);
 		defer (gb_string_free(expr_name));
 
@@ -7086,10 +7114,10 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				ctx.hide_polymorphic_errors = true;
 
 				err = call_checker(&ctx, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
-
 				if (err != CallArgumentError_None) {
 					continue;
 				}
+				isize index = i;
 
 				if (data.gen_entity != nullptr) {
 					Entity *e = data.gen_entity;
@@ -7104,10 +7132,13 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					if (!evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
 						continue;
 					}
+
+					array_add(&proc_entities, data.gen_entity);
+					index = proc_entities.count-1;
 				}
 
 				ValidIndexAndScore item = {};
-				item.index = i;
+				item.index = index;
 				item.score = data.score;
 				array_add(&valids, item);
 			}
@@ -7116,13 +7147,14 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		if (valids.count > 1) {
 			gb_sort_array(valids.data, valids.count, valid_index_and_score_cmp);
 			i64 best_score = valids[0].score;
-			Entity *best_entity = procs[valids[0].index];
+			Entity *best_entity = proc_entities[valids[0].index];
+			GB_ASSERT(best_entity != nullptr);
 			for (isize i = 1; i < valids.count; i++) {
 				if (best_score > valids[i].score) {
 					valids.count = i;
 					break;
 				}
-				if (best_entity == procs[valids[i].index]) {
+				if (best_entity == proc_entities[valids[i].index]) {
 					valids.count = i;
 					break;
 				}
@@ -7200,7 +7232,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			error_line(")\n");
 
 			for (isize i = 0; i < valids.count; i++) {
-				Entity *proc = procs[valids[i].index];
+				Entity *proc = proc_entities[valids[i].index];
+				GB_ASSERT(proc != nullptr);
 				TokenPos pos = proc->token.pos;
 				Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
 				gbString pt = nullptr;
@@ -7248,7 +7281,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				ident = s;
 			}
 
-			Entity *e = procs[valids[0].index];
+			Entity *e = proc_entities[valids[0].index];
+			GB_ASSERT(e != nullptr);
 
 			proc_type = e->type;
 			CallArgumentData data = {};
@@ -7796,15 +7830,6 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		}
 	}
 
-	#if 0
-	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
-		init_core_context(c->checker);
-		GB_ASSERT(t_context != nullptr);
-		GB_ASSERT(t_context->kind == Type_Named);
-		add_declaration_dependency(c, t_context->Named.type_name);
-	}
-	#endif
-
 	if (result_type == nullptr) {
 		operand->mode = Addressing_NoValue;
 	} else {
@@ -7851,6 +7876,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
 		operand->mode = Addressing_OptionalOk;
 	}
+
+	// add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
 
 	return Expr_Expr;
 }
