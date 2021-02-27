@@ -167,7 +167,7 @@ concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T) {
 	res = make(T, n, allocator);
 	i := 0;
 	for s in a {
-		i += copy(b[i:], s);
+		i += copy(res[i:], s);
 	}
 	return;
 }
