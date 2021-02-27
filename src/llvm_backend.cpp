@@ -11535,8 +11535,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 	for_array(type_info_type_index, info->type_info_types) {
 		Type *t = info->type_info_types[type_info_type_index];
-		t = default_type(t);
-		if (t == t_invalid) {
+		if (t == nullptr || t == t_invalid) {
 			continue;
 		}
 
@@ -12568,6 +12567,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager));
+
+	LLVMInitializeFunctionPassManager(default_function_pass_manager);
 	{
 		auto dfpm = default_function_pass_manager;
 
@@ -12632,10 +12633,12 @@ void lb_generate_code(lbGenerator *gen) {
 			} while (repeat_count --> 0);
 		}
 	}
+	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
+	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
 	{
 		auto dfpm = default_function_pass_manager_without_memcpy;
 		LLVMAddPromoteMemoryToRegisterPass(dfpm);
@@ -12648,8 +12651,9 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMAddCFGSimplificationPass(dfpm);
 		// LLVMAddUnifyFunctionExitNodesPass(dfpm);
 	}
+	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
 
-	TIME_SECTION("LLVM Runtime Creation");
+	TIME_SECTION("LLVM Runtime Type Information Creation");
 
 	lbProcedure *startup_type_info = nullptr;
 	lbProcedure *startup_runtime = nullptr;
@@ -12678,6 +12682,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
 	}
+	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
 	{ // Startup Runtime
 		Type *params  = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
@@ -12780,6 +12785,7 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
+		TIME_SECTION("LLVM DLL main");
 
 
 		Type *params  = alloc_type_tuple();
@@ -12880,29 +12886,29 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Function Pass");
-
-	for_array(i, m->procedures_to_generate) {
-		lbProcedure *p = m->procedures_to_generate[i];
-		if (p->body != nullptr) { // Build Procedure
-			for (i32 i = 0; i <= build_context.optimization_level; i++) {
-				if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-					LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
-				} else {
-					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	{
+		for_array(i, m->procedures_to_generate) {
+			lbProcedure *p = m->procedures_to_generate[i];
+			if (p->body != nullptr) { // Build Procedure
+				for (i32 i = 0; i <= build_context.optimization_level; i++) {
+					if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
+						LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+					} else {
+						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+					}
 				}
 			}
 		}
-	}
 
-	for_array(i, m->equal_procs.entries) {
-		lbProcedure *p = m->equal_procs.entries[i].value;
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		for_array(i, m->equal_procs.entries) {
+			lbProcedure *p = m->equal_procs.entries[i].value;
+			LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		}
+		for_array(i, m->hasher_procs.entries) {
+			lbProcedure *p = m->hasher_procs.entries[i].value;
+			LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		}
 	}
-	for_array(i, m->hasher_procs.entries) {
-		lbProcedure *p = m->hasher_procs.entries[i].value;
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-	}
-
 
 	TIME_SECTION("LLVM Module Pass");
 
@@ -12911,12 +12917,12 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMAddAlwaysInlinerPass(module_pass_manager);
 	LLVMAddStripDeadPrototypesPass(module_pass_manager);
 	LLVMAddAnalysisPasses(target_machine, module_pass_manager);
-	// if (build_context.optimization_level >= 2) {
-	// 	LLVMAddArgumentPromotionPass(module_pass_manager);
-	// 	LLVMAddConstantMergePass(module_pass_manager);
-	// 	LLVMAddGlobalDCEPass(module_pass_manager);
-	// 	LLVMAddDeadArgEliminationPass(module_pass_manager);
-	// }
+	if (build_context.optimization_level >= 2) {
+		LLVMAddArgumentPromotionPass(module_pass_manager);
+		LLVMAddConstantMergePass(module_pass_manager);
+		LLVMAddGlobalDCEPass(module_pass_manager);
+		LLVMAddDeadArgEliminationPass(module_pass_manager);
+	}
 
 	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
 	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));
