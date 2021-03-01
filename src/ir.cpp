@@ -3932,22 +3932,39 @@ void ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 		Type *t = type_deref(ir_type(addr.addr));
 		t = base_type(t);
 		GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
-		value = ir_emit_conv(proc, value, t->Struct.soa_elem);
+		Type *elem_type = t->Struct.soa_elem;
+		value = ir_emit_conv(proc, value, elem_type);
+		elem_type = base_type(elem_type);
 
 		irValue *index = addr.soa.index;
 		if (index->kind != irValue_Constant || t->Struct.soa_kind != StructSoa_Fixed) {
 			Type *t = base_type(type_deref(ir_type(addr.addr)));
 			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
-			i64 count = t->Struct.soa_count;
-			irValue *len = ir_const_int(count);
+			irValue *len = ir_soa_struct_len(proc, addr.addr);
 			ir_emit_bounds_check(proc, ast_token(addr.soa.index_expr), index, len);
 		}
 
-		for_array(i, t->Struct.fields) {
+		isize field_count = 0;
+
+		switch (elem_type->kind) {
+		case Type_Struct:
+			field_count = elem_type->Struct.fields.count;
+			break;
+		case Type_Array:
+			field_count = elem_type->Array.count;
+			break;
+		}
+		for (isize i = 0; i < field_count; i++) {
 			irValue *dst = ir_emit_struct_ep(proc, addr.addr, cast(i32)i);
-			dst = ir_emit_array_ep(proc, dst, index);
 			irValue *src = ir_emit_struct_ev(proc, value, cast(i32)i);
-			ir_emit_store(proc, dst, src);
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				dst = ir_emit_array_ep(proc, dst, index);
+				ir_emit_store(proc, dst, src);
+			} else {
+				irValue *field = ir_emit_load(proc, dst);
+				dst = ir_emit_ptr_offset(proc, field, index);
+				ir_emit_store(proc, dst, src);
+			}
 		}
 		return;
 	}
