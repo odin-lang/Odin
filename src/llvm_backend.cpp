@@ -429,13 +429,15 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	value = lb_emit_conv(p, value, lb_addr_type(addr));
 
-	if (lb_is_const_or_global(value)) {
-		// NOTE(bill): Just bypass the actual storage and set the initializer
-		if (LLVMGetValueKind(addr.addr.value) == LLVMGlobalVariableValueKind) {
-			LLVMSetInitializer(addr.addr.value, value.value);
-			return;
-		}
-	}
+	// if (lb_is_const_or_global(value)) {
+	// 	// NOTE(bill): Just bypass the actual storage and set the initializer
+	// 	if (LLVMGetValueKind(addr.addr.value) == LLVMGlobalVariableValueKind) {
+	// 		LLVMValueRef dst = addr.addr.value;
+	// 		LLVMValueRef src = value.value;
+	// 		LLVMSetInitializer(dst, src);
+	// 		return;
+	// 	}
+	// }
 
 	lb_emit_store(p, addr.addr, value);
 }
@@ -1148,11 +1150,19 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	case Type_Pointer:
 		return LLVMPointerType(lb_type(m, type_deref(type)), 0);
 
-	case Type_Array:
-		return LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
+	case Type_Array: {
+		m->internal_type_level -= 1;
+		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
+		m->internal_type_level += 1;
+		return t;
+	}
 
-	case Type_EnumeratedArray:
-		return LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+	case Type_EnumeratedArray: {
+		m->internal_type_level -= 1;
+		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+		m->internal_type_level += 1;
+		return t;
+	}
 
 	case Type_Slice:
 		{
@@ -1204,7 +1214,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 			for_array(i, type->Struct.fields) {
 				Entity *field = type->Struct.fields[i];
-				fields[i+offset] = lb_type(m, field->type);				
+				fields[i+offset] = lb_type(m, field->type);
 			}
 
 
@@ -8519,7 +8529,18 @@ bool lb_is_const(lbValue value) {
 
 
 bool lb_is_const_or_global(lbValue value) {
-	return (LLVMGetValueKind(value.value) == LLVMGlobalVariableValueKind) || lb_is_const(value);
+	if (lb_is_const(value)) {
+		return true;
+	}
+	if (LLVMGetValueKind(value.value) == LLVMGlobalVariableValueKind) {
+		LLVMTypeRef t = LLVMGetElementType(LLVMTypeOf(value.value));
+		if (!lb_is_type_kind(t, LLVMPointerTypeKind)) {
+			return false;
+		}
+		LLVMTypeRef elem = LLVMGetElementType(t);
+		return lb_is_type_kind(elem, LLVMFunctionTypeKind);
+	}
+	return false;
 }
 
 
