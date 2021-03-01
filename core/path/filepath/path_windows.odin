@@ -87,56 +87,6 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	return p, true;
 }
 
-split_list :: proc(path: string, allocator := context.allocator) -> []string {
-	if path == "" {
-		return nil;
-	}
-
-	start: int;
-	quote: bool;
-
-	start, quote = 0, false;
-	count := 0;
-
-	for i := 0; i < len(path); i += 1 {
-		c := path[i];
-		switch {
-		case c == '"':
-			quote = !quote;
-		case c == LIST_SEPARATOR && !quote:
-			count += 1;
-		}
-	}
-
-	start, quote = 0, false;
-	list := make([]string, count, allocator);
-	index := 0;
-	for i := 0; i < len(path); i += 1 {
-		c := path[i];
-		switch {
-		case c == '"':
-			quote = !quote;
-		case c == LIST_SEPARATOR && !quote:
-			list[index] = path[start:i];
-			index += 1;
-			start = i + 1;
-		}
-	}
-	assert(index == count);
-
-	for s0, i in list {
-		s, new := strings.replace_all(s0, `"`, ``, allocator);
-		if !new {
-			s = strings.clone(s, allocator);
-		}
-		list[i] = s;
-	}
-
-	return list;
-}
-
-
-
 
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	for e, i in elems {

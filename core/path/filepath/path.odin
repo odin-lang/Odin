@@ -32,36 +32,38 @@ volume_name :: proc(path: string) -> string {
 }
 
 volume_name_len :: proc(path: string) -> int {
-	if len(path) < 2 {
-		return 0;
-	}
-	c := path[0];
-	if path[1] == ':' {
-		switch c {
-		case 'a'..'z', 'A'..'Z':
-			return 2;
+	if ODIN_OS == "windows" {
+		if len(path) < 2 {
+			return 0;
 		}
-	}
-
-	// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-	if l := len(path); l >= 5 && is_slash(path[0]) && is_slash(path[1]) &&
-		!is_slash(path[2]) && path[2] != '.' {
-		for n := 3; n < l-1; n += 1 {
-			if is_slash(path[n]) {
-				n += 1;
-				if !is_slash(path[n]) {
-					if path[n] == '.' {
-						break;
-					}
-				}
-				for ; n < l; n += 1 {
-					if is_slash(path[n]) {
-						break;
-					}
-				}
-				return n;
+		c := path[0];
+		if path[1] == ':' {
+			switch c {
+			case 'a'..'z', 'A'..'Z':
+				return 2;
 			}
-			break;
+		}
+
+		// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+		if l := len(path); l >= 5 && is_slash(path[0]) && is_slash(path[1]) &&
+			!is_slash(path[2]) && path[2] != '.' {
+			for n := 3; n < l-1; n += 1 {
+				if is_slash(path[n]) {
+					n += 1;
+					if !is_slash(path[n]) {
+						if path[n] == '.' {
+							break;
+						}
+					}
+					for ; n < l; n += 1 {
+						if is_slash(path[n]) {
+							break;
+						}
+					}
+					return n;
+				}
+				break;
+			}
 		}
 	}
 	return 0;
@@ -293,6 +295,57 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 	}
 	return strings.concatenate({vol, dir});
 }
+
+
+
+split_list :: proc(path: string, allocator := context.allocator) -> []string {
+	if path == "" {
+		return nil;
+	}
+
+	start: int;
+	quote: bool;
+
+	start, quote = 0, false;
+	count := 0;
+
+	for i := 0; i < len(path); i += 1 {
+		c := path[i];
+		switch {
+		case c == '"':
+			quote = !quote;
+		case c == LIST_SEPARATOR && !quote:
+			count += 1;
+		}
+	}
+
+	start, quote = 0, false;
+	list := make([]string, count, allocator);
+	index := 0;
+	for i := 0; i < len(path); i += 1 {
+		c := path[i];
+		switch {
+		case c == '"':
+			quote = !quote;
+		case c == LIST_SEPARATOR && !quote:
+			list[index] = path[start:i];
+			index += 1;
+			start = i + 1;
+		}
+	}
+	assert(index == count);
+
+	for s0, i in list {
+		s, new := strings.replace_all(s0, `"`, ``, allocator);
+		if !new {
+			s = strings.clone(s, allocator);
+		}
+		list[i] = s;
+	}
+
+	return list;
+}
+
 
 
 
