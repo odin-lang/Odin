@@ -2549,21 +2549,45 @@ void lb_end_procedure_body(lbProcedure *p) {
 	LLVMBuildBr(p->builder, p->entry_block->block);
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
+	// Make sure there is a "ret void" at the end of a procedure with no return type
 	if (p->type->Proc.result_count == 0) {
-	    LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
-	    if (!lb_is_instr_terminating(instr)) {
-	    	lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (!lb_is_instr_terminating(instr)) {
+			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 			LLVMBuildRetVoid(p->builder);
 		}
-	} else {
-		if (p->curr_block->preds.count == 0) {
-		    LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
-		    if (instr == nullptr) {
-		    	// NOTE(bill): Remove dead trailing block
-		    	LLVMDeleteBasicBlock(p->curr_block->block);
-		    }
+	}
+
+	LLVMBasicBlockRef block = nullptr;
+	LLVMBasicBlockRef first_block = LLVMGetFirstBasicBlock(p->value);
+
+	// Remove dead blocks with no code
+	for (block = first_block;
+	     block != nullptr;
+	     /**/) {
+		LLVMBasicBlockRef next_block = LLVMGetNextBasicBlock(block);
+		LLVMValueRef instr = LLVMGetLastInstruction(block);
+		if (instr == nullptr) {
+			LLVMDeleteBasicBlock(block);
+		}
+		block = next_block;
+	}
+
+
+	// Make sure every block terminates, and if not, make it unreachable
+	for (block = first_block;
+	     block != nullptr;
+	     block = LLVMGetNextBasicBlock(block)) {
+		LLVMValueRef instr = LLVMGetLastInstruction(block);
+		if (!lb_is_instr_terminating(instr)) {
+			// NOTE(bill): This is a sanity check
+			LLVMBasicBlockRef prev_block = block;
+			LLVMPositionBuilderAtEnd(p->builder, block);
+			LLVMBuildUnreachable(p->builder);
+			LLVMPositionBuilderAtEnd(p->builder, prev_block);
 		}
 	}
+
 
 	p->curr_block = nullptr;
 	p->module->state_flags = 0;
@@ -12907,7 +12931,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Function Pass");
-	{
+	if (false) {
 		for_array(i, m->procedures_to_generate) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			if (p->body != nullptr) { // Build Procedure
