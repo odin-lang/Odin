@@ -1,3 +1,4 @@
+//+build linux, darwin, freebsd
 package os
 
 import "core:time"
@@ -58,10 +59,10 @@ _make_time_from_unix_file_time :: proc(uft: Unix_File_Time) -> time.Time {
 }
 
 @private
-_fill_file_info_from_stat :: proc(fi: ^File_Info, s: Stat) {
+_fill_file_info_from_stat :: proc(fi: ^File_Info, s: OS_Stat) {
 	fi.size = s.size;
 	fi.mode = cast(File_Mode)s.mode;
-	fi.is_dir = S_ISDIR(s.mode);
+	fi.is_dir = S_ISDIR(auto_cast s.mode);
 
 	// NOTE(laleksic, 2021-01-21): Not really creation time, but closest we can get (maybe better to leave it 0?)
 	fi.creation_time = _make_time_from_unix_file_time(s.status_change);
@@ -74,7 +75,7 @@ lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, e
 
 	context.allocator = allocator;
 
-	s: Stat;
+	s: OS_Stat;
 	s, err = _lstat(name);
 	if err != ERROR_NONE {
 		return fi, err;
@@ -92,7 +93,7 @@ stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, er
 
 	context.allocator = allocator;
 
-	s: Stat;
+	s: OS_Stat;
 	s, err = _stat(name);
 	if err != ERROR_NONE {
 		return fi, err;
@@ -110,7 +111,7 @@ fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, err
 
 	context.allocator = allocator;
 
-	s: Stat;
+	s: OS_Stat;
 	s, err = _fstat(fd);
 	if err != ERROR_NONE {
 		return fi, err;

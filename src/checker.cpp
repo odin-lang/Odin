@@ -1724,6 +1724,10 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 
 void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
 	Entity *e = scope_lookup(scope, name);
+	if (e == nullptr) {
+		return;
+	}
+	GB_ASSERT_MSG(e != nullptr, "unable to find %.*s", LIT(name));
 	e->flags |= EntityFlag_Used;
 	add_dependency_to_set(c, e);
 }
@@ -4381,12 +4385,6 @@ GB_THREAD_PROC(check_proc_info_worker_proc) {
 }
 
 void check_unchecked_bodies(Checker *c) {
-#if !defined(GB_SYSTEM_WINDOWS)
-	// HACK TODO(2021-02-26, bill): THIS IS A FUCKING HACK
-	if (true) {
-		return;
-	}
-#endif
 	// NOTE(2021-02-26, bill): Sanity checker
 	// This is a partial hack to make sure all procedure bodies have been checked
 	// even ones which should not exist, due to the multithreaded nature of the parser

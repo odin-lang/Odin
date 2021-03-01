@@ -6,6 +6,7 @@ foreign import pthread "System.framework"
 
 import "core:runtime"
 import "core:strings"
+import "core:strconv"
 import "core:c"
 
 Handle    :: distinct i32;
@@ -191,7 +192,7 @@ Unix_File_Time :: struct {
 	nanoseconds: i64,
 }
 
-Stat :: struct {
+OS_Stat :: struct {
 	device_id:     i32, // ID of device containing file
 	mode:          u16, // Mode of the file
 	nlink:         u16, // Number of hard links
@@ -214,6 +215,17 @@ Stat :: struct {
 	_reserve1,
 	_reserve2:     i64,  // RESERVED
 };
+
+// NOTE(laleksic, 2021-01-21): Comment and rename these to match OS_Stat above
+Dirent :: struct {
+	ino:    u64,
+	off:    u64,
+	reclen: u16,
+	type:   u8,
+	name:   [256]byte,
+};
+
+Dir :: distinct rawptr; // DIR*
 
 // File type
 S_IFMT   :: 0o170000; // Type of file mask
@@ -264,25 +276,33 @@ F_OK :: 0; // Test for file existance
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^int ---;
 
-	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---;
-	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
-	@(link_name="read")    _unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
-	@(link_name="write")   _unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
-	@(link_name="lseek")   _unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int ---;
-	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
-	@(link_name="getpagesize") _unix_getpagesize :: proc() -> i32 ---;
-	@(link_name="stat64")    _unix_stat    :: proc(path: cstring, stat: ^Stat) -> int ---;
-	@(link_name="access")  _unix_access  :: proc(path: cstring, mask: int) -> int ---;
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---;
+	@(link_name="close")            _unix_close         :: proc(handle: Handle) ---;
+	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
+	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
+	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---;
+	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
+	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---;
+	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---;
+	@(link_name="lstat")            _unix_lstat         :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---;
+	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---;
+	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---;
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---;
+	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---;
+	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---;
+	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---;
+	@(link_name="readdir_r")        _unix_readdir_r     :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---;
 
-	@(link_name="malloc")  _unix_malloc  :: proc(size: int) -> rawptr ---;
-	@(link_name="calloc")  _unix_calloc  :: proc(num, size: int) -> rawptr ---;
-	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
-	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
-	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring ---;
-	@(link_name="getcwd")  _unix_getcwd  :: proc(buf: cstring, len: c.size_t) -> cstring ---;
-	@(link_name="chdir")   _unix_chdir   :: proc(buf: cstring) -> c.int ---;
+	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---;
+	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---;
+	@(link_name="free")     _unix_free     :: proc(ptr: rawptr) ---;
+	@(link_name="realloc")  _unix_realloc  :: proc(ptr: rawptr, size: int) -> rawptr ---;
+	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---;
+	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---;
+	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---;
+	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---;
 
-	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
+	@(link_name="exit")    _unix_exit :: proc(status: int) ---;
 }
 
 foreign dl {
@@ -366,17 +386,138 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/';
 }
 
-stat :: proc(path: string) -> (Stat, Errno) {
-	s: Stat;
-	cstr := strings.clone_to_cstring(path);
-	defer delete(cstr);
-	ret_int := _unix_stat(cstr, &s);
-	return s, Errno(ret_int);
+
+@private
+_stat :: proc(path: string) -> (OS_Stat, Errno) {
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
+
+	s: OS_Stat;
+	result := _unix_stat(cstr, &s);
+	if result == -1 {
+		return s, Errno(get_last_error());
+	}
+	return s, ERROR_NONE;
+}
+
+@private
+_lstat :: proc(path: string) -> (OS_Stat, Errno) {
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
+
+	s: OS_Stat;
+	result := _unix_lstat(cstr, &s);
+	if result == -1 {
+		return s, Errno(get_last_error());
+	}
+	return s, ERROR_NONE;
+}
+
+@private
+_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+	s: OS_Stat;
+	result := _unix_fstat(fd, &s);
+	if result == -1 {
+		return s, Errno(get_last_error());
+	}
+	return s, ERROR_NONE;
+}
+
+@private
+_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+	dirp := _unix_fdopendir(fd);
+	if dirp == cast(Dir)nil {
+		return nil, Errno(get_last_error());
+	}
+	return dirp, ERROR_NONE;
+}
+
+@private
+_closedir :: proc(dirp: Dir) -> Errno {
+	rc := _unix_closedir(dirp);
+	if rc != 0 {
+		return Errno(get_last_error());
+	}
+	return ERROR_NONE;
+}
+
+@private
+_rewinddir :: proc(dirp: Dir) {
+	_unix_rewinddir(dirp);
+}
+
+@private
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+	result: ^Dirent;
+	rc := _unix_readdir_r(dirp, &entry, &result);
+
+	if rc != 0 {
+		err = Errno(get_last_error());
+		return;
+	}
+	err = ERROR_NONE;
+
+	if result == nil {
+		end_of_stream = true;
+		return;
+	}
+	end_of_stream = false;
+
+	return;
+}
+
+@private
+_readlink :: proc(path: string) -> (string, Errno) {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator);
+
+	bufsz : uint = 256;
+	buf := make([]byte, bufsz);
+	for {
+		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz);
+		if rc == -1 {
+			delete(buf);
+			return "", Errno(get_last_error());
+		} else if rc == int(bufsz) {
+			// NOTE(laleksic, 2021-01-21): Any cleaner way to resize the slice?
+			bufsz *= 2;
+			delete(buf);
+			buf = make([]byte, bufsz);
+		} else {
+			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE;
+		}
+	}
+}
+
+absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
+	buf : [256]byte;
+	fd_str := strconv.itoa( buf[:], cast(int)fd );
+
+	procfs_path := strings.concatenate( []string{ "/proc/self/fd/", fd_str } );
+	defer delete(procfs_path);
+
+	return _readlink(procfs_path);
+}
+
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
+	rel := rel;
+	if rel == "" {
+		rel = ".";
+	}
+
+	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator);
+	
+	path_ptr := _unix_realpath(rel_cstr, nil);
+	if path_ptr == nil {
+		return "", Errno(get_last_error());
+	}
+	defer _unix_free(path_ptr);
+
+	path_cstr := transmute(cstring)path_ptr;
+	path = strings.clone( string(path_cstr) );
+
+	return path, ERROR_NONE;
 }
 
 access :: proc(path: string, mask: int) -> bool {
-	cstr := strings.clone_to_cstring(path);
-	defer delete(cstr);
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
 	return _unix_access(cstr, mask) == 0;
 }
 
@@ -392,8 +533,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name);
-	defer delete(path_str);
+	path_str := strings.clone_to_cstring(name, context.temp_allocator);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
 		return "", false;
@@ -441,15 +581,13 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.clone_to_cstring(filename);
-	defer delete(cstr);
+	cstr := strings.clone_to_cstring(filename, context.temp_allocator);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
-	cstr := strings.clone_to_cstring(symbol);
-	defer delete(cstr);
+	cstr := strings.clone_to_cstring(symbol, context.temp_allocator);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
