@@ -1865,6 +1865,9 @@ bool is_type_comparable(Type *t) {
 		if (type_size_of(t) == 0) {
 			return false;
 		}
+		if (t->Struct.soa_kind != StructSoa_None) {
+			return false;
+		}
 		if (t->Struct.is_raw_union) {
 			return is_type_simple_compare(t);
 		}

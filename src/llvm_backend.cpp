@@ -406,22 +406,39 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		Type *t = type_deref(addr.addr.type);
 		t = base_type(t);
 		GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
-		value = lb_emit_conv(p, value, t->Struct.soa_elem);
+		Type *elem_type = t->Struct.soa_elem;
+		value = lb_emit_conv(p, value, elem_type);
+		elem_type = base_type(elem_type);
 
 		lbValue index = addr.soa.index;
 		if (!lb_is_const(index) || t->Struct.soa_kind != StructSoa_Fixed) {
 			Type *t = base_type(type_deref(addr.addr.type));
 			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
-			i64 count = t->Struct.soa_count;
-			lbValue len = lb_const_int(p->module, t_int, count);
+			lbValue len = lb_soa_struct_len(p, addr.addr);
 			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), index, len);
 		}
 
-		for_array(i, t->Struct.fields) {
+		isize field_count = 0;
+
+		switch (elem_type->kind) {
+		case Type_Struct:
+			field_count = elem_type->Struct.fields.count;
+			break;
+		case Type_Array:
+			field_count = elem_type->Array.count;
+			break;
+		}
+		for (isize i = 0; i < field_count; i++) {
 			lbValue dst = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
-			dst = lb_emit_array_ep(p, dst, index);
 			lbValue src = lb_emit_struct_ev(p, value, cast(i32)i);
-			lb_emit_store(p, dst, src);
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				dst = lb_emit_array_ep(p, dst, index);
+				lb_emit_store(p, dst, src);
+			} else {
+				lbValue field = lb_emit_load(p, dst);
+				dst = lb_emit_ptr_offset(p, field, index);
+				lb_emit_store(p, dst, src);
+			}
 		}
 		return;
 	}

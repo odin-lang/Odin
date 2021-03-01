@@ -171,6 +171,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_is_specialization_of,
 
+	BuiltinProc_type_struct_field_count,
+
 	BuiltinProc_type_proc_parameter_count,
 	BuiltinProc_type_proc_return_count,
 
@@ -357,6 +359,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_has_field"),            2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialization_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_struct_field_count"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("type_proc_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_return_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
