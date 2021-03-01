@@ -464,8 +464,14 @@ ensure_winsock_initialized :: proc() {
 	@static gate := false;
 	@static initted := false;
 
-	for intrinsics.atomic_xchg(&gate, true) {}
+	for intrinsics.atomic_xchg(&gate, true) {
+		intrinsics.cpu_relax();
+	}
 	defer intrinsics.atomic_store(&gate, false);
+
+	if initted {
+		return;
+	}
 
 	unused_info: WSADATA;
 	version_requested := WORD(2) << 8 | 2;
