@@ -15,14 +15,40 @@ Socket_Type :: enum {
 	Bluetooth, // TODO
 }
 
-// NOTE: Must contain all of the other error's values.
-// TODO: A better way to handle this?
-Socket_Error :: enum {
-	Ok,
+// WARNING(tetra): @Volatile: Socket_Error must contain all of the other error's values.
+// NOTE(tetra): Use type_set here if it gets added.
+Socket_Error :: enum c.int {
+	Ok = 0,
+
+// Dial errors
+	Address_Not_Available = win.WSAEADDRNOTAVAIL,
+	Refused = win.WSAECONNREFUSED,
+
+// Recv errors
+	Shutdown = win.WSAESHUTDOWN,
+	Aborted = win.WSAECONNABORTED,
+	Reset = win.WSAECONNRESET,
+	Truncated = win.WSAEMSGSIZE, // Only for UDP sockets
+	Offline = win.WSAENETDOWN,
+	Unreachable = win.WSAEHOSTUNREACH,
+	Interrupted = win.WSAEINTR,
+	Timeout = win.WSAETIMEDOUT,
+
+// Send errors
+	Not_Connected = win.WSAENOTCONN,
+	Out_Of_Resources = win.WSAENOBUFS,
+	// Shutdown (above)
+	// Aborted (above)
+	// Reset (above)
+	// Truncated (above)
+	// Offline (above)
+	// Unreachable (above)
+	// Interrupted (above)
+	// Timeout (above)
 }
 
-Dial_Error :: enum i32 {
-	Ok,
+Dial_Error :: enum c.int {
+	Ok = 0,
 	Address_Not_Available = win.WSAEADDRNOTAVAIL,
 	Refused = win.WSAECONNREFUSED,
 }
@@ -31,14 +57,18 @@ dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error
 	win.ensure_winsock_initialized();
 
 	family: c.int;
-	if type == .Tcp || type == .Udp {
+	switch type {
+	case .Tcp, .Udp:
 		switch in addr {
 		case Ipv4_Address:  family = win.AF_INET;
 		case Ipv6_Address:  family = win.AF_INET6;
 		}
-	} else {
+	case .Bluetooth:
 		family = win.AF_BTH;
+	case:
+		panic("cannot dial this type of socket");
 	}
+
 	typ, proto: c.int;
 	switch type {
 	case .Tcp:        typ = win.SOCK_STREAM; proto = win.IPPROTO_TCP;
@@ -71,7 +101,7 @@ close :: proc(s: Socket) {
 
 // TODO: audit these errors; consider if they can be cleaned up further
 // same for Send_Error
-Recv_Error :: enum i32 {
+Recv_Error :: enum c.int {
 	Ok,
 	Shutdown = win.WSAESHUTDOWN,
 	Aborted = win.WSAECONNABORTED,
@@ -92,7 +122,7 @@ recv :: proc(s: Socket, buf: []byte) -> (bytes_read: int, err: Recv_Error) {
 	return;
 }
 
-Send_Error :: enum i32 {
+Send_Error :: enum c.int {
 	Ok,
 	Aborted = win.WSAECONNABORTED,
 	Not_Connected = win.WSAENOTCONN,
