@@ -176,6 +176,8 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 	return ptr;
 }
 
+DEFAULT_RESERVE_CAPACITY :: 16;
+
 make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
 	make_slice_error_loc(loc, len);
 	data := mem_alloc(size_of(E)*len, alignment, allocator, loc);
@@ -194,7 +196,7 @@ make_slice :: proc($T: typeid/[]$E, auto_cast len: int, allocator := context.all
 
 @builtin
 make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> T {
-	return make_dynamic_array_len_cap(T, 0, 16, allocator, loc);
+	return make_dynamic_array_len_cap(T, 0, DEFAULT_RESERVE_CAPACITY, allocator, loc);
 }
 
 @builtin
@@ -215,7 +217,7 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, a
 }
 
 @builtin
-make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
+make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
 	make_map_expr_error_loc(loc, cap);
 	context.allocator = allocator;
 
@@ -331,209 +333,6 @@ append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #ca
 	append_elems(array=array, args=args, loc=loc);
 }
 
-@builtin
-reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
-	if array == nil {
-		return false;
-	}
-
-	old_cap := cap(array);
-	if capacity <= old_cap {
-		return true;
-	}
-
-	if array.allocator.procedure == nil {
-		array.allocator = context.allocator;
-	}
-	assert(array.allocator.procedure != nil);
-
-
-	ti := type_info_of(typeid_of(T));
-	ti = type_info_base(ti);
-	si := &ti.variant.(Type_Info_Struct);
-
-	field_count := uintptr(len(si.offsets) - 3);
-
-	if field_count == 0 {
-		return true;
-	}
-
-	cap_ptr := cast(^int)rawptr(uintptr(array) + (field_count + 1)*size_of(rawptr));
-	assert(cap_ptr^ == old_cap);
-
-
-	old_size := 0;
-	new_size := 0;
-
-	max_align := 0;
-	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Pointer).elem;
-		max_align = max(max_align, type.align);
-
-		old_size = align_forward_int(old_size, type.align);
-		new_size = align_forward_int(new_size, type.align);
-
-		old_size += type.size * old_cap;
-		new_size += type.size * capacity;
-	}
-
-	old_size = align_forward_int(old_size, max_align);
-	new_size = align_forward_int(new_size, max_align);
-
-	old_data := (^rawptr)(array)^;
-
-	new_data := array.allocator.procedure(
-		array.allocator.data, .Alloc, new_size, max_align,
-		nil, old_size, 0, loc,
-	);
-	if new_data == nil {
-		return false;
-	}
-
-
-	cap_ptr^ = capacity;
-
-	old_offset := 0;
-	new_offset := 0;
-	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Pointer).elem;
-		max_align = max(max_align, type.align);
-
-		old_offset = align_forward_int(old_offset, type.align);
-		new_offset = align_forward_int(new_offset, type.align);
-
-		new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset));
-		old_data_elem := rawptr(uintptr(old_data) + uintptr(old_offset));
-
-		mem_copy(new_data_elem, old_data_elem, type.size * old_cap);
-
-		(^rawptr)(uintptr(array) + i*size_of(rawptr))^ = new_data_elem;
-
-		old_offset += type.size * old_cap;
-		new_offset += type.size * capacity;
-	}
-
-	array.allocator.procedure(
-		array.allocator.data, .Free, 0, max_align,
-		old_data, old_size, 0, loc,
-	);
-
-	return true;
-}
-
-@builtin
-append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_location) {
-	if array == nil {
-		return;
-	}
-
-	arg_len := 1;
-
-	if cap(array) <= len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len);
-		_ = reserve_soa(array, cap, loc);
-	}
-	arg_len = min(cap(array)-len(array), arg_len);
-	if arg_len > 0 {
-		ti := type_info_of(typeid_of(T));
-		ti = type_info_base(ti);
-		si := &ti.variant.(Type_Info_Struct);
-		field_count := uintptr(len(si.offsets) - 3);
-
-		if field_count == 0 {
-			return;
-		}
-
-		data := (^rawptr)(array)^;
-
-		len_ptr := cast(^int)rawptr(uintptr(array) + (field_count + 0)*size_of(rawptr));
-
-
-		soa_offset := 0;
-		item_offset := 0;
-
-		arg_copy := arg;
-		arg_ptr := &arg_copy;
-
-		max_align := 0;
-		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Pointer).elem;
-			max_align = max(max_align, type.align);
-
-			soa_offset  = align_forward_int(soa_offset, type.align);
-			item_offset = align_forward_int(item_offset, type.align);
-
-			dst := rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * len_ptr^));
-			src := rawptr(uintptr(arg_ptr) + uintptr(item_offset));
-			mem_copy(dst, src, type.size);
-
-			soa_offset  += type.size * cap(array);
-			item_offset += type.size;
-		}
-
-		len_ptr^ += arg_len;
-	}
-}
-
-@builtin
-append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_location) {
-	if array == nil {
-		return;
-	}
-
-	arg_len := len(args);
-	if arg_len == 0 {
-		return;
-	}
-
-	if cap(array) <= len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len);
-		_ = reserve_soa(array, cap, loc);
-	}
-	arg_len = min(cap(array)-len(array), arg_len);
-	if arg_len > 0 {
-		ti := type_info_of(typeid_of(T));
-		ti = type_info_base(ti);
-		si := &ti.variant.(Type_Info_Struct);
-		field_count := uintptr(len(si.offsets) - 3);
-
-		if field_count == 0 {
-			return;
-		}
-
-		data := (^rawptr)(array)^;
-
-		len_ptr := cast(^int)rawptr(uintptr(array) + (field_count + 0)*size_of(rawptr));
-
-
-		soa_offset := 0;
-		item_offset := 0;
-
-		args_ptr := &args[0];
-
-		max_align := 0;
-		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Pointer).elem;
-			max_align = max(max_align, type.align);
-
-			soa_offset  = align_forward_int(soa_offset, type.align);
-			item_offset = align_forward_int(item_offset, type.align);
-
-			dst := uintptr(data) + uintptr(soa_offset) + uintptr(type.size * len_ptr^);
-			src := uintptr(args_ptr) + uintptr(item_offset);
-			for j in 0..<arg_len {
-				d := rawptr(dst + uintptr(j*type.size));
-				s := rawptr(src + uintptr(j*size_of(E)));
-				mem_copy(d, s, type.size);
-			}
-
-			soa_offset  += type.size * cap(array);
-			item_offset += type.size;
-		}
-
-		len_ptr^ += arg_len;
-	}
-}
 
 // The append_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
 @builtin
@@ -546,8 +345,6 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 // The append built-in procedure appends elements to the end of a dynamic array
 @builtin append :: proc{append_elem, append_elems, append_elem_string};
 
-// The append_soa built-in procedure appends elements to the end of an #soa dynamic array
-@builtin append_soa :: proc{append_soa_elem, append_soa_elems};
 
 @builtin
 append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) {
