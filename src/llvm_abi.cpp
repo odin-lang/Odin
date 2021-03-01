@@ -400,7 +400,12 @@ namespace lbAbi386 {
 		    lb_is_type_kind(type, LLVMIntegerTypeKind) &&
 		    type == LLVMIntTypeInContext(c, 128)) {
 		    	// NOTE(bill): Because Windows AMD64 is weird
-			LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
+		    	// TODO(bill): LLVM is probably bugged here and doesn't correctly generate the right code
+		    	// So even though it is "technically" wrong, no cast might be the best option
+		    	LLVMTypeRef cast_type = nullptr;
+		    	if (!is_return) {
+				cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
+			}
 			return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 		}
 
