@@ -12929,7 +12929,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Function Pass");
-	if (false) {
+	{
 		for_array(i, m->procedures_to_generate) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			if (p->body != nullptr) { // Build Procedure
