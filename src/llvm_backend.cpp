@@ -5826,9 +5826,9 @@ handle_op:
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 
-			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type) - 1, false);
+			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
 
-			LLVMValueRef less_equal_width = LLVMBuildICmp(p->builder, LLVMIntULE, bits, max, "");
+			LLVMValueRef less_equal_width = LLVMBuildICmp(p->builder, LLVMIntULT, bits, max, "");
 
 			res.value = LLVMBuildShl(p->builder, lhsval, bits, "");
 			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
@@ -5842,9 +5842,9 @@ handle_op:
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(type);
 
-			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type) - 1, false);
+			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
 
-			LLVMValueRef less_equal_width = LLVMBuildICmp(p->builder, LLVMIntULE, bits, max, "");
+			LLVMValueRef less_equal_width = LLVMBuildICmp(p->builder, LLVMIntULT, bits, max, "");
 
 			bits = LLVMBuildSelect(p->builder, less_equal_width, bits, max, "");
 			if (is_unsigned) {
