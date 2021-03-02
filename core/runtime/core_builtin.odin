@@ -500,38 +500,32 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 
 
 @builtin
-incl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
+incl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
 	s^ |= {elem};
-	return s^;
 }
 @builtin
-incl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
+incl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
 	for elem in elems {
 		s^ |= {elem};
 	}
-	return s^;
 }
 @builtin
-incl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
+incl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
 	s^ |= other;
-	return s^;
 }
 @builtin
-excl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
+excl_elem :: proc(s: ^$S/bit_set[$E; $U], elem: E) {
 	s^ &~= {elem};
-	return s^;
 }
 @builtin
-excl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
+excl_elems :: proc(s: ^$S/bit_set[$E; $U], elems: ..E) {
 	for elem in elems {
 		s^ &~= {elem};
 	}
-	return s^;
 }
 @builtin
-excl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
+excl_bit_set :: proc(s: ^$S/bit_set[$E; $U], other: S) {
 	s^ &~= other;
-	return s^;
 }
 
 @builtin incl :: proc{incl_elem, incl_elems, incl_bit_set};
