@@ -2575,36 +2575,17 @@ void lb_end_procedure_body(lbProcedure *p) {
 		}
 	}
 
-	LLVMBasicBlockRef block = nullptr;
 	LLVMBasicBlockRef first_block = LLVMGetFirstBasicBlock(p->value);
-
-	// Remove dead blocks with no code
-	for (block = first_block;
-	     block != nullptr;
-	     /**/) {
-		LLVMBasicBlockRef next_block = LLVMGetNextBasicBlock(block);
-		LLVMValueRef instr = LLVMGetLastInstruction(block);
-		if (instr == nullptr) {
-			LLVMDeleteBasicBlock(block);
-		}
-		block = next_block;
-	}
-
+	LLVMBasicBlockRef block = nullptr;
 
 	// Make sure every block terminates, and if not, make it unreachable
-	for (block = first_block;
-	     block != nullptr;
-	     block = LLVMGetNextBasicBlock(block)) {
+	for (block = first_block; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
 		LLVMValueRef instr = LLVMGetLastInstruction(block);
-		if (!lb_is_instr_terminating(instr)) {
-			// NOTE(bill): This is a sanity check
-			LLVMBasicBlockRef prev_block = block;
+		if (instr == nullptr) {
 			LLVMPositionBuilderAtEnd(p->builder, block);
 			LLVMBuildUnreachable(p->builder);
-			LLVMPositionBuilderAtEnd(p->builder, prev_block);
 		}
 	}
-
 
 	p->curr_block = nullptr;
 	p->module->state_flags = 0;
