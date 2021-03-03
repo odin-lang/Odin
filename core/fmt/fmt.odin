@@ -1169,7 +1169,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		case 128:
 			x := (^u128)(v.data)^;
 			if do_byte_swap { x = byte_swap(x); }
-			bits = u128(x);
+			bits = x;
 		case: panic("unknown bit_size size");
 		}
 
@@ -1389,7 +1389,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			t := a;
 			y, mon, d := time.date(t);
 			h, min, s := time.clock(t);
-			ns := i64(t._nsec - (t._nsec/1e9 + time.UNIX_TO_ABSOLUTE)*1e9) % 1e9;
+			ns := (t._nsec - (t._nsec/1e9 + time.UNIX_TO_ABSOLUTE)*1e9) % 1e9;
 			write_padded_number(fi, i64(y), 4);
 			io.write_byte(fi.writer, '-');
 			write_padded_number(fi, i64(mon), 2);
@@ -1403,7 +1403,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			io.write_byte(fi.writer, ':');
 			write_padded_number(fi, i64(s), 2);
 			io.write_byte(fi.writer, '.');
-			write_padded_number(fi, i64(ns), 9);
+			write_padded_number(fi, (ns), 9);
 			io.write_string(fi.writer, " +0000 UTC");
 			return;
 		}
@@ -1842,7 +1842,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		case u32:  tag = i64(i);
 		case i32:  tag = i64(i);
 		case u64:  tag = i64(i);
-		case i64:  tag = i64(i);
+		case i64:  tag = i;
 		case: panic("Invalid union tag type");
 		}
 		assert(tag >= 0);
@@ -2014,7 +2014,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	base_arg := arg;
 	base_arg.id = runtime.typeid_base(base_arg.id);
 	switch a in base_arg {
-	case bool:       fmt_bool(fi, bool(a), verb);
+	case bool:       fmt_bool(fi, a, verb);
 	case b8:         fmt_bool(fi, bool(a), verb);
 	case b16:        fmt_bool(fi, bool(a), verb);
 	case b32:        fmt_bool(fi, bool(a), verb);
@@ -2045,7 +2045,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case i32:     fmt_int(fi, u64(a), true,  32, verb);
 	case u32:     fmt_int(fi, u64(a), false, 32, verb);
 	case i64:     fmt_int(fi, u64(a), true,  64, verb);
-	case u64:     fmt_int(fi, u64(a), false, 64, verb);
+	case u64:     fmt_int(fi,     a,  false, 64, verb);
 	case int:     fmt_int(fi, u64(a), true,  8*size_of(int), verb);
 	case uint:    fmt_int(fi, u64(a), false, 8*size_of(uint), verb);
 	case uintptr: fmt_int(fi, u64(a), false, 8*size_of(uintptr), verb);
@@ -2070,7 +2070,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case u64be:     fmt_int(fi, u64(a), false, 64, verb);
 
 	case i128:     fmt_int_128(fi, u128(a), true,  128, verb);
-	case u128:     fmt_int_128(fi, u128(a), false, 128, verb);
+	case u128:     fmt_int_128(fi,       a, false, 128, verb);
 
 	case i128le:   fmt_int_128(fi, u128(a), true,  128, verb);
 	case u128le:   fmt_int_128(fi, u128(a), false, 128, verb);

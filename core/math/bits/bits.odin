@@ -65,13 +65,13 @@ leading_zeros_u64 :: proc(i: u64) -> int {
 
 
 byte_swap_u16 :: proc(x: u16) -> u16 {
-	return u16(runtime.bswap_16(u16(x)));
+	return runtime.bswap_16(x);
 }
 byte_swap_u32 :: proc(x: u32) -> u32 {
-	return u32(runtime.bswap_32(u32(x)));
+	return runtime.bswap_32(x);
 }
 byte_swap_u64 :: proc(x: u64) -> u64 {
-	return u64(runtime.bswap_64(u64(x)));
+	return runtime.bswap_64(x);
 }
 byte_swap_i16 :: proc(x: i16) -> i16 {
 	return i16(runtime.bswap_16(u16(x)));
@@ -83,7 +83,7 @@ byte_swap_i64 :: proc(x: i64) -> i64 {
 	return i64(runtime.bswap_64(u64(x)));
 }
 byte_swap_u128 :: proc(x: u128) -> u128 {
-	return u128(runtime.bswap_128(u128(x)));
+	return runtime.bswap_128(x);
 }
 byte_swap_i128 :: proc(x: i128) -> i128 {
 	return i128(runtime.bswap_128(u128(x)));

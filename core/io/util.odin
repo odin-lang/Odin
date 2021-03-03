@@ -4,7 +4,7 @@ import "core:strconv"
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10) -> (n: int, err: Error) {
 	buf: [32]byte;
-	s := strconv.append_bits(buf[:], u64(i), base, false, 64, strconv.digits, nil);
+	s := strconv.append_bits(buf[:], i, base, false, 64, strconv.digits, nil);
 	return write_string(w, s);
 }
 write_i64 :: proc(w: Writer, i: i64, base: int = 10) -> (n: int, err: Error) {

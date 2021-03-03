@@ -263,8 +263,7 @@ align_formula :: proc(size, align: int) -> int {
 }
 
 calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int) -> int {
-	p := uintptr(ptr);
-	a := uintptr(align);
+	p, a := ptr, align;
 	modulo := p & (a-1);
 
 	padding := uintptr(0);

@@ -30,7 +30,7 @@ is_integer_negative :: proc(x: u64, is_signed: bool, bit_size: int) -> (u: u64, 
 		case 64:
 			i := i64(u);
 			neg = i < 0;
-			u = u64(abs(i64(i)));
+			u = u64(abs(i));
 		case:
 			panic("is_integer_negative: Unknown integer size");
 		}
@@ -105,7 +105,7 @@ is_integer_negative_128 :: proc(x: u128, is_signed: bool, bit_size: int) -> (u: 
 		case 128:
 			i := i128(u);
 			neg = i < 0;
-			u = u128(abs(i128(i)));
+			u = u128(abs(i));
 		case:
 			panic("is_integer_negative: Unknown integer size");
 		}

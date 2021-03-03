@@ -203,7 +203,7 @@ size := size;
 		old_ptr := uintptr(old_memory);
 
 		if s.prev_allocation == old_memory {
-			s.curr_offset = int(uintptr(s.prev_allocation) - uintptr(start));
+			s.curr_offset = int(uintptr(s.prev_allocation) - start);
 			s.prev_allocation = nil;
 			return nil;
 		}
@@ -319,8 +319,8 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		next_addr := curr_addr + uintptr(padding);
 		header := (^Stack_Allocation_Header)(next_addr - size_of(Stack_Allocation_Header));
-		header.padding = auto_cast padding;
-		header.prev_offset = auto_cast s.prev_offset;
+		header.padding = padding;
+		header.prev_offset = s.prev_offset;
 
 		s.curr_offset += size;
 
@@ -352,12 +352,12 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
 		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
-		if old_offset != int(header.prev_offset) {
+		if old_offset != header.prev_offset {
 			panic("Out of order stack allocator free");
 		}
 
-		s.curr_offset = int(old_offset);
-		s.prev_offset = int(header.prev_offset);
+		s.curr_offset = old_offset;
+		s.prev_offset = header.prev_offset;
 
 
 	case .Free_All:
@@ -391,7 +391,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
 		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
-		if old_offset != int(header.prev_offset) {
+		if old_offset != header.prev_offset {
 			ptr := raw_alloc(s, size, alignment);
 			copy(ptr, old_memory, min(old_size, size));
 			return ptr;
@@ -504,7 +504,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header));
 		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
-		s.offset = int(old_offset);
+		s.offset = old_offset;
 
 	case .Free_All:
 		s.offset = 0;
@@ -838,7 +838,7 @@ Tracking_Allocator_Entry :: struct {
 }
 Tracking_Allocator_Bad_Free_Entry :: struct {
 	memory:   rawptr,
-	location: runtime.Source_Code_Location,	
+	location: runtime.Source_Code_Location,
 }
 Tracking_Allocator :: struct {
 	backing:           Allocator,

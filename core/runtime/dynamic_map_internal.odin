@@ -159,14 +159,14 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 
 	header.equal = intrinsics.type_equal_proc(K);
 
-	header.entry_size    = int(size_of(Entry));
-	header.entry_align   = int(align_of(Entry));
+	header.entry_size    = size_of(Entry);
+	header.entry_align   = align_of(Entry);
 
-	header.key_offset    = uintptr(offset_of(Entry, key));
-	header.key_size      = int(size_of(K));
+	header.key_offset    = offset_of(Entry, key);
+	header.key_size      = size_of(K);
 
-	header.value_offset  = uintptr(offset_of(Entry, value));
-	header.value_size    = int(size_of(V));
+	header.value_offset  = offset_of(Entry, value);
+	header.value_size    = size_of(V);
 
 	return header;
 }

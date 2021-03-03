@@ -195,7 +195,7 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 	n := uintptr(n);
 
 	SU :: size_of(uintptr);
-	fast := uintptr(n/SU + 1);
+	fast := n/SU + 1;
 	offset := (fast-1)*SU;
 	curr_block := uintptr(0);
 	if n < SU {
@@ -232,7 +232,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 	n := uintptr(n);
 
 	SU :: size_of(uintptr);
-	fast := uintptr(n/SU + 1);
+	fast := n/SU + 1;
 	offset := (fast-1)*SU;
 	curr_block := uintptr(0);
 	if n < SU {

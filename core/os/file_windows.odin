@@ -27,7 +27,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 		access |= win32.FILE_GENERIC_WRITE;
 	}
 
-	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
+	share_mode := win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE;
 	sa: ^win32.SECURITY_ATTRIBUTES = nil;
 	sa_inherit := win32.SECURITY_ATTRIBUTES{nLength = size_of(win32.SECURITY_ATTRIBUTES), bInheritHandle = true};
 	if mode&O_CLOEXEC == 0 {
@@ -48,7 +48,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 		create_mode = win32.OPEN_EXISTING;
 	}
 	wide_path := win32.utf8_to_wstring(path);
-	handle := Handle(win32.CreateFileW(auto_cast wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS, nil));
+	handle := Handle(win32.CreateFileW(wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS, nil));
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
@@ -107,7 +107,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	for total_read < length {
 		remaining := length - total_read;
-		to_read := win32.DWORD(min(u32(remaining), MAX_RW));
+		to_read := min(win32.DWORD(remaining), MAX_RW);
 
 		e := win32.ReadFile(win32.HANDLE(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || !e {
