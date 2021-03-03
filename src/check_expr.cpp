@@ -2388,6 +2388,14 @@ void check_cast(CheckerContext *c, Operand *x, Type *type) {
 		update_expr_type(c, x->expr, final_type, true);
 	}
 
+	if (build_context.vet_extra) {
+		if (are_types_identical(x->type, type)) {
+			gbString str = type_to_string(type);
+			warning(x->expr, "Unneeded cast to the same type '%s'", str);
+			gb_string_free(str);
+		}
+	}
+
 	x->type = type;
 }
 
@@ -2427,6 +2435,14 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		o->mode = Addressing_Invalid;
 		o->expr = node;
 		return false;
+	}
+
+	if (build_context.vet_extra) {
+		if (are_types_identical(o->type, t)) {
+			gbString str = type_to_string(t);
+			warning(o->expr, "Unneeded transmute to the same type '%s'", str);
+			gb_string_free(str);
+		}
 	}
 
 	o->mode = Addressing_Value;

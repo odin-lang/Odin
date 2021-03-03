@@ -62,9 +62,6 @@ struct lbAddr {
 			Type *result;
 		} map;
 		struct {
-			i32 value_index;
-		} bit_field;
-		struct {
 			Selection sel;
 		} ctx;
 		struct {

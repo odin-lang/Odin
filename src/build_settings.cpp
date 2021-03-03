@@ -190,6 +190,7 @@ struct BuildContext {
 	bool   no_entry_point;
 	bool   use_lld;
 	bool   vet;
+	bool   vet_extra;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
