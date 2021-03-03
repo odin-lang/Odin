@@ -68,13 +68,13 @@ _stat :: proc(name: string, create_file_attributes: u32, allocator := context.al
 
 
 lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno) {
-	attrs := u32(win32.FILE_FLAG_BACKUP_SEMANTICS);
+	attrs := win32.FILE_FLAG_BACKUP_SEMANTICS;
 	attrs |= win32.FILE_FLAG_OPEN_REPARSE_POINT;
 	return _stat(name, attrs, allocator);
 }
 
 stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno) {
-	attrs := u32(win32.FILE_FLAG_BACKUP_SEMANTICS);
+	attrs := win32.FILE_FLAG_BACKUP_SEMANTICS;
 	return _stat(name, attrs, allocator);
 }
 

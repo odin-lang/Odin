@@ -63,8 +63,8 @@ fixdfti :: proc(a: u64) -> i128 {
     aRep := a;
     aAbs := aRep & absMask;
     sign := i128(-1 if aRep & signBit != 0 else 1);
-    exponent := u64((aAbs >> significandBits) - exponentBias);
-    significand := u64((aAbs & significandMask) | implicitBit);
+    exponent := (aAbs >> significandBits) - exponentBias;
+    significand := (aAbs & significandMask) | implicitBit;
 
     // If exponent is negative, the result is zero.
     if exponent < 0 {
@@ -103,7 +103,7 @@ floattidf :: proc(a: i128) -> f64 {
     s := a >> (N-1);
     a = (a ~ s) - s;
     sd: = N - _clz_i128(a);  // number of significant digits
-    e := u32(sd - 1);        // exponent 
+    e := u32(sd - 1);        // exponent
     if sd > DBL_MANT_DIG {
         switch sd {
         case DBL_MANT_DIG + 1:
@@ -115,8 +115,8 @@ floattidf :: proc(a: i128) -> f64 {
                 i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0);
         };
 
-        a |= i128((a & 4) != 0);  
-        a += 1; 
+        a |= i128((a & 4) != 0);
+        a += 1;
         a >>= 2;
 
         if a & (1 << DBL_MANT_DIG) != 0 {

@@ -231,7 +231,7 @@ parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
 			break;
 		}
 		value *= base;
-		value += u64(v);
+		value += v;
 		i += 1;
 	}
 	s = s[i:];
@@ -433,7 +433,7 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return append_bits(buf, u64(u), base, false, 8*size_of(uint), digits, nil);
+	return append_bits(buf, u, base, false, 8*size_of(uint), digits, nil);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
 	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil);

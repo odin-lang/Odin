@@ -597,7 +597,7 @@ union_variant_typeid :: proc(a: any) -> typeid {
 		case u32:  tag = i64(i);
 		case i32:  tag = i64(i);
 		case u64:  tag = i64(i);
-		case i64:  tag = i64(i);
+		case i64:  tag = i;
 		case: unimplemented();
 		}
 
@@ -633,7 +633,7 @@ get_union_variant_raw_tag :: proc(a: any) -> i64 {
 		case u32:  tag = i64(i);
 		case i32:  tag = i64(i);
 		case u64:  tag = i64(i);
-		case i64:  tag = i64(i);
+		case i64:  tag = i;
 		case: unimplemented();
 		}
 
@@ -664,7 +664,7 @@ set_union_variant_raw_tag :: proc(a: any, tag: i64) {
 		case u32:  i = u32(tag);
 		case i32:  i = i32(tag);
 		case u64:  i = u64(tag);
-		case i64:  i = i64(tag);
+		case i64:  i = tag;
 		case: unimplemented();
 		}
 
@@ -744,7 +744,7 @@ as_bool :: proc(a: any) -> (value: bool, valid: bool) {
 	case Type_Info_Boolean:
 		valid = true;
 		switch v in a {
-		case bool: value = bool(v);
+		case bool: value = v;
 		case b8:   value = bool(v);
 		case b16:  value = bool(v);
 		case b32:  value = bool(v);
@@ -783,7 +783,7 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 		case i8:      value = i64(v);
 		case i16:     value = i64(v);
 		case i32:     value = i64(v);
-		case i64:     value = i64(v);
+		case i64:     value =      v;
 		case i128:    value = i64(v);
 		case int:     value = i64(v);
 
@@ -825,23 +825,23 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 	case Type_Info_Float:
 		valid = true;
 		switch v in a {
-		case f32:   value = i64(f32(v));
-		case f64:   value = i64(f64(v));
-		case f32le: value = i64(f32(v));
-		case f64le: value = i64(f64(v));
-		case f32be: value = i64(f32(v));
-		case f64be: value = i64(f64(v));
+		case f32:   value = i64(v);
+		case f64:   value = i64(v);
+		case f32le: value = i64(v);
+		case f64le: value = i64(v);
+		case f32be: value = i64(v);
+		case f64be: value = i64(v);
 		case: valid = false;
 		}
 
 	case Type_Info_Boolean:
 		valid = true;
 		switch v in a {
-		case bool: value = i64(bool(v));
-		case b8:   value = i64(bool(v));
-		case b16:  value = i64(bool(v));
-		case b32:  value = i64(bool(v));
-		case b64:  value = i64(bool(v));
+		case bool: value = i64(v);
+		case b8:   value = i64(v);
+		case b16:  value = i64(v);
+		case b32:  value = i64(v);
+		case b64:  value = i64(v);
 		case: valid = false;
 		}
 
@@ -897,7 +897,7 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 		case u8:     value = u64(v);
 		case u16:    value = u64(v);
 		case u32:    value = u64(v);
-		case u64:    value = u64(v);
+		case u64:    value =    (v);
 		case u128:   value = u64(v);
 		case uint:   value = u64(v);
 		case uintptr:value = u64(v);
@@ -932,23 +932,23 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 	case Type_Info_Float:
 		valid = true;
 		switch v in a {
-		case f32:   value = u64(f32(v));
-		case f64:   value = u64(f64(v));
-		case f32le: value = u64(f32(v));
-		case f64le: value = u64(f64(v));
-		case f32be: value = u64(f32(v));
-		case f64be: value = u64(f64(v));
+		case f32:   value = u64(v);
+		case f64:   value = u64(v);
+		case f32le: value = u64(v);
+		case f64le: value = u64(v);
+		case f32be: value = u64(v);
+		case f64be: value = u64(v);
 		case: valid = false;
 		}
 
 	case Type_Info_Boolean:
 		valid = true;
 		switch v in a {
-		case bool: value = u64(bool(v));
-		case b8:   value = u64(bool(v));
-		case b16:  value = u64(bool(v));
-		case b32:  value = u64(bool(v));
-		case b64:  value = u64(bool(v));
+		case bool: value = u64(v);
+		case b8:   value = u64(v);
+		case b16:  value = u64(v);
+		case b32:  value = u64(v);
+		case b64:  value = u64(v);
 		case: valid = false;
 		}
 
@@ -1037,23 +1037,23 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 	case Type_Info_Float:
 		valid = true;
 		switch v in a {
-		case f32:   value = f64(f32(v));
-		case f64:   value = f64(f64(v));
-		case f32le: value = f64(f32(v));
-		case f64le: value = f64(f64(v));
-		case f32be: value = f64(f32(v));
-		case f64be: value = f64(f64(v));
+		case f32:   value = f64(v);
+		case f64:   value =    (v);
+		case f32le: value = f64(v);
+		case f64le: value = f64(v);
+		case f32be: value = f64(v);
+		case f64be: value = f64(v);
 		case: valid = false;
 		}
 
 	case Type_Info_Boolean:
 		valid = true;
 		switch v in a {
-		case bool: value = f64(i32(bool(v)));
-		case b8:   value = f64(i32(bool(v)));
-		case b16:  value = f64(i32(bool(v)));
-		case b32:  value = f64(i32(bool(v)));
-		case b64:  value = f64(i32(bool(v)));
+		case bool: value = f64(i32(v));
+		case b8:   value = f64(i32(v));
+		case b16:  value = f64(i32(v));
+		case b32:  value = f64(i32(v));
+		case b64:  value = f64(i32(v));
 		case: valid = false;
 		}
 
@@ -1066,7 +1066,7 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 			}
 		case complex128:
 			if imag(v) == 0 {
-				value = f64(real(v));
+				value = real(v);
 				valid = true;
 			}
 		}
@@ -1080,7 +1080,7 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 			}
 		case quaternion256:
 			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
-				value = f64(real(v));
+				value = real(v);
 				valid = true;
 			}
 		}
@@ -1100,7 +1100,7 @@ as_string :: proc(a: any) -> (value: string, valid: bool) {
 	case Type_Info_String:
 		valid = true;
 		switch v in a {
-		case string:  value = string(v);
+		case string:  value = v;
 		case cstring: value = string(v);
 		case: valid = false;
 		}

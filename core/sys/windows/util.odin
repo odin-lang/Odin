@@ -22,7 +22,7 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 
 	text := make([]u16, n+1, allocator);
 
-	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), i32(n));
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n);
 	if n1 == 0 {
 		delete(text, allocator);
 		return nil;
@@ -36,7 +36,7 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 }
 utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstring {
 	if res := utf8_to_utf16(s, allocator); res != nil {
-		return wstring(&res[0]);
+		return &res[0];
 	}
 	return nil;
 }

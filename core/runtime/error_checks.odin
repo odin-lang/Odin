@@ -203,17 +203,17 @@ make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_loca
 
 
 bounds_check_error_loc :: #force_inline proc "contextless" (using loc := #caller_location, index, count: int) {
-	bounds_check_error(file_path, int(line), int(column), index, count);
+	bounds_check_error(file_path, line, column, index, count);
 }
 
 slice_expr_error_hi_loc :: #force_inline proc "contextless" (using loc := #caller_location, hi: int, len: int) {
-	slice_expr_error_hi(file_path, int(line), int(column), hi, len);
+	slice_expr_error_hi(file_path, line, column, hi, len);
 }
 
 slice_expr_error_lo_hi_loc :: #force_inline proc "contextless" (using loc := #caller_location, lo, hi: int, len: int) {
-	slice_expr_error_lo_hi(file_path, int(line), int(column), lo, hi, len);
+	slice_expr_error_lo_hi(file_path, line, column, lo, hi, len);
 }
 
 dynamic_array_expr_error_loc :: #force_inline proc "contextless" (using loc := #caller_location, low, high, max: int) {
-	dynamic_array_expr_error(file_path, int(line), int(column), low, high, max);
+	dynamic_array_expr_error(file_path, line, column, low, high, max);
 }

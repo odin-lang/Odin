@@ -32,6 +32,6 @@ _tick_now :: proc() -> Tick {
 	now: win32.LARGE_INTEGER;
 	win32.QueryPerformanceCounter(&now);
 
-	_nsec := i64(mul_div_u64(i64(now), 1e9, i64(qpc_frequency)));
+	_nsec := mul_div_u64(i64(now), 1e9, i64(qpc_frequency));
 	return Tick{_nsec = _nsec};
 }

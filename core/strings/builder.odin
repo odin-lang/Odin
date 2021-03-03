@@ -385,7 +385,7 @@ write_escaped_rune_writer :: proc(w: io.Writer, r: rune, quote: byte, html_safe 
 
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte;
-	s := strconv.append_bits(buf[:], u64(i), base, false, 64, strconv.digits, nil);
+	s := strconv.append_bits(buf[:], i, base, false, 64, strconv.digits, nil);
 	return write_string(b, s);
 }
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {

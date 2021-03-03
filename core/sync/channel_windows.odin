@@ -5,7 +5,7 @@ import win32 "core:sys/windows"
 import "core:time"
 
 raw_channel_wait_queue_wait_on :: proc(state: ^uintptr, timeout: time.Duration) {
-	ms := win32.DWORD(win32.INFINITE);
+	ms: win32.DWORD = win32.INFINITE;
 	if max(time.Duration) != SELECT_MAX_TIMEOUT {
 		ms = win32.DWORD((max(time.duration_nanoseconds(timeout), 0) + 999999)/1000000);
 	}

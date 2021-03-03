@@ -127,7 +127,7 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		old_ptr := uintptr(old_memory);
 
 		if s.prev_allocation == old_memory {
-			s.curr_offset = int(uintptr(s.prev_allocation) - uintptr(start));
+			s.curr_offset = int(uintptr(s.prev_allocation) - start);
 			s.prev_allocation = nil;
 			return nil;
 		}

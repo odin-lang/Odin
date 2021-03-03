@@ -290,7 +290,7 @@ write_byte :: proc{
 };
 
 write_byte_to_byte_writer :: proc(w: Byte_Writer, c: byte) -> Error {
-	return _write_byte(auto_cast w, c);
+	return _write_byte(w, c);
 }
 
 write_byte_to_writer :: proc(w: Writer, c: byte) -> Error {
