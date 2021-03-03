@@ -313,3 +313,31 @@ hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	return ((v1 * s + v2) * s + v3) * s + v3;
 }
+
+
+
+array_cast :: proc(v: $A/[$N]$T, $U: typeid) -> [N]U {
+	w: [N]U;
+	for _, i in v do w[i] = U(v[i]);
+	return w;
+}
+
+to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32);  }
+to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return array_cast(v, f64);  }
+
+to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return array_cast(v, i8);   }
+to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return array_cast(v, i16);  }
+to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return array_cast(v, i32);  }
+to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return array_cast(v, i64);  }
+to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return array_cast(v, int);  }
+
+to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return array_cast(v, u8);   }
+to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return array_cast(v, u16);  }
+to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return array_cast(v, u32);  }
+to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return array_cast(v, u64);  }
+to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return array_cast(v, uint); }
+
+to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return array_cast(v, complex64);     }
+to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return array_cast(v, complex128);    }
+to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128); }
+to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256); }
