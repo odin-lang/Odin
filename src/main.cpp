@@ -593,6 +593,7 @@ enum BuildFlagKind {
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_Vet,
+	BuildFlag_VetExtra,
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
@@ -706,6 +707,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
@@ -1150,6 +1152,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_Vet:
 							build_context.vet = true;
+							break;
+						case BuildFlag_VetExtra:
+							build_context.vet = true;
+							build_context.vet_extra = true;
 							break;
 
 						case BuildFlag_UseLLVMApi:
@@ -1692,6 +1698,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Extra checks include:");
 		print_usage_line(3, "Variable shadowing within procedures");
 		print_usage_line(3, "Unused declarations");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-extra");
+		print_usage_line(2, "Do even more checks than standard vet on the code");
+		print_usage_line(2, "To treat the extra warnings as errors, use -warnings-as-errors");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-unknown-attributes");
