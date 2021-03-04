@@ -2510,7 +2510,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		e = type->Named.type_name;
 		if (e) {
 			CheckerInfo *info = module->info;
-			file = ir_add_debug_info_file(module, ast_file_of_filename(info, e->token.pos.file));
+			file = ir_add_debug_info_file(module, ast_file_of_filename(info, get_file_path_string(e->token.pos.file_id)));
 			// TODO(lachsinc): Determine proper scope for type declaration location stuff.
 			scope = file;
 		}
@@ -2875,7 +2875,7 @@ irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
 
 	// Create or fetch file debug info.
 	CheckerInfo *info = module->info;
-	String filename = e->token.pos.file;
+	String filename = get_file_path_string(e->token.pos.file_id);
 	AstFile *f = ast_file_of_filename(info, filename);
 	GB_ASSERT_NOT_NULL(f);
 	irDebugInfo *scope = ir_add_debug_info_file(module, f);
@@ -2964,7 +2964,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 
 	// Add / retrieve debug info for file.
 	CheckerInfo *info = proc->module->info;
-	String filename = proc->entity->token.pos.file;
+	String filename = get_file_path_string(proc->entity->token.pos.file_id);
 	AstFile *f = ast_file_of_filename(info, filename);
 	irDebugInfo *file = nullptr;
 	if (f) {
@@ -6419,7 +6419,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 			auto args = array_make<irValue *>(ir_allocator(), 6);
 			args[0] = ok;
 
-			args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+			args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
 			args[2] = ir_const_int(pos.line);
 			args[3] = ir_const_int(pos.column);
 
@@ -6479,7 +6479,7 @@ irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, Toke
 		auto args = array_make<irValue *>(ir_allocator(), 6);
 		args[0] = ok;
 
-		args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+		args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
 		args[2] = ir_const_int(pos.line);
 		args[3] = ir_const_int(pos.column);
 
@@ -6676,7 +6676,7 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 	len = ir_emit_conv(proc, len, t_int);
 
 	gbAllocator a = ir_allocator();
-	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
+	irValue *file = ir_find_or_add_entity_string(proc->module, get_file_path_string(token.pos.file_id));
 	irValue *line = ir_const_int(token.pos.line);
 	irValue *column = ir_const_int(token.pos.column);
 
@@ -6700,7 +6700,7 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	}
 
 	gbAllocator a = ir_allocator();
-	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
+	irValue *file = ir_find_or_add_entity_string(proc->module, get_file_path_string(token.pos.file_id));
 	irValue *line = ir_const_int(token.pos.line);
 	irValue *column = ir_const_int(token.pos.column);
 	high = ir_emit_conv(proc, high, t_int);
@@ -6739,7 +6739,7 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 	}
 
 	gbAllocator a = ir_allocator();
-	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
+	irValue *file = ir_find_or_add_entity_string(proc->module, get_file_path_string(token.pos.file_id));
 	irValue *line = ir_const_int(token.pos.line);
 	irValue *column = ir_const_int(token.pos.column);
 	low  = ir_emit_conv(proc, low,  t_int);
@@ -7077,7 +7077,7 @@ bool is_double_pointer(Type *t) {
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
 	gbAllocator a = ir_allocator();
 	irValue *v = ir_alloc_value(irValue_SourceCodeLocation);
-	v->SourceCodeLocation.file      = ir_find_or_add_entity_string(proc->module, pos.file);
+	v->SourceCodeLocation.file      = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
 	v->SourceCodeLocation.line      = ir_const_int(pos.line);
 	v->SourceCodeLocation.column    = ir_const_int(pos.column);
 	v->SourceCodeLocation.procedure = ir_find_or_add_entity_string(proc->module, procedure);
@@ -7960,7 +7960,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	TokenPos expr_pos = ast_token(expr).pos;
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
-	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' @ %.*s(%td:%td)", expr_to_string(expr), LIT(expr_pos.file), expr_pos.line, expr_pos.column);
+	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' @ %s", expr_to_string(expr), token_pos_to_string(expr_pos));
 	if (tv.mode == Addressing_Type) {
 		// HACK TODO(bill): This is hack but it should be safe in virtually all cases
 		irValue *v = ir_typeid(proc->module, tv.type);
@@ -8018,7 +8018,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				return ir_addr_load(proc, ir_build_addr(proc, expr));
 			}
 
-			GB_PANIC("Error in: %.*s(%td:%td) %s\n", LIT(proc->name), e->token.pos.line, e->token.pos.column);
+			GB_PANIC("Error in: %s %s\n", LIT(proc->name), token_pos_to_string(e->token.pos));
 		}
 
 		return ir_add_module_constant(proc->module, tv.type, tv.value);
@@ -8038,12 +8038,12 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
 		TokenPos pos = bl->token.pos;
-		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(token_strings[bl->token.kind]));
+		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(token_strings[bl->token.kind]));
 	case_end;
 
 	case_ast_node(bd, BasicDirective, expr);
 		TokenPos pos = bd->token.pos;
-		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(bd->name));
+		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(bd->name));
 	case_end;
 
 	case_ast_node(i, Implicit, expr);
@@ -8062,8 +8062,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);
 			GB_PANIC("TODO(bill): ir_build_expr Entity_Builtin '%.*s'\n"
-			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
-			         LIT(token.pos.file), token.pos.line, token.pos.column);
+			         "\t at %s", LIT(builtin_procs[e->Builtin.id].name),
+			         token_pos_to_string(token.pos));
 			return nullptr;
 		} else if (e->kind == Entity_Nil) {
 			return ir_value_nil(tv.type);
@@ -8259,7 +8259,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					auto args = array_make<irValue *>(ir_allocator(), 6);
 					args[0] = ok;
 
-					args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+					args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
 					args[2] = ir_const_int(pos.line);
 					args[3] = ir_const_int(pos.column);
 
@@ -8284,7 +8284,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					auto args = array_make<irValue *>(ir_allocator(), 6);
 					args[0] = ok;
 
-					args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+					args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
 					args[2] = ir_const_int(pos.line);
 					args[3] = ir_const_int(pos.column);
 
@@ -9649,9 +9649,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 	TokenPos token_pos = ast_token(expr).pos;
 	GB_PANIC("Unexpected address expression\n"
 	         "\tAst: %.*s @ "
-	         "%.*s(%td:%td)\n",
+	         "%s\n",
 	         LIT(ast_strings[expr->kind]),
-	         LIT(token_pos.file), token_pos.line, token_pos.column);
+	         token_pos_to_string(token_pos));
 
 
 	return ir_addr(nullptr);
@@ -10263,7 +10263,6 @@ irAddr ir_store_range_stmt_val(irProcedure *proc, Ast *stmt_val, irValue *value)
 			// gb_printf_err("%s\n", expr_to_string(stmt_val));
 			// gb_printf_err("Entity: %s -> Value: %s\n", type_to_string(e->type), type_to_string(vt));
 			// Token tok = ast_token(stmt_val);
-			// gb_printf_err("%.*s(%td:%td)\n", LIT(tok.pos.file), tok.pos.line, tok.pos.column);
 		}
 	}
 	ir_addr_store(proc, addr, value);

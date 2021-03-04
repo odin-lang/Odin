@@ -553,7 +553,7 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 
 			def->add("package",     e->pkg->name);
 			def->add("name",        name);
-			def->add("filepath",    e->token.pos.file);
+			def->add("filepath",    get_file_path_string(e->token.pos.file_id));
 			def->add("line",        cast(i64)e->token.pos.line);
 			def->add("column",      cast(i64)e->token.pos.column);
 			def->add("file_offset", cast(i64)e->token.pos.offset);
@@ -915,7 +915,7 @@ void generate_and_print_query_data_go_to_definitions(Checker *c) {
 		}
 
 
-		AstFile **use_file_found = string_map_get(&c->info.files, pos.file);
+		AstFile **use_file_found = string_map_get(&c->info.files, get_file_path_string(pos.file_id));
 		GB_ASSERT(use_file_found != nullptr);
 		AstFile *use_file = *use_file_found;
 		GB_ASSERT(use_file != nullptr);
@@ -1005,7 +1005,7 @@ void generate_and_print_query_data_go_to_definitions(Checker *c) {
 			AstFile *def_file = e->file;
 
 			if (def_file == nullptr) {
-				auto *def_file_found = string_map_get(&c->info.files, e->token.pos.file);
+				auto *def_file_found = string_map_get(&c->info.files, get_file_path_string(e->token.pos.file_id));
 				if (def_file_found == nullptr) {
 					continue;
 				}

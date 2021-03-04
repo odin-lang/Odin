@@ -185,7 +185,7 @@ void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue le
 	index = lb_emit_conv(p, index, t_int);
 	len = lb_emit_conv(p, len, t_int);
 
-	lbValue file = lb_find_or_add_entity_string(p->module, token.pos.file);
+	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
 	lbValue line = lb_const_int(p->module, t_int, token.pos.line);
 	lbValue column = lb_const_int(p->module, t_int, token.pos.column);
 
@@ -207,7 +207,7 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 		return;
 	}
 
-	lbValue file = lb_find_or_add_entity_string(p->module, token.pos.file);
+	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
 	lbValue line = lb_const_int(p->module, t_int, token.pos.line);
 	lbValue column = lb_const_int(p->module, t_int, token.pos.column);
 	high = lb_emit_conv(p, high, t_int);
@@ -4844,7 +4844,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			return *found;
 		}
 
-		GB_PANIC("Error in: %.*s(%td:%td), missing procedure %.*s\n", LIT(e->token.pos.file), e->token.pos.line, e->token.pos.column, LIT(e->token.string));
+		GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	}
 
 	bool is_local = allow_local && m->curr_procedure != nullptr;
@@ -5414,7 +5414,7 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 	lbModule *m = p->module;
 
 	LLVMValueRef fields[4] = {};
-	fields[0]/*file*/      = lb_find_or_add_entity_string(p->module, pos.file).value;
+	fields[0]/*file*/      = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id)).value;
 	fields[1]/*line*/      = lb_const_int(m, t_int, pos.line).value;
 	fields[2]/*column*/    = lb_const_int(m, t_int, pos.column).value;
 	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
@@ -9509,7 +9509,7 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 			auto args = array_make<lbValue>(permanent_allocator(), 7);
 			args[0] = ok;
 
-			args[1] = lb_const_string(m, pos.file);
+			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
 			args[2] = lb_const_int(m, t_int, pos.line);
 			args[3] = lb_const_int(m, t_int, pos.column);
 
@@ -9571,7 +9571,7 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 		auto args = array_make<lbValue>(permanent_allocator(), 7);
 		args[0] = ok;
 
-		args[1] = lb_const_string(m, pos.file);
+		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
 		args[2] = lb_const_int(m, t_int, pos.line);
 		args[3] = lb_const_int(m, t_int, pos.column);
 
@@ -9614,7 +9614,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	TokenPos expr_pos = ast_token(expr).pos;
 	TypeAndValue tv = type_and_value_of_expr(expr);
-	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %.*s(%td:%td)\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), LIT(expr_pos.file), expr_pos.line, expr_pos.column, LIT(p->name), type_to_string(p->type));
+	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Short on constant values
@@ -9626,12 +9626,12 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
 		TokenPos pos = bl->token.pos;
-		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(token_strings[bl->token.kind]));
+		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(token_strings[bl->token.kind]));
 	case_end;
 
 	case_ast_node(bd, BasicDirective, expr);
 		TokenPos pos = bd->token.pos;
-		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(bd->name));
+		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(bd->name));
 	case_end;
 
 	case_ast_node(i, Implicit, expr);
@@ -9658,8 +9658,8 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);
 			GB_PANIC("TODO(bill): lb_build_expr Entity_Builtin '%.*s'\n"
-			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
-			         LIT(token.pos.file), token.pos.line, token.pos.column);
+			         "\t at %s", LIT(builtin_procs[e->Builtin.id].name),
+			         token_pos_to_string(token.pos));
 			return {};
 		} else if (e->kind == Entity_Nil) {
 			lbValue res = {};
@@ -9680,7 +9680,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		} else if (e != nullptr && e->kind == Entity_Variable) {
 			return lb_addr_load(p, lb_build_addr(p, expr));
 		}
-		gb_printf_err("Error in: %.*s(%td:%td)\n", LIT(p->name), i->token.pos.line, i->token.pos.column);
+		gb_printf_err("Error in: %s\n", token_pos_to_string(i->token.pos));
 		String pkg = {};
 		if (e->pkg) {
 			pkg = e->pkg->name;
@@ -9877,7 +9877,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 					auto args = array_make<lbValue>(permanent_allocator(), 6);
 					args[0] = ok;
 
-					args[1] = lb_find_or_add_entity_string(p->module, pos.file);
+					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
 					args[2] = lb_const_int(p->module, t_int, pos.line);
 					args[3] = lb_const_int(p->module, t_int, pos.column);
 
@@ -9902,7 +9902,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 					auto args = array_make<lbValue>(permanent_allocator(), 6);
 					args[0] = ok;
 
-					args[1] = lb_find_or_add_entity_string(p->module, pos.file);
+					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
 					args[2] = lb_const_int(p->module, t_int, pos.line);
 					args[3] = lb_const_int(p->module, t_int, pos.column);
 
@@ -11345,9 +11345,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	TokenPos token_pos = ast_token(expr).pos;
 	GB_PANIC("Unexpected address expression\n"
 	         "\tAst: %.*s @ "
-	         "%.*s(%td:%td)\n",
+	         "%s\n",
 	         LIT(ast_strings[expr->kind]),
-	         LIT(token_pos.file), token_pos.line, token_pos.column);
+	         token_pos_to_string(token_pos));
 
 
 	return {};

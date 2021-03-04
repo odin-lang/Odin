@@ -799,14 +799,14 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				if (!are_signatures_similar_enough(this_type, other_type)) {
 					error(d->proc_lit,
 					      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
-					      "\tat %.*s(%td:%td)",
-					      LIT(name), LIT(pos.file), pos.line, pos.column);
+					      "\tat %s",
+					      LIT(name), token_pos_to_string(pos));
 				}
 			} else if (!are_types_identical(this_type, other_type)) {
 				error(d->proc_lit,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(name), LIT(pos.file), pos.line, pos.column);
+				      "\tat %s",
+				      LIT(name), token_pos_to_string(pos));
 			}
 		} else if (name == "main") {
 			error(d->proc_lit, "The link name 'main' is reserved for internal use");
@@ -828,8 +828,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				// TODO(bill): Better error message?
 				error(d->proc_lit,
 				      "Non unique linking name for procedure '%.*s'\n"
-				      "\tother at %.*s(%td:%td)",
-				      LIT(name), LIT(pos.file), pos.line, pos.column);
+				      "\tother at %s",
+				      LIT(name), token_pos_to_string(pos));
 			} else if (name == "main") {
 				error(d->proc_lit, "The link name 'main' is reserved for internal use");
 			} else {
@@ -919,8 +919,8 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, 
 			if (!are_types_identical(this_type, other_type)) {
 				error(e->token,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(name), LIT(pos.file), pos.line, pos.column);
+				      "\tat %s",
+				      LIT(name), token_pos_to_string(pos));
 			}
 		} else {
 			string_map_set(fp, key, e);
@@ -1059,7 +1059,7 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 			}
 
 			if (is_invalid) {
-				error_line("\tprevious procedure at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
+				error_line("\tprevious procedure at %s\n", token_pos_to_string(pos));
 				q->type = t_invalid;
 			}
 		}
