@@ -540,11 +540,11 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
 				      "Namespace collision while 'using' '%s' of: %.*s\n"
-				      "\tat %.*s(%td:%td)\n"
-				      "\tat %.*s(%td:%td)",
+				      "\tat %s\n"
+				      "\tat %s",
 				      expr_str, LIT(found->token.string),
-				      LIT(found->token.pos.file), found->token.pos.line, found->token.pos.column,
-				      LIT(decl->token.pos.file), decl->token.pos.line, decl->token.pos.column
+				      token_pos_to_string(found->token.pos),
+				      token_pos_to_string(decl->token.pos)
 				      );
 				gb_string_free(expr_str);
 				return false;
@@ -644,14 +644,12 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 				gbString expr_str = expr_to_string(operand.expr);
 				error(operand.expr,
 				      "Duplicate case '%s'\n"
-				      "\tprevious case at %.*s(%td:%td)",
+				      "\tprevious case at %s",
 				      expr_str,
-				      LIT(pos.file), pos.line, pos.column);
+				      token_pos_to_string(pos));
 				gb_string_free(expr_str);
 			} else {
-				error(operand.expr,
-				      "Duplicate case found with previous case at %.*s(%td:%td)",
-				      LIT(pos.file), pos.line, pos.column);
+				error(operand.expr, "Duplicate case found with previous case at %s", token_pos_to_string(pos));
 			}
 			return;
 		}
@@ -768,8 +766,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				TokenPos pos = found->token.pos;
 				error(token,
 				      "Redeclaration of '%.*s' in this scope\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(str), LIT(pos.file), pos.line, pos.column);
+				      "\tat %s", LIT(str), token_pos_to_string(pos));
 				entity = found;
 			}
 		} else {
@@ -871,8 +868,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				TokenPos pos = ast_token(first_default).pos;
 				error(stmt,
 				           "multiple default clauses\n"
-				           "\tfirst at %.*s(%td:%td)",
-				           LIT(pos.file), pos.line, pos.column);
+				           "\tfirst at %s", token_pos_to_string(pos));
 			} else {
 				first_default = default_stmt;
 			}
@@ -1134,8 +1130,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				TokenPos pos = ast_token(first_default).pos;
 				error(stmt,
 				      "Multiple default clauses\n"
-				      "\tfirst at %.*s(%td:%td)",
-				      LIT(pos.file), pos.line, pos.column);
+				      "\tfirst at %s", token_pos_to_string(pos));
 			} else {
 				first_default = default_stmt;
 			}
@@ -1205,9 +1200,9 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
 					           "Duplicate type case '%s'\n"
-					           "\tprevious type case at %.*s(%td:%td)",
+					           "\tprevious type case at %s",
 					           expr_str,
-					           LIT(pos.file), pos.line, pos.column);
+					           token_pos_to_string(pos));
 					gb_string_free(expr_str);
 					break;
 				}
@@ -1840,8 +1835,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					TokenPos pos = found->token.pos;
 					error(token,
 					      "Redeclaration of '%.*s' in this scope\n"
-					      "\tat %.*s(%td:%td)",
-					      LIT(str), LIT(pos.file), pos.line, pos.column);
+					      "\tat %s",
+					      LIT(str), token_pos_to_string(pos));
 					entity = found;
 				}
 			} else {
@@ -2055,8 +2050,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						TokenPos pos = found->token.pos;
 						error(token,
 						      "Redeclaration of '%.*s' in this scope\n"
-						      "\tat %.*s(%td:%td)",
-						      LIT(str), LIT(pos.file), pos.line, pos.column);
+						      "\tat %s",
+						      LIT(str), token_pos_to_string(pos));
 						entity = found;
 					}
 				}
@@ -2166,8 +2161,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						if (!are_types_identical(this_type, other_type)) {
 							error(e->token,
 							      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-							      "\tat %.*s(%td:%td)",
-							      LIT(name), LIT(pos.file), pos.line, pos.column);
+							      "\tat %s",
+							      LIT(name), token_pos_to_string(pos));
 						}
 					} else {
 						string_map_set(fp, key, e);

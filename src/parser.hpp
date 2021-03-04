@@ -42,6 +42,7 @@ enum ParseFileError {
 	ParseFile_NotFound,
 	ParseFile_InvalidToken,
 	ParseFile_GeneralError,
+	ParseFile_FileTooLarge,
 
 	ParseFile_Count,
 };
@@ -74,7 +75,7 @@ struct ImportedFile {
 };
 
 struct AstFile {
-	isize        id;
+	i32          id;
 	AstPackage * pkg;
 	Scope *      scope;
 

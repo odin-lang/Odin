@@ -4455,6 +4455,7 @@ Array<Ast *> parse_stmt_list(AstFile *f) {
 ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
+	set_file_path_string(f->id, fullpath);
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
@@ -4462,6 +4463,10 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	if (build_context.insert_semicolon) {
 		tokenizer_flags = TokenizerFlag_InsertSemicolon;
 	}
+
+	zero_item(&f->tokenizer);
+	f->tokenizer.curr_file_id = f->id;
+
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath, tokenizer_flags);
 	if (err != TokenizerInit_None) {
 		switch (err) {
@@ -4471,6 +4476,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 			return ParseFile_NotFound;
 		case TokenizerInit_Permission:
 			return ParseFile_Permission;
+		case TokenizerInit_FileTooLarge:
+			return ParseFile_FileTooLarge;
 		default:
 			return ParseFile_InvalidFile;
 		}
@@ -4490,9 +4497,9 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
-		token.pos.file   = fullpath;
-		token.pos.line   = 1;
-		token.pos.column = 1;
+		token.pos.file_id = f->id;
+		token.pos.line    = 1;
+		token.pos.column  = 1;
 		array_add(&f->tokens, token);
 		return ParseFile_None;
 	}
@@ -4593,7 +4600,7 @@ void parser_add_package(Parser *p, AstPackage *pkg) {
 			syntax_error(f->package_token, "Non-unique package name '%.*s'", LIT(pkg->name));
 			GB_ASSERT((*found)->files.count > 0);
 			TokenPos pos = (*found)->files[0]->package_token.pos;
-			error_line("\tpreviously declared at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
+			error_line("\tpreviously declared at %s\n", token_pos_to_string(pos));
 		} else {
 			string_map_set(&p->package_map, key, pkg);
 		}
@@ -5227,11 +5234,11 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
 	file->pkg = pkg;
-	file->id = imported_file.index+1;
+	file->id = cast(i32)(imported_file.index+1);
 
 	TokenPos err_pos = {0};
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
-	err_pos.file = fi->fullpath;
+	err_pos.file_id = file->id;
 	file->last_error = err;
 
 	if (err != ParseFile_None) {
@@ -5259,6 +5266,9 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 				break;
 			case ParseFile_EmptyFile:
 				syntax_error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
+				break;
+			case ParseFile_FileTooLarge:
+				syntax_error(pos, "Failed to parse file: %.*s; file is too large, exceeds maximum file size of 2 GiB", LIT(fi->name));
 				break;
 			}
 

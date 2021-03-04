@@ -1845,7 +1845,7 @@ void print_show_unused(Checker *c) {
 		}
 		if (build_context.show_unused_with_location) {
 			TokenPos pos = e->token.pos;
-			print_usage_line(2, "%.*s(%td:%td) %.*s", LIT(pos.file), pos.line, pos.column, LIT(e->token.string));
+			print_usage_line(2, "%s %.*s", token_pos_to_string(pos), LIT(e->token.string));
 		} else {
 			print_usage_line(2, "%.*s", LIT(e->token.string));
 		}

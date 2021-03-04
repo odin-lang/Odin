@@ -507,7 +507,7 @@ bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 	}
 
 	// NOTE(bill): The entities must be in the same file
-	if (e->token.pos.file != shadowed->token.pos.file) {
+	if (e->token.pos.file_id != shadowed->token.pos.file_id) {
 		return false;
 	}
 	// NOTE(bill): The shaded identifier must appear before this one to be an
@@ -1127,15 +1127,15 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 		if (found->flags & EntityFlag_Result) {
 			error(prev->token,
 			      "Direct shadowing of the named return value '%.*s' in this scope through 'using'\n"
-			      "\tat %.*s(%td:%td)",
+			      "\tat %s",
 			      LIT(name),
-			      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+			      token_pos_to_string(up->token.pos));
 		} else {
 			error(prev->token,
 			      "Redeclaration of '%.*s' in this scope through 'using'\n"
-			      "\tat %.*s(%td:%td)",
+			      "\tat %s",
 			      LIT(name),
-			      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+			      token_pos_to_string(up->token.pos));
 		}
 	} else {
 		if (pos == prev->token.pos) {
@@ -1145,15 +1145,15 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 		if (found->flags & EntityFlag_Result) {
 			error(prev->token,
 			      "Direct shadowing of the named return value '%.*s' in this scope\n"
-			      "\tat %.*s(%td:%td)",
+			      "\tat %s",
 			      LIT(name),
-			      LIT(pos.file), pos.line, pos.column);
+			      token_pos_to_string(pos));
 		} else {
 			error(prev->token,
 			      "Redeclaration of '%.*s' in this scope\n"
-			      "\tat %.*s(%td:%td)",
+			      "\tat %s",
 			      LIT(name),
-			      LIT(pos.file), pos.line, pos.column);
+			      token_pos_to_string(pos));
 		}
 	}
 	return false;
@@ -3524,7 +3524,7 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 				gb_printf_err("%.*s\n", LIT(pkg->fullpath));
 			}
 			Token token = ast_token(decl);
-			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+			gb_printf_err("%s\n", token_pos_to_string(token.pos));
 			GB_PANIC("Unable to find package: %.*s", LIT(path));
 		}
 		AstPackage *pkg = *found;
@@ -3699,7 +3699,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 				AstPackage *pkg = pkgs->entries[pkg_index].value;
 				gb_printf_err("%.*s\n", LIT(pkg->fullpath));
 			}
-			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+			gb_printf_err("%s\n", token_pos_to_string(token.pos));
 			GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
 		} else {
 			AstPackage *pkg = *found;
@@ -4714,9 +4714,9 @@ void check_parsed_files(Checker *c) {
 		Entity *e = scope_lookup_current(s, str_lit("main"));
 		if (e == nullptr) {
 			Token token = {};
-			token.pos.file   = s->pkg->fullpath;
-			token.pos.line   = 1;
-			token.pos.column = 1;
+			token.pos.file_id = 0;
+			token.pos.line    = 1;
+			token.pos.column  = 1;
 			if (s->pkg->files.count > 0) {
 				AstFile *f = s->pkg->files[0];
 				if (f->tokens.count > 0) {
