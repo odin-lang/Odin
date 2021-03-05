@@ -17,11 +17,11 @@ type_assertion_trap :: proc "contextless" () -> ! {
 }
 
 
-bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
+bounds_check_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
 	if 0 <= index && index < count {
 		return;
 	}
-	handle_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
 		context = default_context();
 		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Index ");
@@ -34,7 +34,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	handle_error(file, line, column, index, count);
 }
 
-slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) -> ! {
+slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) -> ! {
 	context = default_context();
 	print_caller_location(Source_Code_Location{file, line, column, ""});
 	print_string(" Invalid slice indices: ");
@@ -47,25 +47,25 @@ slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, h
 	bounds_trap();
 }
 
-slice_expr_error_hi :: proc "contextless" (file: string, line, column: int, hi: int, len: int) {
+slice_expr_error_hi :: proc "contextless" (file: string, line, column: i32, hi: int, len: int) {
 	if 0 <= hi && hi <= len {
 		return;
 	}
 	slice_handle_error(file, line, column, 0, hi, len);
 }
 
-slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
+slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) {
 	if 0 <= lo && lo <= len && lo <= hi && hi <= len {
 		return;
 	}
 	slice_handle_error(file, line, column, lo, hi, len);
 }
 
-dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
+dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max {
 		return;
 	}
-	handle_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
 		context = default_context();
 		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Invalid dynamic array values: ");
@@ -81,11 +81,11 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 }
 
 
-type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
+type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid) {
 	if ok {
 		return;
 	}
-	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid) {
 		context = default_context();
 		print_caller_location(Source_Code_Location{file, line, column, ""});
 		print_string(" Invalid type assertion from ");
@@ -98,7 +98,7 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 	handle_error(file, line, column, from, to);
 }
 
-type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid, from_data: rawptr) {
+type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
 	if ok {
 		return;
 	}
@@ -130,7 +130,7 @@ type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, colum
 		return id;
 	}
 
-	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid, from_data: rawptr) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
 		context = default_context();
 
 		actual := variant_type(from, from_data);

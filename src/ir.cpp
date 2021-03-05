@@ -6420,8 +6420,8 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 			args[0] = ok;
 
 			args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
-			args[2] = ir_const_int(pos.line);
-			args[3] = ir_const_int(pos.column);
+			args[2] = ir_const_i32(pos.line);
+			args[3] = ir_const_i32(pos.column);
 
 			args[4] = ir_typeid(proc->module, src_type);
 			args[5] = ir_typeid(proc->module, dst_type);
@@ -6480,8 +6480,8 @@ irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, Toke
 		args[0] = ok;
 
 		args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
-		args[2] = ir_const_int(pos.line);
-		args[3] = ir_const_int(pos.column);
+		args[2] = ir_const_i32(pos.line);
+		args[3] = ir_const_i32(pos.column);
 
 		args[4] = any_typeid;
 		args[5] = dst_typeid;
@@ -6677,8 +6677,8 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 
 	gbAllocator a = ir_allocator();
 	irValue *file = ir_find_or_add_entity_string(proc->module, get_file_path_string(token.pos.file_id));
-	irValue *line = ir_const_int(token.pos.line);
-	irValue *column = ir_const_int(token.pos.column);
+	irValue *line = ir_const_i32(token.pos.line);
+	irValue *column = ir_const_i32(token.pos.column);
 
 
 	auto args = array_make<irValue *>(ir_allocator(), 5);
@@ -6701,8 +6701,8 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 
 	gbAllocator a = ir_allocator();
 	irValue *file = ir_find_or_add_entity_string(proc->module, get_file_path_string(token.pos.file_id));
-	irValue *line = ir_const_int(token.pos.line);
-	irValue *column = ir_const_int(token.pos.column);
+	irValue *line = ir_const_i32(token.pos.line);
+	irValue *column = ir_const_i32(token.pos.column);
 	high = ir_emit_conv(proc, high, t_int);
 
 	if (!lower_value_used) {
@@ -6740,8 +6740,8 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 
 	gbAllocator a = ir_allocator();
 	irValue *file = ir_find_or_add_entity_string(proc->module, get_file_path_string(token.pos.file_id));
-	irValue *line = ir_const_int(token.pos.line);
-	irValue *column = ir_const_int(token.pos.column);
+	irValue *line = ir_const_i32(token.pos.line);
+	irValue *column = ir_const_i32(token.pos.column);
 	low  = ir_emit_conv(proc, low,  t_int);
 	high = ir_emit_conv(proc, high, t_int);
 
@@ -7078,8 +7078,8 @@ irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, Token
 	gbAllocator a = ir_allocator();
 	irValue *v = ir_alloc_value(irValue_SourceCodeLocation);
 	v->SourceCodeLocation.file      = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
-	v->SourceCodeLocation.line      = ir_const_int(pos.line);
-	v->SourceCodeLocation.column    = ir_const_int(pos.column);
+	v->SourceCodeLocation.line      = ir_const_i32(pos.line);
+	v->SourceCodeLocation.column    = ir_const_i32(pos.column);
 	v->SourceCodeLocation.procedure = ir_find_or_add_entity_string(proc->module, procedure);
 	return v;
 }
@@ -8260,8 +8260,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					args[0] = ok;
 
 					args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
-					args[2] = ir_const_int(pos.line);
-					args[3] = ir_const_int(pos.column);
+					args[2] = ir_const_i32(pos.line);
+					args[3] = ir_const_i32(pos.column);
 
 					args[4] = ir_typeid(proc->module, src_type);
 					args[5] = ir_typeid(proc->module, dst_type);
@@ -8285,8 +8285,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					args[0] = ok;
 
 					args[1] = ir_find_or_add_entity_string(proc->module, get_file_path_string(pos.file_id));
-					args[2] = ir_const_int(pos.line);
-					args[3] = ir_const_int(pos.column);
+					args[2] = ir_const_i32(pos.line);
+					args[3] = ir_const_i32(pos.column);
 
 					args[4] = any_id;
 					args[5] = id;

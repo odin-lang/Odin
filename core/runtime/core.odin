@@ -246,7 +246,7 @@ args__: []cstring;
 
 Source_Code_Location :: struct {
 	file_path:    string,
-	line, column: int,
+	line, column: i32,
 	procedure:    string,
 }
 

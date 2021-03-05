@@ -186,8 +186,8 @@ void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue le
 	len = lb_emit_conv(p, len, t_int);
 
 	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
-	lbValue line = lb_const_int(p->module, t_int, token.pos.line);
-	lbValue column = lb_const_int(p->module, t_int, token.pos.column);
+	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
 
 	auto args = array_make<lbValue>(permanent_allocator(), 5);
 	args[0] = file;
@@ -208,8 +208,8 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	}
 
 	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
-	lbValue line = lb_const_int(p->module, t_int, token.pos.line);
-	lbValue column = lb_const_int(p->module, t_int, token.pos.column);
+	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
 	high = lb_emit_conv(p, high, t_int);
 
 	if (!lower_value_used) {
@@ -5415,8 +5415,8 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 
 	LLVMValueRef fields[4] = {};
 	fields[0]/*file*/      = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id)).value;
-	fields[1]/*line*/      = lb_const_int(m, t_int, pos.line).value;
-	fields[2]/*column*/    = lb_const_int(m, t_int, pos.column).value;
+	fields[1]/*line*/      = lb_const_int(m, t_i32, pos.line).value;
+	fields[2]/*column*/    = lb_const_int(m, t_i32, pos.column).value;
 	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
 
 	lbValue res = {};
@@ -9510,8 +9510,8 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 			args[0] = ok;
 
 			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-			args[2] = lb_const_int(m, t_int, pos.line);
-			args[3] = lb_const_int(m, t_int, pos.column);
+			args[2] = lb_const_int(m, t_i32, pos.line);
+			args[3] = lb_const_int(m, t_i32, pos.column);
 
 			args[4] = lb_typeid(m, src_type);
 			args[5] = lb_typeid(m, dst_type);
@@ -9572,8 +9572,8 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 		args[0] = ok;
 
 		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-		args[2] = lb_const_int(m, t_int, pos.line);
-		args[3] = lb_const_int(m, t_int, pos.column);
+		args[2] = lb_const_int(m, t_i32, pos.line);
+		args[3] = lb_const_int(m, t_i32, pos.column);
 
 		args[4] = any_typeid;
 		args[5] = dst_typeid;
@@ -9878,8 +9878,8 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 					args[0] = ok;
 
 					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-					args[2] = lb_const_int(p->module, t_int, pos.line);
-					args[3] = lb_const_int(p->module, t_int, pos.column);
+					args[2] = lb_const_int(p->module, t_i32, pos.line);
+					args[3] = lb_const_int(p->module, t_i32, pos.column);
 
 					args[4] = lb_typeid(p->module, src_type);
 					args[5] = lb_typeid(p->module, dst_type);
@@ -9903,8 +9903,8 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 					args[0] = ok;
 
 					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-					args[2] = lb_const_int(p->module, t_int, pos.line);
-					args[3] = lb_const_int(p->module, t_int, pos.column);
+					args[2] = lb_const_int(p->module, t_i32, pos.line);
+					args[3] = lb_const_int(p->module, t_i32, pos.column);
 
 					args[4] = any_id;
 					args[5] = id;
