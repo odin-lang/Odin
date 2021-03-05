@@ -2885,8 +2885,8 @@ void print_llvm_ir(irGen *ir) {
 				            ", linkageName: \"%.*s\""
 				            ", scope: !%d"
 				            ", file: !%d"
-				            ", line: %td"
-				            ", scopeLine: %td"
+				            ", line: %d"
+				            ", scopeLine: %d"
 				            ", isDefinition: true"
 				            ", isLocal: false" // TODO(lachsinc): Is this fine?
 				            ", flags: DIFlagPrototyped"
@@ -2910,8 +2910,8 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_Location:
 				GB_ASSERT_NOT_NULL(di->Location.scope);
 				ir_fprintf(f, "!DILocation("
-				              "line: %td"
-				            ", column: %td"
+				              "line: %d"
+				            ", column: %d"
 				            ", scope: !%d)",
 				            di->Location.pos.line,
 				            di->Location.pos.column,
@@ -2921,8 +2921,8 @@ void print_llvm_ir(irGen *ir) {
 				GB_ASSERT_NOT_NULL(di->LexicalBlock.file);
 				GB_ASSERT_NOT_NULL(di->LexicalBlock.scope);
 				ir_fprintf(f, "distinct !DILexicalBlock("
-				              "line: %td"
-				            ", column: %td"
+				              "line: %d"
+				            ", column: %d"
 				            ", file: !%d"
 				            ", scope: !%d)",
 				            di->LexicalBlock.pos.line,
@@ -3039,7 +3039,7 @@ void print_llvm_ir(irGen *ir) {
 				}
 				if (di->CompositeType.file != nullptr) {
 					ir_fprintf(f, ", file: !%d"
-					              ", line: %td",
+					              ", line: %d",
 					              di->CompositeType.file->id,
 					              di->CompositeType.pos.line);
 				}
