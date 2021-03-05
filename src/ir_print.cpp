@@ -1426,9 +1426,9 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, t_string); ir_write_byte(f, ' '); ir_print_value(f, m, file, t_string);
 		ir_write_string(f, str_lit(", "));
-		ir_print_type(f, m, t_int);    ir_write_byte(f, ' '); ir_print_value(f, m, line, t_int);
+		ir_print_type(f, m, t_i32);    ir_write_byte(f, ' '); ir_print_value(f, m, line, t_i32);
 		ir_write_string(f, str_lit(", "));
-		ir_print_type(f, m, t_int);    ir_write_byte(f, ' '); ir_print_value(f, m, column, t_int);
+		ir_print_type(f, m, t_i32);    ir_write_byte(f, ' '); ir_print_value(f, m, column, t_i32);
 		ir_write_string(f, str_lit(", "));
 		ir_print_type(f, m, t_string); ir_write_byte(f, ' '); ir_print_value(f, m, procedure, t_string);
 		ir_write_byte(f, '}');

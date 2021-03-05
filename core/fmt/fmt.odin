@@ -1286,9 +1286,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		case runtime.Source_Code_Location:
 			io.write_string(fi.writer, a.file_path);
 			io.write_byte(fi.writer, '(');
-			io.write_int(fi.writer, a.line);
+			io.write_int(fi.writer, int(a.line));
 			io.write_byte(fi.writer, ':');
-			io.write_int(fi.writer, a.column);
+			io.write_int(fi.writer, int(a.column));
 			io.write_byte(fi.writer, ')');
 			return;
 
