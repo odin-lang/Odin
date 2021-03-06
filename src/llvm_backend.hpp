@@ -315,7 +315,8 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
 
 
 lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
-void lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
+lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
+lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p);
 
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
@@ -327,7 +328,7 @@ lbValue lb_typeid(lbModule *m, Type *type);
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 lbValue lb_address_from_load(lbProcedure *p, lbValue value);
-lbDefer lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
+void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
 
 lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);

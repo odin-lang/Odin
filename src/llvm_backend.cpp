@@ -2545,17 +2545,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		}
 	}
 	if (p->type->Proc.calling_convention == ProcCC_Odin) {
-		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
-		e->flags |= EntityFlag_NoAlias;
-		lbValue param = {};
-		param.value = LLVMGetParam(p->value, LLVMCountParams(p->value)-1);
-		param.type = e->type;
-		lb_add_entity(p->module, e, param);
-		lbAddr ctx_addr = {};
-		ctx_addr.kind = lbAddr_Context;
-		ctx_addr.addr = param;
-		lbContextData ctx = {ctx_addr, p->scope_index};
-		array_add(&p->context_stack, ctx);
+		lb_push_context_onto_stack_from_implicit_parameter(p);
 	}
 
 	lb_start_block(p, p->entry_block);
@@ -6641,10 +6631,38 @@ void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
 	lb_emit_runtime_call(p, "__init_context", args);
 }
 
-void lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
+lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p) {
+	Type *pt = base_type(p->type);
+	GB_ASSERT(pt->kind == Type_Proc);
+	GB_ASSERT(pt->Proc.calling_convention == ProcCC_Odin);
+
+	Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
+	e->flags |= EntityFlag_NoAlias;
+
+	LLVMValueRef context_ptr = LLVMGetParam(p->value, LLVMCountParams(p->value)-1);
+	context_ptr = LLVMBuildPointerCast(p->builder, context_ptr, lb_type(p->module, e->type), "");
+
+	lbValue param = {context_ptr, e->type};
+	lb_add_entity(p->module, e, param);
+	lbAddr ctx_addr = {};
+	ctx_addr.kind = lbAddr_Context;
+	ctx_addr.addr = param;
+
+	lbContextData *cd = array_add_and_get(&p->context_stack);
+	cd->ctx = ctx_addr;
+	cd->scope_index = -1;
+	return cd;
+}
+
+lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
+	if (p->name == "test.foo") {
+		gb_printf_err("lb_push_context_onto_stack %.*s\n", LIT(p->name));
+	}
 	ctx.kind = lbAddr_Context;
-	lbContextData cd = {ctx, p->scope_index};
-	array_add(&p->context_stack, cd);
+	lbContextData *cd = array_add_and_get(&p->context_stack);
+	cd->ctx = ctx;
+	cd->scope_index = p->scope_index;
+	return cd;
 }
 
 
@@ -6655,13 +6673,13 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 
 	Type *pt = base_type(p->type);
 	GB_ASSERT(pt->kind == Type_Proc);
-	{
-		lbAddr c = lb_add_local_generated(p, t_context, false);
-		c.kind = lbAddr_Context;
-		lb_emit_init_context(p, c);
-		lb_push_context_onto_stack(p, c);
-		return c;
-	}
+	GB_ASSERT(pt->Proc.calling_convention != ProcCC_Odin);
+
+	lbAddr c = lb_add_local_generated(p, t_context, true);
+	c.kind = lbAddr_Context;
+	lb_emit_init_context(p, c);
+	lb_push_context_onto_stack(p, c);
+	return c;
 }
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
@@ -6985,7 +7003,7 @@ lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel) {
 
 
 
-void lb_build_defer_stmt(lbProcedure *p, lbDefer d) {
+void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	// NOTE(bill): The prev block may defer injection before it's terminator
 	LLVMValueRef last_instr = LLVMGetLastInstruction(p->curr_block->block);
 	if (last_instr != nullptr && LLVMIsAReturnInst(last_instr)) {
@@ -6994,9 +7012,9 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer d) {
 	}
 
 	isize prev_context_stack_count = p->context_stack.count;
+	GB_ASSERT(prev_context_stack_count <= p->context_stack.capacity);
 	defer (p->context_stack.count = prev_context_stack_count);
 	p->context_stack.count = d.context_stack_count;
-
 
 	lbBlock *b = lb_create_block(p, "defer");
 	if (last_instr == nullptr || !LLVMIsATerminatorInst(last_instr)) {
@@ -7019,11 +7037,7 @@ void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
 	isize count = p->defer_stmts.count;
 	isize i = count;
 	while (i --> 0) {
-		lbDefer d = p->defer_stmts[i];
-
-		isize prev_context_stack_count = p->context_stack.count;
-		defer (p->context_stack.count = prev_context_stack_count);
-		p->context_stack.count = d.context_stack_count;
+		lbDefer const &d = p->defer_stmts[i];
 
 		if (kind == lbDeferExit_Default) {
 			if (p->scope_index == d.scope_index &&
@@ -7046,24 +7060,35 @@ void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
 	}
 }
 
-lbDefer lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt) {
-	lbDefer d = {lbDefer_Node};
-	d.scope_index = scope_index;
-	d.context_stack_count = p->context_stack.count;
-	d.block = p->curr_block;
-	d.stmt = stmt;
-	array_add(&p->defer_stmts, d);
-	return d;
+void lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt) {
+	Type *pt = base_type(p->type);
+	GB_ASSERT(pt->kind == Type_Proc);
+	if (pt->Proc.calling_convention == ProcCC_Odin) {
+		GB_ASSERT(p->context_stack.count != 0);
+	}
+
+	lbDefer *d = array_add_and_get(&p->defer_stmts);
+	d->kind = lbDefer_Node;
+	d->scope_index = scope_index;
+	d->context_stack_count = p->context_stack.count;
+	d->block = p->curr_block;
+	d->stmt = stmt;
 }
 
-lbDefer lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue deferred, Array<lbValue> const &result_as_args) {
-	lbDefer d = {lbDefer_Proc};
-	d.scope_index = p->scope_index;
-	d.block = p->curr_block;
-	d.proc.deferred = deferred;
-	d.proc.result_as_args = result_as_args;
-	array_add(&p->defer_stmts, d);
-	return d;
+void lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue deferred, Array<lbValue> const &result_as_args) {
+	Type *pt = base_type(p->type);
+	GB_ASSERT(pt->kind == Type_Proc);
+	if (pt->Proc.calling_convention == ProcCC_Odin) {
+		GB_ASSERT(p->context_stack.count != 0);
+	}
+
+	lbDefer *d = array_add_and_get(&p->defer_stmts);
+	d->kind = lbDefer_Proc;
+	d->scope_index = p->scope_index;
+	d->block = p->curr_block;
+	d->context_stack_count = p->context_stack.count;
+	d->proc.deferred = deferred;
+	d->proc.result_as_args = result_as_args;
 }
 
 
