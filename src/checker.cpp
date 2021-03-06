@@ -1907,7 +1907,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 				array_add(&c->info.testing_procedures, e);
 			}
 		}
-	} else {
+	} else if (start != nullptr) {
 		start->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, start);
 	}
