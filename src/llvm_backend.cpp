@@ -6655,9 +6655,6 @@ lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p
 }
 
 lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
-	if (p->name == "test.foo") {
-		gb_printf_err("lb_push_context_onto_stack %.*s\n", LIT(p->name));
-	}
 	ctx.kind = lbAddr_Context;
 	lbContextData *cd = array_add_and_get(&p->context_stack);
 	cd->ctx = ctx;
