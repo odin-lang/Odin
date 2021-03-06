@@ -1594,34 +1594,33 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 
 
 
-irDefer ir_add_defer_node(irProcedure *proc, isize scope_index, Ast *stmt) {
+void ir_add_defer_node(irProcedure *proc, isize scope_index, Ast *stmt) {
 	irDefer d = {irDefer_Node};
 	d.scope_index = scope_index;
 	d.context_stack_count = proc->context_stack.count;
 	d.block = proc->curr_block;
 	d.stmt = stmt;
 	array_add(&proc->defer_stmts, d);
-	return d;
 }
 
 
-irDefer ir_add_defer_instr(irProcedure *proc, isize scope_index, irValue *instr) {
+void ir_add_defer_instr(irProcedure *proc, isize scope_index, irValue *instr) {
 	irDefer d = {irDefer_Instr};
 	d.scope_index = proc->scope_index;
+	d.context_stack_count = proc->context_stack.count;
 	d.block = proc->curr_block;
 	d.instr = instr; // NOTE(bill): It will make a copy everytime it is called
 	array_add(&proc->defer_stmts, d);
-	return d;
 }
 
-irDefer ir_add_defer_proc(irProcedure *proc, isize scope_index, irValue *deferred, Array<irValue *> const &result_as_args) {
+void ir_add_defer_proc(irProcedure *proc, isize scope_index, irValue *deferred, Array<irValue *> const &result_as_args) {
 	irDefer d = {irDefer_Proc};
 	d.scope_index = proc->scope_index;
+	d.context_stack_count = proc->context_stack.count;
 	d.block = proc->curr_block;
 	d.proc.deferred = deferred;
 	d.proc.result_as_args = result_as_args;
 	array_add(&proc->defer_stmts, d);
-	return d;
 }
 
 irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value);
