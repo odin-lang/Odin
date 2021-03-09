@@ -202,7 +202,7 @@ gbAllocator ir_allocator(void) {
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
 	IR_INSTR_KIND(Store,    struct { irValue *address, *value; bool is_volatile; }) \
-	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; i64 custom_align; }) \
+	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; i64 custom_align; bool is_volatile; }) \
 	IR_INSTR_KIND(InlineCode, struct { BuiltinProcId id; Array<irValue *> operands; Type *type; }) \
 	IR_INSTR_KIND(AtomicFence, struct { BuiltinProcId id; })          \
 	IR_INSTR_KIND(AtomicStore, struct {                               \
@@ -1084,11 +1084,12 @@ irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value, bool i
 	return v;
 }
 
-irValue *ir_instr_load(irProcedure *p, irValue *address) {
+irValue *ir_instr_load(irProcedure *p, irValue *address, bool is_volatile) {
 	irValue *v = ir_alloc_instr(p, irInstr_Load);
 	irInstr *i = &v->Instr;
 	i->Load.address = address;
 	i->Load.type = type_deref(ir_type(address));
+	i->Load.is_volatile = is_volatile;
 
 	if (address) address->uses += 1;
 
@@ -3166,7 +3167,7 @@ irValue *ir_emit_load(irProcedure *p, irValue *address, i64 custom_align) {
 		// return ir_emit(p, ir_instr_load_bool(p, address));
 	// }
 	if (address) address->uses += 1;
-	auto instr = ir_instr_load(p, address);
+	auto instr = ir_instr_load(p, address, false);
 	instr->Instr.Load.custom_align = custom_align;
 	return ir_emit(p, instr);
 }
@@ -7526,6 +7527,18 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_cpu_relax:
 		return ir_emit(proc, ir_instr_inline_code(proc, id, {}, nullptr));
+
+	case BuiltinProc_volatile_store:  {
+		irValue *dst = ir_build_expr(proc, ce->args[0]);
+		irValue *val = ir_build_expr(proc, ce->args[1]);
+		val = ir_emit_conv(proc, val, type_deref(ir_type(dst)));
+		return ir_emit(proc, ir_instr_store(proc, dst, val, true));
+	}
+
+	case BuiltinProc_volatile_load: {
+		irValue *dst = ir_build_expr(proc, ce->args[0]);
+		return ir_emit(proc, ir_instr_load(proc, dst, true));
+	}
 
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:

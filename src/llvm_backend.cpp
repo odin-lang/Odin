@@ -8012,6 +8012,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		LLVMBuildFence(p->builder, LLVMAtomicOrderingAcquireRelease, false, "");
 		return {};
 
+	case BuiltinProc_volatile_store:
 	case BuiltinProc_atomic_store:
 	case BuiltinProc_atomic_store_rel:
 	case BuiltinProc_atomic_store_relaxed:
@@ -8022,6 +8023,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		LLVMValueRef instr = LLVMBuildStore(p->builder, val.value, dst.value);
 		switch (id) {
+		case BuiltinProc_volatile_store:         LLVMSetVolatile(instr, true);                                     break;
 		case BuiltinProc_atomic_store:           LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent); break;
 		case BuiltinProc_atomic_store_rel:       LLVMSetOrdering(instr, LLVMAtomicOrderingRelease);                break;
 		case BuiltinProc_atomic_store_relaxed:   LLVMSetOrdering(instr, LLVMAtomicOrderingMonotonic);              break;
@@ -8033,6 +8035,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return {};
 	}
 
+	case BuiltinProc_volatile_load:
 	case BuiltinProc_atomic_load:
 	case BuiltinProc_atomic_load_acq:
 	case BuiltinProc_atomic_load_relaxed:
@@ -8041,6 +8044,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		LLVMValueRef instr = LLVMBuildLoad(p->builder, dst.value, "");
 		switch (id) {
+		case BuiltinProc_volatile_load:         LLVMSetVolatile(instr, true);                                     break;
 		case BuiltinProc_atomic_load:           LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent); break;
 		case BuiltinProc_atomic_load_acq:       LLVMSetOrdering(instr, LLVMAtomicOrderingAcquire);                break;
 		case BuiltinProc_atomic_load_relaxed:   LLVMSetOrdering(instr, LLVMAtomicOrderingMonotonic);              break;

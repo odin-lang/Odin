@@ -39,6 +39,9 @@ enum BuiltinProcId {
 	BuiltinProc_alloca,
 	BuiltinProc_cpu_relax,
 
+	BuiltinProc_volatile_store,
+	BuiltinProc_volatile_load,
+
 	BuiltinProc_atomic_fence,
 	BuiltinProc_atomic_fence_acq,
 	BuiltinProc_atomic_fence_rel,
@@ -231,6 +234,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("atomic_fence"),        0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_fence_acq"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
