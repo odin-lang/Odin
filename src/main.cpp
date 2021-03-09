@@ -875,12 +875,6 @@ bool parse_build_flags(Array<String> args) {
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
-								#if defined(GB_SYSTEM_WINDOWS)
-									String ext = path_extension(path);
-									if (ext == ".exe") {
-										path = substring(path, 0, string_extension_position(path));
-									}
-								#endif
 								build_context.out_filepath = path_to_full_path(heap_allocator(), path);
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
