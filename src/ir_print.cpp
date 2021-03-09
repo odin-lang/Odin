@@ -1534,6 +1534,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_Load: {
 		Type *type = instr->Load.type;
 		ir_fprintf(f, "%%%d = load ", value->index);
+		if (instr->Load.is_volatile) {
+			ir_write_str_lit(f, "volatile ");
+		}
 		ir_print_type(f, m, type);
 		ir_write_str_lit(f, ", ");
 		ir_print_type(f, m, type);

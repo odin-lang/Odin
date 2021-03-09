@@ -5502,6 +5502,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_NoValue;
 		break;
 
+
+
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -5509,6 +5512,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_NoValue;
 		break;
 
+	case BuiltinProc_volatile_store:
+		/*fallthrough*/
 	case BuiltinProc_atomic_store:
 	case BuiltinProc_atomic_store_rel:
 	case BuiltinProc_atomic_store_relaxed:
@@ -5527,6 +5532,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_NoValue;
 			break;
 		}
+
+	case BuiltinProc_volatile_load:
+		/*fallthrough*/
 	case BuiltinProc_atomic_load:
 	case BuiltinProc_atomic_load_acq:
 	case BuiltinProc_atomic_load_relaxed:

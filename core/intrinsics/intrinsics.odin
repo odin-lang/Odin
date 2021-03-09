@@ -9,6 +9,9 @@ x86_mmx :: x86_mmx; // Specialized SIMD Vector type
 simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
 soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
 
+// Volatile
+volatile_load  :: proc(dst: ^$T) -> T ---
+volatile_store :: proc(dst: ^$T, val: T) -> T ---
 
 // Atomics
 
@@ -17,52 +20,52 @@ atomic_fence_acq    :: proc() ---
 atomic_fence_rel    :: proc() ---
 atomic_fence_acqrel :: proc() ---
 
-atomic_store           :: proc(dst: ^$T, val: $T) ---
-atomic_store_rel       :: proc(dst: ^$T, val: $T) ---
-atomic_store_relaxed   :: proc(dst: ^$T, val: $T) ---
-atomic_store_unordered :: proc(dst: ^$T, val: $T) ---
+atomic_store           :: proc(dst: ^$T, val: T) ---
+atomic_store_rel       :: proc(dst: ^$T, val: T) ---
+atomic_store_relaxed   :: proc(dst: ^$T, val: T) ---
+atomic_store_unordered :: proc(dst: ^$T, val: T) ---
 
 atomic_load           :: proc(dst: ^$T) -> T ---
 atomic_load_acq       :: proc(dst: ^$T) -> T ---
 atomic_load_relaxed   :: proc(dst: ^$T) -> T ---
 atomic_load_unordered :: proc(dst: ^$T) -> T ---
 
-atomic_add          :: proc(dst; ^$T, val: $T) -> T ---
-atomic_add_acq      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_add_rel      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_add_acqrel   :: proc(dst; ^$T, val: $T) -> T ---
-atomic_add_relaxed  :: proc(dst; ^$T, val: $T) -> T ---
-atomic_sub          :: proc(dst; ^$T, val: $T) -> T ---
-atomic_sub_acq      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_sub_rel      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_sub_acqrel   :: proc(dst; ^$T, val: $T) -> T ---
-atomic_sub_relaxed  :: proc(dst; ^$T, val: $T) -> T ---
-atomic_and          :: proc(dst; ^$T, val: $T) -> T ---
-atomic_and_acq      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_and_rel      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_and_acqrel   :: proc(dst; ^$T, val: $T) -> T ---
-atomic_and_relaxed  :: proc(dst; ^$T, val: $T) -> T ---
-atomic_nand         :: proc(dst; ^$T, val: $T) -> T ---
-atomic_nand_acq     :: proc(dst; ^$T, val: $T) -> T ---
-atomic_nand_rel     :: proc(dst; ^$T, val: $T) -> T ---
-atomic_nand_acqrel  :: proc(dst; ^$T, val: $T) -> T ---
-atomic_nand_relaxed :: proc(dst; ^$T, val: $T) -> T ---
-atomic_or           :: proc(dst; ^$T, val: $T) -> T ---
-atomic_or_acq       :: proc(dst; ^$T, val: $T) -> T ---
-atomic_or_rel       :: proc(dst; ^$T, val: $T) -> T ---
-atomic_or_acqrel    :: proc(dst; ^$T, val: $T) -> T ---
-atomic_or_relaxed   :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xor          :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xor_acq      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xor_rel      :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xor_acqrel   :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xor_relaxed  :: proc(dst; ^$T, val: $T) -> T ---
+atomic_add          :: proc(dst; ^$T, val: T) -> T ---
+atomic_add_acq      :: proc(dst; ^$T, val: T) -> T ---
+atomic_add_rel      :: proc(dst; ^$T, val: T) -> T ---
+atomic_add_acqrel   :: proc(dst; ^$T, val: T) -> T ---
+atomic_add_relaxed  :: proc(dst; ^$T, val: T) -> T ---
+atomic_sub          :: proc(dst; ^$T, val: T) -> T ---
+atomic_sub_acq      :: proc(dst; ^$T, val: T) -> T ---
+atomic_sub_rel      :: proc(dst; ^$T, val: T) -> T ---
+atomic_sub_acqrel   :: proc(dst; ^$T, val: T) -> T ---
+atomic_sub_relaxed  :: proc(dst; ^$T, val: T) -> T ---
+atomic_and          :: proc(dst; ^$T, val: T) -> T ---
+atomic_and_acq      :: proc(dst; ^$T, val: T) -> T ---
+atomic_and_rel      :: proc(dst; ^$T, val: T) -> T ---
+atomic_and_acqrel   :: proc(dst; ^$T, val: T) -> T ---
+atomic_and_relaxed  :: proc(dst; ^$T, val: T) -> T ---
+atomic_nand         :: proc(dst; ^$T, val: T) -> T ---
+atomic_nand_acq     :: proc(dst; ^$T, val: T) -> T ---
+atomic_nand_rel     :: proc(dst; ^$T, val: T) -> T ---
+atomic_nand_acqrel  :: proc(dst; ^$T, val: T) -> T ---
+atomic_nand_relaxed :: proc(dst; ^$T, val: T) -> T ---
+atomic_or           :: proc(dst; ^$T, val: T) -> T ---
+atomic_or_acq       :: proc(dst; ^$T, val: T) -> T ---
+atomic_or_rel       :: proc(dst; ^$T, val: T) -> T ---
+atomic_or_acqrel    :: proc(dst; ^$T, val: T) -> T ---
+atomic_or_relaxed   :: proc(dst; ^$T, val: T) -> T ---
+atomic_xor          :: proc(dst; ^$T, val: T) -> T ---
+atomic_xor_acq      :: proc(dst; ^$T, val: T) -> T ---
+atomic_xor_rel      :: proc(dst; ^$T, val: T) -> T ---
+atomic_xor_acqrel   :: proc(dst; ^$T, val: T) -> T ---
+atomic_xor_relaxed  :: proc(dst; ^$T, val: T) -> T ---
 
-atomic_xchg         :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xchg_acq     :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xchg_rel     :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xchg_acqrel  :: proc(dst; ^$T, val: $T) -> T ---
-atomic_xchg_relaxed :: proc(dst; ^$T, val: $T) -> T ---
+atomic_xchg         :: proc(dst; ^$T, val: T) -> T ---
+atomic_xchg_acq     :: proc(dst; ^$T, val: T) -> T ---
+atomic_xchg_rel     :: proc(dst; ^$T, val: T) -> T ---
+atomic_xchg_acqrel  :: proc(dst; ^$T, val: T) -> T ---
+atomic_xchg_relaxed :: proc(dst; ^$T, val: T) -> T ---
 
 atomic_cxchg                    :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
 atomic_cxchg_acq                :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
