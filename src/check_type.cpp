@@ -2389,15 +2389,13 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 	}
 
 	if (cc == ProcCC_None) {
-	  for_array(i, new_type->Tuple.variables) {
-	    Type *result_type = new_type->Tuple.variables[i]->type;
-	    if (is_type_boolean(result_type)) {
-	      Type *t = core_type(base_type(result_type));
-	      if (t == t_bool) {
-	        new_type->Tuple.variables[i]->type = t_llvm_bool;
-	      }
-	    }
-	  }
+		for_array(i, new_type->Tuple.variables) {
+			Type **tp = &new_type->Tuple.variables[i]->type;
+			Type *t = core_type(*tp);
+			if (t == t_bool) {
+				*tp = t_llvm_bool;
+			}
+		}
 	}
 
 	new_type->cached_size = -1;
