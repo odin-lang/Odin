@@ -1,4 +1,4 @@
-bool is_divigering_stmt(Ast *stmt) {
+bool is_diverging_stmt(Ast *stmt) {
 	if (stmt->kind != Ast_ExprStmt) {
 		return false;
 	}
@@ -12,7 +12,7 @@ bool is_divigering_stmt(Ast *stmt) {
 	}
 	Type *t = type_of_expr(expr->CallExpr.proc);
 	t = base_type(t);
-	return t->kind == Type_Proc && t->Proc.diverging;
+	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
 }
 
 void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
@@ -69,7 +69,7 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 				break;
 
 			case Ast_ExprStmt:
-				if (is_divigering_stmt(n)) {
+				if (is_diverging_stmt(n)) {
 					error(n, "Statements after a diverging procedure call are never executed");
 				}
 				break;
@@ -86,7 +86,7 @@ bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 			// Okay
 		} else if (stmt->kind == Ast_ValueDecl && !stmt->ValueDecl.is_mutable) {
 			// Okay
-		} else if (is_divigering_stmt(stmt)) {
+		} else if (is_diverging_stmt(stmt)) {
 			return true;
 		} else {
 			return check_is_terminating(stmt, label);
