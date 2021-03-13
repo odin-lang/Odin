@@ -1536,7 +1536,7 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 }
 
 void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
-	if (build_context.strict_style && false) {
+	if (build_context.strict_style) {
 		if (f->curr_proc != nullptr && token.string == "\n") {
 			switch (token.kind) {
 			case Token_CloseBrace:
