@@ -274,16 +274,15 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 			h.m.hashes[fr.hash_index] = index;
 		}
 	}
-	{
-		e := __dynamic_map_get_entry(h, index);
-		e.hash = hash.hash;
 
-		key := rawptr(uintptr(e) + h.key_offset);
-		mem_copy(key, hash.key_ptr, h.key_size);
+	e := __dynamic_map_get_entry(h, index);
+	e.hash = hash.hash;
 
-		val := rawptr(uintptr(e) + h.value_offset);
-		mem_copy(val, value, h.value_size);
-	}
+	key := rawptr(uintptr(e) + h.key_offset);
+	mem_copy(key, hash.key_ptr, h.key_size);
+
+	val := rawptr(uintptr(e) + h.value_offset);
+	mem_copy(val, value, h.value_size);
 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h, loc);
