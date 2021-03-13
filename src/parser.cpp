@@ -1536,25 +1536,20 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 }
 
 void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
-	if (build_context.strict_style) {
-		if (f->curr_proc != nullptr && token.string == "\n") {
-			switch (token.kind) {
-			case Token_CloseBrace:
-			case Token_CloseParen:
-			case Token_else:
-			case Token_EOF:
-				return;
-			}
-			if (s != nullptr) {
-				if (is_semicolon_optional_for_node(f, s)) {
-					return;
-				}
-			}
-
-			Token tok = token;
-			tok.pos.column -= 1;
-			syntax_error(tok, "Expected ';', got newline");
+	if (build_context.strict_style && token.string == "\n") {
+		switch (token.kind) {
+		case Token_CloseBrace:
+		case Token_CloseParen:
+		case Token_else:
+			return;
 		}
+		if (is_semicolon_optional_for_node(f, s)) {
+			return;
+		}
+
+		Token tok = token;
+		tok.pos.column -= 1;
+		syntax_error(tok, "Expected ';', got newline");
 	}
 }
 
