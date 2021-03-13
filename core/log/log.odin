@@ -38,7 +38,7 @@ Options :: bit_set[Option];
 
 Full_Timestamp_Opts :: Options{
 	.Date,
-	.Time
+	.Time,
 };
 Location_Header_Opts :: Options{
 	.Short_File_Path,
@@ -48,7 +48,7 @@ Location_Header_Opts :: Options{
 };
 Location_File_Opts :: Options{
 	.Short_File_Path,
-	.Long_File_Path
+	.Long_File_Path,
 };
 
 

@@ -24,7 +24,7 @@ Value :: struct {
 		String,
 		Array,
 		Object,
-	}
+	},
 }
 
 Pos :: struct {

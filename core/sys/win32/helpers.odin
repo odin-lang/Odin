@@ -10,14 +10,14 @@ call_external_process :: proc(program, command_line: string) -> bool {
     return cast(bool)create_process_w(
         utf8_to_wstring(program),
         utf8_to_wstring(command_line),
-        nil, 
-        nil, 
-        Bool(false), 
-        u32(0x10), 
-        nil, 
-        nil, 
-        &si, 
-        &pi
+        nil,
+        nil,
+        Bool(false),
+        u32(0x10),
+        nil,
+        nil,
+        &si,
+        &pi,
     );
 }
 

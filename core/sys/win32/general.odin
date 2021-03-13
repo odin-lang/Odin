@@ -44,7 +44,7 @@ Wnd_Class_A :: struct {
 	icon:                  Hicon,
 	cursor:                Hcursor,
 	background:            Hbrush,
-	menu_name, class_name: cstring
+	menu_name, class_name: cstring,
 }
 
 Wnd_Class_W :: struct {
@@ -55,7 +55,7 @@ Wnd_Class_W :: struct {
 	icon:                  Hicon,
 	cursor:                Hcursor,
 	background:            Hbrush,
-	menu_name, class_name: Wstring
+	menu_name, class_name: Wstring,
 }
 
 Wnd_Class_Ex_A :: struct {
@@ -169,7 +169,7 @@ Process_Information :: struct {
 	process:    Handle,
 	thread:     Handle,
 	process_id: u32,
-	thread_id:  u32
+	thread_id:  u32,
 }
 
 Startup_Info :: struct {
@@ -355,7 +355,7 @@ OS_Version_Info_Ex_A :: struct {
   service_pack_minor:   u16,
   suite_mask:           u16,
   product_type:         u8,
-  reserved:             u8
+  reserved:             u8,
 }
 
 MAPVK_VK_TO_VSC    :: 0;
@@ -947,7 +947,7 @@ Paint_Struct :: struct {
 	rc_paint:     Rect,
 	restore:      Bool,
 	inc_update:   Bool,
-	rgb_reserved: [32]byte
+	rgb_reserved: [32]byte,
 }
 
 

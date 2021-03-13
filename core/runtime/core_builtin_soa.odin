@@ -47,7 +47,7 @@ Raw_SOA_Footer_Slice :: struct {
 Raw_SOA_Footer_Dynamic_Array :: struct {
 	len: int,
 	cap: int,
-	allocator: Allocator
+	allocator: Allocator,
 }
 
 raw_soa_footer_slice :: proc(array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Slice) {
