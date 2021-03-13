@@ -602,6 +602,7 @@ enum BuildFlagKind {
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_InsertSemicolon,
+	BuildFlag_StrictStyle,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -716,6 +717,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_InsertSemicolon,       str_lit("insert-semicolon"),         BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStyle,           str_lit("strict-style"),             BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
@@ -1182,6 +1184,12 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InsertSemicolon:
 							build_context.insert_semicolon = true;
 							break;
+
+						case BuildFlag_StrictStyle:
+							build_context.insert_semicolon = true;
+							build_context.strict_style = true;
+							break;
+
 
 						case BuildFlag_Compact:
 							if (!build_context.query_data_set_settings.ok) {
@@ -1731,6 +1739,14 @@ void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-default-to-nil-allocator");
 		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-insert-semicolon");
+		print_usage_line(2, "Inserts semicolons on newlines during tokenization using a basic rule");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-strict-style");
+		print_usage_line(2, "Enforces code style stricter whilst parsing, requiring such things as trailing commas");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");

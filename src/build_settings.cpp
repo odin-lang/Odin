@@ -196,6 +196,7 @@ struct BuildContext {
 	bool   keep_object_files;
 	bool   disallow_do;
 	bool   insert_semicolon;
+	bool   strict_style;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;

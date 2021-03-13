@@ -106,6 +106,16 @@ Token ast_token(Ast *node) {
 	return empty_token;
 }
 
+Token token_end_of_line(AstFile *f, Token tok) {
+	u8 const *start = f->tokenizer.start + tok.pos.offset;
+	u8 const *s = start;
+	while (*s && *s != '\n' && s < f->tokenizer.end) {
+		s += 1;
+	}
+	tok.pos.column += cast(i32)(s - start) - 1;
+	return tok;
+}
+
 
 isize ast_node_size(AstKind kind) {
 	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
@@ -1379,6 +1389,17 @@ bool allow_token(AstFile *f, TokenKind kind) {
 	return false;
 }
 
+Token expect_closing_brace_of_field_list(AstFile *f) {
+	Token token = f->curr_token;
+	if (allow_token(f, Token_CloseBrace)) {
+		return token;
+	}
+	if (allow_token(f, Token_Semicolon)) {
+		String p = token_to_string(token);
+		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+	}
+	return expect_token(f, Token_CloseBrace);
+}
 
 bool is_blank_ident(String str) {
 	if (str.len == 1) {
@@ -1451,7 +1472,9 @@ Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
 	    f->curr_token.string == "\n") {
-		syntax_error(f->curr_token, "Missing ',' before newline in %.*s", LIT(context));
+		Token tok = f->prev_token;
+		tok.pos.column += cast(i32)tok.string.len;
+		syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
 		advance_token(f);
 	}
 	return expect_token(f, kind);
@@ -1512,15 +1535,41 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 	return false;
 }
 
-void expect_semicolon(AstFile *f, Ast *s) {
-	if (allow_token(f, Token_Semicolon)) {
-		return;
-	}
-	Token prev_token = f->prev_token;
-	if (prev_token.kind == Token_Semicolon) {
-		return;
-	}
+void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
+	if (build_context.strict_style && false) {
+		if (f->curr_proc != nullptr && token.string == "\n") {
+			switch (token.kind) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+			case Token_else:
+			case Token_EOF:
+				return;
+			}
+			if (s != nullptr) {
+				if (is_semicolon_optional_for_node(f, s)) {
+					return;
+				}
+			}
 
+			Token tok = token;
+			tok.pos.column -= 1;
+			syntax_error(tok, "Expected ';', got newline");
+		}
+	}
+}
+
+void expect_semicolon(AstFile *f, Ast *s) {
+	Token prev_token = {};
+
+	if (allow_token(f, Token_Semicolon)) {
+		expect_semicolon_newline_error(f, f->prev_token, s);
+		return;
+	}
+	prev_token = f->prev_token;
+	if (prev_token.kind == Token_Semicolon) {
+		expect_semicolon_newline_error(f, f->prev_token, s);
+		return;
+	}
 
 	if (s != nullptr) {
 		bool insert_semi = (f->tokenizer.flags & TokenizerFlag_InsertSemicolon) != 0;
@@ -2241,9 +2290,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 
-		isize    name_count = 0;
+		isize name_count = 0;
 		Ast *fields = parse_struct_field_list(f, &name_count);
-		Token    close  = expect_token(f, Token_CloseBrace);
+		Token close = expect_closing_brace_of_field_list(f);
 
 		Slice<Ast *> decls = {};
 		if (fields != nullptr) {
@@ -2328,7 +2377,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 		}
 
-		Token close = expect_token(f, Token_CloseBrace);
+		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil, maybe, where_token, where_clauses);
 	} break;
@@ -2342,7 +2391,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token open = expect_token(f, Token_OpenBrace);
 
 		Array<Ast *> values = parse_element_list(f);
-		Token close = expect_token(f, Token_CloseBrace);
+		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_enum_type(f, token, base_type, values);
 	} break;
@@ -2435,7 +2484,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		expect_token(f, Token_Comma);
 		Ast *constraints_string = parse_expr(f, false);
 		allow_token(f, Token_Comma);
-		Token close = expect_token(f, Token_CloseBrace);
+		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_inline_asm_expr(f, token, open, close, param_types, return_type, asm_string, constraints_string, has_side_effects, is_align_stack, dialect);
 	}
@@ -3370,7 +3419,7 @@ bool parse_expect_field_separator(AstFile *f, Ast *param) {
 	}
 	if (token.kind == Token_Semicolon) {
 		String p = token_to_string(token);
-		syntax_error(f->curr_token, "Expected a comma, got a %.*s", LIT(p));
+		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		advance_token(f);
 		return true;
 	}
@@ -3648,6 +3697,18 @@ Ast *parse_body(AstFile *f) {
 	return ast_block_stmt(f, stmts, open, close);
 }
 
+bool parse_control_statement_semicolon_separator(AstFile *f) {
+	Token tok = peek_token(f);
+	if (tok.kind != Token_OpenBrace) {
+		return allow_token(f, Token_Semicolon);
+	}
+	if (f->curr_token.string == ";") {
+		return allow_token(f, Token_Semicolon);
+	}
+	return false;
+}
+
+
 Ast *parse_if_stmt(AstFile *f) {
 	if (f->curr_proc == nullptr) {
 		syntax_error(f->curr_token, "You cannot use an if statement in the file scope");
@@ -3669,7 +3730,7 @@ Ast *parse_if_stmt(AstFile *f) {
 		cond = parse_expr(f, false);
 	} else {
 		init = parse_simple_stmt(f, StmtAllowFlag_None);
-		if (allow_token(f, Token_Semicolon)) {
+		if (parse_control_statement_semicolon_separator(f)) {
 			cond = parse_expr(f, false);
 		} else {
 			cond = convert_stmt_to_expr(f, init, str_lit("boolean expression"));
@@ -3977,7 +4038,7 @@ Ast *parse_switch_stmt(AstFile *f) {
 			tag = parse_simple_stmt(f, StmtAllowFlag_In);
 			if (tag->kind == Ast_AssignStmt && tag->AssignStmt.op.kind == Token_in) {
 				is_type_switch = true;
-			} else if (allow_token(f, Token_Semicolon)) {
+			} else if (parse_control_statement_semicolon_separator(f)) {
 				init = tag;
 				tag = nullptr;
 				if (f->curr_token.kind != Token_OpenBrace) {
@@ -3986,6 +4047,7 @@ Ast *parse_switch_stmt(AstFile *f) {
 			}
 		}
 	}
+	skip_possible_newline(f);
 	open = expect_token(f, Token_OpenBrace);
 
 	while (f->curr_token.kind == Token_case) {
