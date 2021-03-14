@@ -12930,12 +12930,39 @@ void ir_gen_tree(irGen *s) {
 		ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
 		Array<irValue *> empty_args = {};
 		if (build_context.command_kind == Command_test) {
+			Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
+			Type *array_type = alloc_type_array(t_Internal_Test, m->info->testing_procedures.count);
+			Type *slice_type = alloc_type_slice(t_Internal_Test);
+			irValue *all_tests_array = ir_add_global_generated(proc->module, array_type, nullptr);
+
 			for_array(i, m->info->testing_procedures) {
-				Entity *e = m->info->testing_procedures[i];
-				irValue **found = map_get(&proc->module->values, hash_entity(e));
+				Entity *testing_proc = m->info->testing_procedures[i];
+				String name = testing_proc->token.string;
+				irValue **found = map_get(&m->values, hash_entity(testing_proc));
 				GB_ASSERT(found != nullptr);
-				ir_emit_call(proc, *found, empty_args);
+
+				irValue *v_name = ir_find_or_add_entity_string(m, name);
+				irValue *v_p = *found;
+
+
+				irValue *elem_ptr = ir_emit_array_epi(proc, all_tests_array, cast(i32)i);
+				irValue *name_ptr = ir_emit_struct_ep(proc, elem_ptr, 0);
+				irValue *p_ptr    = ir_emit_struct_ep(proc, elem_ptr, 1);
+				ir_emit_store(proc, name_ptr, v_name);
+				ir_emit_store(proc, p_ptr,    v_p);
 			}
+
+			irValue *all_tests_slice = ir_add_local_generated(proc, slice_type, true);
+			ir_fill_slice(proc, all_tests_slice,
+			              ir_array_elem(proc, all_tests_array),
+			              ir_const_int(m->info->testing_procedures.count));
+
+
+			irValue *runner = ir_get_package_value(m, str_lit("testing"), str_lit("runner"));
+
+			auto args = array_make<irValue *>(temporary_allocator(), 1);
+			args[0] = ir_emit_load(proc, all_tests_slice);
+			ir_emit_call(proc, runner, args);
 		} else {
 			irValue **found = map_get(&proc->module->values, hash_entity(entry_point));
 			if (found != nullptr) {

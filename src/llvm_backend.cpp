@@ -11496,6 +11496,13 @@ lbValue lb_find_runtime_value(lbModule *m, String const &name) {
 	lbValue value = *found;
 	return value;
 }
+lbValue lb_find_package_value(lbModule *m, String const &pkg, String const &name) {
+	Entity *e = find_entity_in_pkg(m->info, pkg, name);
+	lbValue *found = map_get(&m->values, hash_entity(e));
+	GB_ASSERT_MSG(found != nullptr, "Unable to find value '%.*s.%.*s'", LIT(pkg), LIT(name));
+	lbValue value = *found;
+	return value;
+}
 
 lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
 	i32 index = cast(i32)lb_type_info_index(m->info, type);
@@ -12885,12 +12892,51 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
 
 		if (build_context.command_kind == Command_test) {
+			Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
+			Type *array_type = alloc_type_array(t_Internal_Test, m->info->testing_procedures.count);
+			Type *slice_type = alloc_type_slice(t_Internal_Test);
+			lbAddr all_tests_array_addr = lb_add_global_generated(p->module, array_type, {});
+			lbValue all_tests_array = lb_addr_get_ptr(p, all_tests_array_addr);
+
+			LLVMTypeRef lbt_Internal_Test = lb_type(m, t_Internal_Test);
+
+			LLVMValueRef indices[2] = {};
+			indices[0] = LLVMConstInt(lb_type(m, t_i32), 0, false);
+
 			for_array(i, m->info->testing_procedures) {
-				Entity *e = m->info->testing_procedures[i];
-				lbValue *found = map_get(&m->values, hash_entity(e));
+				Entity *testing_proc = m->info->testing_procedures[i];
+				String name = testing_proc->token.string;
+				lbValue *found = map_get(&m->values, hash_entity(testing_proc));
 				GB_ASSERT(found != nullptr);
-				lb_emit_call(p, *found, {});
+
+				lbValue v_name = lb_find_or_add_entity_string(m, name);
+				lbValue v_proc = *found;
+
+				indices[1] = LLVMConstInt(lb_type(m, t_int), i, false);
+
+				LLVMValueRef vals[2] = {};
+				vals[0] = v_name.value;
+				vals[1] = v_proc.value;
+				GB_ASSERT(LLVMIsConstant(vals[0]));
+				GB_ASSERT(LLVMIsConstant(vals[1]));
+
+				LLVMValueRef dst = LLVMConstInBoundsGEP(all_tests_array.value, indices, gb_count_of(indices));
+				LLVMValueRef src = LLVMConstNamedStruct(lbt_Internal_Test, vals, gb_count_of(vals));
+
+				LLVMBuildStore(p->builder, src, dst);
 			}
+
+			lbAddr all_tests_slice = lb_add_local_generated(p, slice_type, true);
+			lb_fill_slice(p, all_tests_slice,
+			              lb_array_elem(p, all_tests_array),
+			              lb_const_int(m, t_int, m->info->testing_procedures.count));
+
+
+			lbValue runner = lb_find_package_value(m, str_lit("testing"), str_lit("runner"));
+
+			auto args = array_make<lbValue>(heap_allocator(), 1);
+			args[0] = lb_addr_load(p, all_tests_slice);
+			lb_emit_call(p, runner, args);
 		} else {
 			lbValue *found = map_get(&m->values, hash_entity(entry_point));
 			GB_ASSERT(found != nullptr);
