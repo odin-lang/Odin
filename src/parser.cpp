@@ -3932,6 +3932,7 @@ Ast *parse_for_stmt(AstFile *f) {
 
 	}
 
+
 	if (allow_token(f, Token_do)) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
 		if (build_context.disallow_do) {

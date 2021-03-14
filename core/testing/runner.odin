@@ -48,14 +48,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		reset_t(t);
 		defer end_t(t);
 
-		name := strings.trim_prefix(it.name, "test_");
-
 		if prev_pkg != it.pkg {
 			prev_pkg = it.pkg;
 			logf(t, "[Package: %s]", it.pkg);
 		}
 
-		logf(t, "[Test: %s]", name);
+		logf(t, "[Test: %s]", it.name);
 
 		// TODO(bill): Catch panics
 		{
@@ -63,9 +61,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 
 		if t.error_count != 0 {
-			logf(t, "[%s : FAILURE]", name);
+			logf(t, "[%s : FAILURE]", it.name);
 		} else {
-			logf(t, "[%s : SUCCESS]", name);
+			logf(t, "[%s : SUCCESS]", it.name);
 			total_success_count += 1;
 		}
 	}

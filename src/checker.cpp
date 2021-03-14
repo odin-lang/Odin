@@ -1891,20 +1891,13 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 				continue;
 			}
 
-			String name = e->token.string;
-			String prefix = str_lit("test_");
-
-			if (!string_starts_with(name, prefix)) {
+			if ((e->flags & EntityFlag_Test) == 0) {
 				continue;
 			}
 
+			String name = e->token.string;
 
-			bool is_tester = false;
-			if (name != prefix) {
-				is_tester = true;
-			} else {
-				error(e->token, "Invalid testing procedure name: %.*s", LIT(name));
-			}
+			bool is_tester = true;
 
 			Type *t = base_type(e->type);
 			GB_ASSERT(t->kind == Type_Proc);
@@ -2414,7 +2407,13 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
-	if (name == "export") {
+	if (name == "test") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+		}
+		ac->test = true;
+		return true;
+	} else if (name == "export") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_Invalid) {
 			ac->is_export = true;
