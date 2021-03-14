@@ -104,6 +104,7 @@ struct AttributeContext {
 	bool    require_declaration;
 	bool    has_disabled_proc;
 	bool    disabled_proc;
+	bool    test;
 	String  link_name;
 	String  link_prefix;
 	isize   init_expr_list_count;

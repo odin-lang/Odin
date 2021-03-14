@@ -64,6 +64,8 @@ enum EntityFlag : u32 {
 
 	EntityFlag_Disabled      = 1<<24,
 
+	EntityFlag_Test          = 1<<25,
+
 };
 
 enum EntityState {
