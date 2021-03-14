@@ -4,6 +4,7 @@ package testing
 import "core:io"
 import "core:os"
 import "core:strings"
+import "core:slice"
 
 reset_t :: proc(t: ^T) {
 	clear(&t.cleanups);
@@ -28,6 +29,15 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	total_success_count := 0;
 	total_test_count := len(internal_tests);
 
+	slice.sort_by(internal_tests, proc(a, b: Internal_Test) -> bool {
+		if a.pkg < b.pkg {
+			return true;
+		}
+		return a.name < b.name;
+	});
+
+	prev_pkg := "";
+
 	for it in internal_tests {
 		if it.p == nil {
 			total_test_count -= 1;
@@ -40,7 +50,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 		name := strings.trim_prefix(it.name, "test_");
 
-		logf(t, "[Test: %q]", name);
+		if prev_pkg != it.pkg {
+			prev_pkg = it.pkg;
+			logf(t, "[Package: %s]", it.pkg);
+		}
+
+		logf(t, "[Test: %s]", name);
 
 		// TODO(bill): Catch panics
 		{
@@ -48,9 +63,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 
 		if t.error_count != 0 {
-			logf(t, "[%q : FAILURE]", name);
+			logf(t, "[%s : FAILURE]", name);
 		} else {
-			logf(t, "[%q : SUCCESS]", name);
+			logf(t, "[%s : SUCCESS]", name);
 			total_success_count += 1;
 		}
 	}

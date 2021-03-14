@@ -12909,16 +12909,23 @@ void lb_generate_code(lbGenerator *gen) {
 				lbValue *found = map_get(&m->values, hash_entity(testing_proc));
 				GB_ASSERT(found != nullptr);
 
+				String pkg_name = {};
+				if (testing_proc->pkg != nullptr) {
+					pkg_name = testing_proc->pkg->name;
+				}
+				lbValue v_pkg  = lb_find_or_add_entity_string(m, pkg_name);
 				lbValue v_name = lb_find_or_add_entity_string(m, name);
 				lbValue v_proc = *found;
 
 				indices[1] = LLVMConstInt(lb_type(m, t_int), i, false);
 
-				LLVMValueRef vals[2] = {};
-				vals[0] = v_name.value;
-				vals[1] = v_proc.value;
+				LLVMValueRef vals[3] = {};
+				vals[0] = v_pkg.value;
+				vals[1] = v_name.value;
+				vals[2] = v_proc.value;
 				GB_ASSERT(LLVMIsConstant(vals[0]));
 				GB_ASSERT(LLVMIsConstant(vals[1]));
+				GB_ASSERT(LLVMIsConstant(vals[2]));
 
 				LLVMValueRef dst = LLVMConstInBoundsGEP(all_tests_array.value, indices, gb_count_of(indices));
 				LLVMValueRef src = LLVMConstNamedStruct(lbt_Internal_Test, vals, gb_count_of(vals));
