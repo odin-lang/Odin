@@ -224,6 +224,13 @@ bool operator<=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, 
 bool operator> (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >  0; }
 bool operator>=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >= 0; }
 
+
+TokenPos token_pos_add_column(TokenPos pos) {
+	pos.column += 1;
+	pos.offset += 1;
+	return pos;
+}
+
 struct Token {
 	TokenKind kind;
 	String    string;
@@ -240,6 +247,10 @@ Token make_token_ident(String s) {
 Token make_token_ident(char const *s) {
 	Token t = {Token_Ident, make_string_c(s)};
 	return t;
+}
+
+bool token_is_newline(Token const &tok) {
+	return tok.kind == Token_Semicolon && tok.string == "\n";
 }
 
 
@@ -653,6 +664,22 @@ void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	t->error_count++;
 }
 
+void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
+	va_list va;
+	isize column = t->read_curr - t->line+1;
+	if (column < 1) {
+		column = 1;
+	}
+	Token token = {};
+	token.pos = pos;
+
+	va_start(va, msg);
+	syntax_error_va(token, msg, va);
+	va_end(va);
+
+	t->error_count++;
+}
+
 void advance_to_next_rune(Tokenizer *t) {
 	if (t->read_curr < t->end) {
 		Rune rune;
@@ -958,7 +985,7 @@ bool scan_escape(Tokenizer *t) {
 }
 
 
-void tokenizer_get_token(Tokenizer *t, Token *token) {
+void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	// Skip whitespace
 	for (;;) {
 		switch (t->curr_rune) {
@@ -983,6 +1010,8 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 	token->pos.line = t->line_count;
 	token->pos.offset = cast(i32)(t->curr - t->start);
 	token->pos.column = cast(i32)(t->curr - t->line + 1);
+
+	TokenPos current_pos = token->pos;
 
 	bool insert_semicolon = false;
 
@@ -1048,6 +1077,17 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 			t->insert_semicolon = false;
 			token->string = str_lit("\n");
 			token->kind = Token_Semicolon;
+			return;
+
+		case '\\':
+			if (t->flags & TokenizerFlag_InsertSemicolon) {
+				t->insert_semicolon = false;
+			}
+			tokenizer_get_token(t, token);
+			if (token->pos.line == current_pos.line) {
+				tokenizer_err(t, token_pos_add_column(current_pos), "Expected a newline after \\");
+			}
+			// NOTE(bill): tokenizer_get_token has been called already, return early
 			return;
 
 		case '\'': // Rune Literal
@@ -1197,7 +1237,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 			insert_semicolon = true;
 			token->kind = Token_CloseBrace;
 			break;
-		case '\\': token->kind = Token_BackSlash;    break;
 
 		case '%':
 			token->kind = Token_Mod;
