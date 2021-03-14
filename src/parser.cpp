@@ -1262,11 +1262,6 @@ Token peek_token(AstFile *f) {
 	return {};
 }
 
-
-bool token_is_newline(Token const &tok) {
-	return tok.kind == Token_Semicolon && tok.string == "\n";
-}
-
 bool skip_possible_newline(AstFile *f) {
 	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
 		return false;
