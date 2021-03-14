@@ -70,6 +70,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 	logf(t, "----------------------------------------");
-	logf(t, "%d/%d SUCCESSFUL", total_success_count, total_test_count);
+	if total_test_count == 0 {
+		log(t, "NO TESTS RAN");
+	} else {
+		logf(t, "%d/%d SUCCESSFUL", total_success_count, total_test_count);
+	}
 	return total_success_count == total_test_count;
 }
