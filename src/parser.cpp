@@ -5287,7 +5287,6 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
 	file->pkg = pkg;
 	file->id = cast(i32)(imported_file.index+1);
-
 	TokenPos err_pos = {0};
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
 	err_pos.file_id = file->id;
@@ -5325,6 +5324,16 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 			}
 
 			return err;
+		}
+	}
+
+	if (build_context.command_kind == Command_test) {
+		String name = file->fullpath;
+		name = remove_extension_from_path(name);
+
+		String test_suffix = str_lit("_test");
+		if (string_ends_with(name, test_suffix) && name != test_suffix) {
+			file->is_test = true;
 		}
 	}
 
@@ -5372,6 +5381,11 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
 	p->init_fullpath = init_fullpath;
+
+	if (build_context.command_kind == Command_test) {
+		String s = get_fullpath_core(heap_allocator(), str_lit("testing"));
+		try_add_import_path(p, s, s, init_pos, Package_Normal);
+	}
 
 	for_array(i, build_context.extra_packages) {
 		String path = build_context.extra_packages[i];

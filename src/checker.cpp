@@ -1865,6 +1865,20 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	}
 
 	if (build_context.command_kind == Command_test) {
+		AstPackage *testing_package = get_core_package(&c->info, str_lit("testing"));
+		Scope *testing_scope = testing_package->scope;
+
+		// Add all of testing library as a dependency
+		for_array(i, testing_scope->elements.entries) {
+			Entity *e = testing_scope->elements.entries[i].value;
+			if (e != nullptr) {
+				e->flags |= EntityFlag_Used;
+				add_dependency_to_set(c, e);
+			}
+		}
+
+		Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
+
 		AstPackage *pkg = c->info.init_package;
 		Scope *s = pkg->scope;
 		for_array(i, s->elements.entries) {
@@ -1884,6 +1898,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 				continue;
 			}
 
+
 			bool is_tester = false;
 			if (name != prefix) {
 				is_tester = true;
@@ -1893,11 +1908,11 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 			Type *t = base_type(e->type);
 			GB_ASSERT(t->kind == Type_Proc);
-			if (t->Proc.param_count == 0 && t->Proc.result_count == 0) {
+			if (are_types_identical(t, base_type(test_signature->type))) {
 				// Good
 			} else {
 				gbString str = type_to_string(t);
-				error(e->token, "Testing procedures must have a signature type of proc(), got %s", str);
+				error(e->token, "Testing procedures must have a signature type of proc(^testing.T), got %s", str);
 				gb_string_free(str);
 				is_tester = false;
 			}
@@ -2098,6 +2113,28 @@ Type *find_core_type(Checker *c, String name) {
 	}
 	if (e->type == nullptr) {
 		check_single_global_entity(c, e, e->decl_info);
+	}
+	GB_ASSERT(e->type != nullptr);
+	return e->type;
+}
+
+
+Entity *find_entity_in_pkg(CheckerInfo *info, String const &pkg, String const &name) {
+	AstPackage *package = get_core_package(info, pkg);
+	Entity *e = scope_lookup_current(package->scope, name);
+	if (e == nullptr) {
+		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
+		// NOTE(bill): This will exit the program as it's cannot continue without it!
+	}
+	return e;
+}
+
+Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String const &name) {
+	AstPackage *package = get_core_package(info, pkg);
+	Entity *e = scope_lookup_current(package->scope, name);
+	if (e == nullptr) {
+		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
+		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
 	GB_ASSERT(e->type != nullptr);
 	return e->type;
