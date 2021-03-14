@@ -12941,13 +12941,20 @@ void ir_gen_tree(irGen *s) {
 				irValue **found = map_get(&m->values, hash_entity(testing_proc));
 				GB_ASSERT(found != nullptr);
 
+				String pkg_name = {};
+				if (testing_proc->pkg != nullptr) {
+					pkg_name = testing_proc->pkg->name;
+				}
+				irValue *v_pkg = ir_find_or_add_entity_string(m, pkg_name);
 				irValue *v_name = ir_find_or_add_entity_string(m, name);
 				irValue *v_p = *found;
 
 
 				irValue *elem_ptr = ir_emit_array_epi(proc, all_tests_array, cast(i32)i);
-				irValue *name_ptr = ir_emit_struct_ep(proc, elem_ptr, 0);
-				irValue *p_ptr    = ir_emit_struct_ep(proc, elem_ptr, 1);
+				irValue *pkg_ptr  = ir_emit_struct_ep(proc, elem_ptr, 0);
+				irValue *name_ptr = ir_emit_struct_ep(proc, elem_ptr, 1);
+				irValue *p_ptr    = ir_emit_struct_ep(proc, elem_ptr, 2);
+				ir_emit_store(proc, pkg_ptr,  v_pkg);
 				ir_emit_store(proc, name_ptr, v_name);
 				ir_emit_store(proc, p_ptr,    v_p);
 			}

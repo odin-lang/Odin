@@ -3,9 +3,12 @@ package testing
 import "core:fmt"
 import "core:io"
 
+// IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T);
 
+// IMPORTANT NOTE: Compiler requires this layout
 Internal_Test :: struct {
+	pkg:  string,
 	name: string,
 	p:    Test_Signature,
 }
