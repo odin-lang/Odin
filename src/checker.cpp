@@ -3419,6 +3419,11 @@ void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	}
 }
 
+CheckerContext *create_checker_context(Checker *c) {
+	CheckerContext *ctx = gb_alloc_item(heap_allocator(), CheckerContext);
+	*ctx = c->init_ctx;
+	return ctx;
+}
 
 void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e != nullptr);
@@ -3431,17 +3436,17 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 		return;
 	}
 
-	CheckerContext ctx = c->init_ctx;
+	CheckerContext *ctx = create_checker_context(c);
 
 	GB_ASSERT(d->scope->flags&ScopeFlag_File);
 	AstFile *file = d->scope->file;
-	add_curr_ast_file(&ctx, file);
+	add_curr_ast_file(ctx, file);
 	AstPackage *pkg = file->pkg;
 
-	GB_ASSERT(ctx.pkg != nullptr);
+	GB_ASSERT(ctx->pkg != nullptr);
 	GB_ASSERT(e->pkg != nullptr);
-	ctx.decl = d;
-	ctx.scope = d->scope;
+	ctx->decl = d;
+	ctx->scope = d->scope;
 
 	if (!e->pkg->used) {
 		return;
@@ -3460,7 +3465,7 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	check_entity_decl(&ctx, e, d, nullptr);
+	check_entity_decl(ctx, e, d, nullptr);
 }
 
 void check_all_global_entities(Checker *c) {
