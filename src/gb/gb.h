@@ -5026,7 +5026,7 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		ptr = aligned_alloc(alignment, size);
+		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
 		// ptr = malloc(size+alignment);
 
 		if (flags & gbAllocatorFlag_ClearToZero) {
