@@ -311,7 +311,7 @@ hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 }
 
 cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
-	return ((v1 * s + v2) * s + v3) * s + v3;
+	return ((v1 * s + v2) * s + v3) * s + v4;
 }
 
 
