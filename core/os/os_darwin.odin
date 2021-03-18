@@ -503,7 +503,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 	}
 
 	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator);
-	
+
 	path_ptr := _unix_realpath(rel_cstr, nil);
 	if path_ptr == nil {
 		return "", Errno(get_last_error());
@@ -566,7 +566,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	return ERROR_NONE;
 }
 
-exit :: proc(code: int) -> ! {
+exit :: proc "contextless" (code: int) -> ! {
 	_unix_exit(code);
 }
 

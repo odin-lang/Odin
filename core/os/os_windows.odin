@@ -127,7 +127,7 @@ get_page_size :: proc() -> int {
 
 
 
-exit :: proc(code: int) -> ! {
+exit :: proc "contextless" (code: int) -> ! {
 	win32.ExitProcess(win32.DWORD(code));
 }
 

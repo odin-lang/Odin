@@ -590,7 +590,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	return ERROR_NONE;
 }
 
-exit :: proc(code: int) -> ! {
+exit :: proc "contextless" (code: int) -> ! {
 	_unix_exit(c.int(code));
 }
 
