@@ -149,7 +149,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		scratch_allocator_init(s, DEFAULT_BACKING_SIZE);
 	}
 
-size := size;
+	size := size;
 
 	switch mode {
 	case .Alloc:
@@ -672,7 +672,6 @@ dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
 		current_pos = new_block;
 		current_block = new_block;
 	}
-
 
 	n := bytes;
 	extra := alignment - (n % alignment);
