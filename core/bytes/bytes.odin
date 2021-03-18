@@ -203,6 +203,62 @@ split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) ->
 
 
 
+@private
+_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save, n: int) -> (res: []byte, ok: bool) {
+	s, n := s, n;
+
+	if n == 0 {
+		return;
+	}
+
+	if sep == nil {
+		res = s[:];
+		ok = true;
+		s^ = s[len(s):];
+		return;
+	}
+
+	if n < 0 {
+		n = count(s^, sep) + 1;
+	}
+
+	n -= 1;
+
+	i := 0;
+	for ; i < n; i += 1 {
+		m := index(s^, sep);
+		if m < 0 {
+			break;
+		}
+		res = s[:m+sep_save];
+		ok = true;
+		s^ = s[m+len(sep):];
+		return;
+	}
+	res = s[:];
+	ok = res != nil;
+	s^ = s[len(s):];
+	return;
+}
+
+
+split_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
+	return _split_iterator(s, sep, 0, -1);
+}
+
+split_n_iterator :: proc(s: ^[]byte, sep: []byte, n: int) -> ([]byte, bool) {
+	return _split_iterator(s, sep, 0, n);
+}
+
+split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
+	return _split_iterator(s, sep, len(sep), -1);
+}
+
+split_after_n_iterator :: proc(s: ^[]byte, sep: []byte, n: int) -> ([]byte, bool) {
+	return _split_iterator(s, sep, len(sep), n);
+}
+
+
 
 index_byte :: proc(s: []byte, c: byte) -> int {
 	for i := 0; i < len(s); i += 1 {
@@ -742,6 +798,60 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 
 	return buf;
 }
+
+
+
+split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false) -> ([]byte, bool) #no_bounds_check {
+	if s == nil || s^ == nil || len(substrs) <= 0 {
+		return nil, false;
+	}
+
+	sublen := len(substrs[0]);
+
+	for substr in substrs[1:] {
+		sublen = min(sublen, len(substr));
+	}
+
+	shared := len(s) - sublen;
+
+	if shared <= 0 {
+		return nil, false;
+	}
+
+	// index, last
+	i, l := 0, 0;
+
+	loop: for i <= shared {
+		for substr in substrs {
+			if string(s[i:i+sublen]) == string(substr) {
+				if !skip_empty || i - l > 0 {
+					res := s[l:i];
+					s^ = s[i:];
+					return res, true;
+				}
+
+				i += sublen;
+				l  = i;
+
+				continue loop;
+			}
+		}
+
+		_, skip := utf8.decode_rune(s[i:]);
+		i += skip;
+	}
+
+	if !skip_empty || len(s) - l > 0 {
+		res := s[l:];
+		s^ = s[len(s):];
+		return res, true;
+	}
+
+	return nil, false;
+}
+
+
+
 
 // scrub scruvs invalid utf-8 characters and replaces them with the replacement string
 // Adjacent invalid bytes are only replaced once
