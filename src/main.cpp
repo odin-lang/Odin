@@ -1508,11 +1508,10 @@ i32 exec_llvm_opt(String output_base) {
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 
 	return system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"memcpy_pass_%.*s.bc\" %.*s "
+		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"memcpy_pass_%.*s.bc\" -memcpyopt"
 		"",
 		LIT(build_context.ODIN_ROOT),
-		LIT(output_base), LIT(output_base),
-		LIT(build_context.opt_flags))
+		LIT(output_base), LIT(output_base))
 
   || system_exec_command_line_app("llvm-opt",
 		"\"%.*sbin/opt\" \"memcpy_pass_%.*s.bc\" -o \"%.*s.bc\" %.*s "
