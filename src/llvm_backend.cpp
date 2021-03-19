@@ -1958,7 +1958,13 @@ LLVMValueRef llvm_const_named_struct(LLVMTypeRef t, LLVMValueRef *values, isize 
 	return LLVMConstNamedStruct(t, values, value_count);
 }
 
-
+LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *values, isize value_count_) {
+	unsigned value_count = cast(unsigned)value_count_;
+	for (unsigned i = 0; i < value_count; i++) {
+		values[i] = llvm_const_cast(values[i], elem_type);
+	}
+	return LLVMConstArray(elem_type, values, value_count);
+}
 
 
 lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
@@ -4839,7 +4845,7 @@ LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_
 		return lb_addr_load(p, v).value;
 	}
 
-	return LLVMConstArray(lb_type(m, elem_type), values, cast(unsigned int)count);
+	return llvm_const_array(lb_type(m, elem_type), values, cast(unsigned int)count);
 }
 
 
@@ -4975,7 +4981,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 			GB_ASSERT(offset == s.len);
 
-			res.value = LLVMConstArray(et, elems, cast(unsigned)count);
+			res.value = llvm_const_array(et, elems, cast(unsigned)count);
 			return res;
 		}
 		GB_PANIC("HERE!\n");
@@ -5010,7 +5016,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			elems[i] = single_elem.value;
 		}
 
-		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)count);
+		res.value = llvm_const_array(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
 	}
 
@@ -12039,8 +12045,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 						value_values[i] = lb_const_value(m, t_i64, fields[i]->Constant.value).value;
 					}
 
-					LLVMValueRef name_init  = LLVMConstArray(lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
-					LLVMValueRef value_init = LLVMConstArray(lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
+					LLVMValueRef name_init  = llvm_const_array(lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
+					LLVMValueRef value_init = llvm_const_array(lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
 					LLVMSetInitializer(name_array.value,  name_init);
 					LLVMSetInitializer(value_array.value, value_init);
 
