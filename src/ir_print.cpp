@@ -339,8 +339,7 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 		// ir_fprintf(f, "* sret noalias ");
 		// ir_write_string(f, str_lit("* noalias "));
 		ir_write_string(f, str_lit("*"));
-		if (build_context.ODIN_OS == "darwin" ||
-		    build_context.ODIN_OS == "linux") {
+		if (build_context.ODIN_OS == "darwin") {
 			ir_fprintf(f, " byval");
 		}
 		if (param_count > 0 || t->Proc.calling_convention == ProcCC_Odin)  {
@@ -2456,8 +2455,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	if (proc_type->return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(proc_type->results));
 		ir_write_str_lit(f, "* sret noalias ");
-		if (build_context.ODIN_OS == "darwin" ||
-		    build_context.ODIN_OS == "linux") {
+		if (build_context.ODIN_OS == "darwin") {
 			ir_fprintf(f, "byval ");
 		}
 		ir_write_str_lit(f, "%agg.result");
