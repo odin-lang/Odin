@@ -1512,7 +1512,7 @@ i32 exec_llvm_opt(String output_base) {
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base), LIT(output_base),
-		LIT(build_context.opt_flags));
+		LIT(build_context.opt_flags))
 
   || system_exec_command_line_app("llvm-opt",
 		"\"%.*sbin/opt\" \"memcpy_pass_%.*s.bc\" -o \"%.*s.bc\" %.*s "
