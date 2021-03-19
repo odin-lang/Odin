@@ -873,7 +873,7 @@ void init_build_context(TargetMetrics *cross_target) {
 		//   -memcpyopt: MemCpy optimization
 	}
 	if (bc->ODIN_DEBUG == false) {
-		opt_flags = gb_string_appendc(opt_flags, "-mem2reg -memcpyopt -die ");
+		opt_flags = gb_string_appendc(opt_flags, "-mem2reg -die ");
 	}
 
 
