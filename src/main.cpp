@@ -1506,8 +1506,16 @@ void remove_temp_files(String output_base) {
 i32 exec_llvm_opt(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
+
 	return system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
+		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"memcpy_pass_%.*s.bc\" %.*s "
+		"",
+		LIT(build_context.ODIN_ROOT),
+		LIT(output_base), LIT(output_base),
+		LIT(build_context.opt_flags));
+
+  || system_exec_command_line_app("llvm-opt",
+		"\"%.*sbin/opt\" \"memcpy_pass_%.*s.bc\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base), LIT(output_base),
@@ -1515,8 +1523,14 @@ i32 exec_llvm_opt(String output_base) {
 #else
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-	return system_exec_command_line_app("llvm-opt",
-		"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
+
+  return system_exec_command_line_app("llvm-opt",
+    "opt \"%.*s.ll\" -o \"memcpy_pass_%.*s.bc\" -memcpyopt"
+    "",
+    LIT(output_base), LIT(output_base))
+  
+	|| system_exec_command_line_app("llvm-opt",
+		"opt \"memcpy_pass_%.*s.bc\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(output_base), LIT(output_base),
 		LIT(build_context.opt_flags));
