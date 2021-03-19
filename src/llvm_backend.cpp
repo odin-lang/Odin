@@ -2171,7 +2171,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	}
 
 
-	{ // Debug Information
+	if (build_context.ODIN_DEBUG) { // Debug Information
 		unsigned line = cast(unsigned)entity->token.pos.line;
 
 		LLVMMetadataRef file = nullptr;
@@ -11429,7 +11429,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	m->ctx = LLVMGetGlobalContext();
 	m->mod = LLVMModuleCreateWithNameInContext("odin_module", m->ctx);
-	m->debug_builder = LLVMCreateDIBuilder(m->mod);
+	m->debug_builder = build_context.ODIN_DEBUG ? LLVMCreateDIBuilder(m->mod) : nullptr;
 
 	m->state_flags = 0;
 	m->state_flags |= StateFlag_bounds_check;
@@ -12381,7 +12381,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMSetModuleDataLayout(mod, LLVMCreateTargetDataLayout(target_machine));
 
-	{ // Debug Info
+	if (build_context.ODIN_DEBUG) { // Debug Info
 		for_array(i, info->files.entries) {
 			AstFile *f = info->files.entries[i].value;
 			String fullpath = f->fullpath;
@@ -13121,7 +13121,10 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	LLVMDIBuilderFinalize(m->debug_builder);
+	if (m->debug_builder != nullptr) {
+		LLVMDIBuilderFinalize(m->debug_builder);
+	}
+
 	if (LLVMVerifyModule(mod, LLVMReturnStatusAction, &llvm_error)) {
 		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
 		if (build_context.keep_temp_files) {
