@@ -19,13 +19,12 @@
 #ifndef LLVM_C_EXECUTIONENGINE_H
 #define LLVM_C_EXECUTIONENGINE_H
 
+#include "ExternC.h"
 #include "Target.h"
 #include "TargetMachine.h"
 #include "Types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+LLVM_C_EXTERN_C_BEGIN
 
 /**
  * @defgroup LLVMCExecutionEngine Execution Engine
@@ -150,6 +149,11 @@ uint64_t LLVMGetGlobalValueAddress(LLVMExecutionEngineRef EE, const char *Name);
 
 uint64_t LLVMGetFunctionAddress(LLVMExecutionEngineRef EE, const char *Name);
 
+/// Returns true on error, false on success. If true is returned then the error
+/// message is copied to OutStr and cleared in the ExecutionEngine instance.
+LLVMBool LLVMExecutionEngineGetErrMsg(LLVMExecutionEngineRef EE,
+                                      char **OutError);
+
 /*===-- Operations on memory managers -------------------------------------===*/
 
 typedef uint8_t *(*LLVMMemoryManagerAllocateCodeSectionCallback)(
@@ -193,8 +197,6 @@ LLVMJITEventListenerRef LLVMCreatePerfJITEventListener(void);
  * @}
  */
 
-#ifdef __cplusplus
-}
-#endif /* defined(__cplusplus) */
+LLVM_C_EXTERN_C_END
 
 #endif
