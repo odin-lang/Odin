@@ -1477,7 +1477,7 @@ void show_timings(Checker *c, Timings *t) {
 void remove_temp_files(String output_base) {
 	if (build_context.keep_temp_files) return;
 
-	auto data = array_make<u8>(heap_allocator(), output_base.len + 10);
+	auto data = array_make<u8>(heap_allocator(), output_base.len + 30);
 	defer (array_free(&data));
 
 	isize n = output_base.len;
@@ -1488,6 +1488,7 @@ void remove_temp_files(String output_base) {
 	} while (0)
 	EXT_REMOVE(".ll");
 	EXT_REMOVE(".bc");
+	EXT_REMOVE("_memcpy_pass.bc");
 	if (build_context.build_mode != BuildMode_Object && !build_context.keep_object_files) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		EXT_REMOVE(".obj");
@@ -1506,8 +1507,15 @@ void remove_temp_files(String output_base) {
 i32 exec_llvm_opt(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
-	return system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
+
+  return system_exec_command_line_app("llvm-opt",
+		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
+		"",
+		LIT(build_context.ODIN_ROOT),
+		LIT(output_base), LIT(output_base))
+
+  || system_exec_command_line_app("llvm-opt",
+		"\"%.*sbin/opt\" \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base), LIT(output_base),
@@ -1515,8 +1523,14 @@ i32 exec_llvm_opt(String output_base) {
 #else
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-	return system_exec_command_line_app("llvm-opt",
-		"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
+
+  return system_exec_command_line_app("llvm-opt",
+    "opt \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
+    "",
+    LIT(output_base), LIT(output_base))
+  
+	|| system_exec_command_line_app("llvm-opt",
+		"opt \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(output_base), LIT(output_base),
 		LIT(build_context.opt_flags));
