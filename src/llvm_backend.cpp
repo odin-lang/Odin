@@ -498,11 +498,16 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	}
 }
 
+LLVMTypeRef llvm_addr_type(lbValue addr_val) {
+	return LLVMGetElementType(LLVMTypeOf(addr_val.value));
+}
+
 lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	lbModule *m = p->module;
 	GB_ASSERT(value.value != nullptr);
+	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
-	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(m, t), value.value, "");
+	LLVMValueRef v = LLVMBuildLoad2(p->builder, llvm_addr_type(value), value.value, "");
 	return lbValue{v, t};
 }
 
@@ -1919,6 +1924,42 @@ void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
 }
 
 
+LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
+	LLVMTypeRef src = LLVMTypeOf(val);
+	if (src == dst) {
+		return val;
+	}
+	if (LLVMIsNull(val)) {
+		return LLVMConstNull(dst);
+	}
+
+	GB_ASSERT(LLVMSizeOf(dst) == LLVMSizeOf(src));
+	LLVMTypeKind kind = LLVMGetTypeKind(dst);
+	switch (kind) {
+	case LLVMPointerTypeKind:
+		return LLVMConstPointerCast(val, dst);
+	case LLVMStructTypeKind:
+		return LLVMConstBitCast(val, dst);
+	default:
+		GB_PANIC("Unhandled const cast %s to %s", LLVMPrintTypeToString(src), LLVMPrintTypeToString(dst));
+	}
+
+	return val;
+
+}
+LLVMValueRef llvm_const_named_struct(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
+	unsigned value_count = cast(unsigned)value_count_;
+	unsigned elem_count = LLVMCountStructElementTypes(t);
+	GB_ASSERT(value_count == elem_count);
+	for (unsigned i = 0; i < elem_count; i++) {
+		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(t, i);
+		values[i] = llvm_const_cast(values[i], elem_type);
+	}
+	return LLVMConstNamedStruct(t, values, value_count);
+}
+
+
+
 
 lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
 	if (false && lb_is_const(str_elem) && lb_is_const(str_len)) {
@@ -1928,7 +1969,7 @@ lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
 		};
 		lbValue res = {};
 		res.type = t_string;
-		res.value = LLVMConstNamedStruct(lb_type(p->module, t_string), values, gb_count_of(values));
+		res.value = llvm_const_named_struct(lb_type(p->module, t_string), values, gb_count_of(values));
 		return res;
 	} else {
 		lbAddr res = lb_add_local_generated(p, t_string, false);
@@ -4627,7 +4668,7 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 	LLVMValueRef values[2] = {ptr, str_len};
 
 	lbValue res = {};
-	res.value = LLVMConstNamedStruct(lb_type(m, t_string), values, 2);
+	res.value = llvm_const_named_struct(lb_type(m, t_string), values, 2);
 	res.type = t_string;
 	return res;
 }
@@ -4662,7 +4703,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	LLVMValueRef values[2] = {ptr, len};
 
 	lbValue res = {};
-	res.value = LLVMConstNamedStruct(lb_type(m, t_u8_slice), values, 2);
+	res.value = llvm_const_named_struct(lb_type(m, t_u8_slice), values, 2);
 	res.type = t_u8_slice;
 	return res;
 }
@@ -4905,7 +4946,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 					LLVMValueRef values[2] = {ptr, len};
 
-					res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+					res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
 					return res;
 				}
 			}
@@ -4994,7 +5035,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
 				LLVMValueRef values[2] = {ptr, str_len};
 
-				res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+				res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
 			}
 
 			return res;
@@ -5058,7 +5099,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				break;
 			}
 
-			res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+			res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
 			return res;
 		}
 		break;
@@ -5082,7 +5123,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				break;
 			}
 
-			res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 4);
+			res.value = llvm_const_named_struct(lb_type(m, original_type), values, 4);
 			return res;
 		}
 		break;
@@ -5342,7 +5383,11 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				values[0] = LLVMConstNull(lb_alignment_prefix_type_hack(m, type->Struct.custom_align));
 			}
 
-			res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, cast(unsigned)value_count);
+			for (isize i = 0; i < value_count; i++) {
+				GB_ASSERT(LLVMIsConstant(values[i]));
+			}
+
+			res.value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
 			return res;
 		} else if (is_type_bit_set(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
@@ -5410,7 +5455,7 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
 
 	lbValue res = {};
-	res.value = LLVMConstNamedStruct(lb_type(m, t_source_code_location), fields, gb_count_of(fields));
+	res.value = llvm_const_named_struct(lb_type(m, t_source_code_location), fields, gb_count_of(fields));
 	res.type = t_source_code_location;
 	return res;
 }
@@ -7406,14 +7451,14 @@ lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
 	return res;
 }
 
-LLVMValueRef llvm_const_slice(lbValue data, lbValue len) {
+LLVMValueRef llvm_const_slice(lbModule *m, lbValue data, lbValue len) {
 	GB_ASSERT(is_type_pointer(data.type));
 	GB_ASSERT(are_types_identical(len.type, t_int));
 	LLVMValueRef vals[2] = {
 		data.value,
 		len.value,
 	};
-	return LLVMConstStruct(vals, gb_count_of(vals), false);
+	return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
 }
 
 
@@ -11575,7 +11620,6 @@ lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String
 }
 
 
-
 void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
 	lbModule *m = p->module;
 	LLVMContextRef ctx = m->ctx;
@@ -11592,7 +11636,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			LLVMConstInBoundsGEP(lb_global_type_info_data.addr.value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
 		};
-		LLVMValueRef slice = LLVMConstStructInContext(ctx, values, gb_count_of(values), false);
+		LLVMValueRef slice = llvm_const_named_struct(llvm_addr_type(global_type_table), values, gb_count_of(values));
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}
@@ -11663,7 +11707,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -11728,7 +11772,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 				break;
 			}
@@ -11762,7 +11806,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 					lbValue res = {};
 					res.type = type_deref(tag.type);
-					res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+					res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 					lb_emit_store(p, tag, res);
 				}
 				break;
@@ -11795,7 +11839,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 					lbValue res = {};
 					res.type = type_deref(tag.type);
-					res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+					res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 					lb_emit_store(p, tag, res);
 				}
 				break;
@@ -11820,7 +11864,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -11836,7 +11880,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -11856,7 +11900,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 
 			// NOTE(bill): Union assignment
@@ -11880,7 +11924,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -11894,7 +11938,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -11919,7 +11963,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -11948,8 +11992,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue count = lb_const_int(m, t_int, t->Tuple.variables.count);
 
-			LLVMValueRef types_slice = llvm_const_slice(memory_types, count);
-			LLVMValueRef names_slice = llvm_const_slice(memory_names, count);
+			LLVMValueRef types_slice = llvm_const_slice(m, memory_types, count);
+			LLVMValueRef names_slice = llvm_const_slice(m, memory_names, count);
 
 			LLVMValueRef vals[2] = {
 				types_slice,
@@ -11958,7 +12002,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 
 			break;
@@ -12002,8 +12046,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 					lbValue v_count = lb_const_int(m, t_int, fields.count);
 
-					vals[1] = llvm_const_slice(lb_array_elem(p, name_array), v_count);
-					vals[2] = llvm_const_slice(lb_array_elem(p, value_array), v_count);
+					vals[1] = llvm_const_slice(m, lb_array_elem(p, name_array), v_count);
+					vals[2] = llvm_const_slice(m, lb_array_elem(p, value_array), v_count);
 				} else {
 					vals[1] = LLVMConstNull(lb_type(m, base_type(t_type_info_enum)->Struct.fields[1]->type));
 					vals[2] = LLVMConstNull(lb_type(m, base_type(t_type_info_enum)->Struct.fields[2]->type));
@@ -12012,7 +12056,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -12037,7 +12081,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 
 				lbValue count = lb_const_int(m, t_int, variant_count);
-				vals[0] = llvm_const_slice(memory_types, count);
+				vals[0] = llvm_const_slice(m, memory_types, count);
 
 				i64 tag_size   = union_tag_size(t);
 				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
@@ -12057,7 +12101,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 
@@ -12139,11 +12183,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 
 				lbValue cv = lb_const_int(m, t_int, count);
-				vals[0] = llvm_const_slice(memory_types,   cv);
-				vals[1] = llvm_const_slice(memory_names,   cv);
-				vals[2] = llvm_const_slice(memory_offsets, cv);
-				vals[3] = llvm_const_slice(memory_usings,  cv);
-				vals[4] = llvm_const_slice(memory_tags,    cv);
+				vals[0] = llvm_const_slice(m, memory_types,   cv);
+				vals[1] = llvm_const_slice(m, memory_names,   cv);
+				vals[2] = llvm_const_slice(m, memory_offsets, cv);
+				vals[3] = llvm_const_slice(m, memory_usings,  cv);
+				vals[4] = llvm_const_slice(m, memory_tags,    cv);
 			}
 			for (isize i = 0; i < gb_count_of(vals); i++) {
 				if (vals[i] == nullptr) {
@@ -12154,7 +12198,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 
 			break;
@@ -12174,7 +12218,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -12198,7 +12242,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -12219,7 +12263,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -12234,7 +12278,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -12248,7 +12292,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -12652,11 +12696,10 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMAddMemCpyOptPass(dfpm);
 			LLVMAddPromoteMemoryToRegisterPass(dfpm);
 			LLVMAddMergedLoadStoreMotionPass(dfpm);
-			LLVMAddAggressiveInstCombinerPass(dfpm);
 			LLVMAddEarlyCSEPass(dfpm);
 			LLVMAddEarlyCSEMemSSAPass(dfpm);
 			LLVMAddConstantPropagationPass(dfpm);
-			LLVMAddAggressiveDCEPass(dfpm);
+			// LLVMAddAggressiveDCEPass(dfpm);
 			LLVMAddMergedLoadStoreMotionPass(dfpm);
 			LLVMAddPromoteMemoryToRegisterPass(dfpm);
 			LLVMAddCFGSimplificationPass(dfpm);
@@ -12681,8 +12724,7 @@ void lb_generate_code(lbGenerator *gen) {
 				LLVMAddEarlyCSEMemSSAPass(dfpm);
 				LLVMAddConstantPropagationPass(dfpm);
 				if (do_extra_passes) {
-					LLVMAddAggressiveInstCombinerPass(dfpm);
-					LLVMAddAggressiveDCEPass(dfpm);
+					// LLVMAddAggressiveDCEPass(dfpm);
 				}
 				LLVMAddMergedLoadStoreMotionPass(dfpm);
 				LLVMAddPromoteMemoryToRegisterPass(dfpm);
@@ -12697,7 +12739,7 @@ void lb_generate_code(lbGenerator *gen) {
 					LLVMAddScalarizerPass(dfpm);
 					LLVMAddLoopIdiomPass(dfpm);
 
-					LLVMAddAggressiveInstCombinerPass(dfpm);
+					// LLVMAddAggressiveInstCombinerPass(dfpm);
 					LLVMAddLowerExpectIntrinsicPass(dfpm);
 
 					LLVMAddDeadStoreEliminationPass(dfpm);
@@ -12719,13 +12761,12 @@ void lb_generate_code(lbGenerator *gen) {
 		auto dfpm = default_function_pass_manager_without_memcpy;
 		LLVMAddPromoteMemoryToRegisterPass(dfpm);
 		LLVMAddMergedLoadStoreMotionPass(dfpm);
-		LLVMAddAggressiveInstCombinerPass(dfpm);
+		LLVMAddUnifyFunctionExitNodesPass(dfpm);
 		LLVMAddConstantPropagationPass(dfpm);
-		LLVMAddAggressiveDCEPass(dfpm);
+		// LLVMAddAggressiveDCEPass(dfpm);
 		LLVMAddMergedLoadStoreMotionPass(dfpm);
 		LLVMAddPromoteMemoryToRegisterPass(dfpm);
 		LLVMAddCFGSimplificationPass(dfpm);
-		// LLVMAddUnifyFunctionExitNodesPass(dfpm);
 	}
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
 
@@ -12928,7 +12969,7 @@ void lb_generate_code(lbGenerator *gen) {
 				GB_ASSERT(LLVMIsConstant(vals[2]));
 
 				LLVMValueRef dst = LLVMConstInBoundsGEP(all_tests_array.value, indices, gb_count_of(indices));
-				LLVMValueRef src = LLVMConstNamedStruct(lbt_Internal_Test, vals, gb_count_of(vals));
+				LLVMValueRef src = llvm_const_named_struct(lbt_Internal_Test, vals, gb_count_of(vals));
 
 				LLVMBuildStore(p->builder, src, dst);
 			}
