@@ -2423,7 +2423,7 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 		}
 	}
 
-	if (build_context.ODIN_OS == "windows") {
+	if (build_context.ODIN_OS == "windows" || build_context.ODIN_OS == "linux" ) {
 		i64 size = 8*type_size_of(abi_return_type);
 		switch (size) {
 		case 0:
