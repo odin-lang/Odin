@@ -240,7 +240,10 @@ struct lbProcedure {
 
 	Ast *curr_stmt;
 
+	Array<Scope *>       scope_stack;
 	Array<lbContextData> context_stack;
+
+	LLVMMetadataRef debug_info;
 
 	lbValue  return_ptr_hint_value;
 	Ast *    return_ptr_hint_ast;
@@ -382,6 +385,10 @@ lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type);
 lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 
+LLVMMetadataRef lb_debug_type(lbModule *m, Type *type);
+
+
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
@@ -451,4 +458,25 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 
 	lbCallingConvention_C,            // ProcCC_None,
 	lbCallingConvention_C,            // ProcCC_InlineAsm,
+};
+
+enum : LLVMDWARFTypeEncoding {
+	LLVMDWARFTypeEncoding_Address = 1,
+	LLVMDWARFTypeEncoding_Boolean = 2,
+	LLVMDWARFTypeEncoding_ComplexFloat = 3,
+	LLVMDWARFTypeEncoding_Float = 4,
+	LLVMDWARFTypeEncoding_Signed = 5,
+	LLVMDWARFTypeEncoding_SignedChar = 6,
+	LLVMDWARFTypeEncoding_Unsigned = 7,
+	LLVMDWARFTypeEncoding_UnsignedChar = 8,
+	LLVMDWARFTypeEncoding_ImaginaryFloat = 9,
+	LLVMDWARFTypeEncoding_PackedDecimal = 10,
+	LLVMDWARFTypeEncoding_NumericString = 11,
+	LLVMDWARFTypeEncoding_Edited = 12,
+	LLVMDWARFTypeEncoding_SignedFixed = 13,
+	LLVMDWARFTypeEncoding_UnsignedFixed = 14,
+	LLVMDWARFTypeEncoding_DecimalFloat = 15,
+	LLVMDWARFTypeEncoding_Utf = 16,
+	LLVMDWARFTypeEncoding_LoUser = 128,
+	LLVMDWARFTypeEncoding_HiUser = 255
 };
