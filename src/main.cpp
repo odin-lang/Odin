@@ -1488,7 +1488,7 @@ void remove_temp_files(String output_base) {
 	} while (0)
 	EXT_REMOVE(".ll");
 	EXT_REMOVE(".bc");
-	EXT_REMOVE("_memcpy_pass.bc");
+
 	if (build_context.build_mode != BuildMode_Object && !build_context.keep_object_files) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		EXT_REMOVE(".obj");
@@ -1502,20 +1502,12 @@ void remove_temp_files(String output_base) {
 }
 
 
-
-
 i32 exec_llvm_opt(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 
   return system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
-		"",
-		LIT(build_context.ODIN_ROOT),
-		LIT(output_base), LIT(output_base))
-
-  || system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
+		"\"%.*sbin/opt\" -memcpyopt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base), LIT(output_base),
@@ -1524,16 +1516,7 @@ i32 exec_llvm_opt(String output_base) {
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 
-  return system_exec_command_line_app("llvm-opt",
-    "opt \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
-    "",
-    LIT(output_base), LIT(output_base))
-  
-	|| system_exec_command_line_app("llvm-opt",
-		"opt \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
-		"",
-		LIT(output_base), LIT(output_base),
-		LIT(build_context.opt_flags));
+  return 0;
 #endif
 }
 
@@ -1552,8 +1535,8 @@ i32 exec_llvm_llc(String output_base) {
 		LIT(build_context.llc_flags));
 #else
 	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
-	return system_exec_command_line_app("llc",
-		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
+	return system_exec_command_line_app("clang",
+		"clang -Wno-override-module \"%.*s.ll\" -c -fPIC -O%d -mllvm "
 		"%.*s "
 		"%s%.*s",
 		LIT(output_base),
@@ -1562,6 +1545,7 @@ i32 exec_llvm_llc(String output_base) {
 		build_context.cross_compiling ? "-mtriple=" : "",
 		cast(int)(build_context.cross_compiling ? build_context.metrics.target_triplet.len : 0),
 		build_context.metrics.target_triplet.text);
+  
 #endif
 }
 
