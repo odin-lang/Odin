@@ -1540,6 +1540,30 @@ LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters, parameter_count, flags);
 }
 
+LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &name, Type *type, u64 offset_in_bits) {
+	unsigned field_line = 1;
+	LLVMDIFlags field_flags = LLVMDIFlagZero;
+
+	AstPackage *pkg = m->info->runtime_package;
+	GB_ASSERT(pkg->files.count != 0);
+	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
+	LLVMMetadataRef scope = file;
+
+	return LLVMDIBuilderCreateMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, field_line,
+		8*cast(u64)type_size_of(type), 8*cast(u32)type_align_of(type), offset_in_bits,
+		field_flags, lb_debug_type(m, type)
+	);
+}
+LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_in_bits, u32 align_in_bits, LLVMMetadataRef *elements, unsigned element_count) {
+	AstPackage *pkg = m->info->runtime_package;
+	GB_ASSERT(pkg->files.count != 0);
+	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
+	LLVMMetadataRef scope = file;
+
+	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+}
+
+
 LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	Type *original_type = type;
 
@@ -1581,40 +1605,36 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		// Basic_complex32,
 		case Basic_complex64:
 			{
-				unsigned element_count = 0;
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_type(m, t_f32);
-				elements[1] = lb_debug_type(m, t_f32);
-				return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "complex64", 9, nullptr, 0, 64, 32, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f32, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 4);
+				return lb_debug_basic_struct(m, str_lit("complex64"), 64, 32, elements, gb_count_of(elements));
 			}
 		case Basic_complex128:
 			{
-				unsigned element_count = 0;
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_type(m, t_f64);
-				elements[1] = lb_debug_type(m, t_f64);
-				return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "complex128", 10, nullptr, 0, 128, 64, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f64, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f64, 8);
+				return lb_debug_basic_struct(m, str_lit("complex128"), 128, 64, elements, gb_count_of(elements));
 			}
 
 		case Basic_quaternion128:
 			{
-				unsigned element_count = 0;
 				LLVMMetadataRef elements[4] = {};
-				elements[0] = lb_debug_type(m, t_f32);
-				elements[1] = lb_debug_type(m, t_f32);
-				elements[2] = lb_debug_type(m, t_f32);
-				elements[3] = lb_debug_type(m, t_f32);
-				return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "quaternion128", 13, nullptr, 0, 128, 32, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f32, 4);
+				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f32, 8);
+				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f32, 12);
+				return lb_debug_basic_struct(m, str_lit("quaternion128"), 128, 32, elements, gb_count_of(elements));
 			}
 		case Basic_quaternion256:
 			{
-				unsigned element_count = 0;
 				LLVMMetadataRef elements[4] = {};
-				elements[0] = lb_debug_type(m, t_f64);
-				elements[1] = lb_debug_type(m, t_f64);
-				elements[2] = lb_debug_type(m, t_f64);
-				elements[3] = lb_debug_type(m, t_f64);
-				return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "quaternion256", 13, nullptr, 0, 256, 32, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f64, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f64, 8);
+				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f64, 16);
+				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f64, 24);
+				return lb_debug_basic_struct(m, str_lit("quaternion256"), 256, 32, elements, gb_count_of(elements));
 			}
 
 		case Basic_int:  return LLVMDIBuilderCreateBasicType(m->debug_builder,    "int",  3, word_bits, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
@@ -1628,11 +1648,10 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			}
 		case Basic_string:
 			{
-				unsigned element_count = 0;
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_type(m, t_u8_ptr);
-				elements[1] = lb_debug_type(m, t_int);
-				return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "string", 6, nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u8_ptr, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, word_bits);
+				return lb_debug_basic_struct(m, str_lit("string"), 2*word_bits, word_bits, elements, gb_count_of(elements));
 			}
 		case Basic_cstring:
 			{
@@ -1641,11 +1660,10 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			}
 		case Basic_any:
 			{
-				unsigned element_count = 0;
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_type(m, t_rawptr);
-				elements[1] = lb_debug_type(m, t_typeid);
-				return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "any", 3, nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("id"),   t_typeid, word_bits);
+				return lb_debug_basic_struct(m, str_lit("any"), 2*word_bits, word_bits, elements, gb_count_of(elements));
 			}
 
 		case Basic_typeid: return LLVMDIBuilderCreateBasicType(m->debug_builder, "typeid", 6, word_bits, 0, LLVMDIFlagZero);
@@ -1704,23 +1722,21 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 	case Type_Slice:
 		{
-			unsigned element_count = 0;
 			LLVMMetadataRef elements[2] = {};
-			elements[0] = LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->Slice.elem), word_bits, word_bits, 0, nullptr, 0);
-			elements[1] = lb_debug_type(m, t_int);
-			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "", 0, nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+			elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(type->Slice.elem), 0);
+			elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, word_bits);
+			return lb_debug_basic_struct(m, str_lit("<anonymous-slice>"), 2*word_bits, word_bits, elements, gb_count_of(elements));
 		}
 		break;
 
 	case Type_DynamicArray:
 		{
-			unsigned element_count = 0;
 			LLVMMetadataRef elements[4] = {};
-			elements[0] = LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->DynamicArray.elem), word_bits, word_bits, 0, nullptr, 0);
-			elements[1] = lb_debug_type(m, t_int);
-			elements[2] = lb_debug_type(m, t_int);
-			elements[3] = lb_debug_type(m, t_allocator);
-			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "", 0, nullptr, 0, 5*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+			elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(type->DynamicArray.elem), 0*word_bits);
+			elements[1] = lb_debug_struct_field(m, str_lit("len"), t_int, 1*word_bits);
+			elements[2] = lb_debug_struct_field(m, str_lit("cap"), t_int, 2*word_bits);
+			elements[3] = lb_debug_struct_field(m, str_lit("allocator"), t_allocator, 3*word_bits);
+			return lb_debug_basic_struct(m, str_lit("<anonymous-dynamic-array>"), 5*word_bits, word_bits, elements, gb_count_of(elements));
 		}
 		break;
 
@@ -1891,9 +1907,9 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		{
 			unsigned element_count = 0;
 			LLVMMetadataRef elements[2] = {};
-			LLVMMetadataRef idx_type = lb_debug_type(m, type->RelativeSlice.base_integer);
-			elements[0] = idx_type;
-			elements[1] = idx_type;
+			Type *base_integer = type->RelativeSlice.base_integer;
+			elements[0] = lb_debug_struct_field(m, str_lit("data_offset"), base_integer, 0);
+			elements[1] = lb_debug_struct_field(m, str_lit("len"), base_integer, 8*type_size_of(base_integer));
 			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "", 0, nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
 		}
 	}
@@ -2771,6 +2787,84 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 }
 
 
+void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token) {
+	if (p->debug_info == nullptr) {
+		return;
+	}
+	if (type == nullptr) {
+		return;
+	}
+	if (type == t_invalid) {
+		return;
+	}
+	if (p->body == nullptr) {
+		return;
+	}
+
+	lbModule *m = p->module;
+	String const &name = token.string;
+	if (name == "" || name == "_") {
+		return;
+	}
+
+	AstFile *file = p->body->file;
+
+	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
+	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	GB_ASSERT(llvm_scope != nullptr);
+	if (llvm_file == nullptr) {
+		llvm_file = LLVMDIScopeGetFile(llvm_scope);
+	}
+
+	if (llvm_file == nullptr) {
+		return;
+	}
+
+	unsigned alignment_in_bits = cast(unsigned)(8*type_align_of(type));
+
+	LLVMDIFlags flags = LLVMDIFlagZero;
+	LLVMBool always_preserve = false;
+
+	LLVMMetadataRef debug_type = lb_debug_type(m, type);
+
+	LLVMMetadataRef var_info = LLVMDIBuilderCreateAutoVariable(
+		m->debug_builder, llvm_scope,
+		cast(char const *)name.text, cast(size_t)name.len,
+		llvm_file, token.pos.line,
+		debug_type,
+		always_preserve, flags, alignment_in_bits
+	);
+
+	LLVMValueRef storage = ptr;
+	LLVMValueRef instr = ptr;
+	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
+	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+	LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
+}
+
+void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
+	if (!p->debug_info || !p->body) {
+		return;
+	}
+	LLVMMetadataRef loc = LLVMGetCurrentDebugLocation2(p->builder);
+	if (!loc) {
+		return;
+	}
+	TokenPos pos = {};
+
+	pos.file_id = p->body->file ? p->body->file->id : 0;
+	pos.line = LLVMDILocationGetLine(loc);
+	pos.column = LLVMDILocationGetColumn(loc);
+
+	Token token = {};
+	token.kind = Token_context;
+	token.string = str_lit("context");
+	token.pos = pos;
+
+	lb_add_debug_local_variable(p, ctx.addr.value, t_context, token);
+}
+
+
 void lb_begin_procedure_body(lbProcedure *p) {
 	DeclInfo *decl = decl_info_of_entity(p->entity);
 	if (decl != nullptr) {
@@ -2927,6 +3021,11 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		if (pos.file_id != 0) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_token_pos(p, pos));
 		}
+
+		if (p->context_stack.count != 0) {
+			lb_add_debug_context_variable(p, lb_find_or_generate_context_ptr(p));
+		}
+
 	}
 
 }
@@ -3065,8 +3164,6 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	return v;
 }
 
-
-
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 param_index) {
 	GB_ASSERT(p->decl_block != p->curr_block);
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
@@ -3110,52 +3207,7 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
-
-		if (p->debug_info) do {
-			lbModule *m = p->module;
-			String name = e->token.string;
-			if (name == "" || name == "_") {
-				break;
-			}
-
-			LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
-			LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, e->file);
-			GB_ASSERT(llvm_scope != nullptr);
-			if (llvm_file == nullptr) {
-				llvm_file = LLVMDIScopeGetFile(llvm_scope);
-			}
-
-			if (llvm_file == nullptr) {
-				break;
-			}
-
-			if (e->type == nullptr) {
-				break;
-			}
-			if (e->type == t_invalid) {
-				break;
-			}
-
-			LLVMDIFlags flags = LLVMDIFlagZero;
-			LLVMBool always_preserve = false;
-
-			LLVMMetadataRef debug_type = lb_debug_type(m, type);
-
-			LLVMMetadataRef var_info = LLVMDIBuilderCreateAutoVariable(
-				m->debug_builder, llvm_scope,
-				cast(char const *)name.text, cast(size_t)name.len,
-				llvm_file, e->token.pos.line,
-				debug_type,
-				always_preserve, flags, 8*alignment
-			);
-
-			LLVMValueRef storage = ptr;
-			LLVMValueRef instr = ptr;
-			LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, e->token.pos);
-			LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
-			LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
-		} while (false);
-
+		lb_add_debug_local_variable(p, ptr, type, e->token);
 	}
 
 	return lb_addr(val);
@@ -7156,6 +7208,8 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 	c.kind = lbAddr_Context;
 	lb_emit_init_context(p, c);
 	lb_push_context_onto_stack(p, c);
+	lb_add_debug_context_variable(p, c);
+
 	return c;
 }
 
