@@ -1666,7 +1666,8 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				return lb_debug_basic_struct(m, str_lit("any"), 2*word_bits, word_bits, elements, gb_count_of(elements));
 			}
 
-		case Basic_typeid: return LLVMDIBuilderCreateBasicType(m->debug_builder, "typeid", 6, word_bits, 0, LLVMDIFlagZero);
+		case Basic_typeid:
+			return LLVMDIBuilderCreateBasicType(m->debug_builder, "typeid", 6, word_bits, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
 
 		// Endian Specific Types
 		case Basic_i16le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i16le",  5, 16,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagLittleEndian);
@@ -2823,7 +2824,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	unsigned alignment_in_bits = cast(unsigned)(8*type_align_of(type));
 
 	LLVMDIFlags flags = LLVMDIFlagZero;
-	LLVMBool always_preserve = false;
+	LLVMBool always_preserve = build_context.optimization_level == 0;
 
 	LLVMMetadataRef debug_type = lb_debug_type(m, type);
 
