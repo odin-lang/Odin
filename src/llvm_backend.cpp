@@ -1490,6 +1490,56 @@ LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
 	return lb_debug_location_from_token_pos(p, ast_token(node).pos);
 }
 
+LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
+	Type *original_type = type;
+
+	LLVMContextRef ctx = m->ctx;
+	i64 size = type_size_of(type); // Check size
+
+	GB_ASSERT(type != t_invalid);
+
+	unsigned const word_size = cast(unsigned)build_context.word_size;
+	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
+
+	GB_ASSERT(type->kind == Type_Proc);
+	LLVMTypeRef return_type = LLVMVoidTypeInContext(ctx);
+	unsigned parameter_count = 1;
+	for (i32 i = 0; i < type->Proc.param_count; i++) {
+		Entity *e = type->Proc.params->Tuple.variables[i];
+		if (e->kind == Entity_Variable) {
+			parameter_count += 1;
+		}
+	}
+	LLVMMetadataRef *parameters = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, parameter_count);
+
+	unsigned param_index = 0;
+	if (type->Proc.result_count == 0) {
+		parameters[param_index++] = nullptr;
+	} else {
+		parameters[param_index++] = lb_debug_type(m, type->Proc.results);
+	}
+
+	LLVMMetadataRef parent_scope = nullptr;
+	LLVMMetadataRef scope = nullptr;
+	LLVMMetadataRef file = nullptr;
+
+	for (i32 i = 0; i < type->Proc.param_count; i++) {
+		Entity *e = type->Proc.params->Tuple.variables[i];
+		if (e->kind != Entity_Variable) {
+			continue;
+		}
+		parameters[param_index] = lb_debug_type(m, e->type);
+		param_index += 1;
+	}
+
+	LLVMDIFlags flags = LLVMDIFlagZero;
+	if (type->Proc.diverging) {
+		flags = LLVMDIFlagNoReturn;
+	}
+
+	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters, parameter_count, flags);
+}
+
 LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	Type *original_type = type;
 
@@ -1573,7 +1623,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 		case Basic_rawptr:
 			{
-				LLVMMetadataRef void_type = LLVMDIBuilderCreateBasicType(m->debug_builder, "void", 4, 8, 0, LLVMDIFlagZero);
+				LLVMMetadataRef void_type = LLVMDIBuilderCreateBasicType(m->debug_builder, "void", 4, 8, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
 				return LLVMDIBuilderCreatePointerType(m->debug_builder, void_type, word_bits, word_bits, LLVMDWARFTypeEncoding_Address, "rawptr", 6);
 			}
 		case Basic_string:
@@ -1759,7 +1809,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 	case Type_Enum:
 		{
-		#if 1
+		#if 0
 			return lb_debug_type(m, base_enum_type(type));
 		#else
 			LLVMMetadataRef scope = nullptr;
@@ -1820,51 +1870,8 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 	case Type_Proc:
 		{
-			LLVMTypeRef return_type = LLVMVoidTypeInContext(ctx);
-			unsigned parameter_count = 1;
-			for (i32 i = 0; i < type->Proc.param_count; i++) {
-				Entity *e = type->Proc.params->Tuple.variables[i];
-				if (e->kind == Entity_Variable) {
-					parameter_count += 1;
-				}
-			}
-			LLVMMetadataRef *parameters = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, parameter_count);
-
-			unsigned param_index = 0;
-			if (type->Proc.result_count == 0) {
-				parameters[param_index++] = nullptr;
-			} else {
-				parameters[param_index++] = lb_debug_type(m, type->Proc.results);
-			}
-
-			LLVMMetadataRef parent_scope = nullptr;
-			LLVMMetadataRef scope = nullptr;
-			LLVMMetadataRef file = nullptr;
-
-			for (i32 i = 0; i < type->Proc.param_count; i++) {
-				Entity *e = type->Proc.params->Tuple.variables[i];
-				if (e->kind != Entity_Variable) {
-					continue;
-				}
-				#if 1
-				parameters[param_index] = lb_debug_type(m, e->type);
-				#else
-				String name = e->token.string;
-				unsigned line = cast(unsigned)e->token.pos.line;
-				parameters[param_index] = LLVMDIBuilderCreateParameterVariable(m->debug_builder, scope,
-					cast(char const *)name.text, name.len, param_index, file, line,
-					lb_debug_type(m, e->type), false, LLVMDIFlagZero
-				);
-				#endif
-				param_index += 1;
-			}
-
-			LLVMDIFlags flags = LLVMDIFlagZero;
-			if (type->Proc.diverging) {
-				flags = LLVMDIFlagNoReturn;
-			}
-
-			return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters, parameter_count, flags);
+			LLVMMetadataRef proc_underlying_type = lb_debug_type_internal_proc(m, type);
+			return LLVMDIBuilderCreatePointerType(m->debug_builder, proc_underlying_type, word_bits, word_bits, 0, nullptr, 0);
 		}
 		break;
 
@@ -1935,11 +1942,31 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		idt.type = type;
 
 		switch (bt->kind) {
+		case Type_Enum:
+			{
+				LLVMMetadataRef scope = nullptr;
+				LLVMMetadataRef file = nullptr;
+				unsigned line = 0;
+				unsigned element_count = cast(unsigned)bt->Enum.fields.count;
+				LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
+				Type *ct = base_enum_type(type);
+				LLVMBool is_unsigned = is_type_unsigned(ct);
+				for (unsigned i = 0; i < element_count; i++) {
+					Entity *f = bt->Enum.fields[i];
+					GB_ASSERT(f->kind == Entity_Constant);
+					String name = f->token.string;
+					i64 value = exact_value_to_i64(f->Constant.value);
+					elements[i] = LLVMDIBuilderCreateEnumerator(m->debug_builder, cast(char const *)name.text, cast(size_t)name.len, value, is_unsigned);
+				}
+				LLVMMetadataRef class_type = lb_debug_type(m, ct);
+				return LLVMDIBuilderCreateEnumerationType(m->debug_builder, scope, name_text, name_len, file, line, 8*type_size_of(type), 8*cast(unsigned)type_align_of(type), elements, element_count, class_type);
+			}
+
+
 		case Type_Basic:
 		case Type_Pointer:
 		case Type_Array:
 		case Type_EnumeratedArray:
-		case Type_Enum:
 		case Type_Tuple:
 		case Type_Proc:
 		case Type_BitSet:
@@ -2063,9 +2090,14 @@ void lb_debug_complete_types(lbModule *m) {
 			case Type_Map:
 				break;
 			case Type_Struct:
+				if (file == nullptr) {
+					GB_ASSERT(bt->Struct.node != nullptr);
+					file = lb_get_llvm_metadata(m, bt->Struct.node->file);
+					line_number = cast(unsigned)ast_token(bt->Struct.node).pos.line;
+				}
+
 				type_set_offsets(bt);
 
-				/*
 				record_scope = lb_get_llvm_metadata(m, bt->Struct.scope);
 				element_count = cast(unsigned)bt->Struct.fields.count;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
@@ -2086,10 +2118,14 @@ void lb_debug_complete_types(lbModule *m) {
 						field_flags, lb_debug_type(m, f->type)
 					);
 				}
-				*/
 				break;
 			case Type_Union:
-				/*
+				if (file == nullptr) {
+					GB_ASSERT(bt->Union.node != nullptr);
+					file = lb_get_llvm_metadata(m, bt->Union.node->file);
+					line_number = cast(unsigned)ast_token(bt->Union.node).pos.line;
+				}
+
 				record_scope = lb_get_llvm_metadata(m, bt->Union.scope);
 				element_count = cast(unsigned)bt->Union.variants.count;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
@@ -2113,7 +2149,6 @@ void lb_debug_complete_types(lbModule *m) {
 						field_flags, lb_debug_type(m, variant)
 					);
 				}
-				*/
 				break;
 			}
 
@@ -2434,13 +2469,15 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 
 
 	if (m->debug_builder) { // Debug Information
+		Type *bt = base_type(p->type);
+
 		unsigned line = cast(unsigned)entity->token.pos.line;
 
 		LLVMMetadataRef scope = nullptr;
 		LLVMMetadataRef file = nullptr;
 		LLVMMetadataRef type = nullptr;
 		scope = p->module->debug_compile_unit;
-		type = lb_debug_type(m, p->type);
+		type = lb_debug_type_internal_proc(m, bt);
 
 		if (entity->file != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->file);
@@ -2460,7 +2497,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		unsigned scope_line = line;
 		u32 flags = LLVMDIFlagStaticMember;
 		LLVMBool is_optimized = false;
-		if (base_type(p->type)->Proc.diverging) {
+		if (bt->Proc.diverging) {
 			flags |= LLVMDIFlagNoReturn;
 		}
 		if (p->body == nullptr) {
@@ -3063,6 +3100,7 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 			break;
 		default:
 			LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+			break;
 		}
 	}
 
@@ -3072,6 +3110,52 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
+
+		if (p->debug_info) do {
+			lbModule *m = p->module;
+			String name = e->token.string;
+			if (name == "" || name == "_") {
+				break;
+			}
+
+			LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
+			LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, e->file);
+			GB_ASSERT(llvm_scope != nullptr);
+			if (llvm_file == nullptr) {
+				llvm_file = LLVMDIScopeGetFile(llvm_scope);
+			}
+
+			if (llvm_file == nullptr) {
+				break;
+			}
+
+			if (e->type == nullptr) {
+				break;
+			}
+			if (e->type == t_invalid) {
+				break;
+			}
+
+			LLVMDIFlags flags = LLVMDIFlagZero;
+			LLVMBool always_preserve = false;
+
+			LLVMMetadataRef debug_type = lb_debug_type(m, type);
+
+			LLVMMetadataRef var_info = LLVMDIBuilderCreateAutoVariable(
+				m->debug_builder, llvm_scope,
+				cast(char const *)name.text, cast(size_t)name.len,
+				llvm_file, e->token.pos.line,
+				debug_type,
+				always_preserve, flags, 8*alignment
+			);
+
+			LLVMValueRef storage = ptr;
+			LLVMValueRef instr = ptr;
+			LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, e->token.pos);
+			LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+			LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
+		} while (false);
+
 	}
 
 	return lb_addr(val);
@@ -7555,6 +7639,12 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 }
 
 lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args) {
+	// LLVMMetadataRef curr_loc = LLVMGetCurrentDebugLocation2(p->builder);
+	// LLVMSetCurrentDebugLocation2(p->builder, nullptr);
+	// defer (if (curr_loc) {
+	// 	LLVMSetCurrentDebugLocation2(p->builder, curr_loc);
+	// });
+
 	String name = make_string_c(c_name);
 
 
@@ -13444,6 +13534,13 @@ void lb_generate_code(lbGenerator *gen) {
 		TIME_SECTION("LLVM Debug Info Complete Types");
 		lb_debug_complete_types(m);
 
+
+		TIME_SECTION("LLVM Print Module to File");
+		if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+			gb_printf_err("LLVM Error: %s\n", llvm_error);
+			gb_exit(1);
+			return;
+		}
 		TIME_SECTION("LLVM Debug Info Builder Finalize");
 		LLVMDIBuilderFinalize(m->debug_builder);
 	}
