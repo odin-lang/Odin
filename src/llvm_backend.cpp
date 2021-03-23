@@ -1565,6 +1565,16 @@ LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_
 }
 
 
+LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 size_in_bits, LLVMDWARFTypeEncoding encoding, LLVMDIFlags flags = LLVMDIFlagZero) {
+	LLVMMetadataRef basic_type = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, flags);
+#if 0
+	LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, basic_type, cast(char const *)name.text, name.len, nullptr, 0, nullptr, cast(u32)size_in_bits);
+	return final_decl;
+#else
+	return basic_type;
+#endif
+}
+
 LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	Type *original_type = type;
 
@@ -1579,29 +1589,59 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	switch (type->kind) {
 	case Type_Basic:
 		switch (type->Basic.kind) {
-		case Basic_llvm_bool: return LLVMDIBuilderCreateBasicType(m->debug_builder, "llvm bool", 9,  1, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-		case Basic_bool:      return LLVMDIBuilderCreateBasicType(m->debug_builder, "bool",      4,  8, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-		case Basic_b8:        return LLVMDIBuilderCreateBasicType(m->debug_builder, "b8",        2,  8, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-		case Basic_b16:       return LLVMDIBuilderCreateBasicType(m->debug_builder, "b16",       3, 16, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-		case Basic_b32:       return LLVMDIBuilderCreateBasicType(m->debug_builder, "b32",       3, 32, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-		case Basic_b64:       return LLVMDIBuilderCreateBasicType(m->debug_builder, "b64",       3, 64, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
+		case Basic_llvm_bool: return lb_debug_type_basic_type(m, str_lit("llvm bool"),  1, LLVMDWARFTypeEncoding_Boolean);
+		case Basic_bool:      return lb_debug_type_basic_type(m, str_lit("bool"),       8, LLVMDWARFTypeEncoding_Boolean);
+		case Basic_b8:        return lb_debug_type_basic_type(m, str_lit("b8"),         8, LLVMDWARFTypeEncoding_Boolean);
+		case Basic_b16:       return lb_debug_type_basic_type(m, str_lit("b16"),       16, LLVMDWARFTypeEncoding_Boolean);
+		case Basic_b32:       return lb_debug_type_basic_type(m, str_lit("b32"),       32, LLVMDWARFTypeEncoding_Boolean);
+		case Basic_b64:       return lb_debug_type_basic_type(m, str_lit("b64"),       64, LLVMDWARFTypeEncoding_Boolean);
 
-		case Basic_i8:   return LLVMDIBuilderCreateBasicType(m->debug_builder, "i8",   2,   8, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-		case Basic_u8:   return LLVMDIBuilderCreateBasicType(m->debug_builder, "u8",   2,   8, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
-		case Basic_i16:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i16",  3,  16, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-		case Basic_u16:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u16",  3,  16, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
-		case Basic_i32:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i32",  3,  32, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-		case Basic_u32:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u32",  3,  32, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
-		case Basic_i64:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i64",  3,  64, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-		case Basic_u64:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u64",  3,  64, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
-		case Basic_i128: return LLVMDIBuilderCreateBasicType(m->debug_builder, "i128", 4, 128, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-		case Basic_u128: return LLVMDIBuilderCreateBasicType(m->debug_builder, "u128", 4, 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
+		case Basic_i8:   return lb_debug_type_basic_type(m, str_lit("i8"),     8, LLVMDWARFTypeEncoding_Signed);
+		case Basic_u8:   return lb_debug_type_basic_type(m, str_lit("u8"),     8, LLVMDWARFTypeEncoding_Unsigned);
+		case Basic_i16:  return lb_debug_type_basic_type(m, str_lit("i16"),   16, LLVMDWARFTypeEncoding_Signed);
+		case Basic_u16:  return lb_debug_type_basic_type(m, str_lit("u16"),   16, LLVMDWARFTypeEncoding_Unsigned);
+		case Basic_i32:  return lb_debug_type_basic_type(m, str_lit("i32"),   32, LLVMDWARFTypeEncoding_Signed);
+		case Basic_u32:  return lb_debug_type_basic_type(m, str_lit("u32"),   32, LLVMDWARFTypeEncoding_Unsigned);
+		case Basic_i64:  return lb_debug_type_basic_type(m, str_lit("i64"),   64, LLVMDWARFTypeEncoding_Signed);
+		case Basic_u64:  return lb_debug_type_basic_type(m, str_lit("u64"),   64, LLVMDWARFTypeEncoding_Unsigned);
+		case Basic_i128: return lb_debug_type_basic_type(m, str_lit("i128"), 128, LLVMDWARFTypeEncoding_Signed);
+		case Basic_u128: return lb_debug_type_basic_type(m, str_lit("u128"), 128, LLVMDWARFTypeEncoding_Unsigned);
 
-		case Basic_rune: return LLVMDIBuilderCreateBasicType(m->debug_builder, "rune", 4, 32, LLVMDWARFTypeEncoding_Utf, LLVMDIFlagZero);
+		case Basic_rune: return lb_debug_type_basic_type(m, str_lit("rune"), 32, LLVMDWARFTypeEncoding_Utf);
 
 		// Basic_f16,
-		case Basic_f32: return LLVMDIBuilderCreateBasicType(m->debug_builder, "f32", 3, 32, LLVMDWARFTypeEncoding_Float, LLVMDIFlagZero);
-		case Basic_f64: return LLVMDIBuilderCreateBasicType(m->debug_builder, "f64", 3, 64, LLVMDWARFTypeEncoding_Float, LLVMDIFlagZero);
+		case Basic_f32: return lb_debug_type_basic_type(m, str_lit("f32"), 32, LLVMDWARFTypeEncoding_Float);
+		case Basic_f64: return lb_debug_type_basic_type(m, str_lit("f64"), 64, LLVMDWARFTypeEncoding_Float);
+
+		case Basic_int:  return lb_debug_type_basic_type(m,    str_lit("int"),     word_bits, LLVMDWARFTypeEncoding_Signed);
+		case Basic_uint: return lb_debug_type_basic_type(m,    str_lit("uint"),    word_bits, LLVMDWARFTypeEncoding_Unsigned);
+		case Basic_uintptr: return lb_debug_type_basic_type(m, str_lit("uintptr"), word_bits, LLVMDWARFTypeEncoding_Unsigned);
+
+		case Basic_typeid:
+			return lb_debug_type_basic_type(m, str_lit("typeid"), word_bits, LLVMDWARFTypeEncoding_Unsigned);
+
+		// Endian Specific Types
+		case Basic_i16le:  return lb_debug_type_basic_type(m, str_lit("i16le"),  16,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
+		case Basic_u16le:  return lb_debug_type_basic_type(m, str_lit("u16le"),  16,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
+		case Basic_i32le:  return lb_debug_type_basic_type(m, str_lit("i32le"),  32,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
+		case Basic_u32le:  return lb_debug_type_basic_type(m, str_lit("u32le"),  32,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
+		case Basic_i64le:  return lb_debug_type_basic_type(m, str_lit("i64le"),  64,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
+		case Basic_u64le:  return lb_debug_type_basic_type(m, str_lit("u64le"),  64,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
+		case Basic_i128le: return lb_debug_type_basic_type(m, str_lit("i128le"), 128, LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
+		case Basic_u128le: return lb_debug_type_basic_type(m, str_lit("u128le"), 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
+		case Basic_f32le: return lb_debug_type_basic_type(m,  str_lit("f32le"),   32, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
+		case Basic_f64le: return lb_debug_type_basic_type(m,  str_lit("f64le"),   64, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
+
+		case Basic_i16be:  return lb_debug_type_basic_type(m, str_lit("i16be"),  16,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagBigEndian);
+		case Basic_u16be:  return lb_debug_type_basic_type(m, str_lit("u16be"),  16,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
+		case Basic_i32be:  return lb_debug_type_basic_type(m, str_lit("i32be"),  32,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagBigEndian);
+		case Basic_u32be:  return lb_debug_type_basic_type(m, str_lit("u32be"),  32,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
+		case Basic_i64be:  return lb_debug_type_basic_type(m, str_lit("i64be"),  64,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagBigEndian);
+		case Basic_u64be:  return lb_debug_type_basic_type(m, str_lit("u64be"),  64,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
+		case Basic_i128be: return lb_debug_type_basic_type(m, str_lit("i128be"), 128, LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagBigEndian);
+		case Basic_u128be: return lb_debug_type_basic_type(m, str_lit("u128be"), 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
+		case Basic_f32be: return lb_debug_type_basic_type(m,  str_lit("f32be"),   32, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
+		case Basic_f64be: return lb_debug_type_basic_type(m,  str_lit("f64be"),   64, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 
 		// Basic_complex32,
 		case Basic_complex64:
@@ -1638,9 +1678,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				return lb_debug_basic_struct(m, str_lit("quaternion256"), 256, 32, elements, gb_count_of(elements));
 			}
 
-		case Basic_int:  return LLVMDIBuilderCreateBasicType(m->debug_builder,    "int",  3, word_bits, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-		case Basic_uint: return LLVMDIBuilderCreateBasicType(m->debug_builder,    "uint", 4, word_bits, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
-		case Basic_uintptr: return LLVMDIBuilderCreateBasicType(m->debug_builder, "uintptr", 7, word_bits, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
+
 
 		case Basic_rawptr:
 			{
@@ -1666,32 +1704,6 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				elements[1] = lb_debug_struct_field(m, str_lit("id"),   t_typeid, word_bits);
 				return lb_debug_basic_struct(m, str_lit("any"), 2*word_bits, word_bits, elements, gb_count_of(elements));
 			}
-
-		case Basic_typeid:
-			return LLVMDIBuilderCreateBasicType(m->debug_builder, "typeid", 6, word_bits, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
-
-		// Endian Specific Types
-		case Basic_i16le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i16le",  5, 16,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagLittleEndian);
-		case Basic_u16le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u16le",  5, 16,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
-		case Basic_i32le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i32le",  5, 32,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagLittleEndian);
-		case Basic_u32le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u32le",  5, 32,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
-		case Basic_i64le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i64le",  5, 64,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagLittleEndian);
-		case Basic_u64le:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u64le",  5, 64,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
-		case Basic_i128le: return LLVMDIBuilderCreateBasicType(m->debug_builder, "i128le", 6, 128, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagLittleEndian);
-		case Basic_u128le: return LLVMDIBuilderCreateBasicType(m->debug_builder, "u128le", 6, 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
-		case Basic_f32le: return LLVMDIBuilderCreateBasicType(m->debug_builder,  "f32le",  5,  32, LLVMDWARFTypeEncoding_Float, LLVMDIFlagLittleEndian);
-		case Basic_f64le: return LLVMDIBuilderCreateBasicType(m->debug_builder,  "f64le",  5,  64, LLVMDWARFTypeEncoding_Float, LLVMDIFlagLittleEndian);
-
-		case Basic_i16be:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i16be",  5, 16,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagBigEndian);
-		case Basic_u16be:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u16be",  5, 16,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
-		case Basic_i32be:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i32be",  5, 32,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagBigEndian);
-		case Basic_u32be:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u32be",  5, 32,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
-		case Basic_i64be:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "i64be",  5, 64,  LLVMDWARFTypeEncoding_Signed, LLVMDIFlagBigEndian);
-		case Basic_u64be:  return LLVMDIBuilderCreateBasicType(m->debug_builder, "u64be",  5, 64,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
-		case Basic_i128be: return LLVMDIBuilderCreateBasicType(m->debug_builder, "i128be", 6, 128, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagBigEndian);
-		case Basic_u128be: return LLVMDIBuilderCreateBasicType(m->debug_builder, "u128be", 6, 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
-		case Basic_f32be: return LLVMDIBuilderCreateBasicType(m->debug_builder,  "f32be",  5,  32, LLVMDWARFTypeEncoding_Float, LLVMDIFlagLittleEndian);
-		case Basic_f64be: return LLVMDIBuilderCreateBasicType(m->debug_builder,  "f64be",  5,  64, LLVMDWARFTypeEncoding_Float, LLVMDIFlagLittleEndian);
 
 		// Untyped types
 		case Basic_UntypedBool:       GB_PANIC("Basic_UntypedBool");       break;
@@ -1746,90 +1758,32 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		return lb_debug_type(m, type->Map.internal_type);
 
 	case Type_Struct:
-		{
-			type_set_offsets(type);
-			LLVMMetadataRef parent_scope = nullptr; // lb_get_llvm_metadata(m, type->Struct.scope);
-			LLVMMetadataRef scope = parent_scope;
-			LLVMMetadataRef file = lb_get_llvm_file_metadata_from_node(m, type->Struct.node);
-			unsigned line = 0;
-			u64 size_in_bits = 8*cast(u64)type_size_of(type);
-			u32 align_in_bits = 8*cast(u32)type_align_of(type);
-			LLVMDIFlags flags = LLVMDIFlagZero;
-
-			unsigned element_count = cast(unsigned)type->Struct.fields.count;
-			LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
-
-			for (unsigned i = 0; i < element_count; i++) {
-				Entity *f = type->Struct.fields[i];
-				GB_ASSERT(f->kind == Entity_Variable);
-				String name = f->token.string;
-				unsigned field_line = 0;
-				LLVMDIFlags field_flags = LLVMDIFlagZero;
-				u64 offset_in_bits = 8*cast(u64)type->Struct.offsets[i];
-				elements[i] = LLVMDIBuilderCreateMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, field_line,
-					8*cast(u64)type_size_of(f->type), 8*cast(u32)type_align_of(f->type), offset_in_bits,
-					field_flags, lb_debug_type(m, f->type)
-				);
-			}
-
-			if (type->Struct.is_raw_union) {
-				return LLVMDIBuilderCreateUnionType(m->debug_builder, parent_scope, "", 0, file, line,
-					size_in_bits, align_in_bits, flags,
-					elements, element_count, 0,
-					"", 0
-				);
-			}
-
-			return LLVMDIBuilderCreateStructType(m->debug_builder, parent_scope, "", 0, file, line,
-				size_in_bits, align_in_bits, flags,
-				nullptr, elements, element_count, 0, nullptr,
-				"", 0
-			);
-		}
-		break;
-
+		type_set_offsets(type);
+		/*fallthrough*/
 	case Type_Union:
 		{
-			LLVMMetadataRef scope = lb_get_llvm_metadata(m, type->Union.scope);
-			LLVMMetadataRef file = lb_get_llvm_file_metadata_from_node(m, type->Union.node);
-			unsigned line = 0;
-			u64 size_in_bits = 8*cast(u64)type_size_of(type);
-			u32 align_in_bits = 8*cast(u32)type_align_of(type);
+			unsigned tag = DW_TAG_structure_type;
+			if (is_type_raw_union(type) || is_type_union(type)) {
+				tag = DW_TAG_union_type;
+			}
+			u64 size_in_bits  = cast(u64)(8*type_size_of(type));
+			u32 align_in_bits = cast(u32)(8*type_size_of(type));
 			LLVMDIFlags flags = LLVMDIFlagZero;
 
+			LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
+				m->debug_builder, tag, "", 0, nullptr, nullptr, 0, 0, size_in_bits, align_in_bits, flags, "", 0
+			);
+			lbIncompleteDebugType idt = {};
+			idt.type = type;
+			idt.metadata = temp_forward_decl;
 
-			if (type->Union.variants.count == 0) {
-				return LLVMDIBuilderCreateStructType(m->debug_builder, scope, "", 0, file, line, size_in_bits, align_in_bits, flags, nullptr, nullptr, 0, 0, nullptr, "", 0);
-			} else if (is_type_union_maybe_pointer_original_alignment(type)) {
-				return lb_debug_type(m, type->Union.variants[0]);
-			}
-
-			unsigned variant_count = cast(unsigned)type->Union.variants.count;
-			LLVMMetadataRef *variants = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, variant_count);
-			for (unsigned i = 0; i < variant_count; i++) {
-				Type *t = type->Union.variants[i];
-				char name[16] = {};
-				gb_snprintf(name, gb_size_of(name), "v%u", i);
-				isize name_len = gb_strlen(name);
-				variants[i] = LLVMDIBuilderCreateMemberType(m->debug_builder, scope, name, name_len, file, 0, 8*type_size_of(t), 8*cast(u32)type_align_of(t), 0, LLVMDIFlagZero, lb_debug_type(m, t));
-			}
-
-			unsigned top_element_count = 2;
-			LLVMMetadataRef top_elements[2] = {};
-			top_elements[0] = LLVMDIBuilderCreateUnionType(m->debug_builder, scope, "", 0, file, line, 8*type->Union.variant_block_size, align_in_bits, flags, variants, variant_count, 0, "", 0);
-			top_elements[1] = lb_debug_type(m, union_tag_type(type));
-
-			return LLVMDIBuilderCreateStructType(m->debug_builder, scope, "", 0, file, line,
-				size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr,
-				top_elements, top_element_count, 0, nullptr, "", 0);
+			array_add(&m->debug_incomplete_types, idt);
+			lb_set_llvm_metadata(m, type, temp_forward_decl);
+			return temp_forward_decl;
 		}
-		break;
 
 	case Type_Enum:
 		{
-		#if 0
-			return lb_debug_type(m, base_enum_type(type));
-		#else
 			LLVMMetadataRef scope = nullptr;
 			LLVMMetadataRef file = nullptr;
 			unsigned line = 0;
@@ -1846,7 +1800,6 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			}
 			LLVMMetadataRef class_type = lb_debug_type(m, bt);
 			return LLVMDIBuilderCreateEnumerationType(m->debug_builder, scope, "", 0, file, line, 8*type_size_of(type), 8*cast(unsigned)type_align_of(type), elements, element_count, class_type);
-		#endif
 		}
 
 	case Type_Tuple:
@@ -2109,9 +2062,10 @@ void lb_debug_complete_types(lbModule *m) {
 				break;
 			case Type_Struct:
 				if (file == nullptr) {
-					GB_ASSERT(bt->Struct.node != nullptr);
-					file = lb_get_llvm_metadata(m, bt->Struct.node->file);
-					line_number = cast(unsigned)ast_token(bt->Struct.node).pos.line;
+					if (bt->Struct.node) {
+						file = lb_get_llvm_metadata(m, bt->Struct.node->file);
+						line_number = cast(unsigned)ast_token(bt->Struct.node).pos.line;
+					}
 				}
 
 				type_set_offsets(bt);
@@ -2144,21 +2098,47 @@ void lb_debug_complete_types(lbModule *m) {
 					line_number = cast(unsigned)ast_token(bt->Union.node).pos.line;
 				}
 
+				isize index_offset = 1;
+				if (is_type_union_maybe_pointer(bt)) {
+					index_offset = 0;
+				}
 				record_scope = lb_get_llvm_metadata(m, bt->Union.scope);
 				element_count = cast(unsigned)bt->Union.variants.count;
+				if (index_offset > 0) {
+					element_count += 1;
+				}
+
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
+				if (index_offset > 0) {
+					Type *tag_type = union_tag_type(bt);
+					unsigned field_line = 0;
+					u64 offset_in_bits = 8*cast(u64)bt->Union.variant_block_size;
+					LLVMDIFlags field_flags = LLVMDIFlagZero;
+
+					elements[0] = LLVMDIBuilderCreateMemberType(
+						m->debug_builder, record_scope,
+						"tag", 3,
+						file, field_line,
+						8*cast(u64)type_size_of(tag_type), 8*cast(u32)type_align_of(tag_type),
+						offset_in_bits,
+						field_flags, lb_debug_type(m, tag_type)
+					);
+				}
+
 				for_array(j, bt->Union.variants) {
 					Type *variant = bt->Union.variants[j];
 
+					unsigned field_index = cast(unsigned)(index_offset+j);
+
 					char name[16] = {};
-					gb_snprintf(name, gb_size_of(name), "v%u", cast(unsigned)j);
+					gb_snprintf(name, gb_size_of(name), "v%u", field_index);
 					isize name_len = gb_strlen(name);
 
 					unsigned field_line = 0;
 					LLVMDIFlags field_flags = LLVMDIFlagZero;
 					u64 offset_in_bits = 0;
 
-					elements[j] = LLVMDIBuilderCreateMemberType(
+					elements[field_index] = LLVMDIBuilderCreateMemberType(
 						m->debug_builder, record_scope,
 						name, name_len,
 						file, field_line,
@@ -2167,6 +2147,8 @@ void lb_debug_complete_types(lbModule *m) {
 						field_flags, lb_debug_type(m, variant)
 					);
 				}
+
+
 				break;
 			}
 
