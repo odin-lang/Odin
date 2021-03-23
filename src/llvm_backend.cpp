@@ -2010,6 +2010,9 @@ void lb_debug_complete_types(lbModule *m) {
 			String name = str_lit("<anonymous-struct>");
 			if (t->kind == Type_Named) {
 				name = t->Named.name;
+				if (t->Named.type_name && t->Named.type_name->pkg && t->Named.type_name->pkg->name.len != 0) {
+					name = concatenate3_strings(temporary_allocator(), t->Named.type_name->pkg->name, str_lit("."), t->Named.name);
+				}
 
 				LLVMMetadataRef file = nullptr;
 				unsigned line = 0;
