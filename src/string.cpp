@@ -343,6 +343,15 @@ String concatenate_strings(gbAllocator a, String const &x, String const &y) {
 	data[len] = 0;
 	return make_string(data, len);
 }
+String concatenate3_strings(gbAllocator a, String const &x, String const &y, String const &z) {
+	isize len = x.len+y.len+z.len;
+	u8 *data = gb_alloc_array(a, u8, len+1);
+	gb_memmove(data,             x.text, x.len);
+	gb_memmove(data+x.len,       y.text, y.len);
+	gb_memmove(data+x.len+y.len, z.text, z.len);
+	data[len] = 0;
+	return make_string(data, len);
+}
 
 String string_join_and_quote(gbAllocator a, Array<String> strings) {
 	if (!strings.count) {
