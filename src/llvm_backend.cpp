@@ -1567,7 +1567,7 @@ LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_
 
 LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 size_in_bits, LLVMDWARFTypeEncoding encoding, LLVMDIFlags flags = LLVMDIFlagZero) {
 	LLVMMetadataRef basic_type = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, flags);
-#if 0
+#if 1
 	LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, basic_type, cast(char const *)name.text, name.len, nullptr, 0, nullptr, cast(u32)size_in_bits);
 	return final_decl;
 #else
@@ -1730,37 +1730,21 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		return LLVMDIBuilderCreateArrayType(m->debug_builder,
 			type->Array.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->Array.elem), nullptr, 0);
 
-	case Type_EnumeratedArray:
-		return LLVMDIBuilderCreateArrayType(m->debug_builder,
+	case Type_EnumeratedArray: {
+		LLVMMetadataRef array_type = LLVMDIBuilderCreateArrayType(m->debug_builder,
 			type->EnumeratedArray.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->EnumeratedArray.elem), nullptr, 0);
+		gbString name = type_to_string(type, temporary_allocator());
+		return LLVMDIBuilderCreateTypedef(m->debug_builder, array_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
+	}
 
-	case Type_Slice:
-		{
-			LLVMMetadataRef elements[2] = {};
-			elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(type->Slice.elem), 0);
-			elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, word_bits);
-			return lb_debug_basic_struct(m, str_lit("<anonymous-slice>"), 2*word_bits, word_bits, elements, gb_count_of(elements));
-		}
-		break;
-
-	case Type_DynamicArray:
-		{
-			LLVMMetadataRef elements[4] = {};
-			elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(type->DynamicArray.elem), 0*word_bits);
-			elements[1] = lb_debug_struct_field(m, str_lit("len"), t_int, 1*word_bits);
-			elements[2] = lb_debug_struct_field(m, str_lit("cap"), t_int, 2*word_bits);
-			elements[3] = lb_debug_struct_field(m, str_lit("allocator"), t_allocator, 3*word_bits);
-			return lb_debug_basic_struct(m, str_lit("<anonymous-dynamic-array>"), 5*word_bits, word_bits, elements, gb_count_of(elements));
-		}
-		break;
-
-	case Type_Map:
-		return lb_debug_type(m, type->Map.internal_type);
 
 	case Type_Struct:
 		type_set_offsets(type);
 		/*fallthrough*/
 	case Type_Union:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
 		{
 			unsigned tag = DW_TAG_structure_type;
 			if (is_type_raw_union(type) || is_type_union(type)) {
@@ -1842,21 +1826,29 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	case Type_Proc:
 		{
 			LLVMMetadataRef proc_underlying_type = lb_debug_type_internal_proc(m, type);
-			return LLVMDIBuilderCreatePointerType(m->debug_builder, proc_underlying_type, word_bits, word_bits, 0, nullptr, 0);
+			LLVMMetadataRef pointer_type = LLVMDIBuilderCreatePointerType(m->debug_builder, proc_underlying_type, word_bits, word_bits, 0, nullptr, 0);
+			gbString name = type_to_string(type, temporary_allocator());
+			return LLVMDIBuilderCreateTypedef(m->debug_builder, pointer_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
 		}
 		break;
 
-	case Type_BitSet:
-		return lb_debug_type(m, bit_set_to_int(type));
+	case Type_BitSet: {
+		LLVMMetadataRef int_type = lb_debug_type(m, bit_set_to_int(type));
+		gbString name = type_to_string(type, temporary_allocator());
+		return LLVMDIBuilderCreateTypedef(m->debug_builder, int_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
+	}
 
 	case Type_SimdVector:
 		if (type->SimdVector.is_x86_mmx) {
-			GB_PANIC("TODO x86_mmx debug info");
+			return LLVMDIBuilderCreateVectorType(m->debug_builder, 2, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, t_f64), nullptr, 0);
 		}
 		return LLVMDIBuilderCreateVectorType(m->debug_builder, cast(unsigned)type->SimdVector.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->SimdVector.elem), nullptr, 0);
 
-	case Type_RelativePointer:
-		return lb_debug_type(m, type->RelativePointer.base_integer);
+	case Type_RelativePointer: {
+		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativePointer.base_integer);
+		gbString name = type_to_string(type, temporary_allocator());
+		return LLVMDIBuilderCreateTypedef(m->debug_builder, base_integer, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
+	}
 
 	case Type_RelativeSlice:
 		{
@@ -1865,7 +1857,8 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			Type *base_integer = type->RelativeSlice.base_integer;
 			elements[0] = lb_debug_struct_field(m, str_lit("data_offset"), base_integer, 0);
 			elements[1] = lb_debug_struct_field(m, str_lit("len"), base_integer, 8*type_size_of(base_integer));
-			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, "", 0, nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+			gbString name = type_to_string(type, temporary_allocator());
+			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, name, gb_string_length(name), nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
 		}
 	}
 
@@ -1944,8 +1937,6 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		case Type_SimdVector:
 		case Type_RelativePointer:
 		case Type_RelativeSlice:
-
-		case Type_Map: // TODO(bill): Is this okay?
 			{
 				LLVMMetadataRef debug_bt = lb_debug_type(m, bt);
 				LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, debug_bt, name_text, name_len, file, line, scope, align_in_bits);
@@ -1955,6 +1946,7 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 
 		case Type_Slice:
 		case Type_DynamicArray:
+		case Type_Map:
 		case Type_Struct:
 		case Type_Union:
 			LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
@@ -2035,31 +2027,37 @@ void lb_debug_complete_types(lbModule *m) {
 
 			} else {
 				switch (bt->kind) {
-				case Type_Slice:        name = str_lit("<anonymous-slice>");          break;
-				case Type_DynamicArray: name = str_lit("<anonymous-dynamic-array>");  break;
-				case Type_Map:          name = str_lit("<anonymous-map>");            break;
-				case Type_Struct:       name = str_lit("<anonymous-struct>");         break;
-				case Type_Union:        name = str_lit("<anonymous-union>");          break;
+				case Type_Slice:
+				case Type_DynamicArray:
+				case Type_Map:
+				case Type_Struct:
+				case Type_Union:
+					name = make_string_c(type_to_string(t, temporary_allocator()));
+					break;
 				}
 			}
+
+
 
 			switch (bt->kind) {
 			case Type_Slice:
 				element_count = 2;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
-				elements[0] = LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, bt->Slice.elem), word_bits, word_bits, 0, nullptr, 0);
-				elements[1] = lb_debug_type(m, t_int);
+				elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->Slice.elem), 0*word_bits);
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int,                              1*word_bits);
 				break;
 			case Type_DynamicArray:
 				element_count = 4;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
-				elements[0] = LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, bt->DynamicArray.elem), word_bits, word_bits, 0, nullptr, 0);
-				elements[1] = lb_debug_type(m, t_int);
-				elements[2] = lb_debug_type(m, t_int);
-				elements[3] = lb_debug_type(m, t_allocator);
+				elements[0] = lb_debug_struct_field(m, str_lit("data"),      alloc_type_pointer(bt->DynamicArray.elem), 0*word_bits);
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),       t_int,                                     1*word_bits);
+				elements[2] = lb_debug_struct_field(m, str_lit("cap"),       t_int,                                     2*word_bits);
+				elements[3] = lb_debug_struct_field(m, str_lit("allocator"), t_allocator,                               3*word_bits);
 				break;
+
 			case Type_Map:
-				break;
+				bt = bt->Map.internal_type;
+				/*fallthrough*/
 			case Type_Struct:
 				if (file == nullptr) {
 					if (bt->Struct.node) {

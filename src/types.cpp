@@ -3623,6 +3623,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 }
 
 
+gbString type_to_string(Type *type, gbAllocator allocator) {
+	return write_type_to_string(gb_string_make(allocator, ""), type);
+}
 gbString type_to_string(Type *type) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }
