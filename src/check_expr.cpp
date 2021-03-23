@@ -1269,7 +1269,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
-		if (!is_type_numeric(type)) {
+		if (is_type_bit_set(type)) {
+			return true;
+		} else if (!is_type_numeric(type)) {
 			error(op, "Operator '%.*s' is only allowed with numeric expressions", LIT(op.string));
 			return false;
 		}
@@ -1280,7 +1282,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_MulEq:
 	case Token_QuoEq:
 	case Token_AddEq:
-		if (!is_type_numeric(type)) {
+		if (is_type_bit_set(type)) {
+			return true;
+		} else if (!is_type_numeric(type)) {
 			error(op, "Operator '%.*s' is only allowed with numeric expressions", LIT(op.string));
 			return false;
 		}
@@ -1293,6 +1297,8 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 			}
 			error(op, "String concatenation is only allowed with constant strings");
 			return false;
+		} else if (is_type_bit_set(type)) {
+			return true;
 		} else if (!is_type_numeric(type)) {
 			error(op, "Operator '%.*s' is only allowed with numeric expressions", LIT(op.string));
 			return false;
@@ -2680,6 +2686,13 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 		if (op.kind == Token_Quo && is_type_integer(type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
+		}
+
+		if (is_type_bit_set(type)) {
+			switch (op.kind) {
+			case Token_Add: op.kind = Token_Or;     break;
+			case Token_Sub: op.kind = Token_AndNot; break;
+			}
 		}
 
 		x->value = exact_binary_operator_value(op.kind, a, b);
