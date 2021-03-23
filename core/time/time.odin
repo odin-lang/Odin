@@ -274,7 +274,7 @@ datetime_to_time :: proc(year, month, day, hour, minute, second: int, nsec := in
 	if _d < 0 || _m > 30 {
 		_d %= 31; ok = false;
 	}
-	if _m < 1 || _m > 12 {
+	if _m < 0 || _m > 11 {
 		_m %= 12; ok = false;
 	}
 
