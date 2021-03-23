@@ -1913,13 +1913,13 @@ Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 		if (e->kind == Ast_ProcLit) {
 			if (expr->ProcLit.inlining != ProcInlining_none &&
 			    expr->ProcLit.inlining != pi) {
-				syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
+				syntax_error(expr, "You cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
 			}
 			expr->ProcLit.inlining = pi;
 		} else if (e->kind == Ast_CallExpr) {
 			if (expr->CallExpr.inlining != ProcInlining_none &&
 			    expr->CallExpr.inlining != pi) {
-				syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure call");
+				syntax_error(expr, "You cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
 			}
 			expr->CallExpr.inlining = pi;
 		}
