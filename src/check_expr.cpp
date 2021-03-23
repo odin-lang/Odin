@@ -2139,62 +2139,6 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 }
 
 
-// Operand check_ptr_addition(CheckerContext *c, TokenKind op, Operand *ptr, Operand *offset, Ast *node) {
-// 	GB_ASSERT(node->kind == Ast_BinaryExpr);
-// 	ast_node(be, BinaryExpr, node);
-// 	GB_ASSERT(is_type_pointer(ptr->type));
-// 	GB_ASSERT(is_type_integer(offset->type));
-// 	GB_ASSERT(op == Token_Add || op == Token_Sub);
-
-// 	Operand operand = {};
-// 	operand.mode = Addressing_Value;
-// 	operand.type = ptr->type;
-// 	operand.expr = node;
-
-// 	if (base_type(ptr->type) == t_rawptr) {
-// 		gbString str = type_to_string(ptr->type);
-// 		error(node, "Invalid pointer type for pointer arithmetic: '%s'", str);
-// 		gb_string_free(str);
-// 		operand.mode = Addressing_Invalid;
-// 		return operand;
-// 	}
-
-// #if defined(NO_POINTER_ARITHMETIC)
-// 	operand.mode = Addressing_Invalid;
-// 	error(operand.expr, "Pointer arithmetic is not supported");
-// 	return operand;
-// #else
-
-// 	Type *base_ptr = base_type(ptr->type); GB_ASSERT(base_ptr->kind == Type_Pointer);
-// 	Type *elem = base_ptr->Pointer.elem;
-// 	i64 elem_size = type_size_of(elem);
-
-// 	if (elem_size <= 0) {
-// 		gbString str = type_to_string(elem);
-// 		error(node, "Size of pointer's element type '%s' is zero and cannot be used for pointer arithmetic", str);
-// 		gb_string_free(str);
-// 		operand.mode = Addressing_Invalid;
-// 		return operand;
-// 	}
-
-// 	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
-// 		i64 ptr_val = ptr->value.value_pointer;
-// 		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
-// 		i64 new_ptr_val = ptr_val;
-// 		if (op == Token_Add) {
-// 			new_ptr_val += elem_size*offset_val;
-// 		} else {
-// 			new_ptr_val -= elem_size*offset_val;
-// 		}
-// 		operand.mode = Addressing_Constant;
-// 		operand.value = exact_value_pointer(new_ptr_val);
-// 	}
-
-// 	return operand;
-// #endif
-// }
-
-
 
 bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (check_is_assignable_to(c, operand, y)) {
@@ -2618,25 +2562,6 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		check_shift(c, x, y, node, type_hint);
 		return;
 	}
-
-	// if (op.kind == Token_Add || op.kind == Token_Sub) {
-	// 	if (is_type_pointer(x->type) && is_type_integer(y->type)) {
-	// 		*x = check_ptr_addition(c, op.kind, x, y, node);
-	// 		return;
-	// 	} else if (is_type_integer(x->type) && is_type_pointer(y->type)) {
-	// 		if (op.kind == Token_Sub) {
-	// 			gbString lhs = expr_to_string(x->expr);
-	// 			gbString rhs = expr_to_string(y->expr);
-	// 			error(node, "Invalid pointer arithmetic, did you mean '%s %.*s %s'?", rhs, LIT(op.string), lhs);
-	// 			gb_string_free(rhs);
-	// 			gb_string_free(lhs);
-	// 			x->mode = Addressing_Invalid;
-	// 			return;
-	// 		}
-	// 		*x = check_ptr_addition(c, op.kind, y, x, node);
-	// 		return;
-	// 	}
-	// }
 
 	convert_to_typed(c, x, y->type);
 	if (x->mode == Addressing_Invalid) {
