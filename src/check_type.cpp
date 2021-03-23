@@ -152,10 +152,12 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 
 		for_array(j, p->names) {
 			Ast *name = p->names[j];
-			if (!ast_node_expect(name, Ast_Ident)) {
+			if (!ast_node_expect2(name, Ast_Ident, Ast_PolyType)) {
 				continue;
 			}
-
+			if (name->kind == Ast_PolyType) {
+				name = name->PolyType.type;
+			}
 			Token name_token = name->Ident.token;
 
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
@@ -464,8 +466,11 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 				Scope *scope = ctx->scope;
 				for_array(j, p->names) {
 					Ast *name = p->names[j];
-					if (!ast_node_expect(name, Ast_Ident)) {
+					if (!ast_node_expect2(name, Ast_Ident, Ast_PolyType)) {
 						continue;
+					}
+					if (name->kind == Ast_PolyType) {
+						name = name->PolyType.type;
 					}
 					Entity *e = nullptr;
 
@@ -680,8 +685,11 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 				Scope *scope = ctx->scope;
 				for_array(j, p->names) {
 					Ast *name = p->names[j];
-					if (!ast_node_expect(name, Ast_Ident)) {
+					if (!ast_node_expect2(name, Ast_Ident, Ast_PolyType)) {
 						continue;
+					}
+					if (name->kind == Ast_PolyType) {
+						name = name->PolyType.type;
 					}
 					Entity *e = nullptr;
 
