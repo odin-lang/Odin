@@ -13174,7 +13174,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 				u32 align_in_bits = cast(u32)(8*type_align_of(e->type));
 
-
 				LLVMMetadataRef global_variable_metadata = LLVMDIBuilderCreateGlobalVariableExpression(
 					m->debug_builder, llvm_scope,
 					cast(char const *)global_name.text, global_name.len,
@@ -13186,6 +13185,8 @@ void lb_generate_code(lbGenerator *gen) {
 					llvm_decl,
 					align_in_bits
 				);
+				lb_set_llvm_metadata(m, g.value, global_variable_metadata);
+				LLVMGlobalSetMetadata(g.value, 0, global_variable_metadata);
 			}
 		}
 	}
