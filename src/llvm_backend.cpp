@@ -1,5 +1,6 @@
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
+#include "llvm_backend_opt.cpp"
 
 gb_global lbAddr lb_global_type_info_data           = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
@@ -12832,7 +12833,6 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 	}
 }
 
-
 void lb_generate_code(lbGenerator *gen) {
 	#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
@@ -13160,6 +13160,34 @@ void lb_generate_code(lbGenerator *gen) {
 
 		lb_add_entity(m, e, g);
 		lb_add_member(m, name, g);
+
+		if (m->debug_builder) {
+			String global_name = e->token.string;
+			if (global_name.len != 0 && global_name != "_") {
+				LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, e->file);
+				LLVMMetadataRef llvm_scope = llvm_file;
+
+				LLVMBool local_to_unit = e->flags & EntityFlag_Static;
+
+				LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+				LLVMMetadataRef llvm_decl = nullptr;
+
+				u32 align_in_bits = cast(u32)(8*type_align_of(e->type));
+
+
+				LLVMMetadataRef global_variable_metadata = LLVMDIBuilderCreateGlobalVariableExpression(
+					m->debug_builder, llvm_scope,
+					cast(char const *)global_name.text, global_name.len,
+					"", 0, // linkage
+					llvm_file, e->token.pos.line,
+					lb_debug_type(m, e->type),
+					local_to_unit,
+					llvm_expr,
+					llvm_decl,
+					align_in_bits
+				);
+			}
+		}
 	}
 
 
@@ -13227,85 +13255,14 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (LLVMDisposePassManager(default_function_pass_manager));
 
 	LLVMInitializeFunctionPassManager(default_function_pass_manager);
-	{
-		auto dfpm = default_function_pass_manager;
-
-		if (build_context.optimization_level == 0) {
-			LLVMAddMemCpyOptPass(dfpm);
-			LLVMAddPromoteMemoryToRegisterPass(dfpm);
-			LLVMAddMergedLoadStoreMotionPass(dfpm);
-			LLVMAddEarlyCSEPass(dfpm);
-			LLVMAddEarlyCSEMemSSAPass(dfpm);
-			LLVMAddConstantPropagationPass(dfpm);
-			// LLVMAddAggressiveDCEPass(dfpm);
-			LLVMAddMergedLoadStoreMotionPass(dfpm);
-			LLVMAddPromoteMemoryToRegisterPass(dfpm);
-			LLVMAddCFGSimplificationPass(dfpm);
-
-
-			// LLVMAddInstructionCombiningPass(dfpm);
-			LLVMAddSLPVectorizePass(dfpm);
-			LLVMAddLoopVectorizePass(dfpm);
-
-			LLVMAddScalarizerPass(dfpm);
-			LLVMAddLoopIdiomPass(dfpm);
-		} else {
-			bool do_extra_passes = true;
-
-			int repeat_count = cast(int)build_context.optimization_level;
-			do {
-				LLVMAddMemCpyOptPass(dfpm);
-				LLVMAddPromoteMemoryToRegisterPass(dfpm);
-				LLVMAddMergedLoadStoreMotionPass(dfpm);
-				LLVMAddAlignmentFromAssumptionsPass(dfpm);
-				LLVMAddEarlyCSEPass(dfpm);
-				LLVMAddEarlyCSEMemSSAPass(dfpm);
-				LLVMAddConstantPropagationPass(dfpm);
-				if (do_extra_passes) {
-					// LLVMAddAggressiveDCEPass(dfpm);
-				}
-				LLVMAddMergedLoadStoreMotionPass(dfpm);
-				LLVMAddPromoteMemoryToRegisterPass(dfpm);
-				LLVMAddCFGSimplificationPass(dfpm);
-				LLVMAddTailCallEliminationPass(dfpm);
-
-				if (do_extra_passes) {
-					LLVMAddSLPVectorizePass(dfpm);
-					LLVMAddLoopVectorizePass(dfpm);
-
-					LLVMAddConstantPropagationPass(dfpm);
-					LLVMAddScalarizerPass(dfpm);
-					LLVMAddLoopIdiomPass(dfpm);
-
-					// LLVMAddAggressiveInstCombinerPass(dfpm);
-					LLVMAddLowerExpectIntrinsicPass(dfpm);
-
-					LLVMAddDeadStoreEliminationPass(dfpm);
-					LLVMAddReassociatePass(dfpm);
-					LLVMAddAddDiscriminatorsPass(dfpm);
-					LLVMAddPromoteMemoryToRegisterPass(dfpm);
-					LLVMAddCorrelatedValuePropagationPass(dfpm);
-				}
-			} while (repeat_count --> 0);
-		}
-	}
+	lb_populate_function_pass_manager(default_function_pass_manager, false);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
 	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
-	{
-		auto dfpm = default_function_pass_manager_without_memcpy;
-		LLVMAddPromoteMemoryToRegisterPass(dfpm);
-		LLVMAddMergedLoadStoreMotionPass(dfpm);
-		LLVMAddUnifyFunctionExitNodesPass(dfpm);
-		LLVMAddConstantPropagationPass(dfpm);
-		// LLVMAddAggressiveDCEPass(dfpm);
-		LLVMAddMergedLoadStoreMotionPass(dfpm);
-		LLVMAddPromoteMemoryToRegisterPass(dfpm);
-		LLVMAddCFGSimplificationPass(dfpm);
-	}
+	lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
 
 	TIME_SECTION("LLVM Runtime Type Information Creation");
@@ -13630,22 +13587,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	defer (LLVMDisposePassManager(module_pass_manager));
-	LLVMAddAlwaysInlinerPass(module_pass_manager);
-	LLVMAddStripDeadPrototypesPass(module_pass_manager);
-	LLVMAddAnalysisPasses(target_machine, module_pass_manager);
-	if (build_context.optimization_level >= 2) {
-		LLVMAddArgumentPromotionPass(module_pass_manager);
-		LLVMAddConstantMergePass(module_pass_manager);
-		LLVMAddGlobalDCEPass(module_pass_manager);
-		LLVMAddDeadArgEliminationPass(module_pass_manager);
-	}
+	lb_populate_module_pass_manager(target_machine, module_pass_manager);
 
-	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
-	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));
-	LLVMPassManagerBuilderSetOptLevel(pass_manager_builder, build_context.optimization_level);
-	LLVMPassManagerBuilderSetSizeLevel(pass_manager_builder, build_context.optimization_level);
-
-	LLVMPassManagerBuilderPopulateLTOPassManager(pass_manager_builder, module_pass_manager, false, false);
 	LLVMRunPassManager(module_pass_manager, mod);
 
 	llvm_error = nullptr;
