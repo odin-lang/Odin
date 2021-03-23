@@ -490,6 +490,13 @@ bool ast_node_expect(Ast *node, AstKind kind) {
 	}
 	return true;
 }
+bool ast_node_expect2(Ast *node, AstKind kind0, AstKind kind1) {
+	if (node->kind != kind0 && node->kind != kind1) {
+		syntax_error(node, "Expected %.*s or %.*s, got %.*s", LIT(ast_strings[kind0]), LIT(ast_strings[kind1]), LIT(ast_strings[node->kind]));
+		return false;
+	}
+	return true;
+}
 
 Ast *ast_bad_expr(AstFile *f, Token begin, Token end) {
 	Ast *result = alloc_ast_node(f, Ast_BadExpr);
@@ -1863,9 +1870,9 @@ void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Toke
 		}
 		for_array(i, field->Field.names) {
 			Ast *name = field->Field.names[i];
-			if (name->kind == Ast_PolyType) {
-				syntax_error(name, "Polymorphic names are not needed for %.*s parameters", LIT(token.string));
-				return; // TODO(bill): Err multiple times or just the once?
+			if (name->kind != field->Field.names[0]->kind) {
+				syntax_error(name, "Mixture of polymorphic names using both $ and not for %.*s parameters", LIT(token.string));
+				return;
 			}
 		}
 	}
