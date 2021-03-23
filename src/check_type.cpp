@@ -976,6 +976,7 @@ bool is_type_valid_bit_set_range(Type *t) {
 void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
+	type->BitSet.node = node;
 
 	i64 const DEFAULT_BITS = cast(i64)(8*build_context.word_size);
 	i64 const MAX_BITS = 128;

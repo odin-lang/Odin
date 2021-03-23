@@ -1682,7 +1682,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 		case Basic_rawptr:
 			{
-				LLVMMetadataRef void_type = LLVMDIBuilderCreateBasicType(m->debug_builder, "void", 4, 8, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagZero);
+				LLVMMetadataRef void_type = lb_debug_type_basic_type(m, str_lit("void"), 8, LLVMDWARFTypeEncoding_Unsigned);
 				return LLVMDIBuilderCreatePointerType(m->debug_builder, void_type, word_bits, word_bits, LLVMDWARFTypeEncoding_Address, "rawptr", 6);
 			}
 		case Basic_string:
@@ -1694,7 +1694,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			}
 		case Basic_cstring:
 			{
-				LLVMMetadataRef char_type = LLVMDIBuilderCreateBasicType(m->debug_builder, "char", 4, 8, 0, LLVMDIFlagZero);
+				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("char"), 8, LLVMDWARFTypeEncoding_Unsigned);
 				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, word_bits, word_bits, 0, "cstring", 7);
 			}
 		case Basic_any:
@@ -1739,12 +1739,11 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 
 	case Type_Struct:
-		type_set_offsets(type);
-		/*fallthrough*/
 	case Type_Union:
 	case Type_Slice:
 	case Type_DynamicArray:
 	case Type_Map:
+	case Type_BitSet:
 		{
 			unsigned tag = DW_TAG_structure_type;
 			if (is_type_raw_union(type) || is_type_union(type)) {
@@ -1831,12 +1830,6 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			return LLVMDIBuilderCreateTypedef(m->debug_builder, pointer_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
 		}
 		break;
-
-	case Type_BitSet: {
-		LLVMMetadataRef int_type = lb_debug_type(m, bit_set_to_int(type));
-		gbString name = type_to_string(type, temporary_allocator());
-		return LLVMDIBuilderCreateTypedef(m->debug_builder, int_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
-	}
 
 	case Type_SimdVector:
 		if (type->SimdVector.is_x86_mmx) {
@@ -1933,7 +1926,6 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		case Type_EnumeratedArray:
 		case Type_Tuple:
 		case Type_Proc:
-		case Type_BitSet:
 		case Type_SimdVector:
 		case Type_RelativePointer:
 		case Type_RelativeSlice:
@@ -1949,6 +1941,7 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		case Type_Map:
 		case Type_Struct:
 		case Type_Union:
+		case Type_BitSet:
 			LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
 				m->debug_builder, tag, name_text, name_len, nullptr, nullptr, 0, 0, size_in_bits, align_in_bits, flags, "", 0
 			);
@@ -2004,7 +1997,8 @@ void lb_debug_complete_types(lbModule *m) {
 		case Type_DynamicArray:
 		case Type_Map:
 		case Type_Struct:
-		case Type_Union: {
+		case Type_Union:
+		case Type_BitSet: {
 			bool is_union = is_type_raw_union(bt) || is_type_union(bt);
 
 			String name = str_lit("<anonymous-struct>");
@@ -2029,15 +2023,7 @@ void lb_debug_complete_types(lbModule *m) {
 				// TODO(bill): location data for Type_Named
 
 			} else {
-				switch (bt->kind) {
-				case Type_Slice:
-				case Type_DynamicArray:
-				case Type_Map:
-				case Type_Struct:
-				case Type_Union:
-					name = make_string_c(type_to_string(t, temporary_allocator()));
-					break;
-				}
+				name = make_string_c(type_to_string(t, temporary_allocator()));
 			}
 
 
@@ -2093,64 +2079,126 @@ void lb_debug_complete_types(lbModule *m) {
 				}
 				break;
 			case Type_Union:
-				if (file == nullptr) {
-					GB_ASSERT(bt->Union.node != nullptr);
-					file = lb_get_llvm_metadata(m, bt->Union.node->file);
-					line_number = cast(unsigned)ast_token(bt->Union.node).pos.line;
+				{
+					if (file == nullptr) {
+						GB_ASSERT(bt->Union.node != nullptr);
+						file = lb_get_llvm_metadata(m, bt->Union.node->file);
+						line_number = cast(unsigned)ast_token(bt->Union.node).pos.line;
+					}
+
+					isize index_offset = 1;
+					if (is_type_union_maybe_pointer(bt)) {
+						index_offset = 0;
+					}
+					record_scope = lb_get_llvm_metadata(m, bt->Union.scope);
+					element_count = cast(unsigned)bt->Union.variants.count;
+					if (index_offset > 0) {
+						element_count += 1;
+					}
+
+					elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
+					if (index_offset > 0) {
+						Type *tag_type = union_tag_type(bt);
+						unsigned field_line = 0;
+						u64 offset_in_bits = 8*cast(u64)bt->Union.variant_block_size;
+						LLVMDIFlags field_flags = LLVMDIFlagZero;
+
+						elements[0] = LLVMDIBuilderCreateMemberType(
+							m->debug_builder, record_scope,
+							"tag", 3,
+							file, field_line,
+							8*cast(u64)type_size_of(tag_type), 8*cast(u32)type_align_of(tag_type),
+							offset_in_bits,
+							field_flags, lb_debug_type(m, tag_type)
+						);
+					}
+
+					for_array(j, bt->Union.variants) {
+						Type *variant = bt->Union.variants[j];
+
+						unsigned field_index = cast(unsigned)(index_offset+j);
+
+						char name[16] = {};
+						gb_snprintf(name, gb_size_of(name), "v%u", field_index);
+						isize name_len = gb_strlen(name);
+
+						unsigned field_line = 0;
+						LLVMDIFlags field_flags = LLVMDIFlagZero;
+						u64 offset_in_bits = 0;
+
+						elements[field_index] = LLVMDIBuilderCreateMemberType(
+							m->debug_builder, record_scope,
+							name, name_len,
+							file, field_line,
+							8*cast(u64)type_size_of(variant), 8*cast(u32)type_align_of(variant),
+							offset_in_bits,
+							field_flags, lb_debug_type(m, variant)
+						);
+					}
 				}
-
-				isize index_offset = 1;
-				if (is_type_union_maybe_pointer(bt)) {
-					index_offset = 0;
-				}
-				record_scope = lb_get_llvm_metadata(m, bt->Union.scope);
-				element_count = cast(unsigned)bt->Union.variants.count;
-				if (index_offset > 0) {
-					element_count += 1;
-				}
-
-				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
-				if (index_offset > 0) {
-					Type *tag_type = union_tag_type(bt);
-					unsigned field_line = 0;
-					u64 offset_in_bits = 8*cast(u64)bt->Union.variant_block_size;
-					LLVMDIFlags field_flags = LLVMDIFlagZero;
-
-					elements[0] = LLVMDIBuilderCreateMemberType(
-						m->debug_builder, record_scope,
-						"tag", 3,
-						file, field_line,
-						8*cast(u64)type_size_of(tag_type), 8*cast(u32)type_align_of(tag_type),
-						offset_in_bits,
-						field_flags, lb_debug_type(m, tag_type)
-					);
-				}
-
-				for_array(j, bt->Union.variants) {
-					Type *variant = bt->Union.variants[j];
-
-					unsigned field_index = cast(unsigned)(index_offset+j);
-
-					char name[16] = {};
-					gb_snprintf(name, gb_size_of(name), "v%u", field_index);
-					isize name_len = gb_strlen(name);
-
-					unsigned field_line = 0;
-					LLVMDIFlags field_flags = LLVMDIFlagZero;
-					u64 offset_in_bits = 0;
-
-					elements[field_index] = LLVMDIBuilderCreateMemberType(
-						m->debug_builder, record_scope,
-						name, name_len,
-						file, field_line,
-						8*cast(u64)type_size_of(variant), 8*cast(u32)type_align_of(variant),
-						offset_in_bits,
-						field_flags, lb_debug_type(m, variant)
-					);
-				}
-
-
 				break;
+
+			case Type_BitSet:
+				{
+					if (file == nullptr) {
+						GB_ASSERT(bt->BitSet.node != nullptr);
+						file = lb_get_llvm_metadata(m, bt->BitSet.node->file);
+						line_number = cast(unsigned)ast_token(bt->BitSet.node).pos.line;
+					}
+
+					LLVMMetadataRef bit_set_field_type = lb_debug_type(m, t_bool);
+					LLVMMetadataRef scope = file;
+
+					Type *elem = base_type(bt->BitSet.elem);
+					if (elem->kind == Type_Enum) {
+						element_count = cast(unsigned)elem->Enum.fields.count;
+						elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
+						for_array(i, elem->Enum.fields) {
+							Entity *f = elem->Enum.fields[i];
+							GB_ASSERT(f->kind == Entity_Constant);
+							i64 val = exact_value_to_i64(f->Constant.value);
+							String name = f->token.string;
+							u64 offset_in_bits = cast(u64)(val - bt->BitSet.lower);
+							elements[i] = LLVMDIBuilderCreateBitFieldMemberType(
+								m->debug_builder,
+								scope,
+								cast(char const *)name.text, name.len,
+								file, line_number,
+								1,
+								offset_in_bits,
+								0,
+								LLVMDIFlagZero,
+								bit_set_field_type
+							);
+						}
+					} else {
+
+						char name[32] = {};
+
+						GB_ASSERT(is_type_integer(elem));
+						i64 count = bt->BitSet.upper - bt->BitSet.lower + 1;
+						GB_ASSERT(0 <= count);
+
+						element_count = cast(unsigned)count;
+						elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
+						for (unsigned i = 0; i < element_count; i++) {
+							u64 offset_in_bits = i;
+							i64 val = bt->BitSet.lower + cast(i64)i;
+							gb_snprintf(name, gb_count_of(name), "%lld", val);
+							elements[i] = LLVMDIBuilderCreateBitFieldMemberType(
+								m->debug_builder,
+								scope,
+								name, gb_strlen(name),
+								file, line_number,
+								1,
+								offset_in_bits,
+								0,
+								LLVMDIFlagZero,
+								bit_set_field_type
+							);
+						}
+					}
+				}
 			}
 
 

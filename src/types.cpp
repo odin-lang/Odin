@@ -276,6 +276,7 @@ struct TypeProc {
 		Type *underlying;                                 \
 		i64   lower;                                      \
 		i64   upper;                                      \
+		Ast * node;                                       \
 	})                                                    \
 	TYPE_KIND(SimdVector, struct {                        \
 		i64   count;                                      \
