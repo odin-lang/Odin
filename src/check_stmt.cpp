@@ -1666,7 +1666,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 		Ast *expr = unparen_expr(rs->expr);
 
-
+		isize max_val_count = 2;
 		if (is_ast_range(expr)) {
 			ast_node(ie, BinaryExpr, expr);
 			Operand x = {};
@@ -1739,9 +1739,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					break;
 
 				case Type_Tuple:
-					if (false) {
-						check_not_tuple(ctx, &operand);
-					} else {
+					{
 						isize count = t->Tuple.variables.count;
 						if (count < 1 || count > 3) {
 							check_not_tuple(ctx, &operand);
@@ -1759,14 +1757,14 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						if (count > 1) val0 = t->Tuple.variables[0]->type;
 						if (count > 2) val1 = t->Tuple.variables[1]->type;
 
-						if (rs->val1 != nullptr && count < 3) {
+						if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
 							gbString s = type_to_string(t);
 							error(operand.expr, "Expected a 3-value tuple on the rhs, got (%s)", s);
 							gb_string_free(s);
 							break;
 						}
 
-						if (rs->val0 != nullptr && count < 2) {
+						if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
 							gbString s = type_to_string(t);
 							error(operand.expr, "Expected at least a 2-values tuple on the rhs, got (%s)", s);
 							gb_string_free(s);
@@ -1776,6 +1774,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					}
 					break;
 
+				case Type_Struct:
+					if (t->Struct.soa_kind != StructSoa_None) {
+						error(operand.expr, "#soa structures do not yet support for in loop iteration");
+					}
+					break;
 				}
 			}
 
@@ -1787,9 +1790,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
 
-				if (rs->val0 != nullptr && rs->val1 == nullptr) {
+				if (rs->vals.count == 1) {
 					if (is_type_map(operand.type) || is_type_bit_set(operand.type)) {
-						gbString v = expr_to_string(rs->val0);
+						gbString v = expr_to_string(rs->vals[0]);
 						defer (gb_string_free(v));
 						error_line("\tSuggestion: place parentheses around the expression\n");
 						error_line("\t            for (%s in %s) {\n", v, s);
@@ -1800,8 +1803,14 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 		skip_expr_range_stmt:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
 
-		Ast * lhs[2] = {rs->val0, rs->val1};
+		if (rs->vals.count > max_val_count) {
+			error(rs->vals[max_val_count], "Expected a maximum of %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
+		}
+
+		Ast * lhs[2] = {};
 		Type *rhs[2] = {val0, val1};
+		if (rs->vals.count > 1) { lhs[1] = rs->vals[1]; }
+		if (rs->vals.count > 0) { lhs[0] = rs->vals[0]; }
 
 		for (isize i = 0; i < 2; i++) {
 			if (lhs[i] == nullptr) {

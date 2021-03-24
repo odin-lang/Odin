@@ -10735,18 +10735,18 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		Type *val0_type = nullptr;
 		Type *val1_type = nullptr;
-		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
-			val0_type = type_of_expr(rs->val0);
+		if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
+			val0_type = type_of_expr(rs->vals[0]);
 		}
-		if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
-			val1_type = type_of_expr(rs->val1);
+		if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
+			val1_type = type_of_expr(rs->vals[1]);
 		}
 
 		if (val0_type != nullptr) {
-			ir_add_local_for_identifier(proc, rs->val0, true);
+			ir_add_local_for_identifier(proc, rs->vals[0], true);
 		}
 		if (val1_type != nullptr) {
-			ir_add_local_for_identifier(proc, rs->val1, true);
+			ir_add_local_for_identifier(proc, rs->vals[1], true);
 		}
 
 		irValue *val = nullptr;
@@ -10851,11 +10851,11 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 
 		if (is_map) {
-			if (val0_type) ir_store_range_stmt_val(proc, rs->val0, key);
-			if (val1_type) ir_store_range_stmt_val(proc, rs->val1, val);
+			if (val0_type) ir_store_range_stmt_val(proc, rs->vals[0], key);
+			if (val1_type) ir_store_range_stmt_val(proc, rs->vals[1], val);
 		} else {
-			if (val0_type) ir_store_range_stmt_val(proc, rs->val0, val);
-			if (val1_type) ir_store_range_stmt_val(proc, rs->val1, key);
+			if (val0_type) ir_store_range_stmt_val(proc, rs->vals[0], val);
+			if (val1_type) ir_store_range_stmt_val(proc, rs->vals[1], key);
 		}
 
 		ir_push_target_list(proc, rs->label, done, loop, nullptr);

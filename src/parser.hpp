@@ -407,8 +407,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(RangeStmt, "range statement", struct { \
 		Token token; \
 		Ast *label; \
-		Ast *val0; \
-		Ast *val1; \
+		Slice<Ast *> vals; \
 		Token in_token; \
 		Ast *expr; \
 		Ast *body; \

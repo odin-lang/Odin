@@ -3889,19 +3889,19 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 
 	Type *val0_type = nullptr;
 	Type *val1_type = nullptr;
-	if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
-		val0_type = type_of_expr(rs->val0);
+	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
+		val0_type = type_of_expr(rs->vals[0]);
 	}
-	if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
-		val1_type = type_of_expr(rs->val1);
+	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
+		val1_type = type_of_expr(rs->vals[1]);
 	}
 
 	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->val0);
+		Entity *e = entity_of_node(rs->vals[0]);
 		lb_add_local(p, e->type, e, true);
 	}
 	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->val1);
+		Entity *e = entity_of_node(rs->vals[1]);
 		lb_add_local(p, e->type, e, true);
 	}
 
@@ -4002,11 +4002,11 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 
 
 	if (is_map) {
-		if (val0_type) lb_store_range_stmt_val(p, rs->val0, key);
-		if (val1_type) lb_store_range_stmt_val(p, rs->val1, val);
+		if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], key);
+		if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], val);
 	} else {
-		if (val0_type) lb_store_range_stmt_val(p, rs->val0, val);
-		if (val1_type) lb_store_range_stmt_val(p, rs->val1, key);
+		if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], val);
+		if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], key);
 	}
 
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
