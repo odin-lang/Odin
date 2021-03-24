@@ -1780,6 +1780,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				case Type_Struct:
 					if (t->Struct.soa_kind != StructSoa_None) {
 						is_soa = true;
+						if (is_ptr) use_by_reference_for_value = true;
 						array_add(&vals, t->Struct.soa_elem);
 						array_add(&vals, t_int);
 						if (!build_context.use_llvm_api) {
