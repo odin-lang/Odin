@@ -30,6 +30,8 @@ enum BuiltinProcId {
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
 
+	BuiltinProc_soa_zip,
+
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
@@ -224,6 +226,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("max"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("abs"),              1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("clamp"),            3, false, Expr_Expr, BuiltinProcPkg_builtin},
+
+	{STR_LIT("soa_zip"),          1, true, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 

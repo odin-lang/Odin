@@ -8250,8 +8250,36 @@ lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 	return lb_emit_struct_ev(p, value, cast(i32)n);
 }
 
+lbValue lb_soa_zip(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
+	GB_ASSERT(ce->args.count > 0);
 
+	auto slices = slice_make<lbValue>(temporary_allocator(), ce->args.count);
+	for_array(i, slices) {
+		Ast *arg = ce->args[i];
+		if (arg->kind == Ast_FieldValue) {
+			arg = arg->FieldValue.value;
+		}
+		slices[i] = lb_build_expr(p, arg);
+	}
 
+	lbValue len = lb_slice_len(p, slices[0]);
+	for (isize i = 1; i < slices.count; i++) {
+		lbValue other_len = lb_slice_len(p, slices[i]);
+		len = lb_emit_min(p, t_int, len, other_len);
+	}
+
+	GB_ASSERT(is_type_soa_struct(tv.type));
+	lbAddr res = lb_add_local_generated(p, tv.type, true);
+	for_array(i, slices) {
+		lbValue src = lb_slice_elem(p, slices[i]);
+		lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
+		lb_emit_store(p, dst, src);
+	}
+	lbValue len_dst = lb_emit_struct_ep(p, res.addr, cast(i32)slices.count);
+	lb_emit_store(p, len_dst, len);
+
+	return lb_addr_load(p, res);
+}
 
 lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
@@ -8641,6 +8669,9 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		                     lb_build_expr(p, ce->args[1]),
 		                     lb_build_expr(p, ce->args[2]));
 
+
+	case BuiltinProc_soa_zip:
+		return lb_soa_zip(p, ce, tv);
 
 
 	// "Intrinsics"
