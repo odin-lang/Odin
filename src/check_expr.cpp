@@ -5325,12 +5325,55 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			scope_insert(s, e);
 		}
 
-		Type *elem = alloc_type_struct();
-		elem->Struct.scope = s;
-		elem->Struct.fields = fields;
-		elem->Struct.tags = array_make<String>(permanent_allocator(), fields.count);
-		elem->Struct.node = dummy_node_struct;
-		type_set_offsets(elem);
+		Type *elem = nullptr;
+		if (type_hint != nullptr && is_type_struct(type_hint)) {
+			Type *soa_type = base_type(type_hint);
+			if (soa_type->Struct.soa_kind != StructSoa_Slice) {
+				goto soa_zip_end;
+			}
+			Type *soa_elem_type = soa_type->Struct.soa_elem;
+			Type *et = base_type(soa_elem_type);
+			if (et->kind != Type_Struct) {
+				goto soa_zip_end;
+			}
+
+			if (et->Struct.fields.count != fields.count) {
+				goto soa_zip_end;
+			}
+			if (!fail && first_is_field_value) {
+				for_array(i, names) {
+					Selection sel = lookup_field(et, names[i], false);
+					if (sel.entity == nullptr) {
+						goto soa_zip_end;
+					}
+					if (sel.index.count != 1) {
+						goto soa_zip_end;
+					}
+					if (!are_types_identical(sel.entity->type, types[i])) {
+						goto soa_zip_end;
+					}
+				}
+ 			} else {
+ 				for_array(i, et->Struct.fields) {
+ 					if (!are_types_identical(et->Struct.fields[i]->type, types[i])) {
+ 						goto soa_zip_end;
+ 					}
+ 				}
+ 			}
+
+ 			elem = soa_elem_type;
+		}
+
+		soa_zip_end:;
+
+		if (elem == nullptr) {
+			elem = alloc_type_struct();
+			elem->Struct.scope = s;
+			elem->Struct.fields = fields;
+			elem->Struct.tags = array_make<String>(permanent_allocator(), fields.count);
+			elem->Struct.node = dummy_node_struct;
+			type_set_offsets(elem);
+		}
 
 		Type *soa_type = make_soa_struct_slice(c, dummy_node_soa, nullptr, elem);
 		type_set_offsets(soa_type);
