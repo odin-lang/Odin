@@ -315,8 +315,7 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_RangeStmt:
 		n->RangeStmt.label = clone_ast(n->RangeStmt.label);
-		n->RangeStmt.val0  = clone_ast(n->RangeStmt.val0);
-		n->RangeStmt.val1  = clone_ast(n->RangeStmt.val1);
+		n->RangeStmt.vals  = clone_ast_array(n->RangeStmt.vals);
 		n->RangeStmt.expr  = clone_ast(n->RangeStmt.expr);
 		n->RangeStmt.body  = clone_ast(n->RangeStmt.body);
 		break;
@@ -842,11 +841,10 @@ Ast *ast_for_stmt(AstFile *f, Token token, Ast *init, Ast *cond, Ast *post, Ast 
 	return result;
 }
 
-Ast *ast_range_stmt(AstFile *f, Token token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+Ast *ast_range_stmt(AstFile *f, Token token, Slice<Ast *> vals, Token in_token, Ast *expr, Ast *body) {
 	Ast *result = alloc_ast_node(f, Ast_RangeStmt);
 	result->RangeStmt.token = token;
-	result->RangeStmt.val0 = val0;
-	result->RangeStmt.val1 = val1;
+	result->RangeStmt.vals = vals;
 	result->RangeStmt.in_token = in_token;
 	result->RangeStmt.expr  = expr;
 	result->RangeStmt.body  = body;
@@ -3914,7 +3912,7 @@ Ast *parse_for_stmt(AstFile *f) {
 			} else {
 				body = parse_block_stmt(f, false);
 			}
-			return ast_range_stmt(f, token, nullptr, nullptr, in_token, rhs, body);
+			return ast_range_stmt(f, token, {}, in_token, rhs, body);
 		}
 
 		if (f->curr_token.kind != Token_Semicolon) {
@@ -3954,26 +3952,12 @@ Ast *parse_for_stmt(AstFile *f) {
 	if (is_range) {
 		GB_ASSERT(cond->kind == Ast_AssignStmt);
 		Token in_token = cond->AssignStmt.op;
-		Ast *value = nullptr;
-		Ast *index = nullptr;
-		switch (cond->AssignStmt.lhs.count) {
-		case 1:
-			value = cond->AssignStmt.lhs[0];
-			break;
-		case 2:
-			value = cond->AssignStmt.lhs[0];
-			index = cond->AssignStmt.lhs[1];
-			break;
-		default:
-			syntax_error(cond, "Expected either 1 or 2 identifiers");
-			return ast_bad_stmt(f, token, f->curr_token);
-		}
-
+		Slice<Ast *> vals = cond->AssignStmt.lhs;
 		Ast *rhs = nullptr;
 		if (cond->AssignStmt.rhs.count > 0) {
 			rhs = cond->AssignStmt.rhs[0];
 		}
-		return ast_range_stmt(f, token, value, index, in_token, rhs, body);
+		return ast_range_stmt(f, token, vals, in_token, rhs, body);
 	}
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
