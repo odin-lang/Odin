@@ -256,6 +256,50 @@ _abs_date :: proc(abs: u64, full: bool) -> (year: int, month: Month, day: int, y
 	return;
 }
 
+datetime_to_time :: proc(year, month, day, hour, minute, second: int, nsec := int(0)) -> (t: Time, ok: bool) {
+	divmod :: proc(year: int, divisor: int) -> (div: int, mod: int) {
+		assert(divisor > 0);
+		div = int(year / divisor);
+		mod = year % divisor;
+		return;
+	}
+
+	_y := year  - 1970;
+	_m := month - 1;
+	_d := day   - 1;
+
+	if _m < 0 || _m > 11 {
+		_m %= 12; ok = false;
+	}
+	if _d < 0 || _m > 30 {
+		_d %= 31; ok = false;
+	}
+	if _m < 0 || _m > 11 {
+		_m %= 12; ok = false;
+	}
+
+	s := i64(0);
+	div, mod := divmod(_y, 400);
+	days := div * DAYS_PER_400_YEARS;
+
+	div, mod = divmod(mod, 100);
+	days += div * DAYS_PER_100_YEARS;
+
+	div, mod = divmod(mod, 4);
+	days += (div * DAYS_PER_4_YEARS) + (mod * 365);
+
+	days += int(days_before[_m]) + _d;
+
+	s += i64(days)   * SECONDS_PER_DAY;
+	s += i64(hour)   * SECONDS_PER_HOUR;
+	s += i64(minute) * SECONDS_PER_MINUTE;
+	s += i64(second);
+
+	t._nsec = (s * 1e9) + i64(nsec);
+
+	return;
+}
+
 days_before := [?]i32{
 	0,
 	31,
