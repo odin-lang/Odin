@@ -5384,6 +5384,40 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_soa_unzip: {
+		if (!build_context.use_llvm_api) {
+			error(call, "'soa_unzip' is not supported with this backend");
+			return false;
+		}
+
+		Operand x = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x)) {
+			error(call, "'soa_unzip' expects an #soa slice");
+			return false;
+		}
+		Type *t = base_type(x.type);
+		if (!is_type_soa_struct(t) || t->Struct.soa_kind != StructSoa_Slice) {
+			gbString s = type_to_string(x.type);
+			error(call, "'soa_unzip' expects an #soa slice, got %s", s);
+			gb_string_free(s);
+			return false;
+		}
+		auto types = slice_make<Type *>(permanent_allocator(), t->Struct.fields.count-1);
+		for_array(i, types) {
+			Entity *f = t->Struct.fields[i];
+			GB_ASSERT(f->type->kind == Type_Pointer);
+			types[i] = alloc_type_slice(f->type->Pointer.elem);
+		}
+
+		operand->type = alloc_type_tuple_from_field_types(types.data, types.count, false, false);
+		operand->mode = Addressing_Value;
+		break;
+	}
+
 
 	case BuiltinProc_simd_vector: {
 		Operand x = {};
