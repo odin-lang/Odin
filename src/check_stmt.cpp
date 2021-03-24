@@ -1661,6 +1661,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
 		bool is_map = false;
 		bool use_by_reference_for_value = false;
+		bool is_soa = false;
 
 		Ast *expr = unparen_expr(rs->expr);
 
@@ -1775,7 +1776,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 				case Type_Struct:
 					if (t->Struct.soa_kind != StructSoa_None) {
-						error(operand.expr, "#soa structures do not yet support for in loop iteration");
+						is_soa = true;
+						array_add(&vals, t->Struct.soa_elem);
+						array_add(&vals, t_int);
+						if (!build_context.use_llvm_api) {
+							error(operand.expr, "#soa structures do not yet support for in loop iteration");
+						}
 					}
 					break;
 				}
@@ -1834,6 +1840,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 							entity->flags &= ~EntityFlag_Value;
 						} else if (i == 1 && is_map) {
 							entity->flags &= ~EntityFlag_Value;
+						}
+					}
+					if (is_soa) {
+						if (i == 0) {
+							entity->flags |= EntityFlag_SoaPtrField;
 						}
 					}
 

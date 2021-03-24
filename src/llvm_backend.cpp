@@ -416,7 +416,9 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			Type *t = base_type(type_deref(addr.addr.type));
 			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
 			lbValue len = lb_soa_struct_len(p, addr.addr);
-			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), index, len);
+			if (addr.soa.index_expr != nullptr) {
+				lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), index, len);
+			}
 		}
 
 		isize field_count = 0;
@@ -640,7 +642,7 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		lbAddr res = lb_add_local_generated(p, elem, true);
 
-		if (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed) {
+		if (addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
 			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 		}
 
@@ -671,8 +673,8 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
 				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
-				src_ptr = lb_emit_ptr_offset(p, src_ptr, addr.soa.index);
 				lbValue src = lb_emit_load(p, src_ptr);
+				src = lb_emit_ptr_offset(p, src, addr.soa.index);
 				src = lb_emit_load(p, src);
 				lb_emit_store(p, dst, src);
 			}
@@ -3673,6 +3675,11 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 
 		break;
 	}
+	case Type_Struct: {
+		GB_ASSERT(is_type_soa_struct(expr_type));
+		break;
+	}
+
 	default:
 		GB_PANIC("Cannot do range_indexed of %s", type_to_string(expr_type));
 		break;
@@ -3884,7 +3891,87 @@ void lb_build_range_tuple(lbProcedure *p, Ast *expr, Type *val0_type, Type *val1
 	if (done_) *done_ = done;
 }
 
+void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
+	Ast *expr = unparen_expr(rs->expr);
+	TypeAndValue tav = type_and_value_of_expr(expr);
+
+	lbBlock *loop = nullptr;
+	lbBlock *body = nullptr;
+	lbBlock *done = nullptr;
+
+	lb_open_scope(p, scope);
+
+
+	Type *val_types[2] = {};
+	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
+		val_types[0] = type_of_expr(rs->vals[0]);
+	}
+	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
+		val_types[1] = type_of_expr(rs->vals[1]);
+	}
+
+
+
+	lbAddr array = lb_build_addr(p, expr);
+	if (is_type_pointer(type_deref(lb_addr_type(array)))) {
+		array = lb_addr(lb_addr_load(p, array));
+	}
+	lbValue count = lb_soa_struct_len(p, lb_addr_load(p, array));
+
+
+	lbAddr index = lb_add_local_generated(p, t_int, false);
+	lb_addr_store(p, index, lb_const_int(p->module, t_int, cast(u64)-1));
+
+	loop = lb_create_block(p, "for.soa.loop");
+	lb_emit_jump(p, loop);
+	lb_start_block(p, loop);
+
+	lbValue incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
+	lb_addr_store(p, index, incr);
+
+	body = lb_create_block(p, "for.soa.body");
+	done = lb_create_block(p, "for.soa.done");
+
+	lbValue cond = lb_emit_comp(p, Token_Lt, incr, count);
+	lb_emit_if(p, cond, body, done);
+	lb_start_block(p, body);
+
+
+	if (val_types[0]) {
+		Entity *e = entity_of_node(rs->vals[0]);
+		if (e != nullptr) {
+			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
+			map_set(&p->module->soa_values, hash_entity(e), soa_val);
+		}
+	}
+	if (val_types[1]) {
+		lb_store_range_stmt_val(p, rs->vals[1], lb_addr_load(p, index));
+	}
+
+
+	lb_push_target_list(p, rs->label, done, loop, nullptr);
+
+	lb_build_stmt(p, rs->body);
+
+	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_pop_target_list(p);
+	lb_emit_jump(p, loop);
+	lb_start_block(p, done);
+
+}
+
 void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
+	Ast *expr = unparen_expr(rs->expr);
+
+	Type *expr_type = type_of_expr(expr);
+	if (expr_type != nullptr) {
+		Type *et = base_type(type_deref(expr_type));
+	 	if (is_type_soa_struct(et)) {
+			lb_build_range_stmt_struct_soa(p, rs, scope);
+			return;
+		}
+	}
+
 	lb_open_scope(p, scope);
 
 	Type *val0_type = nullptr;
@@ -3909,10 +3996,9 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	lbValue key = {};
 	lbBlock *loop = nullptr;
 	lbBlock *done = nullptr;
-	Ast *expr = unparen_expr(rs->expr);
 	bool is_map = false;
-
 	TypeAndValue tav = type_and_value_of_expr(expr);
+
 
 	if (is_ast_range(expr)) {
 		lb_build_range_interval(p, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
@@ -10622,6 +10708,11 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
+lbAddr lb_get_soa_variable_addr(lbProcedure *p, Entity *e) {
+	lbAddr *found = map_get(&p->module->soa_values, hash_entity(e));
+	GB_ASSERT(found != nullptr);
+	return *found;
+}
 lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Using);
 	String name = e->token.string;
@@ -10661,6 +10752,8 @@ lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *expr) {
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
 		// NOTE(bill): Calculate the using variable every time
 		v = lb_get_using_variable(p, e);
+	} else if (e->flags & EntityFlag_SoaPtrField) {
+		return lb_get_soa_variable_addr(p, e);
 	}
 
 	if (v.value == nullptr) {
@@ -10901,7 +10994,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(is_type_soa_struct(t));
 
 					// TODO(bill): Bounds check
-					if (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed) {
+					if (addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
 						lbValue len = lb_soa_struct_len(p, addr.addr);
 						lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 					}
@@ -10911,7 +11004,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					if (t->Struct.soa_kind == StructSoa_Fixed) {
 						item = lb_emit_array_ep(p, arr, index);
 					} else {
-						item = lb_emit_load(p, lb_emit_ptr_offset(p, arr, index));
+						item = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
 					}
 					if (sub_sel.index.count > 0) {
 						item = lb_emit_deep_field_gep(p, item, sub_sel);
@@ -12005,6 +12098,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->types, a);
 	map_init(&m->llvm_types, a);
 	map_init(&m->values, a);
+	map_init(&m->soa_values, a);
 	string_map_init(&m->members, a);
 	map_init(&m->procedure_values, a);
 	string_map_init(&m->procedures, a);

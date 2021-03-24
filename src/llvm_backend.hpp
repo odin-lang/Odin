@@ -98,6 +98,7 @@ struct lbModule {
 	i32 internal_type_level;
 
 	Map<lbValue>  values;           // Key: Entity *
+	Map<lbAddr>   soa_values;       // Key: Entity *
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
