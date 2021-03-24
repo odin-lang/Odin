@@ -738,18 +738,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 	if is_range {
 		assign_stmt := cond.derived.(ast.Assign_Stmt);
-		val0, val1: ^ast.Expr;
-
-		switch len(assign_stmt.lhs) {
-		case 1:
-			val0 = assign_stmt.lhs[0];
-		case 2:
-			val0 = assign_stmt.lhs[0];
-			val1 = assign_stmt.lhs[1];
-		case:
-			error(p, cond.pos, "expected either 1 or 2 identifiers");
-			return ast.new(ast.Bad_Stmt, tok.pos, body.end);
-		}
+		vals := assign_stmt.lhs[:];
 
 		rhs: ^ast.Expr;
 		if len(assign_stmt.rhs) > 0 {
@@ -758,8 +747,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		range_stmt := ast.new(ast.Range_Stmt, tok.pos, body.end);
 		range_stmt.for_pos = tok.pos;
-		range_stmt.val0 = val0;
-		range_stmt.val1 = val1;
+		range_stmt.vals = vals;
 		range_stmt.in_pos = assign_stmt.op.pos;
 		range_stmt.expr = rhs;
 		range_stmt.body = body;
