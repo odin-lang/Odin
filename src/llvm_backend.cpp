@@ -10122,7 +10122,15 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		case Token_CmpEq: pred = LLVMIntEQ;  break;
 		case Token_NotEq: pred = LLVMIntNE;  break;
 		}
-		res.value = LLVMBuildICmp(p->builder, pred, left.value, right.value, "");
+		LLVMValueRef lhs = left.value;
+		LLVMValueRef rhs = right.value;
+		if (LLVMTypeOf(lhs) != LLVMTypeOf(rhs)) {
+			if (lb_is_type_kind(LLVMTypeOf(lhs), LLVMPointerTypeKind)) {
+				rhs = LLVMBuildPointerCast(p->builder, rhs, LLVMTypeOf(lhs), "");
+			}
+		}
+
+		res.value = LLVMBuildICmp(p->builder, pred, lhs, rhs, "");
 	} else if (is_type_float(a)) {
 		LLVMRealPredicate pred = {};
 		switch (op_kind) {
