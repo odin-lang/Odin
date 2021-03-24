@@ -192,8 +192,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.body = clone(r.body);
 	case Range_Stmt:
 		r.label = auto_cast clone(r.label);
-		r.val0 = clone(r.val0);
-		r.val1 = clone(r.val1);
+		r.vals = clone(r.vals);
 		r.expr = clone(r.expr);
 		r.body = clone(r.body);
 	case Case_Clause:
