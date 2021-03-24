@@ -3836,8 +3836,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	if (ce->args.count > 0) {
 		if (ce->args[0]->kind == Ast_FieldValue) {
-			error(call, "'field = value' calling is not allowed on built-in procedures");
-			return false;
+			if (id != BuiltinProc_soa_zip) {
+				error(call, "'field = value' calling is not allowed on built-in procedures");
+				return false;
+			}
 		}
 	}
 
@@ -5229,6 +5231,116 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		break;
 	}
+
+	case BuiltinProc_soa_zip: {
+		if (!build_context.use_llvm_api) {
+			error(call, "'soa_zip' is not supported with this backend");
+			return false;
+		}
+
+		auto types = array_make<Type *>(temporary_allocator(), 0, ce->args.count);
+		auto names = array_make<String>(temporary_allocator(), 0, ce->args.count);
+
+		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
+
+		bool fail = false;
+		for_array(i, ce->args) {
+			Ast *arg = ce->args[i];
+			bool mix = false;
+			if (first_is_field_value) {
+				mix = arg->kind != Ast_FieldValue;
+			} else {
+				mix = arg->kind == Ast_FieldValue;
+			}
+			if (mix) {
+				error(arg, "Mixture of 'field = value' and value elements in the procedure call 'soa_zip' is not allowed");
+				fail = true;
+				break;
+			}
+		}
+		StringSet name_set = {};
+		string_set_init(&name_set, temporary_allocator(), 2*ce->args.count);
+
+		for_array(i, ce->args) {
+			String name = {};
+			Ast *arg = ce->args[i];
+			if (arg->kind == Ast_FieldValue) {
+				Ast *ename = arg->FieldValue.field;
+				if (!fail && ename->kind != Ast_Ident) {
+					error(ename, "Expected an identifier for field argument");
+				} else if (ename->kind == Ast_Ident) {
+					name = ename->Ident.token.string;
+				}
+				arg = arg->FieldValue.value;
+			}
+
+			Operand op = {};
+			check_expr(c, &op, arg);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
+			Type *arg_type = base_type(op.type);
+			if (!is_type_slice(arg_type)) {
+				gbString s = type_to_string(op.type);
+				error(op.expr, "Indices to 'soa_zip' must be slices, got %s", s);
+				gb_string_free(s);
+				return false;
+			}
+			GB_ASSERT(arg_type->kind == Type_Slice);
+			if (name == "_") {
+				error(op.expr, "Field argument name '%.*s' is not allowed", LIT(name));
+				name = {};
+			}
+			if (name.len == 0) {
+				gbString field_name = gb_string_make(permanent_allocator(), "_");
+				field_name = gb_string_append_fmt(field_name, "%td", types.count);
+				name = make_string_c(field_name);
+			}
+
+
+			if (string_set_exists(&name_set, name)) {
+				error(op.expr, "Field argument name '%.*s' already exists", LIT(name));
+			} else {
+				array_add(&types, arg_type->Slice.elem);
+				array_add(&names, name);
+
+				string_set_add(&name_set, name);
+			}
+		}
+
+
+
+
+		Ast *dummy_node_struct = alloc_ast_node(nullptr, Ast_Invalid);
+		Ast *dummy_node_soa = alloc_ast_node(nullptr, Ast_Invalid);
+		Scope *s = create_scope(builtin_pkg->scope);
+
+		auto fields = array_make<Entity *>(permanent_allocator(), 0, types.count);
+		for_array(i, types) {
+			Type *type = types[i];
+			String name = names[i];
+			GB_ASSERT(name != "");
+			Entity *e = alloc_entity_field(s, make_token_ident(name), type, false, cast(i32)i, EntityState_Resolved);
+			array_add(&fields, e);
+			scope_insert(s, e);
+		}
+
+		Type *elem = alloc_type_struct();
+		elem->Struct.scope = s;
+		elem->Struct.fields = fields;
+		elem->Struct.tags = array_make<String>(permanent_allocator(), fields.count);
+		elem->Struct.node = dummy_node_struct;
+		type_set_offsets(elem);
+
+		Type *soa_type = make_soa_struct_slice(c, dummy_node_soa, nullptr, elem);
+		type_set_offsets(soa_type);
+
+		operand->type = soa_type;
+		operand->mode = Addressing_Value;
+
+		break;
+	}
+
 
 	case BuiltinProc_simd_vector: {
 		Operand x = {};
