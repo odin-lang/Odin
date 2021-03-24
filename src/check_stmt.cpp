@@ -1657,10 +1657,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		check_open_scope(ctx, node);
 		check_label(ctx, rs->label, node);
 
-		Type *val0 = nullptr;
-		Type *val1 = nullptr;
-		Entity *entities[2] = {};
-		isize entity_count = 0;
+		auto vals = array_make<Type *>(temporary_allocator(), 0, 2);
+		auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
 		bool is_map = false;
 		bool use_by_reference_for_value = false;
 
@@ -1676,8 +1674,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			if (!ok) {
 				goto skip_expr_range_stmt;
 			}
-			val0 = x.type;
-			val1 = t_int;
+			array_add(&vals, x.type);
+			array_add(&vals, t_int);
 		} else {
 			Operand operand = {Addressing_Invalid};
 			check_expr_base(ctx, &operand, expr, nullptr);
@@ -1690,8 +1688,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					gb_string_free(t);
 					goto skip_expr_range_stmt;
 				} else {
-					val0 = operand.type;
-					val1 = t_int;
+					array_add(&vals, operand.type);
+					array_add(&vals, t_int);
 					add_type_info_type(ctx, operand.type);
 					goto skip_expr_range_stmt;
 				}
@@ -1701,41 +1699,41 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				switch (t->kind) {
 				case Type_Basic:
 					if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
-						val0 = t_rune;
-						val1 = t_int;
+						array_add(&vals, t_rune);
+						array_add(&vals, t_int);
 						add_package_dependency(ctx, "runtime", "string_decode_rune");
 					}
 					break;
 
 				case Type_EnumeratedArray:
 					if (is_ptr) use_by_reference_for_value = true;
-					val0 = t->EnumeratedArray.elem;
-					val1 = t->EnumeratedArray.index;
+					array_add(&vals, t->EnumeratedArray.elem);
+					array_add(&vals, t->EnumeratedArray.index);
 					break;
 
 				case Type_Array:
 					if (is_ptr) use_by_reference_for_value = true;
-					val0 = t->Array.elem;
-					val1 = t_int;
+					array_add(&vals, t->Array.elem);
+					array_add(&vals, t_int);
 					break;
 
 				case Type_DynamicArray:
 					if (is_ptr) use_by_reference_for_value = true;
-					val0 = t->DynamicArray.elem;
-					val1 = t_int;
+					array_add(&vals, t->DynamicArray.elem);
+					array_add(&vals, t_int);
 					break;
 
 				case Type_Slice:
 					if (is_ptr) use_by_reference_for_value = true;
-					val0 = t->Slice.elem;
-					val1 = t_int;
+					array_add(&vals, t->Slice.elem);
+					array_add(&vals, t_int);
 					break;
 
 				case Type_Map:
 					if (is_ptr) use_by_reference_for_value = true;
 					is_map = true;
-					val0 = t->Map.key;
-					val1 = t->Map.value;
+					array_add(&vals, t->Map.key);
+					array_add(&vals, t->Map.value);
 					break;
 
 				case Type_Tuple:
@@ -1754,8 +1752,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 							break;
 						}
 
-						if (count > 1) val0 = t->Tuple.variables[0]->type;
-						if (count > 2) val1 = t->Tuple.variables[1]->type;
+						for_array(ti, t->Tuple.variables) {
+							array_add(&vals, t->Tuple.variables[ti]->type);
+						}
 
 						if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
 							gbString s = type_to_string(t);
@@ -1782,7 +1781,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				}
 			}
 
-			if (val0 == nullptr) {
+			if (vals.count == 0 || vals[0] == nullptr) {
 				gbString s = expr_to_string(operand.expr);
 				gbString t = type_to_string(operand.type);
 				defer (gb_string_free(s));
@@ -1807,12 +1806,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			error(rs->vals[max_val_count], "Expected a maximum of %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
 		}
 
-		Ast * lhs[2] = {};
-		Type *rhs[2] = {val0, val1};
-		if (rs->vals.count > 1) { lhs[1] = rs->vals[1]; }
-		if (rs->vals.count > 0) { lhs[0] = rs->vals[0]; }
+		auto rhs = slice_from_array(vals);
+		auto lhs = slice_make<Ast *>(temporary_allocator(), rhs.count);
+		slice_copy(&lhs, rs->vals);
 
-		for (isize i = 0; i < 2; i++) {
+		for_array(i, rhs) {
 			if (lhs[i] == nullptr) {
 				continue;
 			}
@@ -1856,7 +1854,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
 			}
 
-			entities[entity_count++] = entity;
+			array_add(&entities, entity);
 
 			if (type == nullptr) {
 				entity->type = t_invalid;
@@ -1864,7 +1862,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 		}
 
-		for (isize i = 0; i < entity_count; i++) {
+		for_array(i, entities) {
 			Entity *e = entities[i];
 			DeclInfo *d = decl_info_of_entity(e);
 			GB_ASSERT(d == nullptr);
