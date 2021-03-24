@@ -2840,6 +2840,12 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 		return;
 	}
 
+	if (lb_get_llvm_metadata(m, ptr) != nullptr) {
+		// Already been set
+		return;
+	}
+
+
 	AstFile *file = p->body->file;
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
@@ -2872,6 +2878,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	LLVMValueRef instr = ptr;
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+	lb_set_llvm_metadata(m, ptr, llvm_expr);
 	LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
 }
 
@@ -10631,7 +10638,9 @@ lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	}
 	GB_ASSERT(v.value != nullptr);
 	GB_ASSERT(parent->type == type_deref(v.type));
-	return lb_emit_deep_field_gep(p, v, sel);
+	lbValue ptr = lb_emit_deep_field_gep(p, v, sel);
+	lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+	return ptr;
 }
 
 
