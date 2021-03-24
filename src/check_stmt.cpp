@@ -558,8 +558,11 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 		bool is_ptr = is_type_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
-			// TODO(bill): Make it work for unions too
 			Scope *found = scope_of_node(t->Struct.node);
+			if (found == nullptr) {
+				found = t->Struct.scope;
+			}
+			GB_ASSERT(found != nullptr);
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {

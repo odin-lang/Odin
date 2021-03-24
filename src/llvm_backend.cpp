@@ -162,6 +162,11 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		return final_ptr;
 	}
 
+	case lbAddr_SoaVariable: {
+		// TODO(bill): FIX THIS HACK
+		return lb_address_from_load(p, lb_addr_load(p, addr));
+	}
+
 	case lbAddr_Context:
 		GB_PANIC("lbAddr_Context should be handled elsewhere");
 	}
@@ -10780,15 +10785,21 @@ lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	Selection sel = lookup_field(parent->type, name, false);
 	GB_ASSERT(sel.entity != nullptr);
 	lbValue *pv = map_get(&p->module->values, hash_entity(parent));
+
 	lbValue v = {};
-	if (pv != nullptr) {
+
+	if (pv == nullptr && parent->flags & EntityFlag_SoaPtrField) {
+		// NOTE(bill): using SOA value (probably from for-in statement)
+		lbAddr parent_addr = lb_get_soa_variable_addr(p, parent);
+		v = lb_addr_get_ptr(p, parent_addr);
+	} else if (pv != nullptr) {
 		v = *pv;
 	} else {
 		GB_ASSERT_MSG(e->using_expr != nullptr, "%.*s", LIT(name));
 		v = lb_build_addr_ptr(p, e->using_expr);
 	}
 	GB_ASSERT(v.value != nullptr);
-	GB_ASSERT(parent->type == type_deref(v.type));
+	GB_ASSERT_MSG(parent->type == type_deref(v.type), "%s %s", type_to_string(parent->type), type_to_string(v.type));
 	lbValue ptr = lb_emit_deep_field_gep(p, v, sel);
 	lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
 	return ptr;
