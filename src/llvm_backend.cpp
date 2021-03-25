@@ -2878,7 +2878,7 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 		LLVMValueRef ptr = LLVMBuildAlloca(p->builder, dst_type, "");
 		LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
-		max_align = gb_min(max_align, 4);
+		max_align = gb_max(max_align, 4);
 		LLVMSetAlignment(ptr, cast(unsigned)max_align);
 
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
