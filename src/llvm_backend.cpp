@@ -6079,16 +6079,17 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return res;
 			} else {
 				// TODO(bill): THIS IS HACK BUT IT WORKS FOR WHAT I NEED
+				LLVMValueRef *old_values = values;
 				LLVMValueRef *new_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, value_count);
 				for (isize i = 0; i < value_count; i++) {
-					LLVMValueRef val = values[i];
-					if (LLVMIsConstant(val)) {
-						new_values[i] = val;
+					LLVMValueRef old_value = old_values[i];
+					if (LLVMIsConstant(old_value)) {
+						new_values[i] = old_value;
 					} else {
-						values[i] = lb_const_nil(m, get_struct_field_type(type, i-offset)).value;
+						new_values[i] = LLVMConstNull(LLVMTypeOf(old_value));
 					}
 				}
-				LLVMValueRef constant_value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
+				LLVMValueRef constant_value = llvm_const_named_struct(lb_type(m, original_type), new_values, cast(unsigned)value_count);
 
 
 				GB_ASSERT(is_local);
@@ -6096,10 +6097,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				lbAddr v = lb_add_local_generated(p, res.type, true);
 				LLVMBuildStore(p->builder, constant_value, v.addr.value);
 				for (isize i = 0; i < value_count; i++) {
-					LLVMValueRef val = values[i];
+					LLVMValueRef val = old_values[i];
 					if (!LLVMIsConstant(val)) {
 						LLVMValueRef dst = LLVMBuildStructGEP(p->builder, v.addr.value, cast(unsigned)i, "");
-						LLVMBuildStore(p->builder, dst, val);
+						LLVMBuildStore(p->builder, val, dst);
 					}
 				}
 				return lb_addr_load(p, v);
