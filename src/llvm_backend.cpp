@@ -1331,6 +1331,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					if (e->kind != Entity_Variable) {
 						continue;
 					}
+					if (e->flags & EntityFlag_CVarArg) {
+						continue;
+					}
 					param_count += 1;
 				}
 			}
@@ -1357,6 +1360,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				for_array(i, type->Proc.params->Tuple.variables) {
 					Entity *e = type->Proc.params->Tuple.variables[i];
 					if (e->kind != Entity_Variable) {
+						continue;
+					}
+					if (e->flags & EntityFlag_CVarArg) {
 						continue;
 					}
 
