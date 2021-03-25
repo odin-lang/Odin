@@ -6064,7 +6064,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 
 			for (isize i = 0; i < value_count; i++) {
-				GB_ASSERT(LLVMIsConstant(values[i]));
+				GB_ASSERT(LLVMIsConstant(values[i]) || LLVMIsGlobalConstant(values[i]));
 			}
 
 			res.value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
