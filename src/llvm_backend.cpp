@@ -2814,7 +2814,6 @@ void lb_start_block(lbProcedure *p, lbBlock *b) {
 
 LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRef dst_type) {
 	LLVMContextRef ctx = p->module->ctx;
-
 	LLVMTypeRef src_type = LLVMTypeOf(val);
 
 	if (src_type == dst_type) {
@@ -2823,6 +2822,8 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 
 	i64 src_size = lb_sizeof(src_type);
 	i64 dst_size = lb_sizeof(dst_type);
+	LLVMTypeKind src_kind = LLVMGetTypeKind(src_type);
+	LLVMTypeKind dst_kind = LLVMGetTypeKind(dst_type);
 
 	if (dst_type == LLVMInt1TypeInContext(ctx)) {
 		GB_ASSERT(lb_is_type_kind(src_type, LLVMIntegerTypeKind));
@@ -2840,8 +2841,7 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 		}
 	}
 
-	LLVMTypeKind src_kind = LLVMGetTypeKind(src_type);
-	LLVMTypeKind dst_kind = LLVMGetTypeKind(dst_type);
+
 	if (src_kind == dst_kind) {
 		if (src_kind == LLVMPointerTypeKind) {
 			return LLVMBuildPointerCast(p->builder, val, dst_type, "");
