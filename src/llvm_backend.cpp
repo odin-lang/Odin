@@ -2832,10 +2832,12 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 		return LLVMBuildZExtOrBitCast(p->builder, val, dst_type, "");
 	}
 
-	if (src_size != dst_size && (lb_is_type_kind(src_type, LLVMVectorTypeKind) ^ lb_is_type_kind(dst_type, LLVMVectorTypeKind))) {
-		// Okay
-	} else {
-		GB_ASSERT_MSG(src_size == dst_size, "%s == %s", LLVMPrintTypeToString(src_type), LLVMPrintTypeToString(dst_type));
+	if (src_size != dst_size) {
+		if ((lb_is_type_kind(src_type, LLVMVectorTypeKind) ^ lb_is_type_kind(dst_type, LLVMVectorTypeKind))) {
+			// Okay
+		} else {
+			goto general_end;
+		}
 	}
 
 	LLVMTypeKind src_kind = LLVMGetTypeKind(src_type);
@@ -2856,6 +2858,7 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 		}
 	}
 
+general_end:;
 	if (LLVMIsALoadInst(val) && src_size <= dst_size) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
