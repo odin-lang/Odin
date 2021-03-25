@@ -6093,7 +6093,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;
-				lbAddr v = lb_add_local_generated(p, res.type, false);
+				lbAddr v = lb_add_local_generated(p, res.type, true);
 				LLVMBuildStore(p->builder, constant_value, v.addr.value);
 				for (isize i = 0; i < value_count; i++) {
 					LLVMValueRef val = values[i];
