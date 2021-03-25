@@ -2856,10 +2856,21 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 		}
 	}
 
-	if (LLVMIsALoadInst(val)) {
+	if (LLVMIsALoadInst(val) && src_size <= dst_size) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
-		return LLVMBuildLoad(p->builder, val_ptr, "");
+		LLVMValueRef loaded_val = LLVMBuildLoad(p->builder, val_ptr, "");
+
+		// TODO(bill): Figure out why this doesn't work
+		// unsigned srca = cast(unsigned)LLVMConstIntGetZExtValue(LLVMAlignOf(src_type));
+		// unsigned dsta = cast(unsigned)LLVMConstIntGetZExtValue(LLVMAlignOf(dst_type));
+
+		unsigned srca = cast(unsigned)lb_alignof(src_type);
+		unsigned dsta = cast(unsigned)lb_alignof(dst_type);
+
+		LLVMSetAlignment(loaded_val, gb_min(srca, dsta));
+
+		return loaded_val;
 	} else {
 		GB_ASSERT(p->decl_block != p->curr_block);
 		LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
