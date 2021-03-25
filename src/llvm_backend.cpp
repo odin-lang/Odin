@@ -6063,12 +6063,48 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				values[0] = LLVMConstNull(lb_alignment_prefix_type_hack(m, type->Struct.custom_align));
 			}
 
+			bool is_constant = true;
+
 			for (isize i = 0; i < value_count; i++) {
-				GB_ASSERT(LLVMIsConstant(values[i]) || LLVMIsGlobalConstant(values[i]));
+				LLVMValueRef val = values[i];
+				if (!LLVMIsConstant(val)) {
+					GB_ASSERT(is_local);
+					GB_ASSERT(LLVMGetInstructionOpcode(val) == LLVMLoad);
+					is_constant = false;
+				}
 			}
 
-			res.value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
-			return res;
+			if (is_constant) {
+				res.value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
+				return res;
+			} else {
+				// TODO(bill): THIS IS HACK BUT IT WORKS FOR WHAT I NEED
+				LLVMValueRef *new_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, value_count);
+				for (isize i = 0; i < value_count; i++) {
+					LLVMValueRef val = values[i];
+					if (LLVMIsConstant(val)) {
+						new_values[i] = val;
+					} else {
+						values[i] = lb_const_nil(m, get_struct_field_type(type, i-offset)).value;
+					}
+				}
+				LLVMValueRef constant_value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
+
+
+				GB_ASSERT(is_local);
+				lbProcedure *p = m->curr_procedure;
+				lbAddr v = lb_add_local_generated(p, res.type, false);
+				LLVMBuildStore(p->builder, constant_value, v.addr.value);
+				for (isize i = 0; i < value_count; i++) {
+					LLVMValueRef val = values[i];
+					if (!LLVMIsConstant(val)) {
+						LLVMValueRef dst = LLVMBuildStructGEP(p->builder, v.addr.value, cast(unsigned)i, "");
+						LLVMBuildStore(p->builder, dst, val);
+					}
+				}
+				return lb_addr_load(p, v);
+
+			}
 		} else if (is_type_bit_set(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 			if (cl->elems.count == 0) {
