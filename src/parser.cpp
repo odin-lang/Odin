@@ -4470,6 +4470,33 @@ Ast *parse_stmt(AstFile *f) {
 		return s;
 	}
 
+	// Error correction statements
+	switch (token.kind) {
+	case Token_else:
+		expect_token(f, Token_else);
+		syntax_error(token, "'else' unattached to an 'if' statement");
+		switch (f->curr_token.kind) {
+		case Token_if:
+			return parse_if_stmt(f);
+		case Token_when:
+			return parse_when_stmt(f);
+		case Token_OpenBrace:
+			return parse_block_stmt(f, true);
+		case Token_do: {
+			Token arrow = expect_token(f, Token_do);
+			Ast *stmt = convert_stmt_to_body(f, parse_stmt(f));
+			if (build_context.disallow_do) {
+				syntax_error(stmt, "'do' has been disallowed");
+			}
+			return stmt;
+		} break;
+		default:
+			fix_advance_to_next_stmt(f);
+			return ast_bad_stmt(f, token, f->curr_token);
+		}
+	}
+
+
 	syntax_error(token, "Expected a statement, got '%.*s'", LIT(token_strings[token.kind]));
 	fix_advance_to_next_stmt(f);
 	return ast_bad_stmt(f, token, f->curr_token);
