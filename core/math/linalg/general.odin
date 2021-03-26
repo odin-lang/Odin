@@ -317,10 +317,11 @@ cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 
 
 array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) {
-	for _, i in v do w[i] = Elem_Type(v[i]);
+	for i in 0..<N {
+		w[i] = Elem_Type(v[i]);
+	}
 	return;
 }
-
 
 matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) {
 	for i in 0..<M {

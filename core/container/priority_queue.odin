@@ -3,7 +3,7 @@ package container
 Priority_Queue :: struct(T: typeid) {
 	data: Array(T),
 	len: int,
-	priority: proc(item: T) -> int 
+	priority: proc(item: T) -> int,
 }
 
 priority_queue_init_none :: proc(q: ^$Q/Priority_Queue($T), f: proc(item: T) -> int, allocator := context.allocator) {
