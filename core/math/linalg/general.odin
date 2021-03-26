@@ -316,10 +316,19 @@ cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 
 
 
-array_cast :: proc(v: $A/[$N]$T, $U: typeid) -> [N]U {
-	w: [N]U;
-	for _, i in v do w[i] = U(v[i]);
-	return w;
+array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) {
+	for _, i in v do w[i] = Elem_Type(v[i]);
+	return;
+}
+
+
+matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) {
+	for i in 0..<M {
+		for j in 0..<N {
+			w[i][j] = Elem_Type(v[i][j]);
+		}
+	}
+	return;
 }
 
 to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32);  }
