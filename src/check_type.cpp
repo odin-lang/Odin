@@ -338,12 +338,17 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 }
 
 Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
-                                      bool *is_polymorphic_, bool *can_check_fields_,
+                                      bool *is_polymorphic_,
                                       Ast *node, Array<Operand> *poly_operands,
                                       Type *named_type, Type *original_type_for_poly) {
 	Type *polymorphic_params_type = nullptr;
+	bool can_check_fields = true;
+	GB_ASSERT(is_polymorphic_ != nullptr);
 
 	if (polymorphic_params == nullptr) {
+		if (!*is_polymorphic_) {
+			*is_polymorphic_ = polymorphic_params != nullptr && poly_operands == nullptr;
+		}
 		return polymorphic_params_type;
 	}
 
@@ -463,7 +468,7 @@ Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_para
 					if (is_type_param) {
 						if (is_type_polymorphic(base_type(operand.type))) {
 							*is_polymorphic_ = true;
-							*can_check_fields_ = false;
+							can_check_fields = false;
 						}
 						e = alloc_entity_type_name(scope, token, operand.type);
 						e->TypeName.is_type_alias = true;
@@ -471,7 +476,7 @@ Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_para
 					} else {
 						if (is_type_polymorphic(base_type(operand.type))) {
 							*is_polymorphic_ = true;
-							*can_check_fields_ = false;
+							can_check_fields = false;
 						}
 						if (e == nullptr) {
 							e = alloc_entity_constant(scope, token, operand.type, operand.value);
@@ -507,8 +512,41 @@ Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_para
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
 	}
 
+	if (!*is_polymorphic_) {
+		*is_polymorphic_ = polymorphic_params != nullptr && poly_operands == nullptr;
+	}
+
 	return polymorphic_params_type;
 }
+
+bool check_record_poly_operand_specialization(CheckerContext *ctx, Type *record_type, Array<Operand> *poly_operands, bool *is_polymorphic_) {
+	if (poly_operands == nullptr) {
+		return false;
+	}
+	for (isize i = 0; i < poly_operands->count; i++) {
+		Operand o = (*poly_operands)[i];
+		if (is_type_polymorphic(o.type)) {
+			return false;
+		}
+		if (record_type == o.type) {
+			// NOTE(bill): Cycle
+			return false;
+		}
+		if (o.mode == Addressing_Type) {
+			// NOTE(bill): ANNOYING EDGE CASE FOR `where` clauses
+			// TODO(bill, 2021-03-27): Is this even a valid HACK?!
+			Entity *entity = entity_of_node(o.expr);
+			if (entity != nullptr &&
+			    entity->kind == Entity_TypeName &&
+			    entity->type == t_typeid) {
+			    	*is_polymorphic_ = true;
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 
 void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_struct(struct_type));
@@ -541,39 +579,18 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 	bool &is_polymorphic = struct_type->Struct.is_polymorphic;
 
 	Type *polymorphic_params = nullptr;
-	bool can_check_fields    = true;
-	bool is_poly_specialized = false;
 
 	polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
-		&is_polymorphic, &can_check_fields,
+		&is_polymorphic,
 		node, poly_operands,
 		named_type, original_type_for_poly
 	);
 
-	if (!is_polymorphic) {
-		is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
-	}
-	if (poly_operands != nullptr) {
-		is_poly_specialized = true;
-		for (isize i = 0; i < poly_operands->count; i++) {
-			Operand o = (*poly_operands)[i];
-			if (is_type_polymorphic(o.type)) {
-				is_poly_specialized = false;
-				break;
-			}
-			if (struct_type == o.type) {
-				// NOTE(bill): Cycle
-				is_poly_specialized = false;
-				break;
-			}
-		}
-	}
-
-	struct_type->Struct.scope                   = ctx->scope;
-	struct_type->Struct.is_packed               = st->is_packed;
-	struct_type->Struct.polymorphic_params      = polymorphic_params;
-	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
+	struct_type->Struct.scope               = ctx->scope;
+	struct_type->Struct.is_packed           = st->is_packed;
+	struct_type->Struct.polymorphic_params  = polymorphic_params;
+	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &is_polymorphic);
 
 	if (!is_polymorphic) {
 		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
@@ -611,44 +628,24 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	bool &is_polymorphic = union_type->Union.is_polymorphic;
 
 	Type *polymorphic_params = nullptr;
-	bool can_check_fields    = true;
-	bool is_poly_specialized = false;
-
 	polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
-		&is_polymorphic, &can_check_fields,
+		&is_polymorphic,
 		node, poly_operands,
 		named_type, original_type_for_poly
 	);
 
+	union_type->Union.scope                = ctx->scope;
+	union_type->Union.polymorphic_params   = polymorphic_params;
+	union_type->Union.is_polymorphic       = is_polymorphic;
+	union_type->Union.is_poly_specialized  = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &is_polymorphic);
+
 	if (!is_polymorphic) {
-		is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
-	}
-	if (poly_operands != nullptr) {
-		is_poly_specialized = true;
-		for (isize i = 0; i < poly_operands->count; i++) {
-			Operand o = (*poly_operands)[i];
-			if (is_type_polymorphic(o.type)) {
-				is_poly_specialized = false;
-				break;
-			}
-			if (union_type == o.type) {
-				// NOTE(bill): Cycle
-				is_poly_specialized = false;
-				break;
-			}
+		if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
+			error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
+		} else {
+			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
 		}
-	}
-
-	union_type->Union.scope                   = ctx->scope;
-	union_type->Union.polymorphic_params      = polymorphic_params;
-	union_type->Union.is_polymorphic          = is_polymorphic;
-	union_type->Union.is_poly_specialized     = is_poly_specialized;
-
-	if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
-		error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
-	} else {
-		bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
 	}
 
 

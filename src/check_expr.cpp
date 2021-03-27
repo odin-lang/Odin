@@ -5915,7 +5915,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			i32 i = id - cast(i32)BuiltinProc__type_simple_boolean_begin;
 			auto procedure = builtin_type_is_procs[i];
 			GB_ASSERT_MSG(procedure != nullptr, "%.*s", LIT(builtin_name));
-			operand->value = exact_value_bool(procedure(operand->type));
+			bool ok = procedure(operand->type);
+			operand->value = exact_value_bool(ok);
 		}
 		operand->mode = Addressing_Constant;
 		operand->type = t_untyped_bool;
