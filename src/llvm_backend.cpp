@@ -13897,12 +13897,10 @@ void lb_generate_code(lbGenerator *gen) {
 		for_array(i, m->procedures_to_generate) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			if (p->body != nullptr) { // Build Procedure
-				for (i32 i = 0; i <= build_context.optimization_level; i++) {
-					if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-						LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
-					} else {
-						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-					}
+				if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
+					LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+				} else {
+					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
 				}
 			}
 		}
