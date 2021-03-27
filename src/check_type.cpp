@@ -1187,7 +1187,11 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 	Type *t = base_type(type);
 	Type *s = base_type(specialization);
 	if (t->kind != s->kind) {
-		return false;
+		if (t->kind == Type_EnumeratedArray && s->kind == Type_Array) {
+			// Might be okay, check later
+		} else {
+			return false;
+		}
 	}
 
 	if (is_type_untyped(t)) {

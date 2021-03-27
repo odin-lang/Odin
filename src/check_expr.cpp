@@ -897,8 +897,68 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			if (poly->Array.count == source->Array.count) {
 				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
 			}
+		} else if (source->kind == Type_EnumeratedArray) {
+			// IMPORTANT TODO(bill): Which is correct?
+			// if (poly->Array.generic_count != nullptr && modify_type) {
+			if (poly->Array.generic_count != nullptr) {
+				Type *gt = poly->Array.generic_count;
+				GB_ASSERT(gt->kind == Type_Generic);
+				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
+				GB_ASSERT(e != nullptr);
+				if (e->kind == Entity_TypeName) {
+					Type *elem = poly->Array.elem;
+					Type *index = source->EnumeratedArray.index;
+					Type *it = base_type(index);
+					if (it->kind != Type_Enum) {
+						return false;
+					}
+
+					poly->kind = Type_EnumeratedArray;
+					poly->cached_size  = -1;
+					poly->cached_align = -1;
+					poly->flags        = source->flags;
+					poly->failure      = false;
+					poly->EnumeratedArray.elem      = source->EnumeratedArray.elem;
+					poly->EnumeratedArray.index     = source->EnumeratedArray.index;
+					poly->EnumeratedArray.min_value = source->EnumeratedArray.min_value;
+					poly->EnumeratedArray.max_value = source->EnumeratedArray.max_value;
+					poly->EnumeratedArray.count     = source->EnumeratedArray.count;
+					poly->EnumeratedArray.op        = source->EnumeratedArray.op;
+
+					e->kind = Entity_TypeName;
+					e->TypeName.is_type_alias = true;
+					e->type = index;
+
+					if (poly->EnumeratedArray.count == source->EnumeratedArray.count) {
+						return is_polymorphic_type_assignable(c, poly->EnumeratedArray.elem, source->EnumeratedArray.elem, true, modify_type);
+					}
+				}
+			}
 		}
 		return false;
+	case Type_EnumeratedArray:
+		if (source->kind == Type_EnumeratedArray) {
+			if (poly->EnumeratedArray.op != source->EnumeratedArray.op) {
+				return false;
+			}
+			if (poly->EnumeratedArray.op) {
+				if (poly->EnumeratedArray.count != source->EnumeratedArray.count) {
+					return false;
+				}
+				if (compare_exact_values(Token_NotEq, poly->EnumeratedArray.min_value, source->EnumeratedArray.min_value)) {
+					return false;
+				}
+				if (compare_exact_values(Token_NotEq, poly->EnumeratedArray.max_value, source->EnumeratedArray.max_value)) {
+					return false;
+				}
+				return is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
+			}
+			bool index = is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
+			bool elem  = is_polymorphic_type_assignable(c, poly->EnumeratedArray.elem, source->EnumeratedArray.elem, true, modify_type);
+			return index || elem;
+		}
+		return false;
+
 	case Type_DynamicArray:
 		if (source->kind == Type_DynamicArray) {
 			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true, modify_type);
