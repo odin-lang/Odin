@@ -148,41 +148,29 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, boo
 	}
 
 	char const hex_table[] = "0123456789ABCDEF";
-	isize buf_len = name.len + extra + 2 + 1;
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-
-	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
-
-	isize j = 0;
 
 	if (print_quotes) {
-		buf[j++] = '"';
+		ir_write_byte(f, '"');
 	}
 
 	if (prefix_with_dot) {
-		buf[j++] = '.';
+		ir_write_byte(f, '.');
 	}
 
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name[i];
 		if (ir_valid_char(c)) {
-			buf[j++] = c;
+			ir_write_byte(f, c);
 		} else {
-			buf[j] = '\\';
-			buf[j+1] = hex_table[c >> 4];
-			buf[j+2] = hex_table[c & 0x0f];
-			j += 3;
+			ir_write_byte(f, '\\');
+			ir_write_byte(f, hex_table[c >> 4]);
+			ir_write_byte(f, hex_table[c & 0x0f]);
 		}
 	}
 
 	if (print_quotes) {
-		buf[j++] = '"';
+		ir_write_byte(f, '"');
 	}
-
-	ir_file_write(f, buf, j);
-
-	gb_temp_arena_memory_end(tmp);
 }
 
 
@@ -201,32 +189,20 @@ void ir_print_escape_path(irFileBuffer *f, String path) {
 	}
 
 
-	char hex_table[] = "0123456789ABCDEF";
-	isize buf_len = path.len + extra + 2 + 1;
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-
-	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
-
-	isize j = 0;
+	char const hex_table[] = "0123456789ABCDEF";
 
 	for (isize i = 0; i < path.len; i++) {
 		u8 c = path[i];
 		if (ir_valid_char(c) || c == ':') {
-			buf[j++] = c;
+			ir_write_byte(f, c);
 		} else if (c == '\\') {
-			buf[j++] = '/';
+			ir_write_byte(f, '/');
 		} else {
-			buf[j] = '\\';
-			buf[j+1] = hex_table[c >> 4];
-			buf[j+2] = hex_table[c & 0x0f];
-			j += 3;
+			ir_write_byte(f, '\\');
+			ir_write_byte(f, hex_table[c >> 4]);
+			ir_write_byte(f, hex_table[c & 0x0f]);
 		}
 	}
-
-	ir_file_write(f, buf, j);
-
-	gb_temp_arena_memory_end(tmp);
 }
 
 
