@@ -6886,6 +6886,17 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		i64 sz = type_size_of(default_type(src));
 		i64 dz = type_size_of(default_type(dst));
 
+
+		if (sz == dz) {
+			if (dz > 1 && !types_have_same_internal_endian(src, dst)) {
+				return lb_emit_byte_swap(p, value, t);
+			}
+			lbValue res = {};
+			res.value = value.value;
+			res.type = t;
+			return res;
+		}
+
 		if (sz > 1 && is_type_different_to_arch_endianness(src)) {
 			Type *platform_src_type = integer_endian_type_to_platform_type(src);
 			value = lb_emit_byte_swap(p, value, platform_src_type);
