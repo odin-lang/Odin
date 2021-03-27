@@ -7765,6 +7765,13 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 		}
 	}
 
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		if (proc_entity->flags & EntityFlag_Disabled) {
+			return nullptr;
+		}
+	}
+
 	if (value == nullptr) {
 		value = ir_build_expr(proc, proc_expr);
 	}
