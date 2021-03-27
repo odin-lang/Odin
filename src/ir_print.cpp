@@ -66,6 +66,15 @@ void ir_write_str_lit(irFileBuffer *f, char const *s) {
 void ir_write_byte(irFileBuffer *f, u8 c) {
 	ir_file_buffer_write(f, &c, 1);
 }
+void ir_write_escaped_byte(irFileBuffer *f, u8 c) {
+	static char const hex_table[] = "0123456789ABCDEF";
+	char buf[3];
+	buf[0] = '\\';
+	buf[1] = hex_table[c >> 4];
+	buf[2] = hex_table[c & 0x0f];
+	ir_file_buffer_write(f, buf, 3);
+}
+
 void ir_write_i64(irFileBuffer *f, i64 i) {
 	String str = i64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
 	ir_write_string(f, str);
@@ -147,8 +156,6 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, boo
 		return;
 	}
 
-	char const hex_table[] = "0123456789ABCDEF";
-
 	if (print_quotes) {
 		ir_write_byte(f, '"');
 	}
@@ -162,9 +169,7 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, boo
 		if (ir_valid_char(c)) {
 			ir_write_byte(f, c);
 		} else {
-			ir_write_byte(f, '\\');
-			ir_write_byte(f, hex_table[c >> 4]);
-			ir_write_byte(f, hex_table[c & 0x0f]);
+			ir_write_escaped_byte(f, c);
 		}
 	}
 
@@ -188,9 +193,6 @@ void ir_print_escape_path(irFileBuffer *f, String path) {
 		return;
 	}
 
-
-	char const hex_table[] = "0123456789ABCDEF";
-
 	for (isize i = 0; i < path.len; i++) {
 		u8 c = path[i];
 		if (ir_valid_char(c) || c == ':') {
@@ -198,9 +200,7 @@ void ir_print_escape_path(irFileBuffer *f, String path) {
 		} else if (c == '\\') {
 			ir_write_byte(f, '/');
 		} else {
-			ir_write_byte(f, '\\');
-			ir_write_byte(f, hex_table[c >> 4]);
-			ir_write_byte(f, hex_table[c & 0x0f]);
+			ir_write_escaped_byte(f, c);
 		}
 	}
 }
