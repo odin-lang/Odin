@@ -7066,6 +7066,18 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 	// float <-> integer
 	if (is_type_float(src) && is_type_integer(dst)) {
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			lbValue res = {};
+			res = lb_emit_conv(p, value, platform_src_type);
+			res = lb_emit_conv(p, res, platform_dst_type);
+			if (is_type_different_to_arch_endianness(dst)) {
+				res = lb_emit_byte_swap(p, res, t);
+			}
+			return lb_emit_conv(p, res, t);
+		}
+
 		lbValue res = {};
 		res.type = t;
 		if (is_type_unsigned(dst)) {
@@ -7076,6 +7088,18 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 	if (is_type_integer(src) && is_type_float(dst)) {
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			lbValue res = {};
+			res = lb_emit_conv(p, value, platform_src_type);
+			res = lb_emit_conv(p, res, platform_dst_type);
+			if (is_type_different_to_arch_endianness(dst)) {
+				res = lb_emit_byte_swap(p, res, t);
+			}
+			return lb_emit_conv(p, res, t);
+		}
+
 		lbValue res = {};
 		res.type = t;
 		if (is_type_unsigned(src)) {
