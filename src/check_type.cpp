@@ -2554,21 +2554,32 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 
 	if (o->mode != Addressing_Constant) {
 		if (o->mode != Addressing_Invalid) {
+			Entity *entity = entity_of_node(o->expr);
+			bool is_poly_type = false;
+			if (entity != nullptr) {
+				is_poly_type = \
+					entity->kind == Entity_TypeName &&
+					entity->type == t_typeid &&
+					entity->flags&EntityFlag_PolyConst;
+			}
+
+			// NOTE(bill, 2021-03-27): Improve error message for parametric polymorphic parameters which want to generate
+			// and enumerated array but cannot determine what it ought to be yet
+			if (ctx->allow_polymorphic_types && is_poly_type) {
+				return 0;
+			}
+
 			gbString s = expr_to_string(o->expr);
 			error(e, "Array count must be a constant integer, got %s", s);
 			gb_string_free(s);
 
-			Entity *e = entity_of_node(o->expr);
-			if (e != nullptr) {
-				// NOTE(bill, 2021-03-27): Improve error message for parametric polymorphic parameters which want to generate
-				// and enumerated array but cannot determine what it ought to be yet
-				if (ctx->allow_polymorphic_types && e->kind == Entity_TypeName && e->type == t_typeid && e->flags&EntityFlag_PolyConst) {
-					error_line("\tSuggestion: 'where' clause may be required to restrict the enumerated array index type to an enum\n");
-					error_line("\t            'where intrinsics.type_is_enum(%.*s)'\n", LIT(e->token.string));
-				}
+			if (is_poly_type) {
+				error_line("\tSuggestion: 'where' clause may be required to restrict the enumerated array index type to an enum\n");
+				error_line("\t            'where intrinsics.type_is_enum(%.*s)'\n", LIT(entity->token.string));
 			}
 
 			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
 		}
 		return 0;
 	}
