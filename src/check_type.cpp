@@ -337,6 +337,179 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 	}
 }
 
+Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
+                                      bool *is_polymorphic_, bool *can_check_fields_,
+                                      Ast *node, Array<Operand> *poly_operands,
+                                      Type *named_type, Type *original_type_for_poly) {
+	Type *polymorphic_params_type = nullptr;
+
+	if (polymorphic_params == nullptr) {
+		return polymorphic_params_type;
+	}
+
+	ast_node(field_list, FieldList, polymorphic_params);
+	Slice<Ast *> params = field_list->list;
+	if (params.count != 0) {
+		isize variable_count = 0;
+		for_array(i, params) {
+			Ast *field = params[i];
+			if (ast_node_expect(field, Ast_Field)) {
+				ast_node(f, Field, field);
+				variable_count += gb_max(f->names.count, 1);
+			}
+		}
+
+		auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
+
+		for_array(i, params) {
+			Ast *param = params[i];
+			if (param->kind != Ast_Field) {
+				continue;
+			}
+			ast_node(p, Field, param);
+			Ast *type_expr = p->type;
+			Ast *default_value = unparen_expr(p->default_value);
+			Type *type = nullptr;
+			bool is_type_param = false;
+			bool is_type_polymorphic_type = false;
+			if (type_expr == nullptr && default_value == nullptr) {
+				error(param, "Expected a type for this parameter");
+				continue;
+			}
+
+			if (type_expr != nullptr) {
+				if (type_expr->kind == Ast_Ellipsis) {
+					type_expr = type_expr->Ellipsis.expr;
+					error(param, "A polymorphic parameter cannot be variadic");
+				}
+				if (type_expr->kind == Ast_TypeidType) {
+					is_type_param = true;
+					Type *specialization = nullptr;
+					if (type_expr->TypeidType.specialization != nullptr) {
+						Ast *s = type_expr->TypeidType.specialization;
+						specialization = check_type(ctx, s);
+					}
+					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+				} else {
+					type = check_type(ctx, type_expr);
+					if (is_type_polymorphic(type)) {
+						is_type_polymorphic_type = true;
+					}
+				}
+			}
+
+			ParameterValue param_value = {};
+			if (default_value != nullptr)  {
+				Type *out_type = nullptr;
+				param_value = handle_parameter_value(ctx, type, &out_type, default_value, false);
+				if (type == nullptr && out_type != nullptr) {
+					type = out_type;
+				}
+				if (param_value.kind != ParameterValue_Constant && param_value.kind != ParameterValue_Nil) {
+					error(default_value, "Invalid parameter value");
+					param_value = {};
+				}
+			}
+
+
+			if (type == nullptr) {
+				error(params[i], "Invalid parameter type");
+				type = t_invalid;
+			}
+			if (is_type_untyped(type)) {
+				if (is_type_untyped_undef(type)) {
+					error(params[i], "Cannot determine parameter type from ---");
+				} else {
+					error(params[i], "Cannot determine parameter type from a nil");
+				}
+				type = t_invalid;
+			}
+
+			if (is_type_polymorphic_type) {
+				gbString str = type_to_string(type);
+				error(params[i], "Parameter types cannot be polymorphic, got %s", str);
+				gb_string_free(str);
+				type = t_invalid;
+			}
+
+			if (!is_type_param && !is_type_constant_type(type)) {
+				gbString str = type_to_string(type);
+				error(params[i], "A parameter must be a valid constant type, got %s", str);
+				gb_string_free(str);
+			}
+
+			Scope *scope = ctx->scope;
+			for_array(j, p->names) {
+				Ast *name = p->names[j];
+				if (!ast_node_expect2(name, Ast_Ident, Ast_PolyType)) {
+					continue;
+				}
+				if (name->kind == Ast_PolyType) {
+					name = name->PolyType.type;
+				}
+				Entity *e = nullptr;
+
+				Token token = name->Ident.token;
+
+				if (poly_operands != nullptr) {
+					Operand operand = {};
+					operand.type = t_invalid;
+					if (entities.count < poly_operands->count) {
+						operand = (*poly_operands)[entities.count];
+					} else if (param_value.kind != ParameterValue_Invalid) {
+						operand.mode = Addressing_Constant;
+						operand.value = param_value.value;
+					}
+					if (is_type_param) {
+						if (is_type_polymorphic(base_type(operand.type))) {
+							*is_polymorphic_ = true;
+							*can_check_fields_ = false;
+						}
+						e = alloc_entity_type_name(scope, token, operand.type);
+						e->TypeName.is_type_alias = true;
+						e->flags |= EntityFlag_PolyConst;
+					} else {
+						if (is_type_polymorphic(base_type(operand.type))) {
+							*is_polymorphic_ = true;
+							*can_check_fields_ = false;
+						}
+						if (e == nullptr) {
+							e = alloc_entity_constant(scope, token, operand.type, operand.value);
+							e->Constant.param_value = param_value;
+						}
+					}
+				} else {
+					if (is_type_param) {
+						e = alloc_entity_type_name(scope, token, type);
+						e->TypeName.is_type_alias = true;
+						e->flags |= EntityFlag_PolyConst;
+					} else {
+						e = alloc_entity_constant(scope, token, type, param_value.value);
+						e->Constant.param_value = param_value;
+					}
+				}
+
+				e->state = EntityState_Resolved;
+				add_entity(ctx->checker, scope, name, e);
+				array_add(&entities, e);
+			}
+		}
+
+		if (entities.count > 0) {
+			Type *tuple = alloc_type_tuple();
+			tuple->Tuple.variables = entities;
+			polymorphic_params_type = tuple;
+		}
+	}
+
+	if (original_type_for_poly != nullptr) {
+		GB_ASSERT(named_type != nullptr);
+		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+	}
+
+	return polymorphic_params_type;
+}
+
 void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
@@ -371,165 +544,12 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 	bool can_check_fields    = true;
 	bool is_poly_specialized = false;
 
-	if (st->polymorphic_params != nullptr) {
-		ast_node(field_list, FieldList, st->polymorphic_params);
-		Slice<Ast *> params = field_list->list;
-		if (params.count != 0) {
-			isize variable_count = 0;
-			for_array(i, params) {
-				Ast *field = params[i];
-				if (ast_node_expect(field, Ast_Field)) {
-					ast_node(f, Field, field);
-					variable_count += gb_max(f->names.count, 1);
-				}
-			}
-
-			auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
-
-			for_array(i, params) {
-				Ast *param = params[i];
-				if (param->kind != Ast_Field) {
-					continue;
-				}
-				ast_node(p, Field, param);
-				Ast *type_expr = p->type;
-				Ast *default_value = unparen_expr(p->default_value);
-				Type *type = nullptr;
-				bool is_type_param = false;
-				bool is_type_polymorphic_type = false;
-				if (type_expr == nullptr && default_value == nullptr) {
-					error(param, "Expected a type for this parameter");
-					continue;
-				}
-
-				if (type_expr != nullptr) {
-					if (type_expr->kind == Ast_Ellipsis) {
-						type_expr = type_expr->Ellipsis.expr;
-						error(param, "A polymorphic parameter cannot be variadic");
-					}
-					if (type_expr->kind == Ast_TypeidType) {
-						is_type_param = true;
-						Type *specialization = nullptr;
-						if (type_expr->TypeidType.specialization != nullptr) {
-							Ast *s = type_expr->TypeidType.specialization;
-							specialization = check_type(ctx, s);
-						}
-						type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-					} else {
-						type = check_type(ctx, type_expr);
-						if (is_type_polymorphic(type)) {
-							is_type_polymorphic_type = true;
-						}
-					}
-				}
-
-				ParameterValue param_value = {};
-				if (default_value != nullptr)  {
-					Type *out_type = nullptr;
-					param_value = handle_parameter_value(ctx, type, &out_type, default_value, false);
-					if (type == nullptr && out_type != nullptr) {
-						type = out_type;
-					}
-					if (param_value.kind != ParameterValue_Constant && param_value.kind != ParameterValue_Nil) {
-						error(default_value, "Invalid parameter value");
-						param_value = {};
-					}
-				}
-
-
-				if (type == nullptr) {
-					error(params[i], "Invalid parameter type");
-					type = t_invalid;
-				}
-				if (is_type_untyped(type)) {
-					if (is_type_untyped_undef(type)) {
-						error(params[i], "Cannot determine parameter type from ---");
-					} else {
-						error(params[i], "Cannot determine parameter type from a nil");
-					}
-					type = t_invalid;
-				}
-
-				if (is_type_polymorphic_type) {
-					gbString str = type_to_string(type);
-					error(params[i], "Parameter types cannot be polymorphic, got %s", str);
-					gb_string_free(str);
-					type = t_invalid;
-				}
-
-				if (!is_type_param && !is_type_constant_type(type)) {
-					gbString str = type_to_string(type);
-					error(params[i], "A parameter must be a valid constant type, got %s", str);
-					gb_string_free(str);
-				}
-
-				Scope *scope = ctx->scope;
-				for_array(j, p->names) {
-					Ast *name = p->names[j];
-					if (!ast_node_expect2(name, Ast_Ident, Ast_PolyType)) {
-						continue;
-					}
-					if (name->kind == Ast_PolyType) {
-						name = name->PolyType.type;
-					}
-					Entity *e = nullptr;
-
-					Token token = name->Ident.token;
-
-					if (poly_operands != nullptr) {
-						Operand operand = {};
-						operand.type = t_invalid;
-						if (entities.count < poly_operands->count) {
-							operand = (*poly_operands)[entities.count];
-						} else if (param_value.kind != ParameterValue_Invalid) {
-							operand.mode = Addressing_Constant;
-							operand.value = param_value.value;
-						}
-						if (is_type_param) {
-							if (is_type_polymorphic(base_type(operand.type))) {
-								is_polymorphic = true;
-								can_check_fields = false;
-							}
-							e = alloc_entity_type_name(scope, token, operand.type);
-							e->TypeName.is_type_alias = true;
-						} else {
-							if (is_type_polymorphic(base_type(operand.type))) {
-								is_polymorphic = true;
-								can_check_fields = false;
-							}
-							if (e == nullptr) {
-								e = alloc_entity_constant(scope, token, operand.type, operand.value);
-								e->Constant.param_value = param_value;
-							}
-						}
-					} else {
-						if (is_type_param) {
-							e = alloc_entity_type_name(scope, token, type);
-							e->TypeName.is_type_alias = true;
-						} else {
-							e = alloc_entity_constant(scope, token, type, param_value.value);
-							e->Constant.param_value = param_value;
-						}
-					}
-
-					e->state = EntityState_Resolved;
-					add_entity(ctx->checker, scope, name, e);
-					array_add(&entities, e);
-				}
-			}
-
-			if (entities.count > 0) {
-				Type *tuple = alloc_type_tuple();
-				tuple->Tuple.variables = entities;
-				polymorphic_params = tuple;
-			}
-		}
-
-		if (original_type_for_poly != nullptr) {
-			GB_ASSERT(named_type != nullptr);
-			add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
-		}
-	}
+	polymorphic_params = check_record_polymorphic_params(
+		ctx, st->polymorphic_params,
+		&is_polymorphic, &can_check_fields,
+		node, poly_operands,
+		named_type, original_type_for_poly
+	);
 
 	if (!is_polymorphic) {
 		is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
@@ -587,165 +607,19 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 
 	union_type->Union.scope = ctx->scope;
 
-	Type *polymorphic_params     = nullptr;
-	bool is_polymorphic          = false;
-	bool can_check_fields        = true;
-	bool is_poly_specialized     = false;
+	// NOTE(bill): Yes I know it's a non-const reference, what you gonna do?
+	bool &is_polymorphic = union_type->Union.is_polymorphic;
 
-	if (ut->polymorphic_params != nullptr) {
-		ast_node(field_list, FieldList, ut->polymorphic_params);
-		Slice<Ast *> params = field_list->list;
-		if (params.count != 0) {
-			isize variable_count = 0;
-			for_array(i, params) {
-				Ast *field = params[i];
-				if (ast_node_expect(field, Ast_Field)) {
-					ast_node(f, Field, field);
-					variable_count += gb_max(f->names.count, 1);
-				}
-			}
+	Type *polymorphic_params = nullptr;
+	bool can_check_fields    = true;
+	bool is_poly_specialized = false;
 
-			auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
-
-			for_array(i, params) {
-				Ast *param = params[i];
-				if (param->kind != Ast_Field) {
-					continue;
-				}
-				ast_node(p, Field, param);
-				Ast *type_expr = p->type;
-				Ast *default_value = unparen_expr(p->default_value);
-				Type *type = nullptr;
-				bool is_type_param = false;
-				bool is_type_polymorphic_type = false;
-				if (type_expr == nullptr && default_value == nullptr) {
-					error(param, "Expected a type for this parameter");
-					continue;
-				}
-				if (type_expr != nullptr) {
-					if (type_expr->kind == Ast_Ellipsis) {
-						type_expr = type_expr->Ellipsis.expr;
-						error(param, "A polymorphic parameter cannot be variadic");
-					}
-					if (type_expr->kind == Ast_TypeidType) {
-						is_type_param = true;
-						Type *specialization = nullptr;
-						if (type_expr->TypeidType.specialization != nullptr) {
-							Ast *s = type_expr->TypeidType.specialization;
-							specialization = check_type(ctx, s);
-						}
-						type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-					} else {
-						type = check_type(ctx, type_expr);
-						if (is_type_polymorphic(type)) {
-							is_type_polymorphic_type = true;
-						}
-					}
-				}
-
-				ParameterValue param_value = {};
-				if (default_value != nullptr)  {
-					Type *out_type = nullptr;
-					param_value = handle_parameter_value(ctx, type, &out_type, default_value, false);
-					if (type == nullptr && out_type != nullptr) {
-						type = out_type;
-					}
-					if (param_value.kind != ParameterValue_Constant && param_value.kind != ParameterValue_Nil) {
-						error(default_value, "Invalid parameter value");
-						param_value = {};
-					}
-				}
-
-				if (type == nullptr) {
-					error(params[i], "Invalid parameter type");
-					type = t_invalid;
-				}
-				if (is_type_untyped(type)) {
-					if (is_type_untyped_undef(type)) {
-						error(params[i], "Cannot determine parameter type from ---");
-					} else {
-						error(params[i], "Cannot determine parameter type from a nil");
-					}
-					type = t_invalid;
-				}
-
-				if (is_type_polymorphic_type) {
-					gbString str = type_to_string(type);
-					error(params[i], "Parameter types cannot be polymorphic, got %s", str);
-					gb_string_free(str);
-					type = t_invalid;
-				}
-
-				if (!is_type_param && !is_type_constant_type(type)) {
-					gbString str = type_to_string(type);
-					error(params[i], "A parameter must be a valid constant type, got %s", str);
-					gb_string_free(str);
-				}
-
-				Scope *scope = ctx->scope;
-				for_array(j, p->names) {
-					Ast *name = p->names[j];
-					if (!ast_node_expect2(name, Ast_Ident, Ast_PolyType)) {
-						continue;
-					}
-					if (name->kind == Ast_PolyType) {
-						name = name->PolyType.type;
-					}
-					Entity *e = nullptr;
-
-					Token token = name->Ident.token;
-
-					if (poly_operands != nullptr) {
-						Operand operand = {};
-						operand.type = t_invalid;
-						if (entities.count < poly_operands->count) {
-							operand = (*poly_operands)[entities.count];
-						} else if (param_value.kind != ParameterValue_Invalid) {
-							operand.mode = Addressing_Constant;
-							operand.value = param_value.value;
-						}
-						if (is_type_param) {
-							GB_ASSERT(operand.mode == Addressing_Type ||
-							          operand.mode == Addressing_Invalid);
-							if (is_type_polymorphic(base_type(operand.type))) {
-								is_polymorphic = true;
-								can_check_fields = false;
-							}
-							e = alloc_entity_type_name(scope, token, operand.type);
-							e->TypeName.is_type_alias = true;
-						} else {
-							// GB_ASSERT(operand.mode == Addressing_Constant);
-							e = alloc_entity_constant(scope, token, operand.type, operand.value);
-							e->Constant.param_value = param_value;
-						}
-					} else {
-						if (is_type_param) {
-							e = alloc_entity_type_name(scope, token, type);
-							e->TypeName.is_type_alias = true;
-						} else {
-							e = alloc_entity_constant(scope, token, type, empty_exact_value);
-							e->Constant.param_value = param_value;
-						}
-					}
-
-					e->state = EntityState_Resolved;
-					add_entity(ctx->checker, scope, name, e);
-					array_add(&entities, e);
-				}
-			}
-
-			if (entities.count > 0) {
-				Type *tuple = alloc_type_tuple();
-				tuple->Tuple.variables = entities;
-				polymorphic_params = tuple;
-			}
-		}
-
-		if (original_type_for_poly != nullptr) {
-			GB_ASSERT(named_type != nullptr);
-			add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
-		}
-	}
+	polymorphic_params = check_record_polymorphic_params(
+		ctx, ut->polymorphic_params,
+		&is_polymorphic, &can_check_fields,
+		node, poly_operands,
+		named_type, original_type_for_poly
+	);
 
 	if (!is_polymorphic) {
 		is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
@@ -2661,25 +2535,40 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	}
 
 	check_expr_or_type(ctx, o, e);
-	if (o->mode == Addressing_Type && o->type->kind == Type_Generic) {
-		if (ctx->allow_polymorphic_types) {
-			if (o->type->Generic.specialized) {
-				o->type->Generic.specialized = nullptr;
-				error(o->expr, "Polymorphic array length cannot have a specialization");
-			}
-			return 0;
-		}
-	}
 	if (o->mode == Addressing_Type) {
-		if (is_type_enum(o->type)) {
+		Type *ot = base_type(o->type);
+
+		if (ot->kind == Type_Generic) {
+			if (ctx->allow_polymorphic_types) {
+				if (ot->Generic.specialized) {
+					ot->Generic.specialized = nullptr;
+					error(o->expr, "Polymorphic array length cannot have a specialization");
+				}
+				return 0;
+			}
+		}
+		if (is_type_enum(ot)) {
 			return -1;
 		}
 	}
 
 	if (o->mode != Addressing_Constant) {
 		if (o->mode != Addressing_Invalid) {
+			gbString s = expr_to_string(o->expr);
+			error(e, "Array count must be a constant integer, got %s", s);
+			gb_string_free(s);
+
+			Entity *e = entity_of_node(o->expr);
+			if (e != nullptr) {
+				// NOTE(bill, 2021-03-27): Improve error message for parametric polymorphic parameters which want to generate
+				// and enumerated array but cannot determine what it ought to be yet
+				if (ctx->allow_polymorphic_types && e->kind == Entity_TypeName && e->type == t_typeid && e->flags&EntityFlag_PolyConst) {
+					error_line("\tSuggestion: 'where' clause may be required to restrict the enumerated array index type to an enum\n");
+					error_line("\t            'where intrinsics.type_is_enum(%.*s)'\n", LIT(e->token.string));
+				}
+			}
+
 			o->mode = Addressing_Invalid;
-			error(e, "Array count must be a constant");
 		}
 		return 0;
 	}
@@ -2706,7 +2595,7 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 		}
 	}
 
-	error(e, "Array count must be an integer");
+	error(e, "Array count must be a constant integer");
 	return 0;
 }
 
