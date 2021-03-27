@@ -9198,6 +9198,13 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 		}
 	}
 
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		if (proc_entity->flags & EntityFlag_Disabled) {
+			return {};
+		}
+	}
+
 	if (value.value == nullptr) {
 		value = lb_build_expr(p, proc_expr);
 	}
