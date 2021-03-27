@@ -575,24 +575,17 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		context = str_lit("struct #raw_union");
 	}
 
-	// NOTE(bill): Yes I know it's a non-const reference, what you gonna do?
-	bool &is_polymorphic = struct_type->Struct.is_polymorphic;
-
-	Type *polymorphic_params = nullptr;
-
-	polymorphic_params = check_record_polymorphic_params(
-		ctx, st->polymorphic_params,
-		&is_polymorphic,
-		node, poly_operands,
-		named_type, original_type_for_poly
-	);
-
 	struct_type->Struct.scope               = ctx->scope;
 	struct_type->Struct.is_packed           = st->is_packed;
-	struct_type->Struct.polymorphic_params  = polymorphic_params;
-	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &is_polymorphic);
+	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
+		ctx, st->polymorphic_params,
+		&struct_type->Struct.is_polymorphic,
+		node, poly_operands,
+		named_type, original_type_for_poly
+	);;
+	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &struct_type->Struct.is_polymorphic);
 
-	if (!is_polymorphic) {
+	if (!struct_type->Struct.is_polymorphic) {
 		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
 			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
 		} else {
@@ -616,31 +609,17 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
-	isize variant_count = ut->variants.count;
-
-	Entity *using_index_expr = nullptr;
-
-	auto variants = array_make<Type *>(permanent_allocator(), 0, variant_count);
 
 	union_type->Union.scope = ctx->scope;
-
-	// NOTE(bill): Yes I know it's a non-const reference, what you gonna do?
-	bool &is_polymorphic = union_type->Union.is_polymorphic;
-
-	Type *polymorphic_params = nullptr;
-	polymorphic_params = check_record_polymorphic_params(
+	union_type->Union.polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
-		&is_polymorphic,
+		&union_type->Union.is_polymorphic,
 		node, poly_operands,
 		named_type, original_type_for_poly
 	);
+	union_type->Union.is_poly_specialized = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &union_type->Union.is_polymorphic);
 
-	union_type->Union.scope                = ctx->scope;
-	union_type->Union.polymorphic_params   = polymorphic_params;
-	union_type->Union.is_polymorphic       = is_polymorphic;
-	union_type->Union.is_poly_specialized  = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &is_polymorphic);
-
-	if (!is_polymorphic) {
+	if (!union_type->Union.is_polymorphic) {
 		if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
 			error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
 		} else {
@@ -648,6 +627,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 		}
 	}
 
+	auto variants = array_make<Type *>(permanent_allocator(), 0, ut->variants.count);
 
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];
