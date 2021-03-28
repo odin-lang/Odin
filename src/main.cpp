@@ -1038,6 +1038,7 @@ bool parse_build_flags(Array<String> args) {
 							if (v.kind != ExactValue_Invalid) {
 								map_set(&build_context.defined_values, key, v);
 							} else {
+								gb_printf_err("Invalid define constant value: '%.*s'. Define constants must be a valid Odin literal.\n", LIT(value));
 								bad_flags = true;
 							}
 
@@ -1528,7 +1529,7 @@ i32 exec_llvm_opt(String output_base) {
     "opt \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
     "",
     LIT(output_base), LIT(output_base))
-  
+
 	|| system_exec_command_line_app("llvm-opt",
 		"opt \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
 		"",
