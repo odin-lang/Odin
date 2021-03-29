@@ -24,21 +24,19 @@ void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcp
 		return;
 	}
 
-#if 0
+#if 1
 	LLVMAddSCCPPass(fpm);
 
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddUnifyFunctionExitNodesPass(fpm);
 
 	LLVMAddCFGSimplificationPass(fpm);
-	// LLVMAddScalarReplAggregatesPass(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 #endif
 }
 
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
-	// LLVMAddScalarReplAggregatesPass(mpm);
 	LLVMAddEarlyCSEMemSSAPass(mpm);
 
 	LLVMAddGVNPass(mpm);
@@ -168,6 +166,4 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	}
 
 	LLVMAddCFGSimplificationPass(mpm);
-#if 0
-#endif
 }
