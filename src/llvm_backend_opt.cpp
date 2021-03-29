@@ -1,41 +1,30 @@
-#ifndef LLVM_USE_NO_EXTRA_PASSES
-#define LLVM_USE_NO_EXTRA_PASSES 0
-#endif
-
-#ifndef LLVM_USE_BASIC_PASSES
-#define LLVM_USE_BASIC_PASSES LLVM_USE_NO_EXTRA_PASSES
-#endif
-
-
 void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
-	if (LLVM_USE_BASIC_PASSES) {
-		optimization_level = 0;
-	}
 
 	if (!ignore_memcpy_pass) {
 		LLVMAddMemCpyOptPass(fpm);
 	}
+	LLVMAddPromoteMemoryToRegisterPass(fpm);
+	LLVMAddMergedLoadStoreMotionPass(fpm);
+	LLVMAddEarlyCSEPass(fpm);
+	// LLVMAddEarlyCSEMemSSAPass(fpm);
+	LLVMAddConstantPropagationPass(fpm);
+	LLVMAddMergedLoadStoreMotionPass(fpm);
+	LLVMAddPromoteMemoryToRegisterPass(fpm);
+	LLVMAddCFGSimplificationPass(fpm);
+
+	// LLVMAddSLPVectorizePass(fpm);
+	// LLVMAddLoopVectorizePass(fpm);
+
+	// LLVMAddScalarizerPass(fpm);
+	// LLVMAddLoopIdiomPass(fpm);
 	if (optimization_level == 0) {
-		LLVMAddPromoteMemoryToRegisterPass(fpm);
-		LLVMAddMergedLoadStoreMotionPass(fpm);
-		LLVMAddEarlyCSEPass(fpm);
-		// LLVMAddEarlyCSEMemSSAPass(fpm);
-		LLVMAddConstantPropagationPass(fpm);
-		LLVMAddMergedLoadStoreMotionPass(fpm);
-		LLVMAddPromoteMemoryToRegisterPass(fpm);
-		LLVMAddCFGSimplificationPass(fpm);
-
-		// LLVMAddSLPVectorizePass(fpm);
-		// LLVMAddLoopVectorizePass(fpm);
-
-		// LLVMAddScalarizerPass(fpm);
-		// LLVMAddLoopIdiomPass(fpm);
 		return;
 	}
 
+#if 0
 	LLVMAddSCCPPass(fpm);
 
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
@@ -45,6 +34,7 @@ void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcp
 	// LLVMAddScalarReplAggregatesPass(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
+#endif
 }
 
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
@@ -101,34 +91,30 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 
 
 void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level) {
-	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
 
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	LLVMAddAnalysisPasses(target_machine, mpm);
-	LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
-	LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
-	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
-
-	if (LLVM_USE_BASIC_PASSES) {
-		optimization_level = 0;
-	}
-	if (LLVM_USE_NO_EXTRA_PASSES) {
-		return;
+	if (optimization_level >= 2) {
+		// NOTE(bill, 2021-03-29: use this causes invalid code generation)
+		// LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
+		// LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
+		// LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
+		// LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
+		// LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
 	}
 
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
+	LLVMAddAnalysisPasses(target_machine, mpm);
 	LLVMAddPruneEHPass(mpm);
 	if (optimization_level == 0) {
-		// LLVMAddMergeFunctionsPass(mpm);
 		return;
 	}
 
 	LLVMAddGlobalDCEPass(mpm);
+
 
 	LLVMAddIPSCCPPass(mpm);
 	LLVMAddCalledValuePropagationPass(mpm);
@@ -141,13 +127,14 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	LLVMAddCFGSimplificationPass(mpm);
 
 	LLVMAddPruneEHPass(mpm);
-	LLVMAddFunctionInliningPass(mpm);
+	if (optimization_level < 2) {
+		return;
+	}
 
-	// if (optimization_level > 2) {
-		// LLVMAddArgumentPromotionPass(mpm);
-	// }
+	LLVMAddFunctionInliningPass(mpm);
 	lb_add_function_simplifcation_passes(mpm, optimization_level);
 
+	LLVMAddGlobalDCEPass(mpm);
 	LLVMAddGlobalOptimizerPass(mpm);
 
 	// LLVMAddLowerConstantIntrinsicsPass(mpm);
@@ -181,17 +168,6 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	}
 
 	LLVMAddCFGSimplificationPass(mpm);
-
-
-	#if 0
-		LLVMAddAlwaysInlinerPass(mpm);
-		LLVMAddStripDeadPrototypesPass(mpm);
-		LLVMAddAnalysisPasses(target_machine, mpm);
-		if (optimization_level >= 2) {
-			LLVMAddArgumentPromotionPass(mpm);
-			LLVMAddConstantMergePass(mpm);
-			LLVMAddGlobalDCEPass(mpm);
-			LLVMAddDeadArgEliminationPass(mpm);
-		}
-	#endif
+#if 0
+#endif
 }
