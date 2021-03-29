@@ -2865,6 +2865,18 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 	}
 
 general_end:;
+	// make the alignment big if necessary
+	if (LLVMIsALoadInst(val) && src_align < dst_align) {
+		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
+		if (LLVMGetInstructionOpcode(val_ptr) == LLVMAlloca) {
+			src_align = gb_max(LLVMGetAlignment(val_ptr), dst_align);
+			LLVMSetAlignment(val_ptr, cast(unsigned)src_align);
+		}
+	}
+
+	src_size = align_formula(src_size, src_align);
+	dst_size = align_formula(dst_size, dst_align);
+
 	if (LLVMIsALoadInst(val) && (src_size >= dst_size && src_align >= dst_align)) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
