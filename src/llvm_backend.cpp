@@ -2824,6 +2824,10 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 	i64 dst_size = lb_sizeof(dst_type);
 	i64 src_align = lb_alignof(src_type);
 	i64 dst_align = lb_alignof(dst_type);
+	if (LLVMIsALoadInst(val)) {
+		src_align = gb_min(src_align, LLVMGetAlignment(val));
+	}
+
 	LLVMTypeKind src_kind = LLVMGetTypeKind(src_type);
 	LLVMTypeKind dst_kind = LLVMGetTypeKind(dst_type);
 
@@ -2861,7 +2865,7 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 	}
 
 general_end:;
-	if (LLVMIsALoadInst(val) && src_size >= dst_size) {
+	if (LLVMIsALoadInst(val) && (src_size >= dst_size && src_align >= dst_align)) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
 		LLVMValueRef loaded_val = LLVMBuildLoad(p->builder, val_ptr, "");
