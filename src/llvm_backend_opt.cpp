@@ -26,13 +26,13 @@ void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcp
 	LLVMAddUnifyFunctionExitNodesPass(fpm);
 
 	LLVMAddCFGSimplificationPass(fpm);
-	LLVMAddScalarReplAggregatesPass(fpm);
+	// LLVMAddScalarReplAggregatesPass(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
 }
 
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm) {
-	LLVMAddScalarReplAggregatesPass(mpm);
+	// LLVMAddScalarReplAggregatesPass(mpm);
 	LLVMAddEarlyCSEMemSSAPass(mpm);
 
 	LLVMAddGVNPass(mpm);
