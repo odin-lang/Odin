@@ -139,7 +139,7 @@ fill :: proc(array: $T/[]$E, value: T) {
 	}
 }
 
-rotate_left :: proc(array: $T/[]$E, k: int) {
+rotate_left :: proc(array: $T/[]$E, mid: int) {
 	n := len(array);
 	m := mid %% n;
 	k := n - m;
