@@ -1,6 +1,11 @@
-#ifndef LLVM_USE_BASIC_PASSES
-#define LLVM_USE_BASIC_PASSES 0
+#ifndef LLVM_USE_NO_EXTRA_PASSES
+#define LLVM_USE_NO_EXTRA_PASSES 0
 #endif
+
+#ifndef LLVM_USE_BASIC_PASSES
+#define LLVM_USE_BASIC_PASSES LLVM_USE_NO_EXTRA_PASSES
+#endif
+
 
 void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
@@ -110,6 +115,9 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 
 	if (LLVM_USE_BASIC_PASSES) {
 		optimization_level = 0;
+	}
+	if (LLVM_USE_NO_EXTRA_PASSES) {
+		return;
 	}
 
 	LLVMAddAlwaysInlinerPass(mpm);
