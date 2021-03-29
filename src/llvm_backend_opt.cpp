@@ -1,8 +1,12 @@
+#ifndef LLVM_USE_BASIC_PASSES
+#define LLVM_USE_BASIC_PASSES 0
+#endif
+
 void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcpy_pass) {
 	if (!ignore_memcpy_pass) {
 		LLVMAddMemCpyOptPass(fpm);
 	}
-	if (build_context.optimization_level == 0) {
+	if (LLVM_USE_BASIC_PASSES || build_context.optimization_level == 0) {
 		LLVMAddPromoteMemoryToRegisterPass(fpm);
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 		LLVMAddEarlyCSEPass(fpm);
@@ -95,7 +99,7 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
 	LLVMAddPruneEHPass(mpm);
-	if (build_context.optimization_level == 0) {
+	if (LLVM_USE_BASIC_PASSES || build_context.optimization_level == 0) {
 		// LLVMAddMergeFunctionsPass(mpm);
 		return;
 	}
