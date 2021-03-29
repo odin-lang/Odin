@@ -8,8 +8,9 @@ void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcp
 	}
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
+	LLVMAddConstantPropagationPass(fpm);
 	LLVMAddEarlyCSEPass(fpm);
-	// LLVMAddEarlyCSEMemSSAPass(fpm);
+
 	LLVMAddConstantPropagationPass(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);

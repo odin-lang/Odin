@@ -6599,13 +6599,14 @@ handle_op:
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 
-			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type)-1, false);
 
-			LLVMValueRef less_equal_width = LLVMBuildICmp(p->builder, LLVMIntULT, bits, max, "");
+			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			res.value = LLVMBuildShl(p->builder, lhsval, bits, "");
 			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
-			res.value = LLVMBuildSelect(p->builder, less_equal_width, res.value, zero, "");
+			res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			return res;
 		}
 	case Token_Shr:
@@ -6615,11 +6616,12 @@ handle_op:
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(type);
 
-			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef max = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type)-1, false);
 
-			LLVMValueRef less_equal_width = LLVMBuildICmp(p->builder, LLVMIntULT, bits, max, "");
+			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
-			bits = LLVMBuildSelect(p->builder, less_equal_width, bits, max, "");
+			bits = LLVMBuildSelect(p->builder, width_test, bits, max, "");
 			if (is_unsigned) {
 				res.value = LLVMBuildLShr(p->builder, lhs.value, bits, "");
 			} else {
