@@ -2822,6 +2822,8 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 
 	i64 src_size = lb_sizeof(src_type);
 	i64 dst_size = lb_sizeof(dst_type);
+	i64 src_align = lb_alignof(src_type);
+	i64 dst_align = lb_alignof(dst_type);
 	LLVMTypeKind src_kind = LLVMGetTypeKind(src_type);
 	LLVMTypeKind dst_kind = LLVMGetTypeKind(dst_type);
 
@@ -2859,19 +2861,12 @@ LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRe
 	}
 
 general_end:;
-	if (LLVMIsALoadInst(val) && src_size <= dst_size) {
+	if (LLVMIsALoadInst(val) && src_size >= dst_size) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
 		LLVMValueRef loaded_val = LLVMBuildLoad(p->builder, val_ptr, "");
 
-		// TODO(bill): Figure out why this doesn't work
-		// unsigned srca = cast(unsigned)LLVMConstIntGetZExtValue(LLVMAlignOf(src_type));
-		// unsigned dsta = cast(unsigned)LLVMConstIntGetZExtValue(LLVMAlignOf(dst_type));
-
-		unsigned srca = cast(unsigned)lb_alignof(src_type);
-		unsigned dsta = cast(unsigned)lb_alignof(dst_type);
-
-		LLVMSetAlignment(loaded_val, gb_min(srca, dsta));
+		// LLVMSetAlignment(loaded_val, gb_min(src_align, dst_align));
 
 		return loaded_val;
 	} else {
