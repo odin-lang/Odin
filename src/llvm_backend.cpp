@@ -13631,14 +13631,14 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (LLVMDisposePassManager(default_function_pass_manager));
 
 	LLVMInitializeFunctionPassManager(default_function_pass_manager);
-	lb_populate_function_pass_manager(default_function_pass_manager, false);
+	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
 	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
-	lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true);
+	lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
 
 	TIME_SECTION("LLVM Runtime Type Information Creation");
@@ -13961,7 +13961,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	defer (LLVMDisposePassManager(module_pass_manager));
-	lb_populate_module_pass_manager(target_machine, module_pass_manager);
+	lb_populate_module_pass_manager(target_machine, module_pass_manager, build_context.optimization_level);
 
 	LLVMRunPassManager(module_pass_manager, mod);
 
