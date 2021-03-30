@@ -1231,6 +1231,17 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 	}
 }
 
+bool ignore_newlines(AstFile *f) {
+	if (build_context.strict_style) {
+	    	if (f->allow_newline) {
+	    		return f->expr_level > 0;
+	    	}
+	    	return f->expr_level >= 0;
+	}
+	return false;
+}
+
+
 
 Token advance_token(AstFile *f) {
 	f->lead_comment = nullptr;
@@ -1239,8 +1250,17 @@ Token advance_token(AstFile *f) {
 	Token prev = f->prev_token = f->curr_token;
 
 	bool ok = next_token0(f);
-	if (ok && f->curr_token.kind == Token_Comment) {
-		comsume_comment_groups(f, prev);
+	if (ok) {
+		switch (f->curr_token.kind) {
+		case Token_Comment:
+			comsume_comment_groups(f, prev);
+			break;
+		case Token_Semicolon:
+			if (ignore_newlines(f) && f->curr_token.string == "\n") {
+				advance_token(f);
+			}
+			break;
+		}
 	}
 	return prev;
 }
@@ -2513,7 +2533,11 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	Token open_paren, close_paren;
 	Token ellipsis = {};
 
-	f->expr_level++;
+	isize prev_expr_level = f->expr_level;
+	bool prev_allow_newline = f->allow_newline;
+	f->expr_level = 0;
+	f->allow_newline = true;
+
 	open_paren = expect_token(f, Token_OpenParen);
 
 	while (f->curr_token.kind != Token_CloseParen &&
@@ -2550,8 +2574,8 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 			break;
 		}
 	}
-
-	f->expr_level--;
+	f->allow_newline = prev_allow_newline;
+	f->expr_level = prev_expr_level;
 	close_paren = expect_closing(f, Token_CloseParen, str_lit("argument list"));
 
 
@@ -4828,7 +4852,9 @@ gb_global Rune illegal_import_runes[] = {
 	'\\', // NOTE(bill): Disallow windows style filepaths
 	'!', '$', '%', '^', '&', '*', '(', ')', '=', '+',
 	'[', ']', '{', '}',
-	';', ':', '#',
+	';',
+	':', // NOTE(bill): Disallow windows style absolute filepaths
+	'#',
 	'|', ',',  '<', '>', '?',
 };
 
@@ -4886,6 +4912,8 @@ bool is_build_flag_path_valid(String path) {
 			for (isize i = 0; i < gb_count_of(illegal_import_runes); i++) {
 #if defined(GB_SYSTEM_WINDOWS)
 				if (r == '\\') {
+					break;
+				} else if (r == ':') {
 					break;
 				}
 #endif

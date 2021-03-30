@@ -95,6 +95,7 @@ struct AstFile {
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
 	isize        expr_level;
+	bool         allow_newline; // Only valid for expr_level == 0
 	bool         allow_range;   // NOTE(bill): Ranges are only allowed in certain cases
 	bool         allow_in_expr; // NOTE(bill): in expression are only allowed in certain cases
 	bool         in_foreign_block;
