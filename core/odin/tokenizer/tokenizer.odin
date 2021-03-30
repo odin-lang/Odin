@@ -236,7 +236,7 @@ scan_raw_string :: proc(t: ^Tokenizer) -> string {
 	for {
 		ch := t.ch;
 		if ch == utf8.RUNE_EOF {
-			error(t, offset, "string literal was not terminated");
+			error(t, offset, "raw string literal was not terminated");
 			break;
 		}
 		advance_rune(t);
