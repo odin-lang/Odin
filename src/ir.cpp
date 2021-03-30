@@ -4642,7 +4642,6 @@ handle_op:
 			irValue *bit_size = ir_value_constant(type, exact_value_i64(8*type_size_of(type)));
 			irValue *width_test = ir_emit(proc, ir_instr_binary_op(proc, Token_Lt, bits, bit_size, t_llvm_bool));
 
-
 			irValue *zero = ir_value_constant(type, exact_value_i64(0));
 			irValue *res = ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
 			return ir_emit_select(proc, width_test, res, zero);
@@ -4656,11 +4655,11 @@ handle_op:
 			irValue *bits = right;
 
 			irValue *bit_size = ir_value_constant(type, exact_value_i64(8*type_size_of(type)));
-			irValue *max = ir_value_constant(type, exact_value_i64(8*type_size_of(type)-1));
 			irValue *width_test = ir_emit(proc, ir_instr_binary_op(proc, Token_Lt, bits, bit_size, t_llvm_bool));
 
-			bits = ir_emit_select(proc, width_test, bits, max);
-			return ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
+			irValue *zero = ir_value_constant(type, exact_value_i64(0));
+			irValue *res = ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
+			return ir_emit_select(proc, width_test, res, zero);
 		}
 
 	case Token_AndNot: {
