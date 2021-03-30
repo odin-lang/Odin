@@ -2,9 +2,9 @@ package hash
 
 import "core:mem"
 
-adler32 :: proc(data: []byte) -> u32 {
+adler32 :: proc(data: []byte, seed := u32(1)) -> u32 {
 	ADLER_CONST :: 65521;
-	a, b: u32 = 1, 0;
+	a, b: u32 = seed & 0xFFFF, seed >> 16;
 	for x in data {
 		a = (a + u32(x)) % ADLER_CONST;
 		b = (b + a) % ADLER_CONST;
