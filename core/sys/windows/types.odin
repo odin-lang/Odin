@@ -75,6 +75,7 @@ PCSTR :: cstring;
 PCWSTR :: wstring;
 PDWORD :: ^DWORD;
 LPHANDLE :: ^HANDLE;
+PHANDLE :: ^HANDLE;
 LPOVERLAPPED :: ^OVERLAPPED;
 LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION;
 PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES;
@@ -787,4 +788,76 @@ OSVERSIONINFOEXW :: struct {
     wSuiteMask:          USHORT,
     wProductType:        UCHAR,
     wReserved:           UCHAR,
+};
+
+// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
+// Used in LogonUserExW
+PQUOTA_LIMITS :: struct {
+	PagedPoolLimit: SIZE_T,
+	NonPagedPoolLimit: SIZE_T,
+	MinimumWorkingSetSize: SIZE_T,
+	MaximumWorkingSetSize: SIZE_T,
+	PagefileLimit: SIZE_T,
+	TimeLimit: LARGE_INTEGER,
+};
+
+Logon32_Type :: enum DWORD {
+	INTERACTIVE       = 2,
+	NETWORK           = 3,
+	BATCH             = 4,
+	SERVICE           = 5,
+	UNLOCK            = 7,
+	NETWORK_CLEARTEXT = 8,
+	NEW_CREDENTIALS   = 9,
+}
+
+Logon32_Provider :: enum DWORD {
+	DEFAULT = 0,
+	WINNT35 = 1,
+	WINNT40 = 2,
+	WINNT50 = 3,
+	VIRTUAL = 4,
+}
+
+// https://docs.microsoft.com/en-us/windows/win32/api/profinfo/ns-profinfo-profileinfow
+// Used in LoadUserProfileW
+
+PROFILEINFOW :: struct {
+	dwSize: DWORD,
+	dwFlags: DWORD,
+	lpUserName: LPWSTR,
+	lpProfilePath: LPWSTR,
+	lpDefaultPath: LPWSTR,
+	lpServerName: LPWSTR,
+	lpPolicyPath: LPWSTR,
+  	hProfile: HANDLE,
+};
+
+// Used in LookupAccountNameW
+SID_NAME_USE :: distinct DWORD;
+
+SID_TYPE :: enum SID_NAME_USE {
+  SidTypeUser = 1,
+  SidTypeGroup,
+  SidTypeDomain,
+  SidTypeAlias,
+  SidTypeWellKnownGroup,
+  SidTypeDeletedAccount,
+  SidTypeInvalid,
+  SidTypeUnknown,
+  SidTypeComputer,
+  SidTypeLabel,
+  SidTypeLogonSession
+}
+
+// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-sid
+SID :: struct {
+	Revision: byte,
+	SubAuthorityCount: byte,
+	IdentifierAuthority: SID_IDENTIFIER_AUTHORITY,
+	SubAuthority: ^[]DWORD,
+};
+
+SID_IDENTIFIER_AUTHORITY :: struct {
+    Value: [6]u8,
 };

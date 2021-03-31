@@ -132,6 +132,19 @@ foreign kernel32 {
 		lpStartupInfo: LPSTARTUPINFO,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+	CreateProcessAsUserW :: proc(
+		hToken: HANDLE,
+		lpApplicationName: LPCWSTR,
+		lpCommandLine: LPWSTR,
+		lpProcessAttributes: LPSECURITY_ATTRIBUTES,
+		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
+		bInheritHandles: BOOL,
+		dwCreationFlags: DWORD,
+		lpEnvironment: LPVOID,
+		lpCurrentDirectory: LPCWSTR,
+		lpStartupInfo: LPSTARTUPINFO,
+		lpProcessInformation: LPPROCESS_INFORMATION,
+	) -> BOOL ---
 	GetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPWSTR, nsize: DWORD) -> DWORD ---
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
 	GetEnvironmentStringsW :: proc() -> LPWCH ---
