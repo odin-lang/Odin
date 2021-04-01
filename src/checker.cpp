@@ -4456,7 +4456,9 @@ void check_unchecked_bodies(Checker *c) {
 			GB_ASSERT(pl != nullptr);
 			pi.body  = pl->ProcLit.body;
 			pi.tags  = pl->ProcLit.tags;
-			GB_ASSERT(pi.body != nullptr);
+			if (pi.body == nullptr) {
+				continue;
+			}
 
 			check_proc_info(c, pi);
 		}
