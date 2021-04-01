@@ -1574,6 +1574,7 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		}
 
 		switch (type->Basic.kind) {
+		case Basic_complex32:
 		case Basic_complex64:
 		case Basic_complex128: {
 			ExactValue real = exact_value_real(v);
@@ -1599,6 +1600,7 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		}
 
 		switch (type->Basic.kind) {
+		case Basic_quaternion64:
 		case Basic_quaternion128:
 		case Basic_quaternion256: {
 			ExactValue real = exact_value_real(v);
