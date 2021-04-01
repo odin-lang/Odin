@@ -9192,6 +9192,52 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_type_hasher_proc:
 		return lb_get_hasher_proc_for_type(p->module, ce->args[0]->tav.type);
+
+	case BuiltinProc_fixed_point_mul:
+	case BuiltinProc_fixed_point_div:
+	case BuiltinProc_fixed_point_mul_sat:
+	case BuiltinProc_fixed_point_div_sat:
+		{
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			lbValue y = lb_build_expr(p, ce->args[1]);
+			lbValue scale = lb_build_expr(p, ce->args[2]);
+			x = lb_emit_conv(p, x, tv.type);
+			y = lb_emit_conv(p, y, tv.type);
+			scale = lb_emit_conv(p, scale, tv.type);
+
+			char const *name = nullptr;
+			if (is_type_unsigned(tv.type)) {
+				switch (id) {
+				case BuiltinProc_fixed_point_mul:     name = "llvm.umul.fix";     break;
+				case BuiltinProc_fixed_point_div:     name = "llvm.udiv.fix";     break;
+				case BuiltinProc_fixed_point_mul_sat: name = "llvm.umul.fix.sat"; break;
+				case BuiltinProc_fixed_point_div_sat: name = "llvm.udiv.fix.sat"; break;
+				}
+			} else {
+				switch (id) {
+				case BuiltinProc_fixed_point_mul:     name = "llvm.imul.fix";     break;
+				case BuiltinProc_fixed_point_div:     name = "llvm.idiv.fix";     break;
+				case BuiltinProc_fixed_point_mul_sat: name = "llvm.imul.fix.sat"; break;
+				case BuiltinProc_fixed_point_div_sat: name = "llvm.idiv.fix.sat"; break;
+				}
+			}
+			GB_ASSERT(name != nullptr);
+
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			LLVMTypeRef types[1] = {};
+			types[0] = lb_type(p->module, tv.type);
+
+			LLVMValueRef args[3] = {};
+			args[0] = x.value;
+			args[1] = y.value;
+			args[2] = scale.value;
+
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

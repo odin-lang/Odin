@@ -5853,6 +5853,77 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_fixed_point_mul:
+	case BuiltinProc_fixed_point_div:
+	case BuiltinProc_fixed_point_mul_sat:
+	case BuiltinProc_fixed_point_div_sat:
+		{
+			if (!build_context.use_llvm_api) {
+				error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+				return false;
+			}
+
+			Operand x = {};
+			Operand y = {};
+			Operand z = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			check_expr(c, &y, ce->args[1]);
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &x, y.type);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for %.*s, %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			if (!is_type_integer(x.type) || is_type_untyped(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected an integer type for %.*s, got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			check_expr(c, &z, ce->args[2]);
+			if (z.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (z.mode != Addressing_Constant || !is_type_integer(z.type)) {
+				error(z.expr, "Expected a constant integer for the scale in %.*s", LIT(builtin_procs[id].name));
+				return false;
+			}
+			i64 n = exact_value_to_i64(z.value);
+			if (n <= 0) {
+				error(z.expr, "Scale parameter in %.*s must be positive, got %lld", LIT(builtin_procs[id].name), n);
+				return false;
+			}
+			i64 sz = 8*type_size_of(x.type);
+			if (n > sz) {
+				error(z.expr, "Scale parameter in %.*s is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_procs[id].name), n, sz);
+				return false;
+			}
+
+			operand->type = x.type;
+			operand->mode = Addressing_Value;
+		}
+		break;
+
+
+
 	case BuiltinProc_type_base_type:
 		if (operand->mode != Addressing_Type) {
 			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
