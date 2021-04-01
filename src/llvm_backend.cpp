@@ -9198,12 +9198,12 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_fixed_point_mul_sat:
 	case BuiltinProc_fixed_point_div_sat:
 		{
-			lbValue x = lb_build_expr(p, ce->args[0]);
-			lbValue y = lb_build_expr(p, ce->args[1]);
-			lbValue scale = lb_build_expr(p, ce->args[2]);
-			x = lb_emit_conv(p, x, tv.type);
-			y = lb_emit_conv(p, y, tv.type);
-			scale = lb_emit_conv(p, scale, tv.type);
+			bool do_bswap = is_type_different_to_arch_endianness(tv.type);
+			Type *platform_type = integer_endian_type_to_platform_type(tv.type);
+
+			lbValue x     = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), platform_type);
+			lbValue y     = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), platform_type);
+			lbValue scale = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), platform_type);
 
 			char const *name = nullptr;
 			if (is_type_unsigned(tv.type)) {
@@ -9224,19 +9224,17 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_ASSERT(name != nullptr);
 
 			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			LLVMTypeRef types[1] = {};
-			types[0] = lb_type(p->module, tv.type);
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, &platform_type, 1);
 
 			LLVMValueRef args[3] = {};
 			args[0] = x.value;
 			args[1] = y.value;
 			args[2] = scale.value;
 
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 			lbValue res = {};
-			res.type = tv.type;
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			return res;
+			res.type = platform_type;
+			return lb_emit_conv(p, res, tv.type);
 		}
 	}
 
