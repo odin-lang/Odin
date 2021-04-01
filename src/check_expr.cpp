@@ -4858,6 +4858,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
 				switch (type_size_of(type)) {
+				case 2:
+					operand->value = exact_value_float(-65504.0f);
+					break;
 				case 4:
 					operand->value = exact_value_float(-3.402823466e+38f);
 					break;
@@ -5036,6 +5039,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
 				switch (type_size_of(type)) {
+				case 2:
+					operand->value = exact_value_float(65504.0f);
+					break;
 				case 4:
 					operand->value = exact_value_float(3.402823466e+38f);
 					break;
