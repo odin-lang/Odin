@@ -95,15 +95,6 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	if (optimization_level >= 2) {
-		// NOTE(bill, 2021-03-29: use this causes invalid code generation)
-		// LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
-		// LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
-		// LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
-		// LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-		// LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
-	}
-
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
@@ -114,6 +105,14 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 
 	LLVMAddGlobalDCEPass(mpm);
 
+	if (optimization_level >= 2) {
+		// NOTE(bill, 2021-03-29: use this causes invalid code generation)
+		LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
+		LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
+		LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
+		LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
+		// LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
+	}
 
 	LLVMAddIPSCCPPass(mpm);
 	LLVMAddCalledValuePropagationPass(mpm);
