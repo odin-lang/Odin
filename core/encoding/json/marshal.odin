@@ -89,6 +89,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case Type_Info_Float:
 		val: f64;
 		switch f in a {
+		case f16: val = f64(f);
 		case f32: val = f64(f);
 		case f64: val = f64(f);
 		}

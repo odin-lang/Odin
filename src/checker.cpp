@@ -1769,6 +1769,10 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("fixdfti"),
 		str_lit("floattidf"),
 
+		str_lit("truncsfhf2"),
+		str_lit("truncdfhf2"),
+		str_lit("gnu_h2f_ieee"),
+		str_lit("gnu_f2h_ieee"),
 
 		str_lit("memset"),
 		str_lit("memcpy"),
@@ -1783,6 +1787,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("bswap_64"),
 		str_lit("bswap_128"),
 
+		str_lit("bswap_f16"),
 		str_lit("bswap_f32"),
 		str_lit("bswap_f64"),
 	};

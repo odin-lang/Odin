@@ -1549,14 +1549,16 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		if (out_value) *out_value = v;
 
 		switch (type->Basic.kind) {
-		// case Basic_f16:
+		case Basic_f16:
 		case Basic_f32:
 		case Basic_f64:
 			return true;
 
+		case Basic_f16le:
+		case Basic_f16be:
 		case Basic_f32le:
-		case Basic_f64le:
 		case Basic_f32be:
+		case Basic_f64le:
 		case Basic_f64be:
 			return true;
 
@@ -2775,12 +2777,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
 		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
 		case Basic_complex128:    add_package_dependency(c, "runtime", "quo_complex128");    break;
+		case Basic_quaternion64:  add_package_dependency(c, "runtime", "quo_quaternion64");  break;
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
 		}
 	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
 		Type *bt = base_type(x->type);
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_quaternion64:  add_package_dependency(c, "runtime", "mul_quaternion64"); break;
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "mul_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "mul_quaternion256"); break;
 		}
@@ -4495,6 +4499,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gb_string_free(s);
 			return false;
 		}
+		if (is_type_endian_specific(x.type)) {
+			gbString s = type_to_string(x.type);
+			error(call, "Arguments with a specified endian are not allow, expected a normal floating point, got '%s'", s);
+			gb_string_free(s);
+			return false;
+		}
 
 		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant) {
 			f64 r = exact_value_to_float(x.value).value_float;
@@ -4507,7 +4517,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		BasicKind kind = core_type(x.type)->Basic.kind;
 		switch (kind) {
-		// case Basic_f16:          operand->type = t_complex32;       break;
+		case Basic_f16:          operand->type = t_complex32;       break;
 		case Basic_f32:          operand->type = t_complex64;       break;
 		case Basic_f64:          operand->type = t_complex128;      break;
 		case Basic_UntypedFloat: operand->type = t_untyped_complex; break;
@@ -4586,6 +4596,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gb_string_free(s);
 			return false;
 		}
+		if (is_type_endian_specific(x.type)) {
+			gbString s = type_to_string(x.type);
+			error(call, "Arguments with a specified endian are not allow, expected a normal floating point, got '%s'", s);
+			gb_string_free(s);
+			return false;
+		}
 
 		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant && z.mode == Addressing_Constant && w.mode == Addressing_Constant) {
 			f64 r = exact_value_to_float(x.value).value_float;
@@ -4600,6 +4616,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		BasicKind kind = core_type(x.type)->Basic.kind;
 		switch (kind) {
+		case Basic_f16:          operand->type = t_quaternion64;       break;
 		case Basic_f32:          operand->type = t_quaternion128;      break;
 		case Basic_f64:          operand->type = t_quaternion256;      break;
 		case Basic_UntypedFloat: operand->type = t_untyped_quaternion; break;
@@ -4655,8 +4672,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		BasicKind kind = core_type(x->type)->Basic.kind;
 		switch (kind) {
+		case Basic_complex32:         x->type = t_f16;           break;
 		case Basic_complex64:         x->type = t_f32;           break;
 		case Basic_complex128:        x->type = t_f64;           break;
+		case Basic_quaternion64:      x->type = t_f16;           break;
 		case Basic_quaternion128:     x->type = t_f32;           break;
 		case Basic_quaternion256:     x->type = t_f64;           break;
 		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
@@ -4708,6 +4727,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		BasicKind kind = core_type(x->type)->Basic.kind;
 		switch (kind) {
+		case Basic_quaternion64:      x->type = t_f16;           break;
 		case Basic_quaternion128:     x->type = t_f32;           break;
 		case Basic_quaternion256:     x->type = t_f64;           break;
 		case Basic_UntypedComplex:    x->type = t_untyped_float; break;

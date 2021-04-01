@@ -961,17 +961,34 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 		case Basic_rune: return LLVMInt32TypeInContext(ctx);
 
-		// Basic_f16,
+
+		case Basic_f16: return LLVMHalfTypeInContext(ctx);
 		case Basic_f32: return LLVMFloatTypeInContext(ctx);
 		case Basic_f64: return LLVMDoubleTypeInContext(ctx);
 
+		case Basic_f16le: return LLVMHalfTypeInContext(ctx);
 		case Basic_f32le: return LLVMFloatTypeInContext(ctx);
 		case Basic_f64le: return LLVMDoubleTypeInContext(ctx);
 
+		case Basic_f16be: return LLVMHalfTypeInContext(ctx);
 		case Basic_f32be: return LLVMFloatTypeInContext(ctx);
 		case Basic_f64be: return LLVMDoubleTypeInContext(ctx);
 
-		// Basic_complex32,
+		case Basic_complex32:
+			{
+				char const *name = "..complex32";
+				LLVMTypeRef type = LLVMGetTypeByName(m->mod, name);
+				if (type != nullptr) {
+					return type;
+				}
+				type = LLVMStructCreateNamed(ctx, name);
+				LLVMTypeRef fields[2] = {
+					lb_type(m, t_f16),
+					lb_type(m, t_f16),
+				};
+				LLVMStructSetBody(type, fields, 2, false);
+				return type;
+			}
 		case Basic_complex64:
 			{
 				char const *name = "..complex64";
@@ -1003,6 +1020,23 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return type;
 			}
 
+		case Basic_quaternion64:
+			{
+				char const *name = "..quaternion64";
+				LLVMTypeRef type = LLVMGetTypeByName(m->mod, name);
+				if (type != nullptr) {
+					return type;
+				}
+				type = LLVMStructCreateNamed(ctx, name);
+				LLVMTypeRef fields[4] = {
+					lb_type(m, t_f16),
+					lb_type(m, t_f16),
+					lb_type(m, t_f16),
+					lb_type(m, t_f16),
+				};
+				LLVMStructSetBody(type, fields, 4, false);
+				return type;
+			}
 		case Basic_quaternion128:
 			{
 				char const *name = "..quaternion128";
@@ -1622,7 +1656,8 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 		case Basic_rune: return lb_debug_type_basic_type(m, str_lit("rune"), 32, LLVMDWARFTypeEncoding_Utf);
 
-		// Basic_f16,
+
+		case Basic_f16: return lb_debug_type_basic_type(m, str_lit("f16"), 16, LLVMDWARFTypeEncoding_Float);
 		case Basic_f32: return lb_debug_type_basic_type(m, str_lit("f32"), 32, LLVMDWARFTypeEncoding_Float);
 		case Basic_f64: return lb_debug_type_basic_type(m, str_lit("f64"), 64, LLVMDWARFTypeEncoding_Float);
 
@@ -1642,6 +1677,8 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_u64le:  return lb_debug_type_basic_type(m, str_lit("u64le"),  64,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
 		case Basic_i128le: return lb_debug_type_basic_type(m, str_lit("i128le"), 128, LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
 		case Basic_u128le: return lb_debug_type_basic_type(m, str_lit("u128le"), 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagLittleEndian);
+
+		case Basic_f16le: return lb_debug_type_basic_type(m,  str_lit("f16le"),   16, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 		case Basic_f32le: return lb_debug_type_basic_type(m,  str_lit("f32le"),   32, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 		case Basic_f64le: return lb_debug_type_basic_type(m,  str_lit("f64le"),   64, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 
@@ -1653,10 +1690,18 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_u64be:  return lb_debug_type_basic_type(m, str_lit("u64be"),  64,  LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
 		case Basic_i128be: return lb_debug_type_basic_type(m, str_lit("i128be"), 128, LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagBigEndian);
 		case Basic_u128be: return lb_debug_type_basic_type(m, str_lit("u128be"), 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
+
+		case Basic_f16be: return lb_debug_type_basic_type(m,  str_lit("f16be"),   16, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 		case Basic_f32be: return lb_debug_type_basic_type(m,  str_lit("f32be"),   32, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 		case Basic_f64be: return lb_debug_type_basic_type(m,  str_lit("f64be"),   64, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
 
-		// Basic_complex32,
+		case Basic_complex32:
+			{
+				LLVMMetadataRef elements[2] = {};
+				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f16, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 4);
+				return lb_debug_basic_struct(m, str_lit("complex32"), 64, 32, elements, gb_count_of(elements));
+			}
 		case Basic_complex64:
 			{
 				LLVMMetadataRef elements[2] = {};
@@ -1672,6 +1717,15 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				return lb_debug_basic_struct(m, str_lit("complex128"), 128, 64, elements, gb_count_of(elements));
 			}
 
+		case Basic_quaternion64:
+			{
+				LLVMMetadataRef elements[4] = {};
+				elements[0] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f16, 4);
+				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f16, 8);
+				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f16, 12);
+				return lb_debug_basic_struct(m, str_lit("quaternion64"), 128, 32, elements, gb_count_of(elements));
+			}
 		case Basic_quaternion128:
 			{
 				LLVMMetadataRef elements[4] = {};
@@ -5262,6 +5316,17 @@ lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
 	return res;
 }
 
+LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
+	GB_ASSERT(type_size_of(type) == 2);
+
+	u16 u = f32_to_f16(f);
+	if (is_type_different_to_arch_endianness(type)) {
+		u = gb_endian_swap16(u);
+	}
+	LLVMValueRef i = LLVMConstInt(LLVMInt16TypeInContext(m->ctx), u, false);
+	return LLVMConstBitCast(i, lb_type(m, type));
+}
+
 LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
 	GB_ASSERT(type_size_of(type) == 4);
 	u32 u = bit_cast<u32>(f);
@@ -5761,11 +5826,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		}
 		return res;
 	case ExactValue_Float:
-		if (type_size_of(type) == 4) {
-			f32 f = cast(f32)value.value_float;
-			res.value = lb_const_f32(m, f, type);
-			return res;
-		}
 		if (is_type_different_to_arch_endianness(type)) {
 			u64 u = bit_cast<u64>(value.value_float);
 			u = gb_endian_swap64(u);
@@ -5778,6 +5838,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		{
 			LLVMValueRef values[2] = {};
 			switch (8*type_size_of(type)) {
+			case 32:
+				values[0] = lb_const_f16(m, cast(f32)value.value_complex->real);
+				values[1] = lb_const_f16(m, cast(f32)value.value_complex->imag);
+				break;
 			case 64:
 				values[0] = lb_const_f32(m, cast(f32)value.value_complex->real);
 				values[1] = lb_const_f32(m, cast(f32)value.value_complex->imag);
@@ -5796,6 +5860,13 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		{
 			LLVMValueRef values[4] = {};
 			switch (8*type_size_of(type)) {
+			case 64:
+				// @QuaternionLayout
+				values[3] = lb_const_f16(m, cast(f32)value.value_quaternion->real);
+				values[0] = lb_const_f16(m, cast(f32)value.value_quaternion->imag);
+				values[1] = lb_const_f16(m, cast(f32)value.value_quaternion->jmag);
+				values[2] = lb_const_f16(m, cast(f32)value.value_quaternion->kmag);
+				break;
 			case 128:
 				// @QuaternionLayout
 				values[3] = lb_const_f32(m, cast(f32)value.value_quaternion->real);
@@ -7340,9 +7411,10 @@ bool lb_is_type_aggregate(Type *t) {
 		case Basic_any:
 			return true;
 
-		// case Basic_complex32:
+		case Basic_complex32:
 		case Basic_complex64:
 		case Basic_complex128:
+		case Basic_quaternion64:
 		case Basic_quaternion128:
 		case Basic_quaternion256:
 			return true;
@@ -7663,7 +7735,9 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 			case 1: result_type = t_typeid; break;
 			}
 			break;
-		case Basic_complex64: case Basic_complex128:
+		case Basic_complex32:
+		case Basic_complex64:
+		case Basic_complex128:
 		{
 			Type *ft = base_complex_elem_type(t);
 			switch (index) {
@@ -7672,7 +7746,9 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 			}
 			break;
 		}
-		case Basic_quaternion128: case Basic_quaternion256:
+		case Basic_quaternion64:
+		case Basic_quaternion128:
+		case Basic_quaternion256:
 		{
 			Type *ft = base_complex_elem_type(t);
 			switch (index) {
@@ -8816,6 +8892,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			auto args = array_make<lbValue>(permanent_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
+			case 64:  return lb_emit_runtime_call(p, "abs_quaternion64", args);
 			case 128: return lb_emit_runtime_call(p, "abs_quaternion128", args);
 			case 256: return lb_emit_runtime_call(p, "abs_quaternion256", args);
 			}
@@ -8825,6 +8902,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			auto args = array_make<lbValue>(permanent_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
+			case 32:  return lb_emit_runtime_call(p, "abs_complex32",  args);
 			case 64:  return lb_emit_runtime_call(p, "abs_complex64",  args);
 			case 128: return lb_emit_runtime_call(p, "abs_complex128", args);
 			}
@@ -8834,6 +8912,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			auto args = array_make<lbValue>(permanent_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
+			case 16: return lb_emit_runtime_call(p, "abs_f16", args);
 			case 32: return lb_emit_runtime_call(p, "abs_f32", args);
 			case 64: return lb_emit_runtime_call(p, "abs_f64", args);
 			}
@@ -9566,6 +9645,7 @@ lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
 		if (is_type_float(platform_type)) {
 			String name = {};
 			switch (sz) {
+			case 2:  name = str_lit("bswap_f16");  break;
 			case 4:  name = str_lit("bswap_f32");  break;
 			case 8:  name = str_lit("bswap_f64");  break;
 			default: GB_PANIC("unhandled byteswap size"); break;
@@ -12678,11 +12758,13 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_rune_ptr);
 				break;
 
-			// case Basic_f16:
+			case Basic_f16:
 			case Basic_f32:
 			case Basic_f64:
+			case Basic_f16le:
 			case Basic_f32le:
 			case Basic_f64le:
+			case Basic_f16be:
 			case Basic_f32be:
 			case Basic_f64be:
 				{
@@ -12708,12 +12790,13 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 				break;
 
-			// case Basic_complex32:
+			case Basic_complex32:
 			case Basic_complex64:
 			case Basic_complex128:
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_complex_ptr);
 				break;
 
+			case Basic_quaternion64:
 			case Basic_quaternion128:
 			case Basic_quaternion256:
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_quaternion_ptr);

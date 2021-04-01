@@ -25,6 +25,9 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 	bits: u64;
 	flt: ^Float_Info;
 	switch bit_size {
+	case 16:
+		bits = u64(transmute(u16)f16(val));
+		flt = &_f16_info;
 	case 32:
 		bits = u64(transmute(u32)f32(val));
 		flt = &_f32_info;

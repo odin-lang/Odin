@@ -158,6 +158,8 @@ i64 lb_sizeof(LLVMTypeRef type) {
 			unsigned w = LLVMGetIntTypeWidth(type);
 			return (w + 7)/8;
 		}
+	case LLVMHalfTypeKind:
+		return 2;
 	case LLVMFloatTypeKind:
 		return 4;
 	case LLVMDoubleTypeKind:
@@ -222,6 +224,8 @@ i64 lb_alignof(LLVMTypeRef type) {
 			unsigned w = LLVMGetIntTypeWidth(type);
 			return gb_clamp((w + 7)/8, 1, build_context.max_align);
 		}
+	case LLVMHalfTypeKind:
+		return 2;
 	case LLVMFloatTypeKind:
 		return 4;
 	case LLVMDoubleTypeKind:
@@ -584,6 +588,7 @@ namespace lbAbiAmd64SysV {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		switch (kind) {
 		case LLVMIntegerTypeKind:
+		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
 		case LLVMPointerTypeKind:
@@ -799,6 +804,7 @@ namespace lbAbiAmd64SysV {
 		switch (LLVMGetTypeKind(t)) {
 		case LLVMIntegerTypeKind:
 		case LLVMPointerTypeKind:
+		case LLVMHalfTypeKind:
 			unify(cls, ix + off/8, RegClass_Int);
 			break;
 		case LLVMFloatTypeKind:
@@ -842,6 +848,7 @@ namespace lbAbiAmd64SysV {
 				RegClass reg = RegClass_NoClass;
 				switch (elem_kind) {
 				case LLVMIntegerTypeKind:
+				case LLVMHalfTypeKind:
 					switch (LLVMGetIntTypeWidth(elem)) {
 					case 8:  reg = RegClass_SSEInt8;
 					case 16: reg = RegClass_SSEInt16;
@@ -934,6 +941,7 @@ namespace lbAbiArm64 {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		switch (kind) {
 		case LLVMIntegerTypeKind:
+		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
 		case LLVMPointerTypeKind:
