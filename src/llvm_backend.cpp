@@ -9215,16 +9215,17 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				}
 			} else {
 				switch (id) {
-				case BuiltinProc_fixed_point_mul:     name = "llvm.imul.fix";     break;
-				case BuiltinProc_fixed_point_div:     name = "llvm.idiv.fix";     break;
-				case BuiltinProc_fixed_point_mul_sat: name = "llvm.imul.fix.sat"; break;
-				case BuiltinProc_fixed_point_div_sat: name = "llvm.idiv.fix.sat"; break;
+				case BuiltinProc_fixed_point_mul:     name = "llvm.smul.fix";     break;
+				case BuiltinProc_fixed_point_div:     name = "llvm.sdiv.fix";     break;
+				case BuiltinProc_fixed_point_mul_sat: name = "llvm.smul.fix.sat"; break;
+				case BuiltinProc_fixed_point_div_sat: name = "llvm.sdiv.fix.sat"; break;
 				}
 			}
 			GB_ASSERT(name != nullptr);
 
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 			LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
 			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
 			lbValue res = {};
