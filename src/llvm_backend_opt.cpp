@@ -108,10 +108,11 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	if (optimization_level >= 2) {
 		// NOTE(bill, 2021-03-29: use this causes invalid code generation)
 		LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
+		LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
 		LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
 		LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
-		LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
 		// LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
+		return;
 	}
 
 	LLVMAddIPSCCPPass(mpm);
