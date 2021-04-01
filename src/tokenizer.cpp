@@ -865,11 +865,12 @@ void scan_number_to_token(Tokenizer *t, Token *token, bool seen_decimal_point) {
 					}
 				}
 				switch (digit_count) {
+				case 4:
 				case 8:
 				case 16:
 					break;
 				default:
-					tokenizer_err(t, "Invalid hexadecimal float, expected 8 or 16 digits, got %td", digit_count);
+					tokenizer_err(t, "Invalid hexadecimal float, expected 4, 8, or 16 digits, got %td", digit_count);
 					break;
 				}
 			}

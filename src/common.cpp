@@ -763,7 +763,7 @@ i64 prev_pow2(i64 n) {
 	return n - (n >> 1);
 }
 
-i16 f32_to_f16(f32 value) {
+u16 f32_to_f16(f32 value) {
 	union { u32 i; f32 f; } v;
 	i32 i, s, e, m;
 
@@ -776,20 +776,20 @@ i16 f32_to_f16(f32 value) {
 
 
 	if (e <= 0) {
-		if (e < -10) return cast(i16)s;
+		if (e < -10) return cast(u16)s;
 		m = (m | 0x00800000) >> (1 - e);
 
 		if (m & 0x00001000)
 			m += 0x00002000;
 
-		return cast(i16)(s | (m >> 13));
+		return cast(u16)(s | (m >> 13));
 	} else if (e == 0xff - (127 - 15)) {
 		if (m == 0) {
-			return cast(i16)(s | 0x7c00); /* NOTE(bill): infinity */
+			return cast(u16)(s | 0x7c00); /* NOTE(bill): infinity */
 		} else {
 			/* NOTE(bill): NAN */
 			m >>= 13;
-			return cast(i16)(s | 0x7c00 | m | (m == 0));
+			return cast(u16)(s | 0x7c00 | m | (m == 0));
 		}
 	} else {
 		if (m & 0x00001000) {
@@ -807,11 +807,27 @@ i16 f32_to_f16(f32 value) {
 				f *= f; /* NOTE(bill): Cause overflow */
 			}
 
-			return cast(i16)(s | 0x7c00);
+			return cast(u16)(s | 0x7c00);
 		}
 
-		return cast(i16)(s | (e << 10) | (m >> 13));
+		return cast(u16)(s | (e << 10) | (m >> 13));
 	}
+}
+
+f32 f16_to_f32(u16 value) {
+	typedef union { u32 u; f32 f; } fp32;
+	fp32 v;
+
+	fp32 magic = {(254u - 15u) << 23};
+	fp32 inf_or_nan = {(127u + 16u) << 23};
+
+	v.u = (value & 0x7fffu) << 13;
+	v.f *= magic.f;
+	if (v.f >= inf_or_nan.f) {
+		v.u |= 255u << 23;
+	}
+	v.u |= (value & 0x8000u) << 16;
+	return v.f;
 }
 
 f64 gb_sqrt(f64 x) {

@@ -1,5 +1,7 @@
 package runtime
 
+import "intrinsics"
+
 bswap_16 :: proc "none" (x: u16) -> u16 {
 	return x>>8 | x<<8;
 }
@@ -25,6 +27,12 @@ bswap_128 :: proc "none" (x: u128) -> u128 {
 	return transmute(u128)z;
 }
 
+bswap_f16 :: proc "none" (f: f16) -> f16 {
+	x := transmute(u16)f;
+	z := bswap_16(x);
+	return transmute(f16)z;
+
+}
 
 bswap_f32 :: proc "none" (f: f32) -> f32 {
 	x := transmute(u32)f;
@@ -410,6 +418,12 @@ foreign {
 	@(link_name="llvm.sqrt.f32") _sqrt_f32 :: proc(x: f32) -> f32 ---
 	@(link_name="llvm.sqrt.f64") _sqrt_f64 :: proc(x: f64) -> f64 ---
 }
+abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
+	foreign {
+		@(link_name="llvm.fabs.f16") _abs :: proc "none" (x: f16) -> f16 ---
+	}
+	return _abs(x);
+}
 abs_f32 :: #force_inline proc "contextless" (x: f32) -> f32 {
 	foreign {
 		@(link_name="llvm.fabs.f32") _abs :: proc "none" (x: f32) -> f32 ---
@@ -423,6 +437,12 @@ abs_f64 :: #force_inline proc "contextless" (x: f64) -> f64 {
 	return _abs(x);
 }
 
+min_f16 :: proc(a, b: f16) -> f16 {
+	foreign {
+		@(link_name="llvm.minnum.f16") _min :: proc "none" (a, b: f16) -> f16 ---
+	}
+	return _min(a, b);
+}
 min_f32 :: proc(a, b: f32) -> f32 {
 	foreign {
 		@(link_name="llvm.minnum.f32") _min :: proc "none" (a, b: f32) -> f32 ---
@@ -434,6 +454,12 @@ min_f64 :: proc(a, b: f64) -> f64 {
 		@(link_name="llvm.minnum.f64") _min :: proc "none" (a, b: f64) -> f64 ---
 	}
 	return _min(a, b);
+}
+max_f16 :: proc(a, b: f16) -> f16 {
+	foreign {
+		@(link_name="llvm.maxnum.f16") _max :: proc "none" (a, b: f16) -> f16 ---
+	}
+	return _max(a, b);
 }
 max_f32 :: proc(a, b: f32) -> f32 {
 	foreign {
@@ -448,6 +474,10 @@ max_f64 :: proc(a, b: f64) -> f64 {
 	return _max(a, b);
 }
 
+abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
+	r, i := real(x), imag(x);
+	return f16(_sqrt_f32(f32(r*r + i*i)));
+}
 abs_complex64 :: #force_inline proc "contextless" (x: complex64) -> f32 {
 	r, i := real(x), imag(x);
 	return _sqrt_f32(r*r + i*i);
@@ -455,6 +485,10 @@ abs_complex64 :: #force_inline proc "contextless" (x: complex64) -> f32 {
 abs_complex128 :: #force_inline proc "contextless" (x: complex128) -> f64 {
 	r, i := real(x), imag(x);
 	return _sqrt_f64(r*r + i*i);
+}
+abs_quaternion64 :: #force_inline proc "contextless" (x: quaternion64) -> f16 {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return f16(_sqrt_f32(f32(r*r + i*i + j*j + k*k)));
 }
 abs_quaternion128 :: #force_inline proc "contextless" (x: quaternion128) -> f32 {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
@@ -464,6 +498,26 @@ abs_quaternion256 :: #force_inline proc "contextless" (x: quaternion256) -> f64 
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
 	return _sqrt_f64(r*r + i*i + j*j + k*k);
 }
+
+
+quo_complex32 :: proc "contextless" (n, m: complex32) -> complex32 {
+	e, f: f16;
+
+	if abs(real(m)) >= abs(imag(m)) {
+		ratio := imag(m) / real(m);
+		denom := real(m) + ratio*imag(m);
+		e = (real(n) + imag(n)*ratio) / denom;
+		f = (imag(n) - real(n)*ratio) / denom;
+	} else {
+		ratio := real(m) / imag(m);
+		denom := imag(m) + ratio*real(m);
+		e = (real(n)*ratio + imag(n)) / denom;
+		f = (imag(n)*ratio - real(n)) / denom;
+	}
+
+	return complex(e, f);
+}
+
 
 quo_complex64 :: proc "contextless" (n, m: complex64) -> complex64 {
 	e, f: f32;
@@ -501,6 +555,18 @@ quo_complex128 :: proc "contextless" (n, m: complex128) -> complex128 {
 	return complex(e, f);
 }
 
+mul_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3;
+	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2;
+	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1;
+	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
 mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
 	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
 	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
@@ -521,6 +587,20 @@ mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2;
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1;
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3);
+
+	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2;
+	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2;
+	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2;
+	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2;
 
 	return quaternion(t0, t1, t2, t3);
 }
@@ -551,4 +631,91 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2;
 
 	return quaternion(t0, t1, t2, t3);
+}
+
+@(link_name="__truncsfhf2")
+truncsfhf2 :: proc "c" (value: f32) -> u16 {
+	v: struct #raw_union { i: u32, f: f32 };
+	i, s, e, m: i32;
+
+	v.f = value;
+	i = i32(v.i);
+
+	s =  (i >> 16) & 0x00008000;
+	e = ((i >> 23) & 0x000000ff) - (127 - 15);
+	m =   i        & 0x007fffff;
+
+
+	if (e <= 0) {
+		if (e < -10) {
+			return u16(s);
+		}
+		m = (m | 0x00800000) >> u32(1 - e);
+
+		if (m & 0x00001000) != 0 {
+			m += 0x00002000;
+		}
+
+		return u16(s | (m >> 13));
+	} else if (e == 0xff - (127 - 15)) {
+		if (m == 0) {
+			return u16(s | 0x7c00); /* NOTE(bill): infinity */
+		} else {
+			/* NOTE(bill): NAN */
+			m >>= 13;
+			return u16(s | 0x7c00 | m | i32(m == 0));
+		}
+	} else {
+		if (m & 0x00001000) != 0 {
+			m += 0x00002000;
+			if (m & 0x00800000) != 0 {
+				m = 0;
+				e += 1;
+			}
+		}
+
+		if (e > 30) {
+			f := 1e12;
+			for j := 0; j < 10; j += 1 {
+				/* NOTE(bill): Cause overflow */
+				g := intrinsics.volatile_load(&f);
+				g *= g;
+				intrinsics.volatile_store(&f, g);
+			}
+
+			return u16(s | 0x7c00);
+		}
+
+		return u16(s | (e << 10) | (m >> 13));
+	}
+}
+
+
+@(link_name="__truncdfhf2")
+truncdfhf2 :: proc "c" (value: f64) -> u16 {
+	return truncsfhf2(f32(value));
+}
+
+@(link_name="__gnu_h2f_ieee")
+gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
+	fp32 :: struct #raw_union { u: u32, f: f32 };
+
+	v: fp32;
+	magic, inf_or_nan: fp32;
+	magic.u = u32((254 - 15) << 23);
+	inf_or_nan.u = u32((127 + 16) << 23);
+
+	v.u = u32(value & 0x7fff) << 13;
+	v.f *= magic.f;
+	if v.f >= inf_or_nan.f {
+		v.u |= 255 << 23;
+	}
+	v.u |= u32(value & 0x8000) << 16;
+	return v.f;
+}
+
+
+@(link_name="__gnu_f2h_ieee")
+gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
+	return truncsfhf2(value);
 }

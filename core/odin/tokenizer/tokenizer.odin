@@ -431,9 +431,9 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Token_Kind, str
 					}
 
 					switch digit_count {
-					case 8, 16: break;
+					case 4, 8, 16: break;
 					case:
-						error(t, t.offset, "invalid hexadecimal floating-point number, expected 8 or 16 digits, got %d", digit_count);
+						error(t, t.offset, "invalid hexadecimal floating-point number, expected 4, 8, or 16 digits, got %d", digit_count);
 					}
 				}
 
