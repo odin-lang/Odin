@@ -9224,14 +9224,16 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_ASSERT(name != nullptr);
 
 			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, &platform_type, 1);
+			LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			lbValue res = {};
 
 			LLVMValueRef args[3] = {};
 			args[0] = x.value;
 			args[1] = y.value;
 			args[2] = scale.value;
 
-			lbValue res = {};
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 			res.type = platform_type;
 			return lb_emit_conv(p, res, tv.type);
