@@ -8259,7 +8259,14 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index) {
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
 	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st), "%s", type_to_string(st));
-	GB_ASSERT_MSG(is_type_integer(index.type), "%s", type_to_string(index.type));
+	GB_ASSERT_MSG(is_type_integer(core_type(index.type)), "%s", type_to_string(index.type));
+
+	if (st->kind == Type_EnumeratedArray &&
+	    is_type_enum(st->EnumeratedArray.index) &&
+	    are_types_identical(st->EnumeratedArray.index, index.type)) {
+	    	lbValue min_value = lb_const_value(p->module, index.type, st->EnumeratedArray.min_value, false);
+		index = lb_emit_arith(p, Token_Sub, index, min_value, index.type);
+	}
 
 	LLVMValueRef indices[2] = {};
 	indices[0] = llvm_zero(p->module);
