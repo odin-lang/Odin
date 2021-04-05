@@ -2523,7 +2523,6 @@ int main(int arg_count, char const **arg_ptr) {
 				}
 			}
 
-      gb_printf("Started Linking!");
 			i32 result = system_exec_command_line_app("ld-link",
 				"%s \"%.*s.o\" -o \"%.*s%.*s\" %s "
 				" %s "
