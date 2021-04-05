@@ -1773,6 +1773,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("truncdfhf2"),
 		str_lit("gnu_h2f_ieee"),
 		str_lit("gnu_f2h_ieee"),
+		str_lit("extendhfsf2"),
 
 		str_lit("memset"),
 		str_lit("memcpy"),
