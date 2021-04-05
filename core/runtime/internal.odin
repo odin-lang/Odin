@@ -719,3 +719,8 @@ gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
 gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
 	return truncsfhf2(value);
 }
+
+@(link_name="__extendhfsf2")
+extendhfsf2 :: proc "c" (value: u16) -> f32 {
+	return gnu_h2f_ieee(value);
+}
