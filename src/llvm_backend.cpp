@@ -5797,12 +5797,17 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 	case ExactValue_Integer:
 		if (is_type_pointer(type)) {
-			LLVMValueRef i = LLVMConstIntOfArbitraryPrecision(lb_type(m, t_uintptr), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer));
-			res.value = LLVMConstIntToPtr(i, lb_type(m, original_type));
+			unsigned len = cast(unsigned)value.value_integer.len;
+			LLVMTypeRef t = lb_type(m, t_uintptr);
+			if (len == 0) {
+				res.value = LLVMConstNull(t);
+			} else {
+				LLVMValueRef i = LLVMConstIntOfArbitraryPrecision(t, len, big_int_ptr(&value.value_integer));
+				res.value = LLVMConstIntToPtr(i, lb_type(m, original_type));
+			}
 		} else {
 			unsigned len = cast(unsigned)value.value_integer.len;
 			if (len == 0) {
-				u64 word = 0;
 				res.value = LLVMConstNull(lb_type(m, original_type));
 			} else {
 				u64 *words = big_int_ptr(&value.value_integer);
