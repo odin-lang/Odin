@@ -5798,12 +5798,12 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 	case ExactValue_Integer:
 		if (is_type_pointer(type)) {
 			unsigned len = cast(unsigned)value.value_integer.len;
-			LLVMTypeRef t = lb_type(m, t_uintptr);
+			LLVMTypeRef t = lb_type(m, original_type);
 			if (len == 0) {
 				res.value = LLVMConstNull(t);
 			} else {
-				LLVMValueRef i = LLVMConstIntOfArbitraryPrecision(t, len, big_int_ptr(&value.value_integer));
-				res.value = LLVMConstIntToPtr(i, lb_type(m, original_type));
+				LLVMValueRef i = LLVMConstIntOfArbitraryPrecision(lb_type(m, t_uintptr), len, big_int_ptr(&value.value_integer));
+				res.value = LLVMConstIntToPtr(i, t);
 			}
 		} else {
 			unsigned len = cast(unsigned)value.value_integer.len;
@@ -8053,7 +8053,27 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		LLVMTypeRef fnp = LLVMGetElementType(LLVMTypeOf(fn));
 		GB_ASSERT_MSG(lb_is_type_kind(fnp, LLVMFunctionTypeKind), "%s", LLVMPrintTypeToString(fnp));
 
-		LLVMValueRef ret = LLVMBuildCall2(p->builder, ft, fn, args, arg_count, "");;
+		{
+			unsigned param_count = LLVMCountParamTypes(fnp);
+			GB_ASSERT(arg_count >= param_count);
+
+			LLVMTypeRef *param_types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, param_count);
+			LLVMGetParamTypes(fnp, param_types);
+			for (unsigned i = 0; i < param_count; i++) {
+				LLVMTypeRef param_type = param_types[i];
+				LLVMTypeRef arg_type = LLVMTypeOf(args[i]);
+				GB_ASSERT_MSG(
+					arg_type == param_type,
+					"Parameter types do not match: %s != %s, argument: %s",
+					LLVMPrintTypeToString(arg_type),
+					LLVMPrintTypeToString(param_type),
+					LLVMPrintValueToString(args[i])
+				);
+			}
+		}
+
+		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
+		// LLVMValueRef ret = LLVMBuildCall(p->builder, fn, args, arg_count, "");
 		lbValue res = {};
 		res.value = ret;
 		res.type = abi_rt;
