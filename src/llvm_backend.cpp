@@ -12471,11 +12471,23 @@ void lb_init_module(lbModule *m, Checker *c) {
 		LLVMMetadataRef debug_ref = LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), DEBUG_METADATA_VERSION, true));
 		LLVMAddModuleFlag(m->mod, LLVMModuleFlagBehaviorWarning, "Debug Info Version", 18, debug_ref);
 
-		if (build_context.metrics.os == TargetOs_windows) {
-			LLVMMetadataRef ref = LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true));
-			LLVMAddModuleFlag(m->mod, LLVMModuleFlagBehaviorWarning, "CodeView", 8, ref);
-			m->debug_builder = LLVMCreateDIBuilder(m->mod);
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+			LLVMAddModuleFlag(m->mod,
+				LLVMModuleFlagBehaviorWarning,
+				"CodeView", 8,
+				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true)));
+			break;
+
+		case TargetOs_darwin:
+			// NOTE(bill): Darwin only supports DWARF2 (that I know of)
+			LLVMAddModuleFlag(m->mod,
+				LLVMModuleFlagBehaviorWarning,
+				"Dwarf Version", 13,
+				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 2, true)));
+
 		}
+		m->debug_builder = LLVMCreateDIBuilder(m->mod);
 	}
 
 	m->state_flags = 0;
