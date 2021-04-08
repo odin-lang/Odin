@@ -12485,7 +12485,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 				LLVMModuleFlagBehaviorWarning,
 				"Dwarf Version", 13,
 				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 2, true)));
-
+			break;
 		}
 		m->debug_builder = LLVMCreateDIBuilder(m->mod);
 	}
