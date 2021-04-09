@@ -78,6 +78,11 @@ struct lbAddr {
 	};
 };
 
+struct lbIncompleteDebugType {
+	Type *type;
+	LLVMMetadataRef metadata;
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -93,6 +98,7 @@ struct lbModule {
 	i32 internal_type_level;
 
 	Map<lbValue>  values;           // Key: Entity *
+	Map<lbAddr>   soa_values;       // Key: Entity *
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
@@ -117,6 +123,8 @@ struct lbModule {
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;
 	Map<LLVMMetadataRef> debug_values; // Key: Pointer
+
+	Array<lbIncompleteDebugType> debug_incomplete_types;
 };
 
 struct lbGenerator {
@@ -479,4 +487,15 @@ enum : LLVMDWARFTypeEncoding {
 	LLVMDWARFTypeEncoding_Utf = 16,
 	LLVMDWARFTypeEncoding_LoUser = 128,
 	LLVMDWARFTypeEncoding_HiUser = 255
+};
+
+
+enum {
+	DW_TAG_array_type       = 1,
+	DW_TAG_enumeration_type = 4,
+	DW_TAG_structure_type   = 19,
+	DW_TAG_union_type       = 23,
+	DW_TAG_vector_type      = 259,
+	DW_TAG_subroutine_type  = 21,
+	DW_TAG_inheritance      = 28,
 };

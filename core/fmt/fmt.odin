@@ -948,6 +948,7 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 
 		u: u64;
 		switch bit_size {
+		case 16: u = u64(transmute(u16)f16(v));
 		case 32: u = u64(transmute(u32)f32(v));
 		case 64: u = transmute(u64)v;
 		case: panic("Unhandled float size");
@@ -2023,12 +2024,15 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case any:        fmt_arg(fi,  a, verb);
 	case rune:       fmt_rune(fi, a, verb);
 
+	case f16:        fmt_float(fi, f64(a), 16, verb);
 	case f32:        fmt_float(fi, f64(a), 32, verb);
 	case f64:        fmt_float(fi, a,      64, verb);
 
+	case f16le:      fmt_float(fi, f64(a), 16, verb);
 	case f32le:      fmt_float(fi, f64(a), 32, verb);
 	case f64le:      fmt_float(fi, f64(a), 64, verb);
 
+	case f16be:      fmt_float(fi, f64(a), 16, verb);
 	case f32be:      fmt_float(fi, f64(a), 32, verb);
 	case f64be:      fmt_float(fi, f64(a), 64, verb);
 

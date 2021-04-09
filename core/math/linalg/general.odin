@@ -47,6 +47,9 @@ vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) {
 	}
 	return;
 }
+quaternion64_dot :: proc(a, b: $T/quaternion64) -> (c: f16) {
+	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z;
+}
 quaternion128_dot :: proc(a, b: $T/quaternion128) -> (c: f32) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
@@ -54,7 +57,7 @@ quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-dot :: proc{scalar_dot, vector_dot, quaternion128_dot, quaternion256_dot};
+dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quaternion256_dot};
 
 inner_product :: dot;
 outer_product :: proc(a: $A/[$M]$E, b: $B/[$N]E) -> (out: [M][N]E) where IS_NUMERIC(E) {
@@ -230,6 +233,16 @@ matrix_mul_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
 quaternion_mul_quaternion :: proc(q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
 	return q1 * q2;
 }
+
+quaternion64_mul_vector3 :: proc(q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
+	Raw_Quaternion :: struct {xyz: [3]f16, r: f16};
+
+	q := transmute(Raw_Quaternion)q;
+	v := transmute([3]f16)v;
+
+	t := cross(2*q.xyz, v);
+	return V(v + q.r*t + cross(q.xyz, t));
+}
 quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f32, r: f32};
 
@@ -239,7 +252,6 @@ quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	t := cross(2*q.xyz, v);
 	return V(v + q.r*t + cross(q.xyz, t));
 }
-
 quaternion256_mul_vector3 :: proc(q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f64, r: f64};
 
@@ -249,12 +261,13 @@ quaternion256_mul_vector3 :: proc(q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
 	t := cross(2*q.xyz, v);
 	return V(v + q.r*t + cross(q.xyz, t));
 }
-quaternion_mul_vector3 :: proc{quaternion128_mul_vector3, quaternion256_mul_vector3};
+quaternion_mul_vector3 :: proc{quaternion64_mul_vector3, quaternion128_mul_vector3, quaternion256_mul_vector3};
 
 mul :: proc{
 	matrix_mul,
 	matrix_mul_differ,
 	matrix_mul_vector,
+	quaternion64_mul_vector3,
 	quaternion128_mul_vector3,
 	quaternion256_mul_vector3,
 	quaternion_mul_quaternion,
@@ -316,10 +329,20 @@ cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 
 
 
-array_cast :: proc(v: $A/[$N]$T, $U: typeid) -> [N]U {
-	w: [N]U;
-	for _, i in v do w[i] = U(v[i]);
-	return w;
+array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) {
+	for i in 0..<N {
+		w[i] = Elem_Type(v[i]);
+	}
+	return;
+}
+
+matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) {
+	for i in 0..<M {
+		for j in 0..<N {
+			w[i][j] = Elem_Type(v[i][j]);
+		}
+	}
+	return;
 }
 
 to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32);  }
@@ -337,7 +360,9 @@ to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return array_cast(v, u3
 to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return array_cast(v, u64);  }
 to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return array_cast(v, uint); }
 
+to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return array_cast(v, complex32);     }
 to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return array_cast(v, complex64);     }
 to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return array_cast(v, complex128);    }
+to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64 { return array_cast(v, quaternion64); }
 to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128); }
 to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256); }

@@ -402,8 +402,7 @@ Range_Stmt :: struct {
 	using node: Stmt,
 	label:     ^Expr,
 	for_pos:   tokenizer.Pos,
-	val0:      ^Expr,
-	val1:      ^Expr,
+	vals:      []^Expr,
 	in_pos:    tokenizer.Pos,
 	expr:      ^Expr,
 	body:      ^Stmt,
@@ -562,6 +561,7 @@ Field_Flags_Struct :: Field_Flags{
 };
 Field_Flags_Record_Poly_Params :: Field_Flags{
 	.Typeid_Token,
+	.Default_Parameters,
 };
 Field_Flags_Signature :: Field_Flags{
 	.Ellipsis,

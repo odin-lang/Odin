@@ -121,7 +121,6 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		gb_printf_err("%s\n\n", cmd_line);
 	}
 	exit_code = system(cmd_line);
-
 	// pid_t pid = fork();
 	// int status = 0;
 
@@ -147,12 +146,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	// 	status = WEXITSTATUS(s);
 	// }
 
-	// exit_code = status;
-
-	if (exit_code) {
-		exit(exit_code);
-	}
-
+	// exit_code = status
 	return exit_code;
 #endif
 }
@@ -161,8 +155,9 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 
 #if defined(LLVM_BACKEND_SUPPORT)
-void linker_stage(lbGenerator *gen) {
-	Timings *timings = &global_timings;
+i32 linker_stage(lbGenerator *gen) {
+  i32 result = 0;
+  Timings *timings = &global_timings;
 
 	String output_base = gen->output_base;
 
@@ -176,7 +171,7 @@ void linker_stage(lbGenerator *gen) {
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
-		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
 		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
@@ -273,28 +268,30 @@ void linker_stage(lbGenerator *gen) {
 		char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 		if (!build_context.use_lld) { // msvc
 			if (build_context.has_resource) {
-				system_exec_command_line_app("msvc-link",
+				result = system_exec_command_line_app("msvc-link",
 					"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
-
-				system_exec_command_line_app("msvc-link",
-					"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%s "
-					" %.*s "
-					" %.*s "
-					" %s "
-					"",
-					LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
-					link_settings,
-					subsystem_str,
-					LIT(build_context.link_flags),
-					LIT(build_context.extra_linker_flags),
-					lib_str
-				);
+        
+        if(result == 0) {
+          result = system_exec_command_line_app("msvc-link",
+            "\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+            "/nologo /incremental:no /opt:ref /subsystem:%s "
+            " %.*s "
+            " %.*s "
+            " %s "
+            "",
+            LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
+            link_settings,
+            subsystem_str,
+            LIT(build_context.link_flags),
+            LIT(build_context.extra_linker_flags),
+            lib_str
+          );
+        }
 			} else {
-				system_exec_command_line_app("msvc-link",
+				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
@@ -310,7 +307,7 @@ void linker_stage(lbGenerator *gen) {
 				);
 			}
 		} else { // lld
-			system_exec_command_line_app("msvc-link",
+			  result = system_exec_command_line_app("msvc-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
@@ -428,8 +425,8 @@ void linker_stage(lbGenerator *gen) {
 				output_ext = substring(build_context.out_filepath, pos, build_context.out_filepath.len);
 			}
 		}
-
-		system_exec_command_line_app("ld-link",
+    
+		result = system_exec_command_line_app("ld-link",
 			"%s %s -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
@@ -470,8 +467,8 @@ void linker_stage(lbGenerator *gen) {
 
 	#endif
 	}
-
-	return;
+  
+	return result;
 }
 #endif
 
@@ -1038,6 +1035,7 @@ bool parse_build_flags(Array<String> args) {
 							if (v.kind != ExactValue_Invalid) {
 								map_set(&build_context.defined_values, key, v);
 							} else {
+								gb_printf_err("Invalid define constant value: '%.*s'. Define constants must be a valid Odin literal.\n", LIT(value));
 								bad_flags = true;
 							}
 
@@ -1516,7 +1514,20 @@ i32 exec_llvm_opt(String output_base) {
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 
+<<<<<<< HEAD
   return 0;
+=======
+  return system_exec_command_line_app("llvm-opt",
+    "opt \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
+    "",
+    LIT(output_base), LIT(output_base))
+
+	|| system_exec_command_line_app("llvm-opt",
+		"opt \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
+		"",
+		LIT(output_base), LIT(output_base),
+		LIT(build_context.opt_flags));
+>>>>>>> 8169cb48534a8ea4332a434cee6ed8a6ad9203f7
 #endif
 }
 
@@ -2133,7 +2144,10 @@ int main(int arg_count, char const **arg_ptr) {
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
 		case BuildMode_DynamicLibrary:
-			linker_stage(&gen);
+			i32 result = linker_stage(&gen);
+      if(result != 0) {
+        return 1;
+      }
 			break;
 		}
 
@@ -2327,13 +2341,17 @@ int main(int arg_count, char const **arg_ptr) {
 
 			if (!build_context.use_lld) { // msvc
 				if (build_context.has_resource) {
-					system_exec_command_line_app("msvc-link",
+					i32 result = system_exec_command_line_app("msvc-link",
 						"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 						LIT(output_base),
 						LIT(build_context.resource_filepath)
 					);
-
-					system_exec_command_line_app("msvc-link",
+          
+          if(result != 0) {
+            return 1;
+          }
+          
+          result = system_exec_command_line_app("msvc-link",
 						"\"%.*slink.exe\" \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
 						" %.*s "
@@ -2347,8 +2365,13 @@ int main(int arg_count, char const **arg_ptr) {
 						LIT(build_context.extra_linker_flags),
 						lib_str
 					);
+          
+          if(result != 0) {
+            return 1;
+          }
+          
 				} else {
-					system_exec_command_line_app("msvc-link",
+          i32 result =  system_exec_command_line_app("msvc-link",
 						"\"%.*slink.exe\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
 						" %.*s "
@@ -2362,9 +2385,13 @@ int main(int arg_count, char const **arg_ptr) {
 						LIT(build_context.extra_linker_flags),
 						lib_str
 					);
+          
+          if(result != 0) {
+            return 1;
+          }
 				}
 			} else { // lld
-				system_exec_command_line_app("msvc-link",
+				i32 result = system_exec_command_line_app("msvc-link",
 					"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
@@ -2379,6 +2406,10 @@ int main(int arg_count, char const **arg_ptr) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
+        
+        if(result != 0) {
+          return 1;
+        }
 			}
 
 			if (build_context.show_timings) {
@@ -2489,8 +2520,7 @@ int main(int arg_count, char const **arg_ptr) {
 				}
 			}
 
-
-			system_exec_command_line_app("ld-link",
+			i32 result = system_exec_command_line_app("ld-link",
 				"%s \"%.*s.o\" -o \"%.*s%.*s\" %s "
 				" %s "
 				" %.*s "
@@ -2514,7 +2544,11 @@ int main(int arg_count, char const **arg_ptr) {
 				LIT(build_context.link_flags),
 				LIT(build_context.extra_linker_flags),
 				link_settings);
-
+      
+      if(result != 0) {
+        return 1;
+      }
+      
 		#if defined(GB_SYSTEM_OSX)
 			if (build_context.ODIN_DEBUG) {
 				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
@@ -2541,6 +2575,6 @@ int main(int arg_count, char const **arg_ptr) {
 		#endif
 		}
 	}
-
+  
 	return 0;
 }

@@ -2052,24 +2052,27 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_uintptr:
 		return irDebugBasicEncoding_unsigned;
 
-	// case Basic_f16:
+	case Basic_f16:
 	case Basic_f32:
 	case Basic_f64:
+	case Basic_f16le:
 	case Basic_f32le:
 	case Basic_f64le:
+	case Basic_f16be:
 	case Basic_f32be:
 	case Basic_f64be:
 			return irDebugBasicEncoding_float;
 
-	// case Basic_complex32:
+	case Basic_complex32:
 	case Basic_complex64:
 	case Basic_complex128:
+	case Basic_quaternion64:
+	case Basic_quaternion128:
+	case Basic_quaternion256:
 	case Basic_cstring:
 	case Basic_string:
 	case Basic_any:
 	case Basic_rawptr:
-	case Basic_quaternion128:
-	case Basic_quaternion256:
 		break; // not a "DIBasicType"
 	}
 
@@ -2549,9 +2552,9 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		// Composite basic types
-		case Basic_complex64: case Basic_complex128:
+		case Basic_complex32: case Basic_complex64: case Basic_complex128:
 			return ir_add_debug_info_type_complex(module, type);
-		case Basic_quaternion128: case Basic_quaternion256:
+		case Basic_quaternion64: case Basic_quaternion128: case Basic_quaternion256:
 			return ir_add_debug_info_type_quaternion(module, type);
 		case Basic_string:
 			return ir_add_debug_info_type_string(module, scope, e, type);
@@ -4621,6 +4624,15 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	}
 
 handle_op:
+
+	// NOTE(bill): Bit Set Aliases for + and -
+	if (is_type_bit_set(type)) {
+		switch (op) {
+		case Token_Add: op = Token_Or;     break;
+		case Token_Sub: op = Token_AndNot; break;
+		}
+	}
+
 	switch (op) {
 	case Token_Shl:
 		{
@@ -4630,13 +4642,12 @@ handle_op:
 
 			irValue *bits = right;
 
-			irValue *max = ir_value_constant(type, exact_value_i64(8*type_size_of(type)));
-			irValue *less_equal_width = ir_emit(proc, ir_instr_binary_op(proc, Token_Lt, bits, max, t_llvm_bool));
-
+			irValue *bit_size = ir_value_constant(type, exact_value_i64(8*type_size_of(type)));
+			irValue *width_test = ir_emit(proc, ir_instr_binary_op(proc, Token_Lt, bits, bit_size, t_llvm_bool));
 
 			irValue *zero = ir_value_constant(type, exact_value_i64(0));
 			irValue *res = ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
-			return ir_emit_select(proc, less_equal_width, res, zero);
+			return ir_emit_select(proc, width_test, res, zero);
 		}
 	case Token_Shr:
 		{
@@ -4646,11 +4657,12 @@ handle_op:
 
 			irValue *bits = right;
 
-			irValue *max = ir_value_constant(type, exact_value_i64(8*type_size_of(type)));
-			irValue *less_equal_width = ir_emit(proc, ir_instr_binary_op(proc, Token_Lt, bits, max, t_llvm_bool));
+			irValue *bit_size = ir_value_constant(type, exact_value_i64(8*type_size_of(type)));
+			irValue *width_test = ir_emit(proc, ir_instr_binary_op(proc, Token_Lt, bits, bit_size, t_llvm_bool));
 
-			bits = ir_emit_select(proc, less_equal_width, bits, max);
-			return ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
+			irValue *zero = ir_value_constant(type, exact_value_i64(0));
+			irValue *res = ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
+			return ir_emit_select(proc, width_test, res, zero);
 		}
 
 	case Token_AndNot: {
@@ -5421,7 +5433,9 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 			case 1: result_type = t_typeid; break;
 			}
 			break;
-		case Basic_complex64: case Basic_complex128:
+		case Basic_complex32:
+		case Basic_complex64:
+		case Basic_complex128:
 		{
 			Type *ft = base_complex_elem_type(t);
 			switch (index) {
@@ -5430,7 +5444,9 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 			}
 			break;
 		}
-		case Basic_quaternion128: case Basic_quaternion256:
+		case Basic_quaternion64:
+		case Basic_quaternion128:
+		case Basic_quaternion256:
 		{
 			Type *ft = base_complex_elem_type(t);
 			switch (index) {
@@ -5819,6 +5835,7 @@ irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t) {
 
 		char const *proc_name = nullptr;
 		switch (sz*8) {
+		case 16: proc_name  = "bswap_f16"; break;
 		case 32: proc_name  = "bswap_f32"; break;
 		case 64: proc_name  = "bswap_f64"; break;
 		}
@@ -6263,9 +6280,10 @@ bool ir_is_type_aggregate(Type *t) {
 		case Basic_any:
 			return true;
 
-		// case Basic_complex32:
+		case Basic_complex32:
 		case Basic_complex64:
 		case Basic_complex128:
+		case Basic_quaternion64:
 		case Basic_quaternion128:
 		case Basic_quaternion256:
 			return true;
@@ -7016,6 +7034,7 @@ irValue *ir_emit_min(irProcedure *proc, Type *t, irValue *x, irValue *y) {
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
+		case 16: return ir_emit_runtime_call(proc, "min_f16", args);
 		case 32: return ir_emit_runtime_call(proc, "min_f32", args);
 		case 64: return ir_emit_runtime_call(proc, "min_f64", args);
 		}
@@ -7034,6 +7053,7 @@ irValue *ir_emit_max(irProcedure *proc, Type *t, irValue *x, irValue *y) {
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
+		case 16: return ir_emit_runtime_call(proc, "max_f16", args);
 		case 32: return ir_emit_runtime_call(proc, "max_f32", args);
 		case 64: return ir_emit_runtime_call(proc, "max_f64", args);
 		}
@@ -7478,6 +7498,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
+			case 64:  return ir_emit_runtime_call(proc, "abs_quaternion64", args);
 			case 128: return ir_emit_runtime_call(proc, "abs_quaternion128", args);
 			case 256: return ir_emit_runtime_call(proc, "abs_quaternion256", args);
 			}
@@ -7487,6 +7508,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
+			case 32:  return ir_emit_runtime_call(proc, "abs_complex32",  args);
 			case 64:  return ir_emit_runtime_call(proc, "abs_complex64",  args);
 			case 128: return ir_emit_runtime_call(proc, "abs_complex128", args);
 			}
@@ -7496,6 +7518,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
+			case 16: return ir_emit_runtime_call(proc, "abs_f16", args);
 			case 32: return ir_emit_runtime_call(proc, "abs_f32", args);
 			case 64: return ir_emit_runtime_call(proc, "abs_f64", args);
 			}
@@ -7753,6 +7776,13 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 				value = ir_emit_conv(proc, x, proc_expr->tav.type);
 				break;
 			}
+		}
+	}
+
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		if (proc_entity->flags & EntityFlag_Disabled) {
+			return nullptr;
 		}
 	}
 
@@ -10726,18 +10756,18 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		Type *val0_type = nullptr;
 		Type *val1_type = nullptr;
-		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
-			val0_type = type_of_expr(rs->val0);
+		if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
+			val0_type = type_of_expr(rs->vals[0]);
 		}
-		if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
-			val1_type = type_of_expr(rs->val1);
+		if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
+			val1_type = type_of_expr(rs->vals[1]);
 		}
 
 		if (val0_type != nullptr) {
-			ir_add_local_for_identifier(proc, rs->val0, true);
+			ir_add_local_for_identifier(proc, rs->vals[0], true);
 		}
 		if (val1_type != nullptr) {
-			ir_add_local_for_identifier(proc, rs->val1, true);
+			ir_add_local_for_identifier(proc, rs->vals[1], true);
 		}
 
 		irValue *val = nullptr;
@@ -10842,11 +10872,11 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 
 		if (is_map) {
-			if (val0_type) ir_store_range_stmt_val(proc, rs->val0, key);
-			if (val1_type) ir_store_range_stmt_val(proc, rs->val1, val);
+			if (val0_type) ir_store_range_stmt_val(proc, rs->vals[0], key);
+			if (val1_type) ir_store_range_stmt_val(proc, rs->vals[1], val);
 		} else {
-			if (val0_type) ir_store_range_stmt_val(proc, rs->val0, val);
-			if (val1_type) ir_store_range_stmt_val(proc, rs->val1, key);
+			if (val0_type) ir_store_range_stmt_val(proc, rs->vals[0], val);
+			if (val1_type) ir_store_range_stmt_val(proc, rs->vals[1], key);
 		}
 
 		ir_push_target_list(proc, rs->label, done, loop, nullptr);
@@ -12146,11 +12176,13 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_rune_ptr);
 				break;
 
-			// case Basic_f16:
+			case Basic_f16:
 			case Basic_f32:
 			case Basic_f64:
+			case Basic_f16le:
 			case Basic_f32le:
 			case Basic_f64le:
+			case Basic_f16be:
 			case Basic_f32be:
 			case Basic_f64be:
 				{
@@ -12169,12 +12201,13 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				break;
 
 
-			// case Basic_complex32:
+			case Basic_complex32:
 			case Basic_complex64:
 			case Basic_complex128:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_complex_ptr);
 				break;
 
+			case Basic_quaternion64:
 			case Basic_quaternion128:
 			case Basic_quaternion256:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_quaternion_ptr);

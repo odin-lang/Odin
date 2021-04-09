@@ -209,11 +209,10 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.label != nil {
 			walk(v, n.label);
 		}
-		if n.val0 != nil {
-			walk(v, n.val0);
-		}
-		if n.val1 != nil {
-			walk(v, n.val1);
+		for val in n.vals {
+			if val != nil {
+				walk(v, val);
+			}
 		}
 		walk(v, n.expr);
 		walk(v, n.body);

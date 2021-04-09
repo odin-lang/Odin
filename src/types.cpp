@@ -25,14 +25,15 @@ enum BasicKind {
 
 	Basic_rune,
 
-	// Basic_f16,
+	Basic_f16,
 	Basic_f32,
 	Basic_f64,
 
-	// Basic_complex32,
+	Basic_complex32,
 	Basic_complex64,
 	Basic_complex128,
 
+	Basic_quaternion64,
 	Basic_quaternion128,
 	Basic_quaternion256,
 
@@ -65,9 +66,11 @@ enum BasicKind {
 	Basic_i128be,
 	Basic_u128be,
 
+	Basic_f16le,
 	Basic_f32le,
 	Basic_f64le,
 
+	Basic_f16be,
 	Basic_f32be,
 	Basic_f64be,
 
@@ -276,6 +279,7 @@ struct TypeProc {
 		Type *underlying;                                 \
 		i64   lower;                                      \
 		i64   upper;                                      \
+		Ast * node;                                       \
 	})                                                    \
 	TYPE_KIND(SimdVector, struct {                        \
 		i64   count;                                      \
@@ -462,14 +466,15 @@ gb_global Type basic_types[] = {
 
 	{Type_Basic, {Basic_rune,              BasicFlag_Integer | BasicFlag_Rune,         4, STR_LIT("rune")}},
 
-	// {Type_Basic, {Basic_f16,               BasicFlag_Float,                            2, STR_LIT("f16")}},
+	{Type_Basic, {Basic_f16,               BasicFlag_Float,                            2, STR_LIT("f16")}},
 	{Type_Basic, {Basic_f32,               BasicFlag_Float,                            4, STR_LIT("f32")}},
 	{Type_Basic, {Basic_f64,               BasicFlag_Float,                            8, STR_LIT("f64")}},
 
-	// {Type_Basic, {Basic_complex32,         BasicFlag_Complex,                          4, STR_LIT("complex32")}},
+	{Type_Basic, {Basic_complex32,         BasicFlag_Complex,                          4, STR_LIT("complex32")}},
 	{Type_Basic, {Basic_complex64,         BasicFlag_Complex,                          8, STR_LIT("complex64")}},
 	{Type_Basic, {Basic_complex128,        BasicFlag_Complex,                         16, STR_LIT("complex128")}},
 
+	{Type_Basic, {Basic_quaternion64,      BasicFlag_Quaternion,                       8, STR_LIT("quaternion64")}},
 	{Type_Basic, {Basic_quaternion128,     BasicFlag_Quaternion,                      16, STR_LIT("quaternion128")}},
 	{Type_Basic, {Basic_quaternion256,     BasicFlag_Quaternion,                      32, STR_LIT("quaternion256")}},
 
@@ -503,9 +508,11 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_i128be, BasicFlag_Integer                      | BasicFlag_EndianBig,    16, STR_LIT("i128be")}},
 	{Type_Basic, {Basic_u128be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig,    16, STR_LIT("u128be")}},
 
+	{Type_Basic, {Basic_f16le, BasicFlag_Float | BasicFlag_EndianLittle, 2, STR_LIT("f16le")}},
 	{Type_Basic, {Basic_f32le, BasicFlag_Float | BasicFlag_EndianLittle, 4, STR_LIT("f32le")}},
 	{Type_Basic, {Basic_f64le, BasicFlag_Float | BasicFlag_EndianLittle, 8, STR_LIT("f64le")}},
 
+	{Type_Basic, {Basic_f16be, BasicFlag_Float | BasicFlag_EndianBig,    2, STR_LIT("f16be")}},
 	{Type_Basic, {Basic_f32be, BasicFlag_Float | BasicFlag_EndianBig,    4, STR_LIT("f32be")}},
 	{Type_Basic, {Basic_f64be, BasicFlag_Float | BasicFlag_EndianBig,    8, STR_LIT("f64be")}},
 
@@ -542,14 +549,15 @@ gb_global Type *t_u128            = &basic_types[Basic_u128];
 
 gb_global Type *t_rune            = &basic_types[Basic_rune];
 
-// gb_global Type *t_f16             = &basic_types[Basic_f16];
+gb_global Type *t_f16             = &basic_types[Basic_f16];
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
 
-// gb_global Type *t_complex32       = &basic_types[Basic_complex32];
+gb_global Type *t_complex32       = &basic_types[Basic_complex32];
 gb_global Type *t_complex64       = &basic_types[Basic_complex64];
 gb_global Type *t_complex128      = &basic_types[Basic_complex128];
 
+gb_global Type *t_quaternion64    = &basic_types[Basic_quaternion64];
 gb_global Type *t_quaternion128   = &basic_types[Basic_quaternion128];
 gb_global Type *t_quaternion256   = &basic_types[Basic_quaternion256];
 
@@ -1126,6 +1134,13 @@ bool is_type_quaternion(Type *t) {
 	}
 	return false;
 }
+bool is_type_f16(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_f16;
+	}
+	return false;
+}
 bool is_type_f32(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
@@ -1264,7 +1279,7 @@ Type *core_array_type(Type *t) {
 	for (;;) {
 		Type *prev = t;
 		t = base_array_type(t);
-		if (t->kind != Type_Array && t->kind != Type_SimdVector) {
+		if (t->kind != Type_Array && t->kind != Type_EnumeratedArray && t->kind != Type_SimdVector) {
 			break;
 		}
 	}
@@ -1277,9 +1292,10 @@ Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		switch (t->Basic.kind) {
-		// case Basic_complex32:         return t_f16;
+		case Basic_complex32:         return t_f16;
 		case Basic_complex64:         return t_f32;
 		case Basic_complex128:        return t_f64;
+		case Basic_quaternion64:      return t_f16;
 		case Basic_quaternion128:     return t_f32;
 		case Basic_quaternion256:     return t_f64;
 		case Basic_UntypedComplex:    return t_untyped_float;
@@ -1391,7 +1407,43 @@ bool is_type_endian_little(Type *t) {
 bool types_have_same_internal_endian(Type *a, Type *b) {
 	return is_type_endian_little(a) == is_type_endian_little(b);
 }
+bool is_type_endian_specific(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_BitSet) {
+		t = bit_set_to_int(t);
+	}
+	if (t->kind == Type_Basic) {
+		switch (t->Basic.kind) {
+		case Basic_i16le:
+		case Basic_u16le:
+		case Basic_i32le:
+		case Basic_u32le:
+		case Basic_i64le:
+		case Basic_u64le:
+		case Basic_u128le:
+			return true;
 
+		case Basic_i16be:
+		case Basic_u16be:
+		case Basic_i32be:
+		case Basic_u32be:
+		case Basic_i64be:
+		case Basic_u64be:
+		case Basic_u128be:
+			return true;
+
+		case Basic_f16le:
+		case Basic_f16be:
+		case Basic_f32le:
+		case Basic_f32be:
+		case Basic_f64le:
+		case Basic_f64be:
+			return true;
+		}
+	}
+
+	return false;
+}
 
 bool is_type_dereferenceable(Type *t) {
 	if (is_type_rawptr(t)) {
@@ -1427,6 +1479,7 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	case Basic_u32le: return t_u32;
 	case Basic_i64le: return t_i64;
 	case Basic_u64le: return t_u64;
+	case Basic_u128le: return t_u128;
 
 	case Basic_i16be: return t_i16;
 	case Basic_u16be: return t_u16;
@@ -1434,7 +1487,10 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	case Basic_u32be: return t_u32;
 	case Basic_i64be: return t_i64;
 	case Basic_u64be: return t_u64;
+	case Basic_u128be: return t_u128;
 
+	case Basic_f16le: return t_f16;
+	case Basic_f16be: return t_f16;
 	case Basic_f32le: return t_f32;
 	case Basic_f32be: return t_f32;
 	case Basic_f64le: return t_f64;
@@ -1483,31 +1539,6 @@ bool is_type_valid_for_keys(Type *t) {
 		return false;
 	}
 	return is_type_comparable(t);
-#if 0
-	if (is_type_integer(t)) {
-		return true;
-	}
-	if (is_type_float(t)) {
-		return true;
-	}
-	if (is_type_string(t)) {
-		return true;
-	}
-	if (is_type_pointer(t)) {
-		return true;
-	}
-	if (is_type_typeid(t)) {
-		return true;
-	}
-	if (is_type_simple_compare(t)) {
-		return true;
-	}
-	if (is_type_comparable(t)) {
-		return true;
-	}
-
-	return false;
-#endif
 }
 
 bool is_type_valid_bit_set_elem(Type *t) {
@@ -2492,6 +2523,35 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		#endif
 		} break;
 
+		case Basic_quaternion64: {
+			// @QuaternionLayout
+			gb_local_persist String w = str_lit("w");
+			gb_local_persist String x = str_lit("x");
+			gb_local_persist String y = str_lit("y");
+			gb_local_persist String z = str_lit("z");
+			gb_local_persist Entity *entity__w = alloc_entity_field(nullptr, make_token_ident(w), t_f16, false, 3);
+			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f16, false, 0);
+			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f16, false, 1);
+			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f16, false, 2);
+			if (field_name == w) {
+				selection_add_index(&sel, 3);
+				sel.entity = entity__w;
+				return sel;
+			} else if (field_name == x) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__x;
+				return sel;
+			} else if (field_name == y) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__y;
+				return sel;
+			} else if (field_name == z) {
+				selection_add_index(&sel, 2);
+				sel.entity = entity__z;
+				return sel;
+			}
+		} break;
+
 		case Basic_quaternion128: {
 			// @QuaternionLayout
 			gb_local_persist String w = str_lit("w");
@@ -2763,9 +2823,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
 			return build_context.word_size;
 
-		case Basic_complex64: case Basic_complex128:
+		case Basic_complex32: case Basic_complex64: case Basic_complex128:
 			return type_size_of_internal(t, path) / 2;
-		case Basic_quaternion128: case Basic_quaternion256:
+		case Basic_quaternion64: case Basic_quaternion128: case Basic_quaternion256:
 			return type_size_of_internal(t, path) / 4;
 		}
 	} break;
@@ -3623,6 +3683,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 }
 
 
+gbString type_to_string(Type *type, gbAllocator allocator) {
+	return write_type_to_string(gb_string_make(allocator, ""), type);
+}
 gbString type_to_string(Type *type) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }

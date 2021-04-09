@@ -53,7 +53,7 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 			defer (gb_string_free(t));
 			error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
 			if (e->type == nullptr) {
-				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a type\n", LIT(e->token.string));
+				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a default type\n", LIT(e->token.string));
 			}
 			e->type = operand->type;
 			return nullptr;

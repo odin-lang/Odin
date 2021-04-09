@@ -30,6 +30,9 @@ enum BuiltinProcId {
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
 
+	BuiltinProc_soa_zip,
+	BuiltinProc_soa_unzip,
+
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
@@ -113,6 +116,11 @@ enum BuiltinProcId {
 	BuiltinProc_atomic_cxchgweak_failacq,
 	BuiltinProc_atomic_cxchgweak_acq_failrelaxed,
 	BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed,
+
+	BuiltinProc_fixed_point_mul,
+	BuiltinProc_fixed_point_div,
+	BuiltinProc_fixed_point_mul_sat,
+	BuiltinProc_fixed_point_div_sat,
 
 
 	// Constant type tests
@@ -225,6 +233,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("abs"),              1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("clamp"),            3, false, Expr_Expr, BuiltinProcPkg_builtin},
 
+	{STR_LIT("soa_zip"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("soa_unzip"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
+
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
 
@@ -310,6 +321,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("atomic_cxchgweak_acq_failrelaxed"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_cxchgweak_acqrel_failrelaxed"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+
+	{STR_LIT("fixed_point_mul"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("fixed_point_div"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("fixed_point_mul_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_base_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

@@ -43,6 +43,7 @@ complex32     :: complex32;
 complex64     :: complex64;
 complex128    :: complex128;
 
+quaternion64  :: quaternion64;
 quaternion128 :: quaternion128;
 quaternion256 :: quaternion256;
 
@@ -76,6 +77,17 @@ u64be         :: u64be;
 i128be        :: i128be;
 u128be        :: u128be;
 
+
+f16le         :: f16le;
+f32le         :: f32le;
+f64le         :: f64le;
+
+f16be         :: f16be;
+f32be         :: f32be;
+f64be         :: f64be;
+
+
+
 // Procedures
 len :: proc(array: Array_Type) -> int ---
 cap :: proc(array: Array_Type) -> int ---
@@ -103,3 +115,6 @@ min   :: proc(values: ..T) -> T ---
 max   :: proc(values: ..T) -> T ---
 abs   :: proc(value: T) -> T ---
 clamp :: proc(value, minimum, maximum: T) -> T ---
+
+soa_zip :: proc(slices: ...) -> #soa[]Struct ---
+soa_unzip :: proc(value: $S/#soa[]$E) -> (slices: ...) ---

@@ -271,7 +271,11 @@ ExactValue exact_value_float_from_string(String string) {
 			}
 		}
 		u64 u = u64_from_string(string);
-		if (digit_count == 8) {
+		if (digit_count == 4) {
+			u16 x = cast(u16)u;
+			f32 f = f16_to_f32(x);
+			return exact_value_float(cast(f64)f);
+		} else if (digit_count == 8) {
 			u32 x = cast(u32)u;
 			f32 f = bit_cast<f32>(x);
 			return exact_value_float(cast(f64)f);

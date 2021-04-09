@@ -66,6 +66,15 @@ void ir_write_str_lit(irFileBuffer *f, char const *s) {
 void ir_write_byte(irFileBuffer *f, u8 c) {
 	ir_file_buffer_write(f, &c, 1);
 }
+void ir_write_escaped_byte(irFileBuffer *f, u8 c) {
+	static char const hex_table[] = "0123456789ABCDEF";
+	char buf[3];
+	buf[0] = '\\';
+	buf[1] = hex_table[c >> 4];
+	buf[2] = hex_table[c & 0x0f];
+	ir_file_buffer_write(f, buf, 3);
+}
+
 void ir_write_i64(irFileBuffer *f, i64 i) {
 	String str = i64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
 	ir_write_string(f, str);
@@ -147,42 +156,26 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, boo
 		return;
 	}
 
-	char const hex_table[] = "0123456789ABCDEF";
-	isize buf_len = name.len + extra + 2 + 1;
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-
-	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
-
-	isize j = 0;
-
 	if (print_quotes) {
-		buf[j++] = '"';
+		ir_write_byte(f, '"');
 	}
 
 	if (prefix_with_dot) {
-		buf[j++] = '.';
+		ir_write_byte(f, '.');
 	}
 
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name[i];
 		if (ir_valid_char(c)) {
-			buf[j++] = c;
+			ir_write_byte(f, c);
 		} else {
-			buf[j] = '\\';
-			buf[j+1] = hex_table[c >> 4];
-			buf[j+2] = hex_table[c & 0x0f];
-			j += 3;
+			ir_write_escaped_byte(f, c);
 		}
 	}
 
 	if (print_quotes) {
-		buf[j++] = '"';
+		ir_write_byte(f, '"');
 	}
-
-	ir_file_write(f, buf, j);
-
-	gb_temp_arena_memory_end(tmp);
 }
 
 
@@ -200,33 +193,16 @@ void ir_print_escape_path(irFileBuffer *f, String path) {
 		return;
 	}
 
-
-	char hex_table[] = "0123456789ABCDEF";
-	isize buf_len = path.len + extra + 2 + 1;
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-
-	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
-
-	isize j = 0;
-
 	for (isize i = 0; i < path.len; i++) {
 		u8 c = path[i];
 		if (ir_valid_char(c) || c == ':') {
-			buf[j++] = c;
+			ir_write_byte(f, c);
 		} else if (c == '\\') {
-			buf[j++] = '/';
+			ir_write_byte(f, '/');
 		} else {
-			buf[j] = '\\';
-			buf[j+1] = hex_table[c >> 4];
-			buf[j+2] = hex_table[c & 0x0f];
-			j += 3;
+			ir_write_escaped_byte(f, c);
 		}
 	}
-
-	ir_file_write(f, buf, j);
-
-	gb_temp_arena_memory_end(tmp);
 }
 
 
@@ -442,21 +418,24 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			}
 			return;
 
-		// case Basic_f16:    ir_write_str_lit(f, "half");                 return;
-		case Basic_f32:    ir_write_str_lit(f, "float");                   return;
-		case Basic_f64:    ir_write_str_lit(f, "double");                  return;
+		case Basic_f16:    ir_write_str_lit(f, "half");     return;
+		case Basic_f32:    ir_write_str_lit(f, "float");    return;
+		case Basic_f64:    ir_write_str_lit(f, "double");   return;
 
 
+		case Basic_f16le:    ir_write_str_lit(f, "half");   return;
 		case Basic_f32le:    ir_write_str_lit(f, "float");  return;
 		case Basic_f64le:    ir_write_str_lit(f, "double"); return;
 
+		case Basic_f16be:    ir_write_str_lit(f, "half");    return;
 		case Basic_f32be:    ir_write_str_lit(f, "float");   return;
 		case Basic_f64be:    ir_write_str_lit(f, "double");  return;
 
-		// case Basic_complex32:  ir_write_str_lit(f, "%%..complex32");    return;
+		case Basic_complex32:  ir_write_str_lit(f, "%%..complex32");       return;
 		case Basic_complex64:  ir_write_str_lit(f, "%..complex64");        return;
 		case Basic_complex128: ir_write_str_lit(f, "%..complex128");       return;
 
+		case Basic_quaternion64:  ir_write_str_lit(f, "%..quaternion64");  return;
 		case Basic_quaternion128: ir_write_str_lit(f, "%..quaternion128"); return;
 		case Basic_quaternion256: ir_write_str_lit(f, "%..quaternion256"); return;
 
@@ -897,6 +876,23 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		}
 	#else
 		switch (type->Basic.kind) {
+		case Basic_f16:
+			ir_fprintf(f, "fptrunc (float bitcast (i32 %u to float) to half)", u_32);
+			break;
+		case Basic_f16le:
+			if (build_context.endian_kind != TargetEndian_Little) {
+				u_32 = gb_endian_swap32(u_32);
+			}
+			ir_fprintf(f, "fptrunc (float bitcast (i32 %u to float) to half)", u_32);
+			break;
+		case Basic_f16be:
+			if (build_context.endian_kind != TargetEndian_Big) {
+				u_32 = gb_endian_swap32(u_32);
+			}
+			ir_fprintf(f, "fptrunc (float bitcast (i32 %u to float) to half)", u_32);
+			break;
+
+
 		case Basic_f32:
 			ir_fprintf(f, "bitcast (i32 %u to float)", u_32);
 			break;
