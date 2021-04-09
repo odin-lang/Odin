@@ -711,7 +711,8 @@ quaternion_nlerp_f16 :: proc(a, b: Quaternionf16, t: f16) -> (c: Quaternionf16) 
 	c.z = a.z + (b.z-a.z)*t;
 	c.w = a.w + (b.w-a.w)*t;
 	return normalize(c);
-}quaternion_nlerp_f32 :: proc(a, b: Quaternionf32, t: f32) -> (c: Quaternionf32) {
+}
+quaternion_nlerp_f32 :: proc(a, b: Quaternionf32, t: f32) -> (c: Quaternionf32) {
 	c.x = a.x + (b.x-a.x)*t;
 	c.y = a.y + (b.y-a.y)*t;
 	c.z = a.z + (b.z-a.z)*t;
@@ -758,7 +759,8 @@ quaternion_slerp_f16 :: proc(x, y: Quaternionf16, t: f16) -> (q: Quaternionf16) 
 	q.z = factor_a * a.z + factor_b * b.z;
 	q.w = factor_a * a.w + factor_b * b.w;
 	return;
-}quaternion_slerp_f32 :: proc(x, y: Quaternionf32, t: f32) -> (q: Quaternionf32) {
+}
+quaternion_slerp_f32 :: proc(x, y: Quaternionf32, t: f32) -> (q: Quaternionf32) {
 	a, b := x, y;
 	cos_angle := dot(a, b);
 	if cos_angle < 0 {
