@@ -478,7 +478,7 @@ void syntax_warning_va(Token token, char const *fmt, va_list va) {
 		// NOTE(bill): Duplicate error, skip it
 		if (global_error_collector.prev != token.pos) {
 			global_error_collector.prev = token.pos;
-			error_out("%S Syntax Warning: %s\n",
+			error_out("%s Syntax Warning: %s\n",
 			          token_pos_to_string(token.pos),
 			          gb_bprintf_va(fmt, va));
 		} else if (token.pos.line == 0) {
