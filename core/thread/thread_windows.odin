@@ -1,3 +1,5 @@
+//+build windows
+//+private
 package thread
 
 import "core:runtime"
@@ -10,20 +12,13 @@ Thread_Os_Specific :: struct {
 	done: bool, // see note in `is_done`
 }
 
-
-Thread_Priority :: enum {
-	Normal,
-	Low,
-	High,
-}
-
 _thread_priority_map := [Thread_Priority]i32{
 	.Normal = 0,
 	.Low = -2,
 	.High = +2,
 };
 
-create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	win32_thread_id: win32.DWORD;
 
 	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
@@ -70,18 +65,18 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	return thread;
 }
 
-start :: proc(using thread: ^Thread) {
-	win32.ResumeThread(win32_thread);
+_start :: proc(thread: ^Thread) {
+	win32.ResumeThread(thread.win32_thread);
 }
 
-is_done :: proc(using thread: ^Thread) -> bool {
+_is_done :: proc(using thread: ^Thread) -> bool {
 	// NOTE(tetra, 2019-10-31): Apparently using wait_for_single_object and
 	// checking if it didn't time out immediately, is not good enough,
 	// so we do it this way instead.
 	return sync.atomic_load(&done, .Sequentially_Consistent);
 }
 
-join :: proc(using thread: ^Thread) {
+_join :: proc(using thread: ^Thread) {
 	if win32_thread != win32.INVALID_HANDLE {
 		win32.WaitForSingleObject(win32_thread, win32.INFINITE);
 		win32.CloseHandle(win32_thread);
@@ -89,7 +84,7 @@ join :: proc(using thread: ^Thread) {
 	}
 }
 
-join_multiple :: proc(threads: ..^Thread) {
+_join_multiple :: proc(threads: ..^Thread) {
 	MAXIMUM_WAIT_OBJECTS :: 64;
 
 	handles: [MAXIMUM_WAIT_OBJECTS]win32.HANDLE;
@@ -113,16 +108,16 @@ join_multiple :: proc(threads: ..^Thread) {
 	}
 }
 
-destroy :: proc(thread: ^Thread) {
-	join(thread);
+_destroy :: proc(thread: ^Thread) {
+	_join(thread);
 	free(thread, thread.creation_allocator);
 }
 
-terminate :: proc(using thread : ^Thread, exit_code: u32) {
-	win32.TerminateThread(win32_thread, exit_code);
+_terminate :: proc(using thread : ^Thread, exit_code: int) {
+	win32.TerminateThread(win32_thread, u32(exit_code));
 }
 
-yield :: proc() {
+_yield :: proc() {
 	win32.SwitchToThread();
 }
 

@@ -213,3 +213,27 @@ recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
 	}
 	// outside the lock
 }
+
+
+
+
+
+Once :: struct {
+	m:    Mutex,
+	done: bool,
+}
+
+once_do :: proc(o: ^Once, fn: proc()) {
+	if intrinsics.atomic_load_acq(&o.done) == false {
+		_once_do_slow(o, fn);
+	}
+}
+
+_once_do_slow :: proc(o: ^Once, fn: proc()) {
+	mutex_lock(&o.m);
+	defer mutex_unlock(&o.m);
+	if !o.done {
+		fn();
+		intrinsics.atomic_store_rel(&o.done, true);
+	}
+}
