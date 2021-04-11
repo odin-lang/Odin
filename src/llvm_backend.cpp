@@ -8988,6 +8988,16 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			);
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+		} else if (build_context.metrics.arch == TargetArch_arm64) {
+			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
+			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
+				cast(char *)"yield", 5,
+				cast(char *)"", 0,
+				/*HasSideEffects*/true, /*IsAlignStack*/false,
+				LLVMInlineAsmDialectATT
+			);
+			GB_ASSERT(the_asm != nullptr);
+			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		}
 		return {};
 

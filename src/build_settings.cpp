@@ -127,6 +127,7 @@ char const *odin_command_strings[32] = {
 	"query",
 	"doc",
 	"version",
+	"test",
 };
 
 
