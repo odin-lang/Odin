@@ -4,7 +4,6 @@ package sync2
 
 when #config(ODIN_SYNC_USE_PTHREADS, false) {
 
-import "intrinsics"
 import "core:time"
 import "core:sys/unix"
 
@@ -53,25 +52,25 @@ _RW_Mutex :: struct {
 }
 
 _rw_mutex_lock :: proc(rw: ^RW_Mutex) {
-	_ = intrinsics.atomic_add(&rw.impl.state, RW_Mutex_State_Writer);
+	_ = atomic_add(&rw.impl.state, RW_Mutex_State_Writer);
 	mutex_lock(&rw.impl.mutex);
 
-	state := intrinsics.atomic_or(&rw.impl.state, RW_Mutex_State_Writer);
+	state := atomic_or(&rw.impl.state, RW_Mutex_State_Writer);
 	if state & RW_Mutex_State_Reader_Mask != 0 {
 		sema_wait(&rw.impl.sema);
 	}
 }
 
 _rw_mutex_unlock :: proc(rw: ^RW_Mutex) {
-	_ = intrinsics.atomic_and(&rw.impl.state, ~RW_Mutex_State_Is_Writing);
+	_ = atomic_and(&rw.impl.state, ~RW_Mutex_State_Is_Writing);
 	mutex_unlock(&rw.impl.mutex);
 }
 
 _rw_mutex_try_lock :: proc(rw: ^RW_Mutex) -> bool {
 	if mutex_try_lock(&rw.impl.mutex) {
-		state := intrinsics.atomic_load(&rw.impl.state);
+		state := atomic_load(&rw.impl.state);
 		if state & RW_Mutex_State_Reader_Mask == 0 {
-			_ = intrinsics.atomic_or(&rw.impl.state, RW_Mutex_State_Is_Writing);
+			_ = atomic_or(&rw.impl.state, RW_Mutex_State_Is_Writing);
 			return true;
 		}
 
@@ -81,22 +80,22 @@ _rw_mutex_try_lock :: proc(rw: ^RW_Mutex) -> bool {
 }
 
 _rw_mutex_shared_lock :: proc(rw: ^RW_Mutex) {
-	state := intrinsics.atomic_load(&rw.impl.state);
+	state := atomic_load(&rw.impl.state);
 	for state & (RW_Mutex_State_Is_Writing|RW_Mutex_State_Writer_Mask) == 0 {
 		ok: bool;
-		state, ok = intrinsics.atomic_cxchgweak(&rw.impl.state, state, state + RW_Mutex_State_Reader);
+		state, ok = atomic_cxchgweak(&rw.impl.state, state, state + RW_Mutex_State_Reader);
 		if ok {
 			return;
 		}
 	}
 
 	mutex_lock(&rw.impl.mutex);
-	_ = intrinsics.atomic_add(&rw.impl.state, RW_Mutex_State_Reader);
+	_ = atomic_add(&rw.impl.state, RW_Mutex_State_Reader);
 	mutex_unlock(&rw.impl.mutex);
 }
 
 _rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
-	state := intrinsics.atomic_sub(&rw.impl.state, RW_Mutex_State_Reader);
+	state := atomic_sub(&rw.impl.state, RW_Mutex_State_Reader);
 
 	if (state & RW_Mutex_State_Reader_Mask == RW_Mutex_State_Reader) &&
 	   (state & RW_Mutex_State_Is_Writing != 0) {
@@ -105,15 +104,15 @@ _rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
 }
 
 _rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
-	state := intrinsics.atomic_load(&rw.impl.state);
+	state := atomic_load(&rw.impl.state);
 	if state & (RW_Mutex_State_Is_Writing|RW_Mutex_State_Writer_Mask) == 0 {
-		_, ok := intrinsics.atomic_cxchg(&rw.impl.state, state, state + RW_Mutex_State_Reader);
+		_, ok := atomic_cxchg(&rw.impl.state, state, state + RW_Mutex_State_Reader);
 		if ok {
 			return true;
 		}
 	}
 	if mutex_try_lock(&rw.impl.mutex) {
-		_ = intrinsics.atomic_add(&rw.impl.state, RW_Mutex_State_Reader);
+		_ = atomic_add(&rw.impl.state, RW_Mutex_State_Reader);
 		mutex_unlock(&rw.impl.mutex);
 		return true;
 	}

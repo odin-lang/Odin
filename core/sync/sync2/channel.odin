@@ -5,7 +5,6 @@ package sync2
 
 import "core:mem"
 import "core:time"
-import "intrinsics"
 import "core:math/rand"
 
 _, _ :: time, rand;
@@ -136,10 +135,10 @@ channel_peek :: proc(ch: $C/Channel($T, $D)) -> int {
 	if c == nil {
 		return -1;
 	}
-	if intrinsics.atomic_load(&c.closed) {
+	if atomic_load(&c.closed) {
 		return -1;
 	}
-	return intrinsics.atomic_load(&c.len);
+	return atomic_load(&c.len);
 }
 
 
@@ -238,7 +237,7 @@ raw_channel_destroy :: proc(c: ^Raw_Channel) {
 		return;
 	}
 	context.allocator = c.allocator;
-	intrinsics.atomic_store(&c.closed, true);
+	atomic_store(&c.closed, true);
 	free(c);
 }
 
@@ -248,7 +247,7 @@ raw_channel_close :: proc(c: ^Raw_Channel, loc := #caller_location) {
 	}
 	mutex_lock(&c.mutex);
 	defer mutex_unlock(&c.mutex);
-	intrinsics.atomic_store(&c.closed, true);
+	atomic_store(&c.closed, true);
 
 	// Release readers and writers
 	raw_channel_wait_queue_broadcast(c.recvq);
@@ -317,12 +316,12 @@ raw_channel_recv_impl :: proc(c: ^Raw_Channel, res: rawptr, loc := #caller_locat
 	if c == nil {
 		panic(message="cannot recv message; channel is nil", loc=loc);
 	}
-	intrinsics.atomic_store(&c.ready, true);
+	atomic_store(&c.ready, true);
 	for c.len < 1 {
 		raw_channel_wait_queue_signal(c.sendq);
 		cond_wait(&c.cond, &c.mutex);
 	}
-	intrinsics.atomic_store(&c.ready, false);
+	atomic_store(&c.ready, false);
 	recv(c, res, loc);
 	if c.cap > 0 {
 		if c.len == c.cap - 1 {
