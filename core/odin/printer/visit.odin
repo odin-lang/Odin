@@ -8,21 +8,104 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
- 
+
 @(private)
-append_format_token :: proc(p: ^Printer, unwrapped_line: ^Line, format_token: Format_Token) -> ^Format_Token {
+comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
+
+	if len(p.comments) <= p.latest_comment_index {
+		return false;
+	}
+
+	comment := p.comments[p.latest_comment_index];
+
+	return comment.pos.offset < pos.offset;
+}
+
+@(private)
+next_comment_group :: proc(p: ^Printer) {
+	p.latest_comment_index += 1;
+}
+ 
+@(private) 
+write_comment :: proc(p: ^Printer, comment: tokenizer.Token) {
+
+	if len(comment.text) == 0 {
+		return;
+	}
+
+	if comment.text[0] == '/' && comment.text[1] == '/' {
+		format_token := Format_Token {
+			spaces_before = 1,
+			kind = .Comment,
+			text = comment.text,
+		};
+
+		if len(p.current_line.format_tokens) == 0 {
+			format_token.spaces_before = 0;
+		}
+
+		append(&p.current_line.format_tokens, format_token); 
+		p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens)-1];
+	}
+}
+
+@(private)
+write_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Token) {
+
+	prev_comment: ^tokenizer.Token;
+
+	for comment_before_position(p, pos) {
+
+		comment_group := p.comments[p.latest_comment_index];
+		lines := comment_group.pos.line - p.last_source_position.line;
+
+		set_line(p, p.last_line_index + min(p.config.newline_limit, lines));
+
+		for comment, i in comment_group.list {
+			
+			if prev_comment != nil && p.last_source_position.line != comment.pos.line {
+			 	newline_position(p, comment.pos.line - prev_comment.pos.line);
+			}
+
+			write_comment(p, comment);
+
+			prev_comment = &comment_group.list[i];
+		}
+
+		next_comment_group(p);
+	}
+
+	if prev_comment != nil {
+		newline_position(p, min(p.config.newline_limit, p.source_position.line - prev_comment.pos.line));
+	}
+}
+
+@(private)
+append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_Token {
 
 	format_token := format_token;
 
-	if p.last_token != nil && (p.last_token.kind == .Ellipsis || p.last_token.kind == .Range_Half || 
+	if p.last_token != nil && (p.last_token.kind == .Ellipsis  || p.last_token.kind == .Range_Half || 
 							   p.last_token.kind == .Open_Paren || p.last_token.kind == .Period ||
-							   p.last_token.kind == .Open_Brace) {
+							   p.last_token.kind == .Open_Brace || p.last_token.kind == .Open_Bracket) {
 		format_token.spaces_before = 0;
+	} else if p.merge_next_token {
+		format_token.spaces_before = 0;
+		p.merge_next_token = false;
 	}
+
+	write_comments(p, p.source_position, format_token);
+
+	unwrapped_line := p.current_line;
+    unwrapped_line.used = true;
+	unwrapped_line.depth = p.depth;
 
 	if len(unwrapped_line.format_tokens) == 0 && format_token.spaces_before == 1 {
 		format_token.spaces_before = 0;
 	}
+    
+	p.last_source_position = p.source_position;
+	p.last_line_index = p.current_line_index;
 
 	append(&unwrapped_line.format_tokens, format_token); 
 	return &unwrapped_line.format_tokens[len(unwrapped_line.format_tokens)-1];
@@ -31,10 +114,6 @@ append_format_token :: proc(p: ^Printer, unwrapped_line: ^Line, format_token: Fo
 @(private)
 push_generic_token :: proc(p: ^Printer, kind: tokenizer.Token_Kind, spaces_before: int, value := "") {
  
-    unwrapped_line := p.current_line;
-    unwrapped_line.used = true;
-	unwrapped_line.depth = p.depth;
-    
     format_token := Format_Token {
         spaces_before = spaces_before,
         kind = kind,
@@ -45,38 +124,31 @@ push_generic_token :: proc(p: ^Printer, kind: tokenizer.Token_Kind, spaces_befor
 		format_token.text = value;
 	}
 
-    p.last_token = append_format_token(p, unwrapped_line, format_token);
+    p.last_token = append_format_token(p, format_token);
 }
 
 @(private)
 push_string_token :: proc(p: ^Printer, text: string, spaces_before: int) {
-	unwrapped_line := p.current_line;
-    unwrapped_line.used = true;
-	unwrapped_line.depth = p.depth;
-    
+
     format_token := Format_Token {
         spaces_before = spaces_before,
         kind = .String,
         text = text,
     };
 
-    p.last_token = append_format_token(p, unwrapped_line, format_token);
+    p.last_token = append_format_token(p, format_token);
 }
 
 @(private)
 push_ident_token :: proc(p: ^Printer, text: string, spaces_before: int) {
 
-	unwrapped_line := p.current_line;
-    unwrapped_line.used = true;
-	unwrapped_line.depth = p.depth;
-    
     format_token := Format_Token {
         spaces_before = spaces_before,
         kind = .Ident,
         text = text,
     };
 
-    p.last_token = append_format_token(p, unwrapped_line, format_token); 
+    p.last_token = append_format_token(p, format_token); 
 }
 
 @(private)
@@ -112,12 +184,13 @@ set_line :: proc(p: ^Printer, line: int) -> ^Line {
     }
 
 	p.current_line = unwrapped_line;
+	p.current_line_index = line;
 
 	return unwrapped_line;
 }
 
 @(private)
-newline_source_position :: proc(p: ^Printer, count: int) {
+newline_position :: proc(p: ^Printer, count: int) {
 	p.current_line_index += count;
 	set_line(p, p.current_line_index);
 }
@@ -130,6 +203,10 @@ indent :: proc(p: ^Printer) {
 @(private)
 unindent :: proc(p: ^Printer) {
 	p.depth -= 1;
+}
+
+merge_next_token :: proc(p: ^Printer) {
+	p.merge_next_token = true;
 }
 
 @(private)
@@ -231,7 +308,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		} else if v.is_mutable && v.type == nil && len(v.values) != 0 {
 			push_generic_token(p, .Eq, 0);
 		} else if !v.is_mutable && v.type != nil {
-            push_generic_token(p, .Semicolon, 0);
+            push_generic_token(p, .Colon, 0);
 		}
 
 		visit_exprs(p, v.values, true);
@@ -240,7 +317,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		for value in v.values {
 			switch a in value.derived {
-			case Proc_Lit,Union_Type,Enum_Type,Struct_Type:
+			case Proc_Lit, Union_Type, Enum_Type, Struct_Type:
 				add_semicolon = false || called_in_stmt;
 			}
 		}
@@ -268,17 +345,32 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 
 		visit_expr(p, expr);
 
-		if i != len(list) - 1 && add_comma {
+		if (i != len(list) - 1 || trailing) && add_comma {
 			push_generic_token(p, .Comma, 0);
-		} else if trailing && add_comma {
-			//print(p, strings.trim_space(sep));
-		}
+		} 
 	}
 }
 
 @(private)
 visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 
+	if len(attributes) == 0 {
+		return;
+	}
+
+	for attribute, i in attributes {
+
+		push_generic_token(p, .At, 0);
+		push_generic_token(p, .Open_Paren, 0);
+
+		visit_exprs(p, attribute.elems, true);
+
+		push_generic_token(p, .Close_Paren, 0);
+
+		if len(attributes) - 1 != i {
+			newline_position(p, 1);
+		}
+	}
 }
 
 @(private)
@@ -390,7 +482,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 			visit_stmt(p, v.body, .If_Stmt, true);
 		} else {
 			if uses_do {
-				newline_source_position(p, 1);
+				newline_position(p, 1);
 			}
 
 			visit_stmt(p, v.body, .If_Stmt);
@@ -399,7 +491,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if v.else_stmt != nil {
 
 			if p.config.brace_style == .Allman || p.config.brace_style == .Stroustrup {
-				newline_source_position(p, 1);
+				newline_position(p, 1);
 			} 
 
 			push_generic_token(p, .Else, 1);
@@ -498,14 +590,10 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		if v.label != nil {
 			visit_expr(p, v.label);
-			push_generic_token(p, .Colon, 1);
+			push_generic_token(p, .Colon, 0);
 		}
 
-		push_generic_token(p, .For, 0);
-
-		//if v.init != nil || v.cond != nil || v.post != nil {
-		//	print(p, space);
-		//}
+		push_generic_token(p, .For, 1);
 
 		if v.init != nil {
 			p.skip_semicolon = true;
@@ -522,7 +610,6 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		if v.post != nil {
 			push_generic_token(p, .Semicolon, 0);
-			//print(p, space);
 			visit_stmt(p, v.post);
 		} else if v.post == nil && v.cond != nil && v.init != nil {
 			push_generic_token(p, .Semicolon, 0);
@@ -540,7 +627,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		push_ident_token(p, "#unroll", 0);
 
-		push_generic_token(p, .For, 0);
+		push_generic_token(p, .For, 1);
 		visit_expr(p, v.val0);
 
 		if v.val1 != nil {
@@ -561,7 +648,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 			push_generic_token(p, .Colon, 1);
 		}
 
-		push_generic_token(p, .For, 0);
+		push_generic_token(p, .For, 1);
 
 		if len(v.vals) >= 1 {
 			visit_expr(p, v.vals[0]);
@@ -580,7 +667,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 	case Return_Stmt:
 		move_line(p, v.pos);
 
-		push_generic_token(p, .Return, 0);
+		push_generic_token(p, .Return, 1);
 
 		if v.results != nil {
 			visit_exprs(p, v.results, true);
@@ -600,7 +687,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 	case When_Stmt:
 		move_line(p, v.pos);
-		push_generic_token(p, .When, 0);
+		push_generic_token(p, .When, 1);
 		visit_expr(p, v.cond);
 
 		visit_stmt(p, v.body);
@@ -608,10 +695,10 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if v.else_stmt != nil {
 
 			if p.config.brace_style == .Allman {
-				newline_source_position(p, 1);
+				newline_position(p, 1);
 			} 
 
-			push_generic_token(p, .Else, 0);
+			push_generic_token(p, .Else, 1);
 
 			set_source_position(p, v.else_stmt.pos);
 
@@ -734,7 +821,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Close_Bracket, 0);
 		visit_expr(p, v.elem);
 	case Bit_Set_Type:
-		push_generic_token(p, .Bit_Set, 0);
+		push_generic_token(p, .Bit_Set, 1);
 		push_generic_token(p, .Open_Bracket, 0);
 
 		visit_expr(p, v.elem);
@@ -750,7 +837,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.poly_params != nil {
 			push_generic_token(p, .Open_Paren, 0);
-			visit_field_list(p, v.poly_params, ", ");
+			visit_field_list(p, v.poly_params, true, true);
 			push_generic_token(p, .Close_Paren, 0);
 		}
 
@@ -760,18 +847,17 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.variants != nil && (len(v.variants) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
-			set_source_position(p, v.variants[len(v.variants) - 1].pos);
 			visit_exprs(p, v.variants, true);
 			push_generic_token(p, .Close_Brace, 0);
 		} else {
 			visit_begin_brace(p, v.pos, .Generic);
-			newline_source_position(p, 1);
-			set_source_position(p, v.variants[len(v.variants) - 1].pos);
+			newline_position(p, 1);
+			set_source_position(p, v.variants[0].pos);
 			visit_exprs(p, v.variants, true, true);
 			visit_end_brace(p, v.end);
 		}
 	case Enum_Type:
-		push_generic_token(p, .Enum, 0);
+		push_generic_token(p, .Enum, 1);
 
 		if v.base_type != nil {
 			visit_expr(p, v.base_type);
@@ -779,21 +865,19 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.fields != nil && (len(v.fields) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
-			set_source_position(p, v.fields[len(v.fields) - 1].pos);
 			visit_exprs(p, v.fields, true);
 			push_generic_token(p, .Close_Brace, 0);
 		} else {
 			visit_begin_brace(p, v.pos, .Generic);
-			newline_source_position(p, 1);
-			set_source_position(p, v.fields[len(v.fields) - 1].pos);
-			//visit_enum_fields(p, v.fields, ",");
-			visit_exprs(p, v.fields, true);
+			newline_position(p, 1);
+			set_source_position(p, v.fields[0].pos);
+			visit_exprs(p, v.fields, true, true);
 			visit_end_brace(p, v.end);
 		}
 
 		set_source_position(p, v.end);
 	case Struct_Type:
-		push_generic_token(p, .Struct, 0);
+		push_generic_token(p, .Struct, 1);
 
 		if v.is_packed {
 			push_ident_token(p, "#packed", 1);
@@ -810,21 +894,20 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.poly_params != nil {
 			push_generic_token(p, .Open_Paren, 0);
-			visit_field_list(p, v.poly_params, ", ");
+			visit_field_list(p, v.poly_params, true, true);
 			push_generic_token(p, .Close_Paren, 0);
 		}
 
 		if v.fields != nil && (len(v.fields.list) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
 			set_source_position(p, v.fields.pos);
-			visit_field_list(p, v.fields, ", ");
+			visit_field_list(p, v.fields, true);
 			push_generic_token(p, .Close_Brace, 0);
 		} else {
 			visit_begin_brace(p, v.pos, .Generic);
-			newline_source_position(p, 1);
+			newline_position(p, 1);
 			set_source_position(p, v.fields.pos);
-			visit_field_list(p, v.fields, ", ");
-			//visit_struct_field_list(p, v.fields, ",");
+			visit_field_list(p, v.fields, true, true);
 			visit_end_brace(p, v.end);
 		}
 
@@ -880,7 +963,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Close_Paren, 0);
 	case Index_Expr:
 		visit_expr(p, v.expr);
-		push_generic_token(p, .Open_Bracket, 1);
+		push_generic_token(p, .Open_Bracket, 0);
 		visit_expr(p, v.index);
 		push_generic_token(p, .Close_Bracket, 0);
 	case Proc_Group:
@@ -889,8 +972,8 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if len(v.args) != 0 && v.pos.line != v.args[len(v.args) - 1].pos.line {
 			visit_begin_brace(p, v.pos, .Generic);
-			newline_source_position(p, 1);
-			set_source_position(p, v.args[len(v.args) - 1].pos);
+			newline_position(p, 1);
+			set_source_position(p, v.args[0].pos);
 			visit_exprs(p, v.args, true, true);
 			visit_end_brace(p, v.end);
 		} else {
@@ -907,8 +990,8 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if len(v.elems) != 0 && v.pos.line != v.elems[len(v.elems) - 1].pos.line {
 			visit_begin_brace(p, v.pos, .Comp_Lit);
-			newline_source_position(p, 1);
-			set_source_position(p, v.elems[len(v.elems) - 1].pos);
+			newline_position(p, 1);
+			set_source_position(p, v.elems[0].pos);
 			visit_exprs(p, v.elems, true, true);
 			visit_end_brace(p, v.end);
 		} else {
@@ -919,6 +1002,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		
 	case Unary_Expr:
 		push_generic_token(p, v.op.kind, 0);
+		merge_next_token(p);
 		visit_expr(p, v.expr);
 	case Field_Value:
 		visit_expr(p, v.field);
@@ -939,6 +1023,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 	case Pointer_Type:
 		push_generic_token(p, .Pointer, 0);
+		merge_next_token(p);
 		visit_expr(p, v.elem);
 	case Implicit:
 		push_generic_token(p, v.tok.kind, 0);
@@ -958,7 +1043,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Close_Bracket, 0);
 		visit_expr(p, v.elem);
 	case Map_Type:
-		push_generic_token(p, .Map, 0);
+		push_generic_token(p, .Map, 1);
 		push_generic_token(p, .Open_Bracket, 0);
 		visit_expr(p, v.key);
 		push_generic_token(p, .Close_Bracket, 0);
@@ -980,7 +1065,7 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type) {
 	newline_braced &= p.config.brace_style != ._1TBS;
 
 	if newline_braced {
-		newline_source_position(p, 1);
+		newline_position(p, 1);
 		push_generic_token(p, .Open_Brace, 0);
 		indent(p);
 	} else {
@@ -991,7 +1076,7 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type) {
 
 visit_end_brace :: proc(p: ^Printer, end: tokenizer.Pos) {
 	set_source_position(p, end);
-	newline_source_position(p, 1);
+	newline_position(p, 1);
 	unindent(p);
 	push_generic_token(p, .Close_Brace, 0);
 }
@@ -1000,14 +1085,14 @@ visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, newline_each := false
 	for stmt, i in stmts {
 
 		if newline_each {
-			newline_source_position(p, 1);
+			newline_position(p, 1);
 		}
 
 		visit_stmt(p, stmt, .Generic, false, true);
 	}
 }
 
-visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, sep := "") {
+visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false, trailing := false) {
 
 	if list.list == nil {
 		return;
@@ -1039,8 +1124,8 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, sep := "") {
 			push_generic_token(p, field.tag.kind, 1);
 		}
 
-		if i != len(list.list) - 1 {
-			//print(p, sep);
+		if (i != len(list.list) - 1 || trailing) && add_comma {
+			push_generic_token(p, .Comma, 0);
 		}
 	}
 }
@@ -1049,20 +1134,22 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type) {
 
 	push_generic_token(p, .Proc, 1);
 
-	if proc_type.calling_convention != .Odin {
-		//print(p, space);
-	}
+	explicit_calling := false;
 
 	switch proc_type.calling_convention {
 	case .Odin:
 	case .Contextless:
-		push_string_token(p, "\"contextless\"", 0);
+		push_string_token(p, "\"contextless\"", 1);
+		explicit_calling = true;
 	case .C_Decl:
-		push_string_token(p, "\"c\"", 0);
+		push_string_token(p, "\"c\"", 1);
+		explicit_calling = true;
 	case .Std_Call:
-		push_string_token(p, "\"std\"", 0);
+		push_string_token(p, "\"std\"", 1);
+		explicit_calling = true;
 	case .Fast_Call:
-		push_string_token(p, "\"fast\"", 0);
+		push_string_token(p, "\"fast\"", 1);
+		explicit_calling = true;
 	case .None:
 			//nothing i guess
 	case .Invalid:
@@ -1070,15 +1157,19 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type) {
 	case .Foreign_Block_Default:
 	}
 
-	push_generic_token(p, .Open_Paren, 0);
+	if explicit_calling {
+		push_generic_token(p, .Open_Paren, 1);
+	} else {
+		push_generic_token(p, .Open_Paren, 0);
+	}
 
-	//visit_signature_list(p, proc_type.params, ", ", false);
+	visit_signature_list(p, proc_type.params, false);
 
 	push_generic_token(p, .Close_Paren, 0);
 
-	/*
 	if proc_type.results != nil {
-		print(p, space, "->", space);
+		push_generic_token(p, .Sub, 1);
+		push_generic_token(p, .Gt, 0);
 
 		use_parens := false;
 		use_named  := false;
@@ -1097,14 +1188,14 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type) {
 		}
 
 		if use_parens {
-			print(p, lparen);
-			print_signature_list(p, proc_type.results, ", ");
-			print(p, rparen);
+			push_generic_token(p, .Open_Paren, 1);
+			visit_signature_list(p, proc_type.results);
+			push_generic_token(p, .Close_Paren, 0);
 		} else {
-			print_signature_list(p, proc_type.results, ", ");
+			visit_signature_list(p, proc_type.results);
 		}
 	}
-	*/
+	
 }
 
 visit_binary_expr :: proc(p: ^Printer, binary: ast.Binary_Expr) {
@@ -1173,126 +1264,8 @@ visit_call_exprs :: proc(p: ^Printer, list: []^ast.Expr, ellipsis := false) {
 	}
 }
 
-/*
 
-print_enum_fields :: proc(p: ^Printer, list: []^ast.Expr, sep := " ") {
-
-	//print enum fields is like visit_exprs, but it can contain fields that can be aligned.
-
-	if len(list) == 0 {
-		return;
-	}
-
-	if list[0].pos.line == list[len(list) - 1].pos.line {
-		//if everything is on one line, then it can be treated the same way as visit_exprs
-		visit_exprs(p, list, sep);
-		return;
-	}
-
-	largest          := 0;
-	last_field_value := 0;
-
-	//first find all the field values and find the largest name
-	for expr, i in list {
-
-		if field_value, ok := expr.derived.(ast.Field_Value); ok {
-
-			if ident, ok := field_value.field.derived.(ast.Ident); ok {
-				largest = max(largest, strings.rune_count(ident.name));
-			}
-		}
-	}
-
-	for expr, i in list {
-
-		move_line_limit(p, expr.pos, 1);
-
-		if field_value, ok := expr.derived.(ast.Field_Value); ok && p.config.align_assignments {
-
-			if ident, ok := field_value.field.derived.(ast.Ident); ok {
-				visit_expr(p, field_value.field);
-				print_space_padding(p, largest - strings.rune_count(ident.name) + 1);
-				print(p, "=", space);
-				visit_expr(p, field_value.value);
-			} else {
-				visit_expr(p, expr);
-			}
-		} else {
-			visit_expr(p, expr);
-		}
-
-		if i != len(list) - 1 {
-			print(p, sep);
-		} else {
-			print(p, strings.trim_space(sep));
-		}
-	}
-}
-
-
-
-
-
-
-
-print_struct_field_list :: proc(p: ^Printer, list: ^ast.Field_List, sep := "") {
-
-	if list.list == nil {
-		return;
-	}
-
-	largest    := 0;
-	using_size := len("using ");
-
-	//NOTE(Daniel): Is there any other variables than using in structs?
-
-	for field, i in list.list {
-		if .Using in field.flags {
-			largest = max(largest, get_length_of_names(field.names) + using_size);
-		} else {
-			largest = max(largest, get_length_of_names(field.names));
-		}
-	}
-
-	for field, i in list.list {
-
-		move_line_limit(p, field.pos, 1);
-
-		if .Using in field.flags {
-			print(p, "using", space);
-		}
-
-		visit_exprs(p, field.names, ", ");
-
-		if len(field.names) != 0 {
-			print(p, ": ");
-		}
-
-		if field.type == nil {
-			panic("struct field has to have types");
-		}
-
-		if .Using in field.flags {
-			print_space_padding(p, largest - get_length_of_names(field.names) - using_size);
-		} else {
-			print_space_padding(p, largest - get_length_of_names(field.names));
-		}
-
-		visit_expr(p, field.type);
-
-		if field.tag.text != "" {
-			print(p, space, field.tag);
-		}
-
-		if i != len(list.list) - 1 {
-			print(p, sep);
-		} else {
-			print(p, strings.trim_space(sep));
-		}
-	}
-}
-
-print_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, sep := "", remove_blank := true) {
+visit_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, remove_blank := true) {
 
 	if list.list == nil {
 		return;
@@ -1303,7 +1276,7 @@ print_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, sep := "", remo
 		move_line_limit(p, field.pos, 1);
 
 		if .Using in field.flags {
-			print(p, "using", space);
+			push_generic_token(p, .Using, 0);
 		}
 
 		named := false;
@@ -1321,34 +1294,33 @@ print_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, sep := "", remo
 		}
 
 		if named {
-			visit_exprs(p, field.names, ", ");
+			visit_exprs(p, field.names, true);
 
 			if len(field.names) != 0 && field.type != nil {
-				print(p, ": ");
-			} else {
-				print(p, space);
-			}
+				push_generic_token(p, .Colon, 0);
+			} 
 		}
 
 		if field.type != nil && field.default_value != nil {
 			visit_expr(p, field.type);
-			print(p, space, "=", space);
+			push_generic_token(p, .Eq, 0);
 			visit_expr(p, field.default_value);
 		} else if field.type != nil {
 			visit_expr(p, field.type);
 		} else {
-			print(p, ":= ");
+			push_generic_token(p, .Colon, 1);
+			push_generic_token(p, .Eq, 0);
 			visit_expr(p, field.default_value);
 		}
 
 		if i != len(list.list) - 1 {
-			print(p, sep);
+			push_generic_token(p, .Comma, 0);
 		}
 	}
 }
 
 
-
+/*
 print_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 
 	if len(attributes) == 0 {
@@ -1367,28 +1339,7 @@ print_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 	}
 }
 
-print_file :: proc(p: ^Printer, file: ^ast.File) {
 
-	p.comments = file.comments;
-	p.file     = file;
-
-	move_line(p, file.pkg_token.pos);
-
-	print(p, file.pkg_token, space, file.pkg_name);
-
-	for decl, i in file.decls {
-
-		if value_decl, ok := decl.derived.(ast.Value_Decl); ok {
-			set_value_decl_alignment_padding(p, value_decl, file.decls[i + 1:]);
-		}
-
-		print_decl(p, cast(^ast.Decl)decl);
-	}
-
-	//todo(probably check if there already is a newline, but there really shouldn't be)
-	print(p, newline); //finish document with newline
-	write_whitespaces(p, p.current_whitespace);
-}
 
 */
 

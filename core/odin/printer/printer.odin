@@ -26,14 +26,19 @@ Printer :: struct {
 	config:               Config,
 	depth:                int, //the identation depth
 	comments:             [dynamic]^ast.Comment_Group,
+	latest_comment_index: int,
 	allocator:            mem.Allocator,
 	file:                 ^ast.File,
     source_position:      tokenizer.Pos,
+	last_source_position: tokenizer.Pos,
     lines:                map [int]^Line,
     skip_semicolon:       bool,
 	current_line:         ^Line,
 	current_line_index:   int,
+	last_line_index:      int,
 	last_token:           ^Format_Token,
+	merge_next_token:     bool,
+	debug:                bool,
 }
 
 Config :: struct {
@@ -86,13 +91,16 @@ make_printer :: proc(config: Config, allocator := context.allocator) -> Printer 
 	return {
 		config = config,
 		allocator = allocator,
+		debug = false,
 	};
 }
 
 print :: proc(p: ^Printer, file: ^ast.File) -> string {
 
+	p.comments = file.comments;
+
     for decl in file.decls {
-        visit_stmt(p, decl);
+        visit_decl(p, cast(^ast.Decl)decl);
     }
 
 	fix_lines(p);
@@ -102,7 +110,7 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
     last_line := 0;
 
     for key, value in p.lines {
-        diff_line := min(key - last_line, p.config.newline_limit);
+        diff_line := key - last_line;
         
         for i := 0; i < diff_line; i += 1 {
             strings.write_byte(&builder, '\n');
@@ -110,6 +118,10 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 
 		for i := 0; i < value.depth * 4; i += 1 {
 			strings.write_byte(&builder, ' ');
+		}
+
+		if p.debug {
+			strings.write_string(&builder, fmt.tprintf("line %v: ", key));
 		}
 
 		for format_token in value.format_tokens {
