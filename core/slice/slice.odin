@@ -281,7 +281,7 @@ reduce :: proc(s: $S/[]$U, initializer: $V, f: proc(V, U) -> V) -> V {
 }
 
 filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -> S {
-	r := make([dynamic]S, 0, 0, allocator);
+	r := make([dynamic]U, 0, 0, allocator);
 	for v in s {
 		if f(v) {
 			append(&r, v);
