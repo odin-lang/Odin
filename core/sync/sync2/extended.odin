@@ -1,7 +1,6 @@
 package sync2
 
 import "core:runtime"
-import "intrinsics"
 
 // A Wait_Group waits for a collection of threads to finish
 //
@@ -20,7 +19,7 @@ wait_group_add :: proc(wg: ^Wait_Group, delta: int) {
 	mutex_lock(&wg.mutex);
 	defer mutex_unlock(&wg.mutex);
 
-	intrinsics.atomic_add(&wg.counter, delta);
+	atomic_add(&wg.counter, delta);
 	if wg.counter < 0 {
 		panic("sync.Wait_Group negative counter");
 	}
@@ -130,14 +129,14 @@ Ticket_Mutex :: struct {
 }
 
 ticket_mutex_lock :: #force_inline proc(m: ^Ticket_Mutex) {
-	ticket := intrinsics.atomic_add_relaxed(&m.ticket, 1);
-	for ticket != intrinsics.atomic_load_acq(&m.serving) {
-		intrinsics.cpu_relax();
+	ticket := atomic_add_relaxed(&m.ticket, 1);
+	for ticket != atomic_load_acq(&m.serving) {
+		cpu_relax();
 	}
 }
 
 ticket_mutex_unlock :: #force_inline proc(m: ^Ticket_Mutex) {
-	intrinsics.atomic_add_relaxed(&m.serving, 1);
+	atomic_add_relaxed(&m.serving, 1);
 }
 
 
@@ -148,18 +147,18 @@ Benaphore :: struct {
 }
 
 benaphore_lock :: proc(b: ^Benaphore) {
-	if intrinsics.atomic_add_acq(&b.counter, 1) > 1 {
+	if atomic_add_acq(&b.counter, 1) > 1 {
 		sema_wait(&b.sema);
 	}
 }
 
 benaphore_try_lock :: proc(b: ^Benaphore) -> bool {
-	v, _ := intrinsics.atomic_cxchg_acq(&b.counter, 1, 0);
+	v, _ := atomic_cxchg_acq(&b.counter, 1, 0);
 	return v == 0;
 }
 
 benaphore_unlock :: proc(b: ^Benaphore) {
-	if intrinsics.atomic_sub_rel(&b.counter, 1) > 0 {
+	if atomic_sub_rel(&b.counter, 1) > 0 {
 		sema_post(&b.sema);
 	}
 }
@@ -173,7 +172,7 @@ Recursive_Benaphore :: struct {
 
 recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 	tid := runtime.current_thread_id();
-	if intrinsics.atomic_add_acq(&b.counter, 1) > 1 {
+	if atomic_add_acq(&b.counter, 1) > 1 {
 		if tid != b.owner {
 			sema_wait(&b.sema);
 		}
@@ -186,10 +185,10 @@ recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
 	tid := runtime.current_thread_id();
 	if b.owner == tid {
-		intrinsics.atomic_add_acq(&b.counter, 1);
+		atomic_add_acq(&b.counter, 1);
 	}
 
-	if v, _ := intrinsics.atomic_cxchg_acq(&b.counter, 1, 0); v != 0 {
+	if v, _ := atomic_cxchg_acq(&b.counter, 1, 0); v != 0 {
 		return false;
 	}
 	// inside the lock
@@ -206,7 +205,7 @@ recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
 	if recursion == 0 {
 		b.owner = 0;
 	}
-	if intrinsics.atomic_sub_rel(&b.counter, 1) > 0 {
+	if atomic_sub_rel(&b.counter, 1) > 0 {
 		if recursion == 0 {
 			sema_post(&b.sema);
 		}
@@ -224,7 +223,7 @@ Once :: struct {
 }
 
 once_do :: proc(o: ^Once, fn: proc()) {
-	if intrinsics.atomic_load_acq(&o.done) == false {
+	if atomic_load_acq(&o.done) == false {
 		_once_do_slow(o, fn);
 	}
 }
@@ -234,6 +233,6 @@ _once_do_slow :: proc(o: ^Once, fn: proc()) {
 	defer mutex_unlock(&o.m);
 	if !o.done {
 		fn();
-		intrinsics.atomic_store_rel(&o.done, true);
+		atomic_store_rel(&o.done, true);
 	}
 }
