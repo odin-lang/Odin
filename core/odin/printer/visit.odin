@@ -27,10 +27,10 @@ next_comment_group :: proc(p: ^Printer) {
 }
  
 @(private) 
-write_comment :: proc(p: ^Printer, comment: tokenizer.Token) {
+write_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 	if len(comment.text) == 0 {
-		return;
+		return 0;
 	}
 
 	if comment.text[0] == '/' && comment.text[1] == '/' {
@@ -44,8 +44,90 @@ write_comment :: proc(p: ^Printer, comment: tokenizer.Token) {
 			format_token.spaces_before = 0;
 		}
 
+		p.current_line.used = true;
+		p.current_line.depth = p.depth;
+
 		append(&p.current_line.format_tokens, format_token); 
 		p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens)-1];
+
+		return 0;
+	} else {
+
+		builder := strings.make_builder(context.temp_allocator);
+
+		c_len := len(comment.text);
+		trim_space := true;
+
+		multilines: [dynamic] string;
+
+		for i := 0; i < len(comment.text); i += 1 {
+
+			c := comment.text[i];
+
+			if c != ' ' && c != '\t' {
+				trim_space = false;
+			}
+
+			if (c == ' ' || c == '\t' || c == '\n') && trim_space {
+				continue;
+			} else if c == 13 && comment.text[min(c_len - 1, i + 1)] == 10 {
+				append(&multilines, strings.to_string(builder));
+				builder = strings.make_builder(context.temp_allocator);
+				trim_space = true;
+				i += 1;
+			} else if c == 10 {
+				append(&multilines, strings.to_string(builder));
+				builder = strings.make_builder(context.temp_allocator);
+				trim_space = true;
+			} else if c == '/' && comment.text[min(c_len - 1, i + 1)] == '*' {
+				strings.write_string(&builder, "/*");
+				trim_space = true;
+				p.depth += 1;
+				i += 1;
+			} else if c == '*' && comment.text[min(c_len - 1, i + 1)] == '/' {
+				p.depth -= 1;
+				trim_space = true;
+				strings.write_string(&builder, "*/");
+				i += 1;
+			} else {
+				strings.write_byte(&builder, c);
+			}
+
+		}
+
+		if strings.builder_len(builder) > 0 {
+			append(&multilines, strings.to_string(builder));
+		}
+
+		for line in multilines {
+			format_token := Format_Token {
+				spaces_before = 1,
+				kind = .Comment,
+				text = line,
+			};
+
+			if len(p.current_line.format_tokens) == 0 {
+				format_token.spaces_before = 0;
+			}
+
+			if strings.contains(line, "*/")  {
+				unindent(p);
+			}
+
+			p.current_line.used = true;
+			p.current_line.depth = p.depth;
+
+			append(&p.current_line.format_tokens, format_token); 
+			p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens)-1];
+
+			if strings.contains(line, "/*") {
+				indent(p);
+			} 
+
+			newline_position(p, 1);
+		}
+
+		return len(multilines);
 	}
 }
 
@@ -53,22 +135,24 @@ write_comment :: proc(p: ^Printer, comment: tokenizer.Token) {
 write_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Token) {
 
 	prev_comment: ^tokenizer.Token;
+	prev_comment_lines: int;
 
 	for comment_before_position(p, pos) {
 
 		comment_group := p.comments[p.latest_comment_index];
-		lines := comment_group.pos.line - p.last_source_position.line;
 
-		set_line(p, p.last_line_index + min(p.config.newline_limit, lines));
+		if prev_comment == nil {
+			lines := comment_group.pos.line - p.last_source_position.line;
+			set_line(p, p.last_line_index + min(p.config.newline_limit, lines));
+		}
 
 		for comment, i in comment_group.list {
-			
+
 			if prev_comment != nil && p.last_source_position.line != comment.pos.line {
-			 	newline_position(p, comment.pos.line - prev_comment.pos.line);
+			 	newline_position(p, min(p.config.newline_limit, comment.pos.line - prev_comment.pos.line - prev_comment_lines));
 			}
 
-			write_comment(p, comment);
-
+			prev_comment_lines = write_comment(p, comment);
 			prev_comment = &comment_group.list[i];
 		}
 
@@ -792,7 +876,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		visit_expr(p, v.type);
 	case Slice_Expr:
 		visit_expr(p, v.expr);
-		push_generic_token(p, .Open_Bracket, 1);
+		push_generic_token(p, .Open_Bracket, 0);
 		visit_expr(p, v.low);
 		push_generic_token(p, v.interval.kind, 0);
 		visit_expr(p, v.high);
@@ -803,7 +887,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		visit_expr(p, v.expr);
 		push_generic_token(p, v.op.kind, 0);
 	case Type_Cast:
-		push_generic_token(p, v.tok.kind, 0);
+		push_generic_token(p, v.tok.kind, 1);
 		push_generic_token(p, .Open_Paren, 1);
 		visit_expr(p, v.type);
 		push_generic_token(p, .Close_Paren, 0);
@@ -812,7 +896,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, v.tok.kind, 0);
 		push_ident_token(p, v.name, 0);
 	case Distinct_Type:
-		push_generic_token(p, .Distinct, 0);
+		push_generic_token(p, .Distinct, 1);
 		visit_expr(p, v.type);
 	case Dynamic_Array_Type:
 		visit_expr(p, v.tag);
@@ -833,11 +917,11 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		push_generic_token(p, .Close_Bracket, 0);
 	case Union_Type:
-		push_generic_token(p, .Union, 0);
+		push_generic_token(p, .Union, 1);
 
 		if v.poly_params != nil {
 			push_generic_token(p, .Open_Paren, 0);
-			visit_field_list(p, v.poly_params, true, true);
+			visit_field_list(p, v.poly_params, true, false);
 			push_generic_token(p, .Close_Paren, 0);
 		}
 
@@ -894,7 +978,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.poly_params != nil {
 			push_generic_token(p, .Open_Paren, 0);
-			visit_field_list(p, v.poly_params, true, true);
+			visit_field_list(p, v.poly_params, true, false);
 			push_generic_token(p, .Close_Paren, 0);
 		}
 
@@ -947,7 +1031,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		visit_call_exprs(p, v.args, v.ellipsis.kind == .Ellipsis);
 		push_generic_token(p, .Close_Paren, 0);
 	case Typeid_Type:
-		push_generic_token(p, .Typeid, 0);
+		push_generic_token(p, .Typeid, 1);
 
 		if v.specialization != nil {
 			push_generic_token(p, .Quo, 0);
@@ -1001,7 +1085,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		}
 		
 	case Unary_Expr:
-		push_generic_token(p, v.op.kind, 0);
+		push_generic_token(p, v.op.kind, 1);
 		merge_next_token(p);
 		visit_expr(p, v.expr);
 	case Field_Value:
@@ -1022,18 +1106,19 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		}
 
 	case Pointer_Type:
-		push_generic_token(p, .Pointer, 0);
+		push_generic_token(p, .Pointer, 1);
 		merge_next_token(p);
 		visit_expr(p, v.elem);
 	case Implicit:
-		push_generic_token(p, v.tok.kind, 0);
+		push_generic_token(p, v.tok.kind, 1);
 	case Poly_Type:
-		push_generic_token(p, .Dollar, 0);
-
+		push_generic_token(p, .Dollar, 1);
+		merge_next_token(p);
 		visit_expr(p, v.type);
 
 		if v.specialization != nil {
 			push_generic_token(p, .Quo, 0);
+			merge_next_token(p);
 			visit_expr(p, v.specialization);
 		}
 	case Array_Type:
@@ -1077,8 +1162,9 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type) {
 visit_end_brace :: proc(p: ^Printer, end: tokenizer.Pos) {
 	set_source_position(p, end);
 	newline_position(p, 1);
-	unindent(p);
 	push_generic_token(p, .Close_Brace, 0);
+	unindent(p); 
+	p.current_line.depth = p.depth;
 }
 
 visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, newline_each := false) {
@@ -1318,29 +1404,4 @@ visit_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, remove_blank :=
 		}
 	}
 }
-
-
-/*
-print_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
-
-	if len(attributes) == 0 {
-		return;
-	}
-
-	for attribute, i in attributes {
-
-		print(p, "@", lparen);
-		visit_exprs(p, attribute.elems, ", ");
-		print(p, rparen);
-
-		if len(attributes) - 1 != i {
-			print(p, newline);
-		}
-	}
-}
-
-
-
-*/
-
 
