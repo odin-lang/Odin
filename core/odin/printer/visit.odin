@@ -612,10 +612,10 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 		if v.partial {
-			push_ident_token(p, "#partial", 0);
+			push_ident_token(p, "#partial", 1);
 		}
 
-		push_generic_token(p, .Switch, 0);
+		push_generic_token(p, .Switch, 1);
 
 		if v.init != nil {
 			p.skip_semicolon = true;
@@ -662,10 +662,10 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 		if v.partial {
-			push_ident_token(p, "partial", 0);
+			push_ident_token(p, "#partial", 1);
 		}
 
-		push_generic_token(p, .Switch, 0);
+		push_generic_token(p, .Switch, 1);
 
 		visit_stmt(p, v.tag);
 		visit_stmt(p, v.body);
@@ -897,7 +897,10 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Open_Bracket, 0);
 		visit_expr(p, v.low);
 		push_generic_token(p, v.interval.kind, 0);
-		visit_expr(p, v.high);
+		if v.high != nil {
+			merge_next_token(p);
+			visit_expr(p, v.high);
+		}
 		push_generic_token(p, .Close_Bracket, 0);
 	case Ident:
 		push_ident_token(p, v.name, 1);
