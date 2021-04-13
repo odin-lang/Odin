@@ -233,7 +233,7 @@ align_comments :: proc(p: ^Printer) {
 
 	for info in comment_infos {
 
-		if info.begin == info.end {
+		if info.begin == info.end || info.length == 0 {
 			continue;
 		}
 
