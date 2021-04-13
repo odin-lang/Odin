@@ -134,7 +134,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 }
 
 @(private)
-push_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Token) {
+push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 
 	prev_comment: ^tokenizer.Token;
 	prev_comment_lines: int;
@@ -183,7 +183,7 @@ append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_
 		p.space_next_token = false;
 	}
 
-	push_comments(p, p.source_position, format_token);
+	push_comments(p, p.source_position);
 
 	unwrapped_line := p.current_line;
     unwrapped_line.used = true;
