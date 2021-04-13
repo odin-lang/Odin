@@ -133,7 +133,7 @@ has_suffix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_c
 	return false;
 }
 
-fill :: proc(array: $T/[]$E, value: T) {
+fill :: proc(array: $T/[]$E, value: E) {
 	for _, i in array {
 		array[i] = value;
 	}
