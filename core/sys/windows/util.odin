@@ -1,7 +1,6 @@
 package sys_windows
 
 import "core:strings"
-import "core:runtime"
 import "core:sys/win32"
 
 LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
@@ -297,7 +296,6 @@ add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	defer win32.local_free(sb);
 
 	pszProfilePath := make([]u16, 257, context.temp_allocator);
-	cchProfilePath: DWORD;
 	res2 := CreateProfile(
 		sb,
 		&username_w[0],
