@@ -27,7 +27,7 @@ next_comment_group :: proc(p: ^Printer) {
 }
  
 @(private) 
-write_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
+push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 	if len(comment.text) == 0 {
 		return 0;
@@ -49,6 +49,8 @@ write_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 		append(&p.current_line.format_tokens, format_token); 
 		p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens)-1];
+
+		hint_current_line(p, {.Line_Comment});
 
 		return 0;
 	} else {
@@ -132,7 +134,7 @@ write_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 }
 
 @(private)
-write_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Token) {
+push_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Token) {
 
 	prev_comment: ^tokenizer.Token;
 	prev_comment_lines: int;
@@ -152,7 +154,7 @@ write_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Tok
 			 	newline_position(p, min(p.config.newline_limit, comment.pos.line - prev_comment.pos.line - prev_comment_lines));
 			}
 
-			prev_comment_lines = write_comment(p, comment);
+			prev_comment_lines = push_comment(p, comment);
 			prev_comment = &comment_group.list[i];
 		}
 
@@ -181,7 +183,7 @@ append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_
 		p.space_next_token = false;
 	}
 
-	write_comments(p, p.source_position, format_token);
+	push_comments(p, p.source_position, format_token);
 
 	unwrapped_line := p.current_line;
     unwrapped_line.used = true;
@@ -262,12 +264,15 @@ set_line :: proc(p: ^Printer, line: int) -> ^Line {
 
 	unwrapped_line: ^Line;
 
-	if line not_in p.lines {
-        unwrapped_line = new(Line, p.allocator);
-        unwrapped_line.format_tokens = make([dynamic] Format_Token, 0, 50, p.allocator);
-		p.lines[line] = unwrapped_line;
+	if line >= len(p.lines) {
+		for i := len(p.lines); i <= line; i += 1 {
+			new_line: Line;
+			new_line.format_tokens = make([dynamic] Format_Token, 0, 50, p.allocator);
+			append(&p.lines, new_line);
+		}
+		unwrapped_line = &p.lines[line];
     } else {
-        unwrapped_line = p.lines[line];
+        unwrapped_line = &p.lines[line];
     }
 
 	p.current_line = unwrapped_line;
@@ -297,8 +302,14 @@ merge_next_token :: proc(p: ^Printer) {
 	p.merge_next_token = true;
 }
 
+@(private)
 space_next_token :: proc(p: ^Printer) {
 	p.space_next_token = true;
+}
+
+@(private)
+hint_current_line :: proc(p: ^Printer, hint: Line_Type) {
+	p.current_line.types |= hint;
 }
 
 @(private)
