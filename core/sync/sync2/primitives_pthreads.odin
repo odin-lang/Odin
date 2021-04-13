@@ -2,7 +2,7 @@
 //+private
 package sync2
 
-when #config(ODIN_SYNC_USE_PTHREADS, false) {
+when #config(ODIN_SYNC_USE_PTHREADS, true) {
 
 import "core:time"
 import "core:sys/unix"
