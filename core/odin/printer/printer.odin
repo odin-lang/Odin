@@ -186,6 +186,7 @@ align_comments :: proc(p: ^Printer) {
 		length: int,
 		begin: int,
 		end: int,
+		depth: int,
 	};
 
 	comment_infos := make([dynamic]Comment_Align_Info, 0, context.temp_allocator);
@@ -200,7 +201,7 @@ align_comments :: proc(p: ^Printer) {
 
 		if .Line_Comment in line.types {
 
-			if current_info.end + 1 != line_index {
+			if current_info.end + 1 != line_index || current_info.depth != line.depth {
 
 				if (current_info.begin != 0 && current_info.end != 0) || current_info.length > 0 {
 					append(&comment_infos, current_info);
@@ -208,6 +209,7 @@ align_comments :: proc(p: ^Printer) {
 
 				current_info.begin = line_index;
 				current_info.end = line_index;
+				current_info.depth = line.depth;
 				current_info.length = 0;
 			}
 
