@@ -4,7 +4,7 @@ package thread
 
 import "core:runtime"
 import "core:intrinsics"
-import sync "core:sync/sync2"
+import "core:sync"
 import "core:sys/unix"
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
@@ -20,7 +20,7 @@ Thread_Os_Specific :: struct #align 16 {
 	// in a suspended state, we have it wait on this gate, which we
 	// signal to start it.
 	// destroyed after thread is started.
-	start_gate:  sync.Cond,
+	start_gate:  sync.Condition,
 	start_mutex: sync.Mutex,
 
 	// if true, the thread has been started and the start_gate has been destroyed.
@@ -41,7 +41,9 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 		context = runtime.default_context();
 
 		t := (^Thread)(t);
-		sync.cond_wait(&t.start_gate, &t.start_mutex);
+		sync.condition_wait_for(&t.start_gate);
+		sync.condition_destroy(&t.start_gate);
+		sync.mutex_destroy(&t.start_mutex);
 		t.start_gate = {};
 		t.start_mutex = {};
 
@@ -102,6 +104,9 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	}
 	thread.procedure = procedure;
 
+	sync.mutex_init(&thread.start_mutex);
+	sync.condition_init(&thread.start_gate, &thread.start_mutex);
+
 	return thread;
 }
 
@@ -109,7 +114,7 @@ _start :: proc(t: ^Thread) {
 	if intrinsics.atomic_xchg(&t.started, true) {
 		return;
 	}
-	sync.cond_signal(&t.start_gate);
+	sync.condition_signal(&t.start_gate);
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
@@ -162,6 +167,8 @@ _join_multiple :: proc(threads: ..^Thread) {
 
 _destroy :: proc(t: ^Thread) {
 	_join(t);
+	sync.condition_destroy(&t.start_gate);
+	sync.mutex_destroy(&t.start_mutex);
 	t.unix_thread = {};
 	free(t, t.creation_allocator);
 }
