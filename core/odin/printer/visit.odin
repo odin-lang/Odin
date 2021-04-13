@@ -158,7 +158,7 @@ write_comments :: proc(p: ^Printer, pos: tokenizer.Pos, format_token: Format_Tok
 
 		next_comment_group(p);
 	}
-
+ 
 	if prev_comment != nil {
 		newline_position(p, min(p.config.newline_limit, p.source_position.line - prev_comment.pos.line));
 	}
@@ -176,6 +176,9 @@ append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_
 	} else if p.merge_next_token {
 		format_token.spaces_before = 0;
 		p.merge_next_token = false;
+	} else if p.space_next_token {
+		format_token.spaces_before = 1;
+		p.space_next_token = false;
 	}
 
 	write_comments(p, p.source_position, format_token);
@@ -289,8 +292,13 @@ unindent :: proc(p: ^Printer) {
 	p.depth -= 1;
 }
 
+@(private)
 merge_next_token :: proc(p: ^Printer) {
 	p.merge_next_token = true;
+}
+
+space_next_token :: proc(p: ^Printer) {
+	p.space_next_token = true;
 }
 
 @(private)
@@ -374,7 +382,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
             if !v.is_mutable && v.type != nil {
                 push_generic_token(p, .Colon, 1);
 		    } else {
-                push_generic_token(p, .Colon, 1);
+                push_generic_token(p, .Colon, 0);
             }
 
 			visit_expr(p, v.type);
@@ -388,7 +396,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		}
 
 		if v.is_mutable && v.type != nil && len(v.values) != 0 {
-            push_generic_token(p, .Eq, 0);
+            push_generic_token(p, .Eq, 1);
 		} else if v.is_mutable && v.type == nil && len(v.values) != 0 {
 			push_generic_token(p, .Eq, 0);
 		} else if !v.is_mutable && v.type != nil {
@@ -823,23 +831,22 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 	switch v in expr.derived {
 	case Inline_Asm_Expr:
-	/*
-		print(p, v.tok, space, lparen);
-		visit_exprs(p, v.param_types, ", ");
-		print(p, rparen, space);
+		push_generic_token(p, v.tok.kind, 1, v.tok.text);
 
-		print(p, "->", space);
+		push_generic_token(p, .Open_Paren, 1);
+		visit_exprs(p, v.param_types, true, false);
+		push_generic_token(p, .Close_Paren, 0);
+
+		push_generic_token(p, .Sub, 1);
+		push_generic_token(p, .Gt, 0);
 
 		visit_expr(p, v.return_type);
 
-		print(p, space);
-
-		print(p, lbrace);
+		push_generic_token(p, .Open_Brace, 1);
 		visit_expr(p, v.asm_string);
-		print(p, ", ");
+		push_generic_token(p, .Comma, 0);
 		visit_expr(p, v.constraints_string);
-		print(p, rbrace);
-	*/
+		push_generic_token(p, .Close_Brace, 0);
 	case Undef:
 		push_generic_token(p, .Undef, 1);
 	case Auto_Cast:
@@ -893,7 +900,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Close_Paren, 0);
 		visit_expr(p, v.expr);
 	case Basic_Directive:
-		push_generic_token(p, v.tok.kind, 0);
+		push_generic_token(p, v.tok.kind, 1);
 		push_ident_token(p, v.name, 0);
 	case Distinct_Type:
 		push_generic_token(p, .Distinct, 1);
@@ -924,9 +931,15 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_field_list(p, v.poly_params, true, false);
 			push_generic_token(p, .Close_Paren, 0);
 		}
-
+		
 		if v.is_maybe {
 			push_ident_token(p, "#maybe", 1);
+		}
+
+		if v.where_clauses != nil {
+			move_line(p, v.where_clauses[0].pos);
+			push_generic_token(p, .Where, 1);
+			visit_exprs(p, v.where_clauses, true);
 		}
 
 		if v.variants != nil && (len(v.variants) == 0 || v.pos.line == v.end.line) {
@@ -980,6 +993,12 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			push_generic_token(p, .Open_Paren, 0);
 			visit_field_list(p, v.poly_params, true, false);
 			push_generic_token(p, .Close_Paren, 0);
+		}
+
+		if v.where_clauses != nil {
+			move_line(p, v.where_clauses[0].pos);
+			push_generic_token(p, .Where, 1);
+			visit_exprs(p, v.where_clauses, true);
 		}
 
 		if v.fields != nil && (len(v.fields.list) == 0 || v.pos.line == v.end.line) {

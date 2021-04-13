@@ -38,6 +38,7 @@ Printer :: struct {
 	last_line_index:      int,
 	last_token:           ^Format_Token,
 	merge_next_token:     bool,
+	space_next_token:     bool,
 	debug:                bool,
 }
 
