@@ -7,7 +7,26 @@ import "core:runtime"
 import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
+import "core:sort"
 
+@(private)
+sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
+	return sort.Interface {
+		collection = rawptr(s),
+		len = proc(it: sort.Interface) -> int {
+			s := (^[dynamic]^ast.Attribute)(it.collection);
+			return len(s^);
+		},
+		less = proc(it: sort.Interface, i, j: int) -> bool {
+			s := (^[dynamic]^ast.Attribute)(it.collection);
+			return s[i].pos.offset < s[j].pos.offset;
+		},
+		swap = proc(it: sort.Interface, i, j: int) {
+			s := (^[dynamic]^ast.Attribute)(it.collection);
+			s[i], s[j] = s[j], s[i];
+		},
+	};
+}
 
 @(private)
 comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
@@ -253,6 +272,11 @@ move_line :: proc(p: ^Printer, pos: tokenizer.Pos) {
 @(private)
 move_line_limit :: proc(p: ^Printer, pos: tokenizer.Pos, limit: int) -> bool {
 	lines := min(pos.line - p.source_position.line, limit);
+
+	if lines < 0 {
+		return false;
+	}
+
 	p.source_position = pos;
 	p.current_line_index += lines;
 	set_line(p, p.current_line_index);
@@ -321,7 +345,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		return;
 	}
 
-	switch v in decl.derived {
+	switch v in &decl.derived {
 	case Expr_Stmt:
 		move_line(p, decl.pos);
 		visit_expr(p, v.expr);
@@ -332,13 +356,13 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		visit_stmt(p, cast(^Stmt)decl);
 	case Foreign_Import_Decl:
 		if len(v.attributes) > 0 {
+			sort.sort(sort_attribute(&v.attributes));
 			move_line(p, v.attributes[0].pos);
-		} else {
-			move_line(p, decl.pos);
-		}
+			visit_attributes(p, v.attributes);
+		} 
 
-		visit_attributes(p, v.attributes);
-
+		move_line(p, decl.pos);
+		
         push_generic_token(p, v.foreign_tok.kind, 0);
         push_generic_token(p, v.import_tok.kind, 1);
 
@@ -352,13 +376,13 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 	case Foreign_Block_Decl:
 
 		if len(v.attributes) > 0 {
+			sort.sort(sort_attribute(&v.attributes));
 			move_line(p, v.attributes[0].pos);
-		} else {
-			move_line(p, decl.pos);
-		}
-
-		visit_attributes(p, v.attributes);
-
+			visit_attributes(p, v.attributes);
+		} 
+			
+		move_line(p, decl.pos);
+		
         push_generic_token(p, .Foreign, 0);
 
 		visit_expr(p, v.foreign_library);
@@ -377,6 +401,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 	case Value_Decl:
 		if len(v.attributes) > 0 {
+			sort.sort(sort_attribute(&v.attributes));
 			move_line(p, v.attributes[0].pos);
 			visit_attributes(p, v.attributes);
 		}
@@ -463,16 +488,14 @@ visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 
 	for attribute, i in attributes {
 
+		move_line_limit(p, attribute.pos, 1);
+
 		push_generic_token(p, .At, 0);
 		push_generic_token(p, .Open_Paren, 0);
 
 		visit_exprs(p, attribute.elems, true);
 
-		push_generic_token(p, .Close_Paren, 0);
-
-		if len(attributes) - 1 != i {
-			newline_position(p, 1);
-		}
+		push_generic_token(p, .Close_Paren, 0);	
 	}
 }
 
@@ -1047,7 +1070,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			set_source_position(p, v.body.pos);
 			visit_stmt(p, v.body, .Proc);
 		} else {
-			push_generic_token(p, .Ellipsis, 1);
+			push_generic_token(p, .Undef, 1);
 		}
 	case Proc_Type:
 		visit_proc_type(p, v);
@@ -1240,7 +1263,7 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 		}
 
 		if field.tag.text != "" {
-			push_generic_token(p, field.tag.kind, 1);
+			push_generic_token(p, field.tag.kind, 1, field.tag.text);
 		}
 
 		if (i != len(list.list) - 1 || trailing) && add_comma {
