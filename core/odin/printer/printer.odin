@@ -118,6 +118,12 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
         visit_decl(p, cast(^ast.Decl)decl);
     }
 
+	if len(p.comments) > 0 {
+		infinite := p.comments[len(p.comments)-1].end;
+		infinite.offset = 9999999;
+		push_comments(p, infinite);
+	}
+
 	fix_lines(p);
 
     builder := strings.make_builder(p.allocator);
@@ -163,9 +169,14 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 fix_lines :: proc(p: ^Printer) {
 	align_comments(p);
 	align_var_decls(p);
+	align_blocks(p);
 }
 
 align_var_decls :: proc(p: ^Printer) {
+
+}
+
+align_blocks :: proc(p: ^Printer) {
 
 }
 
@@ -221,6 +232,10 @@ align_comments :: proc(p: ^Printer) {
 	}
 
 	for info in comment_infos {
+
+		if info.begin == info.end {
+			continue;
+		}
 
 		for i := info.begin; i <= info.end; i += 1 {
 
