@@ -63,8 +63,10 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 			format_token.spaces_before = 0;
 		}
 
-		p.current_line.used = true;
-		p.current_line.depth = p.depth;
+		if !p.current_line.used {
+			p.current_line.used = true;
+			p.current_line.depth = p.depth;
+		}
 
 		append(&p.current_line.format_tokens, format_token); 
 		p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens)-1];
@@ -135,8 +137,10 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 				unindent(p);
 			}
 
-			p.current_line.used = true;
-			p.current_line.depth = p.depth;
+			if !p.current_line.used {
+				p.current_line.used = true;
+				p.current_line.depth = p.depth;
+			}
 
 			append(&p.current_line.format_tokens, format_token); 
 			p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens)-1];
@@ -416,7 +420,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		if v.type != nil {
             if !v.is_mutable && v.type != nil {
-                push_generic_token(p, .Colon, 1);
+                push_generic_token(p, .Colon, 0);
 		    } else {
                 push_generic_token(p, .Colon, 0);
             }
