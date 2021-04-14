@@ -405,11 +405,11 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		if v.name.text != "" {
             push_generic_token(p, v.import_tok.kind, 1);
-            push_generic_token(p, v.name.kind, 1);
-            push_ident_token(p, v.fullpath, 0);
+            push_generic_token(p, v.name.kind, 1, v.name.text);
+            push_ident_token(p, v.fullpath, 1);
 		} else {
             push_generic_token(p, v.import_tok.kind, 1);
-            push_ident_token(p, v.fullpath, 0);
+            push_ident_token(p, v.fullpath, 1);
 		}
 
 	case Value_Decl:
@@ -748,7 +748,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		if v.label != nil {
 			visit_expr(p, v.label);
-			push_generic_token(p, .Colon, 1);
+			push_generic_token(p, .Colon, 0);
 		}
 
 		push_ident_token(p, "#unroll", 0);
@@ -771,7 +771,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		if v.label != nil {
 			visit_expr(p, v.label);
-			push_generic_token(p, .Colon, 1);
+			push_generic_token(p, .Colon, 0);
 		}
 
 		push_generic_token(p, .For, 1);
@@ -932,9 +932,10 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, v.op.kind, 0);
 	case Type_Cast:
 		push_generic_token(p, v.tok.kind, 1);
-		push_generic_token(p, .Open_Paren, 1);
+		push_generic_token(p, .Open_Paren, 0);
 		visit_expr(p, v.type);
 		push_generic_token(p, .Close_Paren, 0);
+		merge_next_token(p);
 		visit_expr(p, v.expr);
 	case Basic_Directive:
 		push_generic_token(p, v.tok.kind, 1);
@@ -1080,7 +1081,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Binary_Expr:
 		visit_binary_expr(p, v);
 	case Implicit_Selector_Expr:
-		push_generic_token(p, .Period, 0);
+		push_generic_token(p, .Period, 1);
 		push_ident_token(p, v.field.name, 0);
 	case Call_Expr:
 		visit_expr(p, v.expr);
