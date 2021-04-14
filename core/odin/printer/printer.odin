@@ -201,7 +201,8 @@ align_comments :: proc(p: ^Printer) {
 
 		if .Line_Comment in line.types {
 
-			if current_info.end + 1 != line_index || current_info.depth != line.depth {
+			if current_info.end + 1 != line_index || current_info.depth != line.depth ||
+			   (current_info.begin == current_info.end && current_info.length == 0) {
 
 				if (current_info.begin != 0 && current_info.end != 0) || current_info.length > 0 {
 					append(&comment_infos, current_info);
