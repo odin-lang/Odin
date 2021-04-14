@@ -103,7 +103,7 @@ floattidf :: proc(a: i128) -> f64 {
 	s := a >> (N-1);
 	a = (a ~ s) - s;
 	sd: = N - _clz_i128(a);  // number of significant digits
-	e := u32(sd - 1);        // exponent 
+	e := u32(sd - 1);        // exponent
 	if sd > DBL_MANT_DIG {
 		switch sd {
 		case DBL_MANT_DIG + 1:
@@ -115,8 +115,8 @@ floattidf :: proc(a: i128) -> f64 {
 				i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0);
 		};
 
-		a |= i128((a & 4) != 0);  
-		a += 1; 
+		a |= i128((a & 4) != 0);
+		a += 1;
 		a >>= 2;
 
 		if a & (1 << DBL_MANT_DIG) != 0 {
@@ -127,9 +127,9 @@ floattidf :: proc(a: i128) -> f64 {
 		a <<= u128(DBL_MANT_DIG - sd);
 	}
 	fb: [2]u32;
-	fb[1] = (u32(s) & 0x80000000) |        // sign
-	        ((e + 1023) << 20)      |      // exponent
-	        ((u32(a) >> 32) & 0x000FFFFF); // mantissa-high
-	fb[1] = u32(a);                        // mantissa-low
+	fb[1] = (u32(s) & 0x80000000) |           // sign
+	        ((e + 1023) << 20)    |           // exponent
+	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
+	fb[1] = u32(a);                           // mantissa-low
 	return transmute(f64)fb;
 }
