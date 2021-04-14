@@ -32,7 +32,7 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
-enum EntityFlag : u32 {
+enum EntityFlag : u64 {
 	EntityFlag_Visited       = 1<<0,
 	EntityFlag_Used          = 1<<1,
 	EntityFlag_Using         = 1<<2,
@@ -63,12 +63,13 @@ enum EntityFlag : u32 {
 	EntityFlag_AutoCast      = 1<<22,
 
 	EntityFlag_Disabled      = 1<<24,
+	EntityFlag_Cold          = 1<<25, // procedure is rarely called
 
-	EntityFlag_Test          = 1<<25,
+	EntityFlag_Test          = 1<<30,
 
 };
 
-enum EntityState {
+enum EntityState : u32 {
 	EntityState_Unresolved = 0,
 	EntityState_InProgress = 1,
 	EntityState_Resolved   = 2,
@@ -98,7 +99,7 @@ struct ParameterValue {
 struct Entity {
 	EntityKind  kind;
 	u64         id;
-	u32         flags;
+	u64         flags;
 	EntityState state;
 	Token       token;
 	Scope *     scope;

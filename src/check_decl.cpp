@@ -690,6 +690,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	if (ac.test) {
 		e->flags |= EntityFlag_Test;
 	}
+	if (ac.set_cold) {
+		e->flags |= EntityFlag_Cold;
+	}
+
 	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
