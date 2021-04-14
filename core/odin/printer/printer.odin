@@ -208,7 +208,7 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 
 			if format_token.kind == .Open_Brace && switch_found {
 				brace_token = format_token;
-				brace_line = line_index;
+				brace_line = line_index+index;
 				break found_switch_brace;
 			} else if format_token.kind == .Open_Brace {
 				break;
@@ -294,13 +294,95 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 			if case_count > brace_token.parameter_count {
 				break;
 			}
-			
+
 		}
 	}
 
 }
 
 align_struct :: proc(p: ^Printer, index: int) {
+
+	struct_found := false;
+	brace_token: Format_Token;
+	brace_line: int;
+
+	found_struct_brace: for line, line_index in p.lines[index:] {
+
+		for format_token in line.format_tokens {
+
+			if format_token.kind == .Open_Brace && struct_found {
+				brace_token = format_token;
+				brace_line = line_index+index;
+				break found_struct_brace;
+			} else if format_token.kind == .Open_Brace {
+				break;
+			} else if format_token.kind == .Struct {
+				struct_found = true;
+			}
+
+		}
+
+	}
+
+	if !struct_found {
+		return;
+	}
+
+	largest := 0;
+	colon_count := 0;
+
+	
+
+	for line, line_index in p.lines[brace_line+1:] {
+
+		length := 0;
+
+		for format_token in line.format_tokens {
+
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			if format_token.kind == .Colon {
+				colon_count += 1;
+				largest = max(length, largest);
+				break;
+			} 
+
+			length += len(format_token.text) + format_token.spaces_before;
+		}
+
+		if colon_count > brace_token.parameter_count {
+			break;
+		}
+	}
+
+	colon_count = 0;
+
+	for line, line_index in p.lines[brace_line+1:] {
+
+		length := 0;
+
+		for format_token, i in line.format_tokens {
+
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			if format_token.kind == .Colon {
+				colon_count += 1;
+				line.format_tokens[i+1].spaces_before += (largest - length) - 1;
+				break;
+			} 
+
+			length += len(format_token.text) + format_token.spaces_before;
+		}
+
+		if colon_count > brace_token.parameter_count {
+			break;
+		}
+	}
+
 
 }
 
@@ -314,7 +396,9 @@ align_blocks :: proc(p: ^Printer) {
 
 		if .Switch_Stmt in line.types && p.config.align_switch {
 			align_switch_smt(p, line_index);
-		} else if .Struct in line.types && p.config.align_structs {
+		} 
+		
+		if .Struct in line.types && p.config.align_structs {
 			align_struct(p, line_index);
 		}
 
