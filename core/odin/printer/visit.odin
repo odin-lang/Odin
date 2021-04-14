@@ -9,6 +9,7 @@ import "core:unicode/utf8"
 import "core:mem"
 import "core:sort"
 
+//right the attribute order is not linearly parsed(bug?)
 @(private)
 sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
 	return sort.Interface {
@@ -209,8 +210,11 @@ append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_
 	push_comments(p, p.source_position);
 
 	unwrapped_line := p.current_line;
-    unwrapped_line.used = true;
-	unwrapped_line.depth = p.depth;
+
+	if !unwrapped_line.used {
+    	unwrapped_line.used = true;
+		unwrapped_line.depth = p.depth;
+	}
 
 	if len(unwrapped_line.format_tokens) == 0 && format_token.spaces_before == 1 {
 		format_token.spaces_before = 0;
@@ -221,6 +225,11 @@ append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_
 
 	append(&unwrapped_line.format_tokens, format_token); 
 	return &unwrapped_line.format_tokens[len(unwrapped_line.format_tokens)-1];
+}
+
+@(private)
+push_format_token :: proc(p: ^Printer, format_token: Format_Token) {
+	p.last_token = append_format_token(p, format_token);
 }
 
 @(private)
@@ -541,7 +550,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if v.pos.line == v.end.line && len(v.stmts) > 1 && p.config.split_multiple_stmts {
 
 			if !empty_block {
-				visit_begin_brace(p, v.pos, block_type);
+				visit_begin_brace(p, v.pos, block_type, len(v.stmts));
 			}
 
 			set_source_position(p, v.pos);
@@ -569,7 +578,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 			}
 		} else {
 			if !empty_block {
-				visit_begin_brace(p, v.pos, block_type);
+				visit_begin_brace(p, v.pos, block_type, len(v.stmts));
 			}
 
 			set_source_position(p, v.pos);
@@ -643,6 +652,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 		push_generic_token(p, .Switch, 1);
+
+		hint_current_line(p, {.Switch_Stmt});
 
 		if v.init != nil {
 			p.skip_semicolon = true;
@@ -1201,7 +1212,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 }
 
 
-visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type) {
+visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, count := 0) {
 
 	set_source_position(p, begin);
 
@@ -1209,12 +1220,19 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type) {
 	newline_braced |= p.config.brace_style == .K_And_R && type == .Proc;
 	newline_braced &= p.config.brace_style != ._1TBS;
 
+	format_token := Format_Token {
+		kind = .Open_Brace,
+		parameter_count = count,
+		text = "{",
+	};
+
 	if newline_braced {
 		newline_position(p, 1);
-		push_generic_token(p, .Open_Brace, 0);
+		push_format_token(p, format_token);
 		indent(p);
 	} else {
-		push_generic_token(p, .Open_Brace, 1);
+		format_token.spaces_before = 1;
+		push_format_token(p, format_token);
 		indent(p);
 	}
 }
