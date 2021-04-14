@@ -5,6 +5,8 @@ import "core:odin/format"
 import "core:fmt"
 import "core:strings"
 import "core:path/filepath"
+import "core:time"
+import "core:mem"
 
 import "flag"
 
@@ -51,6 +53,8 @@ walk_files :: proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip
 
 main :: proc() {
 
+    init_global_temporary_allocator(mem.megabytes(100));
+
     args: Args;
 
     if len(os.args) < 2 {
@@ -64,6 +68,8 @@ main :: proc() {
     }
 
     path := os.args[len(os.args)-1];
+
+    tick_time := time.tick_now();
 
     if os.is_file(path) {
 
@@ -122,12 +128,14 @@ main :: proc() {
                 }
 
 
+            } else {
+                fmt.eprintf("failed to format %v", file);
             }
 
             free_all(context.temp_allocator);
         }
 
-        fmt.printf("formatted %v files", len(files));
+        fmt.printf("formatted %v files in %vms", len(files), time.duration_milliseconds(time.tick_lap_time(&tick_time)));
 
     }
 
