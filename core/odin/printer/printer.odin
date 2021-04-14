@@ -256,11 +256,13 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 			length += len(format_token.text) + format_token.spaces_before;
 		}
 
-		if case_count > brace_token.parameter_count {
+		if case_count >= brace_token.parameter_count {
 			break;
 		}
 
 	}
+
+	fmt.println(case_count, brace_token);
 
 	case_count = 0;
 
@@ -291,10 +293,10 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 
 			length += len(format_token.text) + format_token.spaces_before;
 
-			if case_count > brace_token.parameter_count {
-				break;
-			}
+		}
 
+		if case_count >= brace_token.parameter_count {
+			break;
 		}
 	}
 
@@ -331,8 +333,6 @@ align_struct :: proc(p: ^Printer, index: int) {
 	largest := 0;
 	colon_count := 0;
 
-	
-
 	for line, line_index in p.lines[brace_line+1:] {
 
 		length := 0;
@@ -352,7 +352,7 @@ align_struct :: proc(p: ^Printer, index: int) {
 			length += len(format_token.text) + format_token.spaces_before;
 		}
 
-		if colon_count > brace_token.parameter_count {
+		if colon_count >= brace_token.parameter_count {
 			break;
 		}
 	}
@@ -371,18 +371,17 @@ align_struct :: proc(p: ^Printer, index: int) {
 
 			if format_token.kind == .Colon {
 				colon_count += 1;
-				line.format_tokens[i+1].spaces_before += (largest - length) - 1;
+				line.format_tokens[i+1].spaces_before = largest - length + 1;
 				break;
 			} 
 
 			length += len(format_token.text) + format_token.spaces_before;
 		}
 
-		if colon_count > brace_token.parameter_count {
+		if colon_count >= brace_token.parameter_count {
 			break;
 		}
 	}
-
 
 }
 

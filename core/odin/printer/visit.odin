@@ -1259,14 +1259,13 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 
 		visit_exprs(p, field.names, true);
 
-		if len(field.names) != 0 {
-			push_generic_token(p, .Colon, 0);
-		}
-
 		if field.type != nil {
+			if len(field.names) != 0 {
+				push_generic_token(p, .Colon, 0);
+			}
 			visit_expr(p, field.type);
 		} else {
-			push_generic_token(p, .Colon, 0);
+			push_generic_token(p, .Colon, 1);
 			push_generic_token(p, .Eq, 0);
 			visit_expr(p, field.default_value);
 		}
