@@ -1028,6 +1028,8 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Struct_Type:
 		push_generic_token(p, .Struct, 1);
 
+		hint_current_line(p, {.Struct});
+
 		if v.is_packed {
 			push_ident_token(p, "#packed", 1);
 		}
@@ -1058,11 +1060,10 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			set_source_position(p, v.fields.pos);
 			visit_field_list(p, v.fields, true);
 			push_generic_token(p, .Close_Brace, 0);
-		} else {
-			visit_begin_brace(p, v.pos, .Generic);
-			newline_position(p, 1);
+		} else if v.fields != nil {
+			visit_begin_brace(p, v.pos, .Generic, len(v.fields.list));
 			set_source_position(p, v.fields.pos);
-			visit_field_list(p, v.fields, true, true);
+			visit_field_list(p, v.fields, true, true, true);
 			visit_end_brace(p, v.end);
 		}
 
@@ -1256,7 +1257,7 @@ visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, newline_each := false
 	}
 }
 
-visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false, trailing := false) {
+visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false, trailing := false, enforce_newline := false) {
 
 	if list.list == nil {
 		return;
@@ -1264,7 +1265,9 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 
 	for field, i in list.list {
 
-		move_line_limit(p, field.pos, 1);
+		if !move_line_limit(p, field.pos, 1) && enforce_newline {
+			newline_position(p, 1);
+		}	
 
 		if .Using in field.flags {
 			push_generic_token(p, .Using, 0);
