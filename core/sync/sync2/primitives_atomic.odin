@@ -38,7 +38,7 @@ _mutex_try_lock :: proc(m: ^Mutex) -> bool {
 }
 
 
-
+@(cold)
 _mutex_lock_slow :: proc(m: ^Mutex, curr_state: _Mutex_State) {
 	new_state := curr_state; // Make a copy of it
 
@@ -68,6 +68,7 @@ _mutex_lock_slow :: proc(m: ^Mutex, curr_state: _Mutex_State) {
 }
 
 
+@(cold)
 _mutex_unlock_slow :: proc(m: ^Mutex) {
 	// TODO(bill): Use a Futex here for Linux to improve performance and error handling
 }
