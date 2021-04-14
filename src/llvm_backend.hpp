@@ -499,3 +499,10 @@ enum {
 	DW_TAG_subroutine_type  = 21,
 	DW_TAG_inheritance      = 28,
 };
+
+
+enum : LLVMAttributeIndex {
+	LLVMAttributeIndex_ReturnIndex = 0u,
+	LLVMAttributeIndex_FunctionIndex = ~0u,
+	LLVMAttributeIndex_FirstArgIndex = 1,
+};
