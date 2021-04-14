@@ -8,7 +8,7 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
-Line_Type_Enum :: enum{Line_Comment, Value_Decl, Switch_Stmt};
+Line_Type_Enum :: enum{Line_Comment, Value_Decl, Switch_Stmt, Struct};
 
 Line_Type :: bit_set[Line_Type_Enum];
 
@@ -17,7 +17,7 @@ Line :: struct {
     finalized: bool,
     used: bool,
 	depth: int,
-	types: Line_Type,
+	types: Line_Type, //for performance, so you don't have to verify what types are in it by going through the tokens - might give problems when adding linebreaking
 }
 
 Format_Token :: struct {
@@ -55,8 +55,10 @@ Config :: struct {
 	convert_do:           bool, //Convert all do statements to brace blocks
 	semicolons:           bool, //Enable semicolons
 	split_multiple_stmts: bool,
+	align_switch:         bool,
 	brace_style:          Brace_Style,
 	align_assignments:    bool,
+	align_structs:        bool,
 	align_style:          Alignment_Style,
 	indent_cases:         bool,
 	newline_style:        Newline_Style,
@@ -99,6 +101,8 @@ default_style := Config {
 	align_assignments = true,
 	align_style = .Align_On_Type_And_Equals,
 	indent_cases = false,
+	align_switch = true,
+	align_structs = true,
 };
 
 make_printer :: proc(config: Config, allocator := context.allocator) -> Printer {
@@ -221,6 +225,7 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 	}
 
 	largest := 0;
+	case_count := 0;
 
 	//find all the switch cases that are one lined
 	for line, line_index in p.lines[brace_line+1:] {
@@ -243,13 +248,21 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 
 			if format_token.kind == .Case {
 				case_found = true;
+				case_count += 1;
 			} else if format_token.kind == .Colon {
 				colon_found = true;
 			} 
 
 			length += len(format_token.text) + format_token.spaces_before;
 		}
+
+		if case_count > brace_token.parameter_count {
+			break;
+		}
+
 	}
+
+	case_count = 0;
 
 	for line, line_index in p.lines[brace_line+1:] {
 
@@ -271,13 +284,23 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 
 			if format_token.kind == .Case {
 				case_found = true;
+				case_count += 1;
 			} else if format_token.kind == .Colon {
 				colon_found = true;
 			} 
 
 			length += len(format_token.text) + format_token.spaces_before;
+
+			if case_count > brace_token.parameter_count {
+				break;
+			}
+			
 		}
 	}
+
+}
+
+align_struct :: proc(p: ^Printer, index: int) {
 
 }
 
@@ -289,8 +312,10 @@ align_blocks :: proc(p: ^Printer) {
 			continue;
 		}
 
-		if .Switch_Stmt in line.types {
+		if .Switch_Stmt in line.types && p.config.align_switch {
 			align_switch_smt(p, line_index);
+		} else if .Struct in line.types && p.config.align_structs {
+			align_struct(p, line_index);
 		}
 
 	}
