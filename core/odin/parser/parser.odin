@@ -2226,6 +2226,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.expr_level = -1;
 			where_clauses = parse_rhs_expr_list(p);
 			p.expr_level = prev_level;
+			tags = parse_proc_tags(p);
 		}
 		if p.allow_type && p.expr_level < 0 {
 			if where_token.kind != .Invalid {
@@ -3152,6 +3153,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 					case ast.For_Stmt:         n.label = label;
 					case ast.Switch_Stmt:      n.label = label;
 					case ast.Type_Switch_Stmt: n.label = label;
+					case ast.Range_Stmt:	   n.label = label;
 					}
 				}
 
