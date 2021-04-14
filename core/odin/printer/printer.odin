@@ -103,6 +103,7 @@ default_style := Config {
 	indent_cases = false,
 	align_switch = true,
 	align_structs = true,
+	newline_style = .LF,
 };
 
 make_printer :: proc(config: Config, allocator := context.allocator) -> Printer {
@@ -261,8 +262,6 @@ align_switch_smt :: proc(p: ^Printer, index: int) {
 		}
 
 	}
-
-	fmt.println(case_count, brace_token);
 
 	case_count = 0;
 
