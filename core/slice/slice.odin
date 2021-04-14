@@ -115,7 +115,7 @@ simple_equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_simple_comp
 }
 
 
-has_prefix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
+has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
 	n := len(needle);
 	if len(array) >= n {
 		return equal(array[:n], needle);
@@ -124,7 +124,7 @@ has_prefix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_c
 }
 
 
-has_suffix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
+has_suffix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
 	array := array;
 	m, n := len(array), len(needle);
 	if m >= n {
