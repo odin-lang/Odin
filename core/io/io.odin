@@ -23,6 +23,9 @@ Error :: enum i32 {
 	// Short_Write means that a write accepted fewer bytes than requested but failed to return an explicit error
 	Short_Write,
 
+	// Invalid_Write means that a write returned an impossible count
+	Invalid_Write,
+
 	// Short_Buffer means that a read required a longer buffer than was provided
 	Short_Buffer,
 
@@ -39,6 +42,9 @@ Error :: enum i32 {
 	Negative_Write,
 	Negative_Count,
 	Buffer_Full,
+
+	// Unknown means that an error has occurred but cannot be categorized
+	Unknown,
 
 	// Empty is returned when a procedure has not been implemented for an io.Stream
 	Empty = -1,
