@@ -547,29 +547,14 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 	case Block_Stmt:
 		move_line(p, v.pos);
 
-		if v.pos.line == v.end.line && len(v.stmts) > 1 && p.config.split_multiple_stmts {
-
-			if !empty_block {
-				visit_begin_brace(p, v.pos, block_type, len(v.stmts));
-			}
-
-			set_source_position(p, v.pos);
-
-			visit_block_stmts(p, v.stmts, true);
-
-			set_source_position(p, v.end);
-
-			if !empty_block {
-				visit_end_brace(p, v.end);
-			}
-		} else if v.pos.line == v.end.line {
+		if v.pos.line == v.end.line {
 			if !empty_block {
 				push_generic_token(p, .Open_Brace, 0);
 			}
 
 			set_source_position(p, v.pos);
 
-			visit_block_stmts(p, v.stmts);
+			visit_block_stmts(p, v.stmts, len(v.stmts) > 1 && p.config.split_multiple_stmts);
 
 			set_source_position(p, v.end);
 
@@ -583,7 +568,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 			set_source_position(p, v.pos);
 
-			visit_block_stmts(p, v.stmts);
+			visit_block_stmts(p, v.stmts, len(v.stmts) > 1 && p.config.split_multiple_stmts);
 
 			set_source_position(p, v.end);
 
@@ -1246,14 +1231,13 @@ visit_end_brace :: proc(p: ^Printer, end: tokenizer.Pos) {
 	p.current_line.depth = p.depth;
 }
 
-visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, newline_each := false) {
+visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, split := false) {
 	for stmt, i in stmts {
+		visit_stmt(p, stmt, .Generic, false, true);
 
-		if newline_each {
+		if split && i != len(stmts)-1 && stmt.pos.line == stmts[i+1].pos.line {
 			newline_position(p, 1);
 		}
-
-		visit_stmt(p, stmt, .Generic, false, true);
 	}
 }
 
