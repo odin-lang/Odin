@@ -8098,10 +8098,10 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		case ProcInlining_none:
 			break;
 		case ProcInlining_inline:
-			// LLVMAddAttributeAtIndex(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "alwaysinline"));
+			LLVMAddCallSiteAttribute(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "alwaysinline"));
 			break;
 		case ProcInlining_no_inline:
-			// LLVMAddAttributeAtIndex(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "noinline"));
+			LLVMAddCallSiteAttribute(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "noinline"));
 			break;
 		}
 
