@@ -8,7 +8,7 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
-Line_Type_Enum :: enum{Line_Comment, Value_Decl};
+Line_Type_Enum :: enum{Line_Comment, Value_Decl, Switch_Stmt};
 
 Line_Type :: bit_set[Line_Type_Enum];
 
@@ -24,6 +24,7 @@ Format_Token :: struct {
     kind: tokenizer.Token_Kind,
     text: string,
     spaces_before: int,
+	parameter_count: int,
 }
 
 Printer :: struct {
@@ -58,6 +59,7 @@ Config :: struct {
 	align_assignments:    bool,
 	align_style:          Alignment_Style,
 	indent_cases:         bool,
+	newline_style:        Newline_Style,
 }
 
 Brace_Style :: enum {
@@ -73,11 +75,17 @@ Block_Type :: enum {
 	Proc,
 	Generic,
 	Comp_Lit,
+	Switch_Stmt,
 }
 
 Alignment_Style :: enum {
 	Align_On_Colon_And_Equals,
 	Align_On_Type_And_Equals,
+}
+
+Newline_Style :: enum {
+	CRLF,
+	LF,
 }
 
 default_style := Config {
@@ -126,17 +134,25 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 
 	fix_lines(p);
 
-    builder := strings.make_builder(p.allocator);
+    builder := strings.make_builder(0, mem.megabytes(5), p.allocator);
 
     last_line := 0;
+
+	newline: string;
+
+	if p.config.newline_style == .LF {
+		newline = "\n";
+	} else {
+		newline = "\r\n";
+	}
 
     for line, line_index in p.lines {
         diff_line := line_index - last_line;
 
-        for i := 0; i < diff_line; i += 1 {
-            strings.write_byte(&builder, '\n');
-        }
-
+		for i := 0; i < diff_line; i += 1 {
+			strings.write_string(&builder, newline);
+		}
+		
 		if p.config.tabs {
 			for i := 0; i < line.depth; i += 1 {
 				strings.write_byte(&builder, '\t');
@@ -167,16 +183,117 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 }
 
 fix_lines :: proc(p: ^Printer) {
-	align_comments(p);
 	align_var_decls(p);
 	align_blocks(p);
+	align_comments(p); //align them last since they rely on the other alignments
 }
 
 align_var_decls :: proc(p: ^Printer) {
 
 }
 
+align_switch_smt :: proc(p: ^Printer, index: int) {
+
+	switch_found := false;
+	brace_token: Format_Token;
+	brace_line: int;
+
+	found_switch_brace: for line, line_index in p.lines[index:] {
+
+		for format_token in line.format_tokens {
+
+			if format_token.kind == .Open_Brace && switch_found {
+				brace_token = format_token;
+				brace_line = line_index;
+				break found_switch_brace;
+			} else if format_token.kind == .Open_Brace {
+				break;
+			} else if format_token.kind == .Switch {
+				switch_found = true;
+			}
+
+		}
+
+	}
+
+	if !switch_found {
+		return;
+	}
+
+	largest := 0;
+
+	//find all the switch cases that are one lined
+	for line, line_index in p.lines[brace_line+1:] {
+
+		case_found := false;
+		colon_found := false;
+		length := 0;
+
+		for format_token in line.format_tokens {
+
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			//this will only happen if the case is one lined
+			if case_found && colon_found {
+				largest = max(length, largest);
+				break;
+			}
+
+			if format_token.kind == .Case {
+				case_found = true;
+			} else if format_token.kind == .Colon {
+				colon_found = true;
+			} 
+
+			length += len(format_token.text) + format_token.spaces_before;
+		}
+	}
+
+	for line, line_index in p.lines[brace_line+1:] {
+
+		case_found := false;
+		colon_found := false;
+		length := 0;
+
+		for format_token, i in line.format_tokens {
+
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			//this will only happen if the case is one lined
+			if case_found && colon_found {
+				line.format_tokens[i].spaces_before += (largest - length);
+				break;
+			}
+
+			if format_token.kind == .Case {
+				case_found = true;
+			} else if format_token.kind == .Colon {
+				colon_found = true;
+			} 
+
+			length += len(format_token.text) + format_token.spaces_before;
+		}
+	}
+
+}
+
 align_blocks :: proc(p: ^Printer) {
+
+	for line, line_index in p.lines {
+
+		if len(line.format_tokens) <= 0 {
+			continue;
+		}
+
+		if .Switch_Stmt in line.types {
+			align_switch_smt(p, line_index);
+		}
+
+	}
 
 }
 
