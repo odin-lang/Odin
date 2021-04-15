@@ -11,19 +11,19 @@ import "core:sort"
 
 //right the attribute order is not linearly parsed(bug?)
 @(private)
-sort_attribute :: proc(s: ^[dynamic] ^ast.Attribute) -> sort.Interface {
+sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
 	return sort.Interface {
 		collection = rawptr(s),
 		len = proc(it: sort.Interface) -> int {
-			s := (^[dynamic] ^ast.Attribute)(it.collection);
+			s := (^[dynamic]^ast.Attribute)(it.collection);
 			return len(s^);
 		},
 		less = proc(it: sort.Interface, i, j: int) -> bool {
-			s := (^[dynamic] ^ast.Attribute)(it.collection);
+			s := (^[dynamic]^ast.Attribute)(it.collection);
 			return s[i].pos.offset < s[j].pos.offset;
 		},
 		swap = proc(it: sort.Interface, i, j: int) {
-			s := (^[dynamic] ^ast.Attribute)(it.collection);
+			s := (^[dynamic]^ast.Attribute)(it.collection);
 			s[i], s[j] = s[j], s[i];
 		},
 	};
@@ -72,7 +72,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 		append(&p.current_line.format_tokens, format_token);
 		p.last_token = &p.current_line.format_tokens[len(p.current_line.format_tokens) - 1];
 
-		hint_current_line(p,{.Line_Comment});
+		hint_current_line(p, {.Line_Comment});
 
 		return 0;
 	} else {
@@ -82,7 +82,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 		c_len := len(comment.text);
 		trim_space := true;
 
-		multilines: [dynamic] string;
+		multilines: [dynamic]string;
 
 		for i := 0; i < len(comment.text); i += 1 {
 
@@ -185,7 +185,7 @@ push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 	}
 
 	if prev_comment != nil {
-		newline_position(p, min(p.config.newline_limit, p.source_position.line - prev_comment.pos.line));
+		newline_position(p, min(p.config.newline_limit, p.source_position.line - prev_comment.pos.line - prev_comment_lines));
 	}
 }
 
@@ -303,7 +303,7 @@ set_line :: proc(p: ^Printer, line: int) -> ^Line {
 	if line >= len(p.lines) {
 		for i := len(p.lines); i <= line; i += 1 {
 			new_line: Line;
-			new_line.format_tokens = make([dynamic] Format_Token, 0, 50, p.allocator);
+			new_line.format_tokens = make([dynamic]Format_Token, 0, 50, p.allocator);
 			append(&p.lines, new_line);
 		}
 		unwrapped_line = &p.lines[line];
@@ -427,18 +427,20 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		visit_exprs(p, v.names, true);
 
 		if v.type != nil {
-			if !v.is_mutable && v.type != nil {
+			if !v.is_mutable {
 				push_generic_token(p, .Colon, 0);
 			} else {
+				hint_current_line(p, {.Value_Decl});
 				push_generic_token(p, .Colon, 0);
 			}
 
 			visit_expr(p, v.type);
 		} else {
-			if !v.is_mutable && v.type == nil {
+			if !v.is_mutable {
 				push_generic_token(p, .Colon, 1);
 				push_generic_token(p, .Colon, 0);
 			} else {
+				hint_current_line(p, {.Value_Decl});
 				push_generic_token(p, .Colon, 1);
 			}
 		}
@@ -472,7 +474,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 }
 
 @(private)
-visit_exprs :: proc(p: ^Printer, list: [] ^ast.Expr, add_comma := false, trailing := false) {
+visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing := false) {
 
 	if len(list) == 0 {
 		return;
@@ -492,7 +494,7 @@ visit_exprs :: proc(p: ^Printer, list: [] ^ast.Expr, add_comma := false, trailin
 }
 
 @(private)
-visit_attributes :: proc(p: ^Printer, attributes: [dynamic] ^ast.Attribute) {
+visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 
 	if len(attributes) == 0 {
 		return;
@@ -637,7 +639,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		push_generic_token(p, .Switch, 1);
 
-		hint_current_line(p,{.Switch_Stmt});
+		hint_current_line(p, {.Switch_Stmt});
 
 		if v.init != nil {
 			p.skip_semicolon = true;
@@ -694,6 +696,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 	case Assign_Stmt:
 		move_line(p, v.pos);
 
+		hint_current_line(p, {.Assign});
+
 		visit_exprs(p, v.lhs, true);
 
 		push_generic_token(p, v.op.kind, 1);
@@ -730,11 +734,13 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 		if v.cond != nil {
+			move_line(p, v.cond.pos);
 			visit_expr(p, v.cond);
 		}
 
 		if v.post != nil {
 			push_generic_token(p, .Semicolon, 0);
+			move_line(p, v.post.pos);
 			visit_stmt(p, v.post);
 		} else if v.post == nil && v.cond != nil && v.init != nil {
 			push_generic_token(p, .Semicolon, 0);
@@ -946,6 +952,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Open_Bracket, 1);
 		push_generic_token(p, .Dynamic, 0);
 		push_generic_token(p, .Close_Bracket, 0);
+		merge_next_token(p);
 		visit_expr(p, v.elem);
 	case Bit_Set_Type:
 		push_generic_token(p, .Bit_Set, 1);
@@ -1012,7 +1019,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Struct_Type:
 		push_generic_token(p, .Struct, 1);
 
-		hint_current_line(p,{.Struct});
+		hint_current_line(p, {.Struct});
 
 		if v.is_packed {
 			push_ident_token(p, "#packed", 1);
@@ -1083,7 +1090,15 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_ident_token(p, v.field.name, 0);
 	case Call_Expr:
 		visit_expr(p, v.expr);
-		push_generic_token(p, .Open_Paren, 0);
+
+		push_format_token(p, Format_Token {
+			kind = .Open_Paren,
+			type = .Call,
+			text = "(",
+		});
+
+		hint_current_line(p, {.Call});
+
 		visit_call_exprs(p, v.args, v.ellipsis.kind == .Ellipsis);
 		push_generic_token(p, .Close_Paren, 0);
 	case Typeid_Type:
@@ -1135,7 +1150,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_exprs(p, v.elems, true, true);
 			visit_end_brace(p, v.end);
 		} else {
-			push_generic_token(p, .Open_Brace, 0);
+			push_generic_token(p, .Open_Brace, 1);
 			visit_exprs(p, v.elems, true);
 			push_generic_token(p, .Close_Brace, 0);
 		}
@@ -1182,12 +1197,14 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Open_Bracket, 1);
 		visit_expr(p, v.len);
 		push_generic_token(p, .Close_Bracket, 0);
+		merge_next_token(p);
 		visit_expr(p, v.elem);
 	case Map_Type:
 		push_generic_token(p, .Map, 1);
 		push_generic_token(p, .Open_Bracket, 0);
 		visit_expr(p, v.key);
 		push_generic_token(p, .Close_Bracket, 0);
+		merge_next_token(p);
 		visit_expr(p, v.value);
 	case Helper_Type:
 		visit_expr(p, v.type);
@@ -1229,7 +1246,7 @@ visit_end_brace :: proc(p: ^Printer, end: tokenizer.Pos) {
 	p.current_line.depth = p.depth;
 }
 
-visit_block_stmts :: proc(p: ^Printer, stmts: [] ^ast.Stmt, split := false) {
+visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, split := false) {
 	for stmt, i in stmts {
 		visit_stmt(p, stmt, .Generic, false, true);
 
@@ -1370,7 +1387,7 @@ visit_binary_expr :: proc(p: ^Printer, binary: ast.Binary_Expr) {
 	}
 }
 
-visit_call_exprs :: proc(p: ^Printer, list: [] ^ast.Expr, ellipsis := false) {
+visit_call_exprs :: proc(p: ^Printer, list: []^ast.Expr, ellipsis := false) {
 
 	if len(list) == 0 {
 		return;

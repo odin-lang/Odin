@@ -8,12 +8,12 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
-Line_Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct}
+Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum}
 
-Line_Type :: bit_set[Line_Type_Enum];
+Line_Type :: bit_set[Type_Enum];
 
 Line :: struct {
-	format_tokens: [dynamic] Format_Token,
+	format_tokens: [dynamic]Format_Token,
 	finalized:     bool,
 	used:          bool,
 	depth:         int,
@@ -23,6 +23,7 @@ Line :: struct {
 Format_Token :: struct {
 	kind:            tokenizer.Token_Kind,
 	text:            string,
+	type:            Type_Enum,
 	spaces_before:   int,
 	parameter_count: int,
 }
@@ -31,13 +32,13 @@ Printer :: struct {
 	string_builder:       strings.Builder,
 	config:               Config,
 	depth:                int, //the identation depth
-	comments:             [dynamic] ^ast.Comment_Group,
+	comments:             [dynamic]^ast.Comment_Group,
 	latest_comment_index: int,
 	allocator:            mem.Allocator,
 	file:                 ^ast.File,
 	source_position:      tokenizer.Pos,
 	last_source_position: tokenizer.Pos,
-	lines:                [dynamic] Line, //need to look into a better data structure, one that can handle inserting lines rather than appending
+	lines:                [dynamic]Line, //need to look into a better data structure, one that can handle inserting lines rather than appending
 	skip_semicolon:       bool,
 	current_line:         ^Line,
 	current_line_index:   int,
@@ -119,7 +120,7 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 	p.comments = file.comments;
 
 	if len(file.decls) > 0 {
-		p.lines = make([dynamic] Line, 0, (file.decls[len(file.decls) - 1].end.line - file.decls[0].pos.line) * 2, context.temp_allocator);
+		p.lines = make([dynamic]Line, 0, (file.decls[len(file.decls) - 1].end.line - file.decls[0].pos.line) * 2, context.temp_allocator);
 	}
 
 	set_line(p, 0);
@@ -188,15 +189,182 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 }
 
 fix_lines :: proc(p: ^Printer) {
-	align_var_decls(p);
-	align_blocks(p);
+	align_var_decls_and_assignments(p);
+	format_generic(p);
 	align_comments(p); //align them last since they rely on the other alignments
 }
 
-align_var_decls :: proc(p: ^Printer) {
+format_value_decl :: proc(p: ^Printer, index: int) {
+
+	eq_found := false;
+	eq_token: Format_Token;
+	eq_line: int;
+	largest := 0;
+
+	found_eq: for line, line_index in p.lines[index:] {
+		for format_token in line.format_tokens {
+
+			largest += len(format_token.text) + format_token.spaces_before;
+
+			if format_token.kind == .Eq {
+				eq_token = format_token;
+				eq_line = line_index + index;
+				eq_found = true;
+				break found_eq;
+			} 
+		}
+	}
+
+	if !eq_found {
+		return;
+	}
+
+	align_next := false;
+
+	//check to see if there is a binary operator in the last token(this is guaranteed by the ast visit), otherwise it's not multilined
+	for line, line_index in p.lines[eq_line:] {
+
+		if len(line.format_tokens) == 0 {
+			break;
+		}
+
+		if align_next {
+			line.format_tokens[0].spaces_before += largest + 1;
+			align_next = false;
+		}
+
+		kind := find_last_token(line.format_tokens).kind; 
+
+		if tokenizer.Token_Kind.B_Operator_Begin < kind && kind <= tokenizer.Token_Kind.Cmp_Or {
+			align_next = true;
+		}
+
+		if !align_next {
+			break;
+		}
+
+	}
+
 }
 
-align_switch_smt :: proc(p: ^Printer, index: int) {
+find_last_token :: proc(format_tokens: [dynamic]Format_Token) -> Format_Token {
+
+	for i := len(format_tokens)-1; i >= 0; i -= 1 {
+
+		if format_tokens[i].kind != .Comment {
+			return format_tokens[i];
+		}
+
+	}
+
+	panic("not possible");
+}
+
+format_assignment :: proc(p: ^Printer, index: int) {
+	
+}
+
+format_call :: proc(p: ^Printer, index: int) {
+
+	paren_found := false;
+	paren_token: Format_Token;
+	paren_line: int;
+	largest := 0;
+
+	found_paren: for line, line_index in p.lines[index:] {
+		for format_token in line.format_tokens {
+
+			largest += len(format_token.text) + format_token.spaces_before;
+
+			if format_token.kind == .Open_Paren && format_token.type == .Call {
+				paren_token = format_token;
+				paren_line = line_index + index;
+				paren_found = true;
+				break found_paren;
+			} else if format_token.kind == .Open_Paren {
+				return;
+			}
+		}
+	}
+
+	if !paren_found {
+		return;
+	}
+
+	paren_count := 1;
+	done := false;
+
+	for line, line_index in p.lines[paren_line+1:] {
+
+		if len(line.format_tokens) == 0 {
+			continue;
+		}
+
+		for format_token, i in line.format_tokens {
+			
+			if format_token.kind == .Open_Paren {
+				paren_count += 1;
+			} else if format_token.kind == .Close_Paren {
+				paren_count -= 1;
+			}
+
+			if paren_count == 0 {
+				done = true;
+			}
+
+		}
+
+		line.format_tokens[0].spaces_before += largest;
+
+		if done {
+			return;
+		}
+
+
+	}
+
+
+
+}
+
+format_generic :: proc(p: ^Printer) {
+
+	for line, line_index in p.lines {
+
+		if len(line.format_tokens) <= 0 {
+			continue;
+		}
+
+		if .Switch_Stmt in line.types && p.config.align_switch {
+			align_switch_stmt(p, line_index);
+		}
+
+		if .Struct in line.types && p.config.align_structs {
+			align_struct(p, line_index);
+		}
+
+		if .Value_Decl in line.types {
+			format_value_decl(p, line_index);
+		}
+
+		if .Assign in line.types {
+			format_assignment(p, line_index);
+		}
+
+		if .Call in line.types {
+			format_call(p, line_index);
+		}
+	}
+}
+	
+align_var_decls_and_assignments :: proc(p: ^Printer) {
+
+
+
+
+}
+
+align_switch_stmt :: proc(p: ^Printer, index: int) {
 
 	switch_found := false;
 	brace_token: Format_Token;
@@ -375,24 +543,6 @@ align_struct :: proc(p: ^Printer, index: int) {
 	}
 }
 
-align_blocks :: proc(p: ^Printer) {
-
-	for line, line_index in p.lines {
-
-		if len(line.format_tokens) <= 0 {
-			continue;
-		}
-
-		if .Switch_Stmt in line.types && p.config.align_switch {
-			align_switch_smt(p, line_index);
-		}
-
-		if .Struct in line.types && p.config.align_structs {
-			align_struct(p, line_index);
-		}
-	}
-}
-
 align_comments :: proc(p: ^Printer) {
 
 	Comment_Align_Info :: struct {
@@ -402,7 +552,7 @@ align_comments :: proc(p: ^Printer) {
 		depth:  int,
 	};
 
-	comment_infos := make([dynamic] Comment_Align_Info, 0, context.temp_allocator);
+	comment_infos := make([dynamic]Comment_Align_Info, 0, context.temp_allocator);
 
 	current_info: Comment_Align_Info;
 
