@@ -587,6 +587,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		push_generic_token(p, .If, 1);
 
+		hint_current_line(p, {.If});
+
 		if v.init != nil {
 			p.skip_semicolon = true;
 			visit_stmt(p, v.init);
@@ -724,6 +726,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		push_generic_token(p, .For, 1);
 
+		hint_current_line(p, {.For});
+
 		if v.init != nil {
 			p.skip_semicolon = true;
 			visit_stmt(p, v.init);
@@ -759,6 +763,9 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		push_ident_token(p, "#unroll", 0);
 
 		push_generic_token(p, .For, 1);
+
+		hint_current_line(p, {.For});
+
 		visit_expr(p, v.val0);
 
 		if v.val1 != nil {
@@ -780,6 +787,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 		push_generic_token(p, .For, 1);
+
+		hint_current_line(p, {.For});
 
 		if len(v.vals) >= 1 {
 			visit_expr(p, v.vals[0]);
