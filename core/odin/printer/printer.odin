@@ -8,7 +8,7 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
-Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum}
+Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum, If, For}
 
 Line_Type :: bit_set[Type_Enum];
 
@@ -320,12 +320,129 @@ format_call :: proc(p: ^Printer, index: int) {
 			return;
 		}
 
+	}
+}
+
+format_for :: proc(p: ^Printer, index: int) {
+
+	for_found := false;
+	for_token: Format_Token;
+	for_line: int;
+	largest := 0;
+
+	found_for: for line, line_index in p.lines[index:] {
+		for format_token in line.format_tokens {
+
+			largest += len(format_token.text) + format_token.spaces_before;
+
+			if format_token.kind == .For {
+				for_token = format_token;
+				for_line = line_index + index;
+				for_found = true;
+				break found_for;
+			} 
+		}
+	}
+
+	if !for_found {
+		return;
+	}
+
+	brace_count := 0;
+	done := false;
+
+	for line, line_index in p.lines[for_line:] {
+
+		if len(line.format_tokens) == 0 {
+			continue;
+		}
+
+		for format_token, i in line.format_tokens {
+			
+			if format_token.kind == .Open_Brace {
+				brace_count += 1;
+			} else if format_token.kind == .Close_Brace {
+				brace_count -= 1;
+			}
+
+			if brace_count == 1 {
+				done = true;
+			}
+
+		}
+
+		if line_index != 0 {
+			line.format_tokens[0].spaces_before += largest + 1;
+		}
+
+		if done {
+			return;
+		}
+
+	}
+	
+}
+
+format_if :: proc(p: ^Printer, index: int) {
+
+	if_found := false;
+	if_token: Format_Token;
+	if_line: int;
+	largest := 0;
+
+	found_if: for line, line_index in p.lines[index:] {
+		for format_token in line.format_tokens {
+
+			largest += len(format_token.text) + format_token.spaces_before;
+
+			if format_token.kind == .If {
+				if_token = format_token;
+				if_line = line_index + index;
+				if_found = true;
+				break found_if;
+			} 
+		}
+	}
+
+	if !if_found {
+		return;
+	}
+
+	brace_count := 0;
+	done := false;
+
+	for line, line_index in p.lines[if_line:] {
+
+		if len(line.format_tokens) == 0 {
+			continue;
+		}
+
+		for format_token, i in line.format_tokens {
+			
+			if format_token.kind == .Open_Brace {
+				brace_count += 1;
+			} else if format_token.kind == .Close_Brace {
+				brace_count -= 1;
+			}
+
+			if brace_count == 1 {
+				done = true;
+			}
+
+		}
+
+		if line_index != 0 {
+			line.format_tokens[0].spaces_before += largest + 1;
+		}
+
+		if done {
+			break;
+		}
 
 	}
 
-
-
 }
+
 
 format_generic :: proc(p: ^Printer) {
 
@@ -353,6 +470,14 @@ format_generic :: proc(p: ^Printer) {
 
 		if .Call in line.types {
 			format_call(p, line_index);
+		}
+
+		if .If in line.types {
+			format_if(p, line_index);
+		}
+
+		if .For in line.types {
+			format_for(p, line_index);
 		}
 	}
 }
