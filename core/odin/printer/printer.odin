@@ -123,6 +123,8 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 		p.lines = make([dynamic]Line, 0, (file.decls[len(file.decls) - 1].end.line - file.decls[0].pos.line) * 2, context.temp_allocator);
 	}
 
+	set_source_position(p, file.pkg_token.pos);
+
 	set_line(p, 0);
 
 	push_generic_token(p, .Package, 0);
@@ -514,7 +516,7 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 
 			//this will only happen if the case is one lined
 			if case_found && colon_found {
-				line.format_tokens[i].spaces_before = (largest - length);
+				line.format_tokens[i].spaces_before = (largest - length) + 1;
 				break;
 			}
 
