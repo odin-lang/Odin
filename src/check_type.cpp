@@ -2461,7 +2461,6 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	type->Proc.specialization_count = specialization_count;
 	type->Proc.diverging            = pt->diverging;
 	type->Proc.optional_ok          = optional_ok;
-	type->Proc.tags                 = pt->tags;
 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
