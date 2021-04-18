@@ -306,6 +306,10 @@ format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 
 		for format_token, i in line.format_tokens {
 			
+			if format_token.kind == .Comment {
+				continue;
+			}
+
 			if line_index == 0 && i <= paren_token_index {
 				continue;
 			}
@@ -368,6 +372,14 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 
 		for format_token, i in line.format_tokens {
 			
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			if line_index == 0 && i <= format_index {
+				continue;
+			}
+
 			if format_token.kind == .Open_Brace {
 				brace_count += 1;
 			} else if format_token.kind == .Close_Brace {
