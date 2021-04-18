@@ -131,7 +131,7 @@ struct OdinDocType {
 
 	// Used by some types
 	u32 elem_count_len;
-	u64 elem_counts[OdinDocType_ElemsCap];
+	i64 elem_counts[OdinDocType_ElemsCap];
 
 	// Each of these is esed by some types, not all
 	OdinDocArray<OdinDocTypeIndex> types;

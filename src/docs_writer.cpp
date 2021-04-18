@@ -544,7 +544,12 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.kind = OdinDocType_EnumeratedArray;
 		doc_type.elem_count_len = 1;
 		doc_type.elem_counts[0] = type->EnumeratedArray.count;
-		doc_type.types = odin_doc_type_as_slice(w, type->EnumeratedArray.elem);
+		{
+			OdinDocTypeIndex types[2] = {};
+			types[0] = odin_doc_type(w, type->EnumeratedArray.index);
+			types[1] = odin_doc_type(w, type->EnumeratedArray.elem);
+			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
+		}
 		break;
 	case Type_Slice:
 		doc_type.kind = OdinDocType_Slice;
@@ -686,8 +691,8 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			}
 			doc_type.types = odin_write_slice(w, types, type_count);
 			doc_type.elem_count_len = 2;
-			doc_type.elem_counts[0] = cast(u64)type->BitSet.lower;
-			doc_type.elem_counts[1] = cast(u64)type->BitSet.upper;
+			doc_type.elem_counts[0] = type->BitSet.lower;
+			doc_type.elem_counts[1] = type->BitSet.upper;
 		}
 		break;
 	case Type_SimdVector:
