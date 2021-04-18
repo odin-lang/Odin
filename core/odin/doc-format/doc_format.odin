@@ -157,7 +157,8 @@ Type :: struct {
 
 	// Used by some types
 	elem_count_len: u32le,
-	elem_counts:    [Type_Elems_Cap]u64,
+	// for Enumerated Ranges,
+	elem_counts:    [Type_Elems_Cap]i64le,
 
 	// Each of these is esed by some types, not all
 	types:         Array(Type_Index),
