@@ -831,13 +831,31 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		break;
 	}
 
+	OdinDocString init_string = {};
+	if (init_expr) {
+		init_string = odin_doc_expr_string(w, init_expr);
+	} else {
+		if (e->kind == Entity_Constant) {
+			if (e->Constant.flags & EntityConstantFlag_ImplicitEnumValue) {
+				init_string = {}; // Blank
+			} else if (e->Constant.param_value.original_ast_expr) {
+				init_string = odin_doc_expr_string(w, e->Constant.param_value.original_ast_expr);
+			} else {
+				init_string = odin_doc_write_string(w, make_string_c(exact_value_to_string(e->Constant.value)));
+			}
+		} else if (e->kind == Entity_Variable) {
+			if (e->Variable.param_expr) {
+				init_string = odin_doc_expr_string(w, e->Variable.param_expr);
+			}
+		}
+	}
 
 	doc_entity.kind = kind;
 	doc_entity.flags = flags;
 	doc_entity.pos = odin_doc_token_pos_cast(w, e->token.pos);
 	doc_entity.name = odin_doc_write_string(w, e->token.string);
 	doc_entity.type = 0; // Set later
-	doc_entity.init_string = odin_doc_expr_string(w, init_expr);
+	doc_entity.init_string = init_string;
 	doc_entity.comment = odin_doc_comment_group_string(w, comment);
 	doc_entity.docs = odin_doc_comment_group_string(w, docs);
 	doc_entity.foreign_library = 0; // Set later

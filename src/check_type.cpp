@@ -731,6 +731,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		Ast *field = et->fields[i];
 		Ast *ident = nullptr;
 		Ast *init = nullptr;
+		u32 entity_flags = 0;
 		if (field->kind == Ast_FieldValue) {
 			ast_node(fv, FieldValue, field);
 			if (fv->field == nullptr || fv->field->kind != Ast_Ident) {
@@ -764,6 +765,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 			}
 		} else {
 			iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
+			entity_flags |= EntityConstantFlag_ImplicitEnumValue;
 		}
 
 
@@ -800,6 +802,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
+		e->Constant.flags |= entity_flags;
 
 		if (scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
