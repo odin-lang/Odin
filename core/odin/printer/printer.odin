@@ -229,7 +229,7 @@ format_value_decl :: proc(p: ^Printer, index: int) {
 		}
 
 		if align_next {
-			line.format_tokens[0].spaces_before += largest + 1;
+			line.format_tokens[0].spaces_before = largest + 1;
 			align_next = false;
 		}
 
@@ -264,37 +264,41 @@ format_assignment :: proc(p: ^Printer, index: int) {
 	
 }
 
-format_call :: proc(p: ^Printer, index: int) {
+format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 
 	paren_found := false;
 	paren_token: Format_Token;
 	paren_line: int;
+	paren_token_index: int;
 	largest := 0;
 
-	found_paren: for line, line_index in p.lines[index:] {
-		for format_token in line.format_tokens {
+	found_paren: for line, i in p.lines[line_index:] {
+		for format_token, j in line.format_tokens {
 
 			largest += len(format_token.text) + format_token.spaces_before;
 
+			if i == 0 && j < format_index {
+				continue;
+			}
+
 			if format_token.kind == .Open_Paren && format_token.type == .Call {
 				paren_token = format_token;
-				paren_line = line_index + index;
+				paren_line = line_index + i;
 				paren_found = true;
+				paren_token_index = j;
 				break found_paren;
-			} else if format_token.kind == .Open_Paren {
-				return;
-			}
+			} 
 		}
 	}
 
 	if !paren_found {
-		return;
+		panic("Should not be possible");;
 	}
 
 	paren_count := 1;
 	done := false;
 
-	for line, line_index in p.lines[paren_line+1:] {
+	for line, line_index in p.lines[paren_line:] {
 
 		if len(line.format_tokens) == 0 {
 			continue;
@@ -302,6 +306,10 @@ format_call :: proc(p: ^Printer, index: int) {
 
 		for format_token, i in line.format_tokens {
 			
+			if line_index == 0 && i <= paren_token_index {
+				continue;
+			}
+
 			if format_token.kind == .Open_Paren {
 				paren_count += 1;
 			} else if format_token.kind == .Close_Paren {
@@ -314,44 +322,45 @@ format_call :: proc(p: ^Printer, index: int) {
 
 		}
 
-		line.format_tokens[0].spaces_before += largest;
+		if line_index != 0 {
+			line.format_tokens[0].spaces_before = largest;
+		}
 
 		if done {
 			return;
 		}
-
 	}
 }
 
-format_for :: proc(p: ^Printer, index: int) {
+format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int, keyword: tokenizer.Token_Kind) {
 
-	for_found := false;
-	for_token: Format_Token;
-	for_line: int;
+	keyword_found := false;
+	keyword_token: Format_Token;
+	keyword_line: int;
 	largest := 0;
-
-	found_for: for line, line_index in p.lines[index:] {
-		for format_token in line.format_tokens {
-
-			largest += len(format_token.text) + format_token.spaces_before;
-
-			if format_token.kind == .For {
-				for_token = format_token;
-				for_line = line_index + index;
-				for_found = true;
-				break found_for;
-			} 
-		}
-	}
-
-	if !for_found {
-		return;
-	}
 
 	brace_count := 0;
 	done := false;
 
-	for line, line_index in p.lines[for_line:] {
+	found_keyword: for line, i in p.lines[line_index:] {
+		for format_token in line.format_tokens {
+
+			largest += len(format_token.text) + format_token.spaces_before;
+
+			if format_token.kind == keyword {
+				keyword_token = format_token;
+				keyword_line = line_index + i;
+				keyword_found = true;
+				break found_keyword;
+			} 
+		}
+	}
+
+	if !keyword_found {
+		panic("Should not be possible");
+	}
+
+	for line, line_index in p.lines[keyword_line:] {
 
 		if len(line.format_tokens) == 0 {
 			continue;
@@ -372,7 +381,7 @@ format_for :: proc(p: ^Printer, index: int) {
 		}
 
 		if line_index != 0 {
-			line.format_tokens[0].spaces_before += largest + 1;
+			line.format_tokens[0].spaces_before = largest + 1;
 		}
 
 		if done {
@@ -383,73 +392,23 @@ format_for :: proc(p: ^Printer, index: int) {
 	
 }
 
-format_if :: proc(p: ^Printer, index: int) {
-
-	if_found := false;
-	if_token: Format_Token;
-	if_line: int;
-	largest := 0;
-
-	found_if: for line, line_index in p.lines[index:] {
-		for format_token in line.format_tokens {
-
-			largest += len(format_token.text) + format_token.spaces_before;
-
-			if format_token.kind == .If {
-				if_token = format_token;
-				if_line = line_index + index;
-				if_found = true;
-				break found_if;
-			} 
-		}
-	}
-
-	if !if_found {
-		return;
-	}
-
-	brace_count := 0;
-	done := false;
-
-	for line, line_index in p.lines[if_line:] {
-
-		if len(line.format_tokens) == 0 {
-			continue;
-		}
-
-		for format_token, i in line.format_tokens {
-			
-			if format_token.kind == .Open_Brace {
-				brace_count += 1;
-			} else if format_token.kind == .Close_Brace {
-				brace_count -= 1;
-			}
-
-			if brace_count == 1 {
-				done = true;
-			}
-
-		}
-
-		if line_index != 0 {
-			line.format_tokens[0].spaces_before += largest + 1;
-		}
-
-		if done {
-			break;
-		}
-
-	}
-
-}
-
-
 format_generic :: proc(p: ^Printer) {
 
 	for line, line_index in p.lines {
 
 		if len(line.format_tokens) <= 0 {
 			continue;
+		}
+
+		for format_token, token_index in line.format_tokens {
+
+			if format_token.kind == .For || format_token.kind == .If
+			|| format_token.kind == .When || format_token.kind == .Switch {
+				format_keyword_to_brace(p, line_index, token_index, format_token.kind);
+			} else if format_token.type == .Call {
+				format_call(p, line_index, token_index);
+			}
+
 		}
 
 		if .Switch_Stmt in line.types && p.config.align_switch {
@@ -468,17 +427,6 @@ format_generic :: proc(p: ^Printer) {
 			format_assignment(p, line_index);
 		}
 
-		if .Call in line.types {
-			format_call(p, line_index);
-		}
-
-		if .If in line.types {
-			format_if(p, line_index);
-		}
-
-		if .For in line.types {
-			format_for(p, line_index);
-		}
 	}
 }
 	
@@ -568,7 +516,7 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 
 			//this will only happen if the case is one lined
 			if case_found && colon_found {
-				line.format_tokens[i].spaces_before += (largest - length);
+				line.format_tokens[i].spaces_before = (largest - length);
 				break;
 			}
 
@@ -736,9 +684,9 @@ align_comments :: proc(p: ^Printer) {
 
 				if format_token.kind == .Comment {
 					if len(l.format_tokens) == 1 {
-						l.format_tokens[i].spaces_before += info.length + 1;
+						l.format_tokens[i].spaces_before = info.length + 1;
 					} else {
-						l.format_tokens[i].spaces_before += info.length - length;
+						l.format_tokens[i].spaces_before = info.length - length + 1;
 					}
 				}
 
