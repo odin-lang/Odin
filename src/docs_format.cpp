@@ -190,9 +190,16 @@ struct OdinDocEntity {
 	OdinDocArray<OdinDocString>      where_clauses; // Procedures
 };
 
+enum OdinDocPkgFlags : u32 {
+	OdinDocPkgFlag_Builtin = 1<<0,
+	OdinDocPkgFlag_Runtime = 1<<1,
+	OdinDocPkgFlag_Init    = 1<<2,
+};
+
 struct OdinDocPkg {
 	OdinDocString fullpath;
 	OdinDocString name;
+	u32           flags;
 	OdinDocString docs;
 	OdinDocArray<OdinDocFileIndex>   files;
 	OdinDocArray<OdinDocEntityIndex> entities;

@@ -509,7 +509,6 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	map_set(&w->type_cache, hash_pointer(type), type_index);
 	map_set(&w->type_id_cache, hash_integer(type_index), type);
 
-
 	switch (type->kind) {
 	case Type_Basic:
 		doc_type.kind = OdinDocType_Basic;
@@ -1008,9 +1007,28 @@ void odin_doc_write_docs(OdinDocWriter *w) {
 		gbAllocator allocator = heap_allocator();
 
 		AstPackage *pkg = pkgs[i];
+
+		u32 pkg_flags = 0;
+		switch (pkg->kind) {
+		case Package_Normal:
+			break;
+		case Package_Runtime:
+			pkg_flags |= OdinDocPkgFlag_Runtime;
+			break;
+		case Package_Init:
+			pkg_flags |= OdinDocPkgFlag_Init;
+			break;
+		}
+		if (pkg->name == "builtin") {
+			pkg_flags |= OdinDocPkgFlag_Builtin;
+		} else if (pkg->name == "intrinsics") {
+			pkg_flags |= OdinDocPkgFlag_Builtin;
+		}
+
 		OdinDocPkg doc_pkg = {};
 		doc_pkg.fullpath = odin_doc_write_string(w, pkg->fullpath);
 		doc_pkg.name     = odin_doc_write_string(w, pkg->name);
+		doc_pkg.flags    = pkg_flags;
 		doc_pkg.docs     = odin_doc_pkg_doc_string(w, pkg);
 
 		OdinDocPkg *dst = nullptr;
