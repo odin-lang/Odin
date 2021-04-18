@@ -211,7 +211,7 @@ format_value_decl :: proc(p: ^Printer, index: int) {
 				eq_line = line_index + index;
 				eq_found = true;
 				break found_eq;
-			} 
+			}
 		}
 	}
 
@@ -233,7 +233,7 @@ format_value_decl :: proc(p: ^Printer, index: int) {
 			align_next = false;
 		}
 
-		kind := find_last_token(line.format_tokens).kind; 
+		kind := find_last_token(line.format_tokens).kind;
 
 		if tokenizer.Token_Kind.B_Operator_Begin < kind && kind <= tokenizer.Token_Kind.Cmp_Or {
 			align_next = true;
@@ -242,26 +242,22 @@ format_value_decl :: proc(p: ^Printer, index: int) {
 		if !align_next {
 			break;
 		}
-
 	}
-
 }
 
 find_last_token :: proc(format_tokens: [dynamic]Format_Token) -> Format_Token {
 
-	for i := len(format_tokens)-1; i >= 0; i -= 1 {
+	for i := len(format_tokens) - 1; i >= 0; i -= 1 {
 
 		if format_tokens[i].kind != .Comment {
 			return format_tokens[i];
 		}
-
 	}
 
 	panic("not possible");
 }
 
 format_assignment :: proc(p: ^Printer, index: int) {
-	
 }
 
 format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
@@ -287,12 +283,12 @@ format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 				paren_found = true;
 				paren_token_index = j;
 				break found_paren;
-			} 
+			}
 		}
 	}
 
 	if !paren_found {
-		panic("Should not be possible");;
+		panic("Should not be possible");
 	}
 
 	paren_count := 1;
@@ -305,7 +301,7 @@ format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 		}
 
 		for format_token, i in line.format_tokens {
-			
+
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -323,7 +319,6 @@ format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 			if paren_count == 0 {
 				done = true;
 			}
-
 		}
 
 		if line_index != 0 {
@@ -356,7 +351,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 				keyword_line = line_index + i;
 				keyword_found = true;
 				break found_keyword;
-			} 
+			}
 		}
 	}
 
@@ -371,7 +366,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 		}
 
 		for format_token, i in line.format_tokens {
-			
+
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -389,7 +384,6 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 			if brace_count == 1 {
 				done = true;
 			}
-
 		}
 
 		if line_index != 0 {
@@ -399,9 +393,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 		if done {
 			return;
 		}
-
 	}
-	
 }
 
 format_generic :: proc(p: ^Printer) {
@@ -414,13 +406,12 @@ format_generic :: proc(p: ^Printer) {
 
 		for format_token, token_index in line.format_tokens {
 
-			if format_token.kind == .For || format_token.kind == .If
-			|| format_token.kind == .When || format_token.kind == .Switch {
+			if format_token.kind == .For || format_token.kind == .If ||
+			   format_token.kind == .When || format_token.kind == .Switch {
 				format_keyword_to_brace(p, line_index, token_index, format_token.kind);
 			} else if format_token.type == .Call {
 				format_call(p, line_index, token_index);
 			}
-
 		}
 
 		if .Switch_Stmt in line.types && p.config.align_switch {
@@ -438,15 +429,10 @@ format_generic :: proc(p: ^Printer) {
 		if .Assign in line.types {
 			format_assignment(p, line_index);
 		}
-
 	}
 }
-	
+
 align_var_decls_and_assignments :: proc(p: ^Printer) {
-
-
-
-
 }
 
 align_switch_stmt :: proc(p: ^Printer, index: int) {
@@ -650,7 +636,7 @@ align_comments :: proc(p: ^Printer) {
 		if .Line_Comment in line.types {
 
 			if current_info.end + 1 != line_index || current_info.depth != line.depth ||
-			(current_info.begin == current_info.end && current_info.length == 0) {
+			   (current_info.begin == current_info.end && current_info.length == 0) {
 
 				if (current_info.begin != 0 && current_info.end != 0) || current_info.length > 0 {
 					append(&comment_infos, current_info);

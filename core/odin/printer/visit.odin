@@ -195,8 +195,8 @@ append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_
 	format_token := format_token;
 
 	if p.last_token != nil && (p.last_token.kind == .Ellipsis || p.last_token.kind == .Range_Half ||
-	p.last_token.kind == .Open_Paren || p.last_token.kind == .Period ||
-	p.last_token.kind == .Open_Brace || p.last_token.kind == .Open_Bracket) {
+	   p.last_token.kind == .Open_Paren || p.last_token.kind == .Period ||
+	   p.last_token.kind == .Open_Brace || p.last_token.kind == .Open_Bracket) {
 		format_token.spaces_before = 0;
 	} else if p.merge_next_token {
 		format_token.spaces_before = 0;
@@ -1101,10 +1101,10 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		visit_expr(p, v.expr);
 
 		push_format_token(p, Format_Token {
-			kind = .Open_Paren,
-			type = .Call,
-			text = "(",
-		});
+			                  kind = .Open_Paren,
+			                  type = .Call,
+			                  text = "(",
+		                  });
 
 		hint_current_line(p, {.Call});
 
