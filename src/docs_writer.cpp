@@ -521,6 +521,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	case Type_Named:
 		doc_type.kind = OdinDocType_Named;
 		doc_type.name = odin_doc_write_string(w, type->Named.name);
+		doc_type.types = odin_doc_type_as_slice(w, base_type(type));
 		doc_type.entities = odin_doc_add_entity_as_slice(w, type->Named.type_name);
 		break;
 	case Type_Generic:
