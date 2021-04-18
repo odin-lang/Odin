@@ -3,8 +3,8 @@ package odin_doc_format
 import "core:mem"
 
 Array :: struct($T: typeid) {
-	offset: u32,
-	length: u32,
+	offset: u32le,
+	length: u32le,
 }
 
 String :: distinct Array(byte);
@@ -28,11 +28,11 @@ Magic_String :: "odindoc\x00";
 
 Header_Base :: struct {
 	magic: [8]byte,
-	_: u32,
+	_: u32le,
 	version:     Version_Type,
-	total_size:  u32,
-	header_size: u32,
-	hash:        u32,
+	total_size:  u32le,
+	header_size: u32le,
+	hash:        u32le,
 }
 
 Header :: struct {
@@ -45,17 +45,17 @@ Header :: struct {
 	types:    Array(Type),
 }
 
-File_Index   :: distinct u32;
-Pkg_Index    :: distinct u32;
-Entity_Index :: distinct u32;
-Type_Index   :: distinct u32;
+File_Index   :: distinct u32le;
+Pkg_Index    :: distinct u32le;
+Entity_Index :: distinct u32le;
+Type_Index   :: distinct u32le;
 
 
 Position :: struct {
 	file:   File_Index,
-	line:   u32,
-	column: u32,
-	offset: u32,
+	line:   u32le,
+	column: u32le,
+	offset: u32le,
 };
 
 File :: struct {
@@ -71,7 +71,7 @@ Pkg :: struct {
 	entities: Array(Entity_Index),
 }
 
-Entity_Kind :: enum u32 {
+Entity_Kind :: enum u32le {
 	Invalid      = 0,
 	Constant     = 1,
 	Variable     = 2,
@@ -82,7 +82,7 @@ Entity_Kind :: enum u32 {
 	Library_Name = 7,
 }
 
-Entity_Flag :: enum u32 {
+Entity_Flag :: enum u32le {
 	Foreign = 0,
 	Export  = 1,
 
@@ -98,7 +98,7 @@ Entity_Flag :: enum u32 {
 	Var_Thread_Local = 9,
 }
 
-Entity_Flags :: distinct bit_set[Entity_Flag; u32];
+Entity_Flags :: distinct bit_set[Entity_Flag; u32le];
 
 Entity :: struct {
 	kind:             Entity_Kind,
@@ -107,7 +107,7 @@ Entity :: struct {
 	name:             String,
 	type:             Type_Index,
 	init_string:      String,
-	_:                u32,
+	_:                u32le,
 	comment:          String,
 	docs:             String,
 	foreign_library:  Entity_Index,
@@ -122,7 +122,7 @@ Attribute :: struct {
 	value: String,
 }
 
-Type_Kind :: enum u32 {
+Type_Kind :: enum u32le {
 	Invalid            = 0,
 	Basic              = 1,
 	Named              = 2,
@@ -151,12 +151,12 @@ Type_Elems_Cap :: 4;
 
 Type :: struct {
 	kind:         Type_Kind,
-	flags:        u32, // Type_Kind specific
+	flags:        u32le, // Type_Kind specific
 	name:         String,
 	custom_align: String,
 
 	// Used by some types
-	elem_count_len: u32,
+	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]u64,
 
 	// Each of these is esed by some types, not all
@@ -166,27 +166,27 @@ Type :: struct {
 	where_clauses: Array(String), // Struct, Union
 }
 
-Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32];
-Type_Flag_Basic :: enum u32 {
+Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le];
+Type_Flag_Basic :: enum u32le {
 	Untyped = 1,
 }
 
-Type_Flags_Struct :: distinct bit_set[Type_Flag_Struct; u32];
-Type_Flag_Struct :: enum u32 {
+Type_Flags_Struct :: distinct bit_set[Type_Flag_Struct; u32le];
+Type_Flag_Struct :: enum u32le {
 	Polymorphic = 0,
 	Packed      = 1,
 	Raw_Union   = 2,
 }
 
-Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32];
-Type_Flag_Union :: enum u32 {
+Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32le];
+Type_Flag_Union :: enum u32le {
 	Polymorphic = 0,
 	No_Nil      = 1,
 	Maybe       = 2,
 }
 
-Type_Flags_Proc :: distinct bit_set[Type_Flag_Proc; u32];
-Type_Flag_Proc :: enum u32 {
+Type_Flags_Proc :: distinct bit_set[Type_Flag_Proc; u32le];
+Type_Flag_Proc :: enum u32le {
 	Polymorphic = 0,
 	Diverging   = 1,
 	Optional_Ok = 2,
@@ -194,16 +194,16 @@ Type_Flag_Proc :: enum u32 {
 	C_Vararg    = 4,
 }
 
-Type_Flags_BitSet :: distinct bit_set[Type_Flag_BitSet; u32];
-Type_Flag_BitSet :: enum u32 {
+Type_Flags_BitSet :: distinct bit_set[Type_Flag_BitSet; u32le];
+Type_Flag_BitSet :: enum u32le {
 	Range            = 1,
 	Op_Lt            = 2,
 	Op_Lt_Eq         = 3,
 	Underlying_Type  = 4,
 }
 
-Type_Flags_SimdVector :: distinct bit_set[Type_Flag_SimdVector; u32];
-Type_Flag_SimdVector :: enum u32 {
+Type_Flags_SimdVector :: distinct bit_set[Type_Flag_SimdVector; u32le];
+Type_Flag_SimdVector :: enum u32le {
 	x86_mmx = 1,
 }
 
