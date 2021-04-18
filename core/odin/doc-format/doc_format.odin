@@ -63,9 +63,18 @@ File :: struct {
 	name: String,
 }
 
+Pkg_Flag :: enum u32le {
+	Builtin = 0,
+	Runtime = 1,
+	Init    = 2,
+}
+
+Pkg_Flags :: distinct bit_set[Pkg_Flag; u32le];
+
 Pkg :: struct {
 	fullpath: String,
 	name:     String,
+	flags:    Pkg_Flags,
 	docs:     String,
 	files:    Array(File_Index),
 	entities: Array(Entity_Index),
@@ -195,8 +204,8 @@ Type_Flag_Proc :: enum u32le {
 	C_Vararg    = 4,
 }
 
-Type_Flags_BitSet :: distinct bit_set[Type_Flag_BitSet; u32le];
-Type_Flag_BitSet :: enum u32le {
+Type_Flags_Bit_Set :: distinct bit_set[Type_Flag_Bit_Set; u32le];
+Type_Flag_Bit_Set :: enum u32le {
 	Range            = 1,
 	Op_Lt            = 2,
 	Op_Lt_Eq         = 3,
