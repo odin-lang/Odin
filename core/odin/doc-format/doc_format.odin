@@ -160,10 +160,11 @@ Type :: struct {
 	elem_counts:    [Type_Elems_Cap]i64le,
 
 	// Each of these is esed by some types, not all
-	types:         Array(Type_Index),
-	entities:      Array(Entity_Index),
+	calling_convention: String, // Procedures
+	types:              Array(Type_Index),
+	entities:           Array(Entity_Index),
 	polymorphic_params: Type_Index, // Struct, Union
-	where_clauses: Array(String), // Struct, Union
+	where_clauses:      Array(String), // Struct, Union
 }
 
 Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le];
