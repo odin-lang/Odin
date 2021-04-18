@@ -93,7 +93,9 @@ struct ParameterValue {
 	};
 };
 
-
+enum EntityConstantFlags : u32 {
+	EntityConstantFlag_ImplicitEnumValue = 1<<0,
+};
 
 // An Entity is a named "thing" in the language
 struct Entity {
@@ -126,6 +128,7 @@ struct Entity {
 		struct {
 			ExactValue value;
 			ParameterValue param_value;
+			u32 flags;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
