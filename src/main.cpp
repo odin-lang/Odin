@@ -607,6 +607,7 @@ enum BuildFlagKind {
 
 	BuildFlag_Short,
 	BuildFlag_AllPackages,
+	BuildFlag_DocFormat,
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
@@ -721,6 +722,7 @@ bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_DocFormat,     str_lit("doc-format"),   BuildFlagParam_None, Command_doc);
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
@@ -1226,6 +1228,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
+							break;
+						case BuildFlag_DocFormat:
+							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
 							break;
 						case BuildFlag_IgnoreWarnings:
 							if (build_context.warnings_as_errors) {

@@ -34,9 +34,17 @@ GB_COMPARE_PROC(cmp_entities_for_printing) {
 	Entity *x = *cast(Entity **)a;
 	Entity *y = *cast(Entity **)b;
 	int res = 0;
-	res = string_compare(x->pkg->name, y->pkg->name);
-	if (res != 0) {
-		return res;
+	if (x->pkg != y->pkg) {
+		if (x->pkg == nullptr) {
+			return -1;
+		}
+		if (y->pkg == nullptr) {
+			return +1;
+		}
+		res = string_compare(x->pkg->name, y->pkg->name);
+		if (res != 0) {
+			return res;
+		}
 	}
 	int ox = print_entity_kind_ordering[x->kind];
 	int oy = print_entity_kind_ordering[y->kind];
@@ -55,6 +63,9 @@ GB_COMPARE_PROC(cmp_ast_package_by_name) {
 	AstPackage *y = *cast(AstPackage **)b;
 	return string_compare(x->name, y->name);
 }
+
+#include "docs_format.cpp"
+#include "docs_writer.cpp"
 
 void print_doc_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
@@ -297,23 +308,59 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
-	auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
-	for_array(i, info->packages.entries) {
-		AstPackage *pkg = info->packages.entries[i].value;
-		if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
-			array_add(&pkgs, pkg);
+	if (build_context.cmd_doc_flags & CmdDocFlag_DocFormat) {
+		String init_fullpath = c->parser->init_fullpath;
+		String output_name = {};
+		String output_base = {};
+
+		if (build_context.out_filepath.len == 0) {
+			output_name = remove_directory_from_path(init_fullpath);
+			output_name = remove_extension_from_path(output_name);
+			output_name = string_trim_whitespace(output_name);
+			if (output_name.len == 0) {
+				output_name = info->init_scope->pkg->name;
+			}
+			output_base = output_name;
 		} else {
-			if (pkg->kind == Package_Init) {
-				array_add(&pkgs, pkg);
-			} else if (pkg->is_extra) {
-				array_add(&pkgs, pkg);
+			output_name = build_context.out_filepath;
+			output_name = string_trim_whitespace(output_name);
+			if (output_name.len == 0) {
+				output_name = info->init_scope->pkg->name;
+			}
+			isize pos = string_extension_position(output_name);
+			if (pos < 0) {
+				output_base = output_name;
+			} else {
+				output_base = substring(output_name, 0, pos);
 			}
 		}
-	}
 
-	gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+		output_base = path_to_full_path(permanent_allocator(), output_base);
 
-	for_array(i, pkgs) {
-		print_doc_package(info, pkgs[i]);
+		gbString output_file_path = gb_string_make_length(heap_allocator(), output_base.text, output_base.len);
+		output_file_path = gb_string_appendc(output_file_path, ".odin-doc");
+		defer (gb_string_free(output_file_path));
+
+		odin_doc_write(info, output_file_path);
+	} else {
+		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
+		for_array(i, info->packages.entries) {
+			AstPackage *pkg = info->packages.entries[i].value;
+			if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
+				array_add(&pkgs, pkg);
+			} else {
+				if (pkg->kind == Package_Init) {
+					array_add(&pkgs, pkg);
+				} else if (pkg->is_extra) {
+					array_add(&pkgs, pkg);
+				}
+			}
+		}
+
+		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+
+		for_array(i, pkgs) {
+			print_doc_package(info, pkgs[i]);
+		}
 	}
 }

@@ -2523,7 +2523,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	p->type           = entity->type;
 	p->type_expr      = decl->type_expr;
 	p->body           = pl->body;
-	p->tags           = pt->Proc.tags;
 	p->inlining       = ProcInlining_none;
 	p->is_foreign     = entity->Procedure.is_foreign;
 	p->is_export      = entity->Procedure.is_export;
