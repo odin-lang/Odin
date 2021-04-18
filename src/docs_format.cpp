@@ -134,6 +134,7 @@ struct OdinDocType {
 	i64 elem_counts[OdinDocType_ElemsCap];
 
 	// Each of these is esed by some types, not all
+	OdinDocString calling_convention;
 	OdinDocArray<OdinDocTypeIndex> types;
 	OdinDocArray<OdinDocEntityIndex> entities;
 	OdinDocTypeIndex polmorphic_params;
