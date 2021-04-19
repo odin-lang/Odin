@@ -694,6 +694,13 @@ bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
 	return check_is_assignable_to_with_score(c, operand, type, &score);
 }
 
+void add_optional_ok_for_procedure(Type *type, Operand *operand) {
+	type = base_type(type);
+	if (type->kind == Type_Proc && type->Proc.optional_ok) {
+		operand->mode = Addressing_OptionalOk;
+	}
+}
+
 
 // NOTE(bill): 'content_name' is for debugging and error messages
 void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
@@ -750,6 +757,7 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 				Entity *e = procs[i];
 				add_entity_use(c, operand->expr, e);
 				good = true;
+				add_optional_ok_for_procedure(e->type, operand);
 				break;
 			}
 		}
@@ -771,6 +779,8 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 			      LIT(context_name));
 			operand->mode = Addressing_Invalid;
 		}
+
+
 		return;
 	}
 
@@ -2794,8 +2804,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 
 void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
+	GB_ASSERT(e != nullptr);
 	ExprInfo *found = check_get_expr_info(&c->checker->info, e);
 	if (found == nullptr) {
+		if (type != nullptr && type != t_invalid) {
+			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
+				add_type_and_value(&c->checker->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+			}
+		}
 		return;
 	}
 	ExprInfo old = *found;
@@ -6490,7 +6506,7 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			if (o.mode == Addressing_OptionalOk  && is_type_tuple(o.type) && lhs.count == 1) {
+			if (o.mode == Addressing_OptionalOk && is_type_tuple(o.type) && lhs.count == 1) {
 				GB_ASSERT(tuple->variables.count == 2);
 				Ast *expr = unparen_expr(o.expr);
 				if (expr->kind == Ast_CallExpr) {
@@ -7330,7 +7346,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
 			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
 
-
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, e->type, e, operands, CallArgumentMode_ShowErrors, &data);
 			if (err != CallArgumentError_None) {
@@ -7338,7 +7353,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
-
+			if (entity_to_use != nullptr) {
+				update_expr_type(c, operand->expr, entity_to_use->type, true);
+			}
 			return data;
 		}
 
@@ -7610,6 +7627,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
+			if (entity_to_use != nullptr) {
+				update_expr_type(c, operand->expr, entity_to_use->type, true);
+			}
 
 			if (data.gen_entity != nullptr) {
 				Entity *e = data.gen_entity;
@@ -7625,7 +7645,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 				decl->where_clauses_evaluated = true;
 			}
-
 			return data;
 		}
 	} else {
@@ -7641,6 +7660,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
+		if (entity_to_use != nullptr) {
+			update_expr_type(c, operand->expr, entity_to_use->type, true);
+		}
 
 		if (data.gen_entity != nullptr) {
 			Entity *e = data.gen_entity;
@@ -7656,9 +7678,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 			decl->where_clauses_evaluated = true;
 		}
-
 		return data;
 	}
+
 
 	CallArgumentData data = {};
 	data.result_type = t_invalid;
@@ -8144,6 +8166,14 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	}
 
 	Type *pt = base_type(proc_type);
+	if (pt == t_invalid) {
+		if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
+			pt = type_of_expr(operand->expr->CallExpr.proc);
+		}
+		if (pt == t_invalid && data.gen_entity) {
+			pt = data.gen_entity->type;
+		}
+	}
 
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
@@ -8172,7 +8202,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	}
 
 	switch (inlining) {
-	case ProcInlining_inline: {
+	case ProcInlining_inline:
 		if (proc != nullptr) {
 			Entity *e = entity_from_expr(proc);
 			if (e != nullptr && e->kind == Entity_Procedure) {
@@ -8186,16 +8216,24 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 			}
 		}
 		break;
-	}
-
 	case ProcInlining_no_inline:
 		break;
 	}
 
 	operand->expr = call;
 
-	if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
-		operand->mode = Addressing_OptionalOk;
+	{
+		if (proc_type == t_invalid) {
+			// gb_printf_err("%s\n", expr_to_string(operand->expr));
+		}
+		Type *type = nullptr;
+		if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
+			type = type_of_expr(operand->expr->CallExpr.proc);
+		}
+		if (type == nullptr) {
+			type = pt;
+		}
+		add_optional_ok_for_procedure(type, operand);
 	}
 
 	// add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
