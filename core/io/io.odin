@@ -23,6 +23,9 @@ Error :: enum i32 {
 	// Short_Write means that a write accepted fewer bytes than requested but failed to return an explicit error
 	Short_Write,
 
+	// Invalid_Write means that a write returned an impossible count
+	Invalid_Write,
+
 	// Short_Buffer means that a read required a longer buffer than was provided
 	Short_Buffer,
 
@@ -39,6 +42,9 @@ Error :: enum i32 {
 	Negative_Write,
 	Negative_Count,
 	Buffer_Full,
+
+	// Unknown means that an error has occurred but cannot be categorized
+	Unknown,
 
 	// Empty is returned when a procedure has not been implemented for an io.Stream
 	Empty = -1,
@@ -212,17 +218,17 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64) -> (n: int, err: Error) {
 		return 0, .Empty;
 	}
 
-	current_offset: i64;
-	current_offset, err = r->impl_seek(offset, .Current);
+	curr_offset: i64;
+	curr_offset, err = r->impl_seek(offset, .Current);
 	if err != nil {
 		return 0, err;
 	}
 
 	n, err = r->impl_read(p);
-	if err != nil {
-		return;
+	_, err1 := r->impl_seek(curr_offset, .Start);
+	if err1 != nil && err == nil {
+		err = err1;
 	}
-	_, err = r->impl_seek(current_offset, .Start);
 	return;
 
 }
@@ -238,14 +244,18 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64) -> (n: int, err: Error) {
 		return 0, .Empty;
 	}
 
-	current_offset: i64;
-	current_offset, err = w->impl_seek(offset, .Current);
+	curr_offset: i64;
+	curr_offset, err = w->impl_seek(offset, .Current);
 	if err != nil {
 		return 0, err;
 	}
-	defer w->impl_seek(current_offset, .Start);
 
-	return w->impl_write(p);
+	n, err = w->impl_write(p);
+	_, err1 := w->impl_seek(curr_offset, .Start);
+	if err1 != nil && err == nil {
+		err = err1;
+	}
+	return;
 }
 
 write_to :: proc(r: Writer_To, w: Writer) -> (n: i64, err: Error) {

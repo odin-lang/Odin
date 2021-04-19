@@ -2562,6 +2562,18 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "cold") {
+		if (value == nullptr) {
+			ac->set_cold = true;
+		} else {
+			ExactValue ev = check_decl_attribute_value(c, value);
+			if (ev.kind == ExactValue_Bool) {
+				ac->set_cold = ev.value_bool;
+			} else {
+				error(elem, "Expected a boolean value for '%.*s' or no value whatsoever", LIT(name));
+			}
+		}
+		return true;
 	}
 	return false;
 }

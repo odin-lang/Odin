@@ -3515,7 +3515,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 				if (entity->kind == Entity_Builtin) {
 					// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
 					// This means that we should just ignore the found result through it
-					allow_builtin = entity->scope == import_scope;
+					allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
 				} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
 					is_declared = false;
 				}
@@ -8175,24 +8175,24 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	}
 
 	switch (inlining) {
-		case ProcInlining_inline: {
-			if (proc != nullptr) {
-				Entity *e = entity_from_expr(proc);
-				if (e != nullptr && e->kind == Entity_Procedure) {
-					DeclInfo *decl = e->decl_info;
-					if (decl->proc_lit) {
-						ast_node(pl, ProcLit, decl->proc_lit);
-						if (pl->inlining == ProcInlining_no_inline) {
-							error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
-						}
+	case ProcInlining_inline: {
+		if (proc != nullptr) {
+			Entity *e = entity_from_expr(proc);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				DeclInfo *decl = e->decl_info;
+				if (decl->proc_lit) {
+					ast_node(pl, ProcLit, decl->proc_lit);
+					if (pl->inlining == ProcInlining_no_inline) {
+						error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
 					}
 				}
 			}
-			break;
 		}
+		break;
+	}
 
-		case ProcInlining_no_inline:
-			break;
+	case ProcInlining_no_inline:
+		break;
 	}
 
 	operand->expr = call;
@@ -11019,10 +11019,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 	case_ast_node(ce, CallExpr, node);
 		switch (ce->inlining) {
 		case ProcInlining_inline:
-			str = gb_string_appendc(str, "inline ");
+			str = gb_string_appendc(str, "#force_inline ");
 			break;
 		case ProcInlining_no_inline:
-			str = gb_string_appendc(str, "no_inline ");
+			str = gb_string_appendc(str, "#force_no_inline ");
 			break;
 		}
 

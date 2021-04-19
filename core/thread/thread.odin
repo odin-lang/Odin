@@ -1,7 +1,6 @@
 package thread
 
 import "core:runtime"
-import "core:sync"
 import "core:mem"
 import "intrinsics"
 
@@ -26,6 +25,46 @@ Thread :: struct {
 
 #assert(size_of(Thread{}.user_index) == size_of(uintptr));
 
+Thread_Priority :: enum {
+	Normal,
+	Low,
+	High,
+}
+
+create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+	return _create(procedure, priority);
+}
+destroy :: proc(thread: ^Thread) {
+	_destroy(thread);
+}
+
+start :: proc(thread: ^Thread) {
+	_start(thread);
+}
+
+is_done :: proc(thread: ^Thread) -> bool {
+	return _is_done(thread);
+}
+
+
+join :: proc(thread: ^Thread) {
+	_join(thread);
+}
+
+
+join_mulitple :: proc(threads: ..^Thread) {
+	_join_multiple(..threads);
+}
+
+terminate :: proc(thread: ^Thread, exit_code: int) {
+	_terminate(thread, exit_code);
+}
+
+yield :: proc() {
+	_yield();
+}
+
+
 
 run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
 	thread_proc :: proc(t: ^Thread) {
@@ -38,7 +77,6 @@ run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := 
 	t.init_context = init_context;
 	start(t);
 }
-
 
 run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
 	thread_proc :: proc(t: ^Thread) {
@@ -151,32 +189,4 @@ create_and_start :: proc(fn: Thread_Proc, init_context: Maybe(runtime.Context) =
 	t.init_context = init_context;
 	start(t);
 	return t;
-}
-
-
-Once :: struct {
-	m:    sync.Blocking_Mutex,
-	done: bool,
-}
-once_init :: proc(o: ^Once) {
-	sync.blocking_mutex_init(&o.m);
-	intrinsics.atomic_store_rel(&o.done, false);
-}
-once_destroy :: proc(o: ^Once) {
-	sync.blocking_mutex_destroy(&o.m);
-}
-
-once_do :: proc(o: ^Once, fn: proc()) {
-	if intrinsics.atomic_load(&o.done) == false {
-		_once_do_slow(o, fn);
-	}
-}
-
-_once_do_slow :: proc(o: ^Once, fn: proc()) {
-	sync.blocking_mutex_lock(&o.m);
-	defer sync.blocking_mutex_unlock(&o.m);
-	if !o.done {
-		fn();
-		intrinsics.atomic_store_rel(&o.done, true);
-	}
 }
