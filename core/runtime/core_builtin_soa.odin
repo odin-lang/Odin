@@ -226,13 +226,14 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 
 	old_data := (^rawptr)(array)^;
 
-	new_data := array.allocator.procedure(
+	new_bytes, err := array.allocator.procedure(
 		array.allocator.data, .Alloc, new_size, max_align,
-		nil, old_size, 0, loc,
+		nil, old_size, loc,
 	);
-	if new_data == nil {
+	if new_bytes == nil || err != nil {
 		return false;
 	}
+	new_data := raw_data(new_bytes);
 
 
 	footer.cap = capacity;
@@ -256,9 +257,9 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		new_offset += type.size * capacity;
 	}
 
-	array.allocator.procedure(
+	_, err = array.allocator.procedure(
 		array.allocator.data, .Free, 0, max_align,
-		old_data, old_size, 0, loc,
+		old_data, old_size, loc,
 	);
 
 	return true;

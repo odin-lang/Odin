@@ -5,8 +5,8 @@ import "core:runtime"
 
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                            size, alignment: int,
-                           old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
-	return nil;
+                           old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	return nil, nil;
 }
 
 nil_allocator :: proc() -> Allocator {
@@ -47,7 +47,7 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
+                             old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, Allocator_Error)  {
 	arena := cast(^Arena)allocator_data;
 
 	switch mode {
@@ -55,7 +55,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		total_size := size + alignment;
 
 		if arena.offset + total_size > len(arena.data) {
-			return nil;
+			return nil, .Out_Of_Memory;
 		}
 
 		#no_bounds_check end := &arena.data[arena.offset];
@@ -63,7 +63,8 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		ptr := align_forward(end, uintptr(alignment));
 		arena.offset += total_size;
 		arena.peak_used = max(arena.peak_used, arena.offset);
-		return zero(ptr, size);
+		zero(ptr, size);
+		return byte_slice(ptr, size), nil;
 
 	case .Free:
 		// NOTE(bill): Free all at once
@@ -73,20 +74,20 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		arena.offset = 0;
 
 	case .Resize:
-		return default_resize_align(old_memory, old_size, size, alignment, arena_allocator(arena));
+		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena));
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free_All, .Resize, .Query_Features};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		return nil;
+		return nil, nil;
 	}
 
-	return nil;
+	return nil, nil;
 }
 
 begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
@@ -109,9 +110,9 @@ end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 Scratch_Allocator :: struct {
 	data:               []byte,
 	curr_offset:        int,
-	prev_allocation:   rawptr,
+	prev_allocation:    rawptr,
 	backup_allocator:   Allocator,
-	leaked_allocations: [dynamic]rawptr,
+	leaked_allocations: [dynamic][]byte,
 }
 
 scratch_allocator_init :: proc(s: ^Scratch_Allocator, size: int, backup_allocator := context.allocator) {
@@ -127,7 +128,7 @@ scratch_allocator_destroy :: proc(s: ^Scratch_Allocator) {
 		return;
 	}
 	for ptr in s.leaked_allocations {
-		free(ptr, s.backup_allocator);
+		free_bytes(ptr, s.backup_allocator);
 	}
 	delete(s.leaked_allocations);
 	delete(s.data, s.backup_allocator);
@@ -136,7 +137,7 @@ scratch_allocator_destroy :: proc(s: ^Scratch_Allocator) {
 
 scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+                               old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 
 	s := (^Scratch_Allocator)(allocator_data);
 
@@ -165,7 +166,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			s.prev_allocation = rawptr(ptr);
 			offset := int(ptr - start);
 			s.curr_offset = offset + size;
-			return rawptr(ptr);
+			return byte_slice(rawptr(ptr), size), nil;
 
 		case size <= len(s.data):
 			start := uintptr(raw_data(s.data));
@@ -175,7 +176,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			s.prev_allocation = rawptr(ptr);
 			offset := int(ptr - start);
 			s.curr_offset = offset + size;
-			return rawptr(ptr);
+			return byte_slice(rawptr(ptr), size), nil;
 		}
 		a := s.backup_allocator;
 		if a.procedure == nil {
@@ -183,9 +184,12 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			s.backup_allocator = a;
 		}
 
-		ptr := alloc(size, alignment, a, loc);
+		ptr, err := alloc_bytes(size, alignment, a, loc);
+		if err != nil {
+			return ptr, err;
+		}
 		if s.leaked_allocations == nil {
-			s.leaked_allocations = make([dynamic]rawptr, a);
+			s.leaked_allocations = make([dynamic][]byte, a);
 		}
 		append(&s.leaked_allocations, ptr);
 
@@ -195,7 +199,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			}
 		}
 
-		return ptr;
+		return ptr, err;
 
 	case .Free:
 		start := uintptr(raw_data(s.data));
@@ -205,30 +209,32 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		if s.prev_allocation == old_memory {
 			s.curr_offset = int(uintptr(s.prev_allocation) - start);
 			s.prev_allocation = nil;
-			return nil;
+			return nil, nil;
 		}
 
 		if start <= old_ptr && old_ptr < end {
 			// NOTE(bill): Cannot free this pointer but it is valid
-			return nil;
+			return nil, nil;
 		}
 
 		if len(s.leaked_allocations) != 0 {
-			for ptr, i in s.leaked_allocations {
+			for data, i in s.leaked_allocations {
+				ptr := raw_data(data);
 				if ptr == old_memory {
-					free(ptr, s.backup_allocator);
+					free_bytes(data, s.backup_allocator);
 					ordered_remove(&s.leaked_allocations, i);
-					return nil;
+					return nil, nil;
 				}
 			}
 		}
-		panic("invalid pointer passed to default_temp_allocator");
+		return nil, .Invalid_Pointer;
+		// panic("invalid pointer passed to default_temp_allocator");
 
 	case .Free_All:
 		s.curr_offset = 0;
 		s.prev_allocation = nil;
 		for ptr in s.leaked_allocations {
-			free(ptr, s.backup_allocator);
+			free_bytes(ptr, s.backup_allocator);
 		}
 		clear(&s.leaked_allocations);
 
@@ -238,26 +244,28 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		old_ptr := uintptr(old_memory);
 		if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
 			s.curr_offset = int(old_ptr-begin)+size;
-			return old_memory;
+			return byte_slice(old_memory, size), nil;
 		}
-		ptr := scratch_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, flags, loc);
-		copy(ptr, old_memory, old_size);
-		scratch_allocator_proc(allocator_data, .Free, 0, alignment, old_memory, old_size, flags, loc);
-		return ptr;
+		data, err := scratch_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, loc);
+		if err != nil {
+			return data, err;
+		}
+		runtime.copy(data, byte_slice(old_memory, old_size));
+		_, err = scratch_allocator_proc(allocator_data, .Free, 0, alignment, old_memory, old_size, loc);
+		return data, err;
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		return nil;
+		return nil, nil;
 	}
 
-
-	return nil;
+	return nil, nil;
 }
 
 scratch_allocator :: proc(allocator: ^Scratch_Allocator) -> Allocator {
@@ -301,18 +309,18 @@ stack_allocator :: proc(stack: ^Stack) -> Allocator {
 
 stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
+                             old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, Allocator_Error) {
 	s := cast(^Stack)allocator_data;
 
 	if s.data == nil {
-		return nil;
+		return nil, .Out_Of_Memory;
 	}
 
-	raw_alloc :: proc(s: ^Stack, size, alignment: int) -> rawptr {
+	raw_alloc :: proc(s: ^Stack, size, alignment: int) -> ([]byte, Allocator_Error) {
 		curr_addr := uintptr(raw_data(s.data)) + uintptr(s.curr_offset);
 		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Stack_Allocation_Header));
 		if s.curr_offset + padding + size > len(s.data) {
-			return nil;
+			return nil, .Out_Of_Memory;
 		}
 		s.prev_offset = s.curr_offset;
 		s.curr_offset += padding;
@@ -326,7 +334,8 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		s.peak_used = max(s.peak_used, s.curr_offset);
 
-		return zero(rawptr(next_addr), size);
+		zero(rawptr(next_addr), size);
+		return byte_slice(rawptr(next_addr), size), nil;
 	}
 
 	switch mode {
@@ -334,7 +343,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return raw_alloc(s, size, alignment);
 	case .Free:
 		if old_memory == nil {
-			return nil;
+			return nil, nil;
 		}
 		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
@@ -346,19 +355,19 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		if curr_addr >= start+uintptr(s.curr_offset) {
 			// NOTE(bill): Allow double frees
-			return nil;
+			return nil, nil;
 		}
 
 		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
 		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
 		if old_offset != header.prev_offset {
-			panic("Out of order stack allocator free");
+			// panic("Out of order stack allocator free");
+			return nil, .Invalid_Pointer;
 		}
 
 		s.curr_offset = old_offset;
 		s.prev_offset = header.prev_offset;
-
 
 	case .Free_All:
 		s.prev_offset = 0;
@@ -369,7 +378,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return raw_alloc(s, size, alignment);
 		}
 		if size == 0 {
-			return nil;
+			return nil, nil;
 		}
 
 		start := uintptr(raw_data(s.data));
@@ -381,20 +390,22 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		if curr_addr >= start+uintptr(s.curr_offset) {
 			// NOTE(bill): Allow double frees
-			return nil;
+			return nil, nil;
 		}
 
 		if old_size == size {
-			return old_memory;
+			return byte_slice(old_memory, size), nil;
 		}
 
 		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
 		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
 		if old_offset != header.prev_offset {
-			ptr := raw_alloc(s, size, alignment);
-			copy(ptr, old_memory, min(old_size, size));
-			return ptr;
+			data, err := raw_alloc(s, size, alignment);
+			if err == nil {
+				runtime.copy(data, byte_slice(old_memory, old_size));
+			}
+			return data, err;
 		}
 
 		old_memory_size := uintptr(s.curr_offset) - (curr_addr - start);
@@ -406,19 +417,19 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			zero(rawptr(curr_addr + uintptr(diff)), diff);
 		}
 
-		return old_memory;
+		return byte_slice(old_memory, size), nil;
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
-		return set;
+		return nil, nil;
 	case .Query_Info:
-		return nil;
+		return nil, nil;
 	}
 
-	return nil;
+	return nil, nil;
 }
 
 
@@ -453,20 +464,20 @@ small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 
 small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                    size, alignment: int,
-                                   old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
+                                   old_memory: rawptr, old_size: int, ocation := #caller_location) -> ([]byte, Allocator_Error) {
 	s := cast(^Small_Stack)allocator_data;
 
 	if s.data == nil {
-		return nil;
+		return nil, .Out_Of_Memory;
 	}
 
 	align := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
 
-	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> rawptr {
+	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> ([]byte, Allocator_Error) {
 		curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset);
 		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header));
 		if s.offset + padding + size > len(s.data) {
-			return nil;
+			return nil, .Out_Of_Memory;
 		}
 		s.offset += padding;
 
@@ -478,7 +489,8 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		s.peak_used = max(s.peak_used, s.offset);
 
-		return zero(rawptr(next_addr), size);
+		zero(rawptr(next_addr), size);
+		return byte_slice(rawptr(next_addr), size), nil;
 	}
 
 	switch mode {
@@ -486,19 +498,20 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return raw_alloc(s, size, align);
 	case .Free:
 		if old_memory == nil {
-			return nil;
+			return nil, nil;
 		}
 		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		curr_addr := uintptr(old_memory);
 
 		if !(start <= curr_addr && curr_addr < end) {
-			panic("Out of bounds memory address passed to stack allocator (free)");
+			// panic("Out of bounds memory address passed to stack allocator (free)");
+			return nil, .Invalid_Pointer;
 		}
 
 		if curr_addr >= start+uintptr(s.offset) {
 			// NOTE(bill): Allow double frees
-			return nil;
+			return nil, nil;
 		}
 
 		header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header));
@@ -514,41 +527,44 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return raw_alloc(s, size, align);
 		}
 		if size == 0 {
-			return nil;
+			return nil, nil;
 		}
 
 		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		curr_addr := uintptr(old_memory);
 		if !(start <= curr_addr && curr_addr < end) {
-			panic("Out of bounds memory address passed to stack allocator (resize)");
+			// panic("Out of bounds memory address passed to stack allocator (resize)");
+			return nil, .Invalid_Pointer;
 		}
 
 		if curr_addr >= start+uintptr(s.offset) {
 			// NOTE(bill): Treat as a double free
-			return nil;
+			return nil, nil;
 		}
 
 		if old_size == size {
-			return old_memory;
+			return byte_slice(old_memory, size), nil;
 		}
 
-		ptr := raw_alloc(s, size, align);
-		copy(ptr, old_memory, min(old_size, size));
-		return ptr;
+		data, err := raw_alloc(s, size, align);
+		if err == nil {
+			runtime.copy(data, byte_slice(old_memory, old_size));
+		}
+		return data, err;
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		return nil;
+		return nil, nil;
 	}
 
-	return nil;
+	return nil, nil;
 }
 
 
@@ -579,42 +595,44 @@ DYNAMIC_POOL_OUT_OF_BAND_SIZE_DEFAULT :: 6554;
 
 dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                     size, alignment: int,
-                                    old_memory: rawptr, old_size: int,
-                                    flags: u64 = 0, loc := #caller_location) -> rawptr {
+                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	pool := (^Dynamic_Pool)(allocator_data);
 
 	switch mode {
 	case .Alloc:
-		return dynamic_pool_alloc(pool, size);
+		return dynamic_pool_alloc_bytes(pool, size);
 	case .Free:
-		//
+		return nil, nil;
 	case .Free_All:
 		dynamic_pool_free_all(pool);
+		return nil, nil;
 	case .Resize:
 		if old_size >= size {
-			return old_memory;
+			return byte_slice(old_memory, size), nil;
 		}
-		ptr := dynamic_pool_alloc(pool, size);
-		copy(ptr, old_memory, old_size);
-		return ptr;
+		data, err := dynamic_pool_alloc_bytes(pool, size);
+		if err == nil {
+			runtime.copy(data, byte_slice(old_memory, old_size));
+		}
+		return data, err;
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free_All, .Resize, .Query_Features, .Query_Info};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory);
 		if info != nil && info.pointer != nil {
 			info.size = pool.block_size;
 			info.alignment = pool.alignment;
-			return info;
+			return byte_slice(info, size_of(info^)), nil;
 		}
-		return nil;
+		return nil, nil;
 	}
-	return nil;
+	return nil, nil;
 }
 
 
@@ -649,8 +667,14 @@ dynamic_pool_destroy :: proc(using pool: ^Dynamic_Pool) {
 }
 
 
-dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
-	cycle_new_block :: proc(using pool: ^Dynamic_Pool) {
+dynamic_pool_alloc :: proc(pool: ^Dynamic_Pool, bytes: int) -> rawptr {
+	data, err := dynamic_pool_alloc_bytes(pool, bytes);
+	assert(err == nil);
+	return raw_data(data);
+}
+
+dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]byte, Allocator_Error) {
+	cycle_new_block :: proc(using pool: ^Dynamic_Pool) -> (err: Allocator_Error) {
 		if block_allocator.procedure == nil {
 			panic("You must call pool_init on a Pool before using it");
 		}
@@ -663,14 +687,17 @@ dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
 		if len(unused_blocks) > 0 {
 			new_block = pop(&unused_blocks);
 		} else {
-			new_block = block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
-			                                      block_size, alignment,
-			                                      nil, 0);
+			data: []byte;
+			data, err = block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
+			                                           block_size, alignment,
+			                                           nil, 0);
+			new_block = raw_data(data);
 		}
 
 		bytes_left = block_size;
 		current_pos = new_block;
 		current_block = new_block;
+		return;
 	}
 
 	n := bytes;
@@ -678,26 +705,29 @@ dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
 	n += extra;
 	if n >= out_band_size {
 		assert(block_allocator.procedure != nil);
-		memory := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
+		memory, err := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
 			                                block_size, alignment,
 			                                nil, 0);
 		if memory != nil {
-			append(&out_band_allocations, (^byte)(memory));
+			append(&out_band_allocations, raw_data(memory));
 		}
-		return memory;
+		return memory, err;
 	}
 
 	if bytes_left < n {
-		cycle_new_block(pool);
+		err := cycle_new_block(pool);
+		if err != nil {
+			return nil, err;
+		}
 		if current_block == nil {
-			return nil;
+			return nil, .Out_Of_Memory;
 		}
 	}
 
 	memory := current_pos;
 	current_pos = ptr_offset((^byte)(current_pos), n);
 	bytes_left -= n;
-	return memory;
+	return byte_slice(memory, bytes), nil;
 }
 
 
@@ -730,7 +760,7 @@ dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
 
 panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+                             old_memory: rawptr, old_size: int,loc := #caller_location) -> ([]byte, Allocator_Error) {
 
 	switch mode {
 	case .Alloc:
@@ -753,13 +783,13 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		if set != nil {
 			set^ = {.Query_Features};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		return nil;
+		return nil, nil;
 	}
 
-	return nil;
+	return nil, nil;
 }
 
 panic_allocator :: proc() -> Allocator {
@@ -770,70 +800,12 @@ panic_allocator :: proc() -> Allocator {
 }
 
 
-alloca_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-                              size, alignment: int,
-                              old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
-	switch mode {
-	case .Alloc:
-		switch alignment {
-		case:   return intrinsics.alloca(size, 2*align_of(uintptr));
-		case 0: return intrinsics.alloca(size, 0);
-
-		case 1:     return intrinsics.alloca(size, 1);
-		case 2:     return intrinsics.alloca(size, 2);
-		case 4:     return intrinsics.alloca(size, 4);
-		case 8:     return intrinsics.alloca(size, 8);
-		case 16:    return intrinsics.alloca(size, 16);
-		case 32:    return intrinsics.alloca(size, 32);
-		case 64:    return intrinsics.alloca(size, 64);
-		case 128:   return intrinsics.alloca(size, 128);
-		case 256:   return intrinsics.alloca(size, 256);
-		case 512:   return intrinsics.alloca(size, 512);
-		case 1024:  return intrinsics.alloca(size, 1024);
-		case 2048:  return intrinsics.alloca(size, 2048);
-		case 4096:  return intrinsics.alloca(size, 4096);
-		case 8192:  return intrinsics.alloca(size, 8192);
-		case 16384: return intrinsics.alloca(size, 16384);
-		case 32768: return intrinsics.alloca(size, 32768);
-		case 65536: return intrinsics.alloca(size, 65536);
-		}
-	case .Resize:
-		return default_resize_align(old_memory, old_size, size, alignment, alloca_allocator());
-
-	case .Free:
-		// Do nothing
-	case .Free_All:
-		// Do nothing
-
-	case .Query_Features:
-		set := (^Allocator_Mode_Set)(old_memory);
-		if set != nil {
-			set^ = {.Alloc, .Resize, .Query_Features};
-		}
-		return set;
-
-	case .Query_Info:
-		return nil;
-	}
-	return nil;
-}
-
-alloca_allocator :: proc() -> Allocator {
-	return Allocator{
-		procedure = alloca_allocator_proc,
-		data = nil,
-	};
-}
-
-
-
-
-
 Tracking_Allocator_Entry :: struct {
 	memory:    rawptr,
 	size:      int,
 	alignment: int,
-	location: runtime.Source_Code_Location,
+	err:       Allocator_Error,
+	location:  runtime.Source_Code_Location,
 }
 Tracking_Allocator_Bad_Free_Entry :: struct {
 	memory:   rawptr,
@@ -864,7 +836,9 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	};
 }
 
-tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                                size, alignment: int,
+                                old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	data := (^Tracking_Allocator)(allocator_data);
 	if mode == .Query_Info {
 		info := (^Allocator_Query_Info)(old_memory);
@@ -872,23 +846,27 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 			if entry, ok := data.allocation_map[info.pointer]; ok {
 				info.size = entry.size;
 				info.alignment = entry.alignment;
-				return info;
 			}
 			info.pointer = nil;
 		}
 
-		return nil;
+		return nil, nil;
 	}
 
-	result: rawptr;
+	result: []byte;
+	err: Allocator_Error;
 	if mode == .Free && old_memory not_in data.allocation_map {
 		append(&data.bad_free_array, Tracking_Allocator_Bad_Free_Entry{
 			memory = old_memory,
 			location = loc,
 		});
 	} else {
-		result = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, flags, loc);
+		result, err = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, loc);
+		if err != nil {
+			return result, err;
+		}
 	}
+	result_ptr := raw_data(result);
 
 	if data.allocation_map.allocator.procedure == nil {
 		data.allocation_map.allocator = context.allocator;
@@ -896,22 +874,24 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 
 	switch mode {
 	case .Alloc:
-		data.allocation_map[result] = Tracking_Allocator_Entry{
-			memory = result,
+		data.allocation_map[result_ptr] = Tracking_Allocator_Entry{
+			memory = result_ptr,
 			size = size,
 			alignment = alignment,
+			err = err,
 			location = loc,
 		};
 	case .Free:
 		delete_key(&data.allocation_map, old_memory);
 	case .Resize:
-		if old_memory != result {
+		if old_memory != result_ptr {
 			delete_key(&data.allocation_map, old_memory);
 		}
-		data.allocation_map[result] = Tracking_Allocator_Entry{
-			memory = result,
+		data.allocation_map[result_ptr] = Tracking_Allocator_Entry{
+			memory = result_ptr,
 			size = size,
 			alignment = alignment,
+			err = err,
 			location = loc,
 		};
 
@@ -925,13 +905,13 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 		if set != nil {
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features, .Query_Info};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		unreachable();
+		return nil, nil;
 	}
 
-	return result;
+	return result, err;
 }
 
 
@@ -1021,13 +1001,13 @@ small_allocator :: proc(s: ^$S/Small_Allocator, backing := context.allocator) ->
 
 
 		case .Query_Features:
-			return nil;
+			return nil, nil;
 
 		case .Query_Info:
-			return nil;
+			return nil, nil;
 		}
 
-		return nil;
+		return nil, nil;
 	};
 	return a;
 }

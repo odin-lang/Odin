@@ -252,7 +252,6 @@ Source_Code_Location :: struct {
 
 Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
 
-
 // Allocation Stuff
 Allocator_Mode :: enum byte {
 	Alloc,
@@ -271,9 +270,16 @@ Allocator_Query_Info :: struct {
 	alignment: Maybe(int),
 }
 
+Allocator_Error :: enum byte {
+	None            = 0,
+	Out_Of_Memory   = 1,
+	Invalid_Pointer = 2,
+}
+
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64 = 0, location: Source_Code_Location = #caller_location) -> rawptr;
+                             old_memory: rawptr, old_size: int,
+                             location: Source_Code_Location = #caller_location) -> ([]byte, Allocator_Error);
 Allocator :: struct {
 	procedure: Allocator_Proc,
 	data:      rawptr,
