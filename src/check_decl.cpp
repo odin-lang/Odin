@@ -372,7 +372,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 
 
 
-void check_const_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init, Type *named_type) {
+void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
 
@@ -1087,7 +1087,7 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d)
 
 }
 
-void check_entity_decl(CheckerContext *ctx, Entity *&e, DeclInfo *d, Type *named_type) {
+void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
