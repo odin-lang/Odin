@@ -413,7 +413,8 @@ format_generic :: proc(p: ^Printer) {
 		for format_token, token_index in line.format_tokens {
 
 			if format_token.kind == .For || format_token.kind == .If ||
-			   format_token.kind == .When || format_token.kind == .Switch {
+			   format_token.kind == .When || format_token.kind == .Switch ||
+			   format_token.kind == .Proc {
 				format_keyword_to_brace(p, line_index, token_index, format_token.kind);
 			} else if format_token.type == .Call {
 				format_call(p, line_index, token_index);
