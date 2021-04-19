@@ -1910,12 +1910,10 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 		ident := expect_token(p, .Ident);
 
 		switch ident.text {
-		case "bounds_check":
-			tags |= {.Bounds_Check};
-		case "no_bounds_check":
-			tags |= {.No_Bounds_Check};
-		case "optional_ok":
-			tags |= {.Optional_Ok};
+		case "bounds_check":    tags |= {.Bounds_Check};
+		case "no_bounds_check": tags |= {.No_Bounds_Check};
+		case "optional_ok":     tags |= {.Optional_Ok};
+		case "optional_second": tags |= {.Optional_Second};
 		case:
 		}
 	}

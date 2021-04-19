@@ -31,9 +31,10 @@ Allocator_Query_Info :: struct {
 Allocator_Error :: runtime.Allocator_Error;
 /*
 Allocator_Error :: enum byte {
-	None            = 0,
-	Out_Of_Memory   = 1,
-	Invalid_Pointer = 2,
+	None             = 0,
+	Out_Of_Memory    = 1,
+	Invalid_Pointer  = 2,
+	Invalid_Argument = 3,
 }
 */
 Allocator_Proc :: runtime.Allocator_Proc;

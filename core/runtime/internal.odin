@@ -169,16 +169,15 @@ mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNM
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc);
 }
 
-mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (rawptr, Allocator_Error) {
 	if size == 0 {
-		return nil;
+		return nil, nil;
 	}
 	if allocator.procedure == nil {
-		return nil;
+		return nil, nil;
 	}
 	data, err := allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc);
-	_ = err;
-	return raw_data(data);
+	return raw_data(data), err;
 }
 
 mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {

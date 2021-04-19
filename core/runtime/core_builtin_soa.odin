@@ -74,7 +74,7 @@ raw_soa_footer :: proc{
 
 
 @builtin
-make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_second {
 	if length <= 0 {
 		return;
 	}
@@ -106,13 +106,15 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 	}
 	assert(allocator.procedure != nil);
 
-	new_data := allocator.procedure(
+	new_bytes: []byte;
+	new_bytes, err = allocator.procedure(
 		allocator.data, .Alloc, total_size, max_align,
-		nil, 0, 0, loc,
+		nil, 0, loc,
 	);
-	if new_data == nil {
+	if new_bytes == nil || err != nil {
 		return;
 	}
+	new_data := raw_data(new_bytes);
 
 	data := uintptr(&array);
 	offset := 0;
@@ -131,7 +133,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 }
 
 @builtin
-make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_second {
 	return make_soa_aligned(T, length, align_of(E), allocator, loc);
 }
 
