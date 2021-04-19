@@ -159,6 +159,16 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
+mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	if size == 0 {
+		return nil, nil;
+	}
+	if allocator.procedure == nil {
+		return nil, nil;
+	}
+	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc);
+}
+
 mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if size == 0 {
 		return nil;
@@ -166,36 +176,43 @@ mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, a
 	if allocator.procedure == nil {
 		return nil;
 	}
-	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, 0, loc);
+	data, err := allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc);
+	_ = err;
+	return raw_data(data);
 }
 
-mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
+mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if ptr == nil {
-		return;
+		return .None;
 	}
 	if allocator.procedure == nil {
-		return;
+		return .None;
 	}
-	allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, 0, loc);
+	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, loc);
+	return err;
 }
 
-mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #caller_location) {
+mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, 0, loc);
+		_, err = allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, loc);
 	}
+	return;
 }
 
-mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (new_ptr: rawptr, err: Allocator_Error) {
+	new_data: []byte;
 	switch {
 	case allocator.procedure == nil:
-		return nil;
+		return;
 	case new_size == 0:
-		allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, 0, loc);
-		return nil;
+		new_data, err = allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, loc);
 	case ptr == nil:
-		return allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, 0, loc);
+		new_data, err = allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc);
+	case:
+		new_data, err = allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc);
 	}
-	return allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, 0, loc);
+	new_ptr = raw_data(new_data);
+	return;
 }
 memory_equal :: proc "contextless" (a, b: rawptr, n: int) -> bool {
 	return memory_compare(a, b, n) == 0;

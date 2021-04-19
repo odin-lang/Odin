@@ -180,12 +180,14 @@ DEFAULT_RESERVE_CAPACITY :: 16;
 
 make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
 	make_slice_error_loc(loc, len);
-	data := mem_alloc(size_of(E)*len, alignment, allocator, loc);
-	if data == nil && size_of(E) != 0 {
+	data, err := mem_alloc_bytes(size_of(E)*len, alignment, allocator, loc);
+	switch {
+	case err != nil:
+		return nil;
+	case data == nil && size_of(E) != 0:
 		return nil;
 	}
-	// mem_zero(data, size_of(E)*len);
-	s := Raw_Slice{data, len};
+	s := Raw_Slice{raw_data(data), len};
 	return transmute(T)s;
 }
 
@@ -449,15 +451,15 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	new_size  := capacity * size_of(E);
 	allocator := a.allocator;
 
-	new_data := allocator.procedure(
+	new_data, err := allocator.procedure(
 		allocator.data, .Resize, new_size, align_of(E),
-		a.data, old_size, 0, loc,
+		a.data, old_size, loc,
 	);
-	if new_data == nil {
+	if new_data == nil || err != nil {
 		return false;
 	}
 
-	a.data = new_data;
+	a.data = raw_data(new_data);
 	a.cap = capacity;
 	return true;
 }
@@ -483,15 +485,15 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	new_size  := length * size_of(E);
 	allocator := a.allocator;
 
-	new_data := allocator.procedure(
+	new_data, err := allocator.procedure(
 		allocator.data, .Resize, new_size, align_of(E),
-		a.data, old_size, 0, loc,
+		a.data, old_size, loc,
 	);
-	if new_data == nil {
+	if new_data == nil || err != nil {
 		return false;
 	}
 
-	a.data = new_data;
+	a.data = raw_data(new_data);
 	a.len = length;
 	a.cap = length;
 	return true;

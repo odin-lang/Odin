@@ -5,8 +5,8 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" {
 
 	default_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	                               size, alignment: int,
-	                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
-		return nil;
+	                               old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+		return nil, .None;
 	}
 
 	default_allocator :: proc() -> Allocator {
@@ -26,6 +26,13 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" {
 	}
 }
 
+@(private)
+byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> (res: []byte) {
+	r := (^Raw_Slice)(&res);
+	r.data, r.len = data, len;
+	return;
+}
+
 
 DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 1<<22);
 
@@ -35,7 +42,7 @@ Default_Temp_Allocator :: struct {
 	curr_offset:        int,
 	prev_allocation:    rawptr,
 	backup_allocator:   Allocator,
-	leaked_allocations: [dynamic]rawptr,
+	leaked_allocations: [dynamic][]byte,
 }
 
 default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {
@@ -51,7 +58,7 @@ default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {
 		return;
 	}
 	for ptr in s.leaked_allocations {
-		free(ptr, s.backup_allocator);
+		free(raw_data(ptr), s.backup_allocator);
 	}
 	delete(s.leaked_allocations);
 	delete(s.data, s.backup_allocator);
@@ -60,7 +67,7 @@ default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {
 
 default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                     size, alignment: int,
-                                    old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 
 	s := (^Default_Temp_Allocator)(allocator_data);
 
@@ -84,7 +91,7 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 			s.prev_allocation = rawptr(ptr);
 			offset := int(ptr - start);
 			s.curr_offset = offset + size;
-			return rawptr(ptr);
+			return byte_slice(rawptr(ptr), size), .None;
 
 		case size <= len(s.data):
 			start := uintptr(raw_data(s.data));
@@ -94,7 +101,7 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 			s.prev_allocation = rawptr(ptr);
 			offset := int(ptr - start);
 			s.curr_offset = offset + size;
-			return rawptr(ptr);
+			return byte_slice(rawptr(ptr), size), .None;
 		}
 		a := s.backup_allocator;
 		if a.procedure == nil {
@@ -102,11 +109,14 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 			s.backup_allocator = a;
 		}
 
-		ptr := mem_alloc(size, alignment, a, loc);
-		if s.leaked_allocations == nil {
-			s.leaked_allocations = make([dynamic]rawptr, a);
+		data, err := mem_alloc_bytes(size, alignment, a, loc);
+		if err != nil {
+			return data, err;
 		}
-		append(&s.leaked_allocations, ptr);
+		if s.leaked_allocations == nil {
+			s.leaked_allocations = make([dynamic][]byte, a);
+		}
+		append(&s.leaked_allocations, data);
 
 		// TODO(bill): Should leaks be notified about?
 		if logger := context.logger; logger.lowest_level <= .Warning {
@@ -115,11 +125,11 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 			}
 		}
 
-		return ptr;
+		return data, .None;
 
 	case .Free:
 		if old_memory == nil {
-			return nil;
+			return nil, .None;
 		}
 
 		start := uintptr(raw_data(s.data));
@@ -129,30 +139,32 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		if s.prev_allocation == old_memory {
 			s.curr_offset = int(uintptr(s.prev_allocation) - start);
 			s.prev_allocation = nil;
-			return nil;
+			return nil, .None;
 		}
 
 		if start <= old_ptr && old_ptr < end {
 			// NOTE(bill): Cannot free this pointer but it is valid
-			return nil;
+			return nil, .None;
 		}
 
 		if len(s.leaked_allocations) != 0 {
-			for ptr, i in s.leaked_allocations {
+			for data, i in s.leaked_allocations {
+				ptr := raw_data(data);
 				if ptr == old_memory {
 					free(ptr, s.backup_allocator);
 					ordered_remove(&s.leaked_allocations, i);
-					return nil;
+					return nil, .None;
 				}
 			}
 		}
-		panic("invalid pointer passed to default_temp_allocator");
+		return nil, .Invalid_Pointer;
+		// panic("invalid pointer passed to default_temp_allocator");
 
 	case .Free_All:
 		s.curr_offset = 0;
 		s.prev_allocation = nil;
-		for ptr in s.leaked_allocations {
-			free(ptr, s.backup_allocator);
+		for data in s.leaked_allocations {
+			free(raw_data(data), s.backup_allocator);
 		}
 		clear(&s.leaked_allocations);
 
@@ -163,26 +175,28 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		if old_memory == s.prev_allocation && old_ptr & uintptr(alignment)-1 == 0 {
 			if old_ptr+uintptr(size) < end {
 				s.curr_offset = int(old_ptr-begin)+size;
-				return old_memory;
+				return byte_slice(old_memory, size), .None;
 			}
 		}
-		ptr := default_temp_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, flags, loc);
-		mem_copy(ptr, old_memory, old_size);
-		default_temp_allocator_proc(allocator_data, .Free, 0, alignment, old_memory, old_size, flags, loc);
-		return ptr;
+		ptr, err := default_temp_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, loc);
+		if err == .None {
+			copy(ptr, byte_slice(old_memory, old_size));
+			_, err = default_temp_allocator_proc(allocator_data, .Free, 0, alignment, old_memory, old_size, loc);
+		}
+		return ptr, err;
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		return nil;
+		return nil, .None;
 	}
 
-	return nil;
+	return nil, .None;
 }
 
 default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator {

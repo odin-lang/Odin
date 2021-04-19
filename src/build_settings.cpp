@@ -838,7 +838,7 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		}
-		if (!bc->use_llvm_api) {
+		if ((bc->command_kind & Command__does_build) != 0 && !bc->use_llvm_api) {
 			gb_printf_err("The arm64 architecture is only supported with -llvm-api\n");;
 			gb_exit(1);
 		}

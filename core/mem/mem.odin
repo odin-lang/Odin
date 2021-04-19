@@ -139,9 +139,11 @@ slice_ptr :: proc(ptr: ^$T, len: int) -> []T {
 	return transmute([]T)Raw_Slice{data = ptr, len = len};
 }
 
-slice_ptr_to_bytes :: proc(ptr: rawptr, len: int) -> []byte {
-	assert(len >= 0);
-	return transmute([]byte)Raw_Slice{data = ptr, len = len};
+byte_slice :: slice_ptr_to_bytes;
+slice_ptr_to_bytes :: #force_inline proc "contextless" (data: rawptr, len: int) -> (res: []byte) {
+	r := (^Raw_Slice)(&res);
+	r.data, r.len = data, min(len, 0);
+	return;
 }
 
 slice_to_bytes :: proc(slice: $E/[]$T) -> []byte {
