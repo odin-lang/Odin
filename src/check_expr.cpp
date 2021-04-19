@@ -2231,6 +2231,26 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_tuple(src)) {
+		Ast *expr = unparen_expr(operand->expr);
+		if (expr && expr->kind == Ast_CallExpr) {
+			// NOTE(bill, 2021-04-19): Allow casting procedure calls with #optional_ok
+			ast_node(ce, CallExpr, expr);
+			Type *pt = base_type(type_of_expr(ce->proc));
+			if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
+				if (pt->Proc.result_count > 0) {
+					Operand op = *operand;
+					op.type = pt->Proc.results->Tuple.variables[0]->type;
+					bool ok = check_is_castable_to(c, &op, y);
+					if (ok) {
+						ce->optional_ok_one = true;
+					}
+					return ok;
+				}
+			}
+		}
+	}
+
 	if (is_constant && is_type_untyped(src) && is_type_string(src)) {
 		if (is_type_u8_array(dst)) {
 			String s = operand->value.value_string;
@@ -2346,6 +2366,7 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
 		return true;
 	}
+
 	return false;
 }
 
@@ -10598,7 +10619,7 @@ void check_not_tuple(CheckerContext *c, Operand *o) {
 		if (o->type->kind == Type_Tuple) {
 			isize count = o->type->Tuple.variables.count;
 			error(o->expr,
-			      "%td-valued tuple found where single value expected", count);
+			      "%td-valued expression found where single value expected", count);
 			o->mode = Addressing_Invalid;
 			GB_ASSERT(count != 1);
 		}

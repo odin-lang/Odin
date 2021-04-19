@@ -1751,7 +1751,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						Type *cond_type = t->Tuple.variables[count-1]->type;
 						if (!is_type_boolean(cond_type)) {
 							gbString s = type_to_string(cond_type);
-							error(operand.expr, "The final type of %td-valued tuple must be a boolean, got %s", count, s);
+							error(operand.expr, "The final type of %td-valued expression must be a boolean, got %s", count, s);
 							gb_string_free(s);
 							break;
 						}
@@ -1762,14 +1762,14 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 						if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
 							gbString s = type_to_string(t);
-							error(operand.expr, "Expected a 3-value tuple on the rhs, got (%s)", s);
+							error(operand.expr, "Expected a 3-valued expression on the rhs, got (%s)", s);
 							gb_string_free(s);
 							break;
 						}
 
 						if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
 							gbString s = type_to_string(t);
-							error(operand.expr, "Expected at least a 2-values tuple on the rhs, got (%s)", s);
+							error(operand.expr, "Expected at least a 2-valued expression on the rhs, got (%s)", s);
 							gb_string_free(s);
 							break;
 						}
