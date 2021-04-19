@@ -124,6 +124,8 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 	}
 
 	set_source_position(p, file.pkg_token.pos);
+	
+	p.last_source_position.line = 1;
 
 	set_line(p, 0);
 
@@ -186,6 +188,8 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 
 		last_line = line_index;
 	}
+
+	strings.write_string(&builder, newline);
 
 	return strings.to_string(builder);
 }

@@ -106,10 +106,8 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 			} else if c == '/' && comment.text[min(c_len - 1, i + 1)] == '*' {
 				strings.write_string(&builder, "/*");
 				trim_space = true;
-				p.depth += 1;
 				i += 1;
 			} else if c == '*' && comment.text[min(c_len - 1, i + 1)] == '/' {
-				p.depth -= 1;
 				trim_space = true;
 				strings.write_string(&builder, "*/");
 				i += 1;
@@ -453,7 +451,11 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 			push_generic_token(p, .Colon, 0);
 		}
 
-		visit_exprs(p, v.values, true);
+		if len(v.values) == 1 {
+			visit_expr(p, v.values[0]); //this is too ensure that one value are never newlined(procs, structs, etc.)
+		} else {
+			visit_exprs(p, v.values, true);
+		}
 
 		add_semicolon := true;
 
