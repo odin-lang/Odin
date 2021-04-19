@@ -1744,7 +1744,7 @@ void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
-				error(o->expr, "Cannot convert '%s' to '%s' form '%s", a, b, c);
+				error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
