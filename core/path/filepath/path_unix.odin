@@ -1,8 +1,13 @@
 //+build linux, darwin, freebsd
 package filepath
 
+when ODIN_OS == "darwin" {
+	foreign import libc "System.framework"
+} else {
+	foreign import libc "system:c"
+}
+
 import "core:strings"
-import "core:os"
 
 SEPARATOR :: '/';
 SEPARATOR_STRING :: `/`;
@@ -17,11 +22,20 @@ is_abs :: proc(path: string) -> bool {
 }
 
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
-	full_path, err := os.absolute_path_from_relative(path);
-	if err != os.ERROR_NONE {
-		return "", false;
+	rel := path;
+	if rel == "" {
+		rel = ".";
 	}
-	return full_path, true;
+	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator);
+	path_ptr := realpath(rel_cstr, nil);
+	if path_ptr == nil {
+		return "", __error()^ == 0;
+	}
+	defer _unix_free(path_ptr);
+
+	path_cstr := cstring(path_ptr);
+	path = strings.clone(string(path_cstr), allocator);
+	return path, true;
 }
 
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
@@ -32,4 +46,22 @@ join :: proc(elems: ..string, allocator := context.allocator) -> string {
 		}
 	}
 	return "";
+}
+
+@(private)
+foreign libc {
+	realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
+
+}
+when ODIN_OS == "darwin" {
+	@(private)
+	foreign libc {
+		@(link_name="__error")          __error :: proc() -> ^i32 ---
+	}
+} else {
+	@(private)
+	foreign libc {
+		@(link_name="__errno_location") __error :: proc() -> ^i32 ---
+	}
 }

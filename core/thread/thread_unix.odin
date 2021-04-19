@@ -1,5 +1,6 @@
 // +build linux, darwin, freebsd
-package thread;
+// +private
+package thread
 
 import "core:runtime"
 import "core:intrinsics"
@@ -19,7 +20,7 @@ Thread_Os_Specific :: struct #align 16 {
 	// in a suspended state, we have it wait on this gate, which we
 	// signal to start it.
 	// destroyed after thread is started.
-	start_gate: sync.Condition,
+	start_gate:  sync.Condition,
 	start_mutex: sync.Mutex,
 
 	// if true, the thread has been started and the start_gate has been destroyed.
@@ -31,18 +32,11 @@ Thread_Os_Specific :: struct #align 16 {
 	// See the comment in `join`.
 	already_joined: bool,
 }
-
-Thread_Priority :: enum {
-	Normal,
-	Low,
-	High,
-}
-
 //
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
-create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		context = runtime.default_context();
 
@@ -67,7 +61,7 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 			}
 		}
 
-		sync.atomic_store(&t.done, true, .Sequentially_Consistent);
+		intrinsics.atomic_store(&t.done, true);
 		return nil;
 	}
 
@@ -104,29 +98,30 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	res = unix.pthread_attr_setschedparam(&attrs, &params);
 	assert(res == 0);
 
-	sync.mutex_init(&thread.start_mutex);
-	sync.condition_init(&thread.start_gate, &thread.start_mutex);
 	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
 		free(thread, thread.creation_allocator);
 		return nil;
 	}
 	thread.procedure = procedure;
 
+	sync.mutex_init(&thread.start_mutex);
+	sync.condition_init(&thread.start_gate, &thread.start_mutex);
+
 	return thread;
 }
 
-start :: proc(t: ^Thread) {
-	if sync.atomic_swap(&t.started, true, .Sequentially_Consistent) {
+_start :: proc(t: ^Thread) {
+	if intrinsics.atomic_xchg(&t.started, true) {
 		return;
 	}
 	sync.condition_signal(&t.start_gate);
 }
 
-is_done :: proc(t: ^Thread) -> bool {
-	return sync.atomic_load(&t.done, .Sequentially_Consistent);
+_is_done :: proc(t: ^Thread) -> bool {
+	return intrinsics.atomic_load(&t.done);
 }
 
-join :: proc(t: ^Thread) {
+_join :: proc(t: ^Thread) {
 	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return;
 	}
@@ -138,9 +133,9 @@ join :: proc(t: ^Thread) {
 	// See note on `already_joined` field.
 	// TODO(tetra): I'm not sure if we should do this, or panic, since I'm not
 	// sure it makes sense to need to join from multiple threads?
-	if sync.atomic_swap(&t.already_joined, true, .Sequentially_Consistent) {
+	if intrinsics.atomic_xchg(&t.already_joined, true) {
 		for {
-			if sync.atomic_load(&t.done, .Sequentially_Consistent) {
+			if intrinsics.atomic_load(&t.done) {
 				return;
 			}
 			intrinsics.cpu_relax();
@@ -152,31 +147,37 @@ join :: proc(t: ^Thread) {
 	// We do this instead because I don't know if there is a danger
 	// that you may join a different thread from the one you called join on,
 	// if the thread handle is reused.
-	if sync.atomic_load(&t.done, .Sequentially_Consistent) {
+	if intrinsics.atomic_load(&t.done) {
 		return;
 	}
 
 	ret_val: rawptr;
 	_ = unix.pthread_join(t.unix_thread, &ret_val);
-	if !sync.atomic_load(&t.done, .Sequentially_Consistent) {
+	if !intrinsics.atomic_load(&t.done) {
 		panic("thread not done after join");
 	}
 }
 
-join_multiple :: proc(threads: ..^Thread) {
+_join_multiple :: proc(threads: ..^Thread) {
 	for t in threads {
-		join(t);
+		_join(t);
 	}
 }
 
 
-destroy :: proc(t: ^Thread) {
-	join(t);
+_destroy :: proc(t: ^Thread) {
+	_join(t);
+	sync.condition_destroy(&t.start_gate);
+	sync.mutex_destroy(&t.start_mutex);
 	t.unix_thread = {};
 	free(t, t.creation_allocator);
 }
 
 
-yield :: proc() {
+_terminate :: proc(t: ^Thread, exit_code: int) {
+	// TODO(bill)
+}
+
+_yield :: proc() {
 	unix.sched_yield();
 }

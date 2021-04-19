@@ -135,6 +135,22 @@ buffer_grow :: proc(b: ^Buffer, n: int) {
 	resize(&b.buf, m);
 }
 
+buffer_write_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
+	b.last_read = .Invalid;
+	if offset < 0 {
+		err = .Invalid_Offset;
+		return;
+	}
+	_, ok := _buffer_try_grow(b, offset+len(p));
+	if !ok {
+		_ = _buffer_grow(b, offset+len(p));
+	}
+	if len(b.buf) <= offset {
+		return 0, .Short_Write;
+	}
+	return copy(b.buf[offset:], p), nil;
+}
+
 
 buffer_write :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid;
@@ -212,6 +228,24 @@ buffer_read :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	}
 	return;
 }
+
+buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
+	b.last_read = .Invalid;
+
+	if offset < 0 || offset >= len(b.buf) {
+		err = .Invalid_Offset;
+		return;
+	}
+
+	if 0 <= offset && offset < len(b.buf) {
+		n = copy(p, b.buf[offset:]);
+	}
+	if n > 0 {
+		b.last_read = .Read;
+	}
+	return;
+}
+
 
 buffer_read_byte :: proc(b: ^Buffer) -> (byte, io.Error) {
 	if buffer_is_empty(b) {
@@ -346,6 +380,10 @@ _buffer_vtable := &io.Stream_VTable{
 		b := (^Buffer)(s.stream_data);
 		return buffer_read(b, p);
 	},
+	impl_read_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
+		b := (^Buffer)(s.stream_data);
+		return buffer_read_at(b, p, int(offset));
+	},
 	impl_read_byte = proc(s: io.Stream) -> (byte, io.Error) {
 		b := (^Buffer)(s.stream_data);
 		return buffer_read_byte(b);
@@ -357,6 +395,10 @@ _buffer_vtable := &io.Stream_VTable{
 	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		b := (^Buffer)(s.stream_data);
 		return buffer_write(b, p);
+	},
+	impl_write_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
+		b := (^Buffer)(s.stream_data);
+		return buffer_write_at(b, p, int(offset));
 	},
 	impl_write_byte = proc(s: io.Stream, c: byte) -> io.Error {
 		b := (^Buffer)(s.stream_data);

@@ -195,7 +195,6 @@ struct TypeProc {
 	Type *   results; // Type_Tuple
 	i32      param_count;
 	i32      result_count;
-	u64      tags;
 	isize    specialization_count;
 	ProcCallingConvention calling_convention;
 	i32      variadic_index;

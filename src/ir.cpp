@@ -132,6 +132,7 @@ struct irProcedure {
 	irModule *            module;
 	String                name;
 	Type *                type;
+	Ast *                 proc_lit; // only for actual anonymous procedure literals
 	Ast *                 type_expr;
 	Ast *                 body;
 	u64                   tags;
@@ -6894,7 +6895,7 @@ irTargetList *ir_push_target_list(irProcedure *proc, Ast *label, irBlock *break_
 			}
 		}
 
-		GB_PANIC("ir_set_label_blocks: Unreachable");
+		GB_PANIC("ir_set_label_blocks: Unreachable; Unable to find label: %s", expr_to_string(label->Label.name));
 	}
 
 	return tl;
@@ -6927,6 +6928,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, i
 	set_procedure_abi_types(type);
 	irValue *value = ir_value_procedure(m, nullptr, type, pl->type, pl->body, name);
 
+	value->Proc.proc_lit = expr;
 	value->Proc.tags = pl->tags;
 	value->Proc.inlining = pl->inlining;
 	value->Proc.parent = proc;
@@ -11390,6 +11392,10 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	array_init(&proc->context_stack,    heap_allocator());
 
 	DeclInfo *decl = decl_info_of_entity(proc->entity);
+	if (decl == nullptr && proc->proc_lit != nullptr) {
+		GB_ASSERT(proc->proc_lit->kind == Ast_ProcLit);
+		decl = proc->proc_lit->ProcLit.decl;
+	}
 	if (decl != nullptr) {
 		for_array(i, decl->labels) {
 			BlockLabel bl = decl->labels[i];

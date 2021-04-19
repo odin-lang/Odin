@@ -273,7 +273,7 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
-        
+
         if(result == 0) {
           result = system_exec_command_line_app("msvc-link",
             "\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
@@ -425,7 +425,7 @@ i32 linker_stage(lbGenerator *gen) {
 				output_ext = substring(build_context.out_filepath, pos, build_context.out_filepath.len);
 			}
 		}
-    
+
 		result = system_exec_command_line_app("ld-link",
 			"%s %s -o \"%.*s%.*s\" %s "
 			" %s "
@@ -467,7 +467,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	#endif
 	}
-  
+
 	return result;
 }
 #endif
@@ -607,6 +607,7 @@ enum BuildFlagKind {
 
 	BuildFlag_Short,
 	BuildFlag_AllPackages,
+	BuildFlag_DocFormat,
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
@@ -696,7 +697,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String, Command__does_check);
 	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String, Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String, Command__does_build); // Commands_build is not used to allow for a better error message
-	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),              BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),              BuildFlagParam_String, Command__does_check);
 	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),               BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),      BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None, Command__does_check);
@@ -721,6 +722,7 @@ bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_DocFormat,     str_lit("doc-format"),   BuildFlagParam_None, Command_doc);
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
@@ -1226,6 +1228,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
+							break;
+						case BuildFlag_DocFormat:
+							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
 							break;
 						case BuildFlag_IgnoreWarnings:
 							if (build_context.warnings_as_errors) {
@@ -2349,11 +2354,11 @@ int main(int arg_count, char const **arg_ptr) {
 						LIT(output_base),
 						LIT(build_context.resource_filepath)
 					);
-          
+
           if(result != 0) {
             return 1;
           }
-          
+
           result = system_exec_command_line_app("msvc-link",
 						"\"%.*slink.exe\" \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
@@ -2368,11 +2373,11 @@ int main(int arg_count, char const **arg_ptr) {
 						LIT(build_context.extra_linker_flags),
 						lib_str
 					);
-          
+
           if(result != 0) {
             return 1;
           }
-          
+
 				} else {
           i32 result =  system_exec_command_line_app("msvc-link",
 						"\"%.*slink.exe\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
@@ -2388,7 +2393,7 @@ int main(int arg_count, char const **arg_ptr) {
 						LIT(build_context.extra_linker_flags),
 						lib_str
 					);
-          
+
           if(result != 0) {
             return 1;
           }
@@ -2409,7 +2414,7 @@ int main(int arg_count, char const **arg_ptr) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
-        
+
         if(result != 0) {
           return 1;
         }
@@ -2547,11 +2552,11 @@ int main(int arg_count, char const **arg_ptr) {
 				LIT(build_context.link_flags),
 				LIT(build_context.extra_linker_flags),
 				link_settings);
-      
+
       if(result != 0) {
         return 1;
       }
-      
+
 		#if defined(GB_SYSTEM_OSX)
 			if (build_context.ODIN_DEBUG) {
 				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
@@ -2578,6 +2583,6 @@ int main(int arg_count, char const **arg_ptr) {
 		#endif
 		}
 	}
-  
+
 	return 0;
 }

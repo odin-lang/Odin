@@ -127,6 +127,7 @@ char const *odin_command_strings[32] = {
 	"query",
 	"doc",
 	"version",
+	"test",
 };
 
 
@@ -134,6 +135,7 @@ char const *odin_command_strings[32] = {
 enum CmdDocFlag : u32 {
 	CmdDocFlag_Short       = 1<<0,
 	CmdDocFlag_AllPackages = 1<<1,
+	CmdDocFlag_DocFormat   = 1<<2,
 };
 
 

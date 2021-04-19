@@ -2464,9 +2464,12 @@ void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *nam
 }
 
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name) {
-	lb_add_proc_attribute_at_index(p, index, name, cast(u64)true);
+	lb_add_proc_attribute_at_index(p, index, name, 0);
 }
 
+void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
+	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
+}
 
 
 void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
@@ -2520,7 +2523,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	p->type           = entity->type;
 	p->type_expr      = decl->type_expr;
 	p->body           = pl->body;
-	p->tags           = pt->Proc.tags;
 	p->inlining       = ProcInlining_none;
 	p->is_foreign     = entity->Procedure.is_foreign;
 	p->is_export      = entity->Procedure.is_export;
@@ -2554,6 +2556,23 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 			cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
 		}
 		LLVMSetFunctionCallConv(p->value, cc_kind);
+	}
+
+	if (entity->flags & EntityFlag_Cold) {
+		lb_add_attribute_to_proc(m, p->value, "cold");
+	}
+
+	if (pt->Proc.diverging) {
+		lb_add_attribute_to_proc(m, p->value, "noreturn");
+	}
+
+	switch (p->inlining) {
+	case ProcInlining_inline:
+		lb_add_attribute_to_proc(m, p->value, "alwaysinline");
+		break;
+	case ProcInlining_no_inline:
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+		break;
 	}
 
 	// lbCallingConventionKind cc_kind = lbCallingConvention_C;
@@ -8073,7 +8092,18 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		}
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
-		// LLVMValueRef ret = LLVMBuildCall(p->builder, fn, args, arg_count, "");
+
+		switch (inlining) {
+		case ProcInlining_none:
+			break;
+		case ProcInlining_inline:
+			LLVMAddCallSiteAttribute(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "alwaysinline"));
+			break;
+		case ProcInlining_no_inline:
+			LLVMAddCallSiteAttribute(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "noinline"));
+			break;
+		}
+
 		lbValue res = {};
 		res.value = ret;
 		res.type = abi_rt;
@@ -8982,6 +9012,16 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
 			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
 				cast(char *)"pause", 5,
+				cast(char *)"", 0,
+				/*HasSideEffects*/true, /*IsAlignStack*/false,
+				LLVMInlineAsmDialectATT
+			);
+			GB_ASSERT(the_asm != nullptr);
+			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+		} else if (build_context.metrics.arch == TargetArch_arm64) {
+			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
+			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
+				cast(char *)"yield", 5,
 				cast(char *)"", 0,
 				/*HasSideEffects*/true, /*IsAlignStack*/false,
 				LLVMInlineAsmDialectATT
