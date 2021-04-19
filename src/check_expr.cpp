@@ -651,12 +651,26 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 
 	Ast *expr = unparen_expr(operand->expr);
-	if (expr != nullptr && expr->kind == Ast_AutoCast) {
-		Operand x = *operand;
-		x.expr = expr->AutoCast.expr;
-		bool ok = check_cast_internal(c, &x, type);
-		if (ok) {
-			return MAXIMUM_TYPE_DISTANCE;
+	if (expr != nullptr) {
+		if (expr->kind == Ast_AutoCast) {
+			Operand x = *operand;
+			x.expr = expr->AutoCast.expr;
+			bool ok = check_cast_internal(c, &x, type);
+			if (ok) {
+				return MAXIMUM_TYPE_DISTANCE;
+			}
+		} else if (expr->kind == Ast_CallExpr) {
+			// NOTE(bill, 2021-04-19): Allow assignment of procedure calls with #optional_ok
+			ast_node(ce, CallExpr, expr);
+			Type *pt = base_type(type_of_expr(ce->proc));
+			if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
+				Operand x = *operand;
+				x.type = pt->Proc.results->Tuple.variables[0]->type;
+				i64 res = check_distance_between_types(c, &x, type);
+				if (res >= 0) {
+					return res+1;
+				}
+			}
 		}
 	}
 
@@ -694,7 +708,7 @@ bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
 	return check_is_assignable_to_with_score(c, operand, type, &score);
 }
 
-void add_optional_ok_for_procedure(Type *type, Operand *operand) {
+void add_optional_ok_for_procedure(Type *type, Operand *operand, Type *type_hint) {
 	type = base_type(type);
 	if (type->kind == Type_Proc && type->Proc.optional_ok) {
 		operand->mode = Addressing_OptionalOk;
@@ -757,7 +771,7 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 				Entity *e = procs[i];
 				add_entity_use(c, operand->expr, e);
 				good = true;
-				add_optional_ok_for_procedure(e->type, operand);
+				add_optional_ok_for_procedure(e->type, operand, type);
 				break;
 			}
 		}
@@ -8254,7 +8268,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		if (type == nullptr) {
 			type = pt;
 		}
-		add_optional_ok_for_procedure(type, operand);
+		add_optional_ok_for_procedure(type, operand, type_hint);
 	}
 
 	// add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
