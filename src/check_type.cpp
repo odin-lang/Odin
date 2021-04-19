@@ -2450,6 +2450,24 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 			}
 		}
 	}
+	if (pt->tags & ProcTag_optional_second) {
+		if (optional_ok) {
+			error(proc_type_node, "A procedure type cannot have both an #optional_ok tag and #optional_second");
+		}
+		optional_ok = true;
+		if (result_count != 2) {
+			error(proc_type_node, "A procedure type with the #optional_second tag requires 2 return values, got %td", result_count);
+		} else {
+			bool ok = false;
+			if (proc_type_node->file && proc_type_node->file->pkg) {
+				ok = proc_type_node->file->pkg->scope == ctx->info->runtime_package->scope;
+			}
+
+			if (!ok) {
+				error(proc_type_node, "A procedure type with the #optional_second may only be allowed within 'package runtime'");
+			}
+		}
+	}
 
 	type->Proc.node                 = proc_type_node;
 	type->Proc.scope                = c->scope;
