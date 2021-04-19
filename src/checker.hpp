@@ -396,6 +396,10 @@ void check_add_import_decl(CheckerContext *c, Ast *decl);
 void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 
+void check_entity_decl(CheckerContext *c, Entity *&e, DeclInfo *d, Type *named_type);
+void check_const_decl(CheckerContext *c, Entity *&e, Ast *type_expr, Ast *init_expr, Type *named_type);
+void check_type_decl(CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
+
 bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global = false);
 void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes);
 void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
