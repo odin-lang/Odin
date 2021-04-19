@@ -6536,6 +6536,8 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
 				}
 
+				array_add(operands, val0);
+				array_add(operands, val1);
 				optional_ok = true;
 				tuple_index += 2;
 			} else if (o.mode == Addressing_OptionalOk && is_type_tuple(o.type)) {
