@@ -79,15 +79,12 @@ void     check_expr_with_type_hint      (CheckerContext *c, Operand *o, Ast *e, 
 Type *   check_type                     (CheckerContext *c, Ast *expression);
 Type *   check_type_expr                (CheckerContext *c, Ast *expression, Type *named_type);
 Type *   make_optional_ok_type          (Type *value, bool typed=true);
-void     check_type_decl                (CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
 Entity * find_polymorphic_record_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure);
 void     check_not_tuple                (CheckerContext *c, Operand *operand);
 void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (Ast *expression);
-void     check_entity_decl              (CheckerContext *c, Entity *e, DeclInfo *decl, Type *named_type);
-void     check_const_decl               (CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);
 void     check_proc_body                (CheckerContext *c, Token token, DeclInfo *decl, Type *type, Ast *body);
 void     update_expr_type               (CheckerContext *c, Ast *e, Type *type, bool final);
 bool     check_is_terminating           (Ast *node, String const &label);

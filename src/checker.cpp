@@ -2190,8 +2190,6 @@ Type *check_poly_path_pop(CheckerContext *c) {
 
 
 
-void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
-
 Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 	Array<Entity *> procs = {};
 	if (o.mode == Addressing_ProcGroup) {

@@ -33,39 +33,41 @@ String const entity_strings[] = {
 };
 
 enum EntityFlag : u64 {
-	EntityFlag_Visited       = 1<<0,
-	EntityFlag_Used          = 1<<1,
-	EntityFlag_Using         = 1<<2,
-	EntityFlag_Field         = 1<<3,
-	EntityFlag_Param         = 1<<4,
-	EntityFlag_Result        = 1<<5,
-	EntityFlag_ArrayElem     = 1<<6,
-	EntityFlag_Ellipsis      = 1<<7,
-	EntityFlag_NoAlias       = 1<<8,
-	EntityFlag_TypeField     = 1<<9,
-	EntityFlag_Value         = 1<<10,
-	EntityFlag_Sret          = 1<<11,
-	EntityFlag_ByVal         = 1<<12,
-	EntityFlag_BitFieldValue = 1<<13,
-	EntityFlag_PolyConst     = 1<<14,
-	EntityFlag_NotExported   = 1<<15,
-	EntityFlag_ConstInput    = 1<<16,
+	EntityFlag_Visited       = 1ull<<0,
+	EntityFlag_Used          = 1ull<<1,
+	EntityFlag_Using         = 1ull<<2,
+	EntityFlag_Field         = 1ull<<3,
+	EntityFlag_Param         = 1ull<<4,
+	EntityFlag_Result        = 1ull<<5,
+	EntityFlag_ArrayElem     = 1ull<<6,
+	EntityFlag_Ellipsis      = 1ull<<7,
+	EntityFlag_NoAlias       = 1ull<<8,
+	EntityFlag_TypeField     = 1ull<<9,
+	EntityFlag_Value         = 1ull<<10,
+	EntityFlag_Sret          = 1ull<<11,
+	EntityFlag_ByVal         = 1ull<<12,
+	EntityFlag_BitFieldValue = 1ull<<13,
+	EntityFlag_PolyConst     = 1ull<<14,
+	EntityFlag_NotExported   = 1ull<<15,
+	EntityFlag_ConstInput    = 1ull<<16,
 
-	EntityFlag_Static        = 1<<17,
+	EntityFlag_Static        = 1ull<<17,
 
-	EntityFlag_ImplicitReference = 1<<18, // NOTE(bill): equivalent to `const &` in C++
+	EntityFlag_ImplicitReference = 1ull<<18, // NOTE(bill): equivalent to `const &` in C++
 
-	EntityFlag_SoaPtrField   = 1<<19, // to allow s.x[0] where `s.x` is a pointer rather than a slice
+	EntityFlag_SoaPtrField   = 1ull<<19, // to allow s.x[0] where `s.x` is a pointer rather than a slice
 
-	EntityFlag_ProcBodyChecked = 1<<20,
+	EntityFlag_ProcBodyChecked = 1ull<<20,
 
-	EntityFlag_CVarArg       = 1<<21,
-	EntityFlag_AutoCast      = 1<<22,
+	EntityFlag_CVarArg       = 1ull<<21,
+	EntityFlag_AutoCast      = 1ull<<22,
 
-	EntityFlag_Disabled      = 1<<24,
-	EntityFlag_Cold          = 1<<25, // procedure is rarely called
+	EntityFlag_Disabled      = 1ull<<24,
+	EntityFlag_Cold          = 1ull<<25, // procedure is rarely called
 
-	EntityFlag_Test          = 1<<30,
+	EntityFlag_Test          = 1ull<<30,
+
+	EntityFlag_Overridden    = 1ull<<63,
 
 };
 
@@ -125,6 +127,9 @@ struct Entity {
 	// IMPORTANT NOTE(bill): This must be a discriminated union because of patching
 	// later entity kinds
 	union {
+		struct {
+			u8 start;
+		} Dummy;
 		struct {
 			ExactValue value;
 			ParameterValue param_value;
