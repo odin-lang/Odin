@@ -313,7 +313,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	s := cast(^Stack)allocator_data;
 
 	if s.data == nil {
-		return nil, .Out_Of_Memory;
+		return nil, .Invalid_Argument;
 	}
 
 	raw_alloc :: proc(s: ^Stack, size, alignment: int) -> ([]byte, Allocator_Error) {
@@ -468,7 +468,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	s := cast(^Small_Stack)allocator_data;
 
 	if s.data == nil {
-		return nil, .Out_Of_Memory;
+		return nil, .Invalid_Argument;
 	}
 
 	align := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
