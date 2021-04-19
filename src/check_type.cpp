@@ -2101,8 +2101,15 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 			}
 			break;
 		}
-		case Type_Pointer: break;
-		case Type_Proc:    break; // NOTE(bill): Just a pointer
+		case Type_Pointer:
+			if (is_type_struct(bt->Pointer.elem)) {
+				// Force to a raw pointer
+				new_type = t_rawptr;
+			}
+			break;
+		case Type_Proc:
+			new_type = t_rawptr;
+			break; // NOTE(bill): Just a pointer
 
 		// Odin specific
 		case Type_Slice:
@@ -2194,6 +2201,10 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 		return new_type;
 	}
 
+	if (is_type_pointer(single_type)) {
+		// NOTE(bill): Force a cast to prevent a possible type cycle
+		return t_rawptr;
+	}
 
 	if (build_context.ODIN_OS == "windows") {
 		if (build_context.ODIN_ARCH == "amd64") {
