@@ -134,12 +134,6 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
-	byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> (res: []byte) {
-		r := (^mem.Raw_Slice)(&res);
-		r.data, r.len = data, len;
-		return;
-	}
-
 	//
 	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
 	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
@@ -170,7 +164,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		aligned_mem = rawptr(aligned_ptr);
 		mem.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem;
 
-		return byte_slice(aligned_mem, size), .None;
+		return mem.byte_slice(aligned_mem, size), nil;
 	}
 
 	aligned_free :: proc(p: rawptr) {
@@ -207,7 +201,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		if set != nil {
 			set^ = {.Alloc, .Free, .Resize, .Query_Features};
 		}
-		return byte_slice(set, size_of(set^)), .None;
+		return nil, nil;
 
 	case .Query_Info:
 		return nil, nil;

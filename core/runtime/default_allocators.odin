@@ -27,10 +27,8 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" {
 }
 
 @(private)
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> (res: []byte) {
-	r := (^Raw_Slice)(&res);
-	r.data, r.len = data, len;
-	return;
+byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte {
+	return transmute([]u8)Raw_Slice{data=data, len=max(len, 0)};
 }
 
 
