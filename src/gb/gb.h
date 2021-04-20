@@ -491,8 +491,8 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 	#define USIZE_MIX U32_MIN
 	#define USIZE_MAX U32_MAX
 
-	#define ISIZE_MIX S32_MIN
-	#define ISIZE_MAX S32_MAX
+	#define ISIZE_MIX I32_MIN
+	#define ISIZE_MAX I32_MAX
 #elif defined(GB_ARCH_64_BIT)
 	#define USIZE_MIX U64_MIN
 	#define USIZE_MAX U64_MAX
