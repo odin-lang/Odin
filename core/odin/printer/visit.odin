@@ -1017,6 +1017,8 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Enum_Type:
 		push_generic_token(p, .Enum, 1);
 
+		hint_current_line(p, {.Enum});
+
 		if v.base_type != nil {
 			visit_expr(p, v.base_type);
 		}
@@ -1026,7 +1028,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_exprs(p, v.fields, true);
 			push_generic_token(p, .Close_Brace, 0);
 		} else {
-			visit_begin_brace(p, v.pos, .Generic);
+			visit_begin_brace(p, v.pos, .Generic, len(v.fields));
 			newline_position(p, 1);
 			set_source_position(p, v.fields[0].pos);
 			visit_exprs(p, v.fields, true, true);
