@@ -1664,13 +1664,13 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-opt:<integer>");
-		print_usage_line(2, "Set the optimization level for compliation");
+		print_usage_line(2, "Set the optimization level for compilation");
 		print_usage_line(2, "Accepted values: 0, 1, 2, 3");
 		print_usage_line(2, "Example: -opt:2");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-o:<string>");
-		print_usage_line(2, "Set the optimization mode for compliation");
+		print_usage_line(2, "Set the optimization mode for compilation");
 		print_usage_line(2, "Accepted values: minimal, size, speed");
 		print_usage_line(2, "Example: -o:speed");
 		print_usage_line(0, "");
