@@ -1109,6 +1109,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.build_mode = BuildMode_Executable;
 							} else if (str == "asm" || str == "assembly" || str == "assembler") {
 								build_context.build_mode = BuildMode_Assembly;
+							} else if (str == "llvm" || str == "llvm-ir") {
+								build_context.build_mode = BuildMode_LLVM_IR;
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								bad_flags = true;
