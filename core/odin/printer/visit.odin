@@ -485,7 +485,10 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 	//we have to newline the expressions to respect the source
 	for expr, i in list {
 
-		move_line_limit(p, expr.pos, 1);
+		//Don't move the first expression, it looks bad
+		if i != 0 {
+			move_line_limit(p, expr.pos, 1);
+		}
 
 		visit_expr(p, expr);
 
@@ -614,7 +617,11 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 				newline_position(p, 1);
 			}
 
+			set_source_position(p, v.body.pos);
+
 			visit_stmt(p, v.body, .If_Stmt);
+
+			set_source_position(p, v.body.end);
 		}
 
 		if v.else_stmt != nil {
@@ -1445,7 +1452,9 @@ visit_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, remove_blank :=
 
 	for field, i in list.list {
 
-		move_line_limit(p, field.pos, 1);
+		if i != 0 {
+			move_line_limit(p, field.pos, 1);
+		}
 
 		if .Using in field.flags {
 			push_generic_token(p, .Using, 0);
