@@ -9,7 +9,7 @@ import "core:unicode/utf8"
 import "core:mem"
 import "core:sort"
 
-//right the attribute order is not linearly parsed(bug?)
+//right now the attribute order is not linearly parsed(bug?)
 @(private)
 sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
 	return sort.Interface {
@@ -575,8 +575,6 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 			set_source_position(p, v.pos);
 
 			visit_block_stmts(p, v.stmts, len(v.stmts) > 1 && p.config.split_multiple_stmts);
-
-			set_source_position(p, v.end);
 
 			if !empty_block {
 				visit_end_brace(p, v.end);
@@ -1259,8 +1257,7 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, c
 }
 
 visit_end_brace :: proc(p: ^Printer, end: tokenizer.Pos) {
-	set_source_position(p, end);
-	newline_position(p, 1);
+	move_line(p, end);
 	push_generic_token(p, .Close_Brace, 0);
 	unindent(p);
 	p.current_line.depth = p.depth;
