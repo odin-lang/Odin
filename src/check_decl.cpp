@@ -707,6 +707,18 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->flags |= EntityFlag_Cold;
 	}
 
+	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
+
+
+	switch (e->Procedure.optimization_mode) {
+	case ProcedureOptimizationMode_None:
+	case ProcedureOptimizationMode_Minimal:
+		if (pl->inlining == ProcInlining_inline) {
+			error(e->token, "#force_inline cannot be used in conjunction with the attribute 'optimization_mode' with neither \"none\" nor \"minimal\"");
+		}
+		break;
+	}
+
 	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
