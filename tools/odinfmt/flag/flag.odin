@@ -146,13 +146,11 @@ reflect_args_structure :: proc(ctx: ^Flag_Context, v: any) -> Flag_Error {
 	tags := reflect.struct_field_tags(v.id);
 
 	for name, i in names {
-
 		flag: Flag;
 
 		type := types[i];
 
 		if named_type, ok := type.variant.(Type_Info_Named); ok {
-
 			if union_type, ok := named_type.base.variant.(Type_Info_Union); ok && union_type.maybe && len(union_type.variants) == 1 {
 				flag.optional = true;
 				flag.tag_ptr = rawptr(uintptr(union_type.tag_offset) + uintptr(v.data) + uintptr(offsets[i]));
@@ -202,7 +200,6 @@ parse :: proc(v: any, args: []string) -> Flag_Error {
 
 	//validate that the required flags were actually set
 	for k, v in ctx.seen_flags {
-
 		if v.optional && v.parsed {
 			tag_value: i32 = 1;
 			mem.copy(v.tag_ptr, &tag_value, 4); //4 constant is probably not portable, but it works for me currently

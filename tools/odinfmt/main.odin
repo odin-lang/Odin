@@ -68,9 +68,7 @@ main :: proc() {
 	tick_time := time.tick_now();
 
 	if os.is_file(path) {
-
 		if _, ok := args.write.(bool); ok {
-
 			backup_path := strings.concatenate({path, "_bk"}, context.temp_allocator);
 
 			if data, ok := format_file(path); ok {
@@ -84,17 +82,14 @@ main :: proc() {
 				fmt.eprintf("failed to write %v", path);
 			}
 		} else {
-
 			if data, ok := format_file(path); ok {
 				fmt.println(transmute(string)data);
 			}
 		}
 	} else if os.is_dir(path) {
-
 		filepath.walk(path, walk_files);
 
 		for file in files {
-
 			fmt.println(file);
 
 			backup_path := strings.concatenate({file, "_bk"}, context.temp_allocator);
