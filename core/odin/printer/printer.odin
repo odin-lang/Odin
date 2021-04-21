@@ -486,12 +486,14 @@ align_var_decls :: proc(p: ^Printer) {
 			if tokenizer.Token_Kind.B_Keyword_Begin <= line.format_tokens[i].kind && line.format_tokens[i].kind <= tokenizer.Token_Kind.B_Keyword_End {
 				continue_flag = true;
 			}
-
 		}
 
 		if continue_flag {
 			continue;
 		}
+
+		fmt.println(line);
+		fmt.println(largest_rhs);
 
 		if line_index != current_line + 1 || typed != current_typed || not_mutable != current_not_mutable {
 
@@ -705,7 +707,7 @@ align_enum :: proc(p: ^Printer, index: int) {
 	}
 
 	largest  := 0;
-	eq_count := 0;
+	comma_count := 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
 		length := 0;
@@ -716,20 +718,21 @@ align_enum :: proc(p: ^Printer, index: int) {
 			}
 
 			if format_token.kind == .Eq {
-				eq_count += 1;
 				largest = max(length, largest);
 				break;
+			} else if format_token.kind == .Comma {
+				comma_count += 1;
 			}
 
 			length += len(format_token.text) + format_token.spaces_before;
 		}
 
-		if eq_count >= brace_token.parameter_count {
+		if comma_count >= brace_token.parameter_count {
 			break;
 		}
 	}
 
-	eq_count = 0;
+	comma_count = 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
 		length := 0;
@@ -740,15 +743,16 @@ align_enum :: proc(p: ^Printer, index: int) {
 			}
 
 			if format_token.kind == .Eq {
-				eq_count += 1;
 				line.format_tokens[i].spaces_before = largest - length + 1;
 				break;
+			} else if format_token.kind == .Comma {
+				comma_count += 1;
 			}
 
 			length += len(format_token.text) + format_token.spaces_before;
 		}
 
-		if eq_count >= brace_token.parameter_count {
+		if comma_count >= brace_token.parameter_count {
 			break;
 		}
 	}

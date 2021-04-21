@@ -31,7 +31,7 @@ sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
 
 @(private)
 comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
-
+	
 	if len(p.comments) <= p.latest_comment_index {
 		return false;
 	}
