@@ -114,7 +114,7 @@ enum CommandKind : u32 {
 	Command_query   = 1<<4,
 	Command_doc     = 1<<5,
 	Command_version = 1<<6,
-	Command_test     = 1<<7,
+	Command_test    = 1<<7,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test,
 	Command__does_build = Command_run|Command_build|Command_test,
