@@ -424,11 +424,12 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		visit_exprs(p, v.names, true);
 
+		hint_current_line(p, {.Value_Decl});
+
 		if v.type != nil {
 			if !v.is_mutable {
 				push_generic_token(p, .Colon, 0);
 			} else {
-				hint_current_line(p, {.Value_Decl});
 				push_generic_token(p, .Colon, 0);
 			}
 
@@ -438,7 +439,6 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 				push_generic_token(p, .Colon, 1);
 				push_generic_token(p, .Colon, 0);
 			} else {
-				hint_current_line(p, {.Value_Decl});
 				push_generic_token(p, .Colon, 1);
 			}
 		}
