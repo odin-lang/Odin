@@ -61,6 +61,7 @@ Config :: struct {
 	align_assignments:    bool,
 	align_structs:        bool,
 	align_style:          Alignment_Style,
+	align_enums:          bool,
 	indent_cases:         bool,
 	newline_style:        Newline_Style,
 }
@@ -104,6 +105,7 @@ default_style := Config {
 	indent_cases = false,
 	align_switch = true,
 	align_structs = true,
+	align_enums = true,
 	newline_style = .CRLF,
 };
 
@@ -425,6 +427,10 @@ format_generic :: proc(p: ^Printer) {
 			align_switch_stmt(p, line_index);
 		}
 
+		if .Enum in line.types && p.config.align_enums {
+			align_enum(p, line_index);
+		}
+
 		if .Struct in line.types && p.config.align_structs {
 			align_struct(p, line_index);
 		}
@@ -542,8 +548,6 @@ align_var_decls :: proc(p: ^Printer) {
 		largest_rhs = max(largest_rhs, rhs_length);
 	}
 
-	fmt.println(current_typed);
-
 	//repeating myself, move to sub procedure
 	if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed {
 		for colon_token in colon_tokens {
@@ -660,6 +664,85 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 		}
 
 		if case_count >= brace_token.parameter_count {
+			break;
+		}
+	}
+}
+
+align_enum :: proc(p: ^Printer, index: int) {
+	enum_found := false;
+	brace_token: Format_Token;
+	brace_line: int;
+
+	found_enum_brace: for line, line_index in p.lines[index:] {
+
+		for format_token in line.format_tokens {
+
+			if format_token.kind == .Open_Brace && enum_found {
+				brace_token = format_token;
+				brace_line = line_index + index;
+				break found_enum_brace;
+			} else if format_token.kind == .Open_Brace {
+				break;
+			} else if format_token.kind == .Enum {
+				enum_found = true;
+			}
+		}
+	}
+
+	if !enum_found {
+		return;
+	}
+
+	largest := 0;
+	eq_count := 0;
+
+	for line, line_index in p.lines[brace_line + 1:] {
+
+		length := 0;
+
+		for format_token in line.format_tokens {
+
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			if format_token.kind == .Eq {
+				eq_count += 1;
+				largest = max(length, largest);
+				break;
+			}
+
+			length += len(format_token.text) + format_token.spaces_before;
+		}
+
+		if eq_count >= brace_token.parameter_count {
+			break;
+		}
+	}
+
+	eq_count = 0;
+
+	for line, line_index in p.lines[brace_line + 1:] {
+
+		length := 0;
+
+		for format_token, i in line.format_tokens {
+
+			if format_token.kind == .Comment {
+				continue;
+			}
+
+			if format_token.kind == .Eq {
+				eq_count += 1;
+				line.format_tokens[i].spaces_before = largest - length + 1;
+				break;
+			}
+
+			length += len(format_token.text) + format_token.spaces_before;
+		}
+
+		if eq_count >= brace_token.parameter_count {
 			break;
 		}
 	}
