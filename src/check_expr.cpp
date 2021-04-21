@@ -2764,31 +2764,27 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		ExactValue a = x->value;
 		ExactValue b = y->value;
 
-		// Type *type = base_type(x->type);
-		Type *type = x->type;
-		if (is_type_pointer(type)) {
-			GB_ASSERT(op.kind == Token_Sub);
-			i64 bytes = a.value_pointer - b.value_pointer;
-			i64 diff = bytes/type_size_of(type);
-			x->value = exact_value_pointer(diff);
-			return;
-		}
-
-		if (!is_type_constant_type(type)) {
+		if (!is_type_constant_type(x->type)) {
+		#if 0
 			gbString xt = type_to_string(x->type);
 			gbString err_str = expr_to_string(node);
 			error(op, "Invalid type, '%s', for constant binary expression '%s'", xt, err_str);
 			gb_string_free(err_str);
 			gb_string_free(xt);
 			x->mode = Addressing_Invalid;
+		#else
+			// NOTE(bill, 2021-04-21): The above is literally a useless error message.
+			// Why did I add it in the first place?!
+			x->mode = Addressing_Value;
+		#endif
 			return;
 		}
 
-		if (op.kind == Token_Quo && is_type_integer(type)) {
+		if (op.kind == Token_Quo && is_type_integer(x->type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
 		}
 
-		if (is_type_bit_set(type)) {
+		if (is_type_bit_set(x->type)) {
 			switch (op.kind) {
 			case Token_Add: op.kind = Token_Or;     break;
 			case Token_Sub: op.kind = Token_AndNot; break;
@@ -2797,11 +2793,11 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 		x->value = exact_binary_operator_value(op.kind, a, b);
 
-		if (is_type_typed(type)) {
+		if (is_type_typed(x->type)) {
 			if (node != nullptr) {
 				x->expr = node;
 			}
-			check_is_expressible(c, x, type);
+			check_is_expressible(c, x, x->type);
 		}
 		return;
 	} else if (is_type_string(x->type)) {
