@@ -449,6 +449,7 @@ align_var_decls :: proc(p: ^Printer) {
 
 	current_line: int;
 	current_typed: bool;
+	current_not_mutable: bool;
 
 	largest_lhs := 0;
 	largest_rhs := 0;
@@ -470,17 +471,31 @@ align_var_decls :: proc(p: ^Printer) {
 		}
 
 		typed := true;
+		not_mutable := false;
+		continue_flag := false;
 
 		for i := 0; i < len(line.format_tokens) - 1; i += 1 {
 			if line.format_tokens[i].kind == .Colon && line.format_tokens[i + 1].kind == .Eq {
 				typed = false;
-				break;
 			}
+
+			if line.format_tokens[i].kind == .Colon && line.format_tokens[i + 1].kind == .Colon {
+				not_mutable = true;
+			}
+
+			if tokenizer.Token_Kind.B_Keyword_Begin <= line.format_tokens[i].kind && line.format_tokens[i].kind <= tokenizer.Token_Kind.B_Keyword_End {
+				continue_flag = true;
+			}
+
 		}
 
-		if line_index != current_line + 1 || typed != current_typed {
+		if continue_flag {
+			continue;
+		}
 
-			if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed {
+		if line_index != current_line + 1 || typed != current_typed || not_mutable != current_not_mutable {
+
+			if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed || current_not_mutable {
 				for colon_token in colon_tokens {
 					colon_token.format_token.spaces_before = largest_lhs - colon_token.length + 1;
 				}
@@ -507,6 +522,7 @@ align_var_decls :: proc(p: ^Printer) {
 			largest_rhs = 0;
 			largest_lhs = 0;
 			current_typed = typed;
+			current_not_mutable = not_mutable;
 		}
 
 		current_line = line_index;
@@ -549,7 +565,7 @@ align_var_decls :: proc(p: ^Printer) {
 	}
 
 	//repeating myself, move to sub procedure
-	if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed {
+	if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed || current_not_mutable {
 		for colon_token in colon_tokens {
 			colon_token.format_token.spaces_before = largest_lhs - colon_token.length + 1;
 		}
