@@ -124,7 +124,7 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 	}
 
 	set_source_position(p, file.pkg_token.pos);
-	
+
 	p.last_source_position.line = 1;
 
 	set_line(p, 0);
@@ -195,7 +195,7 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 }
 
 fix_lines :: proc(p: ^Printer) {
-	align_var_decls_and_assignments(p);
+	align_var_decls(p);
 	format_generic(p);
 	align_comments(p); //align them last since they rely on the other alignments
 }
@@ -439,7 +439,131 @@ format_generic :: proc(p: ^Printer) {
 	}
 }
 
-align_var_decls_and_assignments :: proc(p: ^Printer) {
+align_var_decls :: proc(p: ^Printer) {
+
+	current_line: int;
+	current_typed: bool;
+
+	largest_lhs := 0;
+	largest_rhs := 0;
+
+	TokenAndLength :: struct {
+		format_token: ^Format_Token,
+		length:       int,
+	};
+
+	colon_tokens := make([dynamic]TokenAndLength, 0, 10, context.temp_allocator);
+	type_tokens := make([dynamic]TokenAndLength, 0, 10, context.temp_allocator);
+	equal_tokens := make([dynamic]TokenAndLength, 0, 10, context.temp_allocator);
+
+	for line, line_index in p.lines {
+
+		//It is only possible to align value decls that are one one line, otherwise just ignore them
+		if .Value_Decl not_in line.types {
+			continue;
+		}
+
+		typed := true;
+
+		for i := 0; i < len(line.format_tokens) - 1; i += 1 {
+			if line.format_tokens[i].kind == .Colon && line.format_tokens[i + 1].kind == .Eq {
+				typed = false;
+				break;
+			}
+		}
+
+		if line_index != current_line + 1 || typed != current_typed {
+
+			if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed {
+				for colon_token in colon_tokens {
+					colon_token.format_token.spaces_before = largest_lhs - colon_token.length + 1;
+				}
+			} else if p.config.align_style == .Align_On_Type_And_Equals {
+				for type_token in type_tokens {
+					type_token.format_token.spaces_before = largest_lhs - type_token.length + 1;
+				}
+			}
+
+			if current_typed {
+				for equal_token in equal_tokens {
+					equal_token.format_token.spaces_before = largest_rhs - equal_token.length + 1;
+				}
+			} else {
+				for equal_token in equal_tokens {
+					equal_token.format_token.spaces_before = 0;
+				}
+			}
+
+			clear(&colon_tokens);
+			clear(&type_tokens);
+			clear(&equal_tokens);
+
+			largest_rhs = 0;
+			largest_lhs = 0;
+			current_typed = typed;
+		}
+
+		current_line = line_index;
+
+		current_token_index := 0;
+		lhs_length := 0;
+		rhs_length := 0;
+
+		//calcuate the length of lhs of a value decl i.e. `a, b:`
+		for; current_token_index < len(line.format_tokens); current_token_index += 1 {
+
+			lhs_length += len(line.format_tokens[current_token_index].text) + line.format_tokens[current_token_index].spaces_before;
+
+			if line.format_tokens[current_token_index].kind == .Colon {
+				append(&colon_tokens, TokenAndLength {format_token = &line.format_tokens[current_token_index], length = lhs_length});
+
+				if len(line.format_tokens) > current_token_index && line.format_tokens[current_token_index + 1].kind != .Eq {
+					append(&type_tokens, TokenAndLength {format_token = &line.format_tokens[current_token_index + 1], length = lhs_length});
+				}
+
+				current_token_index += 1;
+
+				break;
+			}
+		}
+
+		//calcuate the length of the rhs i.e. `[dynamic]int = 123123`
+		for; current_token_index < len(line.format_tokens); current_token_index += 1 {
+
+			rhs_length += len(line.format_tokens[current_token_index].text) + line.format_tokens[current_token_index].spaces_before;
+
+			if line.format_tokens[current_token_index].kind == .Eq {
+				append(&equal_tokens, TokenAndLength {format_token = &line.format_tokens[current_token_index], length = rhs_length});
+				break;
+			}
+		}
+
+		largest_lhs = max(largest_lhs, lhs_length);
+		largest_rhs = max(largest_rhs, rhs_length);
+	}
+
+	fmt.println(current_typed);
+
+	//repeating myself, move to sub procedure
+	if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed {
+		for colon_token in colon_tokens {
+			colon_token.format_token.spaces_before = largest_lhs - colon_token.length + 1;
+		}
+	} else if p.config.align_style == .Align_On_Type_And_Equals {
+		for type_token in type_tokens {
+			type_token.format_token.spaces_before = largest_lhs - type_token.length + 1;
+		}
+	}
+
+	if current_typed {
+		for equal_token in equal_tokens {
+			equal_token.format_token.spaces_before = largest_rhs - equal_token.length + 1;
+		}
+	} else {
+		for equal_token in equal_tokens {
+			equal_token.format_token.spaces_before = 0;
+		}
+	}
 }
 
 align_switch_stmt :: proc(p: ^Printer, index: int) {
