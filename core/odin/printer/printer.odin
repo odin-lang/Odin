@@ -206,7 +206,7 @@ format_value_decl :: proc(p: ^Printer, index: int) {
 
 	eq_found := false;
 	eq_token: Format_Token;
-	eq_line: int;
+	eq_line:  int;
 	largest := 0;
 
 	found_eq: for line, line_index in p.lines[index:] {
@@ -271,8 +271,8 @@ format_assignment :: proc(p: ^Printer, index: int) {
 format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 
 	paren_found := false;
-	paren_token: Format_Token;
-	paren_line: int;
+	paren_token:       Format_Token;
+	paren_line:        int;
 	paren_token_index: int;
 	largest := 0;
 
@@ -300,7 +300,7 @@ format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 	}
 
 	paren_count := 1;
-	done := false;
+	done        := false;
 
 	for line, line_index in p.lines[paren_line:] {
 
@@ -343,11 +343,11 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 
 	keyword_found := false;
 	keyword_token: Format_Token;
-	keyword_line: int;
+	keyword_line:  int;
 	largest := 0;
 
 	brace_count := 0;
-	done := false;
+	done        := false;
 
 	found_keyword: for line, i in p.lines[line_index:] {
 		for format_token in line.format_tokens {
@@ -447,8 +447,8 @@ format_generic :: proc(p: ^Printer) {
 
 align_var_decls :: proc(p: ^Printer) {
 
-	current_line: int;
-	current_typed: bool;
+	current_line:        int;
+	current_typed:       bool;
 	current_not_mutable: bool;
 
 	largest_lhs := 0;
@@ -470,8 +470,8 @@ align_var_decls :: proc(p: ^Printer) {
 			continue;
 		}
 
-		typed := true;
-		not_mutable := false;
+		typed         := true;
+		not_mutable   := false;
 		continue_flag := false;
 
 		for i := 0; i < len(line.format_tokens) - 1; i += 1 {
@@ -528,8 +528,8 @@ align_var_decls :: proc(p: ^Printer) {
 		current_line = line_index;
 
 		current_token_index := 0;
-		lhs_length := 0;
-		rhs_length := 0;
+		lhs_length          := 0;
+		rhs_length          := 0;
 
 		//calcuate the length of lhs of a value decl i.e. `a, b:`
 		for; current_token_index < len(line.format_tokens); current_token_index += 1 {
@@ -590,12 +590,10 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 
 	switch_found := false;
 	brace_token: Format_Token;
-	brace_line: int;
+	brace_line:  int;
 
 	found_switch_brace: for line, line_index in p.lines[index:] {
-
 		for format_token in line.format_tokens {
-
 			if format_token.kind == .Open_Brace && switch_found {
 				brace_token = format_token;
 				brace_line = line_index + index;
@@ -612,15 +610,15 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 		return;
 	}
 
-	largest := 0;
+	largest    := 0;
 	case_count := 0;
 
 	//find all the switch cases that are one lined
 	for line, line_index in p.lines[brace_line + 1:] {
 
-		case_found := false;
+		case_found  := false;
 		colon_found := false;
-		length := 0;
+		length      := 0;
 
 		for format_token in line.format_tokens {
 
@@ -652,13 +650,11 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 	case_count = 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
-
-		case_found := false;
+		case_found  := false;
 		colon_found := false;
-		length := 0;
+		length      := 0;
 
 		for format_token, i in line.format_tokens {
-
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -688,12 +684,10 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 align_enum :: proc(p: ^Printer, index: int) {
 	enum_found := false;
 	brace_token: Format_Token;
-	brace_line: int;
+	brace_line:  int;
 
 	found_enum_brace: for line, line_index in p.lines[index:] {
-
 		for format_token in line.format_tokens {
-
 			if format_token.kind == .Open_Brace && enum_found {
 				brace_token = format_token;
 				brace_line = line_index + index;
@@ -710,15 +704,13 @@ align_enum :: proc(p: ^Printer, index: int) {
 		return;
 	}
 
-	largest := 0;
+	largest  := 0;
 	eq_count := 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
-
 		length := 0;
 
 		for format_token in line.format_tokens {
-
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -740,11 +732,9 @@ align_enum :: proc(p: ^Printer, index: int) {
 	eq_count = 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
-
 		length := 0;
 
 		for format_token, i in line.format_tokens {
-
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -768,12 +758,10 @@ align_struct :: proc(p: ^Printer, index: int) {
 
 	struct_found := false;
 	brace_token: Format_Token;
-	brace_line: int;
+	brace_line:  int;
 
 	found_struct_brace: for line, line_index in p.lines[index:] {
-
 		for format_token in line.format_tokens {
-
 			if format_token.kind == .Open_Brace && struct_found {
 				brace_token = format_token;
 				brace_line = line_index + index;
@@ -790,15 +778,13 @@ align_struct :: proc(p: ^Printer, index: int) {
 		return;
 	}
 
-	largest := 0;
+	largest     := 0;
 	colon_count := 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
-
 		length := 0;
 
 		for format_token in line.format_tokens {
-
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -820,11 +806,9 @@ align_struct :: proc(p: ^Printer, index: int) {
 	colon_count = 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
-
 		length := 0;
 
 		for format_token, i in line.format_tokens {
-
 			if format_token.kind == .Comment {
 				continue;
 			}
@@ -858,13 +842,11 @@ align_comments :: proc(p: ^Printer) {
 	current_info: Comment_Align_Info;
 
 	for line, line_index in p.lines {
-
 		if len(line.format_tokens) <= 0 {
 			continue;
 		}
 
 		if .Line_Comment in line.types {
-
 			if current_info.end + 1 != line_index || current_info.depth != line.depth ||
 			   (current_info.begin == current_info.end && current_info.length == 0) {
 
@@ -881,7 +863,6 @@ align_comments :: proc(p: ^Printer) {
 			length := 0;
 
 			for format_token, i in line.format_tokens {
-
 				if format_token.kind == .Comment {
 					current_info.length = max(current_info.length, length);
 					current_info.end = line_index;
@@ -903,13 +884,11 @@ align_comments :: proc(p: ^Printer) {
 		}
 
 		for i := info.begin; i <= info.end; i += 1 {
-
 			l := p.lines[i];
 
 			length := 0;
 
 			for format_token, i in l.format_tokens {
-
 				if format_token.kind == .Comment {
 					if len(l.format_tokens) == 1 {
 						l.format_tokens[i].spaces_before = info.length + 1;
@@ -923,4 +902,3 @@ align_comments :: proc(p: ^Printer) {
 		}
 	}
 }
- 
