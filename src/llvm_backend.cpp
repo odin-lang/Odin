@@ -9692,6 +9692,7 @@ bool lb_is_const_nil(lbValue value) {
 
 String lb_get_const_string(lbModule *m, lbValue value) {
 	GB_ASSERT(lb_is_const(value));
+	GB_ASSERT(LLVMIsConstant(value.value));
 
 	Type *t = base_type(value.type);
 	GB_ASSERT(are_types_identical(t, t_string));
@@ -14220,11 +14221,16 @@ void lb_generate_code(lbGenerator *gen) {
 		return;
 	}
 	llvm_error = nullptr;
-	if (build_context.keep_temp_files) {
+	if (build_context.keep_temp_files ||
+	    build_context.build_mode == BuildMode_LLVM_IR) {
 		TIME_SECTION("LLVM Print Module to File");
 		if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 			gb_printf_err("LLVM Error: %s\n", llvm_error);
 			gb_exit(1);
+			return;
+		}
+		if (build_context.build_mode == BuildMode_LLVM_IR) {
+			gb_exit(0);
 			return;
 		}
 	}

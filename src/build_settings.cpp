@@ -104,6 +104,7 @@ enum BuildModeKind {
 	BuildMode_DynamicLibrary,
 	BuildMode_Object,
 	BuildMode_Assembly,
+	BuildMode_LLVM_IR,
 };
 
 enum CommandKind : u32 {
