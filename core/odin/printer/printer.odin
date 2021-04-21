@@ -492,9 +492,6 @@ align_var_decls :: proc(p: ^Printer) {
 			continue;
 		}
 
-		fmt.println(line);
-		fmt.println(largest_rhs);
-
 		if line_index != current_line + 1 || typed != current_typed || not_mutable != current_not_mutable {
 
 			if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed || current_not_mutable {
