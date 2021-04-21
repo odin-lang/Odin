@@ -99,6 +99,14 @@ enum EntityConstantFlags : u32 {
 	EntityConstantFlag_ImplicitEnumValue = 1<<0,
 };
 
+enum ProcedureOptimizationMode : u32 {
+	ProcedureOptimizationMode_Default,
+	ProcedureOptimizationMode_None,
+	ProcedureOptimizationMode_Minimal,
+	ProcedureOptimizationMode_Size,
+	ProcedureOptimizationMode_Speed,
+};
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
@@ -165,6 +173,7 @@ struct Entity {
 			DeferredProcedure deferred_procedure;
 			bool    is_foreign;
 			bool    is_export;
+			ProcedureOptimizationMode optimization_mode;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

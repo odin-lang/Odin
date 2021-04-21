@@ -2572,6 +2572,29 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "optimization_mode") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			String mode = ev.value_string;
+			if (mode == "none") {
+				ac->optimization_mode = ProcedureOptimizationMode_None;
+			} else if (mode == "minimal") {
+				ac->optimization_mode = ProcedureOptimizationMode_Minimal;
+			} else if (mode == "size") {
+				ac->optimization_mode = ProcedureOptimizationMode_Size;
+			} else if (mode == "speed") {
+				ac->optimization_mode = ProcedureOptimizationMode_Speed;
+			} else {
+				error(elem, "Invalid optimization_mode for '%.*s'. Valid modes:", LIT(name));
+				error_line("\tnone\n");
+				error_line("\tminimal\n");
+				error_line("\tsize\n");
+				error_line("\tspeed\n");
+			}
+		} else {
+			error(elem, "Expected a string for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 	return false;
 }

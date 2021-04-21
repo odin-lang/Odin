@@ -2523,7 +2523,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	p->type           = entity->type;
 	p->type_expr      = decl->type_expr;
 	p->body           = pl->body;
-	p->inlining       = ProcInlining_none;
+	p->inlining       = pl->inlining;
 	p->is_foreign     = entity->Procedure.is_foreign;
 	p->is_export      = entity->Procedure.is_export;
 	p->is_entry_point = false;
@@ -2558,9 +2558,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		LLVMSetFunctionCallConv(p->value, cc_kind);
 	}
 
-	if (entity->flags & EntityFlag_Cold) {
-		lb_add_attribute_to_proc(m, p->value, "cold");
-	}
 
 	if (pt->Proc.diverging) {
 		lb_add_attribute_to_proc(m, p->value, "noreturn");
@@ -2574,6 +2571,27 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
 		break;
 	}
+
+	if (entity->flags & EntityFlag_Cold) {
+		lb_add_attribute_to_proc(m, p->value, "cold");
+	}
+
+	switch (entity->Procedure.optimization_mode) {
+	case ProcedureOptimizationMode_None:
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		break;
+	case ProcedureOptimizationMode_Minimal:
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		break;
+	case ProcedureOptimizationMode_Size:
+		lb_add_attribute_to_proc(m, p->value, "optsize");
+		break;
+	case ProcedureOptimizationMode_Speed:
+		// TODO(bill): handle this correctly
+		lb_add_attribute_to_proc(m, p->value, "optsize");
+		break;
+	}
+
 
 	// lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// // TODO(bill): Clean up this logic
