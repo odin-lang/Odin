@@ -16,6 +16,21 @@ ptr_from_slice :: proc(str: []byte) -> ^byte {
 	return d.data;
 }
 
+truncate_to_byte :: proc(str: []byte, b: byte) -> []byte {
+	n := index_byte(str, b);
+	if n < 0 {
+		n = len(str);
+	}
+	return str[:n];
+}
+truncate_to_rune :: proc(str: []byte, r: rune) -> []byte {
+	n := index_rune(str, r);
+	if n < 0 {
+		n = len(str);
+	}
+	return str[:n];
+}
+
 // Compares two strings, returning a value representing which one comes first lexiographically.
 // -1 for `a`; 1 for `b`, or 0 if they are equal.
 compare :: proc(lhs, rhs: []byte) -> int {
