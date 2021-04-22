@@ -1479,7 +1479,7 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	if (t->kind == Type_BitSet) {
 		t = bit_set_to_int(t);
 	}
-	GB_ASSERT(t->kind == Type_Basic);
+	GB_ASSERT_MSG(t->kind == Type_Basic, "%s", type_to_string(t));
 
 	switch (t->Basic.kind) {
 	// Endian Specific Types

@@ -5760,14 +5760,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_trap:
 	case BuiltinProc_debug_trap:
 		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
 		}
 		operand->mode = Addressing_NoValue;
 		break;
 
 	case BuiltinProc_read_cycle_counter:
 		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
 		}
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
@@ -5776,9 +5776,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_count_ones:
 	case BuiltinProc_trailing_zeros:
 	case BuiltinProc_reverse_bits:
-	case BuiltinProc_byte_swap:
 		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
 			// continue anyway
 		}
 		{
@@ -5788,21 +5787,99 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (id == BuiltinProc_byte_swap && (!is_type_integer_like(x.type) && !is_type_float(x.type))) {
+			if (!is_type_integer_like(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Values passed to %.*s must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_procs[id].name), xts);
-				gb_string_free(xts);
-			} else if (id != BuiltinProc_byte_swap && !is_type_integer_like(x.type)) {
-				gbString xts = type_to_string(x.type);
-				error(x.expr, "Values passed to %.*s must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
 				gb_string_free(xts);
 			} else if (x.type == t_llvm_bool) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Invalid type passed to %.*s, got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_procs[id].name), xts);
 				gb_string_free(xts);
 			}
+
 			operand->mode = Addressing_Value;
 			operand->type = default_type(x.type);
+		}
+		break;
+
+	case BuiltinProc_byte_swap:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+
+			if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			} else if (x.type == t_llvm_bool) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			}
+			i64 sz = type_size_of(x.type);
+			if (sz < 2) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Type passed to '%.*s' must be at least 2 bytes, got %s with size of %lld", LIT(builtin_procs[id].name), xts, sz);
+				gb_string_free(xts);
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
+	case BuiltinProc_overflow_add:
+	case BuiltinProc_overflow_sub:
+	case BuiltinProc_overflow_mul:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &x, y.type);
+			if (is_type_untyped(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			if (!is_type_integer(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected an integer for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			Type *ct = core_type(x.type);
+			if (is_type_different_to_arch_endianness(ct)) {
+				GB_ASSERT(ct->kind == Type_Basic);
+				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+					gb_string_free(xts);
+					return false;
+				}
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = make_optional_ok_type(default_type(x.type), false); // Just reusing this procedure, it's not optional
 		}
 		break;
 
@@ -5945,7 +6022,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_fixed_point_div_sat:
 		{
 			if (!build_context.use_llvm_api) {
-				error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+				error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
 				// continue anyway
 			}
 
@@ -5971,7 +6048,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!are_types_identical(x.type, y.type)) {
 				gbString xts = type_to_string(x.type);
 				gbString yts = type_to_string(y.type);
-				error(x.expr, "Mismatched types for %.*s, %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
 				gb_string_free(yts);
 				gb_string_free(xts);
 				return false;
@@ -5979,7 +6056,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer(x.type) || is_type_untyped(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected an integer type for %.*s, got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Expected an integer type for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
 				gb_string_free(xts);
 				return false;
 			}
@@ -5989,17 +6066,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 			if (z.mode != Addressing_Constant || !is_type_integer(z.type)) {
-				error(z.expr, "Expected a constant integer for the scale in %.*s", LIT(builtin_procs[id].name));
+				error(z.expr, "Expected a constant integer for the scale in '%.*s'", LIT(builtin_procs[id].name));
 				return false;
 			}
 			i64 n = exact_value_to_i64(z.value);
 			if (n <= 0) {
-				error(z.expr, "Scale parameter in %.*s must be positive, got %lld", LIT(builtin_procs[id].name), n);
+				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_procs[id].name), n);
 				return false;
 			}
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
-				error(z.expr, "Scale parameter in %.*s is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_procs[id].name), n, sz);
+				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_procs[id].name), n, sz);
 				return false;
 			}
 
@@ -6011,7 +6088,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_expect:
 		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
 			// continue anyway
 		}
 		{
@@ -6030,7 +6107,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!are_types_identical(x.type, y.type)) {
 				gbString xts = type_to_string(x.type);
 				gbString yts = type_to_string(y.type);
-				error(x.expr, "Mismatched types for %.*s, %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
 				gb_string_free(yts);
 				gb_string_free(xts);
 				*operand = x; // minimize error propagation
@@ -6039,14 +6116,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer_like(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Values passed to %.*s must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
 				gb_string_free(xts);
 				*operand = x;
 				return true;
 			}
 
 			if (y.mode != Addressing_Constant) {
-				error(y.expr, "Second argument to %.*s must be constant as it is the expected value", LIT(builtin_procs[id].name));
+				error(y.expr, "Second argument to '%.*s' must be constant as it is the expected value", LIT(builtin_procs[id].name));
 			}
 
 			if (x.mode == Addressing_Constant) {

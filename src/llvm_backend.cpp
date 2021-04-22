@@ -9127,34 +9127,57 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		{
 			lbValue x = lb_build_expr(p, ce->args[0]);
 			x = lb_emit_conv(p, x, tv.type);
-			if (is_type_float(tv.type)) {
-				i64 sz = type_size_of(tv.type);
-				Type *integer_type = nullptr;
-				switch (sz) {
-				case 2: integer_type = t_u16; break;
-				case 4: integer_type = t_u32; break;
-				case 8: integer_type = t_u64; break;
-				}
-				GB_ASSERT(integer_type != nullptr);
-				x = lb_emit_transmute(p, x, integer_type);
-			}
+			return lb_emit_byte_swap(p, x, tv.type);
+		}
 
-			char const *name = "llvm.bswap";
-			LLVMTypeRef types[1] = {lb_type(p->module, x.type)};
+	case BuiltinProc_overflow_add:
+	case BuiltinProc_overflow_sub:
+	case BuiltinProc_overflow_mul:
+		{
+			Type *tuple = tv.type;
+			GB_ASSERT(is_type_tuple(tuple));
+			Type *type = tuple->Tuple.variables[0]->type;
+
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			lbValue y = lb_build_expr(p, ce->args[1]);
+			x = lb_emit_conv(p, x, type);
+			y = lb_emit_conv(p, y, type);
+
+			char const *name = nullptr;
+			if (is_type_unsigned(type)) {
+				switch (id) {
+				case BuiltinProc_overflow_add: name = "llvm.uadd.with.overflow"; break;
+				case BuiltinProc_overflow_sub: name = "llvm.usub.with.overflow"; break;
+				case BuiltinProc_overflow_mul: name = "llvm.umul.with.overflow"; break;
+				}
+			} else {
+				switch (id) {
+				case BuiltinProc_overflow_add: name = "llvm.sadd.with.overflow"; break;
+				case BuiltinProc_overflow_sub: name = "llvm.ssub.with.overflow"; break;
+				case BuiltinProc_overflow_mul: name = "llvm.smul.with.overflow"; break;
+				}
+			}
+			LLVMTypeRef types[1] = {lb_type(p->module, type)};
 			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
 			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			LLVMValueRef args[1] = {};
+			LLVMValueRef args[2] = {};
 			args[0] = x.value;
+			args[1] = y.value;
+
+			Type *res_type = nullptr;
+			{
+				gbAllocator a = permanent_allocator();
+				res_type = alloc_type_tuple();
+				array_init(&res_type->Tuple.variables, a, 2);
+				res_type->Tuple.variables[0] = alloc_entity_field(nullptr, blank_token, type,        false, 0);
+				res_type->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
+			}
 
 			lbValue res = {};
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = x.type;
-
-			if (is_type_float(tv.type)) {
-				res = lb_emit_transmute(p, res, tv.type);
-			}
+			res.type = res_type;
 			return res;
 		}
 
@@ -9896,43 +9919,43 @@ LLVMValueRef lb_lookup_runtime_procedure(lbModule *m, String const &name) {
 	return found->value;
 }
 
-lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
-	Type *vt = core_type(value.type);
-	GB_ASSERT(type_size_of(vt) == type_size_of(platform_type));
+lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type) {
+	GB_ASSERT(type_size_of(value.type) == type_size_of(end_type));
 
-	// TODO(bill): lb_emit_byte_swap
-	lbValue res = {};
-	res.type = platform_type;
-	res.value = value.value;
-
-	int sz = cast(int)type_size_of(vt);
-	if (sz > 1) {
-		if (is_type_float(platform_type)) {
-			String name = {};
-			switch (sz) {
-			case 2:  name = str_lit("bswap_f16");  break;
-			case 4:  name = str_lit("bswap_f32");  break;
-			case 8:  name = str_lit("bswap_f64");  break;
-			default: GB_PANIC("unhandled byteswap size"); break;
-			}
-			LLVMValueRef fn = lb_lookup_runtime_procedure(p->module, name);
-			res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
-		} else {
-			GB_ASSERT(is_type_integer(platform_type));
-			String name = {};
-			switch (sz) {
-			case 2:  name = str_lit("bswap_16");  break;
-			case 4:  name = str_lit("bswap_32");  break;
-			case 8:  name = str_lit("bswap_64");  break;
-			case 16: name = str_lit("bswap_128"); break;
-			default: GB_PANIC("unhandled byteswap size"); break;
-			}
-			LLVMValueRef fn = lb_lookup_runtime_procedure(p->module, name);
-
-			res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
-		}
+	if (type_size_of(value.type) < 2) {
+		return value;
 	}
 
+	Type *original_type = value.type;
+	if (is_type_float(original_type)) {
+		i64 sz = type_size_of(original_type);
+		Type *integer_type = nullptr;
+		switch (sz) {
+		case 2: integer_type = t_u16; break;
+		case 4: integer_type = t_u32; break;
+		case 8: integer_type = t_u64; break;
+		}
+		GB_ASSERT(integer_type != nullptr);
+		value = lb_emit_transmute(p, value, integer_type);
+	}
+
+	char const *name = "llvm.bswap";
+	LLVMTypeRef types[1] = {lb_type(p->module, value.type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[1] = {};
+	args[0] = value.value;
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = value.type;
+
+	if (is_type_float(original_type)) {
+		res = lb_emit_transmute(p, res, original_type);
+	}
+	res.type = end_type;
 	return res;
 }
 
