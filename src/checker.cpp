@@ -783,15 +783,6 @@ void init_universal(void) {
 		}
 	}
 
-	// TODO(bill): Set the correct arch for this
-	if (bc->metrics.arch == TargetArch_amd64 || bc->metrics.arch == TargetArch_386) {
-		t_vector_x86_mmx = alloc_type(Type_SimdVector);
-		t_vector_x86_mmx->SimdVector.is_x86_mmx = true;
-
-		Entity *entity = alloc_entity(Entity_TypeName, nullptr, make_token_ident(str_lit("x86_mmx")), t_vector_x86_mmx);
-		add_global_entity(entity, intrinsics_pkg->scope);
-	}
-
 	bool defined_values_double_declaration = false;
 	for_array(i, bc->defined_values.entries) {
 		char const *name = cast(char const *)cast(uintptr)bc->defined_values.entries[i].key.key;

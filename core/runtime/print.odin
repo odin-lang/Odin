@@ -347,14 +347,10 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 
 
 	case Type_Info_Simd_Vector:
-		if info.is_x86_mmx {
-			print_string("intrinsics.x86_mmx");
-		} else {
-			print_string("#simd[");
-			print_u64(u64(info.count));
-			print_byte(']');
-			print_type(info.elem);
-		}
+		print_string("#simd[");
+		print_u64(u64(info.count));
+		print_byte(']');
+		print_type(info.elem);
 
 	case Type_Info_Relative_Pointer:
 		print_string("#relative(");

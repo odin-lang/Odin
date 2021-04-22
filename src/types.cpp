@@ -283,7 +283,6 @@ struct TypeProc {
 	TYPE_KIND(SimdVector, struct {                        \
 		i64   count;                                      \
 		Type *elem;                                       \
-		bool is_x86_mmx;                                  \
 	})                                                    \
 	TYPE_KIND(RelativePointer, struct {                   \
 		Type *pointer_type;                               \
@@ -678,8 +677,6 @@ gb_global Type *t_source_code_location_ptr       = nullptr;
 
 gb_global Type *t_map_hash                       = nullptr;
 gb_global Type *t_map_header                     = nullptr;
-
-gb_global Type *t_vector_x86_mmx                 = nullptr;
 
 
 gb_global Type *t_equal_proc  = nullptr;
@@ -2162,12 +2159,8 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_SimdVector:
 		if (y->kind == Type_SimdVector) {
-			if (x->SimdVector.is_x86_mmx == y->SimdVector.is_x86_mmx) {
-				if (x->SimdVector.is_x86_mmx) {
-					return true;
-				} else if (x->SimdVector.count == y->SimdVector.count) {
-					return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
-				}
+			if (x->SimdVector.count == y->SimdVector.count) {
+				return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
 			}
 		}
 		break;
@@ -2967,9 +2960,6 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_SimdVector: {
-		if (t->SimdVector.is_x86_mmx) {
-			return 8;
-		}
 		// align of
 		i64 count = t->SimdVector.count;
 		Type *elem = t->SimdVector.elem;
@@ -3233,9 +3223,6 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_SimdVector: {
-		if (t->SimdVector.is_x86_mmx) {
-			return 8;
-		}
 		i64 count = t->SimdVector.count;
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
@@ -3670,12 +3657,8 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_SimdVector:
-		if (type->SimdVector.is_x86_mmx) {
-			return gb_string_appendc(str, "intrinsics.x86_mmx");
-		} else {
-			str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
-			str = write_type_to_string(str, type->SimdVector.elem);
-		}
+		str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
+		str = write_type_to_string(str, type->SimdVector.elem);
 		break;
 
 	case Type_RelativePointer:

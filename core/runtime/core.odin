@@ -144,7 +144,6 @@ Type_Info_Simd_Vector :: struct {
 	elem:       ^Type_Info,
 	elem_size:  int,
 	count:      int,
-	is_x86_mmx: bool,
 };
 Type_Info_Relative_Pointer :: struct {
 	pointer:      ^Type_Info,

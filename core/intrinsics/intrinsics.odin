@@ -3,10 +3,6 @@
 package intrinsics
 
 // Types
-
-x86_mmx :: x86_mmx; // Specialized SIMD Vector type
-
-// Types
 simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
 soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
 

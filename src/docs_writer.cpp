@@ -724,13 +724,9 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		break;
 	case Type_SimdVector:
 		doc_type.kind = OdinDocType_SimdVector;
-		if (type->SimdVector.is_x86_mmx) {
-			doc_type.flags |= OdinDocTypeFlag_BitSet_x86_mmx;
-		} else {
-			doc_type.elem_count_len = 1;
-			doc_type.elem_counts[0] = type->SimdVector.count;
-			doc_type.types = odin_doc_type_as_slice(w, type->SimdVector.elem);
-		}
+		doc_type.elem_count_len = 1;
+		doc_type.elem_counts[0] = type->SimdVector.count;
+		doc_type.types = odin_doc_type_as_slice(w, type->SimdVector.elem);
 		// TODO(bill):
 		break;
 	case Type_RelativePointer:
