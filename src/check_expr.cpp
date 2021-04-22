@@ -5773,6 +5773,39 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->type = t_i64;
 		break;
 
+	case BuiltinProc_count_ones:
+	case BuiltinProc_trailing_zeros:
+	case BuiltinProc_reverse_bits:
+	case BuiltinProc_byte_swap:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+
+			if (id == BuiltinProc_byte_swap && (!is_type_integer_like(x.type) && !is_type_float(x.type))) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to %.*s must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			} else if (id != BuiltinProc_byte_swap && !is_type_integer_like(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to %.*s must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			} else if (x.type == t_llvm_bool) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Invalid type passed to %.*s, got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			}
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -5913,7 +5946,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		{
 			if (!build_context.use_llvm_api) {
 				error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
-				return false;
+				// continue anyway
 			}
 
 			Operand x = {};
@@ -5979,8 +6012,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_expect:
 		if (!build_context.use_llvm_api) {
 			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
-			return false;
-		} else {
+			// continue anyway
+		}
+		{
 			Operand x = {};
 			Operand y = {};
 			check_expr(c, &x, ce->args[0]);

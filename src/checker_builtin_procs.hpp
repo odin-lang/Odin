@@ -45,6 +45,11 @@ enum BuiltinProcId {
 	BuiltinProc_debug_trap,
 	BuiltinProc_read_cycle_counter,
 
+	BuiltinProc_count_ones,
+	BuiltinProc_trailing_zeros,
+	BuiltinProc_reverse_bits,
+	BuiltinProc_byte_swap,
+
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
 
@@ -254,6 +259,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("count_ones"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("reverse_bits"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("byte_swap"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
