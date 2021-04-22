@@ -2587,6 +2587,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	}
 
 
+
 	// lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// // TODO(bill): Clean up this logic
 	// if (build_context.metrics.os != TargetOs_js)  {
@@ -2636,26 +2637,16 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		for (isize i = 0; i < pt->Proc.param_count; i++) {
 			Entity *e = params->variables[i];
 			Type *original_type = e->type;
-			Type *abi_type = pt->Proc.abi_compat_params[i];
 			if (e->kind != Entity_Variable) continue;
 
 			if (i+1 == params->variables.count && pt->Proc.c_vararg) {
 				continue;
 			}
-			if (is_type_tuple(abi_type)) {
-				for_array(j, abi_type->Tuple.variables) {
-					Type *tft = abi_type->Tuple.variables[j]->type;
-					if (e->flags&EntityFlag_NoAlias) {
-						lb_add_proc_attribute_at_index(p, offset+parameter_index+j, "noalias");
-					}
-				}
-				parameter_index += abi_type->Tuple.variables.count;
-			} else {
-				if (e->flags&EntityFlag_NoAlias) {
-					lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
-				}
-				parameter_index += 1;
+
+			if (e->flags&EntityFlag_NoAlias) {
+				lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
 			}
+			parameter_index += 1;
 		}
 	}
 
