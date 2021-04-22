@@ -5757,8 +5757,21 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_NoValue;
 		break;
 
+	case BuiltinProc_trap:
+	case BuiltinProc_debug_trap:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+		}
+		operand->mode = Addressing_NoValue;
+		break;
 
-
+	case BuiltinProc_read_cycle_counter:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+		}
+		operand->mode = Addressing_Value;
+		operand->type = t_i64;
+		break;
 
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
@@ -5961,6 +5974,58 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 		}
 		break;
+
+
+	case BuiltinProc_expect:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
+			return false;
+		} else {
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &x, y.type);
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for %.*s, %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				*operand = x; // minimize error propagation
+				return true;
+			}
+
+			if (!is_type_integer_like(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to %.*s must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				*operand = x;
+				return true;
+			}
+
+			if (y.mode != Addressing_Constant) {
+				error(y.expr, "Second argument to %.*s must be constant as it is the expected value", LIT(builtin_procs[id].name));
+			}
+
+			if (x.mode == Addressing_Constant) {
+				// NOTE(bill): just completely ignore this intrinsic entirely
+				*operand = x;
+				return true;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+		}
+		break;
+
 
 
 

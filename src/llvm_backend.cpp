@@ -9049,6 +9049,40 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 		return {};
 
+
+	case BuiltinProc_debug_trap:
+	case BuiltinProc_trap:
+		{
+			char const *name = nullptr;
+			switch (id) {
+			case BuiltinProc_debug_trap: name = "llvm.debugtrap"; break;
+			case BuiltinProc_trap:       name = "llvm.trap";      break;
+			}
+
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
+
+			LLVMBuildCall(p->builder, ip, nullptr, 0, "");
+			if (id == BuiltinProc_trap) {
+				LLVMBuildUnreachable(p->builder);
+			}
+			return {};
+		}
+
+	case BuiltinProc_read_cycle_counter:
+		{
+			char const *name = "llvm.readcyclecounter";
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
+
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, nullptr, 0, "");
+			res.type = tv.type;
+			return res;
+		}
+
 	case BuiltinProc_atomic_fence:
 		LLVMBuildFence(p->builder, LLVMAtomicOrderingSequentiallyConsistent, false, "");
 		return {};
@@ -9321,6 +9355,30 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 			res.type = platform_type;
 			return lb_emit_conv(p, res, tv.type);
+		}
+
+	case BuiltinProc_expect:
+		{
+			Type *t = default_type(tv.type);
+			lbValue x = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t);
+			lbValue y = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t);
+
+			char const *name = "llvm.expect";
+
+			LLVMTypeRef types[1] = {lb_type(p->module, t)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			lbValue res = {};
+
+			LLVMValueRef args[2] = {};
+			args[0] = x.value;
+			args[1] = y.value;
+
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.type = t;
+			return lb_emit_conv(p, res, t);
 		}
 	}
 

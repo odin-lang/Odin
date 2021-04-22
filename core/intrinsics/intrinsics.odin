@@ -6,6 +6,7 @@ package intrinsics
 
 x86_mmx :: x86_mmx; // Specialized SIMD Vector type
 
+// Types
 simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
 soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
 
@@ -13,8 +14,11 @@ soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
 volatile_load  :: proc(dst: ^$T) -> T ---
 volatile_store :: proc(dst: ^$T, val: T) -> T ---
 
-// Atomics
+// Trapping
+debug_trap :: proc() ---
+trap :: proc() -> ! ---
 
+// Atomics
 atomic_fence        :: proc() ---
 atomic_fence_acq    :: proc() ---
 atomic_fence_rel    :: proc() ---
@@ -89,9 +93,14 @@ atomic_cxchgweak_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, /*opti
 
 // Instructions
 
-alloca :: proc(size, align: int) -> ^u8 ---
+alloca             :: proc(size, align: int) -> ^u8 ---
+cpu_relax          :: proc() ---
+read_cycle_counter :: proc() -> i64 ---
 
-cpu_relax :: proc() ---
+
+// Compiler Hints
+expect :: proc(val, expected_val: T) -> T ---
+
 
 // Constant type tests
 

@@ -433,9 +433,6 @@ typeid_base_without_enum :: typeid_core;
 
 @(default_calling_convention = "none")
 foreign {
-	@(link_name="llvm.assume")
-	assume :: proc(cond: bool) ---;
-
 	@(link_name="llvm.debugtrap")
 	debug_trap :: proc() ---;
 

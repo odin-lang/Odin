@@ -339,6 +339,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        ellipsis; \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
+		i32          builtin_id; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryExpr,     "ternary expression",       struct { Ast *cond, *x, *y; }) \
