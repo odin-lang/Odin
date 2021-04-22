@@ -1,11 +1,41 @@
+void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level);
+void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level);
+void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level);
+
+void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm) {
+	LLVMAddPromoteMemoryToRegisterPass(fpm);
+	LLVMAddMergedLoadStoreMotionPass(fpm);
+	LLVMAddConstantPropagationPass(fpm);
+	LLVMAddEarlyCSEPass(fpm);
+
+	LLVMAddConstantPropagationPass(fpm);
+	LLVMAddMergedLoadStoreMotionPass(fpm);
+	LLVMAddPromoteMemoryToRegisterPass(fpm);
+	LLVMAddCFGSimplificationPass(fpm);
+}
+
 void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	if (!ignore_memcpy_pass) {
+	if (ignore_memcpy_pass) {
+		lb_basic_populate_function_pass_manager(fpm);
+		return;
+	} else if (optimization_level == 0) {
 		LLVMAddMemCpyOptPass(fpm);
+		lb_basic_populate_function_pass_manager(fpm);
+		return;
 	}
+
+#if 1
+
+	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
+	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
+	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
+	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
+#else
+	LLVMAddMemCpyOptPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
 	LLVMAddConstantPropagationPass(fpm);
@@ -16,16 +46,6 @@ void lb_populate_function_pass_manager(LLVMPassManagerRef fpm, bool ignore_memcp
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddCFGSimplificationPass(fpm);
 
-	// LLVMAddSLPVectorizePass(fpm);
-	// LLVMAddLoopVectorizePass(fpm);
-
-	// LLVMAddScalarizerPass(fpm);
-	// LLVMAddLoopIdiomPass(fpm);
-	if (optimization_level == 0) {
-		return;
-	}
-
-#if 1
 	LLVMAddSCCPPass(fpm);
 
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
