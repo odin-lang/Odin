@@ -1445,9 +1445,6 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_SimdVector:
-		if (type->SimdVector.is_x86_mmx) {
-			return LLVMX86MMXTypeInContext(ctx);
-		}
 		return LLVMVectorType(lb_type(m, type->SimdVector.elem), cast(unsigned)type->SimdVector.count);
 
 	case Type_RelativePointer:
@@ -1899,9 +1896,6 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_SimdVector:
-		if (type->SimdVector.is_x86_mmx) {
-			return LLVMDIBuilderCreateVectorType(m->debug_builder, 2, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, t_f64), nullptr, 0);
-		}
 		return LLVMDIBuilderCreateVectorType(m->debug_builder, cast(unsigned)type->SimdVector.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->SimdVector.elem), nullptr, 0);
 
 	case Type_RelativePointer: {
@@ -13432,15 +13426,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			{
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_simd_vector_ptr);
 
-				LLVMValueRef vals[4] = {};
+				LLVMValueRef vals[3] = {};
 
-				if (t->SimdVector.is_x86_mmx) {
-					vals[3] = lb_const_bool(m, t_bool, true).value;
-				} else {
-					vals[0] = lb_get_type_info_ptr(m, t->SimdVector.elem).value;
-					vals[1] = lb_const_int(m, t_int, type_size_of(t->SimdVector.elem)).value;
-					vals[2] = lb_const_int(m, t_int, t->SimdVector.count).value;
-				}
+				vals[0] = lb_get_type_info_ptr(m, t->SimdVector.elem).value;
+				vals[1] = lb_const_int(m, t_int, type_size_of(t->SimdVector.elem)).value;
+				vals[2] = lb_const_int(m, t_int, t->SimdVector.count).value;
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);

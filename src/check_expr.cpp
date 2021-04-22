@@ -9324,9 +9324,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (!is_constant) {
 					error(node, "Expected all constant elements for a simd vector");
 				}
-				if (t->SimdVector.is_x86_mmx) {
-					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
-				}
 			}
 
 
