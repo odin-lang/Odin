@@ -157,6 +157,7 @@ struct lbBranchBlocks {
 struct lbContextData {
 	lbAddr ctx;
 	isize scope_index;
+	isize uses;
 };
 
 enum lbParamPasskind {

@@ -391,11 +391,37 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_Context) {
-		lbValue old = lb_addr_load(p, lb_find_or_generate_context_ptr(p));
-		lbAddr next_addr = lb_add_local_generated(p, t_context, true);
-		lb_addr_store(p, next_addr, old);
-		lb_push_context_onto_stack(p, next_addr);
-		lbValue next = lb_addr_get_ptr(p, next_addr);
+		lbAddr old_addr = lb_find_or_generate_context_ptr(p);
+
+
+		// IMPORTANT NOTE(bill, 2021-04-22): reuse unused 'context' variables to minimize stack usage
+		// This has to be done manually since the optimizer cannot determine when this is possible
+		bool create_new = true;
+		for_array(i, p->context_stack) {
+			lbContextData *ctx_data = &p->context_stack[i];
+			if (ctx_data->ctx.addr.value == old_addr.addr.value) {
+				if (ctx_data->uses > 0) {
+					create_new = true;
+				} else if (p->scope_index > ctx_data->scope_index) {
+					create_new = true;
+				} else {
+					// gb_printf_err("%.*s (curr:%td) (ctx:%td) (uses:%td)\n", LIT(p->name), p->scope_index, ctx_data->scope_index, ctx_data->uses);
+					create_new = false;
+				}
+				break;
+			}
+		}
+
+		lbValue next = {};
+		if (create_new) {
+			lbValue old = lb_addr_load(p, old_addr);
+			lbAddr next_addr = lb_add_local_generated(p, t_context, true);
+			lb_addr_store(p, next_addr, old);
+			lb_push_context_onto_stack(p, next_addr);
+			next = next_addr.addr;
+		} else {
+			next = old_addr.addr;
+		}
 
 		if (addr.ctx.sel.index.count > 0) {
 			lbValue lhs = lb_emit_deep_field_gep(p, next, addr.ctx.sel);
@@ -623,6 +649,13 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		}
 	} else if (addr.kind == lbAddr_Context) {
 		lbValue a = addr.addr;
+		for_array(i, p->context_stack) {
+			lbContextData *ctx_data = &p->context_stack[i];
+			if (ctx_data->ctx.addr.value == a.value) {
+				ctx_data->uses += 1;
+				break;
+			}
+		}
 		a.value = LLVMBuildPointerCast(p->builder, a.value, lb_type(p->module, t_context_ptr), "");
 
 		if (addr.ctx.sel.index.count > 0) {
@@ -7570,6 +7603,7 @@ lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p
 	lbContextData *cd = array_add_and_get(&p->context_stack);
 	cd->ctx = ctx_addr;
 	cd->scope_index = -1;
+	cd->uses = +1; // make sure it has been used already
 	return cd;
 }
 
