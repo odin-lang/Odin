@@ -10075,7 +10075,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 		if (type_hint) {
+			Type *type = type_of_expr(ac->expr);
 			check_cast(c, o, type_hint);
+			if (is_type_typed(type) && are_types_identical(type, type_hint)) {
+				if (build_context.vet) {
+					error(node, "Redundant 'auto_cast' applied to expression");
+				} else {
+					warning(node, "Redundant 'auto_cast' applied to expression");
+				}
+			}
+
 		}
 		o->expr = node;
 		return Expr_Expr;
