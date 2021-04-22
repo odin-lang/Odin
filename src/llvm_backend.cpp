@@ -14168,6 +14168,47 @@ void lb_generate_code(lbGenerator *gen) {
 		}*/
 	}
 
+	String filepath_ll = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".ll"));
+
+	TIME_SECTION("LLVM Procedure Generation");
+	for_array(i, m->procedures_to_generate) {
+		lbProcedure *p = m->procedures_to_generate[i];
+		if (p->is_done) {
+			continue;
+		}
+		if (p->body != nullptr) { // Build Procedure
+			m->curr_procedure = p;
+			lb_begin_procedure_body(p);
+			lb_build_stmt(p, p->body);
+			lb_end_procedure_body(p);
+			p->is_done = true;
+			m->curr_procedure = nullptr;
+		}
+		lb_end_procedure(p);
+
+		// Add Flags
+		if (p->body != nullptr) {
+			if (p->name == "memcpy" || p->name == "memmove" ||
+			    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
+			    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
+			    string_starts_with(p->name, str_lit("llvm.memmove"))) {
+				p->flags |= lbProcedureFlag_WithoutMemcpyPass;
+			}
+		}
+
+		if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
+			LLVMDumpValue(p->value);
+			gb_printf_err("\n\n\n\n");
+			if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+			LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
+			gb_exit(1);
+		}
+	}
+
+
 	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
 		TIME_SECTION("LLVM DLL main");
 
@@ -14255,7 +14296,7 @@ void lb_generate_code(lbGenerator *gen) {
 		} else {
 			lbValue *found = map_get(&m->values, hash_entity(entry_point));
 			GB_ASSERT(found != nullptr);
-			LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, found->type)), found->value, nullptr, 0, "");
+			lb_emit_call(p, *found, {});
 		}
 
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
@@ -14270,47 +14311,6 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-	}
-
-
-	String filepath_ll = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".ll"));
-
-	TIME_SECTION("LLVM Procedure Generation");
-	for_array(i, m->procedures_to_generate) {
-		lbProcedure *p = m->procedures_to_generate[i];
-		if (p->is_done) {
-			continue;
-		}
-		if (p->body != nullptr) { // Build Procedure
-			m->curr_procedure = p;
-			lb_begin_procedure_body(p);
-			lb_build_stmt(p, p->body);
-			lb_end_procedure_body(p);
-			p->is_done = true;
-			m->curr_procedure = nullptr;
-		}
-		lb_end_procedure(p);
-
-		// Add Flags
-		if (p->body != nullptr) {
-			if (p->name == "memcpy" || p->name == "memmove" ||
-			    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
-			    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
-			    string_starts_with(p->name, str_lit("llvm.memmove"))) {
-				p->flags |= lbProcedureFlag_WithoutMemcpyPass;
-			}
-		}
-
-		if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-			LLVMDumpValue(p->value);
-			gb_printf_err("\n\n\n\n");
-			if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-				gb_printf_err("LLVM Error: %s\n", llvm_error);
-			}
-			LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-			gb_exit(1);
-		}
 	}
 
 

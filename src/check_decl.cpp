@@ -743,11 +743,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
 			gb_string_free(str);
 		}
-		if (pt->calling_convention != ProcCC_Odin &&
-		    pt->calling_convention != ProcCC_Contextless) {
+		if (pt->calling_convention != ProcCC_Odin) {
 			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
-		pt->calling_convention = ProcCC_Contextless;
+		pt->calling_convention = ProcCC_Odin;
 		if (e->pkg->kind == Package_Init) {
 			if (ctx->info->entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
