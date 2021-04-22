@@ -14030,9 +14030,9 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMInitializeFunctionPassManager(function_pass_manager_speed);
 
 	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
-	lb_populate_function_pass_manager(function_pass_manager_minimal, false, 0);
-	lb_populate_function_pass_manager(function_pass_manager_size, false, 1);
-	lb_populate_function_pass_manager(function_pass_manager_speed, false, 2);
+	lb_populate_function_pass_manager_specific(function_pass_manager_minimal, 0);
+	lb_populate_function_pass_manager_specific(function_pass_manager_size,    1);
+	lb_populate_function_pass_manager_specific(function_pass_manager_speed,   2);
 
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 	LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
