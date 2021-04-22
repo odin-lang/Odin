@@ -10,7 +10,19 @@ bool is_diverging_stmt(Ast *stmt) {
 		String name = expr->CallExpr.proc->BasicDirective.name;
 		return name == "panic";
 	}
-	Type *t = type_of_expr(expr->CallExpr.proc);
+	Ast *proc = unparen_expr(expr->CallExpr.proc);
+	TypeAndValue tv = proc->tav;
+	if (tv.mode == Addressing_Builtin) {
+		Entity *e = entity_of_node(proc);
+		BuiltinProcId id = BuiltinProc_Invalid;
+		if (e != nullptr) {
+			id = cast(BuiltinProcId)e->Builtin.id;
+		} else {
+			id = BuiltinProc_DIRECTIVE;
+		}
+		return builtin_procs[id].diverging;
+	}
+	Type *t = tv.type;
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
 }

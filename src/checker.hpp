@@ -59,6 +59,7 @@ struct BuiltinProc {
 	bool     variadic;
 	ExprKind kind;
 	BuiltinProcPkg pkg;
+	bool diverging;
 };
 
 

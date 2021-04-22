@@ -460,8 +460,8 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_i64,               BasicFlag_Integer,                          8, STR_LIT("i64")}},
 	{Type_Basic, {Basic_u64,               BasicFlag_Integer | BasicFlag_Unsigned,     8, STR_LIT("u64")}},
 
-	{Type_Basic, {Basic_i128,               BasicFlag_Integer,                        16, STR_LIT("i128")}},
-	{Type_Basic, {Basic_u128,               BasicFlag_Integer | BasicFlag_Unsigned,   16, STR_LIT("u128")}},
+	{Type_Basic, {Basic_i128,              BasicFlag_Integer,                         16, STR_LIT("i128")}},
+	{Type_Basic, {Basic_u128,              BasicFlag_Integer | BasicFlag_Unsigned,    16, STR_LIT("u128")}},
 
 	{Type_Basic, {Basic_rune,              BasicFlag_Integer | BasicFlag_Rune,         4, STR_LIT("rune")}},
 
@@ -1012,6 +1012,20 @@ bool is_type_integer(Type *t) {
 	}
 	return false;
 }
+bool is_type_integer_like(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Boolean)) != 0;
+	}
+	if (t->kind == Type_BitSet) {
+		if (t->BitSet.underlying) {
+			return is_type_integer_like(t->BitSet.underlying);
+		}
+		return true;
+	}
+	return false;
+}
+
 bool is_type_unsigned(Type *t) {
 	t = base_type(t);
 	// t = core_type(t);

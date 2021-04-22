@@ -41,6 +41,9 @@ enum BuiltinProcId {
 
 	BuiltinProc_alloca,
 	BuiltinProc_cpu_relax,
+	BuiltinProc_trap,
+	BuiltinProc_debug_trap,
+	BuiltinProc_read_cycle_counter,
 
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
@@ -122,6 +125,7 @@ enum BuiltinProcId {
 	BuiltinProc_fixed_point_mul_sat,
 	BuiltinProc_fixed_point_div_sat,
 
+	BuiltinProc_expect,
 
 	// Constant type tests
 
@@ -246,6 +250,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("trap"),               0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/true},
+	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
+	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -326,6 +335,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("fixed_point_div"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_mul_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("expect"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_base_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
