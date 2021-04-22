@@ -2619,12 +2619,11 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 }
 
 Type *make_optional_ok_type(Type *value, bool typed) {
-	// LEAK TODO(bill): probably don't reallocate everything here and reuse the same one for the same type if possible
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	Type *t = alloc_type_tuple();
-	array_init(&t->Tuple.variables, a, 0, 2);
-	array_add (&t->Tuple.variables, alloc_entity_field(nullptr, blank_token, value,  false, 0));
-	array_add (&t->Tuple.variables, alloc_entity_field(nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
+	array_init(&t->Tuple.variables, a, 2);
+	t->Tuple.variables[0] = alloc_entity_field(nullptr, blank_token, value,  false, 0);
+	t->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1);
 	return t;
 }
 

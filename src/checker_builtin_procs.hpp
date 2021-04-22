@@ -50,6 +50,10 @@ enum BuiltinProcId {
 	BuiltinProc_reverse_bits,
 	BuiltinProc_byte_swap,
 
+	BuiltinProc_overflow_add,
+	BuiltinProc_overflow_sub,
+	BuiltinProc_overflow_mul,
+
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
 
@@ -263,6 +267,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("reverse_bits"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("byte_swap"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("overflow_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

@@ -310,7 +310,7 @@ lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
 lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel);
 
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
-lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type);
+lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type);
 void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block);
 lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);

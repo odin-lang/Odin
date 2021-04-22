@@ -1773,18 +1773,26 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memory_equal"),
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
-
-		str_lit("bswap_16"),
-		str_lit("bswap_32"),
-		str_lit("bswap_64"),
-		str_lit("bswap_128"),
-
-		str_lit("bswap_f16"),
-		str_lit("bswap_f32"),
-		str_lit("bswap_f64"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
+	}
+
+	if (!build_context.use_llvm_api) {
+		String other_required_runtime_entities[] = {
+			str_lit("bswap_16"),
+			str_lit("bswap_32"),
+			str_lit("bswap_64"),
+			str_lit("bswap_128"),
+
+			str_lit("bswap_f16"),
+			str_lit("bswap_f32"),
+			str_lit("bswap_f64"),
+		};
+
+		for (isize i = 0; i < gb_count_of(other_required_runtime_entities); i++) {
+			force_add_dependency_entity(c, c->info.runtime_package->scope, other_required_runtime_entities[i]);
+		}
 	}
 
 	if (build_context.no_crt) {
