@@ -14016,11 +14016,28 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMPassRegistryRef pass_registry = LLVMGetGlobalPassRegistry();
 
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(mod);
+	LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(mod);
+	LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(mod);
+	LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager));
+	defer (LLVMDisposePassManager(function_pass_manager_minimal));
+	defer (LLVMDisposePassManager(function_pass_manager_size));
+	defer (LLVMDisposePassManager(function_pass_manager_speed));
 
 	LLVMInitializeFunctionPassManager(default_function_pass_manager);
+	LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
+	LLVMInitializeFunctionPassManager(function_pass_manager_size);
+	LLVMInitializeFunctionPassManager(function_pass_manager_speed);
+
 	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
+	lb_populate_function_pass_manager(function_pass_manager_minimal, false, 0);
+	lb_populate_function_pass_manager(function_pass_manager_size, false, 1);
+	lb_populate_function_pass_manager(function_pass_manager_speed, false, 2);
+
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
+	LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
+	LLVMFinalizeFunctionPassManager(function_pass_manager_size);
+	LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
 
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
@@ -14330,7 +14347,25 @@ void lb_generate_code(lbGenerator *gen) {
 				if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 					LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
 				} else {
-					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+					if (p->entity && p->entity->kind == Entity_Procedure) {
+						switch (p->entity->Procedure.optimization_mode) {
+						case ProcedureOptimizationMode_None:
+						case ProcedureOptimizationMode_Minimal:
+							LLVMRunFunctionPassManager(function_pass_manager_minimal, p->value);
+							break;
+						case ProcedureOptimizationMode_Size:
+							LLVMRunFunctionPassManager(function_pass_manager_size, p->value);
+							break;
+						case ProcedureOptimizationMode_Speed:
+							LLVMRunFunctionPassManager(function_pass_manager_speed, p->value);
+							break;
+						default:
+							LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+							break;
+						}
+					} else {
+						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+					}
 				}
 			}
 		}
