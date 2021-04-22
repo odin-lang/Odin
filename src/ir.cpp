@@ -8257,7 +8257,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	case_end;
 
 	case_ast_node(ac, AutoCast, expr);
-		return ir_build_expr(proc, ac->expr);
+		irValue *value = ir_build_expr(proc, ac->expr);
+		return ir_emit_conv(proc, value, tv.type);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
