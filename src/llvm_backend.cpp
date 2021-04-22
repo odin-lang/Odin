@@ -11164,7 +11164,8 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(ac, AutoCast, expr);
-		return lb_build_expr(p, ac->expr);
+		lbValue value = lb_build_expr(p, ac->expr);
+		return lb_emit_conv(p, value, tv.type);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
