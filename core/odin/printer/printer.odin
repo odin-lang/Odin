@@ -376,7 +376,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 		for format_token, i in line.format_tokens {
 
 			if format_token.kind == .Comment {
-				continue;
+				break;
 			}
 
 			if line_index == 0 && i <= format_index {
@@ -483,10 +483,14 @@ align_var_decls :: proc(p: ^Printer) {
 				not_mutable = true;
 			}
 
-			if line.format_tokens[i].kind == tokenizer.Token_Kind.Proc || 
-			   line.format_tokens[i].kind == tokenizer.Token_Kind.Union ||
-			   line.format_tokens[i].kind == tokenizer.Token_Kind.Enum ||
-			   line.format_tokens[i].kind == tokenizer.Token_Kind.Struct {
+			if line.format_tokens[i].kind == .Proc || 
+			   line.format_tokens[i].kind == .Union ||
+			   line.format_tokens[i].kind == .Enum ||
+			   line.format_tokens[i].kind == .Struct {
+				continue_flag = true;
+			}
+
+			if line.format_tokens[i].kind == .Comment {
 				continue_flag = true;
 			}
 		}
@@ -633,7 +637,7 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 		for format_token, i in line.format_tokens {
 
 			if format_token.kind == .Comment {
-				continue;
+				break;
 			}
 
 			//this will only happen if the case is one lined
@@ -702,7 +706,7 @@ align_enum :: proc(p: ^Printer, index: int) {
 
 		for format_token, i in line.format_tokens {
 			if format_token.kind == .Comment {
-				continue;
+				break;
 			}
 
 			if format_token.kind == .Eq {
@@ -767,7 +771,7 @@ align_struct :: proc(p: ^Printer, index: int) {
 
 		for format_token, i in line.format_tokens {
 			if format_token.kind == .Comment {
-				continue;
+				break;
 			} else if format_token.kind == .Open_Brace {
 				seen_brace = true;
 			} else if format_token.kind == .Close_Brace {
