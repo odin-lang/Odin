@@ -571,6 +571,7 @@ enum BuildFlagKind {
 
 	BuildFlag_OutFile,
 	BuildFlag_OptimizationLevel,
+	BuildFlag_OptimizationMode,
 	BuildFlag_ShowTimings,
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
@@ -687,6 +688,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),                BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String, Command__does_build &~ Command_test);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer, Command__does_build);
+	add_flag(&build_flags, BuildFlag_OptimizationMode,  str_lit("o"),                   BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_OptimizationMode,  str_lit("O"),                   BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None, Command_check);
@@ -885,7 +888,35 @@ bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_OptimizationLevel:
 							GB_ASSERT(value.kind == ExactValue_Integer);
+							if (set_flags[BuildFlag_OptimizationMode]) {
+								gb_printf_err("Mixture of -opt and -o is not allowed\n");
+								bad_flags = true;
+								break;
+							}
 							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
+							break;
+						case BuildFlag_OptimizationMode:
+							GB_ASSERT(value.kind == ExactValue_String);
+							if (set_flags[BuildFlag_OptimizationLevel]) {
+								gb_printf_err("Mixture of -opt and -o is not allowed\n");
+								bad_flags = true;
+								break;
+							}
+
+							if (value.value_string == "minimal") {
+								build_context.optimization_level = 0;
+							} else if (value.value_string == "size") {
+								build_context.optimization_level = 1;
+							} else if (value.value_string == "speed") {
+								build_context.optimization_level = 2;
+							} else {
+								gb_printf_err("Invalid optimization mode for -o:<string>, got %.*s\n", LIT(value.value_string));
+								gb_printf_err("Valid optimization modes:\n");
+								gb_printf_err("\tminimal\n");
+								gb_printf_err("\tsize\n");
+								gb_printf_err("\tspeed\n");
+								bad_flags = true;
+							}
 							break;
 						case BuildFlag_ShowTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1109,8 +1140,16 @@ bool parse_build_flags(Array<String> args) {
 								build_context.build_mode = BuildMode_Executable;
 							} else if (str == "asm" || str == "assembly" || str == "assembler") {
 								build_context.build_mode = BuildMode_Assembly;
+							} else if (str == "llvm" || str == "llvm-ir") {
+								build_context.build_mode = BuildMode_LLVM_IR;
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
+								gb_printf_err("Valid build modes:\n");
+								gb_printf_err("\tdll, shared\n");
+								gb_printf_err("\tobj, object\n");
+								gb_printf_err("\texe\n");
+								gb_printf_err("\tasm, assembly, assembler\n");
+								gb_printf_err("\tllvm, llvm-ir\n");
 								bad_flags = true;
 								break;
 							}
@@ -1612,6 +1651,10 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-all-packages");
 		print_usage_line(2, "Generates documentation for all packages used in the current project");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-doc-format");
+		print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling)");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
@@ -1621,9 +1664,15 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-opt:<integer>");
-		print_usage_line(2, "Set the optimization level for complication");
+		print_usage_line(2, "Set the optimization level for compilation");
 		print_usage_line(2, "Accepted values: 0, 1, 2, 3");
 		print_usage_line(2, "Example: -opt:2");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-o:<string>");
+		print_usage_line(2, "Set the optimization mode for compilation");
+		print_usage_line(2, "Accepted values: minimal, size, speed");
+		print_usage_line(2, "Example: -o:speed");
 		print_usage_line(0, "");
 	}
 

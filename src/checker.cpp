@@ -783,15 +783,6 @@ void init_universal(void) {
 		}
 	}
 
-	// TODO(bill): Set the correct arch for this
-	if (bc->metrics.arch == TargetArch_amd64 || bc->metrics.arch == TargetArch_386) {
-		t_vector_x86_mmx = alloc_type(Type_SimdVector);
-		t_vector_x86_mmx->SimdVector.is_x86_mmx = true;
-
-		Entity *entity = alloc_entity(Entity_TypeName, nullptr, make_token_ident(str_lit("x86_mmx")), t_vector_x86_mmx);
-		add_global_entity(entity, intrinsics_pkg->scope);
-	}
-
 	bool defined_values_double_declaration = false;
 	for_array(i, bc->defined_values.entries) {
 		char const *name = cast(char const *)cast(uintptr)bc->defined_values.entries[i].key.key;
@@ -1782,18 +1773,26 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memory_equal"),
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
-
-		str_lit("bswap_16"),
-		str_lit("bswap_32"),
-		str_lit("bswap_64"),
-		str_lit("bswap_128"),
-
-		str_lit("bswap_f16"),
-		str_lit("bswap_f32"),
-		str_lit("bswap_f64"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
+	}
+
+	if (!build_context.use_llvm_api) {
+		String other_required_runtime_entities[] = {
+			str_lit("bswap_16"),
+			str_lit("bswap_32"),
+			str_lit("bswap_64"),
+			str_lit("bswap_128"),
+
+			str_lit("bswap_f16"),
+			str_lit("bswap_f32"),
+			str_lit("bswap_f64"),
+		};
+
+		for (isize i = 0; i < gb_count_of(other_required_runtime_entities); i++) {
+			force_add_dependency_entity(c, c->info.runtime_package->scope, other_required_runtime_entities[i]);
+		}
 	}
 
 	if (build_context.no_crt) {
@@ -2190,8 +2189,6 @@ Type *check_poly_path_pop(CheckerContext *c) {
 
 
 
-void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
-
 Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 	Array<Entity *> procs = {};
 	if (o.mode == Addressing_ProcGroup) {
@@ -2572,6 +2569,29 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			} else {
 				error(elem, "Expected a boolean value for '%.*s' or no value whatsoever", LIT(name));
 			}
+		}
+		return true;
+	} else if (name == "optimization_mode") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			String mode = ev.value_string;
+			if (mode == "none") {
+				ac->optimization_mode = ProcedureOptimizationMode_None;
+			} else if (mode == "minimal") {
+				ac->optimization_mode = ProcedureOptimizationMode_Minimal;
+			} else if (mode == "size") {
+				ac->optimization_mode = ProcedureOptimizationMode_Size;
+			} else if (mode == "speed") {
+				ac->optimization_mode = ProcedureOptimizationMode_Speed;
+			} else {
+				error(elem, "Invalid optimization_mode for '%.*s'. Valid modes:", LIT(name));
+				error_line("\tnone\n");
+				error_line("\tminimal\n");
+				error_line("\tsize\n");
+				error_line("\tspeed\n");
+			}
+		} else {
+			error(elem, "Expected a string for '%.*s'", LIT(name));
 		}
 		return true;
 	}

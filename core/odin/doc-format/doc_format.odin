@@ -212,11 +212,6 @@ Type_Flag_Bit_Set :: enum u32le {
 	Underlying_Type  = 4,
 }
 
-Type_Flags_SimdVector :: distinct bit_set[Type_Flag_SimdVector; u32le];
-Type_Flag_SimdVector :: enum u32le {
-	x86_mmx = 1,
-}
-
 from_array :: proc(base: ^Header_Base, a: $A/Array($T)) -> []T {
 	s: mem.Raw_Slice;
 	s.data = rawptr(uintptr(base) + uintptr(a.offset));

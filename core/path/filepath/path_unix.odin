@@ -34,8 +34,8 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	defer _unix_free(path_ptr);
 
 	path_cstr := cstring(path_ptr);
-	path = strings.clone(string(path_cstr), allocator);
-	return path, true;
+	path_str := strings.clone(string(path_cstr), allocator);
+	return path_str, true;
 }
 
 join :: proc(elems: ..string, allocator := context.allocator) -> string {

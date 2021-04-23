@@ -624,13 +624,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	}
 
 	case Type_SimdVector:
-		if (t->SimdVector.is_x86_mmx) {
-			ir_write_str_lit(f, "x86_mmx");
-		} else {
-			ir_fprintf(f, "<%lld x ", t->SimdVector.count);;
-			ir_print_type(f, m, t->SimdVector.elem);
-			ir_write_byte(f, '>');
-		}
+		ir_fprintf(f, "<%lld x ", t->SimdVector.count);;
+		ir_print_type(f, m, t->SimdVector.elem);
+		ir_write_byte(f, '>');
 		return;
 
 	case Type_RelativePointer:

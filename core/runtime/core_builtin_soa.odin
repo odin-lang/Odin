@@ -74,7 +74,7 @@ raw_soa_footer :: proc{
 
 
 @builtin
-make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_second {
 	if length <= 0 {
 		return;
 	}
@@ -106,13 +106,15 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 	}
 	assert(allocator.procedure != nil);
 
-	new_data := allocator.procedure(
+	new_bytes: []byte;
+	new_bytes, err = allocator.procedure(
 		allocator.data, .Alloc, total_size, max_align,
-		nil, 0, 0, loc,
+		nil, 0, loc,
 	);
-	if new_data == nil {
+	if new_bytes == nil || err != nil {
 		return;
 	}
+	new_data := raw_data(new_bytes);
 
 	data := uintptr(&array);
 	offset := 0;
@@ -131,7 +133,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 }
 
 @builtin
-make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_second {
 	return make_soa_aligned(T, length, align_of(E), allocator, loc);
 }
 
@@ -226,13 +228,14 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 
 	old_data := (^rawptr)(array)^;
 
-	new_data := array.allocator.procedure(
+	new_bytes, err := array.allocator.procedure(
 		array.allocator.data, .Alloc, new_size, max_align,
-		nil, old_size, 0, loc,
+		nil, old_size, loc,
 	);
-	if new_data == nil {
+	if new_bytes == nil || err != nil {
 		return false;
 	}
+	new_data := raw_data(new_bytes);
 
 
 	footer.cap = capacity;
@@ -256,9 +259,9 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		new_offset += type.size * capacity;
 	}
 
-	array.allocator.procedure(
+	_, err = array.allocator.procedure(
 		array.allocator.data, .Free, 0, max_align,
-		old_data, old_size, 0, loc,
+		old_data, old_size, loc,
 	);
 
 	return true;

@@ -1638,9 +1638,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Simd_Vector:
-		if info.is_x86_mmx {
-			io.write_string(fi.writer, "intrinsics.x86_mmx<>");
-		}
 		io.write_byte(fi.writer, '<');
 		defer io.write_byte(fi.writer, '>');
 		for i in 0..<info.count {

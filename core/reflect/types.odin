@@ -565,14 +565,10 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		n += _n(io.write_byte(w, ']'));
 
 	case Type_Info_Simd_Vector:
-		if info.is_x86_mmx {
-			n += write_string(w, "intrinsics.x86_mmx");
-		} else {
-			n += write_string(w, "#simd[");
-			n += _n(io.write_i64(w, i64(info.count)));
-			n += _n(io.write_byte(w, ']'));
-			n += write_type(w, info.elem);
-		}
+		n += write_string(w, "#simd[");
+		n += _n(io.write_i64(w, i64(info.count)));
+		n += _n(io.write_byte(w, ']'));
+		n += write_type(w, info.elem);
 
 	case Type_Info_Relative_Pointer:
 		n += write_string(w, "#relative(");

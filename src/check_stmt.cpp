@@ -10,7 +10,19 @@ bool is_diverging_stmt(Ast *stmt) {
 		String name = expr->CallExpr.proc->BasicDirective.name;
 		return name == "panic";
 	}
-	Type *t = type_of_expr(expr->CallExpr.proc);
+	Ast *proc = unparen_expr(expr->CallExpr.proc);
+	TypeAndValue tv = proc->tav;
+	if (tv.mode == Addressing_Builtin) {
+		Entity *e = entity_of_node(proc);
+		BuiltinProcId id = BuiltinProc_Invalid;
+		if (e != nullptr) {
+			id = cast(BuiltinProcId)e->Builtin.id;
+		} else {
+			id = BuiltinProc_DIRECTIVE;
+		}
+		return builtin_procs[id].diverging;
+	}
+	Type *t = tv.type;
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
 }
@@ -1751,7 +1763,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						Type *cond_type = t->Tuple.variables[count-1]->type;
 						if (!is_type_boolean(cond_type)) {
 							gbString s = type_to_string(cond_type);
-							error(operand.expr, "The final type of %td-valued tuple must be a boolean, got %s", count, s);
+							error(operand.expr, "The final type of %td-valued expression must be a boolean, got %s", count, s);
 							gb_string_free(s);
 							break;
 						}
@@ -1762,14 +1774,14 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 						if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
 							gbString s = type_to_string(t);
-							error(operand.expr, "Expected a 3-value tuple on the rhs, got (%s)", s);
+							error(operand.expr, "Expected a 3-valued expression on the rhs, got (%s)", s);
 							gb_string_free(s);
 							break;
 						}
 
 						if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
 							gbString s = type_to_string(t);
-							error(operand.expr, "Expected at least a 2-values tuple on the rhs, got (%s)", s);
+							error(operand.expr, "Expected at least a 2-valued expression on the rhs, got (%s)", s);
 							gb_string_free(s);
 							break;
 						}

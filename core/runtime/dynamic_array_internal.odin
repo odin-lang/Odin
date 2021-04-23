@@ -29,10 +29,13 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size;
 	allocator := array.allocator;
 
-	new_data := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, 0, loc);
+	new_data, err := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, loc);
+	if err != nil {
+		return false;
+	}
 	if new_data != nil || elem_size == 0 {
-		array.data = new_data;
-		array.cap = cap;
+		array.data = raw_data(new_data);
+		array.cap = min(cap, len(new_data)/elem_size);
 		return true;
 	}
 	return false;

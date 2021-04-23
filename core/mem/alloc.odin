@@ -28,11 +28,20 @@ Allocator_Query_Info :: struct {
 }
 */
 
+Allocator_Error :: runtime.Allocator_Error;
+/*
+Allocator_Error :: enum byte {
+	None             = 0,
+	Out_Of_Memory    = 1,
+	Invalid_Pointer  = 2,
+	Invalid_Argument = 3,
+}
+*/
 Allocator_Proc :: runtime.Allocator_Proc;
 /*
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
+                             old_memory: rawptr, old_size: int, location: Source_Code_Location = #caller_location) -> ([]byte, Allocator_Error);
 */
 
 Allocator :: runtime.Allocator;
@@ -52,23 +61,49 @@ alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := contex
 	if allocator.procedure == nil {
 		return nil;
 	}
-	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
+	data, err := allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, loc);
+	_ = err;
+	return raw_data(data);
 }
 
-free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
-	if ptr == nil {
-		return;
+alloc_bytes :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	if size == 0 {
+		return nil, nil;
 	}
 	if allocator.procedure == nil {
-		return;
+		return nil, nil;
 	}
-	allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
+	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, loc);
 }
 
-free_all :: proc(allocator := context.allocator, loc := #caller_location) {
-	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
+free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	if ptr == nil {
+		return nil;
 	}
+	if allocator.procedure == nil {
+		return nil;
+	}
+	_, err := allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, loc);
+	return err;
+}
+
+free_bytes :: proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	if bytes == nil {
+		return nil;
+	}
+	if allocator.procedure == nil {
+		return nil;
+	}
+	_, err := allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, raw_data(bytes), len(bytes), loc);
+	return err;
+}
+
+free_all :: proc(allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	if allocator.procedure != nil {
+		_, err := allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, loc);
+		return err;
+	}
+	return nil;
 }
 
 resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
@@ -77,18 +112,40 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 	}
 	if new_size == 0 {
 		if ptr != nil {
-			allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
+			allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc);
 		}
 		return nil;
 	} else if ptr == nil {
-		return allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, 0, loc);
+		_, err := allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc);
+		_ = err;
+		return nil;
 	}
-	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
+	data, err := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc);
+	_ = err;
+	return raw_data(data);
+}
+
+resize_bytes :: proc(old_data: []byte, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	if allocator.procedure == nil {
+		return nil, nil;
+	}
+	ptr := raw_data(old_data);
+	old_size := len(old_data);
+	if new_size == 0 {
+		if ptr != nil {
+			_, err := allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc);
+			return nil, err;
+		}
+		return nil, nil;
+	} else if ptr == nil {
+		return allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc);
+	}
+	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc);
 }
 
 query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: Allocator_Mode_Set) {
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, Allocator_Mode.Query_Features, 0, 0, &set, 0, 0, loc);
+		allocator.procedure(allocator.data, Allocator_Mode.Query_Features, 0, 0, &set, 0, loc);
 		return set;
 	}
 	return nil;
@@ -97,7 +154,7 @@ query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: A
 query_info :: proc(pointer: rawptr, allocator: Allocator, loc := #caller_location) -> (props: Allocator_Query_Info) {
 	props.pointer = pointer;
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, Allocator_Mode.Query_Info, 0, 0, &props, 0, 0, loc);
+		allocator.procedure(allocator.data, Allocator_Mode.Query_Info, 0, 0, &props, 0, loc);
 	}
 	return;
 }
@@ -218,4 +275,28 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	free(old_memory, allocator, loc);
 	return new_memory;
 }
+default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	old_memory := raw_data(old_data);
+	old_size := len(old_data);
+	if old_memory == nil {
+		return alloc_bytes(new_size, alignment, allocator, loc);
+	}
 
+	if new_size == 0 {
+		err := free_bytes(old_data, allocator, loc);
+		return nil, err;
+	}
+
+	if new_size == old_size {
+		return old_data, .None;
+	}
+
+	new_memory, err := alloc_bytes(new_size, alignment, allocator, loc);
+	if new_memory == nil || err != nil {
+		return nil, err;
+	}
+
+	runtime.copy(new_memory, old_data);
+	free_bytes(old_data, allocator, loc);
+	return new_memory, err;
+}

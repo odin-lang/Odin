@@ -79,15 +79,12 @@ void     check_expr_with_type_hint      (CheckerContext *c, Operand *o, Ast *e, 
 Type *   check_type                     (CheckerContext *c, Ast *expression);
 Type *   check_type_expr                (CheckerContext *c, Ast *expression, Type *named_type);
 Type *   make_optional_ok_type          (Type *value, bool typed=true);
-void     check_type_decl                (CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
 Entity * find_polymorphic_record_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure);
 void     check_not_tuple                (CheckerContext *c, Operand *operand);
 void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (Ast *expression);
-void     check_entity_decl              (CheckerContext *c, Entity *e, DeclInfo *decl, Type *named_type);
-void     check_const_decl               (CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);
 void     check_proc_body                (CheckerContext *c, Token token, DeclInfo *decl, Type *type, Ast *body);
 void     update_expr_type               (CheckerContext *c, Ast *e, Type *type, bool final);
 bool     check_is_terminating           (Ast *node, String const &label);
@@ -654,13 +651,27 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 
 	Ast *expr = unparen_expr(operand->expr);
-	if (expr != nullptr && expr->kind == Ast_AutoCast) {
-		Operand x = *operand;
-		x.expr = expr->AutoCast.expr;
-		bool ok = check_cast_internal(c, &x, type);
-		if (ok) {
-			return MAXIMUM_TYPE_DISTANCE;
-		}
+	if (expr != nullptr) {
+		if (expr->kind == Ast_AutoCast) {
+			Operand x = *operand;
+			x.expr = expr->AutoCast.expr;
+			bool ok = check_cast_internal(c, &x, type);
+			if (ok) {
+				return MAXIMUM_TYPE_DISTANCE;
+			}
+		} /*else if (expr->kind == Ast_CallExpr) {
+			// NOTE(bill, 2021-04-19): Allow assignment of procedure calls with #optional_ok
+			ast_node(ce, CallExpr, expr);
+			Type *pt = base_type(type_of_expr(ce->proc));
+			if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
+				Operand x = *operand;
+				x.type = pt->Proc.results->Tuple.variables[0]->type;
+				i64 res = check_distance_between_types(c, &x, type);
+				if (res >= 0) {
+					return res+1;
+				}
+			}
+		}*/
 	}
 
 	return -1;
@@ -774,6 +785,8 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 			      LIT(context_name));
 			operand->mode = Addressing_Invalid;
 		}
+
+
 		return;
 	}
 
@@ -1714,12 +1727,14 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 }
 
 
-void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
+void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 	GB_ASSERT(o->mode == Addressing_Constant);
-	if (!is_type_constant_type(type) || !check_representable_as_constant(c, o->value, type, &o->value)) {
+	if (!is_type_constant_type(type) || !check_representable_as_constant(ctx, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
+		gbString c = type_to_string(o->type);
 		defer(
+			gb_string_free(c);
 			gb_string_free(b);
 			gb_string_free(a);
 			o->mode = Addressing_Invalid;
@@ -1729,12 +1744,12 @@ void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
-				error(o->expr, "Cannot convert '%s' to '%s'", a, b);
-				check_assignment_error_suggestion(c, o, type);
+				error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
+				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
-			error(o->expr, "Cannot convert '%s' to '%s'", a, b);
-			check_assignment_error_suggestion(c, o, type);
+			error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
+			check_assignment_error_suggestion(ctx, o, type);
 		}
 	}
 }
@@ -2224,6 +2239,26 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	// if (is_type_tuple(src)) {
+	// 	Ast *expr = unparen_expr(operand->expr);
+	// 	if (expr && expr->kind == Ast_CallExpr) {
+	// 		// NOTE(bill, 2021-04-19): Allow casting procedure calls with #optional_ok
+	// 		ast_node(ce, CallExpr, expr);
+	// 		Type *pt = base_type(type_of_expr(ce->proc));
+	// 		if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
+	// 			if (pt->Proc.result_count > 0) {
+	// 				Operand op = *operand;
+	// 				op.type = pt->Proc.results->Tuple.variables[0]->type;
+	// 				bool ok = check_is_castable_to(c, &op, y);
+	// 				if (ok) {
+	// 					ce->optional_ok_one = true;
+	// 				}
+	// 				return ok;
+	// 			}
+	// 		}
+	// 	}
+	// }
+
 	if (is_constant && is_type_untyped(src) && is_type_string(src)) {
 		if (is_type_u8_array(dst)) {
 			String s = operand->value.value_string;
@@ -2339,6 +2374,7 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
 		return true;
 	}
+
 	return false;
 }
 
@@ -2728,31 +2764,27 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		ExactValue a = x->value;
 		ExactValue b = y->value;
 
-		// Type *type = base_type(x->type);
-		Type *type = x->type;
-		if (is_type_pointer(type)) {
-			GB_ASSERT(op.kind == Token_Sub);
-			i64 bytes = a.value_pointer - b.value_pointer;
-			i64 diff = bytes/type_size_of(type);
-			x->value = exact_value_pointer(diff);
-			return;
-		}
-
-		if (!is_type_constant_type(type)) {
+		if (!is_type_constant_type(x->type)) {
+		#if 0
 			gbString xt = type_to_string(x->type);
 			gbString err_str = expr_to_string(node);
 			error(op, "Invalid type, '%s', for constant binary expression '%s'", xt, err_str);
 			gb_string_free(err_str);
 			gb_string_free(xt);
 			x->mode = Addressing_Invalid;
+		#else
+			// NOTE(bill, 2021-04-21): The above is literally a useless error message.
+			// Why did I add it in the first place?!
+			x->mode = Addressing_Value;
+		#endif
 			return;
 		}
 
-		if (op.kind == Token_Quo && is_type_integer(type)) {
+		if (op.kind == Token_Quo && is_type_integer(x->type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
 		}
 
-		if (is_type_bit_set(type)) {
+		if (is_type_bit_set(x->type)) {
 			switch (op.kind) {
 			case Token_Add: op.kind = Token_Or;     break;
 			case Token_Sub: op.kind = Token_AndNot; break;
@@ -2761,11 +2793,11 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 		x->value = exact_binary_operator_value(op.kind, a, b);
 
-		if (is_type_typed(type)) {
+		if (is_type_typed(x->type)) {
 			if (node != nullptr) {
 				x->expr = node;
 			}
-			check_is_expressible(c, x, type);
+			check_is_expressible(c, x, x->type);
 		}
 		return;
 	} else if (is_type_string(x->type)) {
@@ -2797,8 +2829,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 
 void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
+	GB_ASSERT(e != nullptr);
 	ExprInfo *found = check_get_expr_info(&c->checker->info, e);
 	if (found == nullptr) {
+		if (type != nullptr && type != t_invalid) {
+			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
+				add_type_and_value(&c->checker->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+			}
+		}
 		return;
 	}
 	ExprInfo old = *found;
@@ -2865,6 +2903,7 @@ void update_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
 void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_type) {
 	gbString expr_str = expr_to_string(operand->expr);
 	gbString type_str = type_to_string(target_type);
+	gbString from_type_str = type_to_string(operand->type);
 	char const *extra_text = "";
 
 	if (operand->mode == Addressing_Constant) {
@@ -2875,8 +2914,9 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 			}
 		}
 	}
-	error(operand->expr, "Cannot convert '%s' to '%s'%s", expr_str, type_str, extra_text);
+	error(operand->expr, "Cannot convert '%s' to '%s' from '%s'%s", expr_str, type_str, from_type_str, extra_text);
 
+	gb_string_free(from_type_str);
 	gb_string_free(type_str);
 	gb_string_free(expr_str);
 	operand->mode = Addressing_Invalid;
@@ -5717,8 +5757,131 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_NoValue;
 		break;
 
+	case BuiltinProc_trap:
+	case BuiltinProc_debug_trap:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+		}
+		operand->mode = Addressing_NoValue;
+		break;
 
+	case BuiltinProc_read_cycle_counter:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+		}
+		operand->mode = Addressing_Value;
+		operand->type = t_i64;
+		break;
 
+	case BuiltinProc_count_ones:
+	case BuiltinProc_trailing_zeros:
+	case BuiltinProc_reverse_bits:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+
+			if (!is_type_integer_like(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			} else if (x.type == t_llvm_bool) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
+	case BuiltinProc_byte_swap:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+
+			if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			} else if (x.type == t_llvm_bool) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+			}
+			i64 sz = type_size_of(x.type);
+			if (sz < 2) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Type passed to '%.*s' must be at least 2 bytes, got %s with size of %lld", LIT(builtin_procs[id].name), xts, sz);
+				gb_string_free(xts);
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
+	case BuiltinProc_overflow_add:
+	case BuiltinProc_overflow_sub:
+	case BuiltinProc_overflow_mul:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &x, y.type);
+			if (is_type_untyped(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			if (!is_type_integer(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected an integer for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			Type *ct = core_type(x.type);
+			if (is_type_different_to_arch_endianness(ct)) {
+				GB_ASSERT(ct->kind == Type_Basic);
+				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+					gb_string_free(xts);
+					return false;
+				}
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = make_optional_ok_type(default_type(x.type), false); // Just reusing this procedure, it's not optional
+		}
+		break;
 
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
@@ -5859,8 +6022,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_fixed_point_div_sat:
 		{
 			if (!build_context.use_llvm_api) {
-				error(ce->args[0], "%.*s is not supported on this backend", LIT(builtin_procs[id].name));
-				return false;
+				error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+				// continue anyway
 			}
 
 			Operand x = {};
@@ -5885,7 +6048,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!are_types_identical(x.type, y.type)) {
 				gbString xts = type_to_string(x.type);
 				gbString yts = type_to_string(y.type);
-				error(x.expr, "Mismatched types for %.*s, %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
 				gb_string_free(yts);
 				gb_string_free(xts);
 				return false;
@@ -5893,7 +6056,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer(x.type) || is_type_untyped(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected an integer type for %.*s, got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Expected an integer type for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
 				gb_string_free(xts);
 				return false;
 			}
@@ -5903,17 +6066,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 			if (z.mode != Addressing_Constant || !is_type_integer(z.type)) {
-				error(z.expr, "Expected a constant integer for the scale in %.*s", LIT(builtin_procs[id].name));
+				error(z.expr, "Expected a constant integer for the scale in '%.*s'", LIT(builtin_procs[id].name));
 				return false;
 			}
 			i64 n = exact_value_to_i64(z.value);
 			if (n <= 0) {
-				error(z.expr, "Scale parameter in %.*s must be positive, got %lld", LIT(builtin_procs[id].name), n);
+				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_procs[id].name), n);
 				return false;
 			}
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
-				error(z.expr, "Scale parameter in %.*s is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_procs[id].name), n, sz);
+				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_procs[id].name), n, sz);
 				return false;
 			}
 
@@ -5921,6 +6084,59 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 		}
 		break;
+
+
+	case BuiltinProc_expect:
+		if (!build_context.use_llvm_api) {
+			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
+			// continue anyway
+		}
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &x, y.type);
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				*operand = x; // minimize error propagation
+				return true;
+			}
+
+			if (!is_type_integer_like(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				*operand = x;
+				return true;
+			}
+
+			if (y.mode != Addressing_Constant) {
+				error(y.expr, "Second argument to '%.*s' must be constant as it is the expected value", LIT(builtin_procs[id].name));
+			}
+
+			if (x.mode == Addressing_Constant) {
+				// NOTE(bill): just completely ignore this intrinsic entirely
+				*operand = x;
+				return true;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+		}
+		break;
+
 
 
 
@@ -6462,17 +6678,38 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (lhs.count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
-				Type *tuple = make_optional_ok_type(o.type);
-				add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+			    	bool do_normal = true;
+				Ast *expr = unparen_expr(o.expr);
 
-				Operand val = o;
-				Operand ok = o;
-				val.mode = Addressing_Value;
-				ok.mode  = Addressing_Value;
-				ok.type  = t_untyped_bool;
-				array_add(operands, val);
-				array_add(operands, ok);
+				Operand val0 = o;
+				Operand val1 = o;
+				val0.mode = Addressing_Value;
+				val1.mode = Addressing_Value;
+				val1.type = t_untyped_bool;
 
+
+				if (expr->kind == Ast_CallExpr) {
+					Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
+					if (is_type_proc(pt)) {
+						do_normal = false;
+						Type *tuple = pt->Proc.results;
+						add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+
+						if (pt->Proc.result_count >= 2) {
+							Type *t1 = tuple->Tuple.variables[1]->type;
+							val1.type = t1;
+						}
+						expr->CallExpr.optional_ok_one = false;
+					}
+				}
+
+				if (do_normal) {
+					Type *tuple = make_optional_ok_type(o.type);
+					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+				}
+
+				array_add(operands, val0);
+				array_add(operands, val1);
 				optional_ok = true;
 				tuple_index += 2;
 			} else if (o.mode == Addressing_OptionalOk && is_type_tuple(o.type)) {
@@ -6493,27 +6730,12 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			if (o.mode == Addressing_OptionalOk  && is_type_tuple(o.type) && lhs.count == 1) {
-				GB_ASSERT(tuple->variables.count == 2);
-				Ast *expr = unparen_expr(o.expr);
-				if (expr->kind == Ast_CallExpr) {
-					expr->CallExpr.optional_ok_one = true;
-				}
-				Operand val = o;
-				val.type = tuple->variables[0]->type;
-				val.mode = Addressing_Value;
-				array_add(operands, val);
-				tuple_index += tuple->variables.count;
-
-				add_type_and_value(c->info, val.expr, val.mode, val.type, val.value);
-			} else {
-				for_array(j, tuple->variables) {
-					o.type = tuple->variables[j]->type;
-					array_add(operands, o);
-				}
-
-				tuple_index += tuple->variables.count;
+			for_array(j, tuple->variables) {
+				o.type = tuple->variables[j]->type;
+				array_add(operands, o);
 			}
+
+			tuple_index += tuple->variables.count;
 		}
 	}
 
@@ -6570,18 +6792,38 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
-				Type *tuple = make_optional_ok_type(o.type);
-				add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+				bool do_normal = true;
+				Ast *expr = unparen_expr(o.expr);
 
-				Operand val = o;
-				Operand ok = o;
-				val.mode = Addressing_Value;
-				ok.mode  = Addressing_Value;
-				// ok.type  = t_bool;
-				ok.type  = t_untyped_bool;
-				array_add(operands, val);
-				array_add(operands, ok);
+				Operand val0 = o;
+				Operand val1 = o;
+				val0.mode = Addressing_Value;
+				val1.mode = Addressing_Value;
+				val1.type = t_untyped_bool;
 
+
+				if (expr->kind == Ast_CallExpr) {
+					Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
+					if (is_type_proc(pt)) {
+						do_normal = false;
+						Type *tuple = pt->Proc.results;
+						add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+
+						if (pt->Proc.result_count >= 2) {
+							Type *t1 = tuple->Tuple.variables[1]->type;
+							val1.type = t1;
+						}
+						expr->CallExpr.optional_ok_one = false;
+					}
+				}
+
+				if (do_normal) {
+					Type *tuple = make_optional_ok_type(o.type);
+					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+				}
+
+				array_add(operands, val0);
+				array_add(operands, val1);
 				optional_ok = true;
 				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, 2);
 			} else {
@@ -6590,30 +6832,13 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			if (o.mode == Addressing_OptionalOk && lhs_count == 1) {
-				GB_ASSERT(tuple->variables.count == 2);
-				Ast *expr = unparen_expr(o.expr);
-				if (expr->kind == Ast_CallExpr) {
-					expr->CallExpr.optional_ok_one = true;
-				}
-				Operand val = o;
-				val.type = tuple->variables[0]->type;
-				val.mode = Addressing_Value;
-				array_add(operands, val);
-
-				isize count = tuple->variables.count;
-				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
-
-				add_type_and_value(c->info, val.expr, val.mode, val.type, val.value);
-			} else {
-				for_array(j, tuple->variables) {
-					o.type = tuple->variables[j]->type;
-					array_add(operands, o);
-				}
-
-				isize count = tuple->variables.count;
-				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
+			for_array(j, tuple->variables) {
+				o.type = tuple->variables[j]->type;
+				array_add(operands, o);
 			}
+
+			isize count = tuple->variables.count;
+			tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
 		}
 	}
 
@@ -6863,6 +7088,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
+		add_type_and_value(c->info, ce->proc, Addressing_Value, final_proc_type, {});
 	}
 
 	return err;
@@ -7080,6 +7306,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		data->score = score;
 		data->result_type = pt->results;
 		data->gen_entity = gen_entity;
+		add_type_and_value(c->info, ce->proc, Addressing_Value, proc_type, {});
 	}
 
 	return err;
@@ -7333,7 +7560,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
 			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
 
-
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, e->type, e, operands, CallArgumentMode_ShowErrors, &data);
 			if (err != CallArgumentError_None) {
@@ -7341,7 +7567,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
-
+			if (entity_to_use != nullptr) {
+				update_expr_type(c, operand->expr, entity_to_use->type, true);
+			}
 			return data;
 		}
 
@@ -7613,6 +7841,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
+			if (entity_to_use != nullptr) {
+				update_expr_type(c, operand->expr, entity_to_use->type, true);
+			}
 
 			if (data.gen_entity != nullptr) {
 				Entity *e = data.gen_entity;
@@ -7628,7 +7859,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 				decl->where_clauses_evaluated = true;
 			}
-
 			return data;
 		}
 	} else {
@@ -7644,6 +7874,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
+		if (entity_to_use != nullptr) {
+			update_expr_type(c, operand->expr, entity_to_use->type, true);
+		}
 
 		if (data.gen_entity != nullptr) {
 			Entity *e = data.gen_entity;
@@ -7659,9 +7892,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 			decl->where_clauses_evaluated = true;
 		}
-
 		return data;
 	}
+
 
 	CallArgumentData data = {};
 	data.result_type = t_invalid;
@@ -8147,6 +8380,14 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	}
 
 	Type *pt = base_type(proc_type);
+	if (pt == t_invalid) {
+		if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
+			pt = type_of_expr(operand->expr->CallExpr.proc);
+		}
+		if (pt == t_invalid && data.gen_entity) {
+			pt = data.gen_entity->type;
+		}
+	}
 
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
@@ -8175,7 +8416,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	}
 
 	switch (inlining) {
-	case ProcInlining_inline: {
+	case ProcInlining_inline:
 		if (proc != nullptr) {
 			Entity *e = entity_from_expr(proc);
 			if (e != nullptr && e->kind == Entity_Procedure) {
@@ -8189,16 +8430,31 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 			}
 		}
 		break;
-	}
-
 	case ProcInlining_no_inline:
 		break;
 	}
 
 	operand->expr = call;
 
-	if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
-		operand->mode = Addressing_OptionalOk;
+	{
+		if (proc_type == t_invalid) {
+			// gb_printf_err("%s\n", expr_to_string(operand->expr));
+		}
+		Type *type = nullptr;
+		if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
+			type = type_of_expr(operand->expr->CallExpr.proc);
+		}
+		if (type == nullptr) {
+			type = pt;
+		}
+		type = base_type(type);
+		if (type->kind == Type_Proc && type->Proc.optional_ok) {
+			operand->mode = Addressing_OptionalOk;
+			operand->type = type->Proc.results->Tuple.variables[0]->type;
+			if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
+				operand->expr->CallExpr.optional_ok_one = true;
+			}
+		}
 	}
 
 	// add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
@@ -9179,9 +9435,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (!is_constant) {
 					error(node, "Expected all constant elements for a simd vector");
 				}
-				if (t->SimdVector.is_x86_mmx) {
-					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
-				}
 			}
 
 
@@ -9822,7 +10075,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 		if (type_hint) {
+			Type *type = type_of_expr(ac->expr);
 			check_cast(c, o, type_hint);
+			if (is_type_typed(type) && are_types_identical(type, type_hint)) {
+				if (build_context.vet) {
+					error(node, "Redundant 'auto_cast' applied to expression");
+				} else {
+					warning(node, "Redundant 'auto_cast' applied to expression");
+				}
+			}
+
 		}
 		o->expr = node;
 		return Expr_Expr;
@@ -10563,7 +10825,7 @@ void check_not_tuple(CheckerContext *c, Operand *o) {
 		if (o->type->kind == Type_Tuple) {
 			isize count = o->type->Tuple.variables.count;
 			error(o->expr,
-			      "%td-valued tuple found where single value expected", count);
+			      "%td-valued expression found where single value expected", count);
 			o->mode = Addressing_Invalid;
 			GB_ASSERT(count != 1);
 		}

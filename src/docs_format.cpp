@@ -114,10 +114,6 @@ enum OdinDocTypeFlag_BitSet : u32 {
 	OdinDocTypeFlag_BitSet_UnderlyingType = 1<<4,
 };
 
-enum OdinDocTypeFlag_SimdVector : u32 {
-	OdinDocTypeFlag_BitSet_x86_mmx = 1<<1,
-};
-
 enum {
 	// constants
 	OdinDocType_ElemsCap = 4,
