@@ -42,7 +42,7 @@ comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
 }
 
 @(private)
-next_comment_group :: proc(p: ^Printer) { 
+next_comment_group :: proc(p: ^Printer) {
 	p.latest_comment_index += 1;
 }
 
