@@ -616,6 +616,13 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 	largest    := 0;
 	case_count := 0;
 
+	TokenAndLength :: struct {
+		format_token: ^Format_Token,
+		length:       int,
+	};
+
+	format_tokens := make([dynamic] TokenAndLength, 0, brace_token.parameter_count, context.temp_allocator);
+
 	//find all the switch cases that are one lined
 	for line, line_index in p.lines[brace_line + 1:] {
 
@@ -623,7 +630,7 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 		colon_found := false;
 		length      := 0;
 
-		for format_token in line.format_tokens {
+		for format_token, i in line.format_tokens {
 
 			if format_token.kind == .Comment {
 				continue;
@@ -631,6 +638,7 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 
 			//this will only happen if the case is one lined
 			if case_found && colon_found {
+				append(&format_tokens, TokenAndLength { format_token = &line.format_tokens[i], length = length });
 				largest = max(length, largest);
 				break;
 			}
@@ -650,38 +658,10 @@ align_switch_stmt :: proc(p: ^Printer, index: int) {
 		}
 	}
 
-	case_count = 0;
-
-	for line, line_index in p.lines[brace_line + 1:] {
-		case_found  := false;
-		colon_found := false;
-		length      := 0;
-
-		for format_token, i in line.format_tokens {
-			if format_token.kind == .Comment {
-				continue;
-			}
-
-			//this will only happen if the case is one lined
-			if case_found && colon_found {
-				line.format_tokens[i].spaces_before = (largest - length) + 1;
-				break;
-			}
-
-			if format_token.kind == .Case {
-				case_found = true;
-				case_count += 1;
-			} else if format_token.kind == .Colon {
-				colon_found = true;
-			}
-
-			length += len(format_token.text) + format_token.spaces_before;
-		}
-
-		if case_count >= brace_token.parameter_count {
-			break;
-		}
+	for token in format_tokens {
+		token.format_token.spaces_before = largest - token.length + 1;
 	}
+
 }
 
 align_enum :: proc(p: ^Printer, index: int) {
@@ -710,15 +690,23 @@ align_enum :: proc(p: ^Printer, index: int) {
 	largest     := 0;
 	comma_count := 0;
 
+	TokenAndLength :: struct {
+		format_token: ^Format_Token,
+		length:       int,
+	};
+
+	format_tokens := make([dynamic] TokenAndLength, 0, brace_token.parameter_count, context.temp_allocator);
+
 	for line, line_index in p.lines[brace_line + 1:] {
 		length := 0;
 
-		for format_token in line.format_tokens {
+		for format_token, i in line.format_tokens {
 			if format_token.kind == .Comment {
 				continue;
 			}
 
 			if format_token.kind == .Eq {
+				append(&format_tokens, TokenAndLength { format_token = &line.format_tokens[i], length = length });
 				largest = max(length, largest);
 				break;
 			} else if format_token.kind == .Comma {
@@ -733,30 +721,10 @@ align_enum :: proc(p: ^Printer, index: int) {
 		}
 	}
 
-	comma_count = 0;
-
-	for line, line_index in p.lines[brace_line + 1:] {
-		length := 0;
-
-		for format_token, i in line.format_tokens {
-			if format_token.kind == .Comment {
-				continue;
-			}
-
-			if format_token.kind == .Eq {
-				line.format_tokens[i].spaces_before = largest - length + 1;
-				break;
-			} else if format_token.kind == .Comma {
-				comma_count += 1;
-			}
-
-			length += len(format_token.text) + format_token.spaces_before;
-		}
-
-		if comma_count >= brace_token.parameter_count {
-			break;
-		}
+	for token in format_tokens {
+		token.format_token.spaces_before = largest - token.length + 1;
 	}
+
 }
 
 align_struct :: proc(p: ^Printer, index: int) {
