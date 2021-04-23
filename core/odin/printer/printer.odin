@@ -24,7 +24,7 @@ Line :: struct {
 }
 
 /*
-	Represents an singular token in a unwrapped line
+	Represents a singular token in a unwrapped line
 */
 Format_Token :: struct {
 	kind:            tokenizer.Token_Kind,
