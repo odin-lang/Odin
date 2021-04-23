@@ -476,7 +476,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 }
 
 @(private)
-visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing := false) {
+visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing := false, force_newline := false) {
 
 	if len(list) == 0 {
 		return;
@@ -484,9 +484,12 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 
 	//we have to newline the expressions to respect the source
 	for expr, i in list {
-
 		//Don't move the first expression, it looks bad
-		if i != 0 {
+		if i != 0 && force_newline {
+			newline_position(p, 1);
+		}
+
+		else if i != 0 {
 			move_line_limit(p, expr.pos, 1);
 		}
 
@@ -495,6 +498,10 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 		if (i != len(list) - 1 || trailing) && add_comma {
 			push_generic_token(p, .Comma, 0);
 		}
+	}
+
+	if len(list) > 1 && force_newline {
+		newline_position(p, 1);
 	}
 }
 
@@ -506,7 +513,6 @@ visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 	}
 
 	for attribute, i in attributes {
-
 		move_line_limit(p, attribute.pos, 1);
 
 		push_generic_token(p, .At, 0);
@@ -1029,7 +1035,8 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_begin_brace(p, v.pos, .Generic, len(v.fields));
 			newline_position(p, 1);
 			set_source_position(p, v.fields[0].pos);
-			visit_exprs(p, v.fields, true, true);
+			visit_exprs(p, v.fields, true, true, true);
+			set_source_position(p, v.end);
 			visit_end_brace(p, v.end);
 		}
 
