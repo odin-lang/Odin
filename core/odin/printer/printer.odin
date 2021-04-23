@@ -12,6 +12,9 @@ Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, 
 
 Line_Type :: bit_set[Type_Enum];
 
+/*
+	Represents an unwrapped line
+*/
 Line :: struct {
 	format_tokens: [dynamic]Format_Token,
 	finalized:     bool,
@@ -20,6 +23,9 @@ Line :: struct {
 	types:         Line_Type, //for performance, so you don't have to verify what types are in it by going through the tokens - might give problems when adding linebreaking
 }
 
+/*
+	Represents an singular token in a unwrapped line
+*/
 Format_Token :: struct {
 	kind:            tokenizer.Token_Kind,
 	text:            string,
@@ -474,12 +480,12 @@ align_var_decls :: proc(p: ^Printer) {
 		not_mutable   := false;
 		continue_flag := false;
 
-		for i := 0; i < len(line.format_tokens) - 1; i += 1 {
-			if line.format_tokens[i].kind == .Colon && line.format_tokens[i + 1].kind == .Eq {
+		for i := 0; i < len(line.format_tokens); i += 1 {
+			if line.format_tokens[i].kind == .Colon && line.format_tokens[min(i + 1, len(line.format_tokens) - 1)].kind == .Eq {
 				typed = false;
 			}
 
-			if line.format_tokens[i].kind == .Colon && line.format_tokens[i + 1].kind == .Colon {
+			if line.format_tokens[i].kind == .Colon && line.format_tokens[min(i + 1, len(line.format_tokens) - 1)].kind == .Colon {
 				not_mutable = true;
 			}
 
