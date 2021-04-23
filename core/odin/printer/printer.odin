@@ -483,7 +483,10 @@ align_var_decls :: proc(p: ^Printer) {
 				not_mutable = true;
 			}
 
-			if tokenizer.Token_Kind.B_Keyword_Begin <= line.format_tokens[i].kind && line.format_tokens[i].kind <= tokenizer.Token_Kind.B_Keyword_End {
+			if line.format_tokens[i].kind == tokenizer.Token_Kind.Proc || 
+			   line.format_tokens[i].kind == tokenizer.Token_Kind.Union ||
+			   line.format_tokens[i].kind == tokenizer.Token_Kind.Enum ||
+			   line.format_tokens[i].kind == tokenizer.Token_Kind.Struct {
 				continue_flag = true;
 			}
 		}
@@ -496,6 +499,7 @@ align_var_decls :: proc(p: ^Printer) {
 
 			if p.config.align_style == .Align_On_Colon_And_Equals || !current_typed || current_not_mutable {
 				for colon_token in colon_tokens {
+					fmt.println(colon_token);
 					colon_token.format_token.spaces_before = largest_lhs - colon_token.length + 1;
 				}
 			} else if p.config.align_style == .Align_On_Type_And_Equals {
@@ -703,7 +707,7 @@ align_enum :: proc(p: ^Printer, index: int) {
 		return;
 	}
 
-	largest  := 0;
+	largest     := 0;
 	comma_count := 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
@@ -781,30 +785,14 @@ align_struct :: proc(p: ^Printer, index: int) {
 
 	largest     := 0;
 	colon_count := 0;
+	seen_brace  := false;
 
-	for line, line_index in p.lines[brace_line + 1:] {
-		length := 0;
+	TokenAndLength :: struct {
+		format_token: ^Format_Token,
+		length:       int,
+	};
 
-		for format_token in line.format_tokens {
-			if format_token.kind == .Comment {
-				continue;
-			}
-
-			if format_token.kind == .Colon {
-				colon_count += 1;
-				largest = max(length, largest);
-				break;
-			}
-
-			length += len(format_token.text) + format_token.spaces_before;
-		}
-
-		if colon_count >= brace_token.parameter_count {
-			break;
-		}
-	}
-
-	colon_count = 0;
+	format_tokens := make([] TokenAndLength, brace_token.parameter_count, context.temp_allocator);
 
 	for line, line_index in p.lines[brace_line + 1:] {
 		length := 0;
@@ -812,12 +800,18 @@ align_struct :: proc(p: ^Printer, index: int) {
 		for format_token, i in line.format_tokens {
 			if format_token.kind == .Comment {
 				continue;
+			} else if format_token.kind == .Open_Brace {
+				seen_brace = true;
+			} else if format_token.kind == .Close_Brace {
+				seen_brace = false;
+			} else if seen_brace {
+				continue;
 			}
 
 			if format_token.kind == .Colon {
+				format_tokens[colon_count] = { format_token = &line.format_tokens[i + 1], length = length };
 				colon_count += 1;
-				line.format_tokens[i + 1].spaces_before = largest - length + 1;
-				break;
+				largest = max(length, largest);
 			}
 
 			length += len(format_token.text) + format_token.spaces_before;
@@ -827,6 +821,11 @@ align_struct :: proc(p: ^Printer, index: int) {
 			break;
 		}
 	}
+
+	for token in format_tokens {
+		token.format_token.spaces_before = largest - token.length + 1;
+	}
+
 }
 
 align_comments :: proc(p: ^Printer) {

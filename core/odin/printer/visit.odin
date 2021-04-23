@@ -31,7 +31,7 @@ sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
 
 @(private)
 comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
-	
+
 	if len(p.comments) <= p.latest_comment_index {
 		return false;
 	}
@@ -42,7 +42,7 @@ comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
 }
 
 @(private)
-next_comment_group :: proc(p: ^Printer) {
+next_comment_group :: proc(p: ^Printer) { 
 	p.latest_comment_index += 1;
 }
 
@@ -79,7 +79,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 		builder := strings.make_builder(context.temp_allocator);
 
-		c_len := len(comment.text);
+		c_len      := len(comment.text);
 		trim_space := true;
 
 		multilines: [dynamic]string;
@@ -157,7 +157,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 @(private)
 push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 
-	prev_comment: ^tokenizer.Token;
+	prev_comment:       ^tokenizer.Token;
 	prev_comment_lines: int;
 
 	for comment_before_position(p, pos) {
@@ -1141,7 +1141,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Close_Bracket, 0);
 	case Proc_Group:
 
-		push_generic_token(p, v.tok.kind, 0);
+		push_generic_token(p, v.tok.kind, 1);
 
 		if len(v.args) != 0 && v.pos.line != v.args[len(v.args) - 1].pos.line {
 			visit_begin_brace(p, v.pos, .Generic);
@@ -1354,7 +1354,7 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type) {
 		push_generic_token(p, .Gt, 0);
 
 		use_parens := false;
-		use_named := false;
+		use_named  := false;
 
 		if len(proc_type.results.list) > 1 {
 			use_parens = true;
