@@ -343,17 +343,31 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 		return;
 	}
 
-	// IMPORTANT TODO(bill)
-	// Date: 2018-09-29
-	// This assert fails on `using import` if the name of the alias is the same. What should be the expected behaviour?
-	// Namespace collision or override? Overridding is the current behaviour
+	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
+	// original entity was still used check checked, but the checking was only
+	// relying on "constant" data such as the Entity.type and Entity.Constant.value
 	//
-	//     using import "foo"
-	//     bar :: foo.bar;
-
-	// GB_ASSERT_MSG(found_entity == original_entity, "%.*s == %.*s", LIT(found_entity->token.string), LIT(new_entity->token.string));
+	// Therefore two things can be done: the type can be assigned to state that it
+	// has been "evaluated" and the variant data can be copied across
 
 	string_map_set(&found_scope->elements, original_name, new_entity);
+
+	original_entity->type = new_entity->type;
+
+	if (original_entity->identifier == nullptr) {
+		original_entity->identifier = new_entity->identifier;
+	}
+	if (original_entity->identifier != nullptr &&
+	    original_entity->identifier->kind == Ast_Ident) {
+		original_entity->identifier->Ident.entity = new_entity;
+	}
+	original_entity->flags |= EntityFlag_Overridden;
+
+	// IMPORTANT NOTE(bill, 2021-04-10): copy only the variants
+	// This is most likely NEVER required, but it does not at all hurt to keep
+	isize offset = cast(u8 *)&original_entity->Dummy.start - cast(u8 *)original_entity;
+	isize size = gb_size_of(*original_entity) - offset;
+	gb_memmove(cast(u8 *)original_entity, cast(u8 *)new_entity, size);
 }
 
 
@@ -374,6 +388,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	Operand operand = {};
 
+	Entity *other_entity = nullptr;
 	if (init != nullptr) {
 		Entity *entity = nullptr;
 		if (init->kind == Ast_Ident) {
@@ -412,7 +427,6 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 			GB_ASSERT(operand.proc_group->kind == Entity_ProcGroup);
 			// NOTE(bill, 2020-06-10): It is better to just clone the contents than overriding the entity in the scope
 			// Thank goodness I made entities a tagged union to allow for this implace patching
-			// override_entity_in_scope(e, operand.proc_group);
 			e->kind = Entity_ProcGroup;
 			e->ProcGroup.entities = array_clone(heap_allocator(), operand.proc_group->ProcGroup.entities);
 			return;
@@ -454,7 +468,6 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 							error(decl->attributes[0], "Constant alias declarations cannot have attributes");
 						}
 					}
-
 					return;
 				}
 			}
@@ -694,6 +707,18 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->flags |= EntityFlag_Cold;
 	}
 
+	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
+
+
+	switch (e->Procedure.optimization_mode) {
+	case ProcedureOptimizationMode_None:
+	case ProcedureOptimizationMode_Minimal:
+		if (pl->inlining == ProcInlining_inline) {
+			error(e->token, "#force_inline cannot be used in conjunction with the attribute 'optimization_mode' with neither \"none\" nor \"minimal\"");
+		}
+		break;
+	}
+
 	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
@@ -718,11 +743,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
 			gb_string_free(str);
 		}
-		if (pt->calling_convention != ProcCC_Odin &&
-		    pt->calling_convention != ProcCC_Contextless) {
+		if (pt->calling_convention != ProcCC_Odin) {
 			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
-		pt->calling_convention = ProcCC_Contextless;
+		pt->calling_convention = ProcCC_Odin;
 		if (e->pkg->kind == Package_Init) {
 			if (ctx->info->entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
@@ -846,7 +870,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
+void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -946,7 +970,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, 
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
 }
 
-void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) {
+void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
 	GB_ASSERT(pg_entity->kind == Entity_ProcGroup);
 	auto *pge = &pg_entity->ProcGroup;
 	String proc_group_name = pg_entity->token.string;

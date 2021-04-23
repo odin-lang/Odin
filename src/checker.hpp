@@ -59,6 +59,7 @@ struct BuiltinProc {
 	bool     variadic;
 	ExprKind kind;
 	BuiltinProcPkg pkg;
+	bool diverging;
 };
 
 
@@ -112,6 +113,7 @@ struct AttributeContext {
 	String  thread_local_model;
 	String  deprecated_message;
 	DeferredProcedure deferred_procedure;
+	u32 optimization_mode; // ProcedureOptimizationMode
 	struct TypeAtomOpTable *atom_op_table;
 };
 
@@ -395,6 +397,10 @@ void      add_type_info_type      (CheckerContext *c, Type *t);
 void check_add_import_decl(CheckerContext *c, Ast *decl);
 void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
+
+void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
+void check_const_decl(CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);
+void check_type_decl(CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 
 bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global = false);
 void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes);

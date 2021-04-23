@@ -2101,8 +2101,15 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 			}
 			break;
 		}
-		case Type_Pointer: break;
-		case Type_Proc:    break; // NOTE(bill): Just a pointer
+		case Type_Pointer:
+			if (is_type_struct(bt->Pointer.elem)) {
+				// Force to a raw pointer
+				new_type = t_rawptr;
+			}
+			break;
+		case Type_Proc:
+			new_type = t_rawptr;
+			break; // NOTE(bill): Just a pointer
 
 		// Odin specific
 		case Type_Slice:
@@ -2194,6 +2201,10 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 		return new_type;
 	}
 
+	if (is_type_pointer(single_type)) {
+		// NOTE(bill): Force a cast to prevent a possible type cycle
+		return t_rawptr;
+	}
 
 	if (build_context.ODIN_OS == "windows") {
 		if (build_context.ODIN_ARCH == "amd64") {
@@ -2450,6 +2461,24 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 			}
 		}
 	}
+	if (pt->tags & ProcTag_optional_second) {
+		if (optional_ok) {
+			error(proc_type_node, "A procedure type cannot have both an #optional_ok tag and #optional_second");
+		}
+		optional_ok = true;
+		if (result_count != 2) {
+			error(proc_type_node, "A procedure type with the #optional_second tag requires 2 return values, got %td", result_count);
+		} else {
+			bool ok = false;
+			if (proc_type_node->file && proc_type_node->file->pkg) {
+				ok = proc_type_node->file->pkg->scope == ctx->info->runtime_package->scope;
+			}
+
+			if (!ok) {
+				error(proc_type_node, "A procedure type with the #optional_second may only be allowed within 'package runtime'");
+			}
+		}
+	}
 
 	type->Proc.node                 = proc_type_node;
 	type->Proc.scope                = c->scope;
@@ -2590,12 +2619,11 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 }
 
 Type *make_optional_ok_type(Type *value, bool typed) {
-	// LEAK TODO(bill): probably don't reallocate everything here and reuse the same one for the same type if possible
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	Type *t = alloc_type_tuple();
-	array_init(&t->Tuple.variables, a, 0, 2);
-	array_add (&t->Tuple.variables, alloc_entity_field(nullptr, blank_token, value,  false, 0));
-	array_add (&t->Tuple.variables, alloc_entity_field(nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
+	array_init(&t->Tuple.variables, a, 2);
+	t->Tuple.variables[0] = alloc_entity_field(nullptr, blank_token, value,  false, 0);
+	t->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1);
 	return t;
 }
 

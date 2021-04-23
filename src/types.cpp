@@ -283,7 +283,6 @@ struct TypeProc {
 	TYPE_KIND(SimdVector, struct {                        \
 		i64   count;                                      \
 		Type *elem;                                       \
-		bool is_x86_mmx;                                  \
 	})                                                    \
 	TYPE_KIND(RelativePointer, struct {                   \
 		Type *pointer_type;                               \
@@ -460,8 +459,8 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_i64,               BasicFlag_Integer,                          8, STR_LIT("i64")}},
 	{Type_Basic, {Basic_u64,               BasicFlag_Integer | BasicFlag_Unsigned,     8, STR_LIT("u64")}},
 
-	{Type_Basic, {Basic_i128,               BasicFlag_Integer,                        16, STR_LIT("i128")}},
-	{Type_Basic, {Basic_u128,               BasicFlag_Integer | BasicFlag_Unsigned,   16, STR_LIT("u128")}},
+	{Type_Basic, {Basic_i128,              BasicFlag_Integer,                         16, STR_LIT("i128")}},
+	{Type_Basic, {Basic_u128,              BasicFlag_Integer | BasicFlag_Unsigned,    16, STR_LIT("u128")}},
 
 	{Type_Basic, {Basic_rune,              BasicFlag_Integer | BasicFlag_Rune,         4, STR_LIT("rune")}},
 
@@ -678,8 +677,6 @@ gb_global Type *t_source_code_location_ptr       = nullptr;
 
 gb_global Type *t_map_hash                       = nullptr;
 gb_global Type *t_map_header                     = nullptr;
-
-gb_global Type *t_vector_x86_mmx                 = nullptr;
 
 
 gb_global Type *t_equal_proc  = nullptr;
@@ -1012,6 +1009,20 @@ bool is_type_integer(Type *t) {
 	}
 	return false;
 }
+bool is_type_integer_like(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Boolean)) != 0;
+	}
+	if (t->kind == Type_BitSet) {
+		if (t->BitSet.underlying) {
+			return is_type_integer_like(t->BitSet.underlying);
+		}
+		return true;
+	}
+	return false;
+}
+
 bool is_type_unsigned(Type *t) {
 	t = base_type(t);
 	// t = core_type(t);
@@ -1468,7 +1479,7 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	if (t->kind == Type_BitSet) {
 		t = bit_set_to_int(t);
 	}
-	GB_ASSERT(t->kind == Type_Basic);
+	GB_ASSERT_MSG(t->kind == Type_Basic, "%s", type_to_string(t));
 
 	switch (t->Basic.kind) {
 	// Endian Specific Types
@@ -2148,12 +2159,8 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_SimdVector:
 		if (y->kind == Type_SimdVector) {
-			if (x->SimdVector.is_x86_mmx == y->SimdVector.is_x86_mmx) {
-				if (x->SimdVector.is_x86_mmx) {
-					return true;
-				} else if (x->SimdVector.count == y->SimdVector.count) {
-					return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
-				}
+			if (x->SimdVector.count == y->SimdVector.count) {
+				return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
 			}
 		}
 		break;
@@ -2953,9 +2960,6 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_SimdVector: {
-		if (t->SimdVector.is_x86_mmx) {
-			return 8;
-		}
 		// align of
 		i64 count = t->SimdVector.count;
 		Type *elem = t->SimdVector.elem;
@@ -3219,9 +3223,6 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_SimdVector: {
-		if (t->SimdVector.is_x86_mmx) {
-			return 8;
-		}
 		i64 count = t->SimdVector.count;
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
@@ -3656,12 +3657,8 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_SimdVector:
-		if (type->SimdVector.is_x86_mmx) {
-			return gb_string_appendc(str, "intrinsics.x86_mmx");
-		} else {
-			str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
-			str = write_type_to_string(str, type->SimdVector.elem);
-		}
+		str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
+		str = write_type_to_string(str, type->SimdVector.elem);
 		break;
 
 	case Type_RelativePointer:

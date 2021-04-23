@@ -104,6 +104,7 @@ enum BuildModeKind {
 	BuildMode_DynamicLibrary,
 	BuildMode_Object,
 	BuildMode_Assembly,
+	BuildMode_LLVM_IR,
 };
 
 enum CommandKind : u32 {
@@ -113,7 +114,7 @@ enum CommandKind : u32 {
 	Command_query   = 1<<4,
 	Command_doc     = 1<<5,
 	Command_version = 1<<6,
-	Command_test     = 1<<7,
+	Command_test    = 1<<7,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test,
 	Command__does_build = Command_run|Command_build|Command_test,
@@ -838,7 +839,7 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		}
-		if (!bc->use_llvm_api) {
+		if ((bc->command_kind & Command__does_build) != 0 && !bc->use_llvm_api) {
 			gb_printf_err("The arm64 architecture is only supported with -llvm-api\n");;
 			gb_exit(1);
 		}

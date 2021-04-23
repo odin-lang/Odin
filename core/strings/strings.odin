@@ -33,6 +33,21 @@ unsafe_string_to_cstring :: proc(str: string) -> cstring {
 	return cstring(d.data);
 }
 
+truncate_to_byte :: proc(str: string, b: byte) -> string {
+	n := index_byte(str, b);
+	if n < 0 {
+		n = len(str);
+	}
+	return str[:n];
+}
+truncate_to_rune :: proc(str: string, r: rune) -> string {
+	n := index_rune(str, r);
+	if n < 0 {
+		n = len(str);
+	}
+	return str[:n];
+}
+
 // Compares two strings, returning a value representing which one comes first lexiographically.
 // -1 for `a`; 1 for `b`, or 0 if they are equal.
 compare :: proc(lhs, rhs: string) -> int {

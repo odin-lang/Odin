@@ -228,6 +228,7 @@ once_do :: proc(o: ^Once, fn: proc()) {
 	}
 }
 
+@(cold)
 _once_do_slow :: proc(o: ^Once, fn: proc()) {
 	mutex_lock(&o.m);
 	defer mutex_unlock(&o.m);
