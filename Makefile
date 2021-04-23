@@ -23,6 +23,8 @@ release:
 
 nightly:
 	$(CC) src/main.cpp $(DISABLED_WARNINGS) $(CFLAGS) -DNIGHTLY -O3 $(LDFLAGS) -o odin
-
+	
+install: debug demo
+	@sudo ln -s $PWD/odin /usr/bin/odin;
 
 
