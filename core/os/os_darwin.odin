@@ -484,6 +484,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE;
 		}
 	}
+  return;
 }
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {

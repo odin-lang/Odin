@@ -10,6 +10,11 @@ ifeq ($(OS), Darwin)
 	LDFLAGS:=$(LDFLAGS) -liconv
 endif
 
+# ifeq ($(OS), Linux)
+#     CFLAGS  += $(shell llvm-config --cflags) -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
+#     LDFLAGS += $(shell llvm-config --ldflags --libs)
+# endif
+
 all: debug demo
 
 demo:
