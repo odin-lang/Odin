@@ -4295,7 +4295,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	lb_start_block(p, done);
 }
 
-void lb_build_inline_range_stmt(lbProcedure *p, AstInlineRangeStmt *rs, Scope *scope) {
+void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
 	lbModule *m = p->module;
 
 	lb_open_scope(p, scope); // Open scope here
@@ -5288,7 +5288,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		lb_build_range_stmt(p, rs, node->scope);
 	case_end;
 
-	case_ast_node(rs, InlineRangeStmt, node);
+	case_ast_node(rs, UnrollRangeStmt, node);
 		lb_build_inline_range_stmt(p, rs, node->scope);
 	case_end;
 
@@ -9103,50 +9103,13 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_trailing_zeros:
-		{
-			lbValue x = lb_build_expr(p, ce->args[0]);
-			x = lb_emit_conv(p, x, tv.type);
-
-			char const *name = "llvm.cttz";
-			LLVMTypeRef types[1] = {lb_type(p->module, tv.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
-			LLVMValueRef args[2] = {};
-			args[0] = x.value;
-			args[1] = LLVMConstNull(LLVMInt1TypeInContext(p->module->ctx));
-
-			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = tv.type;
-			return res;
-		}
+		return lb_emit_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 
 	case BuiltinProc_count_ones:
+		return lb_emit_count_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+
 	case BuiltinProc_reverse_bits:
-		{
-			lbValue x = lb_build_expr(p, ce->args[0]);
-			x = lb_emit_conv(p, x, tv.type);
-
-			char const *name = nullptr;
-			switch (id) {
-			case BuiltinProc_count_ones:     name = "llvm.ctpop";      break;
-			case BuiltinProc_reverse_bits:   name = "llvm.bitreverse"; break;
-			}
-			LLVMTypeRef types[1] = {lb_type(p->module, tv.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
-			LLVMValueRef args[1] = {};
-			args[0] = x.value;
-
-			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = tv.type;
-			return res;
-		}
+		return lb_emit_reverse_bits(p, lb_build_expr(p, ce->args[0]), tv.type);
 
 	case BuiltinProc_byte_swap:
 		{
@@ -9982,6 +9945,72 @@ lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type) {
 	}
 	res.type = end_type;
 	return res;
+}
+
+
+lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.ctpop";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[1] = {};
+	args[0] = x.value;
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+
+lbValue lb_emit_trailing_zeros(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.cttz";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[2] = {};
+	args[0] = x.value;
+	args[1] = LLVMConstNull(LLVMInt1TypeInContext(p->module->ctx));
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+
+lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.bitreverse";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[1] = {};
+	args[0] = x.value;
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+
+lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x) {
+	GB_ASSERT(is_type_bit_set(x.type));
+	Type *underlying = bit_set_to_int(x.type);
+	lbValue card = lb_emit_count_ones(p, x, underlying);
+	return lb_emit_conv(p, card, t_int);
 }
 
 

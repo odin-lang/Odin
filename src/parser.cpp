@@ -58,7 +58,7 @@ Token ast_token(Ast *node) {
 	case Ast_ReturnStmt:         return node->ReturnStmt.token;
 	case Ast_ForStmt:            return node->ForStmt.token;
 	case Ast_RangeStmt:          return node->RangeStmt.token;
-	case Ast_InlineRangeStmt:    return node->InlineRangeStmt.inline_token;
+	case Ast_UnrollRangeStmt:    return node->UnrollRangeStmt.unroll_token;
 	case Ast_CaseClause:         return node->CaseClause.token;
 	case Ast_SwitchStmt:         return node->SwitchStmt.token;
 	case Ast_TypeSwitchStmt:     return node->TypeSwitchStmt.token;
@@ -319,11 +319,11 @@ Ast *clone_ast(Ast *node) {
 		n->RangeStmt.expr  = clone_ast(n->RangeStmt.expr);
 		n->RangeStmt.body  = clone_ast(n->RangeStmt.body);
 		break;
-	case Ast_InlineRangeStmt:
-		n->InlineRangeStmt.val0  = clone_ast(n->InlineRangeStmt.val0);
-		n->InlineRangeStmt.val1  = clone_ast(n->InlineRangeStmt.val1);
-		n->InlineRangeStmt.expr  = clone_ast(n->InlineRangeStmt.expr);
-		n->InlineRangeStmt.body  = clone_ast(n->InlineRangeStmt.body);
+	case Ast_UnrollRangeStmt:
+		n->UnrollRangeStmt.val0  = clone_ast(n->UnrollRangeStmt.val0);
+		n->UnrollRangeStmt.val1  = clone_ast(n->UnrollRangeStmt.val1);
+		n->UnrollRangeStmt.expr  = clone_ast(n->UnrollRangeStmt.expr);
+		n->UnrollRangeStmt.body  = clone_ast(n->UnrollRangeStmt.body);
 		break;
 	case Ast_CaseClause:
 		n->CaseClause.list  = clone_ast_array(n->CaseClause.list);
@@ -851,15 +851,15 @@ Ast *ast_range_stmt(AstFile *f, Token token, Slice<Ast *> vals, Token in_token, 
 	return result;
 }
 
-Ast *ast_inline_range_stmt(AstFile *f, Token inline_token, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
-	Ast *result = alloc_ast_node(f, Ast_InlineRangeStmt);
-	result->InlineRangeStmt.inline_token = inline_token;
-	result->InlineRangeStmt.for_token = for_token;
-	result->InlineRangeStmt.val0 = val0;
-	result->InlineRangeStmt.val1 = val1;
-	result->InlineRangeStmt.in_token = in_token;
-	result->InlineRangeStmt.expr  = expr;
-	result->InlineRangeStmt.body  = body;
+Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+	Ast *result = alloc_ast_node(f, Ast_UnrollRangeStmt);
+	result->UnrollRangeStmt.unroll_token = unroll_token;
+	result->UnrollRangeStmt.for_token = for_token;
+	result->UnrollRangeStmt.val0 = val0;
+	result->UnrollRangeStmt.val1 = val1;
+	result->UnrollRangeStmt.in_token = in_token;
+	result->UnrollRangeStmt.expr  = expr;
+	result->UnrollRangeStmt.body  = body;
 	return result;
 }
 
@@ -4258,9 +4258,9 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 }
 
 
-Ast *parse_unrolled_for_loop(AstFile *f, Token inline_token) {
-	if (inline_token.kind == Token_inline) {
-		syntax_warning(inline_token, "'inline for' is deprecated in favour of `#unroll for'");
+Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
+	if (unroll_token.kind == Token_inline) {
+		syntax_warning(unroll_token, "'inline for' is deprecated in favour of `#unroll for'");
 	}
 	Token for_token = expect_token(f, Token_for);
 	Ast *val0 = nullptr;
@@ -4308,9 +4308,9 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token inline_token) {
 		body = parse_block_stmt(f, false);
 	}
 	if (bad_stmt) {
-		return ast_bad_stmt(f, inline_token, f->curr_token);
+		return ast_bad_stmt(f, unroll_token, f->curr_token);
 	}
-	return ast_inline_range_stmt(f, inline_token, for_token, val0, val1, in_token, expr, body);
+	return ast_unroll_range_stmt(f, unroll_token, for_token, val0, val1, in_token, expr, body);
 }
 
 Ast *parse_stmt(AstFile *f) {
@@ -4320,8 +4320,8 @@ Ast *parse_stmt(AstFile *f) {
 	// Operands
 	case Token_inline:
 		if (peek_token_kind(f, Token_for)) {
-			Token inline_token = expect_token(f, Token_inline);
-			return parse_unrolled_for_loop(f, inline_token);
+			Token unroll_token = expect_token(f, Token_inline);
+			return parse_unrolled_for_loop(f, unroll_token);
 		}
 		/* fallthrough */
 	case Token_no_inline:

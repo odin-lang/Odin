@@ -10892,8 +10892,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		ir_start_block(proc, done);
 	case_end;
 
-	case_ast_node(rs, InlineRangeStmt, node);
-		ir_emit_comment(proc, str_lit("InlineRangeStmt"));
+	case_ast_node(rs, UnrollRangeStmt, node);
+		ir_emit_comment(proc, str_lit("UnrollRangeStmt"));
 		ir_open_scope(proc); // Open scope here
 
 		irBlock *done = ir_new_block(proc, node, "inline.for.done");
