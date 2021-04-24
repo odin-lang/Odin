@@ -465,7 +465,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 }
 
 @private
-_readlink :: proc(path: string) -> (string, Errno) {
+_readlink :: proc(path: string) -> (re:string, err:Errno) {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator);
 
 	bufsz : uint = 256;
