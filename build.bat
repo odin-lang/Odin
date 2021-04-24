@@ -59,10 +59,37 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
+cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name% ^
+	&& odin check examples/demo
+
+rem odin run examples/demo -llvm-api
+
+rem odin build examples/demo -llvm-api -build-mode:llvm-ir -o:minimal
+
+rem odin build examples/demo -llvm-api -keep-temp-files -opt:2
+
+rem cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name% ^
+rem 	&& odin doc examples/demo -doc-format -all-packages ^
+rem 	&& odin run misc/tools/odin-doc-reader -strict-style -llvm-api
+
+rem odin run misc/tools/odin-doc-reader -strict-style -llvm-api
+
+rem odin build examples/demo -llvm-api -build-mode:assembly -target:darwin_arm64
+rem odin build examples/new_sync -llvm-api -target:linux_amd64 -define:ODIN_USE_PTHREADS=true
+rem odin test core/path -llvm-api
+rem odin test core/thread -llvm-api -target:windows_amd64
+rem odin test core/sync/sync2 -llvm-api -target:linux_amd64 -define:ODIN_USE_PTHREADS=true
+rem odin test core/thread -llvm-api -target:linux_amd64
+rem odin test core/thread -llvm-api -target:linux_amd64
+rem odin check core/os/os2 -no-entry-point -vet
+rem odin test core/sync/sync2 -llvm-api -target:windows_amd64
+
+rem cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
+rem 	&& odin run examples/new_sync -llvm-api
+
 
 if %errorlevel% neq 0 goto end_of_build
-if %release_mode% EQU 0 odin run examples/demo/demo.odin
+rem if %release_mode% EQU 0 odin run examples/demo/demo.odin
 
 del *.obj > NUL 2> NUL
 
