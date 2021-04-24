@@ -2323,7 +2323,7 @@ void lb_debug_complete_types(lbModule *m) {
 						for (unsigned i = 0; i < element_count; i++) {
 							u64 offset_in_bits = i;
 							i64 val = bt->BitSet.lower + cast(i64)i;
-							gb_snprintf(name, gb_count_of(name), "%lld", val);
+							gb_snprintf(name, gb_count_of(name), "%lld", cast(long long)val);
 							elements[i] = LLVMDIBuilderCreateBitFieldMemberType(
 								m->debug_builder,
 								scope,
