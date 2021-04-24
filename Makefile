@@ -12,8 +12,8 @@ ifeq ($(OS), Darwin)
 	LDFLAGS:=$(LDFLAGS) $(shell llvm-config) -lLLVM-C
 endif
 ifeq ($(OS), Linux)
-	CFLAGS:=$(CFLAGS) $(shell llvm-config --cxxflags --ldflags) -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
-	LDFLAGS:=$(LDFLAGS) $(shell llvm-config) -lLLVM-C
+	CFLAGS:=$(CFLAGS) $(shell llvm-config-11 --cxxflags --ldflags) -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
+	LDFLAGS:=$(LDFLAGS) $(shell llvm-config-11) -lLLVM-C
 endif
 
 all: debug demo
