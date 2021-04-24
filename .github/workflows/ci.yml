@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM
-        run: sudo apt-get install llvm-11 llvm-11
+        run: sudo apt-get install libllvm-11 llvm-11
       - name: build odin
         run: make release
       - name: Odin run
