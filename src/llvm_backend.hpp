@@ -1,4 +1,3 @@
-#if defined(LLVM_BACKEND_SUPPORT)
 #if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Core.h"
 #include "llvm-c/ExecutionEngine.h"
@@ -29,7 +28,6 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#endif
 #endif
 
 struct lbProcedure;

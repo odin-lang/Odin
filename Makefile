@@ -8,11 +8,11 @@ OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
 	LDFLAGS:=$(LDFLAGS) -liconv
-	CFLAGS:=$(CFLAGS) $(shell llvm-config --cxxflags --ldflags) -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
+	CFLAGS:=$(CFLAGS) $(shell llvm-config --cxxflags --ldflags)
 	LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
 ifeq ($(OS), Linux)
-	CFLAGS:=$(CFLAGS) $(shell llvm-config-11 --cxxflags --ldflags) -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
+	CFLAGS:=$(CFLAGS) $(shell llvm-config-11 --cxxflags --ldflags)
 	LDFLAGS:=$(LDFLAGS) $(shell llvm-config-11 --libs core native --system-libs)
 endif
 
