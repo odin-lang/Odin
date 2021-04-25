@@ -27,8 +27,7 @@ if "%2" == "1" (
 set odin_version_raw="dev-%curr_year%-%curr_month%"
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
-set compiler_defines=
-rem -DODIN_VERSION_RAW=%odin_version_raw%
+set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
