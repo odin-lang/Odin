@@ -1923,6 +1923,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_count_ones:
+	case BuiltinProc_count_zeros:
 	case BuiltinProc_count_trailing_zeros:
 	case BuiltinProc_count_leading_zeros:
 	case BuiltinProc_reverse_bits:

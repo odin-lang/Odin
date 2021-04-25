@@ -24,68 +24,18 @@ I32_MAX :: 1 << 31 - 1;
 I64_MAX :: 1 << 63 - 1;
 
 
-count_ones     :: intrinsics.count_ones;
-trailing_zeros :: intrinsics.count_trailing_zeros;
-leading_zeros  :: intrinsics.count_leading_zeros;
+count_ones           :: intrinsics.count_ones;
+count_zeros          :: intrinsics.count_zeros;
+trailing_zeros       :: intrinsics.count_trailing_zeros;
+leading_zeros        :: intrinsics.count_leading_zeros;
 count_trailing_zeros :: intrinsics.count_trailing_zeros;
 count_leading_zeros  :: intrinsics.count_leading_zeros;
-reverse_bits   :: intrinsics.reverse_bits;
-byte_swap :: intrinsics.byte_swap;
+reverse_bits         :: intrinsics.reverse_bits;
+byte_swap            :: intrinsics.byte_swap;
 
-
-
-byte_swap_u16 :: proc(x: u16) -> u16 {
-	return runtime.bswap_16(x);
-}
-byte_swap_u32 :: proc(x: u32) -> u32 {
-	return runtime.bswap_32(x);
-}
-byte_swap_u64 :: proc(x: u64) -> u64 {
-	return runtime.bswap_64(x);
-}
-byte_swap_i16 :: proc(x: i16) -> i16 {
-	return i16(runtime.bswap_16(u16(x)));
-}
-byte_swap_i32 :: proc(x: i32) -> i32 {
-	return i32(runtime.bswap_32(u32(x)));
-}
-byte_swap_i64 :: proc(x: i64) -> i64 {
-	return i64(runtime.bswap_64(u64(x)));
-}
-byte_swap_u128 :: proc(x: u128) -> u128 {
-	return runtime.bswap_128(x);
-}
-byte_swap_i128 :: proc(x: i128) -> i128 {
-	return i128(runtime.bswap_128(u128(x)));
-}
-
-byte_swap_uint :: proc(i: uint) -> uint {
-	when size_of(uint) == size_of(u32) {
-		return uint(byte_swap_u32(u32(i)));
-	} else {
-		return uint(byte_swap_u64(u64(i)));
-	}
-}
-byte_swap_int :: proc(i: int) -> int {
-	when size_of(int) == size_of(i32) {
-		return int(byte_swap_i32(i32(i)));
-	} else {
-		return int(byte_swap_i64(i64(i)));
-	}
-}
-
-
-count_zeros8   :: proc(i:   u8) ->   u8 { return   8 - count_ones(i); }
-count_zeros16  :: proc(i:  u16) ->  u16 { return  16 - count_ones(i); }
-count_zeros32  :: proc(i:  u32) ->  u32 { return  32 - count_ones(i); }
-count_zeros64  :: proc(i:  u64) ->  u64 { return  64 - count_ones(i); }
-
-count_zeros :: proc{
-	count_zeros8,
-	count_zeros16,
-	count_zeros32,
-	count_zeros64,
-};
+overflowing_add :: intrinsics.overflow_add;
+overflowing_sub :: intrinsics.overflow_sub;
+overflowing_mul :: intrinsics.overflow_mul;
 
 
 rotate_left8 :: proc(x: u8,  k: int) -> u8 {
@@ -140,11 +90,6 @@ to_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i; }
 to_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
 to_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
 
-
-
-overflowing_add :: intrinsics.overflow_add;
-overflowing_sub :: intrinsics.overflow_sub;
-overflowing_mul :: intrinsics.overflow_mul;
 
 
 len_u8 :: proc(x: u8) -> int {

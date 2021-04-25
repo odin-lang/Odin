@@ -46,6 +46,7 @@ enum BuiltinProcId {
 	BuiltinProc_read_cycle_counter,
 
 	BuiltinProc_count_ones,
+	BuiltinProc_count_zeros,
 	BuiltinProc_count_trailing_zeros,
 	BuiltinProc_count_leading_zeros,
 	BuiltinProc_reverse_bits,
@@ -265,6 +266,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_leading_zeros"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("reverse_bits"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
