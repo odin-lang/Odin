@@ -47,6 +47,7 @@ enum BuiltinProcId {
 
 	BuiltinProc_count_ones,
 	BuiltinProc_trailing_zeros,
+	BuiltinProc_leading_zeros,
 	BuiltinProc_reverse_bits,
 	BuiltinProc_byte_swap,
 
@@ -265,6 +266,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("count_ones"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("leading_zeros"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("reverse_bits"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("byte_swap"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

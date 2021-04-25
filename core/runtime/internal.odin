@@ -415,59 +415,32 @@ foreign {
 	@(link_name="llvm.sqrt.f64") _sqrt_f64 :: proc(x: f64) -> f64 ---
 }
 abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
-	foreign {
-		@(link_name="llvm.fabs.f16") _abs :: proc "none" (x: f16) -> f16 ---
-	}
-	return _abs(x);
+	return -x if x < 0 else x;
 }
 abs_f32 :: #force_inline proc "contextless" (x: f32) -> f32 {
-	foreign {
-		@(link_name="llvm.fabs.f32") _abs :: proc "none" (x: f32) -> f32 ---
-	}
-	return _abs(x);
+	return -x if x < 0 else x;
 }
 abs_f64 :: #force_inline proc "contextless" (x: f64) -> f64 {
-	foreign {
-		@(link_name="llvm.fabs.f64") _abs :: proc "none" (x: f64) -> f64 ---
-	}
-	return _abs(x);
+	return -x if x < 0 else x;
 }
 
 min_f16 :: proc(a, b: f16) -> f16 {
-	foreign {
-		@(link_name="llvm.minnum.f16") _min :: proc "none" (a, b: f16) -> f16 ---
-	}
-	return _min(a, b);
+	return a if a < b else b;
 }
 min_f32 :: proc(a, b: f32) -> f32 {
-	foreign {
-		@(link_name="llvm.minnum.f32") _min :: proc "none" (a, b: f32) -> f32 ---
-	}
-	return _min(a, b);
+	return a if a < b else b;
 }
 min_f64 :: proc(a, b: f64) -> f64 {
-	foreign {
-		@(link_name="llvm.minnum.f64") _min :: proc "none" (a, b: f64) -> f64 ---
-	}
-	return _min(a, b);
+	return a if a < b else b;
 }
 max_f16 :: proc(a, b: f16) -> f16 {
-	foreign {
-		@(link_name="llvm.maxnum.f16") _max :: proc "none" (a, b: f16) -> f16 ---
-	}
-	return _max(a, b);
+	return a if a > b else b;
 }
 max_f32 :: proc(a, b: f32) -> f32 {
-	foreign {
-		@(link_name="llvm.maxnum.f32") _max :: proc "none" (a, b: f32) -> f32 ---
-	}
-	return _max(a, b);
+	return a if a > b else b;
 }
 max_f64 :: proc(a, b: f64) -> f64 {
-	foreign {
-		@(link_name="llvm.maxnum.f64") _max :: proc "none" (a, b: f64) -> f64 ---
-	}
-	return _max(a, b);
+	return a if a > b else b;
 }
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {

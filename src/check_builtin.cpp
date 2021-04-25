@@ -1924,6 +1924,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_count_ones:
 	case BuiltinProc_trailing_zeros:
+	case BuiltinProc_leading_zeros:
 	case BuiltinProc_reverse_bits:
 		{
 			Operand x = {};
