@@ -10,8 +10,6 @@ jobs:
         run: sudo apt-get install llvm-11 clang-11 llvm
       - name: build odin
         run: make release
-      - name: Odin run -llvm-api
-        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Odin check
@@ -29,9 +27,7 @@ jobs:
       - name: build odin
         run: make release
       - name: Odin run
-        run: |
-          ./odin run examples/demo/demo.odin
-          ./odin run examples/demo/demo.odin -llvm-api
+        run: ./odin run examples/demo/demo.odin
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
   build_windows:
