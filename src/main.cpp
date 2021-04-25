@@ -2049,7 +2049,7 @@ int main(int arg_count, char const **arg_ptr) {
 		#endif
 
 		#ifdef GIT_SHA
-		gb_printf("-%s", GIT_SHA);
+		gb_printf(":%s", GIT_SHA);
 		#endif
 
 		gb_printf("\n");
