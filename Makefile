@@ -1,7 +1,7 @@
 GIT_SHA=$(shell git rev-parse --short HEAD)
 DISABLED_WARNINGS=-Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined
 LDFLAGS=-pthread -ldl -lm -lstdc++
-CFLAGS=-std=c++11 -DGIT_SHA=\"$(GIT_SHA)\"
+CFLAGS=-std=c++14 -DGIT_SHA=\"$(GIT_SHA)\"
 CC=clang
 
 OS=$(shell uname)
@@ -13,7 +13,7 @@ ifeq ($(OS), Darwin)
 endif
 ifeq ($(OS), Linux)
 	CFLAGS:=$(CFLAGS) $(shell llvm-config-11 --cxxflags --ldflags) -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
-	LDFLAGS:=$(LDFLAGS) $(shell llvm-config-11) -lLLVM-C
+	LDFLAGS:=$(LDFLAGS) $(shell llvm-config-11 --libs core native --system-libs)
 endif
 
 all: debug demo
