@@ -2169,6 +2169,7 @@ GB_DEF f64   gb_random_range_f64     (gbRandom *r, f64 lower_inc, f64 higher_inc
 
 GB_DEF void gb_exit     (u32 code);
 GB_DEF void gb_yield    (void);
+GB_DEF char const *gb_get_env  (char const *name, gbAllocator allocator);
 GB_DEF void gb_set_env  (char const *name, char const *value);
 GB_DEF void gb_unset_env(char const *name);
 
@@ -9173,6 +9174,47 @@ gb_inline void gb_yield(void) {
 	sched_yield();
 #endif
 }
+
+char const *gb_get_env(char const *name, gbAllocator allocator) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (!name || *name) {
+			return NULL;
+		} else {
+			// TODO(bill): Should this be a Wide version?
+			DWORD cap = 100;
+			char *buf = gb_alloc_array(allocator, char, cap);
+			for (;;) {
+				DWORD n = GetEnvironmentVariableA(name, buf, cap-1);
+				if (n == 0) {
+					DWORD err = GetLastError();
+					if (err == ERROR_ENVVAR_NOT_FOUND) {
+						return NULL;
+					}
+				}
+
+				if (n <= cap) {
+					buf[n] = 0;
+					return buf;
+				}
+
+
+				buf = cast(char *)gb_resize(allocator, buf, gb_size_of(char)*cap, gb_size_of(char)*cap*2);
+				cap = cap*2;
+			}
+		}
+	#else
+		if (!name || *name) {
+			return NULL;
+		} else {
+			char const *res = getenv(name);
+			if (!res) {
+				return NULL;
+			}
+			return gb_alloc_str(allocator, res);
+		}
+	#endif
+}
+
 
 gb_inline void gb_set_env(char const *name, char const *value) {
 #if defined(GB_SYSTEM_WINDOWS)
