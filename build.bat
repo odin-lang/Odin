@@ -65,7 +65,7 @@ cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name% ^
 	&& odin run examples/demo
 
 if %errorlevel% neq 0 goto end_of_build
-rem if %release_mode% EQU 0 odin run examples/demo/demo.odin
+if %release_mode% EQU 0 odin run examples/demo/demo.odin
 
 del *.obj > NUL 2> NUL
 
