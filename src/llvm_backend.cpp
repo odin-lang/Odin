@@ -9113,6 +9113,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_count_ones:
 		return lb_emit_count_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_zeros:
+		return lb_emit_count_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 
 	case BuiltinProc_reverse_bits:
 		return lb_emit_reverse_bits(p, lb_build_expr(p, ce->args[0]), tv.type);
@@ -9970,6 +9972,14 @@ lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type) {
 	res.type = type;
 	return res;
 }
+
+lbValue lb_emit_count_zeros(lbProcedure *p, lbValue x, Type *type) {
+	i64 sz = 8*type_size_of(type);
+	lbValue size = lb_const_int(p->module, type, cast(u64)sz);
+	lbValue count = lb_emit_count_ones(p, x, type);
+	return lb_emit_arith(p, Token_Sub, size, count, type);
+}
+
 
 
 lbValue lb_emit_count_trailing_zeros(lbProcedure *p, lbValue x, Type *type) {
