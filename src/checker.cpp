@@ -732,15 +732,11 @@ void init_universal(void) {
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
 
 	{
-		void set_procedure_abi_types(Type *type);
-
 		Type *equal_args[2] = {t_rawptr, t_rawptr};
 		t_equal_proc = alloc_type_proc_from_types(equal_args, 2, t_bool, false, ProcCC_Contextless);
-		set_procedure_abi_types(t_equal_proc);
 
 		Type *hasher_args[2] = {t_rawptr, t_uintptr};
 		t_hasher_proc = alloc_type_proc_from_types(hasher_args, 2, t_uintptr, false, ProcCC_Contextless);
-		set_procedure_abi_types(t_hasher_proc);
 	}
 
 // Constants

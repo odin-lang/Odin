@@ -103,10 +103,6 @@ CallArgumentData check_call_arguments   (CheckerContext *c, Operand *operand, Ty
 Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
 
-Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCallingConvention cc);
-Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCallingConvention cc);
-bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type);
-void set_procedure_abi_types(Type *type);
 void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
@@ -1086,10 +1082,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				Entity *b = y->results->Tuple.variables[i];
 				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
 				if (!ok) return false;
-			}
-
-			if (modify_type) {
-				set_procedure_abi_types(source);
 			}
 
 			return true;
