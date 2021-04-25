@@ -1194,7 +1194,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_UseLLVMApi:
+							gb_printf_err("-llvm-api flag is not required any more\n");
 							build_context.use_llvm_api = true;
+							bad_flags = true;
 							break;
 
 						case BuildFlag_IgnoreUnknownAttributes:
