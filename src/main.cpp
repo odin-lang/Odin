@@ -33,9 +33,6 @@ gb_global Timings global_timings = {0};
 	#endif
 #endif
 
-#include "ir.cpp"
-#include "ir_opt.cpp"
-#include "ir_print.cpp"
 #include "query_data.cpp"
 
 
