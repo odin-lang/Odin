@@ -782,6 +782,8 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->link_flags  = str_lit(" ");
 	bc->opt_flags   = str_lit(" ");
 
+	bc->use_llvm_api = true;
+
 
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
 	if (bc->ODIN_DEBUG) {
