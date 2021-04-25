@@ -2545,8 +2545,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	Type *pt = base_type(entity->type);
 	GB_ASSERT(pt->kind == Type_Proc);
 
-	set_procedure_abi_types(entity->type);
-
 	p->type           = entity->type;
 	p->type_expr      = decl->type_expr;
 	p->body           = pl->body;
@@ -2844,6 +2842,14 @@ lbValue lb_value_param(lbProcedure *p, Entity *e, Type *abi_type, i32 index, lbP
 	res.type = abi_type;
 	return res;
 }
+
+Type *struct_type_from_systemv_distribute_struct_fields(Type *abi_type) {
+	GB_ASSERT(is_type_tuple(abi_type));
+	Type *final_type = alloc_type_struct();
+	final_type->Struct.fields = abi_type->Tuple.variables;
+	return final_type;
+}
+
 
 lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 index) {
 	lbParamPasskind kind = lbParamPass_Value;
@@ -3476,9 +3482,6 @@ void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e) {
 	name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%d", LIT(p->name), LIT(pd_name), guid);
 	String name = make_string(cast(u8 *)name_text, name_len-1);
 
-	set_procedure_abi_types(e->type);
-
-
 	e->Procedure.link_name = name;
 
 	lbProcedure *nested_proc = lb_create_procedure(p->module, e);
@@ -3613,7 +3616,6 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 				return;
 			}
 
-			set_procedure_abi_types(e->type);
 			e->Procedure.link_name = name;
 
 			lbProcedure *nested_proc = lb_create_procedure(p->module, e);
@@ -8201,8 +8203,6 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		LLVMBuildUnreachable(p->builder);
 	});
 
-	set_procedure_abi_types(pt);
-
 	bool is_c_vararg = pt->Proc.c_vararg;
 	isize param_count = pt->Proc.param_count;
 	if (is_c_vararg) {
@@ -9584,7 +9584,6 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	Type *proc_type_ = base_type(value.type);
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
-	set_procedure_abi_types(proc_type_);
 
 	if (is_call_expr_field_value(ce)) {
 		auto args = array_make<lbValue>(permanent_allocator(), pt->param_count);
@@ -10765,8 +10764,6 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	String name = make_string((u8 *)name_text, name_len-1);
 
 	Type *type = type_of_expr(expr);
-	set_procedure_abi_types(type);
-
 
 	Token token = {};
 	token.pos = ast_token(expr).pos;
