@@ -25,22 +25,13 @@ I64_MAX :: 1 << 63 - 1;
 
 
 count_ones     :: intrinsics.count_ones;
-trailing_zeros :: intrinsics.trailing_zeros;
+trailing_zeros :: intrinsics.count_trailing_zeros;
+leading_zeros  :: intrinsics.count_leading_zeros;
+count_trailing_zeros :: intrinsics.count_trailing_zeros;
+count_leading_zeros  :: intrinsics.count_leading_zeros;
 reverse_bits   :: intrinsics.reverse_bits;
+byte_swap :: intrinsics.byte_swap;
 
-
-leading_zeros_u8  :: proc(i:  u8) -> int {
-	return 8*size_of(i) - len_u8(i);
-}
-leading_zeros_u16 :: proc(i: u16) -> int {
-	return 8*size_of(i) - len_u16(i);
-}
-leading_zeros_u32 :: proc(i: u32) -> int {
-	return 8*size_of(i) - len_u32(i);
-}
-leading_zeros_u64 :: proc(i: u64) -> int {
-	return 8*size_of(i) - len_u64(i);
-}
 
 
 byte_swap_u16 :: proc(x: u16) -> u16 {
@@ -83,18 +74,6 @@ byte_swap_int :: proc(i: int) -> int {
 	}
 }
 
-byte_swap :: proc{
-	byte_swap_u16,
-	byte_swap_u32,
-	byte_swap_u64,
-	byte_swap_u128,
-	byte_swap_i16,
-	byte_swap_i32,
-	byte_swap_i64,
-	byte_swap_i128,
-	byte_swap_uint,
-	byte_swap_int,
-};
 
 count_zeros8   :: proc(i:   u8) ->   u8 { return   8 - count_ones(i); }
 count_zeros16  :: proc(i:  u16) ->  u16 { return  16 - count_ones(i); }
@@ -324,7 +303,7 @@ div_u64 :: proc(hi, lo, y: u64) -> (quo, rem: u64) {
 		panic("overflow error");
 	}
 
-	s := uint(leading_zeros_u64(y));
+	s := uint(count_leading_zeros(y));
 	y <<= s;
 
 	yn1 := y >> 32;

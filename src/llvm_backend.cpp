@@ -9106,10 +9106,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
-	case BuiltinProc_trailing_zeros:
-		return lb_emit_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
-	case BuiltinProc_leading_zeros:
-		return lb_emit_leading_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_trailing_zeros:
+		return lb_emit_count_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_leading_zeros:
+		return lb_emit_count_leading_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 
 	case BuiltinProc_count_ones:
 		return lb_emit_count_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
@@ -9972,7 +9972,7 @@ lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type) {
 }
 
 
-lbValue lb_emit_trailing_zeros(lbProcedure *p, lbValue x, Type *type) {
+lbValue lb_emit_count_trailing_zeros(lbProcedure *p, lbValue x, Type *type) {
 	x = lb_emit_conv(p, x, type);
 
 	char const *name = "llvm.cttz";
@@ -9991,7 +9991,7 @@ lbValue lb_emit_trailing_zeros(lbProcedure *p, lbValue x, Type *type) {
 	return res;
 }
 
-lbValue lb_emit_leading_zeros(lbProcedure *p, lbValue x, Type *type) {
+lbValue lb_emit_count_leading_zeros(lbProcedure *p, lbValue x, Type *type) {
 	x = lb_emit_conv(p, x, type);
 
 	char const *name = "llvm.ctlz";

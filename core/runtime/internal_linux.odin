@@ -98,7 +98,7 @@ floattidf :: proc(a: i128) -> f64 {
 	N :: size_of(i128) * 8;
 	s := a >> (N-1);
 	a = (a ~ s) - s;
-	sd: = N - intrinsics.leading_zeros(a);  // number of significant digits
+	sd: = N - intrinsics.count_leading_zeros(a);  // number of significant digits
 	e := u32(sd - 1);        // exponent
 	if sd > DBL_MANT_DIG {
 		switch sd {
