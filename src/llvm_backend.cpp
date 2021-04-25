@@ -3282,7 +3282,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 	// Make sure every block terminates, and if not, make it unreachable
 	for (block = first_block; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
 		LLVMValueRef instr = LLVMGetLastInstruction(block);
-		if (instr == nullptr) {
+		if (instr == nullptr || !lb_is_instr_terminating(instr)) {
 			LLVMPositionBuilderAtEnd(p->builder, block);
 			LLVMBuildUnreachable(p->builder);
 		}
