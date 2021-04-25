@@ -1,5 +1,7 @@
 package runtime
 
+import "intrinsics"
+
 @(link_name="__umodti3")
 umodti3 :: proc "c" (a, b: u128) -> u128 {
 	r: u128 = ---;
@@ -86,12 +88,6 @@ fixdfti :: proc(a: u64) -> i128 {
 
 }
 
-@(default_calling_convention = "none")
-foreign {
-	@(link_name="llvm.ctlz.i128") _clz_i128 :: proc(x: i128, is_zero_undef := false) -> i128 ---
-}
-
-
 @(link_name="__floattidf")
 floattidf :: proc(a: i128) -> f64 {
 	DBL_MANT_DIG :: 53;
@@ -102,7 +98,7 @@ floattidf :: proc(a: i128) -> f64 {
 	N :: size_of(i128) * 8;
 	s := a >> (N-1);
 	a = (a ~ s) - s;
-	sd: = N - _clz_i128(a);  // number of significant digits
+	sd: = N - intrinsics.leading_zeros((a);  // number of significant digits
 	e := u32(sd - 1);        // exponent
 	if sd > DBL_MANT_DIG {
 		switch sd {
