@@ -9177,7 +9177,7 @@ gb_inline void gb_yield(void) {
 
 char const *gb_get_env(char const *name, gbAllocator allocator) {
 	#if defined(GB_SYSTEM_WINDOWS)
-		if (!name || *name) {
+		if (!name || !*name) {
 			return NULL;
 		} else {
 			// TODO(bill): Should this be a Wide version?
@@ -9203,7 +9203,7 @@ char const *gb_get_env(char const *name, gbAllocator allocator) {
 			}
 		}
 	#else
-		if (!name || *name) {
+		if (!name || !*name) {
 			return NULL;
 		} else {
 			char const *res = getenv(name);
