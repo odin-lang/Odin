@@ -2,6 +2,7 @@ GIT_SHA=$(shell git rev-parse --short HEAD)
 DISABLED_WARNINGS=-Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined
 LDFLAGS=-pthread -ldl -lm -lstdc++
 CFLAGS=-std=c++14 -DGIT_SHA=\"$(GIT_SHA)\"
+CFLAGS:=$(CFLAGS) -DODIN_VERSION_RAW=\"dev-$(shell date +"%Y-%m")\"
 CC=clang
 
 OS=$(shell uname)
