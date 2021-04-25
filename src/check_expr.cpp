@@ -7903,10 +7903,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			error(node, "Inline asm expressions are only allowed within a procedure body");
 		}
 
-		if (!build_context.use_llvm_api) {
-			error(node, "Inline asm expressions are only currently allowed with -llvm-api");
-		}
-
 		auto param_types = array_make<Type *>(heap_allocator(), ia->param_types.count);
 		Type *return_type = nullptr;
 		for_array(i, ia->param_types) {

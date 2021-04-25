@@ -1,7 +1,5 @@
 package sys_cpu
 
-#assert(ODIN_USE_LLVM_API);
-
 Cache_Line_Pad :: struct {_: [_cache_line_size]byte};
 
 initialized: bool;
