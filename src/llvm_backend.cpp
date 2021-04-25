@@ -4641,9 +4641,13 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	lbValue tag_index = {};
 	lbValue union_data = {};
 	if (switch_kind == TypeSwitch_Union) {
-		lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent_ptr);
-		tag_index = lb_emit_load(p, tag_ptr);
 		union_data = lb_emit_conv(p, parent_ptr, t_rawptr);
+		if (is_type_union_maybe_pointer(type_deref(parent_ptr.type))) {
+			tag_index = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
+		} else {
+			lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent_ptr);
+			tag_index = lb_emit_load(p, tag_ptr);
+		}
 	}
 
 	lbBlock *start_block = lb_create_block(p, "typeswitch.case.first");
@@ -11232,8 +11236,15 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 					Type *src_type = type_deref(v.type);
 					Type *dst_type = type;
 
-					lbValue src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-					lbValue dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+					lbValue src_tag = {};
+					lbValue dst_tag = {};
+					if (is_type_union_maybe_pointer(src_type)) {
+						src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
+						dst_tag = lb_const_bool(p->module, t_bool, true);
+					} else {
+						src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
+						dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+					}
 
 					lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
 					auto args = array_make<lbValue>(permanent_allocator(), 6);
