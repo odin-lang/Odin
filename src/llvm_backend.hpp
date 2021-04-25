@@ -395,8 +395,8 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 LLVMMetadataRef lb_debug_type(lbModule *m, Type *type);
 
 lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type);
-lbValue lb_emit_trailing_zeros(lbProcedure *p, lbValue x, Type *type);
-lbValue lb_emit_leading_zeros(lbProcedure *p, lbValue x, Type *type);
+lbValue lb_emit_count_trailing_zeros(lbProcedure *p, lbValue x, Type *type);
+lbValue lb_emit_count_leading_zeros(lbProcedure *p, lbValue x, Type *type);
 lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type);
 
 lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x);
