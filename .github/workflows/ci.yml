@@ -7,9 +7,11 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM
-        run: sudo apt-get install llvm
+        run: sudo apt-get install llvm-11 clang-11 llvm
       - name: build odin
         run: make release
+      - name: Odin run -llvm-api
+        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Odin check
@@ -20,14 +22,16 @@ jobs:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm
+          brew install llvm@11
           echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make release
       - name: Odin run
-        run: ./odin run examples/demo/demo.odin
+        run: |
+          ./odin run examples/demo/demo.odin
+          ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
   build_windows:
