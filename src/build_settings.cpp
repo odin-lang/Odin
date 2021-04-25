@@ -204,8 +204,6 @@ struct BuildContext {
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
 
-	bool   use_llvm_api;
-
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
@@ -782,8 +780,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->link_flags  = str_lit(" ");
 	bc->opt_flags   = str_lit(" ");
 
-	bc->use_llvm_api = true;
-
 
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
 	if (bc->ODIN_DEBUG) {
@@ -840,10 +836,6 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_darwin:
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
-		}
-		if ((bc->command_kind & Command__does_build) != 0 && !bc->use_llvm_api) {
-			gb_printf_err("The arm64 architecture is only supported with -llvm-api\n");;
-			gb_exit(1);
 		}
 
 	} else if (bc->metrics.arch == TargetArch_wasm32) {

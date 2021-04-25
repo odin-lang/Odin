@@ -755,7 +755,6 @@ void init_universal(void) {
 	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
 	add_global_constant(str_lit("ODIN_DISABLE_ASSERT"), t_untyped_bool, exact_value_bool(bc->ODIN_DISABLE_ASSERT));
 	add_global_constant(str_lit("ODIN_DEFAULT_TO_NIL_ALLOCATOR"), t_untyped_bool, exact_value_bool(bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR));
-	add_global_constant(str_lit("ODIN_USE_LLVM_API"), t_untyped_bool, exact_value_bool(bc->use_llvm_api));
 	add_global_constant(str_lit("ODIN_NO_DYNAMIC_LITERALS"), t_untyped_bool, exact_value_bool(bc->no_dynamic_literals));
 	add_global_constant(str_lit("ODIN_TEST"), t_untyped_bool, exact_value_bool(bc->command_kind == Command_test));
 
@@ -1774,23 +1773,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
 	}
 
-	if (!build_context.use_llvm_api) {
-		String other_required_runtime_entities[] = {
-			str_lit("bswap_16"),
-			str_lit("bswap_32"),
-			str_lit("bswap_64"),
-			str_lit("bswap_128"),
-
-			str_lit("bswap_f16"),
-			str_lit("bswap_f32"),
-			str_lit("bswap_f64"),
-		};
-
-		for (isize i = 0; i < gb_count_of(other_required_runtime_entities); i++) {
-			force_add_dependency_entity(c, c->info.runtime_package->scope, other_required_runtime_entities[i]);
-		}
-	}
-
 	if (build_context.no_crt) {
 		String required_no_crt_entities[] = {
 			// NOTE(bill): Only if these exist
@@ -2741,7 +2723,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 					}
 				}
 
-				if (valid && build_context.use_llvm_api) {
+				if (valid) {
 					if (ac->atom_op_table == nullptr) {
 						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
@@ -2800,7 +2782,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 					}
 				}
 
-				if (valid && build_context.use_llvm_api) {
+				if (valid) {
 					if (ac->atom_op_table == nullptr) {
 						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
@@ -2882,7 +2864,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 					}
 				}
 
-				if (valid && build_context.use_llvm_api) {
+				if (valid) {
 					if (ac->atom_op_table == nullptr) {
 						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
