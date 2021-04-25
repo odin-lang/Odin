@@ -10,12 +10,10 @@
 
 gb_global Timings global_timings = {0};
 
-#if defined(LLVM_BACKEND_SUPPORT)
 #if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Types.h"
 #else
 #include <llvm-c/Types.h>
-#endif
 #endif
 
 #include "parser.hpp"
@@ -26,7 +24,6 @@ gb_global Timings global_timings = {0};
 #include "docs.cpp"
 
 
-#if defined(LLVM_BACKEND_SUPPORT)
 #include "llvm_backend.cpp"
 
 #if defined(GB_SYSTEM_OSX)
@@ -34,8 +31,6 @@ gb_global Timings global_timings = {0};
 	#if LLVM_VERSION_MAJOR < 11
 	#error LLVM Version 11+ is required => "brew install llvm@11"
 	#endif
-#endif
-
 #endif
 
 #include "ir.cpp"
@@ -154,7 +149,6 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 
 
-#if defined(LLVM_BACKEND_SUPPORT)
 i32 linker_stage(lbGenerator *gen) {
   i32 result = 0;
   Timings *timings = &global_timings;
@@ -470,7 +464,6 @@ i32 linker_stage(lbGenerator *gen) {
 
 	return result;
 }
-#endif
 
 Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
@@ -2190,7 +2183,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.use_llvm_api) {
-#if defined(LLVM_BACKEND_SUPPORT)
 		timings_start_section(timings, str_lit("LLVM API Code Gen"));
 		lbGenerator gen = {};
 		if (!lb_init_generator(&gen, &checker)) {
@@ -2204,9 +2196,9 @@ int main(int arg_count, char const **arg_ptr) {
 		case BuildMode_Executable:
 		case BuildMode_DynamicLibrary:
 			i32 result = linker_stage(&gen);
-      if(result != 0) {
-        return 1;
-      }
+			if (result != 0) {
+				return 1;
+			}
 			break;
 		}
 
@@ -2257,10 +2249,6 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		return 0;
-#else
-		gb_printf_err("LLVM C API backend is not supported on this platform yet\n");
-		return 1;
-#endif
 	} else {
 		irGen ir_gen = {0};
 		if (!ir_gen_init(&ir_gen, &checker)) {

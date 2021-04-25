@@ -20,7 +20,7 @@ if "%2" == "1" (
 )
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
-set compiler_defines= -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
+set compiler_defines=
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
@@ -59,10 +59,13 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
+rem cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
+
+cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name% ^
+	&& odin run examples/demo
 
 if %errorlevel% neq 0 goto end_of_build
-if %release_mode% EQU 0 odin run examples/demo/demo.odin
+rem if %release_mode% EQU 0 odin run examples/demo/demo.odin
 
 del *.obj > NUL 2> NUL
 
