@@ -14,6 +14,8 @@ jobs:
         run: ./odin run examples/demo/demo.odin
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
+      - name: Odin version
+        run: ./odin version
   build_macOS:
     runs-on: macos-latest
     steps:
@@ -30,6 +32,8 @@ jobs:
         run: ./odin run examples/demo/demo.odin
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
+      - name: Odin version
+        run: ./odin version
   build_windows:
     runs-on: windows-latest
     steps:
@@ -56,5 +60,7 @@ jobs:
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo/demo.odin -vet
+      - name: Odin version
+        run: ./odin version
 
 
