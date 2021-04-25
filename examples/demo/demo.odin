@@ -1109,6 +1109,11 @@ prefix_table := [?]string{
 };
 
 threading_example :: proc() {
+	if ODIN_OS == "darwin" {
+		// TODO: Fix threads on darwin/macOS
+		return;
+	}
+
 	fmt.println("\n# threading_example");
 
 	{ // Basic Threads

@@ -49,9 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: (Linux) Download LLVM
-        run: sudo apt-get install llvm
+        run: sudo apt-get install llvm-11 clang-11 llvm
       - name: build odin
         run: make nightly
+      - name: Odin run -llvm-api
+        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
@@ -78,6 +80,8 @@ jobs:
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make nightly
+      - name: Odin run -llvm-api
+        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
@@ -100,26 +104,26 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-      
+
       - name: Install B2 CLI
         shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade b2
-      
+
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
-      
+
       - name: Download Windows artifacts
         uses: actions/download-artifact@v1
         with:
           name: windows_artifacts
-      
+
       - name: Download Ubuntu artifacts
         uses: actions/download-artifact@v1
         with:
           name: ubuntu_artifacts
-      
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v1
         with:
