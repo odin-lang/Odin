@@ -2183,44 +2183,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 	remove_temp_files(gen.output_base);
 
-#if defined(GB_COMPILER_MSVC)
-	if (false) {
-		PROCESS_MEMORY_COUNTERS_EX pmc = {};
-		GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-		SIZE_T virtual_mem_used_by_me = pmc.PrivateUsage;
-		gb_printf_err("virtual_memory_used:            %tu B\n", virtual_mem_used_by_me);
-
-		Parser *p      = checker.parser;
-		isize lines    = p->total_line_count;
-		isize tokens   = p->total_token_count;
-		isize files    = 0;
-		isize packages = p->packages.count;
-		isize total_file_size = 0;
-		for_array(i, p->packages) {
-			files += p->packages[i]->files.count;
-			for_array(j, p->packages[i]->files) {
-				AstFile *file = p->packages[i]->files[j];
-				total_file_size += file->tokenizer.end - file->tokenizer.start;
-			}
-		}
-		gb_printf_err("total_file_size:                %lld B\n", total_file_size);
-		gb_printf_err("lines:                          %lld\n", lines);
-		gb_printf_err("files:                          %lld\n", files);
-		gb_printf_err("tokens:                         %lld\n", tokens);
-		gb_printf_err("packages:                       %lld\n", packages);
-	}
-#endif
-
 	if (run_output) {
-	#if defined(GB_SYSTEM_WINDOWS)
-		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen.output_base), LIT(run_args_string));
-	#else
-		//NOTE(thebirk): This whole thing is a little leaky
 		String output_ext = {};
 		String complete_path = concatenate_strings(heap_allocator(), gen.output_base, output_ext);
 		complete_path = path_to_full_path(heap_allocator(), complete_path);
 		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
-	#endif
 	}
 
 	return 0;
