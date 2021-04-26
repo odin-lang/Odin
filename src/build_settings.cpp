@@ -450,8 +450,35 @@ bool find_library_collection_path(String name, String *path) {
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
-#if defined(GB_SYSTEM_WINDOWS)
+
+String internal_odin_root_dir(void);
 String odin_root_dir(void) {
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	gbAllocator a = heap_allocator();
+	char const *found = gb_get_env("ODIN_ROOT", a);
+	if (found) {
+		String path = path_to_full_path(a, make_string_c(found));
+		if (path[path.len-1] != '/' && path[path.len-1] != '\\') {
+		#if defined(GB_SYSTEM_WINDOWS)
+			path = concatenate_strings(a, path, WIN32_SEPARATOR_STRING);
+		#else
+			path = concatenate_strings(a, path, NIX_SEPARATOR_STRING);
+		#endif
+		}
+
+		global_module_path = path;
+		global_module_path_set = true;
+		return global_module_path;
+	}
+	return internal_odin_root_dir();
+}
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	gbTempArenaMemory tmp;
@@ -510,7 +537,7 @@ String odin_root_dir(void) {
 
 String path_to_fullpath(gbAllocator a, String s);
 
-String odin_root_dir(void) {
+String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	gbTempArenaMemory tmp;
@@ -568,7 +595,7 @@ String odin_root_dir(void) {
 
 String path_to_fullpath(gbAllocator a, String s);
 
-String odin_root_dir(void) {
+String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	gbTempArenaMemory tmp;
