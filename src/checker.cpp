@@ -3747,6 +3747,19 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 	return empty_path;
 }
 #endif
+
+String get_invalid_import_name(String input) {
+	isize slash = 0;
+	for (isize i = input.len-1; i >= 0; i--) {
+		if (input[i] == '/' || input[i] == '\\') {
+			break;
+		}
+		slash = i;
+	}
+	input = substring(input, slash, input.len);
+	return input;
+}
+
 void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
@@ -3804,7 +3817,14 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		if (id->is_using) {
 			// TODO(bill): Should this be a warning?
 		} else {
-			error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			if (id->import_name.string == "") {
+				String invalid_name = id->fullpath;
+				invalid_name = get_invalid_import_name(invalid_name);
+
+				error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
+			} else {
+				error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			}
 		}
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);
