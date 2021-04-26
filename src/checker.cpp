@@ -732,15 +732,11 @@ void init_universal(void) {
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
 
 	{
-		void set_procedure_abi_types(Type *type);
-
 		Type *equal_args[2] = {t_rawptr, t_rawptr};
 		t_equal_proc = alloc_type_proc_from_types(equal_args, 2, t_bool, false, ProcCC_Contextless);
-		set_procedure_abi_types(t_equal_proc);
 
 		Type *hasher_args[2] = {t_rawptr, t_uintptr};
 		t_hasher_proc = alloc_type_proc_from_types(hasher_args, 2, t_uintptr, false, ProcCC_Contextless);
-		set_procedure_abi_types(t_hasher_proc);
 	}
 
 // Constants
@@ -759,7 +755,6 @@ void init_universal(void) {
 	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
 	add_global_constant(str_lit("ODIN_DISABLE_ASSERT"), t_untyped_bool, exact_value_bool(bc->ODIN_DISABLE_ASSERT));
 	add_global_constant(str_lit("ODIN_DEFAULT_TO_NIL_ALLOCATOR"), t_untyped_bool, exact_value_bool(bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR));
-	add_global_constant(str_lit("ODIN_USE_LLVM_API"), t_untyped_bool, exact_value_bool(bc->use_llvm_api));
 	add_global_constant(str_lit("ODIN_NO_DYNAMIC_LITERALS"), t_untyped_bool, exact_value_bool(bc->no_dynamic_literals));
 	add_global_constant(str_lit("ODIN_TEST"), t_untyped_bool, exact_value_bool(bc->command_kind == Command_test));
 
@@ -1778,23 +1773,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
 	}
 
-	if (!build_context.use_llvm_api) {
-		String other_required_runtime_entities[] = {
-			str_lit("bswap_16"),
-			str_lit("bswap_32"),
-			str_lit("bswap_64"),
-			str_lit("bswap_128"),
-
-			str_lit("bswap_f16"),
-			str_lit("bswap_f32"),
-			str_lit("bswap_f64"),
-		};
-
-		for (isize i = 0; i < gb_count_of(other_required_runtime_entities); i++) {
-			force_add_dependency_entity(c, c->info.runtime_package->scope, other_required_runtime_entities[i]);
-		}
-	}
-
 	if (build_context.no_crt) {
 		String required_no_crt_entities[] = {
 			// NOTE(bill): Only if these exist
@@ -2745,7 +2723,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 					}
 				}
 
-				if (valid && build_context.use_llvm_api) {
+				if (valid) {
 					if (ac->atom_op_table == nullptr) {
 						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
@@ -2804,7 +2782,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 					}
 				}
 
-				if (valid && build_context.use_llvm_api) {
+				if (valid) {
 					if (ac->atom_op_table == nullptr) {
 						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
@@ -2886,7 +2864,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 					}
 				}
 
-				if (valid && build_context.use_llvm_api) {
+				if (valid) {
 					if (ac->atom_op_table == nullptr) {
 						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
@@ -2903,6 +2881,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 
 #include "check_expr.cpp"
+#include "check_builtin.cpp"
 #include "check_type.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
@@ -3280,6 +3259,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			d->attributes = vd->attributes;
 			d->type_expr = vd->type;
 			d->init_expr = init;
+
 
 			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
@@ -3747,6 +3727,19 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 	return empty_path;
 }
 #endif
+
+String get_invalid_import_name(String input) {
+	isize slash = 0;
+	for (isize i = input.len-1; i >= 0; i--) {
+		if (input[i] == '/' || input[i] == '\\') {
+			break;
+		}
+		slash = i;
+	}
+	input = substring(input, slash, input.len);
+	return input;
+}
+
 void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
@@ -3804,7 +3797,14 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		if (id->is_using) {
 			// TODO(bill): Should this be a warning?
 		} else {
-			error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			if (id->import_name.string == "") {
+				String invalid_name = id->fullpath;
+				invalid_name = get_invalid_import_name(invalid_name);
+
+				error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
+			} else {
+				error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			}
 		}
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);

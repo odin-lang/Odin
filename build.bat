@@ -1,5 +1,10 @@
 @echo off
 
+setlocal EnableDelayedExpansion
+
+set curr_year=%DATE:~-4%
+set curr_month=%DATE:~3,2%
+
 :: Make sure this is a decent name and not generic
 set exe_name=odin.exe
 
@@ -19,8 +24,10 @@ if "%2" == "1" (
     set nightly=0
 )
 
+set odin_version_raw="dev-%curr_year%-%curr_month%"
+
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
-set compiler_defines= -DLLVM_BACKEND_SUPPORT -DUSE_NEW_LLVM_ABI_SYSTEM
+set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"

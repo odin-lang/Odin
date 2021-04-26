@@ -20,6 +20,8 @@
 //
 package runtime
 
+import "intrinsics"
+
 // NOTE(bill): This must match the compiler's
 Calling_Convention :: enum u8 {
 	Invalid     = 0,
@@ -430,17 +432,9 @@ typeid_base_without_enum :: typeid_core;
 
 
 
-@(default_calling_convention = "none")
-foreign {
-	@(link_name="llvm.debugtrap")
-	debug_trap :: proc() ---;
-
-	@(link_name="llvm.trap")
-	trap :: proc() -> ! ---;
-
-	@(link_name="llvm.readcyclecounter")
-	read_cycle_counter :: proc() -> u64 ---;
-}
+debug_trap         :: intrinsics.debug_trap;
+trap               :: intrinsics.trap;
+read_cycle_counter :: intrinsics.read_cycle_counter;
 
 
 
@@ -487,7 +481,6 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.logger.procedure = default_logger_proc;
 	c.logger.data = nil;
 }
-
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
 	print_caller_location(loc);

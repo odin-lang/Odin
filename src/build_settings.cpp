@@ -71,9 +71,11 @@ TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 };
 
+#ifndef ODIN_VERSION_RAW
+#define ODIN_VERSION_RAW "dev-unknown-unknown"
+#endif
 
-
-String const ODIN_VERSION = str_lit("0.13.1");
+String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
 
 
 
@@ -199,12 +201,9 @@ struct BuildContext {
 	bool   keep_object_files;
 	bool   disallow_do;
 	bool   insert_semicolon;
-	bool   strict_style;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
-
-	bool   use_llvm_api;
 
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
@@ -451,8 +450,35 @@ bool find_library_collection_path(String name, String *path) {
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
-#if defined(GB_SYSTEM_WINDOWS)
+
+String internal_odin_root_dir(void);
 String odin_root_dir(void) {
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	gbAllocator a = heap_allocator();
+	char const *found = gb_get_env("ODIN_ROOT", a);
+	if (found) {
+		String path = path_to_full_path(a, make_string_c(found));
+		if (path[path.len-1] != '/' && path[path.len-1] != '\\') {
+		#if defined(GB_SYSTEM_WINDOWS)
+			path = concatenate_strings(a, path, WIN32_SEPARATOR_STRING);
+		#else
+			path = concatenate_strings(a, path, NIX_SEPARATOR_STRING);
+		#endif
+		}
+
+		global_module_path = path;
+		global_module_path_set = true;
+		return global_module_path;
+	}
+	return internal_odin_root_dir();
+}
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	gbTempArenaMemory tmp;
@@ -511,7 +537,7 @@ String odin_root_dir(void) {
 
 String path_to_fullpath(gbAllocator a, String s);
 
-String odin_root_dir(void) {
+String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	gbTempArenaMemory tmp;
@@ -569,7 +595,7 @@ String odin_root_dir(void) {
 
 String path_to_fullpath(gbAllocator a, String s);
 
-String odin_root_dir(void) {
+String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	gbTempArenaMemory tmp;
@@ -838,10 +864,6 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_darwin:
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
-		}
-		if ((bc->command_kind & Command__does_build) != 0 && !bc->use_llvm_api) {
-			gb_printf_err("The arm64 architecture is only supported with -llvm-api\n");;
-			gb_exit(1);
 		}
 
 	} else if (bc->metrics.arch == TargetArch_wasm32) {

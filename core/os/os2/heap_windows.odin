@@ -27,9 +27,9 @@ heap_free :: proc(ptr: rawptr) {
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 
-_heap_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
+_heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
-                            old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
 	//
 	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
 	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
@@ -37,7 +37,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 	// the pointer we return to the user.
 	//
 
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> rawptr {
+	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> ([]byte, mem.Allocator_Error) {
 		a := max(alignment, align_of(rawptr));
 		space := size + a - 1;
 
@@ -54,13 +54,13 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a);
 		diff := int(aligned_ptr - ptr);
 		if (size + diff) > space {
-			return nil;
+			return nil, .Out_Of_Memory;
 		}
 
 		aligned_mem = rawptr(aligned_ptr);
 		mem.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem;
 
-		return aligned_mem;
+		return mem.byte_slice(aligned_mem, size), nil;
 	}
 
 	aligned_free :: proc(p: rawptr) {
@@ -69,9 +69,9 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 		}
 	}
 
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> rawptr {
+	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> ([]byte, mem.Allocator_Error) {
 		if p == nil {
-			return nil;
+			return nil, nil;
 		}
 		return aligned_alloc(new_size, new_alignment, p);
 	}
@@ -93,15 +93,15 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 		return aligned_resize(old_memory, old_size, size, alignment);
 
 	case .Query_Features:
-		set := (^runtime.Allocator_Mode_Set)(old_memory);
+		set := (^mem.Allocator_Mode_Set)(old_memory);
 		if set != nil {
 			set^ = {.Alloc, .Free, .Resize, .Query_Features};
 		}
-		return set;
+		return nil, nil;
 
 	case .Query_Info:
-		return nil;
+		return nil, nil;
 	}
 
-	return nil;
+	return nil, nil;
 }

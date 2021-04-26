@@ -2323,7 +2323,7 @@ void lb_debug_complete_types(lbModule *m) {
 						for (unsigned i = 0; i < element_count; i++) {
 							u64 offset_in_bits = i;
 							i64 val = bt->BitSet.lower + cast(i64)i;
-							gb_snprintf(name, gb_count_of(name), "%lld", val);
+							gb_snprintf(name, gb_count_of(name), "%lld", cast(long long)val);
 							elements[i] = LLVMDIBuilderCreateBitFieldMemberType(
 								m->debug_builder,
 								scope,
@@ -2544,8 +2544,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	ast_node(pl, ProcLit, decl->proc_lit);
 	Type *pt = base_type(entity->type);
 	GB_ASSERT(pt->kind == Type_Proc);
-
-	set_procedure_abi_types(entity->type);
 
 	p->type           = entity->type;
 	p->type_expr      = decl->type_expr;
@@ -2844,6 +2842,14 @@ lbValue lb_value_param(lbProcedure *p, Entity *e, Type *abi_type, i32 index, lbP
 	res.type = abi_type;
 	return res;
 }
+
+Type *struct_type_from_systemv_distribute_struct_fields(Type *abi_type) {
+	GB_ASSERT(is_type_tuple(abi_type));
+	Type *final_type = alloc_type_struct();
+	final_type->Struct.fields = abi_type->Tuple.variables;
+	return final_type;
+}
+
 
 lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 index) {
 	lbParamPasskind kind = lbParamPass_Value;
@@ -3282,7 +3288,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 	// Make sure every block terminates, and if not, make it unreachable
 	for (block = first_block; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
 		LLVMValueRef instr = LLVMGetLastInstruction(block);
-		if (instr == nullptr) {
+		if (instr == nullptr || !lb_is_instr_terminating(instr)) {
 			LLVMPositionBuilderAtEnd(p->builder, block);
 			LLVMBuildUnreachable(p->builder);
 		}
@@ -3476,9 +3482,6 @@ void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e) {
 	name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%d", LIT(p->name), LIT(pd_name), guid);
 	String name = make_string(cast(u8 *)name_text, name_len-1);
 
-	set_procedure_abi_types(e->type);
-
-
 	e->Procedure.link_name = name;
 
 	lbProcedure *nested_proc = lb_create_procedure(p->module, e);
@@ -3541,7 +3544,9 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
-		GB_ASSERT(e != nullptr);
+		if (e == nullptr) {
+			continue;
+		}
 		if (e->kind != Entity_TypeName) {
 			continue;
 		}
@@ -3570,7 +3575,9 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
-		GB_ASSERT(e != nullptr);
+		if (e == nullptr) {
+			continue;
+		}
 		if (e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -3613,7 +3620,6 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 				return;
 			}
 
-			set_procedure_abi_types(e->type);
 			e->Procedure.link_name = name;
 
 			lbProcedure *nested_proc = lb_create_procedure(p->module, e);
@@ -4295,7 +4301,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	lb_start_block(p, done);
 }
 
-void lb_build_inline_range_stmt(lbProcedure *p, AstInlineRangeStmt *rs, Scope *scope) {
+void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
 	lbModule *m = p->module;
 
 	lb_open_scope(p, scope); // Open scope here
@@ -4641,9 +4647,13 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	lbValue tag_index = {};
 	lbValue union_data = {};
 	if (switch_kind == TypeSwitch_Union) {
-		lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent_ptr);
-		tag_index = lb_emit_load(p, tag_ptr);
 		union_data = lb_emit_conv(p, parent_ptr, t_rawptr);
+		if (is_type_union_maybe_pointer(type_deref(parent_ptr.type))) {
+			tag_index = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
+		} else {
+			lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent_ptr);
+			tag_index = lb_emit_load(p, tag_ptr);
+		}
 	}
 
 	lbBlock *start_block = lb_create_block(p, "typeswitch.case.first");
@@ -5288,7 +5298,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		lb_build_range_stmt(p, rs, node->scope);
 	case_end;
 
-	case_ast_node(rs, InlineRangeStmt, node);
+	case_ast_node(rs, UnrollRangeStmt, node);
 		lb_build_inline_range_stmt(p, rs, node->scope);
 	case_end;
 
@@ -8197,8 +8207,6 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		LLVMBuildUnreachable(p->builder);
 	});
 
-	set_procedure_abi_types(pt);
-
 	bool is_c_vararg = pt->Proc.c_vararg;
 	isize param_count = pt->Proc.param_count;
 	if (is_c_vararg) {
@@ -9102,51 +9110,18 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
-	case BuiltinProc_trailing_zeros:
-		{
-			lbValue x = lb_build_expr(p, ce->args[0]);
-			x = lb_emit_conv(p, x, tv.type);
-
-			char const *name = "llvm.cttz";
-			LLVMTypeRef types[1] = {lb_type(p->module, tv.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
-			LLVMValueRef args[2] = {};
-			args[0] = x.value;
-			args[1] = LLVMConstNull(LLVMInt1TypeInContext(p->module->ctx));
-
-			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = tv.type;
-			return res;
-		}
+	case BuiltinProc_count_trailing_zeros:
+		return lb_emit_count_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_leading_zeros:
+		return lb_emit_count_leading_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 
 	case BuiltinProc_count_ones:
+		return lb_emit_count_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_zeros:
+		return lb_emit_count_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
+
 	case BuiltinProc_reverse_bits:
-		{
-			lbValue x = lb_build_expr(p, ce->args[0]);
-			x = lb_emit_conv(p, x, tv.type);
-
-			char const *name = nullptr;
-			switch (id) {
-			case BuiltinProc_count_ones:     name = "llvm.ctpop";      break;
-			case BuiltinProc_reverse_bits:   name = "llvm.bitreverse"; break;
-			}
-			LLVMTypeRef types[1] = {lb_type(p->module, tv.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
-			LLVMValueRef args[1] = {};
-			args[0] = x.value;
-
-			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = tv.type;
-			return res;
-		}
+		return lb_emit_reverse_bits(p, lb_build_expr(p, ce->args[0]), tv.type);
 
 	case BuiltinProc_byte_swap:
 		{
@@ -9617,7 +9592,6 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	Type *proc_type_ = base_type(value.type);
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
-	set_procedure_abi_types(proc_type_);
 
 	if (is_call_expr_field_value(ce)) {
 		auto args = array_make<lbValue>(permanent_allocator(), pt->param_count);
@@ -9985,6 +9959,100 @@ lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type) {
 }
 
 
+lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.ctpop";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[1] = {};
+	args[0] = x.value;
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+lbValue lb_emit_count_zeros(lbProcedure *p, lbValue x, Type *type) {
+	i64 sz = 8*type_size_of(type);
+	lbValue size = lb_const_int(p->module, type, cast(u64)sz);
+	lbValue count = lb_emit_count_ones(p, x, type);
+	return lb_emit_arith(p, Token_Sub, size, count, type);
+}
+
+
+
+lbValue lb_emit_count_trailing_zeros(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.cttz";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[2] = {};
+	args[0] = x.value;
+	args[1] = LLVMConstNull(LLVMInt1TypeInContext(p->module->ctx));
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+lbValue lb_emit_count_leading_zeros(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.ctlz";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[2] = {};
+	args[0] = x.value;
+	args[1] = LLVMConstNull(LLVMInt1TypeInContext(p->module->ctx));
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+
+
+lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type) {
+	x = lb_emit_conv(p, x, type);
+
+	char const *name = "llvm.bitreverse";
+	LLVMTypeRef types[1] = {lb_type(p->module, type)};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[1] = {};
+	args[0] = x.value;
+
+	lbValue res = {};
+	res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	res.type = type;
+	return res;
+}
+
+
+lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x) {
+	GB_ASSERT(is_type_bit_set(x.type));
+	Type *underlying = bit_set_to_int(x.type);
+	lbValue card = lb_emit_count_ones(p, x, underlying);
+	return lb_emit_conv(p, card, t_int);
+}
+
+
 lbLoopData lb_loop_start(lbProcedure *p, isize count, Type *index_type) {
 	lbLoopData data = {};
 
@@ -10085,6 +10153,9 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			} else if (op_kind == Token_NotEq) {
 				return lb_const_bool(p->module, t_llvm_bool, false);
 			}
+		} else if (is_type_union_maybe_pointer(t)) {
+			lbValue tag = lb_emit_transmute(p, x, t_rawptr);
+			return lb_emit_comp_against_nil(p, op_kind, tag);
 		} else {
 			lbValue tag = lb_emit_union_tag_value(p, x);
 			return lb_emit_comp(p, op_kind, tag, lb_zero(p->module, tag.type));
@@ -10732,8 +10803,6 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	String name = make_string((u8 *)name_text, name_len-1);
 
 	Type *type = type_of_expr(expr);
-	set_procedure_abi_types(type);
-
 
 	Token token = {};
 	token.pos = ast_token(expr).pos;
@@ -11203,8 +11272,15 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 					Type *src_type = type_deref(v.type);
 					Type *dst_type = type;
 
-					lbValue src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-					lbValue dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+					lbValue src_tag = {};
+					lbValue dst_tag = {};
+					if (is_type_union_maybe_pointer(src_type)) {
+						src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
+						dst_tag = lb_const_bool(p->module, t_bool, true);
+					} else {
+						src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
+						dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+					}
 
 					lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
 					auto args = array_make<lbValue>(permanent_allocator(), 6);
