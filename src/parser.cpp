@@ -1719,11 +1719,9 @@ Array<Ast *> parse_element_list(AstFile *f) {
 Ast *parse_literal_value(AstFile *f, Ast *type) {
 	Array<Ast *> elems = {};
 	Token open = expect_token(f, Token_OpenBrace);
-	f->expr_level++;
 	if (f->curr_token.kind != Token_CloseBrace) {
 		elems = parse_element_list(f);
 	}
-	f->expr_level--;
 	Token close = expect_closing(f, Token_CloseBrace, str_lit("compound literal"));
 
 	return ast_compound_lit(f, type, elems, open, close);
