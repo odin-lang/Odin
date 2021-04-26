@@ -2184,10 +2184,15 @@ int main(int arg_count, char const **arg_ptr) {
 	remove_temp_files(gen.output_base);
 
 	if (run_output) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen.output_base), LIT(run_args_string));
+	#else
+		//NOTE(thebirk): This whole thing is a little leaky
 		String output_ext = {};
 		String complete_path = concatenate_strings(heap_allocator(), gen.output_base, output_ext);
 		complete_path = path_to_full_path(heap_allocator(), complete_path);
 		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
+	#endif
 	}
 
 	return 0;
