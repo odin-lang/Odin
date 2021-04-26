@@ -217,7 +217,7 @@ bool check_is_terminating(Ast *node, String const &label) {
 		}
 	case_end;
 
-	case_ast_node(rs, InlineRangeStmt, node);
+	case_ast_node(rs, UnrollRangeStmt, node);
 		return false;
 	case_end;
 
@@ -675,7 +675,7 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 }
 
 void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
-	ast_node(irs, InlineRangeStmt, node);
+	ast_node(irs, UnrollRangeStmt, node);
 	check_open_scope(ctx, node);
 
 	Type *val0 = nullptr;
@@ -1303,7 +1303,7 @@ void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 			case Ast_IfStmt:
 			case Ast_ForStmt:
 			case Ast_RangeStmt:
-			case Ast_InlineRangeStmt:
+			case Ast_UnrollRangeStmt:
 			case Ast_SwitchStmt:
 			case Ast_TypeSwitchStmt:
 				// TODO(bill): Is this a correct checking system?
@@ -1795,9 +1795,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						if (is_ptr) use_by_reference_for_value = true;
 						array_add(&vals, t->Struct.soa_elem);
 						array_add(&vals, t_int);
-						if (!build_context.use_llvm_api) {
-							error(operand.expr, "#soa structures do not yet support for in loop iteration");
-						}
 					}
 					break;
 				}
@@ -1903,7 +1900,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		check_close_scope(ctx);
 	case_end;
 
-	case_ast_node(irs, InlineRangeStmt, node);
+	case_ast_node(irs, UnrollRangeStmt, node);
 		check_inline_range_stmt(ctx, node, mod_flags);
 	case_end;
 

@@ -359,7 +359,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	}
 	if (original_entity->identifier != nullptr &&
 	    original_entity->identifier->kind == Ast_Ident) {
-		original_entity->identifier->Ident.entity = new_entity;
+		original_entity->identifier->Ident.entity = nullptr;
 	}
 	original_entity->flags |= EntityFlag_Overridden;
 
@@ -460,14 +460,14 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 			case Entity_LibraryName:
 			case Entity_ImportName:
 				{
-					override_entity_in_scope(e, entity);
-
 					DeclInfo *decl = decl_info_of_entity(e);
 					if (decl != nullptr) {
 						if (decl->attributes.count > 0) {
 							error(decl->attributes[0], "Constant alias declarations cannot have attributes");
 						}
 					}
+
+					override_entity_in_scope(e, entity);
 					return;
 				}
 			}

@@ -1,4 +1,3 @@
-#if defined(LLVM_BACKEND_SUPPORT)
 #if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Core.h"
 #include "llvm-c/ExecutionEngine.h"
@@ -29,7 +28,6 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#endif
 #endif
 
 struct lbProcedure;
@@ -395,6 +393,14 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 
 LLVMMetadataRef lb_debug_type(lbModule *m, Type *type);
+
+lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type);
+lbValue lb_emit_count_zeros(lbProcedure *p, lbValue x, Type *type);
+lbValue lb_emit_count_trailing_zeros(lbProcedure *p, lbValue x, Type *type);
+lbValue lb_emit_count_leading_zeros(lbProcedure *p, lbValue x, Type *type);
+lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type);
+
+lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x);
 
 
 

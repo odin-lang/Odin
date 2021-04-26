@@ -198,11 +198,8 @@ struct TypeProc {
 	isize    specialization_count;
 	ProcCallingConvention calling_convention;
 	i32      variadic_index;
-	Array<Type *> abi_compat_params;
-	Type *        abi_compat_result_type;
 	// TODO(bill): Make this a flag set rather than bools
 	bool     variadic;
-	bool     abi_types_set;
 	bool     require_results;
 	bool     c_vararg;
 	bool     is_polymorphic;
@@ -317,7 +314,6 @@ enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
 	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
-	TypeFlag_InProcessOfCheckingABI = 1<<4,
 };
 
 struct Type {

@@ -58,7 +58,7 @@ Token ast_token(Ast *node) {
 	case Ast_ReturnStmt:         return node->ReturnStmt.token;
 	case Ast_ForStmt:            return node->ForStmt.token;
 	case Ast_RangeStmt:          return node->RangeStmt.token;
-	case Ast_InlineRangeStmt:    return node->InlineRangeStmt.inline_token;
+	case Ast_UnrollRangeStmt:    return node->UnrollRangeStmt.unroll_token;
 	case Ast_CaseClause:         return node->CaseClause.token;
 	case Ast_SwitchStmt:         return node->SwitchStmt.token;
 	case Ast_TypeSwitchStmt:     return node->TypeSwitchStmt.token;
@@ -319,11 +319,11 @@ Ast *clone_ast(Ast *node) {
 		n->RangeStmt.expr  = clone_ast(n->RangeStmt.expr);
 		n->RangeStmt.body  = clone_ast(n->RangeStmt.body);
 		break;
-	case Ast_InlineRangeStmt:
-		n->InlineRangeStmt.val0  = clone_ast(n->InlineRangeStmt.val0);
-		n->InlineRangeStmt.val1  = clone_ast(n->InlineRangeStmt.val1);
-		n->InlineRangeStmt.expr  = clone_ast(n->InlineRangeStmt.expr);
-		n->InlineRangeStmt.body  = clone_ast(n->InlineRangeStmt.body);
+	case Ast_UnrollRangeStmt:
+		n->UnrollRangeStmt.val0  = clone_ast(n->UnrollRangeStmt.val0);
+		n->UnrollRangeStmt.val1  = clone_ast(n->UnrollRangeStmt.val1);
+		n->UnrollRangeStmt.expr  = clone_ast(n->UnrollRangeStmt.expr);
+		n->UnrollRangeStmt.body  = clone_ast(n->UnrollRangeStmt.body);
 		break;
 	case Ast_CaseClause:
 		n->CaseClause.list  = clone_ast_array(n->CaseClause.list);
@@ -851,15 +851,15 @@ Ast *ast_range_stmt(AstFile *f, Token token, Slice<Ast *> vals, Token in_token, 
 	return result;
 }
 
-Ast *ast_inline_range_stmt(AstFile *f, Token inline_token, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
-	Ast *result = alloc_ast_node(f, Ast_InlineRangeStmt);
-	result->InlineRangeStmt.inline_token = inline_token;
-	result->InlineRangeStmt.for_token = for_token;
-	result->InlineRangeStmt.val0 = val0;
-	result->InlineRangeStmt.val1 = val1;
-	result->InlineRangeStmt.in_token = in_token;
-	result->InlineRangeStmt.expr  = expr;
-	result->InlineRangeStmt.body  = body;
+Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+	Ast *result = alloc_ast_node(f, Ast_UnrollRangeStmt);
+	result->UnrollRangeStmt.unroll_token = unroll_token;
+	result->UnrollRangeStmt.for_token = for_token;
+	result->UnrollRangeStmt.val0 = val0;
+	result->UnrollRangeStmt.val1 = val1;
+	result->UnrollRangeStmt.in_token = in_token;
+	result->UnrollRangeStmt.expr  = expr;
+	result->UnrollRangeStmt.body  = body;
 	return result;
 }
 
@@ -1232,13 +1232,10 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 }
 
 bool ignore_newlines(AstFile *f) {
-	if (build_context.strict_style) {
-	    	if (f->allow_newline) {
-	    		return f->expr_level > 0;
-	    	}
-	    	return f->expr_level >= 0;
+	if (f->allow_newline) {
+		return f->expr_level > 0;
 	}
-	return false;
+	return f->expr_level >= 0;
 }
 
 
@@ -1505,6 +1502,10 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 		return false;
 	}
 
+	if (build_context.insert_semicolon) {
+		return true;
+	}
+
 	switch (s->kind) {
 	case Ast_EmptyStmt:
 	case Ast_BlockStmt:
@@ -1556,7 +1557,7 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 }
 
 void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
-	if (build_context.strict_style && token.string == "\n") {
+	if (!build_context.insert_semicolon && token.string == "\n") {
 		switch (token.kind) {
 		case Token_CloseBrace:
 		case Token_CloseParen:
@@ -1718,11 +1719,12 @@ Array<Ast *> parse_element_list(AstFile *f) {
 Ast *parse_literal_value(AstFile *f, Ast *type) {
 	Array<Ast *> elems = {};
 	Token open = expect_token(f, Token_OpenBrace);
-	f->expr_level++;
+	isize expr_level = f->expr_level;
+	f->expr_level = 0;
 	if (f->curr_token.kind != Token_CloseBrace) {
 		elems = parse_element_list(f);
 	}
-	f->expr_level--;
+	f->expr_level = expr_level;
 	Token close = expect_closing(f, Token_CloseBrace, str_lit("compound literal"));
 
 	return ast_compound_lit(f, type, elems, open, close);
@@ -1974,12 +1976,21 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		break;
 
 	case Token_OpenParen: {
+		bool allow_newline;
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
+		allow_newline = f->allow_newline;
+		if (f->expr_level < 0) {
+			f->allow_newline = false;
+		}
+
 		f->expr_level++;
 		operand = parse_expr(f, false);
 		f->expr_level--;
+
+		f->allow_newline = allow_newline;
+
 		close = expect_token(f, Token_CloseParen);
 		return ast_paren_expr(f, operand, open, close);
 	}
@@ -2112,11 +2123,14 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return ast_proc_group(f, token, open, close, args);
 		}
 
+
 		Ast *type = parse_proc_type(f, token);
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
 		u64 tags = 0;
+
 		skip_possible_newline_for_literal(f);
+
 
 		if (f->curr_token.kind == Token_where) {
 			where_token = expect_token(f, Token_where);
@@ -2878,6 +2892,9 @@ Ast *parse_expr(AstFile *f, bool lhs) {
 
 
 Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
+	bool allow_newline = f->allow_newline;
+	f->allow_newline = true;
+
 	auto list = array_make<Ast *>(heap_allocator());
 	for (;;) {
 		Ast *e = parse_expr(f, lhs);
@@ -2888,6 +2905,8 @@ Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
 		}
 		advance_token(f);
 	}
+
+	f->allow_newline = allow_newline;
 
 	return list;
 }
@@ -4258,9 +4277,9 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 }
 
 
-Ast *parse_unrolled_for_loop(AstFile *f, Token inline_token) {
-	if (inline_token.kind == Token_inline) {
-		syntax_warning(inline_token, "'inline for' is deprecated in favour of `#unroll for'");
+Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
+	if (unroll_token.kind == Token_inline) {
+		syntax_warning(unroll_token, "'inline for' is deprecated in favour of `#unroll for'");
 	}
 	Token for_token = expect_token(f, Token_for);
 	Ast *val0 = nullptr;
@@ -4308,9 +4327,9 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token inline_token) {
 		body = parse_block_stmt(f, false);
 	}
 	if (bad_stmt) {
-		return ast_bad_stmt(f, inline_token, f->curr_token);
+		return ast_bad_stmt(f, unroll_token, f->curr_token);
 	}
-	return ast_inline_range_stmt(f, inline_token, for_token, val0, val1, in_token, expr, body);
+	return ast_unroll_range_stmt(f, unroll_token, for_token, val0, val1, in_token, expr, body);
 }
 
 Ast *parse_stmt(AstFile *f) {
@@ -4320,8 +4339,8 @@ Ast *parse_stmt(AstFile *f) {
 	// Operands
 	case Token_inline:
 		if (peek_token_kind(f, Token_for)) {
-			Token inline_token = expect_token(f, Token_inline);
-			return parse_unrolled_for_loop(f, inline_token);
+			Token unroll_token = expect_token(f, Token_inline);
+			return parse_unrolled_for_loop(f, unroll_token);
 		}
 		/* fallthrough */
 	case Token_no_inline:
@@ -4555,10 +4574,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	TokenizerFlags tokenizer_flags = TokenizerFlag_None;
-	if (build_context.insert_semicolon) {
-		tokenizer_flags = TokenizerFlag_InsertSemicolon;
-	}
+	TokenizerFlags tokenizer_flags = TokenizerFlag_InsertSemicolon;
 
 	zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
