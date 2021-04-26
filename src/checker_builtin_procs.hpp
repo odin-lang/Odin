@@ -46,7 +46,9 @@ enum BuiltinProcId {
 	BuiltinProc_read_cycle_counter,
 
 	BuiltinProc_count_ones,
-	BuiltinProc_trailing_zeros,
+	BuiltinProc_count_zeros,
+	BuiltinProc_count_trailing_zeros,
+	BuiltinProc_count_leading_zeros,
 	BuiltinProc_reverse_bits,
 	BuiltinProc_byte_swap,
 
@@ -263,10 +265,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("count_ones"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("reverse_bits"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("byte_swap"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_leading_zeros"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("reverse_bits"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("byte_swap"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("overflow_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

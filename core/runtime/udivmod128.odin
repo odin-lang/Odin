@@ -1,35 +1,11 @@
 package runtime
 
-@(default_calling_convention="none")
-foreign {
-	@(link_name="llvm.cttz.i8")  _ctz_u8  :: proc(i:  u8,  is_zero_undef := false) ->  u8 ---
-	@(link_name="llvm.cttz.i16") _ctz_u16 :: proc(i: u16,  is_zero_undef := false) -> u16 ---
-	@(link_name="llvm.cttz.i32") _ctz_u32 :: proc(i: u32,  is_zero_undef := false) -> u32 ---
-	@(link_name="llvm.cttz.i64") _ctz_u64 :: proc(i: u64,  is_zero_undef := false) -> u64 ---
-}
-_ctz :: proc{
-	_ctz_u8,
-	_ctz_u16,
-	_ctz_u32,
-	_ctz_u64,
-};
-
-@(default_calling_convention="none")
-foreign {
-	@(link_name="llvm.ctlz.i8")  _clz_u8  :: proc(i:  u8,  is_zero_undef := false) ->  u8 ---
-	@(link_name="llvm.ctlz.i16") _clz_u16 :: proc(i: u16,  is_zero_undef := false) -> u16 ---
-	@(link_name="llvm.ctlz.i32") _clz_u32 :: proc(i: u32,  is_zero_undef := false) -> u32 ---
-	@(link_name="llvm.ctlz.i64") _clz_u64 :: proc(i: u64,  is_zero_undef := false) -> u64 ---
-}
-_clz :: proc{
-	_clz_u8,
-	_clz_u16,
-	_clz_u32,
-	_clz_u64,
-};
-
+import "intrinsics"
 
 udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
+	_ctz :: intrinsics.count_trailing_zeros;
+	_clz :: intrinsics.count_leading_zeros;
+
 	n := transmute([2]u64)a;
 	d := transmute([2]u64)b;
 	q, r: [2]u64 = ---, ---;

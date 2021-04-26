@@ -10,12 +10,12 @@ jobs:
         run: sudo apt-get install llvm-11 clang-11 llvm
       - name: build odin
         run: make release
-      - name: Odin run -llvm-api
-        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
+      - name: Odin version
+        run: ./odin version
   build_macOS:
     runs-on: macos-latest
     steps:
@@ -29,11 +29,11 @@ jobs:
       - name: build odin
         run: make release
       - name: Odin run
-        run: |
-          ./odin run examples/demo/demo.odin
-          ./odin run examples/demo/demo.odin -llvm-api
+        run: ./odin run examples/demo/demo.odin
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
+      - name: Odin version
+        run: ./odin version
   build_windows:
     runs-on: windows-latest
     steps:
@@ -60,5 +60,7 @@ jobs:
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo/demo.odin -vet
+      - name: Odin version
+        run: ./odin version
 
 
