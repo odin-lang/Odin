@@ -1232,13 +1232,10 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 }
 
 bool ignore_newlines(AstFile *f) {
-	if (build_context.strict_style) {
-	    	if (f->allow_newline) {
-	    		return f->expr_level > 0;
-	    	}
-	    	return f->expr_level >= 0;
+	if (f->allow_newline) {
+		return f->expr_level > 0;
 	}
-	return false;
+	return f->expr_level >= 0;
 }
 
 
@@ -1556,7 +1553,7 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 }
 
 void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
-	if (build_context.strict_style && token.string == "\n") {
+	if (token.string == "\n") {
 		switch (token.kind) {
 		case Token_CloseBrace:
 		case Token_CloseParen:
@@ -4556,9 +4553,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 		return ParseFile_WrongExtension;
 	}
 	TokenizerFlags tokenizer_flags = TokenizerFlag_None;
-	if (build_context.insert_semicolon) {
-		tokenizer_flags = TokenizerFlag_InsertSemicolon;
-	}
+	tokenizer_flags = TokenizerFlag_InsertSemicolon;
 
 	zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;

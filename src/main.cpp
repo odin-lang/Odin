@@ -1216,8 +1216,8 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_StrictStyle:
-							build_context.insert_semicolon = true;
-							build_context.strict_style = true;
+							gb_printf_err("-strict-style flag is not required any more\n");
+							bad_flags = true;
 							break;
 
 
@@ -1800,10 +1800,6 @@ void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-insert-semicolon");
 		print_usage_line(2, "Inserts semicolons on newlines during tokenization using a basic rule");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-strict-style");
-		print_usage_line(2, "Enforces code style stricter whilst parsing, requiring such things as trailing commas");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
