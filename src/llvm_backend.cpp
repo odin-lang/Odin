@@ -3544,7 +3544,9 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
-		GB_ASSERT(e != nullptr);
+		if (e == nullptr) {
+			continue;
+		}
 		if (e->kind != Entity_TypeName) {
 			continue;
 		}
@@ -3573,7 +3575,9 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
-		GB_ASSERT(e != nullptr);
+		if (e == nullptr) {
+			continue;
+		}
 		if (e->kind != Entity_Procedure) {
 			continue;
 		}
