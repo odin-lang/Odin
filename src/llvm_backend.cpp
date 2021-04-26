@@ -10149,6 +10149,9 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			} else if (op_kind == Token_NotEq) {
 				return lb_const_bool(p->module, t_llvm_bool, false);
 			}
+		} else if (is_type_union_maybe_pointer(t)) {
+			lbValue tag = lb_emit_transmute(p, x, t_rawptr);
+			return lb_emit_comp_against_nil(p, op_kind, tag);
 		} else {
 			lbValue tag = lb_emit_union_tag_value(p, x);
 			return lb_emit_comp(p, op_kind, tag, lb_zero(p->module, tag.type));
