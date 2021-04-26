@@ -1553,7 +1553,7 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 }
 
 void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
-	if (token.string == "\n") {
+	if (!build_context.insert_semicolon && token.string == "\n") {
 		switch (token.kind) {
 		case Token_CloseBrace:
 		case Token_CloseParen:
@@ -2109,11 +2109,14 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return ast_proc_group(f, token, open, close, args);
 		}
 
+
 		Ast *type = parse_proc_type(f, token);
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
 		u64 tags = 0;
+
 		skip_possible_newline_for_literal(f);
+
 
 		if (f->curr_token.kind == Token_where) {
 			where_token = expect_token(f, Token_where);
@@ -2875,6 +2878,9 @@ Ast *parse_expr(AstFile *f, bool lhs) {
 
 
 Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
+	bool allow_newline = f->allow_newline;
+	f->allow_newline = true;
+
 	auto list = array_make<Ast *>(heap_allocator());
 	for (;;) {
 		Ast *e = parse_expr(f, lhs);
@@ -2885,6 +2891,8 @@ Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
 		}
 		advance_token(f);
 	}
+
+	f->allow_newline = allow_newline;
 
 	return list;
 }
@@ -4552,8 +4560,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	TokenizerFlags tokenizer_flags = TokenizerFlag_None;
-	tokenizer_flags = TokenizerFlag_InsertSemicolon;
+	TokenizerFlags tokenizer_flags = TokenizerFlag_InsertSemicolon;
 
 	zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
