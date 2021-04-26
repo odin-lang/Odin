@@ -1971,12 +1971,21 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		break;
 
 	case Token_OpenParen: {
+		bool allow_newline;
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
+		allow_newline = f->allow_newline;
+		if (f->expr_level < 0) {
+			f->allow_newline = false;
+		}
+
 		f->expr_level++;
 		operand = parse_expr(f, false);
 		f->expr_level--;
+
+		f->allow_newline = allow_newline;
+
 		close = expect_token(f, Token_CloseParen);
 		return ast_paren_expr(f, operand, open, close);
 	}
