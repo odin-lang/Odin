@@ -3260,6 +3260,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			d->type_expr = vd->type;
 			d->init_expr = init;
 
+
 			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
 				// if (vd->type != nullptr) {
