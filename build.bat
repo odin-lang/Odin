@@ -66,10 +66,7 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-rem cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
-
-cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name% ^
-	&& odin run examples/demo
+cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
 
 if %errorlevel% neq 0 goto end_of_build
 if %release_mode% EQU 0 odin run examples/demo/demo.odin

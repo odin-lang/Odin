@@ -72,7 +72,7 @@ TargetEndianKind target_endians[TargetArch_COUNT] = {
 };
 
 #ifndef ODIN_VERSION_RAW
-#define ODIN_VERSION_RAW "dev-2021-unknown"
+#define ODIN_VERSION_RAW "dev-unknown-unknown"
 #endif
 
 String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
