@@ -1916,6 +1916,24 @@ void print_show_unused(Checker *c) {
 	print_usage_line(0, "");
 }
 
+bool check_env(void) {
+	gbAllocator a = heap_allocator();
+	char const *odin_root = gb_get_env("ODIN_ROOT", a);
+	defer (gb_free(a, cast(void *)odin_root));
+	if (odin_root) {
+		if (!gb_file_exists(odin_root)) {
+			gb_printf_err("Invalid ODIN_ROOT, directory does not exist, got %s\n", odin_root);
+			return false;
+		}
+		String path = make_string_c(odin_root);
+		if (!path_is_directory(path)) {
+			gb_printf_err("Invalid ODIN_ROOT, expected a directory, got %s\n", odin_root);
+			return false;
+		}
+	}
+	return true;
+}
+
 
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
@@ -1938,6 +1956,10 @@ int main(int arg_count, char const **arg_ptr) {
 	init_global_error_collector();
 	init_keyword_hash_table();
 	global_big_int_init();
+
+	if (!check_env()) {
+		return 1;
+	}
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
