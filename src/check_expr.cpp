@@ -7269,7 +7269,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (build_context.vet) {
 					error(node, "Redundant 'auto_cast' applied to expression");
 				} else {
-					warning(node, "Redundant 'auto_cast' applied to expression");
+					// warning(node, "Redundant 'auto_cast' applied to expression");
 				}
 			}
 
