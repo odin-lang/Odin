@@ -1502,6 +1502,10 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 		return false;
 	}
 
+	if (build_context.insert_semicolon) {
+		return true;
+	}
+
 	switch (s->kind) {
 	case Ast_EmptyStmt:
 	case Ast_BlockStmt:

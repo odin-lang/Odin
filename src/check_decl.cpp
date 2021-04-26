@@ -359,7 +359,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	}
 	if (original_entity->identifier != nullptr &&
 	    original_entity->identifier->kind == Ast_Ident) {
-		original_entity->identifier->Ident.entity = new_entity;
+		original_entity->identifier->Ident.entity = nullptr;
 	}
 	original_entity->flags |= EntityFlag_Overridden;
 
