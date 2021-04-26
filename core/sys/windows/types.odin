@@ -848,7 +848,7 @@ SID_TYPE :: enum SID_NAME_USE {
   Unknown,
   Computer,
   Label,
-  LogonSession
+  LogonSession,
 }
 
 SECURITY_MAX_SID_SIZE :: 68;
