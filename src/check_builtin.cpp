@@ -614,9 +614,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		} else if (type->kind == Type_SimdVector) {
 			max_count = type->SimdVector.count;
 			elem_type = type->SimdVector.elem;
-			if (!build_context.use_llvm_api) {
-				error(call, "'swizzle' with #simd vector is not supported on this backend");
-			}
 		}
 
 		i64 arg_count = 0;
@@ -1529,11 +1526,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_soa_zip: {
-		if (!build_context.use_llvm_api) {
-			error(call, "'soa_zip' is not supported with this backend");
-			return false;
-		}
-
 		auto types = array_make<Type *>(temporary_allocator(), 0, ce->args.count);
 		auto names = array_make<String>(temporary_allocator(), 0, ce->args.count);
 
@@ -1681,11 +1673,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_soa_unzip: {
-		if (!build_context.use_llvm_api) {
-			error(call, "'soa_unzip' is not supported with this backend");
-			return false;
-		}
-
 		Operand x = {};
 		check_expr(c, &x, ce->args[0]);
 		if (x.mode == Addressing_Invalid) {
@@ -1927,27 +1914,19 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_trap:
 	case BuiltinProc_debug_trap:
-		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-		}
 		operand->mode = Addressing_NoValue;
 		break;
 
 	case BuiltinProc_read_cycle_counter:
-		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-		}
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
 		break;
 
 	case BuiltinProc_count_ones:
-	case BuiltinProc_trailing_zeros:
+	case BuiltinProc_count_zeros:
+	case BuiltinProc_count_trailing_zeros:
+	case BuiltinProc_count_leading_zeros:
 	case BuiltinProc_reverse_bits:
-		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-			// continue anyway
-		}
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]);
@@ -1971,10 +1950,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_byte_swap:
-		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-			// continue anyway
-		}
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]);
@@ -2006,10 +1981,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_overflow_add:
 	case BuiltinProc_overflow_sub:
 	case BuiltinProc_overflow_mul:
-		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-			// continue anyway
-		}
 		{
 			Operand x = {};
 			Operand y = {};
@@ -2189,11 +2160,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_fixed_point_mul_sat:
 	case BuiltinProc_fixed_point_div_sat:
 		{
-			if (!build_context.use_llvm_api) {
-				error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-				// continue anyway
-			}
-
 			Operand x = {};
 			Operand y = {};
 			Operand z = {};
@@ -2255,10 +2221,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_expect:
-		if (!build_context.use_llvm_api) {
-			error(ce->args[0], "'%.*s' is not supported on this backend", LIT(builtin_procs[id].name));
-			// continue anyway
-		}
 		{
 			Operand x = {};
 			Operand y = {};

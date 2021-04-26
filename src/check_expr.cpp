@@ -103,10 +103,6 @@ CallArgumentData check_call_arguments   (CheckerContext *c, Operand *operand, Ty
 Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
 
-Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCallingConvention cc);
-Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCallingConvention cc);
-bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type);
-void set_procedure_abi_types(Type *type);
 void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
@@ -1086,10 +1082,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				Entity *b = y->results->Tuple.variables[i];
 				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
 				if (!ok) return false;
-			}
-
-			if (modify_type) {
-				set_procedure_abi_types(source);
 			}
 
 			return true;
@@ -7277,7 +7269,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (build_context.vet) {
 					error(node, "Redundant 'auto_cast' applied to expression");
 				} else {
-					warning(node, "Redundant 'auto_cast' applied to expression");
+					// warning(node, "Redundant 'auto_cast' applied to expression");
 				}
 			}
 
@@ -7909,10 +7901,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_ast_node(ia, InlineAsmExpr, node);
 		if (c->curr_proc_decl == nullptr) {
 			error(node, "Inline asm expressions are only allowed within a procedure body");
-		}
-
-		if (!build_context.use_llvm_api) {
-			error(node, "Inline asm expressions are only currently allowed with -llvm-api");
 		}
 
 		auto param_types = array_make<Type *>(heap_allocator(), ia->param_types.count);

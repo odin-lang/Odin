@@ -1,5 +1,7 @@
 package time
 
+import "intrinsics"
+
 Duration :: distinct i64;
 
 Nanosecond  :: Duration(1);
@@ -137,11 +139,7 @@ clock :: proc(t: Time) -> (hour, min, sec: int) {
 
 
 read_cycle_counter :: proc() -> u64 {
-	foreign _ {
-		@(link_name="llvm.readcyclecounter")
-		llvm_readcyclecounter :: proc "none" () -> u64 ---
-	}
-	return llvm_readcyclecounter();
+	return u64(intrinsics.read_cycle_counter());
 }
 
 

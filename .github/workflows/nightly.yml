@@ -52,8 +52,6 @@ jobs:
         run: sudo apt-get install llvm-11 clang-11 llvm
       - name: build odin
         run: make nightly
-      - name: Odin run -llvm-api
-        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
@@ -80,8 +78,6 @@ jobs:
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make nightly
-      - name: Odin run -llvm-api
-        run: ./odin run examples/demo/demo.odin -llvm-api
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
