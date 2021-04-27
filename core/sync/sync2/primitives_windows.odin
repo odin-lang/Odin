@@ -50,6 +50,56 @@ _rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 }
 
 
+_Recursive_Mutex :: struct {
+	owner:       u32,
+	claim_count: i32,
+}
+
+_recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
+	tid := win32.GetCurrentThreadId();
+	for {
+		prev_owner := atomic_cxchg_acq(&m.impl.owner, tid, 0);
+		switch prev_owner {
+		case 0, tid:
+			m.impl.claim_count += 1;
+			// inside the lock
+			return;
+		}
+
+		win32.WaitOnAddress(
+			&m.impl.owner,
+			&prev_owner,
+			size_of(prev_owner),
+			win32.INFINITE,
+		);
+	}
+}
+
+_recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
+	m.impl.claim_count -= 1;
+	if m.impl.claim_count != 0 {
+		return;
+	}
+	atomic_xchg_rel(&m.impl.owner, 0);
+	win32.WakeByAddressSingle(&m.impl.owner);
+	// outside the lock
+
+}
+
+_recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
+	tid := win32.GetCurrentThreadId();
+	prev_owner := atomic_cxchg_acq(&m.impl.owner, tid, 0);
+	switch prev_owner {
+	case 0, tid:
+		m.impl.claim_count += 1;
+		// inside the lock
+		return true;
+	}
+	return false;
+}
+
+
+
 
 _Cond :: struct {
 	cond: win32.CONDITION_VARIABLE,

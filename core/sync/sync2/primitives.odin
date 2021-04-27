@@ -72,52 +72,19 @@ rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 //
 // A Recursive_Mutex must not be copied after first use
 Recursive_Mutex :: struct {
-	// TODO(bill): Is this implementation too lazy?
-	// Can this be made to work on all OSes without construction and destruction, i.e. Zero is Initialized
-	// CRITICAL_SECTION would be a perfect candidate for this on Windows but that cannot be "dumb"
-
-	owner:     int,
-	recursion: int,
-	mutex: Mutex,
+	impl: _Recursive_Mutex,
 }
 
 recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
-	tid := runtime.current_thread_id();
-	if tid != m.owner {
-		mutex_lock(&m.mutex);
-	}
-	// inside the lock
-	m.owner = tid;
-	m.recursion += 1;
+	_recursive_mutex_lock(m);
 }
 
 recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
-	tid := runtime.current_thread_id();
-	assert(tid == m.owner);
-	m.recursion -= 1;
-	recursion := m.recursion;
-	if recursion == 0 {
-		m.owner = 0;
-	}
-	if recursion == 0 {
-		mutex_unlock(&m.mutex);
-	}
-	// outside the lock
-
+	_recursive_mutex_unlock(m);
 }
 
 recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
-	tid := runtime.current_thread_id();
-	if m.owner == tid {
-		return mutex_try_lock(&m.mutex);
-	}
-	if !mutex_try_lock(&m.mutex) {
-		return false;
-	}
-	// inside the lock
-	m.owner = tid;
-	m.recursion += 1;
-	return true;
+	return _recursive_mutex_try_lock(m);
 }
 
 
