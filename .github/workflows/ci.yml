@@ -23,7 +23,7 @@ jobs:
       - name: Download LLVM and setup PATH
         run: |
           brew install llvm@11
-          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+          echo "/usr/local/opt/llvm@11/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
