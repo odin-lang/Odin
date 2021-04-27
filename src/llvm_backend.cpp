@@ -5663,6 +5663,25 @@ LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_
 	return llvm_const_array(lb_type(m, elem_type), values, cast(unsigned int)count);
 }
 
+lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
+	e = strip_entity_wrapping(e);
+	GB_ASSERT(e != nullptr);
+	auto *found = map_get(&m->values, hash_entity(e));
+	if (found) {
+		return *found;
+	}
+
+	// TODO(bill): this is
+	lbProcedure *missing_proc = lb_create_procedure(m, e);
+	found = map_get(&m->values, hash_entity(e));
+	if (found) {
+		return *found;
+	}
+
+	GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+	return {};
+}
+
 
 lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
 	LLVMContextRef ctx = m->ctx;
@@ -5689,14 +5708,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			return lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
 		}
 		Entity *e = entity_from_expr(expr);
-		e = strip_entity_wrapping(e);
-		GB_ASSERT(e != nullptr);
-		auto *found = map_get(&m->values, hash_entity(e));
-		if (found) {
-			return *found;
-		}
-
-		GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+		return lb_find_procedure_value_from_entity(m, e);
 	}
 
 	bool is_local = allow_local && m->curr_procedure != nullptr;
