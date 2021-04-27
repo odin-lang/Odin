@@ -8,13 +8,17 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
+	LLVM_CONFIG=llvm-config --version=11
+
 	LDFLAGS:=$(LDFLAGS) -liconv
-	CFLAGS:=$(CFLAGS) $(shell llvm-config --cxxflags --ldflags)
+	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG)--cxxflags --ldflags)
 	LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
 ifeq ($(OS), Linux)
-	CFLAGS:=$(CFLAGS) $(shell llvm-config-11 --cxxflags --ldflags)
-	LDFLAGS:=$(LDFLAGS) $(shell llvm-config-11 --libs core native --system-libs)
+	LLVM_CONFIG=llvm-config-11
+
+	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+	LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
 endif
 
 all: debug demo
