@@ -240,5 +240,35 @@ _cond_broadcast :: proc(c: ^Cond) {
 	}
 }
 
+_Sema :: struct {
+	mutex: Mutex,
+	cond:  Cond,
+	count: int,
+}
+
+_sema_wait :: proc(s: ^Sema) {
+	mutex_lock(&s.impl.mutex);
+	defer mutex_unlock(&s.impl.mutex);
+
+	for s.impl.count == 0 {
+		cond_wait(&s.impl.cond, &s.impl.mutex);
+	}
+
+	s.impl.count -= 1;
+	if s.impl.count > 0 {
+		cond_signal(&s.impl.cond);
+	}
+}
+
+_sema_post :: proc(s: ^Sema, count := 1) {
+	mutex_lock(&s.impl.mutex);
+	defer mutex_unlock(&s.impl.mutex);
+
+	s.impl.count += count;
+	cond_signal(&s.impl.cond);
+}
+
+
+
 
 } // !ODIN_SYNC_USE_PTHREADS
