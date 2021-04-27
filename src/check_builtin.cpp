@@ -2017,8 +2017,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 			}
 
-			operand->mode = Addressing_Value;
-			operand->type = make_optional_ok_type(default_type(x.type), false); // Just reusing this procedure, it's not optional
+			operand->mode = Addressing_OptionalOk;
+			operand->type = default_type(x.type);
 		}
 		break;
 
@@ -2149,8 +2149,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_assignment(c, &x, elem, builtin_name);
 			check_assignment(c, &y, elem, builtin_name);
 
-			operand->mode = Addressing_Value;
-			operand->type = make_optional_ok_type(elem, /*typed*/false);
+			operand->mode = Addressing_OptionalOk;
+			operand->type = elem;
 			break;
 		}
 		break;
