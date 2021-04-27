@@ -74,7 +74,7 @@ _cond_broadcast :: proc(c: ^Cond) {
 
 
 _Sema :: struct {
-	count: int,
+	count: i32,
 }
 
 _sema_wait :: proc(s: ^Sema) {
@@ -96,7 +96,7 @@ _sema_wait :: proc(s: ^Sema) {
 }
 
 _sema_post :: proc(s: ^Sema, count := 1) {
-	atomic_add(&s.impl.count, count);
+	atomic_add(&s.impl.count, i32(count));
 	if count == 1 {
 		win32.WakeByAddressSingle(&s.impl.count);
 	} else {
