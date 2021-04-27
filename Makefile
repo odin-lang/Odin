@@ -8,7 +8,7 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
-	LLVM_CONFIG=llvm-config --version=11
+	LLVM_CONFIG=llvm-config
 
 	LDFLAGS:=$(LDFLAGS) -liconv
 	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG)--cxxflags --ldflags)
