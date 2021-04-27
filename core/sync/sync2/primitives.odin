@@ -1,7 +1,6 @@
 package sync2
 
 import "core:time"
-import "core:runtime"
 
 // A Mutex is a mutual exclusion lock
 // The zero value for a Mutex is an unlocked mutex
