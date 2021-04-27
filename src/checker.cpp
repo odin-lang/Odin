@@ -960,7 +960,11 @@ Entity *entity_of_node(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
-		return ident->entity;
+		Entity *e = ident->entity;
+		if (e && e->flags & EntityFlag_Overridden) {
+			// GB_PANIC("use of an overriden entity: %.*s", LIT(e->token.string));
+		}
+		return e;
 	case_end;
 	case_ast_node(se, SelectorExpr, expr);
 		Ast *s = unselector_expr(se->selector);
@@ -972,7 +976,6 @@ Entity *entity_of_node(Ast *expr) {
 	}
 	return nullptr;
 }
-
 
 DeclInfo *decl_info_of_entity(Entity *e) {
 	if (e != nullptr) {

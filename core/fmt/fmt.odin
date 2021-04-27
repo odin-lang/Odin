@@ -1908,17 +1908,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	}
-
-	handle_relative_pointer :: proc(ptr: ^$T) -> rawptr where intrinsics.type_is_integer(T) {
-		if ptr^ == 0 {
-			return nil;
-		}
-		when intrinsics.type_is_unsigned(T) {
-			return rawptr(uintptr(ptr) + uintptr(ptr^));
-		} else {
-			return rawptr(uintptr(ptr) + uintptr(i64(ptr^)));
-		}
-	}
 }
 
 fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {

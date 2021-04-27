@@ -1141,6 +1141,9 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		}
 		return nullptr;
 	}
+
+	GB_ASSERT((e->flags & EntityFlag_Overridden) == 0);
+
 	if (e->parent_proc_decl != nullptr &&
 	    e->parent_proc_decl != c->curr_proc_decl) {
 		if (e->kind == Entity_Variable) {
@@ -1195,8 +1198,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
 	}
-
-
 	if (e->type == nullptr) {
 		// TODO(bill): Which is correct? return or compiler_error?
 		// compiler_error("How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
