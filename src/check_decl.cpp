@@ -352,16 +352,17 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 
 	string_map_set(&found_scope->elements, original_name, new_entity);
 
+	original_entity->flags |= EntityFlag_Overridden;
 	original_entity->type = new_entity->type;
+	original_entity->aliased_of = new_entity;
 
 	if (original_entity->identifier == nullptr) {
 		original_entity->identifier = new_entity->identifier;
 	}
 	if (original_entity->identifier != nullptr &&
 	    original_entity->identifier->kind == Ast_Ident) {
-		original_entity->identifier->Ident.entity = nullptr;
+		original_entity->identifier->Ident.entity = new_entity;
 	}
-	original_entity->flags |= EntityFlag_Overridden;
 
 	// IMPORTANT NOTE(bill, 2021-04-10): copy only the variants
 	// This is most likely NEVER required, but it does not at all hurt to keep

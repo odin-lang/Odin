@@ -3544,16 +3544,14 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
-		if (e == nullptr) {
-			continue;
-		}
+		GB_ASSERT(e != nullptr);
 		if (e->kind != Entity_TypeName) {
 			continue;
 		}
 
 		bool polymorphic_struct = false;
 		if (e->type != nullptr && e->kind == Entity_TypeName) {
-		Type *bt = base_type(e->type);
+			Type *bt = base_type(e->type);
 			if (bt->kind == Type_Struct) {
 				polymorphic_struct = bt->Struct.is_polymorphic;
 			}
@@ -3575,11 +3573,15 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
-		if (e == nullptr) {
-			continue;
-		}
+		GB_ASSERT(e != nullptr);
 		if (e->kind != Entity_Procedure) {
 			continue;
+		}
+		GB_ASSERT (vd->values[i] != nullptr);
+
+		Ast *value = unparen_expr(vd->values[i]);
+		if (value->kind != Ast_ProcLit) {
+			continue; // It's an alias
 		}
 
 		CheckerInfo *info = p->module->info;
@@ -11436,7 +11438,13 @@ lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	GB_ASSERT(v.value != nullptr);
 	GB_ASSERT_MSG(parent->type == type_deref(v.type), "%s %s", type_to_string(parent->type), type_to_string(v.type));
 	lbValue ptr = lb_emit_deep_field_gep(p, v, sel);
-	lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+	if (parent->scope) {
+		if ((parent->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+		}
+	} else {
+		lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+	}
 	return ptr;
 }
 
@@ -13778,13 +13786,13 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		gbString producer = gb_string_make(heap_allocator(), "odin");
-		producer = gb_string_append_fmt(producer, " version %.*s", LIT(ODIN_VERSION));
-		#ifdef NIGHTLY
-		producer = gb_string_appendc(producer, "-nightly");
-		#endif
-		#ifdef GIT_SHA
-		producer = gb_string_append_fmt(producer, "-%s", GIT_SHA);
-		#endif
+		// producer = gb_string_append_fmt(producer, " version %.*s", LIT(ODIN_VERSION));
+		// #ifdef NIGHTLY
+		// producer = gb_string_appendc(producer, "-nightly");
+		// #endif
+		// #ifdef GIT_SHA
+		// producer = gb_string_append_fmt(producer, "-%s", GIT_SHA);
+		// #endif
 
 		gbString split_name = gb_string_make(heap_allocator(), "");
 
