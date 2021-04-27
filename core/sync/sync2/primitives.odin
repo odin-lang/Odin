@@ -153,33 +153,14 @@ cond_broadcast :: proc(c: ^Cond) {
 //
 // A Sema must not be copied after first use
 Sema :: struct {
-	// TODO(bill): Is this implementation too lazy?
-	// Can this be made to work on all OSes without construction and destruction, i.e. Zero is Initialized
-
-	mutex: Mutex,
-	cond:  Cond,
-	count: int,
+	impl: _Sema,
 }
 
 
 sema_wait :: proc(s: ^Sema) {
-	mutex_lock(&s.mutex);
-	defer mutex_unlock(&s.mutex);
-
-	for s.count == 0 {
-		cond_wait(&s.cond, &s.mutex);
-	}
-
-	s.count -= 1;
-	if s.count > 0 {
-		cond_signal(&s.cond);
-	}
+	_sema_wait(s);
 }
 
 sema_post :: proc(s: ^Sema, count := 1) {
-	mutex_lock(&s.mutex);
-	defer mutex_unlock(&s.mutex);
-
-	s.count += count;
-	cond_signal(&s.cond);
+	_sema_post(s, count);
 }

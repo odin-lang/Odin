@@ -71,3 +71,35 @@ _cond_signal :: proc(c: ^Cond) {
 _cond_broadcast :: proc(c: ^Cond) {
 	win32.WakeAllConditionVariable(&c.impl.cond);
 }
+
+
+_Sema :: struct {
+	count: int,
+}
+
+_sema_wait :: proc(s: ^Sema) {
+	for {
+		original_count := s.impl.count;
+		for original_count == 0 {
+			win32.WaitOnAddress(
+				&s.impl.count,
+				&original_count,
+				size_of(original_count),
+				win32.INFINITE,
+			);
+			original_count = s.impl.count;
+		}
+		if original_count == atomic_cxchg(&s.impl.count, original_count-1, original_count) {
+			return;
+		}
+	}
+}
+
+_sema_post :: proc(s: ^Sema, count := 1) {
+	atomic_add(&s.impl.count, count);
+	if count == 1 {
+		win32.WakeByAddressSingle(&s.impl.count);
+	} else {
+		win32.WakeByAddressAll(&s.impl.count);
+	}
+}
