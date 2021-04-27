@@ -9136,9 +9136,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_overflow_sub:
 	case BuiltinProc_overflow_mul:
 		{
-			Type *tuple = tv.type;
-			GB_ASSERT(is_type_tuple(tuple));
-			Type *type = tuple->Tuple.variables[0]->type;
+			Type *main_type = tv.type;
+			Type *type = main_type;
+			if (is_type_tuple(main_type)) {
+				type = main_type->Tuple.variables[0]->type;
+			}
 
 			lbValue x = lb_build_expr(p, ce->args[0]);
 			lbValue y = lb_build_expr(p, ce->args[1]);
@@ -9168,18 +9170,22 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			args[0] = x.value;
 			args[1] = y.value;
 
-			Type *res_type = nullptr;
-			{
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+
+			if (is_type_tuple(main_type)) {
+				Type *res_type = nullptr;
 				gbAllocator a = permanent_allocator();
 				res_type = alloc_type_tuple();
 				array_init(&res_type->Tuple.variables, a, 2);
 				res_type->Tuple.variables[0] = alloc_entity_field(nullptr, blank_token, type,        false, 0);
 				res_type->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
-			}
 
-			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = res_type;
+				res.type = res_type;
+			} else {
+				res.value = LLVMBuildExtractValue(p->builder, res.value, 0, "");
+				res.type = type;
+			}
 			return res;
 		}
 
@@ -9392,16 +9398,22 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			single_threaded
 		);
 
-		GB_ASSERT(tv.type->kind == Type_Tuple);
-		Type *fix_typed = alloc_type_tuple();
-		array_init(&fix_typed->Tuple.variables, permanent_allocator(), 2);
-		fix_typed->Tuple.variables[0] = tv.type->Tuple.variables[0];
-		fix_typed->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
+		if (tv.type->kind == Type_Tuple) {
+			Type *fix_typed = alloc_type_tuple();
+			array_init(&fix_typed->Tuple.variables, permanent_allocator(), 2);
+			fix_typed->Tuple.variables[0] = tv.type->Tuple.variables[0];
+			fix_typed->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
 
-		lbValue res = {};
-		res.value = value;
-		res.type = fix_typed;
-		return res;
+			lbValue res = {};
+			res.value = value;
+			res.type = fix_typed;
+			return res;
+		} else {
+			lbValue res = {};
+			res.value = LLVMBuildExtractValue(p->builder, value, 0, "");
+			res.type = tv.type;
+			return res;
+		}
 	}
 
 
