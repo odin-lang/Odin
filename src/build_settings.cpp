@@ -173,8 +173,6 @@ struct BuildContext {
 	String resource_filepath;
 	String pdb_filepath;
 	bool   has_resource;
-	String opt_flags;
-	String llc_flags;
 	String link_flags;
 	String extra_linker_flags;
 	String microarch;
@@ -806,22 +804,12 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->word_size   = metrics->word_size;
 	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
-	bc->opt_flags   = str_lit(" ");
 
-
-	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
-	if (bc->ODIN_DEBUG) {
-		// llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");
-	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
 	// here, so I just #defined the linker flags to keep things concise.
 	if (bc->metrics.arch == TargetArch_amd64) {
-		if (bc->microarch.len == 0) {
-			llc_flags = gb_string_appendc(llc_flags, "-march=x86-64 ");
-		}
-
 		switch (bc->metrics.os) {
 		case TargetOs_windows:
 			bc->link_flags = str_lit("/machine:x64 ");
@@ -836,10 +824,6 @@ void init_build_context(TargetMetrics *cross_target) {
 			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_386) {
-		if (bc->microarch.len == 0) {
-			llc_flags = gb_string_appendc(llc_flags, "-march=x86 ");
-		}
-
 		switch (bc->metrics.os) {
 		case TargetOs_windows:
 			bc->link_flags = str_lit("/machine:x86 ");
@@ -856,10 +840,6 @@ void init_build_context(TargetMetrics *cross_target) {
 			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_arm64) {
-		if (bc->microarch.len == 0) {
-			llc_flags = gb_string_appendc(llc_flags, "-march=arm64 ");
-		}
-
 		switch (bc->metrics.os) {
 		case TargetOs_darwin:
 			bc->link_flags = str_lit("-arch arm64 ");
@@ -872,49 +852,8 @@ void init_build_context(TargetMetrics *cross_target) {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");;
 		gb_exit(1);
 	}
-	llc_flags = gb_string_appendc(llc_flags, " ");
-
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
-
-	gbString opt_flags = gb_string_make_reserve(heap_allocator(), 64);
-
-	if (bc->microarch.len != 0) {
-		opt_flags = gb_string_appendc(opt_flags, "-march=");
-		opt_flags = gb_string_append_length(opt_flags, bc->microarch.text, bc->microarch.len);
-		opt_flags = gb_string_appendc(opt_flags, " ");
-
-		// llc_flags = gb_string_appendc(opt_flags, "-march=");
-		// llc_flags = gb_string_append_length(llc_flags, bc->microarch.text, bc->microarch.len);
-		// llc_flags = gb_string_appendc(llc_flags, " ");
-	}
-
-
-	if (bc->optimization_level != 0) {
-		opt_flags = gb_string_append_fmt(opt_flags, "-O%d ", bc->optimization_level);
-		// NOTE(lachsinc): The following options were previously passed during call
-		// to opt in main.cpp:exec_llvm_opt().
-		//   -die:       Dead instruction elimination
-		//   -memcpyopt: MemCpy optimization
-	}
-	if (bc->ODIN_DEBUG == false) {
-		opt_flags = gb_string_appendc(opt_flags, "-mem2reg -die ");
-	}
-
-
-
-
-
-	// NOTE(lachsinc): This optimization option was previously required to get
-	// around an issue in fmt.odin. Thank bp for tracking it down! Leaving for now until the issue
-	// is resolved and confirmed by Bill. Maybe it should be readded in non-debug builds.
-	// if (bc->ODIN_DEBUG == false) {
-	// 	opt_flags = gb_string_appendc(opt_flags, "-mem2reg ");
-	// }
-
-	bc->opt_flags = make_string_c(opt_flags);
-	bc->llc_flags = make_string_c(llc_flags);
-
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
