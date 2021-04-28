@@ -1873,7 +1873,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 				continue;
 			}
 
-			if (e->file == nullptr || !e->file->is_test) {
+			// if (e->file == nullptr || !e->file->is_test) {
+			if (e->file == nullptr) {
 				continue;
 			}
 
