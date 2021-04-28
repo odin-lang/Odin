@@ -487,9 +487,7 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 		//Don't move the first expression, it looks bad
 		if i != 0 && force_newline {
 			newline_position(p, 1);
-		}
-
-		else if i != 0 {
+		} else if i != 0 {
 			move_line_limit(p, expr.pos, 1);
 		}
 

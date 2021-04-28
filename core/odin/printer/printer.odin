@@ -493,7 +493,8 @@ align_var_decls :: proc(p: ^Printer) {
 			   line.format_tokens[i].kind == .Union ||
 			   line.format_tokens[i].kind == .Enum ||
 			   line.format_tokens[i].kind == .Struct ||
-			   line.format_tokens[i].kind == .For {
+			   line.format_tokens[i].kind == .For ||
+			   line.format_tokens[i].kind == .If {
 				continue_flag = true;
 			}
 
@@ -771,6 +772,10 @@ align_struct :: proc(p: ^Printer, index: int) {
 	};
 
 	format_tokens := make([]TokenAndLength, brace_token.parameter_count, context.temp_allocator);
+
+	if brace_token.parameter_count == 0 {
+		return;
+	}
 
 	for line, line_index in p.lines[brace_line + 1:] {
 		length := 0;
