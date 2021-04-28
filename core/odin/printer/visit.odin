@@ -461,8 +461,10 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		for value in v.values {
 			switch a in value.derived {
-			case Proc_Lit, Union_Type, Enum_Type, Struct_Type:
+			case Union_Type, Enum_Type, Struct_Type:
 				add_semicolon = false || called_in_stmt;
+			case Proc_Lit:
+				add_semicolon = false;
 			}
 		}
 
@@ -532,6 +534,9 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 	}
 
 	switch v in stmt.derived {
+	case Import_Decl:
+		visit_decl(p, cast(^Decl)stmt, true);
+		return;
 	case Value_Decl:
 		visit_decl(p, cast(^Decl)stmt, true);
 		return;
@@ -692,6 +697,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 	case Type_Switch_Stmt:
 		move_line(p, v.pos);
+
+		hint_current_line(p, {.Switch_Stmt});
 
 		if v.label != nil {
 			visit_expr(p, v.label);

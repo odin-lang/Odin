@@ -608,7 +608,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				kind = switch3(t, .And, .And_Eq, '&', .Cmp_And);
 			}
 		case '|': kind = switch3(t, .Or, .Or_Eq, '|', .Cmp_Or);
-		case '~': kind = .Xor;
+		case '~': kind = switch2(t, .Xor, .Xor_Eq);
 		case '<': kind = switch4(t, .Lt, .Lt_Eq, '<', .Shl, .Shl_Eq);
 		case '>': kind = switch4(t, .Gt, .Gt_Eq, '>', .Shr,.Shr_Eq);
 

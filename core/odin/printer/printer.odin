@@ -350,8 +350,8 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 	keyword_found := false;
 	keyword_token: Format_Token;
 	keyword_line:  int;
-	largest := 0;
 
+	largest := 0;
 	brace_count := 0;
 	done        := false;
 
@@ -383,6 +383,10 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 
 			if format_token.kind == .Comment {
 				break;
+			}
+
+			if format_token.kind == .Undef || format_token.kind == .Comma {
+				return;
 			}
 
 			if line_index == 0 && i <= format_index {
@@ -489,18 +493,20 @@ align_var_decls :: proc(p: ^Printer) {
 				not_mutable = true;
 			}
 
-			if line.format_tokens[i].kind == .Proc ||
-			   line.format_tokens[i].kind == .Union ||
+			if line.format_tokens[i].kind == .Union ||
 			   line.format_tokens[i].kind == .Enum ||
 			   line.format_tokens[i].kind == .Struct ||
 			   line.format_tokens[i].kind == .For ||
-			   line.format_tokens[i].kind == .If {
+			   line.format_tokens[i].kind == .If || 
+			   line.format_tokens[i].kind == .Comment {
 				continue_flag = true;
 			}
 
-			if line.format_tokens[i].kind == .Comment {
+			//enforced undef is always on the last line, if it exists
+			if line.format_tokens[i].kind == .Proc && line.format_tokens[len(line.format_tokens)-1].kind != .Undef {
 				continue_flag = true;
 			}
+
 		}
 
 		if continue_flag {
@@ -601,7 +607,6 @@ align_var_decls :: proc(p: ^Printer) {
 }
 
 align_switch_stmt :: proc(p: ^Printer, index: int) {
-
 	switch_found := false;
 	brace_token: Format_Token;
 	brace_line:  int;
@@ -739,7 +744,6 @@ align_enum :: proc(p: ^Printer, index: int) {
 }
 
 align_struct :: proc(p: ^Printer, index: int) {
-
 	struct_found := false;
 	brace_token: Format_Token;
 	brace_line:  int;
@@ -795,6 +799,7 @@ align_struct :: proc(p: ^Printer, index: int) {
 				format_tokens[colon_count] = {format_token = &line.format_tokens[i + 1], length = length};
 				colon_count += 1;
 				largest = max(length, largest);
+				break;
 			}
 
 			length += len(format_token.text) + format_token.spaces_before;
