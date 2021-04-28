@@ -472,6 +472,7 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 	lbCallingConvention_X86_FastCall, // ProcCC_FastCall,
 
 	lbCallingConvention_C,            // ProcCC_None,
+	lbCallingConvention_C,            // ProcCC_Naked,
 	lbCallingConvention_C,            // ProcCC_InlineAsm,
 };
 
