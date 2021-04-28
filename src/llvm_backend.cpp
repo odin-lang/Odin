@@ -14363,13 +14363,15 @@ void lb_generate_code(lbGenerator *gen) {
 		Type *params  = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
 
+		Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
+
 		String name = str_lit("main");
 		if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
 			name = str_lit("mainCRTStartup");
 		} else {
 			array_init(&params->Tuple.variables, permanent_allocator(), 2);
 			params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
-			params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), alloc_type_pointer(t_cstring), false, true);
+			params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
 		}
 
 		array_init(&results->Tuple.variables, permanent_allocator(), 1);
@@ -14384,6 +14386,14 @@ void lb_generate_code(lbGenerator *gen) {
 		p->is_startup = true;
 
 		lb_begin_procedure_body(p);
+
+		{ // initialize `runtime.args__`
+			lbValue argc = {LLVMGetParam(p->value, 0), t_i32};
+			argc = lb_emit_conv(p, argc, t_int);
+			lbValue argv = {LLVMGetParam(p->value, 1), t_ptr_cstring};
+			lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
+			lb_fill_slice(p, args, argv, argc);
+		}
 
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
 
