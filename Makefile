@@ -11,7 +11,7 @@ ifeq ($(OS), Darwin)
 	LLVM_CONFIG=llvm-config
 
 	LDFLAGS:=$(LDFLAGS) -liconv
-	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG)--cxxflags --ldflags)
+	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
 	LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
 ifeq ($(OS), Linux)
