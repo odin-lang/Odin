@@ -3220,6 +3220,7 @@ ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "fastcall")    return ProcCC_FastCall;
 	if (s == "fast")        return ProcCC_FastCall;
 	if (s == "none")        return ProcCC_None;
+	if (s == "naked")       return ProcCC_Naked;
 	return ProcCC_Invalid;
 }
 

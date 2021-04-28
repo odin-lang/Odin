@@ -32,6 +32,7 @@ Calling_Convention :: enum u8 {
 	Fast_Call   = 5,
 
 	None        = 6,
+	Naked       = 7,
 }
 
 Type_Info_Enum_Value :: distinct i64;

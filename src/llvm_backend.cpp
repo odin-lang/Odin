@@ -2588,6 +2588,10 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		lb_add_attribute_to_proc(m, p->value, "noreturn");
 	}
 
+	if (pt->Proc.calling_convention == ProcCC_Naked) {
+		lb_add_attribute_to_proc(m, p->value, "naked");
+	}
+
 	switch (p->inlining) {
 	case ProcInlining_inline:
 		lb_add_attribute_to_proc(m, p->value, "alwaysinline");
