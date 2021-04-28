@@ -409,6 +409,11 @@ i32 linker_stage(lbGenerator *gen) {
 			#endif
 		}
 
+		if (build_context.metrics.os == TargetOs_linux) {
+			link_settings = gb_string_appendc(link_settings, "-no-pie ");
+		}
+
+
 		if (build_context.out_filepath.len > 0) {
 			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
 			isize pos = string_extension_position(build_context.out_filepath);
