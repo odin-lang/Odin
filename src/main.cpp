@@ -265,22 +265,22 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(build_context.resource_filepath)
 				);
 
-        if(result == 0) {
-          result = system_exec_command_line_app("msvc-link",
-            "\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
-            "/nologo /incremental:no /opt:ref /subsystem:%s "
-            " %.*s "
-            " %.*s "
-            " %s "
-            "",
-            LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
-            link_settings,
-            subsystem_str,
-            LIT(build_context.link_flags),
-            LIT(build_context.extra_linker_flags),
-            lib_str
-          );
-        }
+				if (result == 0) {
+					result = system_exec_command_line_app("msvc-link",
+						"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+						"/nologo /incremental:no /opt:ref /subsystem:%s "
+						" %.*s "
+						" %.*s "
+						" %s "
+						"",
+						LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
+						link_settings,
+						subsystem_str,
+						LIT(build_context.link_flags),
+						LIT(build_context.extra_linker_flags),
+						lib_str
+					  );
+				}
 			} else {
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
@@ -1534,69 +1534,6 @@ void remove_temp_files(String output_base) {
 #undef EXT_REMOVE
 }
 
-
-
-
-i32 exec_llvm_opt(String output_base) {
-#if defined(GB_SYSTEM_WINDOWS)
-	// For more passes arguments: http://llvm.org/docs/Passes.html
-
-  return system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
-		"",
-		LIT(build_context.ODIN_ROOT),
-		LIT(output_base), LIT(output_base))
-
-  || system_exec_command_line_app("llvm-opt",
-		"\"%.*sbin/opt\" \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
-		"",
-		LIT(build_context.ODIN_ROOT),
-		LIT(output_base), LIT(output_base),
-		LIT(build_context.opt_flags));
-#else
-	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
-	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-
-  return system_exec_command_line_app("llvm-opt",
-    "opt \"%.*s.ll\" -o \"%.*s_memcpy_pass.bc\" -memcpyopt"
-    "",
-    LIT(output_base), LIT(output_base))
-
-	|| system_exec_command_line_app("llvm-opt",
-		"opt \"%.*s_memcpy_pass.bc\" -o \"%.*s.bc\" %.*s "
-		"",
-		LIT(output_base), LIT(output_base),
-		LIT(build_context.opt_flags));
-#endif
-}
-
-i32 exec_llvm_llc(String output_base) {
-	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-#if defined(GB_SYSTEM_WINDOWS)
-	return system_exec_command_line_app("llvm-llc",
-		"\"%.*sbin\\llc\" \"%.*s.bc\" -filetype=obj -O%d "
-		"-o \"%.*s.obj\" "
-		"%.*s"
-		"",
-		LIT(build_context.ODIN_ROOT),
-		LIT(output_base),
-		build_context.optimization_level,
-		LIT(output_base),
-		LIT(build_context.llc_flags));
-#else
-	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
-	return system_exec_command_line_app("llc",
-		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
-		"%.*s "
-		"%s%.*s",
-		LIT(output_base),
-		build_context.optimization_level,
-		LIT(build_context.llc_flags),
-		build_context.cross_compiling ? "-mtriple=" : "",
-		cast(int)(build_context.cross_compiling ? build_context.metrics.target_triplet.len : 0),
-		build_context.metrics.target_triplet.text);
-#endif
-}
 
 void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(arg0));
