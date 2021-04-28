@@ -2,8 +2,12 @@
 
 setlocal EnableDelayedExpansion
 
-set curr_year=%DATE:~-4%
-set curr_month=%DATE:~3,2%
+for /f "usebackq tokens=1,2 delims=,=- " %%i in (`wmic os get LocalDateTime /value`) do @if %%i==LocalDateTime (
+     set CURR_DATE_TIME=%%j
+)
+
+set curr_year=%CURR_DATE_TIME:~0,4%
+set curr_month=%CURR_DATE_TIME:~4,2%
 
 :: Make sure this is a decent name and not generic
 set exe_name=odin.exe
