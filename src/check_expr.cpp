@@ -5476,6 +5476,15 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	if (operand->mode == Addressing_Type) {
 		Type *t = operand->type;
 		if (is_type_polymorphic_record(t)) {
+			if (!is_type_named(t)) {
+				gbString s = expr_to_string(operand->expr);
+				error(call, "Illegal use of an unnamed polymorphic record, %s", s);
+				gb_string_free(s);
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;;
+				return Expr_Expr;
+			}
+
 			auto err = check_polymorphic_record_type(c, operand, call);
 			if (err == 0) {
 				Ast *ident = operand->expr;
@@ -8526,8 +8535,18 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 
 	case_ast_node(st, StructType, node);
 		str = gb_string_appendc(str, "struct ");
+		if (st->polymorphic_params) {
+			str = gb_string_append_rune(str, '(');
+			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
+			str = gb_string_appendc(str, ") ");
+		}
 		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
 		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
+		if (st->align) {
+			str = gb_string_appendc(str, "#align ");
+			str = write_expr_to_string(str, st->align, shorthand);
+			str = gb_string_append_rune(str, ' ');
+		}
 		str = gb_string_append_rune(str, '{');
 		if (shorthand) {
 			str = gb_string_appendc(str, "...");
@@ -8540,6 +8559,18 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");
+		if (st->polymorphic_params) {
+			str = gb_string_append_rune(str, '(');
+			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
+			str = gb_string_appendc(str, ") ");
+		}
+		if (st->no_nil) str = gb_string_appendc(str, "#no_nil ");
+		if (st->maybe)  str = gb_string_appendc(str, "#maybe ");
+		if (st->align) {
+			str = gb_string_appendc(str, "#align ");
+			str = write_expr_to_string(str, st->align, shorthand);
+			str = gb_string_append_rune(str, ' ');
+		}
 		str = gb_string_append_rune(str, '{');
 		if (shorthand) {
 			str = gb_string_appendc(str, "...");
