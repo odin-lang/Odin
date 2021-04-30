@@ -38,13 +38,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Download and unpack LLVM bins
-        shell: powershell
-        run: |
-          cd bin
-          $ProgressPreference = "SilentlyContinue";
-          Invoke-WebRequest -Uri https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip -OutFile llvm-binaries.zip
-          7z x llvm-binaries.zip > $null
       - name: build Odin
         shell: cmd
         run: |
