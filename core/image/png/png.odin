@@ -366,11 +366,9 @@ load_from_slice :: proc(slice: ^[]u8, options: Options = {}, allocator := contex
 }
 
 load_from_file :: proc(filename: string, options: Options = {}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	load_file :: proc(filename: string) -> (res: []u8, ok: bool) {
-		return os.read_entire_file(filename, context.temp_allocator);
-	}
+	data, ok := os.read_entire_file(filename, allocator);
+	defer delete(data);
 
-	data, ok := load_file(filename);
 	if ok {
 		img, err = load_from_slice(&data, options, allocator);
 		return;
