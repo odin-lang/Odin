@@ -108,7 +108,9 @@ load_from_slice :: proc(slice: ^[]u8, buf: ^bytes.Buffer, allocator := context.a
 }
 
 load_from_file :: proc(filename: string, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
-	data, ok := os.read_entire_file(filename, context.temp_allocator);
+	data, ok := os.read_entire_file(filename, allocator);
+	defer delete(data);
+
 	if ok {
 		err = load_from_slice(&data, buf, allocator);
 		return;
