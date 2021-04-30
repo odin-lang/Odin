@@ -21,8 +21,8 @@ Compression_Method :: enum u8 {
 Compression_Level :: enum u8 {
 	Fastest = 0,
 	Fast    = 1,
-    Default = 2,
-    Maximum = 3,
+	Default = 2,
+	Maximum = 3,
 }
 
 Options :: struct {
@@ -68,19 +68,19 @@ Z_LENGTH_DEZIGZAG := []u8{
 };
 
 Z_FIXED_LENGTH := [288]u8{
-   8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-   8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-   8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-   8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-   8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-   9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-   9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-   9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-   7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, 7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,8,
+	8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
+	8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
+	8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
+	8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
+	8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+	9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+	9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+	9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+	7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, 7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,8,
 };
 
 Z_FIXED_DIST := [32]u8{
-   5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+	5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
 };
 
 /*
@@ -94,12 +94,12 @@ ZFAST_MASK :: ((1 << ZFAST_BITS) - 1);
 	JPEG packs from left, ZLIB from right. We can't share code.
 */
 Huffman_Table :: struct {
-   fast: [1 << ZFAST_BITS]u16,
-   firstcode: [16]u16,
-   maxcode: [17]int,
-   firstsymbol: [16]u16,
-   size: [288]u8,
-   value: [288]u16,
+	fast:        [1 << ZFAST_BITS]u16,
+	firstcode:   [16]u16,
+	maxcode:     [17]int,
+	firstsymbol: [16]u16,
+	size:        [288]u8,
+	value:       [288]u16,
 };
 
 // Implementation starts here
@@ -218,19 +218,19 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 	if (s >= 16) {
 		return 0, E_Deflate.Bad_Huffman_Code;
 	}
-   	// code size is s, so:
-   	b := (k >> (16-s)) - int(t.firstcode[s]) + int(t.firstsymbol[s]);
-   	if b >= size_of(t.size) {
-   		return 0, E_Deflate.Bad_Huffman_Code;	
-   	}
-   	if t.size[b] != s {
-   		return 0, E_Deflate.Bad_Huffman_Code;
-   	}
+	// code size is s, so:
+	b := (k >> (16-s)) - int(t.firstcode[s]) + int(t.firstsymbol[s]);
+	if b >= size_of(t.size) {
+		return 0, E_Deflate.Bad_Huffman_Code;
+	}
+	if t.size[b] != s {
+		return 0, E_Deflate.Bad_Huffman_Code;
+	}
 
-   	compress.consume_bits_lsb(z, s);
+	compress.consume_bits_lsb(z, s);
 
-   	r = t.value[b];
-   	return r, E_General.OK;
+	r = t.value[b];
+	return r, E_General.OK;
 }
 
 decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
@@ -254,7 +254,6 @@ decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #
 }
 
 parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
-
 	#no_bounds_check for {
 		value, e := decode_huffman(z, z_repeat);
 		if !is_kind(e, E_General.OK) {
@@ -267,8 +266,8 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 			}
 		} else {
 			if value == 256 {
-         		// End of block
-         		return E_General.OK;
+      				// End of block
+      				return E_General.OK;
 			}
 
 			value -= 257;
@@ -370,7 +369,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 		}
 
 		fdict   := (flg >> 5) & 1;
-		/* 
+		/*
 			We don't handle built-in dictionaries for now.
 			They're application specific and PNG doesn't use them.
 		*/
@@ -449,7 +448,8 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 
 		// log.debugf("Final: %v | Type: %v\n", final, type);
 
-		if type == 0 {
+		switch type {
+		case 0:
 			// Uncompressed block
 
 			// Discard bits until next byte boundary
@@ -471,9 +471,9 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 				write_byte(z, u8(lit));
 				uncompressed_len -= 1;
 			}
-		} else if type == 3 {
+		case 3:
 			return E_Deflate.BType_3;
-		} else {
+		case:
 			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
 			if type == 1 {
 				// Use fixed code lengths.
@@ -487,12 +487,12 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 				}
 			} else {
 				lencodes: [286+32+137]u8;
-			   	codelength_sizes: [19]u8;
+				codelength_sizes: [19]u8;
 
-			   	//i: u32;
-			   	n: u32;
+				//i: u32;
+				n: u32;
 
-			   	compress.refill_lsb(z, 14);
+				compress.refill_lsb(z, 14);
 				hlit  := compress.read_bits_no_refill_lsb(z, 5) + 257;
 				hdist := compress.read_bits_no_refill_lsb(z, 5) + 1;
 				hclen := compress.read_bits_no_refill_lsb(z, 4) + 4;
@@ -525,34 +525,35 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 					} else {
 						fill := u8(0);
 						compress.refill_lsb(z, 7);
-						if c == 16 {
+						switch c {
+						case 16:
 							c = u16(compress.read_bits_no_refill_lsb(z, 2) + 3);
-			            	if n == 0 {
-			            		return E_Deflate.Huffman_Bad_Code_Lengths;
-			            	}
-			            	fill = lencodes[n - 1];
-						} else if c == 17 {
-			            	c = u16(compress.read_bits_no_refill_lsb(z, 3) + 3);
-			        	} else if c == 18 {
-			            	c = u16(compress.read_bits_no_refill_lsb(z, 7) + 11);
-			        	} else {
-			            	return E_Deflate.Huffman_Bad_Code_Lengths;
-			            }
+							if n == 0 {
+								return E_Deflate.Huffman_Bad_Code_Lengths;
+							}
+							fill = lencodes[n - 1];
+						case 17:
+							c = u16(compress.read_bits_no_refill_lsb(z, 3) + 3);
+						case 18:
+							c = u16(compress.read_bits_no_refill_lsb(z, 7) + 11);
+						case:
+					         	return E_Deflate.Huffman_Bad_Code_Lengths;
+						}
 
 						if ntot - n < u32(c) {
-				        	return E_Deflate.Huffman_Bad_Code_Lengths;
-				        }
+							return E_Deflate.Huffman_Bad_Code_Lengths;
+						}
 
-				        nc := n + u32(c);
-				        #no_bounds_check for ; n < nc; n += 1 {
-				        	lencodes[n] = fill;
-				        }
+						nc := n + u32(c);
+						#no_bounds_check for ; n < nc; n += 1 {
+							lencodes[n] = fill;
+						}
 					}
 				}
 
 				if n != ntot {
-			   		return E_Deflate.Huffman_Bad_Code_Lengths;
-			   	}
+					return E_Deflate.Huffman_Bad_Code_Lengths;
+				}
 
 				err = build_huffman(z_repeat, lencodes[:hlit]);
 				if !is_kind(err, E_General.OK) {
@@ -577,11 +578,11 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 	return E_General.OK;
 }
 
-inflate_from_byte_array :: proc(input: ^[]u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
+inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
 	ctx := Context{};
 
 	r := bytes.Reader{};
-	bytes.reader_init(&r, input^);
+	bytes.reader_init(&r, input);
 	rs := bytes.reader_to_stream(&r);
 	ctx.input = rs;
 
@@ -594,7 +595,7 @@ inflate_from_byte_array :: proc(input: ^[]u8, buf: ^bytes.Buffer, raw := false) 
 	return err;
 }
 
-inflate_from_byte_array_raw :: proc(input: ^[]u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
+inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
 	return inflate_from_byte_array(input, buf, true);
 }
 
