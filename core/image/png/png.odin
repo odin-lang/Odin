@@ -350,9 +350,9 @@ chunk_type_to_name :: proc(type: ^Chunk_Type) -> string {
 	return strings.string_from_ptr(t, 4);
 }
 
-load_from_slice :: proc(slice: ^[]u8, options: Options = {}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	r := bytes.Reader{};
-	bytes.reader_init(&r, slice^);
+	bytes.reader_init(&r, slice);
 	stream := bytes.reader_to_stream(&r);
 
 	/*
@@ -360,17 +360,17 @@ load_from_slice :: proc(slice: ^[]u8, options: Options = {}, allocator := contex
 		This way the stream reader could avoid the copy into the temp memory returned by it,
 		and instead return a slice into the original memory that's already owned by the caller.
 	*/
-	img, err = load_from_stream(&stream, options, allocator);
+	img, err = load_from_stream(stream, options, allocator);
 
 	return img, err;
 }
 
-load_from_file :: proc(filename: string, options: Options = {}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	data, ok := os.read_entire_file(filename, allocator);
 	defer delete(data);
 
 	if ok {
-		img, err = load_from_slice(&data, options, allocator);
+		img, err = load_from_slice(data, options, allocator);
 		return;
 	} else {
 		img = new(Image);
@@ -378,7 +378,7 @@ load_from_file :: proc(filename: string, options: Options = {}, allocator := con
 	}
 }
 
-load_from_stream :: proc(stream: ^io.Stream, options: Options = {}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	options := options;
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image};
@@ -396,7 +396,7 @@ load_from_stream :: proc(stream: ^io.Stream, options: Options = {}, allocator :=
 	img.sidecar = nil;
 
 	ctx := compress.Context{
-		input  = stream^,
+		input = stream,
 	};
 
 	signature, io_error := compress.read_data(&ctx, Signature);
@@ -669,7 +669,7 @@ load_from_stream :: proc(stream: ^io.Stream, options: Options = {}, allocator :=
 	}
 
 	buf: bytes.Buffer;
-	zlib_error := zlib.inflate(&idat, &buf);
+	zlib_error := zlib.inflate(idat, &buf);
 	defer bytes.buffer_destroy(&buf);
 
 	if !is_kind(zlib_error, E_General.OK) {
@@ -817,8 +817,7 @@ load_from_stream :: proc(stream: ^io.Stream, options: Options = {}, allocator :=
 				}
 			}
 		} else {
-			// This should be impossible.
-			assert(false);
+			unreachable();
 		}
 
 		img.pixels = t;
@@ -845,145 +844,145 @@ load_from_stream :: proc(stream: ^io.Stream, options: Options = {}, allocator :=
 		o16 := mem.slice_data_cast([]u16, t.buf[:]);
 
 		switch (raw_image_channels) {
-			case 1:
-				// Gray without Alpha. Might have tRNS alpha.
-				key   := u16(0);
+		case 1:
+			// Gray without Alpha. Might have tRNS alpha.
+			key   := u16(0);
+			if seen_trns {
+				key = mem.slice_data_cast([]u16, trns.data)[0];
+			}
+
+			for len(p16) > 0 {
+				r := p16[0];
+
+				alpha := u16(1); // Default to full opaque
+
 				if seen_trns {
-					key = mem.slice_data_cast([]u16, trns.data)[0];
-				}
-
-				for len(p16) > 0 {
-					r := p16[0];
-
-					alpha := u16(1); // Default to full opaque
-
-					if seen_trns {
-						if r == key {
-							if seen_bkgd {
-								c := img.background.([3]u16);
-								r = c[0];
-							} else {
-								alpha = 0; // Keyed transparency
-							}
+					if r == key {
+						if seen_bkgd {
+							c := img.background.([3]u16);
+							r = c[0];
+						} else {
+							alpha = 0; // Keyed transparency
 						}
 					}
-
-					if premultiply {
-						o16[0] = r * alpha;
-						o16[1] = r * alpha;
-						o16[2] = r * alpha;
-					} else {
-						o16[0] = r;
-						o16[1] = r;
-						o16[2] = r;
-					}
-
-					if out_image_channels == 4 {
-						o16[3] = alpha * 65535;
-					}
-
-					p16 = p16[1:];
-					o16 = o16[out_image_channels:];
 				}
-			case 2:
-				// Gray with alpha, we shouldn't have a tRNS chunk.
-				for len(p16) > 0 {
-					r := p16[0];
-					if premultiply {
-						alpha := p16[1];
-						c := u16(f32(r) * f32(alpha) / f32(65535));
-						o16[0] = c;
-						o16[1] = c;
-						o16[2] = c;
-					} else {
-						o16[0] = r;
-						o16[1] = r;
-						o16[2] = r;
-					}
 
-					if .alpha_drop_if_present not_in options {
-						o16[3] = p16[1];
-					}
-
-					p16 = p16[2:];
-					o16 = o16[out_image_channels:];
+				if premultiply {
+					o16[0] = r * alpha;
+					o16[1] = r * alpha;
+					o16[2] = r * alpha;
+				} else {
+					o16[0] = r;
+					o16[1] = r;
+					o16[2] = r;
 				}
-			case 3:
-				/*
-					Color without Alpha.
-					We may still have a tRNS chunk or `.alpha_add_if_missing`.
-				*/
 
-				key: []u16;
+				if out_image_channels == 4 {
+					o16[3] = alpha * 65535;
+				}
+
+				p16 = p16[1:];
+				o16 = o16[out_image_channels:];
+			}
+		case 2:
+			// Gray with alpha, we shouldn't have a tRNS chunk.
+			for len(p16) > 0 {
+				r := p16[0];
+				if premultiply {
+					alpha := p16[1];
+					c := u16(f32(r) * f32(alpha) / f32(65535));
+					o16[0] = c;
+					o16[1] = c;
+					o16[2] = c;
+				} else {
+					o16[0] = r;
+					o16[1] = r;
+					o16[2] = r;
+				}
+
+				if .alpha_drop_if_present not_in options {
+					o16[3] = p16[1];
+				}
+
+				p16 = p16[2:];
+				o16 = o16[out_image_channels:];
+			}
+		case 3:
+			/*
+				Color without Alpha.
+				We may still have a tRNS chunk or `.alpha_add_if_missing`.
+			*/
+
+			key: []u16;
+			if seen_trns {
+				key = mem.slice_data_cast([]u16, trns.data);
+			}
+
+			for len(p16) > 0 {
+				r     := p16[0];
+				g     := p16[1];
+				b     := p16[2];
+
+				alpha := u16(1); // Default to full opaque
+
 				if seen_trns {
-					key = mem.slice_data_cast([]u16, trns.data);
-				}
-
-				for len(p16) > 0 {
-					r     := p16[0];
-					g     := p16[1];
-					b     := p16[2];
-
-					alpha := u16(1); // Default to full opaque
-
-					if seen_trns {
-						if r == key[0] && g == key[1] && b == key[2] {
-							if seen_bkgd {
-								c := img.background.([3]u16);
-								r = c[0];
-								g = c[1];
-								b = c[2];
-							} else {
-								alpha = 0; // Keyed transparency
-							}
+					if r == key[0] && g == key[1] && b == key[2] {
+						if seen_bkgd {
+							c := img.background.([3]u16);
+							r = c[0];
+							g = c[1];
+							b = c[2];
+						} else {
+							alpha = 0; // Keyed transparency
 						}
 					}
-
-					if premultiply {
-						o16[0] = r * alpha;
-						o16[1] = g * alpha;
-						o16[2] = b * alpha;
-					} else {
-						o16[0] = r;
-						o16[1] = g;
-						o16[2] = b;
-					}
-
-					if out_image_channels == 4 {
-						o16[3] = alpha * 65535;
-					}
-
-					p16 = p16[3:];
-					o16 = o16[out_image_channels:];
 				}
-			case 4:
-				// Color with Alpha, can't have tRNS.
-				for len(p16) > 0 {
-					r     := p16[0];
-					g     := p16[1];
-					b     := p16[2];
-					a     := p16[3];
 
-					if premultiply {
-						alpha := f32(a) / 65535.0;
-						o16[0] = u16(f32(r) * alpha);
-						o16[1] = u16(f32(g) * alpha);
-						o16[2] = u16(f32(b) * alpha);
-					} else {
-						o16[0] = r;
-						o16[1] = g;
-						o16[2] = b;
-					}
-
-					if .alpha_drop_if_present not_in options {
-						o16[3] = a;
-					}
-
-					p16 = p16[4:];
-					o16 = o16[out_image_channels:];
+				if premultiply {
+					o16[0] = r * alpha;
+					o16[1] = g * alpha;
+					o16[2] = b * alpha;
+				} else {
+					o16[0] = r;
+					o16[1] = g;
+					o16[2] = b;
 				}
-			case:
-				unreachable("We should never seen # channels other than 1-4 inclusive.");
+
+				if out_image_channels == 4 {
+					o16[3] = alpha * 65535;
+				}
+
+				p16 = p16[3:];
+				o16 = o16[out_image_channels:];
+			}
+		case 4:
+			// Color with Alpha, can't have tRNS.
+			for len(p16) > 0 {
+				r     := p16[0];
+				g     := p16[1];
+				b     := p16[2];
+				a     := p16[3];
+
+				if premultiply {
+					alpha := f32(a) / 65535.0;
+					o16[0] = u16(f32(r) * alpha);
+					o16[1] = u16(f32(g) * alpha);
+					o16[2] = u16(f32(b) * alpha);
+				} else {
+					o16[0] = r;
+					o16[1] = g;
+					o16[2] = b;
+				}
+
+				if .alpha_drop_if_present not_in options {
+					o16[3] = a;
+				}
+
+				p16 = p16[4:];
+				o16 = o16[out_image_channels:];
+			}
+		case:
+			unreachable("We should never seen # channels other than 1-4 inclusive.");
 		}
 
 		img.pixels = t;
@@ -1011,143 +1010,143 @@ load_from_stream :: proc(stream: ^io.Stream, options: Options = {}, allocator :=
 		o := mem.slice_data_cast([]u8, t.buf[:]);
 
 		switch (raw_image_channels) {
-			case 1:
-				// Gray without Alpha. Might have tRNS alpha.
-				key   := u8(0);
+		case 1:
+			// Gray without Alpha. Might have tRNS alpha.
+			key   := u8(0);
+			if seen_trns {
+				key = u8(mem.slice_data_cast([]u16be, trns.data)[0]);
+			}
+
+			for len(p) > 0 {
+				r := p[0];
+				alpha := u8(1);
+
 				if seen_trns {
-					key = u8(mem.slice_data_cast([]u16be, trns.data)[0]);
-				}
-
-				for len(p) > 0 {
-					r := p[0];
-					alpha := u8(1);
-
-					if seen_trns {
-						if r == key {
-							if seen_bkgd {
-								c := img.background.([3]u16);
-								r = u8(c[0]);
-							} else {
-								alpha = 0; // Keyed transparency
-							}
+					if r == key {
+						if seen_bkgd {
+							c := img.background.([3]u16);
+							r = u8(c[0]);
+						} else {
+							alpha = 0; // Keyed transparency
 						}
-						if premultiply {
-							o[0] = r * alpha;
-							o[1] = r * alpha;
-							o[2] = r * alpha;
-						}
-					} else {
-						o[0] = r;
-						o[1] = r;
-						o[2] = r;
 					}
-
-					if out_image_channels == 4 {
-						o[3] = alpha * 255;
+					if premultiply {
+						o[0] = r * alpha;
+						o[1] = r * alpha;
+						o[2] = r * alpha;
 					}
-
-					p = p[1:];
-					o = o[out_image_channels:];
+				} else {
+					o[0] = r;
+					o[1] = r;
+					o[2] = r;
 				}
-			case 2:
-				// Gray with alpha, we shouldn't have a tRNS chunk.
-				for len(p) > 0 {
-					r := p[0];
-					if .alpha_premultiply in options {
-						alpha := p[1];
-						c := u8(f32(r) * f32(alpha) / f32(255));
-						o[0] = c;
-						o[1] = c;
-						o[2] = c;
-					} else {
-						o[0] = r;
-						o[1] = r;
-						o[2] = r;
-					}
 
-					if .alpha_drop_if_present not_in options {
-						o[3] = p[1];
-					}
-
-					p = p[2:];
-					o = o[out_image_channels:];
+				if out_image_channels == 4 {
+					o[3] = alpha * 255;
 				}
-			case 3:
-				// Color without Alpha. We may still have a tRNS chunk
-				key: []u8;
+
+				p = p[1:];
+				o = o[out_image_channels:];
+			}
+		case 2:
+			// Gray with alpha, we shouldn't have a tRNS chunk.
+			for len(p) > 0 {
+				r := p[0];
+				if .alpha_premultiply in options {
+					alpha := p[1];
+					c := u8(f32(r) * f32(alpha) / f32(255));
+					o[0] = c;
+					o[1] = c;
+					o[2] = c;
+				} else {
+					o[0] = r;
+					o[1] = r;
+					o[2] = r;
+				}
+
+				if .alpha_drop_if_present not_in options {
+					o[3] = p[1];
+				}
+
+				p = p[2:];
+				o = o[out_image_channels:];
+			}
+		case 3:
+			// Color without Alpha. We may still have a tRNS chunk
+			key: []u8;
+			if seen_trns {
+				/*
+					For 8-bit images, the tRNS chunk still contains a triple in u16be.
+					We use only the low byte in this case.
+				*/
+				key = []u8{trns.data[1], trns.data[3], trns.data[5]};
+			}
+			for len(p) > 0 {
+				r     := p[0];
+				g     := p[1];
+				b     := p[2];
+
+				alpha := u8(1); // Default to full opaque
+
+				// TODO: Combine the seen_trns cases.
 				if seen_trns {
-					/*
-						For 8-bit images, the tRNS chunk still contains a triple in u16be.
-						We use only the low byte in this case.
-					*/
-					key = []u8{trns.data[1], trns.data[3], trns.data[5]};
-				}
-				for len(p) > 0 {
-					r     := p[0];
-					g     := p[1];
-					b     := p[2];
-
-					alpha := u8(1); // Default to full opaque
-
-					// TODO: Combine the seen_trns cases.
-					if seen_trns {
-						if r == key[0] && g == key[1] && b == key[2] {
-							if seen_bkgd {
-								c := img.background.([3]u16);
-								r = u8(c[0]);
-								g = u8(c[1]);
-								b = u8(c[2]);
-							} else {
-								alpha = 0; // Keyed transparency
-							}
+					if r == key[0] && g == key[1] && b == key[2] {
+						if seen_bkgd {
+							c := img.background.([3]u16);
+							r = u8(c[0]);
+							g = u8(c[1]);
+							b = u8(c[2]);
+						} else {
+							alpha = 0; // Keyed transparency
 						}
-
-						if .alpha_premultiply in options || .blend_background in options {
-							o[0] = r * alpha;
-							o[1] = g * alpha;
-							o[2] = b * alpha;
-						}
-					} else {
-						o[0] = r;
-						o[1] = g;
-						o[2] = b;
 					}
 
-					if out_image_channels == 4 {
-						o[3] = alpha * 255;
+					if .alpha_premultiply in options || .blend_background in options {
+						o[0] = r * alpha;
+						o[1] = g * alpha;
+						o[2] = b * alpha;
 					}
-
-					p = p[3:];
-					o = o[out_image_channels:];
+				} else {
+					o[0] = r;
+					o[1] = g;
+					o[2] = b;
 				}
-			case 4:
-				// Color with Alpha, can't have tRNS.
-				for len(p) > 0 {
-					r     := p[0];
-					g     := p[1];
-					b     := p[2];
-					a     := p[3];
 
-					if .alpha_premultiply in options {
-						alpha := f32(a) / 255.0;
-						o[0] = u8(f32(r) * alpha);
-						o[1] = u8(f32(g) * alpha);
-						o[2] = u8(f32(b) * alpha);
-					} else {
-						o[0] = r;
-						o[1] = g;
-						o[2] = b;
-					}
-
-					if .alpha_drop_if_present not_in options {
-						o[3] = a;
-					}
-
-					p = p[4:];
-					o = o[out_image_channels:];
+				if out_image_channels == 4 {
+					o[3] = alpha * 255;
 				}
-			case:
-				unreachable("We should never seen # channels other than 1-4 inclusive.");
+
+				p = p[3:];
+				o = o[out_image_channels:];
+			}
+		case 4:
+			// Color with Alpha, can't have tRNS.
+			for len(p) > 0 {
+				r     := p[0];
+				g     := p[1];
+				b     := p[2];
+				a     := p[3];
+
+				if .alpha_premultiply in options {
+					alpha := f32(a) / 255.0;
+					o[0] = u8(f32(r) * alpha);
+					o[1] = u8(f32(g) * alpha);
+					o[2] = u8(f32(b) * alpha);
+				} else {
+					o[0] = r;
+					o[1] = g;
+					o[2] = b;
+				}
+
+				if .alpha_drop_if_present not_in options {
+					o[3] = a;
+				}
+
+				p = p[4:];
+				o = o[out_image_channels:];
+			}
+		case:
+			unreachable("We should never seen # channels other than 1-4 inclusive.");
 		}
 
 		img.pixels = t;
@@ -1181,13 +1180,13 @@ filter_paeth :: #force_inline proc(left, up, up_left: u8) -> u8 {
 }
 
 Filter_Params :: struct #packed {
-	src     : []u8,
-	dest    : []u8,
-	width   : int,
-	height  : int,
-	depth   : int,
+	src:      []u8,
+	dest:     []u8,
+	width:    int,
+	height:   int,
+	depth:    int,
 	channels: int,
-	rescale : bool,
+	rescale:  bool,
 }
 
 depth_scale_table :: []u8{0, 0xff, 0x55, 0, 0x11, 0,0,0, 0x01};
@@ -1210,39 +1209,39 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 		filter := Row_Filter(src[0]); src = src[1:];
 		// fmt.printf("Row: %v | Filter: %v\n", y, filter);
 		switch(filter) {
-			case .None:
-				copy(dest, src[:row_stride]);
-			case .Sub:
-				for i := 0; i < channels; i += 1 {
-					dest[i] = src[i];
-				}
-				for k := 0; k < nk; k += 1 {
-					dest[channels+k] = (src[channels+k] + dest[k]) & 255;
-				}
-			case .Up:
-				for k := 0; k < row_stride; k += 1 {
-					dest[k] = (src[k] + up[k]) & 255;
-				}
-			case .Average:
-				for i := 0; i < channels; i += 1 {
-					avg := up[i] >> 1;
-					dest[i] = (src[i] + avg) & 255;
-				}
-				for k := 0; k < nk; k += 1 {
-					avg := u8((u16(up[channels+k]) + u16(dest[k])) >> 1);
-					dest[channels+k] = (src[channels+k] + avg) & 255;
-				}
-			case .Paeth:
-				for i := 0; i < channels; i += 1 {
-					paeth := filter_paeth(0, up[i], 0);
-					dest[i] = (src[i] + paeth) & 255;
-				}
-				for k := 0; k < nk; k += 1 {
-					paeth := filter_paeth(dest[k], up[channels+k], up[k]);
-					dest[channels+k] = (src[channels+k] + paeth) & 255;
-				}
-			case:
-				return false;
+		case .None:
+			copy(dest, src[:row_stride]);
+		case .Sub:
+			for i := 0; i < channels; i += 1 {
+				dest[i] = src[i];
+			}
+			for k := 0; k < nk; k += 1 {
+				dest[channels+k] = (src[channels+k] + dest[k]) & 255;
+			}
+		case .Up:
+			for k := 0; k < row_stride; k += 1 {
+				dest[k] = (src[k] + up[k]) & 255;
+			}
+		case .Average:
+			for i := 0; i < channels; i += 1 {
+				avg := up[i] >> 1;
+				dest[i] = (src[i] + avg) & 255;
+			}
+			for k := 0; k < nk; k += 1 {
+				avg := u8((u16(up[channels+k]) + u16(dest[k])) >> 1);
+				dest[channels+k] = (src[channels+k] + avg) & 255;
+			}
+		case .Paeth:
+			for i := 0; i < channels; i += 1 {
+				paeth := filter_paeth(0, up[i], 0);
+				dest[i] = (src[i] + paeth) & 255;
+			}
+			for k := 0; k < nk; k += 1 {
+				paeth := filter_paeth(dest[k], up[channels+k], up[k]);
+				dest[channels+k] = (src[channels+k] + paeth) & 255;
+			}
+		case:
+			return false;
 		}
 
 		src     = src[row_stride:];
@@ -1277,45 +1276,45 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 		dest = dest[row_offset:];
 
 		filter := Row_Filter(src[0]); src = src[1:];
-		switch(filter) {
-			case .None:
-				copy(dest, src[:row_stride_in]);
-			case .Sub:
-				for i in 0..channels {
-					dest[i] = src[i];
-				}
-				for k in 0..nk {
-					dest[channels+k] = (src[channels+k] + dest[k]) & 255;
-				}
-			case .Up:
-				for k in 0..row_stride_in {
-					dest[k] = (src[k] + up[k]) & 255;
-				}
-			case .Average:
-				for i in 0..channels {
-					avg := up[i] >> 1;
-					dest[i] = (src[i] + avg) & 255;
-				}
-				for k in 0..nk {
-					avg := u8((u16(up[channels+k]) + u16(dest[k])) >> 1);
-					dest[channels+k] = (src[channels+k] + avg) & 255;
-				}
-			case .Paeth:
-				for i in 0..channels {
-					paeth := filter_paeth(0, up[i], 0);
-					dest[i] = (src[i] + paeth) & 255;
-				}
-				for k in 0..nk {
-					paeth := filter_paeth(dest[k], up[channels], up[k]);
-					dest[channels+k] = (src[channels+k] + paeth) & 255;
-				}
-			case:
-				return false;
+		switch filter {
+		case .None:
+			copy(dest, src[:row_stride_in]);
+		case .Sub:
+			for i in 0..channels {
+				dest[i] = src[i];
+			}
+			for k in 0..nk {
+				dest[channels+k] = (src[channels+k] + dest[k]) & 255;
+			}
+		case .Up:
+			for k in 0..row_stride_in {
+				dest[k] = (src[k] + up[k]) & 255;
+			}
+		case .Average:
+			for i in 0..channels {
+				avg := up[i] >> 1;
+				dest[i] = (src[i] + avg) & 255;
+			}
+			for k in 0..nk {
+				avg := u8((u16(up[channels+k]) + u16(dest[k])) >> 1);
+				dest[channels+k] = (src[channels+k] + avg) & 255;
+			}
+		case .Paeth:
+			for i in 0..channels {
+				paeth := filter_paeth(0, up[i], 0);
+				dest[i] = (src[i] + paeth) & 255;
+			}
+			for k in 0..nk {
+				paeth := filter_paeth(dest[k], up[channels], up[k]);
+				dest[channels+k] = (src[channels+k] + paeth) & 255;
+			}
+		case:
+			return false;
 		}
 
-		src     = src [row_stride_in:];
-		up      = dest;
-		dest    = dest[row_stride_in:];
+		src   = src [row_stride_in:];
+		up    = dest;
+		dest  = dest[row_stride_in:];
 	}
 
 	// Let's expand the bits
@@ -1334,7 +1333,8 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 	for j := 0; j < height; j += 1 {
 		src = dest[row_offset:];
 
-		if depth == 4 {
+		switch depth {
+		case 4:
 			k := row_stride_out;
 			for ; k >= 2; k -= 2 {
 				c := src[0];
@@ -1347,7 +1347,7 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 				dest[0] = scale * (c >> 4);
 				dest = dest[1:];
 			}
-		} else if depth == 2 {
+		case 2:
 			k := row_stride_out;
 			for ; k >= 4; k -= 4 {
 				c := src[0];
@@ -1368,7 +1368,7 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 				}
 				dest = dest[k:];
 			}
-		} else if depth == 1 {
+		case 1:
 			k := row_stride_out;
 			for ; k >= 8; k -= 8 {
 				c := src[0];
@@ -1406,6 +1406,7 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 				dest = dest[k:];
 
 			}
+
 		}
 	}
 
@@ -1429,40 +1430,40 @@ defilter_16 :: proc(params: ^Filter_Params) -> (ok: bool) {
 		nk := row_stride - stride;
 
 		filter := Row_Filter(src[0]); src = src[1:];
-		switch(filter) {
-			case .None:
-				copy(dest, src[:row_stride]);
-			case .Sub:
-				for i := 0; i < stride; i += 1 {
-					dest[i] = src[i];
-				}
-				for k := 0; k < nk; k += 1 {
-					dest[stride+k] = (src[stride+k] + dest[k]) & 255;
-				}
-			case .Up:
-				for k := 0; k < row_stride; k += 1 {
-					dest[k] = (src[k] + up[k]) & 255;
-				}
-			case .Average:
-				for i := 0; i < stride; i += 1 {
-					avg := up[i] >> 1;
-					dest[i] = (src[i] + avg) & 255;
-				}
-				for k := 0; k < nk; k += 1 {
-					avg := u8((u16(up[stride+k]) + u16(dest[k])) >> 1);
-					dest[stride+k] = (src[stride+k] + avg) & 255;
-				}
-			case .Paeth:
-				for i := 0; i < stride; i += 1 {
-					paeth := filter_paeth(0, up[i], 0);
-					dest[i] = (src[i] + paeth) & 255;
-				}
-				for k := 0; k < nk; k += 1 {
-					paeth := filter_paeth(dest[k], up[stride+k], up[k]);
-					dest[stride+k] = (src[stride+k] + paeth) & 255;
-				}
-			case:
-				return false;
+		switch filter {
+		case .None:
+			copy(dest, src[:row_stride]);
+		case .Sub:
+			for i := 0; i < stride; i += 1 {
+				dest[i] = src[i];
+			}
+			for k := 0; k < nk; k += 1 {
+				dest[stride+k] = (src[stride+k] + dest[k]) & 255;
+			}
+		case .Up:
+			for k := 0; k < row_stride; k += 1 {
+				dest[k] = (src[k] + up[k]) & 255;
+			}
+		case .Average:
+			for i := 0; i < stride; i += 1 {
+				avg := up[i] >> 1;
+				dest[i] = (src[i] + avg) & 255;
+			}
+			for k := 0; k < nk; k += 1 {
+				avg := u8((u16(up[stride+k]) + u16(dest[k])) >> 1);
+				dest[stride+k] = (src[stride+k] + avg) & 255;
+			}
+		case .Paeth:
+			for i := 0; i < stride; i += 1 {
+				paeth := filter_paeth(0, up[i], 0);
+				dest[i] = (src[i] + paeth) & 255;
+			}
+			for k := 0; k < nk; k += 1 {
+				paeth := filter_paeth(dest[k], up[stride+k], up[k]);
+				dest[stride+k] = (src[stride+k] + paeth) & 255;
+			}
+		case:
+			return false;
 		}
 
 		src     = src[row_stride:];
@@ -1510,7 +1511,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 		if !filter_ok {
 			// Caller will destroy buffer for us.
 			return E_PNG.Unknown_Filter_Method;
-		}		
+		}
 	} else {
 		/*
 			For deinterlacing we need to make a temporary buffer, defiilter part of the image,
@@ -1582,7 +1583,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 		}
 	}
 
-	return E_General.OK; 
+	return E_General.OK;
 }
 
 load :: proc{load_from_file, load_from_slice, load_from_stream};

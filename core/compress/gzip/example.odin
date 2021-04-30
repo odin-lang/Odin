@@ -34,7 +34,7 @@ main :: proc() {
 
 	if len(args) < 2 {
 		stderr("No input file specified.\n");
-		err := gzip.load(&TEST, &buf);
+		err := gzip.load(TEST, &buf);
 		if gzip.is_kind(err, gzip.E_General.OK) {
 			stdout("Displaying test vector: ");
 			stdout(bytes.buffer_to_string(&buf));
@@ -50,7 +50,7 @@ main :: proc() {
 		if file == "-" {
 			// Read from stdin
 			s := os.stream_from_handle(os.stdin);
-			err = gzip.load(&s, &buf);
+			err = gzip.load(s, &buf);
 		} else {
 			err = gzip.load(file, &buf);
 		}

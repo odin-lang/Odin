@@ -76,102 +76,102 @@ core_time :: proc(c: Chunk) -> (t: coretime.Time, ok: bool) {
 	using png_time;
 	return coretime.datetime_to_time(
 		int(year), int(month), int(day),
-		int(hour), int(minute), int(second));
+		int(hour), int(minute), int(second),
+	);
 }
 
 text :: proc(c: Chunk) -> (res: Text, ok: bool) {
 	 #partial switch c.header.type {
-		case .tEXt:
-			ok = true;
+	case .tEXt:
+		ok = true;
 
-			fields := bytes.split(s=c.data, sep=[]u8{0}, allocator=context.temp_allocator);
-			if len(fields) == 2 {
-				res.keyword = strings.clone(string(fields[0]));
-				res.text    = strings.clone(string(fields[1]));
-			} else {
-				ok = false;
-			}
-			return;
-		case .zTXt:
-			ok = true;
+		fields := bytes.split(s=c.data, sep=[]u8{0}, allocator=context.temp_allocator);
+		if len(fields) == 2 {
+			res.keyword = strings.clone(string(fields[0]));
+			res.text    = strings.clone(string(fields[1]));
+		} else {
+			ok = false;
+		}
+		return;
+	case .zTXt:
+		ok = true;
 
-			fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator);
-			if len(fields) != 3 || len(fields[1]) != 0 {
-				// Compression method must be 0=Deflate, which thanks to the split above turns
-				// into an empty slice
-				ok = false; return;
-			}
+		fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator);
+		if len(fields) != 3 || len(fields[1]) != 0 {
+			// Compression method must be 0=Deflate, which thanks to the split above turns
+			// into an empty slice
+			ok = false; return;
+		}
 
+		// Set up ZLIB context and decompress text payload.
+		buf: bytes.Buffer;
+		zlib_error := zlib.inflate_from_byte_array(fields[2], &buf);
+		defer bytes.buffer_destroy(&buf);
+		if !is_kind(zlib_error, E_General.OK) {
+			ok = false; return;
+		}
+
+		res.keyword = strings.clone(string(fields[0]));
+		res.text = strings.clone(bytes.buffer_to_string(&buf));
+		return;
+	case .iTXt:
+		ok = true;
+
+		s := string(c.data);
+		null := strings.index_byte(s, 0);
+		if null == -1 {
+			ok = false; return;
+		}
+		if len(c.data) < null + 4 {
+			// At a minimum, including the \0 following the keyword, we require 5 more bytes.
+			ok = false;	return;
+		}
+		res.keyword = strings.clone(string(c.data[:null]));
+		rest := c.data[null+1:];
+
+		compression_flag := rest[:1][0];
+		if compression_flag > 1 {
+			ok = false; return;
+		}
+		compression_method := rest[1:2][0];
+		if compression_flag == 1 && compression_method > 0 {
+			// Only Deflate is supported
+			ok = false; return;
+		}
+		rest = rest[2:];
+
+		// We now expect an optional language keyword and translated keyword, both followed by a \0
+		null = strings.index_byte(string(rest), 0);
+		if null == -1 {
+			ok = false; return;
+		}
+		res.language = strings.clone(string(rest[:null]));
+		rest = rest[null+1:];
+
+		null = strings.index_byte(string(rest), 0);
+		if null == -1 {
+			ok = false; return;
+		}
+		res.keyword_localized = strings.clone(string(rest[:null]));
+		rest = rest[null+1:];
+		if compression_flag == 0 {
+			res.text = strings.clone(string(rest));
+		} else {
 			// Set up ZLIB context and decompress text payload.
 			buf: bytes.Buffer;
-			zlib_error := zlib.inflate_from_byte_array(&fields[2], &buf);
+			zlib_error := zlib.inflate_from_byte_array(rest, &buf);
 			defer bytes.buffer_destroy(&buf);
 			if !is_kind(zlib_error, E_General.OK) {
+
 				ok = false; return;
 			}
 
-			res.keyword = strings.clone(string(fields[0]));
 			res.text = strings.clone(bytes.buffer_to_string(&buf));
-			return;
-		case .iTXt:
-			ok = true;
-
-			s := string(c.data);
-			null := strings.index_byte(s, 0);
-			if null == -1 {
-				ok = false; return;
-			}
-			if len(c.data) < null + 4 {
-				// At a minimum, including the \0 following the keyword, we require 5 more bytes.
-				ok = false;	return;
-			}
-			res.keyword = strings.clone(string(c.data[:null]));
-			rest := c.data[null+1:];
-
-			compression_flag := rest[:1][0];
-			if compression_flag > 1 {
-				ok = false; return;
-			}
-			compression_method := rest[1:2][0];
-			if compression_flag == 1 && compression_method > 0 {
-				// Only Deflate is supported
-				ok = false; return;
-			}
-			rest = rest[2:];
-
-			// We now expect an optional language keyword and translated keyword, both followed by a \0
-			null = strings.index_byte(string(rest), 0);
-			if null == -1 {
-				ok = false; return;
-			}
-			res.language = strings.clone(string(rest[:null]));
-			rest = rest[null+1:];
-
-			null = strings.index_byte(string(rest), 0);
-			if null == -1 {
-				ok = false; return;
-			}
-			res.keyword_localized = strings.clone(string(rest[:null]));
-			rest = rest[null+1:];
-			if compression_flag == 0 {
-				res.text = strings.clone(string(rest));
-			} else {
-				// Set up ZLIB context and decompress text payload.
-				buf: bytes.Buffer;
-				zlib_error := zlib.inflate_from_byte_array(&rest, &buf);
-				defer bytes.buffer_destroy(&buf);
-				if !is_kind(zlib_error, E_General.OK) {
-					
-					ok = false; return;
-				}
-
-				res.text = strings.clone(bytes.buffer_to_string(&buf));
-			}
-			return;
-		case:
-			// PNG text helper called with an unrecognized chunk type.
-			ok = false; return;
-
+		}
+		return;
+	case:
+		// PNG text helper called with an unrecognized chunk type.
+		ok = false; return;
 	}
 }
 
@@ -199,7 +199,7 @@ iccp :: proc(c: Chunk) -> (res: iCCP, ok: bool) {
 
 	// Set up ZLIB context and decompress iCCP payload
 	buf: bytes.Buffer;
-	zlib_error := zlib.inflate_from_byte_array(&fields[2], &buf);
+	zlib_error := zlib.inflate_from_byte_array(fields[2], &buf);
 	if !is_kind(zlib_error, E_General.OK) {
 		bytes.buffer_destroy(&buf);
 		ok = false; return;
@@ -458,19 +458,14 @@ when false {
 			interlace_method   = .None,
 		};
 
-		if channels == 1 {
-			ihdr.color_type = Color_Type{};
-		} else if channels == 2 {
-			ihdr.color_type = Color_Type{.Alpha};
-		} else if channels == 3 {
-			ihdr.color_type = Color_Type{.Color};
-		} else if channels == 4 {
-			ihdr.color_type = Color_Type{.Color, .Alpha};
-		} else {
-			// Unhandled
+		switch channels {
+		case 1: ihdr.color_type = Color_Type{};
+		case 2: ihdr.color_type = Color_Type{.Alpha};
+		case 3: ihdr.color_type = Color_Type{.Color};
+		case 4: ihdr.color_type = Color_Type{.Color, .Alpha};
+		case:// Unhandled
 			return E_PNG.Unknown_Color_Type;
 		}
-
 		h := make_chunk(ihdr, .IHDR);
 		write_chunk(fd, h);
 

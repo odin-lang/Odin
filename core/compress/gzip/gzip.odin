@@ -45,39 +45,39 @@ Header_Flag :: enum u8 {
 Header_Flags :: distinct bit_set[Header_Flag; u8];
 
 OS :: enum u8 {
-	FAT = 0,
-	Amiga = 1,
-	VMS = 2,
-	Unix = 3,
-	VM_CMS = 4,
-	Atari_TOS = 5,
-	HPFS = 6,
-	Macintosh = 7,
-	Z_System = 8,
-	CP_M = 9,
-	TOPS_20 = 10,
-	NTFS = 11,
-	QDOS = 12,
+	FAT          = 0,
+	Amiga        = 1,
+	VMS          = 2,
+	Unix         = 3,
+	VM_CMS       = 4,
+	Atari_TOS    = 5,
+	HPFS         = 6,
+	Macintosh    = 7,
+	Z_System     = 8,
+	CP_M         = 9,
+	TOPS_20      = 10,
+	NTFS         = 11,
+	QDOS         = 12,
 	Acorn_RISCOS = 13,
-	_Unknown = 14,
-	Unknown = 255,
+	_Unknown     = 14,
+	Unknown      = 255,
 }
 OS_Name :: #partial [OS]string{
-	.FAT   = "FAT",
-	.Amiga = "Amiga",
-	.VMS   = "VMS/OpenVMS",
-	.Unix = "Unix",
-	.VM_CMS = "VM/CMS",
-	.Atari_TOS = "Atari TOS",
-	.HPFS = "HPFS",
-	.Macintosh = "Macintosh",
-	.Z_System = "Z-System",
-	.CP_M = "CP/M",
-	.TOPS_20 = "TOPS-20",
-	.NTFS = "NTFS",
-	.QDOS = "QDOS",
+	.FAT          = "FAT",
+	.Amiga        = "Amiga",
+	.VMS          = "VMS/OpenVMS",
+	.Unix         = "Unix",
+	.VM_CMS       = "VM/CMS",
+	.Atari_TOS    = "Atari TOS",
+	.HPFS         = "HPFS",
+	.Macintosh    = "Macintosh",
+	.Z_System     = "Z-System",
+	.CP_M         = "CP/M",
+	.TOPS_20      = "TOPS-20",
+	.NTFS         = "NTFS",
+	.QDOS         = "QDOS",
 	.Acorn_RISCOS = "Acorn RISCOS",
-	.Unknown = "Unknown",
+	.Unknown      = "Unknown",
 };
 
 Compression :: enum u8 {
@@ -96,13 +96,13 @@ E_ZLIB    :: compress.ZLIB_Error;
 E_Deflate :: compress.Deflate_Error;
 is_kind   :: compress.is_kind;
 
-load_from_slice :: proc(slice: ^[]u8, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
+load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
 
 	r := bytes.Reader{};
-	bytes.reader_init(&r, slice^);
+	bytes.reader_init(&r, slice);
 	stream := bytes.reader_to_stream(&r);
 
-	err = load_from_stream(&stream, buf, allocator);
+	err = load_from_stream(stream, buf, allocator);
 
 	return err;
 }
@@ -111,18 +111,16 @@ load_from_file :: proc(filename: string, buf: ^bytes.Buffer, allocator := contex
 	data, ok := os.read_entire_file(filename, allocator);
 	defer delete(data);
 
+	err = E_General.File_Not_Found;
 	if ok {
-		err = load_from_slice(&data, buf, allocator);
-		return;
-	} else {
-		return E_General.File_Not_Found;
+		err = load_from_slice(data, buf, allocator);
 	}
+	return;
 }
 
-load_from_stream :: proc(stream: ^io.Stream, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
-
+load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
 	ctx := compress.Context{
-		input  = stream^,
+		input  = stream,
 	};
 	buf := buf;
 	ws := bytes.buffer_to_stream(buf);

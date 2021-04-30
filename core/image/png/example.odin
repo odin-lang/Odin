@@ -194,7 +194,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	}
 	defer close(fd);
 
-	write_string(fd, 
+	write_string(fd,
 		fmt.tprintf("P6\n%v %v\n%v\n", width, height, (1 << depth -1)),
 	);
 
