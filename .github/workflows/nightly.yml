@@ -10,15 +10,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Install cURL
-        run: choco install curl
-      - name: Download and unpack LLVM bins
-        shell: cmd
-        run: |
-          cd bin
-          curl -sL https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip --output llvm-binaries.zip
-          7z x llvm-binaries.zip > nul
-          rm -f llvm-binaries.zip
       - name: build Odin
         shell: cmd
         run: |
