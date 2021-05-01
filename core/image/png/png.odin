@@ -886,9 +886,25 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			}
 		case 2:
 			// Gray with alpha, we shouldn't have a tRNS chunk.
+			bg := f32(0.0);
+			if seen_bkgd {
+				bg = f32(img.background.([3]u16)[0]);
+			}
+
 			for len(p16) > 0 {
 				r := p16[0];
-				if premultiply {
+				if seen_bkgd {
+					alpha := f32(p16[1]) / f32(65535);
+					c := u16(f32(r) * alpha + (1.0 - alpha) * bg);
+					o16[0] = c;
+					o16[1] = c;
+					o16[2] = c;
+					/*
+						After BG blending, the pixel is now fully opaque.
+						Update the value we'll write to the output alpha.
+					*/
+					p16[1] = 65535;
+				} else if premultiply {
 					alpha := p16[1];
 					c := u16(f32(r) * f32(alpha) / f32(65535));
 					o16[0] = c;
@@ -900,7 +916,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 					o16[2] = r;
 				}
 
-				if .alpha_drop_if_present not_in options {
+				if out_image_channels == 4 {
 					o16[3] = p16[1];
 				}
 
@@ -963,7 +979,22 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				b     := p16[2];
 				a     := p16[3];
 
-				if premultiply {
+				if seen_bkgd {
+					alpha := f32(a) / 65535.0;
+					c  := img.background.([3]u16);
+					rb := f32(c[0]) * (1.0 - alpha);
+					gb := f32(c[1]) * (1.0 - alpha);
+					bb := f32(c[2]) * (1.0 - alpha);
+
+					o16[0] = u16(f32(r) * alpha + rb);
+					o16[1] = u16(f32(g) * alpha + gb);
+					o16[2] = u16(f32(b) * alpha + bb);
+					/*
+						After BG blending, the pixel is now fully opaque.
+						Update the value we'll write to the output alpha.
+					*/
+					a = 65535;
+				} else if premultiply {
 					alpha := f32(a) / 65535.0;
 					o16[0] = u16(f32(r) * alpha);
 					o16[1] = u16(f32(g) * alpha);
@@ -974,7 +1005,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 					o16[2] = b;
 				}
 
-				if .alpha_drop_if_present not_in options {
+				if out_image_channels == 4 {
 					o16[3] = a;
 				}
 
@@ -992,7 +1023,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		// Check if we need to do something.
 		if raw_image_channels == out_image_channels {
 			// If we have 3 in and 3 out, or 4 in and 4 out without premultiplication...
-			if raw_image_channels == 4 && .alpha_premultiply not_in options {
+			if !premultiply {
 				// Then we're done.
 				return img, E_General.OK;
 			}
@@ -1050,9 +1081,25 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			}
 		case 2:
 			// Gray with alpha, we shouldn't have a tRNS chunk.
+			bg := f32(0.0);
+			if seen_bkgd {
+				bg = f32(img.background.([3]u16)[0]);
+			}
+
 			for len(p) > 0 {
 				r := p[0];
-				if .alpha_premultiply in options {
+				if seen_bkgd {
+					alpha := f32(p[1]) / f32(255);
+					c := u8(f32(r) * alpha + (1.0 - alpha) * bg);
+					o[0] = c;
+					o[1] = c;
+					o[2] = c;
+					/*
+						After BG blending, the pixel is now fully opaque.
+						Update the value we'll write to the output alpha.
+					*/
+					p[1] = 255;
+				} else if .alpha_premultiply in options {
 					alpha := p[1];
 					c := u8(f32(r) * f32(alpha) / f32(255));
 					o[0] = c;
@@ -1064,7 +1111,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 					o[2] = r;
 				}
 
-				if .alpha_drop_if_present not_in options {
+				if out_image_channels == 4 {
 					o[3] = p[1];
 				}
 
@@ -1088,7 +1135,6 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 
 				alpha := u8(1); // Default to full opaque
 
-				// TODO: Combine the seen_trns cases.
 				if seen_trns {
 					if r == key[0] && g == key[1] && b == key[2] {
 						if seen_bkgd {
@@ -1126,8 +1172,22 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				g     := p[1];
 				b     := p[2];
 				a     := p[3];
+				if seen_bkgd {
+					alpha := f32(a) / 255.0;
+					c  := img.background.([3]u16);
+					rb := f32(c[0]) * (1.0 - alpha);
+					gb := f32(c[1]) * (1.0 - alpha);
+					bb := f32(c[2]) * (1.0 - alpha);
 
-				if .alpha_premultiply in options {
+					o[0] = u8(f32(r) * alpha + rb);
+					o[1] = u8(f32(g) * alpha + gb);
+					o[2] = u8(f32(b) * alpha + bb);
+					/*
+						After BG blending, the pixel is now fully opaque.
+						Update the value we'll write to the output alpha.
+					*/
+					a = 255;
+				} else if premultiply {
 					alpha := f32(a) / 255.0;
 					o[0] = u8(f32(r) * alpha);
 					o[1] = u8(f32(g) * alpha);
@@ -1138,7 +1198,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 					o[2] = b;
 				}
 
-				if .alpha_drop_if_present not_in options {
+				if out_image_channels == 4 {
 					o[3] = a;
 				}
 
@@ -1207,7 +1267,6 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 		nk := row_stride - channels;
 
 		filter := Row_Filter(src[0]); src = src[1:];
-		// fmt.printf("Row: %v | Filter: %v\n", y, filter);
 		switch(filter) {
 		case .None:
 			copy(dest, src[:row_stride]);
