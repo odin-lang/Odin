@@ -12,7 +12,28 @@ volatile_store :: proc(dst: ^$T, val: T) -> T ---
 
 // Trapping
 debug_trap :: proc() ---
-trap :: proc() -> ! ---
+trap       :: proc() -> ! ---
+
+// Instructions
+
+alloca             :: proc(size, align: int) -> ^u8 ---
+cpu_relax          :: proc() ---
+read_cycle_counter :: proc() -> i64 ---
+
+count_ones           :: proc(x: $T) -> T where type_is_integer(T) ---
+count_zeros          :: proc(x: $T) -> T where type_is_integer(T) ---
+count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) ---
+count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) ---
+reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) ---
+byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+
+overflow_add :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
+overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
+overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
+
+// Compiler Hints
+expect :: proc(val, expected_val: T) -> T ---
+
 
 // Atomics
 atomic_fence        :: proc() ---
@@ -67,36 +88,25 @@ atomic_xchg_rel     :: proc(dst; ^$T, val: T) -> T ---
 atomic_xchg_acqrel  :: proc(dst; ^$T, val: T) -> T ---
 atomic_xchg_relaxed :: proc(dst; ^$T, val: T) -> T ---
 
-atomic_cxchg                    :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_acq                :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_rel                :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_acqrel             :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_relaxed            :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_failrelaxed        :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_failacq            :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchg_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
+atomic_cxchg                    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_acq                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_rel                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_acqrel             :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_relaxed            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_failrelaxed        :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_failacq            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchg_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
 
-atomic_cxchgweak                    :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_acq                :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_rel                :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_acqrel             :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_relaxed            :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_failrelaxed        :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_failacq            :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-atomic_cxchgweak_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
-
-// Instructions
-
-alloca             :: proc(size, align: int) -> ^u8 ---
-cpu_relax          :: proc() ---
-read_cycle_counter :: proc() -> i64 ---
-
-
-// Compiler Hints
-expect :: proc(val, expected_val: T) -> T ---
-
+atomic_cxchgweak                    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_acq                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_rel                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_acqrel             :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_relaxed            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_failrelaxed        :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_failacq            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_cxchgweak_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
 
 // Constant type tests
 
@@ -159,5 +169,5 @@ type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V --
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
-type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool) ---
-type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) ---
+type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
+type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
