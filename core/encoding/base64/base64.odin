@@ -39,7 +39,7 @@ DEC_TABLE := [128]int {
     49, 50, 51, -1, -1, -1, -1, -1,
 };
 
-encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string #no_bounds_check {
+encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string {
     length := len(data);
     if length == 0 {
         return "";
@@ -50,7 +50,7 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
 
     c0, c1, c2, block: int;
 
-    for i, d := 0, 0; i < length; i, d = i + 3, d + 4 {
+    #no_bounds_check for i, d := 0, 0; i < length; i, d = i + 3, d + 4 {
         c0, c1, c2 = int(data[i]), -1, -1;
 
         if i + 1 < length { c1 = int(data[i + 1]); }
@@ -66,7 +66,7 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
     return string(out);
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> []byte #no_bounds_check {
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> []byte {
     length := len(data);
     if length == 0 {
         return nil;
@@ -79,7 +79,7 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
     c0, c1, c2, c3: int;
     b0, b1, b2: int;
 
-    for i, j := 0, 0; i < length; i, j = i + 4, j + 3 {
+    #no_bounds_check for i, j := 0, 0; i < length; i, j = i + 4, j + 3 {
         c0 = DEC_TBL[data[i]];
         c1 = DEC_TBL[data[i + 1]];
         c2 = DEC_TBL[data[i + 2]];
