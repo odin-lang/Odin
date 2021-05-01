@@ -1095,7 +1095,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			push_ident_token(p, "#force_inline", 0);
 		}
 
-		visit_proc_type(p, v.type^);
+		visit_proc_type(p, v.type^, true);
 
 		if v.where_clauses != nil {
 			move_line(p, v.where_clauses[0].pos);
@@ -1324,9 +1324,22 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 	}
 }
 
-visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type) {
+visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type, is_proc_lit := false) {
 
-	push_generic_token(p, .Proc, 1);
+	if is_proc_lit {
+		push_format_token(p, Format_Token {
+			kind = .Proc,
+			type = .Proc_Lit,
+			text = "proc",
+			spaces_before = 1,
+		});
+	} else {
+		push_format_token(p, Format_Token {
+			kind = .Proc,
+			text = "proc",
+			spaces_before = 1,
+		});
+	}
 
 	explicit_calling := false;
 

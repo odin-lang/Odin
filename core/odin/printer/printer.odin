@@ -8,7 +8,7 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
-Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum, If, For}
+Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum, If, For, Proc_Lit}
 
 Line_Type :: bit_set[Type_Enum];
 
@@ -68,6 +68,7 @@ Config :: struct {
 	align_structs:        bool,
 	align_style:          Alignment_Style,
 	align_enums:          bool,
+	align_length_break:   int,
 	indent_cases:         bool,
 	newline_style:        Newline_Style,
 }
@@ -113,6 +114,7 @@ default_style := Config {
 	align_structs = true,
 	align_enums = true,
 	newline_style = .CRLF,
+	align_length_break = 9,
 };
 
 make_printer :: proc(config: Config, allocator := context.allocator) -> Printer {
@@ -383,11 +385,9 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 
 			if format_token.kind == .Comment {
 				break;
-			}
-
-			if format_token.kind == .Undef || format_token.kind == .Comma {
+			} else if format_token.kind == .Undef {
 				return;
-			}
+			} 
 
 			if line_index == 0 && i <= format_index {
 				continue;
@@ -416,6 +416,8 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 
 format_generic :: proc(p: ^Printer) {
 
+	next_struct_line := 0;
+
 	for line, line_index in p.lines {
 
 		if len(line.format_tokens) <= 0 {
@@ -423,10 +425,9 @@ format_generic :: proc(p: ^Printer) {
 		}
 
 		for format_token, token_index in line.format_tokens {
-
 			if format_token.kind == .For || format_token.kind == .If ||
 			   format_token.kind == .When || format_token.kind == .Switch ||
-			   format_token.kind == .Proc {
+			   (format_token.kind == .Proc && format_token.type == .Proc_Lit) {
 				format_keyword_to_brace(p, line_index, token_index, format_token.kind);
 			} else if format_token.type == .Call {
 				format_call(p, line_index, token_index);
@@ -441,8 +442,8 @@ format_generic :: proc(p: ^Printer) {
 			align_enum(p, line_index);
 		}
 
-		if .Struct in line.types && p.config.align_structs {
-			align_struct(p, line_index);
+		if .Struct in line.types && p.config.align_structs && next_struct_line <= 0 {
+			next_struct_line = align_struct(p, line_index);
 		}
 
 		if .Value_Decl in line.types {
@@ -452,6 +453,8 @@ format_generic :: proc(p: ^Printer) {
 		if .Assign in line.types {
 			format_assignment(p, line_index);
 		}
+
+		next_struct_line -= 1;
 	}
 }
 
@@ -743,7 +746,7 @@ align_enum :: proc(p: ^Printer, index: int) {
 
 }
 
-align_struct :: proc(p: ^Printer, index: int) {
+align_struct :: proc(p: ^Printer, index: int) -> int {
 	struct_found := false;
 	brace_token: Format_Token;
 	brace_line:  int;
@@ -763,11 +766,12 @@ align_struct :: proc(p: ^Printer, index: int) {
 	}
 
 	if !struct_found {
-		return;
+		return 0;
 	}
 
 	largest     := 0;
 	colon_count := 0;
+	nested      := false;
 	seen_brace  := false;
 
 	TokenAndLength :: struct {
@@ -778,14 +782,20 @@ align_struct :: proc(p: ^Printer, index: int) {
 	format_tokens := make([]TokenAndLength, brace_token.parameter_count, context.temp_allocator);
 
 	if brace_token.parameter_count == 0 {
-		return;
+		return 0;
 	}
+
+	end_line_index := 0;
 
 	for line, line_index in p.lines[brace_line + 1:] {
 		length := 0;
 
 		for format_token, i in line.format_tokens {
+			
+			//give up on nested structs
 			if format_token.kind == .Comment {
+				break;
+			} else if format_token.kind == .Open_Paren {
 				break;
 			} else if format_token.kind == .Open_Brace {
 				seen_brace = true;
@@ -797,16 +807,35 @@ align_struct :: proc(p: ^Printer, index: int) {
 
 			if format_token.kind == .Colon {
 				format_tokens[colon_count] = {format_token = &line.format_tokens[i + 1], length = length};
+
+				if format_tokens[colon_count].format_token.kind == .Struct {
+					nested = true;
+				}
+
 				colon_count += 1;
 				largest = max(length, largest);
-				break;
 			}
 
 			length += len(format_token.text) + format_token.spaces_before;
 		}
 
+		if nested {
+			end_line_index = line_index + brace_line + 1;
+		}
+
 		if colon_count >= brace_token.parameter_count {
 			break;
+		}
+	} 
+
+	//give up aligning nested, it never looks good
+	if nested {
+		for line, line_index in p.lines[end_line_index:] {
+			for format_token in line.format_tokens {
+				if format_token.kind == .Close_Brace {
+					return end_line_index + line_index - index;
+				} 
+			}
 		}
 	}
 
@@ -814,6 +843,7 @@ align_struct :: proc(p: ^Printer, index: int) {
 		token.format_token.spaces_before = largest - token.length + 1;
 	}
 
+	return 0;
 }
 
 align_comments :: proc(p: ^Printer) {
