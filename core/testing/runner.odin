@@ -54,7 +54,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 		logf(t, "[Test: %s]", it.name);
 
-		// TODO(bill): Catch panics
 		run_internal_test(t, it);
 
 		if failed(t) {
