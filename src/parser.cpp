@@ -3975,7 +3975,7 @@ Ast *parse_for_stmt(AstFile *f) {
 			}
 		}
 
-		if (!is_range && allow_token(f, Token_Semicolon)) {
+		if (!is_range && parse_control_statement_semicolon_separator(f)) {
 			init = cond;
 			cond = nullptr;
 			if (f->curr_token.kind != Token_Semicolon) {
