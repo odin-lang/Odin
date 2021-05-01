@@ -1554,7 +1554,7 @@ void print_show_help(String const arg0, String const &command) {
 	} else if (command == "check") {
 		print_usage_line(1, "check     parse and type check .odin file");
 	} else if (command == "test") {
-		print_usage_line(1, "test      build ands runs 'test_*' procedures in the initial package");
+		print_usage_line(1, "test      build ands runs procedures with the attribute @(test) in the initial package");
 	} else if (command == "query") {
 		print_usage_line(1, "query     [experimental] parse, type check, and output a .json file containing information about the program");
 	} else if (command == "doc") {
@@ -1662,6 +1662,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
 		print_usage_line(3, "-build-mode:obj       Build as an object file");
 		print_usage_line(3, "-build-mode:object    Build as an object file");
+		print_usage_line(3, "-build-mode:assembly  Build as an object file");
+		print_usage_line(3, "-build-mode:assembler Build as an assembly file");
+		print_usage_line(3, "-build-mode:asm       Build as an assembly file");
+		print_usage_line(3, "-build-mode:llvm-ir   Build as an LLVM IR file");
+		print_usage_line(3, "-build-mode:llvm      Build as an LLVM IR file");
 		print_usage_line(0, "");
 	}
 
