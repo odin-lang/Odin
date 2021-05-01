@@ -1362,7 +1362,7 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 				dest[i] = (src[i] + paeth) & 255;
 			}
 			for k in 0..nk {
-				paeth := filter_paeth(dest[k], up[channels], up[k]);
+				paeth := filter_paeth(dest[k], up[channels+k], up[k]);
 				dest[channels+k] = (src[channels+k] + paeth) & 255;
 			}
 		case:
