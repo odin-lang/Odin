@@ -1049,28 +1049,25 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			}
 
 			for len(p) > 0 {
-				r := p[0];
+				r     := p[0];
 				alpha := u8(1);
 
 				if seen_trns {
 					if r == key {
 						if seen_bkgd {
-							c := img.background.([3]u16);
-							r = u8(c[0]);
+							bc := img.background.([3]u16);
+							r = u8(bc[0]);
 						} else {
 							alpha = 0; // Keyed transparency
 						}
 					}
 					if premultiply {
-						o[0] = r * alpha;
-						o[1] = r * alpha;
-						o[2] = r * alpha;
+						r *= alpha;
 					}
-				} else {
-					o[0] = r;
-					o[1] = r;
-					o[2] = r;
 				}
+				o[0] = r;
+				o[1] = r;
+				o[2] = r;
 
 				if out_image_channels == 4 {
 					o[3] = alpha * 255;
@@ -1128,6 +1125,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				*/
 				key = []u8{trns.data[1], trns.data[3], trns.data[5]};
 			}
+
 			for len(p) > 0 {
 				r     := p[0];
 				g     := p[1];
@@ -1147,16 +1145,16 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 						}
 					}
 
-					if .alpha_premultiply in options || .blend_background in options {
-						o[0] = r * alpha;
-						o[1] = g * alpha;
-						o[2] = b * alpha;
+					if premultiply {
+						r *= alpha;
+						g *= alpha;
+						b *= alpha;
 					}
-				} else {
-					o[0] = r;
-					o[1] = g;
-					o[2] = b;
 				}
+
+				o[0] = r;
+				o[1] = g;
+				o[2] = b;
 
 				if out_image_channels == 4 {
 					o[3] = alpha * 255;
