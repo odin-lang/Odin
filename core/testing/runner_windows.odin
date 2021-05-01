@@ -4,7 +4,6 @@ package testing
 
 import win32 "core:sys/windows"
 import "core:runtime"
-import "core:fmt"
 import "intrinsics"
 
 
