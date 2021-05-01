@@ -25,6 +25,8 @@ T :: struct {
 	w: io.Writer,
 
 	cleanups: [dynamic]Internal_Cleanup,
+
+	_fail_now: proc() -> !,
 }
 
 
@@ -44,6 +46,13 @@ errorf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 fail :: proc(t: ^T) {
 	error(t, "FAIL");
 	t.error_count += 1;
+}
+
+fail_now :: proc(t: ^T) {
+	fail(t);
+	if t._fail_now != nil {
+		t._fail_now();
+	}
 }
 
 failed :: proc(t: ^T) -> bool {
