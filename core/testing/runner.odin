@@ -3,7 +3,6 @@ package testing
 
 import "core:io"
 import "core:os"
-import "core:strings"
 import "core:slice"
 
 reset_t :: proc(t: ^T) {
