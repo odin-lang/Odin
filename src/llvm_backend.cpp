@@ -184,7 +184,7 @@ void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue le
 	if (build_context.no_bounds_check) {
 		return;
 	}
-	if ((p->module->state_flags & StateFlag_no_bounds_check) != 0) {
+	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
 		return;
 	}
 
@@ -209,7 +209,7 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	if (build_context.no_bounds_check) {
 		return;
 	}
-	if ((p->module->state_flags & StateFlag_no_bounds_check) != 0) {
+	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
 		return;
 	}
 
@@ -3117,19 +3117,6 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		}
 	}
 
-	if (p->tags != 0) {
-		u64 in = p->tags;
-		u64 out = p->module->state_flags;
-		if (in & ProcTag_bounds_check) {
-			out |= StateFlag_bounds_check;
-			out &= ~StateFlag_no_bounds_check;
-		} else if (in & ProcTag_no_bounds_check) {
-			out |= StateFlag_no_bounds_check;
-			out &= ~StateFlag_bounds_check;
-		}
-		p->module->state_flags = out;
-	}
-
 	p->builder = LLVMCreateBuilder();
 
 	p->decl_block  = lb_create_block(p, "decls", true);
@@ -3299,7 +3286,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 	}
 
 	p->curr_block = nullptr;
-	p->module->state_flags = 0;
+	p->state_flags = 0;
 }
 void lb_end_procedure(lbProcedure *p) {
 	LLVMDisposeBuilder(p->builder);
@@ -4821,12 +4808,12 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		LLVMSetCurrentDebugLocation2(p->builder, prev_debug_location);
 	});
 
-	u64 prev_state_flags = p->module->state_flags;
-	defer (p->module->state_flags = prev_state_flags);
+	u16 prev_state_flags = p->state_flags;
+	defer (p->state_flags = prev_state_flags);
 
 	if (node->state_flags != 0) {
-		u64 in = node->state_flags;
-		u64 out = p->module->state_flags;
+		u16 in = node->state_flags;
+		u16 out = p->state_flags;
 
 		if (in & StateFlag_bounds_check) {
 			out |= StateFlag_bounds_check;
@@ -4836,7 +4823,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			out &= ~StateFlag_bounds_check;
 		}
 
-		p->module->state_flags = out;
+		p->state_flags = out;
 	}
 
 	switch (node->kind) {
@@ -11014,12 +11001,12 @@ lbValue lb_emit_any_cast(lbProcedure *p, lbValue value, Type *type, TokenPos pos
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
-	u64 prev_state_flags = p->module->state_flags;
-	defer (p->module->state_flags = prev_state_flags);
+	u16 prev_state_flags = p->state_flags;
+	defer (p->state_flags = prev_state_flags);
 
 	if (expr->state_flags != 0) {
-		u64 in = expr->state_flags;
-		u64 out = p->module->state_flags;
+		u16 in = expr->state_flags;
+		u16 out = p->state_flags;
 
 		if (in & StateFlag_bounds_check) {
 			out |= StateFlag_bounds_check;
@@ -11029,7 +11016,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 			out &= ~StateFlag_bounds_check;
 		}
 
-		p->module->state_flags = out;
+		p->state_flags = out;
 	}
 
 	expr = unparen_expr(expr);
@@ -12843,9 +12830,6 @@ void lb_init_module(lbModule *m, Checker *c) {
 		}
 		m->debug_builder = LLVMCreateDIBuilder(m->mod);
 	}
-
-	m->state_flags = 0;
-	m->state_flags |= StateFlag_bounds_check;
 
 	gb_mutex_init(&m->mutex);
 	gbAllocator a = heap_allocator();

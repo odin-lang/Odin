@@ -2170,6 +2170,14 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			body = parse_body(f);
 			f->curr_proc = curr_proc;
 
+			// Apply the tags directly to the body rather than the type
+			if (tags & ProcTag_no_bounds_check) {
+				body->state_flags |= StateFlag_no_bounds_check;
+			}
+			if (tags & ProcTag_bounds_check) {
+				body->state_flags |= StateFlag_bounds_check;
+			}
+
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		} else if (allow_token(f, Token_do)) {
 			Ast *curr_proc = f->curr_proc;
