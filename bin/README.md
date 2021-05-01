@@ -2,13 +2,12 @@
 
 ## Setup
 
-Odin only supports x86-64 at the moment (64-bit), relies on LLVM for code generation and an external linker.
+Odin currently supports x86-64 and ARM64 at the moment (64-bit), relies on LLVM for code generation and an external linker.
 
 In addition, the following platform-specific steps are necessary:
 
 - Windows
     * Have Visual Studio installed (MSVC 2010 or later, for the linker)
-    * Have a copy of `opt.exe` and `llc.exe` in `Odin/bin`. Pre-built Windows binaries can be found [here](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) and *must* be explicitly copied
     * Open a valid command prompt:
         * **Basic:** run the `x64 Native Tools Command Prompt for VS2017` shortcut bundled with VS 2017, or
         * **Advanced:** run `vcvarsall.bat x64` from a blank `cmd` session
@@ -19,7 +18,6 @@ In addition, the following platform-specific steps are necessary:
     * Make sure the LLVM binaries and the linker are added to your `$PATH` environmental variable
 
 - GNU/Linux
-    * Have LLVM installed (opt/llc)
     * Have Clang installed (version X.X or later, for linking)
     * Make sure the LLVM binaries and the linker are added to your `$PATH` environmental variable
 
