@@ -731,7 +731,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		`.blend_background` and `seen_bkgd` if we haven't seen both.
 	*/
 	if !(seen_bkgd && .blend_background in options) {
-		options ~= {.blend_background};
+		options -= {.blend_background};
 		seen_bkgd = false;
 	}
 
@@ -748,7 +748,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	}
 
 	add_alpha   := (seen_trns && .alpha_drop_if_present not_in options) || (.alpha_add_if_missing in options);
-	premultiply := .alpha_premultiply in options || .blend_background in options;
+	premultiply := .alpha_premultiply in options || seen_bkgd;
 
 	img.channels = out_image_channels;
 
