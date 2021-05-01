@@ -446,7 +446,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 		final = compress.read_bits_lsb(z, 1);
 		type  = compress.read_bits_lsb(z, 2);
 
-		// log.debugf("Final: %v | Type: %v\n", final, type);
+		// fmt.printf("Final: %v | Type: %v\n", final, type);
 
 		switch type {
 		case 0:
@@ -455,9 +455,13 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 			// Discard bits until next byte boundary
 			compress.discard_to_next_byte_lsb(z);
 
-			uncompressed_len  := int(compress.read_bits_lsb(z, 16));
-			length_check      := int(compress.read_bits_lsb(z, 16));
-			if uncompressed_len != ~length_check {
+			uncompressed_len  := i16(compress.read_bits_lsb(z, 16));
+			length_check      := i16(compress.read_bits_lsb(z, 16));
+
+			// fmt.printf("LEN: %v, ~LEN: %v, NLEN: %v, ~NLEN: %v\n", uncompressed_len, ~uncompressed_len, length_check, ~length_check);
+
+
+			if ~uncompressed_len != length_check {
 				return E_Deflate.Len_Nlen_Mismatch;
 			}
 
