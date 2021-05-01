@@ -4341,6 +4341,16 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	return ast_unroll_range_stmt(f, unroll_token, for_token, val0, val1, in_token, expr, body);
 }
 
+void parse_check_directive_for_empty_statement(Ast *s, Token const &name) {
+	if (s != nullptr && s->kind == Ast_EmptyStmt) {
+		if (s->EmptyStmt.token.string == "\n") {
+			syntax_error(name, "#%.*s cannot be followed by a newline", LIT(name.string));
+		} else {
+			syntax_error(name, "#%.*s cannot be applied to an empty statement ';'", LIT(name.string));
+		}
+	}
+}
+
 Ast *parse_stmt(AstFile *f) {
 	Ast *s = nullptr;
 	Token token = f->curr_token;
@@ -4447,6 +4457,7 @@ Ast *parse_stmt(AstFile *f) {
 
 		if (tag == "bounds_check") {
 			s = parse_stmt(f);
+			parse_check_directive_for_empty_statement(s, name);
 			s->state_flags |= StateFlag_bounds_check;
 			if ((s->state_flags & StateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
@@ -4454,25 +4465,10 @@ Ast *parse_stmt(AstFile *f) {
 			return s;
 		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
+			parse_check_directive_for_empty_statement(s, name);
 			s->state_flags |= StateFlag_no_bounds_check;
 			if ((s->state_flags & StateFlag_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return s;
-		} else if (tag == "complete") {
-			s = parse_stmt(f);
-			switch (s->kind) {
-			case Ast_SwitchStmt:
-				s->SwitchStmt.partial = false;
-				syntax_warning(token, "#complete is now the default and has been replaced with its opposite: #partial");
-				break;
-			case Ast_TypeSwitchStmt:
-				s->TypeSwitchStmt.partial = false;
-				syntax_warning(token, "#complete is now the default and has been replaced with its opposite: #partial");
-				break;
-			default:
-				syntax_error(token, "#complete can only be applied to a switch statement");
-				break;
 			}
 			return s;
 		} else if (tag == "partial") {
@@ -4483,6 +4479,9 @@ Ast *parse_stmt(AstFile *f) {
 				break;
 			case Ast_TypeSwitchStmt:
 				s->TypeSwitchStmt.partial = true;
+				break;
+			case Ast_EmptyStmt:
+				parse_check_directive_for_empty_statement(s, name);
 				break;
 			default:
 				syntax_error(token, "#partial can only be applied to a switch statement");
