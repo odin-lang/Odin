@@ -156,7 +156,7 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 
 		context.assertion_failure_proc = proc(prefix, message: string, loc: runtime.Source_Code_Location) {
 			errorf(t=global_current_t, format="%s %s", args={prefix, message}, loc=loc);
-			intrinsics.debug_trap();
+			intrinsics.trap();
 		};
 
 		thread.it.p(thread.t);
@@ -167,6 +167,10 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 
 	sema_reset(&global_threaded_runner_semaphore);
 	global_current_t = t;
+
+	t._fail_now = proc() -> ! {
+		intrinsics.trap();
+	};
 
 	thread.t = t;
 	thread.it = it;
