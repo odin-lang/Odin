@@ -31,6 +31,11 @@ overflow_add :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 
+fixed_point_mul     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
+fixed_point_div     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
+fixed_point_mul_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
+fixed_point_div_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
+
 // Compiler Hints
 expect :: proc(val, expected_val: T) -> T ---
 
