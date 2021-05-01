@@ -55,11 +55,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		logf(t, "[Test: %s]", it.name);
 
 		// TODO(bill): Catch panics
-		{
-			it.p(t);
-		}
+		run_internal_test(t, it);
 
-		if t.error_count != 0 {
+		if failed(t) {
 			logf(t, "[%s : FAILURE]", it.name);
 		} else {
 			logf(t, "[%s : SUCCESS]", it.name);
