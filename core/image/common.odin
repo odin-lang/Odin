@@ -3,8 +3,6 @@ package image
 import "core:bytes"
 import "core:mem"
 
-import "core:fmt"
-
 Image :: struct {
 	width:      int,
 	height:     int,
@@ -201,8 +199,6 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 	res.pixels     = t;
 	res.background = img.background;
 	res.sidecar    = img.sidecar;
-
-	fmt.println(t);
 
 	return res, true;
 }
