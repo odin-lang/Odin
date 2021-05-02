@@ -14,7 +14,7 @@ import "core:intrinsics"
 
 Error     :: compress.Error;
 E_General :: compress.General_Error;
-E_PNG     :: image.PNG_Error;
+E_PNG     :: image.Error;
 E_Deflate :: compress.Deflate_Error;
 is_kind   :: compress.is_kind;
 
@@ -382,11 +382,15 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	options := options;
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image};
-		options ~= {.info};
+		options -= {.info};
 	}
 
 	if .alpha_drop_if_present in options && .alpha_add_if_missing in options {
 		return {}, E_General.Incompatible_Options;
+	}
+
+	if .do_not_expand_channels in options {
+		options |= {.do_not_expand_grayscale, .do_not_expand_indexed};
 	}
 
 	if img == nil {
@@ -722,6 +726,14 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		may supply an option to return Gray/Gray+Alpha as-is, in which case RGB(A)
 		will become the default.
 	*/
+
+	if .Paletted in header.color_type && .do_not_expand_indexed in options {
+		return img, E_General.OK;
+	}
+	if .Color not_in header.color_type && .do_not_expand_grayscale in options {
+		return img, E_General.OK;
+	}
+
 
 	raw_image_channels := img.channels;
 	out_image_channels := 3;
@@ -1216,6 +1228,19 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			returns will likely bypass this processing pipeline.
 		*/
 		unreachable("We should never see bit depths other than 8, 16 and 'Paletted' here.");
+	}
+
+	// TODO: Rather than first expanding to RGB(A) and then dropping channels, give these their own path.
+	if .do_not_expand_grayscale in options && .Color not_in info.header.color_type {
+
+		single, single_ok := image.return_single_channel(img, .R);
+		if single_ok {
+			destroy(img);
+			img = single;
+		} else {
+			destroy(single);
+			return img, E_PNG.Post_Processing_Error;
+		}
 	}
 
 	return img, E_General.OK;
