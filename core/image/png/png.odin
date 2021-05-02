@@ -1230,19 +1230,6 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		unreachable("We should never see bit depths other than 8, 16 and 'Paletted' here.");
 	}
 
-	// TODO: Rather than first expanding to RGB(A) and then dropping channels, give these their own path.
-	if .do_not_expand_grayscale in options && .Color not_in info.header.color_type {
-
-		single, single_ok := image.return_single_channel(img, .R);
-		if single_ok {
-			destroy(img);
-			img = single;
-		} else {
-			destroy(single);
-			return img, E_PNG.Post_Processing_Error;
-		}
-	}
-
 	return img, E_General.OK;
 }
 
