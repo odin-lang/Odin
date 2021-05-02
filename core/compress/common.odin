@@ -19,7 +19,7 @@ Error :: union {
 		This is here because png.load will return a this type of error union,
 		as it may involve an I/O error, a Deflate error, etc.
 	*/
-	image.PNG_Error,
+	image.Error,
 }
 
 General_Error :: enum {
