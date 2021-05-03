@@ -1,3 +1,5 @@
+#define MULTITHREAD_OBJECT_GENERATION 1
+
 #ifndef USE_SEPARTE_MODULES
 #define USE_SEPARTE_MODULES build_context.use_separate_modules
 #endif
@@ -14259,26 +14261,11 @@ WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 	char *llvm_error = nullptr;
 
 	auto wd = cast(lbLLVMEmitWorker *)data;
-	gbMutex *mutex = &wd->m->gen->mutex;
 
-
-#if 1
-	gb_mutex_lock(mutex);
-	defer (gb_mutex_unlock(mutex));
 	if (LLVMTargetMachineEmitToFile(wd->target_machine, wd->m->mod, cast(char *)wd->filepath_obj.text, wd->code_gen_file_type, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
 		gb_exit(1);
-		return 1;
 	}
-#else
-	LLVMMemoryBufferRef mem_buf = nullptr;
-
-	if (LLVMTargetMachineEmitToMemoryBuffer(wd->target_machine, wd->m->mod, wd->code_gen_file_type, &llvm_error, &mem_buf)) {
-		gb_printf_err("LLVM Error: %s\n", llvm_error);
-		gb_exit(1);
-		return 1;
-	}
-#endif
 
 	return 0;
 }
@@ -14287,6 +14274,7 @@ WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 
 void lb_generate_code(lbGenerator *gen) {
 	#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+	#define TIME_SECTION_WITH_LEN(str, len) do { if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
 
 	TIME_SECTION("LLVM Initializtion");
 
@@ -14349,17 +14337,17 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	// NOTE(bill): Target Machine Creation
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-		target, target_triple, llvm_cpu,
-		llvm_features,
-		code_gen_level,
-		LLVMRelocDefault,
-		code_mode);
-	defer (LLVMDisposeTargetMachine(target_machine));
-
+	// NOTE(bill, 2021-05-04): Target machines must be unique to each module because they are not thread safe
+	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), gen->modules.entries.count);
 
 	for_array(i, gen->modules.entries) {
-		LLVMSetModuleDataLayout(gen->modules.entries[i].value->mod, LLVMCreateTargetDataLayout(target_machine));
+		target_machines[i] = LLVMCreateTargetMachine(
+			target, target_triple, llvm_cpu,
+			llvm_features,
+			code_gen_level,
+			LLVMRelocDefault,
+			code_mode);
+		LLVMSetModuleDataLayout(gen->modules.entries[i].value->mod, LLVMCreateTargetDataLayout(target_machines[i]));
 	}
 
 	for_array(i, gen->modules.entries) {
@@ -14856,10 +14844,10 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Module Pass");
 
-	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
-	lb_populate_module_pass_manager(target_machine, module_pass_manager, build_context.optimization_level);
-
 	for_array(i, gen->modules.entries) {
+		LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
+		auto target_machine = target_machines[i];
+		lb_populate_module_pass_manager(target_machine, module_pass_manager, build_context.optimization_level);
 		lbModule *m = gen->modules.entries[i].value;
 		LLVMRunPassManager(module_pass_manager, m->mod);
 	}
@@ -14918,6 +14906,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Add Foreign Library Paths");
+
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
 		for_array(i, m->info->required_foreign_imports_through_force) {
@@ -14934,7 +14923,9 @@ void lb_generate_code(lbGenerator *gen) {
 
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1;
-	if (USE_SEPARTE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0) {
+
+	LLVMBool do_threading = LLVMIsMultithreaded();
+	if (do_threading && USE_SEPARTE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0) {
 		ThreadPool pool = {};
 		thread_pool_init(&pool, heap_allocator(), worker_count, "LLVMEmitWork");
 		defer (thread_pool_destroy(&pool));
@@ -14944,17 +14935,17 @@ void lb_generate_code(lbGenerator *gen) {
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
+
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			String filepath_obj = lb_filepath_obj_for_module(m);
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
 			auto *wd = gb_alloc_item(heap_allocator(), lbLLVMEmitWorker);
-			wd->target_machine = target_machine;
+			wd->target_machine = target_machines[j];
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;
 			wd->m = m;
-
 			thread_pool_add_task(&pool, lb_llvm_emit_worker_proc, wd);
 		}
 
@@ -14966,17 +14957,21 @@ void lb_generate_code(lbGenerator *gen) {
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
-			// TIME_SECTION("LLVM Generate Object");
 
 			String filepath_obj = lb_filepath_obj_for_module(m);
+			array_add(&gen->output_object_paths, filepath_obj);
 
-			if (LLVMTargetMachineEmitToFile(target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
+			String short_name = remove_directory_from_path(filepath_obj);
+			gbString section_name = gb_string_make(heap_allocator(), "LLVM Generate Object: ");
+			section_name = gb_string_append_length(section_name, short_name.text, short_name.len);
+
+			TIME_SECTION_WITH_LEN(section_name, gb_string_length(section_name));
+
+			if (LLVMTargetMachineEmitToFile(target_machines[j], m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 				gb_exit(1);
 				return;
 			}
-
-			array_add(&gen->output_object_paths, filepath_obj);
 		}
 	}
 
