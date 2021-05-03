@@ -3117,7 +3117,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		}
 	}
 
-	p->builder = LLVMCreateBuilder();
+	p->builder = LLVMCreateBuilderInContext(p->module->ctx);
 
 	p->decl_block  = lb_create_block(p, "decls", true);
 	p->entry_block = lb_create_block(p, "entry", true);
@@ -12898,7 +12898,11 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
+#if 1
 	m->ctx = LLVMGetGlobalContext();
+#else
+	m->ctx = LLVMContextCreate();
+#endif
 	m->mod = LLVMModuleCreateWithNameInContext("odin_module", m->ctx);
 	// m->debug_builder = nullptr;
 	if (build_context.ODIN_DEBUG) {
