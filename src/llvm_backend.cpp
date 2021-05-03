@@ -3424,6 +3424,21 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	LLVMSetAlignment(ptr, alignment);
 
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+
+
+	if (!zero_init) {
+		// If there is any padding of any kind, just zero init regardless of zero_init parameter
+		LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
+		if (kind == LLVMStructTypeKind) {
+			i64 sz = type_size_of(type);
+			if (type_size_of_struct_pretend_is_packed(type) != sz) {
+				zero_init = true;
+			}
+		} else if (kind == LLVMArrayTypeKind) {
+			zero_init = true;
+		}
+	}
+
 	if (zero_init) {
 		LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
 
