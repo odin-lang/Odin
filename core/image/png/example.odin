@@ -23,7 +23,7 @@ main :: proc() {
 	img, err = png.load(file, options);
 	defer png.destroy(img);
 
-	if err != png.E_General.OK {
+	if err != nil {
 		fmt.printf("Trying to read PNG file %v returned %v\n", file, err);
 	} else {
 		v:  png.Info;
@@ -120,7 +120,7 @@ main :: proc() {
 		}
 	}
 
-	if err == E_General.OK && .do_not_decompress_image not_in options && .info not_in options {
+	if err == nil && .do_not_decompress_image not_in options && .info not_in options {
 		if ok := write_image_as_ppm("out.ppm", img); ok {
 			fmt.println("Saved decoded image.");
 		} else {

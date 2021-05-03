@@ -277,7 +277,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 
 	// fmt.printf("ZLIB returned: %v\n", zlib_error);
 
-	if zlib_error != E_General.OK || zlib_error == nil {
+	if zlib_error != nil {
 		return zlib_error;
 	}
 
@@ -307,7 +307,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	if len(payload) != payload_len {
 		return E_GZIP.Payload_Length_Invalid;
 	}
-	return E_General.OK;
+	return nil;
 }
 
 load :: proc{load_from_file, load_from_slice, load_from_stream};
