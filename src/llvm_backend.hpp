@@ -86,6 +86,7 @@ struct lbModule {
 	LLVMContextRef ctx;
 
 	CheckerInfo *info;
+	AstPackage *pkg; // associated
 
 	gbMutex mutex;
 
@@ -124,12 +125,13 @@ struct lbModule {
 };
 
 struct lbGenerator {
-	lbModule module;
 	CheckerInfo *info;
 
 	Array<String> output_object_paths;
 	String   output_base;
 	String   output_name;
+	Map<lbModule *> modules; // Key: AstPackage *
+	lbModule default_module;
 };
 
 

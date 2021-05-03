@@ -218,8 +218,19 @@ i32 linker_stage(lbGenerator *gen) {
 			add_path(find_result.vs_library_path);
 		}
 
-		for_array(i, gen->module.foreign_library_paths) {
-			String lib = gen->module.foreign_library_paths[i];
+		for_array(j, gen->modules.entries) {
+			lbModule *m = gen->modules.entries[j].value;
+			for_array(i, m->foreign_library_paths) {
+				String lib = m->foreign_library_paths[i];
+				GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
+				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				                        " \"%.*s\"", LIT(lib));
+				lib_str = gb_string_appendc(lib_str, lib_str_buf);
+			}
+		}
+
+		for_array(i, gen->default_module.foreign_library_paths) {
+			String lib = gen->default_module.foreign_library_paths[i];
 			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
 			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 			                        " \"%.*s\"", LIT(lib));
