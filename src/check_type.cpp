@@ -2109,6 +2109,12 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 				Entity *field = key->Struct.fields[i];
 				add_map_key_type_dependencies(ctx, field->type);
 			}
+		} else if (key->kind == Type_Union) {
+			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			for_array(i, key->Union.variants) {
+				Type *v = key->Union.variants[i];
+				add_map_key_type_dependencies(ctx, v);
+			}
 		} else if (key->kind == Type_EnumeratedArray) {
 			add_package_dependency(ctx, "runtime", "default_hasher_n");
 			add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
