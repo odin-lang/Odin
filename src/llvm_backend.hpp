@@ -85,6 +85,8 @@ struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
 
+	struct lbGenerator *gen;
+
 	CheckerInfo *info;
 	AstPackage *pkg; // associated
 
@@ -108,8 +110,6 @@ struct lbModule {
 	Map<lbProcedure *> equal_procs; // Key: Type *
 	Map<lbProcedure *> hasher_procs; // Key: Type *
 
-	u32 global_array_index;
-	u32 global_generated_index;
 	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
@@ -131,7 +131,11 @@ struct lbGenerator {
 	String   output_base;
 	String   output_name;
 	Map<lbModule *> modules; // Key: AstPackage *
+	Map<lbModule *> modules_through_ctx; // Key: LLVMContextRef *
 	lbModule default_module;
+
+	gbAtomic32 global_array_index;
+	gbAtomic32 global_generated_index;
 };
 
 
@@ -271,7 +275,7 @@ String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
-lbProcedure *lb_create_procedure(lbModule *module, Entity *entity);
+lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
 void lb_end_procedure(lbProcedure *p);
 
 
@@ -381,6 +385,7 @@ lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String
 lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
 lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type);
 void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value, Ast *node);
+
 
 
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);

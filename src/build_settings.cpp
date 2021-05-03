@@ -207,6 +207,8 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool use_separate_modules;
+
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
@@ -806,6 +808,10 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->word_size   = metrics->word_size;
 	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
+
+	if (bc->metrics.os == TargetOs_windows) {
+		// bc->use_separate_modules = bc->optimization_level == 0;
+	}
 
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
