@@ -33,7 +33,7 @@ main :: proc() {
 	err := zlib.inflate(ODIN_DEMO, &buf);
 	defer bytes.buffer_destroy(&buf);
 
-	if !zlib.is_kind(err, zlib.E_General.OK) {
+	if err != zlib.E_General.OK {
 		fmt.printf("\nError: %v\n", err);
 	}
 	s := bytes.buffer_to_string(&buf);
