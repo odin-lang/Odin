@@ -90,8 +90,6 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // associated
 
-	gbMutex mutex;
-
 	Map<LLVMTypeRef> types; // Key: Type *
 	Map<Type *> llvm_types; // Key: LLVMTypeRef
 	i32 internal_type_level;
@@ -126,6 +124,8 @@ struct lbModule {
 
 struct lbGenerator {
 	CheckerInfo *info;
+
+	gbMutex mutex;
 
 	Array<String> output_object_paths;
 	Array<String> output_temp_paths;
