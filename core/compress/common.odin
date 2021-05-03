@@ -17,7 +17,6 @@ Error :: union {
 }
 
 General_Error :: enum {
-	OK = 0,
 	File_Not_Found,
 	Cannot_Open_File,
 	File_Too_Short,

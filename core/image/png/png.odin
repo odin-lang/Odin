@@ -267,13 +267,13 @@ read_chunk :: proc(ctx: ^compress.Context) -> (Chunk, Error) {
 	if chunk.crc != u32be(computed_crc) {
 		return {}, E_General.Checksum_Failed;
 	}
-	return chunk, E_General.OK;
+	return chunk, nil;
 }
 
 read_header :: proc(ctx: ^compress.Context) -> (IHDR, Error) {
 
 	c, e := read_chunk(ctx);
-	if e != E_General.OK {
+	if e != nil {
 		return {}, e;
 	}
 
@@ -341,7 +341,7 @@ read_header :: proc(ctx: ^compress.Context) -> (IHDR, Error) {
 			return {}, E_PNG.Unknown_Color_Type;
 	}
 
-	return header, E_General.OK;
+	return header, nil;
 }
 
 chunk_type_to_name :: proc(type: ^Chunk_Type) -> string {
@@ -453,7 +453,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				seen_ihdr = true;
 
 				header, err = read_header(&ctx);
-				if err != E_General.OK {
+				if err != nil {
 					return img, err;
 				}
 
@@ -506,7 +506,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				}
 
 				c, err = read_chunk(&ctx);
-				if err != E_General.OK {
+				if err != nil {
 					return img, err;
 				}
 
@@ -527,7 +527,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				if .return_metadata not_in options && .do_not_decompress_image in options {
 					img.channels = final_image_channels;
 					img.sidecar = info;
-					return img, E_General.OK;
+					return img, nil;
 				}
 				// There must be at least 1 IDAT, contiguous if more.
 				if seen_idat {
@@ -541,7 +541,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				next := ch.type;
 				for next == .IDAT {
 					c, err = read_chunk(&ctx);
-					if err != E_General.OK {
+					if err != nil {
 						return img, err;
 					}
 
@@ -561,7 +561,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				seen_idat = true;
 			case .IEND:
 				c, err = read_chunk(&ctx);
-				if err != E_General.OK {
+				if err != nil {
 					return img, err;
 				}
 				seen_iend = true;
@@ -570,7 +570,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
 
 				c, err = read_chunk(&ctx);
-				if err != E_General.OK {
+				if err != nil {
 					return img, err;
 				}
 				seen_bkgd = true;
@@ -605,7 +605,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				}
 			case .tRNS:
 				c, err = read_chunk(&ctx);
-				if err != E_General.OK {
+				if err != nil {
 					return img, err;
 				}
 
@@ -647,7 +647,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			case:
 				// Unhandled type
 				c, err = read_chunk(&ctx);
-				if err != E_General.OK {
+				if err != nil {
 					return img, err;
 				}
 				if .return_metadata in options {
@@ -664,7 +664,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	}
 	if .do_not_decompress_image in options {
 		img.channels = final_image_channels;
-		return img, E_General.OK;
+		return img, nil;
 	}
 
 	if !seen_idat {
@@ -675,7 +675,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	zlib_error := zlib.inflate(idat, &buf);
 	defer bytes.buffer_destroy(&buf);
 
-	if zlib_error != E_General.OK {
+	if zlib_error != nil {
 		return {}, zlib_error;
 	} else {
 		/*
@@ -712,7 +712,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		as metadata, and set it instead to the raw number of channels.
 	*/
 	defilter_error := defilter(img, &buf, &header, options);
-	if defilter_error != E_General.OK {
+	if defilter_error != nil {
 		bytes.buffer_destroy(&img.pixels);
 		return {}, defilter_error;
 	}
@@ -727,10 +727,10 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	*/
 
 	if .Paletted in header.color_type && .do_not_expand_indexed in options {
-		return img, E_General.OK;
+		return img, nil;
 	}
 	if .Color not_in header.color_type && .do_not_expand_grayscale in options {
-		return img, E_General.OK;
+		return img, nil;
 	}
 
 
@@ -839,7 +839,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			// If we have 3 in and 3 out, or 4 in and 4 out without premultiplication...
 			if raw_image_channels == 4 && .alpha_premultiply not_in options && !seen_bkgd {
 				// Then we're done.
-				return img, E_General.OK;
+				return img, nil;
 			}
 		}
 
@@ -1036,7 +1036,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			// If we have 3 in and 3 out, or 4 in and 4 out without premultiplication...
 			if !premultiply {
 				// Then we're done.
-				return img, E_General.OK;
+				return img, nil;
 			}
 		}
 
@@ -1229,7 +1229,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		unreachable("We should never see bit depths other than 8, 16 and 'Paletted' here.");
 	}
 
-	return img, E_General.OK;
+	return img, nil;
 }
 
 
@@ -1651,7 +1651,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 		}
 	}
 
-	return E_General.OK;
+	return nil;
 }
 
 load :: proc{load_from_file, load_from_slice, load_from_stream};
