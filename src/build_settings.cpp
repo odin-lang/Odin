@@ -212,6 +212,8 @@ struct BuildContext {
 
 	QueryDataSetSettings query_data_set_settings;
 
+	StringSet test_names;
+
 	gbAffinity affinity;
 	isize      thread_count;
 
