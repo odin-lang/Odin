@@ -2779,7 +2779,36 @@ void type_path_pop(TypePath *tp) {
 
 i64 type_size_of_internal (Type *t, TypePath *path);
 i64 type_align_of_internal(Type *t, TypePath *path);
+i64 type_size_of(Type *t);
+i64 type_align_of(Type *t);
 
+i64 type_size_of_struct_pretend_is_packed(Type *ot) {
+	if (ot == nullptr) {
+		return 0;
+	}
+	Type *t = core_type(ot);
+	if (t->kind != Type_Struct) {
+		return type_size_of(ot);
+	}
+
+	if (t->Struct.is_packed) {
+		return type_size_of(ot);
+	}
+
+	i64 count = 0, size = 0, align = 1;
+
+	auto const &fields = t->Struct.fields;
+	count = fields.count;
+	if (count == 0) {
+		return 0;
+	}
+
+	for_array(i, fields) {
+		size += type_size_of(fields[i]->type);
+	}
+
+	return align_formula(size, align);
+}
 
 
 i64 type_size_of(Type *t) {
