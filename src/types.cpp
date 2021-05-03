@@ -1544,9 +1544,6 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_untyped(t)) {
 		return false;
 	}
-	if (t->kind == Type_Union) {
-		return false;
-	}
 	return is_type_comparable(t);
 }
 
