@@ -16,7 +16,6 @@ Error     :: compress.Error;
 E_General :: compress.General_Error;
 E_PNG     :: image.Error;
 E_Deflate :: compress.Deflate_Error;
-is_kind   :: compress.is_kind;
 
 Image     :: image.Image;
 Options   :: image.Options;
@@ -274,7 +273,7 @@ read_chunk :: proc(ctx: ^compress.Context) -> (Chunk, Error) {
 read_header :: proc(ctx: ^compress.Context) -> (IHDR, Error) {
 
 	c, e := read_chunk(ctx);
-	if !is_kind(e, E_General.OK) {
+	if e != E_General.OK {
 		return {}, e;
 	}
 
@@ -454,7 +453,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				seen_ihdr = true;
 
 				header, err = read_header(&ctx);
-				if !is_kind(err, E_General.OK) {
+				if err != E_General.OK {
 					return img, err;
 				}
 
@@ -507,7 +506,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				}
 
 				c, err = read_chunk(&ctx);
-				if !is_kind(err, E_General.OK) {
+				if err != E_General.OK {
 					return img, err;
 				}
 
@@ -542,7 +541,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				next := ch.type;
 				for next == .IDAT {
 					c, err = read_chunk(&ctx);
-					if !is_kind(err, E_General.OK) {
+					if err != E_General.OK {
 						return img, err;
 					}
 
@@ -562,7 +561,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				seen_idat = true;
 			case .IEND:
 				c, err = read_chunk(&ctx);
-				if !is_kind(err, E_General.OK) {
+				if err != E_General.OK {
 					return img, err;
 				}
 				seen_iend = true;
@@ -571,7 +570,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
 
 				c, err = read_chunk(&ctx);
-				if !is_kind(err, E_General.OK) {
+				if err != E_General.OK {
 					return img, err;
 				}
 				seen_bkgd = true;
@@ -606,7 +605,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				}
 			case .tRNS:
 				c, err = read_chunk(&ctx);
-				if !is_kind(err, E_General.OK) {
+				if err != E_General.OK {
 					return img, err;
 				}
 
@@ -648,7 +647,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			case:
 				// Unhandled type
 				c, err = read_chunk(&ctx);
-				if !is_kind(err, E_General.OK) {
+				if err != E_General.OK {
 					return img, err;
 				}
 				if .return_metadata in options {
@@ -676,7 +675,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	zlib_error := zlib.inflate(idat, &buf);
 	defer bytes.buffer_destroy(&buf);
 
-	if !is_kind(zlib_error, E_General.OK) {
+	if zlib_error != E_General.OK {
 		return {}, zlib_error;
 	} else {
 		/*
@@ -713,7 +712,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		as metadata, and set it instead to the raw number of channels.
 	*/
 	defilter_error := defilter(img, &buf, &header, options);
-	if !is_kind(defilter_error, E_General.OK) {
+	if defilter_error != E_General.OK {
 		bytes.buffer_destroy(&img.pixels);
 		return {}, defilter_error;
 	}

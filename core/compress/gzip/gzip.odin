@@ -94,7 +94,6 @@ E_General :: compress.General_Error;
 E_GZIP    :: compress.GZIP_Error;
 E_ZLIB    :: compress.ZLIB_Error;
 E_Deflate :: compress.Deflate_Error;
-is_kind   :: compress.is_kind;
 
 load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
 
@@ -278,7 +277,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 
 	// fmt.printf("ZLIB returned: %v\n", zlib_error);
 
-	if !is_kind(zlib_error, E_General.OK) || zlib_error == nil {
+	if zlib_error != E_General.OK || zlib_error == nil {
 		return zlib_error;
 	}
 
