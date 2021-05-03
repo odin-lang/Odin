@@ -121,6 +121,9 @@ Type_Info_Union :: struct {
 	variants:     []^Type_Info,
 	tag_offset:   uintptr,
 	tag_type:     ^Type_Info,
+
+	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
+
 	custom_align: bool,
 	no_nil:       bool,
 	maybe:        bool,

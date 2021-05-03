@@ -1544,6 +1544,9 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_untyped(t)) {
 		return false;
 	}
+	if (t->kind == Type_Union) {
+		return false;
+	}
 	return is_type_comparable(t);
 }
 
@@ -1915,6 +1918,18 @@ bool is_type_comparable(Type *t) {
 			}
 		}
 		return true;
+
+	case Type_Union:
+		if (type_size_of(t) == 0) {
+			return false;
+		}
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_comparable(v)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }
@@ -1959,7 +1974,8 @@ bool is_type_simple_compare(Type *t) {
 				return false;
 			}
 		}
-		return true;
+		// make it dumb on purpose
+		return t->Union.variants.count == 1;
 
 	case Type_SimdVector:
 		return is_type_simple_compare(t->SimdVector.elem);
