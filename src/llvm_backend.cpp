@@ -10429,8 +10429,19 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 		}
 		LLVMBuildRet(p->builder, seed.value);
 	} else if (type->kind == Type_Union)  {
-		lbBlock *end_block = lb_create_block(p, "bend");
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
 
+		if (is_type_union_maybe_pointer(type)) {
+			Type *v = type->Union.variants[0];
+			lbValue variant_hasher = lb_get_hasher_proc_for_type(m, v);
+
+			args[0] = data;
+			args[1] = seed;
+			lbValue res = lb_emit_call(p, variant_hasher, args);
+			LLVMBuildRet(p->builder, res.value);
+		}
+
+		lbBlock *end_block = lb_create_block(p, "bend");
 		data = lb_emit_conv(p, data, pt);
 
 		lbValue tag_ptr = lb_emit_union_tag_ptr(p, data);
@@ -10438,7 +10449,6 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 		LLVMValueRef v_switch = LLVMBuildSwitch(p->builder, tag.value, end_block->block, cast(unsigned)type->Union.variants.count);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		for_array(i, type->Union.variants) {
 			lbBlock *case_block = lb_create_block(p, "bcase");
 			lb_start_block(p, case_block);
