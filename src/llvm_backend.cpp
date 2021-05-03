@@ -10974,12 +10974,9 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 
 
 lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
-	auto *found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
-	if (found != nullptr) {
-		lbValue value = {};
-		value.value = (*found)->value;
-		value.type = (*found)->type;
-		return value;
+	lbProcedure **found = map_get(&m->gen->anonymous_proc_lits, hash_pointer(expr));
+	if (found) {
+		return lb_find_procedure_value_from_entity(m, (*found)->entity);
 	}
 
 	ast_node(pl, ProcLit, expr);
@@ -10988,7 +10985,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	// parent$count
 	isize name_len = prefix_name.len + 1 + 8 + 1;
 	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-	i32 name_id = cast(i32)m->anonymous_proc_lits.entries.count;
+	i32 name_id = cast(i32)m->gen->anonymous_proc_lits.entries.count;
 
 	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
 	String name = make_string((u8 *)name_text, name_len-1);
@@ -11002,6 +10999,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
 	e->file = expr->file;
 	e->decl_info = pl->decl;
+	e->code_gen_module = m;
 	lbProcedure *p = lb_create_procedure(m, e);
 
 	lbValue value = {};
@@ -11016,6 +11014,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	}
 
 	map_set(&m->anonymous_proc_lits, hash_pointer(expr), p);
+	map_set(&m->gen->anonymous_proc_lits, hash_pointer(expr), p);
 
 	return value;
 }
@@ -13112,6 +13111,7 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	map_init(&gen->modules, permanent_allocator(), gen->info->packages.entries.count*2);
 	map_init(&gen->modules_through_ctx, permanent_allocator(), gen->info->packages.entries.count*2);
+	map_init(&gen->anonymous_proc_lits, heap_allocator(), 1024);
 
 	gb_mutex_init(&gen->mutex);
 
