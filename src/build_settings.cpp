@@ -809,10 +809,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
 
-	if (bc->metrics.os == TargetOs_windows) {
-		// bc->use_separate_modules = bc->optimization_level == 0;
-	}
-
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap

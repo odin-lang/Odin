@@ -596,6 +596,7 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
+	BuildFlag_UseSeparateModules,
 	BuildFlag_Vet,
 	BuildFlag_VetExtra,
 	BuildFlag_UseLLVMApi,
@@ -716,6 +717,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseSeparateModules,str_lit("use-separate-modules"),BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
@@ -1195,6 +1197,10 @@ bool parse_build_flags(Array<String> args) {
 							build_context.use_lld = true;
 							break;
 
+						case BuildFlag_UseSeparateModules:
+							build_context.use_separate_modules = true;
+							break;
+
 						case BuildFlag_Vet:
 							build_context.vet = true;
 							break;
@@ -1545,35 +1551,17 @@ void show_timings(Checker *c, Timings *t) {
 void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
 
-	String output_base = gen->output_base;
-
-	auto data = array_make<u8>(heap_allocator(), output_base.len + 30);
-	defer (array_free(&data));
-
-	for_array(i, gen->output_object_paths) {
-		String path = gen->output_object_paths[i];
+	for_array(i, gen->output_temp_paths) {
+		String path = gen->output_temp_paths[i];
 		gb_file_remove(cast(char const *)path.text);
 	}
 
-	isize n = output_base.len;
-	gb_memmove(data.data, output_base.text, n);
-#define EXT_REMOVE(s) do {                         \
-		gb_memmove(data.data+n, s, gb_size_of(s)); \
-		gb_file_remove(cast(char const *)data.data);     \
-	} while (0)
-	EXT_REMOVE(".ll");
-	EXT_REMOVE(".bc");
-	EXT_REMOVE("_memcpy_pass.bc");
 	if (build_context.build_mode != BuildMode_Object && !build_context.keep_object_files) {
-	#if defined(GB_SYSTEM_WINDOWS)
-		EXT_REMOVE(".obj");
-		EXT_REMOVE(".res");
-	#else
-		EXT_REMOVE(".o");
-	#endif
+		for_array(i, gen->output_object_paths) {
+			String path = gen->output_object_paths[i];
+			gb_file_remove(cast(char const *)path.text);
+		}
 	}
-
-#undef EXT_REMOVE
 }
 
 
@@ -1734,6 +1722,12 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-use-lld");
 		print_usage_line(2, "Use the LLD linker rather than the default");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-use-separate-modules");
+		print_usage_line(2, "The backend generates multiple build units which are then linked together");
+		print_usage_line(2, "Normally, a single build unit is generated for a standard project");
+		print_usage_line(0, "");
+
 	}
 
 	if (check) {
