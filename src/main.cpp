@@ -1929,7 +1929,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	Timings *timings = &global_timings;
 
-	timings_init(timings, str_lit("Total Time"), 128);
+	timings_init(timings, str_lit("Total Time"), 2048);
 	defer (timings_destroy(timings));
 
 	arena_init(&permanent_arena, heap_allocator());

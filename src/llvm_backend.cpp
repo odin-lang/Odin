@@ -2,6 +2,11 @@
 #define USE_SEPARTE_MODULES build_context.use_separate_modules
 #endif
 
+#ifndef MULTITHREAD_OBJECT_GENERATION
+#define MULTITHREAD_OBJECT_GENERATION 0
+#endif
+
+
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
 #include "llvm_backend_opt.cpp"
@@ -13026,7 +13031,6 @@ void lb_init_module(lbModule *m, Checker *c) {
 		m->debug_builder = LLVMCreateDIBuilder(m->mod);
 	}
 
-	gb_mutex_init(&m->mutex);
 	gbAllocator a = heap_allocator();
 	map_init(&m->types, a);
 	map_init(&m->llvm_types, a);
@@ -13097,6 +13101,8 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	map_init(&gen->modules, permanent_allocator(), gen->info->packages.entries.count*2);
 	map_init(&gen->modules_through_ctx, permanent_allocator(), gen->info->packages.entries.count*2);
+
+	gb_mutex_init(&gen->mutex);
 
 	if (USE_SEPARTE_MODULES) {
 		for_array(i, gen->info->packages.entries) {
@@ -13945,7 +13951,6 @@ struct lbGlobalVariable {
 
 lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	defer (LLVMDisposePassManager(default_function_pass_manager));
 	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
@@ -13977,7 +13982,6 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 
 lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
-	defer (LLVMDisposePassManager(default_function_pass_manager));
 	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
@@ -14068,7 +14072,6 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 
 lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	defer (LLVMDisposePassManager(default_function_pass_manager));
 	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
@@ -14219,6 +14222,67 @@ String lb_filepath_obj_for_module(lbModule *m) {
 
 	return concatenate_strings(permanent_allocator(), path, ext);
 }
+
+
+bool lb_is_module_empty(lbModule *m) {
+	if (LLVMGetFirstFunction(m->mod) == nullptr &&
+	    LLVMGetFirstGlobal(m->mod) == nullptr) {
+		return true;
+	}
+	for (auto fn = LLVMGetFirstFunction(m->mod); fn != nullptr; fn = LLVMGetNextFunction(fn)) {
+		if (LLVMGetFirstBasicBlock(fn) != nullptr) {
+			return false;
+		}
+	}
+
+	for (auto g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
+		if (LLVMGetLinkage(g) == LLVMExternalLinkage) {
+			continue;
+		}
+		if (!LLVMIsExternallyInitialized(g)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+struct lbLLVMEmitWorker {
+	LLVMTargetMachineRef target_machine;
+	LLVMCodeGenFileType code_gen_file_type;
+	String filepath_obj;
+	lbModule *m;
+};
+
+WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
+	GB_ASSERT(MULTITHREAD_OBJECT_GENERATION);
+
+	char *llvm_error = nullptr;
+
+	auto wd = cast(lbLLVMEmitWorker *)data;
+	gbMutex *mutex = &wd->m->gen->mutex;
+
+
+#if 1
+	gb_mutex_lock(mutex);
+	defer (gb_mutex_unlock(mutex));
+	if (LLVMTargetMachineEmitToFile(wd->target_machine, wd->m->mod, cast(char *)wd->filepath_obj.text, wd->code_gen_file_type, &llvm_error)) {
+		gb_printf_err("LLVM Error: %s\n", llvm_error);
+		gb_exit(1);
+		return 1;
+	}
+#else
+	LLVMMemoryBufferRef mem_buf = nullptr;
+
+	if (LLVMTargetMachineEmitToMemoryBuffer(wd->target_machine, wd->m->mod, wd->code_gen_file_type, &llvm_error, &mem_buf)) {
+		gb_printf_err("LLVM Error: %s\n", llvm_error);
+		gb_exit(1);
+		return 1;
+	}
+#endif
+
+	return 0;
+}
+
 
 
 void lb_generate_code(lbGenerator *gen) {
@@ -14728,10 +14792,6 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(m->mod);
 		LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(m->mod);
 		LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(m->mod);
-		defer (LLVMDisposePassManager(default_function_pass_manager));
-		defer (LLVMDisposePassManager(function_pass_manager_minimal));
-		defer (LLVMDisposePassManager(function_pass_manager_size));
-		defer (LLVMDisposePassManager(function_pass_manager_speed));
 
 		LLVMInitializeFunctionPassManager(default_function_pass_manager);
 		LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
@@ -14750,7 +14810,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 		LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
-		defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
 		LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
 		lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
 		LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
@@ -14798,7 +14857,6 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Module Pass");
 
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
-	defer (LLVMDisposePassManager(module_pass_manager));
 	lb_populate_module_pass_manager(target_machine, module_pass_manager, build_context.optimization_level);
 
 	for_array(i, gen->modules.entries) {
@@ -14839,8 +14897,7 @@ void lb_generate_code(lbGenerator *gen) {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 
-			if (LLVMGetFirstFunction(m->mod) == nullptr &&
-			    LLVMGetFirstGlobal(m->mod) == nullptr) {
+			if (lb_is_module_empty(m)) {
 				continue;
 			}
 
@@ -14859,8 +14916,8 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Object Generation");
 
+	TIME_SECTION("LLVM Add Foreign Library Paths");
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
 		for_array(i, m->info->required_foreign_imports_through_force) {
@@ -14868,23 +14925,60 @@ void lb_generate_code(lbGenerator *gen) {
 			lb_add_foreign_library_path(m, e);
 		}
 
-		if (LLVMGetFirstFunction(m->mod) == nullptr &&
-		    LLVMGetFirstGlobal(m->mod) == nullptr) {
+		if (lb_is_module_empty(m)) {
 			continue;
 		}
-
-		String filepath_obj = lb_filepath_obj_for_module(m);
-
-		if (LLVMTargetMachineEmitToFile(target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
-			gb_printf_err("LLVM Error: %s\n", llvm_error);
-			gb_exit(1);
-			return;
-		}
-
-		array_add(&gen->output_object_paths, filepath_obj);
-
 	}
 
+	TIME_SECTION("LLVM Object Generation");
+
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1;
+	if (USE_SEPARTE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0) {
+		ThreadPool pool = {};
+		thread_pool_init(&pool, heap_allocator(), worker_count, "LLVMEmitWork");
+		defer (thread_pool_destroy(&pool));
+
+		for_array(j, gen->modules.entries) {
+			lbModule *m = gen->modules.entries[j].value;
+			if (lb_is_module_empty(m)) {
+				continue;
+			}
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			String filepath_obj = lb_filepath_obj_for_module(m);
+			array_add(&gen->output_object_paths, filepath_obj);
+			array_add(&gen->output_temp_paths, filepath_ll);
+
+			auto *wd = gb_alloc_item(heap_allocator(), lbLLVMEmitWorker);
+			wd->target_machine = target_machine;
+			wd->code_gen_file_type = code_gen_file_type;
+			wd->filepath_obj = filepath_obj;
+			wd->m = m;
+
+			thread_pool_add_task(&pool, lb_llvm_emit_worker_proc, wd);
+		}
+
+		thread_pool_start(&pool);
+		thread_pool_wait_to_process(&pool);
+	} else {
+		for_array(j, gen->modules.entries) {
+			lbModule *m = gen->modules.entries[j].value;
+			if (lb_is_module_empty(m)) {
+				continue;
+			}
+			// TIME_SECTION("LLVM Generate Object");
+
+			String filepath_obj = lb_filepath_obj_for_module(m);
+
+			if (LLVMTargetMachineEmitToFile(target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+				gb_exit(1);
+				return;
+			}
+
+			array_add(&gen->output_object_paths, filepath_obj);
+		}
+	}
 
 
 
