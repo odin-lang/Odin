@@ -1110,7 +1110,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 		case Basic_uintptr: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
 
-		case Basic_rawptr: return LLVMPointerType(LLVMInt8Type(), 0);
+		case Basic_rawptr: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
 		case Basic_string:
 			{
 				char const *name = "..string";
@@ -1126,7 +1126,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMStructSetBody(type, fields, 2, false);
 				return type;
 			}
-		case Basic_cstring: return LLVMPointerType(LLVMInt8Type(), 0);
+		case Basic_cstring: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
 		case Basic_any:
 			{
 				char const *name = "..any";
@@ -1452,21 +1452,35 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			if (param_index < param_count) {
 				params[param_index++] = lb_type(m, t_rawptr);
-				// params[param_index++] = lb_type(m, t_context_ptr);
 			}
 			GB_ASSERT(param_index == param_count);
 
-
 			lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, type->Proc.calling_convention);
+			{
+				for_array(j, ft->args) {
+					auto arg = ft->args[j];
+					GB_ASSERT_MSG(LLVMGetTypeContext(arg.type) == ft->ctx,
+					              "\n\t%s %td/%td"
+					              "\n\tArgTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
+					              LLVMPrintTypeToString(arg.type),
+					              j, ft->args.count,
+					              LLVMGetTypeContext(arg.type), ft->ctx, LLVMGetGlobalContext());
+				}
+				GB_ASSERT_MSG(LLVMGetTypeContext(ft->ret.type) == ft->ctx,
+				              "\n\t%s"
+				              "\n\tRetTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
+				              LLVMPrintTypeToString(ft->ret.type),
+				              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
+			}
+
 			map_set(&m->function_type_map, hash_type(type), ft);
 			LLVMTypeRef new_abi_fn_ptr_type = lb_function_type_to_llvm_ptr(ft, type->Proc.c_vararg);
 			LLVMTypeRef new_abi_fn_type = LLVMGetElementType(new_abi_fn_ptr_type);
 
-			// LLVMTypeRef new_ret = LLVMGetReturnType(new_abi_fn_type);
-			// LLVMTypeRef old_ret = LLVMGetReturnType(old_abi_fn_type);
-			// unsigned new_count = LLVMCountParamTypes(new_abi_fn_type);
-			// unsigned old_count = LLVMCountParamTypes(old_abi_fn_type);
-			// GB_ASSERT_MSG(new_count == old_count, "%u %u, %s %s", new_count, old_count, LLVMPrintTypeToString(new_abi_fn_type), LLVMPrintTypeToString(old_abi_fn_type));
+			GB_ASSERT_MSG(LLVMGetTypeContext(new_abi_fn_type) == m->ctx,
+			              "\n\tFuncTypeCtx: %p\n\tCurrentCtx:  %p\n\tGlobalCtx:   %p",
+			              LLVMGetTypeContext(new_abi_fn_type), m->ctx, LLVMGetGlobalContext());
+
 			return new_abi_fn_ptr_type;
 		}
 
@@ -12898,7 +12912,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
-#if 1
+#if 0
 	m->ctx = LLVMGetGlobalContext();
 #else
 	m->ctx = LLVMContextCreate();
