@@ -14107,19 +14107,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		lb_fill_slice(p, args, argv, argc);
 	}
 
-	{
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_const_string(p->module, str_lit("Here0\n"));
-		lb_emit_runtime_call(p, "print_string", args);
-	}
-
 	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
-
-	{
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_const_string(p->module, str_lit("Here1\n"));
-		lb_emit_runtime_call(p, "print_string", args);
-	}
 
 	if (build_context.command_kind == Command_test) {
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
