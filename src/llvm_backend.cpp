@@ -13,7 +13,9 @@
 #include "llvm_abi.cpp"
 #include "llvm_backend_opt.cpp"
 
-gb_global lbAddr lb_global_type_info_data           = {};
+gb_global ThreadPool lb_thread_pool = {};
+
+gb_global Entity *lb_global_type_info_data_entity   = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
 gb_global lbAddr lb_global_type_info_member_names   = {};
 gb_global lbAddr lb_global_type_info_member_offsets = {};
@@ -26,6 +28,12 @@ gb_global isize lb_global_type_info_member_names_index   = 0;
 gb_global isize lb_global_type_info_member_offsets_index = 0;
 gb_global isize lb_global_type_info_member_usings_index  = 0;
 gb_global isize lb_global_type_info_member_tags_index    = 0;
+
+
+lbValue lb_global_type_info_data_ptr(lbModule *m) {
+	lbValue v = lb_find_value_from_entity(m, lb_global_type_info_data_entity);
+	return v;
+}
 
 
 struct lbLoopData {
@@ -2539,6 +2547,7 @@ void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
+	GB_ASSERT(entity->kind == Entity_Procedure);
 
 	String link_name = {};
 
@@ -5674,7 +5683,7 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	};
 
 	lbValue value = {};
-	value.value = LLVMConstGEP(lb_global_type_info_data.addr.value, indices, gb_count_of(indices));
+	value.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices));
 	value.type = t_type_info_ptr;
 	return value;
 }
@@ -5736,7 +5745,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
-	if (is_type_proc(e->type)) {
+	if (e->kind == Entity_Procedure) {
 		return lb_find_procedure_value_from_entity(m, e);
 	}
 
@@ -13184,7 +13193,7 @@ lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
 
 	lbValue res = {};
 	res.type = t_type_info_ptr;
-	res.value = LLVMConstGEP(lb_global_type_info_data.addr.value, indices, cast(unsigned)gb_count_of(indices));
+	res.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, cast(unsigned)gb_count_of(indices));
 	return res;
 }
 
@@ -13251,12 +13260,12 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 	{
 		// NOTE(bill): Set the type_table slice with the global backing array
 		lbValue global_type_table = lb_find_runtime_value(m, str_lit("type_table"));
-		Type *type = base_type(lb_addr_type(lb_global_type_info_data));
+		Type *type = base_type(lb_global_type_info_data_entity->type);
 		GB_ASSERT(is_type_array(type));
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef values[2] = {
-			LLVMConstInBoundsGEP(lb_global_type_info_data.addr.value, indices, gb_count_of(indices)),
+			LLVMConstInBoundsGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
 		};
 		LLVMValueRef slice = llvm_const_named_struct(llvm_addr_type(global_type_table), values, gb_count_of(values));
@@ -13288,7 +13297,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		}
 
 		lbValue tag = {};
-		lbValue ti_ptr = lb_emit_array_epi(p, lb_global_type_info_data.addr, cast(i32)entry_index);
+		lbValue ti_ptr = lb_emit_array_epi(p, lb_global_type_info_data_ptr(m), cast(i32)entry_index);
 		lbValue variant_ptr = lb_emit_struct_ep(p, ti_ptr, 4);
 
 		lbValue type_info_flags = lb_const_int(p->module, t_type_info_flags, type_info_flags_of_type(t));
@@ -14270,6 +14279,96 @@ WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 	return 0;
 }
 
+WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
+	GB_ASSERT(MULTITHREAD_OBJECT_GENERATION);
+
+	auto m = cast(lbModule *)data;
+
+	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
+	LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(m->mod);
+	LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(m->mod);
+	LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(m->mod);
+
+	LLVMInitializeFunctionPassManager(default_function_pass_manager);
+	LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
+	LLVMInitializeFunctionPassManager(function_pass_manager_size);
+	LLVMInitializeFunctionPassManager(function_pass_manager_speed);
+
+	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
+	lb_populate_function_pass_manager_specific(function_pass_manager_minimal, 0);
+	lb_populate_function_pass_manager_specific(function_pass_manager_size,    1);
+	lb_populate_function_pass_manager_specific(function_pass_manager_speed,   2);
+
+	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
+	LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
+	LLVMFinalizeFunctionPassManager(function_pass_manager_size);
+	LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
+
+
+	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
+	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
+	lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
+	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
+
+
+	for_array(i, m->procedures_to_generate) {
+		lbProcedure *p = m->procedures_to_generate[i];
+		if (p->body != nullptr) { // Build Procedure
+			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
+				LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+			} else {
+				if (p->entity && p->entity->kind == Entity_Procedure) {
+					switch (p->entity->Procedure.optimization_mode) {
+					case ProcedureOptimizationMode_None:
+					case ProcedureOptimizationMode_Minimal:
+						LLVMRunFunctionPassManager(function_pass_manager_minimal, p->value);
+						break;
+					case ProcedureOptimizationMode_Size:
+						LLVMRunFunctionPassManager(function_pass_manager_size, p->value);
+						break;
+					case ProcedureOptimizationMode_Speed:
+						LLVMRunFunctionPassManager(function_pass_manager_speed, p->value);
+						break;
+					default:
+						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+						break;
+					}
+				} else {
+					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+				}
+			}
+		}
+	}
+
+	for_array(i, m->equal_procs.entries) {
+		lbProcedure *p = m->equal_procs.entries[i].value;
+		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	}
+	for_array(i, m->hasher_procs.entries) {
+		lbProcedure *p = m->hasher_procs.entries[i].value;
+		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	}
+
+	return 0;
+}
+
+
+struct lbLLVMModulePassWorkerData {
+	lbModule *m;
+	LLVMTargetMachineRef target_machine;
+};
+
+WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
+	GB_ASSERT(MULTITHREAD_OBJECT_GENERATION);
+
+	auto wd = cast(lbLLVMModulePassWorkerData *)data;
+
+	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
+	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
+	LLVMRunPassManager(module_pass_manager, wd->m->mod);
+
+	return 0;
+}
 
 
 void lb_generate_code(lbGenerator *gen) {
@@ -14277,6 +14376,14 @@ void lb_generate_code(lbGenerator *gen) {
 	#define TIME_SECTION_WITH_LEN(str, len) do { if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
 
 	TIME_SECTION("LLVM Initializtion");
+
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1;
+
+	LLVMBool do_threading = (LLVMIsMultithreaded() && USE_SEPARTE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+
+	thread_pool_init(&lb_thread_pool, heap_allocator(), worker_count, "LLVMBackend");
+	defer (thread_pool_destroy(&lb_thread_pool));
 
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
@@ -14415,7 +14522,9 @@ void lb_generate_code(lbGenerator *gen) {
 			lbValue value = {};
 			value.value = g;
 			value.type = alloc_type_pointer(t);
-			lb_global_type_info_data = lb_addr(value);
+
+			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, blank_token, t, EntityState_Resolved);
+			lb_add_entity(m, lb_global_type_info_data_entity, value);
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
@@ -14776,81 +14885,21 @@ void lb_generate_code(lbGenerator *gen) {
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
 
-		LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-		LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(m->mod);
-		LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(m->mod);
-		LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(m->mod);
-
-		LLVMInitializeFunctionPassManager(default_function_pass_manager);
-		LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
-		LLVMInitializeFunctionPassManager(function_pass_manager_size);
-		LLVMInitializeFunctionPassManager(function_pass_manager_speed);
-
-		lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
-		lb_populate_function_pass_manager_specific(function_pass_manager_minimal, 0);
-		lb_populate_function_pass_manager_specific(function_pass_manager_size,    1);
-		lb_populate_function_pass_manager_specific(function_pass_manager_speed,   2);
-
-		LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-		LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
-		LLVMFinalizeFunctionPassManager(function_pass_manager_size);
-		LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
-
-
-		LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
-		LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
-		lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
-		LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
-
-
-		for_array(i, m->procedures_to_generate) {
-			lbProcedure *p = m->procedures_to_generate[i];
-			if (p->body != nullptr) { // Build Procedure
-				if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-					LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
-				} else {
-					if (p->entity && p->entity->kind == Entity_Procedure) {
-						switch (p->entity->Procedure.optimization_mode) {
-						case ProcedureOptimizationMode_None:
-						case ProcedureOptimizationMode_Minimal:
-							LLVMRunFunctionPassManager(function_pass_manager_minimal, p->value);
-							break;
-						case ProcedureOptimizationMode_Size:
-							LLVMRunFunctionPassManager(function_pass_manager_size, p->value);
-							break;
-						case ProcedureOptimizationMode_Speed:
-							LLVMRunFunctionPassManager(function_pass_manager_speed, p->value);
-							break;
-						default:
-							LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-							break;
-						}
-					} else {
-						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-					}
-				}
-			}
-		}
-
-		for_array(i, m->equal_procs.entries) {
-			lbProcedure *p = m->equal_procs.entries[i].value;
-			LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-		}
-		for_array(i, m->hasher_procs.entries) {
-			lbProcedure *p = m->hasher_procs.entries[i].value;
-			LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-		}
+		lb_llvm_function_pass_worker_proc(m);
 	}
 
 	TIME_SECTION("LLVM Module Pass");
 
 	for_array(i, gen->modules.entries) {
-		LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
-		auto target_machine = target_machines[i];
-		lb_populate_module_pass_manager(target_machine, module_pass_manager, build_context.optimization_level);
 		lbModule *m = gen->modules.entries[i].value;
-		LLVMRunPassManager(module_pass_manager, m->mod);
+
+		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+		wd->m = m;
+		wd->target_machine = target_machines[i];
+
+		lb_llvm_module_pass_worker_proc(wd);
 	}
+
 
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
@@ -14921,15 +14970,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Object Generation");
 
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1;
-
-	LLVMBool do_threading = LLVMIsMultithreaded();
-	if (do_threading && USE_SEPARTE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0) {
-		ThreadPool pool = {};
-		thread_pool_init(&pool, heap_allocator(), worker_count, "LLVMEmitWork");
-		defer (thread_pool_destroy(&pool));
-
+	if (do_threading) {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			if (lb_is_module_empty(m)) {
@@ -14946,11 +14987,11 @@ void lb_generate_code(lbGenerator *gen) {
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;
 			wd->m = m;
-			thread_pool_add_task(&pool, lb_llvm_emit_worker_proc, wd);
+			thread_pool_add_task(&lb_thread_pool, lb_llvm_emit_worker_proc, wd);
 		}
 
-		thread_pool_start(&pool);
-		thread_pool_wait_to_process(&pool);
+		thread_pool_start(&lb_thread_pool);
+		thread_pool_wait_to_process(&lb_thread_pool);
 	} else {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
