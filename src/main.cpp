@@ -1542,11 +1542,18 @@ void show_timings(Checker *c, Timings *t) {
 	}
 }
 
-void remove_temp_files(String output_base) {
+void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
+
+	String output_base = gen->output_base;
 
 	auto data = array_make<u8>(heap_allocator(), output_base.len + 30);
 	defer (array_free(&data));
+
+	for_array(i, gen->output_object_paths) {
+		String path = gen->output_object_paths[i];
+		gb_file_remove(cast(char const *)path.text);
+	}
 
 	isize n = output_base.len;
 	gb_memmove(data.data, output_base.text, n);
@@ -2183,7 +2190,7 @@ int main(int arg_count, char const **arg_ptr) {
 		show_timings(&checker, timings);
 	}
 
-	remove_temp_files(gen.output_base);
+	remove_temp_files(&gen);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)

@@ -1,3 +1,7 @@
+#ifndef USE_SEPARTE_MODULES
+#define USE_SEPARTE_MODULES build_context.use_separate_modules
+#endif
+
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
 #include "llvm_backend_opt.cpp"
@@ -72,6 +76,15 @@ bool lb_is_instr_terminating(LLVMValueRef instr) {
 	return false;
 }
 
+
+
+lbModule *lb_pkg_module(lbGenerator *gen, AstPackage *pkg) {
+	auto *found = map_get(&gen->modules, hash_pointer(pkg));
+	if (found) {
+		return *found;
+	}
+	return &gen->default_module;
+}
 
 
 lbAddr lb_addr(lbValue addr) {
@@ -2528,10 +2541,17 @@ void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 	GB_ASSERT(p->abi_function_type != nullptr);
 }
 
-lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
+lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 
-	String link_name = lb_get_entity_name(m, entity);
+	String link_name = {};
+
+	if (ignore_body) {
+		lbModule *other_module = lb_pkg_module(m->gen, entity->pkg);
+		link_name = lb_get_entity_name(other_module, entity);
+	} else {
+		link_name = lb_get_entity_name(m, entity);
+	}
 
 	{
 		StringHashKey key = string_hash_string(link_name);
@@ -2697,6 +2717,10 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 			}
 			parameter_index += 1;
 		}
+	}
+
+	if (ignore_body) {
+		p->body = nullptr;
 	}
 
 
@@ -5484,9 +5508,10 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 
 		isize max_len = 7+8+1;
 		char *name = gb_alloc_array(permanent_allocator(), char, max_len);
-		isize len = gb_snprintf(name, max_len, "csbs$%x", m->global_array_index);
+
+		u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_array_index, 1);
+		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
 		len -= 1;
-		m->global_array_index++;
 
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 		LLVMSetInitializer(global_data, data);
@@ -5526,9 +5551,9 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	{
 		isize max_len = 7+8+1;
 		name = gb_alloc_array(permanent_allocator(), char, max_len);
-		isize len = gb_snprintf(name, max_len, "csbs$%x", m->global_array_index);
+		u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_array_index, 1);
+		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
 		len -= 1;
-		m->global_array_index++;
 	}
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 	LLVMSetInitializer(global_data, data);
@@ -5684,6 +5709,7 @@ LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_
 }
 
 lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
+	GB_ASSERT(is_type_proc(e->type));
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
 	auto *found = map_get(&m->values, hash_entity(e));
@@ -5691,8 +5717,14 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 		return *found;
 	}
 
-	// TODO(bill): this is
-	lbProcedure *missing_proc = lb_create_procedure(m, e);
+	bool ignore_body = false;
+
+	if (USE_SEPARTE_MODULES) {
+		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
+		ignore_body = other_module != m;
+	}
+
+	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
 	found = map_get(&m->values, hash_entity(e));
 	if (found) {
 		return *found;
@@ -5701,6 +5733,47 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
 }
+
+lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
+	e = strip_entity_wrapping(e);
+	GB_ASSERT(e != nullptr);
+	if (is_type_proc(e->type)) {
+		return lb_find_procedure_value_from_entity(m, e);
+	}
+
+	auto *found = map_get(&m->values, hash_entity(e));
+	if (found) {
+		return *found;
+	}
+
+	if (USE_SEPARTE_MODULES) {
+		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
+		bool is_external = other_module != m;
+		if (!is_external) {
+			other_module = e->code_gen_module;
+			is_external = other_module != m;
+		}
+
+		if (is_external) {
+			String name = lb_get_entity_name(other_module, e);
+
+			lbValue g = {};
+			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+			g.type = alloc_type_pointer(e->type);
+			LLVMSetExternallyInitialized(g.value, true);
+
+			lb_add_entity(m, e, g);
+			lb_add_member(m, name, g);
+			return g;
+		}
+	}
+
+	GB_PANIC("\n\tError in: %s, missing value %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+	return {};
+}
+
+
+
 
 
 lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
@@ -5777,8 +5850,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			} else {
 				isize max_len = 7+8+1;
 				char *str = gb_alloc_array(permanent_allocator(), char, max_len);
-				isize len = gb_snprintf(str, max_len, "csba$%x", m->global_array_index);
-				m->global_array_index++;
+				u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_array_index, 1);
+				isize len = gb_snprintf(str, max_len, "csba$%x", id);
 
 				String name = make_string(cast(u8 *)str, len-1);
 
@@ -8192,31 +8265,18 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 	}
 }
 
-lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args) {
-	// LLVMMetadataRef curr_loc = LLVMGetCurrentDebugLocation2(p->builder);
-	// LLVMSetCurrentDebugLocation2(p->builder, nullptr);
-	// defer (if (curr_loc) {
-	// 	LLVMSetCurrentDebugLocation2(p->builder, curr_loc);
-	// });
 
-	String name = make_string_c(c_name);
-
-
-	AstPackage *pkg = p->module->info->runtime_package;
+lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name) {
+	AstPackage *pkg = m->info->runtime_package;
 	Entity *e = scope_lookup_current(pkg->scope, name);
+	return lb_find_procedure_value_from_entity(m, e);
+}
 
-	lbValue *found = nullptr;
-	if (p->module != e->code_gen_module) {
-		gb_mutex_lock(&p->module->mutex);
-	}
-	GB_ASSERT(e->code_gen_module != nullptr);
-	found = map_get(&e->code_gen_module->values, hash_entity(e));
-	if (p->module != e->code_gen_module) {
-		gb_mutex_unlock(&p->module->mutex);
-	}
 
-	GB_ASSERT_MSG(found != nullptr, "%s", c_name);
-	return lb_emit_call(p, *found, args);
+lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args) {
+	String name = make_string_c(c_name);
+	lbValue proc = lb_lookup_runtime_procedure(p->module, name);
+	return lb_emit_call(p, proc, args);
 }
 
 lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, bool use_return_ptr_hint) {
@@ -9946,24 +10006,6 @@ void lb_emit_increment(lbProcedure *p, lbValue addr) {
 
 }
 
-LLVMValueRef lb_lookup_runtime_procedure(lbModule *m, String const &name) {
-	AstPackage *pkg = m->info->runtime_package;
-	Entity *e = scope_lookup_current(pkg->scope, name);
-
-	lbValue *found = nullptr;
-	if (m != e->code_gen_module) {
-		gb_mutex_lock(&m->mutex);
-	}
-	GB_ASSERT(e->code_gen_module != nullptr);
-	found = map_get(&e->code_gen_module->values, hash_entity(e));
-	if (m != e->code_gen_module) {
-		gb_mutex_unlock(&m->mutex);
-	}
-	GB_ASSERT(found != nullptr);
-
-	return found->value;
-}
-
 lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type) {
 	GB_ASSERT(type_size_of(value.type) == type_size_of(end_type));
 
@@ -11122,6 +11164,44 @@ lbValue lb_emit_any_cast(lbProcedure *p, lbValue value, Type *type, TokenPos pos
 }
 
 
+lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
+	auto *found = map_get(&m->values, hash_entity(e));
+	if (found) {
+		auto v = *found;
+		// NOTE(bill): This is because pointers are already pointers in LLVM
+		if (is_type_proc(v.type)) {
+			return v;
+		}
+		return lb_emit_load(p, v);
+	} else if (e != nullptr && e->kind == Entity_Variable) {
+		return lb_addr_load(p, lb_build_addr(p, expr));
+	}
+
+	if (USE_SEPARTE_MODULES) {
+		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
+		if (other_module != m) {
+			String name = lb_get_entity_name(other_module, e);
+
+			lbValue g = {};
+			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+			g.type = alloc_type_pointer(e->type);
+			LLVMSetExternallyInitialized(g.value, true);
+
+			lb_add_entity(m, e, g);
+			lb_add_member(m, name, g);
+			return lb_emit_load(p, g);
+		}
+	}
+
+	String pkg = {};
+	if (e->pkg) {
+		pkg = e->pkg->name;
+	}
+	gb_printf_err("Error in: %s\n", token_pos_to_string(ast_token(expr).pos));
+	GB_PANIC("nullptr value for expression from identifier: %.*s.%.*s (%p) : %s @ %p", LIT(pkg), LIT(e->token.string), e, type_to_string(e->type), expr);
+	return {};
+}
+
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -11211,24 +11291,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		}
 		GB_ASSERT(e->kind != Entity_ProcGroup);
 
-		auto *found = map_get(&p->module->values, hash_entity(e));
-		if (found) {
-			auto v = *found;
-			// NOTE(bill): This is because pointers are already pointers in LLVM
-			if (is_type_proc(v.type)) {
-				return v;
-			}
-			return lb_emit_load(p, v);
-		} else if (e != nullptr && e->kind == Entity_Variable) {
-			return lb_addr_load(p, lb_build_addr(p, expr));
-		}
-		gb_printf_err("Error in: %s\n", token_pos_to_string(i->token.pos));
-		String pkg = {};
-		if (e->pkg) {
-			pkg = e->pkg->name;
-		}
-		GB_PANIC("nullptr value for expression from identifier: %.*s.%.*s (%p) : %s @ %p", LIT(pkg), LIT(e->token.string), e, type_to_string(e->type), expr);
-		return {};
+		return lb_find_ident(p, m, e, expr);
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
@@ -11609,11 +11672,14 @@ lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *expr) {
 		return lb_get_soa_variable_addr(p, e);
 	}
 
+
 	if (v.value == nullptr) {
-		error(expr, "%.*s Unknown value: %.*s, entity: %p %.*s",
-		      LIT(p->name),
-		      LIT(e->token.string), e, LIT(entity_strings[e->kind]));
-		GB_PANIC("Unknown value");
+		return lb_addr(lb_find_value_from_entity(p->module, e));
+
+		// error(expr, "%.*s Unknown value: %.*s, entity: %p %.*s",
+		//       LIT(p->name),
+		//       LIT(e->token.string), e, LIT(entity_strings[e->kind]));
+		// GB_PANIC("Unknown value");
 	}
 
 	return lb_addr(v);
@@ -13031,17 +13097,30 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	gen->info = &c->info;
 
 	map_init(&gen->modules, permanent_allocator(), gen->info->packages.entries.count*2);
+	map_init(&gen->modules_through_ctx, permanent_allocator(), gen->info->packages.entries.count*2);
 
-	for_array(i, gen->info->packages.entries) {
-		AstPackage *pkg = gen->info->packages.entries[i].value;
+	if (USE_SEPARTE_MODULES) {
+		for_array(i, gen->info->packages.entries) {
+			AstPackage *pkg = gen->info->packages.entries[i].value;
 
-		auto m = gb_alloc_item(permanent_allocator(), lbModule);
-		m->pkg = pkg;
-		map_set(&gen->modules, hash_pointer(pkg), m);
-		lb_init_module(m, c);
+			auto m = gb_alloc_item(permanent_allocator(), lbModule);
+			m->pkg = pkg;
+			m->gen = gen;
+			map_set(&gen->modules, hash_pointer(pkg), m);
+			lb_init_module(m, c);
+		}
 	}
+
+	gen->default_module.gen = gen;
 	map_set(&gen->modules, hash_pointer(nullptr), &gen->default_module);
 	lb_init_module(&gen->default_module, c);
+
+
+	for_array(i, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[i].value;
+		LLVMContextRef ctx = LLVMGetModuleContext(m->mod);
+		map_set(&gen->modules_through_ctx, hash_pointer(ctx), m);
+	}
 
 	return true;
 }
@@ -13052,8 +13131,10 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 
 	isize max_len = 7+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(permanent_allocator(), u8, max_len);
-	isize len = gb_snprintf(cast(char *)str, max_len, "ggv$%x", m->global_generated_index);
-	m->global_generated_index++;
+
+	u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_generated_index, 1);
+
+	isize len = gb_snprintf(cast(char *)str, max_len, "ggv$%x", id);
 	String name = make_string(str, len-1);
 
 	Scope *scope = nullptr;
@@ -13076,17 +13157,12 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 lbValue lb_find_runtime_value(lbModule *m, String const &name) {
 	AstPackage *p = m->info->runtime_package;
 	Entity *e = scope_lookup_current(p->scope, name);
-	lbValue *found = map_get(&m->values, hash_entity(e));
-	GB_ASSERT_MSG(found != nullptr, "Unable to find runtime value '%.*s'", LIT(name));
-	lbValue value = *found;
-	return value;
+	return lb_find_value_from_entity(m, e);
 }
 lbValue lb_find_package_value(lbModule *m, String const &pkg, String const &name) {
 	Entity *e = find_entity_in_pkg(m->info, pkg, name);
 	lbValue *found = map_get(&m->values, hash_entity(e));
-	GB_ASSERT_MSG(found != nullptr, "Unable to find value '%.*s.%.*s'", LIT(pkg), LIT(name));
-	lbValue value = *found;
-	return value;
+	return lb_find_value_from_entity(m, e);
 }
 
 lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
@@ -13900,8 +13976,8 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	return p;
 }
 
-lbProcedure *lb_create_startup_runtime(lbModule *m, lbProcedure *startup_type_info, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
-	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
+lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager));
 	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -13911,12 +13987,12 @@ lbProcedure *lb_create_startup_runtime(lbModule *m, lbProcedure *startup_type_in
 
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
-	lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
 
 	lb_begin_procedure_body(p);
 
-	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
 
 	for_array(i, global_variables) {
 		auto *var = &global_variables[i];
@@ -13924,8 +14000,11 @@ lbProcedure *lb_create_startup_runtime(lbModule *m, lbProcedure *startup_type_in
 			continue;
 		}
 
+		lbModule *entity_module = main_module;
+
 		Entity *e = var->decl->entity;
 		GB_ASSERT(e->kind == Entity_Variable);
+		e->code_gen_module = entity_module;
 
 		if (var->decl->init_expr != nullptr)  {
 			// gb_printf_err("%s\n", expr_to_string(var->decl->init_expr));
@@ -13951,14 +14030,14 @@ lbProcedure *lb_create_startup_runtime(lbModule *m, lbProcedure *startup_type_in
 			if (is_type_any(t)) {
 				// NOTE(bill): Edge case for 'any' type
 				Type *var_type = default_type(var->init.type);
-				lbAddr g = lb_add_global_generated(m, var_type, var->init);
+				lbAddr g = lb_add_global_generated(main_module, var_type, var->init);
 				lb_addr_store(p, g, var->init);
 				lbValue gp = lb_addr_get_ptr(p, g);
 
 				lbValue data = lb_emit_struct_ep(p, var->var, 0);
 				lbValue ti   = lb_emit_struct_ep(p, var->var, 1);
 				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
-				lb_emit_store(p, ti,   lb_type_info(m, var_type));
+				lb_emit_store(p, ti,   lb_type_info(main_module, var_type));
 			} else {
 				LLVMTypeRef pvt = LLVMTypeOf(var->var.value);
 				LLVMTypeRef vt = LLVMGetElementType(pvt);
@@ -13975,7 +14054,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *m, lbProcedure *startup_type_in
 
 	lb_end_procedure_body(p);
 
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+	if (!main_module->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
 		LLVMDumpValue(p->value);
 		gb_printf_err("\n\n\n\n");
@@ -14085,9 +14164,8 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lb_emit_call(p, runner, args);
 	} else {
-		lbValue *found = map_get(&m->values, hash_entity(m->info->entry_point));
-		GB_ASSERT(found != nullptr);
-		lb_emit_call(p, *found, {});
+		lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
+		lb_emit_call(p, entry_point, {});
 	}
 
 	LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
@@ -14105,13 +14183,51 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	return p;
 }
 
+String lb_filepath_ll_for_module(lbModule *m) {
+	String path = m->gen->output_base;
+	if (m->pkg) {
+		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
+	}
+	path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
+
+	return path;
+}
+String lb_filepath_obj_for_module(lbModule *m) {
+	String path = m->gen->output_base;
+	if (m->pkg) {
+		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
+	}
+
+	String ext = {};
+
+	if (build_context.build_mode == BuildMode_Assembly) {
+		ext = STR_LIT(".S");
+	} else {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+			ext = STR_LIT(".obj");
+			break;
+		case TargetOs_darwin:
+		case TargetOs_linux:
+		case TargetOs_essence:
+			ext = STR_LIT(".o");
+			break;
+		case TargetOs_js:
+			ext = STR_LIT(".wasm-obj");
+			break;
+		}
+	}
+
+	return concatenate_strings(permanent_allocator(), path, ext);
+}
+
 
 void lb_generate_code(lbGenerator *gen) {
 	#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	TIME_SECTION("LLVM Initializtion");
 
-	lbModule *m = &gen->default_module;
+	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
 
 	auto *min_dep_set = &info->minimum_dependency_set;
@@ -14183,62 +14299,67 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMSetModuleDataLayout(gen->modules.entries[i].value->mod, LLVMCreateTargetDataLayout(target_machine));
 	}
 
-	if (m->debug_builder) { // Debug Info
-		for_array(i, info->files.entries) {
-			AstFile *f = info->files.entries[i].value;
-			String fullpath = f->fullpath;
-			String filename = remove_directory_from_path(fullpath);
-			String directory = directory_from_path(fullpath);
-			LLVMMetadataRef res = LLVMDIBuilderCreateFile(m->debug_builder,
-				cast(char const *)filename.text, filename.len,
-				cast(char const *)directory.text, directory.len);
-			lb_set_llvm_metadata(m, f, res);
+	for_array(i, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[i].value;
+		if (m->debug_builder) { // Debug Info
+			for_array(i, info->files.entries) {
+				AstFile *f = info->files.entries[i].value;
+				String fullpath = f->fullpath;
+				String filename = remove_directory_from_path(fullpath);
+				String directory = directory_from_path(fullpath);
+				LLVMMetadataRef res = LLVMDIBuilderCreateFile(m->debug_builder,
+					cast(char const *)filename.text, filename.len,
+					cast(char const *)directory.text, directory.len);
+				lb_set_llvm_metadata(m, f, res);
+			}
+
+			gbString producer = gb_string_make(heap_allocator(), "odin");
+			// producer = gb_string_append_fmt(producer, " version %.*s", LIT(ODIN_VERSION));
+			// #ifdef NIGHTLY
+			// producer = gb_string_appendc(producer, "-nightly");
+			// #endif
+			// #ifdef GIT_SHA
+			// producer = gb_string_append_fmt(producer, "-%s", GIT_SHA);
+			// #endif
+
+			gbString split_name = gb_string_make(heap_allocator(), "");
+
+			LLVMBool is_optimized = build_context.optimization_level > 0;
+			AstFile *init_file = m->info->init_package->files[0];
+			if (m->info->entry_point && m->info->entry_point->identifier && m->info->entry_point->identifier->file) {
+				init_file = m->info->entry_point->identifier->file;
+			}
+
+			LLVMBool split_debug_inlining = false;
+			LLVMBool debug_info_for_profiling = false;
+
+			m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
+				lb_get_llvm_metadata(m, init_file),
+				producer, gb_string_length(producer),
+				is_optimized, "", 0,
+				1, split_name, gb_string_length(split_name),
+				LLVMDWARFEmissionFull,
+				0, split_debug_inlining,
+				debug_info_for_profiling,
+				"", 0, // sys_root
+				"", 0  // SDK
+			);
+			GB_ASSERT(m->debug_compile_unit != nullptr);
 		}
-
-		gbString producer = gb_string_make(heap_allocator(), "odin");
-		// producer = gb_string_append_fmt(producer, " version %.*s", LIT(ODIN_VERSION));
-		// #ifdef NIGHTLY
-		// producer = gb_string_appendc(producer, "-nightly");
-		// #endif
-		// #ifdef GIT_SHA
-		// producer = gb_string_append_fmt(producer, "-%s", GIT_SHA);
-		// #endif
-
-		gbString split_name = gb_string_make(heap_allocator(), "");
-
-		LLVMBool is_optimized = build_context.optimization_level > 0;
-		AstFile *init_file = m->info->init_package->files[0];
-		if (m->info->entry_point && m->info->entry_point->identifier && m->info->entry_point->identifier->file) {
-			init_file = m->info->entry_point->identifier->file;
-		}
-
-		LLVMBool split_debug_inlining = false;
-		LLVMBool debug_info_for_profiling = false;
-
-		m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
-			lb_get_llvm_metadata(m, init_file),
-			producer, gb_string_length(producer),
-			is_optimized, "", 0,
-			1, split_name, gb_string_length(split_name),
-			LLVMDWARFEmissionFull,
-			0, split_debug_inlining,
-			debug_info_for_profiling,
-			"", 0, // sys_root
-			"", 0  // SDK
-		);
-		GB_ASSERT(m->debug_compile_unit != nullptr);
 	}
 
 	TIME_SECTION("LLVM Global Variables");
 
 	{
+		lbModule *m = default_module;
+
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.entries.count+1;
 			// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
 			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-			LLVMSetLinkage(g, LLVMInternalLinkage);
+			// LLVMSetLinkage(g, LLVMInternalLinkage);
 
 			lbValue value = {};
 			value.value = g;
@@ -14276,7 +14397,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_type_info_ptr, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
+					// LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
 
 				}
@@ -14285,7 +14406,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_string, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
+					// LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
 				}
 				{
@@ -14293,7 +14414,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_uintptr, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
+					// LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
 				}
 
@@ -14302,7 +14423,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_bool, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
+					// LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
 				}
 
@@ -14311,7 +14432,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_string, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					LLVMSetLinkage(g, LLVMInternalLinkage);
+					// LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
 				}
 			}
@@ -14373,8 +14494,9 @@ void lb_generate_code(lbGenerator *gen) {
 		bool is_foreign = e->Variable.is_foreign;
 		bool is_export  = e->Variable.is_export;
 
-		String name = lb_get_entity_name(m, e);
 
+		lbModule *m = &gen->default_module;
+		String name = lb_get_entity_name(m, e);
 
 		lbValue g = {};
 		g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
@@ -14409,7 +14531,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		if (e->flags & EntityFlag_Static) {
-			LLVMSetLinkage(g.value, LLVMInternalLinkage);
+			// LLVMSetLinkage(g.value, LLVMInternalLinkage);
 		}
 
 		lbGlobalVariable var = {};
@@ -14438,6 +14560,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 		lb_add_entity(m, e, g);
 		lb_add_member(m, name, g);
+
 
 		if (m->debug_builder) {
 			String global_name = e->token.string;
@@ -14509,6 +14632,10 @@ void lb_generate_code(lbGenerator *gen) {
 			continue;
 		}
 
+		lbModule *m = &gen->default_module;
+		if (USE_SEPARTE_MODULES) {
+			m = lb_pkg_module(gen, e->pkg);
+		}
 
 		String mangled_name = lb_get_entity_name(m, e);
 
@@ -14526,114 +14653,108 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	TIME_SECTION("LLVM Registry Initializtion");
-
-	LLVMPassRegistryRef pass_registry = LLVMGetGlobalPassRegistry();
-
-	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(m->mod);
-	defer (LLVMDisposePassManager(default_function_pass_manager));
-	defer (LLVMDisposePassManager(function_pass_manager_minimal));
-	defer (LLVMDisposePassManager(function_pass_manager_size));
-	defer (LLVMDisposePassManager(function_pass_manager_speed));
-
-	LLVMInitializeFunctionPassManager(default_function_pass_manager);
-	LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
-	LLVMInitializeFunctionPassManager(function_pass_manager_size);
-	LLVMInitializeFunctionPassManager(function_pass_manager_speed);
-
-	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
-	lb_populate_function_pass_manager_specific(function_pass_manager_minimal, 0);
-	lb_populate_function_pass_manager_specific(function_pass_manager_size,    1);
-	lb_populate_function_pass_manager_specific(function_pass_manager_speed,   2);
-
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-	LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
-	LLVMFinalizeFunctionPassManager(function_pass_manager_size);
-	LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
-
-
-	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
-	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
-	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
-	lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
-
 	TIME_SECTION("LLVM Runtime Type Information Creation");
-	lbProcedure *startup_type_info = lb_create_startup_type_info(m);
+	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
-	lbProcedure *startup_runtime = lb_create_startup_runtime(m, startup_type_info, global_variables);
+	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, global_variables);
 
-
-	String filepath_ll = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".ll"));
 
 	TIME_SECTION("LLVM Procedure Generation");
-	for_array(i, m->procedures_to_generate) {
-		lbProcedure *p = m->procedures_to_generate[i];
-		if (p->is_done) {
-			continue;
-		}
-		if (p->body != nullptr) { // Build Procedure
-			m->curr_procedure = p;
-			lb_begin_procedure_body(p);
-			lb_build_stmt(p, p->body);
-			lb_end_procedure_body(p);
-			p->is_done = true;
-			m->curr_procedure = nullptr;
-		}
-		lb_end_procedure(p);
-
-		// Add Flags
-		if (p->body != nullptr) {
-			if (p->name == "memcpy" || p->name == "memmove" ||
-			    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
-			    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
-			    string_starts_with(p->name, str_lit("llvm.memmove"))) {
-				p->flags |= lbProcedureFlag_WithoutMemcpyPass;
+	for_array(j, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[j].value;
+		for_array(i, m->procedures_to_generate) {
+			lbProcedure *p = m->procedures_to_generate[i];
+			if (p->is_done) {
+				continue;
 			}
-		}
-
-		if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-			LLVMDumpValue(p->value);
-			gb_printf_err("\n\n\n\n");
-			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			if (p->body != nullptr) { // Build Procedure
+				m->curr_procedure = p;
+				lb_begin_procedure_body(p);
+				lb_build_stmt(p, p->body);
+				lb_end_procedure_body(p);
+				p->is_done = true;
+				m->curr_procedure = nullptr;
 			}
-			LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-			gb_exit(1);
+			lb_end_procedure(p);
+
+			// Add Flags
+			if (p->body != nullptr) {
+				if (p->name == "memcpy" || p->name == "memmove" ||
+				    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
+				    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
+				    string_starts_with(p->name, str_lit("llvm.memmove"))) {
+					p->flags |= lbProcedureFlag_WithoutMemcpyPass;
+				}
+			}
+
+			if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+				gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
+				LLVMDumpValue(p->value);
+				gb_printf_err("\n\n\n\n");
+				String filepath_ll = lb_filepath_ll_for_module(m);
+				if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+					gb_printf_err("LLVM Error: %s\n", llvm_error);
+				}
+				LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
+				gb_exit(1);
+			}
 		}
 	}
 
 
 	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
 		TIME_SECTION("LLVM main");
-		lb_create_main_procedure(m, startup_runtime);
+		lb_create_main_procedure(default_module, startup_runtime);
 	}
 
-
-	if (m->debug_builder != nullptr) {
-		TIME_SECTION("LLVM Debug Info Complete Types");
-		lb_debug_complete_types(m);
-
-
-		TIME_SECTION("LLVM Print Module to File");
-		if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-			gb_printf_err("LLVM Error: %s\n", llvm_error);
-			gb_exit(1);
-			return;
+	if (build_context.ODIN_DEBUG) {
+		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
+		for_array(j, gen->modules.entries) {
+			lbModule *m = gen->modules.entries[j].value;
+			if (m->debug_builder != nullptr) {
+				lb_debug_complete_types(m);
+				LLVMDIBuilderFinalize(m->debug_builder);
+			}
 		}
-		TIME_SECTION("LLVM Debug Info Builder Finalize");
-		LLVMDIBuilderFinalize(m->debug_builder);
 	}
 
 
 	TIME_SECTION("LLVM Function Pass");
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
+
+		LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
+		LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(m->mod);
+		LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(m->mod);
+		LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(m->mod);
+		defer (LLVMDisposePassManager(default_function_pass_manager));
+		defer (LLVMDisposePassManager(function_pass_manager_minimal));
+		defer (LLVMDisposePassManager(function_pass_manager_size));
+		defer (LLVMDisposePassManager(function_pass_manager_speed));
+
+		LLVMInitializeFunctionPassManager(default_function_pass_manager);
+		LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
+		LLVMInitializeFunctionPassManager(function_pass_manager_size);
+		LLVMInitializeFunctionPassManager(function_pass_manager_speed);
+
+		lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
+		lb_populate_function_pass_manager_specific(function_pass_manager_minimal, 0);
+		lb_populate_function_pass_manager_specific(function_pass_manager_size,    1);
+		lb_populate_function_pass_manager_specific(function_pass_manager_speed,   2);
+
+		LLVMFinalizeFunctionPassManager(default_function_pass_manager);
+		LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
+		LLVMFinalizeFunctionPassManager(function_pass_manager_size);
+		LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
+
+
+		LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
+		defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
+		LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
+		lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
+		LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
+
 
 		for_array(i, m->procedures_to_generate) {
 			lbProcedure *p = m->procedures_to_generate[i];
@@ -14688,49 +14809,41 @@ void lb_generate_code(lbGenerator *gen) {
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
-	String filepath_obj = {};
 	LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
-
 	if (build_context.build_mode == BuildMode_Assembly) {
-		filepath_obj = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".S"));
 		code_gen_file_type = LLVMAssemblyFile;
-	} else {
-		switch (build_context.metrics.os) {
-		case TargetOs_windows:
-			filepath_obj = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".obj"));
-			break;
-		case TargetOs_darwin:
-		case TargetOs_linux:
-		case TargetOs_essence:
-			filepath_obj = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".o"));
-			break;
-		case TargetOs_js:
-			filepath_obj = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".wasm-obj"));
-			break;
-		}
 	}
 
-	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
-		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
-		if (build_context.keep_temp_files) {
-			TIME_SECTION("LLVM Print Module to File");
-			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				gb_exit(1);
-				return;
+	for_array(j, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[j].value;
+		if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
+			gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+			if (build_context.keep_temp_files) {
+				TIME_SECTION("LLVM Print Module to File");
+				String filepath_ll = lb_filepath_ll_for_module(m);
+				if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+					gb_printf_err("LLVM Error: %s\n", llvm_error);
+					gb_exit(1);
+					return;
+				}
 			}
+			gb_exit(1);
+			return;
 		}
-		gb_exit(1);
-		return;
 	}
 	llvm_error = nullptr;
 	if (build_context.keep_temp_files ||
 	    build_context.build_mode == BuildMode_LLVM_IR) {
 		TIME_SECTION("LLVM Print Module to File");
-		if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-			gb_printf_err("LLVM Error: %s\n", llvm_error);
-			gb_exit(1);
-			return;
+
+		for_array(j, gen->modules.entries) {
+			lbModule *m = gen->modules.entries[j].value;
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+				gb_exit(1);
+				return;
+			}
 		}
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
 			gb_exit(0);
@@ -14740,18 +14853,25 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Object Generation");
 
-	if (LLVMTargetMachineEmitToFile(target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
-		gb_printf_err("LLVM Error: %s\n", llvm_error);
-		gb_exit(1);
-		return;
+	for_array(j, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[j].value;
+		String filepath_obj = lb_filepath_obj_for_module(m);
+
+		if (LLVMTargetMachineEmitToFile(target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
+			gb_printf_err("LLVM Error: %s\n", llvm_error);
+			gb_exit(1);
+			return;
+		}
+
+		array_add(&gen->output_object_paths, filepath_obj);
+		for_array(i, m->info->required_foreign_imports_through_force) {
+			Entity *e = m->info->required_foreign_imports_through_force[i];
+			lb_add_foreign_library_path(m, e);
+		}
 	}
 
-	array_add(&gen->output_object_paths, filepath_obj);
 
-	for_array(i, m->info->required_foreign_imports_through_force) {
-		Entity *e = m->info->required_foreign_imports_through_force[i];
-		lb_add_foreign_library_path(m, e);
-	}
+
 
 #undef TIME_SECTION
 }
