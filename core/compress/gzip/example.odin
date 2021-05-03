@@ -35,7 +35,7 @@ main :: proc() {
 	if len(args) < 2 {
 		stderr("No input file specified.\n");
 		err := gzip.load(TEST, &buf);
-		if gzip.is_kind(err, gzip.E_General.OK) {
+		if err != E_General.OK {
 			stdout("Displaying test vector: ");
 			stdout(bytes.buffer_to_string(&buf));
 			stdout("\n");
@@ -54,8 +54,8 @@ main :: proc() {
 		} else {
 			err = gzip.load(file, &buf);
 		}
-		if !gzip.is_kind(err, gzip.E_General.OK) {
-			if gzip.is_kind(err, gzip.E_General.File_Not_Found) {
+		if err != gzip.E_General.OK {
+			if err != E_General.File_Not_Found {
 				stderr("File not found: ");
 				stderr(file);
 				stderr("\n");

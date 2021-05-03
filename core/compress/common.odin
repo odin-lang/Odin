@@ -3,12 +3,6 @@ package compress
 import "core:io"
 import "core:image"
 
-// Error helper, e.g. is_kind(err, General_Error.OK);
-is_kind :: proc(u: $U, x: $V) -> bool {
-    v, ok := u.(V);
-    return ok && v == x;
-}
-
 Error :: union {
 	General_Error,
 	Deflate_Error,
