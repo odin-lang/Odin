@@ -2402,6 +2402,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 
 
+		skip_possible_newline_for_literal(f);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 
 		while (f->curr_token.kind != Token_CloseBrace &&
@@ -2426,6 +2427,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		if (f->curr_token.kind != Token_OpenBrace) {
 			base_type = parse_type(f);
 		}
+
+		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 
 		Array<Ast *> values = parse_element_list(f);
@@ -2517,6 +2520,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 		}
 
+		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 		Ast *asm_string = parse_expr(f, false);
 		expect_token(f, Token_Comma);
@@ -2987,7 +2991,7 @@ Ast *parse_foreign_block(AstFile *f, Token token) {
 	defer (f->in_foreign_block = prev_in_foreign_block);
 	f->in_foreign_block = true;
 
-
+	skip_possible_newline_for_literal(f);
 	open = expect_token(f, Token_OpenBrace);
 
 	while (f->curr_token.kind != Token_CloseBrace &&
