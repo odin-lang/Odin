@@ -5458,6 +5458,7 @@ lbValue lb_emit_min(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
+		case 16: return lb_emit_runtime_call(p, "min_f16", args);
 		case 32: return lb_emit_runtime_call(p, "min_f32", args);
 		case 64: return lb_emit_runtime_call(p, "min_f64", args);
 		}
@@ -5475,6 +5476,7 @@ lbValue lb_emit_max(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
+		case 16: return lb_emit_runtime_call(p, "max_f16", args);
 		case 32: return lb_emit_runtime_call(p, "max_f32", args);
 		case 64: return lb_emit_runtime_call(p, "max_f64", args);
 		}
