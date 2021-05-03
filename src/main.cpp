@@ -338,8 +338,8 @@ i32 linker_stage(lbGenerator *gen) {
 		gbString lib_str = gb_string_make(heap_allocator(), "-L/");
 		defer (gb_string_free(lib_str));
 
-		for_array(i, gen->module.foreign_library_paths) {
-			String lib = gen->module.foreign_library_paths[i];
+		for_array(i, gen->default_module.foreign_library_paths) {
+			String lib = gen->default_module.foreign_library_paths[i];
 
 			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 			//   This allows you to specify '-f' in a #foreign_system_library,
@@ -603,6 +603,8 @@ enum BuildFlagKind {
 	BuildFlag_ExtraLinkerFlags,
 	BuildFlag_Microarch,
 
+	BuildFlag_TestName,
+
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_InsertSemicolon,
@@ -720,6 +722,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None, Command__does_check);
@@ -1219,6 +1223,21 @@ bool parse_build_flags(Array<String> args) {
 							string_to_lower(&build_context.microarch);
 							break;
 
+						case BuildFlag_TestName:
+							GB_ASSERT(value.kind == ExactValue_String);
+							{
+								String name = value.value_string;
+								if (!string_is_valid_identifier(name)) {
+									gb_printf_err("Test name '%.*s' must be a valid identifier\n", LIT(name));
+									bad_flags = true;
+									break;
+								}
+								string_set_add(&build_context.test_names, name);
+
+								// NOTE(bill): Allow for multiple -test-name
+								continue;
+							}
+
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
@@ -1580,6 +1599,7 @@ void print_show_help(String const arg0, String const &command) {
 	bool doc = command == "doc";
 	bool build = command == "build";
 	bool run_or_build = command == "run" || command == "build" || command == "test";
+	bool test_only = command == "test";
 	bool check_only = command == "check";
 	bool check = run_or_build || command == "check";
 
@@ -1732,6 +1752,12 @@ void print_show_help(String const arg0, String const &command) {
 			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure)");
 			print_usage_line(0, "");
 		}
+	}
+
+	if (test_only) {
+		print_usage_line(1, "-test-name:<string>");
+		print_usage_line(2, "Run specific test only by name");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
@@ -1925,7 +1951,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	map_init(&build_context.defined_values, heap_allocator());
 	build_context.extra_packages.allocator = heap_allocator();
-
+	string_set_init(&build_context.test_names, heap_allocator());
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 

@@ -4502,6 +4502,38 @@ void check_unchecked_bodies(Checker *c) {
 	}
 }
 
+void check_test_names(Checker *c) {
+	if (build_context.test_names.entries.count == 0) {
+		return;
+	}
+
+	AstPackage *pkg = c->info.init_package;
+	Scope *s = pkg->scope;
+
+	for_array(i, build_context.test_names.entries) {
+		String name = build_context.test_names.entries[i].value;
+		Entity *e = scope_lookup(s, name);
+		if (e == nullptr) {
+			Token tok = {};
+			if (pkg->files.count != 0) {
+				tok = pkg->files[0]->tokens[0];
+			}
+			error(tok, "Unable to find the test '%.*s' in 'package %.*s' ", LIT(name), LIT(pkg->name));
+		}
+	}
+
+	for (isize i = 0; i < c->info.testing_procedures.count; /**/) {
+		Entity *e = c->info.testing_procedures[i];
+		String name = e->token.string;
+		if (!string_set_exists(&build_context.test_names, name)) {
+			array_ordered_remove(&c->info.testing_procedures, i);
+		} else {
+			i += 1;
+		}
+	}
+
+}
+
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
@@ -4575,6 +4607,9 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check test names");
+	check_test_names(c);
 
 	TIME_SECTION("calculate global init order");
 	// Calculate initialization order of global variables
