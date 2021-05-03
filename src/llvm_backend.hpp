@@ -135,6 +135,8 @@ struct lbGenerator {
 	Map<lbModule *> modules_through_ctx; // Key: LLVMContextRef *
 	lbModule default_module;
 
+	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
+
 	gbAtomic32 global_array_index;
 	gbAtomic32 global_generated_index;
 };
