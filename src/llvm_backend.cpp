@@ -10660,7 +10660,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 	}
 
 
-	if ((is_type_struct(a) || is_type_union(b)) && is_type_comparable(a)) {
+	if ((is_type_struct(a) || is_type_union(a)) && is_type_comparable(a)) {
 		lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 		lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
 		lbValue res = {};
