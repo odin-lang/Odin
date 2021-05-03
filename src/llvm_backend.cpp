@@ -385,18 +385,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		GB_ASSERT(is_type_polymorphic(e->type));
 
 		{
-			lbValue *found = nullptr;
-			if (p->module != e->code_gen_module) {
-				gb_mutex_lock(&p->module->mutex);
-			}
-			GB_ASSERT(e->code_gen_module != nullptr);
-			found = map_get(&e->code_gen_module->values, hash_entity(e));
-			if (p->module != e->code_gen_module) {
-				gb_mutex_unlock(&p->module->mutex);
-			}
-			GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(e->token.string));
-
-			lb_emit_call(p, *found, args);
+			lb_emit_call(p, lb_find_procedure_value_from_entity(p->module, e), args);
 		}
 
 		return;
@@ -8194,6 +8183,8 @@ Array<lbValue> lb_value_to_array(lbProcedure *p, lbValue value) {
 
 
 lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr, Array<lbValue> const &processed_args, Type *abi_rt, lbAddr context_ptr, ProcInlining inlining) {
+	GB_ASSERT(p->module->ctx == LLVMGetTypeContext(LLVMTypeOf(value.value)));
+
 	unsigned arg_count = cast(unsigned)processed_args.count;
 	if (return_ptr.value != nullptr) {
 		arg_count += 1;
@@ -8418,9 +8409,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		if (e != nullptr && entity_has_deferred_procedure(e)) {
 			DeferredProcedureKind kind = e->Procedure.deferred_procedure.kind;
 			Entity *deferred_entity = e->Procedure.deferred_procedure.entity;
-			lbValue *deferred_found = map_get(&p->module->values, hash_entity(deferred_entity));
-			GB_ASSERT(deferred_found != nullptr);
-			lbValue deferred = *deferred_found;
+			lbValue deferred = lb_find_procedure_value_from_entity(p->module, deferred_entity);
 
 
 			auto in_args = args;
@@ -14147,8 +14136,6 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		for_array(i, m->info->testing_procedures) {
 			Entity *testing_proc = m->info->testing_procedures[i];
 			String name = testing_proc->token.string;
-			lbValue *found = map_get(&m->values, hash_entity(testing_proc));
-			GB_ASSERT(found != nullptr);
 
 			String pkg_name = {};
 			if (testing_proc->pkg != nullptr) {
@@ -14156,7 +14143,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 			}
 			lbValue v_pkg  = lb_find_or_add_entity_string(m, pkg_name);
 			lbValue v_name = lb_find_or_add_entity_string(m, name);
-			lbValue v_proc = *found;
+			lbValue v_proc = lb_find_procedure_value_from_entity(m, testing_proc);
 
 			indices[1] = LLVMConstInt(lb_type(m, t_int), i, false);
 
