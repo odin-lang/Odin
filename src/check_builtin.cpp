@@ -1509,6 +1509,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(x.type);
+				if (are_types_identical(bt, t_f16)) {
+					add_package_dependency(c, "runtime", "min_f16");
+					add_package_dependency(c, "runtime", "max_f16");
+				}
 				if (are_types_identical(bt, t_f32)) {
 					add_package_dependency(c, "runtime", "min_f32");
 					add_package_dependency(c, "runtime", "max_f32");
