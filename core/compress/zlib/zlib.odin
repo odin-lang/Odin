@@ -135,7 +135,7 @@ write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_boun
 allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_Table, err: Error) {
 
 	z = new(Huffman_Table, allocator);
-	return z, E_General.OK;
+	return z, nil;
 }
 
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
@@ -193,13 +193,13 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 			next_code[v] += 1;
 		}
 	}
-	return E_General.OK;
+	return nil;
 }
 
 decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 
 	r   = 0;
-	err = E_General.OK;
+	err = nil;
 
 	k: int;
 	s: u8;
@@ -229,7 +229,7 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 	compress.consume_bits_lsb(z, s);
 
 	r = t.value[b];
-	return r, E_General.OK;
+	return r, nil;
 }
 
 decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
@@ -247,7 +247,7 @@ decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #
 	if b != 0 {
 		s := u8(b >> ZFAST_BITS);
 		compress.consume_bits_lsb(z, s);
-		return b & 511, E_General.OK;
+		return b & 511, nil;
 	}
 	return decode_huffman_slowpath(z, t);
 }
@@ -255,7 +255,7 @@ decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #
 parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
 	#no_bounds_check for {
 		value, e := decode_huffman(z, z_repeat);
-		if e != E_General.OK {
+		if e != nil {
 			return err;
 		}
 		if value < 256 {
@@ -266,7 +266,7 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 		} else {
 			if value == 256 {
       				// End of block
-      				return E_General.OK;
+      				return nil;
 			}
 
 			value -= 257;
@@ -276,7 +276,7 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 			}
 
 			value, e = decode_huffman(z, z_offset);
-			if e != E_General.OK {
+			if e != nil {
 				return E_Deflate.Bad_Huffman_Code;
 			}
 
@@ -389,7 +389,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 
  	// Parse ZLIB stream without header.
 	err = inflate_raw(ctx);
-	if err != E_General.OK {
+	if err != nil {
 		return err;
 	}
 
@@ -401,7 +401,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 			return E_General.Checksum_Failed;
 		}
 	}
-	return E_General.OK;
+	return nil;
 }
 
 // @(optimization_mode="speed")
@@ -417,15 +417,15 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 	codelength_ht: ^Huffman_Table;
 
 	z_repeat, err = allocate_huffman_table(allocator=context.allocator);
-	if err != E_General.OK {
+	if err != nil {
 		return err;
 	}
 	z_offset, err = allocate_huffman_table(allocator=context.allocator);
-	if err != E_General.OK {
+	if err != nil {
 		return err;
 	}
 	codelength_ht, err = allocate_huffman_table(allocator=context.allocator);
-	if err != E_General.OK {
+	if err != nil {
 		return err;
 	}
 	defer free(z_repeat);
@@ -481,11 +481,11 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 			if type == 1 {
 				// Use fixed code lengths.
 				err = build_huffman(z_repeat, Z_FIXED_LENGTH[:]);
-				if err != E_General.OK {
+				if err != nil {
 					return err;
 				}
 				err = build_huffman(z_offset, Z_FIXED_DIST[:]);
-				if err != E_General.OK {
+				if err != nil {
 					return err;
 				}
 			} else {
@@ -506,7 +506,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 					codelength_sizes[Z_LENGTH_DEZIGZAG[i]] = u8(s);
 				}
 				err = build_huffman(codelength_ht, codelength_sizes[:]);
-				if err != E_General.OK {
+				if err != nil {
 					return err;
 				}
 
@@ -515,7 +515,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 
 				for n < ntot {
 					c, err = decode_huffman(z, codelength_ht);
-					if err != E_General.OK {
+					if err != nil {
 						return err;
 					}
 
@@ -559,18 +559,18 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 				}
 
 				err = build_huffman(z_repeat, lencodes[:hlit]);
-				if err != E_General.OK {
+				if err != nil {
 					return err;
 				}
 
 				err = build_huffman(z_offset, lencodes[hlit:ntot]);
-				if err != E_General.OK {
+				if err != nil {
 					return err;
 				}
 			}
 			err = parse_huffman_block(z, z_repeat, z_offset);
 			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
-			if err != E_General.OK {
+			if err != nil {
 				return err;
 			}
 		}
@@ -578,7 +578,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 			break;
 		}
 	}
-	return E_General.OK;
+	return nil;
 }
 
 inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
