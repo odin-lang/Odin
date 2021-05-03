@@ -128,6 +128,7 @@ struct lbGenerator {
 	CheckerInfo *info;
 
 	Array<String> output_object_paths;
+	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
 	Map<lbModule *> modules; // Key: AstPackage *

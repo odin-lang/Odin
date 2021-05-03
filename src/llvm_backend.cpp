@@ -2721,6 +2721,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	if (ignore_body) {
 		p->body = nullptr;
+		LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	}
 
 
@@ -5762,7 +5763,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			lbValue g = {};
 			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
 			g.type = alloc_type_pointer(e->type);
-			LLVMSetExternallyInitialized(g.value, true);
+			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
 			lb_add_entity(m, e, g);
 			lb_add_member(m, name, g);
@@ -11179,15 +11180,19 @@ lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	}
 
+	if (e->kind == Entity_Procedure) {
+		return lb_find_procedure_value_from_entity(m, e);
+	}
 	if (USE_SEPARTE_MODULES) {
 		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
 		if (other_module != m) {
+
 			String name = lb_get_entity_name(other_module, e);
 
 			lbValue g = {};
 			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
 			g.type = alloc_type_pointer(e->type);
-			LLVMSetExternallyInitialized(g.value, true);
+			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
 			lb_add_entity(m, e, g);
 			lb_add_member(m, name, g);
@@ -12995,12 +13000,14 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
-	gbString module_name = nullptr;
+	gbString module_name = gb_string_make(heap_allocator(), "odin_package-");
 	if (m->pkg) {
-		module_name = gb_string_make(heap_allocator(), "odin_package-");
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
+	} else if (USE_SEPARTE_MODULES) {
+		module_name = gb_string_appendc(module_name, "builtin");
+	} else {
+		module_name = "odin_package";
 	}
-
 
 	m->ctx = LLVMContextCreate();
 	m->mod = LLVMModuleCreateWithNameInContext(module_name ? module_name : "odin_package", m->ctx);
@@ -13089,6 +13096,7 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	}
 	gbAllocator ha = heap_allocator();
 	array_init(&gen->output_object_paths, ha);
+	array_init(&gen->output_temp_paths, ha);
 
 	gen->output_base = path_to_full_path(ha, gen->output_base);
 
@@ -14110,7 +14118,19 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		lb_fill_slice(p, args, argv, argc);
 	}
 
+	{
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		args[0] = lb_const_string(p->module, str_lit("Here0\n"));
+		lb_emit_runtime_call(p, "print_string", args);
+	}
+
 	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
+
+	{
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		args[0] = lb_const_string(p->module, str_lit("Here1\n"));
+		lb_emit_runtime_call(p, "print_string", args);
+	}
 
 	if (build_context.command_kind == Command_test) {
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
@@ -14189,6 +14209,8 @@ String lb_filepath_ll_for_module(lbModule *m) {
 	String path = m->gen->output_base;
 	if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
+	} else if (USE_SEPARTE_MODULES) {
+		path = concatenate_strings(permanent_allocator(), path, STR_LIT("-builtin"));
 	}
 	path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
 
@@ -14522,6 +14544,7 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMSetThreadLocalMode(g.value, mode);
 		}
 		if (is_foreign) {
+			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
 		} else {
@@ -14840,12 +14863,20 @@ void lb_generate_code(lbGenerator *gen) {
 
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
+
+			if (LLVMGetFirstFunction(m->mod) == nullptr &&
+			    LLVMGetFirstGlobal(m->mod) == nullptr) {
+				continue;
+			}
+
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 				gb_exit(1);
 				return;
 			}
+			array_add(&gen->output_temp_paths, filepath_ll);
+
 		}
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
 			gb_exit(0);
@@ -14857,6 +14888,16 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
+		for_array(i, m->info->required_foreign_imports_through_force) {
+			Entity *e = m->info->required_foreign_imports_through_force[i];
+			lb_add_foreign_library_path(m, e);
+		}
+
+		if (LLVMGetFirstFunction(m->mod) == nullptr &&
+		    LLVMGetFirstGlobal(m->mod) == nullptr) {
+			continue;
+		}
+
 		String filepath_obj = lb_filepath_obj_for_module(m);
 
 		if (LLVMTargetMachineEmitToFile(target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
@@ -14866,10 +14907,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		array_add(&gen->output_object_paths, filepath_obj);
-		for_array(i, m->info->required_foreign_imports_through_force) {
-			Entity *e = m->info->required_foreign_imports_through_force[i];
-			lb_add_foreign_library_path(m, e);
-		}
+
 	}
 
 
