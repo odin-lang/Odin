@@ -100,7 +100,6 @@ In addition, the following platform-specific steps are necessary:
 
 - Windows
     * Have Visual Studio installed (MSVC 2010 or later, for the linker)
-    * Have a copy of `opt.exe` and `llc.exe` in `Odin/bin`. Pre-built Windows binaries can be found [here](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) and *must* be explicitly copied
     * Open a valid command prompt:
         * **Basic:** run the `x64 Native Tools Command Prompt for VS2017` shortcut bundled with VS 2017, or
         * **Advanced:** run `vcvarsall.bat x64` from a blank `cmd` session
@@ -128,7 +127,6 @@ Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#g
 - Windows
 	* x86-64/amd64
 	* MSVC 2010 installed (C++11 support)
-	* [LLVM binaries](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) for `opt.exe`, `llc.exe`, and `lld-link.exe`
 	* Requires MSVC's link.exe as the linker
 		* run `vcvarsall.bat` to setup the path
 
