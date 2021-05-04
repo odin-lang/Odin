@@ -2158,6 +2158,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return type;
 		}
 
+		skip_possible_newline_for_literal(f);
+
 		if (allow_token(f, Token_Undef)) {
 			if (where_token.kind != Token_Invalid) {
 				syntax_error(where_token, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---)");
