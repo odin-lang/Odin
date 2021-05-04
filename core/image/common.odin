@@ -150,13 +150,13 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 
 	idx := int(channel);
 
-	if idx > img.channels {
-		return {}, false;
-	}
-
 	if img.channels == 2 && idx == 4 {
 		// Alpha requested, which in a two channel image is index 2: G.
 		idx = 2;
+	}
+
+	if idx > img.channels {
+		return {}, false;
 	}
 
 	switch(img.depth) {
