@@ -343,7 +343,6 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		i32          builtin_id; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
-	AST_KIND(TernaryExpr,     "ternary expression",       struct { Ast *cond, *x, *y; }) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; Type *type_hint; }) \

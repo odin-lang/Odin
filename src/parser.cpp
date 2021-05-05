@@ -39,7 +39,6 @@ Token ast_token(Ast *node) {
 	case Ast_Ellipsis:           return node->Ellipsis.token;
 	case Ast_FieldValue:         return node->FieldValue.eq;
 	case Ast_DerefExpr:          return node->DerefExpr.op;
-	case Ast_TernaryExpr:        return ast_token(node->TernaryExpr.cond);
 	case Ast_TernaryIfExpr:      return ast_token(node->TernaryIfExpr.x);
 	case Ast_TernaryWhenExpr:    return ast_token(node->TernaryWhenExpr.x);
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
@@ -241,11 +240,6 @@ Ast *clone_ast(Ast *node) {
 		n->FieldValue.value = clone_ast(n->FieldValue.value);
 		break;
 
-	case Ast_TernaryExpr:
-		n->TernaryExpr.cond = clone_ast(n->TernaryExpr.cond);
-		n->TernaryExpr.x    = clone_ast(n->TernaryExpr.x);
-		n->TernaryExpr.y    = clone_ast(n->TernaryExpr.y);
-		break;
 	case Ast_TernaryIfExpr:
 		n->TernaryIfExpr.x    = clone_ast(n->TernaryIfExpr.x);
 		n->TernaryIfExpr.cond = clone_ast(n->TernaryIfExpr.cond);
@@ -698,13 +692,6 @@ Ast *ast_compound_lit(AstFile *f, Ast *type, Array<Ast *> const &elems, Token op
 }
 
 
-Ast *ast_ternary_expr(AstFile *f, Ast *cond, Ast *x, Ast *y) {
-	Ast *result = alloc_ast_node(f, Ast_TernaryExpr);
-	result->TernaryExpr.cond = cond;
-	result->TernaryExpr.x = x;
-	result->TernaryExpr.y = y;
-	return result;
-}
 Ast *ast_ternary_if_expr(AstFile *f, Ast *x, Ast *cond, Ast *y) {
 	Ast *result = alloc_ast_node(f, Ast_TernaryIfExpr);
 	result->TernaryIfExpr.x = x;
@@ -2871,7 +2858,7 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				Ast *x = parse_expr(f, lhs);
 				Token token_c = expect_token(f, Token_Colon);
 				Ast *y = parse_expr(f, lhs);
-				expr = ast_ternary_expr(f, cond, x, y);
+				expr = ast_ternary_if_expr(f, x, cond, y);
 			} else if (op.kind == Token_if) {
 				Ast *x = expr;
 				// Token_if
