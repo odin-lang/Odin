@@ -518,6 +518,38 @@ void lb_const_store(lbValue ptr, lbValue value) {
 }
 
 
+bool lb_is_type_proc_recursive(Type *t) {
+	for (;;) {
+		if (t == nullptr) {
+			return false;
+		}
+		switch (t->kind) {
+		case Type_Named:
+			t = t->Named.base;
+			break;
+		case Type_Pointer:
+			t = t->Pointer.elem;
+			break;
+		case Type_Array:
+			t = t->Array.elem;
+			break;
+		case Type_EnumeratedArray:
+			t = t->EnumeratedArray.elem;
+			break;
+		case Type_Slice:
+			t = t->Slice.elem;
+			break;
+		case Type_DynamicArray:
+			t = t->DynamicArray.elem;
+			break;
+		case Type_Proc:
+			return true;
+		default:
+			return false;
+		}
+	}
+}
+
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	Type *a = type_deref(ptr.type);
@@ -530,7 +562,7 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
 	}
 
-	if (is_type_proc(a)) {
+	if (lb_is_type_proc_recursive(a)) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
