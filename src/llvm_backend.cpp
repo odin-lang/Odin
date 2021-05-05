@@ -5773,6 +5773,25 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			g.type = alloc_type_pointer(e->type);
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
+			if (e->Variable.thread_local_model != "") {
+				LLVMSetThreadLocal(g.value, true);
+
+				String m = e->Variable.thread_local_model;
+				LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
+				if (m == "default") {
+					mode = LLVMGeneralDynamicTLSModel;
+				} else if (m == "localdynamic") {
+					mode = LLVMLocalDynamicTLSModel;
+				} else if (m == "initialexec") {
+					mode = LLVMInitialExecTLSModel;
+				} else if (m == "localexec") {
+					mode = LLVMLocalExecTLSModel;
+				} else {
+					GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
+				}
+				LLVMSetThreadLocalMode(g.value, mode);
+			}
+
 			lb_add_entity(m, e, g);
 			lb_add_member(m, name, g);
 			return g;
