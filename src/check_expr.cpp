@@ -2860,6 +2860,36 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		}
 	case_end;
 
+	case_ast_node(te, TernaryExpr, e);
+		if (old.value.kind != ExactValue_Invalid) {
+			// See above note in UnaryExpr case
+			break;
+		}
+
+		update_expr_type(c, te->x, type, final);
+		update_expr_type(c, te->y, type, final);
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, e);
+		if (old.value.kind != ExactValue_Invalid) {
+			// See above note in UnaryExpr case
+			break;
+		}
+
+		update_expr_type(c, te->x, type, final);
+		update_expr_type(c, te->y, type, final);
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, e);
+		if (old.value.kind != ExactValue_Invalid) {
+			// See above note in UnaryExpr case
+			break;
+		}
+
+		update_expr_type(c, te->x, type, final);
+		update_expr_type(c, te->y, type, final);
+	case_end;
+
 	case_ast_node(pe, ParenExpr, e);
 		update_expr_type(c, pe->expr, type, final);
 	case_end;
@@ -4204,7 +4234,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						if (show_error) {
 							check_assignment(c, &o, t, str_lit("argument"));
 						}
-						err = CallArgumentError_WrongTypes;
+						// TODO(bill, 2021-05-05): Is this incorrect logic to only fail if there is ambiguity for definite?
+						if (o.mode == Addressing_Invalid) {
+							err = CallArgumentError_WrongTypes;
+						}
 					}
 				}
 				score += s;
