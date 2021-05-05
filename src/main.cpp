@@ -2176,6 +2176,9 @@ int main(int arg_count, char const **arg_ptr) {
 	case BuildMode_DynamicLibrary:
 		i32 result = linker_stage(&gen);
 		if (result != 0) {
+			if (build_context.show_timings) {
+				show_timings(&checker, timings);
+			}
 			return 1;
 		}
 		break;
