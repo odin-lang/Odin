@@ -2860,16 +2860,6 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		}
 	case_end;
 
-	case_ast_node(te, TernaryExpr, e);
-		if (old.value.kind != ExactValue_Invalid) {
-			// See above note in UnaryExpr case
-			break;
-		}
-
-		update_expr_type(c, te->x, type, final);
-		update_expr_type(c, te->y, type, final);
-	case_end;
-
 	case_ast_node(te, TernaryIfExpr, e);
 		if (old.value.kind != ExactValue_Invalid) {
 			// See above note in UnaryExpr case
@@ -6104,88 +6094,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		o->type = type;
 	case_end;
 
-	case_ast_node(te, TernaryExpr, node);
-		Operand cond = {Addressing_Invalid};
-		check_expr(c, &cond, te->cond);
-		node->viral_state_flags |= te->cond->viral_state_flags;
-
-		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
-			error(te->cond, "Non-boolean condition in if expression");
-		}
-
-		Operand x = {Addressing_Invalid};
-		Operand y = {Addressing_Invalid};
-		check_expr_or_type(c, &x, te->x, type_hint);
-		node->viral_state_flags |= te->x->viral_state_flags;
-
-		if (te->y != nullptr) {
-			check_expr_or_type(c, &y, te->y, type_hint);
-			node->viral_state_flags |= te->y->viral_state_flags;
-		} else {
-			error(node, "A ternary expression must have an else clause");
-			return kind;
-		}
-
-		if (x.type == nullptr || x.type == t_invalid ||
-		    y.type == nullptr || y.type == t_invalid) {
-			return kind;
-		}
-
-		if (x.mode == Addressing_Type && y.mode == Addressing_Type &&
-		    cond.mode == Addressing_Constant && is_type_boolean(cond.type)) {
-			o->mode = Addressing_Type;
-			if (cond.value.value_bool) {
-				o->type = x.type;
-				o->expr = x.expr;
-			} else {
-				o->type = y.type;
-				o->expr = y.expr;
-			}
-			return Expr_Expr;
-		}
-
-		convert_to_typed(c, &x, y.type);
-		if (x.mode == Addressing_Invalid) {
-			return kind;
-		}
-		convert_to_typed(c, &y, x.type);
-		if (y.mode == Addressing_Invalid) {
-			x.mode = Addressing_Invalid;
-			return kind;
-		}
-
-		if (!ternary_compare_types(x.type, y.type)) {
-			gbString its = type_to_string(x.type);
-			gbString ets = type_to_string(y.type);
-			error(node, "Mismatched types in ternary expression, %s vs %s", its, ets);
-			gb_string_free(ets);
-			gb_string_free(its);
-			return kind;
-		}
-
-		Type *type = x.type;
-		if (is_type_untyped_nil(type) || is_type_untyped_undef(type)) {
-			type = y.type;
-		}
-
-		o->type = type;
-		o->mode = Addressing_Value;
-
-		if (cond.mode == Addressing_Constant && is_type_boolean(cond.type) &&
-		    x.mode == Addressing_Constant &&
-		    y.mode == Addressing_Constant) {
-
-			o->mode = Addressing_Constant;
-
-			if (cond.value.value_bool) {
-				o->value = x.value;
-			} else {
-				o->value = y.value;
-			}
-		}
-
-	case_end;
-
 	case_ast_node(te, TernaryIfExpr, node);
 		Operand cond = {Addressing_Invalid};
 		check_expr(c, &cond, te->cond);
@@ -8265,20 +8173,22 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, be->right, shorthand);
 	case_end;
 
-	case_ast_node(te, TernaryExpr, node);
-		str = write_expr_to_string(str, te->cond, shorthand);
-		str = gb_string_appendc(str, " ? ");
-		str = write_expr_to_string(str, te->x, shorthand);
-		str = gb_string_appendc(str, " : ");
-		str = write_expr_to_string(str, te->y, shorthand);
-	case_end;
-
 	case_ast_node(te, TernaryIfExpr, node);
-		str = write_expr_to_string(str, te->x, shorthand);
-		str = gb_string_appendc(str, " if ");
-		str = write_expr_to_string(str, te->cond, shorthand);
-		str = gb_string_appendc(str, " else ");
-		str = write_expr_to_string(str, te->y, shorthand);
+		TokenPos x = ast_token(te->x).pos;
+		TokenPos cond = ast_token(te->cond).pos;
+		if (x < cond) {
+			str = write_expr_to_string(str, te->x, shorthand);
+			str = gb_string_appendc(str, " if ");
+			str = write_expr_to_string(str, te->cond, shorthand);
+			str = gb_string_appendc(str, " else ");
+			str = write_expr_to_string(str, te->y, shorthand);
+		} else {
+			str = write_expr_to_string(str, te->cond, shorthand);
+			str = gb_string_appendc(str, " ? ");
+			str = write_expr_to_string(str, te->x, shorthand);
+			str = gb_string_appendc(str, " : ");
+			str = write_expr_to_string(str, te->y, shorthand);
+		}
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);

@@ -11351,47 +11351,6 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		return lb_build_expr(p, se->call);
 	case_end;
 
-	case_ast_node(te, TernaryExpr, expr);
-		LLVMValueRef incoming_values[2] = {};
-		LLVMBasicBlockRef incoming_blocks[2] = {};
-
-		GB_ASSERT(te->y != nullptr);
-		lbBlock *then  = lb_create_block(p, "if.then");
-		lbBlock *done  = lb_create_block(p, "if.done"); // NOTE(bill): Append later
-		lbBlock *else_ = lb_create_block(p, "if.else");
-
-		lbValue cond = lb_build_cond(p, te->cond, then, else_);
-		lb_start_block(p, then);
-
-		Type *type = default_type(type_of_expr(expr));
-
-		lb_open_scope(p, nullptr);
-		incoming_values[0] = lb_emit_conv(p, lb_build_expr(p, te->x), type).value;
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
-
-		lb_emit_jump(p, done);
-		lb_start_block(p, else_);
-
-		lb_open_scope(p, nullptr);
-		incoming_values[1] = lb_emit_conv(p, lb_build_expr(p, te->y), type).value;
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
-
-		lb_emit_jump(p, done);
-		lb_start_block(p, done);
-
-		lbValue res = {};
-		res.value = LLVMBuildPhi(p->builder, lb_type(p->module, type), "");
-		res.type = type;
-
-		GB_ASSERT(p->curr_block->preds.count >= 2);
-		incoming_blocks[0] = p->curr_block->preds[0]->block;
-		incoming_blocks[1] = p->curr_block->preds[1]->block;
-
-		LLVMAddIncoming(res.value, incoming_values, incoming_blocks, 2);
-
-		return res;
-	case_end;
-
 	case_ast_node(te, TernaryIfExpr, expr);
 		LLVMValueRef incoming_values[2] = {};
 		LLVMBasicBlockRef incoming_blocks[2] = {};
