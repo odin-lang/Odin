@@ -5745,6 +5745,9 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
+
+	GB_ASSERT(e->token.string != "_");
+
 	if (e->kind == Entity_Procedure) {
 		return lb_find_procedure_value_from_entity(m, e);
 	}
@@ -14101,7 +14104,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 
 	array_init(&results->Tuple.variables, permanent_allocator(), 1);
-	results->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("_"),   t_i32, false, true);
+	results->Tuple.variables[0] = alloc_entity_param(nullptr, blank_token, t_i32, false, true);
 
 	Type *proc_type = alloc_type_proc(nullptr,
 		params, params->Tuple.variables.count,
@@ -14523,7 +14526,7 @@ void lb_generate_code(lbGenerator *gen) {
 			value.value = g;
 			value.type = alloc_type_pointer(t);
 
-			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, blank_token, t, EntityState_Resolved);
+			lb_global_type_info_data_entity = alloc_entity_variable(nullptr, make_token_ident(LB_TYPE_INFO_DATA_NAME), t, EntityState_Resolved);
 			lb_add_entity(m, lb_global_type_info_data_entity, value);
 		}
 		{ // Type info member buffer
