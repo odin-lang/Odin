@@ -3530,9 +3530,6 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
-		if (e->token.string == "v123") {
-			gb_printf_err("%.*s\n", LIT(e->token.string));
-		}
 		lb_add_debug_local_variable(p, ptr, type, e->token);
 	}
 
