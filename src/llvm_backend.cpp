@@ -1888,7 +1888,10 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 	case Type_Array:
 		return LLVMDIBuilderCreateArrayType(m->debug_builder,
-			type->Array.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->Array.elem), nullptr, 0);
+			type->Array.count,
+			8*cast(unsigned)type_align_of(type),
+			lb_debug_type(m, type->Array.elem),
+			nullptr, 0);
 
 	case Type_EnumeratedArray: {
 		LLVMMetadataRef array_type = LLVMDIBuilderCreateArrayType(m->debug_builder,
@@ -2250,7 +2253,7 @@ void lb_debug_complete_types(lbModule *m) {
 							8*type_size_of(bt)-word_bits + 1*word_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_int)
 						);
-						elements[3] = LLVMDIBuilderCreateMemberType(
+						elements[2] = LLVMDIBuilderCreateMemberType(
 							m->debug_builder, record_scope,
 							".allocator", 12,
 							file, 0,
@@ -3527,6 +3530,9 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
+		if (e->token.string == "v123") {
+			gb_printf_err("%.*s\n", LIT(e->token.string));
+		}
 		lb_add_debug_local_variable(p, ptr, type, e->token);
 	}
 
