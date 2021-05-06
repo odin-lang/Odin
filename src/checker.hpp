@@ -335,7 +335,6 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
-	Ast *unary_address_hint;
 };
 
 struct Checker {

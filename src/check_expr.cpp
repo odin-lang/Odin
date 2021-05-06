@@ -7333,15 +7333,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, node);
-		Ast *prev_unary_address_hint = c->unary_address_hint;
-		c->unary_address_hint = unparen_expr(node);
-
 		Type *th = type_hint;
 		if (ue->op.kind == Token_And) {
 			th = type_deref(th);
 		}
 		check_expr_base(c, o, ue->expr, th);
-		c->unary_address_hint = prev_unary_address_hint;
 		node->viral_state_flags |= ue->expr->viral_state_flags;
 
 		if (o->mode == Addressing_Invalid) {
