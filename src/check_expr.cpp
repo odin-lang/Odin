@@ -2504,6 +2504,10 @@ bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x, Operand *y
 	return false;
 }
 
+bool is_ise_expr(Ast *node) {
+	node = unparen_expr(node);
+	return node->kind == Ast_ImplicitSelectorExpr;
+}
 
 void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint, bool use_lhs_as_type_hint=false) {
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
@@ -2521,8 +2525,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 	case Token_CmpEq:
 	case Token_NotEq: {
 		// NOTE(bill): Allow comparisons between types
-		check_expr_or_type(c, x, be->left, type_hint);
-		check_expr_or_type(c, y, be->right, x->type);
+		if (is_ise_expr(be->left)) {
+			// Evalute the right before the left for an '.X' expression
+			check_expr_or_type(c, y, be->right, type_hint);
+			check_expr_or_type(c, x, be->left, y->type);
+		} else {
+			check_expr_or_type(c, x, be->left, type_hint);
+			check_expr_or_type(c, y, be->right, x->type);
+		}
 		bool xt = x->mode == Addressing_Type;
 		bool yt = y->mode == Addressing_Type;
 		// If only one is a type, this is an error
@@ -2629,11 +2639,22 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 
 	default:
-		check_expr_with_type_hint(c, x, be->left, type_hint);
-		if (use_lhs_as_type_hint) {
-			check_expr_with_type_hint(c, y, be->right, x->type);
+		if (is_ise_expr(be->left)) {
+			// Evalute the right before the left for an '.X' expression
+			check_expr_or_type(c, y, be->right, type_hint);
+
+			if (use_lhs_as_type_hint) { // RHS in this case
+				check_expr_or_type(c, x, be->left, y->type);
+			} else {
+				check_expr_with_type_hint(c, x, be->left, type_hint);
+			}
 		} else {
-			check_expr_with_type_hint(c, y, be->right, type_hint);
+			check_expr_with_type_hint(c, x, be->left, type_hint);
+			if (use_lhs_as_type_hint) {
+				check_expr_with_type_hint(c, y, be->right, x->type);
+			} else {
+				check_expr_with_type_hint(c, y, be->right, type_hint);
+			}
 		}
 		break;
 	}
@@ -5929,6 +5950,88 @@ bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o) {
 }
 
 
+bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, AstImplicitSelectorExpr *ise, Type *th) {
+	if (is_type_enum(th)) {
+		Type *enum_type = base_type(th);
+		GB_ASSERT(enum_type->kind == Type_Enum);
+
+		String name = ise->selector->Ident.token.string;
+
+		Entity *e = scope_lookup_current(enum_type->Enum.scope, name);
+		if (e == nullptr) {
+			return false;
+		}
+		GB_ASSERT(are_types_identical(base_type(e->type), enum_type));
+		GB_ASSERT(e->kind == Entity_Constant);
+		o->value = e->Constant.value;
+		o->mode = Addressing_Constant;
+		o->type = e->type;
+		return true;
+	}
+	bool show_error = true;
+	if (is_type_union(th)) {
+		Type *union_type = base_type(th);
+		isize enum_count = 0;
+		Type *et = nullptr;
+
+		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
+
+		for_array(i, union_type->Union.variants) {
+			Type *vt = union_type->Union.variants[i];
+
+			Operand x = {};
+			if (attempt_implicit_selector_expr(c, &x, ise, vt)) {
+				array_add(&operands, x);
+			}
+		}
+
+		if (operands.count == 1) {
+			*o = operands[0];
+			return true;
+		}
+	}
+	return false;
+}
+
+ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ast_node(ise, ImplicitSelectorExpr, node);
+
+	o->type = t_invalid;
+	o->expr = node;
+	o->mode = Addressing_Invalid;
+
+	Type *th = type_hint;
+
+	if (th == nullptr) {
+		gbString str = expr_to_string(node);
+		error(node, "Cannot determine type for implicit selector expression '%s'", str);
+		gb_string_free(str);
+		return Expr_Expr;
+	}
+	o->type = th;
+	Type *enum_type = th;
+
+	bool ok = attempt_implicit_selector_expr(c, o, ise, th);
+	if (!ok) {
+		String name = ise->selector->Ident.token.string;
+
+		if (is_type_enum(th)) {
+			gbString typ = type_to_string(th);
+			error(node, "Undeclared name %.*s for type '%s'", LIT(name), typ);
+			gb_string_free(typ);
+		} else {
+			gbString typ = type_to_string(th);
+			gbString str = expr_to_string(node);
+			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
+			gb_string_free(str);
+			gb_string_free(typ);
+		}
+	}
+
+	o->expr = node;
+	return Expr_Expr;
+}
+
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	u32 prev_state_flags = c->state_flags;
 	defer (c->state_flags = prev_state_flags);
@@ -7395,68 +7498,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(ise, ImplicitSelectorExpr, node);
-		o->type = t_invalid;
-		o->expr = node;
-		o->mode = Addressing_Invalid;
-
-		Type *th = type_hint;
-
-		if (th == nullptr) {
-			gbString str = expr_to_string(node);
-			error(node, "Cannot determine type for implicit selector expression '%s'", str);
-			gb_string_free(str);
-			return Expr_Expr;
-		}
-		o->type = th;
-		Type *enum_type = th;
-
-		if (!is_type_enum(th)) {
-			bool show_error = true;
-			if (is_type_union(th)) {
-				Type *union_type = base_type(th);
-				isize enum_count = 0;
-				Type *et = nullptr;
-				for_array(i, union_type->Union.variants) {
-					Type *vt = union_type->Union.variants[i];
-					if (is_type_enum(vt)) {
-						enum_count += 1;
-						et = vt;
-					}
-				}
-				if (enum_count == 1) {
-					show_error = false;
-					enum_type = et;
-				}
-			}
-
-			if (show_error) {
-				gbString typ = type_to_string(th);
-				gbString str = expr_to_string(node);
-				error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
-				gb_string_free(str);
-				gb_string_free(typ);
-				return Expr_Expr;
-			}
-		}
-		GB_ASSERT(ise->selector->kind == Ast_Ident);
-		String name = ise->selector->Ident.token.string;
-
-		enum_type = base_type(enum_type);
-		GB_ASSERT(enum_type->kind == Type_Enum);
-		Entity *e = scope_lookup_current(enum_type->Enum.scope, name);
-		if (e == nullptr) {
-			gbString typ = type_to_string(th);
-			error(node, "Undeclared name %.*s for type '%s'", LIT(name), typ);
-			gb_string_free(typ);
-			return Expr_Expr;
-		}
-		GB_ASSERT(are_types_identical(base_type(e->type), enum_type));
-		GB_ASSERT(e->kind == Entity_Constant);
-		o->value = e->Constant.value;
-		o->mode = Addressing_Constant;
-		o->type = e->type;
-
-		return Expr_Expr;
+		return check_implicit_selector_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);
