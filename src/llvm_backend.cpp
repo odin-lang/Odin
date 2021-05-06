@@ -10667,6 +10667,30 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 	return {p->value, p->type};
 }
 
+lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right, Type *type) {
+	GB_ASSERT((is_type_struct(type) || is_type_union(type)) && is_type_comparable(type));
+	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
+	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
+	lbValue res = {};
+	if (is_type_simple_compare(type)) {
+		// TODO(bill): Test to see if this is actually faster!!!!
+		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
+		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
+		args[2] = lb_const_int(p->module, t_int, type_size_of(type));
+		res = lb_emit_runtime_call(p, "memory_equal", args);
+	} else {
+		lbValue value = lb_get_equal_proc_for_type(p->module, type);
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
+		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
+		res = lb_emit_call(p, value, args);
+	}
+	if (op_kind == Token_NotEq) {
+		res = lb_emit_unary_arith(p, Token_Not, res, res.type);
+	}
+	return res;
+}
 
 
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
@@ -10797,27 +10821,11 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 
 
 	if ((is_type_struct(a) || is_type_union(a)) && is_type_comparable(a)) {
-		lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
-		lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
-		lbValue res = {};
-		if (is_type_simple_compare(a)) {
-			// TODO(bill): Test to see if this is actually faster!!!!
-			auto args = array_make<lbValue>(permanent_allocator(), 3);
-			args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
-			args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
-			args[2] = lb_const_int(p->module, t_int, type_size_of(a));
-			res = lb_emit_runtime_call(p, "memory_equal", args);
-		} else {
-			lbValue value = lb_get_equal_proc_for_type(p->module, a);
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
-			args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
-			args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
-			res = lb_emit_call(p, value, args);
-		}
-		if (op_kind == Token_NotEq) {
-			res = lb_emit_unary_arith(p, Token_Not, res, res.type);
-		}
-		return res;
+		return lb_compare_records(p, op_kind, left, right, a);
+	}
+
+	if ((is_type_struct(b) || is_type_union(b)) && is_type_comparable(b)) {
+		return lb_compare_records(p, op_kind, left, right, b);
 	}
 
 	if (is_type_string(a)) {
