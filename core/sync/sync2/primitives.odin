@@ -25,6 +25,18 @@ mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	return _mutex_try_lock(m);
 }
 
+// Example:
+//
+// if mutex_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=mutex_unlock)
+mutex_guard :: proc(m: ^Mutex) -> bool {
+	mutex_lock(m);
+	return true;
+}
+
 // A RW_Mutex is a reader/writer mutual exclusion lock
 // The lock can be held by any arbitrary number of readers or a single writer
 // The zero value for a RW_Mutex is an unlocked mutex
@@ -65,6 +77,31 @@ rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw);
 }
 
+// Example:
+//
+// if rw_mutex_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=rw_mutex_unlock)
+rw_mutex_guard :: proc(m: ^RW_Mutex) -> bool {
+	rw_mutex_lock(m);
+	return true;
+}
+
+// Example:
+//
+// if rw_mutex_shared_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=rw_mutex_shared_unlock)
+rw_mutex_shared_guard :: proc(m: ^RW_Mutex) -> bool {
+	rw_mutex_shared_lock(m);
+	return true;
+}
+
+
 
 // A Recusrive_Mutex is a recursive mutual exclusion lock
 // The zero value for a Recursive_Mutex is an unlocked mutex
@@ -86,6 +123,18 @@ recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
 	return _recursive_mutex_try_lock(m);
 }
 
+
+// Example:
+//
+// if recursive_mutex_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=recursive_mutex_unlock)
+recursive_mutex_guard :: proc(m: ^Recursive_Mutex) -> bool {
+	recursive_mutex_lock(m);
+	return true;
+}
 
 
 // Cond implements a condition variable, a rendezvous point for threads
