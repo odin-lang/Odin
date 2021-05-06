@@ -22,7 +22,7 @@ Allocator_Mode_Set :: distinct bit_set[Allocator_Mode];
 Allocator_Query_Info :: runtime.Allocator_Query_Info;
 /*
 Allocator_Query_Info :: struct {
-	pointer:   Maybe(rawptr),
+	pointer:   rawptr,
 	size:      Maybe(int),
 	alignment: Maybe(int),
 }
