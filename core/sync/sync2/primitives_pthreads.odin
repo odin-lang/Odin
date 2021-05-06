@@ -84,7 +84,7 @@ _rw_mutex_shared_lock :: proc(rw: ^RW_Mutex) {
 	state := atomic_load(&rw.impl.state);
 	for state & (RW_Mutex_State_Is_Writing|RW_Mutex_State_Writer_Mask) == 0 {
 		ok: bool;
-		state, ok = atomic_cxchgweak(&rw.impl.state, state, state + RW_Mutex_State_Reader);
+		state, ok = atomic_compare_exchange_weak(&rw.impl.state, state, state + RW_Mutex_State_Reader);
 		if ok {
 			return;
 		}
@@ -107,7 +107,7 @@ _rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
 _rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 	state := atomic_load(&rw.impl.state);
 	if state & (RW_Mutex_State_Is_Writing|RW_Mutex_State_Writer_Mask) == 0 {
-		_, ok := atomic_cxchg(&rw.impl.state, state, state + RW_Mutex_State_Reader);
+		_, ok := atomic_compare_exchange_strong(&rw.impl.state, state, state + RW_Mutex_State_Reader);
 		if ok {
 			return true;
 		}

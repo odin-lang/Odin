@@ -58,7 +58,7 @@ _Recursive_Mutex :: struct {
 _recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
 	tid := win32.GetCurrentThreadId();
 	for {
-		prev_owner := atomic_cxchg_acq(&m.impl.owner, tid, 0);
+		prev_owner := atomic_compare_exchange_strong_acquire(&m.impl.owner, tid, 0);
 		switch prev_owner {
 		case 0, tid:
 			m.impl.claim_count += 1;
@@ -80,7 +80,7 @@ _recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
 	if m.impl.claim_count != 0 {
 		return;
 	}
-	atomic_xchg_rel(&m.impl.owner, 0);
+	atomic_exchange_release(&m.impl.owner, 0);
 	win32.WakeByAddressSingle(&m.impl.owner);
 	// outside the lock
 
@@ -88,7 +88,7 @@ _recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
 
 _recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
 	tid := win32.GetCurrentThreadId();
-	prev_owner := atomic_cxchg_acq(&m.impl.owner, tid, 0);
+	prev_owner := atomic_compare_exchange_strong_acquire(&m.impl.owner, tid, 0);
 	switch prev_owner {
 	case 0, tid:
 		m.impl.claim_count += 1;
@@ -139,7 +139,7 @@ _sema_wait :: proc(s: ^Sema) {
 			);
 			original_count = s.impl.count;
 		}
-		if original_count == atomic_cxchg(&s.impl.count, original_count-1, original_count) {
+		if original_count == atomic_compare_exchange_strong(&s.impl.count, original_count-1, original_count) {
 			return;
 		}
 	}
