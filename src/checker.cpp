@@ -675,55 +675,44 @@ Entity *add_global_entity(Entity *entity, Scope *scope=builtin_pkg->scope) {
 	return entity;
 }
 
-void add_global_constant(String name, Type *type, ExactValue value) {
+void add_global_constant(char const *name, Type *type, ExactValue value) {
 	Entity *entity = alloc_entity(Entity_Constant, nullptr, make_token_ident(name), type);
 	entity->Constant.value = value;
 	add_global_entity(entity);
 }
 
 
-void add_global_string_constant(String name, String value) {
+void add_global_string_constant(char const *name, String const &value) {
 	add_global_constant(name, t_untyped_string, exact_value_string(value));
 }
 
+void add_global_bool_constant(char const *name, bool value) {
+	add_global_constant(name, t_untyped_bool, exact_value_bool(value));
+}
 
 void add_global_type_entity(String name, Type *type) {
 	add_global_entity(alloc_entity_type_name(nullptr, make_token_ident(name), type));
 }
 
 
+AstPackage *create_builtin_package(char const *name) {
+	gbAllocator a = permanent_allocator();
+	AstPackage *pkg = gb_alloc_item(a, AstPackage);
+	pkg->name = make_string_c(name);
+	pkg->kind = Package_Normal;
+
+	pkg->scope = create_scope(nullptr);
+	pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
+	pkg->scope->pkg = pkg;
+	return pkg;
+}
 
 void init_universal(void) {
 	BuildContext *bc = &build_context;
 
-	// NOTE(bill): No need to free these
-	// gbAllocator a = heap_allocator();
-	gbAllocator a = permanent_allocator();
-
-	builtin_pkg = gb_alloc_item(a, AstPackage);
-	builtin_pkg->name = str_lit("builtin");
-	builtin_pkg->kind = Package_Normal;
-
-	builtin_pkg->scope = create_scope(nullptr);
-	builtin_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
-	builtin_pkg->scope->pkg = builtin_pkg;
-
-	intrinsics_pkg = gb_alloc_item(a, AstPackage);
-	intrinsics_pkg->name = str_lit("intrinsics");
-	intrinsics_pkg->kind = Package_Normal;
-
-	intrinsics_pkg->scope = create_scope(nullptr);
-	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
-	intrinsics_pkg->scope->pkg = intrinsics_pkg;
-
-	config_pkg = gb_alloc_item(a, AstPackage);
-	config_pkg->name = str_lit("config");
-	config_pkg->kind = Package_Normal;
-
-	config_pkg->scope = create_scope(nullptr);
-	config_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
-	config_pkg->scope->pkg = config_pkg;
-
+	builtin_pkg    = create_builtin_package("builtin");
+	intrinsics_pkg = create_builtin_package("intrinsics");
+	config_pkg     = create_builtin_package("config");
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -740,23 +729,23 @@ void init_universal(void) {
 	}
 
 // Constants
-	add_global_constant(str_lit("true"),  t_untyped_bool, exact_value_bool(true));
-	add_global_constant(str_lit("false"), t_untyped_bool, exact_value_bool(false));
-
 	add_global_entity(alloc_entity_nil(str_lit("nil"), t_untyped_nil));
 
+	add_global_bool_constant("true",  true);
+	add_global_bool_constant("false", false);
+
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant(str_lit("ODIN_OS"),      bc->ODIN_OS);
-	add_global_string_constant(str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
-	add_global_string_constant(str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
-	add_global_string_constant(str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
-	add_global_string_constant(str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
-	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
-	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
-	add_global_constant(str_lit("ODIN_DISABLE_ASSERT"), t_untyped_bool, exact_value_bool(bc->ODIN_DISABLE_ASSERT));
-	add_global_constant(str_lit("ODIN_DEFAULT_TO_NIL_ALLOCATOR"), t_untyped_bool, exact_value_bool(bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR));
-	add_global_constant(str_lit("ODIN_NO_DYNAMIC_LITERALS"), t_untyped_bool, exact_value_bool(bc->no_dynamic_literals));
-	add_global_constant(str_lit("ODIN_TEST"), t_untyped_bool, exact_value_bool(bc->command_kind == Command_test));
+	add_global_string_constant("ODIN_OS",      bc->ODIN_OS);
+	add_global_string_constant("ODIN_ARCH",    bc->ODIN_ARCH);
+	add_global_string_constant("ODIN_ENDIAN",  bc->ODIN_ENDIAN);
+	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
+	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
+	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
+	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
+	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
+	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 
 
 // Builtin Procedures
@@ -800,8 +789,6 @@ void init_universal(void) {
 			break;
 		}
 		GB_ASSERT(type != nullptr);
-
-
 
 		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
 		entity->state = EntityState_Resolved;
