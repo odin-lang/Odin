@@ -1886,16 +1886,32 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	case Type_Pointer:
 		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->Pointer.elem), word_bits, word_bits, 0, nullptr, 0);
 
-	case Type_Array:
+	case Type_Array: {
+		LLVMMetadataRef subscripts[1] = {};
+		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
+			0ll,
+			type->Array.count
+		);
+
 		return LLVMDIBuilderCreateArrayType(m->debug_builder,
-			type->Array.count,
+			8*cast(uint64_t)type_size_of(type),
 			8*cast(unsigned)type_align_of(type),
 			lb_debug_type(m, type->Array.elem),
-			nullptr, 0);
+			subscripts, gb_count_of(subscripts));
+	}
 
 	case Type_EnumeratedArray: {
+		LLVMMetadataRef subscripts[1] = {};
+		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
+			0ll,
+			type->EnumeratedArray.count
+		);
+
 		LLVMMetadataRef array_type = LLVMDIBuilderCreateArrayType(m->debug_builder,
-			type->EnumeratedArray.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->EnumeratedArray.elem), nullptr, 0);
+			8*cast(uint64_t)type_size_of(type),
+			8*cast(unsigned)type_align_of(type),
+			lb_debug_type(m, type->EnumeratedArray.elem),
+			subscripts, gb_count_of(subscripts));
 		gbString name = type_to_string(type, temporary_allocator());
 		return LLVMDIBuilderCreateTypedef(m->debug_builder, array_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
 	}
