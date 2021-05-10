@@ -549,6 +549,11 @@ namespace lbAbiAmd64SysV {
 		} else if (oldv == RegClass_Memory || newv == RegClass_Memory) {
 			return;
 		} else if (oldv == RegClass_Int || newv	== RegClass_Int) {
+			if (oldv == RegClass_SSEFv || oldv == RegClass_SSEFs) {
+				oldv = RegClass_Int;
+			} else if (newv == RegClass_SSEFv || newv == RegClass_SSEFs) {
+				oldv = RegClass_Int;
+			}
 			return;
 		} else if (oldv == RegClass_X87 || oldv == RegClass_X87Up || oldv == RegClass_ComplexX87 ||
 		           newv == RegClass_X87 || newv == RegClass_X87Up || newv == RegClass_ComplexX87) {

@@ -5794,9 +5794,15 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 
 	if (USE_SEPARTE_MODULES) {
 		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
+
+		// TODO(bill): correct this logic
 		bool is_external = other_module != m;
 		if (!is_external) {
-			other_module = e->code_gen_module;
+			if (e->code_gen_module != nullptr) {
+				other_module = e->code_gen_module;
+			} else {
+				other_module = nullptr;
+			}
 			is_external = other_module != m;
 		}
 
@@ -5806,7 +5812,19 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			lbValue g = {};
 			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
 			g.type = alloc_type_pointer(e->type);
+			lb_add_entity(m, e, g);
+			lb_add_member(m, name, g);
+
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
+
+			// if (other_module != nullptr) {
+			// 	lbValue *other_found = string_map_get(&other_module->members, name);
+			// 	if (other_found) {
+			// 		lbValue other_g = *other_found;
+			// 	}
+			// }
+
+			// LLVMSetLinkage(other_g.value, LLVMExternalLinkage);
 
 			if (e->Variable.thread_local_model != "") {
 				LLVMSetThreadLocal(g.value, true);
@@ -5827,8 +5845,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 				LLVMSetThreadLocalMode(g.value, mode);
 			}
 
-			lb_add_entity(m, e, g);
-			lb_add_member(m, name, g);
+
 			return g;
 		}
 	}
@@ -14713,9 +14730,7 @@ void lb_generate_code(lbGenerator *gen) {
 		if (is_export) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
-		}
-
-		if (e->flags & EntityFlag_Static) {
+		} else {
 			// LLVMSetLinkage(g.value, LLVMInternalLinkage);
 		}
 
