@@ -276,6 +276,7 @@ String lb_mangle_name(lbModule *m, Entity *e);
 String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
+LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
 lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
