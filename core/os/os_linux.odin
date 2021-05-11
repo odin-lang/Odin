@@ -697,10 +697,14 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 
 Signal_Handler :: proc(i32);
-Signal_Set     :: distinct rawptr;
+
+// NOTE(rytc): platform dependent
+Signal_Set     :: struct {
+    val : [16]u64,
+}
 
 Signal_Action :: struct {
-    handler   : proc(i32),
+    handler   : Signal_Handler,
     sigaction : proc(i32, ^Signal_Info, rawptr),
     mask      : Signal_Set,
     flags     : i32,
