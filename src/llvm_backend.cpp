@@ -14019,7 +14019,7 @@ struct lbGlobalVariable {
 
 lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
+	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 	Type *params  = alloc_type_tuple();
@@ -14050,7 +14050,7 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 
 lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
-	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
+	lb_populate_function_pass_manager(main_module, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 	Type *params  = alloc_type_tuple();
@@ -14140,7 +14140,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 
 lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
+	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 	Type *params  = alloc_type_tuple();
@@ -14351,10 +14351,10 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 	LLVMInitializeFunctionPassManager(function_pass_manager_size);
 	LLVMInitializeFunctionPassManager(function_pass_manager_speed);
 
-	lb_populate_function_pass_manager(default_function_pass_manager, false, build_context.optimization_level);
-	lb_populate_function_pass_manager_specific(function_pass_manager_minimal, 0);
-	lb_populate_function_pass_manager_specific(function_pass_manager_size,    1);
-	lb_populate_function_pass_manager_specific(function_pass_manager_speed,   2);
+	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
+	lb_populate_function_pass_manager_specific(m, function_pass_manager_minimal, 0);
+	lb_populate_function_pass_manager_specific(m, function_pass_manager_size,    1);
+	lb_populate_function_pass_manager_specific(m, function_pass_manager_speed,   2);
 
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 	LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
@@ -14364,7 +14364,7 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
 	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
-	lb_populate_function_pass_manager(default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
+	lb_populate_function_pass_manager(m, default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
 
 
