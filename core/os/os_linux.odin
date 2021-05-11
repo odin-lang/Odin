@@ -177,6 +177,54 @@ RTLD_NOW          :: 0x002;
 RTLD_BINDING_MASK :: 0x3;
 RTLD_GLOBAL       :: 0x100;
 
+
+SIGHUP    :: 1;
+SIGINT    :: 2;
+SIGQUIT   :: 3;
+SIGILL    :: 4;
+SIGTRAP   :: 5;
+SIGABRT   :: 6;
+SIGIOT    :: 6;
+SIGBUS    :: 7;
+SIGFPE    :: 8;
+SIGKILL   :: 9;   
+SIGUSR1   :: 10;  
+SIGSEGV   :: 11;  
+SIGUSR2   :: 12;  
+SIGPIPE   :: 13;  
+SIGALRM   :: 14;  
+SIGTERM   :: 15;  
+SIGSTKFLT :: 16;
+SIGCHLD   :: 17;  
+SIGCONT   :: 18;  
+SIGSTOP   :: 19;  
+SIGTSTP   :: 20;  
+SIGTTIN   :: 21;  
+SIGTTOU   :: 22;  
+SIGURG    :: 23;  
+SIGXCPU   :: 24;  
+SIGXFSZ   :: 25;  
+SIGVTALRM :: 26;
+SIGPROF   :: 27;
+SIGWINCH  :: 28;
+SIGIO     :: 29;
+SIGPOLL   :: SIGIO;
+SIGPWR    :: 30;
+SIGSYS    :: 31;
+SIGUNUSED :: 31;
+
+SA_NOCLDSTOP :: 0x00000001;
+SA_NOCLDWAIT :: 0x00000002;
+SA_SIGINFO   :: 0x00000004;
+SA_ONSTACK   :: 0x08000000;
+SA_RESTART   :: 0x10000000;
+SA_NODEFER   :: 0x40000000;
+SA_RESETHAND :: 0x80000000;
+SA_NOMASK    :: SA_NODEFER;
+SA_ONESHOT   :: SA_RESETHAND;
+SA_RESTORER  :: 0x04000000;
+
+
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments();
 
@@ -298,6 +346,13 @@ foreign libc {
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---;
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---;
+
+    @(link_name="signal")           _unix_signal        :: proc(signal: i32, handler: Signal_Handler) -> Signal_Handler ---;
+    @(link_name="sigaction")        _unix_sigaction     :: proc(signum: i32, action: ^Signal_Action, oldact: ^Signal_Action) -> i32 ---;
+    @(link_name="sigemptyset")      _unix_sigemptyset   :: proc(mask: ^Signal_Set) ---;
+    @(link_name="sigaddset")        _unix_sigaddset     :: proc(mask: ^Signal_Set, signal: i32) ---;
+
+
 }
 foreign dl {
 	@(link_name="dlopen")           _unix_dlopen        :: proc(filename: cstring, flags: c.int) -> rawptr ---;
@@ -639,3 +694,53 @@ _alloc_command_line_arguments :: proc() -> []string {
 	}
 	return res;
 }
+
+
+Signal_Handler :: proc(i32);
+Signal_Set     :: distinct rawptr;
+
+Signal_Action :: struct {
+    handler   : proc(i32),
+    sigaction : proc(i32, ^Signal_Info, rawptr),
+    mask      : Signal_Set,
+    flags     : i32,
+    restorer  : proc(),
+}
+
+Signal_Info :: struct {
+    signo    : i32,
+    errno    : i32,
+    code     : i32,
+    trapno   : i32,
+    pid      : i32,
+    uid      : i32,
+    status   : i32,
+    utime    : i64,
+    stime    : i64,
+    value    : i64,
+    sig_int  : i32,
+    sig_ptr  : rawptr,
+    overrun  : i32, 
+    timerid  : i32, 
+    addr     : rawptr,
+    band     : f64,   
+    fd       : i32,   
+    addr_lsb : i16, 
+}
+
+signal :: proc(signal: i32, handler: Signal_Handler) -> Signal_Handler {
+    return _unix_signal(signal, handler);
+}
+
+sigaction :: proc(signum: i32, action: ^Signal_Action, oldact: ^Signal_Action) -> i32 {
+    return _unix_sigaction(signum, action, oldact);
+}
+
+sigemptyset :: proc(mask: ^Signal_Set) {
+    _unix_sigemptyset(mask);
+}
+
+sigaddset :: proc(mask: ^Signal_Set, signal: i32) {
+    _unix_sigaddset(mask, signal);
+}
+
