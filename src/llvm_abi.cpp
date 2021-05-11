@@ -419,7 +419,13 @@ namespace lbAbiAmd64SysV {
 		switch (reg_class) {
 		case RegClass_SSEFs:
 		case RegClass_SSEFv:
+		case RegClass_SSEDs:
 		case RegClass_SSEDv:
+			return true;
+		case RegClass_SSEInt8:
+		case RegClass_SSEInt16:
+		case RegClass_SSEInt32:
+		case RegClass_SSEInt64:
 			return true;
 		}
 		return false;
@@ -538,35 +544,48 @@ namespace lbAbiAmd64SysV {
 		return reg_classes;
 	}
 
-	void unify(Array<RegClass> *cls, i64 i, RegClass newv) {
-		RegClass &oldv = (*cls)[i];
+	void unify(Array<RegClass> *cls, i64 i, RegClass const newv) {
+		RegClass const oldv = (*cls)[i];
 		if (oldv == newv) {
 			return;
-		} else if (oldv == RegClass_NoClass) {
-			oldv = newv;
+		}
+
+		RegClass to_write = newv;
+		if (oldv == RegClass_NoClass) {
+			to_write = newv;
 		} else if (newv == RegClass_NoClass) {
 			return;
 		} else if (oldv == RegClass_Memory || newv == RegClass_Memory) {
-			return;
-		} else if (oldv == RegClass_Int || newv	== RegClass_Int) {
-			if (oldv == RegClass_SSEFv || oldv == RegClass_SSEFs) {
-				oldv = RegClass_Int;
-			} else if (newv == RegClass_SSEFv || newv == RegClass_SSEFs) {
-				oldv = RegClass_Int;
+			to_write = RegClass_Memory;
+		} else if (oldv == RegClass_Int || newv == RegClass_Int) {
+			to_write = RegClass_Int;
+		} else if (oldv == RegClass_X87 || oldv == RegClass_X87Up || oldv == RegClass_ComplexX87) {
+			to_write = RegClass_Memory;
+		} else if (newv == RegClass_X87 || newv == RegClass_X87Up || newv == RegClass_ComplexX87) {
+			to_write = RegClass_Memory;
+		} else if (newv == RegClass_SSEUp) {
+			switch (oldv) {
+			case RegClass_SSEFv:
+			case RegClass_SSEFs:
+			case RegClass_SSEDv:
+			case RegClass_SSEDs:
+			case RegClass_SSEInt8:
+			case RegClass_SSEInt16:
+			case RegClass_SSEInt32:
+			case RegClass_SSEInt64:
+				return;
 			}
-			return;
-		} else if (oldv == RegClass_X87 || oldv == RegClass_X87Up || oldv == RegClass_ComplexX87 ||
-		           newv == RegClass_X87 || newv == RegClass_X87Up || newv == RegClass_ComplexX87) {
-			oldv = RegClass_Memory;
-		} else {
-			oldv = newv;
 		}
+
+		(*cls)[i] = to_write;
 	}
 
 	void fixup(LLVMTypeRef t, Array<RegClass> *cls) {
 		i64 i = 0;
 		i64 e = cls->count;
-		if (e > 2 && (lb_is_type_kind(t, LLVMStructTypeKind) || lb_is_type_kind(t, LLVMArrayTypeKind))) {
+		if (e > 2 && (lb_is_type_kind(t, LLVMStructTypeKind) ||
+		              lb_is_type_kind(t, LLVMArrayTypeKind) ||
+		              lb_is_type_kind(t, LLVMVectorTypeKind))) {
 			RegClass &oldv = (*cls)[i];
 			if (is_sse(oldv)) {
 				for (i++; i < e; i++) {
@@ -610,8 +629,8 @@ namespace lbAbiAmd64SysV {
 
 	unsigned llvec_len(Array<RegClass> const &reg_classes, isize offset) {
 		unsigned len = 1;
-		for (isize i = offset+1; i < reg_classes.count; i++) {
-			if (reg_classes[offset] != RegClass_SSEFv && reg_classes[i] != RegClass_SSEUp) {
+		for (isize i = offset; i < reg_classes.count; i++) {
+			if (reg_classes[i] != RegClass_SSEUp) {
 				break;
 			}
 			len++;
@@ -622,7 +641,7 @@ namespace lbAbiAmd64SysV {
 
 	LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes) {
 		auto types = array_make<LLVMTypeRef>(heap_allocator(), 0, reg_classes.count);
-		for_array(i, reg_classes) {
+		for (isize i = 0; i < reg_classes.count; /**/) {
 			RegClass reg_class = reg_classes[i];
 			switch (reg_class) {
 			case RegClass_Int:
@@ -664,7 +683,7 @@ namespace lbAbiAmd64SysV {
 						break;
 					}
 
-					unsigned vec_len = llvec_len(reg_classes, i);
+					unsigned vec_len = llvec_len(reg_classes, i+1);
 					LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
 					array_add(&types, vec_type);
 					i += vec_len;
@@ -680,6 +699,7 @@ namespace lbAbiAmd64SysV {
 			default:
 				GB_PANIC("Unhandled RegClass");
 			}
+			i += 1;
 		}
 
 		GB_ASSERT(types.count != 0);
