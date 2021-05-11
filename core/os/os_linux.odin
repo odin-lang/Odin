@@ -698,9 +698,10 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 Signal_Handler :: proc(i32);
 
-SIG_IGN :: proc(signal: i32) { }
-SIG_ERR :: proc(signal: i32) { }
-SIG_DFL :: proc(signal: i32) { }
+// NOTE(rytc): These are just stubs so the user code doesn't have to do typecasting
+SIG_IGN :: proc(signal: i32) { } /* Ignore */
+SIG_ERR :: proc(signal: i32) { } /* Error */
+SIG_DFL :: proc(signal: i32) { } /* Default handler */
 
 // NOTE(rytc): platform dependent
 Signal_Set :: struct {
@@ -740,26 +741,27 @@ signal :: proc(signal: i32, handler: Signal_Handler) -> Signal_Handler {
     if handler == SIG_IGN {
         return _unix_signal(signal, rawptr(uintptr(1)));
     } else if handler == SIG_ERR {
-        // NOTE(rytc) libc expects a pointer of "-1" for SIG_ERR
-        //return _unix_signal(signal, rawptr(uintptr(-1)));
+        err := -1;
+        return _unix_signal(signal, rawptr(transmute(uintptr)err));
     } else if handler == SIG_DFL {
         return _unix_signal(signal, rawptr(uintptr(0)));
     }
+
     return _unix_signal(signal, rawptr(handler));
 }
 
 sigaction :: proc(signum: i32, action: ^Signal_Action, oldact: ^Signal_Action) -> i32 {
-
-    /*
     if action.handler == SIG_IGN {
-        action.handler = rawptr(uintptr(1));
-    } else if action.handler.(Signal_Handler) == SIG_ERR {
-        // NOTE(rytc) libc expects a pointer of "-1" for SIG_ERR
-        //return _unix_signal(signal, rawptr(uintptr(-1)));
+        @static ign := 1;
+        action.handler = transmute(Signal_Handler)uintptr(ign);
+    } else if action.handler == SIG_ERR {
+        @static err := -1;
+        action.handler = transmute(Signal_Handler)uintptr(err);
     } else if action.handler == SIG_DFL {
-        action.handler = rawptr(uintptr(0));
+        @static dfl := 0;
+        action.handler = transmute(Signal_Handler)uintptr(dfl);
     } 
-    */
+    
 
     return _unix_sigaction(signum, action, oldact);
 }
