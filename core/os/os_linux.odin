@@ -347,7 +347,7 @@ foreign libc {
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---;
 
-    @(link_name="signal")           _unix_signal        :: proc(signal: i32, handler: Signal_Handler) -> Signal_Handler ---;
+    @(link_name="signal")           _unix_signal        :: proc(signal: i32, handler: rawptr) -> Signal_Handler ---;
     @(link_name="sigaction")        _unix_sigaction     :: proc(signum: i32, action: ^Signal_Action, oldact: ^Signal_Action) -> i32 ---;
     @(link_name="sigemptyset")      _unix_sigemptyset   :: proc(mask: ^Signal_Set) ---;
     @(link_name="sigaddset")        _unix_sigaddset     :: proc(mask: ^Signal_Set, signal: i32) ---;
@@ -698,8 +698,12 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 Signal_Handler :: proc(i32);
 
+SIG_IGN :: proc(signal: i32) { }
+SIG_ERR :: proc(signal: i32) { }
+SIG_DFL :: proc(signal: i32) { }
+
 // NOTE(rytc): platform dependent
-Signal_Set     :: struct {
+Signal_Set :: struct {
     val : [16]u64,
 }
 
@@ -733,10 +737,30 @@ Signal_Info :: struct {
 }
 
 signal :: proc(signal: i32, handler: Signal_Handler) -> Signal_Handler {
-    return _unix_signal(signal, handler);
+    if handler == SIG_IGN {
+        return _unix_signal(signal, rawptr(uintptr(1)));
+    } else if handler == SIG_ERR {
+        // NOTE(rytc) libc expects a pointer of "-1" for SIG_ERR
+        //return _unix_signal(signal, rawptr(uintptr(-1)));
+    } else if handler == SIG_DFL {
+        return _unix_signal(signal, rawptr(uintptr(0)));
+    }
+    return _unix_signal(signal, rawptr(handler));
 }
 
 sigaction :: proc(signum: i32, action: ^Signal_Action, oldact: ^Signal_Action) -> i32 {
+
+    /*
+    if action.handler == SIG_IGN {
+        action.handler = rawptr(uintptr(1));
+    } else if action.handler.(Signal_Handler) == SIG_ERR {
+        // NOTE(rytc) libc expects a pointer of "-1" for SIG_ERR
+        //return _unix_signal(signal, rawptr(uintptr(-1)));
+    } else if action.handler == SIG_DFL {
+        action.handler = rawptr(uintptr(0));
+    } 
+    */
+
     return _unix_sigaction(signum, action, oldact);
 }
 
@@ -747,4 +771,5 @@ sigemptyset :: proc(mask: ^Signal_Set) {
 sigaddset :: proc(mask: ^Signal_Set, signal: i32) {
     _unix_sigaddset(mask, signal);
 }
+
 
