@@ -13061,13 +13061,12 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
-	gbString module_name = gb_string_make(heap_allocator(), "odin_package-");
+	gbString module_name = gb_string_make(heap_allocator(), "odin_package");
 	if (m->pkg) {
+		module_name = gb_string_appendc(module_name, "-");
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
 	} else if (USE_SEPARTE_MODULES) {
-		module_name = gb_string_appendc(module_name, "builtin");
-	} else {
-		module_name = "odin_package";
+		module_name = gb_string_appendc(module_name, "-builtin");
 	}
 
 	m->ctx = LLVMContextCreate();
