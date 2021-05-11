@@ -347,12 +347,16 @@ foreign libc {
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---;
 
+    @(link_name="getpid")           _unix_getpid        :: proc() -> i32 ---;
+    
+    @(link_name="kill")             _unix_kill          :: proc(pid, signal: i32) -> i32 ---;
+    @(link_name="killpg")           _unix_killpg        :: proc(pgrp, signal: i32) -> i32 ---;
+    @(link_name="raise")            _unix_raise         :: proc(signal: i32) -> i32 ---;
+
     @(link_name="signal")           _unix_signal        :: proc(signal: i32, handler: rawptr) -> Signal_Handler ---;
     @(link_name="sigaction")        _unix_sigaction     :: proc(signum: i32, action: ^Signal_Action, oldact: ^Signal_Action) -> i32 ---;
     @(link_name="sigemptyset")      _unix_sigemptyset   :: proc(mask: ^Signal_Set) ---;
     @(link_name="sigaddset")        _unix_sigaddset     :: proc(mask: ^Signal_Set, signal: i32) ---;
-
-
 }
 foreign dl {
 	@(link_name="dlopen")           _unix_dlopen        :: proc(filename: cstring, flags: c.int) -> rawptr ---;
@@ -773,5 +777,30 @@ sigemptyset :: proc(mask: ^Signal_Set) {
 sigaddset :: proc(mask: ^Signal_Set, signal: i32) {
     _unix_sigaddset(mask, signal);
 }
+
+getpid :: proc() -> i32 {
+    return _unix_getpid();
+}
+
+kill :: proc(pid, signal: i32) -> i32 {
+    return _unix_kill(pid, signal);
+}
+
+killpg :: proc(pgrp, signal: i32) -> i32 {
+    return _unix_killpg(pgrp, signal);
+}
+
+raise :: proc(signal: i32) -> i32 {
+    return _unix_raise(signal);
+}
+
+
+
+
+
+
+
+
+
 
 
