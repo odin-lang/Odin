@@ -2545,6 +2545,27 @@ lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
 	}
 }
 
+LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type) {
+	String s = make_string_c(name);
+
+	// NOTE(2021-02-25, bill); All this attributes require a type associated with them
+	// and the current LLVM C API does not expose this functionality yet.
+	// It is better to ignore the attributes for the time being
+	if (s == "byval") {
+		// return nullptr;
+	} else if (s == "byref") {
+		return nullptr;
+	} else if (s == "preallocated") {
+		return nullptr;
+	} else if (s == "sret") {
+		// return nullptr;
+	}
+
+	unsigned kind = LLVMGetEnumAttributeKindForName(name, s.len);
+	GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
+	return LLVMCreateEnumAttribute(ctx, kind, 0);
+}
+
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value) {
 	String s = make_string_c(name);
 
@@ -2552,13 +2573,13 @@ LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, 
 	// and the current LLVM C API does not expose this functionality yet.
 	// It is better to ignore the attributes for the time being
 	if (s == "byval") {
-		return nullptr;
+		GB_PANIC("lb_create_enum_attribute_with_type should be used for %s", name);
 	} else if (s == "byref") {
-		return nullptr;
+		GB_PANIC("lb_create_enum_attribute_with_type should be used for %s", name);
 	} else if (s == "preallocated") {
-		return nullptr;
+		GB_PANIC("lb_create_enum_attribute_with_type should be used for %s", name);
 	} else if (s == "sret") {
-		return nullptr;
+		GB_PANIC("lb_create_enum_attribute_with_type should be used for %s", name);
 	}
 
 	unsigned kind = LLVMGetEnumAttributeKindForName(name, s.len);
