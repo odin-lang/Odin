@@ -16,7 +16,7 @@ LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data
 
 void lb_add_must_preserve_predicate_pass(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
 	if (false && optimization_level == 0 && m->debug_builder) {
-		LLVMAddInternalizePassWithMustPreservePredicate(fpm, m, lb_must_preserve_predicate_callback);
+		// LLVMAddInternalizePassWithMustPreservePredicate(fpm, m, lb_must_preserve_predicate_callback);
 	}
 }
 
