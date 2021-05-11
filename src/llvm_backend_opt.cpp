@@ -216,7 +216,7 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	LLVMAddGlobalDCEPass(mpm);
 	LLVMAddGlobalOptimizerPass(mpm);
 
-	LLVMAddLowerConstantIntrinsicsPass(mpm);
+	// LLVMAddLowerConstantIntrinsicsPass(mpm);
 
 	LLVMAddLoopRotatePass(mpm);
 
