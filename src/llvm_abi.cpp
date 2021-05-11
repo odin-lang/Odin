@@ -717,7 +717,6 @@ namespace lbAbiAmd64SysV {
 			i += 1;
 		}
 
-		GB_ASSERT(types.count != 0);
 		if (types.count == 1) {
 			return types[0];
 		}
