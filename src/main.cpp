@@ -1719,7 +1719,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Disables automatic linking with the C Run Time");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-use-lld");
+		print_usage_line(1, "-lld");
 		print_usage_line(2, "Use the LLD linker rather than the default");
 		print_usage_line(0, "");
 
