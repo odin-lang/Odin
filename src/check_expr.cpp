@@ -2380,9 +2380,15 @@ bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 		if (core_type(bt)->kind == Type_Basic) {
 			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
 				return true;
-			} else if (is_type_pointer(type) && check_is_castable_to(c, x, type)) {
-				return true;
+			} else if (check_is_castable_to(c, x, type)) {
+				if (is_type_pointer(type)) {
+					return true;
+				}
 			}
+		} else if (check_is_castable_to(c, x, type)) {
+			x->value = {};
+			x->mode = Addressing_Value;
+			return true;
 		}
 	} else if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
@@ -2391,6 +2397,9 @@ bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
 			x->mode = Addressing_Value;
+		}
+		if (x->mode == Addressing_Value) {
+			x->value = {};
 		}
 		return true;
 	}
