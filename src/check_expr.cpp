@@ -5572,9 +5572,15 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				}
 				check_expr(c, operand, arg);
 				if (operand->mode != Addressing_Invalid) {
-					check_cast(c, operand, t);
+					if (is_type_polymorphic(t)) {
+						error(call, "A polymorphic type cannot be used in a type conversion");
+					} else {
+						// NOTE(bill): Otherwise the compiler can override the polymorphic type
+						// as it assumes it is determining the type
+						check_cast(c, operand, t);
+					}
 				}
-
+				operand->type = t;
 				break;
 			}
 			}
