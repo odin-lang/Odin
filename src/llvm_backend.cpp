@@ -10773,42 +10773,22 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		Type *lt = left.type;
 		Type *rt = right.type;
 
-		// if (is_type_bit_set(lt) && is_type_bit_set(rt)) {
-		// 	Type *blt = base_type(lt);
-		// 	Type *brt = base_type(rt);
-		// 	i64 bits = gb_max(blt->BitSet.bits, brt->BitSet.bits);
-		// 	i64 bytes = bits / 8;
-		// 	switch (bytes) {
-		// 	case 1:
-		// 		left = lb_emit_conv(p, left, t_u8);
-		// 		right = lb_emit_conv(p, right, t_u8);
-		// 		break;
-		// 	case 2:
-		// 		left = lb_emit_conv(p, left, t_u16);
-		// 		right = lb_emit_conv(p, right, t_u16);
-		// 		break;
-		// 	case 4:
-		// 		left = lb_emit_conv(p, left, t_u32);
-		// 		right = lb_emit_conv(p, right, t_u32);
-		// 		break;
-		// 	case 8:
-		// 		left = lb_emit_conv(p, left, t_u64);
-		// 		right = lb_emit_conv(p, right, t_u64);
-		// 		break;
-		// 	default: GB_PANIC("Unknown integer size"); break;
-		// 	}
-		// }
-
 		lt = left.type;
 		rt = right.type;
 		i64 ls = type_size_of(lt);
 		i64 rs = type_size_of(rt);
+
+		// NOTE(bill): Quick heuristic, larger types are usually the target type
 		if (ls < rs) {
 			left = lb_emit_conv(p, left, rt);
 		} else if (ls > rs) {
 			right = lb_emit_conv(p, right, lt);
 		} else {
-			right = lb_emit_conv(p, right, lt);
+			if (is_type_union(rt)) {
+				left = lb_emit_conv(p, left, rt);
+			} else {
+				right = lb_emit_conv(p, right, lt);
+			}
 		}
 	}
 
