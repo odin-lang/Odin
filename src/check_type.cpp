@@ -1271,7 +1271,13 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 		check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 	}
 
-	if (out_type_) *out_type_ = default_type(o.type);
+	if (out_type_) {
+		if (in_type != nullptr) {
+			*out_type_ = in_type;
+		} else {
+			*out_type_ = default_type(o.type);
+		}
+	}
 
 	return param_value;
 }
@@ -1389,6 +1395,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				}
 			}
 		}
+
+
+
 		if (type == nullptr) {
 			error(param, "Invalid parameter type");
 			type = t_invalid;
@@ -1406,6 +1415,12 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			error(param, "Invalid use of an empty union '%s'", str);
 			gb_string_free(str);
 			type = t_invalid;
+		}
+
+		if (param_value.kind != ParameterValue_Invalid && is_type_polymorphic(type)) {
+			gbString str = type_to_string(type);
+			error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
+			gb_string_free(str);
 		}
 
 
