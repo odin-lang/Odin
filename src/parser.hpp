@@ -7,22 +7,22 @@ struct AstFile;
 struct AstPackage;
 
 enum AddressingMode {
-	Addressing_Invalid,       // invalid addressing mode
-	Addressing_NoValue,       // no value (void in C)
-	Addressing_Value,         // computed value (rvalue)
-	Addressing_Context,       // context value
-	Addressing_Variable,      // addressable variable (lvalue)
-	Addressing_Constant,      // constant
-	Addressing_Type,          // type
-	Addressing_Builtin,       // built-in procedure
-	Addressing_ProcGroup,     // procedure group (overloaded procedure)
-	Addressing_MapIndex,      // map index expression -
-	                          // 	lhs: acts like a Variable
-	                          // 	rhs: acts like OptionalOk
-	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
-	Addressing_SoaVariable,   // Struct-Of-Arrays indexed variable
+	Addressing_Invalid   = 0,    // invalid addressing mode
+	Addressing_NoValue   = 1,    // no value (void in C)
+	Addressing_Value     = 2,    // computed value (rvalue)
+	Addressing_Context   = 3,    // context value
+	Addressing_Variable  = 4,    // addressable variable (lvalue)
+	Addressing_Constant  = 5,    // constant
+	Addressing_Type      = 6,    // type
+	Addressing_Builtin   = 7,    // built-in procedure
+	Addressing_ProcGroup = 8,    // procedure group (overloaded procedure)
+	Addressing_MapIndex  = 9,    // map index expression -
+	                             // 	lhs: acts like a Variable
+	                             // 	rhs: acts like OptionalOk
+	Addressing_OptionalOk  = 10, // rhs: acts like a value with an optional boolean part (for existence check)
+	Addressing_SoaVariable = 11, // Struct-Of-Arrays indexed variable
 
-	Addressing_AtomOpAssign,  // Specialized for custom atom operations for assignments
+	Addressing_AtomOpAssign = 12, // Specialized for custom atom operations for assignments
 };
 
 struct TypeAndValue {
