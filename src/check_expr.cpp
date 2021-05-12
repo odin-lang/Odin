@@ -5730,7 +5730,7 @@ void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 		break;
 	case Addressing_Type:
 		if (t == nullptr || !is_type_typeid(t)) {
-			err_str = "is not an expression but a type";
+			err_str = "is not an expression but a type, in this context it is ambiguous";
 		}
 		break;
 	case Addressing_Builtin:
