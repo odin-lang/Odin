@@ -2532,16 +2532,6 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 					return true;
 				}
 			}
-
-			// if (ctx->type_level == 0 && entity->state == EntityState_InProgress) {
-			// 	error(entity->token, "Illegal declaration cycle of `%.*s`", LIT(entity->token.string));
-			// 	for_array(j, *ctx->type_path) {
-			// 		Entity *k = (*ctx->type_path)[j];
-			// 		error(k->token, "\t%.*s refers to", LIT(k->token.string));
-			// 	}
-			// 	error(entity->token, "\t%.*s", LIT(entity->token.string));
-			// 	*type = t_invalid;
-			// }
 			return true;
 		}
 

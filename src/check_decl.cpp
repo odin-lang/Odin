@@ -376,6 +376,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
+	init = unparen_expr(init);
 
 	if (e->flags & EntityFlag_Visited) {
 		e->type = t_invalid;
@@ -409,6 +410,18 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 			e->kind = Entity_TypeName;
 			e->type = nullptr;
 
+			if (entity != nullptr && entity->type != nullptr &&
+			    is_type_polymorphic_record_unspecialized(entity->type)) {
+				DeclInfo *decl = decl_info_of_entity(e);
+				if (decl != nullptr) {
+					if (decl->attributes.count > 0) {
+						error(decl->attributes[0], "Constant alias declarations cannot have attributes");
+					}
+				}
+
+				override_entity_in_scope(e, entity);
+				return;
+			}
 			check_type_decl(ctx, e, ctx->decl->init_expr, named_type);
 			return;
 		}
