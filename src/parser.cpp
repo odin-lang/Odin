@@ -1994,14 +1994,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
-		} /* else if (name.string == "no_deferred") {
-			operand = parse_expr(f, false);
-			if (unparen_expr(operand)->kind != Ast_CallExpr) {
-				syntax_error(operand, "#no_deferred can only be applied to procedure calls");
-				operand = ast_bad_expr(f, token, f->curr_token);
-			}
-			operand->state_flags |= StateFlag_no_deferred;
-		} */ else if (name.string == "file") {
+		} else if (name.string == "file") {
 			return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
@@ -2046,6 +2039,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return original_type;
 		} else if (name.string == "bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
+			if (operand == nullptr) {
+				syntax_error(token, "Invalid expresssion for #%.*s", LIT(name.string));
+				return nullptr;
+			}
 			operand->state_flags |= StateFlag_bounds_check;
 			if ((operand->state_flags & StateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
@@ -2053,6 +2050,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return operand;
 		} else if (name.string == "no_bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
+			if (operand == nullptr) {
+				syntax_error(token, "Invalid expresssion for #%.*s", LIT(name.string));
+				return nullptr;
+			}
 			operand->state_flags |= StateFlag_no_bounds_check;
 			if ((operand->state_flags & StateFlag_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
