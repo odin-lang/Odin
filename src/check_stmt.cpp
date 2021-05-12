@@ -960,9 +960,44 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				Operand b1 = rhs;
 				check_comparison(ctx, &a1, &b1, Token_LtEq);
 
-				add_constant_switch_case(ctx, &seen, lhs);
-				if (upper_op == Token_GtEq) {
-					add_constant_switch_case(ctx, &seen, rhs);
+				if (is_type_enum(x.type)) {
+					// TODO(bill): Fix this logic so it's fast!!!
+
+					i64 v0 = exact_value_to_i64(lhs.value);
+					i64 v1 = exact_value_to_i64(rhs.value);
+					Operand v = {};
+					v.mode = Addressing_Constant;
+					v.type = x.type;
+					v.expr = x.expr;
+
+					Type *bt = base_type(x.type);
+					GB_ASSERT(bt->kind == Type_Enum);
+					for (i64 vi = v0; vi <= v1; vi++) {
+						if (upper_op != Token_GtEq && vi == v1) {
+							break;
+						}
+
+						bool found = false;
+						for_array(j, bt->Enum.fields) {
+							Entity *f = bt->Enum.fields[j];
+							GB_ASSERT(f->kind == Entity_Constant);
+
+							i64 fv = exact_value_to_i64(f->Constant.value);
+							if (fv == vi) {
+								found = true;
+								break;
+							}
+						}
+						if (found) {
+							v.value = exact_value_i64(vi);
+							add_constant_switch_case(ctx, &seen, v);
+						}
+					}
+				} else {
+					add_constant_switch_case(ctx, &seen, lhs);
+					if (upper_op == Token_GtEq) {
+						add_constant_switch_case(ctx, &seen, rhs);
+					}
 				}
 
 				if (is_type_string(x.type)) {
