@@ -6023,7 +6023,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			res.value = llvm_const_array(et, elems, cast(unsigned)count);
 			return res;
 		}
-		GB_PANIC("HERE!\n");
+		GB_PANIC("This should not have happened!\n");
 
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
 			cast(char const *)value.value_string.text,
@@ -9715,7 +9715,8 @@ lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterVal
 	switch (param_value.kind) {
 	case ParameterValue_Constant:
 		if (is_type_constant_type(parameter_type)) {
-			return lb_const_value(p->module, parameter_type, param_value.value);
+			auto res = lb_const_value(p->module, parameter_type, param_value.value);
+			return res;
 		} else {
 			ExactValue ev = param_value.value;
 			lbValue arg = {};

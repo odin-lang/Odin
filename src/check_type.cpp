@@ -1207,12 +1207,22 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 		init_core_source_code_location(ctx->checker);
 		param_value.kind = ParameterValue_Location;
 		o.type = t_source_code_location;
+
+		if (in_type) {
+			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		}
+
 	} else {
 		if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
 		} else {
 			check_expr(ctx, &o, expr);
 		}
+
+		if (in_type) {
+			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		}
+
 
 		if (is_operand_nil(o)) {
 			param_value.kind = ParameterValue_Nil;
@@ -1221,16 +1231,7 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				param_value.kind = ParameterValue_Constant;
 				param_value.value = exact_value_procedure(expr);
 			} else {
-				Entity *e = nullptr;
-				// if (o.mode == Addressing_Value && is_type_proc(o.type)) {
-				if (o.mode == Addressing_Value || o.mode == Addressing_Variable) {
-					Operand x = {};
-					if (expr->kind == Ast_Ident) {
-						e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
-					} else if (expr->kind == Ast_SelectorExpr) {
-						e = check_selector(ctx, &x, expr, nullptr);
-					}
-				}
+				Entity *e = entity_from_expr(o.expr);
 
 				if (e != nullptr) {
 					if (e->kind == Entity_Procedure) {
@@ -1265,10 +1266,6 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				error(o.expr, "Invalid constant parameter");
 			}
 		}
-	}
-
-	if (in_type) {
-		check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 	}
 
 	if (out_type_) {

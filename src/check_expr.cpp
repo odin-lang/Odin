@@ -621,7 +621,9 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
-			add_entity_use(c, operand->expr, poly_proc_data.gen_entity);
+			Entity *e = poly_proc_data.gen_entity;
+			add_type_and_value(c->info, operand->expr, Addressing_Value, e->type, {});
+			add_entity_use(c, operand->expr, e);
 			return 4;
 		}
 	}
