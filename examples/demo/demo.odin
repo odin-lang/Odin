@@ -1352,8 +1352,8 @@ bit_set_type :: proc() {
 
 		d: Days;
 		d = {Sunday, Monday};
-		e := d | WEEKEND;
-		e |= {Monday};
+		e := d + WEEKEND;
+		e += {Monday};
 		fmt.println(d, e);
 
 		ok := Saturday in e; // `in` is only allowed for `map` and `bit_set` types
@@ -1372,12 +1372,12 @@ bit_set_type :: proc() {
 		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
 		fmt.println(typeid_of(type_of(y))); // bit_set[0..8; u16]
 
-		incl(&x, 'F');
+		x += {'F'};
 		assert('F' in x);
-		excl(&x, 'F');
+		x -= {'F'};
 		assert('F' not_in x);
 
-		y |= {1, 4, 2};
+		y += {1, 4, 2};
 		assert(2 in y);
 	}
 	{
