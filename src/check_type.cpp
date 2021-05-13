@@ -1254,8 +1254,11 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				} else if (allow_caller_location && o.mode == Addressing_Context) {
 					param_value.kind = ParameterValue_Value;
 					param_value.ast_value = expr;
+				} else if (o.value.kind != ExactValue_Invalid) {
+					param_value.kind = ParameterValue_Constant;
+					param_value.value = o.value;
 				} else {
-					error(expr, "Default parameter must be a constant");
+					error(expr, "Default parameter must be a constant, %d", o.mode);
 				}
 			}
 		} else {
@@ -1414,10 +1417,19 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			type = t_invalid;
 		}
 
-		if (param_value.kind != ParameterValue_Invalid && is_type_polymorphic(type)) {
-			gbString str = type_to_string(type);
-			error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
-			gb_string_free(str);
+		if (is_type_polymorphic(type)) {
+			switch (param_value.kind) {
+			case ParameterValue_Invalid:
+			case ParameterValue_Constant:
+			case ParameterValue_Nil:
+				break;
+			case ParameterValue_Location:
+			case ParameterValue_Value:
+				gbString str = type_to_string(type);
+				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
+				gb_string_free(str);
+				break;
+			}
 		}
 
 
