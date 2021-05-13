@@ -345,7 +345,13 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
-	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; Type *type_hint; }) \
+	AST_KIND(TypeAssertion, "type assertion", struct { \
+		Ast *expr; \
+		Token dot; \
+		Ast *type; \
+		Type *type_hint; \
+		bool ignores[2]; \
+	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
 	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
