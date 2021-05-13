@@ -2429,6 +2429,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_type_is_variant_of:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *v = check_type(c, ce->args[1]);
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+
+			bool is_variant = false;
+
+			for_array(i, u->Union.variants) {
+				Type *vt = u->Union.variants[i];
+				if (are_types_identical(v, vt)) {
+					is_variant = true;
+					break;
+				}
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			operand->value = exact_value_bool(is_variant);
+		}
+		break;
+
 	case BuiltinProc_type_struct_field_count:
 		operand->value = exact_value_i64(0);
 		if (operand->mode != Addressing_Type) {
