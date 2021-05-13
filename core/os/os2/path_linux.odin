@@ -1,0 +1,30 @@
+//+private
+package os2
+
+_Path_Separator      :: '/';
+_Path_List_Separator :: ';';
+
+_is_path_separator :: proc(c: byte) -> bool {
+    return c == _Path_Separator;
+}
+
+_mkdir :: proc(name: string, perm: File_Mode) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_mkdir_all :: proc(path: string, perm: File_Mode) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_remove_all :: proc(path: string) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
+	return "", nil;
+}
+
+_setwd :: proc(dir: string) -> (err: Error) {
+	return nil;
+}
+
