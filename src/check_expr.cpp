@@ -3949,6 +3949,16 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
 				}
 
+				if (o.mode == Addressing_OptionalOk && expr->kind == Ast_TypeAssertion) {
+					// NOTE(bill): Used only for optimizations in the backend
+					if (is_blank_ident(lhs[0].expr)) {
+						expr->TypeAssertion.ignores[0] = true;
+					}
+					if (is_blank_ident(lhs[1].expr)) {
+						expr->TypeAssertion.ignores[1] = true;
+					}
+				}
+
 				array_add(operands, val0);
 				array_add(operands, val1);
 				optional_ok = true;
@@ -4061,6 +4071,16 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 				if (do_normal) {
 					Type *tuple = make_optional_ok_type(o.type);
 					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+				}
+
+				if (o.mode == Addressing_OptionalOk && expr->kind == Ast_TypeAssertion) {
+					// NOTE(bill): Used only for optimizations in the backend
+					if (is_blank_ident(lhs[0]->token)) {
+						expr->TypeAssertion.ignores[0] = true;
+					}
+					if (is_blank_ident(lhs[1]->token)) {
+						expr->TypeAssertion.ignores[1] = true;
+					}
 				}
 
 				array_add(operands, val0);

@@ -11119,7 +11119,54 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	return value;
 }
 
-lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos pos, bool do_conversion_check=true) {
+lbValue lb_emit_union_cast_only_ok_check(lbProcedure *p, lbValue value, Type *type, TokenPos pos) {
+	GB_ASSERT(is_type_tuple(type));
+	lbModule *m = p->module;
+
+	Type *src_type = value.type;
+	bool is_ptr = is_type_pointer(src_type);
+
+
+	// IMPORTANT NOTE(bill): This assumes that the value is completely ignored
+	// so when it does an assignment, it complete ignores the value.
+	// Just make it two booleans and ignore the first one
+	//
+	// _, ok := x.(T);
+	//
+	Type *ok_type = type->Tuple.variables[1]->type;
+	Type *gen_tuple_types[2] = {};
+	gen_tuple_types[0] = ok_type;
+	gen_tuple_types[1] = ok_type;
+
+	Type *gen_tuple = alloc_type_tuple_from_field_types(gen_tuple_types, gb_count_of(gen_tuple_types), false, true);
+
+	lbAddr v = lb_add_local_generated(p, gen_tuple, false);
+
+	if (is_ptr) {
+		value = lb_emit_load(p, value);
+	}
+	Type *src = base_type(type_deref(src_type));
+	GB_ASSERT_MSG(is_type_union(src), "%s", type_to_string(src_type));
+	Type *dst = type->Tuple.variables[0]->type;
+
+	lbValue cond = {};
+
+	if (is_type_union_maybe_pointer(src)) {
+		lbValue data = lb_emit_transmute(p, value, dst);
+		cond = lb_emit_comp_against_nil(p, Token_NotEq, data);
+	} else {
+		lbValue tag = lb_emit_union_tag_value(p, value);
+		lbValue dst_tag = lb_const_union_tag(m, src, dst);
+		cond = lb_emit_comp(p, Token_CmpEq, tag, dst_tag);
+	}
+
+	lbValue gep1 = lb_emit_struct_ep(p, v.addr, 1);
+	lb_emit_store(p, gep1, cond);
+
+	return lb_addr_load(p, v);
+}
+
+lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos pos) {
 	lbModule *m = p->module;
 
 	Type *src_type = value.type;
@@ -11183,7 +11230,7 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 	lb_start_block(p, end_block);
 
 	if (!is_tuple) {
-		if (do_conversion_check) {
+		{
 			// NOTE(bill): Panic on invalid conversion
 			Type *dst_type = tuple->Tuple.variables[0]->type;
 
@@ -11487,6 +11534,10 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		lbValue e = lb_build_expr(p, ta->expr);
 		Type *t = type_deref(e.type);
 		if (is_type_union(t)) {
+			if (ta->ignores[0]) {
+				// NOTE(bill): This is not needed for optimization levels other than 0
+				return lb_emit_union_cast_only_ok_check(p, e, type, pos);
+			}
 			return lb_emit_union_cast(p, e, type, pos);
 		} else if (is_type_any(t)) {
 			return lb_emit_any_cast(p, e, type, pos);
