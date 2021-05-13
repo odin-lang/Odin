@@ -159,6 +159,7 @@ type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
+type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
 
