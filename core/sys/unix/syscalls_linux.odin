@@ -95,10 +95,42 @@ readlink :: proc(name: string, p: []byte) -> int {
 
     result := asm(i32, ^u8, ^u8, int) -> int {
         "syscall",
-        "={rax},{rax},{rdi},{rsi}",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
     }(syscall_readlink, strings.ptr_from_string(name), raw_data(p), len(p));
 
     return result;
 }
 
+mkdir :: proc(name: string, mode: u16) -> int {
+    @static syscall_mkdir :i32= 83;
+
+    result := asm(i32, ^u8, u16) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_mkdir, strings.ptr_from_string(name), mode);
+
+    return result;
+}
+
+getcwd :: proc(p: []byte) -> ^u8 {
+    @static syscall_getcwd :i32= 79;
+
+    result := asm(i32, ^u8, int) -> ^u8 {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_getcwd, &p[0], len(p));
+
+    return result;
+}
+
+rmdir :: proc(name: string) -> int {
+    @static syscall_rmdir :i32= 84;
+
+    result := asm(i32, ^u8) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_rmdir, strings.ptr_from_string(name));
+
+    return result;
+}
 
