@@ -18,7 +18,7 @@ close :: proc(fd: int) -> int {
 
     result := asm(i32, int) -> int {
         "syscall",
-        "={rax},{rdi}{rsi}",
+        "={rax},{rax}{rdi}",
     }(syscall_close, fd);
 
     return result;
@@ -29,18 +29,18 @@ lseek :: proc(fd: int, offset: i64, whence: uint) -> i64 {
 
     result := asm(i32, int, i64, uint) -> i64 {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}{rsx}",
+        "={rax},{rax}{rdi}{rsi}{rdx}",
     }(syscall_lseek, fd, offset, whence);
 
     return result;
 }
 
-read :: proc(fd: int, p: []byte) -> int {
+read :: proc"contextless"(fd: int, p: []byte) -> int {
     @static syscall_read :i32= 0;
 
-    result := asm(i32, int, ^u8, int) -> int #sideeffects {
+    result := asm(i32, int, ^u8, int) -> int {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}{rsx}",
+        "={rax},{rax}{rdi}{rsi}{rdx}",
     }(syscall_read, fd, raw_data(p), len(p));
 
     return int(result);
@@ -71,7 +71,7 @@ fsync :: proc(fd: int) -> int {
 fstat :: proc(fd: int, stat: uintptr) -> int {
     @static syscall_fstat :i32= 5;
 
-    result := asm(i32, int, uintptr) -> int #sideeffects {
+    result := asm(i32, int, uintptr) -> int {
         "syscall",
         "={rax},{rax}{rdi}{rsi}",
     }(syscall_fstat, fd, stat);
