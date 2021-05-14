@@ -7,7 +7,7 @@ open :: proc(name: string, flags: int, mode: u32) -> int {
 
     result := asm(i32, ^u8, int, u32) -> int {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}{rdx}",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
     }(syscall_open, strings.ptr_from_string(name), flags, mode);
 
     return result;
@@ -18,7 +18,7 @@ close :: proc(fd: int) -> int {
 
     result := asm(i32, int) -> int {
         "syscall",
-        "={rax},{rax}{rdi}",
+        "={rax},{rax},{rdi}",
     }(syscall_close, fd);
 
     return result;
@@ -29,7 +29,7 @@ lseek :: proc(fd: int, offset: i64, whence: uint) -> i64 {
 
     result := asm(i32, int, i64, uint) -> i64 {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}{rdx}",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
     }(syscall_lseek, fd, offset, whence);
 
     return result;
@@ -40,7 +40,7 @@ read :: proc"contextless"(fd: int, p: []byte) -> int {
 
     result := asm(i32, int, ^u8, int) -> int {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}{rdx}",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
     }(syscall_read, fd, raw_data(p), len(p));
 
     return int(result);
@@ -51,7 +51,7 @@ write :: proc(fd: int, p: []byte) -> int {
     
     result := asm(i32, int, ^u8, int) -> int {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}{rdx}",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
     }(syscall_write, fd, raw_data(p), len(p));
 
     return result;
@@ -62,7 +62,7 @@ fsync :: proc(fd: int) -> int {
     
     result := asm(i32, int) -> int {
         "syscall",
-        "={rax},{rax}{rdi}",
+        "={rax},{rax},{rdi}",
     }(syscall_fsync, fd);
 
     return result;
@@ -73,8 +73,32 @@ fstat :: proc(fd: int, stat: uintptr) -> int {
 
     result := asm(i32, int, uintptr) -> int {
         "syscall",
-        "={rax},{rax}{rdi}{rsi}",
+        "={rax},{rax},{rdi},{rsi}",
     }(syscall_fstat, fd, stat);
 
     return result;
 }
+
+lstat :: proc(name: string, stat: uintptr) -> int {
+    @static syscall_lstat :i32= 6;
+
+    result := asm(i32, ^u8, uintptr) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_lstat, strings.ptr_from_string(name), stat);
+
+    return result;
+}
+
+readlink :: proc(name: string, p: []byte) -> int {
+    @static syscall_readlink :i32= 89;
+
+    result := asm(i32, ^u8, ^u8, int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_readlink, strings.ptr_from_string(name), raw_data(p), len(p));
+
+    return result;
+}
+
+
