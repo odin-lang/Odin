@@ -39,8 +39,7 @@ _remove_all :: proc(path: string) -> Maybe(Path_Error) {
 }
 
 _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
-    // TODO(rytc): don't hardcode max path length
-    buff := make([]byte, 4094, allocator);
+    buff := make([]byte, MAX_PATH_LENGTH, allocator);
     result := unix.getcwd(buff);
     if result == nil {
         return "", Error.Permission_Denied;
@@ -53,3 +52,7 @@ _setwd :: proc(dir: string) -> (err: Error) {
 	return _unix_errno(error);
 }
 
+_is_relative_path :: proc(name: string) -> bool {
+    if name[0] == '/' do return false;
+    return true;
+}
