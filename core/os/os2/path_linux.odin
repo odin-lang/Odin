@@ -7,8 +7,9 @@ import "core:strings"
 _Path_Separator      :: '/';
 _Path_List_Separator :: ';';
 
-// TODO(rytc): Need to investigate this, not giving the expected permissions
-@private _Default_Perm: u16: 00755;
+// NOTE(rytc): the mkdir (and open()) permissions are masked with the processes
+// permissions, so the resulting access permissions may end up different.
+@private _Default_Perm :: 00755;
 
 _is_path_separator :: proc(c: byte) -> bool {
     return c == _Path_Separator;
@@ -30,6 +31,10 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Maybe(Path_Error) {
 }
 
 _remove_all :: proc(path: string) -> Maybe(Path_Error) {
+    dirs := strings.split(path, ";");
+    for d in dirs {
+        unix.rmdir(d);
+    }
 	return nil;
 }
 
