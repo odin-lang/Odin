@@ -143,7 +143,6 @@ chmod :: proc(name: string, perm: u16) -> int {
     }(syscall_chmod, strings.ptr_from_string(name), perm);
 
     return result;
-
 }
 
 umask :: proc(mask: int) -> int {
@@ -155,5 +154,15 @@ umask :: proc(mask: int) -> int {
     }(syscall_umask, mask);
 
     return result;
+}
 
+chdir :: proc(name: string) -> int {
+    @static syscall_chdir :i32= 80;
+
+    result := asm(i32, ^u8) -> int {
+        "syscall",
+        "={rax},{rax},{rdi}",
+    }(syscall_chdir, strings.ptr_from_string(name));
+
+    return result;
 }
