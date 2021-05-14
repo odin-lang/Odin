@@ -6,6 +6,10 @@ import "core:io"
 import "core:sys/unix"
 import "core:time"
 
+// Max length in bytes defined by Linux
+MAX_PATH_LENGTH     :: 4096;
+MAX_FILENAME_LENGTH :: 255;
+
 _create :: proc(name: string) -> (Handle, Error) {
     fd := unix.open(name, O_CREATE, 0);
     return transmute(Handle)fd, _unix_errno(fd);

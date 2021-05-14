@@ -45,19 +45,12 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     result : File_Info;
     if err < 0 do return result, nil;
 
-    // TODO(rytc): don't hard code "max path"
-    // TODO(rytc): Should we force the temp allocator or let the user choose?
-    path := make([]byte, 4096, context.temp_allocator);
+    path := make([]byte, MAX_PATH_LENGTH, allocator);
     fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
     unix.readlink(fd_path, path[:]);
     
-    // TODO(rytc): this is bad. We don't want to return something
-    // that was allocated on the temp allocator, because it could
-    // potentially be stored.
     fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
     
-    // TODO(rytc): don't hardcode the path separator?
-    // TODO(rytc): SLOW
     filename_break := strings.last_index_byte(fullpath, '/') + 1;
     name := strings.string_from_ptr(&path[filename_break], len(fullpath) - filename_break);
     
@@ -84,9 +77,24 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe
 
     result : File_Info;
     if err < 0 do return result,nil;
+  
+    filename_break := strings.last_index_byte(name, '/') + 1;
 
-    //result.fullpath = ""
-    result.name = name; 
+    if _is_relative_path(name) {
+        result.name = fmt.aprint(name[filename_break:]);
+
+        fullpath := make([]string, 3, context.temp_allocator);
+        cwd,err := _getwd(context.temp_allocator);
+        fullpath[0] = cwd;
+        fullpath[1] = "/"; //_Path_Separator,
+        fullpath[2] = result.name;
+
+        result.fullpath = strings.concatenate(fullpath, allocator); 
+    } else {
+        result.fullpath = name;
+        result.name = fmt.aprint(name[filename_break:]);
+    }
+
     result.size = stat.size;
     result.mode = _get_mode(stat.mode);
     result.creation_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
