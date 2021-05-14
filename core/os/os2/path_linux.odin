@@ -49,6 +49,7 @@ _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
 }
 
 _setwd :: proc(dir: string) -> (err: Error) {
-	return nil;
+    error := unix.chdir(dir);
+	return _unix_errno(error);
 }
 
