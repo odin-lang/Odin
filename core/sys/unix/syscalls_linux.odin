@@ -1,10 +1,9 @@
 package unix
 
-import "core:slice"
 import "core:strings"
 
 open :: proc(name: string, flags: int, mode: u32) -> int {
-    @static syscall_open :i32 =  2;
+    @static syscall_open :i32 = 2;
 
     result := asm(i32, ^u8, int, u32) -> int {
         "syscall",
@@ -15,7 +14,7 @@ open :: proc(name: string, flags: int, mode: u32) -> int {
 }
 
 close :: proc(fd: int) -> int {
-    @static syscall_close :i32 =  3;
+    @static syscall_close :i32 = 3;
 
     result := asm(i32, int) -> int {
         "syscall",
@@ -26,7 +25,7 @@ close :: proc(fd: int) -> int {
 }
 
 lseek :: proc(fd: int, offset: i64, whence: uint) -> i64 {
-    @static syscall_lseek :i32 =  8;
+    @static syscall_lseek :i32 = 8;
 
     result := asm(i32, int, i64, uint) -> i64 {
         "syscall",
@@ -37,15 +36,15 @@ lseek :: proc(fd: int, offset: i64, whence: uint) -> i64 {
 }
 
 read :: proc(fd: int, p: []byte) -> int {
-    @static syscall_read :i32=  8;
+    @static syscall_read :i32= 0;
 
-    result := asm(i32, int, ^u8, int) -> int {
+    result := asm(i32, int, ^u8, int) -> int #sideeffects {
         "syscall",
         "={eax},{eax}{ebx}{ecx}{edx}",
-    }(syscall_read, fd, &p[0], len(p));
+    }(syscall_read, fd, raw_data(p), len(p));
 
-    return result;
-}
+    return int(result);
+};
 
 write :: proc(fd: int, p: []byte) -> int {
     @static syscall_write :i32= 1;
@@ -72,10 +71,10 @@ fsync :: proc(fd: int) -> int {
 fstat :: proc(fd: int, stat: uintptr) -> int {
     @static syscall_fstat :i32= 5;
 
-    error := asm(i32, uintptr) -> int {
+    result := asm(i32, int, uintptr) -> int #sideeffects {
         "syscall",
-        "={eax},{eax}{ebx}",
-    }(syscall_fstat, stat);
+        "={eax},{eax}{ebx}{ecx}",
+    }(syscall_fstat, fd, stat);
 
-    return error;
+    return result;
 }

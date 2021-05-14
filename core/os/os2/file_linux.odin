@@ -4,6 +4,7 @@ package os2
 import "core:strings"
 import "core:io"
 import "core:sys/unix"
+import "core:time"
 
 _create :: proc(name: string) -> (Handle, Error) {
     fd := unix.open(name, O_CREATE, 0);
@@ -74,12 +75,10 @@ _write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
     return n,err;
 }
 
-// TODO(rytc): temporary stub
 _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
     return 0,Error.Invalid_Argument;
 }
 
-// TODO(rytc): temporary stub
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
     return 0,Error.Invalid_Argument;
 }
@@ -91,6 +90,62 @@ _sync :: proc(fd: Handle) -> Error {
 
 _flush :: proc(fd: Handle) -> Error {
     return _sync(fd);
+}
+
+_truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_remove :: proc(name: string) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+	return nil;
+}
+
+_symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+	return nil; 
+}
+
+_read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
+	return "",nil;
+}
+
+_chdir :: proc(fd: Handle) -> Error {
+	return Error.Invalid_Argument;
+}
+
+_chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
+	return Error.Invalid_Argument;
+}
+
+_chown :: proc(fd: Handle, uid, gid: int) -> Error {
+	return Error.Invalid_Argument; 
+}
+
+_lchown :: proc(name: string, uid, gid: int) -> Error {
+	return Error.Invalid_Argument; 
+}
+
+_chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
+	return nil;
+}
+
+_exists :: proc(path: string) -> bool {
+	return false;
+}
+
+_is_file :: proc(path: string) -> bool {
+	return false;
+}
+
+_is_dir :: proc(path: string) -> bool {
+	return false;
 }
 
 @private
