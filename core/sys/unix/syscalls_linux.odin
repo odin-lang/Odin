@@ -128,9 +128,32 @@ rmdir :: proc(name: string) -> int {
 
     result := asm(i32, ^u8) -> int {
         "syscall",
-        "={rax},{rax},{rdi},{rsi}",
+        "={rax},{rax},{rdi}",
     }(syscall_rmdir, strings.ptr_from_string(name));
 
     return result;
 }
 
+chmod :: proc(name: string, perm: u16) -> int {
+    @static syscall_chmod :i32= 90;
+
+    result := asm(i32, ^u8, u16) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_chmod, strings.ptr_from_string(name), perm);
+
+    return result;
+
+}
+
+umask :: proc(mask: int) -> int {
+    @static syscall_umask :i32= 95;
+
+    result := asm(i32, int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi}",
+    }(syscall_umask, mask);
+
+    return result;
+
+}
