@@ -48,8 +48,8 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     // TODO(rytc): don't hard code "max path"
     // TODO(rytc): Should we force the temp allocator or let the user choose?
     path := make([]byte, 4096, context.temp_allocator);
-    //unix.readlink(fmt.tprint("/proc/self/fd/%", transmute(uint)fd), path[:]);
-    unix.readlink("/proc/self/fd/3", path[:]);
+    fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
+    unix.readlink(fd_path, path[:]);
     
     // TODO(rytc): this is bad. We don't want to return something
     // that was allocated on the temp allocator, because it could
@@ -58,10 +58,9 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     
     // TODO(rytc): don't hardcode the path separator?
     // TODO(rytc): SLOW
-    filename_break := strings.last_index_byte(fullpath, '/');
-    name := strings.string_from_ptr(&path[filename_break+1], len(fullpath) - filename_break);
-    //name := "";
-
+    filename_break := strings.last_index_byte(fullpath, '/') + 1;
+    name := strings.string_from_ptr(&path[filename_break], len(fullpath) - filename_break);
+    
     result.fullpath = fullpath;
     result.name = name;
     result.size = stat.size;
