@@ -184,7 +184,29 @@ rename :: proc(old_name: string, new_name: string) -> int {
     result := asm(i32, ^u8, ^u8) -> int {
         "syscall",
         "={rax},{rax},{rdi},{rsi}",
-    }(syscall_rename, strings.ptr_from_string(oldname), strings.ptr_from_string(newname));
+    }(syscall_rename, strings.ptr_from_string(old_name), strings.ptr_from_string(new_name));
+
+    return result;
+}
+
+link :: proc(old_name: string, new_name: string) -> int {
+    @static syscall_link :i32= 86;
+
+    result := asm(i32, ^u8, ^u8) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_link, strings.ptr_from_string(old_name), strings.ptr_from_string(new_name));
+
+    return result;
+}
+
+symlink :: proc(old_name: string, new_name: string) -> int {
+    @static syscall_symlink :i32= 88;
+
+    result := asm(i32, ^u8, ^u8) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_symlink, strings.ptr_from_string(old_name), strings.ptr_from_string(new_name));
 
     return result;
 }

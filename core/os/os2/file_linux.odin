@@ -111,7 +111,7 @@ _truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
 }
 
 _remove :: proc(name: string) -> Maybe(Path_Error) {
-	return nil;
+	return Path_Error{"Remove (not implemented)", name, Error.Invalid_Argument};
 }
 
 _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
@@ -124,15 +124,28 @@ _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
 }
 
 _link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+    err := unix.link(old_name, new_name);
+    if err < 0 {
+        return Link_Error{"Link", old_name, new_name, _unix_errno(err)};
+    }
 	return nil;
 }
 
 _symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+    err := unix.symlink(old_name, new_name);
+    if err < 0 {
+        return  Link_Error{"Link", old_name, new_name, _unix_errno(err)};
+    }
 	return nil; 
 }
 
 _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
-	return "",nil;
+    p := make([]byte, MAX_PATH_LENGTH, context.allocator);
+    err := unix.readlink(name, p);
+    if err < 0 {
+        return name, Path_Error{"readlink", name, _unix_errno(err)};
+    }
+	return strings.string_from_ptr(raw_data(p), len(p)), nil;
 }
 
 _chdir :: proc(fd: Handle) -> Error {
