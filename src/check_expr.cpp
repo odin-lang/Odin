@@ -1132,7 +1132,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	Entity *e = scope_lookup(c->scope, name);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
-			error(n, "'_' cannot be used as a value type");
+			error(n, "'_' cannot be used as a value");
 		} else {
 			error(n, "Undeclared name: %.*s", LIT(name));
 		}
