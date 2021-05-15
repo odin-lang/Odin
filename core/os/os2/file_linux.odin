@@ -1,6 +1,7 @@
 //+private
 package os2
 
+import "core:fmt"
 import "core:strings"
 import "core:io"
 import "core:sys/unix"
@@ -83,9 +84,9 @@ _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
 
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
     stat : Unix_Stat;
-    err := unix.fstat(transmute(int)handle, uintptr(&stat));
+    stat_err := unix.fstat(transmute(int)fd, uintptr(&stat));
 
-    return stat.size, _unix_errno(err);
+    return stat.size, _unix_errno(stat_err);
 }
 
 _sync :: proc(fd: Handle) -> Error {
@@ -133,7 +134,7 @@ _chdir :: proc(fd: Handle) -> Error {
     // NOTE(rytc): I assume this is suppose to change the working directory to the same directory as the file 
     fullpath := _get_handle_path(fd, context.temp_allocator);
     filename_break := strings.last_index_byte(fullpath, '/');
-    dir := fmt.fprintf(fullpath[:filename_break]);
+    dir := fmt.tprintf(fullpath[:filename_break], filename_break);
     err := unix.chdir(dir);
 	return _unix_errno(err);
 }
@@ -160,13 +161,13 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
 
 _exists :: proc(path: string) -> bool {
     stat : Unix_Stat;
-    err := unix.lstat(path, uintptr(&stat);
-	return (_unix_errno(err) != Error.Not_Exist;
+    err := unix.lstat(path, uintptr(&stat));
+	return (_unix_errno(err) != Error.Not_Exist);
 }
 
 _is_file :: proc(path: string) -> bool {
     stat : Unix_Stat;
-    err := unix.lstat(path, uintptr(&stat);
+    err := unix.lstat(path, uintptr(&stat));
     if err >= 0 {
     	return (_unix_get_mode(stat.mode) < File_Mode_Dir);
     } else {
@@ -176,7 +177,7 @@ _is_file :: proc(path: string) -> bool {
 
 _is_dir :: proc(path: string) -> bool {
     stat : Unix_Stat;
-    err := unix.lstat(path, uintptr(&stat);
+    err := unix.lstat(path, uintptr(&stat));
     if err >= 0 {
         return (_unix_get_mode(stat.mode) == File_Mode_Dir);
     } else {
