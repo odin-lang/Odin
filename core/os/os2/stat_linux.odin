@@ -48,7 +48,7 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     }
         
     filename_break := strings.last_index_byte(fullpath, '/') + 1;
-    name := strings.string_from_ptr(&path[filename_break], len(fullpath) - filename_break);
+    name := fullpath[filename_break:];
     
     result.fullpath = fullpath;
     result.name = name;
