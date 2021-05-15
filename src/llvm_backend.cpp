@@ -2971,72 +2971,6 @@ Type *struct_type_from_systemv_distribute_struct_fields(Type *abi_type) {
 }
 
 
-lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 index) {
-	lbParamPasskind kind = lbParamPass_Value;
-	lbValue v = lb_value_param(p, e, abi_type, index, &kind);
-	array_add(&p->params, v);
-
-	lbValue res = {};
-
-	switch (kind) {
-	case lbParamPass_Value: {
-		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue x = v;
-		if (abi_type == t_llvm_bool) {
-			x = lb_emit_conv(p, x, t_bool);
-		}
-		lb_addr_store(p, l, x);
-		return x;
-	}
-	case lbParamPass_Pointer:
-		lb_add_entity(p->module, e, v);
-		return lb_emit_load(p, v);
-
-	case lbParamPass_Integer: {
-		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue iptr = lb_emit_conv(p, l.addr, alloc_type_pointer(abi_type));
-		lb_emit_store(p, iptr, v);
-		return lb_addr_load(p, l);
-	}
-
-	case lbParamPass_ConstRef:
-		lb_add_entity(p->module, e, v);
-		return lb_emit_load(p, v);
-
-	case lbParamPass_BitCast: {
-		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue x = lb_emit_transmute(p, v, e->type);
-		lb_addr_store(p, l, x);
-		return x;
-	}
-	case lbParamPass_Tuple: {
-		lbAddr l = lb_add_local(p, e->type, e, true, index);
-		Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
-		lbValue ptr = lb_emit_transmute(p, l.addr, alloc_type_pointer(st));
-		if (abi_type->Tuple.variables.count > 0) {
-			array_pop(&p->params);
-		}
-		for_array(i, abi_type->Tuple.variables) {
-			Type *t = abi_type->Tuple.variables[i]->type;
-			GB_ASSERT(!is_type_tuple(t));
-
-			lbParamPasskind elem_kind = lbParamPass_Value;
-			lbValue elem = lb_value_param(p, nullptr, t, index+cast(i32)i, &elem_kind);
-			array_add(&p->params, elem);
-
-			lbValue dst = lb_emit_struct_ep(p, ptr, cast(i32)i);
-			lb_emit_store(p, dst, elem);
-		}
-		return lb_addr_load(p, l);
-	}
-
-	}
-
-
-	GB_PANIC("Unreachable");
-	return {};
-}
-
 void lb_start_block(lbProcedure *p, lbBlock *b) {
 	GB_ASSERT(b != nullptr);
 	if (!b->appended) {
@@ -4072,38 +4006,31 @@ void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_type,
 }
 
 
-void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node, Type *val_type,
-                             lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
+void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
+                             AstRangeStmt *rs, Scope *scope) {
+	bool ADD_EXTRA_WRAPPING_CHECK = true;
+
 	lbModule *m = p->module;
 
-	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
-	// If 'lower' is changed, should 'val' do so or is that not typical behaviour?
+	lb_open_scope(p, scope);
 
-	lbValue lower = lb_build_expr(p, node->left);
-	lbValue upper = {};
-
-	lbValue val = {};
-	lbValue idx = {};
-	lbBlock *loop = nullptr;
-	lbBlock *done = nullptr;
-	lbBlock *body = nullptr;
-
-	if (val_type == nullptr) {
-		val_type = lower.type;
+	Type *val0_type = nullptr;
+	Type *val1_type = nullptr;
+	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
+		val0_type = type_of_expr(rs->vals[0]);
 	}
-	lbAddr value = lb_add_local_generated(p, val_type, false);
-	lb_addr_store(p, value, lower);
+	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
+		val1_type = type_of_expr(rs->vals[1]);
+	}
 
-	lbAddr index = lb_add_local_generated(p, t_int, false);
-	lb_addr_store(p, index, lb_const_int(m, t_int, 0));
-
-	loop = lb_create_block(p, "for.interval.loop");
-	lb_emit_jump(p, loop);
-	lb_start_block(p, loop);
-
-	body = lb_create_block(p, "for.interval.body");
-	done = lb_create_block(p, "for.interval.done");
-
+	if (val0_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[0]);
+		lb_add_local(p, e->type, e, true);
+	}
+	if (val1_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[1]);
+		lb_add_local(p, e->type, e, true);
+	}
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
@@ -4112,23 +4039,71 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node, Type *val_type
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
 
-	upper = lb_build_expr(p, node->right);
+	lbValue lower = lb_build_expr(p, node->left);
+	lbValue upper = {}; // initialized each time in the loop
 
+	lbAddr value = lb_add_local_generated(p, val0_type ? val0_type : lower.type, false);
+	lb_addr_store(p, value, lower);
+
+	lbAddr index = lb_add_local_generated(p, t_int, false);
+	lb_addr_store(p, index, lb_const_int(m, t_int, 0));
+
+	lbBlock *loop = lb_create_block(p, "for.interval.loop");
+	lbBlock *body = lb_create_block(p, "for.interval.body");
+	lbBlock *done = lb_create_block(p, "for.interval.done");
+
+	lb_emit_jump(p, loop);
+	lb_start_block(p, loop);
+
+	upper = lb_build_expr(p, node->right);
 	lbValue curr_value = lb_addr_load(p, value);
 	lbValue cond = lb_emit_comp(p, op, curr_value, upper);
 	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
-	val = lb_addr_load(p, value);
-	idx = lb_addr_load(p, index);
+	lbValue val = lb_addr_load(p, value);
+	lbValue idx = lb_addr_load(p, index);
+	if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], val);
+	if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], idx);
 
-	lb_emit_increment(p, value.addr);
-	lb_emit_increment(p, index.addr);
+	{
+		// NOTE: this check block will most likely be optimized out, and is here
+		// to make this code easier to read
+		lbBlock *check = nullptr;
+		lbBlock *post = lb_create_block(p, "for.interval.post");
 
-	if (val_)  *val_  = val;
-	if (idx_)  *idx_  = idx;
-	if (loop_) *loop_ = loop;
-	if (done_) *done_ = done;
+		lbBlock *continue_block = post;
+
+		if (ADD_EXTRA_WRAPPING_CHECK &&
+		    op == Token_LtEq) {
+			check = lb_create_block(p, "for.interval.check");
+			continue_block = check;
+		}
+
+		lb_push_target_list(p, rs->label, done, continue_block, nullptr);
+
+		lb_build_stmt(p, rs->body);
+
+		lb_close_scope(p, lbDeferExit_Default, nullptr);
+		lb_pop_target_list(p);
+
+		if (check != nullptr) {
+			lb_emit_jump(p, check);
+			lb_start_block(p, check);
+
+			lbValue check_cond = lb_emit_comp(p, Token_NotEq, curr_value, upper);
+			lb_emit_if(p, check_cond, post, done);
+		} else {
+			lb_emit_jump(p, post);
+		}
+
+		lb_start_block(p, post);
+		lb_emit_increment(p, value.addr);
+		lb_emit_increment(p, index.addr);
+		lb_emit_jump(p, loop);
+	}
+
+	lb_start_block(p, done);
 }
 
 void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_type, lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
@@ -4283,6 +4258,11 @@ void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *sco
 void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	Ast *expr = unparen_expr(rs->expr);
 
+	if (is_ast_range(expr)) {
+		lb_build_range_interval(p, &expr->BinaryExpr, rs, scope);
+		return;
+	}
+
 	Type *expr_type = type_of_expr(expr);
 	if (expr_type != nullptr) {
 		Type *et = base_type(type_deref(expr_type));
@@ -4319,10 +4299,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	bool is_map = false;
 	TypeAndValue tav = type_and_value_of_expr(expr);
 
-
-	if (is_ast_range(expr)) {
-		lb_build_range_interval(p, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
-	} else if (tav.mode == Addressing_Type) {
+	if (tav.mode == Addressing_Type) {
 		lb_build_range_enum(p, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 	} else {
 		Type *expr_type = type_of_expr(expr);
@@ -7824,10 +7801,13 @@ lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p
 	GB_ASSERT(pt->kind == Type_Proc);
 	GB_ASSERT(pt->Proc.calling_convention == ProcCC_Odin);
 
-	Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
+	String name = str_lit("__.context_ptr");
+
+	Entity *e = alloc_entity_param(nullptr, make_token_ident(name), t_context_ptr, false, false);
 	e->flags |= EntityFlag_NoAlias;
 
 	LLVMValueRef context_ptr = LLVMGetParam(p->value, LLVMCountParams(p->value)-1);
+	LLVMSetValueName2(context_ptr, cast(char const *)name.text, name.len);
 	context_ptr = LLVMBuildPointerCast(p->builder, context_ptr, lb_type(p->module, e->type), "");
 
 	lbValue param = {context_ptr, e->type};
@@ -14241,8 +14221,10 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 
 	{ // initialize `runtime.args__`
 		lbValue argc = {LLVMGetParam(p->value, 0), t_i32};
-		argc = lb_emit_conv(p, argc, t_int);
 		lbValue argv = {LLVMGetParam(p->value, 1), t_ptr_cstring};
+		LLVMSetValueName2(argc.value, "argc", 4);
+		LLVMSetValueName2(argv.value, "argv", 4);
+		argc = lb_emit_conv(p, argc, t_int);
 		lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
 		lb_fill_slice(p, args, argv, argc);
 	}
