@@ -322,19 +322,6 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 		array_add(&array, e);
 		map_set(&ctx->checker->info.gen_types, hash_pointer(original_type), array);
 	}
-
-	{
-		Type *dst_bt = base_type(named_type);
-		Type *src_bt = base_type(original_type);
-		if ((dst_bt != nullptr && src_bt != nullptr) &&
-		    (dst_bt->kind == src_bt->kind)){
-			if (dst_bt->kind == Type_Struct) {
-				if (dst_bt->Struct.atom_op_table == nullptr) {
-					dst_bt->Struct.atom_op_table = src_bt->Struct.atom_op_table;
-				}
-			}
-		}
-	}
 }
 
 Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
