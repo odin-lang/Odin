@@ -248,3 +248,96 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 
 	LLVMAddCFGSimplificationPass(mpm);
 }
+
+void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
+	isize removal_count = 0;
+	isize pass_count = 0;
+	isize const max_pass_count = 10;
+	// Custom remove dead instruction pass
+	for (; pass_count < max_pass_count; pass_count++) {
+		bool was_dead_instructions = false;
+
+		// NOTE(bill): Iterate backwards
+		// reduces the number of passes as things later on will depend on things previously
+		for (LLVMBasicBlockRef block = LLVMGetLastBasicBlock(p->value);
+		     block != nullptr;
+		     block = LLVMGetPreviousBasicBlock(block)) {
+			// NOTE(bill): Iterate backwards
+			// reduces the number of passes as things later on will depend on things previously
+			for (LLVMValueRef instr = LLVMGetLastInstruction(block);
+			     instr != nullptr;
+			     /**/)  {
+				LLVMValueRef curr_instr = instr;
+				instr = LLVMGetPreviousInstruction(instr);
+
+				LLVMUseRef first_use = LLVMGetFirstUse(curr_instr);
+				if (first_use != nullptr)  {
+					continue;
+				}
+				if (LLVMTypeOf(curr_instr) == nullptr) {
+					continue;
+				}
+
+				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
+				switch (LLVMGetInstructionOpcode(curr_instr)) {
+				case LLVMAdd:
+				case LLVMFAdd:
+				case LLVMSub:
+				case LLVMFSub:
+				case LLVMMul:
+				case LLVMFMul:
+				case LLVMUDiv:
+				case LLVMSDiv:
+				case LLVMFDiv:
+				case LLVMURem:
+				case LLVMSRem:
+				case LLVMFRem:
+				case LLVMShl:
+				case LLVMLShr:
+				case LLVMAShr:
+				case LLVMAnd:
+				case LLVMOr:
+				case LLVMXor:
+				case LLVMAlloca:
+				case LLVMLoad:
+				case LLVMGetElementPtr:
+				case LLVMTrunc:
+				case LLVMZExt:
+				case LLVMSExt:
+				case LLVMFPToUI:
+				case LLVMFPToSI:
+				case LLVMUIToFP:
+				case LLVMSIToFP:
+				case LLVMFPTrunc:
+				case LLVMFPExt:
+				case LLVMPtrToInt:
+				case LLVMIntToPtr:
+				case LLVMBitCast:
+				case LLVMAddrSpaceCast:
+				case LLVMICmp:
+				case LLVMFCmp:
+				case LLVMSelect:
+				case LLVMExtractElement:
+					removal_count += 1;
+					LLVMInstructionEraseFromParent(curr_instr);
+					was_dead_instructions = true;
+					break;
+				}
+			}
+		}
+
+		if (!was_dead_instructions) {
+			break;
+		}
+	}
+}
+
+
+void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
+	LLVMRunFunctionPassManager(fpm, p->value);
+	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
+	// which means we cannot rely upon it
+	// This is also useful for read the .ll for debug purposes because a lot of instructions
+	// are not removed
+	lb_run_remove_dead_instruction_pass(p);
+}

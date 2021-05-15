@@ -3318,9 +3318,11 @@ void lb_end_procedure_body(lbProcedure *p) {
 	LLVMBuildBr(p->builder, p->entry_block->block);
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
+	LLVMValueRef instr = nullptr;
+
 	// Make sure there is a "ret void" at the end of a procedure with no return type
 	if (p->type->Proc.result_count == 0) {
-		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {
 			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 			LLVMBuildRetVoid(p->builder);
@@ -3332,7 +3334,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 
 	// Make sure every block terminates, and if not, make it unreachable
 	for (block = first_block; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
-		LLVMValueRef instr = LLVMGetLastInstruction(block);
+		instr = LLVMGetLastInstruction(block);
 		if (instr == nullptr || !lb_is_instr_terminating(instr)) {
 			LLVMPositionBuilderAtEnd(p->builder, block);
 			LLVMBuildUnreachable(p->builder);
@@ -14045,7 +14047,7 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	lb_run_function_pass_manager(default_function_pass_manager, p);
 
 	return p;
 }
@@ -14134,7 +14136,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	lb_run_function_pass_manager(default_function_pass_manager, p);
 
 	return p;
 }
@@ -14251,7 +14253,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	lb_run_function_pass_manager(default_function_pass_manager, p);
 	return p;
 }
 
@@ -14376,26 +14378,26 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 		lbProcedure *p = m->procedures_to_generate[i];
 		if (p->body != nullptr) { // Build Procedure
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-				LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+				lb_run_function_pass_manager(default_function_pass_manager_without_memcpy, p);
 			} else {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
 					case ProcedureOptimizationMode_None:
 					case ProcedureOptimizationMode_Minimal:
-						LLVMRunFunctionPassManager(function_pass_manager_minimal, p->value);
+						lb_run_function_pass_manager(function_pass_manager_minimal, p);
 						break;
 					case ProcedureOptimizationMode_Size:
-						LLVMRunFunctionPassManager(function_pass_manager_size, p->value);
+						lb_run_function_pass_manager(function_pass_manager_size, p);
 						break;
 					case ProcedureOptimizationMode_Speed:
-						LLVMRunFunctionPassManager(function_pass_manager_speed, p->value);
+						lb_run_function_pass_manager(function_pass_manager_speed, p);
 						break;
 					default:
-						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+						lb_run_function_pass_manager(default_function_pass_manager, p);
 						break;
 					}
 				} else {
-					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+					lb_run_function_pass_manager(default_function_pass_manager, p);
 				}
 			}
 		}
@@ -14403,11 +14405,11 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 
 	for_array(i, m->equal_procs.entries) {
 		lbProcedure *p = m->equal_procs.entries[i].value;
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
 	for_array(i, m->hasher_procs.entries) {
 		lbProcedure *p = m->hasher_procs.entries[i].value;
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
 
 	return 0;
