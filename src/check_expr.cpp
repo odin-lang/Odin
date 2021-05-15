@@ -7573,47 +7573,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return Expr_Expr;
 		}
 
-		if (t->kind == Type_Struct) {
-			TypeAtomOpTable *atom_op_table = t->Struct.atom_op_table;
-			if (atom_op_table != nullptr) {
-				if (atom_op_table->op[TypeAtomOp_index_set]) {
-					if (c->assignment_lhs_hint == node) {
-						o->mode = Addressing_AtomOpAssign;
-						o->type = o->type;
-						o->expr = node;
-						return kind;
-					}
-				}
-				if (atom_op_table->op[TypeAtomOp_index_get]) {
-					Entity *e = atom_op_table->op[TypeAtomOp_index_get];
-					if (ie->index == nullptr) {
-						gbString str = expr_to_string(o->expr);
-						error(o->expr, "Missing index for '%s'", str);
-						gb_string_free(str);
-						o->mode = Addressing_Invalid;
-						o->expr = node;
-						return kind;
-					}
-
-					GB_ASSERT(e->identifier != nullptr);
-					Ast *proc_ident = clone_ast(e->identifier);
-
-					auto args = array_make<Ast *>(heap_allocator(), 2);
-					args[0] = ie->expr;
-					args[1] = ie->index;
-
-					GB_ASSERT(c->file != nullptr);
-					Ast *fake_call = ast_call_expr(c->file, proc_ident, args, ie->open, ie->close, {});
-					check_expr_base(c, o, fake_call, type_hint);
-					AtomOpMapEntry entry = {TypeAtomOp_index_get, fake_call};
-					map_set(&c->info->atom_op_map, hash_pointer(node), entry);
-					o->expr = node;
-					return kind;
-				}
-			}
-		}
-
-
 		i64 max_count = -1;
 		bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
 
@@ -7752,37 +7711,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (is_type_soa_struct(t)) {
 				valid = true;
 				o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
-			} else {
-				TypeAtomOpTable *atom_op_table = t->Struct.atom_op_table;
-				if (atom_op_table != nullptr && atom_op_table->op[TypeAtomOp_slice]) {
-					Entity *e = atom_op_table->op[TypeAtomOp_slice];
-					GB_ASSERT(e->identifier != nullptr);
-					Ast *proc_ident = clone_ast(e->identifier);
-
-					Ast *expr = se->expr;
-					if (o->mode == Addressing_Variable) {
-						expr = ast_unary_expr(c->file, {Token_And, STR_LIT("&")}, expr);
-					} else if (is_type_pointer(o->type)) {
-						// Okay
-					} else {
-						gbString str = expr_to_string(node);
-						error(node, "Cannot slice '%s', value is not addressable", str);
-						gb_string_free(str);
-						o->mode = Addressing_Invalid;
-						o->expr = node;
-						return kind;
-					}
-					auto args = array_make<Ast *>(heap_allocator(), 1);
-					args[0] = expr;
-
-
-					GB_ASSERT(c->file != nullptr);
-					Ast *fake_call = ast_call_expr(c->file, proc_ident, args, se->open, se->close, {});
-					check_expr_base(c, o, fake_call, type_hint);
-					AtomOpMapEntry entry = {TypeAtomOp_slice, fake_call};
-					map_set(&c->info->atom_op_map, hash_pointer(node), entry);
-					valid = true;
-				}
 			}
 			break;
 

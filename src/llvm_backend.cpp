@@ -12147,27 +12147,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return lb_addr(val);
 		}
 
-		if (!is_type_indexable(t)) {
-			AtomOpMapEntry *found = map_get(&p->module->info->atom_op_map, hash_pointer(expr));
-			if (found != nullptr) {
-				if (found->kind == TypeAtomOp_index_get) {
-					return lb_build_addr(p, found->node);
-				} else if (found->kind == TypeAtomOp_index_get_ptr) {
-					return lb_addr(lb_build_expr(p, found->node));
-				} else if (found->kind == TypeAtomOp_index_set) {
-					lbValue ptr = lb_build_addr_ptr(p, ie->expr);
-					if (deref) {
-						ptr = lb_emit_load(p, ptr);
-					}
-
-					lbAddr addr = {lbAddr_AtomOp_index_set};
-					addr.addr = ptr;
-					addr.index_set.index = lb_build_expr(p, ie->index);
-					addr.index_set.node = found->node;
-					return addr;
-				}
-			}
-		}
 		GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 		if (is_type_map(t)) {
@@ -12311,36 +12290,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		if (se->high != nullptr) high = lb_build_expr(p, se->high);
 
 		bool no_indices = se->low == nullptr && se->high == nullptr;
-
-		{
-			Type *type = base_type(type_of_expr(se->expr));
-			if (type->kind == Type_Struct && !is_type_soa_struct(type)) {
-				TypeAtomOpTable *atom_op_table = type->Struct.atom_op_table;
-				if (atom_op_table != nullptr && atom_op_table->op[TypeAtomOp_slice]) {
-					AtomOpMapEntry *found = map_get(&p->module->info->atom_op_map, hash_pointer(expr));
-					if (found) {
-						lbValue base = lb_build_expr(p, found->node);
-
-						Type *slice_type = base.type;
-						lbValue len = lb_slice_len(p, base);
-						if (high.value == nullptr) high = len;
-
-						if (!no_indices) {
-							lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
-						}
-
-
-						lbValue elem    = lb_emit_ptr_offset(p, lb_slice_elem(p, base), low);
-						lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
-
-						lbAddr slice = lb_add_local_generated(p, slice_type, false);
-						lb_fill_slice(p, slice, elem, new_len);
-						return slice;
-					}
-				}
-			}
-		}
-
 
 		lbAddr addr = lb_build_addr(p, se->expr);
 		lbValue base = lb_addr_load(p, addr);
