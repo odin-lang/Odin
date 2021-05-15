@@ -181,7 +181,12 @@ _lchown :: proc(name: string, uid, gid: int) -> Error {
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
-	return nil;
+    atime_value := time.time_to_unix(atime);
+    mtime_value := time.time_to_unix(mtime);
+
+    unix.utime(name, atime_value, mtime_value);
+
+    return nil;
 }
 
 _exists :: proc(path: string) -> bool {
