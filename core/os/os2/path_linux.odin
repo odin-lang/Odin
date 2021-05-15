@@ -1,6 +1,7 @@
 //+private
 package os2
 
+import "core:fmt"
 import "core:sys/unix"
 import "core:strings"
 
