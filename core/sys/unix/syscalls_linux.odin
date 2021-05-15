@@ -211,4 +211,24 @@ symlink :: proc(old_name: string, new_name: string) -> int {
     return result;
 }
 
+chown :: proc(name: string, uid, gid: int) -> int {
+    @static syscall_chown :i32= 92;
 
+    result := asm(i32, ^u8, int, int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
+    }(syscall_chown, strings.ptr_from_string(name), uid, gid);
+
+    return result;
+}
+
+lchown :: proc(name: string, uid, gid: int) -> int {
+    @static syscall_lchown :i32= 94;
+
+    result := asm(i32, ^u8, int, int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi},{rdx}",
+    }(syscall_lchown, strings.ptr_from_string(name), uid, gid);
+
+    return result;
+}

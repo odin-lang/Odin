@@ -165,12 +165,19 @@ _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
 	return Error.Invalid_Argument;
 }
 
+// NOTE(rytc): Why does chown take a handle, and lchown take a path?
+// chown derefences symbolic links
+// lchown does not dereference symbolic links
+
 _chown :: proc(fd: Handle, uid, gid: int) -> Error {
-	return Error.Invalid_Argument; 
+    fullpath := _get_handle_path(fd, context.temp_allocator);
+    err := unix.chown(fullpath, uid, gid);
+	return _unix_errno(err); 
 }
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	return Error.Invalid_Argument; 
+    err := unix.lchown(name, uid, gid);
+	return _unix_errno(err); 
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
