@@ -318,6 +318,8 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				case LLVMFCmp:
 				case LLVMSelect:
 				case LLVMExtractElement:
+				case LLVMShuffleVector:
+				case LLVMExtractValue:
 					removal_count += 1;
 					LLVMInstructionEraseFromParent(curr_instr);
 					was_dead_instructions = true;
