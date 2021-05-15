@@ -1,11 +1,8 @@
 package os2
 
-Platform_Error_Min_Bits :: 32;
+import "core:io"
 
-Error :: enum u64 {
-	None = 0,
-
-	// General Errors
+General_Error :: enum u32 {
 	Invalid_Argument,
 
 	Permission_Denied,
@@ -13,42 +10,19 @@ Error :: enum u64 {
 	Not_Exist,
 	Closed,
 
-	// Timeout Errors
 	Timeout,
-
-	// I/O Errors
-	// EOF is the error returned by `read` when no more input is available
-	EOF,
-
-	// Unexpected_EOF means that EOF was encountered in the middle of reading a fixed-sized block of data
-	Unexpected_EOF,
-
-	// Short_Write means that a write accepted fewer bytes than requested but failed to return an explicit error
-	Short_Write,
-
-	// Invalid_Write means that a write returned an impossible count
-	Invalid_Write,
-
-	// Short_Buffer means that a read required a longer buffer than was provided
-	Short_Buffer,
-
-	// No_Progress is returned by some implementations of `io.Reader` when many calls
-	// to `read` have failed to return any data or error.
-	// This is usually a signed of a broken `io.Reader` implementation
-	No_Progress,
-
-	Invalid_Whence,
-	Invalid_Offset,
-	Invalid_Unread,
-
-	Negative_Read,
-	Negative_Write,
-	Negative_Count,
-	Buffer_Full,
-
-	// Platform Specific Errors
-	Platform_Minimum = 1<<Platform_Error_Min_Bits,
 }
+
+Platform_Error :: struct {
+	err: i32,
+}
+
+Error :: union {
+	General_Error,
+	io.Error,
+	Platform_Error,
+}
+#assert(size_of(Error) == size_of(u64));
 
 Path_Error :: struct {
 	op:   string,
@@ -83,20 +57,17 @@ link_error_delete :: proc(lerr: Maybe(Link_Error)) {
 
 
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
-	if ferr >= .Platform_Minimum {
-		err = i32(u64(ferr)>>Platform_Error_Min_Bits);
-		ok = true;
+	v: Platform_Error;
+	if v, ok = ferr.(Platform_Error); ok {
+		err = v.err;
 	}
 	return;
 }
 
-error_from_platform_error :: proc(errno: i32) -> Error {
-	return Error(u64(errno) << Platform_Error_Min_Bits);
-}
 
 error_string :: proc(ferr: Error) -> string {
-	#partial switch ferr {
-	case .None:              return "";
+	switch ferr {
+	case nil:                return "";
 	case .Invalid_Argument:  return "invalid argument";
 	case .Permission_Denied: return "permission denied";
 	case .Exist:             return "file already exists";
