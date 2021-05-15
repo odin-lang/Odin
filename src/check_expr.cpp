@@ -7811,10 +7811,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
-		o->mode = Addressing_Value;
-
 		if (se->low == nullptr && se->high != nullptr) {
-			// error(se->interval0, "1st index is required if a 2nd index is specified");
 			// It is okay to continue as it will assume the 1st index is zero
 		}
 
@@ -7848,6 +7845,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 		}
+
+		if (max_count < 0)  {
+			if (o->mode == Addressing_Constant) {
+				gbString s = expr_to_string(se->expr);
+				error(se->expr, "Cannot slice constant value '%s'", s);
+				gb_string_free(s);
+			}
+		}
+
+		o->mode = Addressing_Value;
 
 		if (is_type_string(t) && max_count >= 0) {
 			bool all_constant = true;
