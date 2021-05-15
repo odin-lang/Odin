@@ -21,7 +21,6 @@ _open :: proc(name: string) -> (Handle, Error) {
 }
 
 _open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
-    // TODO(rytc): Do checking of file_mode?
     fd := unix.open(name, flag, transmute(u32)perm);
     return transmute(Handle)fd, _unix_errno(fd);
 }
@@ -31,9 +30,8 @@ _close :: proc(fd: Handle) -> Error {
     return _unix_errno(result);
 }
 
-// NOTE(rytc): temporary stub
 _name :: proc(fd: Handle) -> string {
-    return "";
+    return _get_handle_name(fd);
 }
 
 _seek :: proc(fd: Handle, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
@@ -84,7 +82,10 @@ _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
 }
 
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
-    return 0,Error.Invalid_Argument;
+    stat : Unix_Stat;
+    err := unix.fstat(transmute(int)handle, uintptr(&stat));
+
+    return stat.size, _unix_errno(err);
 }
 
 _sync :: proc(fd: Handle) -> Error {
@@ -96,7 +97,15 @@ _flush :: proc(fd: Handle) -> Error {
     return _sync(fd);
 }
 
+// NOTE(rytc): Is it a good idea to truncate an open fil??
 _truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
+    path := _get_handle_path(fd);  
+    error := unix.truncate(path, size);
+
+    if error < 0 {
+        return Path_Error{"Truncate", path, _unix_errno(error)};
+    }
+
 	return nil;
 }
 
@@ -121,10 +130,19 @@ _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
 }
 
 _chdir :: proc(fd: Handle) -> Error {
-	return Error.Invalid_Argument;
+    // NOTE(rytc): I assume this is suppose to change the working directory to the same directory as the file 
+    fullpath := _get_handle_path(fd, context.temp_allocator);
+    filename_break := strings.last_index_byte(fullpath, '/');
+    dir := fmt.fprintf(fullpath[:filename_break]);
+    err := unix.chdir(dir);
+	return _unix_errno(err);
 }
 
 _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
+    // TODO(rytc): why is File_Mode passed here?
+    // path := _get_handle_path(fd, context.temp_allocator);
+    // err := unix.chmod(path, mode);
+    // return _unix_errno(err);
 	return Error.Invalid_Argument;
 }
 
@@ -141,15 +159,29 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
 }
 
 _exists :: proc(path: string) -> bool {
-	return false;
+    stat : Unix_Stat;
+    err := unix.lstat(path, uintptr(&stat);
+	return (_unix_errno(err) != Error.Not_Exist;
 }
 
 _is_file :: proc(path: string) -> bool {
-	return false;
+    stat : Unix_Stat;
+    err := unix.lstat(path, uintptr(&stat);
+    if err >= 0 {
+    	return (_unix_get_mode(stat.mode) < File_Mode_Dir);
+    } else {
+        return false;
+    }
 }
 
 _is_dir :: proc(path: string) -> bool {
-	return false;
+    stat : Unix_Stat;
+    err := unix.lstat(path, uintptr(&stat);
+    if err >= 0 {
+        return (_unix_get_mode(stat.mode) == File_Mode_Dir);
+    } else {
+        return false;
+    }
 }
 
 
