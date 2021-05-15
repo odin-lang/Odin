@@ -263,6 +263,10 @@ utime :: proc(name: string, atime, mtime: i64) -> int {
 
 }
 
+// NOTE(rytc): Ehh, multiple return values are too nice
+// to ignore just to do things the C-way in odin :\
+// Not sure how much the original API should be followed in 
+// this case
 pipe :: proc() -> (fd: [2]int, err: int) {
     @static syscall_pipe :i32= 22;
 
@@ -288,3 +292,59 @@ pipe2 :: proc(flags: int) -> (fd: [2]int, err: int) {
 
     return handles, result;
 }
+
+mmap :: proc(addr, len, prot, flags, fd, offset: uint) -> uintptr {
+    @static syscall_mmap :i32= 9;
+
+    handles : [2]int;
+
+    result := asm(i32, uint, uint, uint, uint, uint, uint) -> u64 {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi},{rdx},{r10}{r8}{r9}",
+    }(syscall_mmap, addr, len, prot, flags, fd, offset);
+
+    // NOTE(rytc): these syscalls returns the error code in a negative number
+    // to be able to easily translate it into a pointer on success, we just 
+    // follow c's underflow rule for uints to figure out what would be an 
+    // error code /invalid ptr
+    // This magic number is based on the possible error codes that mmap could 
+    // return
+    if result >= max(u64) - 76 {
+        return 0; 
+    }
+
+    return transmute(uintptr)result;
+}
+
+munmap :: proc(addr, len: uint) -> int {
+    @static syscall_munmap :i32= 11;
+
+    handles : [2]int;
+
+    result := asm(i32, uint, uint) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_munmap, addr, len);
+
+    return result;
+}
+
+mremap :: proc(addr, old_len, new_len, flags, new_addr: uint) -> uintptr {
+    @static syscall_mremap :i32= 163;
+
+    handles : [2]int;
+
+    result := asm(i32, uint, uint, uint, uint, uint) -> u64 {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi},{rdx},{r10},{r8}",
+    }(syscall_mremap, addr, old_len, new_len, flags, new_addr);
+
+    // NOTE(rytc): See note in mmap
+    if result >= max(u64) - 76 {
+        return 0;
+    }
+
+    return transmute(uintptr)result;
+}
+
+
