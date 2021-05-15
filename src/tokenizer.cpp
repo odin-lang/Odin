@@ -51,8 +51,10 @@ TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_CmpAndEq, "&&="), \
 	TOKEN_KIND(Token_CmpOrEq,  "||="), \
 TOKEN_KIND(Token__AssignOpEnd, ""), \
-	TOKEN_KIND(Token_ArrowRight,       "->"), \
-	TOKEN_KIND(Token_Undef,            "---"), \
+	TOKEN_KIND(Token_Increment, "++"), \
+	TOKEN_KIND(Token_Decrement, "--"), \
+	TOKEN_KIND(Token_ArrowRight,"->"), \
+	TOKEN_KIND(Token_Undef,     "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, ""), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -1287,6 +1289,9 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token->kind = Token_AddEq;
+			} else if (t->curr_rune == '+') {
+				advance_to_next_rune(t);
+				token->kind = Token_Increment;
 			}
 			break;
 		case '-':
@@ -1298,7 +1303,10 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				advance_to_next_rune(t);
 				advance_to_next_rune(t);
 				token->kind = Token_Undef;
-			} else if (t->curr_rune == '>') {
+			} else if (t->curr_rune == '-') {
+				advance_to_next_rune(t);
+				token->kind = Token_Decrement;
+			}else if (t->curr_rune == '>') {
 				advance_to_next_rune(t);
 				token->kind = Token_ArrowRight;
 			}

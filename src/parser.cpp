@@ -2724,6 +2724,16 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			}
 			break;
 
+		case Token_Increment:
+		case Token_Decrement:
+			if (!lhs) {
+				Token token = advance_token(f);
+				syntax_error(token, "Postfix '%.*s' operator is not supported", LIT(token.string));
+			} else {
+				loop = false;
+			}
+			break;
+
 		default:
 			loop = false;
 			break;
@@ -2754,6 +2764,10 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		return ast_auto_cast(f, token, expr);
 	}
 
+
+	case Token_Add:
+	case Token_Sub:
+	case Token_Xor:
 	case Token_And:
 	case Token_Not: {
 		Token token = advance_token(f);
@@ -2761,18 +2775,14 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		return ast_unary_expr(f, token, expr);
 	}
 
-	case Token_Add:
-	case Token_Sub:
-	case Token_Xor: {
+	case Token_Increment:
+	case Token_Decrement: {
 		Token token = advance_token(f);
+		syntax_error(token, "Unary '%.*s' operator is not supported", LIT(token.string));
 		Ast *expr = parse_unary_expr(f, lhs);
-		if (expr != nullptr && expr->kind == Ast_UnaryExpr) {
-			if (expr->UnaryExpr.op.kind == token.kind) {
-				syntax_error(expr, "Duplicate unary operator '%.*s' will produce a redundant no-op", LIT(token.string));
-			}
-		}
 		return ast_unary_expr(f, token, expr);
 	}
+
 
 	case Token_Period: {
 		Token token = expect_token(f, Token_Period);
@@ -3163,6 +3173,13 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 		return ast_bad_stmt(f, token, f->curr_token);
 	}
 
+	switch (token.kind) {
+	case Token_Increment:
+	case Token_Decrement:
+		advance_token(f);
+		syntax_error(token, "Postfix '%.*s' statement is not supported", LIT(token.string));
+		break;
+	}
 
 
 	#if 0
