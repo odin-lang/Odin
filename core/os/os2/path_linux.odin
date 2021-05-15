@@ -56,3 +56,24 @@ _is_relative_path :: proc(name: string) -> bool {
     if name[0] == '/' do return false;
     return true;
 }
+
+_get_handle_path :: proc(fd: Handle, allocator := context.allocator) -> string {
+    path := make([]byte, MAX_PATH_LENGTH, allocator);
+    fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
+    unix.readlink(fd_path, path[:]);
+    fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
+    
+    return fullpath;
+}
+
+_get_handle_name :: proc(fd: Handle) -> string {
+    path := make([]byte, MAX_PATH_LENGTH, context.temp_allocator);
+    fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
+    unix.readlink(fd_path, path[:]);
+    fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
+    
+    filename_break := strings.last_index_byte(fullpath, '/') + 1;
+    name := fmt.aprintf(fullpath[filename_break:]);
+
+    return name;
+}

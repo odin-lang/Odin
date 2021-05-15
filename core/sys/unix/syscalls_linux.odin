@@ -166,3 +166,15 @@ chdir :: proc(name: string) -> int {
 
     return result;
 }
+
+truncate :: proc(name: string, len: i64) -> int {
+    @static syscall_truncate :i32= 76;
+
+    result := asm(i32, ^u8, i64) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_truncate, strings.ptr_from_string(name), len);
+
+    return result;
+}
+

@@ -7,7 +7,6 @@ import "core:time"
 import "core:strings"
 
 // TOOD(rytc): Make sure this is accurate
-@private
 Unix_Stat :: struct {
     dev:      u64,
     ino:      u64,
@@ -48,7 +47,6 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     path := make([]byte, MAX_PATH_LENGTH, allocator);
     fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
     unix.readlink(fd_path, path[:]);
-    
     fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
     
     filename_break := strings.last_index_byte(fullpath, '/') + 1;
@@ -57,7 +55,7 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     result.fullpath = fullpath;
     result.name = name;
     result.size = stat.size;
-    result.mode = _get_mode(stat.mode);
+    result.mode = _unix_get_mode(stat.mode);
     result.creation_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.modification_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.access_time = time.unix(i64(stat.atime), i64(stat.atime_ns));
@@ -78,7 +76,7 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe
     result : File_Info;
     if err < 0 do return result,nil;
   
-    filename_break := strings.last_index_byte(name, '/') + 1;
+    filename_break := strings.last_index_byte(name, _Path_Separator) + 1;
 
     if _is_relative_path(name) {
         result.name = fmt.aprint(name[filename_break:]);
@@ -86,7 +84,7 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe
         fullpath := make([]string, 3, context.temp_allocator);
         cwd,err := _getwd(context.temp_allocator);
         fullpath[0] = cwd;
-        fullpath[1] = "/"; //_Path_Separator,
+        fullpath[1] = "/";
         fullpath[2] = result.name;
 
         result.fullpath = strings.concatenate(fullpath, allocator); 
@@ -96,7 +94,7 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe
     }
 
     result.size = stat.size;
-    result.mode = _get_mode(stat.mode);
+    result.mode = _unix_get_mode(stat.mode);
     result.creation_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.modification_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.access_time = time.unix(i64(stat.atime), i64(stat.atime_ns));
@@ -118,8 +116,7 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
     return fi1.fullpath == fi2.fullpath;
 }
 
-@private
-_get_mode :: proc(mode: u32) -> File_Mode {
+_unix_get_mode :: proc(mode: u32) -> File_Mode {
     m := mode & S_IFMT;
 
     switch m {
