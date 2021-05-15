@@ -40,15 +40,13 @@ S_IFIFO:  u32: 0010000;
 _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
     stat : Unix_Stat;
     err := unix.fstat(transmute(int)fd, uintptr(&stat));
-   
-    result : File_Info;
-    if err < 0 do return result, nil;
+    fullpath := _get_handle_path(fd, allocator);
 
-    path := make([]byte, MAX_PATH_LENGTH, allocator);
-    fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
-    unix.readlink(fd_path, path[:]);
-    fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
-    
+    result : File_Info;
+    if err < 0 {
+        return result, Path_Error{"fstat", fullpath, _unix_errno(err)};
+    }
+        
     filename_break := strings.last_index_byte(fullpath, '/') + 1;
     name := strings.string_from_ptr(&path[filename_break], len(fullpath) - filename_break);
     
@@ -74,7 +72,9 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe
     err := unix.lstat(name, uintptr(&stat));
 
     result : File_Info;
-    if err < 0 do return result,nil;
+    if err < 0 {
+        return result, Path_Error{"lstat", name, _unix_errno(err)};
+    }
   
     filename_break := strings.last_index_byte(name, _Path_Separator) + 1;
 
@@ -129,3 +129,4 @@ _unix_get_mode :: proc(mode: u32) -> File_Mode {
 
     return File_Mode(0);
 }
+
