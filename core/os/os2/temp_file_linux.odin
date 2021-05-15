@@ -13,5 +13,5 @@ _mkdir_temp :: proc(dir, pattern: string, allocator := context.allocator) -> (st
 
 // TODO(rytc): temp stub
 _temp_dir :: proc(allocator := context.allocator) -> string {
-    return "";
+    return "/tmp/";
 }
