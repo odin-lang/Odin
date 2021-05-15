@@ -253,6 +253,7 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
+	isize original_instruction_count = 0;
 	// Custom remove dead instruction pass
 	for (; pass_count < max_pass_count; pass_count++) {
 		bool was_dead_instructions = false;
@@ -267,6 +268,10 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 			for (LLVMValueRef instr = LLVMGetLastInstruction(block);
 			     instr != nullptr;
 			     /**/)  {
+			     	if (pass_count == 0) {
+			     		original_instruction_count += 1;
+			     	}
+
 				LLVMValueRef curr_instr = instr;
 				instr = LLVMGetPreviousInstruction(instr);
 
@@ -280,6 +285,7 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 
 				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
 				switch (LLVMGetInstructionOpcode(curr_instr)) {
+				case LLVMFNeg:
 				case LLVMAdd:
 				case LLVMFAdd:
 				case LLVMSub:
