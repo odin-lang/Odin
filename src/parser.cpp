@@ -2754,13 +2754,23 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		return ast_auto_cast(f, token, expr);
 	}
 
-	case Token_Add:
-	case Token_Sub:
-	case Token_Not:
-	case Token_Xor:
-	case Token_And: {
+	case Token_And:
+	case Token_Not: {
 		Token token = advance_token(f);
 		Ast *expr = parse_unary_expr(f, lhs);
+		return ast_unary_expr(f, token, expr);
+	}
+
+	case Token_Add:
+	case Token_Sub:
+	case Token_Xor: {
+		Token token = advance_token(f);
+		Ast *expr = parse_unary_expr(f, lhs);
+		if (expr != nullptr && expr->kind == Ast_UnaryExpr) {
+			if (expr->UnaryExpr.op.kind == token.kind) {
+				syntax_error(expr, "Duplicate unary operator '%.*s' will produce a redundant no-op", LIT(token.string));
+			}
+		}
 		return ast_unary_expr(f, token, expr);
 	}
 
