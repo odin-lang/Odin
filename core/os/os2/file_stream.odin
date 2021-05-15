@@ -10,6 +10,9 @@ file_to_stream :: proc(fd: Handle) -> (s: io.Stream) {
 
 @(private)
 error_to_io_error :: proc(ferr: Error) -> io.Error {
+	if ferr == nil {
+		return .None;
+	}
 	err, ok := ferr.(io.Error);
 	if !ok {
 		err = .Unknown;
