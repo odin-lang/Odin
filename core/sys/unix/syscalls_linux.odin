@@ -262,3 +262,29 @@ utime :: proc(name: string, atime, mtime: i64) -> int {
     return result;
 
 }
+
+pipe :: proc() -> (fd: [2]int, err: int) {
+    @static syscall_pipe :i32= 22;
+
+    handles : [2]int;
+
+    result := asm(i32, ^int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi}",
+    }(syscall_pipe, &handles[0]);
+
+    return handles, result;
+}
+
+pipe2 :: proc(flags: int) -> (fd: [2]int, err: int) {
+    @static syscall_pipe2 :i32= 293;
+
+    handles : [2]int;
+
+    result := asm(i32, ^int, int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_pipe2, &handles[0], flags);
+
+    return handles, result;
+}
