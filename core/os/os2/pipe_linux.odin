@@ -1,6 +1,13 @@
 package os2
 
-// TODO(rytc): temporary stub
+import "core:sys/unix"
+
 _pipe :: proc() -> (r, w: Handle, err: Error) {
-    return 0,0,nil;
+    fd, pipe_err := unix.pipe();
+
+    if pipe_err < 0 {
+        return 0,0,_unix_errno(pipe_err);
+    }
+
+    return transmute(Handle)fd[0], transmute(Handle)fd[1], Error.None;
 }
