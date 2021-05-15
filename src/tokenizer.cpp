@@ -1292,6 +1292,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			} else if (t->curr_rune == '+') {
 				advance_to_next_rune(t);
 				token->kind = Token_Increment;
+				insert_semicolon = true;
 			}
 			break;
 		case '-':
@@ -1306,6 +1307,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			} else if (t->curr_rune == '-') {
 				advance_to_next_rune(t);
 				token->kind = Token_Decrement;
+				insert_semicolon = true;
 			}else if (t->curr_rune == '>') {
 				advance_to_next_rune(t);
 				token->kind = Token_ArrowRight;
