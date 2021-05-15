@@ -3184,11 +3184,15 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		lbValue return_ptr_value = {};
 		if (ft->ret.kind == lbArg_Indirect) {
 			// NOTE(bill): this must be parameter 0
+
+			String name = str_lit("agg.result");
+
 			Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(p->type->Proc.results));
-			Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
+			Entity *e = alloc_entity_param(nullptr, make_token_ident(name), ptr_type, false, false);
 			e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
 
 			return_ptr_value.value = LLVMGetParam(p->value, 0);
+			LLVMSetValueName2(return_ptr_value.value, cast(char const *)name.text, name.len);
 			return_ptr_value.type = ptr_type;
 			p->return_ptr = lb_addr(return_ptr_value);
 
