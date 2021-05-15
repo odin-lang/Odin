@@ -232,3 +232,33 @@ lchown :: proc(name: string, uid, gid: int) -> int {
 
     return result;
 }
+
+setxattr :: proc(path, attr_name: string, value: uintptr, size: uint, flags: int) -> int {
+    @static syscall_setxattr :i32= 188;
+
+    result := asm(i32, ^u8, ^u8, uintptr, uint, int) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi},{rdx},{r10},{r8}",
+    }(syscall_setxattr, strings.ptr_from_string(path), strings.ptr_from_string(attr_name), value, size, flags);
+
+    return result;
+}
+
+utime :: proc(name: string, atime, mtime: i64) -> int {
+    @static syscall_utime :i32= 132;
+
+    utimbuf :: struct {
+        atime: i64,
+        mtime: i64,
+    };
+
+    values := utimbuf{atime, mtime};
+
+    result := asm(i32, ^u8, uintptr) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_utime, strings.ptr_from_string(name), uintptr(&values));
+
+    return result;
+
+}
