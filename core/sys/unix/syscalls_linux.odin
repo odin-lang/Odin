@@ -178,3 +178,15 @@ truncate :: proc(name: string, len: i64) -> int {
     return result;
 }
 
+rename :: proc(old_name: string, new_name: string) -> int {
+    @static syscall_rename :i32= 82;
+
+    result := asm(i32, ^u8, ^u8) -> int {
+        "syscall",
+        "={rax},{rax},{rdi},{rsi}",
+    }(syscall_rename, strings.ptr_from_string(oldname), strings.ptr_from_string(newname));
+
+    return result;
+}
+
+

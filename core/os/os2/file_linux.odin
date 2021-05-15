@@ -115,6 +115,11 @@ _remove :: proc(name: string) -> Maybe(Path_Error) {
 }
 
 _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
+    err := unix.rename(old_path, new_path);
+    if err < 0 {
+        // NOTE(rytc): could have smarter error handling here
+        return Path_Error{"Rename", old_path, _unix_errno(err)}; 
+    }
 	return nil;
 }
 
