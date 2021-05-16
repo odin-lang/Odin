@@ -69,7 +69,7 @@ File :: struct {
 	pkg: ^Package,
 
 	fullpath: string,
-	src:      []byte,
+	src:      string,
 
 	docs: ^Comment_Group,
 
