@@ -33,22 +33,25 @@ Errno :: enum i32 {
     EPIPE   = 32,
 }
 
-_unix_errno :: proc(fd: int) -> Error {
-    if fd >= 0 do return Error.None;
+_unix_errno :: proc(fd: int) -> (err: Error) {
+    if fd >= 0 {
+        err = Platform_Error{0};
+        return;
+    }
 
     errno := Errno(-fd);
-
+     
     #partial switch errno { 
         case Errno.EACCES: fallthrough;
         case Errno.EPERM:
-            return Error.Permission_Denied;
+            err = General_Error.Permission_Denied;
         case Errno.ENOENT:
-            return Error.Not_Exist;
+            err = General_Error.Not_Exist;
         case Errno.EINVAL: 
-            return Error.Invalid_Argument;
-        //case Errno.EBUSY:
-        //  return Error.Timeout;
+            err = General_Error.Invalid_Argument;
+        case:
+            err = Platform_Error{0};
     }
 
-    return Error.Invalid_Argument;
+    return err;
 }
