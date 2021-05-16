@@ -2971,72 +2971,6 @@ Type *struct_type_from_systemv_distribute_struct_fields(Type *abi_type) {
 }
 
 
-lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 index) {
-	lbParamPasskind kind = lbParamPass_Value;
-	lbValue v = lb_value_param(p, e, abi_type, index, &kind);
-	array_add(&p->params, v);
-
-	lbValue res = {};
-
-	switch (kind) {
-	case lbParamPass_Value: {
-		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue x = v;
-		if (abi_type == t_llvm_bool) {
-			x = lb_emit_conv(p, x, t_bool);
-		}
-		lb_addr_store(p, l, x);
-		return x;
-	}
-	case lbParamPass_Pointer:
-		lb_add_entity(p->module, e, v);
-		return lb_emit_load(p, v);
-
-	case lbParamPass_Integer: {
-		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue iptr = lb_emit_conv(p, l.addr, alloc_type_pointer(abi_type));
-		lb_emit_store(p, iptr, v);
-		return lb_addr_load(p, l);
-	}
-
-	case lbParamPass_ConstRef:
-		lb_add_entity(p->module, e, v);
-		return lb_emit_load(p, v);
-
-	case lbParamPass_BitCast: {
-		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue x = lb_emit_transmute(p, v, e->type);
-		lb_addr_store(p, l, x);
-		return x;
-	}
-	case lbParamPass_Tuple: {
-		lbAddr l = lb_add_local(p, e->type, e, true, index);
-		Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
-		lbValue ptr = lb_emit_transmute(p, l.addr, alloc_type_pointer(st));
-		if (abi_type->Tuple.variables.count > 0) {
-			array_pop(&p->params);
-		}
-		for_array(i, abi_type->Tuple.variables) {
-			Type *t = abi_type->Tuple.variables[i]->type;
-			GB_ASSERT(!is_type_tuple(t));
-
-			lbParamPasskind elem_kind = lbParamPass_Value;
-			lbValue elem = lb_value_param(p, nullptr, t, index+cast(i32)i, &elem_kind);
-			array_add(&p->params, elem);
-
-			lbValue dst = lb_emit_struct_ep(p, ptr, cast(i32)i);
-			lb_emit_store(p, dst, elem);
-		}
-		return lb_addr_load(p, l);
-	}
-
-	}
-
-
-	GB_PANIC("Unreachable");
-	return {};
-}
-
 void lb_start_block(lbProcedure *p, lbBlock *b) {
 	GB_ASSERT(b != nullptr);
 	if (!b->appended) {
@@ -3250,11 +3184,15 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		lbValue return_ptr_value = {};
 		if (ft->ret.kind == lbArg_Indirect) {
 			// NOTE(bill): this must be parameter 0
+
+			String name = str_lit("agg.result");
+
 			Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(p->type->Proc.results));
-			Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
+			Entity *e = alloc_entity_param(nullptr, make_token_ident(name), ptr_type, false, false);
 			e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
 
 			return_ptr_value.value = LLVMGetParam(p->value, 0);
+			LLVMSetValueName2(return_ptr_value.value, cast(char const *)name.text, name.len);
 			return_ptr_value.type = ptr_type;
 			p->return_ptr = lb_addr(return_ptr_value);
 
@@ -3380,9 +3318,11 @@ void lb_end_procedure_body(lbProcedure *p) {
 	LLVMBuildBr(p->builder, p->entry_block->block);
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
+	LLVMValueRef instr = nullptr;
+
 	// Make sure there is a "ret void" at the end of a procedure with no return type
 	if (p->type->Proc.result_count == 0) {
-		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+		instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {
 			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 			LLVMBuildRetVoid(p->builder);
@@ -3394,7 +3334,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 
 	// Make sure every block terminates, and if not, make it unreachable
 	for (block = first_block; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
-		LLVMValueRef instr = LLVMGetLastInstruction(block);
+		instr = LLVMGetLastInstruction(block);
 		if (instr == nullptr || !lb_is_instr_terminating(instr)) {
 			LLVMPositionBuilderAtEnd(p->builder, block);
 			LLVMBuildUnreachable(p->builder);
@@ -3469,6 +3409,20 @@ void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *fals
 	LLVMBuildCondBr(p->builder, cv, true_block->block, false_block->block);
 }
 
+bool lb_is_expr_untyped_const(Ast *expr) {
+	auto const &tv = type_and_value_of_expr(expr);
+	if (is_type_untyped(tv.type)) {
+		return tv.value.kind != ExactValue_Invalid;
+	}
+	return false;
+}
+
+lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t) {
+	GB_ASSERT(is_type_typed(t));
+	auto const &tv = type_and_value_of_expr(expr);
+	return lb_const_value(m, t, tv.value);
+}
+
 lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block) {
 	GB_ASSERT(cond != nullptr);
 	GB_ASSERT(true_block  != nullptr);
@@ -3500,8 +3454,13 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	case_end;
 	}
 
-	lbValue v = lb_build_expr(p, cond);
-	// v = lb_emit_conv(p, v, t_bool);
+	lbValue v = {};
+	if (lb_is_expr_untyped_const(cond)) {
+		v = lb_expr_untyped_const_to_typed(p->module, cond, t_llvm_bool);
+	} else {
+		v = lb_build_expr(p, cond);
+	}
+
 	v = lb_emit_conv(p, v, t_llvm_bool);
 
 	lb_emit_if(p, v, true_block, false_block);
@@ -4072,63 +4031,105 @@ void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_type,
 }
 
 
-void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node, Type *val_type,
-                             lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
+void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
+                             AstRangeStmt *rs, Scope *scope) {
+	bool ADD_EXTRA_WRAPPING_CHECK = true;
+
 	lbModule *m = p->module;
 
-	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
-	// If 'lower' is changed, should 'val' do so or is that not typical behaviour?
+	lb_open_scope(p, scope);
+
+	Type *val0_type = nullptr;
+	Type *val1_type = nullptr;
+	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
+		val0_type = type_of_expr(rs->vals[0]);
+	}
+	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
+		val1_type = type_of_expr(rs->vals[1]);
+	}
+
+	if (val0_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[0]);
+		lb_add_local(p, e->type, e, true);
+	}
+	if (val1_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[1]);
+		lb_add_local(p, e->type, e, true);
+	}
+
+	TokenKind op = Token_Lt;
+	switch (node->op.kind) {
+	case Token_Ellipsis:  op = Token_LtEq; break;
+	case Token_RangeFull: op = Token_LtEq; break;
+	case Token_RangeHalf: op = Token_Lt;  break;
+	default: GB_PANIC("Invalid interval operator"); break;
+	}
 
 	lbValue lower = lb_build_expr(p, node->left);
-	lbValue upper = {};
+	lbValue upper = {}; // initialized each time in the loop
 
-	lbValue val = {};
-	lbValue idx = {};
-	lbBlock *loop = nullptr;
-	lbBlock *done = nullptr;
-	lbBlock *body = nullptr;
-
-	if (val_type == nullptr) {
-		val_type = lower.type;
-	}
-	lbAddr value = lb_add_local_generated(p, val_type, false);
+	lbAddr value = lb_add_local_generated(p, val0_type ? val0_type : lower.type, false);
 	lb_addr_store(p, value, lower);
 
 	lbAddr index = lb_add_local_generated(p, t_int, false);
 	lb_addr_store(p, index, lb_const_int(m, t_int, 0));
 
-	loop = lb_create_block(p, "for.interval.loop");
+	lbBlock *loop = lb_create_block(p, "for.interval.loop");
+	lbBlock *body = lb_create_block(p, "for.interval.body");
+	lbBlock *done = lb_create_block(p, "for.interval.done");
+
 	lb_emit_jump(p, loop);
 	lb_start_block(p, loop);
 
-	body = lb_create_block(p, "for.interval.body");
-	done = lb_create_block(p, "for.interval.done");
-
-
-	TokenKind op = Token_Lt;
-	switch (node->op.kind) {
-	case Token_Ellipsis:  op = Token_LtEq; break;
-	case Token_RangeHalf: op = Token_Lt;  break;
-	default: GB_PANIC("Invalid interval operator"); break;
-	}
-
 	upper = lb_build_expr(p, node->right);
-
 	lbValue curr_value = lb_addr_load(p, value);
 	lbValue cond = lb_emit_comp(p, op, curr_value, upper);
 	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
-	val = lb_addr_load(p, value);
-	idx = lb_addr_load(p, index);
+	lbValue val = lb_addr_load(p, value);
+	lbValue idx = lb_addr_load(p, index);
+	if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], val);
+	if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], idx);
 
-	lb_emit_increment(p, value.addr);
-	lb_emit_increment(p, index.addr);
+	{
+		// NOTE: this check block will most likely be optimized out, and is here
+		// to make this code easier to read
+		lbBlock *check = nullptr;
+		lbBlock *post = lb_create_block(p, "for.interval.post");
 
-	if (val_)  *val_  = val;
-	if (idx_)  *idx_  = idx;
-	if (loop_) *loop_ = loop;
-	if (done_) *done_ = done;
+		lbBlock *continue_block = post;
+
+		if (ADD_EXTRA_WRAPPING_CHECK &&
+		    op == Token_LtEq) {
+			check = lb_create_block(p, "for.interval.check");
+			continue_block = check;
+		}
+
+		lb_push_target_list(p, rs->label, done, continue_block, nullptr);
+
+		lb_build_stmt(p, rs->body);
+
+		lb_close_scope(p, lbDeferExit_Default, nullptr);
+		lb_pop_target_list(p);
+
+		if (check != nullptr) {
+			lb_emit_jump(p, check);
+			lb_start_block(p, check);
+
+			lbValue check_cond = lb_emit_comp(p, Token_NotEq, curr_value, upper);
+			lb_emit_if(p, check_cond, post, done);
+		} else {
+			lb_emit_jump(p, post);
+		}
+
+		lb_start_block(p, post);
+		lb_emit_increment(p, value.addr);
+		lb_emit_increment(p, index.addr);
+		lb_emit_jump(p, loop);
+	}
+
+	lb_start_block(p, done);
 }
 
 void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_type, lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
@@ -4283,6 +4284,11 @@ void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *sco
 void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	Ast *expr = unparen_expr(rs->expr);
 
+	if (is_ast_range(expr)) {
+		lb_build_range_interval(p, &expr->BinaryExpr, rs, scope);
+		return;
+	}
+
 	Type *expr_type = type_of_expr(expr);
 	if (expr_type != nullptr) {
 		Type *et = base_type(type_deref(expr_type));
@@ -4319,10 +4325,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	bool is_map = false;
 	TypeAndValue tav = type_and_value_of_expr(expr);
 
-
-	if (is_ast_range(expr)) {
-		lb_build_range_interval(p, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
-	} else if (tav.mode == Addressing_Type) {
+	if (tav.mode == Addressing_Type) {
 		lb_build_range_enum(p, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 	} else {
 		Type *expr_type = type_of_expr(expr);
@@ -4471,7 +4474,7 @@ void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 
 		ExactValue start = start_expr->tav.value;
 		ExactValue end   = end_expr->tav.value;
-		if (op == Token_Ellipsis) { // .. [start, end]
+		if (op != Token_RangeHalf) { // .. [start, end] (or ..=)
 			ExactValue index = exact_value_i64(0);
 			for (ExactValue val = start;
 			     compare_exact_values(Token_LtEq, val, end);
@@ -4482,7 +4485,7 @@ void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 
 				lb_build_stmt(p, rs->body);
 			}
-		} else if (op == Token_RangeHalf) { // ..< [start, end)
+		} else { // ..< [start, end)
 			ExactValue index = exact_value_i64(0);
 			for (ExactValue val = start;
 			     compare_exact_values(Token_Lt, val, end);
@@ -4649,6 +4652,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 				TokenKind op = Token_Invalid;
 				switch (ie->op.kind) {
 				case Token_Ellipsis:  op = Token_LtEq; break;
+				case Token_RangeFull: op = Token_LtEq; break;
 				case Token_RangeHalf: op = Token_Lt;   break;
 				default: GB_PANIC("Invalid interval operator"); break;
 				}
@@ -4887,6 +4891,9 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 
 	if (done->preds.count == 0) {
 		lb_start_block(p, rhs);
+		if (lb_is_expr_untyped_const(right)) {
+			return lb_expr_untyped_const_to_typed(m, right, type);
+		}
 		return lb_build_expr(p, right);
 	}
 
@@ -4901,7 +4908,12 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	}
 
 	lb_start_block(p, rhs);
-	lbValue edge = lb_build_expr(p, right);
+	lbValue edge = {};
+	if (lb_is_expr_untyped_const(right)) {
+		edge = lb_expr_untyped_const_to_typed(m, right, type);
+	} else {
+		edge = lb_build_expr(p, right);
+	}
 
 	incoming_values[done->preds.count] = edge.value;
 	incoming_blocks[done->preds.count] = p->curr_block->block;
@@ -7025,12 +7037,26 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_And:
 	case Token_Or:
 	case Token_Xor:
-	case Token_AndNot:
-	case Token_Shl:
-	case Token_Shr: {
+	case Token_AndNot: {
 		Type *type = default_type(tv.type);
 		lbValue left = lb_build_expr(p, be->left);
 		lbValue right = lb_build_expr(p, be->right);
+		return lb_emit_arith(p, be->op.kind, left, right, type);
+	}
+
+	case Token_Shl:
+	case Token_Shr: {
+		lbValue left, right;
+		Type *type = default_type(tv.type);
+		left = lb_build_expr(p, be->left);
+
+		if (lb_is_expr_untyped_const(be->right)) {
+			// NOTE(bill): RHS shift operands can still be untyped
+			// Just bypass the standard lb_build_expr
+			right = lb_expr_untyped_const_to_typed(p->module, be->right, type);
+		} else {
+			right = lb_build_expr(p, be->right);
+		}
 		return lb_emit_arith(p, be->op.kind, left, right, type);
 	}
 
@@ -7824,10 +7850,13 @@ lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p
 	GB_ASSERT(pt->kind == Type_Proc);
 	GB_ASSERT(pt->Proc.calling_convention == ProcCC_Odin);
 
-	Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
+	String name = str_lit("__.context_ptr");
+
+	Entity *e = alloc_entity_param(nullptr, make_token_ident(name), t_context_ptr, false, false);
 	e->flags |= EntityFlag_NoAlias;
 
 	LLVMValueRef context_ptr = LLVMGetParam(p->value, LLVMCountParams(p->value)-1);
+	LLVMSetValueName2(context_ptr, cast(char const *)name.text, name.len);
 	context_ptr = LLVMBuildPointerCast(p->builder, context_ptr, lb_type(p->module, e->type), "");
 
 	lbValue param = {context_ptr, e->type};
@@ -11360,6 +11389,15 @@ lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
 	return {};
 }
 
+bool lb_is_expr_constant_zero(Ast *expr) {
+	GB_ASSERT(expr != nullptr);
+	auto v = exact_value_to_integer(expr->tav.value);
+	if (v.kind == ExactValue_Integer) {
+		return big_int_cmp_zero(&v.value_integer) == 0;
+	}
+	return false;
+}
+
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -11388,6 +11426,12 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
 	if (tv.value.kind != ExactValue_Invalid) {
+		// NOTE(bill): The commented out code below is just for debug purposes only
+		// GB_ASSERT_MSG(!is_type_untyped(tv.type), "%s @ %s\n%s", type_to_string(tv.type), token_pos_to_string(expr_pos), expr_to_string(expr));
+		// if (is_type_untyped(tv.type)) {
+		// 	gb_printf_err("%s %s\n", token_pos_to_string(expr_pos), expr_to_string(expr));
+		// }
+
 		// NOTE(bill): Short on constant values
 		return lb_const_value(p->module, tv.type, tv.value);
 	}
@@ -11683,6 +11727,13 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
+		if (is_type_slice(type_of_expr(se->expr))) {
+			// NOTE(bill): Quick optimization
+			if (se->high == nullptr &&
+			    (se->low == nullptr || lb_is_expr_constant_zero(se->low))) {
+				return lb_build_expr(p, se->expr);
+			}
+		}
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
 
@@ -12147,27 +12198,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return lb_addr(val);
 		}
 
-		if (!is_type_indexable(t)) {
-			AtomOpMapEntry *found = map_get(&p->module->info->atom_op_map, hash_pointer(expr));
-			if (found != nullptr) {
-				if (found->kind == TypeAtomOp_index_get) {
-					return lb_build_addr(p, found->node);
-				} else if (found->kind == TypeAtomOp_index_get_ptr) {
-					return lb_addr(lb_build_expr(p, found->node));
-				} else if (found->kind == TypeAtomOp_index_set) {
-					lbValue ptr = lb_build_addr_ptr(p, ie->expr);
-					if (deref) {
-						ptr = lb_emit_load(p, ptr);
-					}
-
-					lbAddr addr = {lbAddr_AtomOp_index_set};
-					addr.addr = ptr;
-					addr.index_set.index = lb_build_expr(p, ie->index);
-					addr.index_set.node = found->node;
-					return addr;
-				}
-			}
-		}
 		GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 		if (is_type_map(t)) {
@@ -12303,6 +12333,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
+
 		lbValue low  = lb_const_int(p->module, t_int, 0);
 		lbValue high = {};
 
@@ -12310,36 +12341,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		if (se->high != nullptr) high = lb_build_expr(p, se->high);
 
 		bool no_indices = se->low == nullptr && se->high == nullptr;
-
-		{
-			Type *type = base_type(type_of_expr(se->expr));
-			if (type->kind == Type_Struct && !is_type_soa_struct(type)) {
-				TypeAtomOpTable *atom_op_table = type->Struct.atom_op_table;
-				if (atom_op_table != nullptr && atom_op_table->op[TypeAtomOp_slice]) {
-					AtomOpMapEntry *found = map_get(&p->module->info->atom_op_map, hash_pointer(expr));
-					if (found) {
-						lbValue base = lb_build_expr(p, found->node);
-
-						Type *slice_type = base.type;
-						lbValue len = lb_slice_len(p, base);
-						if (high.value == nullptr) high = len;
-
-						if (!no_indices) {
-							lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
-						}
-
-
-						lbValue elem    = lb_emit_ptr_offset(p, lb_slice_elem(p, base), low);
-						lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
-
-						lbAddr slice = lb_add_local_generated(p, slice_type, false);
-						lb_fill_slice(p, slice, elem, new_len);
-						return slice;
-					}
-				}
-			}
-		}
-
 
 		lbAddr addr = lb_build_addr(p, se->expr);
 		lbValue base = lb_addr_load(p, addr);
@@ -13268,7 +13269,7 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 	g.type = alloc_type_pointer(type);
 	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), cast(char const *)str);
 	if (value.value != nullptr) {
-		GB_ASSERT(LLVMIsConstant(value.value));
+		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
 		LLVMSetInitializer(g.value, value.value);
 	} else {
 		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, type)));
@@ -14095,7 +14096,7 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	lb_run_function_pass_manager(default_function_pass_manager, p);
 
 	return p;
 }
@@ -14184,7 +14185,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	lb_run_function_pass_manager(default_function_pass_manager, p);
 
 	return p;
 }
@@ -14224,8 +14225,10 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 
 	{ // initialize `runtime.args__`
 		lbValue argc = {LLVMGetParam(p->value, 0), t_i32};
-		argc = lb_emit_conv(p, argc, t_int);
 		lbValue argv = {LLVMGetParam(p->value, 1), t_ptr_cstring};
+		LLVMSetValueName2(argc.value, "argc", 4);
+		LLVMSetValueName2(argv.value, "argv", 4);
+		argc = lb_emit_conv(p, argc, t_int);
 		lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
 		lb_fill_slice(p, args, argv, argc);
 	}
@@ -14299,7 +14302,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	lb_run_function_pass_manager(default_function_pass_manager, p);
 	return p;
 }
 
@@ -14424,26 +14427,26 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 		lbProcedure *p = m->procedures_to_generate[i];
 		if (p->body != nullptr) { // Build Procedure
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-				LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+				lb_run_function_pass_manager(default_function_pass_manager_without_memcpy, p);
 			} else {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
 					case ProcedureOptimizationMode_None:
 					case ProcedureOptimizationMode_Minimal:
-						LLVMRunFunctionPassManager(function_pass_manager_minimal, p->value);
+						lb_run_function_pass_manager(function_pass_manager_minimal, p);
 						break;
 					case ProcedureOptimizationMode_Size:
-						LLVMRunFunctionPassManager(function_pass_manager_size, p->value);
+						lb_run_function_pass_manager(function_pass_manager_size, p);
 						break;
 					case ProcedureOptimizationMode_Speed:
-						LLVMRunFunctionPassManager(function_pass_manager_speed, p->value);
+						lb_run_function_pass_manager(function_pass_manager_speed, p);
 						break;
 					default:
-						LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+						lb_run_function_pass_manager(default_function_pass_manager, p);
 						break;
 					}
 				} else {
-					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+					lb_run_function_pass_manager(default_function_pass_manager, p);
 				}
 			}
 		}
@@ -14451,11 +14454,11 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 
 	for_array(i, m->equal_procs.entries) {
 		lbProcedure *p = m->equal_procs.entries[i].value;
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
 	for_array(i, m->hasher_procs.entries) {
 		lbProcedure *p = m->hasher_procs.entries[i].value;
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
 
 	return 0;

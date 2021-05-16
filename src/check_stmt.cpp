@@ -939,6 +939,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				TokenKind upper_op = Token_Invalid;
 				switch (be->op.kind) {
 				case Token_Ellipsis:  upper_op = Token_GtEq; break;
+				case Token_RangeFull: upper_op = Token_GtEq; break;
 				case Token_RangeHalf: upper_op = Token_Gt;   break;
 				default: GB_PANIC("Invalid range operator"); break;
 				}
@@ -1489,53 +1490,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			auto lhs_to_ignore = array_make<bool>(temporary_allocator(), lhs_count);
 
 			isize max = gb_min(lhs_count, rhs_count);
-			// NOTE(bill, 2020-05-02): This is an utter hack to get these custom atom operations working
-			// correctly for assignments
-			for (isize i = 0; i < max; i++) {
-				if (lhs_operands[i].mode == Addressing_AtomOpAssign) {
-					Operand lhs = lhs_operands[i];
-
-					Type *t = base_type(lhs.type);
-					GB_ASSERT(t->kind == Type_Struct);
-					ast_node(ie, IndexExpr, unparen_expr(lhs.expr));
-
-					TypeAtomOpTable *atom_op_table = t->Struct.atom_op_table;
-					GB_ASSERT(atom_op_table->op[TypeAtomOp_index_set] != nullptr);
-					Entity *e = atom_op_table->op[TypeAtomOp_index_set];
-
-					GB_ASSERT(e->identifier != nullptr);
-					Ast *proc_ident = clone_ast(e->identifier);
-					GB_ASSERT(ctx->file != nullptr);
-
-
-					TypeAndValue tv = type_and_value_of_expr(ie->expr);
-					Ast *expr = ie->expr;
-					if (is_type_pointer(tv.type)) {
-						// Okay
-					} else if (tv.mode == Addressing_Variable) {
-						// NOTE(bill): Hack it to take the address instead
-						expr = ast_unary_expr(ctx->file, {Token_And, STR_LIT("&")}, ie->expr);
-					} else {
-						continue;
-					}
-
-					auto args = array_make<Ast *>(heap_allocator(), 3);
-					args[0] = expr;
-					args[1] = ie->index;
-					args[2] = rhs_operands[i].expr;
-
-					Ast *fake_call = ast_call_expr(ctx->file, proc_ident, args, ie->open, ie->close, {});
-					Operand fake_operand = {};
-					fake_operand.expr = lhs.expr;
-					check_expr_base(ctx, &fake_operand, fake_call, nullptr);
-					AtomOpMapEntry entry = {TypeAtomOp_index_set, fake_call};
-					map_set(&ctx->info->atom_op_map, hash_pointer(lhs.expr), entry);
-
-					lhs_to_ignore[i] = true;
-
-				}
-			}
-
 			for (isize i = 0; i < max; i++) {
 				if (lhs_to_ignore[i]) {
 					continue;
@@ -1667,7 +1621,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		} else {
 			for (isize i = 0; i < result_count; i++) {
 				Entity *e = pt->results->Tuple.variables[i];
-				check_assignment(ctx, &operands[i], e->type, str_lit("return statement"));
+				Operand *o = &operands[i];
+				check_assignment(ctx, o, e->type, str_lit("return statement"));
+				if (is_type_untyped(o->type)) {
+					update_expr_type(ctx, o->expr, e->type, true);
+				}
 			}
 		}
 	case_end;

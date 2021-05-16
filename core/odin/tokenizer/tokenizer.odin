@@ -14,7 +14,7 @@ Flags :: distinct bit_set[Flag; u32];
 Tokenizer :: struct {
 	// Immutable data
 	path: string,
-	src:  []byte,
+	src:  string,
 	err:  Error_Handler,
 
 	flags: Flags,
@@ -31,7 +31,7 @@ Tokenizer :: struct {
 	error_count: int,
 }
 
-init :: proc(t: ^Tokenizer, src: []byte, path: string, err: Error_Handler = default_error_handler) {
+init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = default_error_handler) {
 	t.src = src;
 	t.err = err;
 	t.ch = ' ';
@@ -87,7 +87,7 @@ advance_rune :: proc(using t: ^Tokenizer) {
 		case r == 0:
 			error(t, t.offset, "illegal character NUL");
 		case r >= utf8.RUNE_SELF:
-			r, w = utf8.decode_rune(src[read_offset:]);
+			r, w = utf8.decode_rune_in_string(src[read_offset:]);
 			if r == utf8.RUNE_ERROR && w == 1 {
 				error(t, t.offset, "illegal UTF-8 encoding");
 			} else if r == utf8.RUNE_BOM && offset > 0 {
@@ -623,6 +623,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					if t.ch == '<' {
 						advance_rune(t);
 						kind = .Range_Half;
+					} else if t.ch == '=' {
+						advance_rune(t);
+						kind = .Range_Full;
 					}
 				}
 			}

@@ -51,8 +51,10 @@ TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_CmpAndEq, "&&="), \
 	TOKEN_KIND(Token_CmpOrEq,  "||="), \
 TOKEN_KIND(Token__AssignOpEnd, ""), \
-	TOKEN_KIND(Token_ArrowRight,       "->"), \
-	TOKEN_KIND(Token_Undef,            "---"), \
+	TOKEN_KIND(Token_Increment, "++"), \
+	TOKEN_KIND(Token_Decrement, "--"), \
+	TOKEN_KIND(Token_ArrowRight,"->"), \
+	TOKEN_KIND(Token_Undef,     "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, ""), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -74,6 +76,7 @@ TOKEN_KIND(Token__ComparisonEnd, ""), \
 	TOKEN_KIND(Token_Period,        "."),   \
 	TOKEN_KIND(Token_Comma,         ","),   \
 	TOKEN_KIND(Token_Ellipsis,      ".."),  \
+	TOKEN_KIND(Token_RangeFull,     "..="), \
 	TOKEN_KIND(Token_RangeHalf,     "..<"), \
 	TOKEN_KIND(Token_BackSlash,     "\\"),  \
 TOKEN_KIND(Token__OperatorEnd, ""), \
@@ -1202,6 +1205,9 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				if (t->curr_rune == '<') {
 					advance_to_next_rune(t);
 					token->kind = Token_RangeHalf;
+				} else if (t->curr_rune == '=') {
+					advance_to_next_rune(t);
+					token->kind = Token_RangeFull;
 				}
 			} else if ('0' <= t->curr_rune && t->curr_rune <= '9') {
 				scan_number_to_token(t, token, true);
@@ -1287,6 +1293,10 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token->kind = Token_AddEq;
+			} else if (t->curr_rune == '+') {
+				advance_to_next_rune(t);
+				token->kind = Token_Increment;
+				insert_semicolon = true;
 			}
 			break;
 		case '-':
@@ -1298,6 +1308,10 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				advance_to_next_rune(t);
 				advance_to_next_rune(t);
 				token->kind = Token_Undef;
+			} else if (t->curr_rune == '-') {
+				advance_to_next_rune(t);
+				token->kind = Token_Decrement;
+				insert_semicolon = true;
 			} else if (t->curr_rune == '>') {
 				advance_to_next_rune(t);
 				token->kind = Token_ArrowRight;

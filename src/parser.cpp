@@ -1344,6 +1344,7 @@ Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 bool is_token_range(TokenKind kind) {
 	switch (kind) {
 	case Token_Ellipsis:
+	case Token_RangeFull:
 	case Token_RangeHalf:
 		return true;
 	}
@@ -1571,6 +1572,10 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
 		expect_semicolon_newline_error(f, f->prev_token, s);
+		return;
+	}
+
+	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
 
@@ -2315,7 +2320,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			f->expr_level = prev_level;
 		}
 
-
+		skip_possible_newline_for_literal(f);
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 
 		isize name_count = 0;
@@ -2675,6 +2680,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
+			case Token_RangeFull:
 			case Token_RangeHalf:
 				// NOTE(bill): Do not err yet
 			case Token_Colon:
@@ -2686,6 +2692,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
+			case Token_RangeFull:
 			case Token_RangeHalf:
 				syntax_error(f->curr_token, "Expected a colon, not a range");
 				/* fallthrough */
@@ -2724,6 +2731,16 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			}
 			break;
 
+		case Token_Increment:
+		case Token_Decrement:
+			if (!lhs) {
+				Token token = advance_token(f);
+				syntax_error(token, "Postfix '%.*s' operator is not supported", LIT(token.string));
+			} else {
+				loop = false;
+			}
+			break;
+
 		default:
 			loop = false;
 			break;
@@ -2754,15 +2771,25 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		return ast_auto_cast(f, token, expr);
 	}
 
+
 	case Token_Add:
 	case Token_Sub:
-	case Token_Not:
 	case Token_Xor:
-	case Token_And: {
+	case Token_And:
+	case Token_Not: {
 		Token token = advance_token(f);
 		Ast *expr = parse_unary_expr(f, lhs);
 		return ast_unary_expr(f, token, expr);
 	}
+
+	case Token_Increment:
+	case Token_Decrement: {
+		Token token = advance_token(f);
+		syntax_error(token, "Unary '%.*s' operator is not supported", LIT(token.string));
+		Ast *expr = parse_unary_expr(f, lhs);
+		return ast_unary_expr(f, token, expr);
+	}
+
 
 	case Token_Period: {
 		Token token = expect_token(f, Token_Period);
@@ -2792,6 +2819,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_when:
 		return 1;
 	case Token_Ellipsis:
+	case Token_RangeFull:
 	case Token_RangeHalf:
 		if (!f->allow_range) {
 			return 0;
@@ -3153,6 +3181,13 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 		return ast_bad_stmt(f, token, f->curr_token);
 	}
 
+	switch (token.kind) {
+	case Token_Increment:
+	case Token_Decrement:
+		advance_token(f);
+		syntax_error(token, "Postfix '%.*s' statement is not supported", LIT(token.string));
+		break;
+	}
 
 
 	#if 0
@@ -3899,12 +3934,6 @@ Ast *parse_return_stmt(AstFile *f) {
 
 	while (f->curr_token.kind != Token_Semicolon) {
 		Ast *arg = parse_expr(f, false);
-		// if (f->curr_token.kind == Token_Eq) {
-		// 	Token eq = expect_token(f, Token_Eq);
-		// 	Ast *value = parse_value(f);
-		// 	arg = ast_field_value(f, arg, value, eq);
-		// }
-
 		array_add(&results, arg);
 		if (f->curr_token.kind != Token_Comma ||
 		    f->curr_token.kind == Token_EOF) {
@@ -4025,7 +4054,7 @@ Ast *parse_case_clause(AstFile *f, bool is_type) {
 	}
 	f->allow_range = prev_allow_range;
 	f->allow_in_expr = prev_allow_in_expr;
-	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
+	expect_token(f, Token_Colon);
 	Array<Ast *> stmts = parse_stmt_list(f);
 
 	return ast_case_clause(f, token, list, stmts);

@@ -40,7 +40,7 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
 
 
 _stat_errno :: proc(errno: win32.DWORD) -> Path_Error {
-	return Path_Error{err = error_from_platform_error(i32(errno))};
+	return Path_Error{err = Platform_Error{i32(errno)}};
 }
 
 
@@ -89,7 +89,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 		fd: win32.WIN32_FIND_DATAW;
 		sh := win32.FindFirstFileW(wname, &fd);
 		if sh == win32.INVALID_HANDLE_VALUE {
-			e = Path_Error{err = error_from_platform_error(i32(win32.GetLastError()))};
+			e = Path_Error{err = Platform_Error{i32(win32.GetLastError())}};
 			return;
 		}
 		win32.FindClose(sh);
@@ -99,7 +99,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 
 	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil);
 	if h == win32.INVALID_HANDLE_VALUE {
-		e = Path_Error{err = error_from_platform_error(i32(win32.GetLastError()))};
+		e = Path_Error{err = Platform_Error{i32(win32.GetLastError())}};
 		return;
 	}
 	defer win32.CloseHandle(h);
