@@ -8,13 +8,20 @@ import "core:fmt"
 Warning_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any);
 Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any);
 
+Flag :: enum u32 {
+	Optional_Semicolons,
+}
+
+Flags :: distinct bit_set[Flag; u32];
+
+
 Parser :: struct {
 	file: ^ast.File,
 	tok: tokenizer.Tokenizer,
 
-	// If optional_semicolons is true, semicolons are completely as statement terminators
+	// If .Optional_Semicolons is true, semicolons are completely as statement terminators
 	// different to .Insert_Semicolon in tok.flags
-	optional_semicolons: bool,
+	flags: Flags,
 
 	warn: Warning_Handler,
 	err:  Error_Handler,
@@ -104,8 +111,9 @@ end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 	return pos;
 }
 
-default_parser :: proc() -> Parser {
+default_parser :: proc(flags := Flags{}) -> Parser {
 	return Parser {
+		flags = flags,
 		err  = default_error_handler,
 		warn = default_warning_handler,
 	};
@@ -132,7 +140,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		p.line_comment     = nil;
 	}
 
-	if p.optional_semicolons {
+	if .Optional_Semicolons in p.flags {
 		p.tok.flags += {.Insert_Semicolon};
 	}
 
@@ -409,7 +417,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return false;
 	}
 
-	if p.optional_semicolons {
+	if .Optional_Semicolons in p.flags {
 		return true;
 	}
 
@@ -453,7 +461,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 }
 
 expect_semicolon_newline_error :: proc(p: ^Parser, token: tokenizer.Token, s: ^ast.Node) {
-	if !p.optional_semicolons && .Insert_Semicolon in p.tok.flags && token.text == "\n" {
+	if .Optional_Semicolons not_in p.flags && .Insert_Semicolon in p.tok.flags && token.text == "\n" {
 		#partial switch token.kind {
 		case .Close_Brace:
 		case .Close_Paren:
