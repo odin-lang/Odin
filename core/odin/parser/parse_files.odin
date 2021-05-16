@@ -39,7 +39,7 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 		}
 		file := ast.new(ast.File, NO_POS, NO_POS);
 		file.pkg = pkg;
-		file.src = src;
+		file.src = string(src);
 		file.fullpath = fullpath;
 		pkg.files[fullpath] = file;
 	}
