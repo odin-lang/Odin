@@ -11386,6 +11386,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Short on constant values
+		// GB_ASSERT_MSG(!is_type_untyped(tv.type), "%s @ %s", type_to_string(tv.type), token_pos_to_string(expr_pos));
 		return lb_const_value(p->module, tv.type, tv.value);
 	}
 
