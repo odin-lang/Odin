@@ -1115,6 +1115,7 @@ bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 					error(curr->token, "\t%.*s refers to", LIT(curr->token.string));
 				}
 				error(curr->token, "\t%.*s", LIT(curr->token.string));
+				curr->type = t_invalid;
 			}
 			return true;
 		}
