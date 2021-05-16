@@ -931,6 +931,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 
 		switch (be->op.kind) {
 		case Token_Ellipsis:
+		case Token_RangeFull:
 			if (upper - lower >= bits) {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower+1));
 			}
