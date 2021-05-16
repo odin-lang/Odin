@@ -5940,8 +5940,9 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 
 		TokenKind op = Token_Lt;
 		switch (ie->op.kind) {
-		case Token_Ellipsis:  op = Token_LtEq; break;
-		case Token_RangeHalf: op = Token_Lt; break;
+		case Token_Ellipsis:  op = Token_LtEq; break; // ..
+		case Token_RangeFull: op = Token_LtEq; break; // ..=
+		case Token_RangeHalf: op = Token_Lt;   break; // ..<
 		default: error(ie->op, "Invalid range operator"); break;
 		}
 		bool ok = compare_exact_values(op, a, b);
@@ -5952,7 +5953,7 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 		}
 
 		ExactValue inline_for_depth = exact_value_sub(b, a);
-		if (ie->op.kind == Token_Ellipsis) {
+		if (ie->op.kind != Token_RangeHalf) {
 			inline_for_depth = exact_value_increment_one(inline_for_depth);
 		}
 

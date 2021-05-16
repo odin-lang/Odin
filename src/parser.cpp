@@ -1344,6 +1344,7 @@ Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 bool is_token_range(TokenKind kind) {
 	switch (kind) {
 	case Token_Ellipsis:
+	case Token_RangeFull:
 	case Token_RangeHalf:
 		return true;
 	}
@@ -1571,6 +1572,10 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
 		expect_semicolon_newline_error(f, f->prev_token, s);
+		return;
+	}
+
+	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
 
@@ -2315,7 +2320,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			f->expr_level = prev_level;
 		}
 
-
+		skip_possible_newline_for_literal(f);
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 
 		isize name_count = 0;
@@ -2675,6 +2680,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
+			case Token_RangeFull:
 			case Token_RangeHalf:
 				// NOTE(bill): Do not err yet
 			case Token_Colon:
@@ -2686,6 +2692,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
+			case Token_RangeFull:
 			case Token_RangeHalf:
 				syntax_error(f->curr_token, "Expected a colon, not a range");
 				/* fallthrough */
@@ -2812,6 +2819,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_when:
 		return 1;
 	case Token_Ellipsis:
+	case Token_RangeFull:
 	case Token_RangeHalf:
 		if (!f->allow_range) {
 			return 0;
@@ -3926,12 +3934,6 @@ Ast *parse_return_stmt(AstFile *f) {
 
 	while (f->curr_token.kind != Token_Semicolon) {
 		Ast *arg = parse_expr(f, false);
-		// if (f->curr_token.kind == Token_Eq) {
-		// 	Token eq = expect_token(f, Token_Eq);
-		// 	Ast *value = parse_value(f);
-		// 	arg = ast_field_value(f, arg, value, eq);
-		// }
-
 		array_add(&results, arg);
 		if (f->curr_token.kind != Token_Comma ||
 		    f->curr_token.kind == Token_EOF) {
@@ -4052,7 +4054,7 @@ Ast *parse_case_clause(AstFile *f, bool is_type) {
 	}
 	f->allow_range = prev_allow_range;
 	f->allow_in_expr = prev_allow_in_expr;
-	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
+	expect_token(f, Token_Colon);
 	Array<Ast *> stmts = parse_stmt_list(f);
 
 	return ast_case_clause(f, token, list, stmts);

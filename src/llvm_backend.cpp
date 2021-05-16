@@ -4041,6 +4041,7 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
 	case Token_Ellipsis:  op = Token_LtEq; break;
+	case Token_RangeFull: op = Token_LtEq; break;
 	case Token_RangeHalf: op = Token_Lt;  break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
@@ -4454,7 +4455,7 @@ void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 
 		ExactValue start = start_expr->tav.value;
 		ExactValue end   = end_expr->tav.value;
-		if (op == Token_Ellipsis) { // .. [start, end]
+		if (op != Token_RangeHalf) { // .. [start, end] (or ..=)
 			ExactValue index = exact_value_i64(0);
 			for (ExactValue val = start;
 			     compare_exact_values(Token_LtEq, val, end);
@@ -4465,7 +4466,7 @@ void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 
 				lb_build_stmt(p, rs->body);
 			}
-		} else if (op == Token_RangeHalf) { // ..< [start, end)
+		} else { // ..< [start, end)
 			ExactValue index = exact_value_i64(0);
 			for (ExactValue val = start;
 			     compare_exact_values(Token_Lt, val, end);
@@ -4632,6 +4633,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 				TokenKind op = Token_Invalid;
 				switch (ie->op.kind) {
 				case Token_Ellipsis:  op = Token_LtEq; break;
+				case Token_RangeFull: op = Token_LtEq; break;
 				case Token_RangeHalf: op = Token_Lt;   break;
 				default: GB_PANIC("Invalid interval operator"); break;
 				}

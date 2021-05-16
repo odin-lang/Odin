@@ -107,6 +107,7 @@ Token_Kind :: enum u32 {
 		Comma,         // ,
 		Ellipsis,      // ..
 		Range_Half,    // ..<
+		Range_Full,    // ..=
 		Back_Slash,    // \
 	B_Operator_End,
 
@@ -233,6 +234,7 @@ tokens := [Token_Kind.COUNT]string {
 	",",
 	"..",
 	"..<",
+	"..=",
 	"\\",
 	"",
 

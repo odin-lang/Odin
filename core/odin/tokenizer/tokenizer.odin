@@ -623,6 +623,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					if t.ch == '<' {
 						advance_rune(t);
 						kind = .Range_Half;
+					} else if t.ch == '=' {
+						advance_rune(t);
+						kind = .Range_Full;
 					}
 				}
 			}
