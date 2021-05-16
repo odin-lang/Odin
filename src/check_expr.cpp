@@ -4282,6 +4282,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 							err = CallArgumentError_WrongTypes;
 						}
 					}
+				} else if (show_error) {
+					check_assignment(c, &o, t, str_lit("argument"));
 				}
 				score += s;
 
@@ -4335,6 +4337,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 							check_assignment(c, &o, t, str_lit("argument"));
 						}
 						err = CallArgumentError_WrongTypes;
+					} else if (show_error) {
+						check_assignment(c, &o, t, str_lit("argument"));
 					}
 					score += s;
 					if (is_type_any(elem)) {
@@ -4557,6 +4561,8 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 						err = CallArgumentError_NoneConstantParameter;
 					}
 				}
+			} else if (show_error) {
+				check_assignment(c, o, e->type, str_lit("procedure argument"));
 			}
 			score += s;
 		}
