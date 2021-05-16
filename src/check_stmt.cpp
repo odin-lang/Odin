@@ -1621,7 +1621,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		} else {
 			for (isize i = 0; i < result_count; i++) {
 				Entity *e = pt->results->Tuple.variables[i];
-				check_assignment(ctx, &operands[i], e->type, str_lit("return statement"));
+				Operand *o = &operands[i];
+				check_assignment(ctx, o, e->type, str_lit("return statement"));
+				if (is_type_untyped(o->type)) {
+					update_expr_type(ctx, o->expr, e->type, true);
+				}
 			}
 		}
 	case_end;

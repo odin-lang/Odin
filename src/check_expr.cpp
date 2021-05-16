@@ -2216,6 +2216,10 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		return;
 	}
 
+	if (is_type_untyped(y->type)) {
+		convert_to_typed(c, y, t_uint);
+	}
+
 	x->mode = Addressing_Value;
 }
 
@@ -2886,7 +2890,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		if (token_is_comparison(be->op.kind)) {
 			// NOTE(bill): Do nothing as the types are fine
 		} else if (token_is_shift(be->op.kind)) {
-			update_expr_type(c, be->left,  type, final);
+			update_expr_type(c, be->left, type, final);
 		} else {
 			update_expr_type(c, be->left,  type, final);
 			update_expr_type(c, be->right, type, final);
@@ -3200,8 +3204,8 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		break;
 	}
 
-	operand->type = target_type;
 	update_expr_type(c, operand->expr, target_type, true);
+	operand->type = target_type;
 }
 
 bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
@@ -4108,6 +4112,16 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 }
 
 
+bool is_expr_constant_zero(Ast *expr) {
+	GB_ASSERT(expr != nullptr);
+	auto v = exact_value_to_integer(expr->tav.value);
+	if (v.kind == ExactValue_Integer) {
+		return big_int_cmp_zero(&v.value_integer) == 0;
+	}
+	return false;
+}
+
+
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
 	GB_ASSERT(is_type_proc(proc_type));
@@ -4299,7 +4313,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				if (o.mode == Addressing_Type && is_type_typeid(e->type)) {
 					add_type_info_type(c, o.type);
 					add_type_and_value(c->info, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
+				} else if (show_error && is_type_untyped(o.type)) {
+					update_expr_type(c, o.expr, t, true);
 				}
+
 			}
 
 			if (variadic) {
@@ -4347,6 +4364,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (o.mode == Addressing_Type && is_type_typeid(t)) {
 						add_type_info_type(c, o.type);
 						add_type_and_value(c->info, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
+					} else if (show_error && is_type_untyped(o.type)) {
+						update_expr_type(c, o.expr, t, true);
 					}
 				}
 			}

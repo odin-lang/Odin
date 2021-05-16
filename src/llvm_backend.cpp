@@ -3409,6 +3409,20 @@ void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *fals
 	LLVMBuildCondBr(p->builder, cv, true_block->block, false_block->block);
 }
 
+bool lb_is_expr_untyped_const(Ast *expr) {
+	auto const &tv = type_and_value_of_expr(expr);
+	if (is_type_untyped(tv.type)) {
+		return tv.value.kind != ExactValue_Invalid;
+	}
+	return false;
+}
+
+lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t) {
+	GB_ASSERT(is_type_typed(t));
+	auto const &tv = type_and_value_of_expr(expr);
+	return lb_const_value(m, t, tv.value);
+}
+
 lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block) {
 	GB_ASSERT(cond != nullptr);
 	GB_ASSERT(true_block  != nullptr);
@@ -3440,8 +3454,13 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	case_end;
 	}
 
-	lbValue v = lb_build_expr(p, cond);
-	// v = lb_emit_conv(p, v, t_bool);
+	lbValue v = {};
+	if (lb_is_expr_untyped_const(cond)) {
+		v = lb_expr_untyped_const_to_typed(p->module, cond, t_llvm_bool);
+	} else {
+		v = lb_build_expr(p, cond);
+	}
+
 	v = lb_emit_conv(p, v, t_llvm_bool);
 
 	lb_emit_if(p, v, true_block, false_block);
@@ -4872,6 +4891,9 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 
 	if (done->preds.count == 0) {
 		lb_start_block(p, rhs);
+		if (lb_is_expr_untyped_const(right)) {
+			return lb_expr_untyped_const_to_typed(m, right, type);
+		}
 		return lb_build_expr(p, right);
 	}
 
@@ -4886,7 +4908,12 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	}
 
 	lb_start_block(p, rhs);
-	lbValue edge = lb_build_expr(p, right);
+	lbValue edge = {};
+	if (lb_is_expr_untyped_const(right)) {
+		edge = lb_expr_untyped_const_to_typed(m, right, type);
+	} else {
+		edge = lb_build_expr(p, right);
+	}
 
 	incoming_values[done->preds.count] = edge.value;
 	incoming_blocks[done->preds.count] = p->curr_block->block;
@@ -7010,12 +7037,26 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_And:
 	case Token_Or:
 	case Token_Xor:
-	case Token_AndNot:
-	case Token_Shl:
-	case Token_Shr: {
+	case Token_AndNot: {
 		Type *type = default_type(tv.type);
 		lbValue left = lb_build_expr(p, be->left);
 		lbValue right = lb_build_expr(p, be->right);
+		return lb_emit_arith(p, be->op.kind, left, right, type);
+	}
+
+	case Token_Shl:
+	case Token_Shr: {
+		lbValue left, right;
+		Type *type = default_type(tv.type);
+		left = lb_build_expr(p, be->left);
+
+		if (lb_is_expr_untyped_const(be->right)) {
+			// NOTE(bill): RHS shift operands can still be untyped
+			// Just bypass the standard lb_build_expr
+			right = lb_expr_untyped_const_to_typed(p->module, be->right, type);
+		} else {
+			right = lb_build_expr(p, be->right);
+		}
 		return lb_emit_arith(p, be->op.kind, left, right, type);
 	}
 
@@ -11385,8 +11426,13 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
 	if (tv.value.kind != ExactValue_Invalid) {
+		// NOTE(bill): The commented out code below is just for debug purposes only
+		// GB_ASSERT_MSG(!is_type_untyped(tv.type), "%s @ %s\n%s", type_to_string(tv.type), token_pos_to_string(expr_pos), expr_to_string(expr));
+		// if (is_type_untyped(tv.type)) {
+		// 	gb_printf_err("%s %s\n", token_pos_to_string(expr_pos), expr_to_string(expr));
+		// }
+
 		// NOTE(bill): Short on constant values
-		// GB_ASSERT_MSG(!is_type_untyped(tv.type), "%s @ %s", type_to_string(tv.type), token_pos_to_string(expr_pos));
 		return lb_const_value(p->module, tv.type, tv.value);
 	}
 
