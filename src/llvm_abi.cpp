@@ -343,7 +343,7 @@ namespace lbAbi386 {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
-					args[i] = lb_arg_type_indirect_byval(c, t);
+					args[i] = lb_arg_type_indirect(t, nullptr);
 				}
 			} else {
 				args[i] = non_struct(c, t, false);
@@ -828,7 +828,7 @@ namespace lbAbiAmd64SysV {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
-					args[i] = lb_arg_type_indirect(t, lb_create_enum_attribute_with_type(c, "byval", t));
+					args[i] = lb_arg_type_indirect_byval(c, t);
 				}
 			} else {
 				args[i] = non_struct(c, t);
