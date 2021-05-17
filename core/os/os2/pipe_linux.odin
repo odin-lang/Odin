@@ -9,5 +9,5 @@ _pipe :: proc() -> (r, w: Handle, err: Error) {
         return 0,0,_unix_errno(pipe_err);
     }
 
-    return transmute(Handle)fd[0], transmute(Handle)fd[1], Error.None;
+    return transmute(Handle)fd[0], transmute(Handle)fd[1], Platform_Error{0};
 }

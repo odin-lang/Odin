@@ -49,17 +49,13 @@ _read :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
 _read_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
     off,err_seek := _seek(fd, offset, Seek_From.Start);
 
-    if err_seek != Error.None {
-        return 0, err_seek;
-    }
-
     read_bytes,err_read := _read(fd, p);
     return read_bytes, err_read;
 }
 
 // TODO(rytc): temporary stub
 _read_from :: proc(fd: Handle, r: io.Reader) -> (n: i64, err: Error) {
-    return 0, Error.Invalid_Argument;
+    return 0, General_Error.Invalid_Argument;
 }
 
 _write :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
@@ -70,16 +66,12 @@ _write :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
 _write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
     off,err_seek := _seek(fd, offset, Seek_From.Start);
 
-    if err_seek != Error.None {
-        return 0, err_seek;
-    }
-
     n,err = _write(fd, p);
     return n,err;
 }
 
 _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
-    return 0,Error.Invalid_Argument;
+    return 0, General_Error.Invalid_Argument;
 }
 
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
@@ -111,7 +103,7 @@ _truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
 }
 
 _remove :: proc(name: string) -> Maybe(Path_Error) {
-	return Path_Error{"Remove (not implemented)", name, Error.Invalid_Argument};
+	return Path_Error{"Remove (not implemented)", name, General_Error.Invalid_Argument};
 }
 
 _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
@@ -162,7 +154,7 @@ _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
     // path := _get_handle_path(fd, context.temp_allocator);
     // err := unix.chmod(path, mode);
     // return _unix_errno(err);
-	return Error.Invalid_Argument;
+	return General_Error.Invalid_Argument;
 }
 
 // NOTE(rytc): Why does chown take a handle, and lchown take a path?
@@ -192,7 +184,7 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
 _exists :: proc(path: string) -> bool {
     stat : Unix_Stat;
     err := unix.lstat(path, uintptr(&stat));
-	return (_unix_errno(err) != Error.Not_Exist);
+	return (_unix_errno(err) != General_Error.Not_Exist);
 }
 
 _is_file :: proc(path: string) -> bool {

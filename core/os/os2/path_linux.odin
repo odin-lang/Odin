@@ -43,7 +43,7 @@ _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
     buff := make([]byte, MAX_PATH_LENGTH, allocator);
     result := unix.getcwd(buff);
     if result == nil {
-        return "", Error.Permission_Denied;
+        return "", General_Error.Permission_Denied;
     }
 	return strings.string_from_ptr(raw_data(buff), len(buff)), nil;
 }

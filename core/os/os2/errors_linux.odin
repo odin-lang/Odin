@@ -34,21 +34,21 @@ Errno :: enum i32 {
 }
 
 _unix_errno :: proc(fd: int) -> Error {
-    if fd >= 0 do return Error.None;
+    if fd >= 0 do return nil;
 
     errno := Errno(-fd);
 
     #partial switch errno { 
         case Errno.EACCES: fallthrough;
         case Errno.EPERM:
-            return Error.Permission_Denied;
+            return General_Error.Permission_Denied;
         case Errno.ENOENT:
-            return Error.Not_Exist;
+            return General_Error.Not_Exist;
         case Errno.EINVAL: 
-            return Error.Invalid_Argument;
+            return General_Error.Invalid_Argument;
         //case Errno.EBUSY:
         //  return Error.Timeout;
     }
 
-    return Error.Invalid_Argument;
+    return General_Error.Invalid_Argument;
 }
