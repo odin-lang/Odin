@@ -126,10 +126,6 @@ utime :: proc(name: string, atime, mtime: i64) -> int {
 
 }
 
-// NOTE(rytc): Ehh, multiple return values are too nice
-// to ignore just to do things the C-way in odin :\
-// Not sure how much the original API should be followed in 
-// this case
 pipe :: proc() -> (fd: [2]int, err: int) {
     handles : [2]int;
     result := _syscall1(SYSCALL_PIPE, int, &handles[0]);
@@ -147,10 +143,10 @@ mmap :: proc(addr, len, prot, flags, fd, offset: uint) -> uintptr {
 
     result := _syscall6(SYSCALL_MMAP, u64, addr, len, prot, flags, fd, offset);
 
-    // NOTE(rytc): these syscalls returns the error code in a negative number
-    // to be able to easily translate it into a pointer on success, we just 
+    // NOTE(rytc): these syscalls returns the error code in a negative number.
+    // To be able to easily translate it into a pointer on success, we just 
     // follow c's underflow rule for uints to figure out what would be an 
-    // error code /invalid ptr
+    // error code or invalid ptr.
     // This magic number is based on the possible error codes that mmap could 
     // return
     if result >= max(u64) - 76 {
@@ -161,7 +157,7 @@ mmap :: proc(addr, len, prot, flags, fd, offset: uint) -> uintptr {
 }
 
 munmap :: proc(addr: rawptr, len: uint) -> int {
-        handles : [2]int;
+    handles : [2]int;
     result := _syscall2(SYSCALL_MUNMAP, int, addr, len);
     return result;
 }

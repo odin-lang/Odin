@@ -36,7 +36,6 @@ _name :: proc(fd: Handle) -> string {
 }
 
 _seek :: proc(fd: Handle, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
-    // TOOD(rytc): Do checking of whence?
     result := linux.lseek(transmute(int)fd, offset, transmute(uint)whence);
     return result, _linux_errno(int(result));
 }
@@ -70,6 +69,7 @@ _write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
     return n,err;
 }
 
+// TODO(rytc): temporary stub
 _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
     return 0, General_Error.Invalid_Argument;
 }
@@ -99,11 +99,11 @@ _truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
         return Path_Error{"Truncate", path, _linux_errno(error)};
     }
 
-	return nil;
+    return nil;
 }
 
 _remove :: proc(name: string) -> Maybe(Path_Error) {
-	return Path_Error{"Remove (not implemented)", name, General_Error.Invalid_Argument};
+    return Path_Error{"Remove (not implemented)", name, General_Error.Invalid_Argument};
 }
 
 _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
@@ -112,7 +112,7 @@ _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
         // NOTE(rytc): could have smarter error handling here
         return Path_Error{"Rename", old_path, _linux_errno(err)}; 
     }
-	return nil;
+    return nil;
 }
 
 _link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
@@ -120,7 +120,7 @@ _link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
     if err < 0 {
         return Link_Error{"Link", old_name, new_name, _linux_errno(err)};
     }
-	return nil;
+    return nil;
 }
 
 _symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
@@ -128,7 +128,7 @@ _symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
     if err < 0 {
         return  Link_Error{"Link", old_name, new_name, _linux_errno(err)};
     }
-	return nil; 
+    return nil; 
 }
 
 _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
@@ -137,20 +137,20 @@ _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
     if err < 0 {
         return name, Path_Error{"readlink", name, _linux_errno(err)};
     }
-	return strings.string_from_ptr(raw_data(p), len(p)), nil;
+    return strings.string_from_ptr(raw_data(p), len(p)), nil;
 }
 
 _chdir :: proc(fd: Handle) -> Error {
-    // NOTE(rytc): I assume this is suppose to change the working directory to the same directory as the file 
     fullpath := _get_handle_path(fd, context.temp_allocator);
     filename_break := strings.last_index_byte(fullpath, '/');
     dir := fmt.tprintf(fullpath[:filename_break], filename_break);
     err := linux.chdir(dir);
-	return _linux_errno(err);
+    return _linux_errno(err);
 }
 
+// TODO(rytc): temporary stub
 _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
-    // TODO(rytc): why is File_Mode passed here?
+    // TODO(rytc): This needs permission, not File_mode 
     // path := _get_handle_path(fd, context.temp_allocator);
     // err := linux.chmod(path, mode);
     // return _linux_errno(err);
@@ -160,16 +160,15 @@ _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
 // NOTE(rytc): Why does chown take a handle, and lchown take a path?
 // chown derefences symbolic links
 // lchown does not dereference symbolic links
-
 _chown :: proc(fd: Handle, uid, gid: int) -> Error {
     fullpath := _get_handle_path(fd, context.temp_allocator);
     err := linux.chown(fullpath, uid, gid);
-	return _linux_errno(err); 
+    return _linux_errno(err); 
 }
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
     err := linux.lchown(name, uid, gid);
-	return _linux_errno(err); 
+    return _linux_errno(err); 
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
