@@ -4,11 +4,11 @@ package os2
 import win32 "core:sys/windows"
 
 _create_temp :: proc(dir, pattern: string) -> (Handle, Error) {
-	return 0, .None;
+	return 0, nil;
 }
 
 _mkdir_temp :: proc(dir, pattern: string, allocator := context.allocator) -> (string, Error) {
-	return "", .None;
+	return "", nil;
 }
 
 _temp_dir :: proc(allocator := context.allocator) -> string {

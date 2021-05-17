@@ -1,6 +1,7 @@
 package os2
 
 import "core:mem"
+import "core:io"
 import "core:strconv"
 import "core:unicode/utf8"
 

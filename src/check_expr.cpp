@@ -1115,6 +1115,7 @@ bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 					error(curr->token, "\t%.*s refers to", LIT(curr->token.string));
 				}
 				error(curr->token, "\t%.*s", LIT(curr->token.string));
+				curr->type = t_invalid;
 			}
 			return true;
 		}
@@ -1132,7 +1133,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	Entity *e = scope_lookup(c->scope, name);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
-			error(n, "'_' cannot be used as a value type");
+			error(n, "'_' cannot be used as a value");
 		} else {
 			error(n, "Undeclared name: %.*s", LIT(name));
 		}
@@ -2215,6 +2216,10 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		return;
 	}
 
+	if (is_type_untyped(y->type)) {
+		convert_to_typed(c, y, t_uint);
+	}
+
 	x->mode = Addressing_Value;
 }
 
@@ -2885,7 +2890,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		if (token_is_comparison(be->op.kind)) {
 			// NOTE(bill): Do nothing as the types are fine
 		} else if (token_is_shift(be->op.kind)) {
-			update_expr_type(c, be->left,  type, final);
+			update_expr_type(c, be->left, type, final);
 		} else {
 			update_expr_type(c, be->left,  type, final);
 			update_expr_type(c, be->right, type, final);
@@ -3199,8 +3204,8 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		break;
 	}
 
-	operand->type = target_type;
 	update_expr_type(c, operand->expr, target_type, true);
+	operand->type = target_type;
 }
 
 bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
@@ -4107,6 +4112,16 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 }
 
 
+bool is_expr_constant_zero(Ast *expr) {
+	GB_ASSERT(expr != nullptr);
+	auto v = exact_value_to_integer(expr->tav.value);
+	if (v.kind == ExactValue_Integer) {
+		return big_int_cmp_zero(&v.value_integer) == 0;
+	}
+	return false;
+}
+
+
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
 	GB_ASSERT(is_type_proc(proc_type));
@@ -4281,6 +4296,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 							err = CallArgumentError_WrongTypes;
 						}
 					}
+				} else if (show_error) {
+					check_assignment(c, &o, t, str_lit("argument"));
 				}
 				score += s;
 
@@ -4296,7 +4313,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				if (o.mode == Addressing_Type && is_type_typeid(e->type)) {
 					add_type_info_type(c, o.type);
 					add_type_and_value(c->info, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
+				} else if (show_error && is_type_untyped(o.type)) {
+					update_expr_type(c, o.expr, t, true);
 				}
+
 			}
 
 			if (variadic) {
@@ -4334,6 +4354,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 							check_assignment(c, &o, t, str_lit("argument"));
 						}
 						err = CallArgumentError_WrongTypes;
+					} else if (show_error) {
+						check_assignment(c, &o, t, str_lit("argument"));
 					}
 					score += s;
 					if (is_type_any(elem)) {
@@ -4342,6 +4364,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (o.mode == Addressing_Type && is_type_typeid(t)) {
 						add_type_info_type(c, o.type);
 						add_type_and_value(c->info, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
+					} else if (show_error && is_type_untyped(o.type)) {
+						update_expr_type(c, o.expr, t, true);
 					}
 				}
 			}
@@ -4556,6 +4580,8 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 						err = CallArgumentError_NoneConstantParameter;
 					}
 				}
+			} else if (show_error) {
+				check_assignment(c, o, e->type, str_lit("procedure argument"));
 			}
 			score += s;
 		}
@@ -5940,8 +5966,9 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 
 		TokenKind op = Token_Lt;
 		switch (ie->op.kind) {
-		case Token_Ellipsis:  op = Token_LtEq; break;
-		case Token_RangeHalf: op = Token_Lt; break;
+		case Token_Ellipsis:  op = Token_LtEq; break; // ..
+		case Token_RangeFull: op = Token_LtEq; break; // ..=
+		case Token_RangeHalf: op = Token_Lt;   break; // ..<
 		default: error(ie->op, "Invalid range operator"); break;
 		}
 		bool ok = compare_exact_values(op, a, b);
@@ -5952,7 +5979,7 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 		}
 
 		ExactValue inline_for_depth = exact_value_sub(b, a);
-		if (ie->op.kind == Token_Ellipsis) {
+		if (ie->op.kind != Token_RangeHalf) {
 			inline_for_depth = exact_value_increment_one(inline_for_depth);
 		}
 
@@ -7573,47 +7600,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return Expr_Expr;
 		}
 
-		if (t->kind == Type_Struct) {
-			TypeAtomOpTable *atom_op_table = t->Struct.atom_op_table;
-			if (atom_op_table != nullptr) {
-				if (atom_op_table->op[TypeAtomOp_index_set]) {
-					if (c->assignment_lhs_hint == node) {
-						o->mode = Addressing_AtomOpAssign;
-						o->type = o->type;
-						o->expr = node;
-						return kind;
-					}
-				}
-				if (atom_op_table->op[TypeAtomOp_index_get]) {
-					Entity *e = atom_op_table->op[TypeAtomOp_index_get];
-					if (ie->index == nullptr) {
-						gbString str = expr_to_string(o->expr);
-						error(o->expr, "Missing index for '%s'", str);
-						gb_string_free(str);
-						o->mode = Addressing_Invalid;
-						o->expr = node;
-						return kind;
-					}
-
-					GB_ASSERT(e->identifier != nullptr);
-					Ast *proc_ident = clone_ast(e->identifier);
-
-					auto args = array_make<Ast *>(heap_allocator(), 2);
-					args[0] = ie->expr;
-					args[1] = ie->index;
-
-					GB_ASSERT(c->file != nullptr);
-					Ast *fake_call = ast_call_expr(c->file, proc_ident, args, ie->open, ie->close, {});
-					check_expr_base(c, o, fake_call, type_hint);
-					AtomOpMapEntry entry = {TypeAtomOp_index_get, fake_call};
-					map_set(&c->info->atom_op_map, hash_pointer(node), entry);
-					o->expr = node;
-					return kind;
-				}
-			}
-		}
-
-
 		i64 max_count = -1;
 		bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
 
@@ -7752,37 +7738,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (is_type_soa_struct(t)) {
 				valid = true;
 				o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
-			} else {
-				TypeAtomOpTable *atom_op_table = t->Struct.atom_op_table;
-				if (atom_op_table != nullptr && atom_op_table->op[TypeAtomOp_slice]) {
-					Entity *e = atom_op_table->op[TypeAtomOp_slice];
-					GB_ASSERT(e->identifier != nullptr);
-					Ast *proc_ident = clone_ast(e->identifier);
-
-					Ast *expr = se->expr;
-					if (o->mode == Addressing_Variable) {
-						expr = ast_unary_expr(c->file, {Token_And, STR_LIT("&")}, expr);
-					} else if (is_type_pointer(o->type)) {
-						// Okay
-					} else {
-						gbString str = expr_to_string(node);
-						error(node, "Cannot slice '%s', value is not addressable", str);
-						gb_string_free(str);
-						o->mode = Addressing_Invalid;
-						o->expr = node;
-						return kind;
-					}
-					auto args = array_make<Ast *>(heap_allocator(), 1);
-					args[0] = expr;
-
-
-					GB_ASSERT(c->file != nullptr);
-					Ast *fake_call = ast_call_expr(c->file, proc_ident, args, se->open, se->close, {});
-					check_expr_base(c, o, fake_call, type_hint);
-					AtomOpMapEntry entry = {TypeAtomOp_slice, fake_call};
-					map_set(&c->info->atom_op_map, hash_pointer(node), entry);
-					valid = true;
-				}
 			}
 			break;
 
@@ -7811,10 +7766,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
-		o->mode = Addressing_Value;
-
 		if (se->low == nullptr && se->high != nullptr) {
-			// error(se->interval0, "1st index is required if a 2nd index is specified");
 			// It is okay to continue as it will assume the 1st index is zero
 		}
 
@@ -7848,6 +7800,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 		}
+
+		if (max_count < 0)  {
+			if (o->mode == Addressing_Constant) {
+				gbString s = expr_to_string(se->expr);
+				error(se->expr, "Cannot slice constant value '%s'", s);
+				gb_string_free(s);
+			}
+		}
+
+		o->mode = Addressing_Value;
 
 		if (is_type_string(t) && max_count >= 0) {
 			bool all_constant = true;
