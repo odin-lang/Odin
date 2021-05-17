@@ -2,12 +2,12 @@
 package os2
 
 import "core:fmt"
-import "core:sys/unix"
+import "core:sys/linux"
 import "core:time"
 import "core:strings"
 
 // TOOD(rytc): Make sure this is accurate
-Unix_Stat :: struct {
+Linux_Stat :: struct {
     dev:      u64,
     ino:      u64,
     nlink:    u64,
@@ -38,13 +38,13 @@ S_IFCHR:  u32: 0020000;
 S_IFIFO:  u32: 0010000;
 
 _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-    stat : Unix_Stat;
-    err := unix.fstat(transmute(int)fd, uintptr(&stat));
+    stat : Linux_Stat;
+    err := linux.fstat(transmute(int)fd, uintptr(&stat));
     fullpath := _get_handle_path(fd, allocator);
 
     result : File_Info;
     if err < 0 {
-        return result, Path_Error{"fstat", fullpath, _unix_errno(err)};
+        return result, Path_Error{"fstat", fullpath, _linux_errno(err)};
     }
         
     filename_break := strings.last_index_byte(fullpath, '/') + 1;
@@ -53,7 +53,7 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
     result.fullpath = fullpath;
     result.name = name;
     result.size = stat.size;
-    result.mode = _unix_get_mode(stat.mode);
+    result.mode = _linux_get_mode(stat.mode);
     result.creation_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.modification_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.access_time = time.unix(i64(stat.atime), i64(stat.atime_ns));
@@ -68,12 +68,12 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
 }
 
 _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-    stat : Unix_Stat;
-    err := unix.lstat(name, uintptr(&stat));
+    stat : Linux_Stat;
+    err := linux.lstat(name, uintptr(&stat));
 
     result : File_Info;
     if err < 0 {
-        return result, Path_Error{"lstat", name, _unix_errno(err)};
+        return result, Path_Error{"lstat", name, _linux_errno(err)};
     }
   
     filename_break := strings.last_index_byte(name, _Path_Separator) + 1;
@@ -94,7 +94,7 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe
     }
 
     result.size = stat.size;
-    result.mode = _unix_get_mode(stat.mode);
+    result.mode = _linux_get_mode(stat.mode);
     result.creation_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.modification_time = time.unix(i64(stat.mtime), i64(stat.mtime_ns));
     result.access_time = time.unix(i64(stat.atime), i64(stat.atime_ns));
@@ -116,7 +116,7 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
     return fi1.fullpath == fi2.fullpath;
 }
 
-_unix_get_mode :: proc(mode: u32) -> File_Mode {
+_linux_get_mode :: proc(mode: u32) -> File_Mode {
     m := mode & S_IFMT;
 
     switch m {

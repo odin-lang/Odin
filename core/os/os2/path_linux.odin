@@ -2,7 +2,7 @@
 package os2
 
 import "core:fmt"
-import "core:sys/unix"
+import "core:sys/linux"
 import "core:strings"
 
 _Path_Separator      :: '/';
@@ -17,7 +17,7 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(name: string, perm: File_Mode) -> Maybe(Path_Error) {
-    unix.mkdir(name, _Default_Perm);
+    linux.mkdir(name, _Default_Perm);
 	return nil; 
 }
 
@@ -26,7 +26,7 @@ _mkdir :: proc(name: string, perm: File_Mode) -> Maybe(Path_Error) {
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Maybe(Path_Error) {
     dirs := strings.split(path, ";");
     for d in dirs {
-        unix.mkdir(d, _Default_Perm);
+        linux.mkdir(d, _Default_Perm);
     }
     return nil;
 }
@@ -34,14 +34,14 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Maybe(Path_Error) {
 _remove_all :: proc(path: string) -> Maybe(Path_Error) {
     dirs := strings.split(path, ";");
     for d in dirs {
-        unix.rmdir(d);
+        linux.rmdir(d);
     }
 	return nil;
 }
 
 _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
     buff := make([]byte, MAX_PATH_LENGTH, allocator);
-    result := unix.getcwd(buff);
+    result := linux.getcwd(buff);
     if result == nil {
         return "", General_Error.Permission_Denied;
     }
@@ -49,8 +49,8 @@ _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
 }
 
 _setwd :: proc(dir: string) -> (err: Error) {
-    error := unix.chdir(dir);
-	return _unix_errno(error);
+    error := linux.chdir(dir);
+	return _linux_errno(error);
 }
 
 _is_relative_path :: proc(name: string) -> bool {
@@ -61,7 +61,7 @@ _is_relative_path :: proc(name: string) -> bool {
 _get_handle_path :: proc(fd: Handle, allocator := context.allocator) -> string {
     path := make([]byte, MAX_PATH_LENGTH, allocator);
     fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
-    unix.readlink(fd_path, path[:]);
+    linux.readlink(fd_path, path[:]);
     fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
     
     return fullpath;
@@ -70,7 +70,7 @@ _get_handle_path :: proc(fd: Handle, allocator := context.allocator) -> string {
 _get_handle_name :: proc(fd: Handle) -> string {
     path := make([]byte, MAX_PATH_LENGTH, context.temp_allocator);
     fd_path := fmt.tprintf("/proc/self/fd/%v", transmute(uint)fd);
-    unix.readlink(fd_path, path[:]);
+    linux.readlink(fd_path, path[:]);
     fullpath := strings.string_from_ptr(raw_data(path), len(path)); 
     
     filename_break := strings.last_index_byte(fullpath, '/') + 1;

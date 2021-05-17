@@ -4,7 +4,7 @@ package os2
 import "core:fmt"
 import "core:strings"
 import "core:io"
-import "core:sys/unix"
+import "core:sys/linux"
 import "core:time"
 
 // Max length in bytes defined by Linux
@@ -12,23 +12,23 @@ MAX_PATH_LENGTH     :: 4096;
 MAX_FILENAME_LENGTH :: 255;
 
 _create :: proc(name: string) -> (Handle, Error) {
-    fd := unix.open(name, O_CREATE, 0);
-    return transmute(Handle)fd, _unix_errno(fd);
+    fd := linux.open(name, O_CREATE, 0);
+    return transmute(Handle)fd, _linux_errno(fd);
 }
 
 _open :: proc(name: string) -> (Handle, Error) {
-    fd := unix.open(name, O_RDONLY, 0);
-    return transmute(Handle)fd, _unix_errno(fd);
+    fd := linux.open(name, O_RDONLY, 0);
+    return transmute(Handle)fd, _linux_errno(fd);
 }
 
 _open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
-    fd := unix.open(name, flag, transmute(u32)perm);
-    return transmute(Handle)fd, _unix_errno(fd);
+    fd := linux.open(name, flag, transmute(u32)perm);
+    return transmute(Handle)fd, _linux_errno(fd);
 }
 
 _close :: proc(fd: Handle) -> Error {
-    result := unix.close(transmute(int)fd);
-    return _unix_errno(result);
+    result := linux.close(transmute(int)fd);
+    return _linux_errno(result);
 }
 
 _name :: proc(fd: Handle) -> string {
@@ -37,13 +37,13 @@ _name :: proc(fd: Handle) -> string {
 
 _seek :: proc(fd: Handle, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
     // TOOD(rytc): Do checking of whence?
-    result := unix.lseek(transmute(int)fd, offset, transmute(uint)whence);
-    return result, _unix_errno(int(result));
+    result := linux.lseek(transmute(int)fd, offset, transmute(uint)whence);
+    return result, _linux_errno(int(result));
 }
 
 _read :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
-    result := unix.read(transmute(int)fd, p);
-    return result, _unix_errno(result);
+    result := linux.read(transmute(int)fd, p);
+    return result, _linux_errno(result);
 }
 
 _read_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
@@ -59,8 +59,8 @@ _read_from :: proc(fd: Handle, r: io.Reader) -> (n: i64, err: Error) {
 }
 
 _write :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
-    result := unix.write(transmute(int)fd, p);
-    return result, _unix_errno(result);
+    result := linux.write(transmute(int)fd, p);
+    return result, _linux_errno(result);
 }
 
 _write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
@@ -75,15 +75,15 @@ _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
 }
 
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
-    stat : Unix_Stat;
-    stat_err := unix.fstat(transmute(int)fd, uintptr(&stat));
+    stat : Linux_Stat;
+    stat_err := linux.fstat(transmute(int)fd, uintptr(&stat));
 
-    return stat.size, _unix_errno(stat_err);
+    return stat.size, _linux_errno(stat_err);
 }
 
 _sync :: proc(fd: Handle) -> Error {
-    err := unix.fsync(transmute(int)fd);
-    return _unix_errno(err);
+    err := linux.fsync(transmute(int)fd);
+    return _linux_errno(err);
 }
 
 _flush :: proc(fd: Handle) -> Error {
@@ -93,10 +93,10 @@ _flush :: proc(fd: Handle) -> Error {
 // NOTE(rytc): Is it a good idea to truncate an open fil??
 _truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
     path := _get_handle_path(fd);  
-    error := unix.truncate(path, size);
+    error := linux.truncate(path, size);
 
     if error < 0 {
-        return Path_Error{"Truncate", path, _unix_errno(error)};
+        return Path_Error{"Truncate", path, _linux_errno(error)};
     }
 
 	return nil;
@@ -107,35 +107,35 @@ _remove :: proc(name: string) -> Maybe(Path_Error) {
 }
 
 _rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
-    err := unix.rename(old_path, new_path);
+    err := linux.rename(old_path, new_path);
     if err < 0 {
         // NOTE(rytc): could have smarter error handling here
-        return Path_Error{"Rename", old_path, _unix_errno(err)}; 
+        return Path_Error{"Rename", old_path, _linux_errno(err)}; 
     }
 	return nil;
 }
 
 _link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
-    err := unix.link(old_name, new_name);
+    err := linux.link(old_name, new_name);
     if err < 0 {
-        return Link_Error{"Link", old_name, new_name, _unix_errno(err)};
+        return Link_Error{"Link", old_name, new_name, _linux_errno(err)};
     }
 	return nil;
 }
 
 _symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
-    err := unix.symlink(old_name, new_name);
+    err := linux.symlink(old_name, new_name);
     if err < 0 {
-        return  Link_Error{"Link", old_name, new_name, _unix_errno(err)};
+        return  Link_Error{"Link", old_name, new_name, _linux_errno(err)};
     }
 	return nil; 
 }
 
 _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
     p := make([]byte, MAX_PATH_LENGTH, context.allocator);
-    err := unix.readlink(name, p);
+    err := linux.readlink(name, p);
     if err < 0 {
-        return name, Path_Error{"readlink", name, _unix_errno(err)};
+        return name, Path_Error{"readlink", name, _linux_errno(err)};
     }
 	return strings.string_from_ptr(raw_data(p), len(p)), nil;
 }
@@ -145,15 +145,15 @@ _chdir :: proc(fd: Handle) -> Error {
     fullpath := _get_handle_path(fd, context.temp_allocator);
     filename_break := strings.last_index_byte(fullpath, '/');
     dir := fmt.tprintf(fullpath[:filename_break], filename_break);
-    err := unix.chdir(dir);
-	return _unix_errno(err);
+    err := linux.chdir(dir);
+	return _linux_errno(err);
 }
 
 _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
     // TODO(rytc): why is File_Mode passed here?
     // path := _get_handle_path(fd, context.temp_allocator);
-    // err := unix.chmod(path, mode);
-    // return _unix_errno(err);
+    // err := linux.chmod(path, mode);
+    // return _linux_errno(err);
 	return General_Error.Invalid_Argument;
 }
 
@@ -163,45 +163,45 @@ _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
 
 _chown :: proc(fd: Handle, uid, gid: int) -> Error {
     fullpath := _get_handle_path(fd, context.temp_allocator);
-    err := unix.chown(fullpath, uid, gid);
-	return _unix_errno(err); 
+    err := linux.chown(fullpath, uid, gid);
+	return _linux_errno(err); 
 }
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-    err := unix.lchown(name, uid, gid);
-	return _unix_errno(err); 
+    err := linux.lchown(name, uid, gid);
+	return _linux_errno(err); 
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
     atime_value := time.time_to_unix(atime);
     mtime_value := time.time_to_unix(mtime);
 
-    unix.utime(name, atime_value, mtime_value);
+    linux.utime(name, atime_value, mtime_value);
 
     return nil;
 }
 
 _exists :: proc(path: string) -> bool {
-    stat : Unix_Stat;
-    err := unix.lstat(path, uintptr(&stat));
-	return (_unix_errno(err) != General_Error.Not_Exist);
+    stat : Linux_Stat;
+    err := linux.lstat(path, uintptr(&stat));
+	return (_linux_errno(err) != General_Error.Not_Exist);
 }
 
 _is_file :: proc(path: string) -> bool {
-    stat : Unix_Stat;
-    err := unix.lstat(path, uintptr(&stat));
+    stat : Linux_Stat;
+    err := linux.lstat(path, uintptr(&stat));
     if err >= 0 {
-    	return (_unix_get_mode(stat.mode) < File_Mode_Dir);
+    	return (_linux_get_mode(stat.mode) < File_Mode_Dir);
     } else {
         return false;
     }
 }
 
 _is_dir :: proc(path: string) -> bool {
-    stat : Unix_Stat;
-    err := unix.lstat(path, uintptr(&stat));
+    stat : Linux_Stat;
+    err := linux.lstat(path, uintptr(&stat));
     if err >= 0 {
-        return (_unix_get_mode(stat.mode) == File_Mode_Dir);
+        return (_linux_get_mode(stat.mode) == File_Mode_Dir);
     } else {
         return false;
     }

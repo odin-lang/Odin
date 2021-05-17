@@ -33,7 +33,7 @@ Errno :: enum i32 {
     EPIPE   = 32,
 }
 
-_unix_errno :: proc(fd: int) -> Error {
+_linux_errno :: proc(fd: int) -> Error {
     if fd >= 0 do return nil;
 
     errno := Errno(-fd);
