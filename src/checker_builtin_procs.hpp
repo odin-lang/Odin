@@ -56,6 +56,8 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_sub,
 	BuiltinProc_overflow_mul,
 
+	BuiltinProc_sqrt,
+
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
 
@@ -277,6 +279,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
