@@ -14910,7 +14910,7 @@ void lb_generate_code(lbGenerator *gen) {
 				LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, e->file);
 				LLVMMetadataRef llvm_scope = llvm_file;
 
-				LLVMBool local_to_unit = e->flags & EntityFlag_Static;
+				LLVMBool local_to_unit = LLVMGetLinkage(g.value) == LLVMInternalLinkage;
 
 				LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 				LLVMMetadataRef llvm_decl = nullptr;

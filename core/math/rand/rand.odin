@@ -6,9 +6,9 @@ Rand :: struct {
 }
 
 
-@(private, static)
+@(private)
 _GLOBAL_SEED_DATA := 1234567890;
-@(private, static)
+@(private)
 global_rand := create(u64(uintptr(&_GLOBAL_SEED_DATA)));
 
 set_global_seed :: proc(seed: u64) {

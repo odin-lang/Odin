@@ -12,7 +12,6 @@ package unicode
 @(private) pLo    :: pLl | pLu; // a letter that is neither upper nor lower case.
 @(private) pLmask :: pLo;
 
-@(static)
 char_properties := [MAX_LATIN1+1]u8{
 	0x00 = pC,       // '\x00'
 	0x01 = pC,       // '\x01'
@@ -273,7 +272,6 @@ char_properties := [MAX_LATIN1+1]u8{
 };
 
 
-@(static)
 alpha_ranges := [?]i32{
 	0x00d8,  0x00f6,
 	0x00f8,  0x01f5,
@@ -429,7 +427,6 @@ alpha_ranges := [?]i32{
 	0xffda,  0xffdc,
 };
 
-@(static)
 alpha_singlets := [?]i32{
 	0x00aa,
 	0x00b5,
@@ -465,7 +462,6 @@ alpha_singlets := [?]i32{
 	0xfe74,
 };
 
-@(static)
 space_ranges := [?]i32{
 	0x0009,  0x000d, // tab and newline
 	0x0020,  0x0020, // space
@@ -481,7 +477,6 @@ space_ranges := [?]i32{
 	0xfeff,  0xfeff,
 };
 
-@(static)
 unicode_spaces := [?]i32{
 	0x0009, // tab
 	0x000a, // LF
@@ -499,7 +494,6 @@ unicode_spaces := [?]i32{
 	0xfeff, // unknown
 };
 
-@(static)
 to_upper_ranges := [?]i32{
 	0x0061,  0x007a, 468, // a-z A-Z
 	0x00e0,  0x00f6, 468,
@@ -538,7 +532,6 @@ to_upper_ranges := [?]i32{
 	0xff41,  0xff5a, 468,
 };
 
-@(static)
 to_upper_singlets := [?]i32{
 	0x00ff, 621,
 	0x0101, 499,
@@ -882,7 +875,6 @@ to_upper_singlets := [?]i32{
 	0x1ff3, 509,
 };
 
-@(static)
 to_lower_ranges := [?]i32{
 	0x0041,  0x005a, 532, // A-Z a-z
 	0x00c0,  0x00d6, 532, // - -
@@ -922,7 +914,6 @@ to_lower_ranges := [?]i32{
 	0xff21,  0xff3a, 532, // - -
 };
 
-@(static)
 to_lower_singlets := [?]i32{
 	0x0100, 501,
 	0x0102, 501,
@@ -1259,7 +1250,6 @@ to_lower_singlets := [?]i32{
 	0x1ffc, 491,
 };
 
-@(static)
 to_title_singlets := [?]i32{
 	0x01c4, 501,
 	0x01c6, 499,

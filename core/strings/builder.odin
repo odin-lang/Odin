@@ -221,7 +221,7 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 }
 
 
-@(private, static)
+@(private)
 DIGITS_LOWER := "0123456789abcdefx";
 
 write_quoted_string :: proc{
