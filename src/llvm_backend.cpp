@@ -5607,9 +5607,7 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 		LLVMSetInitializer(global_data, data);
-		if (!USE_SEPARTE_MODULES) {
-			LLVMSetLinkage(global_data, LLVMInternalLinkage);
-		}
+		LLVMSetLinkage(global_data, LLVMInternalLinkage);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -5651,9 +5649,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	}
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 	LLVMSetInitializer(global_data, data);
-	if (!USE_SEPARTE_MODULES) {
-		LLVMSetLinkage(global_data, LLVMInternalLinkage);
-	}
+	LLVMSetLinkage(global_data, LLVMInternalLinkage);
 
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -13373,26 +13369,31 @@ lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
 
 
 lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
+	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_types.addr, lb_global_type_info_member_types_index);
 	lb_global_type_info_member_types_index += cast(i32)count;
 	return offset;
 }
 lbValue lb_type_info_member_names_offset(lbProcedure *p, isize count) {
+	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_names.addr, lb_global_type_info_member_names_index);
 	lb_global_type_info_member_names_index += cast(i32)count;
 	return offset;
 }
 lbValue lb_type_info_member_offsets_offset(lbProcedure *p, isize count) {
+	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_offsets.addr, lb_global_type_info_member_offsets_index);
 	lb_global_type_info_member_offsets_index += cast(i32)count;
 	return offset;
 }
 lbValue lb_type_info_member_usings_offset(lbProcedure *p, isize count) {
+	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_usings.addr, lb_global_type_info_member_usings_index);
 	lb_global_type_info_member_usings_index += cast(i32)count;
 	return offset;
 }
 lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
+	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_tags.addr, lb_global_type_info_member_tags_index);
 	lb_global_type_info_member_tags_index += cast(i32)count;
 	return offset;
@@ -14735,9 +14736,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_type_info_ptr, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					if (!USE_SEPARTE_MODULES) {
-						LLVMSetLinkage(g, LLVMInternalLinkage);
-					}
+					LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
 
 				}
@@ -14746,9 +14745,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_string, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					if (!USE_SEPARTE_MODULES) {
-						LLVMSetLinkage(g, LLVMInternalLinkage);
-					}
+					LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
 				}
 				{
@@ -14756,9 +14753,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_uintptr, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					if (!USE_SEPARTE_MODULES) {
-						LLVMSetLinkage(g, LLVMInternalLinkage);
-					}
+					LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
 				}
 
@@ -14767,9 +14762,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_bool, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					if (!USE_SEPARTE_MODULES) {
-						LLVMSetLinkage(g, LLVMInternalLinkage);
-					}
+					LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
 				}
 
@@ -14778,9 +14771,7 @@ void lb_generate_code(lbGenerator *gen) {
 					Type *t = alloc_type_array(t_string, count);
 					LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), name);
 					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-					if (!USE_SEPARTE_MODULES) {
-						LLVMSetLinkage(g, LLVMInternalLinkage);
-					}
+					LLVMSetLinkage(g, LLVMInternalLinkage);
 					lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
 				}
 			}
@@ -14878,7 +14869,9 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else {
-			if (!USE_SEPARTE_MODULES) {
+			if (USE_SEPARTE_MODULES) {
+				LLVMSetLinkage(g.value, LLVMExternalLinkage);
+			} else {
 				LLVMSetLinkage(g.value, LLVMInternalLinkage);
 			}
 		}
