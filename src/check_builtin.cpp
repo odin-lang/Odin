@@ -2026,6 +2026,34 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_sqrt:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_float(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			if (x.mode == Addressing_Constant) {
+				f64 v = exact_value_to_f64(x.value);
+
+				operand->mode = Addressing_Constant;
+				operand->type = x.type;
+				operand->value = exact_value_float(gb_sqrt(v));
+				break;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
