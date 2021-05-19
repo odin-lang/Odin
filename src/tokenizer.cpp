@@ -188,9 +188,11 @@ void init_keyword_hash_table(void) {
 	GB_ASSERT(max_keyword_size < 16);
 }
 
-gb_global Array<String> global_file_path_strings; // index is file id
+gb_global Array<String>           global_file_path_strings; // index is file id
+gb_global Array<struct AstFile *> global_files; // index is file id
 
-String get_file_path_string(i32 index);
+String   get_file_path_string(i32 index);
+struct AstFile *get_ast_file_from_id(i32 index);
 
 struct TokenPos {
 	i32 file_id;
@@ -284,6 +286,7 @@ void init_global_error_collector(void) {
 	array_init(&global_error_collector.errors, heap_allocator());
 	array_init(&global_error_collector.error_buffer, heap_allocator());
 	array_init(&global_file_path_strings, heap_allocator(), 4096);
+	array_init(&global_files, heap_allocator(), 4096);
 }
 
 
@@ -305,6 +308,24 @@ bool set_file_path_string(i32 index, String const &path) {
 	return ok;
 }
 
+bool set_ast_file_from_id(i32 index, AstFile *file) {
+	bool ok = false;
+	GB_ASSERT(index >= 0);
+	gb_mutex_lock(&global_error_collector.string_mutex);
+
+	if (index >= global_files.count) {
+		array_resize(&global_files, index);
+	}
+	AstFile *prev = global_files[index];
+	if (prev == nullptr) {
+		global_files[index] = file;
+		ok = true;
+	}
+
+	gb_mutex_unlock(&global_error_collector.string_mutex);
+	return ok;
+}
+
 String get_file_path_string(i32 index) {
 	GB_ASSERT(index >= 0);
 	gb_mutex_lock(&global_error_collector.string_mutex);
@@ -317,6 +338,20 @@ String get_file_path_string(i32 index) {
 	gb_mutex_unlock(&global_error_collector.string_mutex);
 	return path;
 }
+
+AstFile *get_ast_file_from_id(i32 index) {
+	GB_ASSERT(index >= 0);
+	gb_mutex_lock(&global_error_collector.string_mutex);
+
+	AstFile *file = nullptr;
+	if (index < global_files.count) {
+		file = global_files[index];
+	}
+
+	gb_mutex_unlock(&global_error_collector.string_mutex);
+	return file;
+}
+
 
 void begin_error_block(void) {
 	gb_mutex_lock(&global_error_collector.mutex);
@@ -377,6 +412,8 @@ ErrorOutProc *error_out_va = default_error_out_va;
 // NOTE: defined in build_settings.cpp
 bool global_warnings_as_errors(void);
 bool global_ignore_warnings(void);
+bool show_error_line(void);
+gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
 void error_out(char const *fmt, ...) {
 	va_list va;
@@ -385,6 +422,53 @@ void error_out(char const *fmt, ...) {
 	va_end(va);
 }
 
+
+bool show_error_on_line(TokenPos const &pos) {
+	if (!show_error_line()) {
+		return false;
+	}
+
+	i32 offset = 0;
+	gbString the_line = get_file_line_as_string(pos, &offset);
+	defer (gb_string_free(the_line));
+
+	if (the_line != nullptr) {
+		String line = make_string(cast(u8 const *)the_line, gb_string_length(the_line));
+
+		enum {
+			MAX_LINE_LENGTH  = 76,
+			MAX_TAB_WIDTH    = 8,
+			ELLIPSIS_PADDING = 8
+		};
+
+		error_out("\n\t");
+		if (line.len+MAX_TAB_WIDTH+ELLIPSIS_PADDING > MAX_LINE_LENGTH) {
+			i32 const half_width = MAX_LINE_LENGTH/2;
+			i32 left  = cast(i32)(offset);
+			i32 right = cast(i32)(line.len - offset);
+			left  = gb_min(left, half_width);
+			right = gb_min(right, half_width);
+
+			line.text += offset-left;
+			line.len  -= offset+right-left;
+
+			line = string_trim_whitespace(line);
+
+			offset = left + ELLIPSIS_PADDING/2;
+
+			error_out("... %.*s ...", LIT(line));
+		} else {
+			error_out("%.*s", LIT(line));
+		}
+		error_out("\n\t");
+
+		for (i32 i = 0; i < offset; i++) error_out(" ");
+		error_out("^\n");
+		error_out("\n");
+		return true;
+	}
+	return false;
+}
 
 void error_va(Token token, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
@@ -397,6 +481,7 @@ void error_va(Token token, char const *fmt, va_list va) {
 		error_out("%s %s\n",
 		          token_pos_to_string(token.pos),
 		          gb_bprintf_va(fmt, va));
+		show_error_on_line(token.pos);
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
@@ -420,6 +505,7 @@ void warning_va(Token token, char const *fmt, va_list va) {
 			error_out("%s Warning: %s\n",
 			          token_pos_to_string(token.pos),
 			          gb_bprintf_va(fmt, va));
+			show_error_on_line(token.pos);
 		}
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -460,6 +546,7 @@ void syntax_error_va(Token token, char const *fmt, va_list va) {
 		error_out("%s Syntax Error: %s\n",
 		          token_pos_to_string(token.pos),
 		          gb_bprintf_va(fmt, va));
+		show_error_on_line(token.pos);
 	} else if (token.pos.line == 0) {
 		error_out("Syntax Error: %s\n", gb_bprintf_va(fmt, va));
 	}
@@ -484,6 +571,7 @@ void syntax_warning_va(Token token, char const *fmt, va_list va) {
 			error_out("%s Syntax Warning: %s\n",
 			          token_pos_to_string(token.pos),
 			          gb_bprintf_va(fmt, va));
+			show_error_on_line(token.pos);
 		} else if (token.pos.line == 0) {
 			error_out("Warning: %s\n", gb_bprintf_va(fmt, va));
 		}

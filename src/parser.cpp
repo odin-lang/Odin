@@ -115,6 +115,48 @@ Token token_end_of_line(AstFile *f, Token tok) {
 	return tok;
 }
 
+gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
+	AstFile *file = get_ast_file_from_id(pos.file_id);
+	if (file == nullptr) {
+		return nullptr;
+	}
+	isize offset = pos.offset;
+
+	u8 *start = file->tokenizer.start;
+	u8 *end = file->tokenizer.end;
+	isize len = end-start;
+	if (len < offset) {
+		return nullptr;
+	}
+
+	u8 *pos_offset = start+offset;
+
+	u8 *line_start = pos_offset;
+	u8 *line_end  = pos_offset;
+	while (line_start >= start) {
+		if (*line_start == '\n') {
+			line_start += 1;
+			break;
+		}
+		line_start -= 1;
+	}
+
+	while (line_end < end) {
+		if (*line_end == '\n') {
+			line_end -= 1;
+			break;
+		}
+		line_end += 1;
+	}
+	String the_line = make_string(line_start, line_end-line_start);
+	the_line = string_trim_whitespace(the_line);
+
+	if (offset_) *offset_ = cast(i32)(pos_offset - the_line.text);
+
+	return gb_string_make_length(heap_allocator(), the_line.text, the_line.len);
+}
+
+
 
 isize ast_node_size(AstKind kind) {
 	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
@@ -4602,6 +4644,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
 	set_file_path_string(f->id, fullpath);
+	set_ast_file_from_id(f->id, f);
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}

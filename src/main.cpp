@@ -621,6 +621,7 @@ enum BuildFlagKind {
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
+	BuildFlag_VerboseErrors,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -741,6 +742,7 @@ bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_VerboseErrors,    str_lit("verbose-errors"),     BuildFlagParam_None, Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
@@ -1318,6 +1320,10 @@ bool parse_build_flags(Array<String> args) {
 							} else {
 								build_context.warnings_as_errors = true;
 							}
+							break;
+
+						case BuildFlag_VerboseErrors:
+							build_context.show_error_line = true;
 							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
