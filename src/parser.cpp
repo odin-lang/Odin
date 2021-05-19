@@ -479,7 +479,7 @@ void error(Ast *node, char const *fmt, ...) {
 	}
 	va_list va;
 	va_start(va, fmt);
-	error_va(token, fmt, va);
+	error_va(token.pos, fmt, va);
 	va_end(va);
 	if (node != nullptr && node->file != nullptr) {
 		node->file->error_count += 1;
@@ -493,7 +493,7 @@ void error_no_newline(Ast *node, char const *fmt, ...) {
 	}
 	va_list va;
 	va_start(va, fmt);
-	error_no_newline_va(token, fmt, va);
+	error_no_newline_va(token.pos, fmt, va);
 	va_end(va);
 	if (node != nullptr && node->file != nullptr) {
 		node->file->error_count += 1;
@@ -503,14 +503,14 @@ void error_no_newline(Ast *node, char const *fmt, ...) {
 void warning(Ast *node, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	warning_va(ast_token(node), fmt, va);
+	warning_va(ast_token(node).pos, fmt, va);
 	va_end(va);
 }
 
 void syntax_error(Ast *node, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	syntax_error_va(ast_token(node), fmt, va);
+	syntax_error_va(ast_token(node).pos, fmt, va);
 	va_end(va);
 	if (node != nullptr && node->file != nullptr) {
 		node->file->error_count += 1;

@@ -470,18 +470,18 @@ bool show_error_on_line(TokenPos const &pos) {
 	return false;
 }
 
-void error_va(Token token, char const *fmt, va_list va) {
+void error_va(TokenPos pos, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (token.pos.line == 0) {
+	if (pos.line == 0) {
 		error_out("Error: %s\n", gb_bprintf_va(fmt, va));
-	} else if (global_error_collector.prev != token.pos) {
-		global_error_collector.prev = token.pos;
+	} else if (global_error_collector.prev != pos) {
+		global_error_collector.prev = pos;
 		error_out("%s %s\n",
-		          token_pos_to_string(token.pos),
+		          token_pos_to_string(pos),
 		          gb_bprintf_va(fmt, va));
-		show_error_on_line(token.pos);
+		show_error_on_line(pos);
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
@@ -489,23 +489,23 @@ void error_va(Token token, char const *fmt, va_list va) {
 	}
 }
 
-void warning_va(Token token, char const *fmt, va_list va) {
+void warning_va(TokenPos const &pos, char const *fmt, va_list va) {
 	if (global_warnings_as_errors()) {
-		error_va(token, fmt, va);
+		error_va(pos, fmt, va);
 		return;
 	}
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	if (!global_ignore_warnings()) {
 		// NOTE(bill): Duplicate error, skip it
-		if (token.pos.line == 0) {
+		if (pos.line == 0) {
 			error_out("Warning: %s\n", gb_bprintf_va(fmt, va));
-		} else if (global_error_collector.prev != token.pos) {
-			global_error_collector.prev = token.pos;
+		} else if (global_error_collector.prev != pos) {
+			global_error_collector.prev = pos;
 			error_out("%s Warning: %s\n",
-			          token_pos_to_string(token.pos),
+			          token_pos_to_string(pos),
 			          gb_bprintf_va(fmt, va));
-			show_error_on_line(token.pos);
+			show_error_on_line(pos);
 		}
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -518,16 +518,16 @@ void error_line_va(char const *fmt, va_list va) {
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
-void error_no_newline_va(Token token, char const *fmt, va_list va) {
+void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (token.pos.line == 0) {
+	if (pos.line == 0) {
 		error_out("Error: %s", gb_bprintf_va(fmt, va));
-	} else if (global_error_collector.prev != token.pos) {
-		global_error_collector.prev = token.pos;
+	} else if (global_error_collector.prev != pos) {
+		global_error_collector.prev = pos;
 		error_out("%s %s",
-		          token_pos_to_string(token.pos),
+		          token_pos_to_string(pos),
 		          gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -537,17 +537,17 @@ void error_no_newline_va(Token token, char const *fmt, va_list va) {
 }
 
 
-void syntax_error_va(Token token, char const *fmt, va_list va) {
+void syntax_error_va(TokenPos const &pos, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (global_error_collector.prev != token.pos) {
-		global_error_collector.prev = token.pos;
+	if (global_error_collector.prev != pos) {
+		global_error_collector.prev = pos;
 		error_out("%s Syntax Error: %s\n",
-		          token_pos_to_string(token.pos),
+		          token_pos_to_string(pos),
 		          gb_bprintf_va(fmt, va));
-		show_error_on_line(token.pos);
-	} else if (token.pos.line == 0) {
+		show_error_on_line(pos);
+	} else if (pos.line == 0) {
 		error_out("Syntax Error: %s\n", gb_bprintf_va(fmt, va));
 	}
 
@@ -557,22 +557,22 @@ void syntax_error_va(Token token, char const *fmt, va_list va) {
 	}
 }
 
-void syntax_warning_va(Token token, char const *fmt, va_list va) {
+void syntax_warning_va(TokenPos const &pos, char const *fmt, va_list va) {
 	if (global_warnings_as_errors()) {
-		syntax_error_va(token, fmt, va);
+		syntax_error_va(pos, fmt, va);
 		return;
 	}
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	if (!global_ignore_warnings()) {
 		// NOTE(bill): Duplicate error, skip it
-		if (global_error_collector.prev != token.pos) {
-			global_error_collector.prev = token.pos;
+		if (global_error_collector.prev != pos) {
+			global_error_collector.prev = pos;
 			error_out("%s Syntax Warning: %s\n",
-			          token_pos_to_string(token.pos),
+			          token_pos_to_string(pos),
 			          gb_bprintf_va(fmt, va));
-			show_error_on_line(token.pos);
-		} else if (token.pos.line == 0) {
+			show_error_on_line(pos);
+		} else if (pos.line == 0) {
 			error_out("Warning: %s\n", gb_bprintf_va(fmt, va));
 		}
 	}
@@ -581,17 +581,17 @@ void syntax_warning_va(Token token, char const *fmt, va_list va) {
 
 
 
-void warning(Token token, char const *fmt, ...) {
+void warning(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	warning_va(token, fmt, va);
+	warning_va(token.pos, fmt, va);
 	va_end(va);
 }
 
-void error(Token token, char const *fmt, ...) {
+void error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	error_va(token, fmt, va);
+	error_va(token.pos, fmt, va);
 	va_end(va);
 }
 
@@ -600,7 +600,7 @@ void error(TokenPos pos, char const *fmt, ...) {
 	va_start(va, fmt);
 	Token token = {};
 	token.pos = pos;
-	error_va(token, fmt, va);
+	error_va(pos, fmt, va);
 	va_end(va);
 }
 
@@ -612,26 +612,24 @@ void error_line(char const *fmt, ...) {
 }
 
 
-void syntax_error(Token token, char const *fmt, ...) {
+void syntax_error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	syntax_error_va(token, fmt, va);
+	syntax_error_va(token.pos, fmt, va);
 	va_end(va);
 }
 
 void syntax_error(TokenPos pos, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	Token token = {};
-	token.pos = pos;
-	syntax_error_va(token, fmt, va);
+	syntax_error_va(pos, fmt, va);
 	va_end(va);
 }
 
-void syntax_warning(Token token, char const *fmt, ...) {
+void syntax_warning(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	syntax_warning_va(token, fmt, va);
+	syntax_warning_va(token.pos, fmt, va);
 	va_end(va);
 }
 
@@ -743,13 +741,14 @@ void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	if (column < 1) {
 		column = 1;
 	}
-	Token token = {};
-	token.pos.file_id = t->curr_file_id;
-	token.pos.line = t->line_count;
-	token.pos.column = cast(i32)column;
+	TokenPos pos = {};
+	pos.file_id = t->curr_file_id;
+	pos.line = t->line_count;
+	pos.column = cast(i32)column;
+	pos.offset = cast(i32)(t->read_curr - t->start);
 
 	va_start(va, msg);
-	syntax_error_va(token, msg, va);
+	syntax_error_va(pos, msg, va);
 	va_end(va);
 
 	t->error_count++;
@@ -761,11 +760,9 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 	if (column < 1) {
 		column = 1;
 	}
-	Token token = {};
-	token.pos = pos;
 
 	va_start(va, msg);
-	syntax_error_va(token, msg, va);
+	syntax_error_va(pos, msg, va);
 	va_end(va);
 
 	t->error_count++;
