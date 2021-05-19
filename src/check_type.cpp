@@ -1191,7 +1191,7 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 
 	if (allow_caller_location &&
 	    expr->kind == Ast_BasicDirective &&
-	    expr->BasicDirective.name == "caller_location") {
+	    expr->BasicDirective.name.string == "caller_location") {
 		init_core_source_code_location(ctx->checker);
 		param_value.kind = ParameterValue_Location;
 		o.type = t_source_code_location;
@@ -2711,7 +2711,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				bool is_partial = false;
 				if (at->tag != nullptr) {
 					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-					String name = at->tag->BasicDirective.name;
+					String name = at->tag->BasicDirective.name.string;
 					if (name == "partial") {
 						is_partial = true;
 					} else {
@@ -2745,7 +2745,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 			if (at->tag != nullptr) {
 				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-				String name = at->tag->BasicDirective.name;
+				String name = at->tag->BasicDirective.name.string;
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "simd") {
@@ -2770,7 +2770,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 			if (at->tag != nullptr) {
 				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-				String name = at->tag->BasicDirective.name;
+				String name = at->tag->BasicDirective.name.string;
 				if (name == "soa") {
 					*type = make_soa_struct_slice(ctx, e, at->elem, elem);
 				} else {
@@ -2790,7 +2790,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		Type *elem = check_type(ctx, dat->elem);
 		if (dat->tag != nullptr) {
 			GB_ASSERT(dat->tag->kind == Ast_BasicDirective);
-			String name = dat->tag->BasicDirective.name;
+			String name = dat->tag->BasicDirective.name.string;
 			if (name == "soa") {
 				*type = make_soa_struct_dynamic_array(ctx, e, dat->elem, elem);
 			} else {

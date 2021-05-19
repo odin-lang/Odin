@@ -87,7 +87,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name;
+		String name = bd->name.string;
 		if (name == "defined") {
 			break;
 		}
@@ -124,7 +124,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name;
+		String name = bd->name.string;
 		if (name == "location") {
 			if (ce->args.count > 1) {
 				error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
