@@ -899,10 +899,9 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 
 	e->Variable.thread_local_model = ac.thread_local_model;
 	e->Variable.is_export = ac.is_export;
+	e->flags &= ~EntityFlag_Static;
 	if (ac.is_static) {
-		e->flags |= EntityFlag_Static;
-	} else {
-		e->flags &= ~EntityFlag_Static;
+		error(e->token, "@(static) is not supported for global variables, nor required");
 	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 
