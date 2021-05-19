@@ -1537,8 +1537,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 			Operand lhs = {Addressing_Invalid};
 			Operand rhs = {Addressing_Invalid};
-			Ast binary_expr = {Ast_BinaryExpr};
-			ast_node(be, BinaryExpr, &binary_expr);
+			Ast *binary_expr = alloc_ast_node(node->file, Ast_BinaryExpr);
+			ast_node(be, BinaryExpr, binary_expr);
 			be->op = op;
 			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
 			 // NOTE(bill): Only use the first one will be used
@@ -1546,7 +1546,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			be->right = as->rhs[0];
 
 			check_expr(ctx, &lhs, as->lhs[0]);
-			check_binary_expr(ctx, &rhs, &binary_expr, nullptr, true);
+			check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
 			if (rhs.mode == Addressing_Invalid) {
 				return;
 			}
