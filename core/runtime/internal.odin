@@ -105,17 +105,9 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil {
 		return dst;
 	}
+
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memmove.p0i8.p0i8.i64")
-			llvm_memmove :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		} else {
-			@(link_name="llvm.memmove.p0i8.p0i8.i32")
-			llvm_memmove :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		}
-	}
-	llvm_memmove(dst, src, len);
+	intrinsics.mem_copy(dst, src, len);
 	return dst;
 }
 
@@ -123,17 +115,9 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 	if src == nil {
 		return dst;
 	}
+
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
-			llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		} else {
-			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
-			llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		}
-	}
-	llvm_memcpy(dst, src, len);
+	intrinsics.mem_copy_non_overlapping(dst, src, len);
 	return dst;
 }
 
