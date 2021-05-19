@@ -9451,6 +9451,44 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
+	case BuiltinProc_mem_copy:
+	case BuiltinProc_mem_copy_non_overlapping:
+		{
+
+
+			lbValue dst = lb_build_expr(p, ce->args[0]);
+			lbValue src = lb_build_expr(p, ce->args[1]);
+			lbValue len = lb_build_expr(p, ce->args[2]);
+			dst = lb_emit_conv(p, dst, t_rawptr);
+			src = lb_emit_conv(p, src, t_rawptr);
+			len = lb_emit_conv(p, len, t_int);
+
+			char const *name = nullptr;
+			switch (id) {
+			case BuiltinProc_mem_copy:                 name = "llvm.memmove"; break;
+			case BuiltinProc_mem_copy_non_overlapping: name = "llvm.memcpy";  break;
+			}
+
+			LLVMTypeRef types[3] = {
+				lb_type(p->module, t_rawptr),
+				lb_type(p->module, t_rawptr),
+				lb_type(p->module, t_int)
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]), LLVMPrintTypeToString(types[2]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[4] = {};
+			args[0] = dst.value;
+			args[1] = src.value;
+			args[2] = len.value;
+			args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, false); // is_volatile parameter
+
+			LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+
+			return {};
+		}
+
 
 	case BuiltinProc_atomic_fence:
 		LLVMBuildFence(p->builder, LLVMAtomicOrderingSequentiallyConsistent, false, "");
