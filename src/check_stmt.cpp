@@ -7,7 +7,7 @@ bool is_diverging_stmt(Ast *stmt) {
 		return false;
 	}
 	if (expr->CallExpr.proc->kind == Ast_BasicDirective) {
-		String name = expr->CallExpr.proc->BasicDirective.name;
+		String name = expr->CallExpr.proc->BasicDirective.name.string;
 		return name == "panic";
 	}
 	Ast *proc = unparen_expr(expr->CallExpr.proc);

@@ -286,8 +286,8 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Token token; \
 	}) \
 	AST_KIND(BasicDirective, "basic directive", struct { \
-		Token  token; \
-		String name; \
+		Token token; \
+		Token name; \
 	}) \
 	AST_KIND(Ellipsis,       "ellipsis", struct { \
 		Token    token; \
@@ -324,7 +324,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(SelectorCallExpr, "selector call expression",    struct { Token token; Ast *expr, *call; bool modified_call; }) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
-	AST_KIND(DerefExpr,    "dereference expression", struct { Token op; Ast *expr; }) \
+	AST_KIND(DerefExpr,    "dereference expression", struct { Ast *expr; Token op; }) \
 	AST_KIND(SliceExpr,    "slice expression", struct { \
 		Ast *expr; \
 		Token open, close; \
