@@ -1436,6 +1436,28 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(node, "Expression is not used: '%s'", expr_str);
 			gb_string_free(expr_str);
+			if (operand.expr->kind == Ast_BinaryExpr) {
+				ast_node(be, BinaryExpr, operand.expr);
+				if (be->op.kind != Token_CmpEq) {
+					break;
+				}
+
+				switch (be->left->tav.mode) {
+				case Addressing_Context:
+				case Addressing_Variable:
+				case Addressing_MapIndex:
+				case Addressing_SoaVariable:
+					{
+						gbString lhs = expr_to_string(be->left);
+						gbString rhs = expr_to_string(be->right);
+						error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+						error_line("\t            '%s = %s;'\n", lhs, rhs);
+						gb_string_free(rhs);
+						gb_string_free(lhs);
+					}
+					break;
+				}
+			}
 
 			break;
 		}
