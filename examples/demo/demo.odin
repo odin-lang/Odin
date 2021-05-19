@@ -1868,7 +1868,7 @@ soa_struct_layout :: proc() {
 
 		// iterate over the #soa slice
 		for v, i in s {
-			fmt.println(v); // exactly the same as s[i]
+			fmt.println(v, i); // exactly the same as s[i]
 			// NOTE: 'v' is NOT a temporary value but has a specialized addressing mode
 			// which means that when accessing v.a etc, it does the correct transformation
 			// internally:
