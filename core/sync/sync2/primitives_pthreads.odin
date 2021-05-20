@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd
+//+build linux, freebsd
 //+private
 package sync2
 
