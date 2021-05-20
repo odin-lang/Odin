@@ -8,13 +8,31 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
+	LLVM_CONFIG=llvm-config
+	ifneq ($(shell llvm-config --version | grep '^11\.'),)
+		LLVM_CONFIG=llvm-config
+	else
+		$(error "Requirement: llvm-config must be version 11")
+	endif
+
 	LDFLAGS:=$(LDFLAGS) -liconv
-	CFLAGS:=$(CFLAGS) $(shell llvm-config --cxxflags --ldflags)
+	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
 	LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
 ifeq ($(OS), Linux)
-	CFLAGS:=$(CFLAGS) $(shell llvm-config-11 --cxxflags --ldflags)
-	LDFLAGS:=$(LDFLAGS) $(shell llvm-config-11 --libs core native --system-libs)
+	LLVM_CONFIG=llvm-config-11
+	ifneq ($(shell which llvm-config-11 2>/dev/null),)
+		LLVM_CONFIG=llvm-config-11
+	else
+		ifneq ($(shell llvm-config --version | grep '^11\.'),)
+			LLVM_CONFIG=llvm-config
+		else
+			$(error "Requirement: llvm-config must be version 11")
+		endif
+	endif
+
+	CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+	LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
 endif
 
 all: debug demo

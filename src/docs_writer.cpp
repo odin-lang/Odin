@@ -697,6 +697,9 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			case ProcCC_None:
 				calling_convention = str_lit("none");
 				break;
+			case ProcCC_Naked:
+				calling_convention = str_lit("naked");
+				break;
 			case ProcCC_InlineAsm:
 				calling_convention = str_lit("inline-assembly");
 				break;

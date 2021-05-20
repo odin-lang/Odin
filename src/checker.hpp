@@ -114,7 +114,6 @@ struct AttributeContext {
 	String  deprecated_message;
 	DeferredProcedure deferred_procedure;
 	u32 optimization_mode; // ProcedureOptimizationMode
-	struct TypeAtomOpTable *atom_op_table;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
@@ -335,7 +334,6 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
-	Ast *unary_address_hint;
 };
 
 struct Checker {

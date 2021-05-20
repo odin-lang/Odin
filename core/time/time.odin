@@ -262,18 +262,17 @@ datetime_to_time :: proc(year, month, day, hour, minute, second: int, nsec := in
 		return;
 	}
 
+	ok = true;
+
 	_y := year  - 1970;
 	_m := month - 1;
 	_d := day   - 1;
 
-	if _m < 0 || _m > 11 {
+	if month < 1 || month > 12 {
 		_m %= 12; ok = false;
 	}
-	if _d < 0 || _m > 30 {
+	if day   < 1 || day   > 31 {
 		_d %= 31; ok = false;
-	}
-	if _m < 0 || _m > 11 {
-		_m %= 12; ok = false;
 	}
 
 	s := i64(0);

@@ -1,7 +1,6 @@
 package sync2
 
 import "core:time"
-import "core:runtime"
 
 // A Mutex is a mutual exclusion lock
 // The zero value for a Mutex is an unlocked mutex
@@ -24,6 +23,18 @@ mutex_unlock :: proc(m: ^Mutex) {
 // mutex_lock tries to lock m, will return true on success, and false on failure
 mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	return _mutex_try_lock(m);
+}
+
+// Example:
+//
+// if mutex_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=mutex_unlock)
+mutex_guard :: proc(m: ^Mutex) -> bool {
+	mutex_lock(m);
+	return true;
 }
 
 // A RW_Mutex is a reader/writer mutual exclusion lock
@@ -66,60 +77,64 @@ rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw);
 }
 
+// Example:
+//
+// if rw_mutex_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=rw_mutex_unlock)
+rw_mutex_guard :: proc(m: ^RW_Mutex) -> bool {
+	rw_mutex_lock(m);
+	return true;
+}
+
+// Example:
+//
+// if rw_mutex_shared_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=rw_mutex_shared_unlock)
+rw_mutex_shared_guard :: proc(m: ^RW_Mutex) -> bool {
+	rw_mutex_shared_lock(m);
+	return true;
+}
+
+
 
 // A Recusrive_Mutex is a recursive mutual exclusion lock
 // The zero value for a Recursive_Mutex is an unlocked mutex
 //
 // A Recursive_Mutex must not be copied after first use
 Recursive_Mutex :: struct {
-	// TODO(bill): Is this implementation too lazy?
-	// Can this be made to work on all OSes without construction and destruction, i.e. Zero is Initialized
-	// CRITICAL_SECTION would be a perfect candidate for this on Windows but that cannot be "dumb"
-
-	owner:     int,
-	recursion: int,
-	mutex: Mutex,
+	impl: _Recursive_Mutex,
 }
 
 recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
-	tid := runtime.current_thread_id();
-	if tid != m.owner {
-		mutex_lock(&m.mutex);
-	}
-	// inside the lock
-	m.owner = tid;
-	m.recursion += 1;
+	_recursive_mutex_lock(m);
 }
 
 recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
-	tid := runtime.current_thread_id();
-	assert(tid == m.owner);
-	m.recursion -= 1;
-	recursion := m.recursion;
-	if recursion == 0 {
-		m.owner = 0;
-	}
-	if recursion == 0 {
-		mutex_unlock(&m.mutex);
-	}
-	// outside the lock
-
+	_recursive_mutex_unlock(m);
 }
 
 recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
-	tid := runtime.current_thread_id();
-	if m.owner == tid {
-		return mutex_try_lock(&m.mutex);
-	}
-	if !mutex_try_lock(&m.mutex) {
-		return false;
-	}
-	// inside the lock
-	m.owner = tid;
-	m.recursion += 1;
-	return true;
+	return _recursive_mutex_try_lock(m);
 }
 
+
+// Example:
+//
+// if recursive_mutex_guard(&m) {
+//         ...
+// }
+//
+@(deferred_in=recursive_mutex_unlock)
+recursive_mutex_guard :: proc(m: ^Recursive_Mutex) -> bool {
+	recursive_mutex_lock(m);
+	return true;
+}
 
 
 // Cond implements a condition variable, a rendezvous point for threads
@@ -153,33 +168,14 @@ cond_broadcast :: proc(c: ^Cond) {
 //
 // A Sema must not be copied after first use
 Sema :: struct {
-	// TODO(bill): Is this implementation too lazy?
-	// Can this be made to work on all OSes without construction and destruction, i.e. Zero is Initialized
-
-	mutex: Mutex,
-	cond:  Cond,
-	count: int,
+	impl: _Sema,
 }
 
 
 sema_wait :: proc(s: ^Sema) {
-	mutex_lock(&s.mutex);
-	defer mutex_unlock(&s.mutex);
-
-	for s.count == 0 {
-		cond_wait(&s.cond, &s.mutex);
-	}
-
-	s.count -= 1;
-	if s.count > 0 {
-		cond_signal(&s.cond);
-	}
+	_sema_wait(s);
 }
 
 sema_post :: proc(s: ^Sema, count := 1) {
-	mutex_lock(&s.mutex);
-	defer mutex_unlock(&s.mutex);
-
-	s.count += count;
-	cond_signal(&s.cond);
+	_sema_post(s, count);
 }

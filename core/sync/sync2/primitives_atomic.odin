@@ -5,6 +5,7 @@ package sync2
 when !#config(ODIN_SYNC_USE_PTHREADS, true) {
 
 import "core:time"
+import "core:runtime"
 
 _Mutex_State :: enum i32 {
 	Unlocked = 0,
@@ -160,6 +161,54 @@ _rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 }
 
 
+_Recursive_Mutex :: struct {
+	owner:     int,
+	recursion: int,
+	mutex: Mutex,
+}
+
+_recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
+	tid := runtime.current_thread_id();
+	if tid != m.impl.owner {
+		mutex_lock(&m.impl.mutex);
+	}
+	// inside the lock
+	m.impl.owner = tid;
+	m.impl.recursion += 1;
+}
+
+_recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
+	tid := runtime.current_thread_id();
+	assert(tid == m.impl.owner);
+	m.impl.recursion -= 1;
+	recursion := m.impl.recursion;
+	if recursion == 0 {
+		m.impl.owner = 0;
+	}
+	if recursion == 0 {
+		mutex_unlock(&m.impl.mutex);
+	}
+	// outside the lock
+
+}
+
+_recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
+	tid := runtime.current_thread_id();
+	if m.impl.owner == tid {
+		return mutex_try_lock(&m.impl.mutex);
+	}
+	if !mutex_try_lock(&m.impl.mutex) {
+		return false;
+	}
+	// inside the lock
+	m.impl.owner = tid;
+	m.impl.recursion += 1;
+	return true;
+}
+
+
+
+
 
 Queue_Item :: struct {
 	next: ^Queue_Item,
@@ -239,6 +288,36 @@ _cond_broadcast :: proc(c: ^Cond) {
 		waiters = waiters.next;
 	}
 }
+
+_Sema :: struct {
+	mutex: Mutex,
+	cond:  Cond,
+	count: int,
+}
+
+_sema_wait :: proc(s: ^Sema) {
+	mutex_lock(&s.impl.mutex);
+	defer mutex_unlock(&s.impl.mutex);
+
+	for s.impl.count == 0 {
+		cond_wait(&s.impl.cond, &s.impl.mutex);
+	}
+
+	s.impl.count -= 1;
+	if s.impl.count > 0 {
+		cond_signal(&s.impl.cond);
+	}
+}
+
+_sema_post :: proc(s: ^Sema, count := 1) {
+	mutex_lock(&s.impl.mutex);
+	defer mutex_unlock(&s.impl.mutex);
+
+	s.impl.count += count;
+	cond_signal(&s.impl.cond);
+}
+
+
 
 
 } // !ODIN_SYNC_USE_PTHREADS

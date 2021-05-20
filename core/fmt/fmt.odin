@@ -641,9 +641,9 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 		return;
 	}
 
-	pad_byte: byte = '0';
-	if fi.space {
-		pad_byte = ' ';
+	pad_byte: byte = ' ';
+	if !fi.space {
+		pad_byte = '0';
 	}
 
 	for i := 0; i < width; i += 1 {
@@ -1907,17 +1907,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		}
 
-	}
-
-	handle_relative_pointer :: proc(ptr: ^$T) -> rawptr where intrinsics.type_is_integer(T) {
-		if ptr^ == 0 {
-			return nil;
-		}
-		when intrinsics.type_is_unsigned(T) {
-			return rawptr(uintptr(ptr) + uintptr(ptr^));
-		} else {
-			return rawptr(uintptr(ptr) + uintptr(i64(ptr^)));
-		}
 	}
 }
 
