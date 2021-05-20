@@ -567,7 +567,7 @@ align_var_decls :: proc(p: ^Printer) {
 				}
 
 				current_token_index += 1;
-
+				largest_lhs = max(largest_lhs, lhs_length);
 				break;
 			}
 		}
@@ -579,12 +579,11 @@ align_var_decls :: proc(p: ^Printer) {
 
 			if line.format_tokens[current_token_index].kind == .Eq {
 				append(&equal_tokens, TokenAndLength {format_token = &line.format_tokens[current_token_index], length = rhs_length});
+				largest_rhs = max(largest_rhs, rhs_length);
 				break;
 			}
 		}
-
-		largest_lhs = max(largest_lhs, lhs_length);
-		largest_rhs = max(largest_rhs, rhs_length);
+		
 	}
 
 	//repeating myself, move to sub procedure
