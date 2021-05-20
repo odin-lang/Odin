@@ -35,8 +35,6 @@ void thread_pool_destroy(ThreadPool *pool);
 void thread_pool_start(ThreadPool *pool);
 void thread_pool_join(ThreadPool *pool);
 void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
-void thread_pool_kick(ThreadPool *pool);
-void thread_pool_kick_and_wait(ThreadPool *pool);
 GB_THREAD_PROC(worker_thread_internal);
 
 void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_prefix) {
@@ -181,4 +179,3 @@ GB_THREAD_PROC(worker_thread_internal) {
 
 	return 0;
 }
-

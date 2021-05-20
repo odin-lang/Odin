@@ -5,19 +5,19 @@ import "core:io"
 import "core:time"
 
 _create :: proc(name: string) -> (Handle, Error) {
-	return 0, .None;
+	return 0, nil;
 }
 
 _open :: proc(name: string) -> (Handle, Error) {
-	return 0, .None;
+	return 0, nil;
 }
 
 _open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
-	return 0, .None;
+	return 0, nil;
 }
 
 _close :: proc(fd: Handle) -> Error {
-	return .None;
+	return nil;
 }
 
 _name :: proc(fd: Handle, allocator := context.allocator) -> string {
@@ -58,11 +58,11 @@ _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
 
 
 _sync :: proc(fd: Handle) -> Error {
-	return .None;
+	return nil;
 }
 
 _flush :: proc(fd: Handle) -> Error {
-	return .None;
+	return nil;
 }
 
 _truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
@@ -92,20 +92,20 @@ _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
 
 
 _chdir :: proc(fd: Handle) -> Error {
-	return .None;
+	return nil;
 }
 
 _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
-	return .None;
+	return nil;
 }
 
 _chown :: proc(fd: Handle, uid, gid: int) -> Error {
-	return .None;
+	return nil;
 }
 
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	return .None;
+	return nil;
 }
 
 

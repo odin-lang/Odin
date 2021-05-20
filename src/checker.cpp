@@ -675,55 +675,44 @@ Entity *add_global_entity(Entity *entity, Scope *scope=builtin_pkg->scope) {
 	return entity;
 }
 
-void add_global_constant(String name, Type *type, ExactValue value) {
+void add_global_constant(char const *name, Type *type, ExactValue value) {
 	Entity *entity = alloc_entity(Entity_Constant, nullptr, make_token_ident(name), type);
 	entity->Constant.value = value;
 	add_global_entity(entity);
 }
 
 
-void add_global_string_constant(String name, String value) {
+void add_global_string_constant(char const *name, String const &value) {
 	add_global_constant(name, t_untyped_string, exact_value_string(value));
 }
 
+void add_global_bool_constant(char const *name, bool value) {
+	add_global_constant(name, t_untyped_bool, exact_value_bool(value));
+}
 
 void add_global_type_entity(String name, Type *type) {
 	add_global_entity(alloc_entity_type_name(nullptr, make_token_ident(name), type));
 }
 
 
+AstPackage *create_builtin_package(char const *name) {
+	gbAllocator a = permanent_allocator();
+	AstPackage *pkg = gb_alloc_item(a, AstPackage);
+	pkg->name = make_string_c(name);
+	pkg->kind = Package_Normal;
+
+	pkg->scope = create_scope(nullptr);
+	pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
+	pkg->scope->pkg = pkg;
+	return pkg;
+}
 
 void init_universal(void) {
 	BuildContext *bc = &build_context;
 
-	// NOTE(bill): No need to free these
-	// gbAllocator a = heap_allocator();
-	gbAllocator a = permanent_allocator();
-
-	builtin_pkg = gb_alloc_item(a, AstPackage);
-	builtin_pkg->name = str_lit("builtin");
-	builtin_pkg->kind = Package_Normal;
-
-	builtin_pkg->scope = create_scope(nullptr);
-	builtin_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
-	builtin_pkg->scope->pkg = builtin_pkg;
-
-	intrinsics_pkg = gb_alloc_item(a, AstPackage);
-	intrinsics_pkg->name = str_lit("intrinsics");
-	intrinsics_pkg->kind = Package_Normal;
-
-	intrinsics_pkg->scope = create_scope(nullptr);
-	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
-	intrinsics_pkg->scope->pkg = intrinsics_pkg;
-
-	config_pkg = gb_alloc_item(a, AstPackage);
-	config_pkg->name = str_lit("config");
-	config_pkg->kind = Package_Normal;
-
-	config_pkg->scope = create_scope(nullptr);
-	config_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
-	config_pkg->scope->pkg = config_pkg;
-
+	builtin_pkg    = create_builtin_package("builtin");
+	intrinsics_pkg = create_builtin_package("intrinsics");
+	config_pkg     = create_builtin_package("config");
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -740,23 +729,23 @@ void init_universal(void) {
 	}
 
 // Constants
-	add_global_constant(str_lit("true"),  t_untyped_bool, exact_value_bool(true));
-	add_global_constant(str_lit("false"), t_untyped_bool, exact_value_bool(false));
-
 	add_global_entity(alloc_entity_nil(str_lit("nil"), t_untyped_nil));
 
+	add_global_bool_constant("true",  true);
+	add_global_bool_constant("false", false);
+
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant(str_lit("ODIN_OS"),      bc->ODIN_OS);
-	add_global_string_constant(str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
-	add_global_string_constant(str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
-	add_global_string_constant(str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
-	add_global_string_constant(str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
-	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
-	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
-	add_global_constant(str_lit("ODIN_DISABLE_ASSERT"), t_untyped_bool, exact_value_bool(bc->ODIN_DISABLE_ASSERT));
-	add_global_constant(str_lit("ODIN_DEFAULT_TO_NIL_ALLOCATOR"), t_untyped_bool, exact_value_bool(bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR));
-	add_global_constant(str_lit("ODIN_NO_DYNAMIC_LITERALS"), t_untyped_bool, exact_value_bool(bc->no_dynamic_literals));
-	add_global_constant(str_lit("ODIN_TEST"), t_untyped_bool, exact_value_bool(bc->command_kind == Command_test));
+	add_global_string_constant("ODIN_OS",      bc->ODIN_OS);
+	add_global_string_constant("ODIN_ARCH",    bc->ODIN_ARCH);
+	add_global_string_constant("ODIN_ENDIAN",  bc->ODIN_ENDIAN);
+	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
+	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
+	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
+	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
+	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
+	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
+	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 
 
 // Builtin Procedures
@@ -800,8 +789,6 @@ void init_universal(void) {
 			break;
 		}
 		GB_ASSERT(type != nullptr);
-
-
 
 		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
 		entity->state = EntityState_Resolved;
@@ -960,7 +947,11 @@ Entity *entity_of_node(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
-		return ident->entity;
+		Entity *e = ident->entity;
+		if (e && e->flags & EntityFlag_Overridden) {
+			// GB_PANIC("use of an overriden entity: %.*s", LIT(e->token.string));
+		}
+		return e;
 	case_end;
 	case_ast_node(se, SelectorExpr, expr);
 		Ast *s = unselector_expr(se->selector);
@@ -972,7 +963,6 @@ Entity *entity_of_node(Ast *expr) {
 	}
 	return nullptr;
 }
-
 
 DeclInfo *decl_info_of_entity(Entity *e) {
 	if (e != nullptr) {
@@ -1870,7 +1860,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 				continue;
 			}
 
-			if (e->file == nullptr || !e->file->is_test) {
+			// if (e->file == nullptr || !e->file->is_test) {
+			if (e->file == nullptr) {
 				continue;
 			}
 
@@ -2675,206 +2666,6 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 	if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
-	} else if (name == "index_get") {
-		if (value != nullptr) {
-			Operand o = {};
-			check_expr_or_type(c, &o, value);
-			Entity *e = entity_of_node(value);
-			if (e != nullptr && e->kind == Entity_Procedure) {
-				if (ac->deferred_procedure.entity != nullptr) {
-					error(elem, "Previous usage of the '%.*s' attribute", LIT(name));
-				}
-
-				bool valid = true;
-
-				{
-					Type *pt = base_type(e->type);
-					GB_ASSERT(pt->kind == Type_Proc);
-
-					if (pt->Proc.result_count == 0) {
-						error(value, "'%s' attribute must return something", LIT(name));
-						valid = false;
-					}
-
-					if (pt->Proc.param_count < 2) {
-						error(value, "'%s' attribute must allow for 2 parameters", LIT(name));
-						valid = false;
-					} else {
-						isize minimum_param_count = 0;
-						for_array(i, pt->Proc.params->Tuple.variables) {
-							Entity *param = pt->Proc.params->Tuple.variables[i];
-							if (param->kind == Entity_Variable) {
-								if (param->Variable.param_value.kind == ParameterValue_Invalid) {
-									minimum_param_count += 1;
-								} else {
-									break;
-								}
-							} else if (param->kind == Entity_Constant) {
-								minimum_param_count += 1;
-							} else {
-								break;
-							}
-						}
-
-						if (minimum_param_count > 2) {
-							error(value, "'%s' attribute must allow for at a minimum 2 parameters", LIT(name));
-							valid = false;
-						}
-					}
-				}
-
-				if (valid) {
-					if (ac->atom_op_table == nullptr) {
-						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
-					}
-					ac->atom_op_table->op[TypeAtomOp_index_get] = e;
-				}
-				return true;
-			}
-		}
-		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
-		return false;
-	} else if (name == "index_set") {
-		if (value != nullptr) {
-			Operand o = {};
-			check_expr_or_type(c, &o, value);
-			Entity *e = entity_of_node(value);
-			if (e != nullptr && e->kind == Entity_Procedure) {
-				if (ac->deferred_procedure.entity != nullptr) {
-					error(elem, "Previous usage of the '%.*s' attribute", LIT(name));
-				}
-
-				bool valid = true;
-
-				{
-					Type *pt = base_type(e->type);
-					GB_ASSERT(pt->kind == Type_Proc);
-
-					if (pt->Proc.param_count < 3) {
-						error(value, "'%s' attribute must allow for 3 parameters", LIT(name));
-						valid = false;
-					} else {
-						isize minimum_param_count = 0;
-						for_array(i, pt->Proc.params->Tuple.variables) {
-							Entity *param = pt->Proc.params->Tuple.variables[i];
-							if (param->kind == Entity_Variable) {
-								if (param->Variable.param_value.kind == ParameterValue_Invalid) {
-									minimum_param_count += 1;
-								} else {
-									break;
-								}
-							} else if (param->kind == Entity_Constant) {
-								minimum_param_count += 1;
-							} else {
-								break;
-							}
-						}
-
-						if (minimum_param_count > 3) {
-							error(value, "'%s' attribute must allow for at a minimum 3 parameters", LIT(name));
-							valid = false;
-						}
-					}
-
-					if (pt->Proc.variadic || pt->Proc.c_vararg) {
-						error(value, "'%s' attribute does not allow variadic procedures", LIT(name));
-						valid = false;
-					}
-				}
-
-				if (valid) {
-					if (ac->atom_op_table == nullptr) {
-						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
-					}
-					ac->atom_op_table->op[TypeAtomOp_index_set] = e;
-				}
-				return true;
-			}
-		}
-		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
-		return false;
-	} else if (name == "slice") {
-		if (value != nullptr) {
-			Operand o = {};
-			check_expr_or_type(c, &o, value);
-			Entity *e = entity_of_node(value);
-			if (e != nullptr && e->kind == Entity_Procedure) {
-				if (ac->deferred_procedure.entity != nullptr) {
-					error(elem, "Previous usage of the '%.*s' attribute", LIT(name));
-				}
-
-				bool valid = true;
-
-				{
-					Type *pt = base_type(e->type);
-					GB_ASSERT(pt->kind == Type_Proc);
-
-					if (pt->Proc.param_count < 1) {
-						error(value, "'%s' attribute must allow for 1 parameter", LIT(name));
-						valid = false;
-					} else {
-						isize minimum_param_count = 0;
-						for_array(i, pt->Proc.params->Tuple.variables) {
-							Entity *param = pt->Proc.params->Tuple.variables[i];
-							if (param->kind == Entity_Variable) {
-								if (param->Variable.param_value.kind == ParameterValue_Invalid) {
-									minimum_param_count += 1;
-								} else {
-									break;
-								}
-							} else if (param->kind == Entity_Constant) {
-								minimum_param_count += 1;
-							} else {
-								break;
-							}
-						}
-
-						if (minimum_param_count > 1) {
-							error(value, "'%s' attribute must allow for at a minimum 1 parameter", LIT(name));
-							valid = false;
-						}
-						{
-							Entity *param = pt->Proc.params->Tuple.variables[0];
-							Type *param_type = base_type(param->type);
-							if (is_type_pointer(param_type) && !is_type_rawptr(param_type)) {
-								// okay
-							} else {
-								error(value, "'%s' attribute's first parameter must be a pointer", LIT(name));
-								valid = false;
-							}
-
-						}
-					}
-
-					if (pt->Proc.variadic || pt->Proc.c_vararg) {
-						error(value, "'%s' attribute does not allow variadic procedures", LIT(name));
-						valid = false;
-					}
-
-					if (pt->Proc.result_count != 1) {
-						error(value, "'%s' attribute must return 1 result", LIT(name));
-						valid = false;
-					} else {
-						Type *rt = pt->Proc.results->Tuple.variables[0]->type;
-						rt = base_type(rt);
-						if (!is_type_slice(rt)) {
-							error(value, "'%s' attribute must return a slice", LIT(name));
-							valid = false;
-						}
-					}
-				}
-
-				if (valid) {
-					if (ac->atom_op_table == nullptr) {
-						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
-					}
-					ac->atom_op_table->op[TypeAtomOp_slice] = e;
-				}
-				return true;
-			}
-		}
-		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
-		return false;
 	}
 	return false;
 }
@@ -4498,6 +4289,38 @@ void check_unchecked_bodies(Checker *c) {
 	}
 }
 
+void check_test_names(Checker *c) {
+	if (build_context.test_names.entries.count == 0) {
+		return;
+	}
+
+	AstPackage *pkg = c->info.init_package;
+	Scope *s = pkg->scope;
+
+	for_array(i, build_context.test_names.entries) {
+		String name = build_context.test_names.entries[i].value;
+		Entity *e = scope_lookup(s, name);
+		if (e == nullptr) {
+			Token tok = {};
+			if (pkg->files.count != 0) {
+				tok = pkg->files[0]->tokens[0];
+			}
+			error(tok, "Unable to find the test '%.*s' in 'package %.*s' ", LIT(name), LIT(pkg->name));
+		}
+	}
+
+	for (isize i = 0; i < c->info.testing_procedures.count; /**/) {
+		Entity *e = c->info.testing_procedures[i];
+		String name = e->token.string;
+		if (!string_set_exists(&build_context.test_names, name)) {
+			array_ordered_remove(&c->info.testing_procedures, i);
+		} else {
+			i += 1;
+		}
+	}
+
+}
+
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
@@ -4571,6 +4394,9 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check test names");
+	check_test_names(c);
 
 	TIME_SECTION("calculate global init order");
 	// Calculate initialization order of global variables

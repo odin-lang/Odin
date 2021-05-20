@@ -25,22 +25,34 @@ T :: struct {
 	w: io.Writer,
 
 	cleanups: [dynamic]Internal_Cleanup,
+
+	_fail_now: proc() -> !,
 }
 
 
 error :: proc(t: ^T, args: ..any, loc := #caller_location) {
-	log(t=t, args=args, loc=loc);
+	fmt.wprintf(t.w, "%v: ", loc);
+	fmt.wprintln(t.w, ..args);
 	t.error_count += 1;
 }
 
 errorf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
-	logf(t=t, format=format, args=args, loc=loc);
+	fmt.wprintf(t.w, "%v: ", loc);
+	fmt.wprintf(t.w, format, ..args);
+	fmt.wprintln(t.w);
 	t.error_count += 1;
 }
 
 fail :: proc(t: ^T) {
 	error(t, "FAIL");
 	t.error_count += 1;
+}
+
+fail_now :: proc(t: ^T) {
+	fail(t);
+	if t._fail_now != nil {
+		t._fail_now();
+	}
 }
 
 failed :: proc(t: ^T) -> bool {

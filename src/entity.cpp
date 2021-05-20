@@ -126,6 +126,8 @@ struct Entity {
 	Entity *    using_parent;
 	Ast *       using_expr;
 
+	Entity *    aliased_of;
+
 	lbModule *   code_gen_module;
 	lbProcedure *code_gen_procedure;
 

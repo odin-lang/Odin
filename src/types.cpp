@@ -128,21 +128,6 @@ enum StructSoaKind {
 	StructSoa_Dynamic = 3,
 };
 
-enum TypeAtomOpKind {
-	TypeAtomOp_Invalid,
-
-	TypeAtomOp_index_get,
-	TypeAtomOp_index_set,
-	TypeAtomOp_slice,
-	TypeAtomOp_index_get_ptr,
-
-	TypeAtomOp_COUNT,
-};
-
-struct TypeAtomOpTable {
-	Entity *op[TypeAtomOp_COUNT];
-};
-
 struct TypeStruct {
 	Array<Entity *> fields;
 	Array<String>   tags;
@@ -155,8 +140,6 @@ struct TypeStruct {
 
 	i64      custom_align;
 	Entity * names;
-
-	TypeAtomOpTable *atom_op_table;
 
 	Type *        soa_elem;
 	i64           soa_count;
@@ -179,8 +162,6 @@ struct TypeUnion {
 	i64           tag_size;
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
-
-	TypeAtomOpTable *atom_op_table;
 
 	bool          no_nil;
 	bool          maybe;
@@ -1915,6 +1896,18 @@ bool is_type_comparable(Type *t) {
 			}
 		}
 		return true;
+
+	case Type_Union:
+		if (type_size_of(t) == 0) {
+			return false;
+		}
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_comparable(v)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }
@@ -1959,7 +1952,8 @@ bool is_type_simple_compare(Type *t) {
 				return false;
 			}
 		}
-		return true;
+		// make it dumb on purpose
+		return t->Union.variants.count == 1;
 
 	case Type_SimdVector:
 		return is_type_simple_compare(t->SimdVector.elem);
@@ -2766,7 +2760,36 @@ void type_path_pop(TypePath *tp) {
 
 i64 type_size_of_internal (Type *t, TypePath *path);
 i64 type_align_of_internal(Type *t, TypePath *path);
+i64 type_size_of(Type *t);
+i64 type_align_of(Type *t);
 
+i64 type_size_of_struct_pretend_is_packed(Type *ot) {
+	if (ot == nullptr) {
+		return 0;
+	}
+	Type *t = core_type(ot);
+	if (t->kind != Type_Struct) {
+		return type_size_of(ot);
+	}
+
+	if (t->Struct.is_packed) {
+		return type_size_of(ot);
+	}
+
+	i64 count = 0, size = 0, align = 1;
+
+	auto const &fields = t->Struct.fields;
+	count = fields.count;
+	if (count == 0) {
+		return 0;
+	}
+
+	for_array(i, fields) {
+		size += type_size_of(fields[i]->type);
+	}
+
+	return align_formula(size, align);
+}
 
 
 i64 type_size_of(Type *t) {
@@ -3617,6 +3640,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 			break;
 		case ProcCC_None:
 			str = gb_string_appendc(str, " \"none\" ");
+			break;
+		case ProcCC_Naked:
+			str = gb_string_appendc(str, " \"naked\" ");
 			break;
 		// case ProcCC_VectorCall:
 		// 	str = gb_string_appendc(str, " \"vectorcall\" ");

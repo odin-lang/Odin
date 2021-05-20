@@ -85,11 +85,10 @@ struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
 
-	u64 state_flags;
+	struct lbGenerator *gen;
 
 	CheckerInfo *info;
-
-	gbMutex mutex;
+	AstPackage *pkg; // associated
 
 	Map<LLVMTypeRef> types; // Key: Type *
 	Map<Type *> llvm_types; // Key: LLVMTypeRef
@@ -109,8 +108,6 @@ struct lbModule {
 	Map<lbProcedure *> equal_procs; // Key: Type *
 	Map<lbProcedure *> hasher_procs; // Key: Type *
 
-	u32 global_array_index;
-	u32 global_generated_index;
 	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
@@ -126,12 +123,22 @@ struct lbModule {
 };
 
 struct lbGenerator {
-	lbModule module;
 	CheckerInfo *info;
 
+	gbMutex mutex;
+
 	Array<String> output_object_paths;
+	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
+	Map<lbModule *> modules; // Key: AstPackage *
+	Map<lbModule *> modules_through_ctx; // Key: LLVMContextRef *
+	lbModule default_module;
+
+	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
+
+	gbAtomic32 global_array_index;
+	gbAtomic32 global_generated_index;
 };
 
 
@@ -210,6 +217,7 @@ enum lbProcedureFlag : u32 {
 
 struct lbProcedure {
 	u32 flags;
+	u16 state_flags;
 
 	lbProcedure *parent;
 	Array<lbProcedure *> children;
@@ -268,9 +276,10 @@ String lb_mangle_name(lbModule *m, Entity *e);
 String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
+LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
-lbProcedure *lb_create_procedure(lbModule *module, Entity *entity);
+lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
 void lb_end_procedure(lbProcedure *p);
 
 
@@ -381,6 +390,8 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
 lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type);
 void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value, Ast *node);
 
+lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e);
+lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
 
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
 lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
@@ -472,6 +483,7 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 	lbCallingConvention_X86_FastCall, // ProcCC_FastCall,
 
 	lbCallingConvention_C,            // ProcCC_None,
+	lbCallingConvention_C,            // ProcCC_Naked,
 	lbCallingConvention_C,            // ProcCC_InlineAsm,
 };
 
