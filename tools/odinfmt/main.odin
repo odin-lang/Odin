@@ -14,26 +14,31 @@ Args :: struct {
 	write: Maybe(bool) `flag:"w" usage:"write the new format to file"`,
 }
 
-print_help :: proc() {
+print_help :: proc(args: []string) {
+	if len(args) == 0 {
+		fmt.eprint("odinfmt ");
+	} else {
+		fmt.eprintf("%s ", args[0]);
+	}
+	fmt.eprintln();
 }
 
 print_arg_error :: proc(error: flag.Flag_Error) {
 	fmt.println(error);
 }
- 
-format_file :: proc(filepath: string) -> ([]u8, bool) {
+
+format_file :: proc(filepath: string) -> (string, bool) {
 
 	if data, ok := os.read_entire_file(filepath); ok {
-		return format.format(data, format.default_style);
+		return format.format(string(data), format.default_style);
 	} else {
-		return {}, false;
+		return "", false;
 	}
 }
 
 files: [dynamic]string;
 
 walk_files :: proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip_dir: bool) {
-
 	if info.is_dir {
 		return 0, false;
 	}
@@ -48,13 +53,12 @@ walk_files :: proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip
 }
 
 main :: proc() {
-
 	init_global_temporary_allocator(mem.megabytes(100));
 
 	args: Args;
 
 	if len(os.args) < 2 {
-		print_help();
+		print_help(os.args);
 		os.exit(1);
 	}
 
@@ -69,13 +73,13 @@ main :: proc() {
 
 	if os.is_file(path) {
 		if _, ok := args.write.(bool); ok {
-			backup_path := strings.concatenate({path, "_bk"}, context.temp_allocator);
+			backup_path := strings.concatenate({path, "_bk"});
+			defer delete(backup_path);
 
 			if data, ok := format_file(path); ok {
-
 				os.rename(path, backup_path);
 
-				if os.write_entire_file(path, data) {
+				if os.write_entire_file(path, transmute([]byte)data) {
 					os.remove(backup_path);
 				}
 			} else {
@@ -83,7 +87,7 @@ main :: proc() {
 			}
 		} else {
 			if data, ok := format_file(path); ok {
-				fmt.println(transmute(string)data);
+				fmt.println(data);
 			}
 		}
 	} else if os.is_dir(path) {
@@ -92,24 +96,23 @@ main :: proc() {
 		for file in files {
 			fmt.println(file);
 
-			backup_path := strings.concatenate({file, "_bk"}, context.temp_allocator);
+			backup_path := strings.concatenate({file, "_bk"});
+			defer delete(backup_path);
 
 			if data, ok := format_file(file); ok {
 
 				if _, ok := args.write.(bool); ok {
 					os.rename(file, backup_path);
 
-					if os.write_entire_file(file, data) {
+					if os.write_entire_file(file, transmute([]byte)data) {
 						os.remove(backup_path);
 					}
 				} else {
-					fmt.println(transmute(string)data);
+					fmt.println(data);
 				}
 			} else {
 				fmt.eprintf("failed to format %v", file);
 			}
-
-			free_all(context.temp_allocator);
 		}
 
 		fmt.printf("formatted %v files in %vms", len(files), time.duration_milliseconds(time.tick_lap_time(&tick_time)));

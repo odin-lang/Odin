@@ -10,26 +10,25 @@ simplify :: proc(file: ^ast.File) {
 
 }
 
-format :: proc(source: [] u8, config: printer.Config, allocator := context.allocator) -> ([] u8, bool) {
+format :: proc(source: string, config: printer.Config, parser_flags := parser.Flags{}, allocator := context.allocator) -> (string, bool) {
+	pkg := ast.Package {
+		kind = .Normal,
+	};
 
-    pkg := ast.Package {
-        kind = .Normal,
-    };
+	file := ast.File {
+		pkg = &pkg,
+		src = source,
+	};
 
-    file := ast.File {
-        pkg = &pkg,
-        src = source,
-    };
+	p := parser.default_parser(parser_flags);
 
-    p := parser.default_parser();
+	ok := parser.parse_file(&p, &file);
 
-    ok := parser.parse_file(&p, &file);
+	if !ok || file.syntax_error_count > 0  {
+		return {}, false;
+	}
 
-    if !ok || file.syntax_error_count > 0  {
-        return {}, false;
-    }
+	prnt := printer.make_printer(config, allocator);
 
-    prnt := printer.make_printer(config, allocator);
-
-    return transmute([]u8) printer.print(&prnt, &file), true;
+	return printer.print(&prnt, &file), true;
 }
