@@ -1939,24 +1939,12 @@ parse_results :: proc(p: ^Parser) -> (list: ^ast.Field_List, diverging: bool) {
 
 string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	if s[0] != '"' && s[0] != '`' {
-		return .Invalid;
+		return nil;
 	}
-	switch s[1:len(s)-1] {
-	case "odin":
-		return .Odin;
-	case "contextless":
-		return .Contextless;
-	case "cdecl", "c":
-		return .C_Decl;
-	case "stdcall", "std":
-		return .Std_Call;
-	case "fast", "fastcall":
-		return .Fast_Call;
-
-	case "none":
-		return .None;
+	if len(s) == 2 {
+		return nil;
 	}
-	return .Invalid;
+	return s;
 }
 
 parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
@@ -1981,21 +1969,17 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 }
 
 parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
-	cc := ast.Proc_Calling_Convention.Invalid;
+	cc: ast.Proc_Calling_Convention;
 	if p.curr_tok.kind == .String {
 		str := expect_token(p, .String);
 		cc = string_to_calling_convention(str.text);
-		if cc == ast.Proc_Calling_Convention.Invalid {
+		if cc == nil {
 			error(p, str.pos, "unknown calling convention '%s'", str.text);
 		}
 	}
 
-	if cc == ast.Proc_Calling_Convention.Invalid {
-		if p.in_foreign_block {
-			cc = ast.Proc_Calling_Convention.Foreign_Block_Default;
-		} else {
-			cc = ast.Proc_Calling_Convention.Odin;
-		}
+	if cc == nil && p.in_foreign_block {
+		cc = .Foreign_Block_Default;
 	}
 
 	expect_token(p, .Open_Paren);

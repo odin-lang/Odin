@@ -161,12 +161,12 @@ push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 
 		if prev_comment == nil {
 			lines := comment_group.pos.line - p.last_source_position.line;
-			set_line(p, p.last_line_index + min(p.config.newline_limit, lines));
+			set_line(p, p.last_line_index + min(p.config.newline_limit+1, lines));
 		}
 
 		for comment, i in comment_group.list {
 			if prev_comment != nil && p.last_source_position.line != comment.pos.line {
-				newline_position(p, min(p.config.newline_limit, comment.pos.line - prev_comment.pos.line - prev_comment_lines));
+				newline_position(p, min(p.config.newline_limit+1, comment.pos.line - prev_comment.pos.line - prev_comment_lines));
 			}
 
 			prev_comment_lines = push_comment(p, comment);
@@ -177,7 +177,7 @@ push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 	}
 
 	if prev_comment != nil {
-		newline_position(p, min(p.config.newline_limit, p.source_position.line - prev_comment.pos.line - prev_comment_lines));
+		newline_position(p, min(p.config.newline_limit+1, p.source_position.line - prev_comment.pos.line - prev_comment_lines));
 	}
 }
 
@@ -268,7 +268,7 @@ set_source_position :: proc(p: ^Printer, pos: tokenizer.Pos) {
 
 @(private)
 move_line :: proc(p: ^Printer, pos: tokenizer.Pos) {
-	move_line_limit(p, pos, p.config.newline_limit);
+	move_line_limit(p, pos, p.config.newline_limit+1);
 }
 
 @(private)
@@ -1368,22 +1368,9 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type, is_proc_lit := fa
 
 	explicit_calling := false;
 
-	switch proc_type.calling_convention {
-	case .Odin:
-	case .Contextless:
-		push_string_token(p, "\"contextless\"", 1);
+	if v, ok := proc_type.calling_convention.(string); ok {
 		explicit_calling = true;
-	case .C_Decl:
-		push_string_token(p, "\"c\"", 1);
-		explicit_calling = true;
-	case .Std_Call:
-		push_string_token(p, "\"std\"", 1);
-		explicit_calling = true;
-	case .Fast_Call:
-		push_string_token(p, "\"fast\"", 1);
-		explicit_calling = true;
-	case .None, .Invalid, .Foreign_Block_Default:
-		// nothing
+		push_string_token(p, v, 1);
 	}
 
 	if explicit_calling {

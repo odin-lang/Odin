@@ -11,6 +11,8 @@ simplify :: proc(file: ^ast.File) {
 }
 
 format :: proc(filepath: string, source: string, config: printer.Config, parser_flags := parser.Flags{}, allocator := context.allocator) -> (string, bool) {
+	config := config;
+
 	pkg := ast.Package {
 		kind = .Normal,
 	};
@@ -20,6 +22,10 @@ format :: proc(filepath: string, source: string, config: printer.Config, parser_
 		src = source,
 		fullpath = filepath,
 	};
+
+	config.newline_limit      = clamp(config.newline_limit, 0, 16);
+	config.spaces             = clamp(config.spaces, 1, 16);
+	config.align_length_break = clamp(config.align_length_break, 0, 64);
 
 	p := parser.default_parser(parser_flags);
 
