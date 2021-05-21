@@ -2031,23 +2031,6 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	return pt;
 }
 
-check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok: tokenizer.Token) {
-	if poly_params == nil {
-		return;
-	}
-	for field in poly_params.list {
-		for name in field.names {
-			if name == nil {
-				continue;
-			}
-			if _, ok := name.derived.(ast.Poly_Type); ok {
-				error(p, name.pos, "polymorphic names are not needed for %s parameters", tok.text);
-				return;
-			}
-		}
-	}
-}
-
 parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
 	expr := parse_unary_expr(p, lhs);
 
@@ -2416,7 +2399,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				poly_params = nil;
 			}
 			expect_token_after(p, .Close_Paren, "parameter list");
-			check_poly_params_for_type(p, poly_params, tok);
 		}
 
 		prev_level := p.expr_level;
@@ -2493,7 +2475,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				poly_params = nil;
 			}
 			expect_token_after(p, .Close_Paren, "parameter list");
-			check_poly_params_for_type(p, poly_params, tok);
 		}
 
 		prev_level := p.expr_level;
