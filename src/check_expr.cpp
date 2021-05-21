@@ -3392,7 +3392,7 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 							GB_ASSERT(bt->kind == Type_EnumeratedArray);
 							corrected_index = index + exact_value_to_i64(bt->EnumeratedArray.min_value);
 						}
-						if (op == Token_Ellipsis) {
+						if (op != Token_RangeHalf) {
 							if (lo <= corrected_index && corrected_index <= hi) {
 								TypeAndValue tav = fv->value->tav;
 								if (success_) *success_ = true;
