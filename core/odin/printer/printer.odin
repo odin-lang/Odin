@@ -8,7 +8,7 @@ import "core:fmt"
 import "core:unicode/utf8"
 import "core:mem"
 
-Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum, If, For, Proc_Lit}
+Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum, If, For, Proc_Lit};
 
 Line_Type :: bit_set[Type_Enum];
 
@@ -100,21 +100,21 @@ Newline_Style :: enum {
 }
 
 default_style := Config {
-	spaces = 4,
-	newline_limit = 2,
-	convert_do = false,
-	semicolons = true,
-	tabs = true,
-	brace_style = ._1TBS,
+	spaces               = 4,
+	newline_limit        = 2,
+	convert_do           = false,
+	semicolons           = true,
+	tabs                 = true,
+	brace_style          = ._1TBS,
 	split_multiple_stmts = true,
-	align_assignments = true,
-	align_style = .Align_On_Type_And_Equals,
-	indent_cases = false,
-	align_switch = true,
-	align_structs = true,
-	align_enums = true,
-	newline_style = .CRLF,
-	align_length_break = 9,
+	align_assignments    = true,
+	align_style          = .Align_On_Type_And_Equals,
+	indent_cases         = false,
+	align_switch         = true,
+	align_structs        = true,
+	align_enums          = true,
+	newline_style        = .CRLF,
+	align_length_break   = 9,
 };
 
 make_printer :: proc(config: Config, allocator := context.allocator) -> Printer {
@@ -126,7 +126,6 @@ make_printer :: proc(config: Config, allocator := context.allocator) -> Printer 
 }
 
 print :: proc(p: ^Printer, file: ^ast.File) -> string {
-
 	p.comments = file.comments;
 
 	if len(file.decls) > 0 {
@@ -387,7 +386,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 				break;
 			} else if format_token.kind == .Undef {
 				return;
-			} 
+			}
 
 			if line_index == 0 && i <= format_index {
 				continue;
@@ -500,7 +499,7 @@ align_var_decls :: proc(p: ^Printer) {
 			   line.format_tokens[i].kind == .Enum ||
 			   line.format_tokens[i].kind == .Struct ||
 			   line.format_tokens[i].kind == .For ||
-			   line.format_tokens[i].kind == .If || 
+			   line.format_tokens[i].kind == .If ||
 			   line.format_tokens[i].kind == .Comment {
 				continue_flag = true;
 			}
@@ -583,7 +582,7 @@ align_var_decls :: proc(p: ^Printer) {
 				break;
 			}
 		}
-		
+
 	}
 
 	//repeating myself, move to sub procedure
@@ -790,7 +789,7 @@ align_struct :: proc(p: ^Printer, index: int) -> int {
 		length := 0;
 
 		for format_token, i in line.format_tokens {
-			
+
 			//give up on nested structs
 			if format_token.kind == .Comment {
 				break;
@@ -825,7 +824,7 @@ align_struct :: proc(p: ^Printer, index: int) -> int {
 		if colon_count >= brace_token.parameter_count {
 			break;
 		}
-	} 
+	}
 
 	//give up aligning nested, it never looks good
 	if nested {
@@ -833,7 +832,7 @@ align_struct :: proc(p: ^Printer, index: int) -> int {
 			for format_token in line.format_tokens {
 				if format_token.kind == .Close_Brace {
 					return end_line_index + line_index - index;
-				} 
+				}
 			}
 		}
 	}

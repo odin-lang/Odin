@@ -31,7 +31,6 @@ sort_attribute :: proc(s: ^[dynamic]^ast.Attribute) -> sort.Interface {
 
 @(private)
 comment_before_position :: proc(p: ^Printer, pos: tokenizer.Pos) -> bool {
-
 	if len(p.comments) <= p.latest_comment_index {
 		return false;
 	}
@@ -48,7 +47,6 @@ next_comment_group :: proc(p: ^Printer) {
 
 @(private)
 push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
-
 	if len(comment.text) == 0 {
 		return 0;
 	}
@@ -76,7 +74,6 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 		return 0;
 	} else {
-
 		builder := strings.make_builder(context.temp_allocator);
 
 		c_len      := len(comment.text);
@@ -156,12 +153,10 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 @(private)
 push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
-
 	prev_comment:       ^tokenizer.Token;
 	prev_comment_lines: int;
 
 	for comment_before_position(p, pos) {
-
 		comment_group := p.comments[p.latest_comment_index];
 
 		if prev_comment == nil {
@@ -170,7 +165,6 @@ push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 		}
 
 		for comment, i in comment_group.list {
-
 			if prev_comment != nil && p.last_source_position.line != comment.pos.line {
 				newline_position(p, min(p.config.newline_limit, comment.pos.line - prev_comment.pos.line - prev_comment_lines));
 			}
@@ -189,7 +183,6 @@ push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 
 @(private)
 append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_Token {
-
 	format_token := format_token;
 
 	if p.last_token != nil && (p.last_token.kind == .Ellipsis || p.last_token.kind == .Range_Half ||
@@ -231,7 +224,6 @@ push_format_token :: proc(p: ^Printer, format_token: Format_Token) {
 
 @(private)
 push_generic_token :: proc(p: ^Printer, kind: tokenizer.Token_Kind, spaces_before: int, value := "") {
-
 	format_token := Format_Token {
 		spaces_before = spaces_before,
 		kind = kind,
@@ -247,7 +239,6 @@ push_generic_token :: proc(p: ^Printer, kind: tokenizer.Token_Kind, spaces_befor
 
 @(private)
 push_string_token :: proc(p: ^Printer, text: string, spaces_before: int) {
-
 	format_token := Format_Token {
 		spaces_before = spaces_before,
 		kind = .String,
@@ -259,7 +250,6 @@ push_string_token :: proc(p: ^Printer, text: string, spaces_before: int) {
 
 @(private)
 push_ident_token :: proc(p: ^Printer, text: string, spaces_before: int) {
-
 	format_token := Format_Token {
 		spaces_before = spaces_before,
 		kind = .Ident,
@@ -295,7 +285,6 @@ move_line_limit :: proc(p: ^Printer, pos: tokenizer.Pos, limit: int) -> bool {
 
 @(private)
 set_line :: proc(p: ^Printer, line: int) -> ^Line {
-
 	unwrapped_line: ^Line;
 
 	if line >= len(p.lines) {
@@ -348,7 +337,6 @@ hint_current_line :: proc(p: ^Printer, hint: Line_Type) {
 
 @(private)
 visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
-
 	using ast;
 
 	if decl == nil {
@@ -384,7 +372,6 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 			push_ident_token(p, path, 0);
 		}
 	case Foreign_Block_Decl:
-
 		if len(v.attributes) > 0 {
 			sort.sort(sort_attribute(&v.attributes));
 			move_line(p, v.attributes[0].pos);
@@ -479,14 +466,13 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 @(private)
 visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing := false, force_newline := false) {
-
 	if len(list) == 0 {
 		return;
 	}
 
-	//we have to newline the expressions to respect the source
+	// we have to newline the expressions to respect the source
 	for expr, i in list {
-		//Don't move the first expression, it looks bad
+		// Don't move the first expression, it looks bad
 		if i != 0 && force_newline {
 			newline_position(p, 1);
 		} else if i != 0 {
@@ -507,7 +493,6 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 
 @(private)
 visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
-
 	if len(attributes) == 0 {
 		return;
 	}
@@ -526,7 +511,6 @@ visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 
 @(private)
 visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Generic, empty_block := false, block_stmt := false) {
-
 	using ast;
 
 	if stmt == nil {
@@ -734,7 +718,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 			push_generic_token(p, .Semicolon, 0);
 		}
 	case For_Stmt:
-		//this should be simplified
+		// this should be simplified
 		move_line(p, v.pos);
 
 		if v.label != nil {
@@ -796,7 +780,6 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		visit_expr(p, v.expr);
 		visit_stmt(p, v.body);
 	case Range_Stmt:
-
 		move_line(p, v.pos);
 
 		if v.label != nil {
@@ -864,7 +847,6 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 	case Branch_Stmt:
-
 		move_line(p, v.pos);
 
 		push_generic_token(p, v.tok.kind, 0);
@@ -885,7 +867,6 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 @(private)
 visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
-
 	using ast;
 
 	if expr == nil {
@@ -1090,9 +1071,12 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		set_source_position(p, v.end);
 	case Proc_Lit:
-
-		if v.inlining == .Inline {
+		switch v.inlining {
+		case .None:
+		case .Inline:
 			push_ident_token(p, "#force_inline", 0);
+		case .No_Inline:
+			push_ident_token(p, "#force_no_inline", 0);
 		}
 
 		visit_proc_type(p, v.type^, true);
@@ -1121,11 +1105,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Call_Expr:
 		visit_expr(p, v.expr);
 
-		push_format_token(p, Format_Token {
-			                  kind = .Open_Paren,
-			                  type = .Call,
-			                  text = "(",
-		                  });
+		push_format_token(p,
+			Format_Token {
+				kind = .Open_Paren,
+				type = .Call,
+				text = "(",
+			},
+		);
 
 		hint_current_line(p, {.Call});
 
@@ -1152,7 +1138,6 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		visit_expr(p, v.index);
 		push_generic_token(p, .Close_Bracket, 0);
 	case Proc_Group:
-
 		push_generic_token(p, v.tok.kind, 1);
 
 		if len(v.args) != 0 && v.pos.line != v.args[len(v.args) - 1].pos.line {
@@ -1168,7 +1153,6 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		}
 
 	case Comp_Lit:
-
 		if v.type != nil {
 			visit_expr(p, v.type);
 		}
@@ -1244,7 +1228,6 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 }
 
 visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, count := 0) {
-
 	set_source_position(p, begin);
 
 	newline_braced := p.config.brace_style == .Allman;
@@ -1262,7 +1245,6 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, c
 		push_format_token(p, format_token);
 		indent(p);
 	} else {
-		format_token.spaces_before = 1;
 		push_format_token(p, format_token);
 		indent(p);
 	}
@@ -1286,13 +1268,11 @@ visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, split := false) {
 }
 
 visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false, trailing := false, enforce_newline := false) {
-
 	if list.list == nil {
 		return;
 	}
 
 	for field, i in list.list {
-
 		if !move_line_limit(p, field.pos, 1) && enforce_newline {
 			newline_position(p, 1);
 		}
@@ -1325,7 +1305,6 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 }
 
 visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type, is_proc_lit := false) {
-
 	if is_proc_lit {
 		push_format_token(p, Format_Token {
 			kind = .Proc,
@@ -1357,11 +1336,8 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type, is_proc_lit := fa
 	case .Fast_Call:
 		push_string_token(p, "\"fast\"", 1);
 		explicit_calling = true;
-	case .None:
-	//nothing i guess
-	case .Invalid:
-	//nothing i guess
-	case .Foreign_Block_Default:
+	case .None, .Invalid, .Foreign_Block_Default:
+		// nothing
 	}
 
 	if explicit_calling {
@@ -1405,7 +1381,6 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type, is_proc_lit := fa
 }
 
 visit_binary_expr :: proc(p: ^Printer, binary: ast.Binary_Expr) {
-
 	move_line(p, binary.left.pos);
 
 	if v, ok := binary.left.derived.(ast.Binary_Expr); ok {
@@ -1430,15 +1405,13 @@ visit_binary_expr :: proc(p: ^Printer, binary: ast.Binary_Expr) {
 }
 
 visit_call_exprs :: proc(p: ^Printer, list: []^ast.Expr, ellipsis := false) {
-
 	if len(list) == 0 {
 		return;
 	}
 
-	//all the expression are on the line
+	// all the expression are on the line
 	if list[0].pos.line == list[len(list) - 1].pos.line {
 		for expr, i in list {
-
 			if i == len(list) - 1 && ellipsis {
 				push_generic_token(p, .Ellipsis, 0);
 			}
@@ -1451,8 +1424,7 @@ visit_call_exprs :: proc(p: ^Printer, list: []^ast.Expr, ellipsis := false) {
 		}
 	} else {
 		for expr, i in list {
-
-			//we have to newline the expressions to respect the source
+			// we have to newline the expressions to respect the source
 			move_line_limit(p, expr.pos, 1);
 
 			if i == len(list) - 1 && ellipsis {
@@ -1469,13 +1441,11 @@ visit_call_exprs :: proc(p: ^Printer, list: []^ast.Expr, ellipsis := false) {
 }
 
 visit_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, remove_blank := true) {
-
 	if list.list == nil {
 		return;
 	}
 
 	for field, i in list.list {
-
 		if i != 0 {
 			move_line_limit(p, field.pos, 1);
 		}
