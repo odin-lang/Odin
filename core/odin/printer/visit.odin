@@ -411,7 +411,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 			push_generic_token(p, .Using, 0);
 		}
 
-		visit_exprs(p, v.names, true);
+		visit_exprs(p, v.names, {.Add_Comma});
 
 		hint_current_line(p, {.Value_Decl});
 
@@ -443,7 +443,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		if len(v.values) == 1 {
 			visit_expr(p, v.values[0]); //this is too ensure that one value are never newlined(procs, structs, etc.)
 		} else {
-			visit_exprs(p, v.values, true);
+			visit_exprs(p, v.values, {.Add_Comma});
 		}
 
 		add_semicolon := true;
@@ -467,7 +467,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 }
 
 @(private)
-visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing := false, force_newline := false) {
+visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, options := List_Options{}) {
 	if len(list) == 0 {
 		return;
 	}
@@ -475,20 +475,20 @@ visit_exprs :: proc(p: ^Printer, list: []^ast.Expr, add_comma := false, trailing
 	// we have to newline the expressions to respect the source
 	for expr, i in list {
 		// Don't move the first expression, it looks bad
-		if i != 0 && force_newline {
+		if i != 0 && .Enforce_Newline in options {
 			newline_position(p, 1);
 		} else if i != 0 {
 			move_line_limit(p, expr.pos, 1);
 		}
 
-		visit_expr(p, expr);
+		visit_expr(p, expr, options);
 
-		if (i != len(list) - 1 || trailing) && add_comma {
+		if (i != len(list) - 1 || .Trailing in options) && .Add_Comma in options {
 			push_generic_token(p, .Comma, 0);
 		}
 	}
 
-	if len(list) > 1 && force_newline {
+	if len(list) > 1 && .Enforce_Newline in options {
 		newline_position(p, 1);
 	}
 }
@@ -505,7 +505,7 @@ visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 		push_generic_token(p, .At, 0);
 		push_generic_token(p, .Open_Paren, 0);
 
-		visit_exprs(p, attribute.elems, true);
+		visit_exprs(p, attribute.elems, {.Add_Comma});
 
 		push_generic_token(p, .Close_Paren, 0);
 	}
@@ -540,7 +540,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		push_generic_token(p, .Using, 1);
 
-		visit_exprs(p, v.list, true);
+		visit_exprs(p, v.list, {.Add_Comma});
 
 		if p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0);
@@ -667,7 +667,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		push_generic_token(p, .Case, 0);
 
 		if v.list != nil {
-			visit_exprs(p, v.list, true);
+			visit_exprs(p, v.list, {.Add_Comma});
 		}
 
 		push_generic_token(p, v.terminator.kind, 0);
@@ -704,11 +704,11 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		hint_current_line(p, {.Assign});
 
-		visit_exprs(p, v.lhs, true);
+		visit_exprs(p, v.lhs, {.Add_Comma});
 
 		push_generic_token(p, v.op.kind, 1);
 
-		visit_exprs(p, v.rhs, true);
+		visit_exprs(p, v.rhs, {.Add_Comma});
 
 		if block_stmt && p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0);
@@ -814,7 +814,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		push_generic_token(p, .Return, 1);
 
 		if v.results != nil {
-			visit_exprs(p, v.results, true);
+			visit_exprs(p, v.results, {.Add_Comma});
 		}
 
 		if block_stmt && p.config.semicolons {
@@ -869,18 +869,50 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 }
 
 @(private)
-push_where_clauses :: proc(p: ^Printer, where_clauses: []^ast.Expr) {
-	if where_clauses == nil {
+push_where_clauses :: proc(p: ^Printer, clauses: []^ast.Expr) {
+	if len(clauses) == 0 {
 		return;
 	}
-	move_line(p, where_clauses[0].pos);
+
+	// TODO(bill): This is not outputting correctly at all
+
+	move_line(p, clauses[0].pos);
 	push_generic_token(p, .Where, 1);
-	visit_exprs(p, where_clauses, true);
+
+	force_newline := false;
+
+	for expr, i in clauses {
+		// Don't move the first expression, it looks bad
+		if i != 0 && i != len(clauses)-1 && force_newline {
+			newline_position(p, 1);
+		} else if i != 0 {
+			move_line_limit(p, expr.pos, 1);
+		}
+
+		visit_expr(p, expr);
+
+		if i != len(clauses) - 1 {
+			push_generic_token(p, .Comma, 0);
+		}
+	}
+
+	if len(clauses) > 1 && force_newline {
+		newline_position(p, 1);
+	}
+}
+
+@(private)
+push_poly_params :: proc(p: ^Printer, poly_params: ^ast.Field_List) {
+	if poly_params != nil {
+		push_generic_token(p, .Open_Paren, 0);
+		visit_field_list(p, poly_params, {.Add_Comma, .Enforce_Poly_Names});
+		push_generic_token(p, .Close_Paren, 0);
+	}
 }
 
 
 @(private)
-visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
+visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 	using ast;
 
 	if expr == nil {
@@ -894,7 +926,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, v.tok.kind, 1, v.tok.text);
 
 		push_generic_token(p, .Open_Paren, 1);
-		visit_exprs(p, v.param_types, true, false);
+		visit_exprs(p, v.param_types, {.Add_Comma});
 		push_generic_token(p, .Close_Paren, 0);
 
 		push_generic_token(p, .Sub, 1);
@@ -933,7 +965,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Selector_Call_Expr:
 		visit_expr(p, v.call.expr);
 		push_generic_token(p, .Open_Paren, 1);
-		visit_exprs(p, v.call.args, true);
+		visit_exprs(p, v.call.args, {.Add_Comma});
 		push_generic_token(p, .Close_Paren, 0);
 	case Ellipsis:
 		push_generic_token(p, .Ellipsis, 1);
@@ -952,7 +984,12 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		}
 		push_generic_token(p, .Close_Bracket, 0);
 	case Ident:
-		push_ident_token(p, v.name, 1);
+		if .Enforce_Poly_Names in options {
+			push_generic_token(p, .Dollar, 1);
+			push_ident_token(p, v.name, 0);
+		} else {
+			push_ident_token(p, v.name, 1);
+		}
 	case Deref_Expr:
 		visit_expr(p, v.expr);
 		push_generic_token(p, v.op.kind, 0);
@@ -991,11 +1028,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	case Union_Type:
 		push_generic_token(p, .Union, 1);
 
-		if v.poly_params != nil {
-			push_generic_token(p, .Open_Paren, 0);
-			visit_field_list(p, v.poly_params, true, false);
-			push_generic_token(p, .Close_Paren, 0);
-		}
+		push_poly_params(p, v.poly_params);
 
 		if v.is_maybe {
 			push_ident_token(p, "#maybe", 1);
@@ -1005,13 +1038,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.variants != nil && (len(v.variants) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
-			visit_exprs(p, v.variants, true);
+			visit_exprs(p, v.variants, {.Add_Comma});
 			push_generic_token(p, .Close_Brace, 0);
 		} else {
 			visit_begin_brace(p, v.pos, .Generic);
 			newline_position(p, 1);
 			set_source_position(p, v.variants[0].pos);
-			visit_exprs(p, v.variants, true, true);
+			visit_exprs(p, v.variants, {.Add_Comma, .Trailing});
 			visit_end_brace(p, v.end);
 		}
 	case Enum_Type:
@@ -1025,13 +1058,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		if v.fields != nil && (len(v.fields) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
-			visit_exprs(p, v.fields, true);
+			visit_exprs(p, v.fields, {.Add_Comma});
 			push_generic_token(p, .Close_Brace, 0);
 		} else {
 			visit_begin_brace(p, v.pos, .Generic, len(v.fields));
 			newline_position(p, 1);
 			set_source_position(p, v.fields[0].pos);
-			visit_exprs(p, v.fields, true, true, true);
+			visit_exprs(p, v.fields, {.Add_Comma, .Trailing, .Enforce_Newline});
 			set_source_position(p, v.end);
 			visit_end_brace(p, v.end);
 		}
@@ -1041,6 +1074,8 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		push_generic_token(p, .Struct, 1);
 
 		hint_current_line(p, {.Struct});
+
+		push_poly_params(p, v.poly_params);
 
 		if v.is_packed {
 			push_ident_token(p, "#packed", 1);
@@ -1055,23 +1090,17 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_expr(p, v.align);
 		}
 
-		if v.poly_params != nil {
-			push_generic_token(p, .Open_Paren, 0);
-			visit_field_list(p, v.poly_params, true, false);
-			push_generic_token(p, .Close_Paren, 0);
-		}
-
 		push_where_clauses(p, v.where_clauses);
 
 		if v.fields != nil && (len(v.fields.list) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
 			set_source_position(p, v.fields.pos);
-			visit_field_list(p, v.fields, true);
+			visit_field_list(p, v.fields, {.Add_Comma});
 			push_generic_token(p, .Close_Brace, 0);
 		} else if v.fields != nil {
 			visit_begin_brace(p, v.pos, .Generic, len(v.fields.list));
 			set_source_position(p, v.fields.pos);
-			visit_field_list(p, v.fields, true, true, true);
+			visit_field_list(p, v.fields, {.Add_Comma, .Trailing, .Enforce_Newline});
 			visit_end_brace(p, v.end);
 		}
 
@@ -1146,11 +1175,11 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_begin_brace(p, v.pos, .Generic);
 			newline_position(p, 1);
 			set_source_position(p, v.args[0].pos);
-			visit_exprs(p, v.args, true, true);
+			visit_exprs(p, v.args, {.Add_Comma, .Trailing});
 			visit_end_brace(p, v.end);
 		} else {
 			push_generic_token(p, .Open_Brace, 0);
-			visit_exprs(p, v.args, true);
+			visit_exprs(p, v.args, {.Add_Comma});
 			push_generic_token(p, .Close_Brace, 0);
 		}
 
@@ -1163,11 +1192,11 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			visit_begin_brace(p, v.pos, .Comp_Lit, 0);
 			newline_position(p, 1);
 			set_source_position(p, v.elems[0].pos);
-			visit_exprs(p, v.elems, true, true);
+			visit_exprs(p, v.elems, {.Add_Comma, .Trailing});
 			visit_end_brace(p, v.end);
 		} else {
 			push_generic_token(p, .Open_Brace, 0 if v.type != nil else 1);
-			visit_exprs(p, v.elems, true);
+			visit_exprs(p, v.elems, {.Add_Comma});
 			push_generic_token(p, .Close_Brace, 0);
 		}
 
@@ -1270,13 +1299,22 @@ visit_block_stmts :: proc(p: ^Printer, stmts: []^ast.Stmt, split := false) {
 	}
 }
 
-visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false, trailing := false, enforce_newline := false) {
+List_Option :: enum u8 {
+	Add_Comma,
+	Trailing,
+	Enforce_Newline,
+	Enforce_Poly_Names,
+}
+
+List_Options :: distinct bit_set[List_Option];
+
+visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, options := List_Options{}) {
 	if list.list == nil {
 		return;
 	}
 
 	for field, i in list.list {
-		if !move_line_limit(p, field.pos, 1) && enforce_newline {
+		if !move_line_limit(p, field.pos, 1) && .Enforce_Newline in options {
 			newline_position(p, 1);
 		}
 
@@ -1284,7 +1322,12 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 			push_generic_token(p, .Using, 1);
 		}
 
-		visit_exprs(p, field.names, true);
+		name_options := List_Options{.Add_Comma};
+		if .Enforce_Poly_Names in options {
+			name_options += {.Enforce_Poly_Names};
+		}
+
+		visit_exprs(p, field.names, name_options);
 
 		if field.type != nil {
 			if len(field.names) != 0 {
@@ -1301,7 +1344,7 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 			push_generic_token(p, field.tag.kind, 1, field.tag.text);
 		}
 
-		if (i != len(list.list) - 1 || trailing) && add_comma {
+		if (i != len(list.list) - 1 || .Trailing in options) && .Add_Comma in options {
 			push_generic_token(p, .Comma, 0);
 		}
 	}
@@ -1401,7 +1444,8 @@ visit_binary_expr :: proc(p: ^Printer, binary: ast.Binary_Expr) {
 
 	#partial switch binary.op.kind {
 	case .Ellipsis:
-		push_generic_token(p, binary.op.kind, 1 if either_implicit_selector else 0, tokenizer.tokens[tokenizer.Token_Kind.Range_Full]);
+		push_generic_token(p, binary.op.kind, 1 if either_implicit_selector else 0,
+		                   tokenizer.tokens[tokenizer.Token_Kind.Range_Full]);
 	case .Range_Half, .Range_Full:
 		push_generic_token(p, binary.op.kind, 1 if either_implicit_selector else 0);
 	case:
@@ -1483,7 +1527,7 @@ visit_signature_list :: proc(p: ^Printer, list: ^ast.Field_List, remove_blank :=
 		}
 
 		if named {
-			visit_exprs(p, field.names, true);
+			visit_exprs(p, field.names, {.Add_Comma});
 
 			if len(field.names) != 0 && field.type != nil {
 				push_generic_token(p, .Colon, 0);
