@@ -10,7 +10,7 @@ simplify :: proc(file: ^ast.File) {
 
 }
 
-format :: proc(source: string, config: printer.Config, parser_flags := parser.Flags{}, allocator := context.allocator) -> (string, bool) {
+format :: proc(filepath: string, source: string, config: printer.Config, parser_flags := parser.Flags{}, allocator := context.allocator) -> (string, bool) {
 	pkg := ast.Package {
 		kind = .Normal,
 	};
@@ -18,6 +18,7 @@ format :: proc(source: string, config: printer.Config, parser_flags := parser.Fl
 	file := ast.File {
 		pkg = &pkg,
 		src = source,
+		fullpath = filepath,
 	};
 
 	p := parser.default_parser(parser_flags);

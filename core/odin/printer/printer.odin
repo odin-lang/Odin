@@ -90,8 +90,8 @@ Block_Type :: enum {
 }
 
 Alignment_Style :: enum {
-	Align_On_Colon_And_Equals,
 	Align_On_Type_And_Equals,
+	Align_On_Colon_And_Equals,
 }
 
 Newline_Style :: enum {
@@ -414,7 +414,6 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 }
 
 format_generic :: proc(p: ^Printer) {
-
 	next_struct_line := 0;
 
 	for line, line_index in p.lines {
@@ -424,12 +423,17 @@ format_generic :: proc(p: ^Printer) {
 		}
 
 		for format_token, token_index in line.format_tokens {
-			if format_token.kind == .For || format_token.kind == .If ||
-			   format_token.kind == .When || format_token.kind == .Switch ||
-			   (format_token.kind == .Proc && format_token.type == .Proc_Lit) {
+			#partial switch format_token.kind {
+			case .For, .If, .When, .Switch:
 				format_keyword_to_brace(p, line_index, token_index, format_token.kind);
-			} else if format_token.type == .Call {
-				format_call(p, line_index, token_index);
+			case .Proc:
+				if format_token.type == .Proc_Lit {
+					format_keyword_to_brace(p, line_index, token_index, format_token.kind);
+				}
+			case:
+				if format_token.type == .Call {
+					format_call(p, line_index, token_index);
+				}
 			}
 		}
 
