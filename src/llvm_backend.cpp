@@ -6231,7 +6231,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 							TokenKind op = ie->op.kind;
 							i64 lo = exact_value_to_i64(lo_tav.value);
 							i64 hi = exact_value_to_i64(hi_tav.value);
-							if (op == Token_Ellipsis) {
+							if (op != Token_RangeHalf) {
 								hi += 1;
 							}
 							if (lo == i) {
@@ -6315,7 +6315,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 							TokenKind op = ie->op.kind;
 							i64 lo = exact_value_to_i64(lo_tav.value);
 							i64 hi = exact_value_to_i64(hi_tav.value);
-							if (op == Token_Ellipsis) {
+							if (op != Token_RangeHalf) {
 								hi += 1;
 							}
 							if (lo == i) {
@@ -12704,7 +12704,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 							TokenKind op = ie->op.kind;
 							i64 lo = exact_value_to_i64(lo_tav.value);
 							i64 hi = exact_value_to_i64(hi_tav.value);
-							if (op == Token_Ellipsis) {
+							if (op != Token_RangeHalf) {
 								hi += 1;
 							}
 
@@ -12803,7 +12803,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 							TokenKind op = ie->op.kind;
 							i64 lo = exact_value_to_i64(lo_tav.value);
 							i64 hi = exact_value_to_i64(hi_tav.value);
-							if (op == Token_Ellipsis) {
+							if (op != Token_RangeHalf) {
 								hi += 1;
 							}
 
@@ -12912,7 +12912,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 							TokenKind op = ie->op.kind;
 							i64 lo = exact_value_to_i64(lo_tav.value);
 							i64 hi = exact_value_to_i64(hi_tav.value);
-							if (op == Token_Ellipsis) {
+							if (op != Token_RangeHalf) {
 								hi += 1;
 							}
 
@@ -13016,7 +13016,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						TokenKind op = ie->op.kind;
 						i64 lo = exact_value_to_i64(lo_tav.value);
 						i64 hi = exact_value_to_i64(hi_tav.value);
-						if (op == Token_Ellipsis) {
+						if (op != Token_RangeHalf) {
 							hi += 1;
 						}
 
