@@ -51,7 +51,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 		return 0;
 	}
 
-	if comment.text[0] == '/' && comment.text[1] == '/' {
+	if comment.text[:2] != "/*" {
 		format_token := Format_Token {
 			spaces_before = 1,
 			kind = .Comment,
@@ -82,33 +82,33 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 		multilines: [dynamic]string;
 
 		for i := 0; i < len(comment.text); i += 1 {
-
 			c := comment.text[i];
 
 			if c != ' ' && c != '\t' {
 				trim_space = false;
 			}
 
-			if (c == ' ' || c == '\t' || c == '\n') && trim_space {
+			switch {
+			case (c == ' ' || c == '\t' || c == '\n') && trim_space:
 				continue;
-			} else if c == 13 && comment.text[min(c_len - 1, i + 1)] == 10 {
+			case c == '\r' && comment.text[min(c_len - 1, i + 1)] == '\n':
 				append(&multilines, strings.to_string(builder));
 				builder = strings.make_builder(context.temp_allocator);
 				trim_space = true;
 				i += 1;
-			} else if c == 10 {
+			case c == '\n':
 				append(&multilines, strings.to_string(builder));
 				builder = strings.make_builder(context.temp_allocator);
 				trim_space = true;
-			} else if c == '/' && comment.text[min(c_len - 1, i + 1)] == '*' {
+			case c == '/' && comment.text[min(c_len - 1, i + 1)] == '*':
 				strings.write_string(&builder, "/*");
 				trim_space = true;
 				i += 1;
-			} else if c == '*' && comment.text[min(c_len - 1, i + 1)] == '/' {
+			case c == '*' && comment.text[min(c_len - 1, i + 1)] == '/':
 				trim_space = true;
 				strings.write_string(&builder, "*/");
 				i += 1;
-			} else {
+			case:
 				strings.write_byte(&builder, c);
 			}
 		}
@@ -185,7 +185,9 @@ push_comments :: proc(p: ^Printer, pos: tokenizer.Pos) {
 append_format_token :: proc(p: ^Printer, format_token: Format_Token) -> ^Format_Token {
 	format_token := format_token;
 
-	if p.last_token != nil && (p.last_token.kind == .Ellipsis || p.last_token.kind == .Range_Half ||
+	if p.last_token != nil && (
+           p.last_token.kind == .Ellipsis ||
+           p.last_token.kind == .Range_Half || p.last_token.kind == .Range_Full ||
 	   p.last_token.kind == .Open_Paren || p.last_token.kind == .Period ||
 	   p.last_token.kind == .Open_Brace || p.last_token.kind == .Open_Bracket) {
 		format_token.spaces_before = 0;
@@ -548,7 +550,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		if v.pos.line == v.end.line {
 			if !empty_block {
-				push_generic_token(p, .Open_Brace, 0);
+				push_generic_token(p, .Open_Brace, 1);
 			}
 
 			set_source_position(p, v.pos);
@@ -753,8 +755,8 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		}
 
 		visit_stmt(p, v.body);
-	case Inline_Range_Stmt:
 
+	case Inline_Range_Stmt:
 		move_line(p, v.pos);
 
 		if v.label != nil {
@@ -779,6 +781,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		visit_expr(p, v.expr);
 		visit_stmt(p, v.body);
+
 	case Range_Stmt:
 		move_line(p, v.pos);
 
@@ -864,6 +867,17 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 	set_source_position(p, stmt.end);
 }
+
+@(private)
+push_where_clauses :: proc(p: ^Printer, where_clauses: []^ast.Expr) {
+	if where_clauses == nil {
+		return;
+	}
+	move_line(p, where_clauses[0].pos);
+	push_generic_token(p, .Where, 1);
+	visit_exprs(p, where_clauses, true);
+}
+
 
 @(private)
 visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
@@ -987,11 +1001,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			push_ident_token(p, "#maybe", 1);
 		}
 
-		if v.where_clauses != nil {
-			move_line(p, v.where_clauses[0].pos);
-			push_generic_token(p, .Where, 1);
-			visit_exprs(p, v.where_clauses, true);
-		}
+		push_where_clauses(p, v.where_clauses);
 
 		if v.variants != nil && (len(v.variants) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
@@ -1051,11 +1061,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 			push_generic_token(p, .Close_Paren, 0);
 		}
 
-		if v.where_clauses != nil {
-			move_line(p, v.where_clauses[0].pos);
-			push_generic_token(p, .Where, 1);
-			visit_exprs(p, v.where_clauses, true);
-		}
+		push_where_clauses(p, v.where_clauses);
 
 		if v.fields != nil && (len(v.fields.list) == 0 || v.pos.line == v.end.line) {
 			push_generic_token(p, .Open_Brace, 1);
@@ -1081,11 +1087,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 
 		visit_proc_type(p, v.type^, true);
 
-		if v.where_clauses != nil {
-			move_line(p, v.where_clauses[0].pos);
-			push_generic_token(p, .Where, 1);
-			visit_exprs(p, v.where_clauses, true);
-		}
+		push_where_clauses(p, v.where_clauses);
 
 		if v.body != nil {
 			set_source_position(p, v.body.pos);
@@ -1158,13 +1160,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 		}
 
 		if len(v.elems) != 0 && v.pos.line != v.elems[len(v.elems) - 1].pos.line {
-			visit_begin_brace(p, v.pos, .Comp_Lit);
+			visit_begin_brace(p, v.pos, .Comp_Lit, 0);
 			newline_position(p, 1);
 			set_source_position(p, v.elems[0].pos);
 			visit_exprs(p, v.elems, true, true);
 			visit_end_brace(p, v.end);
 		} else {
-			push_generic_token(p, .Open_Brace, 1);
+			push_generic_token(p, .Open_Brace, 0 if v.type != nil else 1);
 			visit_exprs(p, v.elems, true);
 			push_generic_token(p, .Close_Brace, 0);
 		}
@@ -1227,7 +1229,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr) {
 	}
 }
 
-visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, count := 0) {
+visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, count := 0, same_line_spaces_before := 1) {
 	set_source_position(p, begin);
 
 	newline_braced := p.config.brace_style == .Allman;
@@ -1245,6 +1247,7 @@ visit_begin_brace :: proc(p: ^Printer, begin: tokenizer.Pos, type: Block_Type, c
 		push_format_token(p, format_token);
 		indent(p);
 	} else {
+		format_token.spaces_before = same_line_spaces_before;
 		push_format_token(p, format_token);
 		indent(p);
 	}
@@ -1278,7 +1281,7 @@ visit_field_list :: proc(p: ^Printer, list: ^ast.Field_List, add_comma := false,
 		}
 
 		if .Using in field.flags {
-			push_generic_token(p, .Using, 0);
+			push_generic_token(p, .Using, 1);
 		}
 
 		visit_exprs(p, field.names, true);
@@ -1389,13 +1392,24 @@ visit_binary_expr :: proc(p: ^Printer, binary: ast.Binary_Expr) {
 		visit_expr(p, binary.left);
 	}
 
-	if binary.op.kind == .Ellipsis || binary.op.kind == .Range_Half {
-		push_generic_token(p, binary.op.kind, 0);
-	} else {
+	either_implicit_selector := false;
+	if _, ok := binary.left.derived.(ast.Implicit_Selector_Expr); ok {
+		either_implicit_selector = true;
+	} else if _, ok := binary.right.derived.(ast.Implicit_Selector_Expr); ok {
+		either_implicit_selector = true;
+	}
+
+	#partial switch binary.op.kind {
+	case .Ellipsis:
+		push_generic_token(p, binary.op.kind, 1 if either_implicit_selector else 0, tokenizer.tokens[tokenizer.Token_Kind.Range_Full]);
+	case .Range_Half, .Range_Full:
+		push_generic_token(p, binary.op.kind, 1 if either_implicit_selector else 0);
+	case:
 		push_generic_token(p, binary.op.kind, 1);
 	}
 
 	move_line(p, binary.right.pos);
+
 
 	if v, ok := binary.right.derived.(ast.Binary_Expr); ok {
 		visit_binary_expr(p, v);
