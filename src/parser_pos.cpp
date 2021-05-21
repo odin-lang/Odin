@@ -125,6 +125,8 @@ Token ast_end_token(Ast *node) {
 	GB_ASSERT(node != nullptr);
 
 	switch (node->kind) {
+	case Ast_Invalid:
+		return empty_token;
 	case Ast_Ident:          return node->Ident.token;
 	case Ast_Implicit:       return node->Implicit;
 	case Ast_Undef:          return node->Undef;
@@ -140,7 +142,11 @@ Token ast_end_token(Ast *node) {
 		return node->CompoundLit.close;
 
 	case Ast_BadExpr:       return node->BadExpr.end;
-	case Ast_TagExpr:       return ast_end_token(node->TagExpr.expr);
+	case Ast_TagExpr:
+		if (node->TagExpr.expr) {
+			return ast_end_token(node->TagExpr.expr);
+		}
+		return node->TagExpr.name;
 	case Ast_UnaryExpr:     return ast_end_token(node->UnaryExpr.expr);
 	case Ast_BinaryExpr:    return ast_end_token(node->BinaryExpr.right);
 	case Ast_ParenExpr:     return node->ParenExpr.close;
@@ -150,7 +156,10 @@ Token ast_end_token(Ast *node) {
 	case Ast_SelectorCallExpr:
 		return ast_end_token(node->SelectorCallExpr.call);
 	case Ast_ImplicitSelectorExpr:
-		return ast_end_token(node->SelectorExpr.selector);
+		if (node->ImplicitSelectorExpr.selector) {
+			return ast_end_token(node->ImplicitSelectorExpr.selector);
+		}
+		return node->ImplicitSelectorExpr.token;
 	case Ast_IndexExpr:          return node->IndexExpr.close;
 	case Ast_SliceExpr:          return node->SliceExpr.close;
 	case Ast_Ellipsis:
