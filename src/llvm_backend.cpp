@@ -3712,11 +3712,8 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 			value.type = nested_proc->type;
 
 			array_add(&p->module->procedures_to_generate, nested_proc);
-			if (p != nullptr) {
-				array_add(&p->children, nested_proc);
-			} else {
-				string_map_set(&p->module->members, name, value);
-			}
+			array_add(&p->children, nested_proc);
+			string_map_set(&p->module->members, name, value);
 		}
 	}
 }
@@ -8507,7 +8504,9 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 			} else if (arg->kind == lbArg_Indirect) {
 				lbValue ptr = {};
-				if (is_calling_convention_odin(pt->Proc.calling_convention)) {
+				if (arg->is_byval) {
+					ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
+				} else if (is_calling_convention_odin(pt->Proc.calling_convention)) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
 					ptr = lb_address_from_load_or_generate_local(p, x);
