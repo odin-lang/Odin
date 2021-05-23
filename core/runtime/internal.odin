@@ -623,7 +623,7 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 		}
 
 		if (e > 30) {
-			f := 1e12;
+			f := i64(1e12);
 			for j := 0; j < 10; j += 1 {
 				/* NOTE(bill): Cause overflow */
 				g := intrinsics.volatile_load(&f);

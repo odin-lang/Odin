@@ -1,6 +1,6 @@
 package runtime
 
-when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" {
+when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" || ODIN_OS == "js" {
 	// mem.nil_allocator reimplementation
 
 	default_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
