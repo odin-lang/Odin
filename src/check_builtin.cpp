@@ -2106,6 +2106,47 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_mem_zero:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand ptr = {};
+			Operand len = {};
+			check_expr(c, &ptr, ce->args[0]);
+			check_expr(c, &len, ce->args[1]);
+			if (ptr.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
+
+			if (!is_type_pointer(ptr.type)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(len.type)) {
+				gbString str = type_to_string(len.type);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (len.mode == Addressing_Constant) {
+				i64 n = exact_value_to_i64(len.value);
+				if (n < 0) {
+					gbString str = expr_to_string(len.expr);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					gb_string_free(str);
+				}
+			}
+		}
+		break;
+
 
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
