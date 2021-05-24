@@ -14880,6 +14880,9 @@ void lb_generate_code(lbGenerator *gen) {
 				LLVMSetLinkage(g.value, LLVMInternalLinkage);
 			}
 		}
+		if (e->Variable.link_section.len > 0) {
+			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
+		}
 
 		lbGlobalVariable var = {};
 		var.var = g;
