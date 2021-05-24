@@ -2650,6 +2650,16 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_section") {
+		if (ev.kind == ExactValue_String) {
+			ac->link_section = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_section)) {
+				error(elem, "Invalid link section: %.*s", LIT(ac->link_section));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 	return false;
 }

@@ -934,6 +934,9 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	if (ac.link_name.len > 0) {
 		e->Variable.link_name = ac.link_name;
 	}
+	if (ac.link_section.len > 0) {
+		e->Variable.link_section = ac.link_section;
+	}
 
 	if (e->Variable.is_foreign || e->Variable.is_export) {
 		String name = e->token.string;

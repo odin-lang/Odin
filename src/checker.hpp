@@ -109,6 +109,7 @@ struct AttributeContext {
 	bool    set_cold;
 	String  link_name;
 	String  link_prefix;
+	String  link_section;
 	isize   init_expr_list_count;
 	String  thread_local_model;
 	String  deprecated_message;
