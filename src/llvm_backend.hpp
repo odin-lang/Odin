@@ -215,6 +215,12 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
 };
 
+struct lbCopyElisionHint {
+	lbValue ptr;
+	Ast *   ast;
+	bool    used;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -260,9 +266,7 @@ struct lbProcedure {
 
 	LLVMMetadataRef debug_info;
 
-	lbValue  return_ptr_hint_value;
-	Ast *    return_ptr_hint_ast;
-	bool     return_ptr_hint_used;
+	lbCopyElisionHint copy_elision_hint;
 };
 
 
@@ -413,6 +417,7 @@ lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type);
 
 lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x);
 
+void lb_mem_zero_addr(lbProcedure *p, LLVMValueRef ptr, Type *type);
 
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
