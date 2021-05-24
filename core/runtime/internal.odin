@@ -97,7 +97,7 @@ mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	if len < 0 {
 		return data;
 	}
-	memset(data, 0, len);
+	intrinsics.mem_zero(data, len);
 	return data;
 }
 
