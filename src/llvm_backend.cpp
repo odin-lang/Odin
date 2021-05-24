@@ -4927,6 +4927,23 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	return res;
 }
 
+lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, Ast *ast) {
+	lbCopyElisionHint prev = p->copy_elision_hint;
+	p->copy_elision_hint.used = false;
+	p->copy_elision_hint.ptr = {};
+	p->copy_elision_hint.ast = nullptr;
+	if (addr.kind == lbAddr_Default && addr.addr.value != nullptr) {
+		p->copy_elision_hint.ptr = lb_addr_get_ptr(p, addr);
+		p->copy_elision_hint.ast = unparen_expr(ast);
+	}
+	return prev;
+}
+
+void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint) {
+	p->copy_elision_hint = prev_hint;
+}
+
+
 void lb_build_stmt(lbProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
 	defer (p->curr_stmt = prev_stmt);
@@ -5084,6 +5101,47 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 					lb_add_local(p, e->type, e, true);
 				}
 			}
+		} else if (vd->names.count == vd->values.count) {
+			auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
+			auto inits = array_make<lbValue>(permanent_allocator(), 0, vd->names.count);
+
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				lbAddr lval = {};
+				if (!is_blank_ident(name)) {
+					Entity *e = entity_of_node(name);
+					bool zero_init = true;
+					if (vd->names.count == vd->values.count) {
+						// Possibly uses copy elision
+						// Make the caller mem zero
+						zero_init = true;
+					}
+					lval = lb_add_local(p, e->type, e, zero_init);
+				}
+				array_add(&lvals, lval);
+			}
+
+			for_array(i, vd->values) {
+				Ast *rhs = unparen_expr(vd->values[i]);
+
+				auto prev_hint = lb_set_copy_elision_hint(p, lvals[i], rhs);
+
+				lbValue init = lb_build_expr(p, rhs);
+				Type *t = init.type;
+				GB_ASSERT(t->kind != Type_Tuple);
+				array_add(&inits, init);
+
+				if (p->copy_elision_hint.used) {
+					lvals[i] = {}; // zero lval
+				}
+				lb_reset_copy_elision_hint(p, prev_hint);
+			}
+
+			for_array(i, inits) {
+				lbAddr lval = lvals[i];
+				lbValue init = inits[i];
+				lb_addr_store(p, lval, init);
+			}
 		} else { // Tuple(s)
 			auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
 			auto inits = array_make<lbValue>(permanent_allocator(), 0, vd->names.count);
@@ -5093,13 +5151,15 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				lbAddr lval = {};
 				if (!is_blank_ident(name)) {
 					Entity *e = entity_of_node(name);
-					lval = lb_add_local(p, e->type, e, false);
+					bool zero_init = false;
+					lval = lb_add_local(p, e->type, e, zero_init);
 				}
 				array_add(&lvals, lval);
 			}
 
 			for_array(i, vd->values) {
-				lbValue init = lb_build_expr(p, vd->values[i]);
+				Ast *rhs = unparen_expr(vd->values[i]);
+				lbValue init = lb_build_expr(p, rhs);
 				Type *t = init.type;
 				if (t->kind == Type_Tuple) {
 					for_array(i, t->Tuple.variables) {
@@ -5111,7 +5171,6 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 					array_add(&inits, init);
 				}
 			}
-
 
 			for_array(i, inits) {
 				lbAddr lval = lvals[i];
@@ -5135,24 +5194,26 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			}
 
 			if (as->lhs.count == as->rhs.count) {
-				if (as->lhs.count == 1) {
-					lbAddr lval = lvals[0];
-					Ast *rhs = as->rhs[0];
+				auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
+
+				for_array(i, as->rhs) {
+					Ast *rhs = unparen_expr(as->rhs[i]);
+
+					auto prev_hint = lb_set_copy_elision_hint(p, lvals[i], rhs);
+
 					lbValue init = lb_build_expr(p, rhs);
-					lb_addr_store(p, lvals[0], init);
-				} else {
-					auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
+					array_add(&inits, init);
 
-					for_array(i, as->rhs) {
-						lbValue init = lb_build_expr(p, as->rhs[i]);
-						array_add(&inits, init);
+					if (p->copy_elision_hint.used) {
+						lvals[i] = {}; // zero lval
 					}
+					lb_reset_copy_elision_hint(p, prev_hint);
+				}
 
-					for_array(i, inits) {
-						lbAddr lval = lvals[i];
-						lbValue init = inits[i];
-						lb_addr_store(p, lval, init);
-					}
+				for_array(i, inits) {
+					lbAddr lval = lvals[i];
+					lbValue init = inits[i];
+					lb_addr_store(p, lval, init);
 				}
 			} else {
 				auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
@@ -8426,7 +8487,7 @@ lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> 
 	return lb_emit_call(p, proc, args);
 }
 
-lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, bool use_return_ptr_hint) {
+lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, bool use_copy_elision_hint) {
 	lbModule *m = p->module;
 
 	Type *pt = base_type(value.type);
@@ -8532,10 +8593,13 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		Type *rt = reduce_tuple_to_single_type(results);
 		if (return_by_pointer) {
 			lbValue return_ptr = {};
-			if (use_return_ptr_hint && p->return_ptr_hint_value.value != nullptr) {
-				if (are_types_identical(type_deref(p->return_ptr_hint_value.type), rt)) {
-					return_ptr = p->return_ptr_hint_value;
-					p->return_ptr_hint_used = true;
+			if (use_copy_elision_hint && p->copy_elision_hint.ptr.value != nullptr) {
+				if (are_types_identical(type_deref(p->copy_elision_hint.ptr.type), rt)) {
+					return_ptr = p->copy_elision_hint.ptr;
+					p->copy_elision_hint.used = true;
+					// consume it
+					p->copy_elision_hint.ptr = {};
+					p->copy_elision_hint.ast = nullptr;
 				}
 			}
 			if (return_ptr.value == nullptr) {
@@ -9958,7 +10022,7 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 			}
 		}
 
-		return lb_emit_call(p, value, args, ce->inlining, p->return_ptr_hint_ast == expr);
+		return lb_emit_call(p, value, args, ce->inlining, p->copy_elision_hint.ast == expr);
 	}
 
 	isize arg_index = 0;
@@ -10140,7 +10204,7 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	}
 
 	auto call_args = array_slice(args, 0, final_count);
-	return lb_emit_call(p, value, call_args, ce->inlining, p->return_ptr_hint_ast == expr);
+	return lb_emit_call(p, value, call_args, ce->inlining, p->copy_elision_hint.ast == expr);
 }
 
 bool lb_is_const(lbValue value) {
@@ -12751,18 +12815,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				}
 
 				for_array(i, temp_data) {
-					auto return_ptr_hint_ast   = p->return_ptr_hint_ast;
-					auto return_ptr_hint_value = p->return_ptr_hint_value;
-					auto return_ptr_hint_used  = p->return_ptr_hint_used;
-					defer (p->return_ptr_hint_ast   = return_ptr_hint_ast);
-					defer (p->return_ptr_hint_value = return_ptr_hint_value);
-					defer (p->return_ptr_hint_used  = return_ptr_hint_used);
-
 					lbValue field_expr = temp_data[i].value;
 					Ast *expr = temp_data[i].expr;
 
-					p->return_ptr_hint_value = temp_data[i].gep;
-					p->return_ptr_hint_ast = unparen_expr(expr);
+					auto prev_hint = lb_set_copy_elision_hint(p, lb_addr(temp_data[i].gep), expr);
 
 					if (field_expr.value == nullptr) {
 						field_expr = lb_build_expr(p, expr);
@@ -12771,9 +12827,11 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(t->kind != Type_Tuple);
 					lbValue ev = lb_emit_conv(p, field_expr, et);
 
-					if (!p->return_ptr_hint_used) {
+					if (!p->copy_elision_hint.used) {
 						temp_data[i].value = ev;
 					}
+
+					lb_reset_copy_elision_hint(p, prev_hint);
 				}
 
 				for_array(i, temp_data) {
@@ -12854,18 +12912,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				}
 
 				for_array(i, temp_data) {
-					auto return_ptr_hint_ast   = p->return_ptr_hint_ast;
-					auto return_ptr_hint_value = p->return_ptr_hint_value;
-					auto return_ptr_hint_used  = p->return_ptr_hint_used;
-					defer (p->return_ptr_hint_ast   = return_ptr_hint_ast);
-					defer (p->return_ptr_hint_value = return_ptr_hint_value);
-					defer (p->return_ptr_hint_used  = return_ptr_hint_used);
-
 					lbValue field_expr = temp_data[i].value;
 					Ast *expr = temp_data[i].expr;
 
-					p->return_ptr_hint_value = temp_data[i].gep;
-					p->return_ptr_hint_ast = unparen_expr(expr);
+					auto prev_hint = lb_set_copy_elision_hint(p, lb_addr(temp_data[i].gep), expr);
 
 					if (field_expr.value == nullptr) {
 						field_expr = lb_build_expr(p, expr);
@@ -12874,9 +12924,11 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(t->kind != Type_Tuple);
 					lbValue ev = lb_emit_conv(p, field_expr, et);
 
-					if (!p->return_ptr_hint_used) {
+					if (!p->copy_elision_hint.used) {
 						temp_data[i].value = ev;
 					}
+
+					lb_reset_copy_elision_hint(p, prev_hint);
 				}
 
 				for_array(i, temp_data) {
