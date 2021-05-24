@@ -8519,6 +8519,12 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			param_index += 1;
 		}
 
+		if (is_c_vararg) {
+			for (isize i = processed_args.count; i < args.count; i++) {
+				array_add(&processed_args, args[i]);
+			}
+		}
+
 		if (inlining == ProcInlining_none) {
 			inlining = p->inlining;
 		}
