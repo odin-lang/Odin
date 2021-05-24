@@ -4425,7 +4425,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	lb_start_block(p, done);
 }
 
-void lb_build_inline_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
+void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
 	lbModule *m = p->module;
 
 	lb_open_scope(p, scope); // Open scope here
@@ -4943,6 +4943,321 @@ void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint) {
 	p->copy_elision_hint = prev_hint;
 }
 
+void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
+	for_array(i, vd->names) {
+		lbValue value = {};
+		if (vd->values.count > 0) {
+			GB_ASSERT(vd->names.count == vd->values.count);
+			Ast *ast_value = vd->values[i];
+			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+			          ast_value->tav.mode == Addressing_Invalid);
+
+			bool allow_local = false;
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, allow_local);
+		}
+
+		Ast *ident = vd->names[i];
+		GB_ASSERT(!is_blank_ident(ident));
+		Entity *e = entity_of_node(ident);
+		GB_ASSERT(e->flags & EntityFlag_Static);
+		String name = e->token.string;
+
+		String mangled_name = {};
+		{
+			gbString str = gb_string_make_length(permanent_allocator(), p->name.text, p->name.len);
+			str = gb_string_appendc(str, "-");
+			str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
+			mangled_name.text = cast(u8 *)str;
+			mangled_name.len = gb_string_length(str);
+		}
+
+		char *c_name = alloc_cstring(permanent_allocator(), mangled_name);
+
+		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
+		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
+		if (value.value != nullptr) {
+			LLVMSetInitializer(global, value.value);
+		} else {
+		}
+		if (e->Variable.thread_local_model != "") {
+			LLVMSetThreadLocal(global, true);
+
+			String m = e->Variable.thread_local_model;
+			LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
+			if (m == "default") {
+				mode = LLVMGeneralDynamicTLSModel;
+			} else if (m == "localdynamic") {
+				mode = LLVMLocalDynamicTLSModel;
+			} else if (m == "initialexec") {
+				mode = LLVMInitialExecTLSModel;
+			} else if (m == "localexec") {
+				mode = LLVMLocalExecTLSModel;
+			} else {
+				GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
+			}
+			LLVMSetThreadLocalMode(global, mode);
+		} else {
+			LLVMSetLinkage(global, LLVMInternalLinkage);
+		}
+
+
+		lbValue global_val = {global, alloc_type_pointer(e->type)};
+		lb_add_entity(p->module, e, global_val);
+		lb_add_member(p->module, mangled_name, global_val);
+	}
+}
+
+
+void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
+	if (values.count == 0) {
+		return;
+	}
+
+	auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
+
+	for_array(i, values) {
+		Ast *rhs = values[i];
+		if (is_type_tuple(type_of_expr(rhs))) {
+			lbValue init = lb_build_expr(p, rhs);
+			Type *t = init.type;
+			GB_ASSERT(t->kind == Type_Tuple);
+			for_array(i, t->Tuple.variables) {
+				Entity *e = t->Tuple.variables[i];
+				lbValue v = lb_emit_struct_ev(p, init, cast(i32)i);
+				array_add(&inits, v);
+			}
+		} else {
+			auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
+			lbValue init = lb_build_expr(p, rhs);
+			if (p->copy_elision_hint.used) {
+				lvals[inits.count] = {}; // zero lval
+			}
+			lb_reset_copy_elision_hint(p, prev_hint);
+			array_add(&inits, init);
+		}
+	}
+
+	GB_ASSERT(lvals.count == inits.count);
+	for_array(i, inits) {
+		lbAddr lval = lvals[i];
+		lbValue init = inits[i];
+		lb_addr_store(p, lval, init);
+	}
+}
+
+void lb_build_return_stmt(lbProcedure *p, AstReturnStmt *rs) {
+	lbValue res = {};
+
+	TypeTuple *tuple  = &p->type->Proc.results->Tuple;
+	isize return_count = p->type->Proc.result_count;
+	isize res_count = rs->results.count;
+
+	if (return_count == 0) {
+		// No return values
+
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
+		LLVMBuildRetVoid(p->builder);
+		return;
+	} else if (return_count == 1) {
+		Entity *e = tuple->variables[0];
+		if (res_count == 0) {
+			lbValue *found = map_get(&p->module->values, hash_entity(e));
+			GB_ASSERT(found);
+			res = lb_emit_load(p, *found);
+		} else {
+			res = lb_build_expr(p, rs->results[0]);
+			res = lb_emit_conv(p, res, e->type);
+		}
+		if (p->type->Proc.has_named_results) {
+			// NOTE(bill): store the named values before returning
+			if (e->token.string != "") {
+				lbValue *found = map_get(&p->module->values, hash_entity(e));
+				GB_ASSERT(found != nullptr);
+				lb_emit_store(p, *found, lb_emit_conv(p, res, e->type));
+			}
+		}
+
+	} else {
+		auto results = array_make<lbValue>(permanent_allocator(), 0, return_count);
+
+		if (res_count != 0) {
+			for (isize res_index = 0; res_index < res_count; res_index++) {
+				lbValue res = lb_build_expr(p, rs->results[res_index]);
+				Type *t = res.type;
+				if (t->kind == Type_Tuple) {
+					for_array(i, t->Tuple.variables) {
+						Entity *e = t->Tuple.variables[i];
+						lbValue v = lb_emit_struct_ev(p, res, cast(i32)i);
+						array_add(&results, v);
+					}
+				} else {
+					array_add(&results, res);
+				}
+			}
+		} else {
+			for (isize res_index = 0; res_index < return_count; res_index++) {
+				Entity *e = tuple->variables[res_index];
+				lbValue *found = map_get(&p->module->values, hash_entity(e));
+				GB_ASSERT(found);
+				lbValue res = lb_emit_load(p, *found);
+				array_add(&results, res);
+			}
+		}
+
+		GB_ASSERT(results.count == return_count);
+
+		if (p->type->Proc.has_named_results) {
+			// NOTE(bill): store the named values before returning
+			for_array(i, p->type->Proc.results->Tuple.variables) {
+				Entity *e = p->type->Proc.results->Tuple.variables[i];
+				if (e->kind != Entity_Variable) {
+					continue;
+				}
+
+				if (e->token.string == "") {
+					continue;
+				}
+				lbValue *found = map_get(&p->module->values, hash_entity(e));
+				GB_ASSERT(found != nullptr);
+				lb_emit_store(p, *found, lb_emit_conv(p, results[i], e->type));
+			}
+		}
+
+		Type *ret_type = p->type->Proc.results;
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		res = lb_add_local_generated(p, ret_type, false).addr;
+		for_array(i, results) {
+			Entity *e = tuple->variables[i];
+			lbValue field = lb_emit_struct_ep(p, res, cast(i32)i);
+			lbValue val = lb_emit_conv(p, results[i], e->type);
+			lb_emit_store(p, field, val);
+		}
+
+		res = lb_emit_load(p, res);
+	}
+
+
+	lb_ensure_abi_function_type(p->module, p);
+	if (p->abi_function_type->ret.kind == lbArg_Indirect) {
+		if (res.value != nullptr) {
+			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
+		} else {
+			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+		}
+
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
+		LLVMBuildRetVoid(p->builder);
+	} else {
+		LLVMValueRef ret_val = res.value;
+		ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
+		if (p->abi_function_type->ret.cast_type != nullptr) {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
+		}
+
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+		LLVMBuildRet(p->builder, ret_val);
+	}
+}
+
+void lb_build_if_stmt(lbProcedure *p, Ast *node) {
+	ast_node(is, IfStmt, node);
+	lb_open_scope(p, node->scope); // Scope #1
+
+	if (is->init != nullptr) {
+		// TODO(bill): Should this have a separate block to begin with?
+	#if 1
+		lbBlock *init = lb_create_block(p, "if.init");
+		lb_emit_jump(p, init);
+		lb_start_block(p, init);
+	#endif
+		lb_build_stmt(p, is->init);
+	}
+	lbBlock *then = lb_create_block(p, "if.then");
+	lbBlock *done = lb_create_block(p, "if.done");
+	lbBlock *else_ = done;
+	if (is->else_stmt != nullptr) {
+		else_ = lb_create_block(p, "if.else");
+	}
+
+	lb_build_cond(p, is->cond, then, else_);
+	lb_start_block(p, then);
+
+	if (is->label != nullptr) {
+		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
+		tl->is_block = true;
+	}
+
+	lb_build_stmt(p, is->body);
+
+	lb_emit_jump(p, done);
+
+	if (is->else_stmt != nullptr) {
+		lb_start_block(p, else_);
+
+		lb_open_scope(p, is->else_stmt->scope);
+		lb_build_stmt(p, is->else_stmt);
+		lb_close_scope(p, lbDeferExit_Default, nullptr);
+
+		lb_emit_jump(p, done);
+	}
+
+	lb_start_block(p, done);
+	lb_close_scope(p, lbDeferExit_Default, nullptr);
+}
+
+void lb_build_for_stmt(lbProcedure *p, Ast *node) {
+	ast_node(fs, ForStmt, node);
+
+	lb_open_scope(p, node->scope); // Open Scope here
+
+	if (fs->init != nullptr) {
+	#if 1
+		lbBlock *init = lb_create_block(p, "for.init");
+		lb_emit_jump(p, init);
+		lb_start_block(p, init);
+	#endif
+		lb_build_stmt(p, fs->init);
+	}
+	lbBlock *body = lb_create_block(p, "for.body");
+	lbBlock *done = lb_create_block(p, "for.done"); // NOTE(bill): Append later
+	lbBlock *loop = body;
+	if (fs->cond != nullptr) {
+		loop = lb_create_block(p, "for.loop");
+	}
+	lbBlock *post = loop;
+	if (fs->post != nullptr) {
+		post = lb_create_block(p, "for.post");
+	}
+
+
+	lb_emit_jump(p, loop);
+	lb_start_block(p, loop);
+
+	if (loop != body) {
+		lb_build_cond(p, fs->cond, body, done);
+		lb_start_block(p, body);
+	}
+
+	lb_push_target_list(p, fs->label, done, post, nullptr);
+
+	lb_build_stmt(p, fs->body);
+	lb_close_scope(p, lbDeferExit_Default, nullptr);
+
+	lb_pop_target_list(p);
+
+	lb_emit_jump(p, post);
+
+	if (fs->post != nullptr) {
+		lb_start_block(p, post);
+		lb_build_stmt(p, fs->post);
+		lb_emit_jump(p, loop);
+	}
+
+	lb_start_block(p, done);
+}
+
 
 void lb_build_stmt(lbProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
@@ -5028,156 +5343,24 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		}
 
 		if (is_static) {
-			for_array(i, vd->names) {
-				lbValue value = {};
-				if (vd->values.count > 0) {
-					GB_ASSERT(vd->names.count == vd->values.count);
-					Ast *ast_value = vd->values[i];
-					GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
-					          ast_value->tav.mode == Addressing_Invalid);
-
-					bool allow_local = false;
-					value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, allow_local);
-				}
-
-				Ast *ident = vd->names[i];
-				GB_ASSERT(!is_blank_ident(ident));
-				Entity *e = entity_of_node(ident);
-				GB_ASSERT(e->flags & EntityFlag_Static);
-				String name = e->token.string;
-
-				String mangled_name = {};
-				{
-					gbString str = gb_string_make_length(permanent_allocator(), p->name.text, p->name.len);
-					str = gb_string_appendc(str, "-");
-					str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
-					mangled_name.text = cast(u8 *)str;
-					mangled_name.len = gb_string_length(str);
-				}
-
-				char *c_name = alloc_cstring(permanent_allocator(), mangled_name);
-
-				LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
-				LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
-				if (value.value != nullptr) {
-					LLVMSetInitializer(global, value.value);
-				} else {
-				}
-				if (e->Variable.thread_local_model != "") {
-					LLVMSetThreadLocal(global, true);
-
-					String m = e->Variable.thread_local_model;
-					LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
-					if (m == "default") {
-						mode = LLVMGeneralDynamicTLSModel;
-					} else if (m == "localdynamic") {
-						mode = LLVMLocalDynamicTLSModel;
-					} else if (m == "initialexec") {
-						mode = LLVMInitialExecTLSModel;
-					} else if (m == "localexec") {
-						mode = LLVMLocalExecTLSModel;
-					} else {
-						GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
-					}
-					LLVMSetThreadLocalMode(global, mode);
-				} else {
-					LLVMSetLinkage(global, LLVMInternalLinkage);
-				}
-
-
-				lbValue global_val = {global, alloc_type_pointer(e->type)};
-				lb_add_entity(p->module, e, global_val);
-				lb_add_member(p->module, mangled_name, global_val);
-			}
+			lb_build_static_variables(p, vd);
 			return;
 		}
 
 
-		if (vd->values.count == 0) { // declared and zero-initialized
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
-				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_node(name);
-					lb_add_local(p, e->type, e, true);
-				}
+		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
+
+		for_array(i, vd->names) {
+			Ast *name = vd->names[i];
+			lbAddr lval = {};
+			if (!is_blank_ident(name)) {
+				Entity *e = entity_of_node(name);
+				bool zero_init = true; // Zero always and optimize out later
+				lval = lb_add_local(p, e->type, e, zero_init);
 			}
-		} else if (vd->names.count == vd->values.count) {
-			auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
-			auto inits = array_make<lbValue>(permanent_allocator(), 0, vd->names.count);
-
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
-				lbAddr lval = {};
-				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_node(name);
-					bool zero_init = true;
-					if (vd->names.count == vd->values.count) {
-						// Possibly uses copy elision
-						// Make the caller mem zero
-						zero_init = true;
-					}
-					lval = lb_add_local(p, e->type, e, zero_init);
-				}
-				array_add(&lvals, lval);
-			}
-
-			for_array(i, vd->values) {
-				Ast *rhs = unparen_expr(vd->values[i]);
-
-				auto prev_hint = lb_set_copy_elision_hint(p, lvals[i], rhs);
-
-				lbValue init = lb_build_expr(p, rhs);
-				Type *t = init.type;
-				GB_ASSERT(t->kind != Type_Tuple);
-				array_add(&inits, init);
-
-				if (p->copy_elision_hint.used) {
-					lvals[i] = {}; // zero lval
-				}
-				lb_reset_copy_elision_hint(p, prev_hint);
-			}
-
-			for_array(i, inits) {
-				lbAddr lval = lvals[i];
-				lbValue init = inits[i];
-				lb_addr_store(p, lval, init);
-			}
-		} else { // Tuple(s)
-			auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
-			auto inits = array_make<lbValue>(permanent_allocator(), 0, vd->names.count);
-
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
-				lbAddr lval = {};
-				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_node(name);
-					bool zero_init = false;
-					lval = lb_add_local(p, e->type, e, zero_init);
-				}
-				array_add(&lvals, lval);
-			}
-
-			for_array(i, vd->values) {
-				Ast *rhs = unparen_expr(vd->values[i]);
-				lbValue init = lb_build_expr(p, rhs);
-				Type *t = init.type;
-				if (t->kind == Type_Tuple) {
-					for_array(i, t->Tuple.variables) {
-						Entity *e = t->Tuple.variables[i];
-						lbValue v = lb_emit_struct_ev(p, init, cast(i32)i);
-						array_add(&inits, v);
-					}
-				} else {
-					array_add(&inits, init);
-				}
-			}
-
-			for_array(i, inits) {
-				lbAddr lval = lvals[i];
-				lbValue init = inits[i];
-				lb_addr_store(p, lval, init);
-			}
+			array_add(&lvals, lval);
 		}
+		lb_build_assignment(p, lvals, vd->values);
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
@@ -5192,54 +5375,10 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				}
 				array_add(&lvals, lval);
 			}
-
-			if (as->lhs.count == as->rhs.count) {
-				auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
-
-				for_array(i, as->rhs) {
-					Ast *rhs = unparen_expr(as->rhs[i]);
-
-					auto prev_hint = lb_set_copy_elision_hint(p, lvals[i], rhs);
-
-					lbValue init = lb_build_expr(p, rhs);
-					array_add(&inits, init);
-
-					if (p->copy_elision_hint.used) {
-						lvals[i] = {}; // zero lval
-					}
-					lb_reset_copy_elision_hint(p, prev_hint);
-				}
-
-				for_array(i, inits) {
-					lbAddr lval = lvals[i];
-					lbValue init = inits[i];
-					lb_addr_store(p, lval, init);
-				}
-			} else {
-				auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
-
-				for_array(i, as->rhs) {
-					lbValue init = lb_build_expr(p, as->rhs[i]);
-					Type *t = init.type;
-					// TODO(bill): refactor for code reuse as this is repeated a bit
-					if (t->kind == Type_Tuple) {
-						for_array(i, t->Tuple.variables) {
-							Entity *e = t->Tuple.variables[i];
-							lbValue v = lb_emit_struct_ev(p, init, cast(i32)i);
-							array_add(&inits, v);
-						}
-					} else {
-						array_add(&inits, init);
-					}
-				}
-
-				for_array(i, inits) {
-					lbAddr lval = lvals[i];
-					lbValue init = inits[i];
-					lb_addr_store(p, lval, init);
-				}
-			}
+			lb_build_assignment(p, lvals, as->rhs);
 		} else {
+			GB_ASSERT(as->lhs.count == 1);
+			GB_ASSERT(as->rhs.count == 1);
 			// NOTE(bill): Only 1 += 1 is allowed, no tuples
 			// +=, -=, etc
 			i32 op = cast(i32)as->op.kind;
@@ -5270,222 +5409,19 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);
-		isize scope_index = p->scope_index;
-		lb_add_defer_node(p, scope_index, ds->stmt);
+		lb_add_defer_node(p, p->scope_index, ds->stmt);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
-		lbValue res = {};
-
-		TypeTuple *tuple  = &p->type->Proc.results->Tuple;
-		isize return_count = p->type->Proc.result_count;
-		isize res_count = rs->results.count;
-
-		if (return_count == 0) {
-			// No return values
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-			LLVMBuildRetVoid(p->builder);
-			return;
-		} else if (return_count == 1) {
-			Entity *e = tuple->variables[0];
-			if (res_count == 0) {
-				lbValue *found = map_get(&p->module->values, hash_entity(e));
-				GB_ASSERT(found);
-				res = lb_emit_load(p, *found);
-			} else {
-				res = lb_build_expr(p, rs->results[0]);
-				res = lb_emit_conv(p, res, e->type);
-			}
-			if (p->type->Proc.has_named_results) {
-				// NOTE(bill): store the named values before returning
-				if (e->token.string != "") {
-					lbValue *found = map_get(&p->module->values, hash_entity(e));
-					GB_ASSERT(found != nullptr);
-					lb_emit_store(p, *found, lb_emit_conv(p, res, e->type));
-				}
-			}
-
-		} else {
-			auto results = array_make<lbValue>(permanent_allocator(), 0, return_count);
-
-			if (res_count != 0) {
-				for (isize res_index = 0; res_index < res_count; res_index++) {
-					lbValue res = lb_build_expr(p, rs->results[res_index]);
-					Type *t = res.type;
-					if (t->kind == Type_Tuple) {
-						for_array(i, t->Tuple.variables) {
-							Entity *e = t->Tuple.variables[i];
-							lbValue v = lb_emit_struct_ev(p, res, cast(i32)i);
-							array_add(&results, v);
-						}
-					} else {
-						array_add(&results, res);
-					}
-				}
-			} else {
-				for (isize res_index = 0; res_index < return_count; res_index++) {
-					Entity *e = tuple->variables[res_index];
-					lbValue *found = map_get(&p->module->values, hash_entity(e));
-					GB_ASSERT(found);
-					lbValue res = lb_emit_load(p, *found);
-					array_add(&results, res);
-				}
-			}
-
-			GB_ASSERT(results.count == return_count);
-
-			if (p->type->Proc.has_named_results) {
-				// NOTE(bill): store the named values before returning
-				for_array(i, p->type->Proc.results->Tuple.variables) {
-					Entity *e = p->type->Proc.results->Tuple.variables[i];
-					if (e->kind != Entity_Variable) {
-						continue;
-					}
-
-					if (e->token.string == "") {
-						continue;
-					}
-					lbValue *found = map_get(&p->module->values, hash_entity(e));
-					GB_ASSERT(found != nullptr);
-					lb_emit_store(p, *found, lb_emit_conv(p, results[i], e->type));
-				}
-			}
-
-			Type *ret_type = p->type->Proc.results;
-			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-			res = lb_add_local_generated(p, ret_type, false).addr;
-			for_array(i, results) {
-				Entity *e = tuple->variables[i];
-				lbValue field = lb_emit_struct_ep(p, res, cast(i32)i);
-				lbValue val = lb_emit_conv(p, results[i], e->type);
-				lb_emit_store(p, field, val);
-			}
-
-			res = lb_emit_load(p, res);
-		}
-
-
-		lb_ensure_abi_function_type(p->module, p);
-		if (p->abi_function_type->ret.kind == lbArg_Indirect) {
-			if (res.value != nullptr) {
-				LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
-			} else {
-				LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
-			}
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-			LLVMBuildRetVoid(p->builder);
-		} else {
-			LLVMValueRef ret_val = res.value;
-			ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
-			if (p->abi_function_type->ret.cast_type != nullptr) {
-				ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
-			}
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-			LLVMBuildRet(p->builder, ret_val);
-		}
-
-
-
+		lb_build_return_stmt(p, rs);
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
-		lb_open_scope(p, node->scope); // Scope #1
-
-		if (is->init != nullptr) {
-			// TODO(bill): Should this have a separate block to begin with?
-		#if 1
-			lbBlock *init = lb_create_block(p, "if.init");
-			lb_emit_jump(p, init);
-			lb_start_block(p, init);
-		#endif
-			lb_build_stmt(p, is->init);
-		}
-		lbBlock *then = lb_create_block(p, "if.then");
-		lbBlock *done = lb_create_block(p, "if.done");
-		lbBlock *else_ = done;
-		if (is->else_stmt != nullptr) {
-			else_ = lb_create_block(p, "if.else");
-		}
-
-		lb_build_cond(p, is->cond, then, else_);
-		lb_start_block(p, then);
-
-		if (is->label != nullptr) {
-			lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
-			tl->is_block = true;
-		}
-
-		lb_build_stmt(p, is->body);
-
-		lb_emit_jump(p, done);
-
-		if (is->else_stmt != nullptr) {
-			lb_start_block(p, else_);
-
-			lb_open_scope(p, is->else_stmt->scope);
-			lb_build_stmt(p, is->else_stmt);
-			lb_close_scope(p, lbDeferExit_Default, nullptr);
-
-			lb_emit_jump(p, done);
-		}
-
-
-		lb_start_block(p, done);
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
+		lb_build_if_stmt(p, node);
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		lb_open_scope(p, node->scope); // Open Scope here
-
-		if (fs->init != nullptr) {
-		#if 1
-			lbBlock *init = lb_create_block(p, "for.init");
-			lb_emit_jump(p, init);
-			lb_start_block(p, init);
-		#endif
-			lb_build_stmt(p, fs->init);
-		}
-		lbBlock *body = lb_create_block(p, "for.body");
-		lbBlock *done = lb_create_block(p, "for.done"); // NOTE(bill): Append later
-		lbBlock *loop = body;
-		if (fs->cond != nullptr) {
-			loop = lb_create_block(p, "for.loop");
-		}
-		lbBlock *post = loop;
-		if (fs->post != nullptr) {
-			post = lb_create_block(p, "for.post");
-		}
-
-
-		lb_emit_jump(p, loop);
-		lb_start_block(p, loop);
-
-		if (loop != body) {
-			lb_build_cond(p, fs->cond, body, done);
-			lb_start_block(p, body);
-		}
-
-		lb_push_target_list(p, fs->label, done, post, nullptr);
-
-		lb_build_stmt(p, fs->body);
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
-
-		lb_pop_target_list(p);
-
-		lb_emit_jump(p, post);
-
-		if (fs->post != nullptr) {
-			lb_start_block(p, post);
-			lb_build_stmt(p, fs->post);
-			lb_emit_jump(p, loop);
-		}
-
-		lb_start_block(p, done);
+		lb_build_for_stmt(p, node);
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
@@ -5493,7 +5429,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
-		lb_build_inline_range_stmt(p, rs, node->scope);
+		lb_build_unroll_range_stmt(p, rs, node->scope);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
