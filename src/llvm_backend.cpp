@@ -1584,6 +1584,18 @@ LLVMTypeRef lb_type(lbModule *m, Type *type) {
 	return llvm_type;
 }
 
+lbFunctionType *lb_get_function_type(lbModule *m, lbProcedure *p, Type *pt) {
+	lbFunctionType **ft_found = nullptr;
+	ft_found = map_get(&m->function_type_map, hash_type(pt));
+	if (!ft_found) {
+		LLVMTypeRef llvm_proc_type = lb_type(p->module, pt);
+		ft_found = map_get(&m->function_type_map, hash_type(pt));
+	}
+	GB_ASSERT(ft_found != nullptr);
+
+	return *ft_found;
+}
+
 
 LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
 	if (key == nullptr) {
@@ -4943,6 +4955,14 @@ void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint) {
 	p->copy_elision_hint = prev_hint;
 }
 
+lbValue lb_consume_copy_elision_hint(lbProcedure *p) {
+	lbValue return_ptr = p->copy_elision_hint.ptr;
+	p->copy_elision_hint.used = true;
+	p->copy_elision_hint.ptr = {};
+	p->copy_elision_hint.ast = nullptr;
+	return return_ptr;
+}
+
 void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
@@ -5052,6 +5072,9 @@ void lb_build_return_stmt(lbProcedure *p, AstReturnStmt *rs) {
 	isize return_count = p->type->Proc.result_count;
 	isize res_count = rs->results.count;
 
+	lbFunctionType *ft = lb_get_function_type(p->module, p, p->type);
+	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
+
 	if (return_count == 0) {
 		// No return values
 
@@ -5139,7 +5162,7 @@ void lb_build_return_stmt(lbProcedure *p, AstReturnStmt *rs) {
 
 
 	lb_ensure_abi_function_type(p->module, p);
-	if (p->abi_function_type->ret.kind == lbArg_Indirect) {
+	if (return_by_pointer) {
 		if (res.value != nullptr) {
 			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
 		} else {
@@ -8459,15 +8482,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
-		lbFunctionType **ft_found = nullptr;
-		ft_found = map_get(&m->function_type_map, hash_type(pt));
-		if (!ft_found) {
-			LLVMTypeRef llvm_proc_type = lb_type(p->module, pt);
-			ft_found = map_get(&m->function_type_map, hash_type(pt));
-		}
-		GB_ASSERT(ft_found != nullptr);
-
-		lbFunctionType *ft = *ft_found;
+		lbFunctionType *ft = lb_get_function_type(m, p, pt);
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
 		unsigned param_index = 0;
@@ -8531,11 +8546,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			lbValue return_ptr = {};
 			if (use_copy_elision_hint && p->copy_elision_hint.ptr.value != nullptr) {
 				if (are_types_identical(type_deref(p->copy_elision_hint.ptr.type), rt)) {
-					return_ptr = p->copy_elision_hint.ptr;
-					p->copy_elision_hint.used = true;
-					// consume it
-					p->copy_elision_hint.ptr = {};
-					p->copy_elision_hint.ast = nullptr;
+					return_ptr = lb_consume_copy_elision_hint(p);
 				}
 			}
 			if (return_ptr.value == nullptr) {
