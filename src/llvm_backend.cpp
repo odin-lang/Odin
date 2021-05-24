@@ -57,6 +57,9 @@ void lb_loop_end(lbProcedure *p, lbLoopData const &data);
 LLVMValueRef llvm_zero(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_int), 0, false);
 }
+LLVMValueRef llvm_zero32(lbModule *m) {
+	return LLVMConstInt(lb_type(m, t_i32), 0, false);
+}
 LLVMValueRef llvm_one(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_i32), 1, false);
 }
@@ -3480,6 +3483,28 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	return v;
 }
 
+void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment) {
+	LLVMTypeRef llvm_type = lb_type(p->module, type);
+
+	LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
+
+	switch (kind) {
+	case LLVMStructTypeKind:
+	case LLVMArrayTypeKind:
+		{
+			// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
+			LLVMTypeRef type_i8 = LLVMInt8TypeInContext(p->module->ctx);
+			LLVMTypeRef type_i32 = LLVMInt32TypeInContext(p->module->ctx);
+			i32 sz = cast(i32)type_size_of(type);
+			LLVMBuildMemSet(p->builder, ptr, LLVMConstNull(type_i8), LLVMConstInt(type_i32, sz, false), alignment);
+		}
+		break;
+	default:
+		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+		break;
+	}
+}
+
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 param_index) {
 	GB_ASSERT(p->decl_block != p->curr_block);
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
@@ -3513,23 +3538,7 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	}
 
 	if (zero_init) {
-		LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
-
-		switch (kind) {
-		case LLVMStructTypeKind:
-		case LLVMArrayTypeKind:
-			{
-				// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
-				LLVMTypeRef type_i8 = LLVMInt8TypeInContext(p->module->ctx);
-				LLVMTypeRef type_i32 = LLVMInt32TypeInContext(p->module->ctx);
-				i32 sz = cast(i32)type_size_of(type);
-				LLVMBuildMemSet(p->builder, ptr, LLVMConstNull(type_i8), LLVMConstInt(type_i32, sz, false), alignment);
-			}
-			break;
-		default:
-			LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
-			break;
-		}
+		lb_mem_zero_ptr(p, ptr, type, alignment);
 	}
 
 	lbValue val = {};
@@ -5370,7 +5379,6 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			return;
 		}
 
-
 		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
 
 		for_array(i, vd->names) {
@@ -5378,7 +5386,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			lbAddr lval = {};
 			if (!is_blank_ident(name)) {
 				Entity *e = entity_of_node(name);
-				bool zero_init = true; // Zero always and optimize out later
+				bool zero_init = true; // Always do it
 				lval = lb_add_local(p, e->type, e, zero_init);
 			}
 			array_add(&lvals, lval);
