@@ -12599,7 +12599,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		if (is_type_relative_pointer(type_of_expr(de->expr))) {
 			lbAddr addr = lb_build_addr(p, de->expr);
 			addr.relative.deref = true;
-			return addr;
+			return addr;\
 		}
 		lbValue addr = lb_build_expr(p, de->expr);
 		return lb_addr(addr);
@@ -12608,9 +12608,13 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_ast_node(ce, CallExpr, expr);
 		// NOTE(bill): This is make sure you never need to have an 'array_ev'
 		lbValue e = lb_build_expr(p, expr);
+	#if 1
+		return lb_addr(lb_address_from_load_or_generate_local(p, e));
+	#else
 		lbAddr v = lb_add_local_generated(p, e.type, false);
 		lb_addr_store(p, v, e);
 		return v;
+	#endif
 	case_end;
 
 	case_ast_node(cl, CompoundLit, expr);
