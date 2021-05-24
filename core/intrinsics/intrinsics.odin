@@ -31,6 +31,13 @@ overflow_add :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 
+sqrt :: proc(x: $T) -> T where type_is_float(T) ---
+
+mem_copy                 :: proc(dst, src: rawptr, len: int) ---
+mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) ---
+mem_zero                 :: proc(ptr: rawptr, len: int) ---
+
+
 fixed_point_mul     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
 fixed_point_div     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
 fixed_point_mul_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---

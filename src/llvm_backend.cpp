@@ -9478,8 +9478,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_mem_copy:
 	case BuiltinProc_mem_copy_non_overlapping:
 		{
-
-
 			lbValue dst = lb_build_expr(p, ce->args[0]);
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
@@ -9509,6 +9507,20 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, false); // is_volatile parameter
 
 			LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+
+			return {};
+		}
+
+	case BuiltinProc_mem_zero:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+			lbValue len = lb_build_expr(p, ce->args[1]);
+			ptr = lb_emit_conv(p, ptr, t_rawptr);
+			len = lb_emit_conv(p, len, t_int);
+
+			LLVMTypeRef type_i8 = LLVMInt8TypeInContext(p->module->ctx);
+			unsigned alignment = 1;
+			LLVMBuildMemSet(p->builder, ptr.value, LLVMConstNull(type_i8), len.value, alignment);
 
 			return {};
 		}
