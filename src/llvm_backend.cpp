@@ -5056,12 +5056,12 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 				array_add(&inits, v);
 			}
 		} else {
-			auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
+			// auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
 			lbValue init = lb_build_expr(p, rhs);
 			if (p->copy_elision_hint.used) {
 				lvals[inits.count] = {}; // zero lval
 			}
-			lb_reset_copy_elision_hint(p, prev_hint);
+			// lb_reset_copy_elision_hint(p, prev_hint);
 			array_add(&inits, init);
 		}
 	}
