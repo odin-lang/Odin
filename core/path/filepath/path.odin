@@ -2,7 +2,6 @@
 // To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
 package filepath
 
-import "core:fmt"
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
