@@ -215,6 +215,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		}
 		delete(base_clean);
 	}
+
 	if strings.equal_fold(target_clean, base_clean) {
 		return strings.clone("."), .None;
 	}
