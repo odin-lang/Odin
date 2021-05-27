@@ -2,6 +2,7 @@
 // To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
 package filepath
 
+import "core:fmt"
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
@@ -206,23 +207,22 @@ Relative_Error :: enum {
 
 rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
 	context.allocator = allocator;
-	base_vol, target_vol := volume_name(base_path), volume_name(target_path);
-	base, target := clean(base_path), clean(target_path);
+	base_clean, target_clean := clean(base_path), clean(target_path);
 
 	delete_target := true;
 	defer {
 		if delete_target {
-			delete(target);
+			delete(target_clean);
 		}
-		delete(base);
+		delete(base_clean);
 	}
-
-	if strings.equal_fold(target, base) {
+	if strings.equal_fold(target_clean, base_clean) {
 		return strings.clone("."), .None;
 	}
 
-	base = base[len(base_vol):];
-	target = target[len(target_vol):];
+	base_vol, target_vol := volume_name(base_path), volume_name(target_path);
+	base := base_clean[len(base_vol):];
+	target := target_clean[len(target_vol):];
 	if base == "." {
 		base = "";
 	}
