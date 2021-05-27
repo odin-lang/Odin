@@ -322,19 +322,6 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 		array_add(&array, e);
 		map_set(&ctx->checker->info.gen_types, hash_pointer(original_type), array);
 	}
-
-	{
-		Type *dst_bt = base_type(named_type);
-		Type *src_bt = base_type(original_type);
-		if ((dst_bt != nullptr && src_bt != nullptr) &&
-		    (dst_bt->kind == src_bt->kind)){
-			if (dst_bt->kind == Type_Struct) {
-				if (dst_bt->Struct.atom_op_table == nullptr) {
-					dst_bt->Struct.atom_op_table = src_bt->Struct.atom_op_table;
-				}
-			}
-		}
-	}
 }
 
 Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
@@ -944,6 +931,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 
 		switch (be->op.kind) {
 		case Token_Ellipsis:
+		case Token_RangeFull:
 			if (upper - lower >= bits) {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower+1));
 			}
@@ -1203,16 +1191,26 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 
 	if (allow_caller_location &&
 	    expr->kind == Ast_BasicDirective &&
-	    expr->BasicDirective.name == "caller_location") {
+	    expr->BasicDirective.name.string == "caller_location") {
 		init_core_source_code_location(ctx->checker);
 		param_value.kind = ParameterValue_Location;
 		o.type = t_source_code_location;
+
+		if (in_type) {
+			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		}
+
 	} else {
 		if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
 		} else {
 			check_expr(ctx, &o, expr);
 		}
+
+		if (in_type) {
+			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		}
+
 
 		if (is_operand_nil(o)) {
 			param_value.kind = ParameterValue_Nil;
@@ -1221,16 +1219,7 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				param_value.kind = ParameterValue_Constant;
 				param_value.value = exact_value_procedure(expr);
 			} else {
-				Entity *e = nullptr;
-				// if (o.mode == Addressing_Value && is_type_proc(o.type)) {
-				if (o.mode == Addressing_Value || o.mode == Addressing_Variable) {
-					Operand x = {};
-					if (expr->kind == Ast_Ident) {
-						e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
-					} else if (expr->kind == Ast_SelectorExpr) {
-						e = check_selector(ctx, &x, expr, nullptr);
-					}
-				}
+				Entity *e = entity_from_expr(o.expr);
 
 				if (e != nullptr) {
 					if (e->kind == Entity_Procedure) {
@@ -1253,8 +1242,11 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				} else if (allow_caller_location && o.mode == Addressing_Context) {
 					param_value.kind = ParameterValue_Value;
 					param_value.ast_value = expr;
+				} else if (o.value.kind != ExactValue_Invalid) {
+					param_value.kind = ParameterValue_Constant;
+					param_value.value = o.value;
 				} else {
-					error(expr, "Default parameter must be a constant");
+					error(expr, "Default parameter must be a constant, %d", o.mode);
 				}
 			}
 		} else {
@@ -1267,11 +1259,13 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 		}
 	}
 
-	if (in_type) {
-		check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+	if (out_type_) {
+		if (in_type != nullptr) {
+			*out_type_ = in_type;
+		} else {
+			*out_type_ = default_type(o.type);
+		}
 	}
-
-	if (out_type_) *out_type_ = default_type(o.type);
 
 	return param_value;
 }
@@ -1389,6 +1383,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				}
 			}
 		}
+
+
+
 		if (type == nullptr) {
 			error(param, "Invalid parameter type");
 			type = t_invalid;
@@ -1406,6 +1403,21 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			error(param, "Invalid use of an empty union '%s'", str);
 			gb_string_free(str);
 			type = t_invalid;
+		}
+
+		if (is_type_polymorphic(type)) {
+			switch (param_value.kind) {
+			case ParameterValue_Invalid:
+			case ParameterValue_Constant:
+			case ParameterValue_Nil:
+				break;
+			case ParameterValue_Location:
+			case ParameterValue_Value:
+				gbString str = type_to_string(type);
+				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
+				gb_string_free(str);
+				break;
+			}
 		}
 
 
@@ -2517,16 +2529,6 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 					return true;
 				}
 			}
-
-			// if (ctx->type_level == 0 && entity->state == EntityState_InProgress) {
-			// 	error(entity->token, "Illegal declaration cycle of `%.*s`", LIT(entity->token.string));
-			// 	for_array(j, *ctx->type_path) {
-			// 		Entity *k = (*ctx->type_path)[j];
-			// 		error(k->token, "\t%.*s refers to", LIT(k->token.string));
-			// 	}
-			// 	error(entity->token, "\t%.*s", LIT(entity->token.string));
-			// 	*type = t_invalid;
-			// }
 			return true;
 		}
 
@@ -2709,7 +2711,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				bool is_partial = false;
 				if (at->tag != nullptr) {
 					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-					String name = at->tag->BasicDirective.name;
+					String name = at->tag->BasicDirective.name.string;
 					if (name == "partial") {
 						is_partial = true;
 					} else {
@@ -2743,7 +2745,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 			if (at->tag != nullptr) {
 				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-				String name = at->tag->BasicDirective.name;
+				String name = at->tag->BasicDirective.name.string;
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "simd") {
@@ -2768,7 +2770,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 			if (at->tag != nullptr) {
 				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
-				String name = at->tag->BasicDirective.name;
+				String name = at->tag->BasicDirective.name.string;
 				if (name == "soa") {
 					*type = make_soa_struct_slice(ctx, e, at->elem, elem);
 				} else {
@@ -2788,7 +2790,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		Type *elem = check_type(ctx, dat->elem);
 		if (dat->tag != nullptr) {
 			GB_ASSERT(dat->tag->kind == Ast_BasicDirective);
-			String name = dat->tag->BasicDirective.name;
+			String name = dat->tag->BasicDirective.name.string;
 			if (name == "soa") {
 				*type = make_soa_struct_dynamic_array(ctx, e, dat->elem, elem);
 			} else {

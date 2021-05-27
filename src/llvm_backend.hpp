@@ -215,6 +215,12 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
 };
 
+struct lbCopyElisionHint {
+	lbValue ptr;
+	Ast *   ast;
+	bool    used;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -260,9 +266,7 @@ struct lbProcedure {
 
 	LLVMMetadataRef debug_info;
 
-	lbValue  return_ptr_hint_value;
-	Ast *    return_ptr_hint_ast;
-	bool     return_ptr_hint_used;
+	lbCopyElisionHint copy_elision_hint;
 };
 
 
@@ -276,6 +280,7 @@ String lb_mangle_name(lbModule *m, Entity *e);
 String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
+LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
 lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
@@ -412,6 +417,7 @@ lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type);
 
 lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x);
 
+void lb_mem_zero_addr(lbProcedure *p, LLVMValueRef ptr, Type *type);
 
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"

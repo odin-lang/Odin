@@ -200,8 +200,10 @@ struct BuildContext {
 	bool   disallow_do;
 	bool   insert_semicolon;
 
+
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
+	bool   show_error_line;
 
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
@@ -746,6 +748,9 @@ String get_fullpath_core(gbAllocator a, String path) {
 	return path_to_fullpath(a, res);
 }
 
+bool show_error_line(void) {
+	return build_context.show_error_line;
+}
 
 
 void init_build_context(TargetMetrics *cross_target) {

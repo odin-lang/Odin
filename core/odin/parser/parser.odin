@@ -8,9 +8,20 @@ import "core:fmt"
 Warning_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any);
 Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any);
 
+Flag :: enum u32 {
+	Optional_Semicolons,
+}
+
+Flags :: distinct bit_set[Flag; u32];
+
+
 Parser :: struct {
 	file: ^ast.File,
 	tok: tokenizer.Tokenizer,
+
+	// If .Optional_Semicolons is true, semicolons are completely as statement terminators
+	// different to .Insert_Semicolon in tok.flags
+	flags: Flags,
 
 	warn: Warning_Handler,
 	err:  Error_Handler,
@@ -100,8 +111,9 @@ end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 	return pos;
 }
 
-default_parser :: proc() -> Parser {
+default_parser :: proc(flags := Flags{}) -> Parser {
 	return Parser {
+		flags = flags,
 		err  = default_error_handler,
 		warn = default_warning_handler,
 	};
@@ -126,6 +138,10 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		p.allow_type       = false;
 		p.lead_comment     = nil;
 		p.line_comment     = nil;
+	}
+
+	if .Optional_Semicolons in p.flags {
+		p.tok.flags += {.Insert_Semicolon};
 	}
 
 	p.file = file;
@@ -400,6 +416,11 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 	if node == nil {
 		return false;
 	}
+
+	if .Optional_Semicolons in p.flags {
+		return true;
+	}
+
 	switch n in node.derived {
 	case ast.Empty_Stmt, ast.Block_Stmt:
 		return true;
@@ -439,14 +460,34 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 	return false;
 }
 
+expect_semicolon_newline_error :: proc(p: ^Parser, token: tokenizer.Token, s: ^ast.Node) {
+	if .Optional_Semicolons not_in p.flags && .Insert_Semicolon in p.tok.flags && token.text == "\n" {
+		#partial switch token.kind {
+		case .Close_Brace:
+		case .Close_Paren:
+		case .Else:
+			return;
+		}
+		if is_semicolon_optional_for_node(p, s) {
+			return;
+		}
+
+		tok := token;
+		tok.pos.column -= 1;
+		error(p, tok.pos, "expected ';', got newline");
+	}
+}
+
 
 expect_semicolon :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 	if allow_token(p, .Semicolon) {
+		expect_semicolon_newline_error(p, p.prev_tok, node);
 		return true;
 	}
 
 	prev := p.prev_tok;
 	if prev.kind == .Semicolon {
+		expect_semicolon_newline_error(p, p.prev_tok, node);
 		return true;
 	}
 
@@ -615,7 +656,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 		cond = parse_expr(p, false);
 	} else {
 		init = parse_simple_stmt(p, nil);
-		if allow_token(p, .Semicolon) {
+		if parse_control_statement_semicolon_separator(p) {
 			cond = parse_expr(p, false);
 		} else {
 			cond = convert_stmt_to_expr(p, init, "boolean expression");
@@ -668,6 +709,18 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	return if_stmt;
 }
 
+parse_control_statement_semicolon_separator :: proc(p: ^Parser) -> bool {
+	tok := peek_token(p);
+	if tok.kind != .Open_Brace {
+		return allow_token(p, .Semicolon);
+	}
+	if tok.text == ";" {
+		return allow_token(p, .Semicolon);
+	}
+	return false;
+
+}
+
 parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	if p.curr_proc == nil {
 		error(p, p.curr_tok.pos, "you cannot use a for statement in the file scope");
@@ -716,7 +769,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			}
 		}
 
-		if !is_range && allow_token(p, .Semicolon) {
+		if !is_range && parse_control_statement_semicolon_separator(p) {
 			init = cond;
 			cond = nil;
 			if p.curr_tok.kind != .Semicolon {
@@ -820,7 +873,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			tag = parse_simple_stmt(p, {Stmt_Allow_Flag.In});
 			if as, ok := tag.derived.(ast.Assign_Stmt); ok && as.op.kind == .In {
 				is_type_switch = true;
-			} else if allow_token(p, .Semicolon) {
+			} else if parse_control_statement_semicolon_separator(p) {
 				init = tag;
 				tag = nil;
 				if p.curr_tok.kind != .Open_Brace {
@@ -831,6 +884,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	}
 
 
+	skip_possible_newline(p);
 	open := expect_token(p, .Open_Brace);
 
 	for p.curr_tok.kind == .Case {
@@ -958,6 +1012,7 @@ parse_foreign_block :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Foreign_Bl
 	defer p.in_foreign_block = prev_in_foreign_block;
 	p.in_foreign_block = true;
 
+	skip_possible_newline_for_literal(p);
 	open := expect_token(p, .Open_Brace);
 	for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
 		decl := parse_foreign_block_decl(p);
@@ -1287,7 +1342,7 @@ token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
 	case .Question, .If, .When:
 		return 1;
-	case .Ellipsis, .Range_Half:
+	case .Ellipsis, .Range_Half, .Range_Full:
 		if !p.allow_range {
 			return 0;
 		}
@@ -1884,24 +1939,12 @@ parse_results :: proc(p: ^Parser) -> (list: ^ast.Field_List, diverging: bool) {
 
 string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	if s[0] != '"' && s[0] != '`' {
-		return .Invalid;
+		return nil;
 	}
-	switch s[1:len(s)-1] {
-	case "odin":
-		return .Odin;
-	case "contextless":
-		return .Contextless;
-	case "cdecl", "c":
-		return .C_Decl;
-	case "stdcall", "std":
-		return .Std_Call;
-	case "fast", "fastcall":
-		return .Fast_Call;
-
-	case "none":
-		return .None;
+	if len(s) == 2 {
+		return nil;
 	}
-	return .Invalid;
+	return s;
 }
 
 parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
@@ -1926,21 +1969,17 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 }
 
 parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
-	cc := ast.Proc_Calling_Convention.Invalid;
+	cc: ast.Proc_Calling_Convention;
 	if p.curr_tok.kind == .String {
 		str := expect_token(p, .String);
 		cc = string_to_calling_convention(str.text);
-		if cc == ast.Proc_Calling_Convention.Invalid {
+		if cc == nil {
 			error(p, str.pos, "unknown calling convention '%s'", str.text);
 		}
 	}
 
-	if cc == ast.Proc_Calling_Convention.Invalid {
-		if p.in_foreign_block {
-			cc = ast.Proc_Calling_Convention.Foreign_Block_Default;
-		} else {
-			cc = ast.Proc_Calling_Convention.Odin;
-		}
+	if cc == nil && p.in_foreign_block {
+		cc = .Foreign_Block_Default;
 	}
 
 	expect_token(p, .Open_Paren);
@@ -1974,23 +2013,6 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	pt.diverging = diverging;
 	pt.generic = is_generic;
 	return pt;
-}
-
-check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok: tokenizer.Token) {
-	if poly_params == nil {
-		return;
-	}
-	for field in poly_params.list {
-		for name in field.names {
-			if name == nil {
-				continue;
-			}
-			if _, ok := name.derived.(ast.Poly_Type); ok {
-				error(p, name.pos, "polymorphic names are not needed for %s parameters", tok.text);
-				return;
-			}
-		}
-	}
 }
 
 parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
@@ -2224,6 +2246,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.expr_level = -1;
 			where_clauses = parse_rhs_expr_list(p);
 			p.expr_level = prev_level;
+			tags = parse_proc_tags(p);
 		}
 		if p.allow_type && p.expr_level < 0 {
 			if where_token.kind != .Invalid {
@@ -2232,6 +2255,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return type;
 		}
 		body: ^ast.Stmt;
+
+		skip_possible_newline_for_literal(p);
 
 		if allow_token(p, .Undef) {
 			body = nil;
@@ -2358,7 +2383,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				poly_params = nil;
 			}
 			expect_token_after(p, .Close_Paren, "parameter list");
-			check_poly_params_for_type(p, poly_params, tok);
 		}
 
 		prev_level := p.expr_level;
@@ -2405,6 +2429,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.expr_level = where_prev_level;
 		}
 
+		skip_possible_newline_for_literal(p);
 		expect_token(p, .Open_Brace);
 		fields, name_count = parse_field_list(p, .Close_Brace, ast.Field_Flags_Struct);
 		close := expect_token(p, .Close_Brace);
@@ -2434,7 +2459,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				poly_params = nil;
 			}
 			expect_token_after(p, .Close_Paren, "parameter list");
-			check_poly_params_for_type(p, poly_params, tok);
 		}
 
 		prev_level := p.expr_level;
@@ -2473,6 +2497,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		variants: [dynamic]^ast.Expr;
 
+		skip_possible_newline_for_literal(p);
 		expect_token_after(p, .Open_Brace, "union");
 
 		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
@@ -2503,6 +2528,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		if p.curr_tok.kind != .Open_Brace {
 			base_type = parse_type(p);
 		}
+
+		skip_possible_newline_for_literal(p);
 		open := expect_token(p, .Open_Brace);
 		fields := parse_elem_list(p);
 		close := expect_token(p, .Close_Brace);
@@ -2601,6 +2628,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			}
 		}
 
+		skip_possible_newline_for_literal(p);
 		open := expect_token(p, .Open_Brace);
 		asm_string := parse_expr(p, false);
 		expect_token(p, .Comma);
@@ -2811,7 +2839,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			open := expect_token(p, .Open_Bracket);
 
 			#partial switch p.curr_tok.kind {
-			case .Colon, .Ellipsis, .Range_Half:
+			case .Colon, .Ellipsis, .Range_Half, .Range_Full:
 				// NOTE(bill): Do not err yet
 				break;
 			case:
@@ -2819,7 +2847,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			}
 
 			#partial switch p.curr_tok.kind {
-			case .Ellipsis, .Range_Half:
+			case .Ellipsis, .Range_Half, .Range_Full:
 				error(p, p.curr_tok.pos, "expected a colon, not a range");
 				fallthrough;
 			case .Colon:
@@ -3150,6 +3178,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 					case ast.For_Stmt:         n.label = label;
 					case ast.Switch_Stmt:      n.label = label;
 					case ast.Type_Switch_Stmt: n.label = label;
+					case ast.Range_Stmt:	   n.label = label;
 					}
 				}
 

@@ -7,22 +7,21 @@ struct AstFile;
 struct AstPackage;
 
 enum AddressingMode {
-	Addressing_Invalid,       // invalid addressing mode
-	Addressing_NoValue,       // no value (void in C)
-	Addressing_Value,         // computed value (rvalue)
-	Addressing_Context,       // context value
-	Addressing_Variable,      // addressable variable (lvalue)
-	Addressing_Constant,      // constant
-	Addressing_Type,          // type
-	Addressing_Builtin,       // built-in procedure
-	Addressing_ProcGroup,     // procedure group (overloaded procedure)
-	Addressing_MapIndex,      // map index expression -
-	                          // 	lhs: acts like a Variable
-	                          // 	rhs: acts like OptionalOk
-	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
-	Addressing_SoaVariable,   // Struct-Of-Arrays indexed variable
+	Addressing_Invalid   = 0,    // invalid addressing mode
+	Addressing_NoValue   = 1,    // no value (void in C)
+	Addressing_Value     = 2,    // computed value (rvalue)
+	Addressing_Context   = 3,    // context value
+	Addressing_Variable  = 4,    // addressable variable (lvalue)
+	Addressing_Constant  = 5,    // constant
+	Addressing_Type      = 6,    // type
+	Addressing_Builtin   = 7,    // built-in procedure
+	Addressing_ProcGroup = 8,    // procedure group (overloaded procedure)
+	Addressing_MapIndex  = 9,    // map index expression -
+	                             // 	lhs: acts like a Variable
+	                             // 	rhs: acts like OptionalOk
+	Addressing_OptionalOk  = 10, // rhs: acts like a value with an optional boolean part (for existence check)
+	Addressing_SoaVariable = 11, // Struct-Of-Arrays indexed variable
 
-	Addressing_AtomOpAssign,  // Specialized for custom atom operations for assignments
 };
 
 struct TypeAndValue {
@@ -287,8 +286,8 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Token token; \
 	}) \
 	AST_KIND(BasicDirective, "basic directive", struct { \
-		Token  token; \
-		String name; \
+		Token token; \
+		Token name; \
 	}) \
 	AST_KIND(Ellipsis,       "ellipsis", struct { \
 		Token    token; \
@@ -325,7 +324,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(SelectorCallExpr, "selector call expression",    struct { Token token; Ast *expr, *call; bool modified_call; }) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
-	AST_KIND(DerefExpr,    "dereference expression", struct { Token op; Ast *expr; }) \
+	AST_KIND(DerefExpr,    "dereference expression", struct { Ast *expr; Token op; }) \
 	AST_KIND(SliceExpr,    "slice expression", struct { \
 		Ast *expr; \
 		Token open, close; \
@@ -345,7 +344,13 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
-	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; Type *type_hint; }) \
+	AST_KIND(TypeAssertion, "type assertion", struct { \
+		Ast *expr; \
+		Token dot; \
+		Ast *type; \
+		Type *type_hint; \
+		bool ignores[2]; \
+	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
 	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \

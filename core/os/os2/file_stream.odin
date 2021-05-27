@@ -10,23 +10,14 @@ file_to_stream :: proc(fd: Handle) -> (s: io.Stream) {
 
 @(private)
 error_to_io_error :: proc(ferr: Error) -> io.Error {
-	#partial switch ferr {
-	case .None:           return .None;
-	case .EOF:            return .EOF;
-	case .Unexpected_EOF: return .Unexpected_EOF;
-	case .Short_Write:    return .Short_Write;
-	case .Invalid_Write:  return .Invalid_Write;
-	case .Short_Buffer:   return .Short_Buffer;
-	case .No_Progress:    return .No_Progress;
-	case .Invalid_Whence: return .Invalid_Whence;
-	case .Invalid_Offset: return .Invalid_Offset;
-	case .Invalid_Unread: return .Invalid_Unread;
-	case .Negative_Read:  return .Negative_Read;
-	case .Negative_Write: return .Negative_Write;
-	case .Negative_Count: return .Negative_Count;
-	case .Buffer_Full:    return .Buffer_Full;
+	if ferr == nil {
+		return .None;
 	}
-	return .Unknown;
+	err, ok := ferr.(io.Error);
+	if !ok {
+		err = .Unknown;
+	}
+	return err;
 }
 
 
