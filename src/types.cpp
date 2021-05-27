@@ -128,21 +128,6 @@ enum StructSoaKind {
 	StructSoa_Dynamic = 3,
 };
 
-enum TypeAtomOpKind {
-	TypeAtomOp_Invalid,
-
-	TypeAtomOp_index_get,
-	TypeAtomOp_index_set,
-	TypeAtomOp_slice,
-	TypeAtomOp_index_get_ptr,
-
-	TypeAtomOp_COUNT,
-};
-
-struct TypeAtomOpTable {
-	Entity *op[TypeAtomOp_COUNT];
-};
-
 struct TypeStruct {
 	Array<Entity *> fields;
 	Array<String>   tags;
@@ -155,8 +140,6 @@ struct TypeStruct {
 
 	i64      custom_align;
 	Entity * names;
-
-	TypeAtomOpTable *atom_op_table;
 
 	Type *        soa_elem;
 	i64           soa_count;
@@ -179,8 +162,6 @@ struct TypeUnion {
 	i64           tag_size;
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
-
-	TypeAtomOpTable *atom_op_table;
 
 	bool          no_nil;
 	bool          maybe;

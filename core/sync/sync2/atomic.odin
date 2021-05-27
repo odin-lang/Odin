@@ -56,6 +56,7 @@ atomic_exchange_release :: intrinsics.atomic_xchg_rel;
 atomic_exchange_acqrel  :: intrinsics.atomic_xchg_acqrel;
 atomic_exchange_relaxed :: intrinsics.atomic_xchg_relaxed;
 
+// Returns value and optional ok boolean
 atomic_compare_exchange_strong                     :: intrinsics.atomic_cxchg;
 atomic_compare_exchange_strong_acquire             :: intrinsics.atomic_cxchg_acq;
 atomic_compare_exchange_strong_release             :: intrinsics.atomic_cxchg_rel;
@@ -66,6 +67,7 @@ atomic_compare_exchange_strong_failacquire         :: intrinsics.atomic_cxchg_fa
 atomic_compare_exchange_strong_acquire_failrelaxed :: intrinsics.atomic_cxchg_acq_failrelaxed;
 atomic_compare_exchange_strong_acqrel_failrelaxed  :: intrinsics.atomic_cxchg_acqrel_failrelaxed;
 
+// Returns value and optional ok boolean
 atomic_compare_exchange_weak                     :: intrinsics.atomic_cxchgweak;
 atomic_compare_exchange_weak_acquire             :: intrinsics.atomic_cxchgweak_acq;
 atomic_compare_exchange_weak_release             :: intrinsics.atomic_cxchgweak_rel;

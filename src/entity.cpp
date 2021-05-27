@@ -158,6 +158,7 @@ struct Entity {
 			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     link_section;
 			bool       is_foreign;
 			bool       is_export;
 		} Variable;

@@ -87,7 +87,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name;
+		String name = bd->name.string;
 		if (name == "defined") {
 			break;
 		}
@@ -124,7 +124,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name;
+		String name = bd->name.string;
 		if (name == "location") {
 			if (ce->args.count > 1) {
 				error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
@@ -2026,6 +2026,128 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_sqrt:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_float(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			if (x.mode == Addressing_Constant) {
+				f64 v = exact_value_to_f64(x.value);
+
+				operand->mode = Addressing_Constant;
+				operand->type = x.type;
+				operand->value = exact_value_float(gb_sqrt(v));
+				break;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
+	case BuiltinProc_mem_copy:
+	case BuiltinProc_mem_copy_non_overlapping:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand dst = {};
+			Operand src = {};
+			Operand len = {};
+			check_expr(c, &dst, ce->args[0]);
+			check_expr(c, &src, ce->args[1]);
+			check_expr(c, &len, ce->args[2]);
+			if (dst.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (src.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
+
+			if (!is_type_pointer(dst.type)) {
+				gbString str = type_to_string(dst.type);
+				error(dst.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_pointer(src.type)) {
+				gbString str = type_to_string(src.type);
+				error(src.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(len.type)) {
+				gbString str = type_to_string(len.type);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (len.mode == Addressing_Constant) {
+				i64 n = exact_value_to_i64(len.value);
+				if (n < 0) {
+					gbString str = expr_to_string(len.expr);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					gb_string_free(str);
+				}
+			}
+		}
+		break;
+
+	case BuiltinProc_mem_zero:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand ptr = {};
+			Operand len = {};
+			check_expr(c, &ptr, ce->args[0]);
+			check_expr(c, &len, ce->args[1]);
+			if (ptr.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
+
+			if (!is_type_pointer(ptr.type)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(len.type)) {
+				gbString str = type_to_string(len.type);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (len.mode == Addressing_Constant) {
+				i64 n = exact_value_to_i64(len.value);
+				if (n < 0) {
+					gbString str = expr_to_string(len.expr);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					gb_string_free(str);
+				}
+			}
+		}
+		break;
+
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -2426,6 +2548,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_untyped_bool;
 			operand->value = exact_value_bool(check_type_specialization_to(c, s, t, false, false));
 
+		}
+		break;
+
+	case BuiltinProc_type_is_variant_of:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+
+			Type *u = operand->type;
+
+			if (!is_type_union(u)) {
+				error(operand->expr, "Expected a union type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *v = check_type(c, ce->args[1]);
+
+			u = base_type(u);
+			GB_ASSERT(u->kind == Type_Union);
+
+			bool is_variant = false;
+
+			for_array(i, u->Union.variants) {
+				Type *vt = u->Union.variants[i];
+				if (are_types_identical(v, vt)) {
+					is_variant = true;
+					break;
+				}
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			operand->value = exact_value_bool(is_variant);
 		}
 		break;
 

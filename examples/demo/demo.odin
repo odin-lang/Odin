@@ -1352,8 +1352,8 @@ bit_set_type :: proc() {
 
 		d: Days;
 		d = {Sunday, Monday};
-		e := d | WEEKEND;
-		e |= {Monday};
+		e := d + WEEKEND;
+		e += {Monday};
 		fmt.println(d, e);
 
 		ok := Saturday in e; // `in` is only allowed for `map` and `bit_set` types
@@ -1372,12 +1372,12 @@ bit_set_type :: proc() {
 		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
 		fmt.println(typeid_of(type_of(y))); // bit_set[0..8; u16]
 
-		incl(&x, 'F');
+		x += {'F'};
 		assert('F' in x);
-		excl(&x, 'F');
+		x -= {'F'};
 		assert('F' not_in x);
 
-		y |= {1, 4, 2};
+		y += {1, 4, 2};
 		assert(2 in y);
 	}
 	{
@@ -1760,8 +1760,6 @@ range_statements_with_multiple_return_values :: proc() {
 
 
 soa_struct_layout :: proc() {
-	// IMPORTANT NOTE(bill, 2019-11-03): This feature is subject to be changed/removed
-	// NOTE(bill): Most likely #soa [N]T
 	fmt.println("\n#SOA Struct Layout");
 
 	{
@@ -1857,6 +1855,30 @@ soa_struct_layout :: proc() {
 		fmt.println(len(d));
 		fmt.println(cap(d));
 		fmt.println(d[:]);
+	}
+	{ // soa_zip and soa_unzip
+		fmt.println("\nsoa_zip and soa_unzip");
+
+		x := []i32{1, 3, 9};
+		y := []f32{2, 4, 16};
+		z := []b32{true, false, true};
+
+		// produce an #soa slice the normal slices passed
+		s := soa_zip(a=x, b=y, c=z);
+
+		// iterate over the #soa slice
+		for v, i in s {
+			fmt.println(v, i); // exactly the same as s[i]
+			// NOTE: 'v' is NOT a temporary value but has a specialized addressing mode
+			// which means that when accessing v.a etc, it does the correct transformation
+			// internally:
+			//         s[i].a === s.a[i]
+			fmt.println(v.a, v.b, v.c);
+		}
+
+		// Recover the slices from the #soa slice
+		a, b, c := soa_unzip(s);
+		fmt.println(a, b, c);
 	}
 }
 

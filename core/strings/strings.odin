@@ -541,6 +541,14 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 	return;
 }
 
+remove :: proc(s, key: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
+	return replace(s, key, "", n, allocator);
+}
+
+remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
+	return remove(s, key, -1, allocator);
+}
+
 @(private) _ascii_space := [256]u8{'\t' = 1, '\n' = 1, '\v' = 1, '\f' = 1, '\r' = 1, ' ' = 1};
 
 

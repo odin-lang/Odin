@@ -641,9 +641,9 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 		return;
 	}
 
-	pad_byte: byte = '0';
-	if fi.space {
-		pad_byte = ' ';
+	pad_byte: byte = ' ';
+	if !fi.space {
+		pad_byte = '0';
 	}
 
 	for i := 0; i < width; i += 1 {
