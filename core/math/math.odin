@@ -934,7 +934,7 @@ factorial :: proc(n: int) -> int {
 	return table[n];
 }
 
-classify_f16 :: proc(x: f16) -> Float_Class {
+classify_f16   :: proc(x: f16)   -> Float_Class {
 	switch {
 	case x == 0:
 		i := transmute(i16)x;
@@ -958,7 +958,9 @@ classify_f16 :: proc(x: f16) -> Float_Class {
 	}
 	return .Normal;
 }
-classify_f32 :: proc(x: f32) -> Float_Class {
+classify_f16le :: proc(x: f16le) -> Float_Class { return #force_inline classify_f16(f16(x)); }
+classify_f16be :: proc(x: f16be) -> Float_Class { return #force_inline classify_f16(f16(x)); }
+classify_f32   :: proc(x: f32)   -> Float_Class {
 	switch {
 	case x == 0:
 		i := transmute(i32)x;
@@ -982,7 +984,9 @@ classify_f32 :: proc(x: f32) -> Float_Class {
 	}
 	return .Normal;
 }
-classify_f64 :: proc(x: f64) -> Float_Class {
+classify_f32le :: proc(x: f32le) -> Float_Class { return #force_inline classify_f32(f32(x)); }
+classify_f32be :: proc(x: f32be) -> Float_Class { return #force_inline classify_f32(f32(x)); }
+classify_f64   :: proc(x: f64)   -> Float_Class {
 	switch {
 	case x == 0:
 		i := transmute(i64)x;
@@ -1005,13 +1009,28 @@ classify_f64 :: proc(x: f64) -> Float_Class {
 	}
 	return .Normal;
 }
-classify :: proc{classify_f16, classify_f32, classify_f64};
+classify_f64le :: proc(x: f64le) -> Float_Class { return #force_inline classify_f64(f64(x)); }
+classify_f64be :: proc(x: f64be) -> Float_Class { return #force_inline classify_f64(f64(x)); }
+classify       :: proc{
+	classify_f16, classify_f16le, classify_f16be,
+	classify_f32, classify_f32le, classify_f32be,
+	classify_f64, classify_f64le, classify_f64be,
+};
 
-is_nan_f16 :: proc(x: f16) -> bool { return classify(x) == .NaN; }
-is_nan_f32 :: proc(x: f32) -> bool { return classify(x) == .NaN; }
-is_nan_f64 :: proc(x: f64) -> bool { return classify(x) == .NaN; }
-is_nan :: proc{is_nan_f16, is_nan_f32, is_nan_f64};
-
+is_nan_f16   :: proc(x: f16)   -> bool { return classify(x) == .NaN; }
+is_nan_f16le :: proc(x: f16le) -> bool { return classify(x) == .NaN; }
+is_nan_f16be :: proc(x: f16be) -> bool { return classify(x) == .NaN; }
+is_nan_f32   :: proc(x: f32)   -> bool { return classify(x) == .NaN; }
+is_nan_f32le :: proc(x: f32le) -> bool { return classify(x) == .NaN; }
+is_nan_f32be :: proc(x: f32be) -> bool { return classify(x) == .NaN; }
+is_nan_f64   :: proc(x: f64)   -> bool { return classify(x) == .NaN; }
+is_nan_f64le :: proc(x: f64le) -> bool { return classify(x) == .NaN; }
+is_nan_f64be :: proc(x: f64be) -> bool { return classify(x) == .NaN; }
+is_nan       :: proc{
+	is_nan_f16, is_nan_f16le, is_nan_f16be,
+	is_nan_f32, is_nan_f32le, is_nan_f32be,
+	is_nan_f64, is_nan_f64le, is_nan_f64be,
+};
 
 // is_inf reports whether f is an infinity, according to sign.
 // If sign > 0, is_inf reports whether f is positive infinity.
@@ -1073,13 +1092,25 @@ is_inf :: proc{
 	is_inf_f64, is_inf_f64le, is_inf_f64be,
 };
 
-inf_f16 :: proc(sign: int) -> f16 {
-	return f16(inf_f16(sign));
+inf_f16   :: proc(sign: int) -> f16 {
+	return f16(inf_f64(sign));
 }
-inf_f32 :: proc(sign: int) -> f32 {
+inf_f16le :: proc(sign: int) -> f16le {
+	return f16le(inf_f64(sign));
+}
+inf_f16be :: proc(sign: int) -> f16be {
+	return f16be(inf_f64(sign));
+}
+inf_f32   :: proc(sign: int) -> f32 {
 	return f32(inf_f64(sign));
 }
-inf_f64 :: proc(sign: int) -> f64 {
+inf_f32le :: proc(sign: int) -> f32le {
+	return f32le(inf_f64(sign));
+}
+inf_f32be :: proc(sign: int) -> f32be {
+	return f32be(inf_f64(sign));
+}
+inf_f64   :: proc(sign: int) -> f64 {
 	v: u64;
 	if sign >= 0 {
 		v = 0x7ff00000_00000000;
@@ -1088,16 +1119,40 @@ inf_f64 :: proc(sign: int) -> f64 {
 	}
 	return transmute(f64)v;
 }
+inf_f64le :: proc(sign: int) -> f64le {
+	return f64le(inf_f64(sign));
+}
+inf_f64be :: proc(sign: int) -> f64be {
+	return f64be(inf_f64(sign));
+}
 
-nan_f16 :: proc() -> f16 {
+nan_f16   :: proc() -> f16 {
 	return f16(nan_f64());
 }
-nan_f32 :: proc() -> f32 {
+nan_f16le :: proc() -> f16le {
+	return f16le(nan_f64());
+}
+nan_f16be :: proc() -> f16be {
+	return f16be(nan_f64());
+}
+nan_f32   :: proc() -> f32 {
 	return f32(nan_f64());
 }
-nan_f64 :: proc() -> f64 {
+nan_f32le :: proc() -> f32le {
+	return f32le(nan_f64());
+}
+nan_f32be :: proc() -> f32be {
+	return f32be(nan_f64());
+}
+nan_f64   :: proc() -> f64 {
 	v: u64 = 0x7ff80000_00000001;
 	return transmute(f64)v;
+}
+nan_f64le :: proc() -> f64le {
+	return f64le(nan_f64());
+}
+nan_f64be :: proc() -> f64be {
+	return f64be(nan_f64());
 }
 
 is_power_of_two :: proc(x: int) -> bool {
@@ -1155,13 +1210,29 @@ cumsum :: proc(dst, src: $T/[]$E) -> T
 }
 
 
-atan2_f16 :: proc(y, x: f16) -> f16 {
+atan2_f16   :: proc(y, x: f16)   -> f16 {
 	// TODO(bill): Better atan2_f16
 	return f16(atan2_f64(f64(y), f64(x)));
 }
-atan2_f32 :: proc(y, x: f32) -> f32 {
+atan2_f16le :: proc(y, x: f16le) -> f16le {
+	// TODO(bill): Better atan2_f16
+	return f16le(atan2_f64(f64(y), f64(x)));
+}
+atan2_f16be :: proc(y, x: f16be) -> f16be {
+	// TODO(bill): Better atan2_f16
+	return f16be(atan2_f64(f64(y), f64(x)));
+}
+atan2_f32 :: proc(y, x: f32)     -> f32 {
 	// TODO(bill): Better atan2_f32
 	return f32(atan2_f64(f64(y), f64(x)));
+}
+atan2_f32le :: proc(y, x: f32le) -> f32le {
+	// TODO(bill): Better atan2_f32
+	return f32le(atan2_f64(f64(y), f64(x)));
+}
+atan2_f32be :: proc(y, x: f32be) -> f32be {
+	// TODO(bill): Better atan2_f32
+	return f32be(atan2_f64(f64(y), f64(x)));
 }
 
 atan2_f64 :: proc(y, x: f64) -> f64 {
@@ -1249,80 +1320,45 @@ atan2_f64 :: proc(y, x: f64) -> f64 {
 	}
 	return q;
 }
+atan2_f64le :: proc(y, x: f64le) -> f64le {
+	// TODO(bill): Better atan2_f32
+	return f64le(atan2_f64(f64(y), f64(x)));
+}
+atan2_f64be :: proc(y, x: f64be) -> f64be {
+	// TODO(bill): Better atan2_f32
+	return f64be(atan2_f64(f64(y), f64(x)));
+}
 
+atan2 :: proc{
+	atan2_f16, atan2_f16le, atan2_f16be,
+	atan2_f32, atan2_f32le, atan2_f32be,
+	atan2_f64, atan2_f64le, atan2_f64be,
+};
 
-atan2 :: proc{atan2_f16, atan2_f32, atan2_f64};
+atan :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+	return atan2(x, 1);
+}
 
-atan_f16 :: proc(x: f16) -> f16 {
-	return atan2_f16(x, 1);
+asin :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+	return atan2(x, 1 + sqrt(1 - x*x));
 }
-atan_f32 :: proc(x: f32) -> f32 {
-	return atan2_f32(x, 1);
-}
-atan_f64 :: proc(x: f64) -> f64 {
-	return atan2_f64(x, 1);
-}
-atan :: proc{atan_f16, atan_f32, atan_f64};
 
-asin_f16 :: proc(x: f16) -> f16 {
-	return atan2_f16(x, 1 + sqrt_f16(1 - x*x));
+acos :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+	return 2 * atan2(sqrt(1 - x), sqrt(1 + x));
 }
-asin_f32 :: proc(x: f32) -> f32 {
-	return atan2_f32(x, 1 + sqrt_f32(1 - x*x));
-}
-asin_f64 :: proc(x: f64) -> f64 {
-	return atan2_f64(x, 1 + sqrt_f64(1 - x*x));
-}
-asin :: proc{asin_f16, asin_f32, asin_f64};
 
-acos_f16 :: proc(x: f16) -> f16 {
-	return 2 * atan2_f16(sqrt_f16(1 - x), sqrt_f16(1 + x));
-}
-acos_f32 :: proc(x: f32) -> f32 {
-	return 2 * atan2_f32(sqrt_f32(1 - x), sqrt_f32(1 + x));
-}
-acos_f64 :: proc(x: f64) -> f64 {
-	return 2 * atan2_f64(sqrt_f64(1 - x), sqrt_f64(1 + x));
-}
-acos :: proc{acos_f16, acos_f32, acos_f64};
-
-
-sinh_f16 :: proc(x: f16) -> f16 {
+sinh :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
 	return (exp(x) - exp(-x))*0.5;
 }
-sinh_f32 :: proc(x: f32) -> f32 {
-	return (exp(x) - exp(-x))*0.5;
-}
-sinh_f64 :: proc(x: f64) -> f64 {
-	return (exp(x) - exp(-x))*0.5;
-}
-sinh :: proc{sinh_f16, sinh_f32, sinh_f64};
 
-cosh_f16 :: proc(x: f16) -> f16 {
+cosh :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
 	return (exp(x) + exp(-x))*0.5;
 }
-cosh_f32 :: proc(x: f32) -> f32 {
-	return (exp(x) + exp(-x))*0.5;
-}
-cosh_f64 :: proc(x: f64) -> f64 {
-	return (exp(x) + exp(-x))*0.5;
-}
-cosh :: proc{cosh_f16, cosh_f32, cosh_f64};
 
-tanh_f16 :: proc(x: f16) -> f16 {
+tanh :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
 	t := exp(2*x);
 	return (t - 1) / (t + 1);
 }
-tanh_f32 :: proc(x: f32) -> f32 {
-	t := exp(2*x);
-	return (t - 1) / (t + 1);
-}
-tanh_f64 :: proc(x: f64) -> f64 {
-	t := exp(2*x);
-	return (t - 1) / (t + 1);
-}
-tanh :: proc{tanh_f16, tanh_f32, tanh_f64};
-
 
 F16_DIG        :: 3;
 F16_EPSILON    :: 0.00097656;
