@@ -264,10 +264,9 @@ tan       :: proc{
 lerp :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
 saturate :: proc(a: $T) -> (x: T) { return clamp(a, 0, 1); };
 
-unlerp_f16 :: proc(a, b, x: f16) -> (t: f16) { return (x-a)/(b-a); }
-unlerp_f32 :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
-unlerp_f64 :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
-unlerp     :: proc{unlerp_f16, unlerp_f32, unlerp_f64};
+unlerp :: proc(a, b, x: $T) -> (t: T)  where intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
+	return (x-a)/(b-a);
+}
 
 remap :: proc(old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	old_range := old_max - old_min;
@@ -312,57 +311,105 @@ gain :: proc(t, g: $T) -> T where intrinsics.type_is_numeric(T) {
 }
 
 
-sign_f16 :: proc(x: f16) -> f16 { return f16(int(0 < x) - int(x < 0)); }
-sign_f32 :: proc(x: f32) -> f32 { return f32(int(0 < x) - int(x < 0)); }
-sign_f64 :: proc(x: f64) -> f64 { return f64(int(0 < x) - int(x < 0)); }
-sign     :: proc{sign_f16, sign_f32, sign_f64};
+sign_f16   :: proc(x: f16)   -> f16   { return f16(int(0 < x) - int(x < 0)); }
+sign_f16le :: proc(x: f16le) -> f16le { return f16le(int(0 < x) - int(x < 0)); }
+sign_f16be :: proc(x: f16be) -> f16be { return f16be(int(0 < x) - int(x < 0)); }
+sign_f32   :: proc(x: f32)   -> f32   { return f32(int(0 < x) - int(x < 0)); }
+sign_f32le :: proc(x: f32le) -> f32le { return f32le(int(0 < x) - int(x < 0)); }
+sign_f32be :: proc(x: f32be) -> f32be { return f32be(int(0 < x) - int(x < 0)); }
+sign_f64   :: proc(x: f64)   -> f64   { return f64(int(0 < x) - int(x < 0)); }
+sign_f64le :: proc(x: f64le) -> f64le { return f64le(int(0 < x) - int(x < 0)); }
+sign_f64be :: proc(x: f64be) -> f64be { return f64be(int(0 < x) - int(x < 0)); }
+sign       :: proc{
+	sign_f16, sign_f16le, sign_f16be,
+	sign_f32, sign_f32le, sign_f32be,
+	sign_f64, sign_f64le, sign_f64be,
+};
 
-
-sign_bit_f16 :: proc(x: f16) -> bool {
+sign_bit_f16 :: proc(x: f16)     -> bool {
 	return (transmute(u16)x) & (1<<15) != 0;
 }
-sign_bit_f32 :: proc(x: f32) -> bool {
+sign_bit_f16le :: proc(x: f16le) -> bool { return #force_inline sign_bit_f16(f16(x)); }
+sign_bit_f16be :: proc(x: f16be) -> bool { return #force_inline sign_bit_f16(f16(x)); }
+sign_bit_f32   :: proc(x: f32)   -> bool {
 	return (transmute(u32)x) & (1<<31) != 0;
 }
-sign_bit_f64 :: proc(x: f64) -> bool {
+sign_bit_f32le :: proc(x: f32le) -> bool { return #force_inline sign_bit_f32(f32(x)); }
+sign_bit_f32be :: proc(x: f32be) -> bool { return #force_inline sign_bit_f32(f32(x)); }
+sign_bit_f64   :: proc(x: f64)   -> bool {
 	return (transmute(u64)x) & (1<<63) != 0;
 }
-sign_bit :: proc{sign_bit_f16, sign_bit_f32, sign_bit_f64};
+sign_bit_f64le :: proc(x: f64le) -> bool { return #force_inline sign_bit_f64(f64(x)); }
+sign_bit_f64be :: proc(x: f64be) -> bool { return #force_inline sign_bit_f64(f64(x)); }
+sign_bit       :: proc{
+	sign_bit_f16, sign_bit_f16le, sign_bit_f16be,
+	sign_bit_f32, sign_bit_f32le, sign_bit_f32be,
+	sign_bit_f64, sign_bit_f64le, sign_bit_f64be,
+};
 
-copy_sign_f16 :: proc(x, y: f16) -> f16 {
+copy_sign_f16   :: proc(x, y: f16) -> f16 {
 	ix := transmute(u16)x;
 	iy := transmute(u16)y;
 	ix &= 0x7fff;
 	ix |= iy & 0x8000;
 	return transmute(f16)ix;
 }
-copy_sign_f32 :: proc(x, y: f32) -> f32 {
+copy_sign_f16le :: proc(x, y: f16le) -> f16le { return #force_inline f16le(copy_sign_f16(f16(x), f16(y))); }
+copy_sign_f16be :: proc(x, y: f16be) -> f16be { return #force_inline f16be(copy_sign_f16(f16(x), f16(y))); }
+copy_sign_f32   :: proc(x, y: f32) -> f32 {
 	ix := transmute(u32)x;
 	iy := transmute(u32)y;
 	ix &= 0x7fff_ffff;
 	ix |= iy & 0x8000_0000;
 	return transmute(f32)ix;
 }
-copy_sign_f64 :: proc(x, y: f64) -> f64 {
+copy_sign_f32le :: proc(x, y: f32le) -> f32le { return #force_inline f32le(copy_sign_f32(f32(x), f32(y))); }
+copy_sign_f32be :: proc(x, y: f32be) -> f32be { return #force_inline f32be(copy_sign_f32(f32(x), f32(y))); }
+copy_sign_f64   :: proc(x, y: f64) -> f64 {
 	ix := transmute(u64)x;
 	iy := transmute(u64)y;
 	ix &= 0x7fff_ffff_ffff_ffff;
 	ix |= iy & 0x8000_0000_0000_0000;
 	return transmute(f64)ix;
 }
-copy_sign :: proc{copy_sign_f16, copy_sign_f32, copy_sign_f64};
+copy_sign_f64le :: proc(x, y: f64le) -> f64le { return #force_inline f64le(copy_sign_f64(f64(x), f64(y))); }
+copy_sign_f64be :: proc(x, y: f64be) -> f64be { return #force_inline f64be(copy_sign_f64(f64(x), f64(y))); }
+copy_sign       :: proc{
+	copy_sign_f16, copy_sign_f16le, copy_sign_f16be,
+	copy_sign_f32, copy_sign_f32le, copy_sign_f32be,
+	copy_sign_f64, copy_sign_f64le, copy_sign_f64be,
+};
 
+to_radians_f16   :: proc(degrees: f16)   -> f16   { return degrees * RAD_PER_DEG; }
+to_radians_f16le :: proc(degrees: f16le) -> f16le { return degrees * RAD_PER_DEG; }
+to_radians_f16be :: proc(degrees: f16be) -> f16be { return degrees * RAD_PER_DEG; }
+to_radians_f32   :: proc(degrees: f32)   -> f32   { return degrees * RAD_PER_DEG; }
+to_radians_f32le :: proc(degrees: f32le) -> f32le { return degrees * RAD_PER_DEG; }
+to_radians_f32be :: proc(degrees: f32be) -> f32be { return degrees * RAD_PER_DEG; }
+to_radians_f64   :: proc(degrees: f64)   -> f64   { return degrees * RAD_PER_DEG; }
+to_radians_f64le :: proc(degrees: f64le) -> f64le { return degrees * RAD_PER_DEG; }
+to_radians_f64be :: proc(degrees: f64be) -> f64be { return degrees * RAD_PER_DEG; }
+to_degrees_f16   :: proc(radians: f16)   -> f16   { return radians * DEG_PER_RAD; }
+to_degrees_f16le :: proc(radians: f16le) -> f16le { return radians * DEG_PER_RAD; }
+to_degrees_f16be :: proc(radians: f16be) -> f16be { return radians * DEG_PER_RAD; }
+to_degrees_f32   :: proc(radians: f32)   -> f32   { return radians * DEG_PER_RAD; }
+to_degrees_f32le :: proc(radians: f32le) -> f32le { return radians * DEG_PER_RAD; }
+to_degrees_f32be :: proc(radians: f32be) -> f32be { return radians * DEG_PER_RAD; }
+to_degrees_f64   :: proc(radians: f64)   -> f64   { return radians * DEG_PER_RAD; }
+to_degrees_f64le :: proc(radians: f64le) -> f64le { return radians * DEG_PER_RAD; }
+to_degrees_f64be :: proc(radians: f64be) -> f64be { return radians * DEG_PER_RAD; }
+to_radians       :: proc{
+	to_radians_f16, to_radians_f16le, to_radians_f16be,
+	to_radians_f32, to_radians_f32le, to_radians_f32be,
+	to_radians_f64, to_radians_f64le, to_radians_f64be,
+};
+to_degrees       :: proc{
+	to_degrees_f16, to_degrees_f16le, to_degrees_f16be,
+	to_degrees_f32, to_degrees_f32le, to_degrees_f32be,
+	to_degrees_f64, to_degrees_f64le, to_degrees_f64be,
+};
 
-to_radians_f16 :: proc(degrees: f16) -> f16 { return degrees * RAD_PER_DEG; }
-to_radians_f32 :: proc(degrees: f32) -> f32 { return degrees * RAD_PER_DEG; }
-to_radians_f64 :: proc(degrees: f64) -> f64 { return degrees * RAD_PER_DEG; }
-to_degrees_f16 :: proc(radians: f16) -> f16 { return radians * DEG_PER_RAD; }
-to_degrees_f32 :: proc(radians: f32) -> f32 { return radians * DEG_PER_RAD; }
-to_degrees_f64 :: proc(radians: f64) -> f64 { return radians * DEG_PER_RAD; }
-to_radians     :: proc{to_radians_f16, to_radians_f32, to_radians_f64};
-to_degrees     :: proc{to_degrees_f16, to_degrees_f32, to_degrees_f64};
-
-trunc_f16 :: proc(x: f16) -> f16 {
+trunc_f16   :: proc(x: f16) -> f16 {
 	trunc_internal :: proc(f: f16) -> f16 {
 		mask :: 0x1f;
 		shift :: 16 - 6;
@@ -391,8 +438,10 @@ trunc_f16 :: proc(x: f16) -> f16 {
 	}
 	return trunc_internal(x);
 }
+trunc_f16le :: proc(x: f16le) -> f16le { return #force_inline f16le(trunc_f16(f16(x))); }
+trunc_f16be :: proc(x: f16be) -> f16be { return #force_inline f16be(trunc_f16(f16(x))); }
 
-trunc_f32 :: proc(x: f32) -> f32 {
+trunc_f32   :: proc(x: f32) -> f32 {
 	trunc_internal :: proc(f: f32) -> f32 {
 		mask :: 0xff;
 		shift :: 32 - 9;
@@ -421,8 +470,10 @@ trunc_f32 :: proc(x: f32) -> f32 {
 	}
 	return trunc_internal(x);
 }
+trunc_f32le :: proc(x: f32le) -> f32le { return #force_inline f32le(trunc_f32(f32(x))); }
+trunc_f32be :: proc(x: f32be) -> f32be { return #force_inline f32be(trunc_f32(f32(x))); }
 
-trunc_f64 :: proc(x: f64) -> f64 {
+trunc_f64   :: proc(x: f64) -> f64 {
 	trunc_internal :: proc(f: f64) -> f64 {
 		mask :: 0x7ff;
 		shift :: 64 - 12;
@@ -451,27 +502,64 @@ trunc_f64 :: proc(x: f64) -> f64 {
 	}
 	return trunc_internal(x);
 }
+trunc_f64le :: proc(x: f64le) -> f64le { return #force_inline f64le(trunc_f64(f64(x))); }
+trunc_f64be :: proc(x: f64be) -> f64be { return #force_inline f64be(trunc_f64(f64(x))); }
+trunc       :: proc{
+	trunc_f16, trunc_f16le, trunc_f16be,
+	trunc_f32, trunc_f32le, trunc_f32be, 
+	trunc_f64, trunc_f64le, trunc_f64be, 
+};
 
-trunc :: proc{trunc_f16, trunc_f32, trunc_f64};
-
-round_f16 :: proc(x: f16) -> f16 {
+round_f16   :: proc(x: f16)   -> f16 {
 	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
 }
-round_f32 :: proc(x: f32) -> f32 {
+round_f16le :: proc(x: f16le) -> f16le {
 	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
 }
-round_f64 :: proc(x: f64) -> f64 {
+round_f16be :: proc(x: f16be) -> f16be {
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
+}
+
+round_f32   :: proc(x: f32)   -> f32 {
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
+}
+round_f32le :: proc(x: f32le) -> f32le {
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
+}
+round_f32be :: proc(x: f32be) -> f32be {
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
+}
+round_f64   :: proc(x: f64)   -> f64 {
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
+}
+round_f64le :: proc(x: f64le) -> f64le {
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
+}
+round_f64be :: proc(x: f64be) -> f64be {
 	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
 }
 round :: proc{round_f16, round_f32, round_f64};
 
 
-ceil_f16 :: proc(x: f16) -> f16 { return -floor(-x); }
-ceil_f32 :: proc(x: f32) -> f32 { return -floor(-x); }
-ceil_f64 :: proc(x: f64) -> f64 { return -floor(-x); }
-ceil :: proc{ceil_f16, ceil_f32, ceil_f64};
+ceil_f16   :: proc(x: f16)   -> f16   { return -floor(-x); }
+ceil_f16le :: proc(x: f16le) -> f16le { return -floor(-x); }
+ceil_f16be :: proc(x: f16be) -> f16be { return -floor(-x); }
 
-floor_f16 :: proc(x: f16) -> f16 {
+ceil_f32   :: proc(x: f32)   -> f32   { return -floor(-x); }
+ceil_f32le :: proc(x: f32le) -> f32le { return -floor(-x); }
+ceil_f32be :: proc(x: f32be) -> f32be { return -floor(-x); }
+
+ceil_f64   :: proc(x: f64)   -> f64   { return -floor(-x); }
+ceil_f64le :: proc(x: f64le) -> f64le { return -floor(-x); }
+ceil_f64be :: proc(x: f64be) -> f64be { return -floor(-x); }
+
+ceil       :: proc{
+	ceil_f16, ceil_f16le, ceil_f16be,
+	ceil_f32, ceil_f32le, ceil_f32be,
+	ceil_f64, ceil_f64le, ceil_f64be,
+};
+
+floor_f16   :: proc(x: f16)   -> f16 {
 	if x == 0 || is_nan(x) || is_inf(x) {
 		return x;
 	}
@@ -485,7 +573,9 @@ floor_f16 :: proc(x: f16) -> f16 {
 	d, _ := modf(x);
 	return d;
 }
-floor_f32 :: proc(x: f32) -> f32 {
+floor_f16le :: proc(x: f16le) -> f16le { return #force_inline f16le(floor_f16(f16(x))); }
+floor_f16be :: proc(x: f16be) -> f16be { return #force_inline f16be(floor_f16(f16(x))); }
+floor_f32   :: proc(x: f32)   -> f32 {
 	if x == 0 || is_nan(x) || is_inf(x) {
 		return x;
 	}
@@ -499,7 +589,9 @@ floor_f32 :: proc(x: f32) -> f32 {
 	d, _ := modf(x);
 	return d;
 }
-floor_f64 :: proc(x: f64) -> f64 {
+floor_f32le :: proc(x: f32le) -> f32le { return #force_inline f32le(floor_f32(f32(x))); }
+floor_f32be :: proc(x: f32be) -> f32be { return #force_inline f32be(floor_f32(f32(x))); }
+floor_f64   :: proc(x: f64)   -> f64 {
 	if x == 0 || is_nan(x) || is_inf(x) {
 		return x;
 	}
@@ -513,7 +605,13 @@ floor_f64 :: proc(x: f64) -> f64 {
 	d, _ := modf(x);
 	return d;
 }
-floor :: proc{floor_f16, floor_f32, floor_f64};
+floor_f64le :: proc(x: f64le) -> f64le { return #force_inline f64le(floor_f64(f64(x))); }
+floor_f64be :: proc(x: f64be) -> f64be { return #force_inline f64be(floor_f64(f64(x))); }
+floor       :: proc{
+	floor_f16, floor_f16le, floor_f16be,
+	floor_f32, floor_f32le, floor_f32be,
+	floor_f64, floor_f64le, floor_f64be,
+};
 
 
 floor_div :: proc(x, y: $T) -> T
