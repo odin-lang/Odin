@@ -538,7 +538,11 @@ round_f64le :: proc(x: f64le) -> f64le {
 round_f64be :: proc(x: f64be) -> f64be {
 	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
 }
-round :: proc{round_f16, round_f32, round_f64};
+round       :: proc{
+	round_f16, round_f16le, round_f16be,
+	round_f32, round_f32le, round_f32be,
+	round_f64, round_f64le, round_f64be,
+};
 
 
 ceil_f16   :: proc(x: f16)   -> f16   { return -floor(-x); }
@@ -633,7 +637,7 @@ floor_mod :: proc(x, y: $T) -> T
 	return r;
 }
 
-modf_f16 :: proc(x: f16) -> (int: f16, frac: f16) {
+modf_f16   :: proc(x: f16) -> (int: f16, frac: f16) {
 	shift :: 16 - 5 - 1;
 	mask  :: 0x1f;
 	bias  :: 15;
@@ -659,7 +663,15 @@ modf_f16 :: proc(x: f16) -> (int: f16, frac: f16) {
 	frac = x - int;
 	return;
 }
-modf_f32 :: proc(x: f32) -> (int: f32, frac: f32) {
+modf_f16le :: proc(x: f16le) -> (int: f16le, frac: f16le) {
+	i, f := #force_inline modf_f16(f16(x));
+	return f16le(i), f16le(f);
+}
+modf_f16be :: proc(x: f16be) -> (int: f16be, frac: f16be) {
+	i, f := #force_inline modf_f16(f16(x));
+	return f16be(i), f16be(f);
+}
+modf_f32   :: proc(x: f32) -> (int: f32, frac: f32) {
 	shift :: 32 - 8 - 1;
 	mask  :: 0xff;
 	bias  :: 127;
@@ -685,7 +697,15 @@ modf_f32 :: proc(x: f32) -> (int: f32, frac: f32) {
 	frac = x - int;
 	return;
 }
-modf_f64 :: proc(x: f64) -> (int: f64, frac: f64) {
+modf_f32le :: proc(x: f32le) -> (int: f32le, frac: f32le) {
+	i, f := #force_inline modf_f32(f32(x));
+	return f32le(i), f32le(f);
+}
+modf_f32be :: proc(x: f32be) -> (int: f32be, frac: f32be) {
+	i, f := #force_inline modf_f32(f32(x));
+	return f32be(i), f32be(f);
+}
+modf_f64   :: proc(x: f64) -> (int: f64, frac: f64) {
 	shift :: 64 - 11 - 1;
 	mask  :: 0x7ff;
 	bias  :: 1023;
@@ -711,10 +731,22 @@ modf_f64 :: proc(x: f64) -> (int: f64, frac: f64) {
 	frac = x - int;
 	return;
 }
-modf :: proc{modf_f16, modf_f32, modf_f64};
+modf_f64le :: proc(x: f64le) -> (int: f64le, frac: f64le) {
+	i, f := #force_inline modf_f64(f64(x));
+	return f64le(i), f64le(f);
+}
+modf_f64be :: proc(x: f64be) -> (int: f64be, frac: f64be) {
+	i, f := #force_inline modf_f64(f64(x));
+	return f64be(i), f64be(f);
+}
+modf       :: proc{
+	modf_f16, modf_f16le, modf_f16be,
+	modf_f32, modf_f32le, modf_f32be,
+	modf_f64, modf_f64le, modf_f64be,
+};
 split_decimal :: modf;
 
-mod_f16 :: proc(x, y: f16) -> (n: f16) {
+mod_f16   :: proc(x, y: f16) -> (n: f16) {
 	z := abs(y);
 	n = remainder(abs(x), z);
 	if sign(n) < 0 {
@@ -722,7 +754,9 @@ mod_f16 :: proc(x, y: f16) -> (n: f16) {
 	}
 	return copy_sign(n, x);
 }
-mod_f32 :: proc(x, y: f32) -> (n: f32) {
+mod_f16le :: proc(x, y: f16le) -> (n: f16le) { return #force_inline f16le(mod_f16(f16(x), f16(y))); }
+mod_f16be :: proc(x, y: f16be) -> (n: f16be) { return #force_inline f16be(mod_f16(f16(x), f16(y))); }
+mod_f32   :: proc(x, y: f32)   -> (n: f32) {
 	z := abs(y);
 	n = remainder(abs(x), z);
 	if sign(n) < 0 {
@@ -730,7 +764,9 @@ mod_f32 :: proc(x, y: f32) -> (n: f32) {
 	}
 	return copy_sign(n, x);
 }
-mod_f64 :: proc(x, y: f64) -> (n: f64) {
+mod_f32le :: proc(x, y: f32le) -> (n: f32le) { return #force_inline f32le(mod_f32(f32(x), f32(y))); }
+mod_f32be :: proc(x, y: f32be) -> (n: f32be) { return #force_inline f32be(mod_f32(f32(x), f32(y))); }
+mod_f64   :: proc(x, y: f64)   -> (n: f64) {
 	z := abs(y);
 	n = remainder(abs(x), z);
 	if sign(n) < 0 {
@@ -738,14 +774,28 @@ mod_f64 :: proc(x, y: f64) -> (n: f64) {
 	}
 	return copy_sign(n, x);
 }
-mod :: proc{mod_f16, mod_f32, mod_f64};
+mod_f64le :: proc(x, y: f64le) -> (n: f64le) { return #force_inline f64le(mod_f64(f64(x), f64(y))); }
+mod_f64be :: proc(x, y: f64be) -> (n: f64be) { return #force_inline f64be(mod_f64(f64(x), f64(y))); }
+mod       :: proc{
+	mod_f16, mod_f16le, mod_f16be,
+	mod_f32, mod_f32le, mod_f32be,
+	mod_f64, mod_f64le, mod_f64be,
+};
 
-remainder_f16 :: proc(x, y: f16) -> f16 { return x - round(x/y) * y; }
-remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
-remainder_f64 :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
-remainder :: proc{remainder_f16, remainder_f32, remainder_f64};
-
-
+remainder_f16   :: proc(x, y: f16  ) -> f16   { return x - round(x/y) * y; }
+remainder_f16le :: proc(x, y: f16le) -> f16le { return x - round(x/y) * y; }
+remainder_f16be :: proc(x, y: f16be) -> f16be { return x - round(x/y) * y; }
+remainder_f32   :: proc(x, y: f32  ) -> f32   { return x - round(x/y) * y; }
+remainder_f32le :: proc(x, y: f32le) -> f32le { return x - round(x/y) * y; }
+remainder_f32be :: proc(x, y: f32be) -> f32be { return x - round(x/y) * y; }
+remainder_f64   :: proc(x, y: f64  ) -> f64   { return x - round(x/y) * y; }
+remainder_f64le :: proc(x, y: f64le) -> f64le { return x - round(x/y) * y; }
+remainder_f64be :: proc(x, y: f64be) -> f64be { return x - round(x/y) * y; }
+remainder       :: proc{
+	remainder_f16, remainder_f16le, remainder_f16be,
+	remainder_f32, remainder_f32le, remainder_f32be,
+	remainder_f64, remainder_f64le, remainder_f64be,
+};
 
 gcd :: proc(x, y: $T) -> T
 	where intrinsics.type_is_ordered_numeric(T) {
@@ -762,13 +812,29 @@ lcm :: proc(x, y: $T) -> T
 	return x / gcd(x, y) * y;
 }
 
-frexp_f16 :: proc(x: f16) -> (significand: f16, exponent: int) {
+frexp_f16   :: proc(x: f16)   -> (significand: f16,   exponent: int) {
 	f, e := frexp_f64(f64(x));
 	return f16(f), e;
 }
-frexp_f32 :: proc(x: f32) -> (significand: f32, exponent: int) {
+frexp_f16le :: proc(x: f16le) -> (significand: f16le, exponent: int) {
+	f, e := frexp_f64(f64(x));
+	return f16le(f), e;
+}
+frexp_f16be :: proc(x: f16be) -> (significand: f16be, exponent: int) {
+	f, e := frexp_f64(f64(x));
+	return f16be(f), e;
+}
+frexp_f32 :: proc(x: f32)     -> (significand: f32,   exponent: int) {
 	f, e := frexp_f64(f64(x));
 	return f32(f), e;
+}
+frexp_f32le :: proc(x: f32le) -> (significand: f32le, exponent: int) {
+	f, e := frexp_f64(f64(x));
+	return f32le(f), e;
+}
+frexp_f32be :: proc(x: f32be) -> (significand: f32be, exponent: int) {
+	f, e := frexp_f64(f64(x));
+	return f32be(f), e;
 }
 frexp_f64 :: proc(x: f64) -> (significand: f64, exponent: int) {
 	switch {
@@ -790,7 +856,19 @@ frexp_f64 :: proc(x: f64) -> (significand: f64, exponent: int) {
 	}
 	return;
 }
-frexp :: proc{frexp_f16, frexp_f32, frexp_f64};
+frexp_f64le :: proc(x: f64le) -> (significand: f64le, exponent: int) {
+	f, e := frexp_f64(f64(x));
+	return f64le(f), e;
+}
+frexp_f64be :: proc(x: f64be) -> (significand: f64be, exponent: int) {
+	f, e := frexp_f64(f64(x));
+	return f64be(f), e;
+}
+frexp       :: proc{
+	frexp_f16, frexp_f16le, frexp_f16be,
+	frexp_f32, frexp_f32le, frexp_f32be,
+	frexp_f64, frexp_f64le, frexp_f64be, 
+};
 
 
 
