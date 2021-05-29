@@ -96,36 +96,170 @@ foreign _ {
 	ldexp_f64 :: proc(val: f64, exp: i32) -> f64 ---;
 }
 
-sqrt      :: proc{sqrt_f16,    sqrt_f32,    sqrt_f64};
-sin       :: proc{sin_f16,     sin_f32,     sin_f64};
-cos       :: proc{cos_f16,     cos_f32,     cos_f64};
-pow       :: proc{pow_f16,     pow_f32,     pow_f64};
-fmuladd   :: proc{fmuladd_f16, fmuladd_f32, fmuladd_f64};
-ln        :: proc{ln_f16,      ln_f32,      ln_f64};
-exp       :: proc{exp_f16,     exp_f32,     exp_f64};
+sqrt_f16le :: proc(x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))); }
+sqrt_f16be :: proc(x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))); }
+sqrt_f32le :: proc(x: f32le) -> f32le { return #force_inline f32le(sqrt_f32(f32(x))); }
+sqrt_f32be :: proc(x: f32be) -> f32be { return #force_inline f32be(sqrt_f32(f32(x))); }
+sqrt_f64le :: proc(x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))); }
+sqrt_f64be :: proc(x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))); }
+sqrt       :: proc{
+	sqrt_f16, sqrt_f16le, sqrt_f16be,
+	sqrt_f32, sqrt_f32le, sqrt_f32be,
+	sqrt_f64, sqrt_f64le, sqrt_f64be,
+};
 
-ldexp :: proc{ldexp_f16, ldexp_f32, ldexp_f64};
+sin_f16le :: proc(θ: f16le) -> f16le { return #force_inline f16le(sin_f16(f16(θ))); }
+sin_f16be :: proc(θ: f16be) -> f16be { return #force_inline f16be(sin_f16(f16(θ))); }
+sin_f32le :: proc(θ: f32le) -> f32le { return #force_inline f32le(sin_f32(f32(θ))); }
+sin_f32be :: proc(θ: f32be) -> f32be { return #force_inline f32be(sin_f32(f32(θ))); }
+sin_f64le :: proc(θ: f64le) -> f64le { return #force_inline f64le(sin_f64(f64(θ))); }
+sin_f64be :: proc(θ: f64be) -> f64be { return #force_inline f64be(sin_f64(f64(θ))); }
+sin       :: proc{
+	sin_f16, sin_f16le, sin_f16be,
+	sin_f32, sin_f32le, sin_f32be,
+	sin_f64, sin_f64le, sin_f64be,
+};
 
-log_f16 :: proc(x, base: f16) -> f16 { return ln(x) / ln(base); }
-log_f32 :: proc(x, base: f32) -> f32 { return ln(x) / ln(base); }
-log_f64 :: proc(x, base: f64) -> f64 { return ln(x) / ln(base); }
-log     :: proc{log_f16, log_f32, log_f64};
+cos_f16le :: proc(θ: f16le) -> f16le { return #force_inline f16le(cos_f16(f16(θ))); }
+cos_f16be :: proc(θ: f16be) -> f16be { return #force_inline f16be(cos_f16(f16(θ))); }
+cos_f32le :: proc(θ: f32le) -> f32le { return #force_inline f32le(cos_f32(f32(θ))); }
+cos_f32be :: proc(θ: f32be) -> f32be { return #force_inline f32be(cos_f32(f32(θ))); }
+cos_f64le :: proc(θ: f64le) -> f64le { return #force_inline f64le(cos_f64(f64(θ))); }
+cos_f64be :: proc(θ: f64be) -> f64be { return #force_inline f64be(cos_f64(f64(θ))); }
+cos       :: proc{
+	cos_f16, cos_f16le, cos_f16be,
+	cos_f32, cos_f32le, cos_f32be,
+	cos_f64, cos_f64le, cos_f64be,
+};
 
-log2_f16 :: proc(x: f16) -> f16 { return ln(x)/LN2; }
-log2_f32 :: proc(x: f32) -> f32 { return ln(x)/LN2; }
-log2_f64 :: proc(x: f64) -> f64 { return ln(x)/LN2; }
-log2     :: proc{log2_f16, log2_f32, log2_f64};
+pow_f16le :: proc(x, power: f16le) -> f16le { return #force_inline f16le(pow_f16(f16(x), f16(power))); }
+pow_f16be :: proc(x, power: f16be) -> f16be { return #force_inline f16be(pow_f16(f16(x), f16(power))); }
+pow_f32le :: proc(x, power: f32le) -> f32le { return #force_inline f32le(pow_f32(f32(x), f32(power))); }
+pow_f32be :: proc(x, power: f32be) -> f32be { return #force_inline f32be(pow_f32(f32(x), f32(power))); }
+pow_f64le :: proc(x, power: f64le) -> f64le { return #force_inline f64le(pow_f64(f64(x), f64(power))); }
+pow_f64be :: proc(x, power: f64be) -> f64be { return #force_inline f64be(pow_f64(f64(x), f64(power))); }
+pow       :: proc{
+	pow_f16, pow_f16le, pow_f16be,
+	pow_f32, pow_f32le, pow_f32be,
+	pow_f64, pow_f64le, pow_f64be,
+};
 
-log10_f16 :: proc(x: f16) -> f16 { return ln(x)/LN10; }
-log10_f32 :: proc(x: f32) -> f32 { return ln(x)/LN10; }
-log10_f64 :: proc(x: f64) -> f64 { return ln(x)/LN10; }
-log10     :: proc{log10_f16, log10_f32, log10_f64};
+fmuladd_f16le :: proc(a, b, c: f16le) -> f16le { return #force_inline f16le(fmuladd_f16(f16(a), f16(b), f16(c))); }
+fmuladd_f16be :: proc(a, b, c: f16be) -> f16be { return #force_inline f16be(fmuladd_f16(f16(a), f16(b), f16(c))); }
+fmuladd_f32le :: proc(a, b, c: f32le) -> f32le { return #force_inline f32le(fmuladd_f32(f32(a), f32(b), f32(c))); }
+fmuladd_f32be :: proc(a, b, c: f32be) -> f32be { return #force_inline f32be(fmuladd_f32(f32(a), f32(b), f32(c))); }
+fmuladd_f64le :: proc(a, b, c: f64le) -> f64le { return #force_inline f64le(fmuladd_f64(f64(a), f64(b), f64(c))); }
+fmuladd_f64be :: proc(a, b, c: f64be) -> f64be { return #force_inline f64be(fmuladd_f64(f64(a), f64(b), f64(c))); }
+fmuladd       :: proc{
+	fmuladd_f16, fmuladd_f16le, fmuladd_f16be,
+	fmuladd_f32, fmuladd_f32le, fmuladd_f32be,
+	fmuladd_f64, fmuladd_f64le, fmuladd_f64be,
+};
+
+ln_f16le :: proc(x: f16le) -> f16le { return #force_inline f16le(ln_f16(f16(x))); }
+ln_f16be :: proc(x: f16be) -> f16be { return #force_inline f16be(ln_f16(f16(x))); }
+ln_f32le :: proc(x: f32le) -> f32le { return #force_inline f32le(ln_f32(f32(x))); }
+ln_f32be :: proc(x: f32be) -> f32be { return #force_inline f32be(ln_f32(f32(x))); }
+ln_f64le :: proc(x: f64le) -> f64le { return #force_inline f64le(ln_f64(f64(x))); }
+ln_f64be :: proc(x: f64be) -> f64be { return #force_inline f64be(ln_f64(f64(x))); }
+ln       :: proc{
+	ln_f16, ln_f16le, ln_f16be,
+	ln_f32, ln_f32le, ln_f32be,
+	ln_f64, ln_f64le, ln_f64be,
+};
+
+exp_f16le :: proc(x: f16le) -> f16le { return #force_inline f16le(exp_f16(f16(x))); }
+exp_f16be :: proc(x: f16be) -> f16be { return #force_inline f16be(exp_f16(f16(x))); }
+exp_f32le :: proc(x: f32le) -> f32le { return #force_inline f32le(exp_f32(f32(x))); }
+exp_f32be :: proc(x: f32be) -> f32be { return #force_inline f32be(exp_f32(f32(x))); }
+exp_f64le :: proc(x: f64le) -> f64le { return #force_inline f64le(exp_f64(f64(x))); }
+exp_f64be :: proc(x: f64be) -> f64be { return #force_inline f64be(exp_f64(f64(x))); }
+exp       :: proc{
+	exp_f16, exp_f16le, exp_f16be,
+	exp_f32, exp_f32le, exp_f32be,
+	exp_f64, exp_f64le, exp_f64be,
+};
+
+ldexp_f16le :: proc(val: f16le, exp: i32) -> f16le { return #force_inline f16le(ldexp_f16(f16(val), exp)); }
+ldexp_f16be :: proc(val: f16be, exp: i32) -> f16be { return #force_inline f16be(ldexp_f16(f16(val), exp)); }
+ldexp_f32le :: proc(val: f32le, exp: i32) -> f32le { return #force_inline f32le(ldexp_f32(f32(val), exp)); }
+ldexp_f32be :: proc(val: f32be, exp: i32) -> f32be { return #force_inline f32be(ldexp_f32(f32(val), exp)); }
+ldexp_f64le :: proc(val: f64le, exp: i32) -> f64le { return #force_inline f64le(ldexp_f64(f64(val), exp)); }
+ldexp_f64be :: proc(val: f64be, exp: i32) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp)); }
+ldexp       :: proc{
+	ldexp_f16, ldexp_f16le, ldexp_f16be,
+	ldexp_f32, ldexp_f32le, ldexp_f32be,
+	ldexp_f64, ldexp_f64le, ldexp_f64be,
+};
 
 
-tan_f16 :: proc(θ: f16) -> f16 { return sin(θ)/cos(θ); }
-tan_f32 :: proc(θ: f32) -> f32 { return sin(θ)/cos(θ); }
-tan_f64 :: proc(θ: f64) -> f64 { return sin(θ)/cos(θ); }
-tan     :: proc{tan_f16, tan_f32, tan_f64};
+log_f16   :: proc(x, base: f16)   -> f16   { return ln(x) / ln(base); }
+log_f16le :: proc(x, base: f16le) -> f16le { return f16le(log_f16(f16(x), f16(base))); }
+log_f16be :: proc(x, base: f16be) -> f16be { return f16be(log_f16(f16(x), f16(base))); }
+
+log_f32   :: proc(x, base: f32)   -> f32   { return ln(x) / ln(base); }
+log_f32le :: proc(x, base: f32le) -> f32le { return f32le(log_f32(f32(x), f32(base))); }
+log_f32be :: proc(x, base: f32be) -> f32be { return f32be(log_f32(f32(x), f32(base))); }
+
+log_f64   :: proc(x, base: f64)   -> f64   { return ln(x) / ln(base); }
+log_f64le :: proc(x, base: f64le) -> f64le { return f64le(log_f64(f64(x), f64(base))); }
+log_f64be :: proc(x, base: f64be) -> f64be { return f64be(log_f64(f64(x), f64(base))); }
+log       :: proc{
+	log_f16, log_f16le, log_f16be,
+	log_f32, log_f32le, log_f32be,
+	log_f64, log_f64le, log_f64be,
+};
+
+log2_f16   :: proc(x: f16)   -> f16   { return ln(x)/LN2; }
+log2_f16le :: proc(x: f16le) -> f16le { return f16le(log2_f16(f16(x))); }
+log2_f16be :: proc(x: f16be) -> f16be { return f16be(log2_f16(f16(x))); }
+
+log2_f32   :: proc(x: f32)   -> f32   { return ln(x)/LN2; }
+log2_f32le :: proc(x: f32le) -> f32le { return f32le(log2_f32(f32(x))); }
+log2_f32be :: proc(x: f32be) -> f32be { return f32be(log2_f32(f32(x))); }
+
+log2_f64   :: proc(x: f64)   -> f64   { return ln(x)/LN2; }
+log2_f64le :: proc(x: f64le) -> f64le { return f64le(log2_f64(f64(x))); }
+log2_f64be :: proc(x: f64be) -> f64be { return f64be(log2_f64(f64(x))); }
+log2       :: proc{
+	log2_f16, log2_f16le, log2_f16be,
+	log2_f32, log2_f32le, log2_f32be,
+	log2_f64, log2_f64le, log2_f64be,
+};
+
+log10_f16   :: proc(x: f16)   -> f16   { return ln(x)/LN10; }
+log10_f16le :: proc(x: f16le) -> f16le { return f16le(log10_f16(f16(x))); }
+log10_f16be :: proc(x: f16be) -> f16be { return f16be(log10_f16(f16(x))); }
+
+log10_f32   :: proc(x: f32)   -> f32   { return ln(x)/LN10; }
+log10_f32le :: proc(x: f32le) -> f32le { return f32le(log10_f32(f32(x))); }
+log10_f32be :: proc(x: f32be) -> f32be { return f32be(log10_f32(f32(x))); }
+
+log10_f64   :: proc(x: f64)   -> f64   { return ln(x)/LN10; }
+log10_f64le :: proc(x: f64le) -> f64le { return f64le(log10_f64(f64(x))); }
+log10_f64be :: proc(x: f64be) -> f64be { return f64be(log10_f64(f64(x))); }
+log10       :: proc{
+	log10_f16, log10_f16le, log10_f16be,
+	log10_f32, log10_f32le, log10_f32be,
+	log10_f64, log10_f64le, log10_f64be,
+};
+
+tan_f16   :: proc(θ: f16)   -> f16   { return sin(θ)/cos(θ); }
+tan_f16le :: proc(θ: f16le) -> f16le { return f16le(tan_f16(f16(θ))); }
+tan_f16be :: proc(θ: f16be) -> f16be { return f16be(tan_f16(f16(θ))); }
+
+tan_f32   :: proc(θ: f32)   -> f32   { return sin(θ)/cos(θ); }
+tan_f32le :: proc(θ: f32le) -> f32le { return f32le(tan_f32(f32(θ))); }
+tan_f32be :: proc(θ: f32be) -> f32be { return f32be(tan_f32(f32(θ))); }
+
+tan_f64   :: proc(θ: f64)   -> f64   { return sin(θ)/cos(θ); }
+tan_f64le :: proc(θ: f64le) -> f64le { return f64le(tan_f64(f64(θ))); }
+tan_f64be :: proc(θ: f64be) -> f64be { return f64be(tan_f64(f64(θ))); }
+tan       :: proc{
+	tan_f16, tan_f16le, tan_f16be,
+	tan_f32, tan_f32le, tan_f32be,
+	tan_f64, tan_f64le, tan_f64be,
+};
 
 lerp :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
 saturate :: proc(a: $T) -> (x: T) { return clamp(a, 0, 1); };
@@ -135,6 +269,14 @@ unlerp_f32 :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
 unlerp_f64 :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 unlerp     :: proc{unlerp_f16, unlerp_f32, unlerp_f64};
 
+remap :: proc(old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	old_range := old_max - old_min;
+	new_range := new_max - new_min;
+	if old_range == 0 {
+		return new_range / 2;
+	}
+	return ((old_value - old_min) / old_range) * new_range + new_min;
+}
 
 wrap :: proc(x, y: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	tmp := mod(x, y);
@@ -709,6 +851,13 @@ is_inf_f16 :: proc(x: f16, sign: int = 0) -> bool {
 	}
 	return class == .Inf || class == .Neg_Inf;
 }
+is_inf_f16le :: proc(x: f16le, sign: int = 0) -> bool {
+	return #force_inline is_inf_f16(f16(x), sign);
+}
+is_inf_f16be :: proc(x: f16be, sign: int = 0) -> bool {
+	return #force_inline is_inf_f16(f16(x), sign);
+}
+
 is_inf_f32 :: proc(x: f32, sign: int = 0) -> bool {
 	class := classify(abs(x));
 	switch {
@@ -719,6 +868,13 @@ is_inf_f32 :: proc(x: f32, sign: int = 0) -> bool {
 	}
 	return class == .Inf || class == .Neg_Inf;
 }
+is_inf_f32le :: proc(x: f32le, sign: int = 0) -> bool {
+	return #force_inline is_inf_f32(f32(x), sign);
+}
+is_inf_f32be :: proc(x: f32be, sign: int = 0) -> bool {
+	return #force_inline is_inf_f32(f32(x), sign);
+}
+
 is_inf_f64 :: proc(x: f64, sign: int = 0) -> bool {
 	class := classify(abs(x));
 	switch {
@@ -729,8 +885,17 @@ is_inf_f64 :: proc(x: f64, sign: int = 0) -> bool {
 	}
 	return class == .Inf || class == .Neg_Inf;
 }
-is_inf :: proc{is_inf_f16, is_inf_f32, is_inf_f64};
-
+is_inf_f64le :: proc(x: f64le, sign: int = 0) -> bool {
+	return #force_inline is_inf_f64(f64(x), sign);
+}
+is_inf_f64be :: proc(x: f64be, sign: int = 0) -> bool {
+	return #force_inline is_inf_f64(f64(x), sign);
+}
+is_inf :: proc{
+	is_inf_f16, is_inf_f16le, is_inf_f16be,
+	is_inf_f32, is_inf_f32le, is_inf_f32be,
+	is_inf_f64, is_inf_f64le, is_inf_f64be,
+};
 
 inf_f16 :: proc(sign: int) -> f16 {
 	return f16(inf_f16(sign));
@@ -758,8 +923,6 @@ nan_f64 :: proc() -> f64 {
 	v: u64 = 0x7ff80000_00000001;
 	return transmute(f64)v;
 }
-
-
 
 is_power_of_two :: proc(x: int) -> bool {
 	return x > 0 && (x & (x-1)) == 0;
