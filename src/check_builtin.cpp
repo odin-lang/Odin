@@ -1406,6 +1406,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(operand->type);
+				if (are_types_identical(bt, t_f16))        add_package_dependency(c, "runtime", "abs_f16");
 				if (are_types_identical(bt, t_f32))        add_package_dependency(c, "runtime", "abs_f32");
 				if (are_types_identical(bt, t_f64))        add_package_dependency(c, "runtime", "abs_f64");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
