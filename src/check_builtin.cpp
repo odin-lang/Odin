@@ -2148,6 +2148,107 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_ptr_offset:
+		{
+			Operand ptr = {};
+			Operand offset = {};
+			check_expr(c, &ptr, ce->args[0]);
+			check_expr(c, &offset, ce->args[1]);
+			if (ptr.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+			if (offset.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = ptr.type;
+
+			if (!is_type_pointer(ptr.type)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (are_types_identical(core_type(ptr.type), t_rawptr)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(offset.type)) {
+				gbString str = type_to_string(offset.type);
+				error(offset.expr, "Expected an integer value for the offset parameter for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+		}
+		break;
+	case BuiltinProc_ptr_sub:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand ptr0 = {};
+			Operand ptr1 = {};
+			check_expr(c, &ptr0, ce->args[0]);
+			check_expr(c, &ptr1, ce->args[1]);
+			if (ptr0.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+			if (ptr1.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_int;
+
+			if (!is_type_pointer(ptr0.type)) {
+				gbString str = type_to_string(ptr0.type);
+				error(ptr0.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (are_types_identical(core_type(ptr0.type), t_rawptr)) {
+				gbString str = type_to_string(ptr0.type);
+				error(ptr0.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (!is_type_pointer(ptr1.type)) {
+				gbString str = type_to_string(ptr1.type);
+				error(ptr1.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (are_types_identical(core_type(ptr1.type), t_rawptr)) {
+				gbString str = type_to_string(ptr1.type);
+				error(ptr1.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (!are_types_identical(ptr0.type, ptr1.type)) {
+				gbString xts = type_to_string(ptr0.type);
+				gbString yts = type_to_string(ptr1.type);
+				error(ptr0.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
+
+		}
+		break;
+
 
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:

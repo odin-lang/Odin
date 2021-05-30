@@ -9580,6 +9580,37 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return {};
 		}
 
+	case BuiltinProc_ptr_offset:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+			lbValue len = lb_build_expr(p, ce->args[1]);
+			len = lb_emit_conv(p, len, t_int);
+
+			LLVMValueRef indices[1] = {
+				len.value,
+			};
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildGEP(p->builder, ptr.value, indices, gb_count_of(indices), "");
+			return res;
+		}
+	case BuiltinProc_ptr_sub:
+		{
+			lbValue ptr0 = lb_build_expr(p, ce->args[0]);
+			lbValue ptr1 = lb_build_expr(p, ce->args[1]);
+
+			LLVMTypeRef type_int = lb_type(p->module, t_int);
+			LLVMValueRef diff = LLVMBuildPtrDiff(p->builder, ptr0.value, ptr1.value, "");
+			diff = LLVMBuildIntCast2(p->builder, diff, type_int, /*signed*/true, "");
+
+			lbValue res = {};
+			res.type = t_int;
+			res.value = diff;
+			return res;
+		}
+
+
 
 	case BuiltinProc_atomic_fence:
 		LLVMBuildFence(p->builder, LLVMAtomicOrderingSequentiallyConsistent, false, "");
