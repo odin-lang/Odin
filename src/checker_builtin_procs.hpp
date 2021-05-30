@@ -62,6 +62,9 @@ enum BuiltinProcId {
 	BuiltinProc_mem_copy_non_overlapping,
 	BuiltinProc_mem_zero,
 
+	BuiltinProc_ptr_offset,
+	BuiltinProc_ptr_sub,
+
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
 
@@ -289,6 +292,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("mem_copy"),                 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("mem_copy_non_overlapping"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("mem_zero"),                 2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("ptr_offset"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("ptr_sub"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
