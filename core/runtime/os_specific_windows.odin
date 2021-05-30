@@ -2,6 +2,8 @@
 //+build windows
 package runtime
 
+import "intrinsics"
+
 foreign import kernel32 "system:Kernel32.lib"
 
 @(private="file")
@@ -108,12 +110,12 @@ _windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, ol
 
 	allocated_mem: rawptr;
 	if old_ptr != nil {
-		original_old_ptr := ptr_offset((^rawptr)(old_ptr), -1)^;
+		original_old_ptr := intrinsics.ptr_offset((^rawptr)(old_ptr), -1)^;
 		allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr));
 	} else {
 		allocated_mem = heap_alloc(space+size_of(rawptr));
 	}
-	aligned_mem := rawptr(ptr_offset((^u8)(allocated_mem), size_of(rawptr)));
+	aligned_mem := rawptr(intrinsics.ptr_offset((^u8)(allocated_mem), size_of(rawptr)));
 
 	ptr := uintptr(aligned_mem);
 	aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a);
@@ -123,7 +125,7 @@ _windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, ol
 	}
 
 	aligned_mem = rawptr(aligned_ptr);
-	ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem;
+	intrinsics.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem;
 
 	return byte_slice(aligned_mem, size), nil;
 }
@@ -135,7 +137,7 @@ _windows_default_alloc :: proc "contextless" (size, alignment: int) -> ([]byte, 
 
 _windows_default_free :: proc "contextless" (ptr: rawptr) {
 	if ptr != nil {
-		heap_free(ptr_offset((^rawptr)(ptr), -1)^);
+		heap_free(intrinsics.ptr_offset((^rawptr)(ptr), -1)^);
 	}
 }
 
