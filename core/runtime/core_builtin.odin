@@ -17,7 +17,7 @@ init_global_temporary_allocator :: proc(size: int, backup_allocator := context.a
 copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 {
-		mem_copy(raw_data(dst), raw_data(src), n*size_of(E));
+		intrinsics.mem_copy(raw_data(dst), raw_data(src), n*size_of(E));
 	}
 	return n;
 }
@@ -25,7 +25,7 @@ copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 {
-		mem_copy(raw_data(dst), raw_data(src), n);
+		intrinsics.mem_copy(raw_data(dst), raw_data(src), n);
 	}
 	return n;
 }
@@ -285,22 +285,18 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 		return;
 	}
 
-	arg_len := 1;
-
-	if cap(array) < len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len);
+	if cap(array) < len(array)+1 {
+		cap := 2 * cap(array) + max(8, 1);
 		_ = reserve(array, cap, loc);
 	}
-	arg_len = min(cap(array)-len(array), arg_len);
-	if arg_len > 0 {
+	if cap(array)-len(array) > 0 {
 		a := (^Raw_Dynamic_Array)(array);
-		if size_of(E) != 0 {
+		when size_of(E) != 0 {
 			data := (^E)(a.data);
-			assert(data != nil);
-			val := arg;
-			mem_copy(ptr_offset(data, a.len), &val, size_of(E));
+			assert(condition=data != nil, loc=loc);
+			intrinsics.ptr_offset(data, a.len)^ = arg;
 		}
-		a.len += arg_len;
+		a.len += 1;
 	}
 }
 
@@ -323,10 +319,10 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
 		a := (^Raw_Dynamic_Array)(array);
-		if size_of(E) != 0 {
+		when size_of(E) != 0 {
 			data := (^E)(a.data);
-			assert(data != nil);
-			mem_copy(ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+			assert(condition=data != nil, loc=loc);
+			intrinsics.mem_copy(intrinsics.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		}
 		a.len += arg_len;
 	}
