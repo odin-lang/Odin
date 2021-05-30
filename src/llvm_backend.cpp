@@ -3483,6 +3483,40 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	return v;
 }
 
+void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment) {
+	bool is_inlinable = false;
+
+	i64 const_len = 0;
+	if (LLVMIsConstant(len)) {
+		const_len = cast(i64)LLVMConstIntGetSExtValue(len);
+		// TODO(bill): Determine when it is better to do the `*.inline` versions
+		if (const_len <= 4*build_context.word_size) {
+			is_inlinable = true;
+		}
+	}
+
+	char const *name = "llvm.memset";
+	if (is_inlinable) {
+		name = "llvm.memset.inline";
+	}
+
+	LLVMTypeRef types[2] = {
+		lb_type(p->module, t_rawptr),
+		lb_type(p->module, t_int)
+	};
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]), LLVMPrintTypeToString(types[2]));
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	LLVMValueRef args[4] = {};
+	args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
+	args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
+	args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
+	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, false); // is_volatile parameter
+
+	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+}
+
 void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment) {
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 
@@ -3493,10 +3527,8 @@ void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alig
 	case LLVMArrayTypeKind:
 		{
 			// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
-			LLVMTypeRef type_i8 = LLVMInt8TypeInContext(p->module->ctx);
-			LLVMTypeRef type_i32 = LLVMInt32TypeInContext(p->module->ctx);
 			i32 sz = cast(i32)type_size_of(type);
-			LLVMBuildMemSet(p->builder, ptr, LLVMConstNull(type_i8), LLVMConstInt(type_i32, sz, false), alignment);
+			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment);
 		}
 		break;
 	default:
@@ -4953,10 +4985,12 @@ lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, A
 	p->copy_elision_hint.used = false;
 	p->copy_elision_hint.ptr = {};
 	p->copy_elision_hint.ast = nullptr;
+#if 0
 	if (addr.kind == lbAddr_Default && addr.addr.value != nullptr) {
 		p->copy_elision_hint.ptr = lb_addr_get_ptr(p, addr);
 		p->copy_elision_hint.ast = unparen_expr(ast);
 	}
+#endif
 	return prev;
 }
 
@@ -5056,12 +5090,12 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 				array_add(&inits, v);
 			}
 		} else {
-			// auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
+			auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
 			lbValue init = lb_build_expr(p, rhs);
 			if (p->copy_elision_hint.used) {
 				lvals[inits.count] = {}; // zero lval
 			}
-			// lb_reset_copy_elision_hint(p, prev_hint);
+			lb_reset_copy_elision_hint(p, prev_hint);
 			array_add(&inits, init);
 		}
 	}
@@ -9485,10 +9519,33 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			src = lb_emit_conv(p, src, t_rawptr);
 			len = lb_emit_conv(p, len, t_int);
 
+			bool is_inlinable = false;
+
+			if (ce->args[2]->tav.mode == Addressing_Constant) {
+				ExactValue ev = exact_value_to_integer(ce->args[2]->tav.value);
+				i64 const_len = exact_value_to_i64(ev);
+				// TODO(bill): Determine when it is better to do the `*.inline` versions
+				if (const_len <= 4*build_context.word_size) {
+					is_inlinable = true;
+				}
+			}
+
 			char const *name = nullptr;
 			switch (id) {
-			case BuiltinProc_mem_copy:                 name = "llvm.memmove"; break;
-			case BuiltinProc_mem_copy_non_overlapping: name = "llvm.memcpy";  break;
+			case BuiltinProc_mem_copy:
+				if (is_inlinable) {
+					name = "llvm.memmove.inline";
+				} else {
+					name = "llvm.memmove";
+				}
+				break;
+			case BuiltinProc_mem_copy_non_overlapping:
+				if (is_inlinable) {
+					name = "llvm.memcpy.line";
+				} else {
+					name = "llvm.memcpy";
+				}
+				break;
 			}
 
 			LLVMTypeRef types[3] = {
@@ -9518,10 +9575,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			ptr = lb_emit_conv(p, ptr, t_rawptr);
 			len = lb_emit_conv(p, len, t_int);
 
-			LLVMTypeRef type_i8 = LLVMInt8TypeInContext(p->module->ctx);
 			unsigned alignment = 1;
-			LLVMBuildMemSet(p->builder, ptr.value, LLVMConstNull(type_i8), len.value, alignment);
-
+			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment);
 			return {};
 		}
 
