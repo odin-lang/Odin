@@ -1181,15 +1181,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 			}
 
-
-			{
-				Type *bt = base_type(operands[0].type);
-				if (are_types_identical(bt, t_f16)) add_package_dependency(c, "runtime", "min_f16");
-				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "min_f32");
-				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "min_f64");
-
-				operand->type = operands[0].type;
-			}
+			operand->type = operands[0].type;
 		}
 		break;
 	}
@@ -1363,14 +1355,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 			}
 
-			{
-				Type *bt = base_type(operands[0].type);
-				if (are_types_identical(bt, t_f16)) add_package_dependency(c, "runtime", "max_f16");
-				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "max_f32");
-				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "max_f64");
-
-				operand->type = operands[0].type;
-			}
+			operand->type = operands[0].type;
 		}
 		break;
 	}
@@ -1408,9 +1393,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(operand->type);
-				if (are_types_identical(bt, t_f16))        add_package_dependency(c, "runtime", "abs_f16");
-				if (are_types_identical(bt, t_f32))        add_package_dependency(c, "runtime", "abs_f32");
-				if (are_types_identical(bt, t_f64))        add_package_dependency(c, "runtime", "abs_f64");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
 				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "abs_complex128");
 				if (are_types_identical(bt, t_quaternion128)) add_package_dependency(c, "runtime", "abs_quaternion128");
@@ -1510,23 +1492,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			{
-				Type *bt = base_type(x.type);
-				if (are_types_identical(bt, t_f16)) {
-					add_package_dependency(c, "runtime", "min_f16");
-					add_package_dependency(c, "runtime", "max_f16");
-				}
-				if (are_types_identical(bt, t_f32)) {
-					add_package_dependency(c, "runtime", "min_f32");
-					add_package_dependency(c, "runtime", "max_f32");
-				}
-				if (are_types_identical(bt, t_f64)) {
-					add_package_dependency(c, "runtime", "min_f64");
-					add_package_dependency(c, "runtime", "max_f64");
-				}
-
-				operand->type = ops[0]->type;
-			}
+			operand->type = ops[0]->type;
 		}
 
 		break;
