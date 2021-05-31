@@ -7970,6 +7970,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = check_expr_base_internal(c, o, node, type_hint);
+	if (o->type != nullptr && core_type(o->type) == nullptr) {
+		o->type = t_invalid;
+		gbString xs = expr_to_string(o->expr);
+		if (o->mode == Addressing_Type) {
+			error(o->expr, "Invalid type usage '%s'", xs);
+		} else {
+			error(o->expr, "Invalid expression '%s'", xs);
+		}
+		gb_string_free(xs);
+	}
 	if (o->type != nullptr && is_type_untyped(o->type)) {
 		add_untyped(&c->checker->info, node, false, o->mode, o->type, o->value);
 	}
