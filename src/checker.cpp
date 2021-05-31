@@ -1718,45 +1718,45 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
 	String required_runtime_entities[] = {
-		str_lit("Allocator"),
-		str_lit("Logger"),
-
-		str_lit("__init_context"),
-
-		str_lit("args__"),
-		str_lit("type_table"),
-		str_lit("__type_info_of"),
-		str_lit("default_allocator"),
-		str_lit("default_allocator_proc"),
-		str_lit("default_temp_allocator"),
-		str_lit("default_temp_allocator_proc"),
-
+		// Odin types
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
+		str_lit("Allocator"),
+		str_lit("Logger"),
 
-		str_lit("cstring_to_string"), // Is this needed?
+		// Global variables
+		str_lit("args__"),
+		str_lit("type_table"),
 
+		// Odin internal procedures
+		str_lit("__init_context"),
+		str_lit("__type_info_of"),
+		str_lit("cstring_to_string"),
+
+		// Pseudo-CRT required procedures
+		str_lit("memset"),
+		str_lit("memcpy"),
+		str_lit("memmove"),
+
+		// Utility procedures
+		str_lit("memory_equal"),
+		str_lit("memory_compare"),
+		str_lit("memory_compare_zero"),
+
+		// Extended data type internal procedures
 		str_lit("umodti3"),
 		str_lit("udivti3"),
 		str_lit("modti3"),
 		str_lit("divti3"),
 		str_lit("fixdfti"),
 		str_lit("floattidf"),
-
 		str_lit("truncsfhf2"),
 		str_lit("truncdfhf2"),
 		str_lit("gnu_h2f_ieee"),
 		str_lit("gnu_f2h_ieee"),
 		str_lit("extendhfsf2"),
 
-		str_lit("memset"),
-		str_lit("memcpy"),
-		str_lit("memmove"),
-
-		str_lit("memory_equal"),
-		str_lit("memory_compare"),
-		str_lit("memory_compare_zero"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
@@ -1775,10 +1775,10 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	if (!build_context.no_bounds_check) {
 		String bounds_check_entities[] = {
+			// Bounds checking related procedures
 			str_lit("bounds_check_error"),
 			str_lit("slice_expr_error_hi"),
 			str_lit("slice_expr_error_lo_hi"),
-			str_lit("dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
 			force_add_dependency_entity(c, c->info.runtime_package->scope, bounds_check_entities[i]);
