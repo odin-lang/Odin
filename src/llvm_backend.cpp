@@ -5600,37 +5600,11 @@ LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
 lbValue lb_emit_min(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	x = lb_emit_conv(p, x, t);
 	y = lb_emit_conv(p, y, t);
-
-	if (is_type_float(t)) {
-		i64 sz = 8*type_size_of(t);
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = x;
-		args[1] = y;
-		switch (sz) {
-		case 16: return lb_emit_runtime_call(p, "min_f16", args);
-		case 32: return lb_emit_runtime_call(p, "min_f32", args);
-		case 64: return lb_emit_runtime_call(p, "min_f64", args);
-		}
-		GB_PANIC("Unknown float type");
-	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Lt, x, y), x, y);
 }
 lbValue lb_emit_max(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 	x = lb_emit_conv(p, x, t);
 	y = lb_emit_conv(p, y, t);
-
-	if (is_type_float(t)) {
-		i64 sz = 8*type_size_of(t);
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = x;
-		args[1] = y;
-		switch (sz) {
-		case 16: return lb_emit_runtime_call(p, "max_f16", args);
-		case 32: return lb_emit_runtime_call(p, "max_f32", args);
-		case 64: return lb_emit_runtime_call(p, "max_f64", args);
-		}
-		GB_PANIC("Unknown float type");
-	}
 	return lb_emit_select(p, lb_emit_comp(p, Token_Gt, x, y), x, y);
 }
 
@@ -9307,16 +9281,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			case 128: return lb_emit_runtime_call(p, "abs_complex128", args);
 			}
 			GB_PANIC("Unknown complex type");
-		} else if (is_type_float(t)) {
-			i64 sz = 8*type_size_of(t);
-			auto args = array_make<lbValue>(permanent_allocator(), 1);
-			args[0] = x;
-			switch (sz) {
-			case 16: return lb_emit_runtime_call(p, "abs_f16", args);
-			case 32: return lb_emit_runtime_call(p, "abs_f32", args);
-			case 64: return lb_emit_runtime_call(p, "abs_f64", args);
-			}
-			GB_PANIC("Unknown float type");
 		}
 		lbValue zero = lb_const_nil(p->module, t);
 		lbValue cond = lb_emit_comp(p, Token_Lt, x, zero);
