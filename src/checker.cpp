@@ -1720,23 +1720,22 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	String required_runtime_entities[] = {
 		str_lit("Allocator"),
 		str_lit("Logger"),
-		str_lit("mem_zero"),
 
 		str_lit("__init_context"),
 
 		str_lit("args__"),
 		str_lit("type_table"),
 		str_lit("__type_info_of"),
+		str_lit("default_allocator"),
+		str_lit("default_allocator_proc"),
 		str_lit("default_temp_allocator"),
-		// str_lit("default_temp_allocator_init"),
-		// str_lit("default_temp_allocator_destroy"),
 		str_lit("default_temp_allocator_proc"),
 
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
 
-		str_lit("cstring_to_string"), // Is tihs needed?
+		str_lit("cstring_to_string"), // Is this needed?
 
 		str_lit("umodti3"),
 		str_lit("udivti3"),
@@ -1766,8 +1765,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	if (build_context.no_crt) {
 		String required_no_crt_entities[] = {
 			// NOTE(bill): Only if these exist
-			str_lit("memcpy"),
-			str_lit("memmove"),
 			str_lit("_tls_index"),
 			str_lit("_fltused"),
 		};
@@ -1775,15 +1772,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			force_add_dependency_entity(c, c->info.runtime_package->scope, required_no_crt_entities[i]);
 		}
 	}
-
-	AstPackage *os = get_core_package(&c->info, str_lit("os"));
-	String required_os_entities[] = {
-		str_lit("heap_allocator"),
-	};
-	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
-		force_add_dependency_entity(c, os->scope, required_os_entities[i]);
-	}
-
 
 	if (!build_context.no_bounds_check) {
 		String bounds_check_entities[] = {
