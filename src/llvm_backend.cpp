@@ -9819,7 +9819,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 			lbValue x     = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), platform_type);
 			lbValue y     = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), platform_type);
-			lbValue scale = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), platform_type);
+			lbValue scale = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), t_i32);
 
 			char const *name = nullptr;
 			if (is_type_unsigned(tv.type)) {
