@@ -5286,8 +5286,8 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 	TypeTuple *tuple = get_record_polymorphic_params(original_type);
 	isize param_count = tuple->variables.count;
 	isize minimum_param_count = param_count;
-	for (minimum_param_count = tuple->variables.count-1; minimum_param_count >= 0; minimum_param_count--) {
-		Entity *e = tuple->variables[minimum_param_count];
+	for (; minimum_param_count > 0; minimum_param_count--) {
+		Entity *e = tuple->variables[minimum_param_count-1];
 		if (e->kind != Entity_Constant) {
 			break;
 		}
@@ -5295,6 +5295,7 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			break;
 		}
 	}
+
 
 	Array<Operand> ordered_operands = operands;
 	if (!named_fields) {
@@ -5365,6 +5366,13 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 	if (err != 0) {
 		operand->mode = Addressing_Invalid;
 		return err;
+	}
+
+	while (ordered_operands.count >= 0) {
+		if (ordered_operands[ordered_operands.count-1].expr != nullptr) {
+			break;
+		}
+		array_pop(&ordered_operands);
 	}
 
 	if (minimum_param_count != param_count) {
