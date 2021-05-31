@@ -403,22 +403,22 @@ abs_f64 :: #force_inline proc "contextless" (x: f64) -> f64 {
 	return -x if x < 0 else x;
 }
 
-min_f16 :: proc(a, b: f16) -> f16 {
+min_f16 :: #force_inline proc "contextless" (a, b: f16) -> f16 {
 	return a if a < b else b;
 }
-min_f32 :: proc(a, b: f32) -> f32 {
+min_f32 :: #force_inline proc "contextless" (a, b: f32) -> f32 {
 	return a if a < b else b;
 }
-min_f64 :: proc(a, b: f64) -> f64 {
+min_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
 	return a if a < b else b;
 }
-max_f16 :: proc(a, b: f16) -> f16 {
+max_f16 :: #force_inline proc "contextless" (a, b: f16) -> f16 {
 	return a if a > b else b;
 }
-max_f32 :: proc(a, b: f32) -> f32 {
+max_f32 :: #force_inline proc "contextless" (a, b: f32) -> f32 {
 	return a if a > b else b;
 }
-max_f64 :: proc(a, b: f64) -> f64 {
+max_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
 	return a if a > b else b;
 }
 
