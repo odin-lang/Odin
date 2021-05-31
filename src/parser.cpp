@@ -3786,7 +3786,8 @@ Ast *parse_if_stmt(AstFile *f) {
 	}
 
 	skip_possible_newline_for_literal(f);
-	if (allow_token(f, Token_else)) {
+	if (f->curr_token.kind == Token_else) {
+		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_if:
 			else_stmt = parse_if_stmt(f);
@@ -3795,12 +3796,12 @@ Ast *parse_if_stmt(AstFile *f) {
 			else_stmt = parse_block_stmt(f, false);
 			break;
 		case Token_do: {
-			Token arrow = expect_token(f, Token_do);
+			expect_token(f, Token_do);
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
-			} else if (!ast_on_same_line(cond, body)) {
-				syntax_error(body, "The body of a 'do' be on the same line as 'else'");
+			} else if (!ast_on_same_line(else_stmt, else_stmt)) {
+				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -3842,7 +3843,8 @@ Ast *parse_when_stmt(AstFile *f) {
 	}
 
 	skip_possible_newline_for_literal(f);
-	if (allow_token(f, Token_else)) {
+	if (f->curr_token.kind == Token_else) {
+		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_when:
 			else_stmt = parse_when_stmt(f);
@@ -3851,12 +3853,12 @@ Ast *parse_when_stmt(AstFile *f) {
 			else_stmt = parse_block_stmt(f, true);
 			break;
 		case Token_do: {
-			Token arrow = expect_token(f, Token_do);
+			expect_token(f, Token_do);
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
-			} else if (!ast_on_same_line(cond, body)) {
-				syntax_error(body, "The body of a 'do' be on the same line as 'else'");
+			} else if (!ast_on_same_line(else_token, else_stmt)) {
+				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -4510,7 +4512,7 @@ Ast *parse_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			return parse_block_stmt(f, true);
 		case Token_do: {
-			Token arrow = expect_token(f, Token_do);
+			expect_token(f, Token_do);
 			Ast *stmt = convert_stmt_to_body(f, parse_stmt(f));
 			if (build_context.disallow_do) {
 				syntax_error(stmt, "'do' has been disallowed");
