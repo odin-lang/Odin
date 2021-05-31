@@ -250,9 +250,14 @@ Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type,
 
 			bool skip = false;
 
+			GB_ASSERT(ordered_operands.count >= param_count);
+
 			for (isize j = 0; j < param_count; j++) {
 				Entity *p = tuple->variables[j];
 				Operand o = ordered_operands[j];
+				if (o.expr == nullptr) {
+					return nullptr;
+				}
 				Entity *oe = entity_of_node(o.expr);
 				if (p == oe) {
 					// NOTE(bill): This is the same type, make sure that it will be be same thing and use that

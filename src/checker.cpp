@@ -937,7 +937,7 @@ Type *type_of_expr(Ast *expr) {
 }
 
 Entity *implicit_entity_of_node(Ast *clause) {
-	if (clause->kind == Ast_CaseClause) {
+	if (clause != nullptr && clause->kind == Ast_CaseClause) {
 		return clause->CaseClause.implicit_entity;
 	}
 	return nullptr;
