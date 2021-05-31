@@ -1335,27 +1335,27 @@ atan2 :: proc{
 	atan2_f64, atan2_f64le, atan2_f64be,
 };
 
-atan :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+atan :: proc(x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1);
 }
 
-asin :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+asin :: proc(x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1 + sqrt(1 - x*x));
 }
 
-acos :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+acos :: proc(x: $T) -> T where intrinsics.type_is_float(T) {
 	return 2 * atan2(sqrt(1 - x), sqrt(1 + x));
 }
 
-sinh :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+sinh :: proc(x: $T) -> T where intrinsics.type_is_float(T) {
 	return (exp(x) - exp(-x))*0.5;
 }
 
-cosh :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+cosh :: proc(x: $T) -> T where intrinsics.type_is_float(T) {
 	return (exp(x) + exp(-x))*0.5;
 }
 
-tanh :: proc(x: $T) -> T where intrinsics.type_is_float(x) {
+tanh :: proc(x: $T) -> T where intrinsics.type_is_float(T) {
 	t := exp(2*x);
 	return (t - 1) / (t + 1);
 }
