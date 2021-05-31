@@ -14283,7 +14283,9 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 			LLVMValueKind value_kind = LLVMGetValueKind(init.value);
 			// gb_printf_err("%s %d\n", LLVMPrintValueToString(init.value));
 
-			if (lb_is_const_or_global(init)) {
+			if (is_type_any(e->type) || is_type_union(e->type)) {
+				var->init = init;
+			} else if (lb_is_const_or_global(init)) {
 				if (!var->is_initialized) {
 					LLVMSetInitializer(var->var.value, init.value);
 					var->is_initialized = true;
@@ -14967,7 +14969,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 		if (decl->init_expr != nullptr) {
 			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
-			if (!is_type_any(e->type)) {
+			if (!is_type_any(e->type) && !is_type_union(e->type)) {
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
 						ExactValue v = tav.value;
