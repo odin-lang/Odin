@@ -6863,13 +6863,8 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 	lhs = lb_emit_conv(p, lhs, type);
 	rhs = lb_emit_conv(p, rhs, type);
 
-	lbValue x = lb_address_from_load_or_generate_local(p, lhs);
-	lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
 	GB_ASSERT(is_type_array(type));
 	Type *elem_type = base_array_type(type);
-
-	lbAddr res = lb_add_local_generated(p, type, false);
 
 	i64 count = base_type(type)->Array.count;
 
@@ -6877,6 +6872,37 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 
 	if (inline_array_arith) {
 	#if 1
+		#if 1
+		unsigned n = cast(unsigned)count;
+		auto dst_ptrs = array_make<lbValue>(temporary_allocator(), count);
+
+		auto a_loads = array_make<lbValue>(temporary_allocator(), count);
+		auto b_loads = array_make<lbValue>(temporary_allocator(), count);
+		auto c_ops = array_make<lbValue>(temporary_allocator(), count);
+
+		for (unsigned i = 0; i < n; i++) {
+			a_loads[i].value = LLVMBuildExtractValue(p->builder, lhs.value, i, "");
+			a_loads[i].type = elem_type;
+		}
+		for (unsigned i = 0; i < n; i++) {
+			b_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+			b_loads[i].type = elem_type;
+		}
+		for (unsigned i = 0; i < n; i++) {
+			c_ops[i] = lb_emit_arith(p, op, a_loads[i], b_loads[i], elem_type);
+		}
+
+		lbAddr res = lb_add_local_generated(p, type, false);
+		for (unsigned i = 0; i < n; i++) {
+			dst_ptrs[i] = lb_emit_array_epi(p, res.addr, i);
+		}
+		for (unsigned i = 0; i < n; i++) {
+			lb_emit_store(p, dst_ptrs[i], c_ops[i]);
+		}
+		#else
+		lbValue x = lb_address_from_load_or_generate_local(p, lhs);
+		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
+
 		auto a_ptrs = array_make<lbValue>(temporary_allocator(), count);
 		auto b_ptrs = array_make<lbValue>(temporary_allocator(), count);
 		auto dst_ptrs = array_make<lbValue>(temporary_allocator(), count);
@@ -6901,12 +6927,14 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 			c_ops[i] = lb_emit_arith(p, op, a_loads[i], b_loads[i], elem_type);
 		}
 
+		lbAddr res = lb_add_local_generated(p, type, false);
 		for (i64 i = 0; i < count; i++) {
 			dst_ptrs[i] = lb_emit_array_epi(p, res.addr, i);
 		}
 		for (i64 i = 0; i < count; i++) {
 			lb_emit_store(p, dst_ptrs[i], c_ops[i]);
 		}
+		#endif
 	#else
 		for (i64 i = 0; i < count; i++) {
 			lbValue a_ptr = lb_emit_array_epi(p, x, i);
@@ -6919,7 +6947,14 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 			lb_emit_store(p, dst_ptr, c);
 		}
 	#endif
+
+		return lb_addr_load(p, res);
 	} else {
+		lbValue x = lb_address_from_load_or_generate_local(p, lhs);
+		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
+
+		lbAddr res = lb_add_local_generated(p, type, false);
+
 		auto loop_data = lb_loop_start(p, count, t_i32);
 
 		lbValue a_ptr = lb_emit_array_ep(p, x, loop_data.idx);
@@ -6932,9 +6967,9 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 		lb_emit_store(p, dst_ptr, c);
 
 		lb_loop_end(p, loop_data);
-	}
 
-	return lb_addr_load(p, res);
+		return lb_addr_load(p, res);
+	}
 }
 
 
