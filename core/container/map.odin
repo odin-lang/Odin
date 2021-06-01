@@ -141,7 +141,7 @@ map_clear :: proc(m: ^$M/Map($Key, $Value)) {
 
 
 
-multi_map_find_first :: proc(m: $M/Map($Key, $Value), key: Key) -> ^Map_Entry(Value) {
+multi_map_find_first :: proc(m: $M/Map($Key, $Value), key: Key) -> ^Map_Entry(Key, Value) {
 	i := _map_find_or_fail(m, key);
 	if i < 0 {
 		return nil;
@@ -149,7 +149,7 @@ multi_map_find_first :: proc(m: $M/Map($Key, $Value), key: Key) -> ^Map_Entry(Va
 	return array_get_ptr(m.entries, i);
 }
 
-multi_map_find_next :: proc(m: $M/Map($Key, $Value), e: ^Map_Entry(Value)) -> ^Map_Entry(Value) {
+multi_map_find_next :: proc(m: $M/Map($Key, $Value), e: ^Map_Entry(Key, Value)) -> ^Map_Entry(Key, Value) {
 	i := e.next;
 	for i >= 0 {
 		it := array_get_ptr(m.entries, i);
@@ -220,7 +220,7 @@ multi_map_insert :: proc(m: ^$M/Map($Key, $Value), key: Key, value: Value) {
 	}
 }
 
-multi_map_remove :: proc(m: ^$M/Map($Key, $Value), e: ^Map_Entry(Value)) {
+multi_map_remove :: proc(m: ^$M/Map($Key, $Value), e: ^Map_Entry(Key, Value)) {
 	fr := _map_find_entry(m, e);
 	if fr.entry_index >= 0 {
 		_map_erase(m, fr);
@@ -306,7 +306,7 @@ _map_find_key :: proc(m: $M/Map($Key, $Value), key: Key) -> Map_Find_Result wher
 	return fr;
 }
 
-_map_find_entry :: proc(m: ^$M/Map($Key, $Value), e: ^Map_Entry(Value)) -> Map_Find_Result {
+_map_find_entry :: proc(m: ^$M/Map($Key, $Value), e: ^Map_Entry(Key, Value)) -> Map_Find_Result {
 	fr: Map_Find_Result;
 	fr.hash_index = -1;
 	fr.entry_prev = -1;
