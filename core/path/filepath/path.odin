@@ -170,8 +170,8 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	cleaned, new_allocation := from_slash(s);
 	if new_allocation {
 		delete(s);
-		lazy_buffer_destroy(out);
 	}
+	lazy_buffer_destroy(out);
 	return cleaned;
 }
 
@@ -397,8 +397,8 @@ lazy_buffer_string :: proc(lb: ^Lazy_Buffer) -> string {
 	return string(z);
 }
 @(private)
-lazy_buffer_destroy :: proc(lb: ^Lazy_Buffer) {
 	delete(lb.b);
+lazy_buffer_destroy :: proc(lb: ^Lazy_Buffer) {
 	free(lb);
 	lb^ = {};
 }
