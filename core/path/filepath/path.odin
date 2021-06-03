@@ -399,6 +399,5 @@ lazy_buffer_string :: proc(lb: ^Lazy_Buffer) -> string {
 @(private)
 lazy_buffer_destroy :: proc(lb: ^Lazy_Buffer) {
 	delete(lb.b);
-	free(lb);
 	lb^ = {};
 }
