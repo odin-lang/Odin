@@ -147,7 +147,11 @@ Token ast_end_token(Ast *node) {
 			return ast_end_token(node->TagExpr.expr);
 		}
 		return node->TagExpr.name;
-	case Ast_UnaryExpr:     return ast_end_token(node->UnaryExpr.expr);
+	case Ast_UnaryExpr:
+		if (node->UnaryExpr.expr) {
+			return ast_end_token(node->UnaryExpr.expr);
+		}
+		return node->UnaryExpr.op;
 	case Ast_BinaryExpr:    return ast_end_token(node->BinaryExpr.right);
 	case Ast_ParenExpr:     return node->ParenExpr.close;
 	case Ast_CallExpr:      return node->CallExpr.close;
