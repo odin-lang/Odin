@@ -1284,13 +1284,13 @@ matrix3_from_quaternion :: proc{
 
 
 matrix3_inverse_f16 :: proc(m: Matrix3f16) -> Matrix3f16 {
-	return transpose(matrix3_inverse_transpose(m));
+	return auto_cast transpose(matrix3_inverse_transpose(m));
 }
 matrix3_inverse_f32 :: proc(m: Matrix3f32) -> Matrix3f32 {
-	return transpose(matrix3_inverse_transpose(m));
+	return auto_cast transpose(matrix3_inverse_transpose(m));
 }
 matrix3_inverse_f64 :: proc(m: Matrix3f64) -> Matrix3f64 {
-	return transpose(matrix3_inverse_transpose(m));
+	return auto_cast transpose(matrix3_inverse_transpose(m));
 }
 matrix3_inverse :: proc{
 	matrix3_inverse_f16,
@@ -1655,13 +1655,13 @@ matrix4_from_trs :: proc{
 
 
 matrix4_inverse_f16 :: proc(m: Matrix4f16) -> Matrix4f16 {
-	return transpose(matrix4_inverse_transpose(m));
+	return auto_cast transpose(matrix4_inverse_transpose(m));
 }
 matrix4_inverse_f32 :: proc(m: Matrix4f32) -> Matrix4f32 {
-	return transpose(matrix4_inverse_transpose(m));
+	return auto_cast transpose(matrix4_inverse_transpose(m));
 }
 matrix4_inverse_f64 :: proc(m: Matrix4f64) -> Matrix4f64 {
-	return transpose(matrix4_inverse_transpose(m));
+	return auto_cast transpose(matrix4_inverse_transpose(m));
 }
 matrix4_inverse :: proc{
 	matrix4_inverse_f16,
