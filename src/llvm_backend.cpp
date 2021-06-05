@@ -290,6 +290,39 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	}
 }
 
+bool lb_try_vector_cast(lbProcedure *p, lbValue ptr, LLVMTypeRef *vector_type_) {
+	Type *array_type = base_type(type_deref(ptr.type));
+	GB_ASSERT(array_type->kind == Type_Array);
+	Type *elem_type = base_type(array_type->Array.elem);
+
+	if (type_size_of(array_type) <= build_context.max_align &&
+	    is_type_valid_vector_elem(elem_type)) {
+		// Try to treat it like a vector if possible
+		bool possible = false;
+		LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem_type), cast(unsigned)array_type->Array.count);
+		unsigned vector_alignment = cast(unsigned)lb_alignof(vector_type);
+
+		LLVMValueRef addr_ptr = ptr.value;
+		if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
+			unsigned alignment = LLVMGetAlignment(addr_ptr);
+			alignment = gb_max(alignment, vector_alignment);
+			possible = true;
+			LLVMSetAlignment(addr_ptr, alignment);
+		} else if (LLVMIsALoadInst(addr_ptr)) {
+			unsigned alignment = LLVMGetAlignment(addr_ptr);
+			possible = alignment >= vector_alignment;
+		}
+
+		// NOTE: Due to alignment requirements, if the pointer is not correctly aligned
+		// then it cannot be treated as a vector
+		if (possible) {
+			if (vector_type_) *vector_type_ =vector_type;
+			return true;
+		}
+	}
+	return false;
+}
+
 void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
 		return;
@@ -459,14 +492,28 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		}
 		return;
 	} else if (addr.kind == lbAddr_Swizzle) {
-		lbValue ptr = lb_addr_get_ptr(p, addr);
-		lbValue src_ptr = lb_address_from_load_or_generate_local(p, value);
+		GB_ASSERT(addr.swizzle.count <= 4);
 
-		for (u8 i = 0; i < addr.swizzle.count; i++) {
-			u8 index = addr.swizzle.indices[i];
-			lbValue dst = lb_emit_array_epi(p, ptr, index);
-			lbValue src = lb_emit_array_epi(p, src_ptr, i);
-			lb_emit_store(p, dst, lb_emit_load(p, src));
+		lbValue dst = lb_addr_get_ptr(p, addr);
+		lbValue src = lb_address_from_load_or_generate_local(p, value);
+		{
+			lbValue src_ptrs[4] = {};
+			lbValue src_loads[4] = {};
+			lbValue dst_ptrs[4] = {};
+
+			for (u8 i = 0; i < addr.swizzle.count; i++) {
+				src_ptrs[i] = lb_emit_array_epi(p, src, i);
+			}
+			for (u8 i = 0; i < addr.swizzle.count; i++) {
+				dst_ptrs[i] = lb_emit_array_epi(p, dst, addr.swizzle.indices[i]);
+			}
+			for (u8 i = 0; i < addr.swizzle.count; i++) {
+				src_loads[i] = lb_emit_load(p, src_ptrs[i]);
+			}
+
+			for (u8 i = 0; i < addr.swizzle.count; i++) {
+				lb_emit_store(p, dst_ptrs[i], src_loads[i]);
+			}
 		}
 		return;
 	}
@@ -753,46 +800,25 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		lbAddr res = lb_add_local_generated(p, addr.swizzle.type, false);
 		lbValue ptr = lb_addr_get_ptr(p, res);
 
-		if (type_size_of(array_type) <= build_context.max_align &&
-		    is_type_valid_vector_elem(elem_type)) {
-			// Try to treat it like a vector if possible
-			bool possible = false;
-			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem_type), cast(unsigned)array_type->Array.count);
-			unsigned vector_alignment = cast(unsigned)lb_alignof(vector_type);
-
-			LLVMValueRef addr_ptr = addr.addr.value;
-			if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
-				unsigned alignment = LLVMGetAlignment(addr_ptr);
-				alignment = gb_max(alignment, vector_alignment);
-				possible = true;
-				LLVMSetAlignment(addr_ptr, alignment);
-			} else if (LLVMIsALoadInst(addr_ptr)) {
-				unsigned alignment = LLVMGetAlignment(addr_ptr);
-				possible = alignment >= vector_alignment;
+		LLVMTypeRef vector_type = nullptr;
+		if (lb_try_vector_cast(p, addr.addr, &vector_type)) {
+			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
+			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
+			LLVMValueRef scalars[4] = {};
+			for (u8 i = 0; i < addr.swizzle.count; i++) {
+				scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
 			}
+			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
+			LLVMValueRef sv = LLVMBuildShuffleVector(p->builder, v, LLVMGetUndef(vector_type), mask, "");
 
-			// NOTE: Due to alignment requirements, if the pointer is not correctly aligned
-			// then it cannot be treated as a vector
-			if (possible) {
-				LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr_ptr, LLVMPointerType(vector_type, 0), "");
-				LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
-				LLVMValueRef scalars[4] = {};
-				for (u8 i = 0; i < addr.swizzle.count; i++) {
-					scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
-				}
-				LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
-				LLVMValueRef sv = LLVMBuildShuffleVector(p->builder, v, LLVMGetUndef(vector_type), mask, "");
-
-				LLVMBuildStore(p->builder, sv, LLVMBuildPointerCast(p->builder, ptr.value, LLVMTypeOf(vp), ""));
-				return lb_addr_load(p, res);
+			LLVMBuildStore(p->builder, sv, LLVMBuildPointerCast(p->builder, ptr.value, LLVMTypeOf(vp), ""));
+		} else {
+			for (u8 i = 0; i < addr.swizzle.count; i++) {
+				u8 index = addr.swizzle.indices[i];
+				lbValue dst = lb_emit_array_epi(p, ptr, i);
+				lbValue src = lb_emit_array_epi(p, addr.addr, index);
+				lb_emit_store(p, dst, lb_emit_load(p, src));
 			}
-		}
-
-		for (u8 i = 0; i < addr.swizzle.count; i++) {
-			u8 index = addr.swizzle.indices[i];
-			lbValue dst = lb_emit_array_epi(p, ptr, i);
-			lbValue src = lb_emit_array_epi(p, addr.addr, index);
-			lb_emit_store(p, dst, lb_emit_load(p, src));
 		}
 		return lb_addr_load(p, res);
 	}
