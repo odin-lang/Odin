@@ -746,8 +746,47 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 		return lb_addr_load(p, res);
 	} else if (addr.kind == lbAddr_Swizzle) {
+		Type *array_type = base_type(addr.swizzle.type);
+		GB_ASSERT(array_type->kind == Type_Array);
+
+		Type *elem_type = base_type(array_type->Array.elem);
 		lbAddr res = lb_add_local_generated(p, addr.swizzle.type, false);
 		lbValue ptr = lb_addr_get_ptr(p, res);
+
+		if (type_size_of(array_type) <= build_context.max_align &&
+		    is_type_valid_vector_elem(elem_type)) {
+			// Try to treat it like a vector if possible
+			bool possible = false;
+			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem_type), cast(unsigned)array_type->Array.count);
+			unsigned vector_alignment = cast(unsigned)lb_alignof(vector_type);
+
+			LLVMValueRef addr_ptr = addr.addr.value;
+			if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
+				unsigned alignment = LLVMGetAlignment(addr_ptr);
+				alignment = gb_max(alignment, vector_alignment);
+				possible = true;
+				LLVMSetAlignment(addr_ptr, alignment);
+			} else if (LLVMIsALoadInst(addr_ptr)) {
+				unsigned alignment = LLVMGetAlignment(addr_ptr);
+				possible = alignment >= vector_alignment;
+			}
+
+			// NOTE: Due to alignment requirements, if the pointer is not correctly aligned
+			// then it cannot be treated as a vector
+			if (possible) {
+				LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr_ptr, LLVMPointerType(vector_type, 0), "");
+				LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
+				LLVMValueRef scalars[4] = {};
+				for (u8 i = 0; i < addr.swizzle.count; i++) {
+					scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
+				}
+				LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
+				LLVMValueRef sv = LLVMBuildShuffleVector(p->builder, v, LLVMGetUndef(vector_type), mask, "");
+
+				LLVMBuildStore(p->builder, sv, LLVMBuildPointerCast(p->builder, ptr.value, LLVMTypeOf(vp), ""));
+				return lb_addr_load(p, res);
+			}
+		}
 
 		for (u8 i = 0; i < addr.swizzle.count; i++) {
 			u8 index = addr.swizzle.indices[i];
