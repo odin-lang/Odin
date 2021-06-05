@@ -28,11 +28,11 @@ Magic_String :: "odindoc\x00";
 
 Header_Base :: struct {
 	magic: [8]byte,
-	_: u32le,
+	_: u32le, // padding
 	version:     Version_Type,
-	total_size:  u32le,
-	header_size: u32le,
-	hash:        u32le,
+	total_size:  u32le, // in bytes
+	header_size: u32le, // in bytes
+	hash:        u32le, // hash of the data after the header (header_size)
 }
 
 Header :: struct {
@@ -95,16 +95,17 @@ Entity_Flag :: enum u32le {
 	Foreign = 0,
 	Export  = 1,
 
-	Param_Using     = 2,
-	Param_Const     = 3,
-	Param_Auto_Cast = 4,
-	Param_Ellipsis  = 5,
-	Param_CVararg   = 6,
-	Param_No_Alias  = 7,
+	Param_Using     = 2, // using
+	Param_Const     = 3, // #const
+	Param_Auto_Cast = 4, // auto_cast
+	Param_Ellipsis  = 5, // Variadic parameter
+	Param_CVararg   = 6, // #c_vararg
+	Param_No_Alias  = 7, // #no_alias
 
 	Type_Alias = 8,
 
 	Var_Thread_Local = 9,
+	Var_Static       = 10,
 }
 
 Entity_Flags :: distinct bit_set[Entity_Flag; u32le];
@@ -116,14 +117,25 @@ Entity :: struct {
 	name:             String,
 	type:             Type_Index,
 	init_string:      String,
-	_:                u32le,
+	_:                u32le, // reserved for init
 	comment:          String,
 	docs:             String,
+
+	// May used by:
+	// .Variable
+	// .Procedure
 	foreign_library:  Entity_Index,
+	// May used by:
+	// .Variable
+	// .Procedure
 	link_name:        String,
+
 	attributes:       Array(Attribute),
-	grouped_entities: Array(Entity_Index), // Procedure Groups
-	where_clauses:    Array(String), // Procedures
+
+	// Used by: .Proc_Group
+	grouped_entities: Array(Entity_Index),
+	// May used by: .Procedure
+	where_clauses:    Array(String),
 }
 
 Attribute :: struct {
@@ -160,14 +172,23 @@ Type_Elems_Cap :: 4;
 
 Type :: struct {
 	kind:  Type_Kind,
-	flags: u32le, // Type_Kind specific
+	// Type_Kind specific used by some types
+	// Underlying flag types:
+	// .Basic   - Type_Flags_Basic
+	// .Struct  - Type_Flags_Struct
+	// .Union   - Type_Flags_Union
+	// .Proc    - Type_Flags_Proc
+	// .Bit_Set - Type_Flags_Bit_Set
+	flags: u32le,
 
 	// Used by:
 	// .Basic
 	// .Named
 	// .Generic
-	name:         String,
-	custom_align: String, // .Struct, .Union
+	name: String,
+
+	// Used By: .Struct, .Union
+	custom_align: String,
 
 	// Used by:
 	// .Array - 1 count: 0=len
@@ -178,8 +199,9 @@ Type :: struct {
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
-	// Each of these is esed by some types, not all
-	calling_convention: String, // Procedures
+	// Used by: .Procedures
+	// blank implies the "odin" calling convention
+	calling_convention: String,
 
 	// Used by:
 	// .Named              - 1 type:    0=base type
@@ -195,22 +217,24 @@ Type :: struct {
 	// .SOA_Struct_Dynamic - 1 type:    underlying SOA struct element
 	// .Union              - 0+ types:  variants
 	// .Enum               - <1 type:   0=base type
-	// .Procedure          - 2 types:   0=parameters, 1=results
+	// .Proc               - 2 types:   0=parameters, 1=results
 	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
 	// .Simd_Vector        - 1 type:    0=element
 	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
 	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
-	types:              Array(Type_Index),
+	types: Array(Type_Index),
 
 	// Used by:
 	// .Named  - 1 field for the definition
 	// .Struct - fields
 	// .Enum   - fields
 	// .Tuple  - parameters (procedures only)
-	entities:           Array(Entity_Index),
+	entities: Array(Entity_Index),
 
-	polymorphic_params: Type_Index,    // .Struct, .Union
-	where_clauses:      Array(String), // .Struct, .Union
+	// Used By: .Struct, .Union
+	polymorphic_params: Type_Index,
+	// Used By: .Struct, .Union
+	where_clauses: Array(String),
 }
 
 Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le];
