@@ -167,6 +167,7 @@ enum OdinDocEntityFlag : u32 {
 	OdinDocEntityFlag_Type_Alias = 1<<8,
 
 	OdinDocEntityFlag_Var_Thread_Local = 1<<9,
+	OdinDocEntityFlag_Var_Static       = 1<<10,
 };
 
 struct OdinDocEntity {

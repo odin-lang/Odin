@@ -813,17 +813,26 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		break;
 	case Entity_Variable:
 		if (e->Variable.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
-		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export; }
+		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		if (e->Variable.thread_local_model != "") {
 			flags |= OdinDocEntityFlag_Var_Thread_Local;
 		}
+		if (e->flags & EntityFlag_Static) { flags |= OdinDocEntityFlag_Var_Static; }
 		link_name = e->Variable.link_name;
 		break;
 	case Entity_Procedure:
 		if (e->Procedure.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
-		if (e->Procedure.is_export)  { flags |= OdinDocEntityFlag_Export; }
+		if (e->Procedure.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		link_name = e->Procedure.link_name;
 		break;
+	}
+
+	if (e->flags & EntityFlag_Param) {
+		if (e->flags & EntityFlag_Using)      { flags |= OdinDocEntityFlag_Param_Using;    }
+		if (e->flags & EntityFlag_ConstInput) { flags |= OdinDocEntityFlag_Param_Const;    }
+		if (e->flags & EntityFlag_AutoCast)   { flags |= OdinDocEntityFlag_Param_AutoCast; }
+		if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
+		if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
 	}
 
 	OdinDocString init_string = {};
