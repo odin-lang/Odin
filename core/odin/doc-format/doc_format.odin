@@ -159,21 +159,58 @@ Type_Kind :: enum u32le {
 Type_Elems_Cap :: 4;
 
 Type :: struct {
-	kind:         Type_Kind,
-	flags:        u32le, // Type_Kind specific
-	name:         String,
-	custom_align: String,
+	kind:  Type_Kind,
+	flags: u32le, // Type_Kind specific
 
-	// Used by some types
+	// Used by:
+	// .Basic
+	// .Named
+	// .Generic
+	name:         String,
+	custom_align: String, // .Struct, .Union
+
+	// Used by:
+	// .Array - 1 count: 0=len
+	// .Enumerated_Array - 1 count: 0=len
+	// .SOA_Struct_Fixed - 1 count: 0=len
+	// .Bit_Set - 2 count: 0=lower, 1=upper
+	// .Simd_Vector - 1 count: 0=len
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
 	// Each of these is esed by some types, not all
 	calling_convention: String, // Procedures
+
+	// Used by:
+	// .Named              - 1 type:    0=base type
+	// .Generic            - <1 type:   0=specialization
+	// .Pointer            - 1 type:    0=element
+	// .Array              - 1 type:    0=element
+	// .Enumerated_Array   - 2 types:   0=index and 1=element
+	// .Slice              - 1 type:    0=element
+	// .Dynamic_Array      - 1 type:    0=element
+	// .Map                - 2 types:   0=key, 1=value
+	// .SOA_Struct_Fixed   - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Slice   - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Dynamic - 1 type:    underlying SOA struct element
+	// .Union              - 0+ types:  variants
+	// .Enum               - <1 type:   0=base type
+	// .Procedure          - 2 types:   0=parameters, 1=results
+	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
+	// .Simd_Vector        - 1 type:    0=element
+	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
+	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
 	types:              Array(Type_Index),
+
+	// Used by:
+	// .Named  - 1 field for the definition
+	// .Struct - fields
+	// .Enum   - fields
+	// .Tuple  - parameters (procedures only)
 	entities:           Array(Entity_Index),
-	polymorphic_params: Type_Index, // Struct, Union
-	where_clauses:      Array(String), // Struct, Union
+
+	polymorphic_params: Type_Index,    // .Struct, .Union
+	where_clauses:      Array(String), // .Struct, .Union
 }
 
 Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le];
