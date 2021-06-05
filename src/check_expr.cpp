@@ -1805,6 +1805,10 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 					case Addressing_Constant:
 						error(op, "Cannot take the pointer address of '%s' which is a constant", str);
 						break;
+					case Addressing_SwizzleValue:
+					case Addressing_SwizzleVariable:
+						error(op, "Cannot take the pointer address of '%s' which is a swizzle intermediate array value", str);
+						break;
 					default:
 						error(op, "Cannot take the pointer address of '%s'", str);
 						break;
