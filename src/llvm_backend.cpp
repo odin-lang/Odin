@@ -5319,9 +5319,36 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 	lbValue rhs = lb_emit_conv(p, value, lhs_type);
 
+	bool inline_array_arith = type_size_of(array_type) <= build_context.max_align;
+
+
+	if (lhs.kind == lbAddr_Swizzle) {
+		GB_ASSERT(is_type_array(lhs_type));
+		bool indices_handled[4] = {};
+
+		// TODO(bill): Inline array arith optimization for swizzles
+		{
+			for (u8 i = 0; i < lhs.swizzle.count; i++) {
+				u8 index = lhs.swizzle.indices[i];
+				if (indices_handled[index]) {
+					continue;
+				}
+				indices_handled[index] = true;
+				lbValue lhs_ptr = lb_emit_array_epi(p, lhs.addr, index);
+				lbValue x_load = lb_emit_load(p, lhs_ptr);
+				lbValue y_load = {};
+				y_load.value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+				y_load.type = elem_type;
+				lbValue op_value = lb_emit_arith(p, op, x_load, y_load, elem_type);
+				lb_emit_store(p, lhs_ptr, op_value);
+			}
+		}
+		return;
+	}
+
+
 	lbValue x = lb_addr_get_ptr(p, lhs);
 
-	bool inline_array_arith = type_size_of(array_type) <= build_context.max_align;
 
 	if (inline_array_arith) {
 	#if 1
