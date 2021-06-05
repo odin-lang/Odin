@@ -134,6 +134,15 @@ lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_expr) {
 	return v;
 }
 
+lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swizzle_indices[4]) {
+	GB_ASSERT(1 < swizzle_count && swizzle_count <= 4);
+	lbAddr v = {lbAddr_Swizzle, addr};
+	v.swizzle.type = array_type;
+	v.swizzle.count = swizzle_count;
+	gb_memmove(v.swizzle.indices, swizzle_indices, swizzle_count);
+	return v;
+}
+
 Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		return nullptr;
@@ -142,6 +151,9 @@ Type *lb_addr_type(lbAddr const &addr) {
 		Type *t = base_type(addr.map.type);
 		GB_ASSERT(is_type_map(t));
 		return t->Map.value;
+	}
+	if (addr.kind == lbAddr_Swizzle) {
+		return addr.swizzle.type;
 	}
 	return type_deref(addr.addr.type);
 }
@@ -193,13 +205,17 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		return final_ptr;
 	}
 
-	case lbAddr_SoaVariable: {
+	case lbAddr_SoaVariable:
 		// TODO(bill): FIX THIS HACK
 		return lb_address_from_load(p, lb_addr_load(p, addr));
-	}
 
 	case lbAddr_Context:
 		GB_PANIC("lbAddr_Context should be handled elsewhere");
+		break;
+
+	case lbAddr_Swizzle:
+		// TOOD(bill): is this good enough logic?
+		break;
 	}
 
 	return addr.addr;
@@ -354,59 +370,6 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		LLVMBuildStore(p->builder, len.value, len_ptr.value);
 
 		return;
-
-	} else if (addr.kind == lbAddr_AtomOp_index_set) {
-		lbValue ptr = addr.addr;
-		lbValue index = addr.index_set.index;
-		Ast *node = addr.index_set.node;
-
-		ast_node(ce, CallExpr, node);
-		Type *proc_type = type_and_value_of_expr(ce->proc).type;
-		proc_type = base_type(proc_type);
-		GB_ASSERT(is_type_proc(proc_type));
-		TypeProc *pt = &proc_type->Proc;
-
-		isize arg_count = 3;
-		isize param_count = 0;
-		if (pt->params) {
-			GB_ASSERT(pt->params->kind == Type_Tuple);
-			param_count = pt->params->Tuple.variables.count;
-		}
-
-
-		auto args = array_make<lbValue>(permanent_allocator(), gb_max(arg_count, param_count));
-		args[0] = ptr;
-		args[1] = index;
-		args[2] = value;
-
-		isize arg_index = arg_count;
-		if (arg_count < param_count) {
-			lbModule *m = p->module;
-			String proc_name = {};
-			if (p->entity != nullptr) {
-				proc_name = p->entity->token.string;
-			}
-			TokenPos pos = ast_token(ce->proc).pos;
-
-			TypeTuple *param_tuple = &pt->params->Tuple;
-
-			isize end = cast(isize)param_count;
-			while (arg_index < end) {
-				Entity *e = param_tuple->variables[arg_index];
-				GB_ASSERT(e->kind == Entity_Variable);
-				args[arg_index++] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
-			}
-		}
-
-		Entity *e = entity_from_expr(ce->proc);
-		GB_ASSERT(e != nullptr);
-		GB_ASSERT(is_type_polymorphic(e->type));
-
-		{
-			lb_emit_call(p, lb_find_procedure_value_from_entity(p->module, e), args);
-		}
-
-		return;
 	} else if (addr.kind == lbAddr_Map) {
 		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
@@ -493,6 +456,17 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 				dst = lb_emit_ptr_offset(p, field, index);
 				lb_emit_store(p, dst, src);
 			}
+		}
+		return;
+	} else if (addr.kind == lbAddr_Swizzle) {
+		lbValue ptr = lb_addr_get_ptr(p, addr);
+		lbValue src_ptr = lb_address_from_load_or_generate_local(p, value);
+
+		for (u8 i = 0; i < addr.swizzle.count; i++) {
+			u8 index = addr.swizzle.indices[i];
+			lbValue dst = lb_emit_array_epi(p, ptr, index);
+			lbValue src = lb_emit_array_epi(p, src_ptr, i);
+			lb_emit_store(p, dst, lb_emit_load(p, src));
 		}
 		return;
 	}
@@ -770,6 +744,17 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			}
 		}
 
+		return lb_addr_load(p, res);
+	} else if (addr.kind == lbAddr_Swizzle) {
+		lbAddr res = lb_add_local_generated(p, addr.swizzle.type, false);
+		lbValue ptr = lb_addr_get_ptr(p, res);
+
+		for (u8 i = 0; i < addr.swizzle.count; i++) {
+			u8 index = addr.swizzle.indices[i];
+			lbValue dst = lb_emit_array_epi(p, ptr, i);
+			lbValue src = lb_emit_array_epi(p, addr.addr, index);
+			lb_emit_store(p, dst, lb_emit_load(p, src));
+		}
 		return lb_addr_load(p, res);
 	}
 
@@ -12389,6 +12374,23 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				GB_PANIC("Unreachable");
 			}
 
+			if (se->swizzle_count > 0) {
+				Type *array_type = base_type(type_deref(tav.type));
+				GB_ASSERT(array_type->kind == Type_Array);
+				u8 swizzle_count = se->swizzle_count;
+				u8 swizzle_indices_raw = se->swizzle_indices;
+				u8 swizzle_indices[4] = {};
+				for (u8 i = 0; i < swizzle_count; i++) {
+					u8 index = swizzle_indices_raw>>(i*2) & 3;
+					swizzle_indices[i] = index;
+				}
+				lbAddr addr = lb_build_addr(p, se->expr);
+				lbValue a = lb_addr_get_ptr(p, addr);
+
+				GB_ASSERT(is_type_array(expr->tav.type));
+				return lb_addr_swizzle(a, expr->tav.type, swizzle_count, swizzle_indices);
+			}
+
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
 
@@ -12419,7 +12421,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					Type *t = base_type(type_deref(addr.addr.type));
 					GB_ASSERT(is_type_soa_struct(t));
 
-					// TODO(bill): Bounds check
 					if (addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
 						lbValue len = lb_soa_struct_len(p, addr.addr);
 						lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
@@ -12436,6 +12437,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						item = lb_emit_deep_field_gep(p, item, sub_sel);
 					}
 					return lb_addr(item);
+				} else if (addr.kind == lbAddr_Swizzle) {
+					GB_ASSERT(sel.index.count > 0);
+					// NOTE(bill): just patch the index in place
+					sel.index[0] = addr.swizzle.indices[sel.index[0]];
 				}
 				lbValue a = lb_addr_get_ptr(p, addr);
 				a = lb_emit_deep_field_gep(p, a, sel);

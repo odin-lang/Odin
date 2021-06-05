@@ -370,6 +370,9 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 	case Addressing_SoaVariable:
 		break;
 
+	case Addressing_SwizzleVariable:
+		break;
+
 	default: {
 		if (lhs->expr->kind == Ast_SelectorExpr) {
 			// NOTE(bill): Extra error checks

@@ -371,6 +371,8 @@ struct Selection {
 	Entity *   entity;
 	Array<i32> index;
 	bool       indirect; // Set if there was a pointer deref anywhere down the line
+	u8 swizzle_count;    // maximum components = 4
+	u8 swizzle_indices;  // 2 bits per component, representing which swizzle index
 };
 Selection empty_selection = {0};
 

@@ -47,7 +47,7 @@ enum lbAddrKind {
 	lbAddr_RelativePointer,
 	lbAddr_RelativeSlice,
 
-	lbAddr_AtomOp_index_set,
+	lbAddr_Swizzle,
 };
 
 struct lbAddr {
@@ -73,6 +73,11 @@ struct lbAddr {
 		struct {
 			bool deref;
 		} relative;
+		struct {
+			Type *type;
+			u8 count;      // 2, 3, or 4 components
+			u8 indices[4];
+		} swizzle;
 	};
 };
 
