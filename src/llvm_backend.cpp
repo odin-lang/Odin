@@ -5324,24 +5324,44 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 	if (lhs.kind == lbAddr_Swizzle) {
 		GB_ASSERT(is_type_array(lhs_type));
-		bool indices_handled[4] = {};
 
-		// TODO(bill): Inline array arith optimization for swizzles
-		{
-			for (u8 i = 0; i < lhs.swizzle.count; i++) {
-				u8 index = lhs.swizzle.indices[i];
-				if (indices_handled[index]) {
-					continue;
-				}
-				indices_handled[index] = true;
-				lbValue lhs_ptr = lb_emit_array_epi(p, lhs.addr, index);
-				lbValue x_load = lb_emit_load(p, lhs_ptr);
-				lbValue y_load = {};
-				y_load.value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
-				y_load.type = elem_type;
-				lbValue op_value = lb_emit_arith(p, op, x_load, y_load, elem_type);
-				lb_emit_store(p, lhs_ptr, op_value);
+		struct ValueAndIndex {
+			lbValue value;
+			u8      index;
+		};
+
+		bool indices_handled[4] = {};
+		i32 indices[4] = {};
+		i32 index_count = 0;
+		for (u8 i = 0; i < lhs.swizzle.count; i++) {
+			u8 index = lhs.swizzle.indices[i];
+			if (indices_handled[index]) {
+				continue;
 			}
+			indices[index_count++] = index;
+		}
+		gb_sort_array(indices, index_count, gb_i32_cmp(0));
+
+		lbValue lhs_ptrs[4] = {};
+		lbValue x_loads[4]  = {};
+		lbValue y_loads[4]  = {};
+		lbValue ops[4]      = {};
+
+		for (i32 i = 0; i < index_count; i++) {
+			lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, indices[i]);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+			y_loads[i].type = elem_type;
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
 		return;
 	}
