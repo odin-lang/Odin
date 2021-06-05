@@ -3698,6 +3698,94 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 	}
 
+	if (entity == nullptr  && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
+		// TODO(bill): Simd_Vector swizzling
+
+		String field_name = selector->Ident.token.string;
+		if (1 < field_name.len && field_name.len <= 4) {
+			u8 swizzles_xyzw[4] = {'x', 'y', 'z', 'w'};
+			u8 swizzles_rgba[4] = {'r', 'g', 'b', 'a'};
+			bool found_xyzw = false;
+			bool found_rgba = false;
+			for (isize i = 0; i < field_name.len; i++) {
+				bool valid = false;
+				for (isize j = 0; j < 4; j++) {
+					if (field_name.text[i] == swizzles_xyzw[j]) {
+						found_xyzw = true;
+						valid = true;
+						break;
+					}
+					if (field_name.text[i] == swizzles_rgba[j]) {
+						found_rgba = true;
+						valid = true;
+						break;
+					}
+				}
+				if (!valid) {
+					goto end_of_array_selector_swizzle;
+				}
+			}
+
+			u8 *swizzles = nullptr;
+
+			u8 index_count = cast(u8)field_name.len;
+			if (found_xyzw && found_rgba) {
+				gbString op_str = expr_to_string(op_expr);
+				error(op_expr, "Mixture of swizzle kinds for field index, got %s", op_str);
+				gb_string_free(op_str);
+				operand->mode = Addressing_Invalid;
+				operand->expr = node;
+				return nullptr;
+			}
+			u8 indices = 0;
+
+			if (found_xyzw) {
+				swizzles = swizzles_xyzw;
+			} else if (found_rgba) {
+				swizzles = swizzles_rgba;
+			}
+			for (isize i = 0; i < field_name.len; i++) {
+				for (isize j = 0; j < 4; j++) {
+					if (field_name.text[i] == swizzles[j]) {
+						indices |= cast(u8)(j)<<(i*2);
+						break;
+					}
+				}
+			}
+
+			se->swizzle_count = index_count;
+			se->swizzle_indices = indices;
+
+			Type *array_type = base_type(type_deref(operand->type));
+			GB_ASSERT(array_type->kind == Type_Array);
+
+			Type *swizzle_array_type = nullptr;
+			Type *bth = base_type(type_hint);
+			if (bth != nullptr && bth->kind == Type_Array && bth->Array.count == index_count) {
+				swizzle_array_type = type_hint;
+			} else {
+				swizzle_array_type = alloc_type_array(array_type->Array.elem, index_count);
+			}
+			AddressingMode prev_mode = operand->mode;
+			operand->mode = Addressing_SwizzleValue;
+			operand->type = swizzle_array_type;
+			operand->expr = node;
+
+			switch (prev_mode) {
+			case Addressing_Variable:
+			case Addressing_SoaVariable:
+			case Addressing_SwizzleVariable:
+				operand->mode = Addressing_SwizzleVariable;
+				break;
+			}
+
+			Entity *swizzle_entity = alloc_entity_variable(nullptr, make_token_ident(field_name), operand->type, EntityState_Resolved);
+			add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+			return swizzle_entity;
+		}
+	end_of_array_selector_swizzle:;
+	}
+
 	if (entity == nullptr) {
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);

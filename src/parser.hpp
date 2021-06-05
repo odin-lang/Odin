@@ -22,6 +22,8 @@ enum AddressingMode {
 	Addressing_OptionalOk  = 10, // rhs: acts like a value with an optional boolean part (for existence check)
 	Addressing_SoaVariable = 11, // Struct-Of-Arrays indexed variable
 
+	Addressing_SwizzleValue    = 12, // Swizzle indexed value
+	Addressing_SwizzleVariable = 13, // Swizzle indexed variable
 };
 
 struct TypeAndValue {
@@ -320,7 +322,12 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(UnaryExpr,    "unary expression",       struct { Token op; Ast *expr; }) \
 	AST_KIND(BinaryExpr,   "binary expression",      struct { Token op; Ast *left, *right; } ) \
 	AST_KIND(ParenExpr,    "parentheses expression", struct { Ast *expr; Token open, close; }) \
-	AST_KIND(SelectorExpr, "selector expression",    struct { Token token; Ast *expr, *selector; }) \
+	AST_KIND(SelectorExpr, "selector expression",    struct { \
+		Token token; \
+		Ast *expr, *selector; \
+		u8 swizzle_count; /*maximum of 4 components, if set, count >= 2*/ \
+		u8 swizzle_indices; /*2 bits per component*/ \
+	}) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(SelectorCallExpr, "selector call expression",    struct { Token token; Ast *expr, *call; bool modified_call; }) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
