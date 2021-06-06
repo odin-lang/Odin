@@ -1751,6 +1751,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("divti3"),
 		str_lit("fixdfti"),
 		str_lit("floattidf"),
+		str_lit("floattidf_unsigned"),
 		str_lit("truncsfhf2"),
 		str_lit("truncdfhf2"),
 		str_lit("gnu_h2f_ieee"),
