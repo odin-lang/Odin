@@ -672,3 +672,88 @@ gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
 extendhfsf2 :: proc "c" (value: u16) -> f32 {
 	return gnu_h2f_ieee(value);
 }
+
+
+
+@(link_name="__floattidf")
+floattidf :: proc(a: i128) -> f64 {
+	DBL_MANT_DIG :: 53;
+	if a == 0 {
+		return 0.0;
+	}
+	a := a;
+	N :: size_of(i128) * 8;
+	s := a >> (N-1);
+	a = (a ~ s) - s;
+	sd: = N - intrinsics.count_leading_zeros(a);  // number of significant digits
+	e := u32(sd - 1);        // exponent
+	if sd > DBL_MANT_DIG {
+		switch sd {
+		case DBL_MANT_DIG + 1:
+			a <<= 1;
+		case DBL_MANT_DIG + 2:
+			// okay
+		case:
+			a = i128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
+				i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0);
+		};
+
+		a |= i128((a & 4) != 0);
+		a += 1;
+		a >>= 2;
+
+		if a & (1 << DBL_MANT_DIG) != 0 {
+			a >>= 1;
+			e += 1;
+		}
+	} else {
+		a <<= u128(DBL_MANT_DIG - sd);
+	}
+	fb: [2]u32;
+	fb[1] = (u32(s) & 0x80000000) |           // sign
+	        ((e + 1023) << 20)    |           // exponent
+	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
+	fb[1] = u32(a);                           // mantissa-low
+	return transmute(f64)fb;
+}
+
+
+@(link_name="__floattidf_unsigned")
+floattidf_unsigned :: proc(a: u128) -> f64 {
+	DBL_MANT_DIG :: 53;
+	if a == 0 {
+		return 0.0;
+	}
+	a := a;
+	N :: size_of(u128) * 8;
+	sd: = N - intrinsics.count_leading_zeros(a);  // number of significant digits
+	e := u32(sd - 1);        // exponent
+	if sd > DBL_MANT_DIG {
+		switch sd {
+		case DBL_MANT_DIG + 1:
+			a <<= 1;
+		case DBL_MANT_DIG + 2:
+			// okay
+		case:
+			a = u128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
+				u128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0);
+		};
+
+		a |= u128((a & 4) != 0);
+		a += 1;
+		a >>= 2;
+
+		if a & (1 << DBL_MANT_DIG) != 0 {
+			a >>= 1;
+			e += 1;
+		}
+	} else {
+		a <<= u128(DBL_MANT_DIG - sd);
+	}
+	fb: [2]u32;
+	fb[1] = (0) |                             // sign
+	        ((e + 1023) << 20) |              // exponent
+	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
+	fb[1] = u32(a);                           // mantissa-low
+	return transmute(f64)fb;
+}

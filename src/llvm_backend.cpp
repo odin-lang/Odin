@@ -7821,6 +7821,17 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			return lb_emit_conv(p, res, t);
 		}
 
+		if (is_type_integer_128bit(src)) {
+			auto args = array_make<lbValue>(temporary_allocator(), 1);
+			args[0] = value;
+			char const *call = "floattidf";
+			if (is_type_unsigned(src)) {
+				call = "floattidf_unsigned";
+			}
+			lbValue res_f64 = lb_emit_runtime_call(p, call, args);
+			return lb_emit_conv(p, res_f64, t);
+		}
+
 		lbValue res = {};
 		res.type = t;
 		if (is_type_unsigned(src)) {
