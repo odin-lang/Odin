@@ -561,10 +561,6 @@ bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 }
 
 void check_scope_usage(Checker *c, Scope *scope) {
-	if (!build_context.vet) {
-		return;
-	}
-
 	bool vet_unused = true;
 	bool vet_shadowing = true;
 
@@ -591,19 +587,32 @@ void check_scope_usage(Checker *c, Scope *scope) {
 		Entity *other = ve.other;
 		String name = e->token.string;
 
-		switch (ve.kind) {
-		case VettedEntity_Unused:
-			error(e->token, "'%.*s' declared but not used", LIT(name));
-			break;
-		case VettedEntity_Shadowed:
-			if (e->flags&EntityFlag_Using) {
-				error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
-			} else {
-				error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+		if (build_context.vet) {
+			switch (ve.kind) {
+			case VettedEntity_Unused:
+				error(e->token, "'%.*s' declared but not used", LIT(name));
+				break;
+			case VettedEntity_Shadowed:
+				if (e->flags&EntityFlag_Using) {
+					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+				} else {
+					error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
+		}
+
+		if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using)) == 0) {
+			i64 sz = type_size_of(e->type);
+			// TODO(bill): When is a good size warn?
+			// Is 128 KiB good enough?
+			if (sz >= 1ll<<17) {
+				gbString type_str = type_to_string(e->type);
+				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(name), type_str, cast(long long)sz);
+				gb_string_free(type_str);
+			}
 		}
 	}
 
