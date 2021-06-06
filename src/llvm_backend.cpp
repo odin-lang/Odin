@@ -7224,50 +7224,55 @@ handle_op:
 		}
 	}
 
+	Type *integral_type = type;
+	if (is_type_simd_vector(integral_type)) {
+		integral_type = core_array_type(integral_type);
+	}
+
 	switch (op) {
 	case Token_Add:
-		if (is_type_float(type)) {
+		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFAdd(p->builder, lhs.value, rhs.value, "");
 			return res;
 		}
 		res.value = LLVMBuildAdd(p->builder, lhs.value, rhs.value, "");
 		return res;
 	case Token_Sub:
-		if (is_type_float(type)) {
+		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFSub(p->builder, lhs.value, rhs.value, "");
 			return res;
 		}
 		res.value = LLVMBuildSub(p->builder, lhs.value, rhs.value, "");
 		return res;
 	case Token_Mul:
-		if (is_type_float(type)) {
+		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFMul(p->builder, lhs.value, rhs.value, "");
 			return res;
 		}
 		res.value = LLVMBuildMul(p->builder, lhs.value, rhs.value, "");
 		return res;
 	case Token_Quo:
-		if (is_type_float(type)) {
+		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFDiv(p->builder, lhs.value, rhs.value, "");
 			return res;
-		} else if (is_type_unsigned(type)) {
+		} else if (is_type_unsigned(integral_type)) {
 			res.value = LLVMBuildUDiv(p->builder, lhs.value, rhs.value, "");
 			return res;
 		}
 		res.value = LLVMBuildSDiv(p->builder, lhs.value, rhs.value, "");
 		return res;
 	case Token_Mod:
-		if (is_type_float(type)) {
+		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFRem(p->builder, lhs.value, rhs.value, "");
 			return res;
-		} else if (is_type_unsigned(type)) {
+		} else if (is_type_unsigned(integral_type)) {
 			res.value = LLVMBuildURem(p->builder, lhs.value, rhs.value, "");
 			return res;
 		}
 		res.value = LLVMBuildSRem(p->builder, lhs.value, rhs.value, "");
 		return res;
 	case Token_ModMod:
-		if (is_type_unsigned(type)) {
+		if (is_type_unsigned(integral_type)) {
 			res.value = LLVMBuildURem(p->builder, lhs.value, rhs.value, "");
 			return res;
 		} else {
@@ -7307,7 +7312,7 @@ handle_op:
 			rhs = lb_emit_conv(p, rhs, lhs.type);
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
-			bool is_unsigned = is_type_unsigned(type);
+			bool is_unsigned = is_type_unsigned(integral_type);
 
 			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
 
