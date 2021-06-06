@@ -11830,6 +11830,194 @@ bool lb_is_expr_constant_zero(Ast *expr) {
 	return false;
 }
 
+lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
+	ast_node(ue, UnaryExpr, expr);
+	auto tv = type_and_value_of_expr(expr);
+
+
+	Ast *ue_expr = unparen_expr(ue->expr);
+	if (ue_expr->kind == Ast_IndexExpr && tv.mode == Addressing_OptionalOkPtr && is_type_tuple(tv.type)) {
+		Type *tuple = tv.type;
+
+		Type *map_type = type_of_expr(ue_expr->IndexExpr.expr);
+		Type *ot = base_type(map_type);
+		Type *t = base_type(type_deref(ot));
+		bool deref = t != ot;
+		GB_ASSERT(t->kind == Type_Map);
+		ast_node(ie, IndexExpr, ue_expr);
+
+		lbValue map_val = lb_build_addr_ptr(p, ie->expr);
+		if (deref) {
+			map_val = lb_emit_load(p, map_val);
+		}
+
+		lbValue key = lb_build_expr(p, ie->index);
+		key = lb_emit_conv(p, key, t->Map.key);
+
+		Type *result_type = type_of_expr(expr);
+		lbAddr addr = lb_addr_map(map_val, key, t, alloc_type_pointer(t->Map.value));
+		lbValue ptr = lb_addr_get_ptr(p, addr);
+
+		lbValue ok = lb_emit_comp_against_nil(p, Token_NotEq, ptr);
+		ok = lb_emit_conv(p, ok, tuple->Tuple.variables[1]->type);
+
+		lbAddr res = lb_add_local_generated(p, tuple, false);
+		lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
+		lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
+		lb_emit_store(p, gep0, ptr);
+		lb_emit_store(p, gep1, ok);
+		return lb_addr_load(p, res);
+
+	} if (ue_expr->kind == Ast_CompoundLit) {
+		lbValue v = lb_build_expr(p, ue->expr);
+
+		Type *type = v.type;
+		lbAddr addr = {};
+		if (p->is_startup) {
+			addr = lb_add_global_generated(p->module, type, v);
+		} else {
+			addr = lb_add_local_generated(p, type, false);
+		}
+		lb_addr_store(p, addr, v);
+		return addr.addr;
+
+	} else if (ue_expr->kind == Ast_TypeAssertion) {
+		if (is_type_tuple(tv.type)) {
+			Type *tuple = tv.type;
+			Type *ptr_type = tuple->Tuple.variables[0]->type;
+			Type *ok_type = tuple->Tuple.variables[1]->type;
+
+			ast_node(ta, TypeAssertion, ue_expr);
+			TokenPos pos = ast_token(expr).pos;
+			Type *type = type_of_expr(ue_expr);
+			GB_ASSERT(!is_type_tuple(type));
+
+			lbValue e = lb_build_expr(p, ta->expr);
+			Type *t = type_deref(e.type);
+			if (is_type_union(t)) {
+				lbValue v = e;
+				if (!is_type_pointer(v.type)) {
+					v = lb_address_from_load_or_generate_local(p, v);
+				}
+				Type *src_type = type_deref(v.type);
+				Type *dst_type = type;
+
+				lbValue src_tag = {};
+				lbValue dst_tag = {};
+				if (is_type_union_maybe_pointer(src_type)) {
+					src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
+					dst_tag = lb_const_bool(p->module, t_bool, true);
+				} else {
+					src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
+					dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+				}
+
+				lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
+
+				lbValue data_ptr = lb_emit_conv(p, v, ptr_type);
+				lbAddr res = lb_add_local_generated(p, tuple, true);
+				lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
+				lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
+				lb_emit_store(p, gep0, lb_emit_select(p, ok, data_ptr, lb_const_nil(p->module, ptr_type)));
+				lb_emit_store(p, gep1, lb_emit_conv(p, ok, ok_type));
+				return lb_addr_load(p, res);
+			} else if (is_type_any(t)) {
+				lbValue v = e;
+				if (is_type_pointer(v.type)) {
+					v = lb_emit_load(p, v);
+				}
+
+				lbValue data_ptr = lb_emit_conv(p, lb_emit_struct_ev(p, v, 0), ptr_type);
+				lbValue any_id = lb_emit_struct_ev(p, v, 1);
+				lbValue id = lb_typeid(p->module, type);
+
+				lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
+
+				lbAddr res = lb_add_local_generated(p, tuple, false);
+				lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
+				lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
+				lb_emit_store(p, gep0, lb_emit_select(p, ok, data_ptr, lb_const_nil(p->module, ptr_type)));
+				lb_emit_store(p, gep1, lb_emit_conv(p, ok, ok_type));
+				return lb_addr_load(p, res);
+			} else {
+				GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+			}
+
+		} else {
+			GB_ASSERT(is_type_pointer(tv.type));
+
+			ast_node(ta, TypeAssertion, ue_expr);
+			TokenPos pos = ast_token(expr).pos;
+			Type *type = type_of_expr(ue_expr);
+			GB_ASSERT(!is_type_tuple(type));
+
+			lbValue e = lb_build_expr(p, ta->expr);
+			Type *t = type_deref(e.type);
+			if (is_type_union(t)) {
+				lbValue v = e;
+				if (!is_type_pointer(v.type)) {
+					v = lb_address_from_load_or_generate_local(p, v);
+				}
+				Type *src_type = type_deref(v.type);
+				Type *dst_type = type;
+
+				lbValue src_tag = {};
+				lbValue dst_tag = {};
+				if (is_type_union_maybe_pointer(src_type)) {
+					src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
+					dst_tag = lb_const_bool(p->module, t_bool, true);
+				} else {
+					src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
+					dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+				}
+
+				lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
+				auto args = array_make<lbValue>(permanent_allocator(), 6);
+				args[0] = ok;
+
+				args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
+				args[2] = lb_const_int(p->module, t_i32, pos.line);
+				args[3] = lb_const_int(p->module, t_i32, pos.column);
+
+				args[4] = lb_typeid(p->module, src_type);
+				args[5] = lb_typeid(p->module, dst_type);
+				lb_emit_runtime_call(p, "type_assertion_check", args);
+
+				lbValue data_ptr = v;
+				return lb_emit_conv(p, data_ptr, tv.type);
+			} else if (is_type_any(t)) {
+				lbValue v = e;
+				if (is_type_pointer(v.type)) {
+					v = lb_emit_load(p, v);
+				}
+
+				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
+				lbValue any_id = lb_emit_struct_ev(p, v, 1);
+				lbValue id = lb_typeid(p->module, type);
+
+
+				lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
+				auto args = array_make<lbValue>(permanent_allocator(), 6);
+				args[0] = ok;
+
+				args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
+				args[2] = lb_const_int(p->module, t_i32, pos.line);
+				args[3] = lb_const_int(p->module, t_i32, pos.column);
+
+				args[4] = any_id;
+				args[5] = id;
+				lb_emit_runtime_call(p, "type_assertion_check", args);
+
+				return lb_emit_conv(p, data_ptr, tv.type);
+			} else {
+				GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+			}
+		}
+	}
+
+	return lb_build_addr_ptr(p, ue->expr);
+}
+
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -12040,94 +12228,8 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_And: {
-			Ast *ue_expr = unparen_expr(ue->expr);
-			if (ue_expr->kind == Ast_CompoundLit) {
-				lbValue v = lb_build_expr(p, ue->expr);
-
-				Type *type = v.type;
-				lbAddr addr = {};
-				if (p->is_startup) {
-					addr = lb_add_global_generated(p->module, type, v);
-				} else {
-					addr = lb_add_local_generated(p, type, false);
-				}
-				lb_addr_store(p, addr, v);
-				return addr.addr;
-
-			} else if (ue_expr->kind == Ast_TypeAssertion) {
-				GB_ASSERT(is_type_pointer(tv.type));
-
-				ast_node(ta, TypeAssertion, ue_expr);
-				TokenPos pos = ast_token(expr).pos;
-				Type *type = type_of_expr(ue_expr);
-				GB_ASSERT(!is_type_tuple(type));
-
-				lbValue e = lb_build_expr(p, ta->expr);
-				Type *t = type_deref(e.type);
-				if (is_type_union(t)) {
-					lbValue v = e;
-					if (!is_type_pointer(v.type)) {
-						v = lb_address_from_load_or_generate_local(p, v);
-					}
-					Type *src_type = type_deref(v.type);
-					Type *dst_type = type;
-
-					lbValue src_tag = {};
-					lbValue dst_tag = {};
-					if (is_type_union_maybe_pointer(src_type)) {
-						src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
-						dst_tag = lb_const_bool(p->module, t_bool, true);
-					} else {
-						src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-						dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
-					}
-
-					lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
-					auto args = array_make<lbValue>(permanent_allocator(), 6);
-					args[0] = ok;
-
-					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-					args[2] = lb_const_int(p->module, t_i32, pos.line);
-					args[3] = lb_const_int(p->module, t_i32, pos.column);
-
-					args[4] = lb_typeid(p->module, src_type);
-					args[5] = lb_typeid(p->module, dst_type);
-					lb_emit_runtime_call(p, "type_assertion_check", args);
-
-					lbValue data_ptr = v;
-					return lb_emit_conv(p, data_ptr, tv.type);
-				} else if (is_type_any(t)) {
-					lbValue v = e;
-					if (is_type_pointer(v.type)) {
-						v = lb_emit_load(p, v);
-					}
-
-					lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
-					lbValue any_id = lb_emit_struct_ev(p, v, 1);
-					lbValue id = lb_typeid(p->module, type);
-
-
-					lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
-					auto args = array_make<lbValue>(permanent_allocator(), 6);
-					args[0] = ok;
-
-					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-					args[2] = lb_const_int(p->module, t_i32, pos.line);
-					args[3] = lb_const_int(p->module, t_i32, pos.column);
-
-					args[4] = any_id;
-					args[5] = id;
-					lb_emit_runtime_call(p, "type_assertion_check", args);
-
-					return lb_emit_conv(p, data_ptr, tv.type);
-				} else {
-					GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
-				}
-			}
-
-			return lb_build_addr_ptr(p, ue->expr);
-		}
+		case Token_And:
+			return lb_build_unary_and(p, expr);
 		default:
 			{
 				lbValue v = lb_build_expr(p, ue->expr);
@@ -12589,9 +12691,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_And: {
+		case Token_And:
 			return lb_build_addr(p, ue->expr);
-		}
 		default:
 			GB_PANIC("Invalid unary expression for lb_build_addr");
 		}

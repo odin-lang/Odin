@@ -7,23 +7,24 @@ struct AstFile;
 struct AstPackage;
 
 enum AddressingMode {
-	Addressing_Invalid   = 0,    // invalid addressing mode
-	Addressing_NoValue   = 1,    // no value (void in C)
-	Addressing_Value     = 2,    // computed value (rvalue)
-	Addressing_Context   = 3,    // context value
-	Addressing_Variable  = 4,    // addressable variable (lvalue)
-	Addressing_Constant  = 5,    // constant
-	Addressing_Type      = 6,    // type
-	Addressing_Builtin   = 7,    // built-in procedure
-	Addressing_ProcGroup = 8,    // procedure group (overloaded procedure)
-	Addressing_MapIndex  = 9,    // map index expression -
-	                             // 	lhs: acts like a Variable
-	                             // 	rhs: acts like OptionalOk
-	Addressing_OptionalOk  = 10, // rhs: acts like a value with an optional boolean part (for existence check)
-	Addressing_SoaVariable = 11, // Struct-Of-Arrays indexed variable
+	Addressing_Invalid   = 0,        // invalid addressing mode
+	Addressing_NoValue   = 1,        // no value (void in C)
+	Addressing_Value     = 2,        // computed value (rvalue)
+	Addressing_Context   = 3,        // context value
+	Addressing_Variable  = 4,        // addressable variable (lvalue)
+	Addressing_Constant  = 5,        // constant
+	Addressing_Type      = 6,        // type
+	Addressing_Builtin   = 7,        // built-in procedure
+	Addressing_ProcGroup = 8,        // procedure group (overloaded procedure)
+	Addressing_MapIndex  = 9,        // map index expression -
+	                                 //         lhs: acts like a Variable
+	                                 //         rhs: acts like OptionalOk
+	Addressing_OptionalOk    = 10,   // rhs: acts like a value with an optional boolean part (for existence check)
+	Addressing_OptionalOkPtr = 11,   // rhs: same as OptionalOk but the value is a pointer
+	Addressing_SoaVariable   = 12,   // Struct-Of-Arrays indexed variable
 
-	Addressing_SwizzleValue    = 12, // Swizzle indexed value
-	Addressing_SwizzleVariable = 13, // Swizzle indexed variable
+	Addressing_SwizzleValue    = 13, // Swizzle indexed value
+	Addressing_SwizzleVariable = 14, // Swizzle indexed variable
 };
 
 struct TypeAndValue {
