@@ -1778,16 +1778,16 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 		return false;
 	}
 
-	if (o->mode != Addressing_Variable) {
-		return true;
-	}
-
-	return false;
+	return o->mode != Addressing_Variable;
 }
 
 void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
+		if (node->kind == Ast_TypeAssertion) {
+			gb_printf_err("%s\n", expr_to_string(node));
+		}
+
 		if (check_is_not_addressable(c, o)) {
 			if (ast_node_expect(node, Ast_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
@@ -1818,8 +1818,19 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			o->mode = Addressing_Invalid;
 			return;
 		}
-		o->mode = Addressing_Value;
+
 		o->type = alloc_type_pointer(o->type);
+
+		switch (o->mode) {
+		case Addressing_OptionalOk:
+		case Addressing_MapIndex:
+			o->mode = Addressing_OptionalOkPtr;
+			break;
+		default:
+			o->mode = Addressing_Value;
+			break;
+		}
+
 		return;
 	}
 	}
@@ -3892,7 +3903,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			operand->mode = Addressing_Value;
 		} else if (entity->flags & EntityFlag_SoaPtrField) {
 			operand->mode = Addressing_SoaVariable;
-		} else if (operand->mode == Addressing_OptionalOk) {
+		} else if (operand->mode == Addressing_OptionalOk || operand->mode == Addressing_OptionalOkPtr) {
 			operand->mode = Addressing_Value;
 		} else if (operand->mode == Addressing_SoaVariable) {
 			operand->mode = Addressing_Variable;
@@ -4015,7 +4026,7 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (lhs.count == 2 && rhs.count == 1 &&
-			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
+			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
 			    	bool do_normal = true;
 				Ast *expr = unparen_expr(o.expr);
 
@@ -4046,7 +4057,8 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
 				}
 
-				if (o.mode == Addressing_OptionalOk && expr->kind == Ast_TypeAssertion) {
+				if (expr->kind == Ast_TypeAssertion &&
+				    (o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
 					// NOTE(bill): Used only for optimizations in the backend
 					if (is_blank_ident(lhs[0].expr)) {
 						expr->TypeAssertion.ignores[0] = true;
@@ -4139,7 +4151,7 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
-			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
+			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
 				bool do_normal = true;
 				Ast *expr = unparen_expr(o.expr);
 
@@ -4170,7 +4182,8 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
 				}
 
-				if (o.mode == Addressing_OptionalOk && expr->kind == Ast_TypeAssertion) {
+				if (expr->kind == Ast_TypeAssertion &&
+				    (o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
 					// NOTE(bill): Used only for optimizations in the backend
 					if (is_blank_ident(lhs[0]->token)) {
 						expr->TypeAssertion.ignores[0] = true;
@@ -7505,15 +7518,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		check_expr_base(c, o, ue->expr, th);
 		node->viral_state_flags |= ue->expr->viral_state_flags;
 
-		if (o->mode == Addressing_Invalid) {
-			o->expr = node;
-			return kind;
+		if (o->mode != Addressing_Invalid) {
+			check_unary_expr(c, o, ue->op, node);
 		}
-		check_unary_expr(c, o, ue->op, node);
-		if (o->mode == Addressing_Invalid) {
-			o->expr = node;
-			return kind;
-		}
+		o->expr = node;
+		return kind;
 	case_end;
 
 
