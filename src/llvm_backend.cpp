@@ -14850,8 +14850,10 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lb_emit_call(p, runner, args);
 	} else {
-		lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
-		lb_emit_call(p, entry_point, {});
+		if (m->info->entry_point != nullptr) {
+			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
+			lb_emit_call(p, entry_point, {});
+		}
 	}
 
 	LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
