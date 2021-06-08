@@ -7040,11 +7040,11 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 	#if 1
 		#if 1
 		unsigned n = cast(unsigned)count;
-		auto dst_ptrs = array_make<lbValue>(temporary_allocator(), count);
+		auto dst_ptrs = slice_make<lbValue>(temporary_allocator(), count);
 
-		auto a_loads = array_make<lbValue>(temporary_allocator(), count);
-		auto b_loads = array_make<lbValue>(temporary_allocator(), count);
-		auto c_ops = array_make<lbValue>(temporary_allocator(), count);
+		auto a_loads = slice_make<lbValue>(temporary_allocator(), count);
+		auto b_loads = slice_make<lbValue>(temporary_allocator(), count);
+		auto c_ops = slice_make<lbValue>(temporary_allocator(), count);
 
 		for (unsigned i = 0; i < n; i++) {
 			a_loads[i].value = LLVMBuildExtractValue(p->builder, lhs.value, i, "");
@@ -7069,13 +7069,13 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 		lbValue x = lb_address_from_load_or_generate_local(p, lhs);
 		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
 
-		auto a_ptrs = array_make<lbValue>(temporary_allocator(), count);
-		auto b_ptrs = array_make<lbValue>(temporary_allocator(), count);
-		auto dst_ptrs = array_make<lbValue>(temporary_allocator(), count);
+		auto a_ptrs = slice_make<lbValue>(temporary_allocator(), count);
+		auto b_ptrs = slice_make<lbValue>(temporary_allocator(), count);
+		auto dst_ptrs = slice_make<lbValue>(temporary_allocator(), count);
 
-		auto a_loads = array_make<lbValue>(temporary_allocator(), count);
-		auto b_loads = array_make<lbValue>(temporary_allocator(), count);
-		auto c_ops = array_make<lbValue>(temporary_allocator(), count);
+		auto a_loads = slice_make<lbValue>(temporary_allocator(), count);
+		auto b_loads = slice_make<lbValue>(temporary_allocator(), count);
+		auto c_ops = slice_make<lbValue>(temporary_allocator(), count);
 
 		for (i64 i = 0; i < count; i++) {
 			a_ptrs[i] = lb_emit_array_epi(p, x, i);
@@ -11439,6 +11439,12 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		char const *runtime_procedure = "";
 		i64 sz = 8*type_size_of(a);
 		switch (sz) {
+		case 32:
+			switch (op_kind) {
+			case Token_CmpEq: runtime_procedure = "complex32_eq"; break;
+			case Token_NotEq: runtime_procedure = "complex32_ne"; break;
+			}
+			break;
 		case 64:
 			switch (op_kind) {
 			case Token_CmpEq: runtime_procedure = "complex64_eq"; break;
@@ -11464,6 +11470,12 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		char const *runtime_procedure = "";
 		i64 sz = 8*type_size_of(a);
 		switch (sz) {
+		case 64:
+			switch (op_kind) {
+			case Token_CmpEq: runtime_procedure = "quaternion64_eq"; break;
+			case Token_NotEq: runtime_procedure = "quaternion64_ne"; break;
+			}
+			break;
 		case 128:
 			switch (op_kind) {
 			case Token_CmpEq: runtime_procedure = "quaternion128_eq"; break;
