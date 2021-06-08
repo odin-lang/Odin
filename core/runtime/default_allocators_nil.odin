@@ -1,4 +1,4 @@
-//+build freestanding, js
+//+build freestanding
 package runtime
 
 // mem.nil_allocator reimplementation

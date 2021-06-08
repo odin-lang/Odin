@@ -152,7 +152,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	String output_base = gen->output_base;
 
-	if (build_context.metrics.os == TargetOs_js) {
+	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 		system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm-obj\" -o \"%.*s.wasm\" %.*s %.*s",

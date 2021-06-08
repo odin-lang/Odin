@@ -5121,7 +5121,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *>
 			for_array(fp_idx, fl->filepaths) {
 				String file_str = fl->filepaths[fp_idx].string;
 				String fullpath = file_str;
-				if (build_context.metrics.os != TargetOs_js) {
+				if (allow_check_foreign_filepath()) {
 					String foreign_path = {};
 					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
 					if (!ok) {

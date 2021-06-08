@@ -1,6 +1,5 @@
 //+build !freestanding
 //+build !windows
-//+build !js
 package runtime
 
 import "core:os"
