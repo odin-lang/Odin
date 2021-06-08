@@ -2235,11 +2235,17 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		};
 
 		for (i64 i = 0; i < old_array->Array.count; i++) {
-			Type *array_type = alloc_type_array(old_array->Array.elem, count);
+			Type *field_type = nullptr;
+			if (soa_kind == StructSoa_Fixed) {
+				GB_ASSERT(count >= 0);
+				field_type = alloc_type_array(old_array->Array.elem, count);
+			} else {
+				field_type = alloc_type_pointer(old_array->Array.elem);
+			}
 			Token token = {};
 			token.string = params_xyzw[i];
 
-			Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
+			Entity *new_field = alloc_entity_field(scope, token, field_type, false, cast(i32)i);
 			soa_struct->Struct.fields[i] = new_field;
 			add_entity(ctx->checker, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
@@ -2266,8 +2272,14 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		for_array(i, old_struct->Struct.fields) {
 			Entity *old_field = old_struct->Struct.fields[i];
 			if (old_field->kind == Entity_Variable) {
-				Type *array_type = alloc_type_array(old_field->type, count);
-				Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+				Type *field_type = nullptr;
+				if (soa_kind == StructSoa_Fixed) {
+					GB_ASSERT(count >= 0);
+					field_type = alloc_type_array(old_field->type, count);
+				} else {
+					field_type = alloc_type_pointer(old_field->type);
+				}
+				Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_src_index);
 				soa_struct->Struct.fields[i] = new_field;
 				add_entity(ctx->checker, scope, nullptr, new_field);
 				add_entity_use(ctx, nullptr, new_field);
