@@ -419,3 +419,4 @@ void  check_poly_path_push(CheckerContext *c, Type *t);
 Type *check_poly_path_pop (CheckerContext *c);
 
 void init_core_context(Checker *c);
+void init_mem_allocator(Checker *c);
