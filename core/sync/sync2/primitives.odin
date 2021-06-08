@@ -2,6 +2,10 @@ package sync2
 
 import "core:time"
 
+current_thread_id :: proc "contextless" () -> int {
+	return _current_thread_id();
+}
+
 // A Mutex is a mutual exclusion lock
 // The zero value for a Mutex is an unlocked mutex
 //

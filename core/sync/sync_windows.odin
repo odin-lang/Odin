@@ -4,6 +4,10 @@ package sync
 import win32 "core:sys/windows"
 import "core:time"
 
+current_thread_id :: proc "contextless" () -> int {
+	return int(win32.GetCurrentThreadId());
+}
+
 
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
 // Posting to the semaphore increases the count by one, or the provided amount.

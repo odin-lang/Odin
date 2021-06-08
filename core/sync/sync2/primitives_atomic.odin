@@ -233,7 +233,7 @@ Atomic_Recursive_Mutex :: struct {
 }
 
 atomic_recursive_mutex_lock :: proc(m: ^Atomic_Recursive_Mutex) {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	if tid != m.owner {
 		mutex_lock(&m.mutex);
 	}
@@ -243,7 +243,7 @@ atomic_recursive_mutex_lock :: proc(m: ^Atomic_Recursive_Mutex) {
 }
 
 atomic_recursive_mutex_unlock :: proc(m: ^Atomic_Recursive_Mutex) {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	assert(tid == m.owner);
 	m.recursion -= 1;
 	recursion := m.recursion;
@@ -258,7 +258,7 @@ atomic_recursive_mutex_unlock :: proc(m: ^Atomic_Recursive_Mutex) {
 }
 
 atomic_recursive_mutex_try_lock :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	if m.owner == tid {
 		return mutex_try_lock(&m.mutex);
 	}
