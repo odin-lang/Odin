@@ -797,9 +797,18 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *array_type = base_type(addr.swizzle.type);
 		GB_ASSERT(array_type->kind == Type_Array);
 
+		unsigned res_align = cast(unsigned)type_align_of(addr.swizzle.type);
+
 		static u8 const ordered_indices[4] = {0, 1, 2, 3};
 		if (gb_memcompare(ordered_indices, addr.swizzle.indices, addr.swizzle.count) == 0) {
-			if (LLVMGetAlignment(addr.addr.value) >= type_align_of(addr.swizzle.type)) {
+			LLVMValueRef addr_ptr = addr.addr.value;
+			if (LLVMGetAlignment(addr.addr.value) < res_align) {
+				if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
+					LLVMSetAlignment(addr_ptr, res_align);
+				}
+			}
+
+			if (LLVMGetAlignment(addr.addr.value) >= res_align) {
 				Type *pt = alloc_type_pointer(addr.swizzle.type);
 				lbValue res = {};
 				res.value = LLVMBuildPointerCast(p->builder, addr.addr.value, lb_type(p->module, pt), "");
