@@ -5189,6 +5189,8 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 }
 
 void lb_build_return_stmt(lbProcedure *p, AstReturnStmt *rs) {
+	lb_ensure_abi_function_type(p->module, p);
+
 	lbValue res = {};
 
 	TypeTuple *tuple  = &p->type->Proc.results->Tuple;
@@ -5254,6 +5256,9 @@ void lb_build_return_stmt(lbProcedure *p, AstReturnStmt *rs) {
 		GB_ASSERT(results.count == return_count);
 
 		if (p->type->Proc.has_named_results) {
+			auto named_results = slice_make<lbValue>(temporary_allocator(), results.count);
+			auto values = slice_make<lbValue>(temporary_allocator(), results.count);
+
 			// NOTE(bill): store the named values before returning
 			for_array(i, p->type->Proc.results->Tuple.variables) {
 				Entity *e = p->type->Proc.results->Tuple.variables[i];
@@ -5266,25 +5271,47 @@ void lb_build_return_stmt(lbProcedure *p, AstReturnStmt *rs) {
 				}
 				lbValue *found = map_get(&p->module->values, hash_entity(e));
 				GB_ASSERT(found != nullptr);
-				lb_emit_store(p, *found, lb_emit_conv(p, results[i], e->type));
+				named_results[i] = *found;
+				values[i] = lb_emit_conv(p, results[i], e->type);
+			}
+
+			for_array(i, named_results) {
+				lb_emit_store(p, named_results[i], values[i]);
 			}
 		}
 
 		Type *ret_type = p->type->Proc.results;
+
 		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-		res = lb_add_local_generated(p, ret_type, false).addr;
+		if (return_by_pointer) {
+			res = p->return_ptr.addr;
+		} else {
+			res = lb_add_local_generated(p, ret_type, false).addr;
+		}
+
+		auto result_values = slice_make<lbValue>(temporary_allocator(), results.count);
+		auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count);
+
 		for_array(i, results) {
-			Entity *e = tuple->variables[i];
-			lbValue field = lb_emit_struct_ep(p, res, cast(i32)i);
-			lbValue val = lb_emit_conv(p, results[i], e->type);
-			lb_emit_store(p, field, val);
+			result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
+		}
+		for_array(i, results) {
+			result_eps[i] = lb_emit_struct_ep(p, res, cast(i32)i);
+		}
+		for_array(i, result_values) {
+			lb_emit_store(p, result_eps[i], result_values[i]);
+		}
+
+		if (return_by_pointer) {
+			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+			LLVMBuildRetVoid(p->builder);
+			return;
 		}
 
 		res = lb_emit_load(p, res);
 	}
 
 
-	lb_ensure_abi_function_type(p->module, p);
 	if (return_by_pointer) {
 		if (res.value != nullptr) {
 			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
@@ -14695,6 +14722,7 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 
 	lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
 	p->is_startup = true;
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 	lb_begin_procedure_body(p);
 
