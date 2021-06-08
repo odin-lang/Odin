@@ -2819,7 +2819,12 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 			char const *export_name = alloc_cstring(permanent_allocator(), p->name);
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
 		}
+	} else if (!p->is_foreign) {
+		if (!USE_SEPARTE_MODULES) {
+			LLVMSetLinkage(p->value, LLVMInternalLinkage);
+		}
 	}
+
 	if (p->is_foreign) {
 		if (is_arch_wasm()) {
 			char const *import_name = alloc_cstring(permanent_allocator(), p->name);
@@ -6066,6 +6071,23 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	return {};
 }
 
+void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name) {
+	if (other_module == nullptr) {
+		return;
+	}
+	char const *cname = alloc_cstring(temporary_allocator(), name);
+
+	LLVMValueRef other_global = nullptr;
+	if (e->kind == Entity_Variable) {
+		other_global = LLVMGetNamedGlobal(other_module->mod, cname);
+	} else if (e->kind == Entity_Procedure) {
+		other_global = LLVMGetNamedFunction(other_module->mod, cname);
+	}
+	if (other_global) {
+		LLVMSetLinkage(other_global, LLVMExternalLinkage);
+	}
+}
+
 lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
@@ -6106,12 +6128,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
-			// if (other_module != nullptr) {
-			// 	lbValue *other_found = string_map_get(&other_module->members, name);
-			// 	if (other_found) {
-			// 		lbValue other_g = *other_found;
-			// 	}
-			// }
+			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
 
 			// LLVMSetLinkage(other_g.value, LLVMExternalLinkage);
 
@@ -11819,6 +11836,8 @@ lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
 		if (other_module != m) {
 
 			String name = lb_get_entity_name(other_module, e);
+
+			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
 
 			lbValue g = {};
 			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
