@@ -1,7 +1,6 @@
 package sync2
 
 import "core:time"
-import "core:runtime"
 
 Atomic_Mutex_State :: enum i32 {
 	Unlocked = 0,

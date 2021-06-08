@@ -1,7 +1,5 @@
 package sync2
 
-import "core:runtime"
-
 // A Wait_Group waits for a collection of threads to finish
 //
 // A Wait_Group must not be copied after first use
