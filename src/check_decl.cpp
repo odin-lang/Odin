@@ -648,7 +648,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	if (d->gen_proc_type != nullptr) {
 		proc_type = d->gen_proc_type;
 	} else {
-		proc_type = alloc_type_proc(e->scope, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+		proc_type = alloc_type_proc(e->scope, nullptr, 0, nullptr, 0, false, default_calling_convention());
 	}
 	e->type = proc_type;
 	ast_node(pl, ProcLit, d->proc_lit);
@@ -746,10 +746,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
 			gb_string_free(str);
 		}
-		if (pt->calling_convention != ProcCC_Odin) {
+		if (pt->calling_convention != default_calling_convention()) {
 			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
-		pt->calling_convention = ProcCC_Odin;
+		pt->calling_convention = default_calling_convention();
 		if (e->pkg->kind == Package_Init) {
 			if (ctx->info->entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");

@@ -208,24 +208,28 @@ enum ProcTag {
 	ProcTag_optional_second = 1<<6,
 };
 
-enum ProcCallingConvention {
-	ProcCC_Invalid = 0,
-	ProcCC_Odin = 1,
+enum ProcCallingConvention : i32 {
+	ProcCC_Invalid     = 0,
+	ProcCC_Odin        = 1,
 	ProcCC_Contextless = 2,
-	ProcCC_CDecl = 3,
-	ProcCC_StdCall = 4,
-	ProcCC_FastCall = 5,
+	ProcCC_CDecl       = 3,
+	ProcCC_StdCall     = 4,
+	ProcCC_FastCall    = 5,
 
-	ProcCC_None = 6,
-	ProcCC_Naked = 7,
+	ProcCC_None        = 6,
+	ProcCC_Naked       = 7,
 
-	ProcCC_InlineAsm = 8,
+	ProcCC_InlineAsm   = 8,
 
 	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
 };
+
+ProcCallingConvention default_calling_convention(void) {
+	return ProcCC_Odin;
+}
 
 enum StateFlag : u16 {
 	StateFlag_bounds_check    = 1<<0,

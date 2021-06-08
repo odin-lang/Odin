@@ -3618,9 +3618,14 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 		switch (type->Proc.calling_convention) {
 		case ProcCC_Odin:
+			if (default_calling_convention() != ProcCC_Odin) {
+				str = gb_string_appendc(str, " \"odin\" ");
+			}
 			break;
 		case ProcCC_Contextless:
-			str = gb_string_appendc(str, " \"contextless\" ");
+			if (default_calling_convention() != ProcCC_Contextless) {
+				str = gb_string_appendc(str, " \"contextless\" ");
+			}
 			break;
 		case ProcCC_CDecl:
 			str = gb_string_appendc(str, " \"cdecl\" ");
