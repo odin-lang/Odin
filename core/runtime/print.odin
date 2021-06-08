@@ -86,7 +86,7 @@ print_encoded_rune :: proc "contextless" (r: rune) {
 	print_byte('\'');
 }
 
-print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) {
+print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) #no_bounds_check {
 	RUNE_SELF :: 0x80;
 
 	if r < RUNE_SELF {
@@ -98,7 +98,7 @@ print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) {
 }
 
 
-print_u64 :: proc "contextless" (x: u64) {
+print_u64 :: proc "contextless" (x: u64) #no_bounds_check {
 	digits := _INTEGER_DIGITS;
 
 	a: [129]byte;
@@ -115,7 +115,7 @@ print_u64 :: proc "contextless" (x: u64) {
 }
 
 
-print_i64 :: proc "contextless" (x: i64) {
+print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
 	digits := _INTEGER_DIGITS;
 	b :: i64(10);
 
