@@ -309,15 +309,14 @@ i32 linker_stage(lbGenerator *gen) {
 				);
 			}
 		} else { // lld
-			  result = system_exec_command_line_app("msvc-link",
+			  result = system_exec_command_line_app("msvc-lld-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
 				" %.*s "
 				" %s "
 				"",
-				LIT(build_context.ODIN_ROOT),
-				LIT(output_base), object_files, output_ext,
+				LIT(build_context.ODIN_ROOT), object_files, LIT(output_base),output_ext,
 				link_settings,
 				subsystem_str,
 				LIT(build_context.link_flags),
