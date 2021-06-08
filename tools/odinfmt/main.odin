@@ -1,6 +1,7 @@
 package odinfmt
 
 import "core:os"
+import "core:odin/tokenizer"
 import "core:odin/format"
 import "core:fmt"
 import "core:strings"
@@ -23,14 +24,30 @@ print_help :: proc(args: []string) {
 	fmt.eprintln();
 }
 
-print_arg_error :: proc(error: flag.Flag_Error) {
-	fmt.println(error);
+print_arg_error :: proc(args: []string, error: flag.Flag_Error) {
+	switch error {
+	case .None:
+		print_help(args);
+	case .No_Base_Struct:
+		fmt.eprintln(args[0], "no base struct");
+	case .Arg_Error:
+		fmt.eprintln(args[0], "argument error");
+	case .Arg_Unsupported_Field_Type:
+		fmt.eprintln(args[0], "argument: unsupported field type");
+	case .Arg_Not_Defined:
+		fmt.eprintln(args[0], "argument: no defined");
+	case .Arg_Non_Optional:
+		fmt.eprintln(args[0], "argument: non optional");
+	case .Value_Parse_Error:
+		fmt.eprintln(args[0], "argument: value parse error");
+	case .Tag_Error:
+		fmt.eprintln(args[0], "argument: tag error");
+	}
 }
 
 format_file :: proc(filepath: string) -> (string, bool) {
-
 	if data, ok := os.read_entire_file(filepath); ok {
-		return format.format(string(data), format.default_style);
+		return format.format(filepath, string(data), format.default_style);
 	} else {
 		return "", false;
 	}
@@ -63,13 +80,15 @@ main :: proc() {
 	}
 
 	if res := flag.parse(args, os.args[1:len(os.args) - 1]); res != .None {
-		print_arg_error(res);
+		print_arg_error(os.args, res);
 		os.exit(1);
 	}
 
 	path := os.args[len(os.args) - 1];
 
 	tick_time := time.tick_now();
+
+	write_failure := false;
 
 	if os.is_file(path) {
 		if _, ok := args.write.(bool); ok {
@@ -84,6 +103,7 @@ main :: proc() {
 				}
 			} else {
 				fmt.eprintf("failed to write %v", path);
+				write_failure = true;
 			}
 		} else {
 			if data, ok := format_file(path); ok {
@@ -112,6 +132,7 @@ main :: proc() {
 				}
 			} else {
 				fmt.eprintf("failed to format %v", file);
+				write_failure = true;
 			}
 		}
 
@@ -121,5 +142,5 @@ main :: proc() {
 		os.exit(1);
 	}
 
-	os.exit(0);
+	os.exit(1 if write_failure else 0);
 }
