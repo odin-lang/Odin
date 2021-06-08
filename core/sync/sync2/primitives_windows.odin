@@ -5,6 +5,10 @@ package sync2
 import "core:time"
 import win32 "core:sys/windows"
 
+_current_thread_id :: proc "contextless" () -> int {
+	return int(win32.GetCurrentThreadId());
+}
+
 _Mutex :: struct {
 	srwlock: win32.SRWLOCK,
 }

@@ -2,6 +2,18 @@ package sync
 
 import "core:sys/unix"
 
+foreign import libc "system:c"
+
+current_thread_id :: proc "contextless" () -> int {
+	foreign libc {
+		syscall :: proc(number: i32, #c_vararg args: ..any) -> i32 ---
+	}
+
+	SYS_GETTID :: 186;
+	return int(syscall(SYS_GETTID));
+}
+
+
 // The Darwin docs say it best:
 // A semaphore is much like a lock, except that a finite number of threads can hold it simultaneously.
 // Semaphores can be thought of as being much like piles of tokens; multiple threads can take these tokens, 

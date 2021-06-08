@@ -329,8 +329,6 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	thread_id:  int,
-
 	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
@@ -479,7 +477,6 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.temp_allocator.procedure = default_temp_allocator_proc;
 	c.temp_allocator.data = &global_default_temp_allocator_data;
 
-	c.thread_id = current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
 	c.assertion_failure_proc = default_assertion_failure_proc;
 
 	c.logger.procedure = default_logger_proc;
