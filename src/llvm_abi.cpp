@@ -151,7 +151,7 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// TODO(bill): Clean up this logic
-	if (build_context.metrics.os != TargetOs_js)  {
+	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[calling_convention];
 	}
 	LLVMSetFunctionCallConv(fn, cc_kind);

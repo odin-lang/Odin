@@ -2753,7 +2753,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	if (false) {
 		lbCallingConventionKind cc_kind = lbCallingConvention_C;
 		// TODO(bill): Clean up this logic
-		if (build_context.metrics.os != TargetOs_js)  {
+		if (!is_arch_wasm()) {
 			cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
 		}
 		LLVMSetFunctionCallConv(p->value, cc_kind);
@@ -2815,13 +2815,13 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
 		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
 
-		if (build_context.metrics.os == TargetOs_js) {
+		if (is_arch_wasm()) {
 			char const *export_name = alloc_cstring(permanent_allocator(), p->name);
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
 		}
 	}
 	if (p->is_foreign) {
-		if (build_context.metrics.os == TargetOs_js) {
+		if (is_arch_wasm()) {
 			char const *import_name = alloc_cstring(permanent_allocator(), p->name);
 			char const *module_name = "env";
 			if (entity->Procedure.foreign_library != nullptr) {
@@ -2959,7 +2959,7 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 	Type *pt = p->type;
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// TODO(bill): Clean up this logic
-	if (build_context.metrics.os != TargetOs_js)  {
+	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
 	}
 	LLVMSetFunctionCallConv(p->value, cc_kind);
@@ -14901,18 +14901,20 @@ String lb_filepath_obj_for_module(lbModule *m) {
 	if (build_context.build_mode == BuildMode_Assembly) {
 		ext = STR_LIT(".S");
 	} else {
-		switch (build_context.metrics.os) {
-		case TargetOs_windows:
-			ext = STR_LIT(".obj");
-			break;
-		case TargetOs_darwin:
-		case TargetOs_linux:
-		case TargetOs_essence:
-			ext = STR_LIT(".o");
-			break;
-		case TargetOs_js:
-			ext = STR_LIT(".wasm-obj");
-			break;
+		if (is_arch_wasm()) {
+			ext = STR_LIT(".wasm.o");
+		} else {
+			switch (build_context.metrics.os) {
+			case TargetOs_windows:
+				ext = STR_LIT(".obj");
+				break;
+			default:
+			case TargetOs_darwin:
+			case TargetOs_linux:
+			case TargetOs_essence:
+				ext = STR_LIT(".o");
+				break;
+			}
 		}
 	}
 
@@ -15099,7 +15101,7 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Create Target Machine");
 
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
-	if (build_context.metrics.arch == TargetArch_wasm32) {
+	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
 	}
 
