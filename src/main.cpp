@@ -178,7 +178,11 @@ i32 linker_stage(lbGenerator *gen) {
 		build_context.keep_object_files = true;
 	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
-		timings_start_section(timings, str_lit("msvc-link"));
+		String section_name = str_lit("msvc-link");
+		if (build_context.use_lld) {
+			section_name = str_lit("lld-link");
+		}
+		timings_start_section(timings, section_name);
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
