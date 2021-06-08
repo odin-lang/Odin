@@ -135,6 +135,7 @@ lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_expr) {
 }
 
 lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swizzle_indices[4]) {
+	GB_ASSERT(is_type_array(array_type));
 	GB_ASSERT(1 < swizzle_count && swizzle_count <= 4);
 	lbAddr v = {lbAddr_Swizzle, addr};
 	v.swizzle.type = array_type;
@@ -796,12 +797,26 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *array_type = base_type(addr.swizzle.type);
 		GB_ASSERT(array_type->kind == Type_Array);
 
+		static u8 const ordered_indices[4] = {0, 1, 2, 3};
+		if (gb_memcompare(ordered_indices, addr.swizzle.indices, addr.swizzle.count) == 0) {
+			if (LLVMGetAlignment(addr.addr.value) >= type_align_of(addr.swizzle.type)) {
+				Type *pt = alloc_type_pointer(addr.swizzle.type);
+				lbValue res = {};
+				res.value = LLVMBuildPointerCast(p->builder, addr.addr.value, lb_type(p->module, pt), "");
+				res.type = pt;
+				return lb_emit_load(p, res);
+			}
+		}
+
 		Type *elem_type = base_type(array_type->Array.elem);
 		lbAddr res = lb_add_local_generated(p, addr.swizzle.type, false);
 		lbValue ptr = lb_addr_get_ptr(p, res);
+		GB_ASSERT(is_type_pointer(ptr.type));
 
 		LLVMTypeRef vector_type = nullptr;
 		if (lb_try_vector_cast(p, addr.addr, &vector_type)) {
+			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(vector_type));
+
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
 			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
 			LLVMValueRef scalars[4] = {};
@@ -811,7 +826,8 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
 			LLVMValueRef sv = LLVMBuildShuffleVector(p->builder, v, LLVMGetUndef(vector_type), mask, "");
 
-			LLVMBuildStore(p->builder, sv, LLVMBuildPointerCast(p->builder, ptr.value, LLVMTypeOf(vp), ""));
+			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
+			LLVMBuildStore(p->builder, sv, dst);
 		} else {
 			for (u8 i = 0; i < addr.swizzle.count; i++) {
 				u8 index = addr.swizzle.indices[i];
