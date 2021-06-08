@@ -676,11 +676,17 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			String calling_convention = {};
 			switch (type->Proc.calling_convention) {
 			case ProcCC_Invalid:
-			case ProcCC_Odin:
 				// no need
 				break;
+			case ProcCC_Odin:
+				if (default_calling_convention() != ProcCC_Odin) {
+					calling_convention = str_lit("odin");
+				}
+				break;
 			case ProcCC_Contextless:
-				calling_convention = str_lit("contextless");
+				if (default_calling_convention() != ProcCC_Contextless) {
+					calling_convention = str_lit("contextless");
+				}
 				break;
 			case ProcCC_CDecl:
 				calling_convention = str_lit("cdecl");

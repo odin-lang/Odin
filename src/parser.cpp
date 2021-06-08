@@ -3232,7 +3232,7 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 		if (f->in_foreign_block) {
 			cc = ProcCC_ForeignBlockDefault;
 		} else {
-			cc = ProcCC_Odin;
+			cc = default_calling_convention();
 		}
 	}
 
