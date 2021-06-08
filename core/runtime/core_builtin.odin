@@ -35,26 +35,26 @@ copy :: proc{copy_slice, copy_from_string};
 
 
 @builtin
-unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
+unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array));
 	n := len(array)-1;
 	if index != n {
 		array[index] = array[n];
 	}
-	pop(array);
+	(^Raw_Dynamic_Array)(array).len -= 1;
 }
 
 @builtin
-ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
+ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array));
 	if index+1 < len(array) {
 		copy(array[index:], array[index+1:]);
 	}
-	pop(array);
+	(^Raw_Dynamic_Array)(array).len -= 1;
 }
 
 @builtin
-remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) {
+remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) #no_bounds_check {
 	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array));
 	n := max(hi-lo, 0);
 	if n > 0 {

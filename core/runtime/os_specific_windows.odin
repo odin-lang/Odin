@@ -24,7 +24,7 @@ foreign kernel32 {
 	HeapFree       :: proc(hHeap: rawptr, dwFlags: u32, lpMem: rawptr) -> b32 ---
 }
 
-_os_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) {
+_os_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_bounds_check {
 	if len(data) == 0 {
 		return 0, 0;
 	}
