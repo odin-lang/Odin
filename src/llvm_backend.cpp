@@ -8556,6 +8556,9 @@ lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel) {
 
 
 void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
+	if (p->curr_block == nullptr) {
+		return;
+	}
 	// NOTE(bill): The prev block may defer injection before it's terminator
 	LLVMValueRef last_instr = LLVMGetLastInstruction(p->curr_block->block);
 	if (last_instr != nullptr && LLVMIsAReturnInst(last_instr)) {
