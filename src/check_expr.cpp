@@ -1904,6 +1904,10 @@ void add_comparison_procedures_for_fields(CheckerContext *c, Type *t) {
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
+		case Basic_complex32:
+			add_package_dependency(c, "runtime", "complex32_eq");
+			add_package_dependency(c, "runtime", "complex32_ne");
+			break;
 		case Basic_complex64:
 			add_package_dependency(c, "runtime", "complex64_eq");
 			add_package_dependency(c, "runtime", "complex64_ne");
@@ -1911,6 +1915,10 @@ void add_comparison_procedures_for_fields(CheckerContext *c, Type *t) {
 		case Basic_complex128:
 			add_package_dependency(c, "runtime", "complex128_eq");
 			add_package_dependency(c, "runtime", "complex128_ne");
+			break;
+		case Basic_quaternion64:
+			add_package_dependency(c, "runtime", "quaternion64_eq");
+			add_package_dependency(c, "runtime", "quaternion64_ne");
 			break;
 		case Basic_quaternion128:
 			add_package_dependency(c, "runtime", "quaternion128_eq");
@@ -2854,6 +2862,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 	if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
 		Type *bt = base_type(x->type);
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_complex32:     add_package_dependency(c, "runtime", "quo_complex32");     break;
 		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
 		case Basic_complex128:    add_package_dependency(c, "runtime", "quo_complex128");    break;
 		case Basic_quaternion64:  add_package_dependency(c, "runtime", "quo_quaternion64");  break;
