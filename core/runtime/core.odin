@@ -413,7 +413,7 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 type_info_base_without_enum :: type_info_core;
 
-__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
+__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	MASK :: 1<<(8*size_of(typeid) - 8) - 1;
 	data := transmute(uintptr)id;
 	n := int(data & MASK);
