@@ -1,7 +1,6 @@
 package sync
 
 import "intrinsics"
-import "core:runtime"
 
 cpu_relax :: #force_inline proc "contextless" () {
 	intrinsics.cpu_relax();
