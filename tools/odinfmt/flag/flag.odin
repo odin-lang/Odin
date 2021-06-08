@@ -36,8 +36,7 @@ parse_args :: proc(ctx: ^Flag_Context, args: []string) -> Flag_Error {
 
 	args := args;
 
-	for true {
-
+	for {
 		if len(args) == 0 {
 			return .None;
 		}
@@ -82,15 +81,11 @@ parse_args :: proc(ctx: ^Flag_Context, args: []string) -> Flag_Error {
 		}
 
 		if reflect.is_boolean(flag.type) {
-			tmp := true;
+			tmp: b64 = true;
 			mem.copy(flag.data, &tmp, flag.type.size);
 			flag.parsed = true;
 			continue;
-		} else
-
-		//must be in the next argument
-		if value == "" {
-
+		} else if value == "" { // must be in the next argument
 			if len(args) == 0 {
 				return .Arg_Error;
 			}
