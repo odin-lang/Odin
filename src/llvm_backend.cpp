@@ -4726,6 +4726,47 @@ void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 	lb_close_scope(p, lbDeferExit_Default, nullptr);
 }
 
+bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_found_) {
+	if (ss->tag == nullptr) {
+		return false;
+	}
+	TypeAndValue tv = type_and_value_of_expr(ss->tag);
+	if (!is_type_integer(core_type(tv.type))) {
+		return false;
+	}
+
+	ast_node(body, BlockStmt, ss->body);
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+
+		if (cc->list.count == 0) {
+			if (default_found_) *default_found_ = true;
+			continue;
+		}
+
+		for_array(j, cc->list) {
+			Ast *expr = unparen_expr(cc->list[j]);
+			if (is_ast_range(expr)) {
+				return false;
+			}
+			if (expr->tav.mode == Addressing_Type) {
+				return false;
+			}
+			tv = type_and_value_of_expr(expr);
+			if (tv.mode != Addressing_Constant) {
+				return false;
+			}
+			if (!is_type_integer(core_type(tv.type))) {
+				return false;
+			}
+		}
+
+	}
+
+	return true;
+}
+
 
 void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	lb_open_scope(p, scope);
@@ -4739,15 +4780,41 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	}
 	lbBlock *done = lb_create_block(p, "switch.done"); // NOTE(bill): Append later
 
+
 	ast_node(body, BlockStmt, ss->body);
 
+
+	isize case_count = body->stmts.count;
 	Slice<Ast *> default_stmts = {};
 	lbBlock *default_fall = nullptr;
 	lbBlock *default_block = nullptr;
 
 	lbBlock *fall = nullptr;
 
-	isize case_count = body->stmts.count;
+
+	bool default_found = false;
+	bool is_trivial = lb_switch_stmt_can_be_trivial_jump_table(ss, &default_found);
+
+	LLVMValueRef switch_instr = nullptr;
+	if (is_trivial) {
+		isize num_cases = 0;
+		for_array(i, body->stmts) {
+			Ast *clause = body->stmts[i];
+			ast_node(cc, CaseClause, clause);
+			num_cases += cc->list.count;
+		}
+
+		if (default_found) {
+			default_block = lb_create_block(p, "switch.default.body");
+		}
+
+		LLVMBasicBlockRef end_block = done->block;
+		if (default_block) {
+			end_block = default_block->block;
+		}
+
+		switch_instr = LLVMBuildSwitch(p->builder, tag.value, end_block, cast(unsigned)num_cases);
+	}
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
@@ -4755,7 +4822,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 		lbBlock *body = fall;
 
 		if (body == nullptr) {
-			body = lb_create_block(p, "switch.case.body");
+			body = lb_create_block(p, cc->list.count == 0 ? "switch.default.body" : "switch.case.body");
 		}
 
 		fall = done;
@@ -4767,16 +4834,31 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 			// default case
 			default_stmts = cc->stmts;
 			default_fall  = fall;
-			default_block = body;
+			if (switch_instr == nullptr) {
+				default_block = body;
+			} else {
+				GB_ASSERT(default_block != nullptr);
+			}
 			continue;
 		}
 
 		lbBlock *next_cond = nullptr;
 		for_array(j, cc->list) {
 			Ast *expr = unparen_expr(cc->list[j]);
+
+			if (switch_instr != nullptr) {
+				GB_ASSERT(expr->tav.mode == Addressing_Constant);
+				GB_ASSERT(!is_ast_range(expr));
+
+				lbValue on_val = lb_build_expr(p, expr);
+				GB_ASSERT(LLVMIsConstant(on_val.value));
+				LLVMAddCase(switch_instr, on_val.value, body->block);
+				continue;
+			}
+
 			next_cond = lb_create_block(p, "switch.case.next");
 
-			lbValue cond = lb_const_bool(p->module, t_llvm_bool, false);
+			lbValue cond = {};
 			if (is_ast_range(expr)) {
 				ast_node(ie, BinaryExpr, expr);
 				TokenKind op = Token_Invalid;
@@ -4802,6 +4884,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 					cond = lb_emit_comp(p, Token_CmpEq, tag, lb_build_expr(p, expr));
 				}
 			}
+
 			lb_emit_if(p, cond, body, next_cond);
 			lb_start_block(p, next_cond);
 		}
@@ -4814,11 +4897,15 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 		lb_pop_target_list(p);
 
 		lb_emit_jump(p, done);
-		lb_start_block(p, next_cond);
+		if (switch_instr == nullptr) {
+			lb_start_block(p, next_cond);
+		}
 	}
 
 	if (default_block != nullptr) {
-		lb_emit_jump(p, default_block);
+		if (switch_instr == nullptr) {
+			lb_emit_jump(p, default_block);
+		}
 		lb_start_block(p, default_block);
 
 		lb_push_target_list(p, ss->label, done, nullptr, default_fall);
