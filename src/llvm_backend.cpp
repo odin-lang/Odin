@@ -5038,14 +5038,13 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	GB_ASSERT(tag.value != nullptr);
 	LLVMValueRef switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
 
-	// NOTE(bill): Append this later
-	Ast *default_ = nullptr;
-
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
 		if (cc->list.count == 0) {
-			default_ = clause;
+			lb_start_block(p, default_block);
+			lb_store_type_case_implicit(p, clause, parent_value);
+			lb_type_case_body(p, ss->label, clause, p->curr_block, done);
 			continue;
 		}
 
@@ -5094,13 +5093,7 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 		lb_type_case_body(p, ss->label, clause, body, done);
 	}
 
-	if (default_ != nullptr) {
-		lb_start_block(p, default_block);
-		lb_store_type_case_implicit(p, default_, parent_value);
-		lb_type_case_body(p, ss->label, default_, p->curr_block, done);
-	} else {
-		lb_emit_jump(p, done);
-	}
+	lb_emit_jump(p, done);
 	lb_start_block(p, done);
 }
 
