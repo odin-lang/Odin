@@ -4882,7 +4882,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 				}
 				lbValue lhs = lb_build_expr(p, ie->left);
 				lbValue rhs = lb_build_expr(p, ie->right);
-				// TODO(bill): do short circuit here
+
 				lbValue cond_lhs = lb_emit_comp(p, Token_LtEq, lhs, tag);
 				lbValue cond_rhs = lb_emit_comp(p, op, tag, rhs);
 				cond = lb_emit_arith(p, Token_And, cond_lhs, cond_rhs, t_bool);
@@ -5001,29 +5001,45 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 		parent_ptr = lb_address_from_load_or_generate_local(p, parent);
 	}
 
-	lbValue tag_index = {};
+	lbValue tag = {};
 	lbValue union_data = {};
 	if (switch_kind == TypeSwitch_Union) {
 		union_data = lb_emit_conv(p, parent_ptr, t_rawptr);
 		if (is_type_union_maybe_pointer(type_deref(parent_ptr.type))) {
-			tag_index = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
+			tag = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
 		} else {
 			lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent_ptr);
-			tag_index = lb_emit_load(p, tag_ptr);
+			tag = lb_emit_load(p, tag_ptr);
 		}
+	} else if (switch_kind == TypeSwitch_Any) {
+		tag = lb_emit_load(p, lb_emit_struct_ep(p, parent_ptr, 1));
+	} else {
+		GB_PANIC("Unknown switch kind");
 	}
-
-	lbBlock *start_block = lb_create_block(p, "typeswitch.case.first");
-	lb_emit_jump(p, start_block);
-	lb_start_block(p, start_block);
-
-	// NOTE(bill): Append this later
-	lbBlock *done = lb_create_block(p, "typeswitch.done");
-	Ast *default_ = nullptr;
 
 	ast_node(body, BlockStmt, ss->body);
 
-	gb_local_persist i32 weird_count = 0;
+	lbBlock *done = lb_create_block(p, "typeswitch.done");
+	lbBlock *else_block = done;
+	lbBlock *default_block = nullptr;
+	isize num_cases = 0;
+
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+		num_cases += cc->list.count;
+		if (cc->list.count == 0) {
+			GB_ASSERT(default_block == nullptr);
+			default_block = lb_create_block(p, "typeswitch.default.body");
+			else_block = default_block;
+		}
+	}
+
+	GB_ASSERT(tag.value != nullptr);
+	LLVMValueRef switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
+
+	// NOTE(bill): Append this later
+	Ast *default_ = nullptr;
 
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
@@ -5034,25 +5050,19 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 		}
 
 		lbBlock *body = lb_create_block(p, "typeswitch.body");
-		lbBlock *next = nullptr;
 		Type *case_type = nullptr;
 		for_array(type_index, cc->list) {
-			next = lb_create_block(p, "typeswitch.next");
 			case_type = type_of_expr(cc->list[type_index]);
-			lbValue cond = {};
+			lbValue on_val = {};
 			if (switch_kind == TypeSwitch_Union) {
 				Type *ut = base_type(type_deref(parent.type));
-				lbValue variant_tag = lb_const_union_tag(m, ut, case_type);
-				cond = lb_emit_comp(p, Token_CmpEq, tag_index, variant_tag);
-			} else if (switch_kind == TypeSwitch_Any) {
-				lbValue any_typeid  = lb_emit_load(p, lb_emit_struct_ep(p, parent_ptr, 1));
-				lbValue case_typeid = lb_typeid(m, case_type);
-				cond = lb_emit_comp(p, Token_CmpEq, any_typeid, case_typeid);
-			}
-			GB_ASSERT(cond.value != nullptr);
+				on_val = lb_const_union_tag(m, ut, case_type);
 
-			lb_emit_if(p, cond, body, next);
-			lb_start_block(p, next);
+			} else if (switch_kind == TypeSwitch_Any) {
+				on_val = lb_typeid(m, case_type);
+			}
+			GB_ASSERT(on_val.value != nullptr);
+			LLVMAddCase(switch_instr, on_val.value, body->block);
 		}
 
 		Entity *case_entity = implicit_entity_of_node(clause);
@@ -5068,8 +5078,7 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 			if (switch_kind == TypeSwitch_Union) {
 				data = union_data;
 			} else if (switch_kind == TypeSwitch_Any) {
-				lbValue any_data = lb_emit_load(p, lb_emit_struct_ep(p, parent_ptr, 0));
-				data = any_data;
+				data = lb_emit_load(p, lb_emit_struct_ep(p, parent_ptr, 0));
 			}
 
 			Type *ct = case_entity->type;
@@ -5083,10 +5092,10 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 
 		lb_store_type_case_implicit(p, clause, value);
 		lb_type_case_body(p, ss->label, clause, body, done);
-		lb_start_block(p, next);
 	}
 
 	if (default_ != nullptr) {
+		lb_start_block(p, default_block);
 		lb_store_type_case_implicit(p, default_, parent_value);
 		lb_type_case_body(p, ss->label, default_, p->curr_block, done);
 	} else {
