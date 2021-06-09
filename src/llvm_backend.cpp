@@ -4730,8 +4730,14 @@ bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_f
 	if (ss->tag == nullptr) {
 		return false;
 	}
+	bool is_typeid = false;
 	TypeAndValue tv = type_and_value_of_expr(ss->tag);
-	if (!is_type_integer(core_type(tv.type))) {
+	if (is_type_integer(core_type(tv.type))) {
+		// okay
+	} else if (is_type_typeid(tv.type)) {
+		// okay
+		is_typeid = true;
+	} else {
 		return false;
 	}
 
@@ -4751,7 +4757,8 @@ bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_f
 				return false;
 			}
 			if (expr->tav.mode == Addressing_Type) {
-				return false;
+				GB_ASSERT(is_typeid);
+				continue;
 			}
 			tv = type_and_value_of_expr(expr);
 			if (tv.mode != Addressing_Constant) {
@@ -4780,17 +4787,13 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	}
 	lbBlock *done = lb_create_block(p, "switch.done"); // NOTE(bill): Append later
 
-
 	ast_node(body, BlockStmt, ss->body);
-
 
 	isize case_count = body->stmts.count;
 	Slice<Ast *> default_stmts = {};
 	lbBlock *default_fall = nullptr;
 	lbBlock *default_block = nullptr;
-
 	lbBlock *fall = nullptr;
-
 
 	bool default_found = false;
 	bool is_trivial = lb_switch_stmt_can_be_trivial_jump_table(ss, &default_found);
@@ -4815,6 +4818,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 
 		switch_instr = LLVMBuildSwitch(p->builder, tag.value, end_block, cast(unsigned)num_cases);
 	}
+
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
@@ -4847,10 +4851,18 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 			Ast *expr = unparen_expr(cc->list[j]);
 
 			if (switch_instr != nullptr) {
-				GB_ASSERT(expr->tav.mode == Addressing_Constant);
-				GB_ASSERT(!is_ast_range(expr));
+				lbValue on_val = {};
+				if (expr->tav.mode == Addressing_Type) {
+					GB_ASSERT(is_type_typeid(tag.type));
+					lbValue e = lb_typeid(p->module, expr->tav.type);
+					on_val = lb_emit_conv(p, e, tag.type);
+				} else {
+					GB_ASSERT(expr->tav.mode == Addressing_Constant);
+					GB_ASSERT(!is_ast_range(expr));
 
-				lbValue on_val = lb_build_expr(p, expr);
+					on_val = lb_build_expr(p, expr);
+				}
+
 				GB_ASSERT(LLVMIsConstant(on_val.value));
 				LLVMAddCase(switch_instr, on_val.value, body->block);
 				continue;

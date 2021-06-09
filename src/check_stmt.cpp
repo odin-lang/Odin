@@ -1092,7 +1092,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			}
 			error_line("\n");
 
-			error_line("\tSuggestion: Was '#partial switch' wanted? This replaces the previous '#complete switch'.\n");
+			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
 }
@@ -1324,7 +1324,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				}
 			}
 			error_line("\n");
-			error_line("\tSuggestion: Was '#partial switch' wanted? This replaces the previous '#complete switch'.\n");
+			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
 }
