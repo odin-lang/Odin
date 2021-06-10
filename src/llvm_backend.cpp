@@ -2847,6 +2847,15 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	} else if (!p->is_foreign) {
 		if (!USE_SEPARTE_MODULES) {
 			LLVMSetLinkage(p->value, LLVMInternalLinkage);
+
+			// NOTE(bill): if a procedure is defined in package runtime and uses a custom link name,
+			// then it is very likely it is required by LLVM and thus cannot have internal linkage
+			if (entity->pkg != nullptr && entity->pkg->kind == Package_Runtime && p->body != nullptr) {
+				GB_ASSERT(entity->kind == Entity_Procedure);
+				if (entity->Procedure.link_name != "") {
+					LLVMSetLinkage(p->value, LLVMExternalLinkage);
+				}
+			}
 		}
 	}
 
@@ -5598,10 +5607,10 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 		#if 1
 		unsigned n = cast(unsigned)count;
 
-		auto lhs_ptrs = array_make<lbValue>(temporary_allocator(), n);
-		auto x_loads  = array_make<lbValue>(temporary_allocator(), n);
-		auto y_loads  = array_make<lbValue>(temporary_allocator(), n);
-		auto ops      = array_make<lbValue>(temporary_allocator(), n);
+		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
+		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
 
 		for (unsigned i = 0; i < n; i++) {
 			lhs_ptrs[i] = lb_emit_array_epi(p, x, i);
@@ -5625,11 +5634,11 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 		unsigned n = cast(unsigned)count;
 
-		auto lhs_ptrs = array_make<lbValue>(temporary_allocator(), n);
-		auto rhs_ptrs = array_make<lbValue>(temporary_allocator(), n);
-		auto x_loads  = array_make<lbValue>(temporary_allocator(), n);
-		auto y_loads  = array_make<lbValue>(temporary_allocator(), n);
-		auto ops      = array_make<lbValue>(temporary_allocator(), n);
+		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
+		auto rhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
+		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
 
 		for (unsigned i = 0; i < n; i++) {
 			lhs_ptrs[i] = lb_emit_array_epi(p, x, i);
