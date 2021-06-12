@@ -272,6 +272,7 @@ i64 lb_alignof(LLVMTypeRef type) {
 		return 8;
 	case LLVMVectorTypeKind:
 		{
+			// TODO(bill): This appears to be correct but LLVM isn't necessarily "great" with regards to documentation
 			LLVMTypeRef elem = LLVMGetElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
