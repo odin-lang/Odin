@@ -342,13 +342,14 @@ void lb_start_block(lbProcedure *p, lbBlock *b);
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
 
 
+lbAddr lb_find_context_ptr(lbProcedure *p);
 lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
 lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p);
 
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
-lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
+lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0, bool force_no_init=false);
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
