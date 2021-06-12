@@ -1565,10 +1565,15 @@ void remove_temp_files(lbGenerator *gen) {
 		gb_file_remove(cast(char const *)path.text);
 	}
 
-	if (build_context.build_mode != BuildMode_Object && !build_context.keep_object_files) {
-		for_array(i, gen->output_object_paths) {
-			String path = gen->output_object_paths[i];
-			gb_file_remove(cast(char const *)path.text);
+	if (!build_context.keep_object_files) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			for_array(i, gen->output_object_paths) {
+				String path = gen->output_object_paths[i];
+				gb_file_remove(cast(char const *)path.text);
+			}
+			break;
 		}
 	}
 }
