@@ -12876,7 +12876,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		lbAddr v = {};
 		switch (i->kind) {
 		case Token_context:
-			v = lb_find_context_ptr(p);
+			v = lb_find_or_generate_context_ptr(p);
 			break;
 		}
 
