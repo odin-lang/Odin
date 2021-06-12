@@ -224,7 +224,7 @@ align_backward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
 
 align_backward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align));
-	return ptr&(align-1);
+	return ptr&(~align+1);
 }
 
 align_backward_int :: proc(ptr, align: int) -> int {
