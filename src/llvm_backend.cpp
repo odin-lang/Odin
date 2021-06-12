@@ -12912,28 +12912,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			Type *type = base_type(tav.type);
 			if (tav.mode == Addressing_Type) { // Addressing_Type
-				Selection sel = lookup_field(type, selector, true);
-				Entity *e = sel.entity;
-				GB_ASSERT_MSG(e->kind == Entity_Variable, "Entity_%.*s", LIT(entity_strings[e->kind]));
-				GB_ASSERT(e->flags & EntityFlag_TypeField);
-				String name = e->token.string;
-				/*if (name == "names") {
-					lbValue ti_ptr = lb_type_info(m, type);
-					lbValue variant = lb_emit_struct_ep(p, ti_ptr, 2);
-
-					lbValue names_ptr = nullptr;
-
-					if (is_type_enum(type)) {
-						lbValue enum_info = lb_emit_conv(p, variant, t_type_info_enum_ptr);
-						names_ptr = lb_emit_struct_ep(p, enum_info, 1);
-					} else if (type->kind == Type_Struct) {
-						lbValue struct_info = lb_emit_conv(p, variant, t_type_info_struct_ptr);
-						names_ptr = lb_emit_struct_ep(p, struct_info, 1);
-					}
-					return ir_addr(names_ptr);
-				} else */{
-					GB_PANIC("Unhandled TypeField %.*s", LIT(name));
-				}
 				GB_PANIC("Unreachable");
 			}
 
