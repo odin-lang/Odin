@@ -419,7 +419,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_Context) {
-		lbAddr old_addr = lb_find_context_ptr(p);
+		lbAddr old_addr = lb_find_or_generate_context_ptr(p);
 
 
 		// IMPORTANT NOTE(bill, 2021-04-22): reuse unused 'context' variables to minimize stack usage
@@ -8518,7 +8518,7 @@ lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
 	return cd;
 }
 
-lbAddr lb_find_context_ptr(lbProcedure *p) {
+lbAddr lb_find_existing_context_ptr(lbProcedure *p) {
 	if (p->context_stack.count > 0) {
 		return p->context_stack[p->context_stack.count-1].ctx;
 	}
@@ -9094,7 +9094,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 	lbAddr context_ptr = {};
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
-		context_ptr = lb_find_context_ptr(p);
+		context_ptr = lb_find_existing_context_ptr(p);
 	}
 
 	defer (if (pt->Proc.diverging) {
