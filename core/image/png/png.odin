@@ -115,11 +115,11 @@ Interlace_Method :: enum u8 {
 }
 
 Row_Filter :: enum u8 {
-   None    = 0,
-   Sub     = 1,
-   Up      = 2,
-   Average = 3,
-   Paeth   = 4,
+	None    = 0,
+	Sub     = 1,
+	Up      = 2,
+	Average = 3,
+	Paeth   = 4,
 };
 
 PLTE_Entry    :: [3]u8;
@@ -166,18 +166,18 @@ CIE_1931 :: struct #packed {
 }
 
 cHRM_Raw :: struct #packed {
-   w: CIE_1931_Raw,
-   r: CIE_1931_Raw,
-   g: CIE_1931_Raw,
-   b: CIE_1931_Raw,
+	w: CIE_1931_Raw,
+	r: CIE_1931_Raw,
+	g: CIE_1931_Raw,
+	b: CIE_1931_Raw,
 }
 #assert(size_of(cHRM_Raw) == 32);
 
 cHRM :: struct #packed {
-   w: CIE_1931,
-   r: CIE_1931,
-   g: CIE_1931,
-   b: CIE_1931,
+	w: CIE_1931,
+	r: CIE_1931,
+	g: CIE_1931,
+	b: CIE_1931,
 }
 #assert(size_of(cHRM) == 32);
 
@@ -236,10 +236,7 @@ ADAM7_Y_SPACING := []int{ 8,8,8,4,4,2,2 };
 
 // Implementation starts here
 
-read_chunk :: proc(ctx: ^compress.Context) -> (Chunk, Error) {
-
-	chunk := Chunk{};
-
+read_chunk :: proc(ctx: ^compress.Context) -> (chunk: Chunk, err: Error) {
 	ch, e := compress.read_data(ctx, Chunk_Header);
 	if e != .None {
 		return {}, E_General.Stream_Too_Short;
@@ -271,7 +268,6 @@ read_chunk :: proc(ctx: ^compress.Context) -> (Chunk, Error) {
 }
 
 read_header :: proc(ctx: ^compress.Context) -> (IHDR, Error) {
-
 	c, e := read_chunk(ctx);
 	if e != nil {
 		return {}, e;
@@ -297,48 +293,48 @@ read_header :: proc(ctx: ^compress.Context) -> (IHDR, Error) {
 
 	}
 
-	switch (transmute(u8)color_type) {
-		case 0:
-			/*
-				Grayscale.
-				Allowed bit depths: 1, 2, 4, 8 and 16.
-			*/
-			allowed := false;
-			for i in ([]u8{1, 2, 4, 8, 16}) {
-				if bit_depth == i {
-					allowed = true;
-					break;
-				}
+	switch transmute(u8)color_type {
+	case 0:
+		/*
+			Grayscale.
+			Allowed bit depths: 1, 2, 4, 8 and 16.
+		*/
+		allowed := false;
+		for i in ([]u8{1, 2, 4, 8, 16}) {
+			if bit_depth == i {
+				allowed = true;
+				break;
 			}
-			if !allowed {
-				return {}, E_PNG.Invalid_Color_Bit_Depth_Combo;
+		}
+		if !allowed {
+			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo;
+		}
+	case 2, 4, 6:
+		/*
+			RGB, Grayscale+Alpha, RGBA.
+			Allowed bit depths: 8 and 16
+		*/
+		if bit_depth != 8 && bit_depth != 16 {
+			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo;
+		}
+	case 3:
+		/*
+			Paletted. PLTE chunk must appear.
+			Allowed bit depths: 1, 2, 4 and 8.
+		*/
+		allowed := false;
+		for i in ([]u8{1, 2, 4, 8}) {
+			if bit_depth == i {
+				allowed = true;
+				break;
 			}
-		case 2, 4, 6:
-			/*
-				RGB, Grayscale+Alpha, RGBA.
-				Allowed bit depths: 8 and 16
-			*/
-			if bit_depth != 8 && bit_depth != 16 {
-				return {}, E_PNG.Invalid_Color_Bit_Depth_Combo;
-			}
-		case 3:
-			/*
-				Paletted. PLTE chunk must appear.
-				Allowed bit depths: 1, 2, 4 and 8.
-			*/
-			allowed := false;
-			for i in ([]u8{1, 2, 4, 8}) {
-				if bit_depth == i {
-					allowed = true;
-					break;
-				}
-			}
-			if !allowed {
-				return {}, E_PNG.Invalid_Color_Bit_Depth_Combo;
-			}
+		}
+		if !allowed {
+			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo;
+		}
 
-		case:
-			return {}, E_PNG.Unknown_Color_Type;
+	case:
+		return {}, E_PNG.Unknown_Color_Type;
 	}
 
 	return header, nil;
@@ -398,11 +394,11 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 
 	img.sidecar = nil;
 
-	ctx := compress.Context{
+	ctx := &compress.Context{
 		input = stream,
 	};
 
-	signature, io_error := compress.read_data(&ctx, Signature);
+	signature, io_error := compress.read_data(ctx, Signature);
 	if io_error != .None || signature != .PNG {
 		return img, E_PNG.Invalid_PNG_Signature;
 	}
@@ -435,225 +431,225 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 
 	read_error: io.Error;
 	// 12 bytes is the size of a chunk with a zero-length payload.
-	for (read_error == .None && !seen_iend) {
+	for read_error == .None && !seen_iend {
 		// Peek at next chunk's length and type.
 		// TODO: Some streams may not provide seek/read_at
 
-		ch, e = compress.peek_data(&ctx, Chunk_Header);
+		ch, e = compress.peek_data(ctx, Chunk_Header);
 		if e != .None {
 			return img, E_General.Stream_Too_Short;
 		}
 		// name := chunk_type_to_name(&ch.type); // Only used for debug prints during development.
 
 		#partial switch(ch.type) {
-			case .IHDR:
-				if seen_ihdr || !first {
-					return {}, E_PNG.IHDR_Not_First_Chunk;
-				}
-				seen_ihdr = true;
+		case .IHDR:
+			if seen_ihdr || !first {
+				return {}, E_PNG.IHDR_Not_First_Chunk;
+			}
+			seen_ihdr = true;
 
-				header, err = read_header(&ctx);
-				if err != nil {
-					return img, err;
-				}
+			header, err = read_header(ctx);
+			if err != nil {
+				return img, err;
+			}
 
-				if .Paletted in header.color_type {
-					// Color type 3
-					img.channels = 1;
-					final_image_channels = 3;
-					img.depth    = 8;
-				} else if .Color in header.color_type {
-					// Color image without a palette
-					img.channels = 3;
-					final_image_channels = 3;
-					img.depth    = header.bit_depth;
-				} else {
-					// Grayscale
-					img.channels = 1;
-					final_image_channels = 1;
-					img.depth    = header.bit_depth;
-				}
+			if .Paletted in header.color_type {
+				// Color type 3
+				img.channels = 1;
+				final_image_channels = 3;
+				img.depth    = 8;
+			} else if .Color in header.color_type {
+				// Color image without a palette
+				img.channels = 3;
+				final_image_channels = 3;
+				img.depth    = header.bit_depth;
+			} else {
+				// Grayscale
+				img.channels = 1;
+				final_image_channels = 1;
+				img.depth    = header.bit_depth;
+			}
 
-				if .Alpha in header.color_type {
-					img.channels += 1;
-					final_image_channels += 1;
-				}
-
-				if img.channels == 0 || img.depth == 0 {
-					return {}, E_PNG.IHDR_Corrupt;
-				}
-
-				img.width  = int(header.width);
-				img.height = int(header.height);
-
-				using header;
-				h := IHDR{
-					width              = width,
-					height             = height,
-					bit_depth          = bit_depth,
-					color_type         = color_type,
-					compression_method = compression_method,
-					filter_method      = filter_method,
-					interlace_method   = interlace_method,
-				};
-				info.header = h;
-			case .PLTE:
-				seen_plte = true;
-				// PLTE must appear before IDAT and can't appear for color types 0, 4.
-				ct := transmute(u8)info.header.color_type;
-				if seen_idat || ct == 0 || ct == 4 {
-					return img, E_PNG.PLTE_Encountered_Unexpectedly;
-				}
-
-				c, err = read_chunk(&ctx);
-				if err != nil {
-					return img, err;
-				}
-
-				if c.header.length % 3 != 0 || c.header.length > 768 {
-					return img, E_PNG.PLTE_Invalid_Length;
-				}
-				plte_ok: bool;
-				_plte, plte_ok = plte(c);
-				if !plte_ok {
-					return img, E_PNG.PLTE_Invalid_Length;
-				}
-
-				if .return_metadata in options {
-					append(&info.chunks, c);
-				}
-			case .IDAT:
-				// If we only want image metadata and don't want the pixel data, we can early out.
-				if .return_metadata not_in options && .do_not_decompress_image in options {
-					img.channels = final_image_channels;
-					img.sidecar = info;
-					return img, nil;
-				}
-				// There must be at least 1 IDAT, contiguous if more.
-				if seen_idat {
-					return img, E_PNG.IDAT_Must_Be_Contiguous;
-				}
-
-				if idat_length > 0 {
-					return img, E_PNG.IDAT_Must_Be_Contiguous;
-				}
-
-				next := ch.type;
-				for next == .IDAT {
-					c, err = read_chunk(&ctx);
-					if err != nil {
-						return img, err;
-					}
-
-					bytes.buffer_write(&idat_b, c.data);
-					idat_length += c.header.length;
-
-					ch, e = compress.peek_data(&ctx, Chunk_Header);
-					if e != .None {
-						return img, E_General.Stream_Too_Short;
-					}
-					next = ch.type;
-				}
-				idat = bytes.buffer_to_bytes(&idat_b);
-				if int(idat_length) != len(idat) {
-					return {}, E_PNG.IDAT_Corrupt;
-				}
-				seen_idat = true;
-			case .IEND:
-				c, err = read_chunk(&ctx);
-				if err != nil {
-					return img, err;
-				}
-				seen_iend = true;
-			case .bKGD:
-
-				// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
-
-				c, err = read_chunk(&ctx);
-				if err != nil {
-					return img, err;
-				}
-				seen_bkgd = true;
-				if .return_metadata in options {
-					append(&info.chunks, c);
-				}
-
-				ct := transmute(u8)info.header.color_type;
-				switch(ct) {
-					case 3: // Indexed color
-						if c.header.length != 1 {
-							return {}, E_PNG.BKGD_Invalid_Length;
-						}
-						col := _plte.entries[c.data[0]];
-						img.background = [3]u16{
-							u16(col[0]) << 8 | u16(col[0]),
-							u16(col[1]) << 8 | u16(col[1]),
-							u16(col[2]) << 8 | u16(col[2]),
-						};
-					case 0, 4: // Grayscale, with and without Alpha
-						if c.header.length != 2 {
-							return {}, E_PNG.BKGD_Invalid_Length;
-						}
-						col := u16(mem.slice_data_cast([]u16be, c.data[:])[0]);
-						img.background = [3]u16{col, col, col};
-					case 2, 6: // Color, with and without Alpha
-						if c.header.length != 6 {
-							return {}, E_PNG.BKGD_Invalid_Length;
-						}
-						col := mem.slice_data_cast([]u16be, c.data[:]);
-						img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])};
-				}
-			case .tRNS:
-				c, err = read_chunk(&ctx);
-				if err != nil {
-					return img, err;
-				}
-
-				if .Alpha in info.header.color_type {
-					return img, E_PNG.TRNS_Encountered_Unexpectedly;
-				}
-
-				if .return_metadata in options {
-					append(&info.chunks, c);
-				}
-
-				/*
-					This makes the image one with transparency, so set it to +1 here,
-					even if we need we leave img.channels alone for the defilterer's
-					sake. If we early because the user just cares about metadata,
-					we'll set it to 'final_image_channels'.
-				*/
-
+			if .Alpha in header.color_type {
+				img.channels += 1;
 				final_image_channels += 1;
+			}
 
-				seen_trns = true;
-				if info.header.bit_depth < 8 && .Paletted not_in info.header.color_type {
-					// Rescale tRNS data so key matches intensity
-					dsc := depth_scale_table;
-					scale := dsc[info.header.bit_depth];
-					if scale != 1 {
-						key := mem.slice_data_cast([]u16be, c.data)[0] * u16be(scale);
-						c.data = []u8{0, u8(key & 255)};
-					}
-				}
-				trns = c;
-			case .iDOT, .CbGI:
-				/*
-					iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
-					We're not going to add support for it. If you have the misfortunte of coming
-					across one of these files, use a utility to defry it.s
-				*/
-				return img, E_PNG.PNG_Does_Not_Adhere_to_Spec;
-			case:
-				// Unhandled type
-				c, err = read_chunk(&ctx);
+			if img.channels == 0 || img.depth == 0 {
+				return {}, E_PNG.IHDR_Corrupt;
+			}
+
+			img.width  = int(header.width);
+			img.height = int(header.height);
+
+			using header;
+			h := IHDR{
+				width              = width,
+				height             = height,
+				bit_depth          = bit_depth,
+				color_type         = color_type,
+				compression_method = compression_method,
+				filter_method      = filter_method,
+				interlace_method   = interlace_method,
+			};
+			info.header = h;
+		case .PLTE:
+			seen_plte = true;
+			// PLTE must appear before IDAT and can't appear for color types 0, 4.
+			ct := transmute(u8)info.header.color_type;
+			if seen_idat || ct == 0 || ct == 4 {
+				return img, E_PNG.PLTE_Encountered_Unexpectedly;
+			}
+
+			c, err = read_chunk(ctx);
+			if err != nil {
+				return img, err;
+			}
+
+			if c.header.length % 3 != 0 || c.header.length > 768 {
+				return img, E_PNG.PLTE_Invalid_Length;
+			}
+			plte_ok: bool;
+			_plte, plte_ok = plte(c);
+			if !plte_ok {
+				return img, E_PNG.PLTE_Invalid_Length;
+			}
+
+			if .return_metadata in options {
+				append(&info.chunks, c);
+			}
+		case .IDAT:
+			// If we only want image metadata and don't want the pixel data, we can early out.
+			if .return_metadata not_in options && .do_not_decompress_image in options {
+				img.channels = final_image_channels;
+				img.sidecar = info;
+				return img, nil;
+			}
+			// There must be at least 1 IDAT, contiguous if more.
+			if seen_idat {
+				return img, E_PNG.IDAT_Must_Be_Contiguous;
+			}
+
+			if idat_length > 0 {
+				return img, E_PNG.IDAT_Must_Be_Contiguous;
+			}
+
+			next := ch.type;
+			for next == .IDAT {
+				c, err = read_chunk(ctx);
 				if err != nil {
 					return img, err;
 				}
-				if .return_metadata in options {
-					// NOTE: Chunk cata is currently allocated on the temp allocator.
-					append(&info.chunks, c);
+
+				bytes.buffer_write(&idat_b, c.data);
+				idat_length += c.header.length;
+
+				ch, e = compress.peek_data(ctx, Chunk_Header);
+				if e != .None {
+					return img, E_General.Stream_Too_Short;
 				}
+				next = ch.type;
+			}
+			idat = bytes.buffer_to_bytes(&idat_b);
+			if int(idat_length) != len(idat) {
+				return {}, E_PNG.IDAT_Corrupt;
+			}
+			seen_idat = true;
+		case .IEND:
+			c, err = read_chunk(ctx);
+			if err != nil {
+				return img, err;
+			}
+			seen_iend = true;
+		case .bKGD:
+
+			// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
+
+			c, err = read_chunk(ctx);
+			if err != nil {
+				return img, err;
+			}
+			seen_bkgd = true;
+			if .return_metadata in options {
+				append(&info.chunks, c);
+			}
+
+			ct := transmute(u8)info.header.color_type;
+			switch(ct) {
+				case 3: // Indexed color
+					if c.header.length != 1 {
+						return {}, E_PNG.BKGD_Invalid_Length;
+					}
+					col := _plte.entries[c.data[0]];
+					img.background = [3]u16{
+						u16(col[0]) << 8 | u16(col[0]),
+						u16(col[1]) << 8 | u16(col[1]),
+						u16(col[2]) << 8 | u16(col[2]),
+					};
+				case 0, 4: // Grayscale, with and without Alpha
+					if c.header.length != 2 {
+						return {}, E_PNG.BKGD_Invalid_Length;
+					}
+					col := u16(mem.slice_data_cast([]u16be, c.data[:])[0]);
+					img.background = [3]u16{col, col, col};
+				case 2, 6: // Color, with and without Alpha
+					if c.header.length != 6 {
+						return {}, E_PNG.BKGD_Invalid_Length;
+					}
+					col := mem.slice_data_cast([]u16be, c.data[:]);
+					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])};
+			}
+		case .tRNS:
+			c, err = read_chunk(ctx);
+			if err != nil {
+				return img, err;
+			}
+
+			if .Alpha in info.header.color_type {
+				return img, E_PNG.TRNS_Encountered_Unexpectedly;
+			}
+
+			if .return_metadata in options {
+				append(&info.chunks, c);
+			}
+
+			/*
+				This makes the image one with transparency, so set it to +1 here,
+				even if we need we leave img.channels alone for the defilterer's
+				sake. If we early because the user just cares about metadata,
+				we'll set it to 'final_image_channels'.
+			*/
+
+			final_image_channels += 1;
+
+			seen_trns = true;
+			if info.header.bit_depth < 8 && .Paletted not_in info.header.color_type {
+				// Rescale tRNS data so key matches intensity
+				dsc := depth_scale_table;
+				scale := dsc[info.header.bit_depth];
+				if scale != 1 {
+					key := mem.slice_data_cast([]u16be, c.data)[0] * u16be(scale);
+					c.data = []u8{0, u8(key & 255)};
+				}
+			}
+			trns = c;
+		case .iDOT, .CbGI:
+			/*
+				iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
+				We're not going to add support for it. If you have the misfortunte of coming
+				across one of these files, use a utility to defry it.s
+			*/
+			return img, E_PNG.PNG_Does_Not_Adhere_to_Spec;
+		case:
+			// Unhandled type
+			c, err = read_chunk(ctx);
+			if err != nil {
+				return img, err;
+			}
+			if .return_metadata in options {
+				// NOTE: Chunk cata is currently allocated on the temp allocator.
+				append(&info.chunks, c);
+			}
 
 			first = false;
 		}
@@ -695,7 +691,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			for p := 0; p < 7; p += 1 {
 				x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p];
 				y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p];
-				if (x > 0 && y > 0) {
+				if x > 0 && y > 0 {
 					expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1);
 				}
 			}
@@ -854,7 +850,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		p16 := mem.slice_data_cast([]u16, temp.buf[:]);
 		o16 := mem.slice_data_cast([]u16, t.buf[:]);
 
-		switch (raw_image_channels) {
+		switch raw_image_channels {
 		case 1:
 			// Gray without Alpha. Might have tRNS alpha.
 			key   := u16(0);
@@ -1051,7 +1047,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		p := mem.slice_data_cast([]u8, temp.buf[:]);
 		o := mem.slice_data_cast([]u8, t.buf[:]);
 
-		switch (raw_image_channels) {
+		switch raw_image_channels {
 		case 1:
 			// Gray without Alpha. Might have tRNS alpha.
 			key   := u8(0);
@@ -1276,7 +1272,7 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 		nk := row_stride - channels;
 
 		filter := Row_Filter(src[0]); src = src[1:];
-		switch(filter) {
+		switch filter {
 		case .None:
 			copy(dest, src[:row_stride]);
 		case .Sub:
@@ -1590,7 +1586,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 			i,j,x,y: int;
 			x = (width  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p];
 			y = (height - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p];
-			if (x > 0 && y > 0) {
+			if x > 0 && y > 0 {
 				temp: bytes.Buffer;
 				temp_len := compute_buffer_size(x, y, channels, depth == 16 ? 16 : 8);
 				resize(&temp.buf, temp_len);

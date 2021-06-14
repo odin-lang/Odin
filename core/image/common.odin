@@ -127,7 +127,6 @@ Error :: enum {
 */
 
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
-
 	size = ((((channels * width * depth) + 7) >> 3) + extra_row_bytes) * height;
 	return;
 }
@@ -144,7 +143,6 @@ Channel :: enum u8 {
 }
 
 return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok: bool) {
-
 	ok = false;
 	t: bytes.Buffer;
 
@@ -159,36 +157,36 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 		return {}, false;
 	}
 
-	switch(img.depth) {
-		case 8:
-			buffer_size := compute_buffer_size(img.width, img.height, 1, 8);
-			t = bytes.Buffer{};
-			resize(&t.buf, buffer_size);
+	switch img.depth {
+	case 8:
+		buffer_size := compute_buffer_size(img.width, img.height, 1, 8);
+		t = bytes.Buffer{};
+		resize(&t.buf, buffer_size);
 
-			i := bytes.buffer_to_bytes(&img.pixels);
-			o := bytes.buffer_to_bytes(&t);
+		i := bytes.buffer_to_bytes(&img.pixels);
+		o := bytes.buffer_to_bytes(&t);
 
-			for len(i) > 0 {
-				o[0] = i[idx];
-				i = i[img.channels:];
-				o = o[1:];
-			}
-		case 16:
-			buffer_size := compute_buffer_size(img.width, img.height, 2, 8);
-			t = bytes.Buffer{};
-			resize(&t.buf, buffer_size);
+		for len(i) > 0 {
+			o[0] = i[idx];
+			i = i[img.channels:];
+			o = o[1:];
+		}
+	case 16:
+		buffer_size := compute_buffer_size(img.width, img.height, 2, 8);
+		t = bytes.Buffer{};
+		resize(&t.buf, buffer_size);
 
-			i := mem.slice_data_cast([]u16, img.pixels.buf[:]);
-			o := mem.slice_data_cast([]u16, t.buf[:]);
+		i := mem.slice_data_cast([]u16, img.pixels.buf[:]);
+		o := mem.slice_data_cast([]u16, t.buf[:]);
 
-			for len(i) > 0 {
-				o[0] = i[idx];
-				i = i[img.channels:];
-				o = o[1:];
-			}
-		case 1, 2, 4:
-			// We shouldn't see this case, as the loader already turns these into 8-bit.
-			return {}, false;
+		for len(i) > 0 {
+			o[0] = i[idx];
+			i = i[img.channels:];
+			o = o[1:];
+		}
+	case 1, 2, 4:
+		// We shouldn't see this case, as the loader already turns these into 8-bit.
+		return {}, false;
 	}
 
 	res = new(Image);
