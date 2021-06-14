@@ -5,9 +5,9 @@ import "core:unicode/utf8"
 unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool, tail_string: string, success: bool) {
 	hex_to_int :: proc(c: byte) -> int {
 		switch c {
-		case '0'..'9': return int(c-'0');
-		case 'a'..'f': return int(c-'a')+10;
-		case 'A'..'F': return int(c-'A')+10;
+		case '0'..='9': return int(c-'0');
+		case 'a'..='f': return int(c-'a')+10;
+		case 'A'..='F': return int(c-'A')+10;
 		}
 		return -1;
 	}
@@ -45,7 +45,7 @@ unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool
 	case '"':  r = '"';
 	case '\'': r = '\'';
 
-	case '0'..'7':
+	case '0'..='7':
 		v := int(c-'0');
 		if len(s) < 2 {
 			return;

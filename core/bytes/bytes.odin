@@ -91,7 +91,7 @@ equal_fold :: proc(u, v: []byte) -> bool {
 
 		if tr < utf8.RUNE_SELF {
 			switch sr {
-			case 'A'..'Z':
+			case 'A'..='Z':
 				if tr == (sr+'a')-'A' {
 					continue loop;
 				}

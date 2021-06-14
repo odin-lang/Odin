@@ -39,7 +39,7 @@ volume_name_len :: proc(path: string) -> int {
 		c := path[0];
 		if path[1] == ':' {
 			switch c {
-			case 'a'..'z', 'A'..'Z':
+			case 'a'..='z', 'A'..='Z':
 				return 2;
 			}
 		}

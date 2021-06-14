@@ -85,9 +85,9 @@ is_delimiter :: proc(c: rune) -> bool {
 is_separator :: proc(r: rune) -> bool {
 	if r <= 0x7f {
 		switch r {
-		case '0'..'9': return false;
-		case 'a'..'z': return false;
-		case 'A'..'Z': return false;
+		case '0'..='9': return false;
+		case 'a'..='z': return false;
+		case 'A'..='Z': return false;
 		case '_': return false;
 		}
 		return true;
