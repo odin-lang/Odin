@@ -1,6 +1,6 @@
 package container
 
-Queue :: struct(T: typeid) {
+Queue :: struct($T: typeid) {
 	data: Array(T),
 	len: int,
 	offset: int,

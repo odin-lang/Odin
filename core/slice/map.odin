@@ -27,12 +27,12 @@ map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: 
 	return;
 }
 
-Map_Entry :: struct(Key, Value: typeid) {
+Map_Entry :: struct($Key, $Value: typeid) {
 	key:   Key,
 	value: Value,
 }
 
-Map_Entry_Info :: struct(Key, Value: typeid) {
+Map_Entry_Info :: struct($Key, $Value: typeid) {
 	hash:  uintptr,
 	key:   Key,
 	value: Value,

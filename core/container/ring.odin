@@ -1,7 +1,7 @@
 package container
 
 
-Ring :: struct(T: typeid) {
+Ring :: struct($T: typeid) {
 	next, prev: ^Ring(T),
 	value: T,
 }

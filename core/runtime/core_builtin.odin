@@ -3,7 +3,7 @@ package runtime
 import "intrinsics"
 
 @builtin
-Maybe :: union(T: typeid) #maybe {T};
+Maybe :: union($T: typeid) #maybe {T};
 
 @thread_local global_default_temp_allocator_data: Default_Temp_Allocator;
 
