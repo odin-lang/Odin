@@ -8518,15 +8518,6 @@ lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
 	return cd;
 }
 
-lbAddr lb_find_existing_context_ptr(lbProcedure *p) {
-	if (p->context_stack.count > 0) {
-		return p->context_stack[p->context_stack.count-1].ctx;
-	}
-
-	GB_PANIC("Unable to get `context` ptr");
-	return {};
-}
-
 
 lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 	if (p->context_stack.count > 0) {
@@ -9094,7 +9085,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 	lbAddr context_ptr = {};
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
-		context_ptr = lb_find_existing_context_ptr(p);
+		context_ptr = lb_find_or_generate_context_ptr(p);
 	}
 
 	defer (if (pt->Proc.diverging) {
@@ -15169,12 +15160,6 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	} else {
 		if (m->info->entry_point != nullptr) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
-			Type *pt = base_type(entry_point.type);
-			GB_ASSERT(pt->kind == Type_Proc);
-			if (pt->kind == Type_Proc) {
-				lbAddr ctx = lb_find_or_generate_context_ptr(p);
-			}
-
 			lb_emit_call(p, entry_point, {});
 		}
 	}
