@@ -145,7 +145,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	mem.zero_slice(sizes[:]);
 	mem.zero_slice(z.fast[:]);
 
-	for v, _ in code_lengths {
+	for v in code_lengths {
 		sizes[v] += 1;
 	}
 	sizes[0] = 0;
@@ -163,7 +163,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 		z.firstsymbol[i] = u16(k);
 		code = code + sizes[i];
 		if sizes[i] != 0 {
-			if (code - 1 >= (1 << u16(i))) {
+			if code - 1 >= (1 << u16(i)) {
 				return E_Deflate.Huffman_Bad_Code_Lengths;
 			}
 		}
@@ -181,7 +181,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 			fastv := u16((u16(v) << 9) | u16(ci));
 			z.size[c]  = u8(v);
 			z.value[c] = u16(ci);
-			if (v <= ZFAST_BITS) {
+			if v <= ZFAST_BITS {
 				j := z_bit_reverse(u16(next_code[v]), v);
 				for j < (1 << ZFAST_BITS) {
 					z.fast[j] = fastv;
@@ -195,15 +195,10 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 }
 
 decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
-	r   = 0;
-	err = nil;
-
-	k: int;
-	s: u8;
-
 	code := u16(compress.peek_bits_lsb(z, 16));
 
-	k = int(z_bit_reverse(code, 16));
+	k := int(z_bit_reverse(code, 16));
+	s: u8;
 
 	#no_bounds_check for s = HUFFMAN_FAST_BITS+1; ; {
 		if k < t.maxcode[s] {
@@ -211,7 +206,7 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 		}
 		s += 1;
 	}
-	if (s >= 16) {
+	if s >= 16 {
 		return 0, E_Deflate.Bad_Huffman_Code;
 	}
 	// code size is s, so:
