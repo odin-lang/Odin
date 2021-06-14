@@ -33,7 +33,7 @@ semaphore_destroy :: proc(s: ^Semaphore) {
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
     // NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
-    for in 0..count-1 {
+    for in 0..<count {
 	    assert(unix.sem_post(&s.handle) == 0);
     }
 }

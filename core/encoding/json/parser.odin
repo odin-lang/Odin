@@ -290,9 +290,9 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		for c in s[2:4] {
 			x: rune;
 			switch c {
-			case '0'..'9': x = c - '0';
-			case 'a'..'f': x = c - 'a' + 10;
-			case 'A'..'F': x = c - 'A' + 10;
+			case '0'..='9': x = c - '0';
+			case 'a'..='f': x = c - 'a' + 10;
+			case 'A'..='F': x = c - 'A' + 10;
 			case: return -1;
 			}
 			r = r*16 + x;
@@ -308,9 +308,9 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		for c in s[2:6] {
 			x: rune;
 			switch c {
-			case '0'..'9': x = c - '0';
-			case 'a'..'f': x = c - 'a' + 10;
-			case 'A'..'F': x = c - 'A' + 10;
+			case '0'..='9': x = c - '0';
+			case 'a'..='f': x = c - 'a' + 10;
+			case 'A'..='F': x = c - 'A' + 10;
 			case: return -1;
 			}
 			r = r*16 + x;

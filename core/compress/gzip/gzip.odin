@@ -288,11 +288,11 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 
 	payload_crc_b: [4]u8;
 	payload_len_b: [4]u8;
-	for i in 0..3 {
+	for _, i in payload_crc_b {
 		payload_crc_b[i] = u8(compress.read_bits_lsb(&ctx, 8));
 	}
 	payload_crc := transmute(u32le)payload_crc_b;
-	for i in 0..3 {
+	for _, i in payload_len_b {
 		payload_len_b[i] = u8(compress.read_bits_lsb(&ctx, 8));
 	}
 	payload_len := int(transmute(u32le)payload_len_b);

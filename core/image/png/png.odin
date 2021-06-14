@@ -1348,31 +1348,31 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 		case .None:
 			copy(dest, src[:row_stride_in]);
 		case .Sub:
-			for i in 0..channels {
+			for i in 0..=channels {
 				dest[i] = src[i];
 			}
-			for k in 0..nk {
+			for k in 0..=nk {
 				dest[channels+k] = (src[channels+k] + dest[k]) & 255;
 			}
 		case .Up:
-			for k in 0..row_stride_in {
+			for k in 0..=row_stride_in {
 				dest[k] = (src[k] + up[k]) & 255;
 			}
 		case .Average:
-			for i in 0..channels {
+			for i in 0..=channels {
 				avg := up[i] >> 1;
 				dest[i] = (src[i] + avg) & 255;
 			}
-			for k in 0..nk {
+			for k in 0..=nk {
 				avg := u8((u16(up[channels+k]) + u16(dest[k])) >> 1);
 				dest[channels+k] = (src[channels+k] + avg) & 255;
 			}
 		case .Paeth:
-			for i in 0..channels {
+			for i in 0..=channels {
 				paeth := filter_paeth(0, up[i], 0);
 				dest[i] = (src[i] + paeth) & 255;
 			}
-			for k in 0..nk {
+			for k in 0..=nk {
 				paeth := filter_paeth(dest[k], up[channels+k], up[k]);
 				dest[channels+k] = (src[channels+k] + paeth) & 255;
 			}
@@ -1380,9 +1380,9 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 			return false;
 		}
 
-		src   = src [row_stride_in:];
-		up    = dest;
-		dest  = dest[row_stride_in:];
+		src  = src[row_stride_in:];
+		up   = dest;
+		dest = dest[row_stride_in:];
 	}
 
 	// Let's expand the bits

@@ -39,7 +39,7 @@ encode :: proc(d: []u16, s: []rune) -> int {
 			d[n] = u16(r);
 			n += 1;
 
-		case _surr_self .. MAX_RUNE:
+		case _surr_self ..= MAX_RUNE:
 			if m+2 < n { break loop; }
 			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);
@@ -65,7 +65,7 @@ encode_string :: proc(d: []u16, s: string) -> int {
 			d[n] = u16(r);
 			n += 1;
 
-		case _surr_self .. MAX_RUNE:
+		case _surr_self ..= MAX_RUNE:
 			if m+2 < n { break loop; }
 			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);

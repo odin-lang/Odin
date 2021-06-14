@@ -232,7 +232,7 @@ get_pos :: proc(t: ^Tokenizer) -> Pos {
 
 is_letter :: proc(r: rune) -> bool {
 	switch r {
-	case 'a'..'z', 'A'..'Z', '_':
+	case 'a'..='z', 'A'..='Z', '_':
 		return true;
 	}
 	return false;
@@ -240,7 +240,7 @@ is_letter :: proc(r: rune) -> bool {
 
 is_digit :: proc(r: rune) -> bool {
 	switch r {
-	case '0'..'9':
+	case '0'..='9':
 		return true;
 	}
 	return false;
@@ -273,9 +273,9 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 
 digit_value :: proc(r: rune) -> int {
 	switch r {
-	case '0'..'9': return int(r - '0');
-	case 'a'..'f': return int(r - 'a' + 10);
-	case 'A'..'F': return int(r - 'A' + 10);
+	case '0'..='9': return int(r - '0');
+	case 'a'..='f': return int(r - 'a' + 10);
+	case 'A'..='F': return int(r - 'A' + 10);
 	}
 	return 16;
 }

@@ -133,9 +133,7 @@ write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_boun
 }
 
 allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_Table, err: Error) {
-
-	z = new(Huffman_Table, allocator);
-	return z, nil;
+	return new(Huffman_Table, allocator), nil;
 }
 
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
@@ -152,14 +150,14 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	}
 	sizes[0] = 0;
 
-	for i in 1..16 {
+	for i in 1..<(HUFFMAN_MAX_BITS+1) {
 		if sizes[i] > (1 << uint(i)) {
 			return E_Deflate.Huffman_Bad_Sizes;
 		}
 	}
 	code := int(0);
 
-	for i in 1..<16 {
+	for i in 1..<HUFFMAN_MAX_BITS {
 		next_code[i]     = code;
 		z.firstcode[i]   = u16(code);
 		z.firstsymbol[i] = u16(k);
@@ -169,12 +167,12 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 				return E_Deflate.Huffman_Bad_Code_Lengths;
 			}
 		}
-		z.maxcode[i] = code << (16 - uint(i));
+		z.maxcode[i] = code << (HUFFMAN_MAX_BITS - uint(i));
 		code <<= 1;
 		k += int(sizes[i]);
 	}
 
-	z.maxcode[16] = 0x10000; // Sentinel
+	z.maxcode[HUFFMAN_MAX_BITS] = 0x10000; // Sentinel
 	c: int;
 
 	for v, ci in code_lengths {
@@ -197,7 +195,6 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 }
 
 decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
-
 	r   = 0;
 	err = nil;
 
@@ -233,7 +230,6 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 }
 
 decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
-
 	if z.num_bits < 16 {
 		if z.num_bits == -100 {
 			return 0, E_ZLIB.Code_Buffer_Malformed;

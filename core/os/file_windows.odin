@@ -347,7 +347,7 @@ is_abs :: proc(path: string) -> bool {
 	when ODIN_OS == "windows" {
 		if len(path) > 2 {
 			switch path[0] {
-			case 'A'..'Z', 'a'..'z':
+			case 'A'..='Z', 'a'..='z':
 				return path[1] == ':' && is_path_separator(path[2]);
 			}
 		}
