@@ -526,7 +526,7 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 	s.pos.line = 0;
 
 	redo: for {
-		for (ch < utf8.RUNE_SELF && ch in s.whitespace) {
+		for ch < utf8.RUNE_SELF && (ch in s.whitespace) {
 			ch = advance(s);
 		}
 
