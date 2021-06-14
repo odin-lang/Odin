@@ -13,7 +13,7 @@ Channel_Direction :: enum i8 {
 	Recv = -1,
 }
 
-Channel :: struct(T: typeid, Direction := Channel_Direction.Both) {
+Channel :: struct($T: typeid, $Direction := Channel_Direction.Both) {
 	using _internal: ^Raw_Channel,
 }
 

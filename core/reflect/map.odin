@@ -5,7 +5,7 @@ import "core:mem"
 _ :: runtime;
 _ :: mem;
 
-Map_Entry_Info :: struct(Key, Value: typeid) {
+Map_Entry_Info :: struct($Key, $Value: typeid) {
 	hash:  uintptr,
 	key:   Key,
 	value: Value,

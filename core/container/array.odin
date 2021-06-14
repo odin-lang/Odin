@@ -3,7 +3,7 @@ package container
 import "core:mem"
 import "core:runtime"
 
-Array :: struct(T: typeid) {
+Array :: struct($T: typeid) {
 	data:      ^T,
 	len:       int,
 	cap:       int,

@@ -6,7 +6,7 @@ import "core:strconv"
 import "intrinsics"
 _ :: intrinsics;
 
-Fixed :: struct($Backing: typeid, Fraction_Width: uint)
+Fixed :: struct($Backing: typeid, $Fraction_Width: uint)
 	where
 		intrinsics.type_is_integer(Backing),
 		0 <= Fraction_Width,

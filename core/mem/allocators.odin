@@ -919,7 +919,7 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 // Small_Allocator primary allocates memory from its local buffer of size BUFFER_SIZE
 // If that buffer's memory is exhausted, it will use the backing allocator (a scratch allocator is recommended)
 // Memory allocated with Small_Allocator cannot be freed individually using 'free' and must be freed using 'free_all'
-Small_Allocator :: struct(BUFFER_SIZE: int)
+Small_Allocator :: struct($BUFFER_SIZE: int)
 	where
 		BUFFER_SIZE >= 2*size_of(uintptr),
 		BUFFER_SIZE & (BUFFER_SIZE-1) == 0 {

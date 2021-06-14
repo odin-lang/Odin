@@ -4,12 +4,12 @@ import "intrinsics"
 _ :: intrinsics;
 
 
-Map :: struct(Key, Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
+Map :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
 	hash: Array(int),
 	entries: Array(Map_Entry(Key, Value)),
 }
 
-Map_Entry :: struct(Key, Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
+Map_Entry :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
 	hash:  uintptr,
 	next:  int,
 	key:   Key,

@@ -898,14 +898,14 @@ parametric_polymorphism :: proc() {
 
 
 	{ // Polymorphic Types and Type Specialization
-		Table_Slot :: struct(Key, Value: typeid) {
+		Table_Slot :: struct($Key, $Value: typeid) {
 			occupied: bool,
 			hash:     u32,
 			key:      Key,
 			value:    Value,
 		};
 		TABLE_SIZE_MIN :: 32;
-		Table :: struct(Key, Value: typeid) {
+		Table :: struct($Key, $Value: typeid) {
 			count:     int,
 			allocator: mem.Allocator,
 			slots:     []Table_Slot(Key, Value),
@@ -1042,7 +1042,7 @@ parametric_polymorphism :: proc() {
 			Foo2,
 			Foo3,
 		};
-		Para_Union :: union(T: typeid) {T, Error};
+		Para_Union :: union($T: typeid) {T, Error};
 		r: Para_Union(int);
 		fmt.println(typeid_of(type_of(r)));
 
@@ -1594,7 +1594,7 @@ where_clauses :: proc() {
 	}
 
 	{ // Record types
-		Foo :: struct(T: typeid, N: int)
+		Foo :: struct($T: typeid, $N: int)
 			where intrinsics.type_is_integer(T),
 				  N > 2 {
 			x: [N]T,
@@ -1949,7 +1949,8 @@ constant_literal_expressions :: proc() {
 union_maybe :: proc() {
 	fmt.println("\n#union #maybe");
 
-	Maybe :: union(T: typeid) #maybe {T};
+	// NOTE: This is already built-in, and this is just a reimplementation to explain the behaviour
+	Maybe :: union($T: typeid) #maybe {T};
 
 	i: Maybe(u8);
 	p: Maybe(^u8); // No tag is stored for pointers, nil is the sentinel value
