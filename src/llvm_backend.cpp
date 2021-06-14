@@ -4817,6 +4817,18 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	bool default_found = false;
 	bool is_trivial = lb_switch_stmt_can_be_trivial_jump_table(ss, &default_found);
 
+	auto body_blocks = slice_make<lbBlock *>(permanent_allocator(), body->stmts.count);
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+
+		body_blocks[i] = lb_create_block(p, cc->list.count == 0 ? "switch.default.body" : "switch.case.body");
+		if (cc->list.count == 0) {
+			default_block = body_blocks[i];
+		}
+	}
+
+
 	LLVMValueRef switch_instr = nullptr;
 	if (is_trivial) {
 		isize num_cases = 0;
@@ -4824,10 +4836,6 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 			Ast *clause = body->stmts[i];
 			ast_node(cc, CaseClause, clause);
 			num_cases += cc->list.count;
-		}
-
-		if (default_found) {
-			default_block = lb_create_block(p, "switch.default.body");
 		}
 
 		LLVMBasicBlockRef end_block = done->block;
@@ -4838,19 +4846,15 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 		switch_instr = LLVMBuildSwitch(p->builder, tag.value, end_block, cast(unsigned)num_cases);
 	}
 
+
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
 
-		lbBlock *body = fall;
-
-		if (body == nullptr) {
-			body = lb_create_block(p, cc->list.count == 0 ? "switch.default.body" : "switch.case.body");
-		}
-
+		lbBlock *body = body_blocks[i];
 		fall = done;
 		if (i+1 < case_count) {
-			fall = lb_create_block(p, "switch.fall.body");
+			fall = body_blocks[i+1];
 		}
 
 		if (cc->list.count == 0) {
