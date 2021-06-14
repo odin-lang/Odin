@@ -362,7 +362,7 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 		curr := __dynamic_map_get_entry(h, fr.entry_index);
 		prev.next = curr.next;
 	}
-	if (fr.entry_index == m.entries.len-1) {
+	if fr.entry_index == m.entries.len-1 {
 		// NOTE(bill): No need to do anything else, just pop
 	} else {
 		old := __dynamic_map_get_entry(h, fr.entry_index);

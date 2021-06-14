@@ -337,7 +337,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 		return 0, 0;
 	}
 	bytes_written := _unix_write(fd, raw_data(data), len(data));
-	if(bytes_written == -1) {
+	if bytes_written == -1 {
 		return 0, 1;
 	}
 	return bytes_written, 0;

@@ -441,7 +441,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		}
 		// name := chunk_type_to_name(&ch.type); // Only used for debug prints during development.
 
-		#partial switch(ch.type) {
+		#partial switch ch.type {
 		case .IHDR:
 			if seen_ihdr || !first {
 				return {}, E_PNG.IHDR_Not_First_Chunk;
@@ -575,7 +575,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			}
 
 			ct := transmute(u8)info.header.color_type;
-			switch(ct) {
+			switch ct {
 				case 3: // Indexed color
 					if c.header.length != 1 {
 						return {}, E_PNG.BKGD_Invalid_Length;

@@ -600,19 +600,19 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 	m =   i        & 0x007fffff;
 
 
-	if (e <= 0) {
-		if (e < -10) {
+	if e <= 0 {
+		if e < -10 {
 			return u16(s);
 		}
 		m = (m | 0x00800000) >> u32(1 - e);
 
-		if (m & 0x00001000) != 0 {
+		if m & 0x00001000 != 0 {
 			m += 0x00002000;
 		}
 
 		return u16(s | (m >> 13));
-	} else if (e == 0xff - (127 - 15)) {
-		if (m == 0) {
+	} else if e == 0xff - (127 - 15) {
+		if m == 0 {
 			return u16(s | 0x7c00); /* NOTE(bill): infinity */
 		} else {
 			/* NOTE(bill): NAN */
@@ -620,7 +620,7 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 			return u16(s | 0x7c00 | m | i32(m == 0));
 		}
 	} else {
-		if (m & 0x00001000) != 0 {
+		if m & 0x00001000 != 0 {
 			m += 0x00002000;
 			if (m & 0x00800000) != 0 {
 				m = 0;
@@ -628,7 +628,7 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 			}
 		}
 
-		if (e > 30) {
+		if e > 30 {
 			f := i64(1e12);
 			for j := 0; j < 10; j += 1 {
 				/* NOTE(bill): Cause overflow */
