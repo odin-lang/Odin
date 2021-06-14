@@ -342,7 +342,6 @@ void lb_start_block(lbProcedure *p, lbBlock *b);
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
 
 
-lbAddr lb_find_context_ptr(lbProcedure *p);
 lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
 lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p);
