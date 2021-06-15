@@ -13,6 +13,7 @@ bool is_operand_value(Operand o) {
 	case Addressing_Constant:
 	case Addressing_MapIndex:
 	case Addressing_OptionalOk:
+	case Addressing_OptionalOkPtr:
 	case Addressing_SoaVariable:
 	case Addressing_SwizzleValue:
 	case Addressing_SwizzleVariable:
