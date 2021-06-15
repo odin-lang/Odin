@@ -8470,9 +8470,7 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		return lb_emit_load(p, d);
 	}
 
-
 	res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
-	// GB_PANIC("lb_emit_transmute");
 	return res;
 }
 
