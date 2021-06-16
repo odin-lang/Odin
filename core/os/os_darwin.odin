@@ -302,7 +302,7 @@ foreign libc {
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---;
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---;
 
-	@(link_name="exit")    _unix_exit :: proc(status: int) ---;
+	@(link_name="exit")    _unix_exit :: proc(status: int) -> ! ---;
 }
 
 foreign dl {
