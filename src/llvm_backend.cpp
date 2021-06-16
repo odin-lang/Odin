@@ -10534,7 +10534,26 @@ lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterVal
 }
 
 
+lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr);
+
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
+	expr = unparen_expr(expr);
+	ast_node(ce, CallExpr, expr);
+
+	if (ce->sce_temp_data) {
+		return *(lbValue *)ce->sce_temp_data;
+	}
+
+	lbValue res = lb_build_call_expr_internal(p, expr);
+
+	if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
+		GB_ASSERT(is_type_tuple(res.type));
+		GB_ASSERT(res.type->Tuple.variables.count == 2);
+		return lb_emit_struct_ev(p, res, 0);
+	}
+	return res;
+}
+lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
@@ -12482,7 +12501,12 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(se->modified_call);
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode != Addressing_Invalid);
-		return lb_build_expr(p, se->call);
+		lbValue res = lb_build_call_expr(p, se->call);
+
+		ast_node(ce, CallExpr, se->call);
+		ce->sce_temp_data = gb_alloc_copy(permanent_allocator(), &res, gb_size_of(res));
+
+		return res;
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, expr);
@@ -12596,13 +12620,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
-		lbValue res = lb_build_call_expr(p, expr);
-		if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
-			GB_ASSERT(is_type_tuple(res.type));
-			GB_ASSERT(res.type->Tuple.variables.count == 2);
-			return lb_emit_struct_ev(p, res, 0);
-		}
-		return res;
+		return lb_build_call_expr(p, expr);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
@@ -12992,7 +13010,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(se->modified_call);
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode != Addressing_Invalid);
-		return lb_build_addr(p, se->call);
+		lbValue e = lb_build_expr(p, expr);
+		return lb_addr(lb_address_from_load_or_generate_local(p, e));
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
