@@ -4331,16 +4331,29 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		}
 		if (error_code != 0) {
 			err = CallArgumentError_TooManyArguments;
-			char const *err_fmt = "Too many arguments for '%s', expected %td arguments";
+			char const *err_fmt = "Too many arguments for '%s', expected %td arguments, got %td";
 			if (error_code < 0) {
 				err = CallArgumentError_TooFewArguments;
-				err_fmt = "Too few arguments for '%s', expected %td arguments";
+				err_fmt = "Too few arguments for '%s', expected %td arguments, got %td";
 			}
 
 			if (show_error) {
 				gbString proc_str = expr_to_string(ce->proc);
-				error(call, err_fmt, proc_str, param_count_excluding_defaults);
-				gb_string_free(proc_str);
+				defer (gb_string_free(proc_str));
+				error(call, err_fmt, proc_str, param_count_excluding_defaults, operands.count);
+
+				#if 0
+				error_line("\t");
+				for_array(i, operands) {
+					if (i > 0) {
+						error_line(", ");
+					}
+					gbString s = expr_to_string(operands[i].expr);
+					error_line("%s", s);
+					gb_string_free(s);
+				}
+				error_line("\n");
+				#endif
 			}
 		} else {
 			// NOTE(bill): Generate the procedure type for this generic instance
@@ -7563,6 +7576,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		// TODO(bill): Is this a good hack or not?
 		//
 		// NOTE(bill, 2020-05-22): I'm going to regret this decision, ain't I?
+
+
+		if (se->modified_call) {
+			// Prevent double evaluation
+			o->expr  = node;
+			o->type  = node->tav.type;
+			o->value = node->tav.value;
+			o->mode  = node->tav.mode;
+			return Expr_Expr;
+		}
 
 		bool allow_arrow_right_selector_expr;
 		allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
