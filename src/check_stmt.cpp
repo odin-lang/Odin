@@ -27,6 +27,37 @@ bool is_diverging_stmt(Ast *stmt) {
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
 }
 
+bool contains_deferred_call(Ast *node) {
+	if (node->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+		return true;
+	}
+	switch (node->kind) {
+	case Ast_ExprStmt:
+		return contains_deferred_call(node->ExprStmt.expr);
+	case Ast_AssignStmt:
+		for_array(i, node->AssignStmt.rhs) {
+			if (contains_deferred_call(node->AssignStmt.rhs[i])) {
+				return true;
+			}
+		}
+		for_array(i, node->AssignStmt.lhs) {
+			if (contains_deferred_call(node->AssignStmt.lhs[i])) {
+				return true;
+			}
+		}
+		break;
+	case Ast_ValueDecl:
+		for_array(i, node->ValueDecl.values) {
+			if (contains_deferred_call(node->ValueDecl.values[i])) {
+				return true;
+			}
+		}
+		break;
+	}
+
+	return false;
+}
+
 void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
@@ -85,6 +116,19 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 					error(n, "Statements after a diverging procedure call are never executed");
 				}
 				break;
+			}
+		} else if (i+1 == max_non_constant_declaration) {
+			if (is_diverging_stmt(n)) {
+				for (isize j = 0; j < i; j++) {
+					Ast *stmt = stmts[j];
+					if (stmt->kind == Ast_ValueDecl && !stmt->ValueDecl.is_mutable) {
+
+					} else if (stmt->kind == Ast_DeferStmt) {
+						error(stmt, "Unreachable defer statement due to diverging procedure call at the end of the current scope");
+					} else if (contains_deferred_call(stmt)) {
+						error(stmt, "Unreachable deferred procedure call due to a diverging procedure call at the end of the current scope");
+					}
+				}
 			}
 		}
 	}
