@@ -247,11 +247,24 @@ bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ws, WhenStmt, node);
 		// TODO(bill): Is this logic correct for when statements?
-		if (ws->else_stmt != nullptr) {
-			if (check_is_terminating(ws->body, label) &&
-			    check_is_terminating(ws->else_stmt, label)) {
-			    return true;
-		    }
+		auto const &tv = ws->cond->tav;
+		if (tv.mode != Addressing_Constant) {
+			// NOTE(bill): Check the things regardless as a bug occurred earlier
+			if (ws->else_stmt != nullptr) {
+				if (check_is_terminating(ws->body, label) &&
+				    check_is_terminating(ws->else_stmt, label)) {
+				    return true;
+			    }
+			}
+			return false;
+		}
+
+		if (tv.value.kind == ExactValue_Bool) {
+			if (tv.value.value_bool) {
+				return check_is_terminating(ws->body, label);
+			} else {
+				return check_is_terminating(ws->else_stmt, label);
+			}
 		}
 	case_end;
 
