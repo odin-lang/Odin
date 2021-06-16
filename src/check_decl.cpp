@@ -1297,13 +1297,21 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 					error(bs->close, "Missing return statement at the end of the procedure");
 				}
 			}
+		} else if (type->Proc.diverging) {
+			if (!check_is_terminating(body, str_lit(""))) {
+				if (token.kind == Token_Ident) {
+					error(bs->close, "Missing diverging call at the end of the procedure '%.*s'", LIT(token.string));
+				} else {
+					// NOTE(bill): Anonymous procedure (lambda)
+					error(bs->close, "Missing diverging call at the end of the procedure");
+				}
+			}
 		}
 	}
 	check_close_scope(ctx);
 
 	check_scope_usage(ctx->checker, ctx->scope);
 
-#if 1
 	if (decl->parent != nullptr) {
 		Scope *ps = decl->parent->scope;
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
@@ -1321,7 +1329,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			}
 		}
 	}
-#endif
 }
 
 

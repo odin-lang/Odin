@@ -255,7 +255,7 @@ Source_Code_Location :: struct {
 	procedure:    string,
 }
 
-Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
+Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location) -> !;
 
 // Allocation Stuff
 Allocator_Mode :: enum byte {
@@ -483,7 +483,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.logger.data = nil;
 }
 
-default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
+default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
 	print_caller_location(loc);
 	print_string(" ");
 	print_string(prefix);
@@ -492,6 +492,6 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 		print_string(message);
 	}
 	print_byte('\n');
-	debug_trap();
-	// trap();
+	// debug_trap();
+	trap();
 }
