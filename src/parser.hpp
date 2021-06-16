@@ -334,7 +334,11 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		u8 swizzle_indices; /*2 bits per component*/ \
 	}) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
-	AST_KIND(SelectorCallExpr, "selector call expression",    struct { Token token; Ast *expr, *call; bool modified_call; }) \
+	AST_KIND(SelectorCallExpr, "selector call expression", struct { \
+		Token token; \
+		Ast *expr, *call;  \
+		bool modified_call; \
+	}) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
 	AST_KIND(DerefExpr,    "dereference expression", struct { Ast *expr; Token op; }) \
 	AST_KIND(SliceExpr,    "slice expression", struct { \
@@ -352,6 +356,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
 		i32          builtin_id; \
+		void *sce_temp_data; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
@@ -716,3 +721,4 @@ gbAllocator ast_allocator(AstFile *f) {
 
 Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
+gbString expr_to_string(Ast *expression);
