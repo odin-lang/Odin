@@ -166,6 +166,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_typeid,
 	BuiltinProc_type_is_any,
 
+	BuiltinProc_type_is_endian_platform,
 	BuiltinProc_type_is_endian_little,
 	BuiltinProc_type_is_endian_big,
 	BuiltinProc_type_is_unsigned,
@@ -396,6 +397,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_typeid"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_any"),               1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_is_endian_platform"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_endian_little"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_endian_big"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_unsigned"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

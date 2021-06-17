@@ -12,6 +12,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_string,
 	is_type_typeid,
 	is_type_any,
+	is_type_endian_platform,
 	is_type_endian_little,
 	is_type_endian_big,
 	is_type_unsigned,
@@ -2516,6 +2517,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_string:
 	case BuiltinProc_type_is_typeid:
 	case BuiltinProc_type_is_any:
+	case BuiltinProc_type_is_endian_platform:
 	case BuiltinProc_type_is_endian_little:
 	case BuiltinProc_type_is_endian_big:
 	case BuiltinProc_type_is_unsigned:
