@@ -136,6 +136,7 @@ type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
 
+type_is_endian_platform :: proc($T: typeid) -> bool ---
 type_is_endian_little   :: proc($T: typeid) -> bool ---
 type_is_endian_big      :: proc($T: typeid) -> bool ---
 type_is_unsigned        :: proc($T: typeid) -> bool ---
