@@ -1,7 +1,5 @@
 package sync2
 
-import "core:runtime"
-
 // A Wait_Group waits for a collection of threads to finish
 //
 // A Wait_Group must not be copied after first use
@@ -201,7 +199,7 @@ Recursive_Benaphore :: struct {
 }
 
 recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	if atomic_add_acquire(&b.counter, 1) > 1 {
 		if tid != b.owner {
 			sema_wait(&b.sema);
@@ -213,7 +211,7 @@ recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 }
 
 recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	if b.owner == tid {
 		atomic_add_acquire(&b.counter, 1);
 	}
@@ -228,7 +226,7 @@ recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
 }
 
 recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	assert(tid == b.owner);
 	b.recursion -= 1;
 	recursion := b.recursion;

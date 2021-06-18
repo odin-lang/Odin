@@ -13,7 +13,10 @@ bool is_operand_value(Operand o) {
 	case Addressing_Constant:
 	case Addressing_MapIndex:
 	case Addressing_OptionalOk:
+	case Addressing_OptionalOkPtr:
 	case Addressing_SoaVariable:
+	case Addressing_SwizzleValue:
+	case Addressing_SwizzleVariable:
 		return true;
 	}
 	return false;
@@ -561,10 +564,6 @@ bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 }
 
 void check_scope_usage(Checker *c, Scope *scope) {
-	if (!build_context.vet) {
-		return;
-	}
-
 	bool vet_unused = true;
 	bool vet_shadowing = true;
 
@@ -591,19 +590,32 @@ void check_scope_usage(Checker *c, Scope *scope) {
 		Entity *other = ve.other;
 		String name = e->token.string;
 
-		switch (ve.kind) {
-		case VettedEntity_Unused:
-			error(e->token, "'%.*s' declared but not used", LIT(name));
-			break;
-		case VettedEntity_Shadowed:
-			if (e->flags&EntityFlag_Using) {
-				error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
-			} else {
-				error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+		if (build_context.vet) {
+			switch (ve.kind) {
+			case VettedEntity_Unused:
+				error(e->token, "'%.*s' declared but not used", LIT(name));
+				break;
+			case VettedEntity_Shadowed:
+				if (e->flags&EntityFlag_Using) {
+					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+				} else {
+					error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
+		}
+
+		if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using)) == 0) {
+			i64 sz = type_size_of(e->type);
+			// TODO(bill): When is a good size warn?
+			// Is 128 KiB good enough?
+			if (sz >= 1ll<<17) {
+				gbString type_str = type_to_string(e->type);
+				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(name), type_str, cast(long long)sz);
+				gb_string_free(type_str);
+			}
 		}
 	}
 
@@ -937,7 +949,7 @@ Type *type_of_expr(Ast *expr) {
 }
 
 Entity *implicit_entity_of_node(Ast *clause) {
-	if (clause->kind == Ast_CaseClause) {
+	if (clause != nullptr && clause->kind == Ast_CaseClause) {
 		return clause->CaseClause.implicit_entity;
 	}
 	return nullptr;
@@ -1718,46 +1730,46 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
 	String required_runtime_entities[] = {
-		str_lit("Allocator"),
-		str_lit("Logger"),
-		str_lit("mem_zero"),
-
-		str_lit("__init_context"),
-
-		str_lit("args__"),
-		str_lit("type_table"),
-		str_lit("__type_info_of"),
-		str_lit("default_temp_allocator"),
-		// str_lit("default_temp_allocator_init"),
-		// str_lit("default_temp_allocator_destroy"),
-		str_lit("default_temp_allocator_proc"),
-
+		// Odin types
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
+		str_lit("Allocator"),
+		str_lit("Logger"),
 
-		str_lit("cstring_to_string"), // Is tihs needed?
+		// Global variables
+		str_lit("args__"),
+		str_lit("type_table"),
 
+		// Odin internal procedures
+		str_lit("__init_context"),
+		str_lit("__type_info_of"),
+		str_lit("cstring_to_string"),
+
+		// Pseudo-CRT required procedures
+		str_lit("memset"),
+		str_lit("memcpy"),
+		str_lit("memmove"),
+
+		// Utility procedures
+		str_lit("memory_equal"),
+		str_lit("memory_compare"),
+		str_lit("memory_compare_zero"),
+
+		// Extended data type internal procedures
 		str_lit("umodti3"),
 		str_lit("udivti3"),
 		str_lit("modti3"),
 		str_lit("divti3"),
 		str_lit("fixdfti"),
 		str_lit("floattidf"),
-
+		str_lit("floattidf_unsigned"),
 		str_lit("truncsfhf2"),
 		str_lit("truncdfhf2"),
 		str_lit("gnu_h2f_ieee"),
 		str_lit("gnu_f2h_ieee"),
 		str_lit("extendhfsf2"),
 
-		str_lit("memset"),
-		str_lit("memcpy"),
-		str_lit("memmove"),
-
-		str_lit("memory_equal"),
-		str_lit("memory_compare"),
-		str_lit("memory_compare_zero"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
@@ -1766,8 +1778,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	if (build_context.no_crt) {
 		String required_no_crt_entities[] = {
 			// NOTE(bill): Only if these exist
-			str_lit("memcpy"),
-			str_lit("memmove"),
 			str_lit("_tls_index"),
 			str_lit("_fltused"),
 		};
@@ -1776,21 +1786,12 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		}
 	}
 
-	AstPackage *os = get_core_package(&c->info, str_lit("os"));
-	String required_os_entities[] = {
-		str_lit("heap_allocator"),
-	};
-	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
-		force_add_dependency_entity(c, os->scope, required_os_entities[i]);
-	}
-
-
 	if (!build_context.no_bounds_check) {
 		String bounds_check_entities[] = {
+			// Bounds checking related procedures
 			str_lit("bounds_check_error"),
 			str_lit("slice_expr_error_hi"),
 			str_lit("slice_expr_error_lo_hi"),
-			str_lit("dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
 			force_add_dependency_entity(c, c->info.runtime_package->scope, bounds_check_entities[i]);
@@ -2645,6 +2646,16 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			ac->link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "link_section") {
+		if (ev.kind == ExactValue_String) {
+			ac->link_section = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_section)) {
+				error(elem, "Invalid link section: %.*s", LIT(ac->link_section));
 			}
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));

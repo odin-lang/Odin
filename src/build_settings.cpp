@@ -10,7 +10,6 @@ enum TargetOsKind {
 	TargetOs_darwin,
 	TargetOs_linux,
 	TargetOs_essence,
-	TargetOs_js,
 	TargetOs_freebsd,
 
 	TargetOs_freestanding,
@@ -44,7 +43,6 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("darwin"),
 	str_lit("linux"),
 	str_lit("essence"),
-	str_lit("js"),
 	str_lit("freebsd"),
 
 	str_lit("freestanding"),
@@ -200,8 +198,10 @@ struct BuildContext {
 	bool   disallow_do;
 	bool   insert_semicolon;
 
+
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
+	bool   show_error_line;
 
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
@@ -310,8 +310,8 @@ gb_global TargetMetrics target_essence_amd64 = {
 	str_lit("x86_64-pc-none-elf"),
 };
 
-gb_global TargetMetrics target_js_wasm32 = {
-	TargetOs_js,
+gb_global TargetMetrics target_freestanding_wasm32 = {
+	TargetOs_freestanding,
 	TargetArch_wasm32,
 	4,
 	8,
@@ -328,15 +328,15 @@ struct NamedTargetMetrics {
 
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),   &target_darwin_amd64   },
-	{ str_lit("darwin_arm64"), &target_darwin_arm64 },
+	{ str_lit("darwin_arm64"),   &target_darwin_arm64   },
 	{ str_lit("essence_amd64"),  &target_essence_amd64  },
-	{ str_lit("js_wasm32"),      &target_js_wasm32      },
 	{ str_lit("linux_386"),      &target_linux_386      },
 	{ str_lit("linux_amd64"),    &target_linux_amd64    },
 	{ str_lit("windows_386"),    &target_windows_386    },
 	{ str_lit("windows_amd64"),  &target_windows_amd64  },
 	{ str_lit("freebsd_386"),    &target_freebsd_386    },
 	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
+	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -439,6 +439,14 @@ bool find_library_collection_path(String name, String *path) {
 		}
 	}
 	return false;
+}
+
+bool is_arch_wasm(void) {
+	return build_context.metrics.arch == TargetArch_wasm32;
+}
+
+bool allow_check_foreign_filepath(void) {
+	return build_context.metrics.arch != TargetArch_wasm32;
 }
 
 
@@ -746,6 +754,9 @@ String get_fullpath_core(gbAllocator a, String path) {
 	return path_to_fullpath(a, res);
 }
 
+bool show_error_line(void) {
+	return build_context.show_error_line;
+}
 
 
 void init_build_context(TargetMetrics *cross_target) {

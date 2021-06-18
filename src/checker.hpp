@@ -109,6 +109,7 @@ struct AttributeContext {
 	bool    set_cold;
 	String  link_name;
 	String  link_prefix;
+	String  link_section;
 	isize   init_expr_list_count;
 	String  thread_local_model;
 	String  deprecated_message;
@@ -418,3 +419,4 @@ void  check_poly_path_push(CheckerContext *c, Type *t);
 Type *check_poly_path_pop (CheckerContext *c);
 
 void init_core_context(Checker *c);
+void init_mem_allocator(Checker *c);

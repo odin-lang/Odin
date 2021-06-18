@@ -302,7 +302,7 @@ foreign libc {
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---;
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---;
 
-	@(link_name="exit")    _unix_exit :: proc(status: int) ---;
+	@(link_name="exit")    _unix_exit :: proc(status: int) -> ! ---;
 }
 
 foreign dl {
@@ -337,7 +337,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 		return 0, 0;
 	}
 	bytes_written := _unix_write(fd, raw_data(data), len(data));
-	if(bytes_written == -1) {
+	if bytes_written == -1 {
 		return 0, 1;
 	}
 	return bytes_written, 0;

@@ -224,11 +224,11 @@ scan_string :: proc(t: ^Tokenizer) -> string {
 
 digit_val :: proc(r: rune) -> int {
 	switch r {
-	case '0'..'9':
+	case '0'..='9':
 		return int(r-'0');
-	case 'A'..'F':
+	case 'A'..='F':
 		return int(r-'A' + 10);
-	case 'a'..'f':
+	case 'a'..='f':
 		return int(r-'a' + 10);
 	}
 	return 16;
@@ -245,7 +245,7 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 		advance_rune(t);
 		return true;
 
-	case '0'..'7':
+	case '0'..='7':
 		for digit_val(t.ch) < 8 {
 			advance_rune(t);
 		}

@@ -33,6 +33,8 @@ Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector;
 Type_Info_Relative_Pointer :: runtime.Type_Info_Relative_Pointer;
 Type_Info_Relative_Slice   :: runtime.Type_Info_Relative_Slice;
 
+Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value;
+
 
 Type_Kind :: enum {
 	Invalid,
@@ -111,7 +113,7 @@ backing_type_kind :: proc(T: typeid) -> Type_Kind {
 }
 
 
-type_info_base :: proc(info: ^runtime.Type_Info) -> ^runtime.Type_Info {
+type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil { return nil; }
 
 	base := info;
@@ -125,7 +127,7 @@ type_info_base :: proc(info: ^runtime.Type_Info) -> ^runtime.Type_Info {
 }
 
 
-type_info_core :: proc(info: ^runtime.Type_Info) -> ^runtime.Type_Info {
+type_info_core :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil { return nil; }
 
 	base := info;
@@ -344,7 +346,7 @@ Struct_Tag :: distinct string;
 
 Struct_Field :: struct {
 	name:     string,
-	type:     typeid,
+	type:     ^Type_Info,
 	tag:      Struct_Tag,
 	offset:   uintptr,
 	is_using: bool,
@@ -355,7 +357,7 @@ struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		if 0 <= i && i < len(s.names) {
 			field.name     = s.names[i];
-			field.type     = s.types[i].id;
+			field.type     = s.types[i];
 			field.tag      = Struct_Tag(s.tags[i]);
 			field.offset   = s.offsets[i];
 			field.is_using = s.usings[i];
@@ -370,7 +372,7 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 		for fname, i in s.names {
 			if fname == name {
 				field.name     = s.names[i];
-				field.type     = s.types[i].id;
+				field.type     = s.types[i];
 				field.tag      = Struct_Tag(s.tags[i]);
 				field.offset   = s.offsets[i];
 				field.is_using = s.usings[i];
@@ -381,7 +383,7 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	return;
 }
 
-struct_field_value_by_name :: proc(a: any, field: string, recurse := false) -> any {
+struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) -> any {
 	if a == nil { return nil; }
 
 	ti := runtime.type_info_base(type_info_of(a.id));
@@ -395,13 +397,13 @@ struct_field_value_by_name :: proc(a: any, field: string, recurse := false) -> a
 				};
 			}
 
-			if recurse && s.usings[i] {
+			if allow_using && s.usings[i] {
 				f := any{
 					rawptr(uintptr(a.data) + s.offsets[i]),
 					s.types[i].id,
 				};
 
-				if res := struct_field_value_by_name(f, field, recurse); res != nil {
+				if res := struct_field_value_by_name(f, field, allow_using); res != nil {
 					return res;
 				}
 			}
@@ -420,7 +422,7 @@ struct_field_names :: proc(T: typeid) -> []string {
 	return nil;
 }
 
-struct_field_types :: proc(T: typeid) -> []^runtime.Type_Info {
+struct_field_types :: proc(T: typeid) -> []^Type_Info {
 	ti := runtime.type_info_base(type_info_of(T));
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		return s.types;
@@ -441,6 +443,20 @@ struct_field_offsets :: proc(T: typeid) -> []uintptr {
 	ti := runtime.type_info_base(type_info_of(T));
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		return s.offsets;
+	}
+	return nil;
+}
+
+struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
+	ti := runtime.type_info_base(type_info_of(T));
+	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
+		return soa_zip(
+			name     = s.names,
+			type     = s.types,
+			tag      = transmute([]Struct_Tag)s.tags,
+			offset   = s.offsets,
+			is_using = s.usings,
+		);
 	}
 	return nil;
 }
@@ -468,7 +484,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, o
 			switch t[i] {
 			case ':', '"':
 				break loop;
-			case 0x00 ..< ' ', 0x7f .. 0x9f: // break if control character is found
+			case 0x00 ..< ' ', 0x7f ..= 0x9f: // break if control character is found
 				break loop;
 			}
 			i += 1;
@@ -516,7 +532,7 @@ enum_string :: proc(a: any) -> string {
 	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
 		v, _ := as_i64(a);
 		for value, i in e.values {
-			if value == runtime.Type_Info_Enum_Value(v) {
+			if value == Type_Info_Enum_Value(v) {
 				return e.names[i];
 			}
 		}
@@ -528,26 +544,24 @@ enum_string :: proc(a: any) -> string {
 }
 
 // Given a enum type and a value name, get the enum value.
-enum_from_name :: proc($EnumType: typeid, name: string) -> (value: EnumType, ok: bool) {
-	ti := type_info_base(type_info_of(EnumType));
+enum_from_name :: proc($Enum_Type: typeid, name: string) -> (value: Enum_Type, ok: bool) {
+	ti := type_info_base(type_info_of(Enum_Type));
 	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
 		for value_name, i in eti.names {
 			if value_name != name {
 				continue;
 			}
 			v := eti.values[i];
-			value = EnumType(v);
+			value = Enum_Type(v);
 			ok = true;
 			return;
 		}
-	} else {
-		panic("expected enum type to reflect.enum_from_name");
 	}
 	return;
 }
 
-enum_from_name_any :: proc(EnumType: typeid, name: string) -> (value: runtime.Type_Info_Enum_Value, ok: bool) {
-	ti := runtime.type_info_base(type_info_of(EnumType));
+enum_from_name_any :: proc(Enum_Type: typeid, name: string) -> (value: Type_Info_Enum_Value, ok: bool) {
+	ti := runtime.type_info_base(type_info_of(Enum_Type));
 	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
 		for value_name, i in eti.names {
 			if value_name != name {
@@ -557,14 +571,42 @@ enum_from_name_any :: proc(EnumType: typeid, name: string) -> (value: runtime.Ty
 			ok = true;
 			return;
 		}
-	} else {
-		panic("expected enum type to reflect.enum_from_name_any");
 	}
 	return;
 }
 
 
-union_variant_type_info :: proc(a: any) -> ^runtime.Type_Info {
+enum_field_names :: proc(Enum_Type: typeid) -> []string {
+	ti := runtime.type_info_base(type_info_of(Enum_Type));
+	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
+		return eti.names;
+	}
+	return nil;
+}
+enum_field_values :: proc(Enum_Type: typeid) -> []Type_Info_Enum_Value {
+	ti := runtime.type_info_base(type_info_of(Enum_Type));
+	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
+		return eti.values;
+	}
+	return nil;
+}
+
+Enum_Field :: struct {
+	name:  string,
+	value: Type_Info_Enum_Value,
+}
+
+enum_fields_zipped :: proc(Enum_Type: typeid) -> (fields: #soa[]Enum_Field) {
+	ti := runtime.type_info_base(type_info_of(Enum_Type));
+	if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
+		return soa_zip(name=eti.names, value=eti.values);
+	}
+	return nil;
+}
+
+
+
+union_variant_type_info :: proc(a: any) -> ^Type_Info {
 	id := union_variant_typeid(a);
 	return type_info_of(id);
 }

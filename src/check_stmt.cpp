@@ -7,7 +7,7 @@ bool is_diverging_stmt(Ast *stmt) {
 		return false;
 	}
 	if (expr->CallExpr.proc->kind == Ast_BasicDirective) {
-		String name = expr->CallExpr.proc->BasicDirective.name;
+		String name = expr->CallExpr.proc->BasicDirective.name.string;
 		return name == "panic";
 	}
 	Ast *proc = unparen_expr(expr->CallExpr.proc);
@@ -25,6 +25,37 @@ bool is_diverging_stmt(Ast *stmt) {
 	Type *t = tv.type;
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
+}
+
+bool contains_deferred_call(Ast *node) {
+	if (node->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+		return true;
+	}
+	switch (node->kind) {
+	case Ast_ExprStmt:
+		return contains_deferred_call(node->ExprStmt.expr);
+	case Ast_AssignStmt:
+		for_array(i, node->AssignStmt.rhs) {
+			if (contains_deferred_call(node->AssignStmt.rhs[i])) {
+				return true;
+			}
+		}
+		for_array(i, node->AssignStmt.lhs) {
+			if (contains_deferred_call(node->AssignStmt.lhs[i])) {
+				return true;
+			}
+		}
+		break;
+	case Ast_ValueDecl:
+		for_array(i, node->ValueDecl.values) {
+			if (contains_deferred_call(node->ValueDecl.values[i])) {
+				return true;
+			}
+		}
+		break;
+	}
+
+	return false;
 }
 
 void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
@@ -85,6 +116,19 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 					error(n, "Statements after a diverging procedure call are never executed");
 				}
 				break;
+			}
+		} else if (i+1 == max_non_constant_declaration) {
+			if (is_diverging_stmt(n)) {
+				for (isize j = 0; j < i; j++) {
+					Ast *stmt = stmts[j];
+					if (stmt->kind == Ast_ValueDecl && !stmt->ValueDecl.is_mutable) {
+
+					} else if (stmt->kind == Ast_DeferStmt) {
+						error(stmt, "Unreachable defer statement due to diverging procedure call at the end of the current scope");
+					} else if (contains_deferred_call(stmt)) {
+						error(stmt, "Unreachable deferred procedure call due to a diverging procedure call at the end of the current scope");
+					}
+				}
 			}
 		}
 	}
@@ -203,11 +247,24 @@ bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ws, WhenStmt, node);
 		// TODO(bill): Is this logic correct for when statements?
-		if (ws->else_stmt != nullptr) {
-			if (check_is_terminating(ws->body, label) &&
-			    check_is_terminating(ws->else_stmt, label)) {
-			    return true;
-		    }
+		auto const &tv = ws->cond->tav;
+		if (tv.mode != Addressing_Constant) {
+			// NOTE(bill): Check the things regardless as a bug occurred earlier
+			if (ws->else_stmt != nullptr) {
+				if (check_is_terminating(ws->body, label) &&
+				    check_is_terminating(ws->else_stmt, label)) {
+				    return true;
+			    }
+			}
+			return false;
+		}
+
+		if (tv.value.kind == ExactValue_Bool) {
+			if (tv.value.value_bool) {
+				return check_is_terminating(ws->body, label);
+			} else {
+				return check_is_terminating(ws->else_stmt, label);
+			}
 		}
 	case_end;
 
@@ -368,6 +425,9 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 	}
 
 	case Addressing_SoaVariable:
+		break;
+
+	case Addressing_SwizzleVariable:
 		break;
 
 	default: {
@@ -1089,7 +1149,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			}
 			error_line("\n");
 
-			error_line("\tSuggestion: Was '#partial switch' wanted? This replaces the previous '#complete switch'.\n");
+			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
 }
@@ -1321,7 +1381,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				}
 			}
 			error_line("\n");
-			error_line("\tSuggestion: Was '#partial switch' wanted? This replaces the previous '#complete switch'.\n");
+			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
 		}
 	}
 }
@@ -1436,6 +1496,28 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(node, "Expression is not used: '%s'", expr_str);
 			gb_string_free(expr_str);
+			if (operand.expr->kind == Ast_BinaryExpr) {
+				ast_node(be, BinaryExpr, operand.expr);
+				if (be->op.kind != Token_CmpEq) {
+					break;
+				}
+
+				switch (be->left->tav.mode) {
+				case Addressing_Context:
+				case Addressing_Variable:
+				case Addressing_MapIndex:
+				case Addressing_SoaVariable:
+					{
+						gbString lhs = expr_to_string(be->left);
+						gbString rhs = expr_to_string(be->right);
+						error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+						error_line("\t            '%s = %s;'\n", lhs, rhs);
+						gb_string_free(rhs);
+						gb_string_free(lhs);
+					}
+					break;
+				}
+			}
 
 			break;
 		}
@@ -1515,8 +1597,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 			Operand lhs = {Addressing_Invalid};
 			Operand rhs = {Addressing_Invalid};
-			Ast binary_expr = {Ast_BinaryExpr};
-			ast_node(be, BinaryExpr, &binary_expr);
+			Ast *binary_expr = alloc_ast_node(node->file, Ast_BinaryExpr);
+			ast_node(be, BinaryExpr, binary_expr);
 			be->op = op;
 			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
 			 // NOTE(bill): Only use the first one will be used
@@ -1524,7 +1606,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			be->right = as->rhs[0];
 
 			check_expr(ctx, &lhs, as->lhs[0]);
-			check_binary_expr(ctx, &rhs, &binary_expr, nullptr, true);
+			check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
 			if (rhs.mode == Addressing_Invalid) {
 				return;
 			}

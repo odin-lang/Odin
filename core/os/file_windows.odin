@@ -273,7 +273,7 @@ is_file :: proc(path: string) -> bool {
 	attribs := win32.GetFileAttributesW(wpath);
 
 	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
-		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY == win32.FILE_ATTRIBUTE_DIRECTORY;
+		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY == 0;
 	}
 	return false;
 }
@@ -283,7 +283,7 @@ is_dir :: proc(path: string) -> bool {
 	attribs := win32.GetFileAttributesW(wpath);
 
 	if i32(attribs) != win32.INVALID_FILE_ATTRIBUTES {
-		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY != win32.FILE_ATTRIBUTE_DIRECTORY;
+		return attribs & win32.FILE_ATTRIBUTE_DIRECTORY != 0;
 	}
 	return false;
 }
@@ -347,7 +347,7 @@ is_abs :: proc(path: string) -> bool {
 	when ODIN_OS == "windows" {
 		if len(path) > 2 {
 			switch path[0] {
-			case 'A'..'Z', 'a'..'z':
+			case 'A'..='Z', 'a'..='z':
 				return path[1] == ':' && is_path_separator(path[2]);
 			}
 		}

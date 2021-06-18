@@ -104,7 +104,7 @@ equal_fold :: proc(u, v: string) -> bool {
 
 		if tr < utf8.RUNE_SELF {
 			switch sr {
-			case 'A'..'Z':
+			case 'A'..='Z':
 				if tr == (sr+'a')-'A' {
 					continue loop;
 				}
@@ -539,6 +539,14 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 	w += copy(t[w:], s[start:]);
 	output = string(t[0:w]);
 	return;
+}
+
+remove :: proc(s, key: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
+	return replace(s, key, "", n, allocator);
+}
+
+remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
+	return remove(s, key, -1, allocator);
 }
 
 @(private) _ascii_space := [256]u8{'\t' = 1, '\n' = 1, '\v' = 1, '\f' = 1, '\r' = 1, ' ' = 1};

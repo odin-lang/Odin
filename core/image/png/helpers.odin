@@ -81,7 +81,7 @@ core_time :: proc(c: Chunk) -> (t: coretime.Time, ok: bool) {
 }
 
 text :: proc(c: Chunk) -> (res: Text, ok: bool) {
-	 #partial switch c.header.type {
+	#partial switch c.header.type {
 	case .tEXt:
 		ok = true;
 

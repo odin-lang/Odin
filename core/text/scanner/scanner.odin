@@ -421,8 +421,8 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 	digit_val :: proc(ch: rune) -> int {
 		switch v := lower(ch); v {
-		case '0'..'9': return int(v - '0');
-		case 'a'..'z': return int(v - 'a');
+		case '0'..='9': return int(v - '0');
+		case 'a'..='z': return int(v - 'a');
 		}
 		return 16;
 	}
@@ -450,10 +450,10 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 			switch ch {
 			case quote, 'a', 'b', 'e', 'f', 'n', 'r', 't', 'v', '\\':
 				ch = advance(s);
-			case '0'..'7': ch = scan_digits(s, advance(s), 8, 3);
-			case 'x':      ch = scan_digits(s, advance(s), 16, 2);
-			case 'u':      ch = scan_digits(s, advance(s), 16, 4);
-			case 'U':      ch = scan_digits(s, advance(s), 16, 8);
+			case '0'..='7': ch = scan_digits(s, advance(s), 8, 3);
+			case 'x':       ch = scan_digits(s, advance(s), 16, 2);
+			case 'u':       ch = scan_digits(s, advance(s), 16, 4);
+			case 'U':       ch = scan_digits(s, advance(s), 16, 8);
 			case:
 				error(s, "invalid char escape");
 			}
@@ -526,7 +526,7 @@ scan :: proc(s: ^Scanner) -> (tok: rune) {
 	s.pos.line = 0;
 
 	redo: for {
-		for (ch < utf8.RUNE_SELF && ch in s.whitespace) {
+		for ch < utf8.RUNE_SELF && (ch in s.whitespace) {
 			ch = advance(s);
 		}
 

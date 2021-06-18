@@ -35,8 +35,9 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 close :: proc(fd: Handle) -> Errno {
 	return 0;
 }
-
-
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+	return 0, 0;
+}
 current_thread_id :: proc "contextless" () -> int {
 	return 0;
 }

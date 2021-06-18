@@ -152,7 +152,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	String output_base = gen->output_base;
 
-	if (build_context.metrics.os == TargetOs_js) {
+	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 		system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm-obj\" -o \"%.*s.wasm\" %.*s %.*s",
@@ -178,7 +178,11 @@ i32 linker_stage(lbGenerator *gen) {
 		build_context.keep_object_files = true;
 	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
-		timings_start_section(timings, str_lit("msvc-link"));
+		String section_name = str_lit("msvc-link");
+		if (build_context.use_lld) {
+			section_name = str_lit("lld-link");
+		}
+		timings_start_section(timings, section_name);
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
@@ -309,15 +313,14 @@ i32 linker_stage(lbGenerator *gen) {
 				);
 			}
 		} else { // lld
-			  result = system_exec_command_line_app("msvc-link",
+			  result = system_exec_command_line_app("msvc-lld-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
 				" %.*s "
 				" %s "
 				"",
-				LIT(build_context.ODIN_ROOT),
-				LIT(output_base), object_files, output_ext,
+				LIT(build_context.ODIN_ROOT), object_files, LIT(output_base),output_ext,
 				link_settings,
 				subsystem_str,
 				LIT(build_context.link_flags),
@@ -621,6 +624,7 @@ enum BuildFlagKind {
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
+	BuildFlag_VerboseErrors,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -741,6 +745,7 @@ bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_VerboseErrors,    str_lit("verbose-errors"),     BuildFlagParam_None, Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
@@ -1320,6 +1325,10 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
+						case BuildFlag_VerboseErrors:
+							build_context.show_error_line = true;
+							break;
+
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1556,10 +1565,15 @@ void remove_temp_files(lbGenerator *gen) {
 		gb_file_remove(cast(char const *)path.text);
 	}
 
-	if (build_context.build_mode != BuildMode_Object && !build_context.keep_object_files) {
-		for_array(i, gen->output_object_paths) {
-			String path = gen->output_object_paths[i];
-			gb_file_remove(cast(char const *)path.text);
+	if (!build_context.keep_object_files) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			for_array(i, gen->output_object_paths) {
+				String path = gen->output_object_paths[i];
+				gb_file_remove(cast(char const *)path.text);
+			}
+			break;
 		}
 	}
 }

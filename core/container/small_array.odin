@@ -1,6 +1,6 @@
 package container
 
-Small_Array :: struct(N: int, T: typeid) where N >= 0 {
+Small_Array :: struct($N: int, $T: typeid) where N >= 0 {
 	data: [N]T,
 	len:  int,
 }

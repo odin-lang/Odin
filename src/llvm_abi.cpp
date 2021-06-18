@@ -11,6 +11,8 @@ struct lbArgType {
 	LLVMTypeRef pad_type;       // Optional
 	LLVMAttributeRef attribute; // Optional
 	LLVMAttributeRef align_attribute; // Optional
+	i64 byval_alignment;
+	bool is_byval;
 };
 
 
@@ -18,14 +20,14 @@ i64 lb_sizeof(LLVMTypeRef type);
 i64 lb_alignof(LLVMTypeRef type);
 
 lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
-	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, nullptr};
+	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, nullptr, 0, false};
 }
 lbArgType lb_arg_type_direct(LLVMTypeRef type) {
 	return lb_arg_type_direct(type, nullptr, nullptr, nullptr);
 }
 
 lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef attr) {
-	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, nullptr};
+	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, nullptr, 0, false};
 }
 
 lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
@@ -34,11 +36,11 @@ lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
 
 	LLVMAttributeRef byval_attr = lb_create_enum_attribute_with_type(c, "byval", type);
 	LLVMAttributeRef align_attr = lb_create_enum_attribute(c, "align", alignment);
-	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, byval_attr, align_attr};
+	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, byval_attr, align_attr, alignment, true};
 }
 
 lbArgType lb_arg_type_ignore(LLVMTypeRef type) {
-	return lbArgType{lbArg_Ignore, type, nullptr, nullptr, nullptr, nullptr};
+	return lbArgType{lbArg_Ignore, type, nullptr, nullptr, nullptr, nullptr, 0, false};
 }
 
 struct lbFunctionType {
@@ -149,7 +151,7 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// TODO(bill): Clean up this logic
-	if (build_context.metrics.os != TargetOs_js)  {
+	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[calling_convention];
 	}
 	LLVMSetFunctionCallConv(fn, cc_kind);
@@ -270,6 +272,7 @@ i64 lb_alignof(LLVMTypeRef type) {
 		return 8;
 	case LLVMVectorTypeKind:
 		{
+			// TODO(bill): This appears to be correct but LLVM isn't necessarily "great" with regards to documentation
 			LLVMTypeRef elem = LLVMGetElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
@@ -343,7 +346,7 @@ namespace lbAbi386 {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
-					args[i] = lb_arg_type_indirect_byval(c, t);
+					args[i] = lb_arg_type_indirect(t, nullptr);
 				}
 			} else {
 				args[i] = non_struct(c, t, false);
@@ -458,11 +461,10 @@ namespace lbAbiAmd64SysV {
 		Amd64TypeAttribute_StructRect,
 	};
 
-	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
 	void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off);
 	void fixup(LLVMTypeRef t, Array<RegClass> *cls);
-	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind);
+	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention);
 	Array<RegClass> classify(LLVMTypeRef t);
 	LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes);
 
@@ -473,11 +475,11 @@ namespace lbAbiAmd64SysV {
 
 		ft->args = array_make<lbArgType>(heap_allocator(), arg_count);
 		for (unsigned i = 0; i < arg_count; i++) {
-			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal);
+			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal, calling_convention);
 		}
 
 		if (return_is_defined) {
-			ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect);
+			ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect, calling_convention);
 		} else {
 			ft->ret = lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		}
@@ -514,7 +516,7 @@ namespace lbAbiAmd64SysV {
 		return false;
 	}
 
-	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind) {
+	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention) {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (type == LLVMInt1TypeInContext(c)) {
@@ -527,7 +529,10 @@ namespace lbAbiAmd64SysV {
 		if (is_mem_cls(cls, attribute_kind)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
-				return lb_arg_type_indirect_byval(c, type);
+				if (!is_calling_convention_odin(calling_convention)) {
+					return lb_arg_type_indirect_byval(c, type);
+				}
+				attribute = nullptr;
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}
@@ -815,26 +820,6 @@ namespace lbAbiAmd64SysV {
 			GB_PANIC("Unhandled type");
 			break;
 		}
-	}
-
-	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
-		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
-
-		for (unsigned i = 0; i < arg_count; i++) {
-			LLVMTypeRef t = arg_types[i];
-			LLVMTypeKind kind = LLVMGetTypeKind(t);
-			if (kind == LLVMStructTypeKind) {
-				i64 sz = lb_sizeof(t);
-				if (sz == 0) {
-					args[i] = lb_arg_type_ignore(t);
-				} else {
-					args[i] = lb_arg_type_indirect(t, lb_create_enum_attribute_with_type(c, "byval", t));
-				}
-			} else {
-				args[i] = non_struct(c, t);
-			}
-		}
-		return args;
 	}
 
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {

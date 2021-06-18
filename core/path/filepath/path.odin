@@ -39,7 +39,7 @@ volume_name_len :: proc(path: string) -> int {
 		c := path[0];
 		if path[1] == ':' {
 			switch c {
-			case 'a'..'z', 'A'..'Z':
+			case 'a'..='z', 'A'..='Z':
 				return 2;
 			}
 		}
@@ -170,6 +170,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	cleaned, new_allocation := from_slash(s);
 	if new_allocation {
 		delete(s);
+		lazy_buffer_destroy(out);
 	}
 	return cleaned;
 }
@@ -206,23 +207,23 @@ Relative_Error :: enum {
 
 rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
 	context.allocator = allocator;
-	base_vol, target_vol := volume_name(base_path), volume_name(target_path);
-	base, target := clean(base_path), clean(target_path);
+	base_clean, target_clean := clean(base_path), clean(target_path);
 
 	delete_target := true;
 	defer {
 		if delete_target {
-			delete(target);
+			delete(target_clean);
 		}
-		delete(base);
+		delete(base_clean);
 	}
 
-	if strings.equal_fold(target, base) {
+	if strings.equal_fold(target_clean, base_clean) {
 		return strings.clone("."), .None;
 	}
 
-	base = base[len(base_vol):];
-	target = target[len(target_vol):];
+	base_vol, target_vol := volume_name(base_path), volume_name(target_path);
+	base := base_clean[len(base_vol):];
+	target := target_clean[len(target_vol):];
 	if base == "." {
 		base = "";
 	}
@@ -394,4 +395,9 @@ lazy_buffer_string :: proc(lb: ^Lazy_Buffer) -> string {
 	copy(z, x);
 	copy(z[len(x):], y);
 	return string(z);
+}
+@(private)
+lazy_buffer_destroy :: proc(lb: ^Lazy_Buffer) {
+	delete(lb.b);
+	lb^ = {};
 }

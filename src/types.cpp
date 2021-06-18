@@ -371,6 +371,8 @@ struct Selection {
 	Entity *   entity;
 	Array<i32> index;
 	bool       indirect; // Set if there was a pointer deref anywhere down the line
+	u8 swizzle_count;    // maximum components = 4
+	u8 swizzle_indices;  // 2 bits per component, representing which swizzle index
 };
 Selection empty_selection = {0};
 
@@ -1349,8 +1351,7 @@ bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 
 
 
-
-bool is_type_integer_endian_big(Type *t) {
+bool is_type_endian_big(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		if (t->Basic.flags & BasicFlag_EndianBig) {
@@ -1360,15 +1361,13 @@ bool is_type_integer_endian_big(Type *t) {
 		}
 		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
-		return is_type_integer_endian_big(bit_set_to_int(t));
+		return is_type_endian_big(bit_set_to_int(t));
 	} else if (t->kind == Type_Pointer) {
-		return is_type_integer_endian_big(&basic_types[Basic_uintptr]);
+		return is_type_endian_big(&basic_types[Basic_uintptr]);
 	}
 	return build_context.endian_kind == TargetEndian_Big;
 }
-
-
-bool is_type_integer_endian_little(Type *t) {
+bool is_type_endian_little(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		if (t->Basic.flags & BasicFlag_EndianLittle) {
@@ -1378,17 +1377,23 @@ bool is_type_integer_endian_little(Type *t) {
 		}
 		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
-		return is_type_integer_endian_little(bit_set_to_int(t));
+		return is_type_endian_little(bit_set_to_int(t));
 	} else if (t->kind == Type_Pointer) {
-		return is_type_integer_endian_little(&basic_types[Basic_uintptr]);
+		return is_type_endian_little(&basic_types[Basic_uintptr]);
 	}
 	return build_context.endian_kind == TargetEndian_Little;
 }
-bool is_type_endian_big(Type *t) {
-	return is_type_integer_endian_big(t);
-}
-bool is_type_endian_little(Type *t) {
-	return is_type_integer_endian_little(t);
+
+bool is_type_endian_platform(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) == 0;
+	} else if (t->kind == Type_BitSet) {
+		return is_type_endian_platform(bit_set_to_int(t));
+	} else if (t->kind == Type_Pointer) {
+		return is_type_endian_platform(&basic_types[Basic_uintptr]);
+	}
+	return false;
 }
 
 bool types_have_same_internal_endian(Type *a, Type *b) {
@@ -1444,9 +1449,9 @@ bool is_type_dereferenceable(Type *t) {
 bool is_type_different_to_arch_endianness(Type *t) {
 	switch (build_context.endian_kind) {
 	case TargetEndian_Little:
-		return !is_type_integer_endian_little(t);
+		return !is_type_endian_little(t);
 	case TargetEndian_Big:
-		return !is_type_integer_endian_big(t);
+		return !is_type_endian_big(t);
 	}
 	return false;
 }
@@ -2206,7 +2211,6 @@ i64 union_tag_size(Type *u) {
 		return 0;
 	}
 
-#if 1
 	// TODO(bill): Is this an okay approach?
 	i64 max_align = 1;
 	for_array(i, u->Union.variants) {
@@ -2217,15 +2221,8 @@ i64 union_tag_size(Type *u) {
 		}
 	}
 
-	u->Union.tag_size = gb_min(max_align, build_context.max_align);
-	return max_align;
-#else
-	i64 bytes = next_pow2(cast(i64)(floor_log2(n)/8 + 1));
-	i64 tag_size = gb_max(bytes, 1);
-
-	u->Union.tag_size = tag_size;
-	return tag_size;
-#endif
+	u->Union.tag_size = gb_min3(max_align, build_context.max_align, 8);
+	return u->Union.tag_size;
 }
 
 Type *union_tag_type(Type *u) {
@@ -3624,9 +3621,14 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 		switch (type->Proc.calling_convention) {
 		case ProcCC_Odin:
+			if (default_calling_convention() != ProcCC_Odin) {
+				str = gb_string_appendc(str, " \"odin\" ");
+			}
 			break;
 		case ProcCC_Contextless:
-			str = gb_string_appendc(str, " \"contextless\" ");
+			if (default_calling_convention() != ProcCC_Contextless) {
+				str = gb_string_appendc(str, " \"contextless\" ");
+			}
 			break;
 		case ProcCC_CDecl:
 			str = gb_string_appendc(str, " \"cdecl\" ");

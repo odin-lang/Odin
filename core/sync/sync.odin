@@ -1,7 +1,6 @@
 package sync
 
 import "intrinsics"
-import "core:runtime"
 
 cpu_relax :: #force_inline proc "contextless" () {
 	intrinsics.cpu_relax();
@@ -80,7 +79,7 @@ recursive_benaphore_destroy :: proc(b: ^Recursive_Benaphore) {
 }
 
 recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	if intrinsics.atomic_add_acq(&b.counter, 1) > 1 {
 		if tid != b.owner {
 			semaphore_wait_for(&b.sema);
@@ -92,7 +91,7 @@ recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 }
 
 recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	if b.owner == tid {
 		intrinsics.atomic_add_acq(&b.counter, 1);
 	} else {
@@ -108,7 +107,7 @@ recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
 }
 
 recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
-	tid := runtime.current_thread_id();
+	tid := current_thread_id();
 	assert(tid == b.owner);
 	b.recursion -= 1;
 	recursion := b.recursion;

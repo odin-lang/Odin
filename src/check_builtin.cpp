@@ -12,6 +12,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_string,
 	is_type_typeid,
 	is_type_any,
+	is_type_endian_platform,
 	is_type_endian_little,
 	is_type_endian_big,
 	is_type_unsigned,
@@ -87,7 +88,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name;
+		String name = bd->name.string;
 		if (name == "defined") {
 			break;
 		}
@@ -124,7 +125,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name;
+		String name = bd->name.string;
 		if (name == "location") {
 			if (ce->args.count > 1) {
 				error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
@@ -1181,14 +1182,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 			}
 
-
-			{
-				Type *bt = base_type(operands[0].type);
-				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "min_f32");
-				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "min_f64");
-
-				operand->type = operands[0].type;
-			}
+			operand->type = operands[0].type;
 		}
 		break;
 	}
@@ -1362,13 +1356,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 			}
 
-			{
-				Type *bt = base_type(operands[0].type);
-				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "max_f32");
-				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "max_f64");
-
-				operand->type = operands[0].type;
-			}
+			operand->type = operands[0].type;
 		}
 		break;
 	}
@@ -1406,8 +1394,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(operand->type);
-				if (are_types_identical(bt, t_f32))        add_package_dependency(c, "runtime", "abs_f32");
-				if (are_types_identical(bt, t_f64))        add_package_dependency(c, "runtime", "abs_f64");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
 				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "abs_complex128");
 				if (are_types_identical(bt, t_quaternion128)) add_package_dependency(c, "runtime", "abs_quaternion128");
@@ -1507,23 +1493,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			{
-				Type *bt = base_type(x.type);
-				if (are_types_identical(bt, t_f16)) {
-					add_package_dependency(c, "runtime", "min_f16");
-					add_package_dependency(c, "runtime", "max_f16");
-				}
-				if (are_types_identical(bt, t_f32)) {
-					add_package_dependency(c, "runtime", "min_f32");
-					add_package_dependency(c, "runtime", "max_f32");
-				}
-				if (are_types_identical(bt, t_f64)) {
-					add_package_dependency(c, "runtime", "min_f64");
-					add_package_dependency(c, "runtime", "max_f64");
-				}
-
-				operand->type = ops[0]->type;
-			}
+			operand->type = ops[0]->type;
 		}
 
 		break;
@@ -2026,6 +1996,229 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_sqrt:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_float(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			if (x.mode == Addressing_Constant) {
+				f64 v = exact_value_to_f64(x.value);
+
+				operand->mode = Addressing_Constant;
+				operand->type = x.type;
+				operand->value = exact_value_float(gb_sqrt(v));
+				break;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
+	case BuiltinProc_mem_copy:
+	case BuiltinProc_mem_copy_non_overlapping:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand dst = {};
+			Operand src = {};
+			Operand len = {};
+			check_expr(c, &dst, ce->args[0]);
+			check_expr(c, &src, ce->args[1]);
+			check_expr(c, &len, ce->args[2]);
+			if (dst.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (src.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
+
+			if (!is_type_pointer(dst.type)) {
+				gbString str = type_to_string(dst.type);
+				error(dst.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_pointer(src.type)) {
+				gbString str = type_to_string(src.type);
+				error(src.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(len.type)) {
+				gbString str = type_to_string(len.type);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (len.mode == Addressing_Constant) {
+				i64 n = exact_value_to_i64(len.value);
+				if (n < 0) {
+					gbString str = expr_to_string(len.expr);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					gb_string_free(str);
+				}
+			}
+		}
+		break;
+
+	case BuiltinProc_mem_zero:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand ptr = {};
+			Operand len = {};
+			check_expr(c, &ptr, ce->args[0]);
+			check_expr(c, &len, ce->args[1]);
+			if (ptr.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
+
+			if (!is_type_pointer(ptr.type)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(len.type)) {
+				gbString str = type_to_string(len.type);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (len.mode == Addressing_Constant) {
+				i64 n = exact_value_to_i64(len.value);
+				if (n < 0) {
+					gbString str = expr_to_string(len.expr);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					gb_string_free(str);
+				}
+			}
+		}
+		break;
+
+	case BuiltinProc_ptr_offset:
+		{
+			Operand ptr = {};
+			Operand offset = {};
+			check_expr(c, &ptr, ce->args[0]);
+			check_expr(c, &offset, ce->args[1]);
+			if (ptr.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+			if (offset.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = ptr.type;
+
+			if (!is_type_pointer(ptr.type)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (are_types_identical(core_type(ptr.type), t_rawptr)) {
+				gbString str = type_to_string(ptr.type);
+				error(ptr.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!is_type_integer(offset.type)) {
+				gbString str = type_to_string(offset.type);
+				error(offset.expr, "Expected an integer value for the offset parameter for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+		}
+		break;
+	case BuiltinProc_ptr_sub:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = t_invalid;
+
+			Operand ptr0 = {};
+			Operand ptr1 = {};
+			check_expr(c, &ptr0, ce->args[0]);
+			check_expr(c, &ptr1, ce->args[1]);
+			if (ptr0.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+			if (ptr1.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_int;
+
+			if (!is_type_pointer(ptr0.type)) {
+				gbString str = type_to_string(ptr0.type);
+				error(ptr0.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (are_types_identical(core_type(ptr0.type), t_rawptr)) {
+				gbString str = type_to_string(ptr0.type);
+				error(ptr0.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (!is_type_pointer(ptr1.type)) {
+				gbString str = type_to_string(ptr1.type);
+				error(ptr1.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (are_types_identical(core_type(ptr1.type), t_rawptr)) {
+				gbString str = type_to_string(ptr1.type);
+				error(ptr1.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			if (!are_types_identical(ptr0.type, ptr1.type)) {
+				gbString xts = type_to_string(ptr0.type);
+				gbString yts = type_to_string(ptr1.type);
+				error(ptr0.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
+
+		}
+		break;
+
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -2324,6 +2517,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_string:
 	case BuiltinProc_type_is_typeid:
 	case BuiltinProc_type_is_any:
+	case BuiltinProc_type_is_endian_platform:
 	case BuiltinProc_type_is_endian_little:
 	case BuiltinProc_type_is_endian_big:
 	case BuiltinProc_type_is_unsigned:

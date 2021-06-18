@@ -7,21 +7,24 @@ struct AstFile;
 struct AstPackage;
 
 enum AddressingMode {
-	Addressing_Invalid   = 0,    // invalid addressing mode
-	Addressing_NoValue   = 1,    // no value (void in C)
-	Addressing_Value     = 2,    // computed value (rvalue)
-	Addressing_Context   = 3,    // context value
-	Addressing_Variable  = 4,    // addressable variable (lvalue)
-	Addressing_Constant  = 5,    // constant
-	Addressing_Type      = 6,    // type
-	Addressing_Builtin   = 7,    // built-in procedure
-	Addressing_ProcGroup = 8,    // procedure group (overloaded procedure)
-	Addressing_MapIndex  = 9,    // map index expression -
-	                             // 	lhs: acts like a Variable
-	                             // 	rhs: acts like OptionalOk
-	Addressing_OptionalOk  = 10, // rhs: acts like a value with an optional boolean part (for existence check)
-	Addressing_SoaVariable = 11, // Struct-Of-Arrays indexed variable
+	Addressing_Invalid   = 0,        // invalid addressing mode
+	Addressing_NoValue   = 1,        // no value (void in C)
+	Addressing_Value     = 2,        // computed value (rvalue)
+	Addressing_Context   = 3,        // context value
+	Addressing_Variable  = 4,        // addressable variable (lvalue)
+	Addressing_Constant  = 5,        // constant
+	Addressing_Type      = 6,        // type
+	Addressing_Builtin   = 7,        // built-in procedure
+	Addressing_ProcGroup = 8,        // procedure group (overloaded procedure)
+	Addressing_MapIndex  = 9,        // map index expression -
+	                                 //         lhs: acts like a Variable
+	                                 //         rhs: acts like OptionalOk
+	Addressing_OptionalOk    = 10,   // rhs: acts like a value with an optional boolean part (for existence check)
+	Addressing_OptionalOkPtr = 11,   // rhs: same as OptionalOk but the value is a pointer
+	Addressing_SoaVariable   = 12,   // Struct-Of-Arrays indexed variable
 
+	Addressing_SwizzleValue    = 13, // Swizzle indexed value
+	Addressing_SwizzleVariable = 14, // Swizzle indexed variable
 };
 
 struct TypeAndValue {
@@ -205,24 +208,28 @@ enum ProcTag {
 	ProcTag_optional_second = 1<<6,
 };
 
-enum ProcCallingConvention {
-	ProcCC_Invalid = 0,
-	ProcCC_Odin = 1,
+enum ProcCallingConvention : i32 {
+	ProcCC_Invalid     = 0,
+	ProcCC_Odin        = 1,
 	ProcCC_Contextless = 2,
-	ProcCC_CDecl = 3,
-	ProcCC_StdCall = 4,
-	ProcCC_FastCall = 5,
+	ProcCC_CDecl       = 3,
+	ProcCC_StdCall     = 4,
+	ProcCC_FastCall    = 5,
 
-	ProcCC_None = 6,
-	ProcCC_Naked = 7,
+	ProcCC_None        = 6,
+	ProcCC_Naked       = 7,
 
-	ProcCC_InlineAsm = 8,
+	ProcCC_InlineAsm   = 8,
 
 	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
 };
+
+ProcCallingConvention default_calling_convention(void) {
+	return ProcCC_Odin;
+}
 
 enum StateFlag : u16 {
 	StateFlag_bounds_check    = 1<<0,
@@ -286,8 +293,8 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Token token; \
 	}) \
 	AST_KIND(BasicDirective, "basic directive", struct { \
-		Token  token; \
-		String name; \
+		Token token; \
+		Token name; \
 	}) \
 	AST_KIND(Ellipsis,       "ellipsis", struct { \
 		Token    token; \
@@ -320,11 +327,20 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(UnaryExpr,    "unary expression",       struct { Token op; Ast *expr; }) \
 	AST_KIND(BinaryExpr,   "binary expression",      struct { Token op; Ast *left, *right; } ) \
 	AST_KIND(ParenExpr,    "parentheses expression", struct { Ast *expr; Token open, close; }) \
-	AST_KIND(SelectorExpr, "selector expression",    struct { Token token; Ast *expr, *selector; }) \
+	AST_KIND(SelectorExpr, "selector expression",    struct { \
+		Token token; \
+		Ast *expr, *selector; \
+		u8 swizzle_count; /*maximum of 4 components, if set, count >= 2*/ \
+		u8 swizzle_indices; /*2 bits per component*/ \
+	}) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
-	AST_KIND(SelectorCallExpr, "selector call expression",    struct { Token token; Ast *expr, *call; bool modified_call; }) \
+	AST_KIND(SelectorCallExpr, "selector call expression", struct { \
+		Token token; \
+		Ast *expr, *call;  \
+		bool modified_call; \
+	}) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
-	AST_KIND(DerefExpr,    "dereference expression", struct { Token op; Ast *expr; }) \
+	AST_KIND(DerefExpr,    "dereference expression", struct { Ast *expr; Token op; }) \
 	AST_KIND(SliceExpr,    "slice expression", struct { \
 		Ast *expr; \
 		Token open, close; \
@@ -340,6 +356,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
 		i32          builtin_id; \
+		void *sce_temp_data; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
@@ -704,3 +721,4 @@ gbAllocator ast_allocator(AstFile *f) {
 
 Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
+gbString expr_to_string(Ast *expression);

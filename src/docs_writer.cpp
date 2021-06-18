@@ -265,11 +265,8 @@ OdinDocArray<T> odin_write_item_as_slice(OdinDocWriter *w, T data) {
 OdinDocPosition odin_doc_token_pos_cast(OdinDocWriter *w, TokenPos const &pos) {
 	OdinDocFileIndex file_index = 0;
 	if (pos.file_id != 0) {
-		String file_path = get_file_path_string(pos.file_id);
-		if (file_path != "") {
-			AstFile **found = string_map_get(&w->info->files, file_path);
-			GB_ASSERT(found != nullptr);
-			AstFile *file = *found;
+		AstFile *file = get_ast_file_from_id(pos.file_id);
+		if (file != nullptr) {
 			OdinDocFileIndex *file_index_found = map_get(&w->file_cache, hash_pointer(file));
 			GB_ASSERT(file_index_found != nullptr);
 			file_index = *file_index_found;
@@ -679,11 +676,17 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			String calling_convention = {};
 			switch (type->Proc.calling_convention) {
 			case ProcCC_Invalid:
-			case ProcCC_Odin:
 				// no need
 				break;
+			case ProcCC_Odin:
+				if (default_calling_convention() != ProcCC_Odin) {
+					calling_convention = str_lit("odin");
+				}
+				break;
 			case ProcCC_Contextless:
-				calling_convention = str_lit("contextless");
+				if (default_calling_convention() != ProcCC_Contextless) {
+					calling_convention = str_lit("contextless");
+				}
 				break;
 			case ProcCC_CDecl:
 				calling_convention = str_lit("cdecl");
@@ -816,17 +819,26 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		break;
 	case Entity_Variable:
 		if (e->Variable.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
-		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export; }
+		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		if (e->Variable.thread_local_model != "") {
 			flags |= OdinDocEntityFlag_Var_Thread_Local;
 		}
+		if (e->flags & EntityFlag_Static) { flags |= OdinDocEntityFlag_Var_Static; }
 		link_name = e->Variable.link_name;
 		break;
 	case Entity_Procedure:
 		if (e->Procedure.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
-		if (e->Procedure.is_export)  { flags |= OdinDocEntityFlag_Export; }
+		if (e->Procedure.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		link_name = e->Procedure.link_name;
 		break;
+	}
+
+	if (e->flags & EntityFlag_Param) {
+		if (e->flags & EntityFlag_Using)      { flags |= OdinDocEntityFlag_Param_Using;    }
+		if (e->flags & EntityFlag_ConstInput) { flags |= OdinDocEntityFlag_Param_Const;    }
+		if (e->flags & EntityFlag_AutoCast)   { flags |= OdinDocEntityFlag_Param_AutoCast; }
+		if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
+		if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
 	}
 
 	OdinDocString init_string = {};

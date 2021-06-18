@@ -221,7 +221,7 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 }
 
 
-@(private, static)
+@(private)
 DIGITS_LOWER := "0123456789abcdefx";
 
 write_quoted_string :: proc{
@@ -314,9 +314,9 @@ write_escaped_rune_writer :: proc(w: io.Writer, r: rune, quote: byte, html_safe 
 	is_printable :: proc(r: rune) -> bool {
 		if r <= 0xff {
 			switch r {
-			case 0x20..0x7e:
+			case 0x20..=0x7e:
 				return true;
-			case 0xa1..0xff: // ¡ through ÿ except for the soft hyphen
+			case 0xa1..=0xff: // ¡ through ÿ except for the soft hyphen
 				return r != 0xad; //
 			}
 		}

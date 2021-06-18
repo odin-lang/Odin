@@ -97,7 +97,7 @@ mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	if len < 0 {
 		return data;
 	}
-	memset(data, 0, len);
+	intrinsics.mem_zero(data, len);
 	return data;
 }
 
@@ -105,17 +105,9 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil {
 		return dst;
 	}
+
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memmove.p0i8.p0i8.i64")
-			llvm_memmove :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		} else {
-			@(link_name="llvm.memmove.p0i8.p0i8.i32")
-			llvm_memmove :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		}
-	}
-	llvm_memmove(dst, src, len);
+	intrinsics.mem_copy(dst, src, len);
 	return dst;
 }
 
@@ -123,17 +115,9 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 	if src == nil {
 		return dst;
 	}
+
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
-			llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		} else {
-			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
-			llvm_memcpy :: proc "none" (dst, src: rawptr, len: int, is_volatile: bool = false) ---;
-		}
-	}
-	llvm_memcpy(dst, src, len);
+	intrinsics.mem_copy_non_overlapping(dst, src, len);
 	return dst;
 }
 
@@ -316,12 +300,18 @@ cstring_to_string :: proc "contextless" (s: cstring) -> string {
 }
 
 
+complex32_eq :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) == real(b) && imag(a) == imag(b); }
+complex32_ne :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) != real(b) || imag(a) != imag(b); }
+
 complex64_eq :: #force_inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) == real(b) && imag(a) == imag(b); }
 complex64_ne :: #force_inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
 complex128_eq :: #force_inline proc "contextless" (a, b: complex128) -> bool { return real(a) == real(b) && imag(a) == imag(b); }
 complex128_ne :: #force_inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
+
+quaternion64_eq :: #force_inline proc "contextless"  (a, b: quaternion64)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
+quaternion64_ne :: #force_inline proc "contextless"  (a, b: quaternion64)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
 
 quaternion128_eq :: #force_inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
 quaternion128_ne :: #force_inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
@@ -409,11 +399,6 @@ string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4;
 }
 
-@(default_calling_convention = "none")
-foreign {
-	@(link_name="llvm.sqrt.f32") _sqrt_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.sqrt.f64") _sqrt_f64 :: proc(x: f64) -> f64 ---
-}
 abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
 	return -x if x < 0 else x;
 }
@@ -424,48 +409,48 @@ abs_f64 :: #force_inline proc "contextless" (x: f64) -> f64 {
 	return -x if x < 0 else x;
 }
 
-min_f16 :: proc(a, b: f16) -> f16 {
+min_f16 :: #force_inline proc "contextless" (a, b: f16) -> f16 {
 	return a if a < b else b;
 }
-min_f32 :: proc(a, b: f32) -> f32 {
+min_f32 :: #force_inline proc "contextless" (a, b: f32) -> f32 {
 	return a if a < b else b;
 }
-min_f64 :: proc(a, b: f64) -> f64 {
+min_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
 	return a if a < b else b;
 }
-max_f16 :: proc(a, b: f16) -> f16 {
+max_f16 :: #force_inline proc "contextless" (a, b: f16) -> f16 {
 	return a if a > b else b;
 }
-max_f32 :: proc(a, b: f32) -> f32 {
+max_f32 :: #force_inline proc "contextless" (a, b: f32) -> f32 {
 	return a if a > b else b;
 }
-max_f64 :: proc(a, b: f64) -> f64 {
+max_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
 	return a if a > b else b;
 }
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
 	r, i := real(x), imag(x);
-	return f16(_sqrt_f32(f32(r*r + i*i)));
+	return f16(intrinsics.sqrt(f32(r*r + i*i)));
 }
 abs_complex64 :: #force_inline proc "contextless" (x: complex64) -> f32 {
 	r, i := real(x), imag(x);
-	return _sqrt_f32(r*r + i*i);
+	return intrinsics.sqrt(r*r + i*i);
 }
 abs_complex128 :: #force_inline proc "contextless" (x: complex128) -> f64 {
 	r, i := real(x), imag(x);
-	return _sqrt_f64(r*r + i*i);
+	return intrinsics.sqrt(r*r + i*i);
 }
 abs_quaternion64 :: #force_inline proc "contextless" (x: quaternion64) -> f16 {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
-	return f16(_sqrt_f32(f32(r*r + i*i + j*j + k*k)));
+	return f16(intrinsics.sqrt(f32(r*r + i*i + j*j + k*k)));
 }
 abs_quaternion128 :: #force_inline proc "contextless" (x: quaternion128) -> f32 {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
-	return _sqrt_f32(r*r + i*i + j*j + k*k);
+	return intrinsics.sqrt(r*r + i*i + j*j + k*k);
 }
 abs_quaternion256 :: #force_inline proc "contextless" (x: quaternion256) -> f64 {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
-	return _sqrt_f64(r*r + i*i + j*j + k*k);
+	return intrinsics.sqrt(r*r + i*i + j*j + k*k);
 }
 
 
@@ -615,19 +600,19 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 	m =   i        & 0x007fffff;
 
 
-	if (e <= 0) {
-		if (e < -10) {
+	if e <= 0 {
+		if e < -10 {
 			return u16(s);
 		}
 		m = (m | 0x00800000) >> u32(1 - e);
 
-		if (m & 0x00001000) != 0 {
+		if m & 0x00001000 != 0 {
 			m += 0x00002000;
 		}
 
 		return u16(s | (m >> 13));
-	} else if (e == 0xff - (127 - 15)) {
-		if (m == 0) {
+	} else if e == 0xff - (127 - 15) {
+		if m == 0 {
 			return u16(s | 0x7c00); /* NOTE(bill): infinity */
 		} else {
 			/* NOTE(bill): NAN */
@@ -635,7 +620,7 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 			return u16(s | 0x7c00 | m | i32(m == 0));
 		}
 	} else {
-		if (m & 0x00001000) != 0 {
+		if m & 0x00001000 != 0 {
 			m += 0x00002000;
 			if (m & 0x00800000) != 0 {
 				m = 0;
@@ -643,8 +628,8 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 			}
 		}
 
-		if (e > 30) {
-			f := 1e12;
+		if e > 30 {
+			f := i64(1e12);
 			for j := 0; j < 10; j += 1 {
 				/* NOTE(bill): Cause overflow */
 				g := intrinsics.volatile_load(&f);
@@ -692,4 +677,89 @@ gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
 @(link_name="__extendhfsf2")
 extendhfsf2 :: proc "c" (value: u16) -> f32 {
 	return gnu_h2f_ieee(value);
+}
+
+
+
+@(link_name="__floattidf")
+floattidf :: proc(a: i128) -> f64 {
+	DBL_MANT_DIG :: 53;
+	if a == 0 {
+		return 0.0;
+	}
+	a := a;
+	N :: size_of(i128) * 8;
+	s := a >> (N-1);
+	a = (a ~ s) - s;
+	sd: = N - intrinsics.count_leading_zeros(a);  // number of significant digits
+	e := u32(sd - 1);        // exponent
+	if sd > DBL_MANT_DIG {
+		switch sd {
+		case DBL_MANT_DIG + 1:
+			a <<= 1;
+		case DBL_MANT_DIG + 2:
+			// okay
+		case:
+			a = i128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
+				i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0);
+		};
+
+		a |= i128((a & 4) != 0);
+		a += 1;
+		a >>= 2;
+
+		if a & (1 << DBL_MANT_DIG) != 0 {
+			a >>= 1;
+			e += 1;
+		}
+	} else {
+		a <<= u128(DBL_MANT_DIG - sd);
+	}
+	fb: [2]u32;
+	fb[1] = (u32(s) & 0x80000000) |           // sign
+	        ((e + 1023) << 20)    |           // exponent
+	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
+	fb[1] = u32(a);                           // mantissa-low
+	return transmute(f64)fb;
+}
+
+
+@(link_name="__floattidf_unsigned")
+floattidf_unsigned :: proc(a: u128) -> f64 {
+	DBL_MANT_DIG :: 53;
+	if a == 0 {
+		return 0.0;
+	}
+	a := a;
+	N :: size_of(u128) * 8;
+	sd: = N - intrinsics.count_leading_zeros(a);  // number of significant digits
+	e := u32(sd - 1);        // exponent
+	if sd > DBL_MANT_DIG {
+		switch sd {
+		case DBL_MANT_DIG + 1:
+			a <<= 1;
+		case DBL_MANT_DIG + 2:
+			// okay
+		case:
+			a = u128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
+				u128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0);
+		};
+
+		a |= u128((a & 4) != 0);
+		a += 1;
+		a >>= 2;
+
+		if a & (1 << DBL_MANT_DIG) != 0 {
+			a >>= 1;
+			e += 1;
+		}
+	} else {
+		a <<= u128(DBL_MANT_DIG - sd);
+	}
+	fb: [2]u32;
+	fb[1] = (0) |                             // sign
+	        ((e + 1023) << 20) |              // exponent
+	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
+	fb[1] = u32(a);                           // mantissa-low
+	return transmute(f64)fb;
 }

@@ -82,7 +82,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		for t.offset < len(t.data) {
 			next_rune(t);
 			switch t.r {
-			case '0'..'9', 'a'..'f', 'A'..'F':
+			case '0'..='9', 'a'..='f', 'A'..='F':
 				// Okay
 			case:
 				return;
@@ -100,7 +100,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			for i := 0; i < 4; i += 1 {
 				r := next_rune(t);
 				switch r {
-				case '0'..'9', 'a'..'f', 'A'..'F':
+				case '0'..='9', 'a'..='f', 'A'..='F':
 					// Okay
 				case:
 					return false;
@@ -149,7 +149,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	skip_alphanum :: proc(t: ^Tokenizer) {
 		for t.offset < len(t.data) {
 			switch next_rune(t) {
-			case 'A'..'Z', 'a'..'z', '0'..'9', '_':
+			case 'A'..='Z', 'a'..='z', '0'..='9', '_':
 				continue;
 			}
 
@@ -173,7 +173,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		token.kind = .EOF;
 		err = .EOF;
 
-	case 'A'..'Z', 'a'..'z', '_':
+	case 'A'..='Z', 'a'..='z', '_':
 		token.kind = .Ident;
 
 		skip_alphanum(t);
@@ -200,7 +200,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	case '-':
 		switch t.r {
-		case '0'..'9':
+		case '0'..='9':
 			// Okay
 		case:
 			// Illegal use of +/-
@@ -219,7 +219,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 		fallthrough;
 
-	case '0'..'9':
+	case '0'..='9':
 		token.kind = t.parse_integers ? .Integer : .Float;
 		if t.spec == .JSON5 { // Hexadecimal Numbers
 			if curr_rune == '0' && (t.r == 'x' || t.r == 'X') {
@@ -361,7 +361,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 	switch s[0] {
 	case '0':
 		s = s[1:];
-	case '1'..'9':
+	case '1'..='9':
 		s = s[1:];
 		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' {
 			s = s[1:];
@@ -453,7 +453,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 				for j := 0; j < 4; j += 1 {
 					c2 := hex[j];
 					switch c2 {
-					case '0'..'9', 'a'..'z', 'A'..'Z':
+					case '0'..='9', 'a'..='z', 'A'..='Z':
 						// Okay
 					case:
 						return false;

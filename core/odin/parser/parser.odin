@@ -1939,24 +1939,12 @@ parse_results :: proc(p: ^Parser) -> (list: ^ast.Field_List, diverging: bool) {
 
 string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	if s[0] != '"' && s[0] != '`' {
-		return .Invalid;
+		return nil;
 	}
-	switch s[1:len(s)-1] {
-	case "odin":
-		return .Odin;
-	case "contextless":
-		return .Contextless;
-	case "cdecl", "c":
-		return .C_Decl;
-	case "stdcall", "std":
-		return .Std_Call;
-	case "fast", "fastcall":
-		return .Fast_Call;
-
-	case "none":
-		return .None;
+	if len(s) == 2 {
+		return nil;
 	}
-	return .Invalid;
+	return s;
 }
 
 parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
@@ -1981,21 +1969,17 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 }
 
 parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
-	cc := ast.Proc_Calling_Convention.Invalid;
+	cc: ast.Proc_Calling_Convention;
 	if p.curr_tok.kind == .String {
 		str := expect_token(p, .String);
 		cc = string_to_calling_convention(str.text);
-		if cc == ast.Proc_Calling_Convention.Invalid {
+		if cc == nil {
 			error(p, str.pos, "unknown calling convention '%s'", str.text);
 		}
 	}
 
-	if cc == ast.Proc_Calling_Convention.Invalid {
-		if p.in_foreign_block {
-			cc = ast.Proc_Calling_Convention.Foreign_Block_Default;
-		} else {
-			cc = ast.Proc_Calling_Convention.Odin;
-		}
+	if cc == nil && p.in_foreign_block {
+		cc = .Foreign_Block_Default;
 	}
 
 	expect_token(p, .Open_Paren);
@@ -2029,23 +2013,6 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	pt.diverging = diverging;
 	pt.generic = is_generic;
 	return pt;
-}
-
-check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok: tokenizer.Token) {
-	if poly_params == nil {
-		return;
-	}
-	for field in poly_params.list {
-		for name in field.names {
-			if name == nil {
-				continue;
-			}
-			if _, ok := name.derived.(ast.Poly_Type); ok {
-				error(p, name.pos, "polymorphic names are not needed for %s parameters", tok.text);
-				return;
-			}
-		}
-	}
 }
 
 parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
@@ -2279,6 +2246,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.expr_level = -1;
 			where_clauses = parse_rhs_expr_list(p);
 			p.expr_level = prev_level;
+			tags = parse_proc_tags(p);
 		}
 		if p.allow_type && p.expr_level < 0 {
 			if where_token.kind != .Invalid {
@@ -2415,7 +2383,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				poly_params = nil;
 			}
 			expect_token_after(p, .Close_Paren, "parameter list");
-			check_poly_params_for_type(p, poly_params, tok);
 		}
 
 		prev_level := p.expr_level;
@@ -2492,7 +2459,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				poly_params = nil;
 			}
 			expect_token_after(p, .Close_Paren, "parameter list");
-			check_poly_params_for_type(p, poly_params, tok);
 		}
 
 		prev_level := p.expr_level;
@@ -3212,6 +3178,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 					case ast.For_Stmt:         n.label = label;
 					case ast.Switch_Stmt:      n.label = label;
 					case ast.Type_Switch_Stmt: n.label = label;
+					case ast.Range_Stmt:	   n.label = label;
 					}
 				}
 

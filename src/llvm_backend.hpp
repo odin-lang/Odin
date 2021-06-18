@@ -47,7 +47,7 @@ enum lbAddrKind {
 	lbAddr_RelativePointer,
 	lbAddr_RelativeSlice,
 
-	lbAddr_AtomOp_index_set,
+	lbAddr_Swizzle,
 };
 
 struct lbAddr {
@@ -73,6 +73,11 @@ struct lbAddr {
 		struct {
 			bool deref;
 		} relative;
+		struct {
+			Type *type;
+			u8 count;      // 2, 3, or 4 components
+			u8 indices[4];
+		} swizzle;
 	};
 };
 
@@ -215,6 +220,12 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
 };
 
+struct lbCopyElisionHint {
+	lbValue ptr;
+	Ast *   ast;
+	bool    used;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -260,9 +271,7 @@ struct lbProcedure {
 
 	LLVMMetadataRef debug_info;
 
-	lbValue  return_ptr_hint_value;
-	Ast *    return_ptr_hint_ast;
-	bool     return_ptr_hint_used;
+	lbCopyElisionHint copy_elision_hint;
 };
 
 
@@ -339,7 +348,7 @@ lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p
 
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
-lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
+lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0, bool force_no_init=false);
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
@@ -413,6 +422,7 @@ lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type);
 
 lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x);
 
+void lb_mem_zero_addr(lbProcedure *p, LLVMValueRef ptr, Type *type);
 
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"

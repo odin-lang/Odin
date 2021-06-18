@@ -255,7 +255,7 @@ Source_Code_Location :: struct {
 	procedure:    string,
 }
 
-Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
+Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location) -> !;
 
 // Allocation Stuff
 Allocator_Mode :: enum byte {
@@ -328,8 +328,6 @@ Context :: struct {
 	temp_allocator:         Allocator,
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
-
-	thread_id:  int,
 
 	user_data:  any,
 	user_ptr:   rawptr,
@@ -413,7 +411,7 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 type_info_base_without_enum :: type_info_core;
 
-__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
+__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	MASK :: 1<<(8*size_of(typeid) - 8) - 1;
 	data := transmute(uintptr)id;
 	n := int(data & MASK);
@@ -479,14 +477,13 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.temp_allocator.procedure = default_temp_allocator_proc;
 	c.temp_allocator.data = &global_default_temp_allocator_data;
 
-	c.thread_id = current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
 	c.assertion_failure_proc = default_assertion_failure_proc;
 
 	c.logger.procedure = default_logger_proc;
 	c.logger.data = nil;
 }
 
-default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
+default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
 	print_caller_location(loc);
 	print_string(" ");
 	print_string(prefix);
@@ -495,6 +492,6 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 		print_string(message);
 	}
 	print_byte('\n');
-	debug_trap();
-	// trap();
+	// debug_trap();
+	trap();
 }

@@ -40,27 +40,28 @@ enum EntityFlag : u64 {
 	EntityFlag_Param         = 1ull<<4,
 	EntityFlag_Result        = 1ull<<5,
 	EntityFlag_ArrayElem     = 1ull<<6,
-	EntityFlag_Ellipsis      = 1ull<<7,
-	EntityFlag_NoAlias       = 1ull<<8,
-	EntityFlag_TypeField     = 1ull<<9,
-	EntityFlag_Value         = 1ull<<10,
-	EntityFlag_Sret          = 1ull<<11,
-	EntityFlag_ByVal         = 1ull<<12,
-	EntityFlag_BitFieldValue = 1ull<<13,
-	EntityFlag_PolyConst     = 1ull<<14,
-	EntityFlag_NotExported   = 1ull<<15,
-	EntityFlag_ConstInput    = 1ull<<16,
+	EntityFlag_ArraySwizzle  = 1ull<<7,
+	EntityFlag_Ellipsis      = 1ull<<8,
+	EntityFlag_NoAlias       = 1ull<<9,
+	EntityFlag_TypeField     = 1ull<<10,
+	EntityFlag_Value         = 1ull<<11,
+	EntityFlag_Sret          = 1ull<<12,
+	EntityFlag_ByVal         = 1ull<<13,
+	EntityFlag_BitFieldValue = 1ull<<14,
+	EntityFlag_PolyConst     = 1ull<<15,
+	EntityFlag_NotExported   = 1ull<<16,
+	EntityFlag_ConstInput    = 1ull<<17,
 
-	EntityFlag_Static        = 1ull<<17,
+	EntityFlag_Static        = 1ull<<18,
 
-	EntityFlag_ImplicitReference = 1ull<<18, // NOTE(bill): equivalent to `const &` in C++
+	EntityFlag_ImplicitReference = 1ull<<19, // NOTE(bill): equivalent to `const &` in C++
 
-	EntityFlag_SoaPtrField   = 1ull<<19, // to allow s.x[0] where `s.x` is a pointer rather than a slice
+	EntityFlag_SoaPtrField   = 1ull<<20, // to allow s.x[0] where `s.x` is a pointer rather than a slice
 
-	EntityFlag_ProcBodyChecked = 1ull<<20,
+	EntityFlag_ProcBodyChecked = 1ull<<21,
 
-	EntityFlag_CVarArg       = 1ull<<21,
-	EntityFlag_AutoCast      = 1ull<<22,
+	EntityFlag_CVarArg       = 1ull<<22,
+	EntityFlag_AutoCast      = 1ull<<23,
 
 	EntityFlag_Disabled      = 1ull<<24,
 	EntityFlag_Cold          = 1ull<<25, // procedure is rarely called
@@ -158,6 +159,7 @@ struct Entity {
 			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     link_section;
 			bool       is_foreign;
 			bool       is_export;
 		} Variable;

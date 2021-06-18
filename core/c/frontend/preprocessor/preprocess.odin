@@ -139,18 +139,18 @@ append_token :: proc(a, b: ^Token) -> ^Token {
 
 is_hex_digit :: proc(x: byte) -> bool {
 	switch x {
-	case '0'..'9', 'a'..'f', 'A'..'F':
+	case '0'..='9', 'a'..='f', 'A'..='F':
 		return true;
 	}
 	return false;
 }
 from_hex :: proc(x: byte) -> i32 {
 	switch x {
-	case '0'..'9':
+	case '0'..='9':
 		return i32(x) - '0';
-	case 'a'..'f':
+	case 'a'..='f':
 		return i32(x) - 'a' + 10;
-	case 'A'..'F':
+	case 'A'..='F':
 		return i32(x) - 'A' + 10;
 	}
 	return 16;

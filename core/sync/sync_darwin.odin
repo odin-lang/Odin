@@ -4,6 +4,19 @@ import "core:sys/darwin"
 
 import "core:c"
 
+foreign import pthread "System.framework"
+
+current_thread_id :: proc "contextless" () -> int {
+	tid: u64;
+	// NOTE(Oskar): available from OSX 10.6 and iOS 3.2.
+	// For older versions there is `syscall(SYS_thread_selfid)`, but not really
+	// the same thing apparently.
+	foreign pthread { pthread_threadid_np :: proc "c" (rawptr, ^u64) -> c.int ---; }
+	pthread_threadid_np(nil, &tid);
+	return int(tid);
+}
+
+
 // The Darwin docs say it best:
 // A semaphore is much like a lock, except that a finite number of threads can hold it simultaneously.
 // Semaphores can be thought of as being much like piles of tokens; multiple threads can take these tokens, 
@@ -29,7 +42,7 @@ semaphore_destroy :: proc(s: ^Semaphore) {
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
 	// NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
-	for in 0..count-1 {
+	for in 0..<count {
 		res := darwin.semaphore_signal(s.handle);
 		assert(res == 0);
 	}

@@ -11,14 +11,14 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 	}
 	p := win32.utf8_to_utf16(name, context.temp_allocator);
 	buf := make([dynamic]u16, 100, allocator);
+	defer delete(buf);
 	for {
 		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil);
 		if n == 0 {
-			delete(buf);
 			return "", Errno(win32.GetLastError());
 		}
 		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n]), ERROR_NONE;
+			return win32.utf16_to_utf8(buf[:n], allocator), ERROR_NONE;
 		}
 		resize(&buf, len(buf)*2);
 	}

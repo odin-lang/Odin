@@ -2,6 +2,10 @@ package sync2
 
 import "core:time"
 
+current_thread_id :: proc "contextless" () -> int {
+	return _current_thread_id();
+}
+
 // A Mutex is a mutual exclusion lock
 // The zero value for a Mutex is an unlocked mutex
 //
@@ -15,7 +19,7 @@ mutex_lock :: proc(m: ^Mutex) {
 	_mutex_lock(m);
 }
 
-// mutex_lock unlocks m
+// mutex_unlock unlocks m
 mutex_unlock :: proc(m: ^Mutex) {
 	_mutex_unlock(m);
 }
@@ -103,7 +107,7 @@ rw_mutex_shared_guard :: proc(m: ^RW_Mutex) -> bool {
 
 
 
-// A Recusrive_Mutex is a recursive mutual exclusion lock
+// A Recursive_Mutex is a recursive mutual exclusion lock
 // The zero value for a Recursive_Mutex is an unlocked mutex
 //
 // A Recursive_Mutex must not be copied after first use

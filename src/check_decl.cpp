@@ -648,7 +648,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	if (d->gen_proc_type != nullptr) {
 		proc_type = d->gen_proc_type;
 	} else {
-		proc_type = alloc_type_proc(e->scope, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+		proc_type = alloc_type_proc(e->scope, nullptr, 0, nullptr, 0, false, default_calling_convention());
 	}
 	e->type = proc_type;
 	ast_node(pl, ProcLit, d->proc_lit);
@@ -746,10 +746,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
 			gb_string_free(str);
 		}
-		if (pt->calling_convention != ProcCC_Odin) {
+		if (pt->calling_convention != default_calling_convention()) {
 			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
-		pt->calling_convention = ProcCC_Odin;
+		pt->calling_convention = default_calling_convention();
 		if (e->pkg->kind == Package_Init) {
 			if (ctx->info->entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
@@ -899,10 +899,9 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 
 	e->Variable.thread_local_model = ac.thread_local_model;
 	e->Variable.is_export = ac.is_export;
+	e->flags &= ~EntityFlag_Static;
 	if (ac.is_static) {
-		e->flags |= EntityFlag_Static;
-	} else {
-		e->flags &= ~EntityFlag_Static;
+		error(e->token, "@(static) is not supported for global variables, nor required");
 	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 
@@ -934,6 +933,9 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 	if (ac.link_name.len > 0) {
 		e->Variable.link_name = ac.link_name;
+	}
+	if (ac.link_section.len > 0) {
+		e->Variable.link_section = ac.link_section;
 	}
 
 	if (e->Variable.is_foreign || e->Variable.is_export) {
@@ -1295,13 +1297,21 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 					error(bs->close, "Missing return statement at the end of the procedure");
 				}
 			}
+		} else if (type->Proc.diverging) {
+			if (!check_is_terminating(body, str_lit(""))) {
+				if (token.kind == Token_Ident) {
+					error(bs->close, "Missing diverging call at the end of the procedure '%.*s'", LIT(token.string));
+				} else {
+					// NOTE(bill): Anonymous procedure (lambda)
+					error(bs->close, "Missing diverging call at the end of the procedure");
+				}
+			}
 		}
 	}
 	check_close_scope(ctx);
 
 	check_scope_usage(ctx->checker, ctx->scope);
 
-#if 1
 	if (decl->parent != nullptr) {
 		Scope *ps = decl->parent->scope;
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
@@ -1319,7 +1329,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			}
 		}
 	}
-#endif
 }
 
 

@@ -1,6 +1,6 @@
 package container
 
-Priority_Queue :: struct(T: typeid) {
+Priority_Queue :: struct($T: typeid) {
 	data: Array(T),
 	len: int,
 	priority: proc(item: T) -> int,
