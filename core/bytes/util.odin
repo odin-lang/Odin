@@ -42,7 +42,7 @@ need_endian_conversion :: proc($FT: typeid, $TT: typeid) -> (res: bool) {
 		alloc:         Buffer was freshly allocated because we couldn't convert in-place. Points to `from_buffer` if `false`.
 		err:           True if we passed too few elements or allocation failed, etc.
 
-	If len(from_buffer) == 0, the input type $FT is ingored and create_buffer_of_type is called to create a fresh buffer.
+	If `from_buffer` is empty, the input type $FT is ignored and `create_buffer_of_type` is called to create a fresh buffer.
 
 	This helper will try to do as little work as possible, so if you're converting between two equally sized types,
 	and they have compatible endianness, the contents will simply be reinterpreted using `slice_data_cast`.
@@ -52,7 +52,7 @@ need_endian_conversion :: proc($FT: typeid, $TT: typeid) -> (res: bool) {
 	For example, converting `[]u8{0, 60}` from `[]f16` to `[]u16` will return `[15360]` when simply reinterpreted,
 	and `[1]` if force converted.
 
-	Should you just want to upconvert `f16` to `f32` (or truncate `f32` to `f16`), for example, the size of these elements
+	Should you for example want to promote `[]f16` to `[]f32` (or truncate `[]f32` to `[]f16`), the size of these elements
 	being different will result in a conversion anyway, so this flag is unnecessary in cases like these.
 
 	Example:
