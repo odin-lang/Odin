@@ -89,6 +89,11 @@ rename :: proc(old_name: string, new_name: string) -> int {
     return result;
 }
 
+exit :: proc "contextless" (error_code: int) -> int {
+    result := _syscall1(SYSCALL_EXIT, int, error_code);
+    return result;
+}
+
 link :: proc(old_name: string, new_name: string) -> int {
     result := _syscall2(SYSCALL_LINK, int, strings.ptr_from_string(old_name), strings.ptr_from_string(new_name));
     return result;
@@ -173,5 +178,38 @@ mremap :: proc(addr, old_len, new_len, flags, new_addr: uint) -> uintptr {
 
     return transmute(uintptr)result;
 }
+
+get_uid :: proc() -> int {
+    result := _syscall(SYSCALL_GETUID, int);
+    return result;
+}
+
+get_euid :: proc() -> int {
+    result := _syscall(SYSCALL_GETEUID, int);
+    return result;
+}
+
+get_gid :: proc() -> int {
+    result := _syscall(SYSCALL_GETGID, int);
+    return result;
+}
+
+get_egid :: proc() -> int {
+    result := _syscall(SYSCALL_GETEGID, int);
+    return result;
+}
+
+get_pid :: proc() -> int {
+    result := _syscall(SYSCALL_GETPID, int);
+    return result;
+}
+
+get_ppid :: proc() -> int {
+    result := _syscall(SYSCALL_GETPPID, int);
+    return result;
+}
+
+
+
 
 

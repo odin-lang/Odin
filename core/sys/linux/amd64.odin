@@ -12,6 +12,8 @@ SYSCALL_FSYNC    :: 74;
 SYSCALL_TRUNCATE :: 76;
 SYSCALL_RENAME   :: 82;
 
+SYSCALL_EXIT     :: 60;
+
 SYSCALL_FSTAT    :: 5;
 SYSCALL_LSTAT    :: 6;
 SYSCALL_READLINK :: 89;
@@ -39,6 +41,13 @@ SYSCALL_MMAP     :: 9;
 SYSCALL_MUNMAP   :: 11;
 SYSCALL_MREMAP   :: 163;
 
+SYSCALL_GETUID   :: 102;
+SYSCALL_GETEUID  :: 107;
+SYSCALL_GETGID   :: 104;
+SYSCALL_GETEGID  :: 108;
+SYSCALL_GETPID   :: 39;
+SYSCALL_GETPPID  :: 110;
+
 /*
  * This would be nice, have to find some way to generate the ASM code with variable arguments though
  *
@@ -54,7 +63,17 @@ _syscall :: proc(syscall: i32, $T: typeid, args: ..any) -> T {
 */
 
 @private
-_syscall1 :: #force_inline proc(syscall: i32, $T: typeid, a: $A) -> T {
+_syscall :: #force_inline proc"contextless"(syscall: i32, $T: typeid) -> T {
+    result := asm(i32) -> T {
+        "syscall",
+        "={rax},{rax},{rdi}",
+    }(syscall);
+
+    return result;
+}
+
+@private
+_syscall1 :: #force_inline proc"contextless"(syscall: i32, $T: typeid, a: $A) -> T {
     result := asm(i32, A) -> T {
         "syscall",
         "={rax},{rax},{rdi}",
