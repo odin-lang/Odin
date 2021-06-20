@@ -21,7 +21,6 @@ TEST: []u8 = {
 main :: proc() {
 	// Set up output buffer.
 	buf: bytes.Buffer;
-	defer bytes.buffer_destroy(&buf);
 
 	stdout :: proc(s: string) {
 		os.write_string(os.stdout, s);
@@ -40,6 +39,7 @@ main :: proc() {
 			stdout(bytes.buffer_to_string(&buf));
 			stdout("\n");
 		}
+		bytes.buffer_destroy(&buf);
 	}
 
 	// The rest are all files.
@@ -62,9 +62,10 @@ main :: proc() {
 				os.exit(1);
 			}
 			stderr("GZIP returned an error.\n");
+				bytes.buffer_destroy(&buf);
 			os.exit(2);
 		}
 		stdout(bytes.buffer_to_string(&buf));
 	}
-	os.exit(0);
+	bytes.buffer_destroy(&buf);
 }
