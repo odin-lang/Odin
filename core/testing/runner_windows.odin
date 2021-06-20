@@ -153,7 +153,7 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 		}
 		global_exception_handler = win32.AddVectoredExceptionHandler(0, exception_handler_proc);
 
-		context.assertion_failure_proc = proc(prefix, message: string, loc: runtime.Source_Code_Location) {
+		context.assertion_failure_proc = proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
 			errorf(t=global_current_t, format="%s %s", args={prefix, message}, loc=loc);
 			intrinsics.trap();
 		};
