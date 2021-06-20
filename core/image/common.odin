@@ -7,7 +7,7 @@ Image :: struct {
 	width:      int,
 	height:     int,
 	channels:   int,
-	depth:      u8,
+	depth:      int,
 	pixels:     bytes.Buffer,
 	/*
 		Some image loaders/writers can return/take an optional background color.

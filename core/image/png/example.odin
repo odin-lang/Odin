@@ -26,12 +26,12 @@ main :: proc() {
 	if err != nil {
 		fmt.printf("Trying to read PNG file %v returned %v\n", file, err);
 	} else {
-		v:  png.Info;
+		v: ^png.Info;
 		ok: bool;
 
 		fmt.printf("Image: %vx%vx%v, %v-bit.\n", img.width, img.height, img.channels, img.depth);
 
-		if v, ok = img.sidecar.(png.Info); ok {
+		if v, ok = img.sidecar.(^png.Info); ok {
 			// Handle ancillary chunks as you wish.
 			// We provide helper functions for a few types.
 			for c in v.chunks {
@@ -195,7 +195,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	defer close(fd);
 
 	write_string(fd,
-		fmt.tprintf("P6\n%v %v\n%v\n", width, height, (1 << depth -1)),
+		fmt.tprintf("P6\n%v %v\n%v\n", width, height, (1 << uint(depth) - 1)),
 	);
 
 	if channels == 3 {
