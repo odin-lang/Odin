@@ -392,7 +392,10 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		img = new(Image);
 	}
 
-	img.sidecar = nil;
+	info: ^Info;
+	if img.sidecar == nil {
+		info = new(Info);
+	}
 
 	ctx := &compress.Context{
 		input = stream,
@@ -413,7 +416,8 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	e:      io.Error;
 
 	header:	IHDR;
-	info:   Info;
+
+	img.sidecar = info;
 	info.chunks.allocator = context.temp_allocator;
 
 	// State to ensure correct chunk ordering.
@@ -462,12 +466,12 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 				// Color image without a palette
 				img.channels = 3;
 				final_image_channels = 3;
-				img.depth    = header.bit_depth;
+				img.depth    = int(header.bit_depth);
 			} else {
 				// Grayscale
 				img.channels = 1;
 				final_image_channels = 1;
-				img.depth    = header.bit_depth;
+				img.depth    = int(header.bit_depth);
 			}
 
 			if .Alpha in header.color_type {
@@ -522,7 +526,6 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 			// If we only want image metadata and don't want the pixel data, we can early out.
 			if .return_metadata not_in options && .do_not_decompress_image in options {
 				img.channels = final_image_channels;
-				img.sidecar = info;
 				return img, nil;
 			}
 			// There must be at least 1 IDAT, contiguous if more.
