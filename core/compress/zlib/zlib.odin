@@ -16,7 +16,7 @@ import "core:io"
 import "core:bytes"
 import "core:hash"
 
-when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
+// when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
 /*
 	zlib.inflate decompresses a ZLIB stream passed in as a []u8 or io.Stream.
