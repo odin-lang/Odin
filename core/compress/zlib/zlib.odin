@@ -16,7 +16,7 @@ import "core:io"
 import "core:bytes"
 import "core:hash"
 
-when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
+// when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
 /*
 	zlib.inflate decompresses a ZLIB stream passed in as a []u8 or io.Stream.
@@ -360,13 +360,9 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 					Replicate the last outputted byte, length times.
 				*/
 				if length > 0 {
-					if offset >= 0 && offset < z.window_size {
-						c := z.last[offset];
-						e := repl_byte(z, length, c);
-						if e != .None {
-							return E_General.Output_Too_Short;
-						}
-					} else {
+					c := z.last[offset & z.window_mask];
+					e := repl_byte(z, length, c);
+					if e != .None {
 						return E_General.Output_Too_Short;
 					}
 				}
@@ -376,14 +372,6 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 					if e != .None {
 						return E_General.Output_Too_Short;
 					}
-					// #no_bounds_check for _ in 0..<length {
-					// 	b, e := compress.peek_back_byte(z, offset);
-					// 	if e != .None {
-					// 		return E_General.Output_Too_Short;
-					// 	}
-					// 	write_byte(z, b);
-					// 	offset += 1;
-					// }
 				}
 			}
 		}
