@@ -1,7 +1,19 @@
 package compress
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation, optimization.
+*/
+
 import "core:io"
 import "core:image"
+
+when #config(TRACY_ENABLE, false) {
+	import tracy "shared:odin-tracy"
+}
 
 Error :: union {
 	General_Error,
@@ -71,15 +83,24 @@ Context :: struct {
 	*/
 	eof: b8,
 
-	input: io.Stream,
+	input:  io.Stream,
 	output: io.Stream,
 	bytes_written: i64,
-	// Used to update hash as we write instead of all at once
+	/*
+		Used to update hash as we write instead of all at once.
+	*/
 	rolling_hash: u32,
 
 	// Sliding window buffer. Size must be a power of two.
 	window_size: i64,
+	window_mask: i64,
 	last: ^[dynamic]byte,
+
+	/*
+		If we know the raw data size, we can optimize the reads.
+	*/
+	uncompressed_size: i64,
+	input_data: []u8,
 }
 
 // Stream helpers
@@ -93,6 +114,7 @@ Context :: struct {
 */
 
 read_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Data"); }
 	b := make([]u8, size_of(T), context.temp_allocator);
 	r, e1 := io.to_reader(c.input);
 	_, e2 := io.read(r, b);
@@ -105,10 +127,12 @@ read_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Err
 }
 
 read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read u8"); }
 	return read_data(z, u8);
 }
 
 peek_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Peek Data"); }
 	// Get current position to read from.
 	curr, e1 := c.input->impl_seek(0, .Current);
 	if e1 != .None {
@@ -136,6 +160,7 @@ peek_back_byte :: proc(c: ^Context, offset: i64) -> (res: u8, err: io.Error) {
 
 // Generalized bit reader LSB
 refill_lsb :: proc(z: ^Context, width := i8(24)) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Refill LSB"); }
 	for {
 		if z.num_bits > width {
 			break;
@@ -146,7 +171,7 @@ refill_lsb :: proc(z: ^Context, width := i8(24)) {
 		if z.code_buffer >= 1 << uint(z.num_bits) {
 			// Code buffer is malformed.
 			z.num_bits = -100;
-        	return;
+			return;
 		}
 		c, err := read_u8(z);
 		if err != .None {

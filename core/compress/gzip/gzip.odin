@@ -1,5 +1,19 @@
 package gzip
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	This package implements support for the GZIP file format v4.3,
+	as specified in RFC 1952.
+
+	It is implemented in such a way that it lends itself naturally
+	to be the input to a complementary TAR implementation.
+*/
+
 import "core:compress/zlib"
 import "core:compress"
 import "core:os"
@@ -9,11 +23,6 @@ import "core:hash"
 
 /*
 
-	This package implements support for the GZIP file format v4.3,
-	as specified in RFC 1952.
-
-	It is implemented in such a way that it lends itself naturally
-	to be the input to a complementary TAR implementation.
 
 */
 
@@ -200,7 +209,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 				xlen -= field_length;
 
 				// printf("%v\n", string(field_data));
-	 		}
+			}
 
 			if xlen != 0 {
 				return E_GZIP.Invalid_Extra_Data;

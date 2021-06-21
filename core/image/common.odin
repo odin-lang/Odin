@@ -1,5 +1,14 @@
 package image
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation, optimization.
+		Ginger Bill:     Cosmetic changes.
+*/
+
 import "core:bytes"
 import "core:mem"
 
@@ -66,10 +75,10 @@ Image_Option:
 		If the image has an alpha channel, drop it.
 		You may want to use `.alpha_premultiply` in this case.
 
-        NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
-        unless you select `alpha_premultiply`.
-        In this case it'll premultiply the specified pixels in question only,
-        as the others are implicitly fully opaque.	
+		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
+		unless you select `alpha_premultiply`.
+		In this case it'll premultiply the specified pixels in question only,
+		as the others are implicitly fully opaque.	
 
 	`.alpha_premultiply`
 		If the image has an alpha channel, returns image data as follows:

@@ -1,6 +1,16 @@
 //+ignore
 package zlib
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	An example of how to use `zlib.inflate`.
+*/
+
 import "core:compress/zlib"
 import "core:bytes"
 import "core:fmt"
