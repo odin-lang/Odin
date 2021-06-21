@@ -34,10 +34,8 @@ destroy :: proc(img: ^Image) {
 	}
 
 	bytes.buffer_destroy(&img.pixels);
-	if img.metadata_ptr != nil && img.metadata_type == Info {
-		// Clean up Info.
-		free(img.metadata_ptr);
-	}
+	// Clean up Info.
+	free(img.metadata_ptr);
 
 	/*
 		We don't need to do anything for the individual chunks.
