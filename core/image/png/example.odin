@@ -14,7 +14,7 @@ import "core:os"
 main :: proc() {
 	file: string;
 
-	options := image.Options{};
+	options := image.Options{.return_metadata};
 	err:       compress.Error;
 	img:      ^image.Image;
 
@@ -27,11 +27,11 @@ main :: proc() {
 		fmt.printf("Trying to read PNG file %v returned %v\n", file, err);
 	} else {
 		v: ^png.Info;
-		ok: bool;
 
 		fmt.printf("Image: %vx%vx%v, %v-bit.\n", img.width, img.height, img.channels, img.depth);
 
-		if v, ok = img.sidecar.(^png.Info); ok {
+		if img.metadata_ptr != nil && img.metadata_type == png.Info {
+			v = (^png.Info)(img.metadata_ptr);
 			// Handle ancillary chunks as you wish.
 			// We provide helper functions for a few types.
 			for c in v.chunks {
