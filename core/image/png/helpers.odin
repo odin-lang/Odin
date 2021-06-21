@@ -1,15 +1,22 @@
 package png
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Ginger Bill:     Cosmetic changes.
+
+	These are a few useful utility functions to work with PNG images.
+*/
+
 import "core:image"
 import "core:compress/zlib"
 import coretime "core:time"
 import "core:strings"
 import "core:bytes"
 import "core:mem"
-
-/*
-	These are a few useful utility functions to work with PNG images.
-*/
 
 /*
 	Cleanup of image-specific data.

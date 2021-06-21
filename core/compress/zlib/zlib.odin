@@ -1,11 +1,23 @@
 package zlib
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation, optimization.
+		Ginger Bill:     Cosmetic changes.
+*/
+
 import "core:compress"
 
 import "core:mem"
 import "core:io"
 import "core:bytes"
 import "core:hash"
+
+when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
+
 /*
 	zlib.inflate decompresses a ZLIB stream passed in as a []u8 or io.Stream.
 	Returns: Error.
@@ -118,6 +130,7 @@ z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 }
 
 write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_bounds_check {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Write Byte"); }
 	c := c;
 	buf := transmute([]u8)mem.Raw_Slice{data=&c, len=1};
 	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
@@ -126,17 +139,67 @@ write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_boun
 	if e != .None {
 		return e;
 	}
-	z.last[z.bytes_written % z.window_size] = c;
+	z.last[z.bytes_written & z.window_mask] = c;
 
 	z.bytes_written += 1;
 	return .None;
 }
+
+repl_byte :: proc(z: ^Context, count: u16, c: u8) -> (err: io.Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Repl Byte"); }
+	/*
+		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
+		without having to worry about wrapping, so no need for a temp allocation to give to
+		the output stream, just give it _that_ slice.
+	*/
+	buf := make([]u8, count, context.temp_allocator);
+	#no_bounds_check for i in 0..<count {
+		buf[i] = c;
+		z.last[z.bytes_written & z.window_mask] = c;
+		z.bytes_written += 1;
+	}
+	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+
+	_, e := z.output->impl_write(buf);
+	if e != .None {
+		return e;
+	}
+	return .None;
+}
+
+repl_bytes :: proc(z: ^Context, count: u16, distance: u16) -> (err: io.Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Repl Bytes"); }
+	/*
+		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
+		without having to worry about wrapping, so no need for a temp allocation to give to
+		the output stream, just give it _that_ slice.
+	*/
+	buf := make([]u8, count, context.temp_allocator);
+
+	offset := z.bytes_written - i64(distance);
+	#no_bounds_check for i in 0..<count {
+		c := z.last[offset & z.window_mask];
+
+		z.last[z.bytes_written & z.window_mask] = c;
+		buf[i] = c;
+		z.bytes_written += 1; offset += 1;
+	}
+	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+
+	_, e := z.output->impl_write(buf);
+	if e != .None {
+		return e;
+	}
+	return .None;
+}
+
 
 allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_Table, err: Error) {
 	return new(Huffman_Table, allocator), nil;
 }
 
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Build Huffman Table"); }
 	sizes:     [HUFFMAN_MAX_BITS+1]int;
 	next_code: [HUFFMAN_MAX_BITS]int;
 
@@ -195,6 +258,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 }
 
 decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Decode Huffman Slow"); }
 	code := u16(compress.peek_bits_lsb(z, 16));
 
 	k := int(z_bit_reverse(code, 16));
@@ -225,6 +289,7 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 }
 
 decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Decode Huffman"); }
 	if z.num_bits < 16 {
 		if z.num_bits == -100 {
 			return 0, E_ZLIB.Code_Buffer_Malformed;
@@ -244,6 +309,7 @@ decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #
 }
 
 parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Parse Huffman Block"); }
 	#no_bounds_check for {
 		value, e := decode_huffman(z, z_repeat);
 		if e != nil {
@@ -256,8 +322,8 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 			}
 		} else {
 			if value == 256 {
-      				// End of block
-      				return nil;
+					// End of block
+					return nil;
 			}
 
 			value -= 257;
@@ -294,24 +360,30 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 					Replicate the last outputted byte, length times.
 				*/
 				if length > 0 {
-					b, e := compress.peek_back_byte(z, offset);
-					if e != .None {
+					if offset >= 0 && offset < z.window_size {
+						c := z.last[offset];
+						e := repl_byte(z, length, c);
+						if e != .None {
+							return E_General.Output_Too_Short;
+						}
+					} else {
 						return E_General.Output_Too_Short;
-					}
-					#no_bounds_check for _ in 0..<length {
-						write_byte(z, b);
 					}
 				}
 			} else {
 				if length > 0 {
-					#no_bounds_check for _ in 0..<length {
-						b, e := compress.peek_back_byte(z, offset);
-						if e != .None {
-							return E_General.Output_Too_Short;
-						}
-						write_byte(z, b);
-						offset += 1;
+					e := repl_bytes(z, length, distance);
+					if e != .None {
+						return E_General.Output_Too_Short;
 					}
+					// #no_bounds_check for _ in 0..<length {
+					// 	b, e := compress.peek_back_byte(z, offset);
+					// 	if e != .None {
+					// 		return E_General.Output_Too_Short;
+					// 	}
+					// 	write_byte(z, b);
+					// 	offset += 1;
+					// }
 				}
 			}
 		}
@@ -378,7 +450,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 		ctx.rolling_hash = 1;
 	}
 
- 	// Parse ZLIB stream without header.
+	// Parse ZLIB stream without header.
 	err = inflate_raw(ctx);
 	if err != nil {
 		return err;
@@ -397,6 +469,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 
 // @(optimization_mode="speed")
 inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Inflate Raw"); }
 	final := u32(0);
 	type := u32(0);
 
@@ -426,6 +499,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 	if z.window_size == 0 {
 		z.window_size = DEFLATE_MAX_DISTANCE;
 	}
+	z.window_mask = z.window_size - 1;
 
 	// Allocate rolling window buffer.
 	last_b := mem.make_dynamic_array_len_cap([dynamic]u8, z.window_size, z.window_size, allocator);
@@ -440,6 +514,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 
 		switch type {
 		case 0:
+			when #config(TRACY_ENABLE, false) { tracy.ZoneN("Literal Block"); }
 			// Uncompressed block
 
 			// Discard bits until next byte boundary
@@ -468,6 +543,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 		case 3:
 			return E_Deflate.BType_3;
 		case:
+			when #config(TRACY_ENABLE, false) { tracy.ZoneN("Huffman Block"); }
 			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
 			if type == 1 {
 				// Use fixed code lengths.
@@ -531,7 +607,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 						case 18:
 							c = u16(compress.read_bits_no_refill_lsb(z, 7) + 11);
 						case:
-					         	return E_Deflate.Huffman_Bad_Code_Lengths;
+								return E_Deflate.Huffman_Bad_Code_Lengths;
 						}
 
 						if ntot - n < u32(c) {
