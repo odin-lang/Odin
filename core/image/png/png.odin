@@ -1,5 +1,14 @@
 package png
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Ginger Bill:     Cosmetic changes.
+*/
+
 import "core:compress"
 import "core:compress/zlib"
 import "core:image"

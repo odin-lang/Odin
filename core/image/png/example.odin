@@ -1,6 +1,17 @@
 //+ignore
 package png
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Ginger Bill:     Cosmetic changes.
+
+	An example of how to use `png.load`.
+*/
+
 import "core:compress"
 import "core:image"
 import "core:image/png"
