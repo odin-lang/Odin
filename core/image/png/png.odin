@@ -402,6 +402,8 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	}
 
 	info := new(Info, context.allocator);
+	img.metadata_ptr  = info;
+	img.metadata_type = typeid_of(Info);
 
 	ctx := &compress.Context{
 		input = stream,
@@ -663,10 +665,6 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		}
 	}
 
-	if .return_header in options || .return_metadata in options {
-		img.metadata_ptr  = info;
-		img.metadata_type = typeid_of(Info);
-	}
 	if .do_not_decompress_image in options {
 		img.channels = final_image_channels;
 		return img, nil;
