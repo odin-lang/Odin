@@ -11,9 +11,7 @@ package compress
 import "core:io"
 import "core:image"
 
-when #config(TRACY_ENABLE, false) {
-	import tracy "shared:odin-tracy"
-}
+// when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
 Error :: union {
 	General_Error,
