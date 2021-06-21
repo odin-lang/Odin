@@ -4,18 +4,20 @@ import "core:bytes"
 import "core:mem"
 
 Image :: struct {
-	width:      int,
-	height:     int,
-	channels:   int,
-	depth:      int,
-	pixels:     bytes.Buffer,
+	width:         int,
+	height:        int,
+	channels:      int,
+	depth:         int,
+	pixels:        bytes.Buffer,
 	/*
 		Some image loaders/writers can return/take an optional background color.
 		For convenience, we return them as u16 so we don't need to switch on the type
 		in our viewer, and can just test against nil.
 	*/
-	background: Maybe([3]u16),
-	sidecar:    any,
+	background:    Maybe([3]u16),
+
+	metadata_ptr:  rawptr,
+	metadata_type: typeid,
 }
 
 /*
@@ -190,13 +192,14 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 	}
 
 	res = new(Image);
-	res.width      = img.width;
-	res.height     = img.height;
-	res.channels   = 1;
-	res.depth      = img.depth;
-	res.pixels     = t;
-	res.background = img.background;
-	res.sidecar    = img.sidecar;
+	res.width         = img.width;
+	res.height        = img.height;
+	res.channels      = 1;
+	res.depth         = img.depth;
+	res.pixels        = t;
+	res.background    = img.background;
+	res.metadata_ptr  = img.metadata_ptr;
+	res.metadata_type = img.metadata_type;
 
 	return res, true;
 }
