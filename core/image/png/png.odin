@@ -392,10 +392,7 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 		img = new(Image);
 	}
 
-	info: ^Info;
-	if img.sidecar == nil {
-		info = new(Info);
-	}
+	info := new(Info, context.allocator);
 
 	ctx := &compress.Context{
 		input = stream,
@@ -417,7 +414,6 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 
 	header:	IHDR;
 
-	img.sidecar = info;
 	info.chunks.allocator = context.temp_allocator;
 
 	// State to ensure correct chunk ordering.
@@ -659,7 +655,8 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	}
 
 	if .return_header in options || .return_metadata in options {
-		img.sidecar = info;
+		img.metadata_ptr  = info;
+		img.metadata_type = typeid_of(Info);
 	}
 	if .do_not_decompress_image in options {
 		img.channels = final_image_channels;
