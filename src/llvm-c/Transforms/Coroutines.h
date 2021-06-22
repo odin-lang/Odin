@@ -19,9 +19,9 @@
 #ifndef LLVM_C_TRANSFORMS_COROUTINES_H
 #define LLVM_C_TRANSFORMS_COROUTINES_H
 
-#include "../ExternC.h"
-#include "../Types.h"
-#include "PassManagerBuilder.h"
+#include "ExternC.h"
+#include "Types.h"
+#include "Transforms/PassManagerBuilder.h"
 
 LLVM_C_EXTERN_C_BEGIN
 
