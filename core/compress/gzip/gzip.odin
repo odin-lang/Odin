@@ -281,8 +281,10 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	/*
 		We should have arrived at the ZLIB payload.
 	*/
+	code_buffer := compress.Code_Buffer{};
+	cb := &code_buffer;
 
-	zlib_error := zlib.inflate_raw(&ctx);
+	zlib_error := zlib.inflate_raw(&ctx, &code_buffer);
 
 	// fmt.printf("ZLIB returned: %v\n", zlib_error);
 
@@ -293,16 +295,16 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	/*
 		Read CRC32 using the ctx bit reader because zlib may leave bytes in there.
 	*/
-	compress.discard_to_next_byte_lsb(&ctx);
+	compress.discard_to_next_byte_lsb(cb);
 
 	payload_crc_b: [4]u8;
 	payload_len_b: [4]u8;
 	for _, i in payload_crc_b {
-		payload_crc_b[i] = u8(compress.read_bits_lsb(&ctx, 8));
+		payload_crc_b[i] = u8(compress.read_bits_lsb(&ctx, cb, 8));
 	}
 	payload_crc := transmute(u32le)payload_crc_b;
 	for _, i in payload_len_b {
-		payload_len_b[i] = u8(compress.read_bits_lsb(&ctx, 8));
+		payload_len_b[i] = u8(compress.read_bits_lsb(&ctx, cb, 8));
 	}
 	payload_len := int(transmute(u32le)payload_len_b);
 
