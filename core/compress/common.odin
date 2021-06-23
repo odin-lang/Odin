@@ -10,7 +10,6 @@ package compress
 
 import "core:io"
 import "core:image"
-// import "core:fmt"
 
 // when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
@@ -148,7 +147,7 @@ read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.
 			return []u8{}, .Short_Buffer;
 		}
 	}
-	// fmt.printf("read_slice of %v bytes fell back to stream.\n", size);
+
 	/*
 		TODO: Try to refill z.input_data from stream, using packed_data as a guide.
 	*/
@@ -190,7 +189,6 @@ peek_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Err
 
 	if len(z.input_data) >= size {
 		buf := z.input_data[:size];
-		z.input_data = z.input_data[size:];
 		return (^T)(&buf[0])^, .None;
 	}
 

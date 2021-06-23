@@ -14,6 +14,8 @@ package gzip
 
 import "core:bytes"
 import "core:os"
+import "core:compress"
+import "core:fmt"
 
 // Small GZIP file with fextra, fname and fcomment present.
 @private
@@ -48,6 +50,8 @@ main :: proc() {
 			stdout("Displaying test vector: ");
 			stdout(bytes.buffer_to_string(&buf));
 			stdout("\n");
+		} else {
+			fmt.printf("gzip.load returned %v\n", err);
 		}
 		bytes.buffer_destroy(&buf);
 		os.exit(0);
@@ -61,7 +65,10 @@ main :: proc() {
 		if file == "-" {
 			// Read from stdin
 			s := os.stream_from_handle(os.stdin);
-			err = load(s, &buf);
+			ctx := &compress.Context{
+				input = s,
+			};
+			err = load(ctx, &buf);
 		} else {
 			err = load(file, &buf);
 		}

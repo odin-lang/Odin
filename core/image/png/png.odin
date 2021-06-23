@@ -252,17 +252,15 @@ read_chunk :: proc(ctx: ^compress.Context) -> (chunk: Chunk, err: Error) {
 	}
 	chunk.header = ch;
 
-	data := make([]u8, ch.length, context.temp_allocator);
-	_, e2 := ctx.input->impl_read(data);
-	if e2 != .None {
+	chunk.data, e = compress.read_slice(ctx, int(ch.length));
+	if e != .None {
 		return {}, E_General.Stream_Too_Short;
 	}
-	chunk.data = data;
 
 	// Compute CRC over chunk type + data
 	type := (^[4]byte)(&ch.type)^;
 	computed_crc := hash.crc32(type[:]);
-	computed_crc =  hash.crc32(data, computed_crc);
+	computed_crc =  hash.crc32(chunk.data, computed_crc);
 
 	crc, e3 := compress.read_data(ctx, u32be);
 	if e3 != .None {
@@ -359,12 +357,18 @@ load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.
 	bytes.reader_init(&r, slice);
 	stream := bytes.reader_to_stream(&r);
 
+	ctx := &compress.Context{
+		input = stream,
+		input_data = slice,
+		input_fully_in_memory = true,
+	};
+
 	/*
 		TODO: Add a flag to tell the PNG loader that the stream is backed by a slice.
 		This way the stream reader could avoid the copy into the temp memory returned by it,
 		and instead return a slice into the original memory that's already owned by the caller.
 	*/
-	img, err = load_from_stream(stream, options, allocator);
+	img, err = load_from_stream(ctx, options, allocator);
 
 	return img, err;
 }
@@ -382,7 +386,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	}
 }
 
-load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_stream :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	options := options;
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image};
@@ -404,10 +408,6 @@ load_from_stream :: proc(stream: io.Stream, options := Options{}, allocator := c
 	info := new(Info, context.allocator);
 	img.metadata_ptr  = info;
 	img.metadata_type = typeid_of(Info);
-
-	ctx := &compress.Context{
-		input = stream,
-	};
 
 	signature, io_error := compress.read_data(ctx, Signature);
 	if io_error != .None || signature != .PNG {
