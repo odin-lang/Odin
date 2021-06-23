@@ -127,30 +127,23 @@ read_slice :: #force_inline proc(c: ^Context, size: int) -> (res: []u8, err: io.
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Slice"); }
 
 	b := make([]u8, size, context.temp_allocator);
-
 	_, e := c.input->impl_read(b[:]);
-	if e != .None {
-		return []u8{}, e;
+	if e == .None {
+		return b, .None;
 	}
 
-	return b, .None;
+	return []u8{}, e;
 }
 
-read_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
+read_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Data"); }
 
-	when size_of(T) <= 128 {
-		b: [size_of(T)]u8;
-	} else {
-		b := make([]u8, size_of(T), context.temp_allocator);
-	}
-	_, e := c.input->impl_read(b[:]);
-	if e != .None {
-		return T{}, e;
+	b, e := read_slice(z, size_of(T));
+	if e == .None {
+		return (^T)(&b[0])^, .None;
 	}
 
-	res = (^T)(&b)^;
-	return res, .None;
+	return T{}, e;
 }
 
 read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
@@ -159,9 +152,9 @@ read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
 	b, e := read_slice(z, 1);
 	if e == .None {
 		return b[0], .None;
-	} else {
-		return 0, e;
 	}
+
+	return 0, e;
 }
 
 peek_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
