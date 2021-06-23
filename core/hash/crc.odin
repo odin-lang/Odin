@@ -1,15 +1,18 @@
 package hash
 
-crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
+@(optimization_mode="speed")
+crc32 :: proc(data: []byte, seed := u32(0)) -> u32 {
 	result := ~u32(seed);
-	for b in data {
+	 #no_bounds_check for b in data {
 		result = result>>8 ~ _crc32_table[(result ~ u32(b)) & 0xff];
 	}
 	return ~result;
 }
+
+@(optimization_mode="speed")
 crc64 :: proc(data: []byte, seed := u32(0)) -> u64 #no_bounds_check {
 	result := ~u64(seed);
-	for b in data {
+	 #no_bounds_check for b in data {
 		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
 	}
 	return ~result;
