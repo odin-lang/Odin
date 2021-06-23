@@ -115,7 +115,7 @@ Huffman_Table :: struct {
 };
 
 // Implementation starts here
-
+@(optimization_mode="speed")
 z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	assert(bits <= 16);
 	// NOTE: Can optimize with llvm.bitreverse.i64 or some bit twiddling
@@ -130,6 +130,7 @@ z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	return;
 }
 
+@(optimization_mode="speed")
 write_byte :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, c: u8) -> (err: io.Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Write Byte"); }
 	c := c;
@@ -146,6 +147,7 @@ write_byte :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, c: u8) -> (err: 
 	return .None;
 }
 
+@(optimization_mode="speed")
 repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Repl Byte"); }
 	/*
@@ -168,6 +170,7 @@ repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.
 	return .None;
 }
 
+@(optimization_mode="speed")
 repl_bytes :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, distance: u16) -> (err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Repl Bytes"); }
 	/*
@@ -199,6 +202,7 @@ allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_T
 	return new(Huffman_Table, allocator), nil;
 }
 
+@(optimization_mode="speed")
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Build Huffman Table"); }
 	sizes:     [HUFFMAN_MAX_BITS+1]int;
@@ -258,6 +262,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	return nil;
 }
 
+@(optimization_mode="speed")
 decode_huffman_slowpath :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Decode Huffman Slow"); }
 	code := u16(compress.peek_bits_lsb(z, cb, 16));
@@ -289,6 +294,7 @@ decode_huffman_slowpath :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table
 	return r, nil;
 }
 
+@(optimization_mode="speed")
 decode_huffman :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Decode Huffman"); }
 	if cb.num_bits < 16 {
@@ -309,6 +315,7 @@ decode_huffman :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table) -> (r: 
 	return decode_huffman_slowpath(z, cb, t);
 }
 
+@(optimization_mode="speed")
 parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Parse Huffman Block"); }
 	#no_bounds_check for {
@@ -379,6 +386,7 @@ parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^
 	}
 }
 
+@(optimization_mode="speed")
 inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	/*
 		ctx.input must be an io.Stream backed by an implementation that supports:
@@ -459,7 +467,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 	return nil;
 }
 
-// @(optimization_mode="speed")
+@(optimization_mode="speed")
 inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Inflate Raw"); }
 	final := u32(0);
