@@ -645,6 +645,8 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -
 	bytes.reader_init(&r, input);
 	rs := bytes.reader_to_stream(&r);
 	ctx.input = rs;
+	ctx.input_data = input;
+	ctx.input_fully_in_memory = true;
 
 	buf := buf;
 	ws := bytes.buffer_to_stream(buf);
@@ -662,6 +664,8 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, cb: ^Code_B
 	bytes.reader_init(&r, input);
 	rs := bytes.reader_to_stream(&r);
 	ctx.input = rs;
+	ctx.input_data = input;
+	ctx.input_fully_in_memory = true;
 
 	buf := buf;
 	ws := bytes.buffer_to_stream(buf);

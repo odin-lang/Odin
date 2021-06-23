@@ -10,6 +10,7 @@ package compress
 
 import "core:io"
 import "core:image"
+// import "core:fmt"
 
 // when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
@@ -75,12 +76,12 @@ Deflate_Error :: enum {
 
 // General I/O context for ZLIB, LZW, etc.
 Context :: struct #packed {
-	input:         io.Stream,
-	input_data:    []u8,
+	input:             io.Stream,
+	input_data:        []u8,
 
-	output:        io.Stream,
-	output_buf:    [dynamic]u8,
-	bytes_written: i64,
+	output:            io.Stream,
+	output_buf:        [dynamic]u8,
+	bytes_written:     i64,
 
 	/*
 		If we know the data size, we can optimize the reads and writes.
@@ -93,9 +94,17 @@ Context :: struct #packed {
 	*/
 	rolling_hash:  u32,
 	/*
-		Could put some useful bools in here.
+		Reserved
 	*/
-	padding:       [3]u32,
+	reserved:      [2]u32,
+	/*
+		Flags:
+			`input_fully_in_memory` tells us whether we're EOF when `input_data` is empty.
+			`input_refills_from_stream` tells us we can then possibly refill from the stream.
+	*/
+	input_fully_in_memory: b8,
+	input_refills_from_stream: b8,
+	reserved_flags: [2]b8,
 }
 #assert(size_of(Context) == 128);
 
@@ -123,11 +132,28 @@ Code_Buffer :: struct #packed {
 	This simplifies end-of-stream handling where bits may be left in the bit buffer.
 */
 
-read_slice :: #force_inline proc(c: ^Context, size: int) -> (res: []u8, err: io.Error) {
+read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Slice"); }
 
+	if len(z.input_data) >= size {
+		res = z.input_data[:size];
+		z.input_data = z.input_data[size:];
+		return res, .None;
+	}
+
+	if z.input_fully_in_memory {
+		if len(z.input_data) == 0 {
+			return []u8{}, .EOF;
+		} else {
+			return []u8{}, .Short_Buffer;
+		}
+	}
+	// fmt.printf("read_slice of %v bytes fell back to stream.\n", size);
+	/*
+		TODO: Try to refill z.input_data from stream, using packed_data as a guide.
+	*/
 	b := make([]u8, size, context.temp_allocator);
-	_, e := c.input->impl_read(b[:]);
+	_, e := z.input->impl_read(b[:]);
 	if e == .None {
 		return b, .None;
 	}
@@ -157,24 +183,45 @@ read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
 	return 0, e;
 }
 
-peek_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
+peek_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Peek Data"); }
+
+	size :: size_of(T);
+
+	if len(z.input_data) >= size {
+		buf := z.input_data[:size];
+		z.input_data = z.input_data[size:];
+		return (^T)(&buf[0])^, .None;
+	}
+
+	if z.input_fully_in_memory {
+		if len(z.input_data) < size {
+			return T{}, .EOF;
+		} else {
+			return T{}, .Short_Buffer;
+		}
+	}
+
 	// Get current position to read from.
-	curr, e1 := c.input->impl_seek(0, .Current);
+	curr, e1 := z.input->impl_seek(0, .Current);
 	if e1 != .None {
 		return T{}, e1;
 	}
-	r, e2 := io.to_reader_at(c.input);
+	r, e2 := io.to_reader_at(z.input);
 	if !e2 {
 		return T{}, .Empty;
 	}
-	b := make([]u8, size_of(T), context.temp_allocator);
-	_, e3 := io.read_at(r, b, curr);
+	when size <= 128 {
+		b: [size]u8;
+	} else {
+		b := make([]u8, size, context.temp_allocator);
+	}
+	_, e3 := io.read_at(r, b[:], curr);
 	if e3 != .None {
 		return T{}, .Empty;
 	}
 
-	res = (^T)(raw_data(b))^;
+	res = (^T)(&b[0])^;
 	return res, .None;
 }
 
