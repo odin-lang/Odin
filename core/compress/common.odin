@@ -131,13 +131,16 @@ Code_Buffer :: struct #packed {
 	This simplifies end-of-stream handling where bits may be left in the bit buffer.
 */
 
+@(optimization_mode="speed")
 read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Slice"); }
 
-	if len(z.input_data) >= size {
-		res = z.input_data[:size];
-		z.input_data = z.input_data[size:];
-		return res, .None;
+	#no_bounds_check {
+		if len(z.input_data) >= size {
+			res = z.input_data[:size];
+			z.input_data = z.input_data[size:];
+			return res, .None;
+		}
 	}
 
 	if z.input_fully_in_memory {
@@ -160,6 +163,7 @@ read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.
 	return []u8{}, e;
 }
 
+@(optimization_mode="speed")
 read_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Data"); }
 
@@ -171,8 +175,17 @@ read_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Err
 	return T{}, e;
 }
 
+@(optimization_mode="speed")
 read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read u8"); }
+
+	#no_bounds_check {
+		if len(z.input_data) >= 1 {
+			res = z.input_data[0];
+			z.input_data = z.input_data[1:];
+			return res, .None;
+		}
+	}
 
 	b, e := read_slice(z, 1);
 	if e == .None {
@@ -182,14 +195,17 @@ read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
 	return 0, e;
 }
 
+@(optimization_mode="speed")
 peek_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Peek Data"); }
 
 	size :: size_of(T);
 
-	if len(z.input_data) >= size {
-		buf := z.input_data[:size];
-		return (^T)(&buf[0])^, .None;
+	#no_bounds_check {
+		if len(z.input_data) >= size {
+			buf := z.input_data[:size];
+			return (^T)(&buf[0])^, .None;
+		}
 	}
 
 	if z.input_fully_in_memory {
@@ -224,12 +240,14 @@ peek_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Err
 }
 
 // Sliding window read back
+@(optimization_mode="speed")
 peek_back_byte :: #force_inline proc(cb: ^Code_Buffer, offset: i64) -> (res: u8, err: io.Error) {
 	// Look back into the sliding window.
 	return cb.last[offset & cb.window_mask], .None;
 }
 
 // Generalized bit reader LSB
+@(optimization_mode="speed")
 refill_lsb :: proc(z: ^Context, cb: ^Code_Buffer, width := i8(24)) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Refill LSB"); }
 	for {
@@ -254,11 +272,13 @@ refill_lsb :: proc(z: ^Context, cb: ^Code_Buffer, width := i8(24)) {
 	}
 }
 
+@(optimization_mode="speed")
 consume_bits_lsb :: #force_inline proc(cb: ^Code_Buffer, width: u8) {
 	cb.code_buffer >>= width;
 	cb.num_bits -= u64(width);
 }
 
+@(optimization_mode="speed")
 peek_bits_lsb :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, width: u8) -> u32 {
 	if cb.num_bits < u64(width) {
 		refill_lsb(z, cb);
@@ -267,23 +287,27 @@ peek_bits_lsb :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, width: u8) ->
 	return u32(cb.code_buffer & ~(~u64(0) << width));
 }
 
+@(optimization_mode="speed")
 peek_bits_no_refill_lsb :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, width: u8) -> u32 {
 	assert(cb.num_bits >= u64(width));
 	return u32(cb.code_buffer & ~(~u64(0) << width));
 }
 
+@(optimization_mode="speed")
 read_bits_lsb :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, width: u8) -> u32 {
 	k := peek_bits_lsb(z, cb, width);
 	consume_bits_lsb(cb, width);
 	return k;
 }
 
+@(optimization_mode="speed")
 read_bits_no_refill_lsb :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, width: u8) -> u32 {
 	k := peek_bits_no_refill_lsb(z, cb, width);
 	consume_bits_lsb(cb, width);
 	return k;
 }
 
+@(optimization_mode="speed")
 discard_to_next_byte_lsb :: proc(cb: ^Code_Buffer) {
 	discard := u8(cb.num_bits & 7);
 	consume_bits_lsb(cb, discard);
