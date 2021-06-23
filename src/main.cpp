@@ -1809,6 +1809,10 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-warnings-as-errors");
 		print_usage_line(2, "Treats warning messages as error messages");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-verbose-errors");
+		print_usage_line(2, "Prints verbose error messages showing the code on that line and the location in that line");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
