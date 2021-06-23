@@ -123,8 +123,22 @@ Code_Buffer :: struct #packed {
 	This simplifies end-of-stream handling where bits may be left in the bit buffer.
 */
 
+read_slice :: #force_inline proc(c: ^Context, size: int) -> (res: []u8, err: io.Error) {
+	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Slice"); }
+
+	b := make([]u8, size, context.temp_allocator);
+
+	_, e := c.input->impl_read(b[:]);
+	if e != .None {
+		return []u8{}, e;
+	}
+
+	return b, .None;
+}
+
 read_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Data"); }
+
 	when size_of(T) <= 128 {
 		b: [size_of(T)]u8;
 	} else {
@@ -141,7 +155,13 @@ read_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Err
 
 read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read u8"); }
-	return read_data(z, u8);
+
+	b, e := read_slice(z, 1);
+	if e == .None {
+		return b[0], .None;
+	} else {
+		return 0, e;
+	}
 }
 
 peek_data :: #force_inline proc(c: ^Context, $T: typeid) -> (res: T, err: io.Error) {
