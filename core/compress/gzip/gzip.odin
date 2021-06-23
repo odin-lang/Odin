@@ -21,11 +21,6 @@ import "core:io"
 import "core:bytes"
 import "core:hash"
 
-/*
-
-
-*/
-
 Magic :: enum u16le {
 	GZIP = 0x8b << 8 | 0x1f,
 }
@@ -110,7 +105,13 @@ load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, allocator := context.al
 	bytes.reader_init(&r, slice);
 	stream := bytes.reader_to_stream(&r);
 
-	err = load_from_stream(stream, buf, allocator);
+	ctx := &compress.Context{
+		input  = stream,
+		input_data = slice,
+		input_fully_in_memory = true,
+		input_refills_from_stream = true,
+	};
+	err = load_from_stream(ctx, buf, allocator);
 
 	return err;
 }
@@ -126,15 +127,14 @@ load_from_file :: proc(filename: string, buf: ^bytes.Buffer, allocator := contex
 	return;
 }
 
-load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
-	ctx := compress.Context{
-		input  = stream,
-	};
+load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
 	buf := buf;
 	ws := bytes.buffer_to_stream(buf);
 	ctx.output = ws;
 
-	header, e := compress.read_data(&ctx, Header);
+	b: []u8;
+
+	header, e := compress.read_data(ctx, Header);
 	if e != .None {
 		return E_General.File_Too_Short;
 	}
@@ -162,7 +162,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	// printf("os: %v\n", OS_Name[header.os]);
 
 	if .extra in header.flags {
-		xlen, e_extra := compress.read_data(&ctx, u16le);
+		xlen, e_extra := compress.read_data(ctx, u16le);
 		if e_extra != .None {
 			return E_General.Stream_Too_Short;
 		}
@@ -178,14 +178,14 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 
 		for xlen >= 4 {
 			// println("Parsing Extra field(s).");
-			field_id, field_error = compress.read_data(&ctx, [2]u8);
+			field_id, field_error = compress.read_data(ctx, [2]u8);
 			if field_error != .None {
 				// printf("Parsing Extra returned: %v\n", field_error);
 				return E_General.Stream_Too_Short;
 			}
 			xlen -= 2;
 
-			field_length, field_error = compress.read_data(&ctx, u16le);
+			field_length, field_error = compress.read_data(ctx, u16le);
 			if field_error != .None {
 				// printf("Parsing Extra returned: %v\n", field_error);
 				return E_General.Stream_Too_Short;
@@ -200,8 +200,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 
 			// printf("    Field \"%v\" of length %v found: ", string(field_id[:]), field_length);
 			if field_length > 0 {
-				field_data := make([]u8, field_length, context.temp_allocator);
-				_, field_error = ctx.input->impl_read(field_data);
+				b, field_error = compress.read_slice(ctx, int(field_length));
 				if field_error != .None {
 					// printf("Parsing Extra returned: %v\n", field_error);
 					return E_General.Stream_Too_Short;
@@ -220,16 +219,15 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	if .name in header.flags {
 		// Should be enough.
 		name: [1024]u8;
-		b: [1]u8;
 		i := 0;
 		name_error: io.Error;
 
 		for i < len(name) {
-			_, name_error = ctx.input->impl_read(b[:]);
+			b, name_error = compress.read_slice(ctx, 1);
 			if name_error != .None {
 				return E_General.Stream_Too_Short;
 			}
-			if b == 0 {
+			if b[0] == 0 {
 				break;
 			}
 			name[i] = b[0];
@@ -244,16 +242,15 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	if .comment in header.flags {
 		// Should be enough.
 		comment: [1024]u8;
-		b: [1]u8;
 		i := 0;
 		comment_error: io.Error;
 
 		for i < len(comment) {
-			_, comment_error = ctx.input->impl_read(b[:]);
+			b, comment_error = compress.read_slice(ctx, 1);
 			if comment_error != .None {
 				return E_General.Stream_Too_Short;
 			}
-			if b == 0 {
+			if b[0] == 0 {
 				break;
 			}
 			comment[i] = b[0];
@@ -266,9 +263,8 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	}
 
 	if .header_crc in header.flags {
-		crc16: [2]u8;
 		crc_error: io.Error;
-		_, crc_error = ctx.input->impl_read(crc16[:]);
+		_, crc_error = compress.read_slice(ctx, 2);
 		if crc_error != .None {
 			return E_General.Stream_Too_Short;
 		}
@@ -281,30 +277,32 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 	/*
 		We should have arrived at the ZLIB payload.
 	*/
+	code_buffer := compress.Code_Buffer{};
+	cb := &code_buffer;
 
-	zlib_error := zlib.inflate_raw(&ctx);
-
-	// fmt.printf("ZLIB returned: %v\n", zlib_error);
-
+	zlib_error := zlib.inflate_raw(ctx, &code_buffer);
 	if zlib_error != nil {
 		return zlib_error;
 	}
-
 	/*
 		Read CRC32 using the ctx bit reader because zlib may leave bytes in there.
 	*/
-	compress.discard_to_next_byte_lsb(&ctx);
+	compress.discard_to_next_byte_lsb(cb);
+
+	footer_error: io.Error;
 
 	payload_crc_b: [4]u8;
-	payload_len_b: [4]u8;
 	for _, i in payload_crc_b {
-		payload_crc_b[i] = u8(compress.read_bits_lsb(&ctx, 8));
+		if cb.num_bits >= 8 {
+			payload_crc_b[i] = u8(compress.read_bits_lsb(ctx, cb, 8));
+		} else {
+			payload_crc_b[i], footer_error = compress.read_u8(ctx);
+		}
 	}
 	payload_crc := transmute(u32le)payload_crc_b;
-	for _, i in payload_len_b {
-		payload_len_b[i] = u8(compress.read_bits_lsb(&ctx, 8));
-	}
-	payload_len := int(transmute(u32le)payload_len_b);
+
+	payload_len: u32le;
+	payload_len, footer_error = compress.read_data(ctx, u32le);
 
 	payload := bytes.buffer_to_bytes(buf);
 	crc32 := u32le(hash.crc32(payload));
@@ -313,7 +311,7 @@ load_from_stream :: proc(stream: io.Stream, buf: ^bytes.Buffer, allocator := con
 		return E_GZIP.Payload_CRC_Invalid;
 	}
 
-	if len(payload) != payload_len {
+	if len(payload) != int(payload_len) {
 		return E_GZIP.Payload_Length_Invalid;
 	}
 	return nil;

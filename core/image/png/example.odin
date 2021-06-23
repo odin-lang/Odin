@@ -23,6 +23,22 @@ import "core:mem"
 import "core:os"
 
 main :: proc() {
+	track := mem.Tracking_Allocator{};
+	mem.tracking_allocator_init(&track, context.allocator);
+
+	context.allocator = mem.tracking_allocator(&track);
+
+	demo();
+
+	if len(track.allocation_map) > 0 {
+		fmt.println("Leaks:");
+		for _, v in track.allocation_map {
+			fmt.printf("\t%v\n\n", v);
+		}
+	}
+}
+
+demo :: proc() {
 	file: string;
 
 	options := image.Options{.return_metadata};
