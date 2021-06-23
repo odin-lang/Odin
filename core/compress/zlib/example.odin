@@ -11,7 +11,6 @@ package zlib
 	An example of how to use `zlib.inflate`.
 */
 
-import "core:compress/zlib"
 import "core:bytes"
 import "core:fmt"
 
@@ -40,7 +39,7 @@ main :: proc() {
 	buf: bytes.Buffer;
 
 	// We can pass ", true" to inflate a raw DEFLATE stream instead of a ZLIB wrapped one.
-	err := zlib.inflate(ODIN_DEMO, &buf);
+	err := inflate(ODIN_DEMO, &buf);
 	defer bytes.buffer_destroy(&buf);
 
 	if err != nil {

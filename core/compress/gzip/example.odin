@@ -12,9 +12,10 @@ package gzip
 	A small GZIP implementation as an example.
 */
 
-import "core:compress/gzip"
 import "core:bytes"
 import "core:os"
+import "core:compress"
+import "core:fmt"
 
 // Small GZIP file with fextra, fname and fcomment present.
 @private
@@ -31,7 +32,7 @@ TEST: []u8 = {
 
 main :: proc() {
 	// Set up output buffer.
-	buf: bytes.Buffer;
+	buf := bytes.Buffer{};
 
 	stdout :: proc(s: string) {
 		os.write_string(os.stdout, s);
@@ -44,26 +45,32 @@ main :: proc() {
 
 	if len(args) < 2 {
 		stderr("No input file specified.\n");
-		err := gzip.load(TEST, &buf);
-		if err != nil {
+		err := load(TEST, &buf);
+		if err == nil {
 			stdout("Displaying test vector: ");
 			stdout(bytes.buffer_to_string(&buf));
 			stdout("\n");
+		} else {
+			fmt.printf("gzip.load returned %v\n", err);
 		}
 		bytes.buffer_destroy(&buf);
+		os.exit(0);
 	}
 
 	// The rest are all files.
 	args = args[1:];
-	err: gzip.Error;
+	err: Error;
 
 	for file in args {
 		if file == "-" {
 			// Read from stdin
 			s := os.stream_from_handle(os.stdin);
-			err = gzip.load(s, &buf);
+			ctx := &compress.Context{
+				input = s,
+			};
+			err = load(ctx, &buf);
 		} else {
-			err = gzip.load(file, &buf);
+			err = load(file, &buf);
 		}
 		if err != nil {
 			if err != E_General.File_Not_Found {
