@@ -2,16 +2,18 @@ package hash
 
 import "core:mem"
 
+@(optimization_mode="speed")
 adler32 :: proc(data: []byte, seed := u32(1)) -> u32 {
 	ADLER_CONST :: 65521;
 	a, b: u32 = seed & 0xFFFF, seed >> 16;
-	for x in data {
+	#no_bounds_check for x in data {
 		a = (a + u32(x)) % ADLER_CONST;
 		b = (b + a) % ADLER_CONST;
 	}
 	return (b << 16) | a;
 }
 
+@(optimization_mode="speed")
 djb2 :: proc(data: []byte) -> u32 {
 	hash: u32 = 5381;
 	for b in data {
@@ -20,6 +22,7 @@ djb2 :: proc(data: []byte) -> u32 {
 	return hash;
 }
 
+@(optimization_mode="speed")
 fnv32 :: proc(data: []byte) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
@@ -28,6 +31,7 @@ fnv32 :: proc(data: []byte) -> u32 {
 	return h;
 }
 
+@(optimization_mode="speed")
 fnv64 :: proc(data: []byte) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
@@ -36,6 +40,7 @@ fnv64 :: proc(data: []byte) -> u64 {
 	return h;
 }
 
+@(optimization_mode="speed")
 fnv32a :: proc(data: []byte) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
@@ -44,6 +49,7 @@ fnv32a :: proc(data: []byte) -> u32 {
 	return h;
 }
 
+@(optimization_mode="speed")
 fnv64a :: proc(data: []byte) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
@@ -52,6 +58,7 @@ fnv64a :: proc(data: []byte) -> u64 {
 	return h;
 }
 
+@(optimization_mode="speed")
 jenkins :: proc(data: []byte) -> u32 {
 	hash: u32 = 0;
 	for b in data {
@@ -65,6 +72,7 @@ jenkins :: proc(data: []byte) -> u32 {
 	return hash;
 }
 
+@(optimization_mode="speed")
 murmur32 :: proc(data: []byte) -> u32 {
 	c1_32: u32 : 0xcc9e2d51;
 	c2_32: u32 : 0x1b873593;
@@ -114,6 +122,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 	return h1;
 }
 
+@(optimization_mode="speed")
 murmur64 :: proc(data: []byte) -> u64 {
 	SEED :: 0x9747b28c;
 
@@ -219,7 +228,7 @@ murmur64 :: proc(data: []byte) -> u64 {
 	}
 }
 
-
+@(optimization_mode="speed")
 sdbm :: proc(data: []byte) -> u32 {
 	hash: u32 = 0;
 	for b in data {
