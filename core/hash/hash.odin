@@ -1,16 +1,49 @@
 package hash
 
 import "core:mem"
+import "intrinsics"
 
 @(optimization_mode="speed")
-adler32 :: proc(data: []byte, seed := u32(1)) -> u32 {
+adler32 :: proc(data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
+
 	ADLER_CONST :: 65521;
-	a, b: u32 = seed & 0xFFFF, seed >> 16;
-	#no_bounds_check for x in data {
-		a = (a + u32(x)) % ADLER_CONST;
-		b = (b + a) % ADLER_CONST;
+
+	buffer := raw_data(data);
+	a, b: u64 = u64(seed) & 0xFFFF, u64(seed) >> 16;
+	buf := data[:];
+
+	for len(buf) != 0 && uintptr(buffer) & 7 != 0 {
+		a = (a + u64(buf[0]));
+		b = (b + a);
+		buffer = intrinsics.ptr_offset(buffer, 1);
+		buf = buf[1:];
 	}
-	return (b << 16) | a;
+
+	for len(buf) > 7 {
+		count := min(len(buf), 5552);
+		for count > 7 {
+			a += u64(buf[0]); b += a;
+			a += u64(buf[1]); b += a;
+			a += u64(buf[2]); b += a;
+			a += u64(buf[3]); b += a;
+			a += u64(buf[4]); b += a;
+			a += u64(buf[5]); b += a;
+			a += u64(buf[6]); b += a;
+			a += u64(buf[7]); b += a;
+
+			buf = buf[8:];
+			count -= 8;
+		}
+		a %= ADLER_CONST;
+		b %= ADLER_CONST;
+	}
+
+	for len(buf) != 0 {
+		a = (a + u64(buf[0])) % ADLER_CONST;
+		b = (b + a) % ADLER_CONST;
+		buf = buf[1:];
+	}
+	return (u32(b) << 16) | u32(a);
 }
 
 @(optimization_mode="speed")
