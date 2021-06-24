@@ -17,6 +17,8 @@ Reader :: struct {
 
 	last_byte:      int, // last byte read, invalid is -1
 	last_rune_size: int, // size of last rune read, invalid is -1
+
+	max_consecutive_empty_reads: int,
 }
 
 
@@ -25,7 +27,7 @@ DEFAULT_BUF_SIZE :: 4096;
 @(private)
 MIN_READ_BUFFER_SIZE :: 16;
 @(private)
-MAX_CONSECUTIVE_EMPTY_READS :: 128;
+DEFAULT_MAX_CONSECUTIVE_EMPTY_READS :: 128;
 
 reader_init :: proc(b: ^Reader, rd: io.Reader, size: int = DEFAULT_BUF_SIZE, allocator := context.allocator) {
 	size := size;
@@ -71,8 +73,12 @@ _reader_read_new_chunk :: proc(b: ^Reader) -> io.Error {
 		return .Buffer_Full;
 	}
 
+	if b.max_consecutive_empty_reads <= 0 {
+		b.max_consecutive_empty_reads = DEFAULT_MAX_CONSECUTIVE_EMPTY_READS;
+	}
+
 	// read new data, and try a limited number of times
-	for i := MAX_CONSECUTIVE_EMPTY_READS; i > 0; i -= 1 {
+	for i := b.max_consecutive_empty_reads; i > 0; i -= 1 {
 		n, err := io.read(b.rd, b.buf[b.w:]);
 		if n < 0 {
 			return .Negative_Read;
