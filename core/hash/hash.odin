@@ -12,38 +12,41 @@ adler32 :: proc(data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
 	a, b: u64 = u64(seed) & 0xFFFF, u64(seed) >> 16;
 	buf := data[:];
 
-	for len(buf) != 0 && uintptr(buffer) & 7 != 0 {
+	#no_bounds_check for len(buf) != 0 && uintptr(buffer) & 7 != 0 {
 		a = (a + u64(buf[0]));
 		b = (b + a);
 		buffer = intrinsics.ptr_offset(buffer, 1);
 		buf = buf[1:];
 	}
 
-	for len(buf) > 7 {
-		count := min(len(buf), 5552);
-		for count > 7 {
-			a += u64(buf[0]); b += a;
-			a += u64(buf[1]); b += a;
-			a += u64(buf[2]); b += a;
-			a += u64(buf[3]); b += a;
-			a += u64(buf[4]); b += a;
-			a += u64(buf[5]); b += a;
-			a += u64(buf[6]); b += a;
-			a += u64(buf[7]); b += a;
+	#no_bounds_check for len(buf) > 15 {
+		a += u64(buf[ 0]); b += a;
+		a += u64(buf[ 1]); b += a;
+		a += u64(buf[ 2]); b += a;
+		a += u64(buf[ 3]); b += a;
+		a += u64(buf[ 4]); b += a;
+		a += u64(buf[ 5]); b += a;
+		a += u64(buf[ 6]); b += a;
+		a += u64(buf[ 7]); b += a;
 
-			buf = buf[8:];
-			count -= 8;
-		}
-		a %= ADLER_CONST;
-		b %= ADLER_CONST;
+		a += u64(buf[ 8]); b += a;
+		a += u64(buf[ 9]); b += a;
+		a += u64(buf[10]); b += a;
+		a += u64(buf[11]); b += a;
+		a += u64(buf[12]); b += a;
+		a += u64(buf[13]); b += a;
+		a += u64(buf[14]); b += a;
+		a += u64(buf[15]); b += a;
+		buf = buf[16:];
 	}
 
-	for len(buf) != 0 {
-		a = (a + u64(buf[0])) % ADLER_CONST;
-		b = (b + a) % ADLER_CONST;
+	#no_bounds_check for len(buf) != 0 {
+		a = (a + u64(buf[0]));
+		b = (b + a);
 		buf = buf[1:];
 	}
-	return (u32(b) << 16) | u32(a);
+
+	return (u32(b % ADLER_CONST) << 16) | u32(a % ADLER_CONST);
 }
 
 @(optimization_mode="speed")
