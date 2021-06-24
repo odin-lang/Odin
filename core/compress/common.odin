@@ -250,8 +250,11 @@ peek_back_byte :: #force_inline proc(cb: ^Code_Buffer, offset: i64) -> (res: u8,
 @(optimization_mode="speed")
 refill_lsb :: proc(z: ^Context, cb: ^Code_Buffer, width := i8(24)) {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Refill LSB"); }
+
+	refill := u64(width);
+
 	for {
-		if cb.num_bits > u64(width) {
+		if cb.num_bits > refill {
 			break;
 		}
 		if cb.code_buffer == 0 && cb.num_bits > 63 {
