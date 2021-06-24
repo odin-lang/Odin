@@ -23,6 +23,16 @@ import "core:hash"
 	Returns: Error.
 */
 
+/*
+	Do we do Adler32 as we write bytes to output?
+	It used to be faster to do it inline, now it's faster to do it at the end of `inflate`.
+
+	We'll see what's faster after more optimization, and might end up removing
+	`Context.rolling_hash` if not inlining it is still faster.
+
+*/
+INLINE_ADLER :: false;
+
 Context     :: compress.Context;
 Code_Buffer :: compress.Code_Buffer;
 
@@ -135,7 +145,7 @@ write_byte :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, c: u8) -> (err: 
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Write Byte"); }
 	c := c;
 	buf := transmute([]u8)mem.Raw_Slice{data=&c, len=1};
-	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+	when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
 
 	_, e := z.output->impl_write(buf);
 	if e != .None {
@@ -161,7 +171,7 @@ repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.
 		cb.last[z.bytes_written & cb.window_mask] = c;
 		z.bytes_written += 1;
 	}
-	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+	when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
 
 	_, e := z.output->impl_write(buf);
 	if e != .None {
@@ -188,7 +198,7 @@ repl_bytes :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, distance: u16) -> 
 		buf[i] = c;
 		z.bytes_written += 1; offset += 1;
 	}
-	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+	when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
 
 	_, e := z.output->impl_write(buf);
 	if e != .None {
@@ -458,8 +468,13 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 
 	if !raw {
 		compress.discard_to_next_byte_lsb(cb);
-
 		adler32 := compress.read_bits_lsb(ctx, cb, 8) << 24 | compress.read_bits_lsb(ctx, cb, 8) << 16 | compress.read_bits_lsb(ctx, cb, 8) << 8 | compress.read_bits_lsb(ctx, cb, 8);
+
+		when !INLINE_ADLER {
+			buf := (^bytes.Buffer)(ctx.output.stream_data).buf[:];
+			ctx.rolling_hash = hash.adler32(buf);
+		}
+
 		if ctx.rolling_hash != u32(adler32) {
 			return E_General.Checksum_Failed;
 		}
@@ -643,6 +658,7 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, allocator := cont
 			break;
 		}
 	}
+
 	return nil;
 }
 
