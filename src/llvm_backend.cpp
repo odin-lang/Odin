@@ -11141,16 +11141,16 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			return res;
 		}
 	} else if (is_type_slice(t)) {
-		lbValue len  = lb_emit_struct_ev(p, x, 1);
+		lbValue data = lb_emit_struct_ev(p, x, 0);
 		if (op_kind == Token_CmpEq) {
-			res.value = LLVMBuildIsNull(p->builder, len.value, "");
+			res.value = LLVMBuildIsNull(p->builder, data.value, "");
 			return res;
 		} else if (op_kind == Token_NotEq) {
-			res.value = LLVMBuildIsNotNull(p->builder, len.value, "");
+			res.value = LLVMBuildIsNotNull(p->builder, data.value, "");
 			return res;
 		}
 	} else if (is_type_dynamic_array(t)) {
-		lbValue cap  = lb_emit_struct_ev(p, x, 2);
+		lbValue data = lb_emit_struct_ev(p, x, 0);
 		if (op_kind == Token_CmpEq) {
 			res.value = LLVMBuildIsNull(p->builder, cap.value, "");
 			return res;
@@ -11159,8 +11159,9 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			return res;
 		}
 	} else if (is_type_map(t)) {
-		lbValue cap = lb_map_cap(p, x);
-		return lb_emit_comp(p, op_kind, cap, lb_zero(p->module, cap.type));
+		lbValue hashes = lb_emit_struct_ev(p, x, 0);
+		lbValue data = lb_emit_struct_ev(p, hashes, 0);
+		return lb_emit_comp(p, op_kind, data, lb_zero(p->module, data.type));
 	} else if (is_type_union(t)) {
 		if (type_size_of(t) == 0) {
 			if (op_kind == Token_CmpEq) {
@@ -11181,21 +11182,35 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	} else if (is_type_soa_struct(t)) {
 		Type *bt = base_type(t);
 		if (bt->Struct.soa_kind == StructSoa_Slice) {
-			lbValue len = lb_soa_struct_len(p, x);
+			LLVMValueRef the_value = {};
+			if (bt->Struct.fields.count == 0) {
+				lbValue len = lb_soa_struct_len(p, x);
+				the_value = len.value;
+			} else {
+				lbValue first_field = lb_emit_struct_ev(p, x, 0);
+				the_value = first_field.value;
+			}
 			if (op_kind == Token_CmpEq) {
-				res.value = LLVMBuildIsNull(p->builder, len.value, "");
+				res.value = LLVMBuildIsNull(p->builder, the_value, "");
 				return res;
 			} else if (op_kind == Token_NotEq) {
-				res.value = LLVMBuildIsNotNull(p->builder, len.value, "");
+				res.value = LLVMBuildIsNotNull(p->builder, the_value, "");
 				return res;
 			}
 		} else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
-			lbValue cap = lb_soa_struct_cap(p, x);
+			LLVMValueRef the_value = {};
+			if (bt->Struct.fields.count == 0) {
+				lbValue cap = lb_soa_struct_cap(p, x);
+				the_value = cap.value;
+			} else {
+				lbValue first_field = lb_emit_struct_ev(p, x, 0);
+				the_value = first_field.value;
+			}
 			if (op_kind == Token_CmpEq) {
-				res.value = LLVMBuildIsNull(p->builder, cap.value, "");
+				res.value = LLVMBuildIsNull(p->builder, the_value, "");
 				return res;
 			} else if (op_kind == Token_NotEq) {
-				res.value = LLVMBuildIsNotNull(p->builder, cap.value, "");
+				res.value = LLVMBuildIsNotNull(p->builder, the_value, "");
 				return res;
 			}
 		}
