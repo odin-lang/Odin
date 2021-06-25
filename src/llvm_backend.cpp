@@ -3601,7 +3601,7 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 		lb_type(p->module, t_int)
 	};
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]), LLVMPrintTypeToString(types[2]));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]));
 	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
 	LLVMValueRef args[4] = {};
@@ -11152,10 +11152,10 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	} else if (is_type_dynamic_array(t)) {
 		lbValue data = lb_emit_struct_ev(p, x, 0);
 		if (op_kind == Token_CmpEq) {
-			res.value = LLVMBuildIsNull(p->builder, cap.value, "");
+			res.value = LLVMBuildIsNull(p->builder, data.value, "");
 			return res;
 		} else if (op_kind == Token_NotEq) {
-			res.value = LLVMBuildIsNotNull(p->builder, cap.value, "");
+			res.value = LLVMBuildIsNotNull(p->builder, data.value, "");
 			return res;
 		}
 	} else if (is_type_map(t)) {
