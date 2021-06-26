@@ -3601,7 +3601,7 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 		lb_type(p->module, t_int)
 	};
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]), LLVMPrintTypeToString(types[2]));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]));
 	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
 	LLVMValueRef args[4] = {};
@@ -6836,6 +6836,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			ast_node(cl, CompoundLit, value.value_compound);
 
 			if (cl->elems.count == 0) {
+				return lb_const_nil(m, original_type);
+			}
+
+			if (is_type_raw_union(type)) {
 				return lb_const_nil(m, original_type);
 			}
 
@@ -11141,26 +11145,27 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			return res;
 		}
 	} else if (is_type_slice(t)) {
-		lbValue len  = lb_emit_struct_ev(p, x, 1);
+		lbValue data = lb_emit_struct_ev(p, x, 0);
 		if (op_kind == Token_CmpEq) {
-			res.value = LLVMBuildIsNull(p->builder, len.value, "");
+			res.value = LLVMBuildIsNull(p->builder, data.value, "");
 			return res;
 		} else if (op_kind == Token_NotEq) {
-			res.value = LLVMBuildIsNotNull(p->builder, len.value, "");
+			res.value = LLVMBuildIsNotNull(p->builder, data.value, "");
 			return res;
 		}
 	} else if (is_type_dynamic_array(t)) {
-		lbValue cap  = lb_emit_struct_ev(p, x, 2);
+		lbValue data = lb_emit_struct_ev(p, x, 0);
 		if (op_kind == Token_CmpEq) {
-			res.value = LLVMBuildIsNull(p->builder, cap.value, "");
+			res.value = LLVMBuildIsNull(p->builder, data.value, "");
 			return res;
 		} else if (op_kind == Token_NotEq) {
-			res.value = LLVMBuildIsNotNull(p->builder, cap.value, "");
+			res.value = LLVMBuildIsNotNull(p->builder, data.value, "");
 			return res;
 		}
 	} else if (is_type_map(t)) {
-		lbValue cap = lb_map_cap(p, x);
-		return lb_emit_comp(p, op_kind, cap, lb_zero(p->module, cap.type));
+		lbValue hashes = lb_emit_struct_ev(p, x, 0);
+		lbValue data = lb_emit_struct_ev(p, hashes, 0);
+		return lb_emit_comp(p, op_kind, data, lb_zero(p->module, data.type));
 	} else if (is_type_union(t)) {
 		if (type_size_of(t) == 0) {
 			if (op_kind == Token_CmpEq) {
@@ -11181,21 +11186,35 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	} else if (is_type_soa_struct(t)) {
 		Type *bt = base_type(t);
 		if (bt->Struct.soa_kind == StructSoa_Slice) {
-			lbValue len = lb_soa_struct_len(p, x);
+			LLVMValueRef the_value = {};
+			if (bt->Struct.fields.count == 0) {
+				lbValue len = lb_soa_struct_len(p, x);
+				the_value = len.value;
+			} else {
+				lbValue first_field = lb_emit_struct_ev(p, x, 0);
+				the_value = first_field.value;
+			}
 			if (op_kind == Token_CmpEq) {
-				res.value = LLVMBuildIsNull(p->builder, len.value, "");
+				res.value = LLVMBuildIsNull(p->builder, the_value, "");
 				return res;
 			} else if (op_kind == Token_NotEq) {
-				res.value = LLVMBuildIsNotNull(p->builder, len.value, "");
+				res.value = LLVMBuildIsNotNull(p->builder, the_value, "");
 				return res;
 			}
 		} else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
-			lbValue cap = lb_soa_struct_cap(p, x);
+			LLVMValueRef the_value = {};
+			if (bt->Struct.fields.count == 0) {
+				lbValue cap = lb_soa_struct_cap(p, x);
+				the_value = cap.value;
+			} else {
+				lbValue first_field = lb_emit_struct_ev(p, x, 0);
+				the_value = first_field.value;
+			}
 			if (op_kind == Token_CmpEq) {
-				res.value = LLVMBuildIsNull(p->builder, cap.value, "");
+				res.value = LLVMBuildIsNull(p->builder, the_value, "");
 				return res;
 			} else if (op_kind == Token_NotEq) {
-				res.value = LLVMBuildIsNotNull(p->builder, cap.value, "");
+				res.value = LLVMBuildIsNotNull(p->builder, the_value, "");
 				return res;
 			}
 		}
@@ -13449,6 +13468,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			TypeStruct *st = &bt->Struct;
 			if (cl->elems.count > 0) {
 				lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+				lbValue comp_lit_ptr = lb_addr_get_ptr(p, v);
+
 				for_array(field_index, cl->elems) {
 					Ast *elem = cl->elems[field_index];
 
@@ -13477,6 +13498,12 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 					field_expr = lb_build_expr(p, elem);
 
+					lbValue gep = {};
+					if (is_raw_union) {
+						gep = lb_emit_conv(p, comp_lit_ptr, alloc_type_pointer(ft));
+					} else {
+						gep = lb_emit_struct_ep(p, comp_lit_ptr, cast(i32)index);
+					}
 
 					Type *fet = field_expr.type;
 					GB_ASSERT(fet->kind != Type_Tuple);
@@ -13485,11 +13512,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
 						GB_ASSERT_MSG(union_variant_index(ft, fet) > 0, "%s", type_to_string(fet));
 
-						lbValue gep = lb_emit_struct_ep(p, lb_addr_get_ptr(p, v), cast(i32)index);
 						lb_emit_store_union_variant(p, gep, field_expr, fet);
 					} else {
 						lbValue fv = lb_emit_conv(p, field_expr, ft);
-						lbValue gep = lb_emit_struct_ep(p, lb_addr_get_ptr(p, v), cast(i32)index);
 						lb_emit_store(p, gep, fv);
 					}
 				}
