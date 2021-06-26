@@ -30,8 +30,7 @@ import "core:bytes"
 	`Context.rolling_hash` if not inlining it is still faster.
 
 */
-Context     :: compress.Context;
-Code_Buffer :: compress.Code_Buffer;
+Context :: compress.Context;
 
 Compression_Method :: enum u8 {
 	DEFLATE  = 8,
@@ -166,7 +165,7 @@ grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 */
 
 @(optimization_mode="speed")
-write_byte :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, c: u8) -> (err: io.Error) #no_bounds_check {
+write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_bounds_check {
 	/*
 		Resize if needed.
 	*/
@@ -179,14 +178,13 @@ write_byte :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, c: u8) -> (err: 
 
 	#no_bounds_check {
 		z.output.buf[z.bytes_written] = c;
-		cb.last[z.bytes_written & cb.window_mask] = c;
 	}
 	z.bytes_written += 1;
 	return .None;
 }
 
 @(optimization_mode="speed")
-repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
+repl_byte :: proc(z: ^Context, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
@@ -206,7 +204,6 @@ repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.
 	#no_bounds_check {
 		for _ in 0..<count {
 			z.output.buf[z.bytes_written] = c;
-			cb.last[z.bytes_written & cb.window_mask] = c;
 			z.bytes_written += 1;
 		}
 	}
@@ -215,14 +212,14 @@ repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.
 }
 
 @(optimization_mode="speed")
-repl_bytes :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, distance: u16) -> (err: io.Error) {
+repl_bytes :: proc(z: ^Context, count: u16, distance: u16) -> (err: io.Error) {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
 		the output stream, just give it _that_ slice.
 	*/
 
-	offset := z.bytes_written - i64(distance);
+	offset := i64(distance);
 
 	if int(z.bytes_written) + int(count) >= len(z.output.buf) {
 		e := grow_buffer(&z.output.buf);
@@ -233,10 +230,9 @@ repl_bytes :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, distance: u16) -> 
 
 	#no_bounds_check {
 		for _ in 0..<count {
-			c := cb.last[offset & cb.window_mask];
+			c := z.output.buf[z.bytes_written - offset];
 			z.output.buf[z.bytes_written] = c;
-			cb.last[z.bytes_written & cb.window_mask] = c;
-			z.bytes_written += 1; offset += 1;
+			z.bytes_written += 1;
 		}
 	}
 
@@ -308,8 +304,8 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 }
 
 @(optimization_mode="speed")
-decode_huffman_slowpath :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
-	code := u16(compress.peek_bits_lsb(z, cb, 16));
+decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+	code := u16(compress.peek_bits_lsb(z,16));
 
 	k := int(z_bit_reverse(code, 16));
 	s: u8;
@@ -332,41 +328,41 @@ decode_huffman_slowpath :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table
 		return 0, E_Deflate.Bad_Huffman_Code;
 	}
 
-	compress.consume_bits_lsb(cb, s);
+	compress.consume_bits_lsb(z, s);
 
 	r = t.value[b];
 	return r, nil;
 }
 
 @(optimization_mode="speed")
-decode_huffman :: proc(z: ^Context, cb: ^Code_Buffer, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
-	if cb.num_bits < 16 {
-		if cb.num_bits > 63 {
+decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+	if z.num_bits < 16 {
+		if z.num_bits > 63 {
 			return 0, E_ZLIB.Code_Buffer_Malformed;
 		}
-		compress.refill_lsb(z, cb);
-		if cb.num_bits > 63 {
+		compress.refill_lsb(z);
+		if z.num_bits > 63 {
 			return 0, E_General.Stream_Too_Short;
 		}
 	}
-	#no_bounds_check b := t.fast[cb.code_buffer & ZFAST_MASK];
+	#no_bounds_check b := t.fast[z.code_buffer & ZFAST_MASK];
 	if b != 0 {
 		s := u8(b >> ZFAST_BITS);
-		compress.consume_bits_lsb(cb, s);
+		compress.consume_bits_lsb(z, s);
 		return b & 511, nil;
 	}
-	return decode_huffman_slowpath(z, cb, t);
+	return decode_huffman_slowpath(z, t);
 }
 
 @(optimization_mode="speed")
-parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
+parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
 	#no_bounds_check for {
-		value, e := decode_huffman(z, cb, z_repeat);
+		value, e := decode_huffman(z, z_repeat);
 		if e != nil {
 			return err;
 		}
 		if value < 256 {
-			e := write_byte(z, cb, u8(value));
+			e := write_byte(z, u8(value));
 			if e != .None {
 				return E_General.Output_Too_Short;
 			}
@@ -379,17 +375,17 @@ parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^
 			value -= 257;
 			length := Z_LENGTH_BASE[value];
 			if Z_LENGTH_EXTRA[value] > 0 {
-				length += u16(compress.read_bits_lsb(z, cb, Z_LENGTH_EXTRA[value]));
+				length += u16(compress.read_bits_lsb(z, Z_LENGTH_EXTRA[value]));
 			}
 
-			value, e = decode_huffman(z, cb, z_offset);
+			value, e = decode_huffman(z, z_offset);
 			if e != nil {
 				return E_Deflate.Bad_Huffman_Code;
 			}
 
 			distance := Z_DIST_BASE[value];
 			if Z_DIST_EXTRA[value] > 0 {
-				distance += u16(compress.read_bits_lsb(z, cb, Z_DIST_EXTRA[value]));
+				distance += u16(compress.read_bits_lsb(z, Z_DIST_EXTRA[value]));
 			}
 
 			if z.bytes_written < i64(distance) {
@@ -397,7 +393,6 @@ parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^
 				return E_Deflate.Bad_Distance;
 			}
 
-			offset := i64(z.bytes_written - i64(distance));
 			/*
 				These might be sped up with a repl_byte call that copies
 				from the already written output more directly, and that
@@ -410,15 +405,15 @@ parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^
 					Replicate the last outputted byte, length times.
 				*/
 				if length > 0 {
-					c := cb.last[offset & cb.window_mask];
-					e := repl_byte(z, cb, length, c);
+					c := z.output.buf[z.bytes_written - i64(distance)];
+					e := repl_byte(z, length, c);
 					if e != .None {
 						return E_General.Output_Too_Short;
 					}
 				}
 			} else {
 				if length > 0 {
-					e := repl_bytes(z, cb, length, distance);
+					e := repl_bytes(z, length, distance);
 					if e != .None {
 						return E_General.Output_Too_Short;
 					}
@@ -442,9 +437,6 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 		DEFLATE stream.
 	*/
 
-	code_buffer := Code_Buffer{};
-	cb := &code_buffer;
-
 	if !raw {
 		data_size := io.size(ctx.input);
 		if data_size < 6 {
@@ -462,8 +454,6 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 		if cinfo > 7 {
 			return E_ZLIB.Unsupported_Window_Size;
 		}
-		cb.window_mask = i64((1 << (cinfo + 8) - 1));
-
 		flg, _ := compress.read_u8(ctx);
 
 		fcheck  := flg & 0x1f;
@@ -488,23 +478,21 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 			at the end to compare checksums.
 		*/
 
-		// Seed the Adler32 rolling checksum.
-		ctx.rolling_hash = 1;
 	}
 
 	// Parse ZLIB stream without header.
-	err = inflate_raw(z=ctx, cb=cb, expected_output_size=expected_output_size);
+	err = inflate_raw(z=ctx, expected_output_size=expected_output_size);
 	if err != nil {
 		return err;
 	}
 
 	if !raw {
-		compress.discard_to_next_byte_lsb(cb);
-		adler32 := compress.read_bits_lsb(ctx, cb, 8) << 24 | compress.read_bits_lsb(ctx, cb, 8) << 16 | compress.read_bits_lsb(ctx, cb, 8) << 8 | compress.read_bits_lsb(ctx, cb, 8);
+		compress.discard_to_next_byte_lsb(ctx);
+		adler32 := compress.read_bits_lsb(ctx, 8) << 24 | compress.read_bits_lsb(ctx, 8) << 16 | compress.read_bits_lsb(ctx, 8) << 8 | compress.read_bits_lsb(ctx, 8);
 
-		ctx.rolling_hash = hash.adler32(ctx.output.buf[:]);
+		output_hash := hash.adler32(ctx.output.buf[:]);
 
-		if ctx.rolling_hash != u32(adler32) {
+		if output_hash != u32(adler32) {
 			return E_General.Checksum_Failed;
 		}
 	}
@@ -512,7 +500,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 }
 
 @(optimization_mode="speed")
-inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+inflate_from_stream_raw :: proc(z: ^Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	expected_output_size := expected_output_size;
 
 	if expected_output_size <= 0 {
@@ -536,8 +524,8 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 		return .Resize_Failed;
 	}
 
-	cb.num_bits    = 0;
-	cb.code_buffer = 0;
+	z.num_bits    = 0;
+	z.code_buffer = 0;
 
 	z_repeat:      ^Huffman_Table;
 	z_offset:      ^Huffman_Table;
@@ -559,21 +547,12 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 	defer free(z_offset);
 	defer free(codelength_ht);
 
-	if cb.window_mask == 0 {
-		cb.window_mask = DEFLATE_MAX_DISTANCE - 1;
-	}
-
-	// Allocate rolling window buffer.
-	cb.last = mem.make_dynamic_array_len_cap([dynamic]u8, cb.window_mask + 1, cb.window_mask + 1, allocator);
-	defer delete(cb.last);
-
-
 	final := u32(0);
 	type  := u32(0);
 
 	for {
-		final = compress.read_bits_lsb(z, cb, 1);
-		type  = compress.read_bits_lsb(z, cb, 2);
+		final = compress.read_bits_lsb(z, 1);
+		type  = compress.read_bits_lsb(z, 2);
 
 		// fmt.printf("Final: %v | Type: %v\n", final, type);
 
@@ -582,10 +561,10 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 			// Uncompressed block
 
 			// Discard bits until next byte boundary
-			compress.discard_to_next_byte_lsb(cb);
+			compress.discard_to_next_byte_lsb(z);
 
-			uncompressed_len  := i16(compress.read_bits_lsb(z, cb, 16));
-			length_check      := i16(compress.read_bits_lsb(z, cb, 16));
+			uncompressed_len  := i16(compress.read_bits_lsb(z, 16));
+			length_check      := i16(compress.read_bits_lsb(z, 16));
 
 			// fmt.printf("LEN: %v, ~LEN: %v, NLEN: %v, ~NLEN: %v\n", uncompressed_len, ~uncompressed_len, length_check, ~length_check);
 
@@ -599,9 +578,9 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 				and a single Adler32 update after.
 			*/
 			#no_bounds_check for uncompressed_len > 0 {
-				compress.refill_lsb(z, cb);
-				lit := compress.read_bits_lsb(z, cb, 8);
-				write_byte(z, cb, u8(lit));
+				compress.refill_lsb(z);
+				lit := compress.read_bits_lsb(z, 8);
+				write_byte(z, u8(lit));
 				uncompressed_len -= 1;
 			}
 		case 3:
@@ -625,14 +604,14 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 				//i: u32;
 				n: u32;
 
-				compress.refill_lsb(z, cb, 14);
-				hlit  := compress.read_bits_no_refill_lsb(z, cb, 5) + 257;
-				hdist := compress.read_bits_no_refill_lsb(z, cb, 5) + 1;
-				hclen := compress.read_bits_no_refill_lsb(z, cb, 4) + 4;
+				compress.refill_lsb(z, 14);
+				hlit  := compress.read_bits_no_refill_lsb(z, 5) + 257;
+				hdist := compress.read_bits_no_refill_lsb(z, 5) + 1;
+				hclen := compress.read_bits_no_refill_lsb(z, 4) + 4;
 				ntot  := hlit + hdist;
 
 				#no_bounds_check for i in 0..<hclen {
-					s := compress.read_bits_lsb(z, cb, 3);
+					s := compress.read_bits_lsb(z, 3);
 					codelength_sizes[Z_LENGTH_DEZIGZAG[i]] = u8(s);
 				}
 				err = build_huffman(codelength_ht, codelength_sizes[:]);
@@ -644,7 +623,7 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 				c: u16;
 
 				for n < ntot {
-					c, err = decode_huffman(z, cb, codelength_ht);
+					c, err = decode_huffman(z, codelength_ht);
 					if err != nil {
 						return err;
 					}
@@ -657,18 +636,18 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 						n += 1;
 					} else {
 						fill := u8(0);
-						compress.refill_lsb(z, cb, 7);
+						compress.refill_lsb(z, 7);
 						switch c {
 						case 16:
-							c = u16(compress.read_bits_no_refill_lsb(z, cb, 2) + 3);
+							c = u16(compress.read_bits_no_refill_lsb(z, 2) + 3);
 							if n == 0 {
 								return E_Deflate.Huffman_Bad_Code_Lengths;
 							}
 							fill = lencodes[n - 1];
 						case 17:
-							c = u16(compress.read_bits_no_refill_lsb(z, cb, 3) + 3);
+							c = u16(compress.read_bits_no_refill_lsb(z, 3) + 3);
 						case 18:
-							c = u16(compress.read_bits_no_refill_lsb(z, cb, 7) + 11);
+							c = u16(compress.read_bits_no_refill_lsb(z, 7) + 11);
 						case:
 								return E_Deflate.Huffman_Bad_Code_Lengths;
 						}
@@ -698,7 +677,7 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 					return err;
 				}
 			}
-			err = parse_huffman_block(z, cb, z_repeat, z_offset);
+			err = parse_huffman_block(z, z_repeat, z_offset);
 			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
 			if err != nil {
 				return err;
@@ -734,7 +713,7 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, e
 	return err;
 }
 
-inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, cb: ^Code_Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
+inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
 	ctx := Context{};
 
 	r := bytes.Reader{};
@@ -746,7 +725,7 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, cb: ^Code_B
 
 	ctx.output = buf;
 
-	return inflate_from_stream_raw(z=&ctx, cb=cb, expected_output_size=expected_output_size);
+	return inflate_from_stream_raw(z=&ctx, expected_output_size=expected_output_size);
 }
 
 inflate     :: proc{inflate_from_stream, inflate_from_byte_array};
