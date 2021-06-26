@@ -6557,10 +6557,54 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				break; // NOTE(bill): No need to init
 			}
 			if (t->Struct.is_raw_union) {
-				if (cl->elems.count != 0) {
-					gbString type_str = type_to_string(type);
-					error(node, "Illegal compound literal type '%s'", type_str);
-					gb_string_free(type_str);
+				if (cl->elems.count > 0) {
+					// NOTE: unions cannot be constant
+					is_constant = false;
+
+					if (cl->elems[0]->kind != Ast_FieldValue) {
+						gbString type_str = type_to_string(type);
+						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain 'field = value' elements", type_str);
+						gb_string_free(type_str);
+					} else {
+						if (cl->elems.count != 1) {
+							gbString type_str = type_to_string(type);
+							error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
+							gb_string_free(type_str);
+						} else {
+							Ast *elem = cl->elems[0];
+							ast_node(fv, FieldValue, elem);
+							if (fv->field->kind != Ast_Ident) {
+								gbString expr_str = expr_to_string(fv->field);
+								error(elem, "Invalid field name '%s' in structure literal", expr_str);
+								gb_string_free(expr_str);
+								break;
+							}
+
+							String name = fv->field->Ident.token.string;
+
+							Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+							bool is_unknown = sel.entity == nullptr;
+							if (is_unknown) {
+								error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
+								break;
+							}
+
+							if (sel.index.count > 1) {
+								error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
+								break;
+							}
+
+							Entity *field = t->Struct.fields[sel.index[0]];
+							add_entity_use(c, fv->field, field);
+
+							Operand o = {};
+							check_expr_or_type(c, &o, fv->value, field->type);
+
+
+							check_assignment(c, &o, field->type, str_lit("structure literal"));
+						}
+
+					}
 				}
 				break;
 			}

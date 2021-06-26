@@ -6839,6 +6839,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 
+			if (is_type_raw_union(type)) {
+				return lb_const_nil(m, original_type);
+			}
+
 			isize offset = 0;
 			if (type->Struct.custom_align > 0) {
 				offset = 1;
@@ -13464,6 +13468,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			TypeStruct *st = &bt->Struct;
 			if (cl->elems.count > 0) {
 				lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+				lbValue comp_lit_ptr = lb_addr_get_ptr(p, v);
+
 				for_array(field_index, cl->elems) {
 					Ast *elem = cl->elems[field_index];
 
@@ -13492,6 +13498,12 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 					field_expr = lb_build_expr(p, elem);
 
+					lbValue gep = {};
+					if (is_raw_union) {
+						gep = lb_emit_conv(p, comp_lit_ptr, alloc_type_pointer(ft));
+					} else {
+						gep = lb_emit_struct_ep(p, comp_lit_ptr, cast(i32)index);
+					}
 
 					Type *fet = field_expr.type;
 					GB_ASSERT(fet->kind != Type_Tuple);
@@ -13500,11 +13512,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
 						GB_ASSERT_MSG(union_variant_index(ft, fet) > 0, "%s", type_to_string(fet));
 
-						lbValue gep = lb_emit_struct_ep(p, lb_addr_get_ptr(p, v), cast(i32)index);
 						lb_emit_store_union_variant(p, gep, field_expr, fet);
 					} else {
 						lbValue fv = lb_emit_conv(p, field_expr, ft);
-						lbValue gep = lb_emit_struct_ep(p, lb_addr_get_ptr(p, v), cast(i32)index);
 						lb_emit_store(p, gep, fv);
 					}
 				}
