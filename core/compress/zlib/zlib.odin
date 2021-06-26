@@ -16,6 +16,8 @@ import "core:io"
 import "core:bytes"
 import "core:hash"
 
+// import "core:fmt"
+
 // when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
 /*
@@ -397,7 +399,7 @@ parse_huffman_block :: proc(z: ^Context, cb: ^Code_Buffer, z_repeat, z_offset: ^
 }
 
 @(optimization_mode="speed")
-inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	/*
 		ctx.input must be an io.Stream backed by an implementation that supports:
 		- read
@@ -461,7 +463,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 	}
 
 	// Parse ZLIB stream without header.
-	err = inflate_raw(ctx, cb);
+	err = inflate_raw(z=ctx, cb=cb, expected_output_size=expected_output_size);
 	if err != nil {
 		return err;
 	}
@@ -483,12 +485,29 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 }
 
 @(optimization_mode="speed")
-inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Inflate Raw"); }
-	final := u32(0);
-	type := u32(0);
 
-	cb.num_bits = 0;
+	buf := (^bytes.Buffer)(z.output.stream_data);
+	z.output_buf = &buf.buf;
+
+	// fmt.printf("ZLIB: Expected Payload Size: %v\n", expected_output_size);
+
+	if expected_output_size > -1 && expected_output_size <= compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
+		reserve(z.output_buf, expected_output_size);
+		// resize (z.output_buf, expected_output_size);
+	} else {
+		reserve(z.output_buf, compress.COMPRESS_OUTPUT_ALLOCATE_MIN);
+	}
+
+	// reserve(&z.output_buf, compress.COMPRESS_OUTPUT_ALLOCATE_MIN);
+	// resize (&z.output_buf, compress.COMPRESS_OUTPUT_ALLOCATE_MIN);
+	// fmt.printf("ZLIB: buf: %v\n", buf);
+	// fmt.printf("ZLIB: output_buf: %v\n", z.output_buf);
+	// fmt.printf("ZLIB: z.output: %v\n", z.output);
+
+
+	cb.num_bits    = 0;
 	cb.code_buffer = 0;
 
 	z_repeat:      ^Huffman_Table;
@@ -518,6 +537,10 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, allocator := cont
 	// Allocate rolling window buffer.
 	cb.last = mem.make_dynamic_array_len_cap([dynamic]u8, cb.window_mask + 1, cb.window_mask + 1, allocator);
 	defer delete(cb.last);
+
+
+	final := u32(0);
+	type  := u32(0);
 
 	for {
 		final = compress.read_bits_lsb(z, cb, 1);
@@ -659,10 +682,15 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, allocator := cont
 		}
 	}
 
+	// fmt.printf("ZLIB: Bytes written: %v\n", z.bytes_written);
+	if int(z.bytes_written) != len(buf.buf) {
+		resize(&buf.buf, int(z.bytes_written));
+	}
+
 	return nil;
 }
 
-inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
+inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
 	ctx := Context{};
 
 	r := bytes.Reader{};
@@ -673,15 +701,15 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -
 	ctx.input_fully_in_memory = true;
 
 	buf := buf;
-	ws := bytes.buffer_to_stream(buf);
+	ws  := bytes.buffer_to_stream(buf);
 	ctx.output = ws;
 
-	err = inflate_from_stream(&ctx, raw);
+	err = inflate_from_stream(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
 
 	return err;
 }
 
-inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, cb: ^Code_Buffer, raw := false) -> (err: Error) {
+inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, cb: ^Code_Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
 	ctx := Context{};
 
 	r := bytes.Reader{};
@@ -692,10 +720,10 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, cb: ^Code_B
 	ctx.input_fully_in_memory = true;
 
 	buf := buf;
-	ws := bytes.buffer_to_stream(buf);
+	ws  := bytes.buffer_to_stream(buf);
 	ctx.output = ws;
 
-	return inflate_from_stream_raw(&ctx, cb);
+	return inflate_from_stream_raw(z=&ctx, cb=cb, expected_output_size=expected_output_size);
 }
 
 inflate     :: proc{inflate_from_stream, inflate_from_byte_array};

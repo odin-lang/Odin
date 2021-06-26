@@ -21,6 +21,8 @@ import "core:io"
 import "core:bytes"
 import "core:hash"
 
+// import "core:fmt"
+
 Magic :: enum u16le {
 	GZIP = 0x8b << 8 | 0x1f,
 }
@@ -99,7 +101,9 @@ E_GZIP    :: compress.GZIP_Error;
 E_ZLIB    :: compress.ZLIB_Error;
 E_Deflate :: compress.Deflate_Error;
 
-load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
+GZIP_MAX_PAYLOAD_SIZE :: int(max(u32le));
+
+load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 
 	r := bytes.Reader{};
 	bytes.reader_init(&r, slice);
@@ -111,26 +115,39 @@ load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, allocator := context.al
 		input_fully_in_memory = true,
 		input_refills_from_stream = true,
 	};
-	err = load_from_stream(ctx, buf, allocator);
+
+	err = load_from_stream(ctx, buf, known_gzip_size, expected_output_size, allocator);
 
 	return err;
 }
 
-load_from_file :: proc(filename: string, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
+load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	data, ok := os.read_entire_file(filename, allocator);
 	defer delete(data);
 
 	err = E_General.File_Not_Found;
 	if ok {
-		err = load_from_slice(data, buf, allocator);
+		err = load_from_slice(data, buf, len(data), expected_output_size, allocator);
 	}
 	return;
 }
 
-load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator := context.allocator) -> (err: Error) {
+load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	buf := buf;
+	expected_output_size := expected_output_size;
+
+	input_data_consumed := 0;
+
 	ws := bytes.buffer_to_stream(buf);
 	ctx.output = ws;
+
+	if expected_output_size > GZIP_MAX_PAYLOAD_SIZE {
+		return E_GZIP.Payload_Size_Exceeds_Max_Payload;
+	}
+
+	if expected_output_size > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
+		return E_GZIP.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX;
+	}
 
 	b: []u8;
 
@@ -138,6 +155,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 	if e != .None {
 		return E_General.File_Too_Short;
 	}
+	input_data_consumed += size_of(Header);
 
 	if header.magic != .GZIP {
 		return E_GZIP.Invalid_GZIP_Signature;
@@ -163,6 +181,8 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 
 	if .extra in header.flags {
 		xlen, e_extra := compress.read_data(ctx, u16le);
+		input_data_consumed += 2;
+
 		if e_extra != .None {
 			return E_General.Stream_Too_Short;
 		}
@@ -184,6 +204,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 				return E_General.Stream_Too_Short;
 			}
 			xlen -= 2;
+			input_data_consumed += 2;
 
 			field_length, field_error = compress.read_data(ctx, u16le);
 			if field_error != .None {
@@ -191,6 +212,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 				return E_General.Stream_Too_Short;
 			}
 			xlen -= 2;
+			input_data_consumed += 2;
 
 			if xlen <= 0 {
 				// We're not going to try and recover by scanning for a ZLIB header.
@@ -206,6 +228,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 					return E_General.Stream_Too_Short;
 				}
 				xlen -= field_length;
+				input_data_consumed += int(field_length);
 
 				// printf("%v\n", string(field_data));
 			}
@@ -227,6 +250,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 			if name_error != .None {
 				return E_General.Stream_Too_Short;
 			}
+			input_data_consumed += 1;
 			if b[0] == 0 {
 				break;
 			}
@@ -250,6 +274,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 			if comment_error != .None {
 				return E_General.Stream_Too_Short;
 			}
+			input_data_consumed += 1;
 			if b[0] == 0 {
 				break;
 			}
@@ -265,6 +290,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 	if .header_crc in header.flags {
 		crc_error: io.Error;
 		_, crc_error = compress.read_slice(ctx, 2);
+		input_data_consumed += 2;
 		if crc_error != .None {
 			return E_General.Stream_Too_Short;
 		}
@@ -280,7 +306,43 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 	code_buffer := compress.Code_Buffer{};
 	cb := &code_buffer;
 
-	zlib_error := zlib.inflate_raw(ctx, &code_buffer);
+	payload_u32le: u32le;
+
+	// fmt.printf("known_gzip_size: %v | expected_output_size: %v\n", known_gzip_size, expected_output_size);
+
+	if expected_output_size > -1 {
+		/*
+			We already checked that it's not larger than the output buffer max,
+			or GZIP length field's max.
+
+			We'll just pass it on to `zlib.inflate_raw`;
+		*/
+	} else {
+		/*
+			If we know the size of the GZIP file *and* it is fully in memory,
+			then we can peek at the unpacked size at the end.
+
+			We'll still want to ensure there's capacity left in the output buffer when we write, of course.
+
+		*/
+		if ctx.input_fully_in_memory && known_gzip_size > -1 {
+			offset := known_gzip_size - input_data_consumed - 4;
+			if len(ctx.input_data) >= offset + 4 {
+				length_bytes         := ctx.input_data[offset:][:4];
+				payload_u32le         = (^u32le)(&length_bytes[0])^;
+				expected_output_size = int(payload_u32le);
+			}
+		} else {
+			/*
+				TODO(Jeroen): When reading a GZIP from a stream, check if impl_seek is present.
+				If so, we can seek to the end, grab the size from the footer, and seek back to payload start.
+			*/
+		}
+	}
+
+	// fmt.printf("GZIP: Expected Payload Size: %v\n", expected_output_size);
+
+	zlib_error := zlib.inflate_raw(z=ctx, cb=&code_buffer, expected_output_size=expected_output_size);
 	if zlib_error != nil {
 		return zlib_error;
 	}
@@ -300,9 +362,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 		}
 	}
 	payload_crc := transmute(u32le)payload_crc_b;
-
-	payload_len: u32le;
-	payload_len, footer_error = compress.read_data(ctx, u32le);
+	payload_u32le, footer_error = compress.read_data(ctx, u32le);
 
 	payload := bytes.buffer_to_bytes(buf);
 	crc32 := u32le(hash.crc32(payload));
@@ -311,7 +371,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, allocator :
 		return E_GZIP.Payload_CRC_Invalid;
 	}
 
-	if len(payload) != int(payload_len) {
+	if len(payload) != int(payload_u32le) {
 		return E_GZIP.Payload_Length_Invalid;
 	}
 	return nil;
