@@ -10,6 +10,7 @@ package compress
 
 import "core:io"
 import "core:image"
+import "core:bytes"
 
 /*
 	These settings bound how much compression algorithms will allocate for their output buffer.
@@ -43,8 +44,6 @@ when size_of(uintptr) == 8 {
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29));
 }
 
-
-// when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
 Error :: union {
 	General_Error,
@@ -132,8 +131,7 @@ Context :: struct #packed {
 	input:             io.Stream,
 	input_data:        []u8,
 
-	output:            io.Stream,
-	output_buf:        ^[dynamic]u8,
+	output:            ^bytes.Buffer,
 	bytes_written:     i64,
 
 	/*
@@ -159,6 +157,10 @@ Context :: struct #packed {
 	input_refills_from_stream: b8,
 	output_to_stream: b8,
 	reserved_flag: b8,
+
+	bit_buffer_stuff: [3]u64,
+
+
 }
 // #assert(size_of(Context) == 128);
 
@@ -188,8 +190,6 @@ Code_Buffer :: struct #packed {
 
 @(optimization_mode="speed")
 read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.Error) {
-	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Slice"); }
-
 	#no_bounds_check {
 		if len(z.input_data) >= size {
 			res = z.input_data[:size];
@@ -220,8 +220,6 @@ read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.
 
 @(optimization_mode="speed")
 read_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Error) {
-	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read Data"); }
-
 	b, e := read_slice(z, size_of(T));
 	if e == .None {
 		return (^T)(&b[0])^, .None;
@@ -232,8 +230,6 @@ read_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Err
 
 @(optimization_mode="speed")
 read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
-	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Read u8"); }
-
 	#no_bounds_check {
 		if len(z.input_data) >= 1 {
 			res = z.input_data[0];
@@ -252,8 +248,6 @@ read_u8 :: #force_inline proc(z: ^Context) -> (res: u8, err: io.Error) {
 
 @(optimization_mode="speed")
 peek_data :: #force_inline proc(z: ^Context, $T: typeid) -> (res: T, err: io.Error) {
-	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Peek Data"); }
-
 	size :: size_of(T);
 
 	#no_bounds_check {
@@ -304,8 +298,6 @@ peek_back_byte :: #force_inline proc(cb: ^Code_Buffer, offset: i64) -> (res: u8,
 // Generalized bit reader LSB
 @(optimization_mode="speed")
 refill_lsb :: proc(z: ^Context, cb: ^Code_Buffer, width := i8(24)) {
-	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Refill LSB"); }
-
 	refill := u64(width);
 
 	for {

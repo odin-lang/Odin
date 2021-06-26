@@ -110,10 +110,11 @@ load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, 
 	stream := bytes.reader_to_stream(&r);
 
 	ctx := &compress.Context{
-		input  = stream,
+		input = stream,
 		input_data = slice,
 		input_fully_in_memory = true,
 		input_refills_from_stream = true,
+		output = buf,
 	};
 
 	err = load_from_stream(ctx, buf, known_gzip_size, expected_output_size, allocator);
@@ -138,8 +139,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 
 	input_data_consumed := 0;
 
-	ws := bytes.buffer_to_stream(buf);
-	ctx.output = ws;
+	ctx.output = buf;
 
 	if expected_output_size > GZIP_MAX_PAYLOAD_SIZE {
 		return E_GZIP.Payload_Size_Exceeds_Max_Payload;
@@ -365,6 +365,9 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 	payload_u32le, footer_error = compress.read_data(ctx, u32le);
 
 	payload := bytes.buffer_to_bytes(buf);
+
+	// fmt.printf("GZIP payload: %v\n", string(payload));
+
 	crc32 := u32le(hash.crc32(payload));
 
 	if crc32 != payload_crc {
