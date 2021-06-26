@@ -142,43 +142,121 @@ z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	return;
 }
 
+
+@(optimization_mode="speed")
+grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
+	/*
+		That we get here at all means that we didn't pass an expected output size,
+		or that it was too little.
+	*/
+
+	/*
+		Double until we reach the maximum allowed.
+	*/
+	new_size := min(len(buf) << 1, compress.COMPRESS_OUTPUT_ALLOCATE_MAX);
+
+	resize(buf, new_size);
+	if len(buf) != new_size {
+		/*
+			Resize failed.
+		*/
+		return .Resize_Failed;
+	}
+
+	return nil;
+}
+
+/*
+	TODO: Make these return compress.Error.
+*/
+
 @(optimization_mode="speed")
 write_byte :: #force_inline proc(z: ^Context, cb: ^Code_Buffer, c: u8) -> (err: io.Error) #no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Write Byte"); }
 	c := c;
-	buf := transmute([]u8)mem.Raw_Slice{data=&c, len=1};
-	when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
 
-	_, e := z.output->impl_write(buf);
-	if e != .None {
-		return e;
+	if !z.output_to_stream {
+		/*
+			Resize if needed.
+		*/
+		if int(z.bytes_written) + 1 >= len(z.output_buf) {
+			grow_buffer(z.output_buf);
+		}
+
+		#no_bounds_check {
+			z.output_buf[z.bytes_written] = c;
+			cb.last[z.bytes_written & cb.window_mask] = c;
+		}
+		z.bytes_written += 1;
+
+		when INLINE_ADLER {
+			buf := transmute([]u8)mem.Raw_Slice{data=&c, len=1};
+			z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+		}
+	} else {
+		buf := transmute([]u8)mem.Raw_Slice{data=&c, len=1};
+		when INLINE_ADLER {
+			z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+		}
+
+		_, e := z.output->impl_write(buf);
+		if e != .None {
+			return e;
+		}
+
+		#no_bounds_check cb.last[z.bytes_written & cb.window_mask] = c;
+		z.bytes_written += 1;
 	}
-	cb.last[z.bytes_written & cb.window_mask] = c;
 
-	z.bytes_written += 1;
 	return .None;
 }
 
 @(optimization_mode="speed")
-repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.Error) {
+repl_byte :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
 	when #config(TRACY_ENABLE, false) { tracy.ZoneN("Repl Byte"); }
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
 		the output stream, just give it _that_ slice.
 	*/
-	buf := make([]u8, count, context.temp_allocator);
-	#no_bounds_check for i in 0..<count {
-		buf[i] = c;
-		cb.last[z.bytes_written & cb.window_mask] = c;
-		z.bytes_written += 1;
-	}
-	when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
 
-	_, e := z.output->impl_write(buf);
-	if e != .None {
-		return e;
+	if !z.output_to_stream {
+		/*
+			Resize if needed.
+		*/
+		if int(z.bytes_written) + int(count) >= len(z.output_buf) {
+			grow_buffer(z.output_buf);
+		}
+
+		#no_bounds_check {
+			for _ in 0..<count {
+				z.output_buf[z.bytes_written] = c;
+				cb.last[z.bytes_written & cb.window_mask] = c;
+				z.bytes_written += 1;
+			}
+		}
+
+		when INLINE_ADLER {
+			/* TODO(Jeroen): Test */
+			buf := z.output_buf[bytes_written:][:count];
+			z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+		}
+
+	} else {
+		buf := make([]u8, count, context.temp_allocator);
+		#no_bounds_check for i in 0..<count {
+			buf[i] = c;
+			cb.last[z.bytes_written & cb.window_mask] = c;
+			z.bytes_written += 1;
+		}
+		when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
+
+		_, e := z.output->impl_write(buf);
+		if e != .None {
+			return e;
+		}		
 	}
+
 	return .None;
 }
 
@@ -190,22 +268,45 @@ repl_bytes :: proc(z: ^Context, cb: ^Code_Buffer, count: u16, distance: u16) -> 
 		without having to worry about wrapping, so no need for a temp allocation to give to
 		the output stream, just give it _that_ slice.
 	*/
-	buf := make([]u8, count, context.temp_allocator);
 
 	offset := z.bytes_written - i64(distance);
-	#no_bounds_check for i in 0..<count {
-		c := cb.last[offset & cb.window_mask];
 
-		cb.last[z.bytes_written & cb.window_mask] = c;
-		buf[i] = c;
-		z.bytes_written += 1; offset += 1;
-	}
-	when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
+	if !z.output_to_stream {
+		if int(z.bytes_written) + int(count) >= len(z.output_buf) {
+			grow_buffer(z.output_buf);
+		}
 
-	_, e := z.output->impl_write(buf);
-	if e != .None {
-		return e;
+		#no_bounds_check {
+			for _ in 0..<count {
+				c := cb.last[offset & cb.window_mask];
+				z.output_buf[z.bytes_written] = c;
+				cb.last[z.bytes_written & cb.window_mask] = c;
+				z.bytes_written += 1; offset += 1;
+			}
+		}
+
+		when INLINE_ADLER {
+			/* TODO(Jeroen): Test */
+			buf := z.output_buf[bytes_written:][:count];
+			z.rolling_hash = hash.adler32(buf, z.rolling_hash);
+		}
+	} else {
+		buf := make([]u8, count, context.temp_allocator);
+		#no_bounds_check for i in 0..<count {
+			c := cb.last[offset & cb.window_mask];
+
+			cb.last[z.bytes_written & cb.window_mask] = c;
+			buf[i] = c;
+			z.bytes_written += 1; offset += 1;
+		}
+		when INLINE_ADLER { z.rolling_hash = hash.adler32(buf, z.rolling_hash); }
+
+		_, e := z.output->impl_write(buf);
+		if e != .None {
+			return e;
+		}
 	}
+
 	return .None;
 }
 
@@ -495,7 +596,7 @@ inflate_from_stream_raw :: proc(z: ^Context, cb: ^Code_Buffer, expected_output_s
 
 	if expected_output_size > -1 && expected_output_size <= compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
 		reserve(z.output_buf, expected_output_size);
-		// resize (z.output_buf, expected_output_size);
+		resize (z.output_buf, expected_output_size);
 	} else {
 		reserve(z.output_buf, compress.COMPRESS_OUTPUT_ALLOCATE_MIN);
 	}

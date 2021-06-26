@@ -69,6 +69,13 @@ General_Error :: enum {
 	Checksum_Failed,
 	Incompatible_Options,
 	Unimplemented,
+
+
+	/*
+		Memory errors
+	*/
+	Allocation_Failed,
+	Resize_Failed,
 }
 
 GZIP_Error :: enum {
