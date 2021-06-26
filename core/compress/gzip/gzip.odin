@@ -113,7 +113,6 @@ load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, 
 		input = stream,
 		input_data = slice,
 		input_fully_in_memory = true,
-		input_refills_from_stream = true,
 		output = buf,
 	};
 

@@ -430,8 +430,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 		- read
 		- size
 
-		ctx.output must be an io.Stream backed by an implementation that supports:
-		- write
+		ctx.output must be a bytes.Buffer for now. We'll add a separate implementation that writes to a stream.
 
 		raw determines whether the ZLIB header is processed, or we're inflating a raw
 		DEFLATE stream.
@@ -498,6 +497,8 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 	}
 	return nil;
 }
+
+// TODO: Check alignment of reserve/resize.
 
 @(optimization_mode="speed")
 inflate_from_stream_raw :: proc(z: ^Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {

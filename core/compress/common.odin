@@ -127,28 +127,30 @@ Deflate_Error :: enum {
 
 
 // General I/O context for ZLIB, LZW, etc.
-Context :: struct {
+Context :: struct #packed {
 	input_data:        []u8,
 	input:             io.Stream,
 	output:            ^bytes.Buffer,
 	bytes_written:     i64,
 
-	/*
-		If we know the data size, we can optimize the reads and writes.
-	*/    
-	size_packed:   i64,
-	size_unpacked: i64,
-
 	code_buffer: u64,
 	num_bits:    u64,
 
 	/*
+		If we know the data size, we can optimize the reads and writes.
+	*/
+	size_packed:   i64,
+	size_unpacked: i64,
+
+	/*
 		Flags:
-			`input_fully_in_memory` tells us whether we're EOF when `input_data` is empty.
-			`input_refills_from_stream` tells us we can then possibly refill from the stream.
+			`input_fully_in_memory`
+				true  = This tells us we read input from `input_data` exclusively. [] = EOF.
+				false = Try to refill `input_data` from the `input` stream.
 	*/
 	input_fully_in_memory: b8,
-	input_refills_from_stream: b8,
+
+	padding: [1]u8,
 }
 
 
@@ -161,6 +163,8 @@ Context :: struct {
 	Bit and byte readers may be merged so that reading bytes will grab them from the bit buffer first.
 	This simplifies end-of-stream handling where bits may be left in the bit buffer.
 */
+
+// TODO: Make these return compress.Error errors.
 
 @(optimization_mode="speed")
 read_slice :: #force_inline proc(z: ^Context, size: int) -> (res: []u8, err: io.Error) {
