@@ -133,13 +133,13 @@ load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_siz
 	return;
 }
 
-load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+load_from_stream :: proc(z: ^compress.Context, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	buf := buf;
 	expected_output_size := expected_output_size;
 
 	input_data_consumed := 0;
 
-	ctx.output = buf;
+	z.output = buf;
 
 	if expected_output_size > GZIP_MAX_PAYLOAD_SIZE {
 		return E_GZIP.Payload_Size_Exceeds_Max_Payload;
@@ -151,7 +151,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 
 	b: []u8;
 
-	header, e := compress.read_data(ctx, Header);
+	header, e := compress.read_data(z, Header);
 	if e != .None {
 		return E_General.File_Too_Short;
 	}
@@ -180,7 +180,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 	// printf("os: %v\n", OS_Name[header.os]);
 
 	if .extra in header.flags {
-		xlen, e_extra := compress.read_data(ctx, u16le);
+		xlen, e_extra := compress.read_data(z, u16le);
 		input_data_consumed += 2;
 
 		if e_extra != .None {
@@ -198,7 +198,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 
 		for xlen >= 4 {
 			// println("Parsing Extra field(s).");
-			field_id, field_error = compress.read_data(ctx, [2]u8);
+			field_id, field_error = compress.read_data(z, [2]u8);
 			if field_error != .None {
 				// printf("Parsing Extra returned: %v\n", field_error);
 				return E_General.Stream_Too_Short;
@@ -206,7 +206,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 			xlen -= 2;
 			input_data_consumed += 2;
 
-			field_length, field_error = compress.read_data(ctx, u16le);
+			field_length, field_error = compress.read_data(z, u16le);
 			if field_error != .None {
 				// printf("Parsing Extra returned: %v\n", field_error);
 				return E_General.Stream_Too_Short;
@@ -222,7 +222,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 
 			// printf("    Field \"%v\" of length %v found: ", string(field_id[:]), field_length);
 			if field_length > 0 {
-				b, field_error = compress.read_slice(ctx, int(field_length));
+				b, field_error = compress.read_slice(z, int(field_length));
 				if field_error != .None {
 					// printf("Parsing Extra returned: %v\n", field_error);
 					return E_General.Stream_Too_Short;
@@ -246,7 +246,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 		name_error: io.Error;
 
 		for i < len(name) {
-			b, name_error = compress.read_slice(ctx, 1);
+			b, name_error = compress.read_slice(z, 1);
 			if name_error != .None {
 				return E_General.Stream_Too_Short;
 			}
@@ -270,7 +270,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 		comment_error: io.Error;
 
 		for i < len(comment) {
-			b, comment_error = compress.read_slice(ctx, 1);
+			b, comment_error = compress.read_slice(z, 1);
 			if comment_error != .None {
 				return E_General.Stream_Too_Short;
 			}
@@ -289,7 +289,7 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 
 	if .header_crc in header.flags {
 		crc_error: io.Error;
-		_, crc_error = compress.read_slice(ctx, 2);
+		_, crc_error = compress.read_slice(z, 2);
 		input_data_consumed += 2;
 		if crc_error != .None {
 			return E_General.Stream_Too_Short;
@@ -303,9 +303,6 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 	/*
 		We should have arrived at the ZLIB payload.
 	*/
-	code_buffer := compress.Code_Buffer{};
-	cb := &code_buffer;
-
 	payload_u32le: u32le;
 
 	// fmt.printf("known_gzip_size: %v | expected_output_size: %v\n", known_gzip_size, expected_output_size);
@@ -325,10 +322,10 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 			We'll still want to ensure there's capacity left in the output buffer when we write, of course.
 
 		*/
-		if ctx.input_fully_in_memory && known_gzip_size > -1 {
+		if z.input_fully_in_memory && known_gzip_size > -1 {
 			offset := known_gzip_size - input_data_consumed - 4;
-			if len(ctx.input_data) >= offset + 4 {
-				length_bytes         := ctx.input_data[offset:][:4];
+			if len(z.input_data) >= offset + 4 {
+				length_bytes         := z.input_data[offset:][:4];
 				payload_u32le         = (^u32le)(&length_bytes[0])^;
 				expected_output_size = int(payload_u32le);
 			}
@@ -342,27 +339,27 @@ load_from_stream :: proc(ctx: ^compress.Context, buf: ^bytes.Buffer, known_gzip_
 
 	// fmt.printf("GZIP: Expected Payload Size: %v\n", expected_output_size);
 
-	zlib_error := zlib.inflate_raw(z=ctx, cb=&code_buffer, expected_output_size=expected_output_size);
+	zlib_error := zlib.inflate_raw(z=z, expected_output_size=expected_output_size);
 	if zlib_error != nil {
 		return zlib_error;
 	}
 	/*
 		Read CRC32 using the ctx bit reader because zlib may leave bytes in there.
 	*/
-	compress.discard_to_next_byte_lsb(cb);
+	compress.discard_to_next_byte_lsb(z);
 
 	footer_error: io.Error;
 
 	payload_crc_b: [4]u8;
 	for _, i in payload_crc_b {
-		if cb.num_bits >= 8 {
-			payload_crc_b[i] = u8(compress.read_bits_lsb(ctx, cb, 8));
+		if z.num_bits >= 8 {
+			payload_crc_b[i] = u8(compress.read_bits_lsb(z, 8));
 		} else {
-			payload_crc_b[i], footer_error = compress.read_u8(ctx);
+			payload_crc_b[i], footer_error = compress.read_u8(z);
 		}
 	}
 	payload_crc := transmute(u32le)payload_crc_b;
-	payload_u32le, footer_error = compress.read_data(ctx, u32le);
+	payload_u32le, footer_error = compress.read_data(z, u32le);
 
 	payload := bytes.buffer_to_bytes(buf);
 
