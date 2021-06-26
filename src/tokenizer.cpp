@@ -1409,14 +1409,14 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token->kind = Token_SubEq;
-			} else if (t->curr_rune == '-' && peek_byte(t) == '-') {
-				advance_to_next_rune(t);
-				advance_to_next_rune(t);
-				token->kind = Token_Undef;
 			} else if (t->curr_rune == '-') {
+				insert_semicolon = true;
 				advance_to_next_rune(t);
 				token->kind = Token_Decrement;
-				insert_semicolon = true;
+				if (t->curr_rune == '-') {
+					advance_to_next_rune(t);
+					token->kind = Token_Undef;
+				}
 			} else if (t->curr_rune == '>') {
 				advance_to_next_rune(t);
 				token->kind = Token_ArrowRight;
