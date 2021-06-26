@@ -11,6 +11,39 @@ package compress
 import "core:io"
 import "core:image"
 
+/*
+	These settings bound how much compression algorithms will allocate for their output buffer.
+	If streaming their output, these are unnecessary and will be ignored.
+
+*/
+
+/*
+	When a decompression routine doesn't stream its output, but writes to a buffer,
+	we pre-allocate an output buffer to speed up decompression. The default is 1 MiB.
+*/
+COMPRESS_OUTPUT_ALLOCATE_MIN :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MIN, 1 << 20));
+
+/*
+	This bounds the maximum a buffer will resize to as needed, or the maximum we'll
+	pre-allocate if you inform the decompression routine you know the payload size.
+
+	For reference, the largest payload size of a GZIP file is 4 GiB.
+
+*/
+when size_of(uintptr) == 8 {
+	/*
+		For 64-bit platforms, we set the default max buffer size to 4 GiB,
+		which is GZIP and PKZIP's max payload size.
+	*/	
+	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 32));
+} else {
+	/*
+		For 32-bit platforms, we set the default max buffer size to 512 MiB.
+	*/
+	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29));
+}
+
+
 // when #config(TRACY_ENABLE, false) { import tracy "shared:odin-tracy" }
 
 Error :: union {
@@ -46,6 +79,20 @@ GZIP_Error :: enum {
 	Comment_Too_Long,
 	Payload_Length_Invalid,
 	Payload_CRC_Invalid,
+
+	/*
+		GZIP's payload can be a maximum of max(u32le), or 4 GiB.
+		If you tell it you expect it to contain more, that's obviously an error.
+	*/
+	Payload_Size_Exceeds_Max_Payload,
+	/*
+		For buffered instead of streamed output, the payload size can't exceed
+		the max set by the `COMPRESS_OUTPUT_ALLOCATE_MAX` switch in compress/common.odin.
+
+		You can tweak this setting using `-define:COMPRESS_OUTPUT_ALLOCATE_MAX=size_in_bytes`
+	*/
+	Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX,
+
 }
 
 ZIP_Error :: enum {
@@ -79,7 +126,7 @@ Context :: struct #packed {
 	input_data:        []u8,
 
 	output:            io.Stream,
-	output_buf:        [dynamic]u8,
+	output_buf:        ^[dynamic]u8,
 	bytes_written:     i64,
 
 	/*
@@ -103,9 +150,10 @@ Context :: struct #packed {
 	*/
 	input_fully_in_memory: b8,
 	input_refills_from_stream: b8,
-	reserved_flags: [2]b8,
+	output_to_stream: b8,
+	reserved_flag: b8,
 }
-#assert(size_of(Context) == 128);
+// #assert(size_of(Context) == 128);
 
 /*
 	Compression algorithm context
