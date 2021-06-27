@@ -668,39 +668,41 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, E_PNG.IDAT_Missing;
 	}
 
+	/*
+		Calculate the expected output size, to help `inflate` make better decisions about the output buffer.
+		We'll also use it to check the returned buffer size is what we expected it to be.
+
+		Let's calcalate the expected size of the IDAT based on its dimensions, and whether or not it's interlaced.
+	*/
+	expected_size: int;
+
+	if header.interlace_method != .Adam7 {
+		expected_size = compute_buffer_size(int(header.width), int(header.height), int(img.channels), int(header.bit_depth), 1);
+	} else {
+		/*
+			Because Adam7 divides the image up into sub-images, and each scanline must start
+			with a filter byte, Adam7 interlaced images can have a larger raw size.
+		*/
+		for p := 0; p < 7; p += 1 {
+			x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p];
+			y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p];
+			if x > 0 && y > 0 {
+				expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1);
+			}
+		}
+	}
+
 	buf: bytes.Buffer;
-	zlib_error := zlib.inflate(idat, &buf);
+	zlib_error := zlib.inflate(idat, &buf, false, expected_size);
 	defer bytes.buffer_destroy(&buf);
 
 	if zlib_error != nil {
 		return {}, zlib_error;
-	} else {
-		/*
-			Let's calcalate the expected size of the IDAT based on its dimensions,
-			and whether or not it's interlaced
-		*/
-		expected_size: int;
-		buf_len := len(buf.buf);
+	}
 
-		if header.interlace_method != .Adam7 {
-			expected_size = compute_buffer_size(int(header.width), int(header.height), int(img.channels), int(header.bit_depth), 1);
-		} else {
-			/*
-				Because Adam7 divides the image up into sub-images, and each scanline must start
-				with a filter byte, Adam7 interlaced images can have a larger raw size.
-			*/
-			for p := 0; p < 7; p += 1 {
-				x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p];
-				y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p];
-				if x > 0 && y > 0 {
-					expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1);
-				}
-			}
-		}
-
-		if expected_size != buf_len {
-			return {}, E_PNG.IDAT_Corrupt;
-		}
+	buf_len := len(buf.buf);
+	if expected_size != buf_len {
+		return {}, E_PNG.IDAT_Corrupt;
 	}
 
 	/*
