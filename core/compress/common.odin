@@ -182,6 +182,16 @@ Context_Stream_Input :: struct #packed {
 
 // TODO: Make these return compress.Error errors.
 
+input_size_from_memory :: proc(z: ^Context_Memory_Input) -> (res: i64, err: Error) {
+	return i64(len(z.input_data)), nil;
+}
+
+input_size_from_stream :: proc(z: ^Context_Stream_Input) -> (res: i64, err: Error) {
+	return io.size(z.input), nil;
+}
+
+input_size :: proc{input_size_from_memory, input_size_from_stream};
+
 @(optimization_mode="speed")
 read_slice_from_memory :: #force_inline proc(z: ^Context_Memory_Input, size: int) -> (res: []u8, err: io.Error) {
 	#no_bounds_check {
@@ -257,12 +267,10 @@ peek_data_from_memory :: #force_inline proc(z: ^Context_Memory_Input, $T: typeid
 		}
 	}
 
-	if z.input_fully_in_memory {
-		if len(z.input_data) < size {
-			return T{}, .EOF;
-		} else {
-			return T{}, .Short_Buffer;
-		}
+	if len(z.input_data) == 0 {
+		return T{}, .EOF;
+	} else {
+		return T{}, .Short_Buffer;
 	}
 }
 
