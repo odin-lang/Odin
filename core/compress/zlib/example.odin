@@ -38,7 +38,7 @@ main :: proc() {
 	};
 	OUTPUT_SIZE :: 438;
 
-	fmt.printf("size_of(Context): %v\n", size_of(compress.Context));
+	fmt.printf("size_of(Context): %v\n", size_of(compress.Context_Memory_Input));
 
 	buf: bytes.Buffer;
 
