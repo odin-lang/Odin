@@ -2132,6 +2132,28 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	return nullptr;
 }
 
+LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope) {
+	LLVMMetadataRef found = nullptr;
+	for (;;) {
+		if (scope == nullptr) {
+			return nullptr;
+		}
+		if (scope->flags & ScopeFlag_Proc) {
+			found = lb_get_llvm_metadata(m, scope->procedure_entity);
+			if (found) {
+				return found;
+			}
+		}
+		if (scope->flags & ScopeFlag_File) {
+			found = lb_get_llvm_metadata(m, scope->file);
+			if (found) {
+				return found;
+			}
+		}
+		scope = scope->parent;
+	}
+}
+
 LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	GB_ASSERT(type != nullptr);
 	LLVMMetadataRef found = lb_get_llvm_metadata(m, type);
@@ -2147,7 +2169,7 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 
 		if (type->Named.type_name != nullptr) {
 			Entity *e = type->Named.type_name;
-			scope = lb_get_llvm_metadata(m, e->scope);
+			scope = lb_get_base_scope_metadata(m, e->scope);
 			if (scope != nullptr) {
 				file = LLVMDIScopeGetFile(scope);
 			}
@@ -2174,8 +2196,6 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		switch (bt->kind) {
 		case Type_Enum:
 			{
-				LLVMMetadataRef scope = nullptr;
-				LLVMMetadataRef file = nullptr;
 				unsigned line = 0;
 				unsigned element_count = cast(unsigned)bt->Enum.fields.count;
 				LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
