@@ -15,7 +15,6 @@ import "core:mem"
 import "core:io"
 import "core:hash"
 import "core:bytes"
-// import "core:fmt"
 
 /*
 	zlib.inflate decompresses a ZLIB stream passed in as a []u8 or io.Stream.
@@ -147,7 +146,6 @@ grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 		Double until we reach the maximum allowed.
 	*/
 	new_size := min(len(buf) << 1, compress.COMPRESS_OUTPUT_ALLOCATE_MAX);
-
 	resize(buf, new_size);
 	if len(buf) != new_size {
 		/*
@@ -482,11 +480,16 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 
 	if !raw {
 		compress.discard_to_next_byte_lsb(ctx);
-		adler32 := compress.read_bits_lsb(ctx, 8) << 24 | compress.read_bits_lsb(ctx, 8) << 16 | compress.read_bits_lsb(ctx, 8) << 8 | compress.read_bits_lsb(ctx, 8);
+
+		adler_b: [4]u8;
+		for _, i in adler_b {
+			adler_b[i], _ = compress.read_u8_prefer_code_buffer_lsb(ctx);
+		}
+		adler := transmute(u32be)adler_b;
 
 		output_hash := hash.adler32(ctx.output.buf[:]);
 
-		if output_hash != u32(adler32) {
+		if output_hash != u32(adler) {
 			return E_General.Checksum_Failed;
 		}
 	}
@@ -684,7 +687,6 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 		}
 	}
 
-	// fmt.printf("ZLIB: Bytes written: %v\n", z.bytes_written);
 	if int(z.bytes_written) != len(z.output.buf) {
 		resize(&z.output.buf, int(z.bytes_written));
 	}
