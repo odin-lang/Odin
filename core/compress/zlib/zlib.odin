@@ -502,12 +502,10 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	expected_output_size := expected_output_size;
 
-	if expected_output_size <= 0 {
-		/*
-			Always set up a minimum allocation size.
-		*/
-		expected_output_size = compress.COMPRESS_OUTPUT_ALLOCATE_MIN;
-	}
+	/*
+		Always set up a minimum allocation size.
+	*/
+	expected_output_size = max(max(expected_output_size, compress.COMPRESS_OUTPUT_ALLOCATE_MIN), 512);
 
 	// fmt.printf("\nZLIB: Expected Payload Size: %v\n\n", expected_output_size);
 
