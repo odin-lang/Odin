@@ -2132,6 +2132,28 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	return nullptr;
 }
 
+LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope) {
+	LLVMMetadataRef found = nullptr;
+	for (;;) {
+		if (scope == nullptr) {
+			return nullptr;
+		}
+		if (scope->flags & ScopeFlag_Proc) {
+			found = lb_get_llvm_metadata(m, scope->procedure_entity);
+			if (found) {
+				return found;
+			}
+		}
+		if (scope->flags & ScopeFlag_File) {
+			found = lb_get_llvm_metadata(m, scope->file);
+			if (found) {
+				return found;
+			}
+		}
+		scope = scope->parent;
+	}
+}
+
 LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	GB_ASSERT(type != nullptr);
 	LLVMMetadataRef found = lb_get_llvm_metadata(m, type);
@@ -2147,7 +2169,7 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 
 		if (type->Named.type_name != nullptr) {
 			Entity *e = type->Named.type_name;
-			scope = lb_get_llvm_metadata(m, e->scope);
+			scope = lb_get_base_scope_metadata(m, e->scope);
 			if (scope != nullptr) {
 				file = LLVMDIScopeGetFile(scope);
 			}
@@ -2174,8 +2196,6 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		switch (bt->kind) {
 		case Type_Enum:
 			{
-				LLVMMetadataRef scope = nullptr;
-				LLVMMetadataRef file = nullptr;
 				unsigned line = 0;
 				unsigned element_count = cast(unsigned)bt->Enum.fields.count;
 				LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
@@ -13460,7 +13480,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
 		case Type_Struct: {
-
 			// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
 			// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
 			bool is_raw_union = is_type_raw_union(bt);
@@ -15048,9 +15067,23 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		GB_ASSERT(e->kind == Entity_Variable);
 		e->code_gen_module = entity_module;
 
-		if (var->decl->init_expr != nullptr)  {
-			// gb_printf_err("%s\n", expr_to_string(var->decl->init_expr));
-			lbValue init = lb_build_expr(p, var->decl->init_expr);
+		Ast *init_expr = var->decl->init_expr;
+		if (init_expr != nullptr)  {
+			lbValue init = lb_build_expr(p, init_expr);
+			if (init.value == nullptr) {
+				LLVMTypeRef global_type = LLVMGetElementType(LLVMTypeOf(var->var.value));
+				if (is_type_untyped_undef(init.type)) {
+					LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
+					var->is_initialized = true;
+					continue;
+				} else if (is_type_untyped_nil(init.type)) {
+					LLVMSetInitializer(var->var.value, LLVMConstNull(global_type));
+					var->is_initialized = true;
+					continue;
+				}
+				GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
+			}
+
 			LLVMValueKind value_kind = LLVMGetValueKind(init.value);
 			// gb_printf_err("%s %d\n", LLVMPrintValueToString(init.value));
 
