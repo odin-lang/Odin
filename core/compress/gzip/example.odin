@@ -65,7 +65,7 @@ main :: proc() {
 		if file == "-" {
 			// Read from stdin
 			s := os.stream_from_handle(os.stdin);
-			ctx := &compress.Context{
+			ctx := &compress.Context_Stream_Input{
 				input = s,
 			};
 			err = load(ctx, &buf);

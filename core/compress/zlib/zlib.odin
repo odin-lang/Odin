@@ -30,7 +30,6 @@ import "core:bytes"
 	`Context.rolling_hash` if not inlining it is still faster.
 
 */
-Context :: compress.Context;
 
 Compression_Method :: enum u8 {
 	DEFLATE  = 8,
@@ -165,7 +164,7 @@ grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
 */
 
 @(optimization_mode="speed")
-write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_bounds_check {
+write_byte :: #force_inline proc(z: ^$C, c: u8) -> (err: io.Error) #no_bounds_check {
 	/*
 		Resize if needed.
 	*/
@@ -184,7 +183,7 @@ write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_boun
 }
 
 @(optimization_mode="speed")
-repl_byte :: proc(z: ^Context, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
+repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
@@ -212,7 +211,7 @@ repl_byte :: proc(z: ^Context, count: u16, c: u8) -> (err: io.Error) 	#no_bounds
 }
 
 @(optimization_mode="speed")
-repl_bytes :: proc(z: ^Context, count: u16, distance: u16) -> (err: io.Error) {
+repl_bytes :: proc(z: ^$C, count: u16, distance: u16) -> (err: io.Error) {
 	/*
 		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
 		without having to worry about wrapping, so no need for a temp allocation to give to
@@ -304,7 +303,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 }
 
 @(optimization_mode="speed")
-decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	code := u16(compress.peek_bits_lsb(z,16));
 
 	k := int(z_bit_reverse(code, 16));
@@ -335,7 +334,7 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 }
 
 @(optimization_mode="speed")
-decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	if z.num_bits < 16 {
 		if z.num_bits > 63 {
 			return 0, E_ZLIB.Code_Buffer_Malformed;
@@ -355,7 +354,7 @@ decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #
 }
 
 @(optimization_mode="speed")
-parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
+parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
 	#no_bounds_check for {
 		value, e := decode_huffman(z, z_repeat);
 		if e != nil {
@@ -424,7 +423,78 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 }
 
 @(optimization_mode="speed")
-inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+__inflate_from_memory :: proc(using ctx: ^compress.Context_Memory_Input, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+	/*
+		ctx.output must be a bytes.Buffer for now. We'll add a separate implementation that writes to a stream.
+
+		raw determines whether the ZLIB header is processed, or we're inflating a raw
+		DEFLATE stream.
+	*/
+
+	if !raw {
+		if len(ctx.input_data) < 6 {
+			return E_General.Stream_Too_Short;
+		}
+
+		cmf, _ := compress.read_u8(ctx);
+
+		method := Compression_Method(cmf & 0xf);
+		if method != .DEFLATE {
+			return E_General.Unknown_Compression_Method;
+		}
+
+		cinfo  := (cmf >> 4) & 0xf;
+		if cinfo > 7 {
+			return E_ZLIB.Unsupported_Window_Size;
+		}
+		flg, _ := compress.read_u8(ctx);
+
+		fcheck  := flg & 0x1f;
+		fcheck_computed := (cmf << 8 | flg) & 0x1f;
+		if fcheck != fcheck_computed {
+			return E_General.Checksum_Failed;
+		}
+
+		fdict   := (flg >> 5) & 1;
+		/*
+			We don't handle built-in dictionaries for now.
+			They're application specific and PNG doesn't use them.
+		*/
+		if fdict != 0 {
+			return E_ZLIB.FDICT_Unsupported;
+		}
+
+		// flevel  := Compression_Level((flg >> 6) & 3);
+		/*
+			Inflate can consume bits belonging to the Adler checksum.
+			We pass the entire stream to Inflate and will unget bytes if we need to
+			at the end to compare checksums.
+		*/
+
+	}
+
+	// Parse ZLIB stream without header.
+	err = inflate_raw(z=ctx, expected_output_size=expected_output_size);
+	if err != nil {
+		return err;
+	}
+
+	if !raw {
+		compress.discard_to_next_byte_lsb(ctx);
+		adler32 := compress.read_bits_lsb(ctx, 8) << 24 | compress.read_bits_lsb(ctx, 8) << 16 | compress.read_bits_lsb(ctx, 8) << 8 | compress.read_bits_lsb(ctx, 8);
+
+		output_hash := hash.adler32(ctx.output.buf[:]);
+
+		if output_hash != u32(adler32) {
+			return E_General.Checksum_Failed;
+		}
+	}
+	return nil;
+}
+
+
+@(optimization_mode="speed")
+__inflate_from_stream :: proc(using ctx: ^$C, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	/*
 		ctx.input must be an io.Stream backed by an implementation that supports:
 		- read
@@ -501,7 +571,7 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, expected_output_s
 // TODO: Check alignment of reserve/resize.
 
 @(optimization_mode="speed")
-inflate_from_stream_raw :: proc(z: ^Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	expected_output_size := expected_output_size;
 
 	if expected_output_size <= 0 {
@@ -698,36 +768,23 @@ inflate_from_stream_raw :: proc(z: ^Context, expected_output_size := -1, allocat
 }
 
 inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
-	ctx := Context{};
+	ctx := compress.Context_Memory_Input{};
 
-	r := bytes.Reader{};
-	bytes.reader_init(&r, input);
-	rs := bytes.reader_to_stream(&r);
-	ctx.input = rs;
 	ctx.input_data = input;
-	ctx.input_fully_in_memory = true;
-
 	ctx.output = buf;
 
-	err = inflate_from_stream(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
+	err = __inflate_from_memory(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
 
 	return err;
 }
 
 inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
-	ctx := Context{};
+	ctx := compress.Context_Memory_Input{};
 
-	r := bytes.Reader{};
-	bytes.reader_init(&r, input);
-	rs := bytes.reader_to_stream(&r);
-	ctx.input = rs;
 	ctx.input_data = input;
-	ctx.input_fully_in_memory = true;
-
 	ctx.output = buf;
 
-	return inflate_from_stream_raw(z=&ctx, expected_output_size=expected_output_size);
+	return inflate_raw(z=&ctx, expected_output_size=expected_output_size);
 }
 
-inflate     :: proc{inflate_from_stream, inflate_from_byte_array};
-inflate_raw :: proc{inflate_from_stream_raw, inflate_from_byte_array_raw};
+inflate     :: proc{__inflate_from_stream, inflate_from_byte_array};
