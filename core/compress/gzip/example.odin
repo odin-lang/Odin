@@ -45,7 +45,7 @@ main :: proc() {
 
 	if len(args) < 2 {
 		stderr("No input file specified.\n");
-		err := load(TEST, &buf);
+		err := load(slice=TEST, buf=&buf, known_gzip_size=len(TEST));
 		if err == nil {
 			stdout("Displaying test vector: ");
 			stdout(bytes.buffer_to_string(&buf));
@@ -65,7 +65,7 @@ main :: proc() {
 		if file == "-" {
 			// Read from stdin
 			s := os.stream_from_handle(os.stdin);
-			ctx := &compress.Context{
+			ctx := &compress.Context_Stream_Input{
 				input = s,
 			};
 			err = load(ctx, &buf);

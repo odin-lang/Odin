@@ -41,7 +41,7 @@ main :: proc() {
 demo :: proc() {
 	file: string;
 
-	options := image.Options{.return_metadata};
+	options := image.Options{}; // {.return_metadata};
 	err:       compress.Error;
 	img:      ^image.Image;
 
@@ -56,9 +56,9 @@ demo :: proc() {
 		v: ^Info;
 
 		fmt.printf("Image: %vx%vx%v, %v-bit.\n", img.width, img.height, img.channels, img.depth);
-
 		if img.metadata_ptr != nil && img.metadata_type == Info {
 			v = (^Info)(img.metadata_ptr);
+
 			// Handle ancillary chunks as you wish.
 			// We provide helper functions for a few types.
 			for c in v.chunks {
