@@ -423,7 +423,7 @@ parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err:
 }
 
 @(optimization_mode="speed")
-__inflate_from_memory :: proc(using ctx: ^compress.Context_Memory_Input, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	/*
 		ctx.output must be a bytes.Buffer for now. We'll add a separate implementation that writes to a stream.
 
@@ -432,83 +432,8 @@ __inflate_from_memory :: proc(using ctx: ^compress.Context_Memory_Input, raw := 
 	*/
 
 	if !raw {
-		if len(ctx.input_data) < 6 {
-			return E_General.Stream_Too_Short;
-		}
-
-		cmf, _ := compress.read_u8(ctx);
-
-		method := Compression_Method(cmf & 0xf);
-		if method != .DEFLATE {
-			return E_General.Unknown_Compression_Method;
-		}
-
-		cinfo  := (cmf >> 4) & 0xf;
-		if cinfo > 7 {
-			return E_ZLIB.Unsupported_Window_Size;
-		}
-		flg, _ := compress.read_u8(ctx);
-
-		fcheck  := flg & 0x1f;
-		fcheck_computed := (cmf << 8 | flg) & 0x1f;
-		if fcheck != fcheck_computed {
-			return E_General.Checksum_Failed;
-		}
-
-		fdict   := (flg >> 5) & 1;
-		/*
-			We don't handle built-in dictionaries for now.
-			They're application specific and PNG doesn't use them.
-		*/
-		if fdict != 0 {
-			return E_ZLIB.FDICT_Unsupported;
-		}
-
-		// flevel  := Compression_Level((flg >> 6) & 3);
-		/*
-			Inflate can consume bits belonging to the Adler checksum.
-			We pass the entire stream to Inflate and will unget bytes if we need to
-			at the end to compare checksums.
-		*/
-
-	}
-
-	// Parse ZLIB stream without header.
-	err = inflate_raw(z=ctx, expected_output_size=expected_output_size);
-	if err != nil {
-		return err;
-	}
-
-	if !raw {
-		compress.discard_to_next_byte_lsb(ctx);
-		adler32 := compress.read_bits_lsb(ctx, 8) << 24 | compress.read_bits_lsb(ctx, 8) << 16 | compress.read_bits_lsb(ctx, 8) << 8 | compress.read_bits_lsb(ctx, 8);
-
-		output_hash := hash.adler32(ctx.output.buf[:]);
-
-		if output_hash != u32(adler32) {
-			return E_General.Checksum_Failed;
-		}
-	}
-	return nil;
-}
-
-
-@(optimization_mode="speed")
-__inflate_from_stream :: proc(using ctx: ^$C, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
-	/*
-		ctx.input must be an io.Stream backed by an implementation that supports:
-		- read
-		- size
-
-		ctx.output must be a bytes.Buffer for now. We'll add a separate implementation that writes to a stream.
-
-		raw determines whether the ZLIB header is processed, or we're inflating a raw
-		DEFLATE stream.
-	*/
-
-	if !raw {
-		data_size := io.size(ctx.input);
-		if data_size < 6 {
+		size, size_err := compress.input_size(ctx);
+		if size < 6 || size_err != nil {
 			return E_General.Stream_Too_Short;
 		}
 
@@ -773,7 +698,7 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, e
 	ctx.input_data = input;
 	ctx.output = buf;
 
-	err = __inflate_from_memory(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
+	err = inflate_from_context(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
 
 	return err;
 }
@@ -787,4 +712,4 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 	return inflate_raw(z=&ctx, expected_output_size=expected_output_size);
 }
 
-inflate     :: proc{__inflate_from_stream, inflate_from_byte_array};
+inflate     :: proc{inflate_from_context, inflate_from_byte_array};
