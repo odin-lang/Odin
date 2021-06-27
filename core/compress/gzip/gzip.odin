@@ -21,8 +21,6 @@ import "core:io"
 import "core:bytes"
 import "core:hash"
 
-// import "core:fmt"
-
 Magic :: enum u16le {
 	GZIP = 0x8b << 8 | 0x1f,
 }
@@ -346,26 +344,23 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 	payload_crc_b: [4]u8;
 	for _, i in payload_crc_b {
-		if z.num_bits >= 8 {
-			payload_crc_b[i] = u8(compress.read_bits_lsb(z, 8));
-		} else {
-			payload_crc_b[i], footer_error = compress.read_u8(z);
-		}
+		payload_crc_b[i], footer_error = compress.read_u8_prefer_code_buffer_lsb(z);
 	}
 	payload_crc := transmute(u32le)payload_crc_b;
-	payload_u32le, footer_error = compress.read_data(z, u32le);
 
 	payload := bytes.buffer_to_bytes(buf);
-
-	// fmt.printf("GZIP payload: %v\n", string(payload));
-
-	crc32 := u32le(hash.crc32(payload));
-
+	crc32   := u32le(hash.crc32(payload));
 	if crc32 != payload_crc {
 		return E_GZIP.Payload_CRC_Invalid;
 	}
 
-	if len(payload) != int(payload_u32le) {
+	payload_len_b: [4]u8;
+	for _, i in payload_len_b {
+		payload_len_b[i], footer_error = compress.read_u8_prefer_code_buffer_lsb(z);
+	}
+	payload_len := transmute(u32le)payload_len_b;
+
+	if len(payload) != int(payload_len) {
 		return E_GZIP.Payload_Length_Invalid;
 	}
 	return nil;

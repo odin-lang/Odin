@@ -13,7 +13,6 @@ package zlib
 
 import "core:bytes"
 import "core:fmt"
-import "core:compress"
 
 main :: proc() {
 
@@ -37,8 +36,6 @@ main :: proc() {
 		 63, 234, 138, 133, 204,
 	};
 	OUTPUT_SIZE :: 438;
-
-	fmt.printf("size_of(Context): %v\n", size_of(compress.Context_Memory_Input));
 
 	buf: bytes.Buffer;
 
