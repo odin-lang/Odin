@@ -445,38 +445,77 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_offset_of: {
+		// offset_of :: proc(value.field) -> uintptr
 		// offset_of :: proc(Type, field) -> uintptr
-		Operand op = {};
-		Type *bt = check_type(c, ce->args[0]);
-		Type *type = base_type(bt);
-		if (type == nullptr || type == t_invalid) {
-			error(ce->args[0], "Expected a type for 'offset_of'");
+
+		Type *type = nullptr;
+		Ast *field_arg = nullptr;
+
+		if (ce->args.count == 1) {
+			Ast *arg0 = unparen_expr(ce->args[0]);
+			if (arg0->kind != Ast_SelectorExpr) {
+				gbString x = expr_to_string(arg0);
+				error(ce->args[0], "Invalid expression for 'offset_of', '%s' is not a selector expression", x);
+				gb_string_free(x);
+				return false;
+			}
+
+			ast_node(se, SelectorExpr, arg0);
+
+			Operand x = {};
+			check_expr(c, &x, se->expr);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			type = type_deref(x.type);
+
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for 'offset_of'");
+				return false;
+			}
+
+			field_arg = unparen_expr(se->selector);
+		} else if (ce->args.count == 2) {
+			type = check_type(c, ce->args[0]);
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for 'offset_of'");
+				return false;
+			}
+
+			field_arg = unparen_expr(ce->args[1]);
+		} else {
+			error(ce->args[0], "Expected either 1 or 2 arguments to 'offset_of', in the format of 'offset_of(Type, field)', 'offset_of(value.field)'");
 			return false;
 		}
+		GB_ASSERT(type != nullptr);
 
-		Ast *field_arg = unparen_expr(ce->args[1]);
 		if (field_arg == nullptr ||
 		    field_arg->kind != Ast_Ident) {
 			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
 		if (is_type_array(type)) {
-			error(field_arg, "Invalid type for 'offset_of'");
+			gbString t = type_to_string(type);
+			error(field_arg, "Invalid a struct type for 'offset_of', got '%s'", t);
+			gb_string_free(t);
 			return false;
 		}
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(type, arg->token.string, operand->mode == Addressing_Type);
+		String field_name = arg->token.string;
+		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(bt);
+			gbString type_str = type_to_string(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(arg->token.string));
 			gb_string_free(type_str);
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(bt);
+			gbString type_str = type_to_string(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(arg->token.string), type_str);
 			gb_string_free(type_str);
@@ -486,7 +525,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_offset_of_from_selection(type, sel));
 		operand->type  = t_uintptr;
-
 		break;
 	}
 
