@@ -12978,8 +12978,13 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					u8 index = swizzle_indices_raw>>(i*2) & 3;
 					swizzle_indices[i] = index;
 				}
-				lbAddr addr = lb_build_addr(p, se->expr);
-				lbValue a = lb_addr_get_ptr(p, addr);
+				lbValue a = {};
+				if (is_type_pointer(tav.type)) {
+					a = lb_build_expr(p, se->expr);
+				} else {
+					lbAddr addr = lb_build_addr(p, se->expr);
+					a = lb_addr_get_ptr(p, addr);
+				}
 
 				GB_ASSERT(is_type_array(expr->tav.type));
 				return lb_addr_swizzle(a, expr->tav.type, swizzle_count, swizzle_indices);
