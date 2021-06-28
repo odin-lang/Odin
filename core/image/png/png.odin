@@ -245,7 +245,7 @@ ADAM7_Y_SPACING := []int{ 8,8,8,4,4,2,2 };
 
 // Implementation starts here
 
-read_chunk :: proc(ctx: ^compress.Context) -> (chunk: Chunk, err: Error) {
+read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 	ch, e := compress.read_data(ctx, Chunk_Header);
 	if e != .None {
 		return {}, E_General.Stream_Too_Short;
@@ -274,7 +274,7 @@ read_chunk :: proc(ctx: ^compress.Context) -> (chunk: Chunk, err: Error) {
 	return chunk, nil;
 }
 
-read_header :: proc(ctx: ^compress.Context) -> (IHDR, Error) {
+read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 	c, e := read_chunk(ctx);
 	if e != nil {
 		return {}, e;
@@ -353,14 +353,8 @@ chunk_type_to_name :: proc(type: ^Chunk_Type) -> string {
 }
 
 load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	r := bytes.Reader{};
-	bytes.reader_init(&r, slice);
-	stream := bytes.reader_to_stream(&r);
-
-	ctx := &compress.Context{
-		input = stream,
+	ctx := &compress.Context_Memory_Input{
 		input_data = slice,
-		input_fully_in_memory = true,
 	};
 
 	/*
@@ -368,7 +362,7 @@ load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.
 		This way the stream reader could avoid the copy into the temp memory returned by it,
 		and instead return a slice into the original memory that's already owned by the caller.
 	*/
-	img, err = load_from_stream(ctx, options, allocator);
+	img, err = load_from_context(ctx, options, allocator);
 
 	return img, err;
 }
@@ -386,7 +380,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	}
 }
 
-load_from_stream :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	options := options;
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image};
@@ -674,39 +668,41 @@ load_from_stream :: proc(ctx: ^compress.Context, options := Options{}, allocator
 		return img, E_PNG.IDAT_Missing;
 	}
 
+	/*
+		Calculate the expected output size, to help `inflate` make better decisions about the output buffer.
+		We'll also use it to check the returned buffer size is what we expected it to be.
+
+		Let's calcalate the expected size of the IDAT based on its dimensions, and whether or not it's interlaced.
+	*/
+	expected_size: int;
+
+	if header.interlace_method != .Adam7 {
+		expected_size = compute_buffer_size(int(header.width), int(header.height), int(img.channels), int(header.bit_depth), 1);
+	} else {
+		/*
+			Because Adam7 divides the image up into sub-images, and each scanline must start
+			with a filter byte, Adam7 interlaced images can have a larger raw size.
+		*/
+		for p := 0; p < 7; p += 1 {
+			x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p];
+			y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p];
+			if x > 0 && y > 0 {
+				expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1);
+			}
+		}
+	}
+
 	buf: bytes.Buffer;
-	zlib_error := zlib.inflate(idat, &buf);
+	zlib_error := zlib.inflate(idat, &buf, false, expected_size);
 	defer bytes.buffer_destroy(&buf);
 
 	if zlib_error != nil {
 		return {}, zlib_error;
-	} else {
-		/*
-			Let's calcalate the expected size of the IDAT based on its dimensions,
-			and whether or not it's interlaced
-		*/
-		expected_size: int;
-		buf_len := len(buf.buf);
+	}
 
-		if header.interlace_method != .Adam7 {
-			expected_size = compute_buffer_size(int(header.width), int(header.height), int(img.channels), int(header.bit_depth), 1);
-		} else {
-			/*
-				Because Adam7 divides the image up into sub-images, and each scanline must start
-				with a filter byte, Adam7 interlaced images can have a larger raw size.
-			*/
-			for p := 0; p < 7; p += 1 {
-				x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p];
-				y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p];
-				if x > 0 && y > 0 {
-					expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1);
-				}
-			}
-		}
-
-		if expected_size != buf_len {
-			return {}, E_PNG.IDAT_Corrupt;
-		}
+	buf_len := len(buf.buf);
+	if expected_size != buf_len {
+		return {}, E_PNG.IDAT_Corrupt;
 	}
 
 	/*
@@ -1657,4 +1653,4 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 	return nil;
 }
 
-load :: proc{load_from_file, load_from_slice, load_from_stream};
+load :: proc{load_from_file, load_from_slice, load_from_context};
