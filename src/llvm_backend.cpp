@@ -509,6 +509,9 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	} else if (addr.kind == lbAddr_Swizzle) {
 		GB_ASSERT(addr.swizzle.count <= 4);
 
+		GB_ASSERT(value.value != nullptr);
+		value = lb_emit_conv(p, value, lb_addr_type(addr));
+
 		lbValue dst = lb_addr_get_ptr(p, addr);
 		lbValue src = lb_address_from_load_or_generate_local(p, value);
 		{
