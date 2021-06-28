@@ -170,8 +170,7 @@ trace :: proc(m: $T/[$N][N]$E) -> (tr: E) {
 	return;
 }
 
-
-transpose :: proc(a: $T/[$N][$M]$E) -> (m: [M][N]E) {
+transpose :: proc(a: $T/[$N][$M]$E) -> (m: (T when N == M else [M][N]E)) {
 	for j in 0..<M {
 		for i in 0..<N {
 			m[j][i] = a[i][j];
