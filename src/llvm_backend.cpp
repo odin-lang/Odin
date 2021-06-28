@@ -306,15 +306,16 @@ bool lb_try_update_alignment(lbValue ptr, unsigned alignment)  {
 
 bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_) {
 	Type *array_type = base_type(type_deref(ptr.type));
-	GB_ASSERT(array_type->kind == Type_Array);
-	Type *elem_type = base_type(array_type->Array.elem);
+	GB_ASSERT(is_type_array_like(array_type));
+	i64 count = get_array_type_count(array_type);
+	Type *elem_type = base_array_type(array_type);
 
 	// TODO(bill): Determine what is the correct limit for doing vector arithmetic
 	if (type_size_of(array_type) <= build_context.max_align &&
 	    is_type_valid_vector_elem(elem_type)) {
 		// Try to treat it like a vector if possible
 		bool possible = false;
-		LLVMTypeRef vector_type = LLVMVectorType(lb_type(m, elem_type), cast(unsigned)array_type->Array.count);
+		LLVMTypeRef vector_type = LLVMVectorType(lb_type(m, elem_type), cast(unsigned)count);
 		unsigned vector_alignment = cast(unsigned)lb_alignof(vector_type);
 
 		LLVMValueRef addr_ptr = ptr.value;
@@ -5585,9 +5586,9 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 	Type *lhs_type = lb_addr_type(lhs);
 	Type *rhs_type = value.type;
 	Type *array_type = base_type(lhs_type);
-	GB_ASSERT(array_type->kind == Type_Array);
-	i64 count = array_type->Array.count;
-	Type *elem_type = array_type->Array.elem;
+	GB_ASSERT(is_type_array_like(array_type));
+	i64 count = get_array_type_count(array_type);
+	Type *elem_type = base_array_type(array_type);
 
 	lbValue rhs = lb_emit_conv(p, value, lhs_type);
 
@@ -7059,11 +7060,11 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 		break;
 	}
 
-	if (is_type_array(x.type)) {
+	if (is_type_array_like(x.type)) {
 		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
 		Type *tl = base_type(x.type);
 		lbValue val = lb_address_from_load_or_generate_local(p, x);
-		GB_ASSERT(is_type_array(type));
+		GB_ASSERT(is_type_array_like(type));
 		Type *elem_type = base_array_type(type);
 
 		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
@@ -7072,7 +7073,7 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 
 		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
 
-		i32 count = cast(i32)tl->Array.count;
+		i32 count = cast(i32)get_array_type_count(tl);
 
 		LLVMTypeRef vector_type = nullptr;
 		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type)) {
@@ -7204,7 +7205,7 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 }
 
 bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, lbValue *res_) {
-	GB_ASSERT(is_type_array(type));
+	GB_ASSERT(is_type_array_like(type));
 	Type *elem_type = base_array_type(type);
 
 	// NOTE(bill): Shift operations cannot be easily dealt with due to Odin's semantics
@@ -7339,15 +7340,15 @@ bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbVal
 
 
 lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
-	GB_ASSERT(is_type_array(lhs.type) || is_type_array(rhs.type));
+	GB_ASSERT(is_type_array_like(lhs.type) || is_type_array_like(rhs.type));
 
 	lhs = lb_emit_conv(p, lhs, type);
 	rhs = lb_emit_conv(p, rhs, type);
 
-	GB_ASSERT(is_type_array(type));
+	GB_ASSERT(is_type_array_like(type));
 	Type *elem_type = base_array_type(type);
 
-	i64 count = base_type(type)->Array.count;
+	i64 count = get_array_type_count(type);
 	unsigned n = cast(unsigned)count;
 
 	// NOTE(bill, 2021-06-12): Try to do a direct operation as a vector, if possible
@@ -7415,7 +7416,7 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
 	lbModule *m = p->module;
 
-	if (is_type_array(lhs.type) || is_type_array(rhs.type)) {
+	if (is_type_array_like(lhs.type) || is_type_array_like(rhs.type)) {
 		return lb_emit_arith_array(p, op, lhs, rhs, type);
 	} else if (is_type_complex(type)) {
 		lhs = lb_emit_conv(p, lhs, type);
@@ -8304,12 +8305,12 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return lb_emit_transmute(p, value, t);
 	}
 
-	if (is_type_array(dst)) {
-		Type *elem = dst->Array.elem;
+	if (is_type_array_like(dst)) {
+		Type *elem = base_array_type(dst);
 		lbValue e = lb_emit_conv(p, value, elem);
 		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
 		lbAddr v = lb_add_local_generated(p, t, false);
-		isize index_count = cast(isize)dst->Array.count;
+		isize index_count = cast(isize)get_array_type_count(dst);
 
 		for (isize i = 0; i < index_count; i++) {
 			lbValue elem = lb_emit_array_epi(p, v.addr, i);
@@ -9855,10 +9856,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				lbValue ep = lb_emit_struct_ep(p, tuple, cast(i32)src_index);
 				lb_emit_store(p, ep, f);
 			}
-		} else if (t->kind == Type_Array) {
+		} else if (is_type_array_like(t)) {
 			// TODO(bill): Clean-up this code
 			lbValue ap = lb_address_from_load_or_generate_local(p, val);
-			for (i32 i = 0; i < cast(i32)t->Array.count; i++) {
+			i32 n = cast(i32)get_array_type_count(t);
+			for (i32 i = 0; i < n; i++) {
 				lbValue f = lb_emit_load(p, lb_emit_array_epi(p, ap, i));
 				lbValue ep = lb_emit_struct_ep(p, tuple, i);
 				lb_emit_store(p, ep, f);

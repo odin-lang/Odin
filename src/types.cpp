@@ -1262,6 +1262,20 @@ bool is_type_rune_array(Type *t) {
 }
 
 
+bool is_type_array_like(Type *t) {
+	return is_type_array(t) || is_type_enumerated_array(t);
+}
+i64 get_array_type_count(Type *t) {
+	Type *bt = base_type(t);
+	if (bt->kind == Type_Array) {
+		return bt->Array.count;
+	} else if (bt->kind == Type_EnumeratedArray) {
+		return bt->EnumeratedArray.count;
+	}
+	GB_ASSERT(is_type_array_like(t));
+	return -1;
+}
+
 
 
 Type *core_array_type(Type *t) {
