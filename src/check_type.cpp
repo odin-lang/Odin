@@ -89,12 +89,8 @@ bool does_field_type_allow_using(Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
 		return true;
-	} else if (is_type_raw_union(t)) {
-		return true;
 	} else if (is_type_array(t)) {
 		return t->Array.count <= 4;
-	} else if (is_type_typeid(t)) {
-		return true;
 	}
 	return false;
 }
