@@ -427,7 +427,7 @@ typeid_base :: proc "contextless" (id: typeid) -> typeid {
 	return ti.id;
 }
 typeid_core :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_base_without_enum(type_info_of(id));
+	ti := type_info_core(type_info_of(id));
 	return ti.id;
 }
 typeid_base_without_enum :: typeid_core;
@@ -492,6 +492,6 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 		print_string(message);
 	}
 	print_byte('\n');
-	// debug_trap();
-	trap();
+	// intrinsics.debug_trap();
+	intrinsics.trap();
 }
