@@ -1667,7 +1667,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		GB_ASSERT(ctx->curr_proc_sig != nullptr);
 
 		if (ctx->in_defer) {
-			error(rs->token, "You cannot 'return' within a defer statement");
+			error(rs->token, "'return' cannot be used within a defer statement");
 			break;
 		}
 
