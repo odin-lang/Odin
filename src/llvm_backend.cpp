@@ -9611,115 +9611,45 @@ lbValue lb_emit_try(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
 		lbFunctionType *ft = lb_get_function_type(p->module, p, proc_type);
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
-		lbValue res = {};
 		if (p->type->Proc.has_named_results) {
 			Entity *e = tuple->variables[tuple->variables.count-1];
 			// NOTE(bill): store the named values before returning
 			if (e->token.string != "") {
 				lbValue *found = map_get(&p->module->values, hash_entity(e));
 				GB_ASSERT(found != nullptr);
-				res = lb_emit_conv(p, rhs, e->type);
-				lb_emit_store(p, *found, res);
+				lb_emit_store(p, *found, lb_emit_conv(p, rhs, e->type));
 			}
-		}
 
-		if (return_count == 1) {
+			lb_build_return_stmt(p, {});
+		} else {
+			GB_ASSERT(return_count == 1);
 			Entity *e = tuple->variables[0];
-			if (res.value == nullptr) {
-				res = lb_emit_conv(p, rhs, e->type);
-			}
-		} else {
-			GB_ASSERT(p->type->Proc.has_named_results);
-			auto results = array_make<lbValue>(permanent_allocator(), 0, return_count);
-
-			for (isize res_index = 0; res_index < return_count; res_index++) {
-				Entity *e = tuple->variables[res_index];
-				lbValue *found = map_get(&p->module->values, hash_entity(e));
-				GB_ASSERT(found);
-				lbValue res = lb_emit_load(p, *found);
-				array_add(&results, res);
-			}
-
-			GB_ASSERT(results.count == return_count);
-
-			auto named_results = slice_make<lbValue>(temporary_allocator(), results.count);
-			auto values = slice_make<lbValue>(temporary_allocator(), results.count);
-
-			// NOTE(bill): store the named values before returning
-			for_array(i, p->type->Proc.results->Tuple.variables) {
-				Entity *e = p->type->Proc.results->Tuple.variables[i];
-				if (e->kind != Entity_Variable) {
-					continue;
-				}
-
-				if (e->token.string == "") {
-					continue;
-				}
-				lbValue *found = map_get(&p->module->values, hash_entity(e));
-				GB_ASSERT(found != nullptr);
-				named_results[i] = *found;
-				values[i] = lb_emit_conv(p, results[i], e->type);
-			}
-
-			for_array(i, named_results) {
-				lb_emit_store(p, named_results[i], values[i]);
-			}
-
-			Type *ret_type = p->type->Proc.results;
-
-			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-			if (return_by_pointer) {
-				res = p->return_ptr.addr;
-			} else {
-				res = lb_add_local_generated(p, ret_type, false).addr;
-			}
-
-			auto result_values = slice_make<lbValue>(temporary_allocator(), results.count);
-			auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count);
-
-			for_array(i, results) {
-				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
-			}
-			for_array(i, results) {
-				result_eps[i] = lb_emit_struct_ep(p, res, cast(i32)i);
-			}
-			for_array(i, result_values) {
-				lb_emit_store(p, result_eps[i], result_values[i]);
-			}
+			lbValue res = lb_emit_conv(p, rhs, e->type);
 
 			if (return_by_pointer) {
+				if (res.value != nullptr) {
+					LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
+				} else {
+					LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+				}
+
 				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
 				LLVMBuildRetVoid(p->builder);
-				goto end;
-			}
-
-			res = lb_emit_load(p, res);
-		}
-
-
-		if (return_by_pointer) {
-			if (res.value != nullptr) {
-				LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
 			} else {
-				LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+				LLVMValueRef ret_val = res.value;
+				ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
+				if (p->abi_function_type->ret.cast_type != nullptr) {
+					ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
+				}
+
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				LLVMBuildRet(p->builder, ret_val);
 			}
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-			LLVMBuildRetVoid(p->builder);
-		} else {
-			LLVMValueRef ret_val = res.value;
-			ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
-			if (p->abi_function_type->ret.cast_type != nullptr) {
-				ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
-			}
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-			LLVMBuildRet(p->builder, ret_val);
 		}
+
 	}
 
-end:;
 	lb_start_block(p, continue_block);
 
 	if (tv.type != nullptr) {
