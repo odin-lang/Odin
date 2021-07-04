@@ -1013,6 +1013,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	case 'b': _fmt_int(fi, u,  2, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'o': _fmt_int(fi, u,  8, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'i', 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'z': _fmt_int(fi, u, 12, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case 'X': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 
@@ -1082,7 +1083,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 		case 's', 'v':
 			str, ok := enum_value_to_string(v);
 			if !ok {
-				str = "!%(BAD ENUM VALUE)";
+				str = "%!(BAD ENUM VALUE)";
 			}
 			io.write_string(fi.writer, str);
 		}
