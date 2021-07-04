@@ -5339,6 +5339,28 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 	}
 }
 
+void lb_build_return_stmt_internal(lbProcedure *p, bool return_by_pointer, lbValue const &res) {
+	if (return_by_pointer) {
+		if (res.value != nullptr) {
+			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
+		} else {
+			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+		}
+
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
+		LLVMBuildRetVoid(p->builder);
+	} else {
+		LLVMValueRef ret_val = res.value;
+		ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
+		if (p->abi_function_type->ret.cast_type != nullptr) {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
+		}
+
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+		LLVMBuildRet(p->builder, ret_val);
+	}
+}
 void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	lb_ensure_abi_function_type(p->module, p);
 
@@ -5461,28 +5483,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 
 		res = lb_emit_load(p, res);
 	}
-
-
-	if (return_by_pointer) {
-		if (res.value != nullptr) {
-			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
-		} else {
-			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
-		}
-
-		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-		LLVMBuildRetVoid(p->builder);
-	} else {
-		LLVMValueRef ret_val = res.value;
-		ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
-		if (p->abi_function_type->ret.cast_type != nullptr) {
-			ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
-		}
-
-		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-		LLVMBuildRet(p->builder, ret_val);
-	}
+	lb_build_return_stmt_internal(p, return_by_pointer, res);
 }
 
 void lb_build_if_stmt(lbProcedure *p, Ast *node) {
@@ -9624,28 +9625,7 @@ lbValue lb_emit_try(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
 		} else {
 			GB_ASSERT(return_count == 1);
 			Entity *e = tuple->variables[0];
-			lbValue res = lb_emit_conv(p, rhs, e->type);
-
-			if (return_by_pointer) {
-				if (res.value != nullptr) {
-					LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
-				} else {
-					LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
-				}
-
-				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-				LLVMBuildRetVoid(p->builder);
-			} else {
-				LLVMValueRef ret_val = res.value;
-				ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.type);
-				if (p->abi_function_type->ret.cast_type != nullptr) {
-					ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
-				}
-
-				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-				LLVMBuildRet(p->builder, ret_val);
-			}
+			lb_build_return_stmt_internal(p, return_by_pointer, lb_emit_conv(p, rhs, e->type));
 		}
 
 	}
