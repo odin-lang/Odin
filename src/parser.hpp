@@ -370,6 +370,8 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
+	AST_KIND(TryExpr,       "try expression",      struct { Token token; Ast *expr; }) \
+	AST_KIND(TryElseExpr,   "try else expression", struct { Token try_token; Ast *expr; Token else_token; Ast *else_expr; }) \
 	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
 		Token token; \
 		Token open, close; \
