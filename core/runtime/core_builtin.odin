@@ -270,11 +270,22 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
 // The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
 // If m is nil, or there is no such element, this procedure is a no-op
 @builtin
-delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
+delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
 		key := key;
-		__dynamic_map_delete_key(__get_map_header(m), __get_map_hash(&key));
+		h := __get_map_header(m);
+		hash := __get_map_hash(&key);
+		fr := __dynamic_map_find(h, hash);
+		if fr.entry_index >= 0 {
+			entry := __dynamic_map_get_entry(h, fr.entry_index);
+			deleted_key   = (^K)(uintptr(entry)+h.key_offset)^;
+			deleted_value = (^V)(uintptr(entry)+h.value_offset)^;
+
+			__dynamic_map_erase(h, fr);
+		}
 	}
+
+	return;
 }
 
 
