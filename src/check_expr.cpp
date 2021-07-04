@@ -6263,6 +6263,34 @@ void check_try_split_types(CheckerContext *c, Operand *x, String const &name, Ty
 }
 
 
+void check_try_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
+	// TODO(bill): better error message
+	gbString t = type_to_string(x.type);
+	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
+	if (is_type_union(type_deref(x.type))) {
+		Type *bsrc = base_type(type_deref(x.type));
+		gbString th = nullptr;
+		if (type_hint != nullptr) {
+			GB_ASSERT(bsrc->kind == Type_Union);
+			for_array(i, bsrc->Union.variants) {
+				Type *vt = bsrc->Union.variants[i];
+				if (are_types_identical(vt, type_hint)) {
+					th = type_to_string(type_hint);
+					break;
+				}
+			}
+		}
+		gbString expr_str = expr_to_string(x.expr);
+		if (th != nullptr) {
+			error_line("\tSuggestion: was a type assertion such as %s.(%s) or %s.? wanted?\n", expr_str, th, expr_str);
+		} else {
+			error_line("\tSuggestion: was a type assertion such as %s.(T) or %s.? wanted?\n", expr_str, expr_str);
+		}
+		gb_string_free(th);
+		gb_string_free(expr_str);
+	}
+	gb_string_free(t);
+}
 ExprKind check_try_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	String name = str_lit("try");
 
@@ -6288,44 +6316,48 @@ ExprKind check_try_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hin
 	if (c->curr_proc_sig == nullptr) {
 		error(node, "'%.*s' can only be used within a procedure", LIT(name));
 	}
-	Type *proc_type = base_type(c->curr_proc_sig);
-	GB_ASSERT(proc_type->kind == Type_Proc);
-	Type *result_type = proc_type->Proc.results;
-	if (result_type == nullptr) {
-		error(node, "'%.*s' requires the current procedure to have at least one return value", LIT(name));
+
+	if (right_type == nullptr) {
+		check_try_expr_no_value_error(c, name, x, type_hint);
 	} else {
-		GB_ASSERT(result_type->kind == Type_Tuple);
+		Type *proc_type = base_type(c->curr_proc_sig);
+		GB_ASSERT(proc_type->kind == Type_Proc);
+		Type *result_type = proc_type->Proc.results;
+		if (result_type == nullptr) {
+			error(node, "'%.*s' requires the current procedure to have at least one return value", LIT(name));
+		} else {
+			GB_ASSERT(result_type->kind == Type_Tuple);
 
-		auto const &vars = result_type->Tuple.variables;
-		Type *end_type = vars[vars.count-1]->type;
+			auto const &vars = result_type->Tuple.variables;
+			Type *end_type = vars[vars.count-1]->type;
 
-		if (vars.count > 1) {
-			if (!proc_type->Proc.has_named_results) {
-				error(node, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(name));
+			if (vars.count > 1) {
+				if (!proc_type->Proc.has_named_results) {
+					error(node, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(name));
+				}
 			}
-		}
 
-		Operand rhs = {};
-		rhs.type = right_type;
-		rhs.mode = Addressing_Value;
+			Operand rhs = {};
+			rhs.type = right_type;
+			rhs.mode = Addressing_Value;
 
-		// TODO(bill): better error message
-		if (!check_is_assignable_to(c, &rhs, end_type)) {
-			gbString a = type_to_string(right_type);
-			gbString b = type_to_string(end_type);
-			gbString ret_type = type_to_string(result_type);
-			error(node, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(name));
-			if (vars.count == 1) {
-				error_line("\tProcedure return value type: %s\n", ret_type);
-			} else {
-				error_line("\tProcedure return value types: (%s)\n", ret_type);
+			// TODO(bill): better error message
+			if (!check_is_assignable_to(c, &rhs, end_type)) {
+				gbString a = type_to_string(right_type);
+				gbString b = type_to_string(end_type);
+				gbString ret_type = type_to_string(result_type);
+				error(node, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(name));
+				if (vars.count == 1) {
+					error_line("\tProcedure return value type: %s\n", ret_type);
+				} else {
+					error_line("\tProcedure return value types: (%s)\n", ret_type);
+				}
+				gb_string_free(ret_type);
+				gb_string_free(b);
+				gb_string_free(a);
 			}
-			gb_string_free(ret_type);
-			gb_string_free(b);
-			gb_string_free(a);
 		}
 	}
-
 
 	if (left_type != nullptr) {
 		o->mode = Addressing_Value;
@@ -6367,8 +6399,7 @@ ExprKind check_try_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *typ
 	if (left_type != nullptr) {
 		check_assignment(c, &y, left_type, name);
 	} else {
-		// TODO(bill): better error message
-		error(node, "'%.*s' does not return a value", LIT(name));
+		check_try_expr_no_value_error(c, name, x, type_hint);
 	}
 
 	if (left_type == nullptr) {
