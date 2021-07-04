@@ -9612,17 +9612,21 @@ lbValue lb_emit_try(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
 		lbValue res = {};
+		if (p->type->Proc.has_named_results) {
+			Entity *e = tuple->variables[tuple->variables.count-1];
+			// NOTE(bill): store the named values before returning
+			if (e->token.string != "") {
+				lbValue *found = map_get(&p->module->values, hash_entity(e));
+				GB_ASSERT(found != nullptr);
+				res = lb_emit_conv(p, rhs, e->type);
+				lb_emit_store(p, *found, res);
+			}
+		}
+
 		if (return_count == 1) {
 			Entity *e = tuple->variables[0];
-			res = lb_emit_conv(p, rhs, e->type);
-
-			if (p->type->Proc.has_named_results) {
-				// NOTE(bill): store the named values before returning
-				if (e->token.string != "") {
-					lbValue *found = map_get(&p->module->values, hash_entity(e));
-					GB_ASSERT(found != nullptr);
-					lb_emit_store(p, *found, lb_emit_conv(p, res, e->type));
-				}
+			if (res.value == nullptr) {
+				res = lb_emit_conv(p, rhs, e->type);
 			}
 		} else {
 			GB_ASSERT(p->type->Proc.has_named_results);
