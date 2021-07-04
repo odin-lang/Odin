@@ -111,6 +111,8 @@ Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, As
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint);
 
+void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_);
+
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
@@ -4045,26 +4047,7 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 				val1.mode = Addressing_Value;
 				val1.type = t_untyped_bool;
 
-
-				if (expr->kind == Ast_CallExpr) {
-					Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
-					if (is_type_proc(pt)) {
-						do_normal = false;
-						Type *tuple = pt->Proc.results;
-						add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
-
-						if (pt->Proc.result_count >= 2) {
-							Type *t1 = tuple->Tuple.variables[1]->type;
-							val1.type = t1;
-						}
-						expr->CallExpr.optional_ok_one = false;
-					}
-				}
-
-				if (do_normal) {
-					Type *tuple = make_optional_ok_type(o.type);
-					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
-				}
+				check_promote_optional_ok(c, &o, nullptr, &val1.type);
 
 				if (expr->kind == Ast_TypeAssertion &&
 				    (o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
@@ -4170,26 +4153,7 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 				val1.mode = Addressing_Value;
 				val1.type = t_untyped_bool;
 
-
-				if (expr->kind == Ast_CallExpr) {
-					Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
-					if (is_type_proc(pt)) {
-						do_normal = false;
-						Type *tuple = pt->Proc.results;
-						add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
-
-						if (pt->Proc.result_count >= 2) {
-							Type *t1 = tuple->Tuple.variables[1]->type;
-							val1.type = t1;
-						}
-						expr->CallExpr.optional_ok_one = false;
-					}
-				}
-
-				if (do_normal) {
-					Type *tuple = make_optional_ok_type(o.type);
-					add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
-				}
+				check_promote_optional_ok(c, &o, nullptr, &val1.type);
 
 				if (expr->kind == Ast_TypeAssertion &&
 				    (o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
@@ -8192,6 +8156,21 @@ void check_multi_expr(CheckerContext *c, Operand *o, Ast *e) {
 	o->mode = Addressing_Invalid;
 }
 
+void check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) {
+	check_expr_base(c, o, e, type_hint);
+	switch (o->mode) {
+	default:
+		return; // NOTE(bill): Valid
+	case Addressing_NoValue:
+		error_operand_no_value(o);
+		break;
+	case Addressing_Type:
+		error_operand_not_expression(o);
+		break;
+	}
+	o->mode = Addressing_Invalid;
+}
+
 void check_not_tuple(CheckerContext *c, Operand *o) {
 	if (o->mode == Addressing_Value) {
 		// NOTE(bill): Tuples are not first class thus never named
@@ -8472,9 +8451,15 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 
 	case_ast_node(ta, TypeAssertion, node);
 		str = write_expr_to_string(str, ta->expr, shorthand);
-		str = gb_string_appendc(str, ".(");
-		str = write_expr_to_string(str, ta->type, shorthand);
-		str = gb_string_append_rune(str, ')');
+		if (ta->type != nullptr &&
+		    ta->type->kind == Ast_UnaryExpr &&
+		    ta->type->UnaryExpr.op.kind == Token_Question) {
+			str = gb_string_appendc(str, ".?");
+		} else {
+			str = gb_string_appendc(str, ".(");
+			str = write_expr_to_string(str, ta->type, shorthand);
+			str = gb_string_append_rune(str, ')');
+		}
 	case_end;
 
 	case_ast_node(tc, TypeCast, node);
