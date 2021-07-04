@@ -69,6 +69,7 @@ struct Map {
 template <typename T> void map_init             (Map<T> *h, gbAllocator a, isize capacity = 16);
 template <typename T> void map_destroy          (Map<T> *h);
 template <typename T> T *  map_get              (Map<T> *h, HashKey const &key);
+template <typename T> T &  map_must_get         (Map<T> *h, HashKey const &key);
 template <typename T> void map_set              (Map<T> *h, HashKey const &key, T const &value);
 template <typename T> void map_remove           (Map<T> *h, HashKey const &key);
 template <typename T> void map_clear            (Map<T> *h);
@@ -200,6 +201,13 @@ T *map_get(Map<T> *h, HashKey const &key) {
 		return &h->entries[index].value;
 	}
 	return nullptr;
+}
+
+template <typename T>
+T &map_must_get(Map<T> *h, HashKey const &key) {
+	isize index = map__find(h, key).entry_index;
+	GB_ASSERT(index >= 0);
+	return h->entries[index].value;
 }
 
 template <typename T>

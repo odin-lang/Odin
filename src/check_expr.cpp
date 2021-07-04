@@ -73,6 +73,7 @@ typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 void     check_expr                     (CheckerContext *c, Operand *operand, Ast *expression);
 void     check_multi_expr               (CheckerContext *c, Operand *operand, Ast *expression);
 void     check_multi_expr_or_type       (CheckerContext *c, Operand *operand, Ast *expression);
+void     check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *type_hint);
 void     check_expr_or_type             (CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint);
 ExprKind check_expr_base                (CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint);
 void     check_expr_with_type_hint      (CheckerContext *c, Operand *o, Ast *e, Type *t);
@@ -6195,6 +6196,191 @@ ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o, Ast *node, 
 	return Expr_Expr;
 }
 
+
+void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_) {
+	switch (x->mode) {
+	case Addressing_MapIndex:
+	case Addressing_OptionalOk:
+	case Addressing_OptionalOkPtr:
+		if (val_type_) *val_type_ = x->type;
+		break;
+	default:
+		if (ok_type_) *ok_type_ = x->type;
+		return;
+	}
+
+	Ast *expr = unparen_expr(x->expr);
+
+	if (expr->kind == Ast_CallExpr) {
+		Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
+		if (is_type_proc(pt)) {
+			Type *tuple = pt->Proc.results;
+			add_type_and_value(&c->checker->info, x->expr, x->mode, tuple, x->value);
+
+			if (pt->Proc.result_count >= 2) {
+				if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
+			}
+			expr->CallExpr.optional_ok_one = false;
+			x->type = tuple;
+			return;
+		}
+	}
+
+	Type *tuple = make_optional_ok_type(x->type);
+	if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
+	add_type_and_value(&c->checker->info, x->expr, x->mode, tuple, x->value);
+	x->type = tuple;
+	GB_ASSERT(is_type_tuple(type_of_expr(x->expr)));
+}
+
+void check_try_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	if (x->type->kind == Type_Tuple) {
+		auto const &vars = x->type->Tuple.variables;
+		auto lhs = array_slice(vars, 0, vars.count-1);
+		auto rhs = vars[vars.count-1];
+		if (lhs.count == 1) {
+			left_type = lhs[0]->type;
+		} else if (lhs.count != 0) {
+			left_type = alloc_type_tuple();
+			left_type->Tuple.variables = array_make_from_ptr(lhs.data, lhs.count, lhs.count);
+		}
+
+		right_type = rhs->type;
+	} else {
+		check_promote_optional_ok(c, x, &left_type, &right_type);
+	}
+
+	if (left_type_)  *left_type_  = left_type;
+	if (right_type_) *right_type_ = right_type;
+
+	if (!type_has_nil(right_type) && !is_type_boolean(right_type)) {
+		gbString str = type_to_string(right_type);
+		error(x->expr, "'%.*s' expects an \"optional ok\" like value, or an n-valued expression where the last value is either a boolean or can be compared against 'nil', got %s", LIT(name), str);
+		gb_string_free(str);
+	}
+}
+
+
+ExprKind check_try_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	String name = str_lit("try");
+
+	ast_node(te, TryExpr, node);
+
+	Operand x = {};
+	check_multi_expr_with_type_hint(c, &x, te->expr, type_hint);
+	if (x.mode == Addressing_Invalid) {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+		return Expr_Expr;
+	}
+
+	if (c->in_defer) {
+		error(node, "'%.*s' cannot be used within a defer statement", LIT(name));
+	}
+
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	check_try_split_types(c, &x, name, &left_type, &right_type);
+	add_type_and_value(&c->checker->info, te->expr, x.mode, x.type, x.value);
+
+	if (c->curr_proc_sig == nullptr) {
+		error(node, "'%.*s' can only be used within a procedure", LIT(name));
+	}
+	Type *proc_type = base_type(c->curr_proc_sig);
+	GB_ASSERT(proc_type->kind == Type_Proc);
+	Type *result_type = proc_type->Proc.results;
+	if (result_type == nullptr) {
+		error(node, "'%.*s' requires the current procedure to have at least one return value", LIT(name));
+	} else {
+		GB_ASSERT(result_type->kind == Type_Tuple);
+
+		auto const &vars = result_type->Tuple.variables;
+		Type *end_type = vars[vars.count-1]->type;
+
+		if (vars.count > 1) {
+			if (!proc_type->Proc.has_named_results) {
+				error(node, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(name));
+			}
+		}
+
+		Operand rhs = {};
+		rhs.type = right_type;
+		rhs.mode = Addressing_Value;
+
+		// TODO(bill): better error message
+		if (!check_is_assignable_to(c, &rhs, end_type)) {
+			gbString a = type_to_string(right_type);
+			gbString b = type_to_string(end_type);
+			gbString ret_type = type_to_string(result_type);
+			error(node, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(name));
+			if (vars.count == 1) {
+				error_line("\tProcedure return value type: %s\n", ret_type);
+			} else {
+				error_line("\tProcedure return value types: (%s)\n", ret_type);
+			}
+			gb_string_free(ret_type);
+			gb_string_free(b);
+			gb_string_free(a);
+		}
+	}
+
+
+	if (left_type != nullptr) {
+		o->mode = Addressing_Value;
+		o->type = left_type;
+	} else {
+		o->mode = Addressing_NoValue;
+		o->type = nullptr;
+	}
+
+	return Expr_Expr;
+}
+ExprKind check_try_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	String name = str_lit("try else");
+
+	ast_node(te, TryElseExpr, node);
+
+	Operand x = {};
+	Operand y = {};
+	check_multi_expr_with_type_hint(c, &x, te->expr, type_hint);
+	if (x.mode == Addressing_Invalid) {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+		return Expr_Expr;
+	}
+
+	check_multi_expr_with_type_hint(c, &y, te->else_expr, x.type);
+	error_operand_no_value(&y);
+	if (y.mode == Addressing_Invalid) {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+		return Expr_Expr;
+	}
+
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	check_try_split_types(c, &x, name, &left_type, &right_type);
+	add_type_and_value(&c->checker->info, te->expr, x.mode, x.type, x.value);
+
+	if (left_type != nullptr) {
+		check_assignment(c, &y, left_type, name);
+	} else {
+		// TODO(bill): better error message
+		error(node, "'%.*s' does not return a value", LIT(name));
+	}
+
+	if (left_type == nullptr) {
+		left_type = t_invalid;
+	}
+	o->mode = Addressing_Value;
+	o->type = left_type;
+
+	return Expr_Expr;
+}
+
+
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	u32 prev_state_flags = c->state_flags;
 	defer (c->state_flags = prev_state_flags);
@@ -7564,7 +7750,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 	case_end;
 
+	case_ast_node(te, TryExpr, node);
+		return check_try_expr(c, o, node, type_hint);
+	case_end;
 
+	case_ast_node(te, TryElseExpr, node);
+		return check_try_else_expr(c, o, node, type_hint);
+	case_end;
 
 	case_ast_node(se, SelectorExpr, node);
 		check_selector(c, o, node, type_hint);
