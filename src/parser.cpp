@@ -4385,6 +4385,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_String:
 	case Token_OpenParen:
 	case Token_Pointer:
+	case Token_try:
 	case Token_asm: // Inline assembly
 	// Unary Operators
 	case Token_Add:
