@@ -117,7 +117,6 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_no_inline,   "no_inline"),   \
 	TOKEN_KIND(Token_context,     "context"),     \
 	TOKEN_KIND(Token_asm,         "asm"),         \
-	TOKEN_KIND(Token_try,         "try"),         \
 TOKEN_KIND(Token__KeywordEnd, ""), \
 	TOKEN_KIND(Token_Count, "")
 

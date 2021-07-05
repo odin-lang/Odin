@@ -199,15 +199,6 @@ Ast *clone_ast(Ast *node) {
 		n->AutoCast.expr = clone_ast(n->AutoCast.expr);
 		break;
 
-	case Ast_TryExpr:
-		n->TryExpr.expr = clone_ast(n->TryExpr.expr);
-		break;
-
-	case Ast_TryElseExpr:
-		n->TryElseExpr.expr = clone_ast(n->TryElseExpr.expr);
-		n->TryElseExpr.else_expr = clone_ast(n->TryElseExpr.else_expr);
-		break;
-
 	case Ast_InlineAsmExpr:
 		n->InlineAsmExpr.param_types        = clone_ast_array(n->InlineAsmExpr.param_types);
 		n->InlineAsmExpr.return_type        = clone_ast(n->InlineAsmExpr.return_type);
@@ -686,21 +677,6 @@ Ast *ast_auto_cast(AstFile *f, Token token, Ast *expr) {
 	Ast *result = alloc_ast_node(f, Ast_AutoCast);
 	result->AutoCast.token = token;
 	result->AutoCast.expr  = expr;
-	return result;
-}
-
-Ast *ast_try_expr(AstFile *f, Token token, Ast *expr) {
-	Ast *result = alloc_ast_node(f, Ast_TryExpr);
-	result->TryExpr.token = token;
-	result->TryExpr.expr  = expr;
-	return result;
-}
-Ast *ast_try_else_expr(AstFile *f, Token try_token, Ast *expr, Token else_token, Ast *else_expr) {
-	Ast *result = alloc_ast_node(f, Ast_TryElseExpr);
-	result->TryElseExpr.try_token  = try_token;
-	result->TryElseExpr.expr       = expr;
-	result->TryElseExpr.else_token = else_token;
-	result->TryElseExpr.else_expr  = else_expr;
 	return result;
 }
 
@@ -2748,17 +2724,6 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		return ast_auto_cast(f, token, expr);
 	}
 
-	case Token_try: {
-		Token try_token = advance_token(f);
-		Ast *expr = parse_unary_expr(f, lhs);
-		if (f->curr_token.kind == Token_else) {
-			Token else_token = advance_token(f);
-			Ast *else_expr = parse_expr(f, lhs);
-			return ast_try_else_expr(f, try_token, expr, else_token, else_expr);
-		}
-		return ast_try_expr(f, try_token, expr);
-	}
-
 	case Token_Add:
 	case Token_Sub:
 	case Token_Xor:
@@ -4385,7 +4350,6 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_String:
 	case Token_OpenParen:
 	case Token_Pointer:
-	case Token_try:
 	case Token_asm: // Inline assembly
 	// Unary Operators
 	case Token_Add:
