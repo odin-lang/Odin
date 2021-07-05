@@ -23,12 +23,7 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_);
-		context = runtime.default_context();
-		c := context;
-		if ic, ok := t.init_context.?; ok {
-			c = ic;
-		}
-		context = c;
+		context = or_else(t.init_context.?, runtime.default_context());
 
 		t.procedure(t);
 
