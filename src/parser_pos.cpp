@@ -44,8 +44,6 @@ Token ast_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
 	case Ast_TypeCast:           return node->TypeCast.token;
 	case Ast_AutoCast:           return node->AutoCast.token;
-	case Ast_TryExpr:            return node->TryExpr.token;
-	case Ast_TryElseExpr:        return node->TryElseExpr.try_token;
 	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.token;
 
 	case Ast_BadStmt:            return node->BadStmt.begin;
@@ -180,8 +178,6 @@ Token ast_end_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_end_token(node->TypeAssertion.type);
 	case Ast_TypeCast:           return ast_end_token(node->TypeCast.expr);
 	case Ast_AutoCast:           return ast_end_token(node->AutoCast.expr);
-	case Ast_TryExpr:            return ast_end_token(node->TryExpr.expr);
-	case Ast_TryElseExpr:        return ast_end_token(node->TryElseExpr.else_expr);
 	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.close;
 
 	case Ast_BadStmt:            return node->BadStmt.end;

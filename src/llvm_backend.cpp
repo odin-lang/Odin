@@ -9590,50 +9590,50 @@ lbValue lb_emit_try_has_value(lbProcedure *p, lbValue rhs) {
 	GB_ASSERT(has_value.value != nullptr);
 	return has_value;
 }
-lbValue lb_emit_try(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
-	lbValue lhs = {};
-	lbValue rhs = {};
-	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
+// lbValue lb_emit_try(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
+// 	lbValue lhs = {};
+// 	lbValue rhs = {};
+// 	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
 
-	lbBlock *return_block = lb_create_block(p, "try.return", false);
-	lbBlock *continue_block = lb_create_block(p, "try.continue", false);
-	lb_emit_if(p, lb_emit_try_has_value(p, rhs), continue_block, return_block);
-	lb_start_block(p, return_block);
+// 	lbBlock *return_block = lb_create_block(p, "try.return", false);
+// 	lbBlock *continue_block = lb_create_block(p, "try.continue", false);
+// 	lb_emit_if(p, lb_emit_try_has_value(p, rhs), continue_block, return_block);
+// 	lb_start_block(p, return_block);
 
-	{
-		Type *proc_type = base_type(p->type);
-		Type *results = proc_type->Proc.results;
-		GB_ASSERT(results != nullptr && results->kind == Type_Tuple);
-		TypeTuple *tuple = &results->Tuple;
+// 	{
+// 		Type *proc_type = base_type(p->type);
+// 		Type *results = proc_type->Proc.results;
+// 		GB_ASSERT(results != nullptr && results->kind == Type_Tuple);
+// 		TypeTuple *tuple = &results->Tuple;
 
-		GB_ASSERT(tuple->variables.count != 0);
+// 		GB_ASSERT(tuple->variables.count != 0);
 
-		Entity *end_entity = tuple->variables[tuple->variables.count-1];
-		rhs = lb_emit_conv(p, rhs, end_entity->type);
-		if (p->type->Proc.has_named_results) {
-			GB_ASSERT(end_entity->token.string.len != 0);
+// 		Entity *end_entity = tuple->variables[tuple->variables.count-1];
+// 		rhs = lb_emit_conv(p, rhs, end_entity->type);
+// 		if (p->type->Proc.has_named_results) {
+// 			GB_ASSERT(end_entity->token.string.len != 0);
 
-			// NOTE(bill): store the named values before returning
-			lbValue found = map_must_get(&p->module->values, hash_entity(end_entity));
-			lb_emit_store(p, found, rhs);
+// 			// NOTE(bill): store the named values before returning
+// 			lbValue found = map_must_get(&p->module->values, hash_entity(end_entity));
+// 			lb_emit_store(p, found, rhs);
 
-			lb_build_return_stmt(p, {});
-		} else {
-			GB_ASSERT(tuple->variables.count == 1);
-			lb_build_return_stmt_internal(p, rhs);
-		}
-	}
+// 			lb_build_return_stmt(p, {});
+// 		} else {
+// 			GB_ASSERT(tuple->variables.count == 1);
+// 			lb_build_return_stmt_internal(p, rhs);
+// 		}
+// 	}
 
-	lb_start_block(p, continue_block);
+// 	lb_start_block(p, continue_block);
 
-	if (tv.type != nullptr) {
-		return lb_emit_conv(p, lhs, tv.type);
-	}
-	return {};
-}
+// 	if (tv.type != nullptr) {
+// 		return lb_emit_conv(p, lhs, tv.type);
+// 	}
+// 	return {};
+// }
 
 
-lbValue lb_emit_try_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue const &tv) {
+lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue const &tv) {
 	lbValue lhs = {};
 	lbValue rhs = {};
 	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
@@ -10063,6 +10063,9 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return lb_soa_zip(p, ce, tv);
 	case BuiltinProc_soa_unzip:
 		return lb_soa_unzip(p, ce, tv);
+
+	case BuiltinProc_or_else:
+		return lb_emit_or_else(p, ce->args[0], ce->args[1], tv);
 
 	// "Intrinsics"
 
@@ -12781,14 +12784,6 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(be, BinaryExpr, expr);
 		return lb_build_binary_expr(p, expr);
-	case_end;
-
-	case_ast_node(te, TryExpr, expr);
-		return lb_emit_try(p, te->expr, tv);
-	case_end;
-
-	case_ast_node(te, TryElseExpr, expr);
-		return lb_emit_try_else(p, te->expr, te->else_expr, tv);
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);

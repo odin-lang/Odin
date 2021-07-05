@@ -1999,115 +1999,9 @@ relative_data_types :: proc() {
 	fmt.println(rel_slice[1]);
 }
 
-try_and_try_else :: proc() {
-	fmt.println("\n#'try ...'' and 'try ... else ...'");
-	// IMPORTANT NOTE: 'try' and 'try else' are experimental features and subject to change/removal
-
-	Foo :: struct {};
-	Error :: enum {
-		None,
-		Something,
-		Whatever,
-	};
-
-	bar :: proc(ok: bool) -> (f: Foo, err: Error) {
-		if !ok {
-			err = .Something;
-		}
-		return;
-	}
-
-
-	try_return_value :: proc() -> Error {
-		// This is a common idiom, where the end value of an expression
-		// may not be 'nil' or may be 'false'
-		f0, err := bar(true);
-		if err != nil {
-			return err;
-		}
-		_ = f0;
-
-		// 'try' is a lovely shorthand that does this check automatically
-		// and returns early if necessary
-		f1 := try bar(true);
-		fmt.println(#procedure);
-		fmt.println(f1);
-
-		f2 := try bar(false);
-		fmt.println(#procedure);
-		fmt.println(f2);
-		return .None;
-	}
-
-	try_return_value2 :: proc() -> (i: int, err: Error) {
-		// 'try' will work within procedures with multiple return values
-		// However, the return values must be named
-		// 'try' effectively pops off the last value and checks it
-		// And then returns the rest of the values, meaning it works
-		// for as many return values as possible
-		i = 0;
-		f0, f0_err := bar(true);
-		if f0_err != nil {
-			err = f0_err;
-			return;
-		}
-		fmt.println(#procedure);
-		fmt.println(f0);
-
-		// The above can be translated into 'try'
-		i = 1;
-		f1 := try bar(true);
-		fmt.println(#procedure);
-		fmt.println(f1);
-
-		i = 2;
-
-		f2 := try bar(false);
-		fmt.println(#procedure);
-		fmt.println(f2);
-
-		i = 3;
-
-		return i, .None;
-	}
-
-	try_return_value4 :: proc() -> (i: int, j: f64, k: bool, err: Error) {
-		f := try bar(false);
-		fmt.println(#procedure);
-		fmt.println(f);
-		return 123, 456, true, .None;
-	}
-
-
-	try_optional_ok :: proc() -> bool {
-		m: map[string]int;
-		/*
-		f1, ok := m["hellope"];
-		if !ok {
-			return false;
-		}
-		*/
-		// 'try' equivalent
-		f2 := try m["hellope"];
-		fmt.println(f2);
-		return true;
-	}
-
-	{
-		// 'try' examples
-		err := try_return_value();
-		fmt.println(err);
-
-		ok := try_optional_ok();
-		fmt.println(ok);
-
-		i, err2 := try_return_value2();
-		fmt.println(i);
-		fmt.println(err2);
-
-		a, b, c, err4 := try_return_value4();
-		assert(a == 0 && b == 0 && c == false && err4 == .Something);
-	}
+or_else_procedure :: proc() {
+	fmt.println("\n#'or_else'");
+	// IMPORTANT NOTE: 'or_else' is experimental features and subject to change/removal
 	{
 		// 'try else' does a similar value check as 'try' but instead of doing an
 		// early return, it will give a default value to be used instead
@@ -2120,7 +2014,7 @@ try_and_try_else :: proc() {
 			i = 123;
 		}
 		// The above can be mapped to 'try else'
-		i = try m["hellope"] else 123;
+		i = or_else(m["hellope"], 123);
 
 		assert(i == 123);
 	}
@@ -2129,12 +2023,12 @@ try_and_try_else :: proc() {
 		// have optional ok semantics
 		v: union{int, f64};
 		i: int;
-		i = try v.(int) else 123;
-		i = try v.? else 123; // Type inference magic
+		i = or_else(v.(int), 123);
+		i = or_else(v.?, 123); // Type inference magic
 		assert(i == 123);
 
 		m: Maybe(int);
-		i = try m.? else 456;
+		i = or_else(m.?, 456);
 		assert(i == 456);
 	}
 }
@@ -2171,6 +2065,6 @@ main :: proc() {
 		union_maybe();
 		explicit_context_definition();
 		relative_data_types();
-		try_and_try_else();
+		or_else_procedure();
 	}
 }
