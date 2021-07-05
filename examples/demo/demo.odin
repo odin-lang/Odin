@@ -2003,7 +2003,7 @@ or_else_procedure :: proc() {
 	fmt.println("\n#'or_else'");
 	// IMPORTANT NOTE: 'or_else' is experimental features and subject to change/removal
 	{
-		// 'try else' does a similar value check as 'try' but instead of doing an
+		// 'or_else' does a similar value check as 'try' but instead of doing an
 		// early return, it will give a default value to be used instead
 
 		m: map[string]int;
@@ -2013,13 +2013,13 @@ or_else_procedure :: proc() {
 		if i, ok = m["hellope"]; !ok {
 			i = 123;
 		}
-		// The above can be mapped to 'try else'
+		// The above can be mapped to 'or_else'
 		i = or_else(m["hellope"], 123);
 
 		assert(i == 123);
 	}
 	{
-		// 'try else' can be used with type assertions too, as they
+		// 'or_else' can be used with type assertions too, as they
 		// have optional ok semantics
 		v: union{int, f64};
 		i: int;
