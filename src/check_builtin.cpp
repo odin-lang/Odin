@@ -580,6 +580,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(arg->token.string));
 			gb_string_free(type_str);
+
+			Type *bt = base_type(type);
+			if (bt->kind == Type_Struct) {
+				check_did_you_mean_type(arg->token.string, bt->Struct.fields);
+			}
 			return false;
 		}
 		if (sel.indirect) {
@@ -3082,6 +3087,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(ce->args[0],
 				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 				gb_string_free(type_str);
+
+				if (bt->kind == Type_Struct) {
+					check_did_you_mean_type(field_name, bt->Struct.fields);
+				}
 				return false;
 			}
 			if (sel.indirect) {

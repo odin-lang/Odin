@@ -3576,6 +3576,39 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 	if (success_) *success_ = true;
 	return empty_exact_value;
 }
+void check_did_you_mean_print(DidYouMeanAnswers *d) {
+	auto results = did_you_mean_results(d);
+	if (results.count != 0) {
+		error_line("\tSuggestion: Did you mean?\n");
+		for_array(i, results) {
+			String const &target = results[i].target;
+			error_line("\t\t%.*s\n", LIT(target));
+		}
+	}
+}
+
+void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) {
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, fields) {
+		did_you_mean_append(&d, fields[i]->token.string);
+	}
+	check_did_you_mean_print(&d);
+}
+
+void check_did_you_mean_scope(String const &name, Scope *scope) {
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, scope->elements.entries) {
+		Entity *e = scope->elements.entries[i].value;
+		did_you_mean_append(&d, e->token.string);
+	}
+	check_did_you_mean_print(&d);
+}
+
+
 
 Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
@@ -3641,6 +3674,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 				error(op_expr, "'%.*s' is not declared by '%.*s'", LIT(entity_name), LIT(import_name));
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
+
+				check_did_you_mean_scope(entity_name, import_scope);
 				return nullptr;
 			}
 
@@ -3818,6 +3853,17 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		gbString type_str = type_to_string(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
+
+		if (operand->type != nullptr && selector->kind == Ast_Ident) {
+			String const &name = selector->Ident.token.string;
+			Type *bt = base_type(operand->type);
+			if (bt->kind == Type_Struct) {
+				check_did_you_mean_type(name, bt->Struct.fields);
+			} else if (bt->kind == Type_Enum) {
+				check_did_you_mean_type(name, bt->Enum.fields);
+			}
+		}
+
 		gb_string_free(sel_str);
 		gb_string_free(type_str);
 		gb_string_free(op_str);
@@ -6180,9 +6226,14 @@ ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o, Ast *node, 
 		String name = ise->selector->Ident.token.string;
 
 		if (is_type_enum(th)) {
+			Type *bt = base_type(th);
+			GB_ASSERT(bt->kind == Type_Enum);
+
 			gbString typ = type_to_string(th);
-			error(node, "Undeclared name %.*s for type '%s'", LIT(name), typ);
-			gb_string_free(typ);
+			defer (gb_string_free(typ));
+			error(node, "Undeclared name '%.*s' for type '%s'", LIT(name), typ);
+
+			check_did_you_mean_type(name, bt->Enum.fields);
 		} else {
 			gbString typ = type_to_string(th);
 			gbString str = expr_to_string(node);

@@ -1106,24 +1106,24 @@ bool parse_build_flags(Array<String> args) {
 							}
 
 							if (!found) {
-								struct DistanceAndTarget {
+								struct DistanceAndTargetIndex {
 									isize distance;
 									isize target_index;
 								};
-								DistanceAndTarget distances[gb_count_of(named_targets)] = {};
+
+								DistanceAndTargetIndex distances[gb_count_of(named_targets)] = {};
 								for (isize i = 0; i < gb_count_of(named_targets); i++) {
 									distances[i].target_index = i;
 									distances[i].distance = levenstein_distance_case_insensitive(str, named_targets[i].name);
 								}
-								gb_sort_array(distances, gb_count_of(distances), gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
+								gb_sort_array(distances, gb_count_of(distances), gb_isize_cmp(gb_offset_of(DistanceAndTargetIndex, distance)));
 
 								gb_printf_err("Unknown target '%.*s'\n", LIT(str));
 
-								enum {MAX_SMALLEST_DISTANCE = 3};
-								if (distances[0].distance <= MAX_SMALLEST_DISTANCE) {
+								if (distances[0].distance <= MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
 									gb_printf_err("Did you mean:\n");
 									for (isize i = 0; i < gb_count_of(named_targets); i++) {
-										if (distances[i].distance > MAX_SMALLEST_DISTANCE) {
+										if (distances[i].distance > MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
 											break;
 										}
 										gb_printf_err("\t%.*s\n", LIT(named_targets[distances[i].target_index].name));
