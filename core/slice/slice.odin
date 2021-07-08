@@ -1,10 +1,12 @@
 package slice
 
 import "intrinsics"
+import "builtin"
 import "core:math/bits"
 import "core:mem"
 
 _ :: intrinsics;
+_ :: builtin;
 _ :: bits;
 _ :: mem;
 
@@ -290,6 +292,28 @@ filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -
 	return r[:];
 }
 
+
+
+min :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) != 0 {
+		res = s[0];
+		ok = true;
+		for v in s[1:] {
+			res = min(res, v);
+		}
+	}
+	return;
+}
+max :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
+	if len(s) != 0 {
+		res = s[0];
+		ok = true;
+		for v in s[1:] {
+			res = max(res, v);
+		}
+	}
+	return;
+}
 
 
 dot_product :: proc(a, b: $S/[]$T) -> T
