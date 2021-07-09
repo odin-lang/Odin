@@ -64,7 +64,7 @@ ring_len :: proc(r: ^$R/Ring) -> int {
 	n := 0;
 	if r != nil {
 		n = 1;
-		for p := ring_next(&p); p != r; p = p.next {
+		for p := ring_next(r); p != r; p = p.next {
 			n += 1;
 		}
 	}
