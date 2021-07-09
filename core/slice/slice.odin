@@ -299,7 +299,7 @@ min :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T
 		res = s[0];
 		ok = true;
 		for v in s[1:] {
-			res = min(res, v);
+			res = builtin.min(res, v);
 		}
 	}
 	return;
@@ -309,7 +309,7 @@ max :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T
 		res = s[0];
 		ok = true;
 		for v in s[1:] {
-			res = max(res, v);
+			res = builtin.max(res, v);
 		}
 	}
 	return;
