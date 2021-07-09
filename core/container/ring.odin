@@ -26,6 +26,7 @@ ring_prev :: proc(r: ^$R/Ring) -> ^R {
 
 
 ring_move :: proc(r: ^$R/Ring, n: int) -> ^R {
+  r := r;
 	if r.next == nil {
 		return ring_init(r);
 	}
