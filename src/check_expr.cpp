@@ -48,8 +48,8 @@ struct CallArgumentData {
 };
 
 struct PolyProcData {
-	Entity * gen_entity;
-	ProcInfo proc_info;
+	Entity *  gen_entity;
+	ProcInfo *proc_info;
 };
 
 struct ValidIndexAndScore {
@@ -279,7 +279,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	});
 
 
-
+	CheckerInfo *info = c->info;
 	CheckerContext nctx = *c;
 
 	Scope *scope = create_scope(base_entity->scope);
@@ -294,7 +294,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
-
 	auto *pt = &src->Proc;
 
 	// NOTE(bill): This is slightly memory leaking if the type already exists
@@ -306,8 +305,13 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		return false;
 	}
 
-	auto *found_gen_procs = map_get(&nctx.info->gen_procs, hash_pointer(base_entity->identifier));
+	gb_mutex_lock(&info->gen_procs_mutex);
+	auto *found_gen_procs = map_get(&info->gen_procs, hash_pointer(base_entity->identifier));
+	gb_mutex_unlock(&info->gen_procs_mutex);
 	if (found_gen_procs) {
+		gb_mutex_lock(&info->gen_procs_mutex);
+		defer (gb_mutex_unlock(&info->gen_procs_mutex));
+
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
 			Entity *other = procs[i];
@@ -344,6 +348,9 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 
 		if (found_gen_procs) {
+			gb_mutex_lock(&info->gen_procs_mutex);
+			defer (gb_mutex_unlock(&info->gen_procs_mutex));
+
 			auto procs = *found_gen_procs;
 			for_array(i, procs) {
 				Entity *other = procs[i];
@@ -403,23 +410,25 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 	}
 
-	ProcInfo proc_info = {};
-	proc_info.file  = file;
-	proc_info.token = token;
-	proc_info.decl  = d;
-	proc_info.type  = final_proc_type;
-	proc_info.body  = pl->body;
-	proc_info.tags  = tags;
-	proc_info.generated_from_polymorphic = true;
-	proc_info.poly_def_node = poly_def_node;
+	ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	proc_info->file  = file;
+	proc_info->token = token;
+	proc_info->decl  = d;
+	proc_info->type  = final_proc_type;
+	proc_info->body  = pl->body;
+	proc_info->tags  = tags;
+	proc_info->generated_from_polymorphic = true;
+	proc_info->poly_def_node = poly_def_node;
 
+	gb_mutex_lock(&info->gen_procs_mutex);
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, entity);
-		map_set(&nctx.checker->info.gen_procs, hash_pointer(base_entity->identifier), array);
+		map_set(&info->gen_procs, hash_pointer(base_entity->identifier), array);
 	}
+	gb_mutex_unlock(&info->gen_procs_mutex);
 
 	GB_ASSERT(entity != nullptr);
 

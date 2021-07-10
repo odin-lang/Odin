@@ -236,7 +236,10 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 
 
 Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure) {
-	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
+	gb_mutex_lock(&ctx->info->gen_types_mutex);
+	defer (gb_mutex_unlock(&ctx->info->gen_types_mutex));
+
+	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
 		for_array(i, *found_gen_types) {
 			Entity *e = (*found_gen_types)[i];
@@ -315,14 +318,16 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 
 	named_type->Named.type_name = e;
 
-	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
+	gb_mutex_lock(&ctx->info->gen_types_mutex);
+	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types) {
 		array_add(found_gen_types, e);
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, e);
-		map_set(&ctx->checker->info.gen_types, hash_pointer(original_type), array);
+		map_set(&ctx->info->gen_types, hash_pointer(original_type), array);
 	}
+	gb_mutex_unlock(&ctx->info->gen_types_mutex);
 }
 
 Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
@@ -2796,7 +2801,7 @@ Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type) {
 	#endif
 
 	if (is_type_typed(type)) {
-		add_type_and_value(&ctx->checker->info, e, Addressing_Type, type, empty_exact_value);
+		add_type_and_value(ctx->info, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
 		error(e, "Invalid type definition of %s", name);
