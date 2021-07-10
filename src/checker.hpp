@@ -144,6 +144,7 @@ struct DeclInfo {
 	Type *        gen_proc_type; // Precalculated
 	bool          is_using;
 	bool          where_clauses_evaluated;
+	bool          proc_checked;
 
 	CommentGroup *comment;
 	CommentGroup *docs;
@@ -289,6 +290,7 @@ struct CheckerInfo {
 	gbMutex identifier_uses_mutex;
 	gbMutex entity_mutex;
 	gbMutex foreign_mutex;
+	gbMutex scope_mutex;
 
 	Map<ExprInfo *>       untyped; // Key: Ast * | Expression -> ExprInfo *
 	                               // NOTE(bill): This needs to be a map and not on the Ast
@@ -398,7 +400,6 @@ Entity *scope_insert (Scope *s, Entity *entity);
 
 
 ExprInfo *check_get_expr_info     (CheckerInfo *i, Ast *expr);
-void      check_remove_expr_info  (CheckerInfo *i, Ast *expr);
 void      add_untyped             (CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
 void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
 void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);

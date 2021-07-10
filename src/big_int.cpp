@@ -587,7 +587,9 @@ void big_int_add(BigInt *dst, BigInt const *x, BigInt const *y) {
 			}
 		}
 
-		GB_ASSERT(overflow == 0);
+		if (overflow != 0) {
+			GB_ASSERT_MSG(overflow == 0, "%p %p %p", dst, x, y);
+		}
 		dst->len = i;
 		big_int_normalize(dst);
 		return;

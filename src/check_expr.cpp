@@ -283,7 +283,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	CheckerInfo *info = c->info;
 	CheckerContext nctx = *c;
 
-	Scope *scope = create_scope(base_entity->scope);
+	Scope *scope = create_scope(c->info, base_entity->scope);
 	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
@@ -307,11 +307,11 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 	gb_mutex_lock(&info->gen_procs_mutex);
+	defer (gb_mutex_unlock(&info->gen_procs_mutex));
 	auto *found_gen_procs = map_get(&info->gen_procs, hash_pointer(base_entity->identifier));
-	gb_mutex_unlock(&info->gen_procs_mutex);
 	if (found_gen_procs) {
-		gb_mutex_lock(&info->gen_procs_mutex);
-		defer (gb_mutex_unlock(&info->gen_procs_mutex));
+		// gb_mutex_lock(&info->gen_procs_mutex);
+		// defer (gb_mutex_unlock(&info->gen_procs_mutex));
 
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
@@ -349,8 +349,8 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 
 		if (found_gen_procs) {
-			gb_mutex_lock(&info->gen_procs_mutex);
-			defer (gb_mutex_unlock(&info->gen_procs_mutex));
+			// gb_mutex_lock(&info->gen_procs_mutex);
+			// defer (gb_mutex_unlock(&info->gen_procs_mutex));
 
 			auto procs = *found_gen_procs;
 			for_array(i, procs) {
@@ -421,7 +421,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
 
-	gb_mutex_lock(&info->gen_procs_mutex);
+	// gb_mutex_lock(&info->gen_procs_mutex);
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);
 	} else {
@@ -429,7 +429,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		array_add(&array, entity);
 		map_set(&info->gen_procs, hash_pointer(base_entity->identifier), array);
 	}
-	gb_mutex_unlock(&info->gen_procs_mutex);
+	// gb_mutex_unlock(&info->gen_procs_mutex);
 
 	GB_ASSERT(entity != nullptr);
 
@@ -1738,7 +1738,12 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 
 void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 	GB_ASSERT(o->mode == Addressing_Constant);
-	if (!is_type_constant_type(type) || !check_representable_as_constant(ctx, o->value, type, &o->value)) {
+	ExactValue out_value = o->value;
+	if (is_type_constant_type(type) && check_representable_as_constant(ctx, o->value, type, &out_value)) {
+		o->value = out_value;
+	} else {
+		o->value = out_value;
+
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
 		gbString c = type_to_string(o->type);
@@ -1753,7 +1758,13 @@ void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
-				error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
+				#if 0
+				gb_printf_err("AddressingMode, %d\n", o->mode);
+				gb_printf_err("ExactValueKind, %d\n", o->value.kind);
+				bool ok = check_representable_as_constant(ctx, o->value, type, &out_value);
+				gb_printf_err("ok, %d\n", ok);
+				#endif
+				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s", a, b, c);
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
@@ -1797,10 +1808,6 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
-		if (node->kind == Ast_TypeAssertion) {
-			gb_printf_err("%s\n", expr_to_string(node));
-		}
-
 		if (check_is_not_addressable(c, o)) {
 			if (ast_node_expect(node, Ast_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
@@ -2225,7 +2232,8 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 
 		TokenPos pos = ast_token(x->expr).pos;
 		if (x_is_untyped) {
-			ExprInfo *info = check_get_expr_info(&c->checker->info, x->expr);
+			gb_mutex_lock(&c->info->untyped_mutex);
+			ExprInfo *info = check_get_expr_info(c->info, x->expr);
 			if (info != nullptr) {
 				info->is_lhs = true;
 			}
@@ -2234,6 +2242,8 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 				x->type = type_hint;
 			}
 			// x->value = x_val;
+
+			gb_mutex_unlock(&c->info->untyped_mutex);
 			return;
 		}
 	}
@@ -2517,6 +2527,25 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		o->mode = Addressing_Invalid;
 		o->expr = node;
 		return false;
+	}
+
+	Type *dst_bt = base_type(t);
+	if (dst_bt == nullptr || dst_bt == t_invalid) {
+		GB_ASSERT(global_error_collector.count != 0);
+
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
+	}
+
+	Type *src_bt = base_type(o->type);
+	if (src_bt == nullptr || src_bt == t_invalid) {
+		// NOTE(bill): this should be an error
+		GB_ASSERT(global_error_collector.count != 0);
+		o->mode = Addressing_Value;
+		o->expr = node;
+		o->type = t;
+		return true;
 	}
 
 	i64 srcz = type_size_of(o->type);
@@ -2899,11 +2928,13 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	GB_ASSERT(e != nullptr);
-	ExprInfo *old = check_get_expr_info(&c->checker->info, e);
+	gb_mutex_lock(&c->info->untyped_mutex);
+	defer (gb_mutex_unlock(&c->info->untyped_mutex));
+	ExprInfo *old = check_get_expr_info(c->info, e);
 	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
-				add_type_and_value(&c->checker->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+				add_type_and_value(c->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
 			}
 		}
 		return;
@@ -2966,7 +2997,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	}
 
 	// We need to remove it and then give it a new one
-	check_remove_expr_info(&c->checker->info, e);
+	map_remove(&c->info->untyped, hash_node(e));
 
 	if (old->is_lhs && !is_type_integer(type)) {
 		gbString expr_str = expr_to_string(e);
@@ -2977,11 +3008,14 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		return;
 	}
 
-	add_type_and_value(&c->checker->info, e, old->mode, type, old->value);
+	add_type_and_value(c->info, e, old->mode, type, old->value);
 }
 
 void update_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
-	ExprInfo *found = check_get_expr_info(&c->checker->info, e);
+	ExprInfo *found = nullptr;
+	gb_mutex_lock(&c->info->untyped_mutex);
+	found = check_get_expr_info(c->info, e);
+	gb_mutex_unlock(&c->info->untyped_mutex);
 	if (found) {
 		found->value = value;
 	}
@@ -3001,7 +3035,7 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 			}
 		}
 	}
-	error(operand->expr, "Cannot convert '%s' to '%s' from '%s'%s", expr_str, type_str, from_type_str, extra_text);
+	error(operand->expr, "Cannot convert untyped value '%s' to '%s' from '%s'%s", expr_str, type_str, from_type_str, extra_text);
 
 	gb_string_free(from_type_str);
 	gb_string_free(type_str);
@@ -5682,7 +5716,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = proc;
 			operand->type = t_invalid;
-			add_type_and_value(&c->checker->info, proc, operand->mode, operand->type, operand->value);
+			add_type_and_value(c->info, proc, operand->mode, operand->type, operand->value);
 		} else {
 			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
@@ -5757,7 +5791,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				GB_ASSERT(ot->kind == Type_Named);
 				Entity *e = ot->Named.type_name;
 				add_entity_use(c, ident, e);
-				add_type_and_value(&c->checker->info, call, Addressing_Type, ot, empty_exact_value);
+				add_type_and_value(c->info, call, Addressing_Type, ot, empty_exact_value);
 			} else {
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;
@@ -6153,8 +6187,8 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 		return false;
 	}
 
-	add_type_and_value(&c->checker->info, ie->left,  x->mode, x->type, x->value);
-	add_type_and_value(&c->checker->info, ie->right, y->mode, y->type, y->value);
+	add_type_and_value(c->info, ie->left,  x->mode, x->type, x->value);
+	add_type_and_value(c->info, ie->right, y->mode, y->type, y->value);
 
 	return true;
 }
@@ -6284,7 +6318,7 @@ void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, 
 		Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
 		if (is_type_proc(pt)) {
 			Type *tuple = pt->Proc.results;
-			add_type_and_value(&c->checker->info, x->expr, x->mode, tuple, x->value);
+			add_type_and_value(c->info, x->expr, x->mode, tuple, x->value);
 
 			if (pt->Proc.result_count >= 2) {
 				if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
@@ -6297,7 +6331,7 @@ void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, 
 
 	Type *tuple = make_optional_ok_type(x->type);
 	if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
-	add_type_and_value(&c->checker->info, x->expr, x->mode, tuple, x->value);
+	add_type_and_value(c->info, x->expr, x->mode, tuple, x->value);
 	x->type = tuple;
 	GB_ASSERT(is_type_tuple(type_of_expr(x->expr)));
 }
@@ -8163,7 +8197,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			error(x.expr, "Expected a constant string for the inline asm constraints parameter");
 		}
 
-		Scope *scope = create_scope(c->scope);
+		Scope *scope = create_scope(c->info, c->scope);
 		scope->flags |= ScopeFlag_Proc;
 
 		Type *params = alloc_type_tuple();
@@ -8221,9 +8255,9 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 		gb_string_free(xs);
 	}
 	if (o->type != nullptr && is_type_untyped(o->type)) {
-		add_untyped(&c->checker->info, node, false, o->mode, o->type, o->value);
+		add_untyped(c->info, node, false, o->mode, o->type, o->value);
 	}
-	add_type_and_value(&c->checker->info, node, o->mode, o->type, o->value);
+	add_type_and_value(c->info, node, o->mode, o->type, o->value);
 	return kind;
 }
 
