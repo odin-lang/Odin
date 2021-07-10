@@ -430,7 +430,7 @@ int big_int_cmp(BigInt const *x, BigInt const *y) {
 	u64 const *xd = big_int_ptr(x);
 	u64 const *yd = big_int_ptr(y);
 
-	for (i32 i = x->len; i >= 0; i--) {
+	for (i32 i = x->len-1; i >= 0; i--) {
 		u64 a = xd[i];
 		u64 b = yd[i];
 
