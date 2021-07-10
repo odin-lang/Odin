@@ -313,7 +313,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 					if (is_blank_ident(name)) {
 						continue;
 					}
-					add_entity(ctx->checker, parent, nullptr, f);
+					add_entity(ctx, parent, nullptr, f);
 				}
 			}
 		}

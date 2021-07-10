@@ -1934,7 +1934,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 				Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
 				soa_struct->Struct.fields[i] = new_field;
-				add_entity(c->checker, scope, nullptr, new_field);
+				add_entity(c, scope, nullptr, new_field);
 				add_entity_use(c, nullptr, new_field);
 			}
 
@@ -1959,7 +1959,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 					Type *array_type = alloc_type_array(old_field->type, count);
 					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
 					soa_struct->Struct.fields[i] = new_field;
-					add_entity(c->checker, scope, nullptr, new_field);
+					add_entity(c, scope, nullptr, new_field);
 				} else {
 					soa_struct->Struct.fields[i] = old_field;
 				}
@@ -1971,7 +1971,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		Token token = {};
 		token.string = str_lit("Base_Type");
 		Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
-		add_entity(c->checker, scope, nullptr, base_type_entity);
+		add_entity(c, scope, nullptr, base_type_entity);
 
 		add_type_info_type(c, soa_struct);
 

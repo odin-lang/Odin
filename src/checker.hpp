@@ -20,12 +20,12 @@ struct ExprInfo {
 	bool is_lhs; // Debug info
 };
 
-gb_inline ExprInfo make_expr_info(AddressingMode mode, Type *type, ExactValue value, bool is_lhs) {
-	ExprInfo ei = {};
-	ei.mode   = mode;
-	ei.type   = type;
-	ei.value  = value;
-	ei.is_lhs = is_lhs;
+gb_inline ExprInfo *make_expr_info(AddressingMode mode, Type *type, ExactValue const &value, bool is_lhs) {
+	ExprInfo *ei = gb_alloc_item(permanent_allocator(), ExprInfo);
+	ei->mode   = mode;
+	ei->type   = type;
+	ei->value  = value;
+	ei->is_lhs = is_lhs;
 	return ei;
 }
 
@@ -262,21 +262,12 @@ struct CheckerContext;
 struct CheckerInfo {
 	Checker *checker;
 
-	Map<ExprInfo>         untyped; // Key: Ast * | Expression -> ExprInfo
-	                               // NOTE(bill): This needs to be a map and not on the Ast
-	                               // as it needs to be iterated across
 	StringMap<AstFile *>    files;    // Key (full path)
 	StringMap<AstPackage *> packages; // Key (full path)
 	StringMap<Entity *>     foreigns;
 	Array<Entity *>       definitions;
 	Array<Entity *>       entities;
 	Array<DeclInfo *>     variable_init_order;
-
-	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
-	Map<Array<Entity *> > gen_types;       // Key: Type *
-
-	Array<Type *>         type_info_types;
-	Map<isize>            type_info_map;   // Key: Type *
 
 
 	AstPackage *          builtin_package;
@@ -294,6 +285,20 @@ struct CheckerInfo {
 
 	bool allow_identifier_uses;
 	Array<Ast *> identifier_uses; // only used by 'odin query'
+
+	// Below are accessed within procedures
+	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
+	// these variables will be of contention
+
+	Map<ExprInfo *>       untyped; // Key: Ast * | Expression -> ExprInfo *
+	                               // NOTE(bill): This needs to be a map and not on the Ast
+	                               // as it needs to be iterated across
+
+	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
+	Map<Array<Entity *> > gen_types;       // Key: Type *
+
+	Array<Type *>         type_info_types;
+	Map<isize>            type_info_map;   // Key: Type *
 };
 
 struct CheckerContext {
@@ -339,11 +344,10 @@ struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
 
+	CheckerContext builtin_ctx;
+
 	Array<ProcInfo> procs_to_check;
 	Array<Entity *> procs_with_deferred_to_check;
-
-	CheckerContext *curr_ctx;
-	CheckerContext init_ctx;
 };
 
 
@@ -382,7 +386,6 @@ Entity *scope_insert (Scope *s, Entity *entity);
 
 
 ExprInfo *check_get_expr_info     (CheckerInfo *i, Ast *expr);
-void      check_set_expr_info     (CheckerInfo *i, Ast *expr, ExprInfo info);
 void      check_remove_expr_info  (CheckerInfo *i, Ast *expr);
 void      add_untyped             (CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
 void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
