@@ -850,8 +850,6 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
-	map_init(&i->atom_op_map, a);
-
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -869,8 +867,6 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
 	array_free(&i->required_global_variables);
-
-	map_destroy(&i->atom_op_map);
 }
 
 CheckerContext make_checker_context(Checker *c) {
