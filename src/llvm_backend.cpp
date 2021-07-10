@@ -15903,7 +15903,7 @@ void lb_generate_code(lbGenerator *gen) {
 		if (is_export) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
-		} else {
+		} else if (!is_foreign) {
 			if (USE_SEPARTE_MODULES) {
 				LLVMSetLinkage(g.value, LLVMExternalLinkage);
 			} else {
