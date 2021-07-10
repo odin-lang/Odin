@@ -4909,6 +4909,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 					GB_ASSERT(!is_ast_range(expr));
 
 					on_val = lb_build_expr(p, expr);
+					on_val = lb_emit_conv(p, on_val, tag.type);
 				}
 
 				GB_ASSERT(LLVMIsConstant(on_val.value));
