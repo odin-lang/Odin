@@ -1879,13 +1879,13 @@ Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 		if (e->kind == Ast_ProcLit) {
 			if (expr->ProcLit.inlining != ProcInlining_none &&
 			    expr->ProcLit.inlining != pi) {
-				syntax_error(expr, "You cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
+				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
 			}
 			expr->ProcLit.inlining = pi;
 		} else if (e->kind == Ast_CallExpr) {
 			if (expr->CallExpr.inlining != ProcInlining_none &&
 			    expr->CallExpr.inlining != pi) {
-				syntax_error(expr, "You cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
+				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
 			}
 			expr->CallExpr.inlining = pi;
 		}
@@ -1925,6 +1925,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
+		if (f->prev_token.kind == Token_CloseParen) {
+			close = expect_token(f, Token_CloseParen);
+			syntax_error(open, "Invalid parentheses expression with no inside expression");
+			return ast_bad_expr(f, open, close);
+		}
+
 		allow_newline = f->allow_newline;
 		if (f->expr_level < 0) {
 			f->allow_newline = false;
@@ -3555,7 +3561,9 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 			Ast *tt = unparen_expr(type);
-			if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			if (tt == nullptr) {
+				syntax_error(f->prev_token, "Invalid type expression in field list");
+			} else if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 			}
 		}
