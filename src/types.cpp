@@ -661,6 +661,8 @@ gb_global Type *t_map_header                     = nullptr;
 gb_global Type *t_equal_proc  = nullptr;
 gb_global Type *t_hasher_proc = nullptr;
 
+gb_global gbMutex g_type_mutex;
+
 
 i64      type_size_of               (Type *t);
 i64      type_align_of              (Type *t);
@@ -673,6 +675,10 @@ bool are_types_identical(Type *x, Type *y);
 bool is_type_pointer(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
+
+void init_type_mutex(void) {
+	gb_mutex_init(&g_type_mutex);
+}
 
 bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
 	if (ptr_set_exists(s, t)) {
@@ -2727,7 +2733,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	GB_ASSERT(start_index < tp->path.count);
 	Entity *e = tp->path[start_index];
 	GB_ASSERT(e != nullptr);
-	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(e->token.string));
+	error(e->token, "Illegal type declaration cycle of `%.*s`", LIT(e->token.string));
 	// NOTE(bill): Print cycle, if it's deep enough
 	for (isize j = start_index; j < tp->path.count; j++) {
 		Entity *e = tp->path[j];
@@ -2844,6 +2850,8 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
+	gb_mutex_lock(&g_type_mutex);
+	defer (gb_mutex_unlock(&g_type_mutex));
 
 	t = base_type(t);
 
@@ -3038,6 +3046,9 @@ Array<i64> type_set_offsets_of(Array<Entity *> const &fields, bool is_packed, bo
 }
 
 bool type_set_offsets(Type *t) {
+	gb_mutex_lock(&g_type_mutex);
+	defer (gb_mutex_unlock(&g_type_mutex));
+
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		if (!t->Struct.are_offsets_set) {
@@ -3066,6 +3077,9 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
+	gb_mutex_lock(&g_type_mutex);
+	defer (gb_mutex_unlock(&g_type_mutex));
+
 
 	switch (t->kind) {
 	case Type_Named: {

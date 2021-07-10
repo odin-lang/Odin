@@ -208,6 +208,7 @@ struct BuildContext {
 	bool   linker_map_file;
 
 	bool use_separate_modules;
+	bool threaded_checker;
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;

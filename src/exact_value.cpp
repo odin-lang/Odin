@@ -27,18 +27,18 @@ Quaternion256 quaternion256_inverse(Quaternion256 x) {
 
 
 enum ExactValueKind {
-	ExactValue_Invalid,
+	ExactValue_Invalid    = 0,
 
-	ExactValue_Bool,
-	ExactValue_String,
-	ExactValue_Integer,
-	ExactValue_Float,
-	ExactValue_Complex,
-	ExactValue_Quaternion,
-	ExactValue_Pointer,
-	ExactValue_Compound,  // TODO(bill): Is this good enough?
-	ExactValue_Procedure, // TODO(bill): Is this good enough?
-	ExactValue_Typeid,
+	ExactValue_Bool       = 1,
+	ExactValue_String     = 2,
+	ExactValue_Integer    = 3,
+	ExactValue_Float      = 4,
+	ExactValue_Complex    = 5,
+	ExactValue_Quaternion = 6,
+	ExactValue_Pointer    = 7,
+	ExactValue_Compound   = 8,  // TODO(bill): Is this good enough?
+	ExactValue_Procedure  = 9, // TODO(bill): Is this good enough?
+	ExactValue_Typeid     = 10,
 
 	ExactValue_Count,
 };

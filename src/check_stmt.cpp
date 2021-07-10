@@ -587,7 +587,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 				Entity *found = scope_insert(ctx->scope, f);
 				if (found != nullptr) {
 					gbString expr_str = expr_to_string(expr);
-					error(us->token, "Namespace collision while 'using' '%s' of: %.*s", expr_str, LIT(found->token.string));
+					error(us->token, "Namespace collision while 'using' enum '%s' of: %.*s", expr_str, LIT(found->token.string));
 					gb_string_free(expr_str);
 					return false;
 				}
@@ -611,7 +611,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
-				      "Namespace collision while 'using' '%s' of: %.*s\n"
+				      "Namespace collision while 'using' import name '%s' of: %.*s\n"
 				      "\tat %s\n"
 				      "\tat %s",
 				      expr_str, LIT(found->token.string),
@@ -1103,7 +1103,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					if (y.mode != Addressing_Constant) {
 						continue;
 					}
-
+					update_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
 					add_constant_switch_case(ctx, &seen, y);
 				}
 			}

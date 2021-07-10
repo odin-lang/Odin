@@ -1686,7 +1686,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		Ast *dummy_node_struct = alloc_ast_node(nullptr, Ast_Invalid);
 		Ast *dummy_node_soa = alloc_ast_node(nullptr, Ast_Invalid);
-		Scope *s = create_scope(builtin_pkg->scope);
+		Scope *s = create_scope(c->info, builtin_pkg->scope);
 
 		auto fields = array_make<Entity *>(permanent_allocator(), 0, types.count);
 		for_array(i, types) {
@@ -1917,7 +1917,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.soa_elem = elem;
 			soa_struct->Struct.soa_count = count;
 
-			scope = create_scope(c->scope);
+			scope = create_scope(c->info, c->scope);
 			soa_struct->Struct.scope = scope;
 
 			String params_xyzw[4] = {
@@ -1950,7 +1950,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.soa_elem = elem;
 			soa_struct->Struct.soa_count = count;
 
-			scope = create_scope(old_struct->Struct.scope->parent);
+			scope = create_scope(c->info, old_struct->Struct.scope->parent);
 			soa_struct->Struct.scope = scope;
 
 			for_array(i, old_struct->Struct.fields) {

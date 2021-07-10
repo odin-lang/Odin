@@ -1260,7 +1260,10 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				param_value.kind = ParameterValue_Constant;
 				param_value.value = o.value;
 			} else {
-				error(o.expr, "Invalid constant parameter");
+				gbString s = expr_to_string(o.expr);
+				error(o.expr, "Invalid constant parameter, got '%s'", s);
+				// error(o.expr, "Invalid constant parameter, got '%s' %d %d", s, o.mode, o.value.kind);
+				gb_string_free(s);
 			}
 		}
 	}
@@ -2044,7 +2047,7 @@ void init_map_entry_type(Type *type) {
 	}
 	*/
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
-	Scope *s = create_scope(builtin_pkg->scope);
+	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
 	auto fields = array_make<Entity *>(permanent_allocator(), 0, 4);
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, cast(i32)fields.count, EntityState_Resolved));
@@ -2078,7 +2081,7 @@ void init_map_internal_types(Type *type) {
 	}
 	*/
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
-	Scope *s = create_scope(builtin_pkg->scope);
+	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
 	Type *hashes_type  = alloc_type_slice(t_int);
 	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
@@ -2211,7 +2214,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.soa_count = 0;
 		soa_struct->Struct.is_polymorphic = true;
 
-		scope = create_scope(ctx->scope);
+		scope = create_scope(ctx->info, ctx->scope);
 		soa_struct->Struct.scope = scope;
 	} else if (is_type_array(elem)) {
 		Type *old_array = base_type(elem);
@@ -2225,7 +2228,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = count;
 
-		scope = create_scope(ctx->scope);
+		scope = create_scope(ctx->info, ctx->scope);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {
@@ -2267,7 +2270,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = count;
 
-		scope = create_scope(old_struct->Struct.scope->parent);
+		scope = create_scope(ctx->info, old_struct->Struct.scope->parent);
 		soa_struct->Struct.scope = scope;
 
 		for_array(i, old_struct->Struct.fields) {

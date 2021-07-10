@@ -224,7 +224,7 @@ bool decl_info_has_init(DeclInfo *d) {
 
 
 
-Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
+Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
@@ -234,7 +234,9 @@ Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CA
 	s->delayed_directives.allocator = heap_allocator();
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
+		if (info) gb_mutex_lock(&info->scope_mutex);
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
+		if (info) gb_mutex_unlock(&info->scope_mutex);
 	}
 
 	if (parent != nullptr && parent->flags & ScopeFlag_ContextDefined) {
@@ -244,12 +246,12 @@ Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CA
 	return s;
 }
 
-Scope *create_scope_from_file(AstFile *f) {
+Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	GB_ASSERT(f != nullptr);
 	GB_ASSERT(f->pkg != nullptr);
 	GB_ASSERT(f->pkg->scope != nullptr);
 
-	Scope *s = create_scope(f->pkg->scope);
+	Scope *s = create_scope(info, f->pkg->scope);
 
 	array_reserve(&s->delayed_imports, f->imports.count);
 	array_reserve(&s->delayed_directives, f->directive_count);
@@ -269,7 +271,7 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 		decl_count += pkg->files[i]->decls.count;
 	}
 	isize init_elements_capacity = 2*decl_count;
-	Scope *s = create_scope(builtin_pkg->scope, init_elements_capacity);
+	Scope *s = create_scope(c->info, builtin_pkg->scope, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -329,7 +331,7 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
 	          is_ast_type(node));
-	Scope *scope = create_scope(c->scope);
+	Scope *scope = create_scope(c->info, c->scope);
 	add_scope(c, node, scope);
 	switch (node->kind) {
 	case Ast_ProcType:
@@ -715,7 +717,7 @@ AstPackage *create_builtin_package(char const *name) {
 	pkg->name = make_string_c(name);
 	pkg->kind = Package_Normal;
 
-	pkg->scope = create_scope(nullptr);
+	pkg->scope = create_scope(nullptr, nullptr);
 	pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
 	pkg->scope->pkg = pkg;
 	return pkg;
@@ -860,6 +862,7 @@ void init_checker_info(CheckerInfo *i) {
 	gb_mutex_init(&i->identifier_uses_mutex);
 	gb_mutex_init(&i->entity_mutex);
 	gb_mutex_init(&i->foreign_mutex);
+	gb_mutex_init(&i->scope_mutex);
 
 }
 
@@ -887,6 +890,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	gb_mutex_destroy(&i->identifier_uses_mutex);
 	gb_mutex_destroy(&i->entity_mutex);
 	gb_mutex_destroy(&i->foreign_mutex);
+	gb_mutex_destroy(&i->scope_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -901,6 +905,10 @@ CheckerContext make_checker_context(Checker *c) {
 	ctx.poly_path = new_checker_poly_path();
 	ctx.poly_level = 0;
 	return ctx;
+}
+void destroy_checker_context(CheckerContext *ctx) {
+	destroy_checker_type_path(ctx->type_path);
+	destroy_checker_poly_path(ctx->poly_path);
 }
 
 void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
@@ -917,30 +925,13 @@ void reset_checker_context(CheckerContext *ctx, AstFile *file) {
 	if (ctx == nullptr) {
 		return;
 	}
-	auto checker = ctx->checker;
-	auto info = ctx->info;
-	auto type_path = ctx->type_path;
-	auto poly_path = ctx->poly_path;
-	array_clear(type_path);
-	array_clear(poly_path);
-
-	gb_zero_item(ctx);
-	ctx->checker = checker;
-	ctx->info = info;
-	ctx->type_path = type_path;
-	ctx->poly_path = poly_path;
-	ctx->scope     = builtin_pkg->scope;
-	ctx->pkg       = builtin_pkg;
-
+	destroy_checker_context(ctx);
+	*ctx = make_checker_context(ctx->checker);
 	add_curr_ast_file(ctx, file);
 }
 
 
 
-void destroy_checker_context(CheckerContext *ctx) {
-	destroy_checker_type_path(ctx->type_path);
-	destroy_checker_poly_path(ctx->poly_path);
-}
 
 bool init_checker(Checker *c, Parser *parser) {
 	c->parser = parser;
@@ -1051,21 +1042,13 @@ Scope *scope_of_node(Ast *node) {
 	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, Ast *expr) {
-	gb_mutex_lock(&i->untyped_mutex);
 	ExprInfo *res = nullptr;
 	ExprInfo **found = map_get(&i->untyped, hash_node(expr));
 	if (found) {
 		res = *found;
 	}
-	gb_mutex_unlock(&i->untyped_mutex);
 	return res;
 }
-void check_remove_expr_info(CheckerInfo *i, Ast *expr) {
-	gb_mutex_lock(&i->untyped_mutex);
-	map_remove(&i->untyped, hash_node(expr));
-	gb_mutex_unlock(&i->untyped_mutex);
-}
-
 
 
 isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
@@ -1527,6 +1510,7 @@ void check_procedure_later(Checker *c, ProcInfo *info) {
 	GB_ASSERT(info->decl != nullptr);
 
 	mpmc_enqueue(&c->procs_to_check_queue, info);
+	gb_semaphore_post(&c->procs_to_check_semaphore, 1);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
@@ -4281,6 +4265,9 @@ void check_proc_info(Checker *c, ProcInfo *pi) {
 	if (pi->type == nullptr) {
 		return;
 	}
+	if (pi->decl->proc_checked) {
+		return;
+	}
 
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
@@ -4316,11 +4303,16 @@ void check_proc_info(Checker *c, ProcInfo *pi) {
 		ctx.state_flags |= StateFlag_no_bounds_check;
 		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
+	if (pi->body != nullptr && pi->decl->entity != nullptr) {
+		GB_ASSERT((pi->decl->entity->flags & EntityFlag_ProcBodyChecked) == 0);
+	}
 
 	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
 	if (pi->body != nullptr && pi->decl->entity != nullptr) {
 		pi->decl->entity->flags |= EntityFlag_ProcBodyChecked;
 	}
+	pi->decl->proc_checked = true;
+
 }
 
 GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
@@ -4400,23 +4392,114 @@ void check_test_names(Checker *c) {
 
 }
 
+static bool proc_bodies_is_running;
+
+GB_THREAD_PROC(thread_proc_body) {
+	Checker *c = cast(Checker *)thread->user_data;
+	auto *q = &c->procs_to_check_queue;
+	ProcInfo *pi = nullptr;
+
+	while (proc_bodies_is_running) {
+		gb_semaphore_wait(&c->procs_to_check_semaphore);
+
+		if (mpmc_dequeue(q, &pi)) {
+			if (pi->decl->parent && pi->decl->parent->entity) {
+				Entity *parent = pi->decl->parent->entity;
+				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+				// This is prevent any possible race conditions in evaluation when multithreaded
+				// NOTE(bill): In single threaded mode, this should never happen
+				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+					mpmc_enqueue(q, pi);
+					continue;
+				}
+			}
+			check_proc_info(c, pi);
+		}
+	}
+
+	gb_semaphore_release(&c->procs_to_check_semaphore);
+
+	return 0;
+}
 
 void check_procedure_bodies(Checker *c) {
 	auto *q = &c->procs_to_check_queue;
 	ProcInfo *pi = nullptr;
 
-	while (mpmc_dequeue(q, &pi)) {
-		if (pi->decl->parent && pi->decl->parent->entity) {
-			Entity *parent = pi->decl->parent->entity;
-			// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
-			// This is prevent any possible race conditions in evaluation when multithreaded
-			// NOTE(bill): In single threaded mode, this should never happen
-			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-				mpmc_enqueue(q, pi);
-				continue;
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	if (!build_context.threaded_checker) {
+		worker_count = 0;
+	}
+
+	if (worker_count == 0) {
+		while (mpmc_dequeue(q, &pi)) {
+			if (pi->decl->parent && pi->decl->parent->entity) {
+				Entity *parent = pi->decl->parent->entity;
+				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+				// This is prevent any possible race conditions in evaluation when multithreaded
+				// NOTE(bill): In single threaded mode, this should never happen
+				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+					mpmc_enqueue(q, pi);
+					continue;
+				}
 			}
+			check_proc_info(c, pi);
 		}
-		check_proc_info(c, pi);
+	} else {
+		proc_bodies_is_running = true;
+
+		gbThread threads[64] = {};
+		for (isize i = 0; i < worker_count; i++) {
+			gb_thread_init(threads+i);
+		}
+
+		for (isize i = 0; i < worker_count; i++) {
+			gb_thread_start(threads+i, thread_proc_body, c);
+		}
+
+		while (q->count.load(std::memory_order_relaxed) > 0) {
+			if (mpmc_dequeue(q, &pi)) {
+				if (pi->decl->parent && pi->decl->parent->entity) {
+					Entity *parent = pi->decl->parent->entity;
+					// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+					// This is prevent any possible race conditions in evaluation when multithreaded
+					// NOTE(bill): In single threaded mode, this should never happen
+					if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+						mpmc_enqueue(q, pi);
+
+						gb_yield();
+						continue;
+					}
+				}
+				check_proc_info(c, pi);
+			}
+
+			gb_yield();
+		}
+
+		proc_bodies_is_running = false;
+		gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)worker_count);
+
+		gb_yield();
+
+		for (isize i = 0; i < worker_count; i++) {
+			gb_thread_destroy(threads+i);
+		}
+
+		while (mpmc_dequeue(q, &pi)) {
+			if (pi->decl->parent && pi->decl->parent->entity) {
+				Entity *parent = pi->decl->parent->entity;
+				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+				// This is prevent any possible race conditions in evaluation when multithreaded
+				// NOTE(bill): In single threaded mode, this should never happen
+				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+					mpmc_enqueue(q, pi);
+					continue;
+				}
+			}
+			check_proc_info(c, pi);
+		}
 	}
 }
 
@@ -4457,7 +4540,7 @@ void check_parsed_files(Checker *c) {
 			AstFile *f = pkg->files[j];
 			string_map_set(&c->info.files, f->fullpath, f);
 
-			create_scope_from_file(f);
+			create_scope_from_file(nullptr, f);
 			reset_checker_context(ctx, f);
 			check_collect_entities(ctx, f->decls);
 		}
