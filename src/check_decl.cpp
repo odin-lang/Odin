@@ -786,6 +786,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pl->body->kind == Ast_BlockStmt);
 		if (!pt->is_polymorphic) {
+			// check_procedure_now(ctx->checker, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
 			check_procedure_later(ctx->checker, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
@@ -808,7 +809,9 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.deferred_procedure.entity != nullptr) {
 		e->Procedure.deferred_procedure = ac.deferred_procedure;
+		gb_mutex_lock(&ctx->checker->procs_with_deferred_to_check_mutex);
 		array_add(&ctx->checker->procs_with_deferred_to_check, e);
+		gb_mutex_unlock(&ctx->checker->procs_with_deferred_to_check_mutex);
 	}
 
 	if (is_foreign) {

@@ -6356,7 +6356,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 		}
 	}
 
-	GB_PANIC("\n\tError in: %s, missing value %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+	GB_PANIC("\n\tError in: %s, missing value '%.*s'\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
 }
 

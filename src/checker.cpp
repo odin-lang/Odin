@@ -4,6 +4,8 @@
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
+void check_proc_info(Checker *c, ProcInfo *pi);
+
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -850,6 +852,11 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
+	gb_mutex_init(&i->untyped_mutex);
+	gb_mutex_init(&i->gen_procs_mutex);
+	gb_mutex_init(&i->gen_types_mutex);
+	gb_mutex_init(&i->type_info_mutex);
+
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -867,6 +874,11 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
 	array_free(&i->required_global_variables);
+
+	gb_mutex_destroy(&i->untyped_mutex);
+	gb_mutex_destroy(&i->gen_procs_mutex);
+	gb_mutex_destroy(&i->gen_types_mutex);
+	gb_mutex_destroy(&i->type_info_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -942,6 +954,9 @@ bool init_checker(Checker *c, Parser *parser) {
 	isize arena_size = 2 * item_size * total_token_count;
 
 	c->builtin_ctx = make_checker_context(c);
+
+	gb_mutex_init(&c->procs_to_check_mutex);
+	gb_mutex_init(&c->procs_with_deferred_to_check_mutex);
 	return true;
 }
 
@@ -952,6 +967,9 @@ void destroy_checker(Checker *c) {
 	array_free(&c->procs_with_deferred_to_check);
 
 	destroy_checker_context(&c->builtin_ctx);
+
+	gb_mutex_destroy(&c->procs_to_check_mutex);
+	gb_mutex_destroy(&c->procs_with_deferred_to_check_mutex);
 }
 
 
@@ -1028,14 +1046,19 @@ Scope *scope_of_node(Ast *node) {
 	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, Ast *expr) {
+	gb_mutex_lock(&i->untyped_mutex);
+	ExprInfo *res = nullptr;
 	ExprInfo **found = map_get(&i->untyped, hash_node(expr));
 	if (found) {
-		return *found;
+		res = *found;
 	}
-	return nullptr;
+	gb_mutex_unlock(&i->untyped_mutex);
+	return res;
 }
 void check_remove_expr_info(CheckerInfo *i, Ast *expr) {
+	gb_mutex_lock(&i->untyped_mutex);
 	map_remove(&i->untyped, hash_node(expr));
+	gb_mutex_unlock(&i->untyped_mutex);
 }
 
 
@@ -1045,6 +1068,8 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	if (type == t_llvm_bool) {
 		type = t_bool;
 	}
+
+	gb_mutex_lock(&info->type_info_mutex);
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
@@ -1067,6 +1092,8 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		}
 	}
 
+	gb_mutex_unlock(&info->type_info_mutex);
+
 	if (error_on_failure && entry_index < 0) {
 		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
 	}
@@ -1084,7 +1111,9 @@ void add_untyped(CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode,
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
+	gb_mutex_lock(&i->untyped_mutex);
 	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
+	gb_mutex_unlock(&i->untyped_mutex);
 }
 
 void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
@@ -1285,6 +1314,9 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	add_type_info_dependency(c->decl, t);
 
+	gb_mutex_lock(&c->info->type_info_mutex);
+	defer (gb_mutex_unlock(&c->info->type_info_mutex));
+
 	auto found = map_get(&c->info->type_info_map, hash_type(t));
 	if (found != nullptr) {
 		// Types have already been added
@@ -1478,19 +1510,22 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	}
 }
 
-void check_procedure_later(Checker *c, ProcInfo info) {
-	GB_ASSERT(info.decl != nullptr);
+void check_procedure_later(Checker *c, ProcInfo *info) {
+	GB_ASSERT(info != nullptr);
+	GB_ASSERT(info->decl != nullptr);
+	gb_mutex_lock(&c->procs_to_check_mutex);
 	array_add(&c->procs_to_check, info);
+	gb_mutex_unlock(&c->procs_to_check_mutex);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
-	ProcInfo info = {};
-	info.file  = file;
-	info.token = token;
-	info.decl  = decl;
-	info.type  = type;
-	info.body  = body;
-	info.tags  = tags;
+	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	info->file  = file;
+	info->token = token;
+	info->decl  = decl;
+	info->type  = type;
+	info->body  = body;
+	info->tags  = tags;
 	check_procedure_later(c, info);
 }
 
@@ -4226,37 +4261,40 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
-void check_proc_info(Checker *c, ProcInfo pi) {
-	if (pi.type == nullptr) {
+void check_proc_info(Checker *c, ProcInfo *pi) {
+	if (pi == nullptr) {
+		return;
+	}
+	if (pi->type == nullptr) {
 		return;
 	}
 
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
-	reset_checker_context(&ctx, pi.file);
-	ctx.decl = pi.decl;
+	reset_checker_context(&ctx, pi->file);
+	ctx.decl = pi->decl;
 
-	TypeProc *pt = &pi.type->Proc;
-	String name = pi.token.string;
+	TypeProc *pt = &pi->type->Proc;
+	String name = pi->token.string;
 	if (pt->is_polymorphic && !pt->is_poly_specialized) {
-		Token token = pi.token;
-		if (pi.poly_def_node != nullptr) {
-			token = ast_token(pi.poly_def_node);
+		Token token = pi->token;
+		if (pi->poly_def_node != nullptr) {
+			token = ast_token(pi->poly_def_node);
 		}
 		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
 		return;
 	}
 
 	if (pt->is_polymorphic && pt->is_poly_specialized) {
-		Entity *e = pi.decl->entity;
+		Entity *e = pi->decl->entity;
 		if ((e->flags & EntityFlag_Used) == 0) {
 			// NOTE(bill, 2019-08-31): It was never used, don't check
 			return;
 		}
 	}
 
-	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
-	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
+	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
+	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
 	if (bounds_check) {
 		ctx.state_flags |= StateFlag_bounds_check;
@@ -4266,17 +4304,19 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
 
-	check_proc_body(&ctx, pi.token, pi.decl, pi.type, pi.body);
-	if (pi.body != nullptr && pi.decl->entity != nullptr) {
-		pi.decl->entity->flags |= EntityFlag_ProcBodyChecked;
+	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	if (pi->body != nullptr && pi->decl->entity != nullptr) {
+		pi->decl->entity->flags |= EntityFlag_ProcBodyChecked;
 	}
 }
+
+GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
 GB_THREAD_PROC(check_proc_info_worker_proc) {
 	if (thread == nullptr) return 0;
 	auto *c = cast(Checker *)thread->user_data;
-	isize index = thread->user_index;
-	check_proc_info(c, c->procs_to_check[index]);
+	ProcInfo *pi = cast(ProcInfo *)cast(uintptr)thread->user_index;
+	check_proc_info(c, pi);
 	return 0;
 }
 
@@ -4310,7 +4350,7 @@ void check_unchecked_bodies(Checker *c) {
 				continue;
 			}
 
-			check_proc_info(c, pi);
+			check_proc_info(c, &pi);
 		}
 	}
 }
@@ -4346,6 +4386,33 @@ void check_test_names(Checker *c) {
 	}
 
 }
+
+void check_procedure_bodies(Checker *c) {
+	// TODO(bill): Make this an actual FIFO queue rather than this monstrosity
+	while (c->procs_to_check.count != 0) {
+		ProcInfo *pi = c->procs_to_check.data[0];
+
+		// Preparing to multithread the procedure checking code
+		#if 0
+		gb_mutex_lock(&c->procs_to_check_mutex);
+		defer (gb_mutex_unlock(&c->procs_to_check_mutex));
+
+		array_ordered_remove(&c->procs_to_check, 0);
+		if (pi->decl->parent && pi->decl->parent->entity) {
+			Entity *parent = pi->decl->parent->entity;
+			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+				array_add(&c->procs_to_check, pi);
+				continue;
+			}
+		}
+		#else
+		array_ordered_remove(&c->procs_to_check, 0);
+		#endif
+
+		check_proc_info(c, pi);
+	}
+}
+
 
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
@@ -4405,11 +4472,7 @@ void check_parsed_files(Checker *c) {
 	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
 
 	TIME_SECTION("check procedure bodies");
-	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs_to_check) {
-		ProcInfo pi = c->procs_to_check[i];
-		check_proc_info(c, pi);
-	}
+	check_procedure_bodies(c);
 
 	TIME_SECTION("check scope usage");
 	for_array(i, c->info.files.entries) {

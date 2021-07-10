@@ -290,6 +290,11 @@ struct CheckerInfo {
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
 
+	gbMutex untyped_mutex;
+	gbMutex gen_procs_mutex;
+	gbMutex gen_types_mutex;
+	gbMutex type_info_mutex;
+
 	Map<ExprInfo *>       untyped; // Key: Ast * | Expression -> ExprInfo *
 	                               // NOTE(bill): This needs to be a map and not on the Ast
 	                               // as it needs to be iterated across
@@ -346,8 +351,11 @@ struct Checker {
 
 	CheckerContext builtin_ctx;
 
-	Array<ProcInfo> procs_to_check;
-	Array<Entity *> procs_with_deferred_to_check;
+
+	gbMutex procs_to_check_mutex;
+	gbMutex procs_with_deferred_to_check_mutex;
+	Array<ProcInfo *> procs_to_check;
+	Array<Entity *>   procs_with_deferred_to_check;
 };
 
 
