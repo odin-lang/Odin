@@ -48,6 +48,70 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 };
 
 
+void check_try_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	if (x->type->kind == Type_Tuple) {
+		auto const &vars = x->type->Tuple.variables;
+		auto lhs = array_slice(vars, 0, vars.count-1);
+		auto rhs = vars[vars.count-1];
+		if (lhs.count == 1) {
+			left_type = lhs[0]->type;
+		} else if (lhs.count != 0) {
+			left_type = alloc_type_tuple();
+			left_type->Tuple.variables = array_make_from_ptr(lhs.data, lhs.count, lhs.count);
+		}
+
+		right_type = rhs->type;
+	} else {
+		check_promote_optional_ok(c, x, &left_type, &right_type);
+	}
+
+	if (left_type_)  *left_type_  = left_type;
+	if (right_type_) *right_type_ = right_type;
+
+	if (!is_type_boolean(right_type)) {
+		gbString str = type_to_string(right_type);
+		error(x->expr, "'%.*s' expects an \"optional ok\" like value, got %s", LIT(name), str);
+		gb_string_free(str);
+	}
+	// if (!type_has_nil(right_type) && !is_type_boolean(right_type)) {
+	// 	gbString str = type_to_string(right_type);
+	// 	error(x->expr, "'%.*s' expects an \"optional ok\" like value, or an n-valued expression where the last value is either a boolean or can be compared against 'nil', got %s", LIT(name), str);
+	// 	gb_string_free(str);
+	// }
+}
+
+
+void check_try_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
+	// TODO(bill): better error message
+	gbString t = type_to_string(x.type);
+	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
+	if (is_type_union(type_deref(x.type))) {
+		Type *bsrc = base_type(type_deref(x.type));
+		gbString th = nullptr;
+		if (type_hint != nullptr) {
+			GB_ASSERT(bsrc->kind == Type_Union);
+			for_array(i, bsrc->Union.variants) {
+				Type *vt = bsrc->Union.variants[i];
+				if (are_types_identical(vt, type_hint)) {
+					th = type_to_string(type_hint);
+					break;
+				}
+			}
+		}
+		gbString expr_str = expr_to_string(x.expr);
+		if (th != nullptr) {
+			error_line("\tSuggestion: was a type assertion such as %s.(%s) or %s.? wanted?\n", expr_str, th, expr_str);
+		} else {
+			error_line("\tSuggestion: was a type assertion such as %s.(T) or %s.? wanted?\n", expr_str, expr_str);
+		}
+		gb_string_free(th);
+		gb_string_free(expr_str);
+	}
+	gb_string_free(t);
+}
+
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
@@ -84,6 +148,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_min:
 	case BuiltinProc_max:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
+		break;
+
+	case BuiltinProc_or_else:
+		// NOTE(bill): The arguments may be multi-expr
 		break;
 
 	case BuiltinProc_DIRECTIVE: {
@@ -445,38 +513,82 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_offset_of: {
+		// offset_of :: proc(value.field) -> uintptr
 		// offset_of :: proc(Type, field) -> uintptr
-		Operand op = {};
-		Type *bt = check_type(c, ce->args[0]);
-		Type *type = base_type(bt);
-		if (type == nullptr || type == t_invalid) {
-			error(ce->args[0], "Expected a type for 'offset_of'");
+
+		Type *type = nullptr;
+		Ast *field_arg = nullptr;
+
+		if (ce->args.count == 1) {
+			Ast *arg0 = unparen_expr(ce->args[0]);
+			if (arg0->kind != Ast_SelectorExpr) {
+				gbString x = expr_to_string(arg0);
+				error(ce->args[0], "Invalid expression for 'offset_of', '%s' is not a selector expression", x);
+				gb_string_free(x);
+				return false;
+			}
+
+			ast_node(se, SelectorExpr, arg0);
+
+			Operand x = {};
+			check_expr(c, &x, se->expr);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			type = type_deref(x.type);
+
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for 'offset_of'");
+				return false;
+			}
+
+			field_arg = unparen_expr(se->selector);
+		} else if (ce->args.count == 2) {
+			type = check_type(c, ce->args[0]);
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for 'offset_of'");
+				return false;
+			}
+
+			field_arg = unparen_expr(ce->args[1]);
+		} else {
+			error(ce->args[0], "Expected either 1 or 2 arguments to 'offset_of', in the format of 'offset_of(Type, field)', 'offset_of(value.field)'");
 			return false;
 		}
+		GB_ASSERT(type != nullptr);
 
-		Ast *field_arg = unparen_expr(ce->args[1]);
 		if (field_arg == nullptr ||
 		    field_arg->kind != Ast_Ident) {
 			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
 		if (is_type_array(type)) {
-			error(field_arg, "Invalid type for 'offset_of'");
+			gbString t = type_to_string(type);
+			error(field_arg, "Invalid a struct type for 'offset_of', got '%s'", t);
+			gb_string_free(t);
 			return false;
 		}
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(type, arg->token.string, operand->mode == Addressing_Type);
+		String field_name = arg->token.string;
+		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(bt);
+			gbString type_str = type_to_string(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(arg->token.string));
 			gb_string_free(type_str);
+
+			Type *bt = base_type(type);
+			if (bt->kind == Type_Struct) {
+				check_did_you_mean_type(arg->token.string, bt->Struct.fields);
+			}
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(bt);
+			gbString type_str = type_to_string(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(arg->token.string), type_str);
 			gb_string_free(type_str);
@@ -486,7 +598,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_offset_of_from_selection(type, sel));
 		operand->type  = t_uintptr;
-
 		break;
 	}
 
@@ -1675,6 +1786,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_or_else: {
+		GB_ASSERT(ce->args.count == 2);
+		Ast *arg = ce->args[0];
+		Ast *default_value = ce->args[1];
+
+		Operand x = {};
+		Operand y = {};
+		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
+		if (x.mode == Addressing_Invalid) {
+			operand->mode = Addressing_Value;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		check_multi_expr_with_type_hint(c, &y, default_value, x.type);
+		error_operand_no_value(&y);
+		if (y.mode == Addressing_Invalid) {
+			operand->mode = Addressing_Value;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		Type *left_type = nullptr;
+		Type *right_type = nullptr;
+		check_try_split_types(c, &x, builtin_name, &left_type, &right_type);
+		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
+
+		if (left_type != nullptr) {
+			check_assignment(c, &y, left_type, builtin_name);
+		} else {
+			check_try_expr_no_value_error(c, builtin_name, x, type_hint);
+		}
+
+		if (left_type == nullptr) {
+			left_type = t_invalid;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = left_type;
+		return true;
+	}
 
 	case BuiltinProc_simd_vector: {
 		Operand x = {};
@@ -1783,7 +1934,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 				Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
 				soa_struct->Struct.fields[i] = new_field;
-				add_entity(c->checker, scope, nullptr, new_field);
+				add_entity(c, scope, nullptr, new_field);
 				add_entity_use(c, nullptr, new_field);
 			}
 
@@ -1808,7 +1959,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 					Type *array_type = alloc_type_array(old_field->type, count);
 					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
 					soa_struct->Struct.fields[i] = new_field;
-					add_entity(c->checker, scope, nullptr, new_field);
+					add_entity(c, scope, nullptr, new_field);
 				} else {
 					soa_struct->Struct.fields[i] = old_field;
 				}
@@ -1820,7 +1971,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		Token token = {};
 		token.string = str_lit("Base_Type");
 		Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
-		add_entity(c->checker, scope, nullptr, base_type_entity);
+		add_entity(c, scope, nullptr, base_type_entity);
 
 		add_type_info_type(c, soa_struct);
 
@@ -2936,6 +3087,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(ce->args[0],
 				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 				gb_string_free(type_str);
+
+				if (bt->kind == Type_Struct) {
+					check_did_you_mean_type(field_name, bt->Struct.fields);
+				}
 				return false;
 			}
 			if (sel.indirect) {

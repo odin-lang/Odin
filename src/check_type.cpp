@@ -23,7 +23,7 @@ void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field,
 			tok.pos = ast_token(field->type).pos;
 		}
 		Entity *f = alloc_entity_array_elem(nullptr, tok, t->Array.elem, idx);
-		add_entity(ctx->checker, ctx->scope, nullptr, f);
+		add_entity(ctx, ctx->scope, nullptr, f);
 	}
 }
 
@@ -52,7 +52,7 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 					error(e->token, "'%.*s' is already declared", LIT(name));
 				}
 			} else {
-				add_entity(ctx->checker, ctx->scope, nullptr, f);
+				add_entity(ctx, ctx->scope, nullptr, f);
 				if (f->flags & EntityFlag_Using) {
 					populate_using_entity_scope(ctx, node, field, f->type);
 				}
@@ -89,12 +89,8 @@ bool does_field_type_allow_using(Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
 		return true;
-	} else if (is_type_raw_union(t)) {
-		return true;
 	} else if (is_type_array(t)) {
 		return t->Array.count <= 4;
-	} else if (is_type_typeid(t)) {
-		return true;
 	}
 	return false;
 }
@@ -161,7 +157,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 			Token name_token = name->Ident.token;
 
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
-			add_entity(ctx->checker, ctx->scope, name, field);
+			add_entity(ctx, ctx->scope, name, field);
 			array_add(fields, field);
 			array_add(tags, p->tag.string);
 
@@ -240,7 +236,10 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 
 
 Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure) {
-	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
+	gb_mutex_lock(&ctx->info->gen_types_mutex);
+	defer (gb_mutex_unlock(&ctx->info->gen_types_mutex));
+
+	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
 		for_array(i, *found_gen_types) {
 			Entity *e = (*found_gen_types)[i];
@@ -319,14 +318,16 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 
 	named_type->Named.type_name = e;
 
-	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
+	gb_mutex_lock(&ctx->info->gen_types_mutex);
+	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types) {
 		array_add(found_gen_types, e);
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, e);
-		map_set(&ctx->checker->info.gen_types, hash_pointer(original_type), array);
+		map_set(&ctx->info->gen_types, hash_pointer(original_type), array);
 	}
+	gb_mutex_unlock(&ctx->info->gen_types_mutex);
 }
 
 Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
@@ -487,7 +488,7 @@ Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_para
 				}
 
 				e->state = EntityState_Resolved;
-				add_entity(ctx->checker, scope, name, e);
+				add_entity(ctx, scope, name, e);
 				array_add(&entities, e);
 			}
 		}
@@ -799,7 +800,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		if (scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
-			add_entity(ctx->checker, ctx->scope, nullptr, e);
+			add_entity(ctx, ctx->scope, nullptr, e);
 			array_add(&fields, e);
 			// TODO(bill): Should I add a use for the enum value?
 			add_entity_use(ctx, field, e);
@@ -1626,7 +1627,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
-			add_entity(ctx->checker, scope, name, param);
+			add_entity(ctx, scope, name, param);
 			if (is_using) {
 				add_entity_use(ctx, name, param);
 			}
@@ -1753,7 +1754,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 				param->flags |= EntityFlag_Result;
 				param->Variable.param_value = param_value;
 				array_add(&variables, param);
-				add_entity(ctx->checker, scope, name, param);
+				add_entity(ctx, scope, name, param);
 				// NOTE(bill): Removes `declared but not used` when using -vet
 				add_entity_use(ctx, name, param);
 			}
@@ -2247,7 +2248,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 
 			Entity *new_field = alloc_entity_field(scope, token, field_type, false, cast(i32)i);
 			soa_struct->Struct.fields[i] = new_field;
-			add_entity(ctx->checker, scope, nullptr, new_field);
+			add_entity(ctx, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
 		}
 
@@ -2281,7 +2282,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 				}
 				Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_src_index);
 				soa_struct->Struct.fields[i] = new_field;
-				add_entity(ctx->checker, scope, nullptr, new_field);
+				add_entity(ctx, scope, nullptr, new_field);
 				add_entity_use(ctx, nullptr, new_field);
 			} else {
 				soa_struct->Struct.fields[i] = old_field;
@@ -2294,13 +2295,13 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 	if (soa_kind != StructSoa_Fixed) {
 		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count+0);
 		soa_struct->Struct.fields[field_count+0] = len_field;
-		add_entity(ctx->checker, scope, nullptr, len_field);
+		add_entity(ctx, scope, nullptr, len_field);
 		add_entity_use(ctx, nullptr, len_field);
 
 		if (soa_kind == StructSoa_Dynamic) {
 			Entity *cap_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count+1);
 			soa_struct->Struct.fields[field_count+1] = cap_field;
-			add_entity(ctx->checker, scope, nullptr, cap_field);
+			add_entity(ctx, scope, nullptr, cap_field);
 			add_entity_use(ctx, nullptr, cap_field);
 
 			Token token = {};
@@ -2308,7 +2309,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 			init_mem_allocator(ctx->checker);
 			Entity *allocator_field = alloc_entity_field(scope, token, t_allocator, false, cast(i32)field_count+2);
 			soa_struct->Struct.fields[field_count+2] = allocator_field;
-			add_entity(ctx->checker, scope, nullptr, allocator_field);
+			add_entity(ctx, scope, nullptr, allocator_field);
 			add_entity_use(ctx, nullptr, allocator_field);
 		}
 	}
@@ -2316,7 +2317,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 	Token token = {};
 	token.string = str_lit("Base_Type");
 	Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
-	add_entity(ctx->checker, scope, nullptr, base_type_entity);
+	add_entity(ctx, scope, nullptr, base_type_entity);
 
 	add_type_info_type(ctx, soa_struct);
 
@@ -2429,8 +2430,8 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 			t->Generic.entity = e;
 			e->TypeName.is_type_alias = true;
 			e->state = EntityState_Resolved;
-			add_entity(ctx->checker, ps, ident, e);
-			add_entity(ctx->checker, s, ident, e);
+			add_entity(ctx, ps, ident, e);
+			add_entity(ctx, s, ident, e);
 		} else {
 			error(ident, "Invalid use of a polymorphic parameter '$%.*s'", LIT(token.string));
 			*type = t_invalid;
@@ -2800,7 +2801,7 @@ Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type) {
 	#endif
 
 	if (is_type_typed(type)) {
-		add_type_and_value(&ctx->checker->info, e, Addressing_Type, type, empty_exact_value);
+		add_type_and_value(ctx->info, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
 		error(e, "Invalid type definition of %s", name);

@@ -325,13 +325,13 @@ gb_global u64 const unsigned_integer_maxs[] = {
 
 
 bool add_overflow_u64(u64 x, u64 y, u64 *result) {
-   *result = x + y;
-   return *result < x || *result < y;
+	*result = x + y;
+	return *result < x || *result < y;
 }
 
 bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
-   *result = x - y;
-   return *result > x;
+	*result = x - y;
+	return *result > x;
 }
 
 void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
@@ -1174,3 +1174,97 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 #else
 #error Implement read_directory
 #endif
+
+
+
+#define USE_DAMERAU_LEVENSHTEIN 1
+
+isize levenstein_distance_case_insensitive(String const &a, String const &b) {
+	isize w = a.len+1;
+	isize h = b.len+1;
+	isize *matrix = gb_alloc_array(temporary_allocator(), isize, w*h);
+	for (isize i = 0; i <= a.len; i++) {
+		matrix[i*w + 0] = i;
+	}
+	for (isize i = 0; i <= b.len; i++) {
+		matrix[0*w + i] = i;
+	}
+
+	for (isize i = 1; i <= a.len; i++) {
+		char a_c = gb_char_to_lower(cast(char)a.text[i-1]);
+		for (isize j = 1; j <= b.len; j++) {
+			char b_c = gb_char_to_lower(cast(char)b.text[j-1]);
+			if (a_c == b_c) {
+				matrix[i*w + j] = matrix[(i-1)*w + j-1];
+			} else {
+				isize remove = matrix[(i-1)*w + j] + 1;
+				isize insert = matrix[i*w + j-1] + 1;
+				isize substitute = matrix[(i-1)*w + j-1] + 1;
+				isize minimum = remove;
+				if (insert < minimum) {
+					minimum = insert;
+				}
+				if (substitute < minimum) {
+					minimum = substitute;
+				}
+				// Damerau-Levenshtein (transposition extension)
+				#if USE_DAMERAU_LEVENSHTEIN
+				if (i > 1 && j > 1) {
+					isize transpose = matrix[(i-2)*w + j-2] + 1;
+					if (transpose < minimum) {
+						minimum = transpose;
+					}
+				}
+				#endif
+
+				matrix[i*w + j] = minimum;
+			}
+		}
+	}
+
+	return matrix[a.len*w + b.len];
+}
+
+
+struct DistanceAndTarget {
+	isize distance;
+	String target;
+};
+
+struct DidYouMeanAnswers {
+	Array<DistanceAndTarget> distances;
+	String key;
+};
+
+enum {MAX_SMALLEST_DID_YOU_MEAN_DISTANCE = 3-USE_DAMERAU_LEVENSHTEIN};
+
+DidYouMeanAnswers did_you_mean_make(gbAllocator allocator, isize cap, String const &key) {
+	DidYouMeanAnswers d = {};
+	array_init(&d.distances, allocator, 0, cap);
+	d.key = key;
+	return d;
+}
+void did_you_mean_destroy(DidYouMeanAnswers *d) {
+	array_free(&d->distances);
+}
+void did_you_mean_append(DidYouMeanAnswers *d, String const &target) {
+	if (target.len == 0 || target == "_") {
+		return;
+	}
+	DistanceAndTarget dat = {};
+	dat.target = target;
+	dat.distance = levenstein_distance_case_insensitive(d->key, target);
+	array_add(&d->distances, dat);
+}
+Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) {
+	gb_sort_array(d->distances.data, d->distances.count, gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
+	isize count = 0;
+	for (isize i = 0; i < d->distances.count; i++) {
+		isize distance = d->distances[i].distance;
+		if (distance > MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
+			break;
+		}
+		count += 1;
+	}
+	return slice_array(d->distances, 0, count);
+}

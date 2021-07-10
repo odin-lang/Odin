@@ -57,11 +57,8 @@ link_error_delete :: proc(lerr: Maybe(Link_Error)) {
 
 
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
-	v: Platform_Error;
-	if v, ok = ferr.(Platform_Error); ok {
-		err = v.err;
-	}
-	return;
+	v := or_else(ferr.(Platform_Error), {});
+	return v.err, v.err != 0;
 }
 
 

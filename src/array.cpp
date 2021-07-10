@@ -90,6 +90,19 @@ Slice<T> slice_from_array(Array<T> const &a) {
 	return {a.data, a.count};
 }
 template <typename T>
+Slice<T> slice_array(Array<T> const &array, isize lo, isize hi) {
+	GB_ASSERT(0 <= lo && lo <= hi && hi <= array.count);
+	Slice<T> out = {};
+	isize len = hi-lo;
+	if (len > 0) {
+		out.data = array.data+lo;
+		out.count = len;
+	}
+	return out;
+}
+
+
+template <typename T>
 Slice<T> slice_clone(gbAllocator const &allocator, Slice<T> const &a) {
 	T *data = cast(T *)gb_alloc_copy_align(allocator, a.data, a.count*gb_size_of(T), gb_align_of(T));
 	return {data, a.count};

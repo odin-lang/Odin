@@ -4,6 +4,8 @@
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
+void check_proc_info(Checker *c, ProcInfo *pi);
+
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -242,7 +244,7 @@ Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CA
 	return s;
 }
 
-Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
+Scope *create_scope_from_file(AstFile *f) {
 	GB_ASSERT(f != nullptr);
 	GB_ASSERT(f->pkg != nullptr);
 	GB_ASSERT(f->pkg->scope != nullptr);
@@ -850,7 +852,10 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
-	map_init(&i->atom_op_map, a);
+	gb_mutex_init(&i->untyped_mutex);
+	gb_mutex_init(&i->gen_procs_mutex);
+	gb_mutex_init(&i->gen_types_mutex);
+	gb_mutex_init(&i->type_info_mutex);
 
 }
 
@@ -870,11 +875,14 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->required_foreign_imports_through_force);
 	array_free(&i->required_global_variables);
 
-	map_destroy(&i->atom_op_map);
+	gb_mutex_destroy(&i->untyped_mutex);
+	gb_mutex_destroy(&i->gen_procs_mutex);
+	gb_mutex_destroy(&i->gen_types_mutex);
+	gb_mutex_destroy(&i->type_info_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
-	CheckerContext ctx = c->init_ctx;
+	CheckerContext ctx = {};
 	ctx.checker   = c;
 	ctx.info      = &c->info;
 	ctx.scope     = builtin_pkg->scope;
@@ -886,6 +894,40 @@ CheckerContext make_checker_context(Checker *c) {
 	ctx.poly_level = 0;
 	return ctx;
 }
+
+void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
+	if (file != nullptr) {
+		TokenPos zero_pos = {};
+		global_error_collector.prev = zero_pos;
+		ctx->file  = file;
+		ctx->decl  = file->pkg->decl_info;
+		ctx->scope = file->scope;
+		ctx->pkg   = file->pkg;
+	}
+}
+void reset_checker_context(CheckerContext *ctx, AstFile *file) {
+	if (ctx == nullptr) {
+		return;
+	}
+	auto checker = ctx->checker;
+	auto info = ctx->info;
+	auto type_path = ctx->type_path;
+	auto poly_path = ctx->poly_path;
+	array_clear(type_path);
+	array_clear(poly_path);
+
+	gb_zero_item(ctx);
+	ctx->checker = checker;
+	ctx->info = info;
+	ctx->type_path = type_path;
+	ctx->poly_path = poly_path;
+	ctx->scope     = builtin_pkg->scope;
+	ctx->pkg       = builtin_pkg;
+
+	add_curr_ast_file(ctx, file);
+}
+
+
 
 void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_type_path(ctx->type_path);
@@ -911,7 +953,10 @@ bool init_checker(Checker *c, Parser *parser) {
 	isize total_token_count = c->parser->total_token_count;
 	isize arena_size = 2 * item_size * total_token_count;
 
-	c->init_ctx = make_checker_context(c);
+	c->builtin_ctx = make_checker_context(c);
+
+	gb_mutex_init(&c->procs_to_check_mutex);
+	gb_mutex_init(&c->procs_with_deferred_to_check_mutex);
 	return true;
 }
 
@@ -921,7 +966,10 @@ void destroy_checker(Checker *c) {
 	array_free(&c->procs_to_check);
 	array_free(&c->procs_with_deferred_to_check);
 
-	destroy_checker_context(&c->init_ctx);
+	destroy_checker_context(&c->builtin_ctx);
+
+	gb_mutex_destroy(&c->procs_to_check_mutex);
+	gb_mutex_destroy(&c->procs_with_deferred_to_check_mutex);
 }
 
 
@@ -998,13 +1046,19 @@ Scope *scope_of_node(Ast *node) {
 	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, Ast *expr) {
-	return map_get(&i->untyped, hash_node(expr));
-}
-void check_set_expr_info(CheckerInfo *i, Ast *expr, ExprInfo info) {
-	map_set(&i->untyped, hash_node(expr), info);
+	gb_mutex_lock(&i->untyped_mutex);
+	ExprInfo *res = nullptr;
+	ExprInfo **found = map_get(&i->untyped, hash_node(expr));
+	if (found) {
+		res = *found;
+	}
+	gb_mutex_unlock(&i->untyped_mutex);
+	return res;
 }
 void check_remove_expr_info(CheckerInfo *i, Ast *expr) {
+	gb_mutex_lock(&i->untyped_mutex);
 	map_remove(&i->untyped, hash_node(expr));
+	gb_mutex_unlock(&i->untyped_mutex);
 }
 
 
@@ -1014,6 +1068,8 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	if (type == t_llvm_bool) {
 		type = t_bool;
 	}
+
+	gb_mutex_lock(&info->type_info_mutex);
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
@@ -1036,6 +1092,8 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		}
 	}
 
+	gb_mutex_unlock(&info->type_info_mutex);
+
 	if (error_on_failure && entry_index < 0) {
 		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
 	}
@@ -1053,7 +1111,9 @@ void add_untyped(CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode,
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
+	gb_mutex_lock(&i->untyped_mutex);
 	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
+	gb_mutex_unlock(&i->untyped_mutex);
 }
 
 void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
@@ -1147,7 +1207,7 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 	return false;
 }
 
-bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
+bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
 	if (scope == nullptr) {
 		return false;
 	}
@@ -1159,14 +1219,13 @@ bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *ent
 	}
 	if (identifier != nullptr) {
 		if (entity->file == nullptr) {
-			GB_ASSERT(c->curr_ctx != nullptr);
-			entity->file = c->curr_ctx->file;
+			entity->file = c->file;
 		}
-		add_entity_definition(&c->info, identifier, entity);
+		add_entity_definition(c->info, identifier, entity);
 	}
 	return true;
 }
-bool add_entity(Checker *c, Scope *scope, Ast *identifier, Entity *entity) {
+bool add_entity(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity) {
 	return add_entity_with_name(c, scope, identifier, entity, entity->token.string);
 }
 
@@ -1217,7 +1276,7 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 				scope = pkg->scope;
 			}
 		}
-		add_entity(c->checker, scope, identifier, e);
+		add_entity(c, scope, identifier, e);
 	}
 
 	add_entity_definition(&c->checker->info, identifier, e);
@@ -1254,6 +1313,9 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	}
 
 	add_type_info_dependency(c->decl, t);
+
+	gb_mutex_lock(&c->info->type_info_mutex);
+	defer (gb_mutex_unlock(&c->info->type_info_mutex));
 
 	auto found = map_get(&c->info->type_info_map, hash_type(t));
 	if (found != nullptr) {
@@ -1448,33 +1510,25 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	}
 }
 
-void check_procedure_later(Checker *c, ProcInfo info) {
-	GB_ASSERT(info.decl != nullptr);
+void check_procedure_later(Checker *c, ProcInfo *info) {
+	GB_ASSERT(info != nullptr);
+	GB_ASSERT(info->decl != nullptr);
+	gb_mutex_lock(&c->procs_to_check_mutex);
 	array_add(&c->procs_to_check, info);
+	gb_mutex_unlock(&c->procs_to_check_mutex);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
-	ProcInfo info = {};
-	info.file  = file;
-	info.token = token;
-	info.decl  = decl;
-	info.type  = type;
-	info.body  = body;
-	info.tags  = tags;
+	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	info->file  = file;
+	info->token = token;
+	info->decl  = decl;
+	info->type  = type;
+	info->body  = body;
+	info->tags  = tags;
 	check_procedure_later(c, info);
 }
 
-void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
-	if (file != nullptr) {
-		TokenPos zero_pos = {};
-		global_error_collector.prev = zero_pos;
-		ctx->file  = file;
-		ctx->decl  = file->pkg->decl_info;
-		ctx->scope = file->scope;
-		ctx->pkg   = file->pkg;
-		ctx->checker->curr_ctx = ctx;
-	}
-}
 
 void add_min_dep_type_info(Checker *c, Type *t) {
 	if (t == nullptr) {
@@ -1492,7 +1546,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	isize ti_index = type_info_index(&c->info, t, false);
 	if (ti_index < 0) {
-		add_type_info_type(&c->init_ctx, t); // Missing the type information
+		add_type_info_type(&c->builtin_ctx, t); // Missing the type information
 		ti_index = type_info_index(&c->info, t, false);
 	}
 	GB_ASSERT(ti_index >= 0);
@@ -2286,8 +2340,7 @@ void init_core_map_type(Checker *c) {
 	if (t_map_hash == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Map_Hash"));
 		if (e->state == EntityState_Unresolved) {
-			auto ctx = c->init_ctx;
-			check_entity_decl(&ctx, e, nullptr, nullptr);
+			check_entity_decl(&c->builtin_ctx, e, nullptr, nullptr);
 		}
 		t_map_hash = e->type;
 		GB_ASSERT(t_map_hash != nullptr);
@@ -2296,8 +2349,7 @@ void init_core_map_type(Checker *c) {
 	if (t_map_header == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Map_Header"));
 		if (e->state == EntityState_Unresolved) {
-			auto ctx = c->init_ctx;
-			check_entity_decl(&ctx, e, nullptr, nullptr);
+			check_entity_decl(&c->builtin_ctx, e, nullptr, nullptr);
 		}
 		t_map_header = e->type;
 		GB_ASSERT(t_map_header != nullptr);
@@ -2891,7 +2943,7 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 			}
 
 			if (name == "builtin") {
-				add_entity(ctx->checker, builtin_pkg->scope, nullptr, e);
+				add_entity(ctx, builtin_pkg->scope, nullptr, e);
 				GB_ASSERT(scope_lookup(builtin_pkg->scope, e->token.string) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
@@ -3240,8 +3292,8 @@ void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 }
 
 CheckerContext *create_checker_context(Checker *c) {
-	CheckerContext *ctx = gb_alloc_item(heap_allocator(), CheckerContext);
-	*ctx = c->init_ctx;
+	CheckerContext *ctx = gb_alloc_item(permanent_allocator(), CheckerContext);
+	*ctx = make_checker_context(c);
 	return ctx;
 }
 
@@ -3615,7 +3667,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		                                     id->fullpath, id->import_name.string,
 		                                     scope);
 
-		add_entity(ctx->checker, parent_scope, nullptr, e);
+		add_entity(ctx, parent_scope, nullptr, e);
 		if (force_use || id->is_using) {
 			add_entity_use(ctx, nullptr, e);
 		}
@@ -3642,7 +3694,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 					// file scope otherwise the error would be the wrong way around
 					redeclaration_error(name, found, e);
 				} else {
-					add_entity_with_name(ctx->checker, parent_scope, e->identifier, e, name);
+					add_entity_with_name(ctx, parent_scope, e->identifier, e, name);
 				}
 			}
 		}
@@ -3704,7 +3756,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
-	add_entity(ctx->checker, parent_scope, nullptr, e);
+	add_entity(ctx, parent_scope, nullptr, e);
 
 
 	AttributeContext ac = {};
@@ -3962,6 +4014,8 @@ void check_import_entities(Checker *c) {
 		}
 	}
 
+	CheckerContext ctx = make_checker_context(c);
+
 	for (isize loop_count = 0; ; loop_count++) {
 		bool new_files = false;
 		for_array(i, package_order) {
@@ -3974,8 +4028,7 @@ void check_import_entities(Checker *c) {
 
 			for_array(i, pkg->files) {
 				AstFile *f = pkg->files[i];
-				CheckerContext ctx = c->init_ctx;
-				add_curr_ast_file(&ctx, f);
+				reset_checker_context(&ctx, f);
 				new_files |= collect_checked_packages_from_decl_list(c, f->decls);
 			}
 		}
@@ -3998,9 +4051,8 @@ void check_import_entities(Checker *c) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 
-			CheckerContext ctx = c->init_ctx;
+			reset_checker_context(&ctx, f);
 			ctx.collect_delayed_decls = true;
-			add_curr_ast_file(&ctx, f);
 
 			if (collect_file_decls(&ctx, f->decls)) {
 				new_packages = true;
@@ -4021,8 +4073,7 @@ void check_import_entities(Checker *c) {
 
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
-			CheckerContext ctx = c->init_ctx;
-			add_curr_ast_file(&ctx, f);
+			reset_checker_context(&ctx, f);
 
 			for_array(j, f->scope->delayed_imports) {
 				Ast *decl = f->scope->delayed_imports[j];
@@ -4031,8 +4082,7 @@ void check_import_entities(Checker *c) {
 		}
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
-			CheckerContext ctx = c->init_ctx;
-			add_curr_ast_file(&ctx, f);
+			reset_checker_context(&ctx, f);
 
 			for_array(j, f->scope->delayed_directives) {
 				Ast *expr = f->scope->delayed_directives[j];
@@ -4211,37 +4261,40 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
-void check_proc_info(Checker *c, ProcInfo pi) {
-	if (pi.type == nullptr) {
+void check_proc_info(Checker *c, ProcInfo *pi) {
+	if (pi == nullptr) {
+		return;
+	}
+	if (pi->type == nullptr) {
 		return;
 	}
 
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
-	add_curr_ast_file(&ctx, pi.file);
-	ctx.decl = pi.decl;
+	reset_checker_context(&ctx, pi->file);
+	ctx.decl = pi->decl;
 
-	TypeProc *pt = &pi.type->Proc;
-	String name = pi.token.string;
+	TypeProc *pt = &pi->type->Proc;
+	String name = pi->token.string;
 	if (pt->is_polymorphic && !pt->is_poly_specialized) {
-		Token token = pi.token;
-		if (pi.poly_def_node != nullptr) {
-			token = ast_token(pi.poly_def_node);
+		Token token = pi->token;
+		if (pi->poly_def_node != nullptr) {
+			token = ast_token(pi->poly_def_node);
 		}
 		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
 		return;
 	}
 
 	if (pt->is_polymorphic && pt->is_poly_specialized) {
-		Entity *e = pi.decl->entity;
+		Entity *e = pi->decl->entity;
 		if ((e->flags & EntityFlag_Used) == 0) {
 			// NOTE(bill, 2019-08-31): It was never used, don't check
 			return;
 		}
 	}
 
-	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
-	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
+	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
+	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
 	if (bounds_check) {
 		ctx.state_flags |= StateFlag_bounds_check;
@@ -4251,17 +4304,19 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
 
-	check_proc_body(&ctx, pi.token, pi.decl, pi.type, pi.body);
-	if (pi.body != nullptr && pi.decl->entity != nullptr) {
-		pi.decl->entity->flags |= EntityFlag_ProcBodyChecked;
+	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	if (pi->body != nullptr && pi->decl->entity != nullptr) {
+		pi->decl->entity->flags |= EntityFlag_ProcBodyChecked;
 	}
 }
+
+GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
 GB_THREAD_PROC(check_proc_info_worker_proc) {
 	if (thread == nullptr) return 0;
 	auto *c = cast(Checker *)thread->user_data;
-	isize index = thread->user_index;
-	check_proc_info(c, c->procs_to_check[index]);
+	ProcInfo *pi = cast(ProcInfo *)cast(uintptr)thread->user_index;
+	check_proc_info(c, pi);
 	return 0;
 }
 
@@ -4295,7 +4350,7 @@ void check_unchecked_bodies(Checker *c) {
 				continue;
 			}
 
-			check_proc_info(c, pi);
+			check_proc_info(c, &pi);
 		}
 	}
 }
@@ -4332,17 +4387,44 @@ void check_test_names(Checker *c) {
 
 }
 
+void check_procedure_bodies(Checker *c) {
+	// TODO(bill): Make this an actual FIFO queue rather than this monstrosity
+	while (c->procs_to_check.count != 0) {
+		ProcInfo *pi = c->procs_to_check.data[0];
+
+		// Preparing to multithread the procedure checking code
+		#if 0
+		gb_mutex_lock(&c->procs_to_check_mutex);
+		defer (gb_mutex_unlock(&c->procs_to_check_mutex));
+
+		array_ordered_remove(&c->procs_to_check, 0);
+		if (pi->decl->parent && pi->decl->parent->entity) {
+			Entity *parent = pi->decl->parent->entity;
+			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+				array_add(&c->procs_to_check, pi);
+				continue;
+			}
+		}
+		#else
+		array_ordered_remove(&c->procs_to_check, 0);
+		#endif
+
+		check_proc_info(c, pi);
+	}
+}
+
+
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	TIME_SECTION("map full filepaths to scope");
-	add_type_info_type(&c->init_ctx, t_invalid);
+	add_type_info_type(&c->builtin_ctx, t_invalid);
 
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->packages) {
 		AstPackage *p = c->parser->packages[i];
-		Scope *scope = create_scope_from_package(&c->init_ctx, p);
-		p->decl_info = make_decl_info(scope, c->init_ctx.decl);
+		Scope *scope = create_scope_from_package(&c->builtin_ctx, p);
+		p->decl_info = make_decl_info(scope, c->builtin_ctx.decl);
 		string_map_set(&c->info.packages, p->fullpath, p);
 
 		if (scope->flags&ScopeFlag_Init) {
@@ -4357,21 +4439,20 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("collect entities");
 	// Collect Entities
+	CheckerContext collect_entity_ctx = make_checker_context(c);
+	defer (destroy_checker_context(&collect_entity_ctx));
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 
-		CheckerContext ctx = make_checker_context(c);
-		defer (destroy_checker_context(&ctx));
-		ctx.pkg = pkg;
-		ctx.collect_delayed_decls = false;
+		CheckerContext *ctx = &collect_entity_ctx;
 
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
-			create_scope_from_file(&ctx, f);
 			string_map_set(&c->info.files, f->fullpath, f);
 
-			add_curr_ast_file(&ctx, f);
-			check_collect_entities(&ctx, f->decls);
+			create_scope_from_file(f);
+			reset_checker_context(ctx, f);
+			check_collect_entities(ctx, f->decls);
 		}
 
 		pkg->used = true;
@@ -4386,16 +4467,12 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("init preload");
 	init_preload(c);
 
-	CheckerContext prev_context = c->init_ctx;
-	defer (c->init_ctx = prev_context);
-	c->init_ctx.decl = make_decl_info(nullptr, nullptr);
+	CheckerContext prev_context = c->builtin_ctx;
+	defer (c->builtin_ctx = prev_context);
+	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
 
 	TIME_SECTION("check procedure bodies");
-	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs_to_check) {
-		ProcInfo pi = c->procs_to_check[i];
-		check_proc_info(c, pi);
-	}
+	check_procedure_bodies(c);
 
 	TIME_SECTION("check scope usage");
 	for_array(i, c->info.files.entries) {
@@ -4422,10 +4499,17 @@ void check_parsed_files(Checker *c) {
 		auto *entry = &c->info.untyped.entries[i];
 		HashKey key = entry->key;
 		Ast *expr = cast(Ast *)cast(uintptr)key.key;
-		ExprInfo *info = &entry->value;
+		ExprInfo *info = entry->value;
 		if (info != nullptr && expr != nullptr) {
 			if (is_type_typed(info->type)) {
 				compiler_error("%s (type %s) is typed!", expr_to_string(expr), type_to_string(info->type));
+			}
+			if (info->mode == Addressing_Constant) {
+			} else if (info->type == t_untyped_nil) {
+			} else if (info->type == t_untyped_undef) {
+			} else if (info->type == t_untyped_bool) {
+			} else {
+				gb_printf_err("UNTYPED %s %s\n", expr_to_string(expr), type_to_string(info->type));
 			}
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
@@ -4441,7 +4525,7 @@ void check_parsed_files(Checker *c) {
 		Type *t = &basic_types[i];
 		if (t->Basic.size > 0 &&
 		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
-			add_type_info_type(&c->init_ctx, t);
+			add_type_info_type(&c->builtin_ctx, t);
 		}
 	}
 
@@ -4453,7 +4537,7 @@ void check_parsed_files(Checker *c) {
 			// i64 size  = type_size_of(c->allocator, e->type);
 			i64 align = type_align_of(e->type);
 			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
-				add_type_info_type(&c->init_ctx, e->type);
+				add_type_info_type(&c->builtin_ctx, e->type);
 			}
 
 		} else if (e->kind == Entity_Procedure) {

@@ -54,6 +54,10 @@ template <typename T> T *  string_map_get              (StringMap<T> *h, char co
 template <typename T> T *  string_map_get              (StringMap<T> *h, String const &key);
 template <typename T> T *  string_map_get              (StringMap<T> *h, StringHashKey const &key);
 
+template <typename T> T &  string_map_must_get         (StringMap<T> *h, char const *key);
+template <typename T> T &  string_map_must_get         (StringMap<T> *h, String const &key);
+template <typename T> T &  string_map_must_get         (StringMap<T> *h, StringHashKey const &key);
+
 template <typename T> void string_map_set              (StringMap<T> *h, StringHashKey const &key, T const &value);
 template <typename T> void string_map_set              (StringMap<T> *h, String const &key, T const &value);
 template <typename T> void string_map_set              (StringMap<T> *h, char const *key,   T const &value);
@@ -185,6 +189,23 @@ gb_inline T *string_map_get(StringMap<T> *h, String const &key) {
 template <typename T>
 gb_inline T *string_map_get(StringMap<T> *h, char const *key) {
 	return string_map_get(h, string_hash_string(make_string_c(key)));
+}
+
+template <typename T>
+T &string_map_must_get(StringMap<T> *h, StringHashKey const &key) {
+	isize index = string_map__find(h, key).entry_index;
+	GB_ASSERT(index >= 0);
+	return h->entries[index].value;
+}
+
+template <typename T>
+gb_inline T &string_map_must_get(StringMap<T> *h, String const &key) {
+	return string_map_must_get(h, string_hash_string(key));
+}
+
+template <typename T>
+gb_inline T &string_map_must_get(StringMap<T> *h, char const *key) {
+	return string_map_must_get(h, string_hash_string(make_string_c(key)));
 }
 
 template <typename T>

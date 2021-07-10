@@ -1999,6 +1999,40 @@ relative_data_types :: proc() {
 	fmt.println(rel_slice[1]);
 }
 
+or_else_procedure :: proc() {
+	fmt.println("\n#'or_else'");
+	// IMPORTANT NOTE: 'or_else' is experimental features and subject to change/removal
+	{
+		// 'or_else' does a similar value check as 'try' but instead of doing an
+		// early return, it will give a default value to be used instead
+
+		m: map[string]int;
+		i: int;
+		ok: bool;
+
+		if i, ok = m["hellope"]; !ok {
+			i = 123;
+		}
+		// The above can be mapped to 'or_else'
+		i = or_else(m["hellope"], 123);
+
+		assert(i == 123);
+	}
+	{
+		// 'or_else' can be used with type assertions too, as they
+		// have optional ok semantics
+		v: union{int, f64};
+		i: int;
+		i = or_else(v.(int), 123);
+		i = or_else(v.?, 123); // Type inference magic
+		assert(i == 123);
+
+		m: Maybe(int);
+		i = or_else(m.?, 456);
+		assert(i == 456);
+	}
+}
+
 main :: proc() {
 	when true {
 		the_basics();
@@ -2031,5 +2065,6 @@ main :: proc() {
 		union_maybe();
 		explicit_context_definition();
 		relative_data_types();
+		or_else_procedure();
 	}
 }
