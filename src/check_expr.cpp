@@ -5511,7 +5511,7 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		return err;
 	}
 
-	while (ordered_operands.count >= 0) {
+	while (ordered_operands.count > 0) {
 		if (ordered_operands[ordered_operands.count-1].expr != nullptr) {
 			break;
 		}
@@ -5560,8 +5560,9 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		}
 	}
 
+	isize oo_count = gb_min(param_count, ordered_operands.count);
 	i64 score = 0;
-	for (isize i = 0; i < param_count; i++) {
+	for (isize i = 0; i < oo_count; i++) {
 		Entity *e = tuple->variables[i];
 		Operand *o = &ordered_operands[i];
 		if (o->mode == Addressing_Invalid) {
