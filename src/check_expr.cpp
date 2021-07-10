@@ -2889,8 +2889,8 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	GB_ASSERT(e != nullptr);
-	ExprInfo *found = check_get_expr_info(&c->checker->info, e);
-	if (found == nullptr) {
+	ExprInfo *old = check_get_expr_info(&c->checker->info, e);
+	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
 				add_type_and_value(&c->checker->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
@@ -2898,11 +2898,10 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		}
 		return;
 	}
-	ExprInfo old = *found;
 
 	switch (e->kind) {
 	case_ast_node(ue, UnaryExpr, e);
-		if (old.value.kind != ExactValue_Invalid) {
+		if (old->value.kind != ExactValue_Invalid) {
 			// NOTE(bill): if 'e' is constant, the operands will be constant too.
 			// They don't need to be updated as they will be updated later and
 			// checked at the end of general checking stage.
@@ -2912,7 +2911,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	case_end;
 
 	case_ast_node(be, BinaryExpr, e);
-		if (old.value.kind != ExactValue_Invalid) {
+		if (old->value.kind != ExactValue_Invalid) {
 			// See above note in UnaryExpr case
 			break;
 		}
@@ -2927,7 +2926,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, e);
-		if (old.value.kind != ExactValue_Invalid) {
+		if (old->value.kind != ExactValue_Invalid) {
 			// See above note in UnaryExpr case
 			break;
 		}
@@ -2937,7 +2936,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, e);
-		if (old.value.kind != ExactValue_Invalid) {
+		if (old->value.kind != ExactValue_Invalid) {
 			// See above note in UnaryExpr case
 			break;
 		}
@@ -2952,15 +2951,14 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	}
 
 	if (!final && is_type_untyped(type)) {
-		old.type = base_type(type);
-		check_set_expr_info(&c->checker->info, e, old);
+		old->type = base_type(type);
 		return;
 	}
 
 	// We need to remove it and then give it a new one
 	check_remove_expr_info(&c->checker->info, e);
 
-	if (old.is_lhs && !is_type_integer(type)) {
+	if (old->is_lhs && !is_type_integer(type)) {
 		gbString expr_str = expr_to_string(e);
 		gbString type_str = type_to_string(type);
 		error(e, "Shifted operand %s must be an integer, got %s", expr_str, type_str);
@@ -2969,7 +2967,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		return;
 	}
 
-	add_type_and_value(&c->checker->info, e, old.mode, type, old.value);
+	add_type_and_value(&c->checker->info, e, old->mode, type, old->value);
 }
 
 void update_expr_value(CheckerContext *c, Ast *e, ExactValue value) {

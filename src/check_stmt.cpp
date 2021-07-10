@@ -558,7 +558,7 @@ void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	}
 
 	Entity *e = alloc_entity_label(ctx->scope, l->name->Ident.token, t_invalid, label, parent);
-	add_entity(ctx->checker, ctx->scope, l->name, e);
+	add_entity(ctx, ctx->scope, l->name, e);
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
 	if (ok) {
@@ -861,7 +861,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 
 	for (isize i = 0; i < entity_count; i++) {
-		add_entity(ctx->checker, ctx->scope, entities[i]->identifier, entities[i]);
+		add_entity(ctx, ctx->scope, entities[i]->identifier, entities[i]);
 	}
 
 
@@ -1344,7 +1344,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (!is_reference) {
 				tag_var->flags |= EntityFlag_Value;
 			}
-			add_entity(ctx->checker, ctx->scope, lhs, tag_var);
+			add_entity(ctx, ctx->scope, lhs, tag_var);
 			add_entity_use(ctx, lhs, tag_var);
 			add_implicit_entity(ctx, stmt, tag_var);
 		}
@@ -1966,7 +1966,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			Entity *e = entities[i];
 			DeclInfo *d = decl_info_of_entity(e);
 			GB_ASSERT(d == nullptr);
-			add_entity(ctx->checker, ctx->scope, e->identifier, e);
+			add_entity(ctx, ctx->scope, e->identifier, e);
 			d = make_decl_info(ctx->scope, ctx->decl);
 			add_entity_and_decl_info(ctx, e->identifier, e, d);
 		}
@@ -2286,7 +2286,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						}
 					}
 				}
-				add_entity(ctx->checker, ctx->scope, e->identifier, e);
+				add_entity(ctx, ctx->scope, e->identifier, e);
 			}
 
 			if (vd->is_using != 0) {
