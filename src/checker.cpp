@@ -856,6 +856,10 @@ void init_checker_info(CheckerInfo *i) {
 	gb_mutex_init(&i->gen_procs_mutex);
 	gb_mutex_init(&i->gen_types_mutex);
 	gb_mutex_init(&i->type_info_mutex);
+	gb_mutex_init(&i->deps_mutex);
+	gb_mutex_init(&i->identifier_uses_mutex);
+	gb_mutex_init(&i->entity_mutex);
+	gb_mutex_init(&i->foreign_mutex);
 
 }
 
@@ -879,6 +883,10 @@ void destroy_checker_info(CheckerInfo *i) {
 	gb_mutex_destroy(&i->gen_procs_mutex);
 	gb_mutex_destroy(&i->gen_types_mutex);
 	gb_mutex_destroy(&i->type_info_mutex);
+	gb_mutex_destroy(&i->deps_mutex);
+	gb_mutex_destroy(&i->identifier_uses_mutex);
+	gb_mutex_destroy(&i->entity_mutex);
+	gb_mutex_destroy(&i->foreign_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -945,8 +953,7 @@ bool init_checker(Checker *c, Parser *parser) {
 	init_checker_info(&c->info);
 	c->info.checker = c;
 
-	gb_mutex_init(&c->procs_with_deferred_to_check_mutex);
-	array_init(&c->procs_with_deferred_to_check, a);
+	mpmc_init(&c->procs_with_deferred_to_check, a, 1<<10);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -957,18 +964,17 @@ bool init_checker(Checker *c, Parser *parser) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
+	gb_semaphore_init(&c->procs_to_check_semaphore);
 	return true;
 }
 
 void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
-	gb_mutex_destroy(&c->procs_with_deferred_to_check_mutex);
-	array_free(&c->procs_with_deferred_to_check);
-
 	destroy_checker_context(&c->builtin_ctx);
 
 	// mpmc_destroy(&c->procs_to_check_queue);
+	// gb_semaphore_destroy(&c->procs_to_check_semaphore);
 }
 
 
@@ -1160,7 +1166,9 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(entity != nullptr);
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
+	gb_mutex_lock(&i->entity_mutex);
 	array_add(&i->definitions, entity);
+	gb_mutex_unlock(&i->entity_mutex);
 }
 
 bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -1242,7 +1250,9 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 		identifier->Ident.entity = entity;
 
 		if (c->info->allow_identifier_uses) {
+			gb_mutex_lock(&c->info->identifier_uses_mutex);
 			array_add(&c->info->identifier_uses, identifier);
+			gb_mutex_unlock(&c->info->identifier_uses_mutex);
 		}
 
 		String dmsg = entity->deprecated_message;
@@ -1278,13 +1288,16 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 		add_entity(c, scope, identifier, e);
 	}
 
-	add_entity_definition(&c->checker->info, identifier, e);
+	CheckerInfo *info = c->info;
+	add_entity_definition(info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
+	gb_mutex_lock(&info->entity_mutex);
 	e->decl_info = d;
 	d->entity = e;
-	array_add(&c->checker->info.entities, e);
-	e->order_in_src = c->checker->info.entities.count;
+	array_add(&info->entities, e);
+	e->order_in_src = info->entities.count; // Is this even correct?
 	e->pkg = c->pkg;
+	gb_mutex_unlock(&info->entity_mutex);
 }
 
 
@@ -1311,10 +1324,10 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		return;
 	}
 
-	add_type_info_dependency(c->decl, t);
-
 	gb_mutex_lock(&c->info->type_info_mutex);
 	defer (gb_mutex_unlock(&c->info->type_info_mutex));
+
+	add_type_info_dependency(c->decl, t);
 
 	auto found = map_get(&c->info->type_info_map, hash_type(t));
 	if (found != nullptr) {
@@ -3760,7 +3773,9 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
 	if (ac.require_declaration) {
+		gb_mutex_lock(&ctx->info->foreign_mutex);
 		array_add(&ctx->info->required_foreign_imports_through_force, e);
+		gb_mutex_unlock(&ctx->info->foreign_mutex);
 		add_entity_use(ctx, nullptr, e);
 	}
 }
@@ -4385,14 +4400,17 @@ void check_test_names(Checker *c) {
 
 }
 
+
 void check_procedure_bodies(Checker *c) {
 	auto *q = &c->procs_to_check_queue;
 	ProcInfo *pi = nullptr;
+
 	while (mpmc_dequeue(q, &pi)) {
 		if (pi->decl->parent && pi->decl->parent->entity) {
 			Entity *parent = pi->decl->parent->entity;
 			// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
 			// This is prevent any possible race conditions in evaluation when multithreaded
+			// NOTE(bill): In single threaded mode, this should never happen
 			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
 				mpmc_enqueue(q, pi);
 				continue;
@@ -4545,8 +4563,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 	TIME_SECTION("check deferred procedures");
-	for_array(i, c->procs_with_deferred_to_check) {
-		Entity *src = c->procs_with_deferred_to_check[i];
+	for (Entity *src = nullptr; mpmc_dequeue(&c->procs_with_deferred_to_check, &src); /**/) {
 		GB_ASSERT(src->kind == Entity_Procedure);
 
 		DeferredProcedureKind dst_kind = src->Procedure.deferred_procedure.kind;

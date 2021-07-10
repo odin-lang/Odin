@@ -223,6 +223,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	if (!is_type_proc(base_entity->type)) {
 		return false;
 	}
+
 	String name = base_entity->token.string;
 
 	Type *src = base_type(base_entity->type);
