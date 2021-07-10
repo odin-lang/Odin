@@ -4509,7 +4509,7 @@ void check_parsed_files(Checker *c) {
 			} else if (info->type == t_untyped_undef) {
 			} else if (info->type == t_untyped_bool) {
 			} else {
-				gb_printf_err("UNTYPED %s %s\n", expr_to_string(expr), type_to_string(info->type));
+				// gb_printf_err("UNTYPED %s %s\n", expr_to_string(expr), type_to_string(info->type));
 			}
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
