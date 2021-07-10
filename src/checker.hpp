@@ -290,8 +290,6 @@ struct CheckerInfo {
 	Array<Entity *>       required_foreign_imports_through_force;
 	Array<Entity *>       required_global_variables;
 
-	Map<AtomOpMapEntry>   atom_op_map; // Key: Ast *
-
 	Array<Entity *> testing_procedures;
 
 	bool allow_identifier_uses;
