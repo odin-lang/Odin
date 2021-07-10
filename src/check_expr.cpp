@@ -2929,6 +2929,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	GB_ASSERT(e != nullptr);
 	gb_mutex_lock(&c->info->untyped_mutex);
+	defer (gb_mutex_unlock(&c->info->untyped_mutex));
 	ExprInfo *old = check_get_expr_info(c->info, e);
 	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
@@ -2938,26 +2939,6 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		}
 		return;
 	}
-
-	if (!final && is_type_untyped(type)) {
-		old->type = base_type(type);
-	} else {
-
-		// We need to remove it and then give it a new one
-		map_remove(&c->info->untyped, hash_node(e));
-
-		if (old->is_lhs && !is_type_integer(type)) {
-			gbString expr_str = expr_to_string(e);
-			gbString type_str = type_to_string(type);
-			error(e, "Shifted operand %s must be an integer, got %s", expr_str, type_str);
-			gb_string_free(type_str);
-			gb_string_free(expr_str);
-			return;
-		}
-
-		add_type_and_value(c->info, e, old->mode, type, old->value);
-	}
-	gb_mutex_unlock(&c->info->untyped_mutex);
 
 	switch (e->kind) {
 	case_ast_node(ue, UnaryExpr, e);
@@ -3009,6 +2990,25 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		update_expr_type(c, pe->expr, type, final);
 	case_end;
 	}
+
+	if (!final && is_type_untyped(type)) {
+		old->type = base_type(type);
+		return;
+	}
+
+	// We need to remove it and then give it a new one
+	map_remove(&c->info->untyped, hash_node(e));
+
+	if (old->is_lhs && !is_type_integer(type)) {
+		gbString expr_str = expr_to_string(e);
+		gbString type_str = type_to_string(type);
+		error(e, "Shifted operand %s must be an integer, got %s", expr_str, type_str);
+		gb_string_free(type_str);
+		gb_string_free(expr_str);
+		return;
+	}
+
+	add_type_and_value(c->info, e, old->mode, type, old->value);
 }
 
 void update_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
@@ -3247,7 +3247,9 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 						if (i > 0 && count > 2) error_line(", ");
 						if (i == count-1) {
 							if (count == 2) error_line(" ");
-							error_line("or ");
+							if (count > 1) {
+								error_line("or ");
+							}
 						}
 						gbString str = type_to_string(v);
 						error_line("'%s'", str);
