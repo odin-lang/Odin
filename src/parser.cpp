@@ -4664,8 +4664,10 @@ bool init_parser(Parser *p) {
 	string_map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->package_imports, heap_allocator());
+	gb_mutex_init(&p->import_mutex);
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
+	mpmc_init(&p->file_error_queue, heap_allocator(), 1024);
 	return true;
 }
 
@@ -4689,8 +4691,10 @@ void destroy_parser(Parser *p) {
 	array_free(&p->package_imports);
 	string_set_destroy(&p->imported_files);
 	string_map_destroy(&p->package_map);
+	gb_mutex_destroy(&p->import_mutex);
 	gb_mutex_destroy(&p->file_add_mutex);
 	gb_mutex_destroy(&p->file_decl_mutex);
+	mpmc_destroy(&p->file_error_queue);
 }
 
 
@@ -4718,6 +4722,9 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
 	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
+	if (err != ParseFile_None) {
+		mpmc_enqueue(&wd->parser->file_error_queue, err);
+	}
 	return cast(isize)err;
 }
 
@@ -4775,8 +4782,8 @@ void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFi
 AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
-	gb_mutex_lock(&p->file_add_mutex);
-	defer (gb_mutex_unlock(&p->file_add_mutex));
+	gb_mutex_lock(&p->import_mutex);
+	defer (gb_mutex_unlock(&p->import_mutex));
 
 	if (string_set_exists(&p->imported_files, path)) {
 		return nullptr;
@@ -5471,10 +5478,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	thread_pool_start(&parser_thread_pool);
 	thread_pool_wait_to_process(&parser_thread_pool);
 
-	// NOTE(bill): Get the last error and use that
-	for (isize i = parser_thread_pool.task_tail-1; i >= 0; i--) {
-		WorkerTask *task = &parser_thread_pool.tasks[i];
-		ParseFileError err = cast(ParseFileError)task->result;
+	for (ParseFileError err = ParseFile_None; mpmc_dequeue(&p->file_error_queue, &err); /**/) {
 		if (err != ParseFile_None) {
 			return err;
 		}

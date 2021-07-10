@@ -399,6 +399,7 @@ gb_global Arena permanent_arena = {};
 void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
 	arena->backing = backing;
 	arena->block_size = block_size;
+	arena->use_mutex = true;
 	array_init(&arena->blocks, backing, 0, 2);
 	gb_mutex_init(&arena->mutex);
 }
@@ -521,6 +522,7 @@ struct Temp_Allocator {
 	isize curr_offset;
 	gbAllocator backup_allocator;
 	Array<void *> leaked_allocations;
+	gbMutex mutex;
 };
 
 gb_global Temp_Allocator temporary_allocator_data = {};
@@ -531,6 +533,7 @@ void temp_allocator_init(Temp_Allocator *s, isize size) {
 	s->len = size;
 	s->curr_offset = 0;
 	s->leaked_allocations.allocator = s->backup_allocator;
+	gb_mutex_init(&s->mutex);
 }
 
 void *temp_allocator_alloc(Temp_Allocator *s, isize size, isize alignment) {
@@ -572,6 +575,9 @@ GB_ALLOCATOR_PROC(temp_allocator_proc) {
 	void *ptr = nullptr;
 	Temp_Allocator *s = cast(Temp_Allocator *)allocator_data;
 	GB_ASSERT_NOT_NULL(s);
+
+	gb_mutex_lock(&s->mutex);
+	defer (gb_mutex_unlock(&s->mutex));
 
 	switch (type) {
 	case gbAllocation_Alloc:

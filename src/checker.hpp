@@ -264,11 +264,7 @@ struct CheckerInfo {
 
 	StringMap<AstFile *>    files;    // Key (full path)
 	StringMap<AstPackage *> packages; // Key (full path)
-	StringMap<Entity *>     foreigns;
-	Array<Entity *>       definitions;
-	Array<Entity *>       entities;
-	Array<DeclInfo *>     variable_init_order;
-
+	Array<DeclInfo *>       variable_init_order;
 
 	AstPackage *          builtin_package;
 	AstPackage *          runtime_package;
@@ -278,13 +274,8 @@ struct CheckerInfo {
 	PtrSet<Entity *>      minimum_dependency_set;
 	PtrSet<isize>         minimum_dependency_type_info_set;
 
-	Array<Entity *>       required_foreign_imports_through_force;
-	Array<Entity *>       required_global_variables;
 
 	Array<Entity *> testing_procedures;
-
-	bool allow_identifier_uses;
-	Array<Ast *> identifier_uses; // only used by 'odin query'
 
 	// Below are accessed within procedures
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
@@ -294,6 +285,10 @@ struct CheckerInfo {
 	gbMutex gen_procs_mutex;
 	gbMutex gen_types_mutex;
 	gbMutex type_info_mutex;
+	gbMutex deps_mutex;
+	gbMutex identifier_uses_mutex;
+	gbMutex entity_mutex;
+	gbMutex foreign_mutex;
 
 	Map<ExprInfo *>       untyped; // Key: Ast * | Expression -> ExprInfo *
 	                               // NOTE(bill): This needs to be a map and not on the Ast
@@ -304,6 +299,16 @@ struct CheckerInfo {
 
 	Array<Type *>         type_info_types;
 	Map<isize>            type_info_map;   // Key: Type *
+
+	bool allow_identifier_uses;
+	Array<Ast *> identifier_uses; // only used by 'odin query'
+
+	Array<Entity *>       definitions;
+	Array<Entity *>       entities;
+	StringMap<Entity *>   foreigns;
+
+	Array<Entity *>       required_global_variables;
+	Array<Entity *>       required_foreign_imports_through_force;
 };
 
 struct CheckerContext {
@@ -351,10 +356,10 @@ struct Checker {
 
 	CheckerContext builtin_ctx;
 
-	gbMutex procs_with_deferred_to_check_mutex;
-	Array<Entity *>   procs_with_deferred_to_check;
+	MPMCQueue<Entity *> procs_with_deferred_to_check;
 
 	MPMCQueue<ProcInfo *> procs_to_check_queue;
+	gbSemaphore procs_to_check_semaphore;
 };
 
 

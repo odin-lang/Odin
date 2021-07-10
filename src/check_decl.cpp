@@ -809,9 +809,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.deferred_procedure.entity != nullptr) {
 		e->Procedure.deferred_procedure = ac.deferred_procedure;
-		gb_mutex_lock(&ctx->checker->procs_with_deferred_to_check_mutex);
-		array_add(&ctx->checker->procs_with_deferred_to_check, e);
-		gb_mutex_unlock(&ctx->checker->procs_with_deferred_to_check_mutex);
+		mpmc_enqueue(&ctx->checker->procs_with_deferred_to_check, e);
 	}
 
 	if (is_foreign) {
@@ -823,6 +821,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->Procedure.link_name = name;
 
 		init_entity_foreign_library(ctx, e);
+
+		gb_mutex_lock(&ctx->info->foreign_mutex);
 
 		auto *fp = &ctx->info->foreigns;
 		StringHashKey key = string_hash_string(name);
@@ -850,12 +850,16 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		} else {
 			string_map_set(fp, key, e);
 		}
+
+		gb_mutex_unlock(&ctx->info->foreign_mutex);
 	} else {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {
 			name = e->Procedure.link_name;
 		}
 		if (e->Procedure.link_name.len > 0 || is_export) {
+			gb_mutex_lock(&ctx->info->foreign_mutex);
+
 			auto *fp = &ctx->info->foreigns;
 			StringHashKey key = string_hash_string(name);
 			Entity **found = string_map_get(fp, key);
@@ -872,6 +876,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			} else {
 				string_map_set(fp, key, e);
 			}
+
+			gb_mutex_unlock(&ctx->info->foreign_mutex);
 		}
 	}
 }
@@ -896,7 +902,9 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 
 	if (ac.require_declaration) {
+		gb_mutex_lock(&ctx->info->entity_mutex);
 		array_add(&ctx->info->required_global_variables, e);
+		gb_mutex_unlock(&ctx->info->entity_mutex);
 	}
 
 
@@ -1320,6 +1328,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
 			return;
 		} else {
+			gb_mutex_lock(&ctx->info->deps_mutex);
+
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
 			for_array(i, decl->deps.entries) {
@@ -1330,6 +1340,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				Type *t = decl->type_info_deps.entries[i].ptr;
 				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
+
+			gb_mutex_unlock(&ctx->info->deps_mutex);
 		}
 	}
 }

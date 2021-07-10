@@ -15,6 +15,7 @@ struct MPMCQueue {
 	isize mask;
 	Array<MPMCQueueNode<T>> buffer;
 	gbMutex mutex;
+	std::atomic<isize> count;
 
 	CacheLinePad pad1;
 	std::atomic<isize> head_idx;
@@ -42,7 +43,7 @@ void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size) {
 template <typename T>
 void mpmc_destroy(MPMCQueue<T> *q) {
 	gb_mutex_destroy(&q->mutex);
-	gb_array_free(&q->buffer);
+	gb_free(q->buffer.allocator, q->buffer.data);
 }
 
 
@@ -60,6 +61,7 @@ bool mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 			if (q->head_idx.compare_exchange_weak(head_idx, next_head_idx)) {
 				node->data = data;
 				node->idx.store(next_head_idx, std::memory_order_release);
+				q->count.fetch_add(1, std::memory_order_release);
 				return true;
 			}
 		} else if (diff < 0) {
@@ -98,6 +100,7 @@ bool mpmc_dequeue(MPMCQueue<T> *q, T *data_) {
 			if (q->tail_idx.compare_exchange_weak(tail_idx, next_tail_idx)) {
 				if (data_) *data_ = node->data;
 				node->idx.store(tail_idx + q->mask + 1, std::memory_order_release);
+				q->count.fetch_sub(1, std::memory_order_release);
 				return true;
 			}
 		} else if (diff < 0) {
