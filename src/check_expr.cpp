@@ -3826,7 +3826,9 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 			Type *swizzle_array_type = nullptr;
 			Type *bth = base_type(type_hint);
-			if (bth != nullptr && bth->kind == Type_Array && bth->Array.count == index_count) {
+			if (bth != nullptr && bth->kind == Type_Array &&
+			    bth->Array.count == index_count &&
+			    are_types_identical(bth->Array.elem, array_type->Array.elem)) {
 				swizzle_array_type = type_hint;
 			} else {
 				swizzle_array_type = alloc_type_array(array_type->Array.elem, index_count);
