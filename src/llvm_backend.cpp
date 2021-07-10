@@ -7753,6 +7753,11 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			Type *type = default_type(tv.type);
 			lbValue right = lb_build_expr(p, be->right);
 			Type *rt = base_type(right.type);
+			if (is_type_pointer(rt)) {
+				right = lb_emit_load(p, right);
+				rt = type_deref(rt);
+			}
+
 			switch (rt->kind) {
 			case Type_Map:
 				{
