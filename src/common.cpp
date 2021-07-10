@@ -35,6 +35,10 @@ gb_inline void zero_size(void *ptr, isize len) {
 #define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
 
 
+i32 next_pow2(i32 n);
+i64 next_pow2(i64 n);
+
+
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
