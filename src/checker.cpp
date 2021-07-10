@@ -4427,6 +4427,13 @@ void check_parsed_files(Checker *c) {
 			if (is_type_typed(info->type)) {
 				compiler_error("%s (type %s) is typed!", expr_to_string(expr), type_to_string(info->type));
 			}
+			if (info->mode == Addressing_Constant) {
+			} else if (info->type == t_untyped_nil) {
+			} else if (info->type == t_untyped_undef) {
+			} else if (info->type == t_untyped_bool) {
+			} else {
+				gb_printf_err("UNTYPED %s %s\n", expr_to_string(expr), type_to_string(info->type));
+			}
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
 	}

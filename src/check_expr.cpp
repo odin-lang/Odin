@@ -3583,6 +3583,7 @@ void check_did_you_mean_print(DidYouMeanAnswers *d) {
 		for_array(i, results) {
 			String const &target = results[i].target;
 			error_line("\t\t%.*s\n", LIT(target));
+			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
 		}
 	}
 }
@@ -5764,7 +5765,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 					arg = arg->FieldValue.value;
 					// NOTE(bill): Carry on the cast regardless
 				}
-				check_expr(c, operand, arg);
+				check_expr_with_type_hint(c, operand, arg, t);
 				if (operand->mode != Addressing_Invalid) {
 					if (is_type_polymorphic(t)) {
 						error(call, "A polymorphic type cannot be used in a type conversion");
@@ -5775,6 +5776,10 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 					}
 				}
 				operand->type = t;
+				operand->expr = call;
+				if (operand->mode != Addressing_Invalid) {
+					update_expr_type(c, arg, t, false);
+				}
 				break;
 			}
 			}
@@ -6504,20 +6509,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		o->type = type;
 		o->mode = Addressing_Value;
-
-		// if (cond.mode == Addressing_Constant && is_type_boolean(cond.type) &&
-		//     x.mode == Addressing_Constant &&
-		//     y.mode == Addressing_Constant) {
-
-		// 	o->mode = Addressing_Constant;
-
-		// 	if (cond.value.value_bool) {
-		// 		o->value = x.value;
-		// 	} else {
-		// 		o->value = y.value;
-		// 	}
-		// }
-
+		if (type_hint != nullptr && is_type_untyped(type)) {
+			if (check_cast_internal(c, &x, type_hint) &&
+			    check_cast_internal(c, &y, type_hint)) {
+				update_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
+				o->type = type_hint;
+			}
+		}
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);
