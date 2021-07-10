@@ -1884,7 +1884,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
 
 				if (rs->vals.count == 1) {
-					if (is_type_map(operand.type) || is_type_bit_set(operand.type)) {
+					Type *t = type_deref(operand.type);
+					if (is_type_map(t) || is_type_bit_set(t)) {
 						gbString v = expr_to_string(rs->vals[0]);
 						defer (gb_string_free(v));
 						error_line("\tSuggestion: place parentheses around the expression\n");

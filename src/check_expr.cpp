@@ -2597,15 +2597,16 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 	case Token_in:
 	case Token_not_in:
+	{
 		// IMPORTANT NOTE(bill): This uses right-left evaluation in type checking only no in
-
 		check_expr(c, y, be->right);
+		Type *rhs_type = type_deref(y->type);
 
-		if (is_type_bit_set(y->type)) {
-			Type *elem = base_type(y->type)->BitSet.elem;
+		if (is_type_bit_set(rhs_type)) {
+			Type *elem = base_type(rhs_type)->BitSet.elem;
 			check_expr_with_type_hint(c, x, be->left, elem);
-		} else if (is_type_map(y->type)) {
-			Type *key = base_type(y->type)->Map.key;
+		} else if (is_type_map(rhs_type)) {
+			Type *key = base_type(rhs_type)->Map.key;
 			check_expr_with_type_hint(c, x, be->left, key);
 		} else {
 			check_expr(c, x, be->left);
@@ -2620,8 +2621,8 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 			return;
 		}
 
-		if (is_type_map(y->type)) {
-			Type *yt = base_type(y->type);
+		if (is_type_map(rhs_type)) {
+			Type *yt = base_type(rhs_type);
 			if (op.kind == Token_in) {
 				check_assignment(c, x, yt->Map.key, str_lit("map 'in'"));
 			} else {
@@ -2629,8 +2630,8 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 			}
 
 			add_package_dependency(c, "runtime", "__dynamic_map_get");
-		} else if (is_type_bit_set(y->type)) {
-			Type *yt = base_type(y->type);
+		} else if (is_type_bit_set(rhs_type)) {
+			Type *yt = base_type(rhs_type);
 
 			if (op.kind == Token_in) {
 				check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
@@ -2679,6 +2680,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		x->expr = node;
 
 		return;
+	}
 
 	default:
 		if (is_ise_expr(be->left)) {
