@@ -167,6 +167,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 #include "unicode.cpp"
 #include "array.cpp"
 #include "string.cpp"
+#include "queue.cpp"
 
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 

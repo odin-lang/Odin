@@ -945,7 +945,7 @@ bool init_checker(Checker *c, Parser *parser) {
 	init_checker_info(&c->info);
 	c->info.checker = c;
 
-	array_init(&c->procs_to_check, a);
+	gb_mutex_init(&c->procs_with_deferred_to_check_mutex);
 	array_init(&c->procs_with_deferred_to_check, a);
 
 	// NOTE(bill): Is this big enough or too small?
@@ -955,21 +955,20 @@ bool init_checker(Checker *c, Parser *parser) {
 
 	c->builtin_ctx = make_checker_context(c);
 
-	gb_mutex_init(&c->procs_to_check_mutex);
-	gb_mutex_init(&c->procs_with_deferred_to_check_mutex);
+	// NOTE(bill): 1 Mi elements should be enough on average
+	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
 	return true;
 }
 
 void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
-	array_free(&c->procs_to_check);
+	gb_mutex_destroy(&c->procs_with_deferred_to_check_mutex);
 	array_free(&c->procs_with_deferred_to_check);
 
 	destroy_checker_context(&c->builtin_ctx);
 
-	gb_mutex_destroy(&c->procs_to_check_mutex);
-	gb_mutex_destroy(&c->procs_with_deferred_to_check_mutex);
+	// mpmc_destroy(&c->procs_to_check_queue);
 }
 
 
@@ -1513,9 +1512,8 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 void check_procedure_later(Checker *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
 	GB_ASSERT(info->decl != nullptr);
-	gb_mutex_lock(&c->procs_to_check_mutex);
-	array_add(&c->procs_to_check, info);
-	gb_mutex_unlock(&c->procs_to_check_mutex);
+
+	mpmc_enqueue(&c->procs_to_check_queue, info);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
@@ -4388,27 +4386,18 @@ void check_test_names(Checker *c) {
 }
 
 void check_procedure_bodies(Checker *c) {
-	// TODO(bill): Make this an actual FIFO queue rather than this monstrosity
-	while (c->procs_to_check.count != 0) {
-		ProcInfo *pi = c->procs_to_check.data[0];
-
-		// Preparing to multithread the procedure checking code
-		#if 0
-		gb_mutex_lock(&c->procs_to_check_mutex);
-		defer (gb_mutex_unlock(&c->procs_to_check_mutex));
-
-		array_ordered_remove(&c->procs_to_check, 0);
+	auto *q = &c->procs_to_check_queue;
+	ProcInfo *pi = nullptr;
+	while (mpmc_dequeue(q, &pi)) {
 		if (pi->decl->parent && pi->decl->parent->entity) {
 			Entity *parent = pi->decl->parent->entity;
+			// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+			// This is prevent any possible race conditions in evaluation when multithreaded
 			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-				array_add(&c->procs_to_check, pi);
+				mpmc_enqueue(q, pi);
 				continue;
 			}
 		}
-		#else
-		array_ordered_remove(&c->procs_to_check, 0);
-		#endif
-
 		check_proc_info(c, pi);
 	}
 }

@@ -351,11 +351,10 @@ struct Checker {
 
 	CheckerContext builtin_ctx;
 
-
-	gbMutex procs_to_check_mutex;
 	gbMutex procs_with_deferred_to_check_mutex;
-	Array<ProcInfo *> procs_to_check;
 	Array<Entity *>   procs_with_deferred_to_check;
+
+	MPMCQueue<ProcInfo *> procs_to_check_queue;
 };
 
 
