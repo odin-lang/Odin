@@ -124,6 +124,13 @@ void thread_pool_do_work(ThreadPool *pool, WorkerTask *task) {
 }
 
 void thread_pool_wait_to_process(ThreadPool *pool) {
+	if (pool->thread_count == 0) {
+		WorkerTask task = {};
+		while (thread_pool_try_and_pop_task(pool, &task)) {
+			thread_pool_do_work(pool, &task);
+		}
+		return;
+	}
 	while (pool->tasks.count.load(std::memory_order_relaxed) > 0 || gb_atomic32_load(&pool->processing_work_count) != 0) {
 		WorkerTask task = {};
 		if (thread_pool_try_and_pop_task(pool, &task)) {
