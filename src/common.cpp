@@ -1177,6 +1177,7 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 
 
+#define USE_DAMERAU_LEVENSHTEIN 1
 
 isize levenstein_distance_case_insensitive(String const &a, String const &b) {
 	isize w = a.len+1;
@@ -1206,6 +1207,16 @@ isize levenstein_distance_case_insensitive(String const &a, String const &b) {
 				if (substitute < minimum) {
 					minimum = substitute;
 				}
+				// Damerau-Levenshtein (transposition extension)
+				#if USE_DAMERAU_LEVENSHTEIN
+				if (i > 1 && j > 1) {
+					isize transpose = matrix[(i-2)*w + j-2] + 1;
+					if (transpose < minimum) {
+						minimum = transpose;
+					}
+				}
+				#endif
+
 				matrix[i*w + j] = minimum;
 			}
 		}
@@ -1225,7 +1236,7 @@ struct DidYouMeanAnswers {
 	String key;
 };
 
-enum {MAX_SMALLEST_DID_YOU_MEAN_DISTANCE = 3};
+enum {MAX_SMALLEST_DID_YOU_MEAN_DISTANCE = 3-USE_DAMERAU_LEVENSHTEIN};
 
 DidYouMeanAnswers did_you_mean_make(gbAllocator allocator, isize cap, String const &key) {
 	DidYouMeanAnswers d = {};
