@@ -28,7 +28,7 @@ struct MPMCQueue {
 
 template <typename T>
 void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size) {
-	size = next_pow2(size);
+	size = next_pow2_isize(size);
 	GB_ASSERT(gb_is_power_of_two(size));
 
 	gb_mutex_init(&q->mutex);
