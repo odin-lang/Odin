@@ -37,6 +37,7 @@ gb_inline void zero_size(void *ptr, isize len) {
 
 i32 next_pow2(i32 n);
 i64 next_pow2(i64 n);
+isize next_pow2_isize(isize n);
 
 
 template <typename U, typename V>
@@ -680,6 +681,24 @@ i64 next_pow2(i64 n) {
 	n++;
 	return n;
 }
+isize next_pow2_isize(isize n) {
+	if (n <= 0) {
+		return 0;
+	}
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	if (gb_size_of(isize) == 8) {
+		n |= n >> 32;
+	}
+	n++;
+	return n;
+}
+
+
 
 i32 bit_set_count(u32 x) {
 	x -= ((x >> 1) & 0x55555555);
