@@ -1998,7 +1998,7 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o->value.kind == ExactValue_Integer) {
 			BigInt count = o->value.value_integer;
-			if (o->value.value_integer.sign) {
+			if (big_int_is_neg(&o->value.value_integer)) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &count);
 				error(e, "Invalid negative array count, %.*s", LIT(str));
