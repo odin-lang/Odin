@@ -6362,7 +6362,38 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 }
 
 
+LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *a) {
+	if (big_int_is_zero(a)) {
+		return LLVMConstNull(lb_type(m, original_type));
+	}
 
+	u8 *rop = nullptr;
+	size_t max_count = 0;
+	size_t written = 0;
+	size_t size = 1;
+	size_t nails = 0;
+	mp_endian endian = MP_NATIVE_ENDIAN;
+	if (is_type_endian_little(original_type)) {
+		endian = MP_LITTLE_ENDIAN;
+	} else if (is_type_endian_big(original_type)) {
+		endian = MP_BIG_ENDIAN;
+	}
+
+	max_count = mp_pack_count(a, nails, size);
+	rop = cast(u8 *)gb_alloc_align(permanent_allocator(), max_count, gb_align_of(u64));
+	mp_err err = mp_pack(rop, max_count, &written,
+	                     MP_LSB_FIRST,
+	                     size, endian, nails,
+	                     a);
+	GB_ASSERT(err == MP_OKAY);
+
+	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((written+7)/8), cast(u64 *)rop);
+	if (big_int_is_neg(a)) {
+		value = LLVMConstNeg(value);
+	}
+
+	return value;
+}
 
 
 lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
@@ -6559,70 +6590,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 	case ExactValue_Integer:
 		if (is_type_pointer(type)) {
 			LLVMTypeRef t = lb_type(m, original_type);
-			if (mp_iszero(&value.value_integer)) {
-				res.value = LLVMConstNull(t);
-			} else {
-				unsigned len = cast(unsigned)value.value_integer.used;
-				u64 v = mp_get_u64(&value.value_integer);
-				LLVMValueRef i = LLVMConstInt(lb_type(m, t_uintptr), cast(unsigned long long)v, false);
-				res.value = LLVMConstIntToPtr(i, t);
-			}
+			LLVMValueRef i = lb_big_int_to_llvm(m, t_uintptr, &value.value_integer);
+			res.value = LLVMConstIntToPtr(i, t);
 		} else {
-			if (mp_iszero(&value.value_integer)) {
-				res.value = LLVMConstNull(lb_type(m, original_type));
-			} else {
-				mp_int *a = &value.value_integer;
-
-				u8 *rop = nullptr;
-				size_t max_count = 0;
-				size_t written = 0;
-				size_t size = 1;
-				size_t nails = 0;
-				mp_endian endian = MP_NATIVE_ENDIAN;
-				if (is_type_endian_little(type)) {
-					endian = MP_LITTLE_ENDIAN;
-				} else if (is_type_endian_big(type)) {
-					endian = MP_BIG_ENDIAN;
-				}
-
-				max_count = mp_pack_count(a, nails, size);
-				rop = cast(u8 *)gb_alloc_align(permanent_allocator(), max_count, gb_align_of(u64));
-				mp_err err = mp_pack(rop, max_count, &written,
-				                     MP_LSB_FIRST,
-				                     size, endian, nails,
-				                     &value.value_integer);
-				GB_ASSERT(err == MP_OKAY);
-
-				res.value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((written+7)/8), cast(u64 *)rop);
-				if (value.value_integer.sign) {
-					res.value = LLVMConstNeg(res.value);
-				}
-
-				// size_t written = 0;
-				// size_t max_bytes = (value.value_integer.used*gb_size_of(mp_digit)+7)&~7;
-				// u8 *buf = cast(u8 *)gb_alloc_align(permanent_allocator(), max_bytes, gb_align_of(u64));
-				// mp_to_ubin(&value.value_integer, buf, max_bytes, &written);
-
-				// gb_printf_err("%tu %tu", written, max_bytes);
-				// for (size_t i = 0; i < written; i++) {
-				// 	gb_printf_err("%02x", buf[i]);
-				// }
-				// gb_printf_err("\n");
-				// gb_exit(1);
-
-				// if (is_type_different_to_arch_endianness(type)) {
-				// 	u8 *old_bytes = buf;
-				// 	u8 *new_bytes = cast(u8 *)gb_alloc_align(permanent_allocator(), max_bytes, gb_align_of(u64));
-				// 	for (size_t i = 0; i < written; i++) {
-				// 		new_bytes[i] = old_bytes[written-1-i];
-				// 	}
-				// 	buf = new_bytes;
-				// }
-				// res.value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((written+7)/8), cast(u64 *)buf);
-				// if (value.value_integer.sign) {
-				// 	res.value = LLVMConstNeg(res.value);
-				// }
-			}
+			res.value = lb_big_int_to_llvm(m, original_type, &value.value_integer);
 		}
 		return res;
 	case ExactValue_Float:

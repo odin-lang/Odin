@@ -55,6 +55,8 @@ void big_int_mul_eq(BigInt *dst, BigInt const *x);
 void big_int_quo_eq(BigInt *dst, BigInt const *x);
 void big_int_rem_eq(BigInt *dst, BigInt const *x);
 
+bool big_int_is_neg(BigInt const *x);
+
 
 void big_int_add_eq(BigInt *dst, BigInt const *x) {
 	BigInt res = {};
@@ -448,6 +450,13 @@ void big_int_not(BigInt *dst, BigInt const *x, i32 bit_count, bool is_signed) {
 	big_int_dealloc(&pow2b);
 	big_int_dealloc(&mask);
 	big_int_dealloc(&v);
+}
+
+bool big_int_is_neg(BigInt const *x) {
+	if (x == nullptr) {
+		return false;
+	}
+	return x->sign != MP_ZPOS;
 }
 
 

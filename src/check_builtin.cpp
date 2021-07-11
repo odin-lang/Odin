@@ -745,7 +745,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (op.value.value_integer.sign) {
+			if (big_int_is_neg(&op.value.value_integer)) {
 				error(op.expr, "Negative 'swizzle' index");
 				return false;
 			}
@@ -1843,7 +1843,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_invalid;
 			return false;
 		}
-		if (x.value.value_integer.sign) {
+		if (big_int_is_neg(&x.value.value_integer)) {
 			error(call, "Negative vector element length");
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;
@@ -1883,7 +1883,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_invalid;
 			return false;
 		}
-		if (x.value.value_integer.sign) {
+		if (big_int_is_neg(&x.value.value_integer)) {
 			error(call, "Negative array element length");
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;

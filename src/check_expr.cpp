@@ -2242,7 +2242,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		}
 	}
 
-	if (y->mode == Addressing_Constant && y->value.value_integer.sign) {
+	if (y->mode == Addressing_Constant && big_int_is_neg(&y->value.value_integer)) {
 		gbString err_str = expr_to_string(y->expr);
 		error(node, "Shift amount cannot be negative: '%s'", err_str);
 		gb_string_free(err_str);
