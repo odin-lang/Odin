@@ -9,7 +9,6 @@
 
 typedef mp_int BigInt;
 
-
 void big_int_from_u64(BigInt *dst, u64 x);
 void big_int_from_i64(BigInt *dst, i64 x);
 void big_int_init    (BigInt *dst, BigInt const *src);
@@ -265,14 +264,14 @@ void big_int_shr(BigInt *dst, BigInt const *x, BigInt const *y) {
 	u32 yy = mp_get_u32(y);
 	BigInt d = {};
 	mp_div_2d(x, yy, dst, &d);
-	mp_clear(&d);
+	big_int_dealloc(&d);
 }
 
 void big_int_mul_u64(BigInt *dst, BigInt const *x, u64 y) {
 	BigInt d = {};
 	big_int_from_u64(&d, y);
 	mp_mul(x, &d, dst);
-	mp_clear(&d);
+	big_int_dealloc(&d);
 }
 
 
@@ -303,13 +302,13 @@ void big_int_quo_rem(BigInt const *x, BigInt const *y, BigInt *q_, BigInt *r_) {
 void big_int_quo(BigInt *z, BigInt const *x, BigInt const *y) {
 	BigInt r = {};
 	big_int_quo_rem(x, y, z, &r);
-	mp_clear(&r);
+	big_int_dealloc(&r);
 }
 
 void big_int_rem(BigInt *z, BigInt const *x, BigInt const *y) {
 	BigInt q = {};
 	big_int_quo_rem(x, y, &q, z);
-	mp_clear(&q);
+	big_int_dealloc(&q);
 }
 
 void big_int_euclidean_mod(BigInt *z, BigInt const *x, BigInt const *y) {
@@ -355,9 +354,9 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 			mp_complement(&y1, &ny1);
 			mp_and(&x1, &ny1, dst);
 
-			mp_clear(&x1);
-			mp_clear(&y1);
-			mp_clear(&ny1);
+			big_int_dealloc(&x1);
+			big_int_dealloc(&y1);
+			big_int_dealloc(&ny1);
 			return;
 		}
 
@@ -365,7 +364,7 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 		mp_complement(y, &ny);
 		mp_and(x, &ny, dst);
 
-		mp_clear(&ny);
+		big_int_dealloc(&ny);
 		return;
 	}
 
@@ -379,9 +378,9 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 		big_int_or(&z1, &x1, &y1);
 		mp_add_d(&z1, 1, dst);
 
-		mp_clear(&x1);
-		mp_clear(&y1);
-		mp_clear(&z1);
+		big_int_dealloc(&x1);
+		big_int_dealloc(&y1);
+		big_int_dealloc(&z1);
 		return;
 	}
 
@@ -391,8 +390,8 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	mp_decr(&y1);
 	big_int_and(dst, &x1, &y1);
 
-	mp_clear(&x1);
-	mp_clear(&y1);
+	big_int_dealloc(&x1);
+	big_int_dealloc(&y1);
 	return;
 }
 
@@ -442,13 +441,13 @@ void big_int_not(BigInt *dst, BigInt const *x, i32 bit_count, bool is_signed) {
 		big_int_and(&a, dst, &pmask_minus_one);
 		big_int_and(&b, dst, &pmask);
 		big_int_sub(dst, &a, &b);
-		mp_clear(&a);
-		mp_clear(&b);
+		big_int_dealloc(&a);
+		big_int_dealloc(&b);
 	}
 
-	mp_clear(&pow2b);
-	mp_clear(&mask);
-	mp_clear(&v);
+	big_int_dealloc(&pow2b);
+	big_int_dealloc(&mask);
+	big_int_dealloc(&v);
 }
 
 
@@ -499,8 +498,8 @@ String big_int_to_string(gbAllocator allocator, BigInt const *x, u64 base) {
 	digit = cast(u8)big_int_to_u64(&r);
 	array_add(&buf, digit_to_char(digit));
 
-	mp_clear(&r);
-	mp_clear(&b);
+	big_int_dealloc(&r);
+	big_int_dealloc(&b);
 
 	for (isize i = first_word_idx; i < buf.count/2; i++) {
 		isize j = buf.count + first_word_idx - i - 1;
