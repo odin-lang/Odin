@@ -745,7 +745,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (op.value.value_integer.neg) {
+			if (op.value.value_integer.sign) {
 				error(op.expr, "Negative 'swizzle' index");
 				return false;
 			}
@@ -795,10 +795,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant) {
-			if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
+			x.value = exact_value_to_float(x.value);
+		    	y.value = exact_value_to_float(y.value);
+			if (is_type_numeric(x.type) && x.value.kind == ExactValue_Float) {
 				x.type = t_untyped_float;
 			}
-			if (is_type_numeric(y.type) && exact_value_imag(y.value).value_float == 0) {
+			if (is_type_numeric(y.type) && y.value.kind == ExactValue_Float) {
 				y.type = t_untyped_float;
 			}
 		}
@@ -882,16 +884,20 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		    y.mode == Addressing_Constant &&
 		    z.mode == Addressing_Constant &&
 		    w.mode == Addressing_Constant) {
-			if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
+		    	x.value = exact_value_to_float(x.value);
+		    	y.value = exact_value_to_float(y.value);
+		    	z.value = exact_value_to_float(z.value);
+		    	w.value = exact_value_to_float(w.value);
+			if (is_type_numeric(x.type) && x.value.kind == ExactValue_Float) {
 				x.type = t_untyped_float;
 			}
-			if (is_type_numeric(y.type) && exact_value_imag(y.value).value_float == 0) {
+			if (is_type_numeric(y.type) && y.value.kind == ExactValue_Float) {
 				y.type = t_untyped_float;
 			}
-			if (is_type_numeric(z.type) && exact_value_imag(z.value).value_float == 0) {
+			if (is_type_numeric(z.type) && z.value.kind == ExactValue_Float) {
 				z.type = t_untyped_float;
 			}
-			if (is_type_numeric(w.type) && exact_value_imag(w.value).value_float == 0) {
+			if (is_type_numeric(w.type) && w.value.kind == ExactValue_Float) {
 				w.type = t_untyped_float;
 			}
 		}
@@ -1484,7 +1490,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (operand->mode == Addressing_Constant) {
 			switch (operand->value.kind) {
 			case ExactValue_Integer:
-				operand->value.value_integer.neg = false;
+				mp_abs(&operand->value.value_integer, &operand->value.value_integer);
 				break;
 			case ExactValue_Float:
 				operand->value.value_float = gb_abs(operand->value.value_float);
@@ -1837,7 +1843,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_invalid;
 			return false;
 		}
-		if (x.value.value_integer.neg) {
+		if (x.value.value_integer.sign) {
 			error(call, "Negative vector element length");
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;
@@ -1877,7 +1883,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_invalid;
 			return false;
 		}
-		if (x.value.value_integer.neg) {
+		if (x.value.value_integer.sign) {
 			error(call, "Negative array element length");
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;

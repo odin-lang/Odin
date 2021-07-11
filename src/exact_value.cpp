@@ -75,8 +75,8 @@ HashKey hash_exact_value(ExactValue v) {
 		}
 	case ExactValue_Integer:
 		{
-			HashKey key = hashing_proc(big_int_ptr(&v.value_integer), v.value_integer.len * gb_size_of(u64));
-			u8 last = (u8)v.value_integer.neg;
+			HashKey key = hashing_proc(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
+			u8 last = (u8)v.value_integer.sign;
 			key.key = (key.key ^ last) * 0x100000001b3ll;
 			return key;
 		}
@@ -719,7 +719,6 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Shr:    big_int_shr(&c, a, b);     break;
 		default: goto error;
 		}
-		big_int_normalize(&c);
 		ExactValue res = {ExactValue_Integer};
 		res.value_integer = c;
 		return res;

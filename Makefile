@@ -41,13 +41,16 @@ demo:
 	./odin run examples/demo/demo.odin
 
 debug:
-	$(CC) src/main.cpp $(DISABLED_WARNINGS) $(CFLAGS) -g $(LDFLAGS) -o odin
+	$(CC) src/main.cpp src/libtommath.c $(DISABLED_WARNINGS) $(CFLAGS) -g $(LDFLAGS) -o odin
 
 release:
-	$(CC) src/main.cpp $(DISABLED_WARNINGS) $(CFLAGS) -O3 -march=native $(LDFLAGS) -o odin
+	$(CC) src/main.cpp src/libtommath.c $(DISABLED_WARNINGS) $(CFLAGS) -O3 $(LDFLAGS) -o odin
+
+release-native:
+    $(CC) src/main.cpp src/libtommath.c $(DISABLED_WARNINGS) $(CFLAGS) -O3 -march=native $(LDFLAGS) -o odin
 
 nightly:
-	$(CC) src/main.cpp $(DISABLED_WARNINGS) $(CFLAGS) -DNIGHTLY -O3 $(LDFLAGS) -o odin
+	$(CC) src/main.cpp src/libtommath.c $(DISABLED_WARNINGS) $(CFLAGS) -DNIGHTLY -O3 $(LDFLAGS) -o odin
 
 
 

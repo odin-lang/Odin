@@ -1503,13 +1503,13 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 			big_int_from_i64(&bi127, 127);
 
 			big_int_shl_eq(&umax, &bi128);
-			big_int_sub_eq(&umax, &BIG_INT_ONE);
+			mp_decr(&umax);
 
 			big_int_shl_eq(&imin, &bi127);
 			big_int_neg(&imin, &imin);
 
 			big_int_shl_eq(&imax, &bi127);
-			big_int_sub_eq(&imax, &BIG_INT_ONE);
+			mp_decr(&imax);
 		}
 
 		switch (type->Basic.kind) {
@@ -1555,7 +1555,7 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 			{
 				// return 0ull <= i && i <= umax;
 				int b = big_int_cmp(&i, &umax);
-				return !i.neg && (b <= 0);
+				return !i.sign && (b <= 0);
 			}
 
 		case Basic_UntypedInteger:
@@ -1758,12 +1758,6 @@ void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
-				#if 0
-				gb_printf_err("AddressingMode, %d\n", o->mode);
-				gb_printf_err("ExactValueKind, %d\n", o->value.kind);
-				bool ok = check_representable_as_constant(ctx, o->value, type, &out_value);
-				gb_printf_err("ok, %d\n", ok);
-				#endif
 				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s", a, b, c);
 				check_assignment_error_suggestion(ctx, o, type);
 			}
@@ -2206,7 +2200,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 			}
 
 			BigInt max_shift = {};
-			big_int_from_u64(&max_shift, 128);
+			big_int_from_u64(&max_shift, MAX_BIG_INT_SHIFT);
 
 			if (big_int_cmp(&y_val.value_integer, &max_shift) > 0) {
 				gbString err_str = expr_to_string(y->expr);
@@ -2248,7 +2242,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		}
 	}
 
-	if (y->mode == Addressing_Constant && y->value.value_integer.neg) {
+	if (y->mode == Addressing_Constant && y->value.value_integer.sign) {
 		gbString err_str = expr_to_string(y->expr);
 		error(node, "Shift amount cannot be negative: '%s'", err_str);
 		gb_string_free(err_str);
@@ -3320,7 +3314,7 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 	if (operand.mode == Addressing_Constant &&
 	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
-		if (i.neg && !is_type_enum(index_type)) {
+		if (i.sign && !is_type_enum(index_type)) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
 			gb_string_free(expr_str);
@@ -3366,7 +3360,7 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 
 			} else { // NOTE(bill): Do array bound checking
 				i64 v = -1;
-				if (i.len <= 1) {
+				if (i.used <= 1) {
 					v = big_int_to_i64(&i);
 				}
 				if (value) *value = v;
