@@ -415,6 +415,14 @@ void big_int_not(BigInt *dst, BigInt const *x, i32 bit_count, bool is_signed) {
 		big_int_from_u64(dst, 0);
 		return;
 	}
+	if (big_int_is_neg(x)) {
+		// ~x == -x - 1
+		big_int_neg(dst, x);
+		mp_decr(dst);
+		mp_mod_2d(dst, bit_count, dst);
+		return;
+	}
+
 
 	BigInt pow2b = {};
 	mp_2expt(&pow2b, bit_count);
