@@ -1970,7 +1970,6 @@ int main(int arg_count, char const **arg_ptr) {
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
-	global_big_int_init();
 	init_type_mutex();
 
 	if (!check_env()) {
