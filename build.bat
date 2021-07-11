@@ -46,7 +46,7 @@ if %release_mode% EQU 0 ( rem Debug
 
 set compiler_warnings= ^
 	-W4 -WX ^
-	-wd4100 -wd4101 -wd4127 -wd4189 ^
+	-wd4100 -wd4101 -wd4127 -wd4146 -wd4189 ^
 	-wd4201 -wd4204 ^
 	-wd4456 -wd4457 -wd4480 ^
 	-wd4512
@@ -70,7 +70,7 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
+cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 
 if %errorlevel% neq 0 goto end_of_build
 if %release_mode% EQU 0 odin run examples/demo/demo.odin
