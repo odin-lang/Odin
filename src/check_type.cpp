@@ -207,7 +207,7 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
 			BigInt v = o.value.value_integer;
-			if (v.len > 1) {
+			if (v.used > 1) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &v);
 				error(node, "#align too large, %.*s", LIT(str));
@@ -1998,16 +1998,16 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o->value.kind == ExactValue_Integer) {
 			BigInt count = o->value.value_integer;
-			if (o->value.value_integer.neg) {
+			if (o->value.value_integer.sign) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &count);
 				error(e, "Invalid negative array count, %.*s", LIT(str));
 				gb_free(a, str.text);
 				return 0;
 			}
-			switch (count.len) {
+			switch (count.used) {
 			case 0: return 0;
-			case 1: return count.d.word;
+			case 1: return big_int_to_u64(&count);
 			}
 			gbAllocator a = heap_allocator();
 			String str = big_int_to_string(a, &count);
