@@ -46,7 +46,7 @@ debug:
 release:
 	$(CC) src/main.cpp src/libtommath.c $(DISABLED_WARNINGS) $(CFLAGS) -O3 $(LDFLAGS) -o odin
 
-release-native:
+release_native:
     $(CC) src/main.cpp src/libtommath.c $(DISABLED_WARNINGS) $(CFLAGS) -O3 -march=native $(LDFLAGS) -o odin
 
 nightly:

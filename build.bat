@@ -71,18 +71,9 @@ del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.cpp" "src\libtommath.c" /link %linker_settings% -OUT:%exe_name%
-rem cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
 
 if %errorlevel% neq 0 goto end_of_build
-
-odin run examples/demo
-rem odin run examples/bug -show-more-timings -threaded-checker
-rem odin check examples/demo -threaded-checker
-rem odin build examples/demo
-rem odin run examples/demo -threaded-checker
-rem odin run examples/bug -show-more-timings
-rem if %release_mode% EQU 0 odin check examples/bug -show-more-timings
-rem if %release_mode% EQU 0 odin check examples/bug
+if %release_mode% EQU 0 odin run examples/demo/demo.odin
 
 del *.obj > NUL 2> NUL
 

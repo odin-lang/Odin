@@ -1,7 +1,4 @@
-#pragma warning(push)
-#pragma warning(disable: 4146)
 #include "libtommath/tommath.h"
-#pragma warning(pop)
 
 #ifndef MAX_BIG_INT_SHIFT
 #define MAX_BIG_INT_SHIFT 1024
