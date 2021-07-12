@@ -491,7 +491,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			field_count = elem_type->Struct.fields.count;
 			break;
 		case Type_Array:
-			field_count = elem_type->Array.count;
+			field_count = cast(isize)elem_type->Array.count;
 			break;
 		}
 		for (isize i = 0; i < field_count; i++) {
@@ -1559,7 +1559,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 			}
 
-			isize param_index = 0;
+			unsigned param_index = 0;
 			if (type->Proc.param_count != 0) {
 				GB_ASSERT(type->Proc.params->kind == Type_Tuple);
 				for_array(i, type->Proc.params->Tuple.variables) {
@@ -5714,7 +5714,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 	} else {
 		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
 
-		auto loop_data = lb_loop_start(p, count, t_i32);
+		auto loop_data = lb_loop_start(p, cast(isize)count, t_i32);
 
 		lbValue a_ptr = lb_emit_array_ep(p, x, loop_data.idx);
 		lbValue b_ptr = lb_emit_array_ep(p, y, loop_data.idx);
@@ -6440,7 +6440,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			if (count == 0) {
 				return lb_const_nil(m, type);
 			}
-			count = gb_max(cl->max_count, count);
+			count = gb_max(cast(isize)cl->max_count, count);
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = alloc_type_array(elem, count);
 			lbValue backing_array = lb_const_value(m, t, value, allow_local);
@@ -6510,7 +6510,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			isize width = 1;
 			String s = value.value_string;
 
-			LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
+			LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 
 			for (i64 i = 0; i < count && offset < s.len; i++) {
 				width = gb_utf8_decode(s.text+offset, s.len-offset, &rune);
@@ -6551,7 +6551,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
 
-		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 		for (i64 i = 0; i < count; i++) {
 			elems[i] = single_elem.value;
 		}
@@ -6675,7 +6675,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 			if (cl->elems[0]->kind == Ast_FieldValue) {
 				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
-				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->Array.count);
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
 
 				isize value_index = 0;
 				for (i64 i = 0; i < type->Array.count; i++) {
@@ -6727,12 +6727,12 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, type->Array.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, allow_local);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
 
-				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->Array.count);
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
 
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
@@ -6743,7 +6743,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					values[i] = LLVMConstNull(lb_type(m, elem_type));
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, type->Array.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, allow_local);
 				return res;
 			}
 		} else if (is_type_enumerated_array(type)) {
@@ -6755,7 +6755,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 			if (cl->elems[0]->kind == Ast_FieldValue) {
 				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
-				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->EnumeratedArray.count);
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->EnumeratedArray.count);
 
 				isize value_index = 0;
 
@@ -6811,12 +6811,12 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, type->EnumeratedArray.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, allow_local);
 				return res;
 			} else {
 				GB_ASSERT_MSG(elem_count == type->EnumeratedArray.count, "%td != %td", elem_count, type->EnumeratedArray.count);
 
-				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->EnumeratedArray.count);
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->EnumeratedArray.count);
 
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
@@ -6827,7 +6827,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					values[i] = LLVMConstNull(lb_type(m, elem_type));
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, type->EnumeratedArray.count, values, allow_local);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, allow_local);
 				return res;
 			}
 		} else if (is_type_simd_vector(type)) {
@@ -6840,7 +6840,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 			GB_ASSERT(elem_type_can_be_constant(elem_type));
 
-			isize total_elem_count = type->SimdVector.count;
+			isize total_elem_count = cast(isize)type->SimdVector.count;
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, total_elem_count);
 
 			for (isize i = 0; i < elem_count; i++) {
@@ -6853,7 +6853,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			for (isize i = elem_count; i < type->SimdVector.count; i++) {
 				values[i] = LLVMConstNull(et);
 			}
-			for (isize i = 0; i< total_elem_count; i++) {
+			for (isize i = 0; i < total_elem_count; i++) {
 				values[i] = llvm_const_cast(values[i], et);
 			}
 
@@ -7397,7 +7397,7 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 
 		lbAddr res = lb_add_local_generated(p, type, false);
 
-		auto loop_data = lb_loop_start(p, count, t_i32);
+		auto loop_data = lb_loop_start(p, cast(isize)count, t_i32);
 
 		lbValue a_ptr = lb_emit_array_ep(p, x, loop_data.idx);
 		lbValue b_ptr = lb_emit_array_ep(p, y, loop_data.idx);
@@ -9477,9 +9477,9 @@ lbValue lb_soa_struct_len(lbProcedure *p, lbValue value) {
 	isize n = 0;
 	Type *elem = base_type(t->Struct.soa_elem);
 	if (elem->kind == Type_Struct) {
-		n = elem->Struct.fields.count;
+		n = cast(isize)elem->Struct.fields.count;
 	} else if (elem->kind == Type_Array) {
-		n = elem->Array.count;
+		n = cast(isize)elem->Array.count;
 	} else {
 		GB_PANIC("Unreachable");
 	}
@@ -9509,9 +9509,9 @@ lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 	isize n = 0;
 	Type *elem = base_type(t->Struct.soa_elem);
 	if (elem->kind == Type_Struct) {
-		n = elem->Struct.fields.count+1;
+		n = cast(isize)elem->Struct.fields.count+1;
 	} else if (elem->kind == Type_Array) {
-		n = elem->Array.count+1;
+		n = cast(isize)elem->Array.count+1;
 	} else {
 		GB_PANIC("Unreachable");
 	}
@@ -11680,7 +11680,7 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->Array.elem);
 
-		auto loop_data = lb_loop_start(p, type->Array.count, t_i32);
+		auto loop_data = lb_loop_start(p, cast(isize)type->Array.count, t_i32);
 
 		data = lb_emit_conv(p, data, pt);
 
@@ -11701,7 +11701,7 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->EnumeratedArray.elem);
 
-		auto loop_data = lb_loop_start(p, type->EnumeratedArray.count, t_i32);
+		auto loop_data = lb_loop_start(p, cast(isize)type->EnumeratedArray.count, t_i32);
 
 		data = lb_emit_conv(p, data, pt);
 
@@ -13010,7 +13010,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 			unsigned len_indices[] = {1};
 			LLVMValueRef data = LLVMConstExtractValue(key.value, data_indices, gb_count_of(data_indices));
 			LLVMValueRef len  = LLVMConstExtractValue(key.value, len_indices,  gb_count_of(len_indices));
-			isize length = LLVMConstIntGetSExtValue(len);
+			i64 length = LLVMConstIntGetSExtValue(len);
 			char const *text = nullptr;
 			if (false && length != 0) {
 				if (LLVMGetConstOpcode(data) != LLVMGetElementPtr) {
@@ -13021,7 +13021,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 				size_t ulength = 0;
 				text = LLVMGetAsString(data, &ulength);
 				gb_printf_err("%td %td %s\n", length, ulength, text);
-				length = gb_min(length, cast(isize)ulength);
+				length = gb_min(length, cast(i64)ulength);
 			}
 			hash = fnv64a(text, cast(isize)length);
 		} else {

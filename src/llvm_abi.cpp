@@ -565,7 +565,7 @@ namespace lbAbiAmd64SysV {
 	}
 
 	void unify(Array<RegClass> *cls, i64 i, RegClass const newv) {
-		RegClass const oldv = (*cls)[i];
+		RegClass const oldv = (*cls)[cast(isize)i];
 		if (oldv == newv) {
 			return;
 		}
@@ -597,7 +597,7 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 
-		(*cls)[i] = to_write;
+		(*cls)[cast(isize)i] = to_write;
 	}
 
 	void fixup(LLVMTypeRef t, Array<RegClass> *cls) {
@@ -606,7 +606,7 @@ namespace lbAbiAmd64SysV {
 		if (e > 2 && (lb_is_type_kind(t, LLVMStructTypeKind) ||
 		              lb_is_type_kind(t, LLVMArrayTypeKind) ||
 		              lb_is_type_kind(t, LLVMVectorTypeKind))) {
-			RegClass &oldv = (*cls)[i];
+			RegClass &oldv = (*cls)[cast(isize)i];
 			if (is_sse(oldv)) {
 				for (i++; i < e; i++) {
 					if (oldv != RegClass_SSEUp) {
@@ -620,7 +620,7 @@ namespace lbAbiAmd64SysV {
 			}
 		} else {
 			while (i < e) {
-				RegClass &oldv = (*cls)[i];
+				RegClass &oldv = (*cls)[cast(isize)i];
 				if (oldv == RegClass_Memory) {
 					all_mem(cls);
 					return;

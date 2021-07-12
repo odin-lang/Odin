@@ -2218,7 +2218,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.scope = scope;
 	} else if (is_type_array(elem)) {
 		Type *old_array = base_type(elem);
-		field_count = old_array->Array.count;
+		field_count = cast(isize)old_array->Array.count;
 
 		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+extra_field_count);
@@ -2238,7 +2238,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 			str_lit("w")
 		};
 
-		for (i64 i = 0; i < old_array->Array.count; i++) {
+		for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
 			Type *field_type = nullptr;
 			if (soa_kind == StructSoa_Fixed) {
 				GB_ASSERT(count >= 0);

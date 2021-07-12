@@ -1120,7 +1120,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			// TODO(bill): Should I copy each of the entities or is this good enough?
 			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 		} else if (is_type_array(type)) {
-			isize variable_count = type->Array.count;
+			isize variable_count = cast(isize)type->Array.count;
 			array_init(&tuple->Tuple.variables, a, variable_count);
 			for (isize i = 0; i < variable_count; i++) {
 				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
@@ -1916,8 +1916,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (is_type_array(elem)) {
 			Type *old_array = base_type(elem);
 			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
-			soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
+			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), cast(isize)old_array->Array.count);
+			soa_struct->Struct.tags = array_make<String>(heap_allocator(), cast(isize)old_array->Array.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
@@ -1933,7 +1933,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				str_lit("w")
 			};
 
-			for (i64 i = 0; i < old_array->Array.count; i++) {
+			for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
 				Type *array_type = alloc_type_array(old_array->Array.elem, count);
 				Token token = {};
 				token.string = params_xyzw[i];
@@ -2891,7 +2891,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (bt->kind == Type_Proc) {
 				count = bt->Proc.param_count;
 				if (index < count) {
-					param = bt->Proc.params->Tuple.variables[index];
+					param = bt->Proc.params->Tuple.variables[cast(isize)index];
 				}
 			}
 
@@ -2950,7 +2950,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (bt->kind == Type_Proc) {
 				count = bt->Proc.result_count;
 				if (index < count) {
-					param = bt->Proc.results->Tuple.variables[index];
+					param = bt->Proc.results->Tuple.variables[cast(isize)index];
 				}
 			}
 
