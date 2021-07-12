@@ -281,7 +281,25 @@ void big_int_mul(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 u64 leading_zeros_u64(u64 x) {
 #if defined(GB_COMPILER_MSVC)
-	return __lzcnt64(x);
+	#if defined(GB_ARCH_64_BIT)
+		return __lzcnt64(x);
+	#else
+		u64 y, n;
+
+		n = 0;
+		y = x;
+	L:
+		if (x < 0) {
+			return n;
+		}
+		if (y == 0) {
+			return 64-n;
+		}
+		n++;
+		x <<= 1;
+		y >>= 1;
+		goto L;
+	#endif
 #else
 	return cast(u64)__builtin_clzll(cast(unsigned long long)x);
 #endif

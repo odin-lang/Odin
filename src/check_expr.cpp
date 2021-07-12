@@ -8118,7 +8118,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 			o->mode = Addressing_Constant;
 			o->type = t;
-			o->value = exact_value_string(substring(s, indices[0], indices[1]));
+			o->value = exact_value_string(substring(s, cast(isize)indices[0], cast(isize)indices[1]));
 		}
 
 	case_end;
