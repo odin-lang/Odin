@@ -6,7 +6,7 @@ struct DeclInfo;
 struct AstFile;
 struct AstPackage;
 
-enum AddressingMode {
+enum AddressingMode : u8 {
 	Addressing_Invalid   = 0,        // invalid addressing mode
 	Addressing_NoValue   = 1,        // no value (void in C)
 	Addressing_Value     = 2,        // computed value (rvalue)
@@ -29,6 +29,7 @@ enum AddressingMode {
 
 struct TypeAndValue {
 	AddressingMode mode;
+	bool           is_lhs; // Debug info
 	Type *         type;
 	ExactValue     value;
 };

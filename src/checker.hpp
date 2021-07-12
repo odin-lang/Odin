@@ -9,15 +9,15 @@ struct Checker;
 struct CheckerInfo;
 struct CheckerContext;
 
-enum AddressingMode;
+enum AddressingMode : u8;
 struct TypeAndValue;
 
 // ExprInfo stores information used for "untyped" expressions
 struct ExprInfo {
 	AddressingMode mode;
+	bool is_lhs; // Debug info
 	Type *         type;
 	ExactValue     value;
-	bool is_lhs; // Debug info
 };
 
 gb_inline ExprInfo *make_expr_info(AddressingMode mode, Type *type, ExactValue const &value, bool is_lhs) {
