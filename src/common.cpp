@@ -39,7 +39,7 @@ gb_inline void zero_size(void *ptr, isize len) {
 i32 next_pow2(i32 n);
 i64 next_pow2(i64 n);
 isize next_pow2_isize(isize n);
-
+void debugf(char const *fmt, ...);
 
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
