@@ -6368,7 +6368,9 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 	}
 
 	size_t sz = cast(size_t)type_size_of(original_type);
-	u8 rop[64] = {};
+	u64 rop64[4] = {}; // 2 u64 is the maximum we will ever need, so doubling it will be fine :P
+	u8 *rop = cast(u8 *)rop64;
+
 	size_t max_count = 0;
 	size_t written = 0;
 	size_t size = 1;
@@ -6376,7 +6378,8 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 	mp_endian endian = MP_LITTLE_ENDIAN;
 
 	max_count = mp_pack_count(a, nails, size);
-	GB_ASSERT(max_count <= sz);
+	GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu", max_count, sz, written);
+	GB_ASSERT(gb_size_of(rop64) >= sz);
 
 	mp_err err = mp_pack(rop, sz, &written,
 	                     MP_LSB_FIRST,
@@ -6385,7 +6388,6 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 	GB_ASSERT(err == MP_OKAY);
 
 	if (!is_type_endian_little(original_type)) {
-		GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu", max_count, sz, written);
 		for (size_t i = 0; i < sz/2; i++) {
 			u8 tmp = rop[i];
 			rop[i] = rop[sz-1-i];
