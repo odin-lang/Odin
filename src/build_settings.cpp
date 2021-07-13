@@ -210,6 +210,8 @@ struct BuildContext {
 	bool use_separate_modules;
 	bool threaded_checker;
 
+	bool show_debug_messages;
+
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 

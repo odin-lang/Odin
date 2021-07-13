@@ -2004,7 +2004,7 @@ void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, 
 }
 
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
 	map_init(&M, allocator, info->entities.count);
@@ -4204,7 +4204,7 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 
 
 void calculate_global_init_order(Checker *c) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	CheckerInfo *info = &c->info;
 
@@ -4477,6 +4477,8 @@ void check_procedure_bodies(Checker *c) {
 			check_proc_info(c, pi, nullptr, nullptr);
 			total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
 		}
+
+		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 		return;
 	}
 
@@ -4544,7 +4546,7 @@ void check_procedure_bodies(Checker *c) {
 		GB_ASSERT(remaining == 0);
 	}
 
-	// gb_printf_err("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
 	global_procedure_body_in_worker_queue = false;
 }
@@ -4744,7 +4746,7 @@ void check_unique_package_names(Checker *c) {
 
 
 void check_parsed_files(Checker *c) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->builtin_ctx, t_invalid);

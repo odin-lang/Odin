@@ -128,7 +128,6 @@ void timings__stop_current_section(Timings *t) {
 }
 
 void timings_start_section(Timings *t, String const &label) {
-	// gb_printf_err("[%.*s]\n", LIT(label));
 	timings__stop_current_section(t);
 	array_add(&t->sections, make_time_stamp(label));
 }

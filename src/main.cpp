@@ -7,6 +7,15 @@
 #include "exact_value.cpp"
 #include "build_settings.cpp"
 
+void debugf(char const *fmt, ...) {
+	if (build_context.show_debug_messages) {
+		gb_printf_err("[DEBUG] ");
+		va_list va;
+		va_start(va, fmt);
+		(void)gb_printf_err_va(fmt, va);
+		va_end(va);
+	}
+}
 
 gb_global Timings global_timings = {0};
 
@@ -601,6 +610,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_ThreadedChecker,
+	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
 	BuildFlag_VetExtra,
 	BuildFlag_UseLLVMApi,
@@ -724,6 +734,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,str_lit("use-separate-modules"),BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ThreadedChecker,   str_lit("threaded-checker"),    BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowDebugMessages, str_lit("show-debug-messages"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
@@ -1210,6 +1221,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_ThreadedChecker:
 							build_context.threaded_checker = true;
+							break;
+
+						case BuildFlag_ShowDebugMessages:
+							build_context.show_debug_messages = true;
 							break;
 
 						case BuildFlag_Vet:
@@ -1951,15 +1966,15 @@ bool check_env(void) {
 
 
 int main(int arg_count, char const **arg_ptr) {
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
 	}
 
-	Timings *timings = &global_timings;
-
-	timings_init(timings, str_lit("Total Time"), 2048);
-	defer (timings_destroy(timings));
+	timings_init(&global_timings, str_lit("Total Time"), 2048);
+	defer (timings_destroy(&global_timings));
 
 	arena_init(&permanent_arena, heap_allocator());
 	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
@@ -2123,7 +2138,7 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	timings_start_section(timings, str_lit("parse files"));
+	TIME_SECTION("parse files");
 
 	Parser parser = {0};
 	if (!init_parser(&parser)) {
@@ -2141,7 +2156,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	temp_allocator_free_all(&temporary_allocator_data);
 
-	timings_start_section(timings, str_lit("type check"));
+	TIME_SECTION("type check");
 
 	Checker checker = {0};
 
@@ -2173,10 +2188,10 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		if (build_context.query_data_set_settings.ok) {
-			generate_and_print_query_data(&checker, timings);
+			generate_and_print_query_data(&checker, &global_timings);
 		} else {
 			if (build_context.show_timings) {
-				show_timings(&checker, timings);
+				show_timings(&checker, &global_timings);
 			}
 		}
 
@@ -2191,7 +2206,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	timings_start_section(timings, str_lit("LLVM API Code Gen"));
+	TIME_SECTION("LLVM API Code Gen");
 	lbGenerator gen = {};
 	if (!lb_init_generator(&gen, &checker)) {
 		return 1;
@@ -2206,7 +2221,7 @@ int main(int arg_count, char const **arg_ptr) {
 		i32 result = linker_stage(&gen);
 		if (result != 0) {
 			if (build_context.show_timings) {
-				show_timings(&checker, timings);
+				show_timings(&checker, &global_timings);
 			}
 			return 1;
 		}
@@ -2214,7 +2229,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_timings) {
-		show_timings(&checker, timings);
+		show_timings(&checker, &global_timings);
 	}
 
 	remove_temp_files(&gen);
