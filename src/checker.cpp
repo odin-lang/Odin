@@ -4455,11 +4455,29 @@ GB_THREAD_PROC(thread_proc_body) {
 }
 
 void check_procedure_bodies(Checker *c) {
-
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
+
+		auto *q = &c->procs_to_check_queue;
+		ProcInfo *pi = nullptr;
+		while (mpmc_dequeue(q, &pi)) {
+			GB_ASSERT(pi->decl != nullptr);
+			if (pi->decl->parent && pi->decl->parent->entity) {
+				Entity *parent = pi->decl->parent->entity;
+				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+				// This is prevent any possible race conditions in evaluation when multithreaded
+				// NOTE(bill): In single threaded mode, this should never happen
+				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+					mpmc_enqueue(q, pi);
+					continue;
+				}
+			}
+			check_proc_info(c, pi, nullptr, nullptr);
+			total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+		}
+		return;
 	}
 
 	global_procedure_body_in_worker_queue = true;
@@ -4472,9 +4490,12 @@ void check_procedure_bodies(Checker *c) {
 		ThreadProcBodyData *data = thread_data + i;
 		data->checker = c;
 		data->queue = gb_alloc_item(permanent_allocator(), ProcBodyQueue);
+		// NOTE(bill) 2x the amount assumes on average only 1 nested procedure
+		// TODO(bill): Determine a good heuristic
 		mpmc_init(data->queue, heap_allocator(), next_pow2_isize(load_count*2));
 	}
 
+	// Distibute the work load into multiple queues
 	for (isize i = 0; i < thread_count; i++) {
 		ProcBodyQueue *queue = thread_data[i].queue;
 		for (isize j = 0; j < load_count; j++) {
@@ -4516,6 +4537,11 @@ void check_procedure_bodies(Checker *c) {
 
 	for (isize i = 0; i < worker_count; i++) {
 		gb_thread_destroy(threads+i);
+	}
+
+	{
+		isize remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
+		GB_ASSERT(remaining == 0);
 	}
 
 	// gb_printf_err("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
