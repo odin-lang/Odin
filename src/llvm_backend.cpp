@@ -6384,15 +6384,13 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 
 	i64 sz = type_size_of(original_type);
 	if (is_type_different_to_arch_endianness(original_type)) {
-		GB_ASSERT(sz == cast(i64)written);
+		GB_ASSERT_MSG(sz == cast(i64)written, "max_count: %tu, sz: %lld, written: %tu", max_count, sz, written);
 		for (i64 i = 0; i < sz/2; i++) {
 			u8 tmp = rop[i];
 			rop[i] = rop[sz-1-i];
 			rop[sz-1-i] = tmp;
 		}
 	}
-
-
 
 	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((written+7)/8), cast(u64 *)rop);
 	if (big_int_is_neg(a)) {
