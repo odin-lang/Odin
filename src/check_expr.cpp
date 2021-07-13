@@ -87,7 +87,7 @@ void     check_not_tuple                (CheckerContext *c, Operand *operand);
 void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (Ast *expression);
 void     check_proc_body                (CheckerContext *c, Token token, DeclInfo *decl, Type *type, Ast *body);
-void     update_expr_type               (CheckerContext *c, Ast *e, Type *type, bool final);
+void     update_untyped_expr_type       (CheckerContext *c, Ast *e, Type *type, bool final);
 bool     check_is_terminating           (Ast *node, String const &label);
 bool     check_has_break                (Ast *stmt, String const &label, bool implicit);
 void     check_stmt                     (CheckerContext *c, Ast *node, u32 flags);
@@ -215,6 +215,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	//                                                                           //
 	///////////////////////////////////////////////////////////////////////////////
 
+	CheckerInfo *info = c->info;
 
 	if (base_entity == nullptr) {
 		return false;
@@ -223,6 +224,10 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	if (!is_type_proc(base_entity->type)) {
 		return false;
 	}
+
+
+	gb_mutex_lock(&info->gen_procs_mutex);
+	defer (gb_mutex_unlock(&info->gen_procs_mutex));
 
 	String name = base_entity->token.string;
 
@@ -280,7 +285,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	});
 
 
-	CheckerInfo *info = c->info;
 	CheckerContext nctx = *c;
 
 	Scope *scope = create_scope(c->info, base_entity->scope);
@@ -297,6 +301,8 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 
 	auto *pt = &src->Proc;
 
+
+
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
@@ -306,8 +312,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		return false;
 	}
 
-	gb_mutex_lock(&info->gen_procs_mutex);
-	defer (gb_mutex_unlock(&info->gen_procs_mutex));
 	auto *found_gen_procs = map_get(&info->gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
 		// gb_mutex_lock(&info->gen_procs_mutex);
@@ -632,6 +636,8 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		if (are_types_identical(src, dst)) {
 			return 3;
 		}
+		gb_mutex_lock(&c->checker->poly_proc_mutex);
+		defer (gb_mutex_unlock(&c->checker->poly_proc_mutex));
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
@@ -2099,8 +2105,8 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		} else {
 			x->mode = Addressing_Value;
 
-			update_expr_type(c, x->expr, default_type(x->type), true);
-			update_expr_type(c, y->expr, default_type(y->type), true);
+			update_untyped_expr_type(c, x->expr, default_type(x->type), true);
+			update_untyped_expr_type(c, y->expr, default_type(y->type), true);
 
 			i64 size = 0;
 			if (!is_type_untyped(x->type)) size = gb_max(size, type_size_of(x->type));
@@ -2226,18 +2232,14 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 
 		TokenPos pos = ast_token(x->expr).pos;
 		if (x_is_untyped) {
-			gb_mutex_lock(&c->info->untyped_mutex);
-			ExprInfo *info = check_get_expr_info(c->info, x->expr);
-			if (info != nullptr) {
-				info->is_lhs = true;
+			if (x->expr != nullptr) {
+				x->expr->tav.is_lhs = true;
 			}
 			x->mode = Addressing_Value;
 			if (type_hint && is_type_integer(type_hint)) {
 				x->type = type_hint;
 			}
 			// x->value = x_val;
-
-			gb_mutex_unlock(&c->info->untyped_mutex);
 			return;
 		}
 	}
@@ -2484,7 +2486,7 @@ void check_cast(CheckerContext *c, Operand *x, Type *type) {
 		if (is_const_expr && !is_type_constant_type(type)) {
 			final_type = default_type(x->type);
 		}
-		update_expr_type(c, x->expr, final_type, true);
+		update_untyped_expr_type(c, x->expr, final_type, true);
 	}
 
 	if (build_context.vet_extra) {
@@ -2920,11 +2922,9 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 }
 
 
-void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
+void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	GB_ASSERT(e != nullptr);
-	gb_mutex_lock(&c->info->untyped_mutex);
-	defer (gb_mutex_unlock(&c->info->untyped_mutex));
-	ExprInfo *old = check_get_expr_info(c->info, e);
+	ExprInfo *old = check_get_expr_info(c, e);
 	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
@@ -2942,7 +2942,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 			// checked at the end of general checking stage.
 			break;
 		}
-		update_expr_type(c, ue->expr, type, final);
+		update_untyped_expr_type(c, ue->expr, type, final);
 	case_end;
 
 	case_ast_node(be, BinaryExpr, e);
@@ -2953,10 +2953,10 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 		if (token_is_comparison(be->op.kind)) {
 			// NOTE(bill): Do nothing as the types are fine
 		} else if (token_is_shift(be->op.kind)) {
-			update_expr_type(c, be->left, type, final);
+			update_untyped_expr_type(c, be->left, type, final);
 		} else {
-			update_expr_type(c, be->left,  type, final);
-			update_expr_type(c, be->right, type, final);
+			update_untyped_expr_type(c, be->left,  type, final);
+			update_untyped_expr_type(c, be->right, type, final);
 		}
 	case_end;
 
@@ -2966,8 +2966,8 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 			break;
 		}
 
-		update_expr_type(c, te->x, type, final);
-		update_expr_type(c, te->y, type, final);
+		update_untyped_expr_type(c, te->x, type, final);
+		update_untyped_expr_type(c, te->y, type, final);
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, e);
@@ -2976,12 +2976,12 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 			break;
 		}
 
-		update_expr_type(c, te->x, type, final);
-		update_expr_type(c, te->y, type, final);
+		update_untyped_expr_type(c, te->x, type, final);
+		update_untyped_expr_type(c, te->y, type, final);
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
-		update_expr_type(c, pe->expr, type, final);
+		update_untyped_expr_type(c, pe->expr, type, final);
 	case_end;
 	}
 
@@ -2991,7 +2991,7 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	}
 
 	// We need to remove it and then give it a new one
-	map_remove(&c->info->untyped, hash_node(e));
+	check_remove_expr_info(c, e);
 
 	if (old->is_lhs && !is_type_integer(type)) {
 		gbString expr_str = expr_to_string(e);
@@ -3005,11 +3005,9 @@ void update_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	add_type_and_value(c->info, e, old->mode, type, old->value);
 }
 
-void update_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
-	ExprInfo *found = nullptr;
-	gb_mutex_lock(&c->info->untyped_mutex);
-	found = check_get_expr_info(c->info, e);
-	gb_mutex_unlock(&c->info->untyped_mutex);
+void update_untyped_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
+	GB_ASSERT(e != nullptr);
+	ExprInfo *found = check_get_expr_info(c, e);
 	if (found) {
 		found->value = value;
 	}
@@ -3072,7 +3070,7 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		if (is_type_numeric(operand->type) && is_type_numeric(target_type)) {
 			if (x_kind < y_kind) {
 				operand->type = target_type;
-				update_expr_type(c, operand->expr, target_type, false);
+				update_untyped_expr_type(c, operand->expr, target_type, false);
 			}
 		} else if (x_kind != y_kind) {
 			operand->mode = Addressing_Invalid;
@@ -3094,7 +3092,7 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			if (operand->mode == Addressing_Invalid) {
 				return;
 			}
-			update_expr_value(c, operand->expr, operand->value);
+			update_untyped_expr_value(c, operand->expr, operand->value);
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
@@ -3271,7 +3269,7 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		break;
 	}
 
-	update_expr_type(c, operand->expr, target_type, true);
+	update_untyped_expr_type(c, operand->expr, target_type, true);
 	operand->type = target_type;
 }
 
@@ -4411,9 +4409,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			}
 		} else {
 			// NOTE(bill): Generate the procedure type for this generic instance
-			PolyProcData poly_proc_data = {};
-
 			if (pt->is_polymorphic && !pt->is_poly_specialized) {
+				gb_mutex_lock(&c->checker->poly_proc_mutex);
+
+				PolyProcData poly_proc_data = {};
 				if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &operands, call, &poly_proc_data)) {
 					gen_entity = poly_proc_data.gen_entity;
 					GB_ASSERT(is_type_proc(gen_entity->type));
@@ -4421,6 +4420,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				} else {
 					err = CallArgumentError_WrongTypes;
 				}
+
+				gb_mutex_unlock(&c->checker->poly_proc_mutex);
 			}
 
 			GB_ASSERT(is_type_proc(final_proc_type));
@@ -4495,7 +4496,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					add_type_info_type(c, o.type);
 					add_type_and_value(c->info, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
 				} else if (show_error && is_type_untyped(o.type)) {
-					update_expr_type(c, o.expr, t, true);
+					update_untyped_expr_type(c, o.expr, t, true);
 				}
 
 			}
@@ -4546,7 +4547,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						add_type_info_type(c, o.type);
 						add_type_and_value(c->info, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
 					} else if (show_error && is_type_untyped(o.type)) {
-						update_expr_type(c, o.expr, t, true);
+						update_untyped_expr_type(c, o.expr, t, true);
 					}
 				}
 			}
@@ -4693,6 +4694,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 	Entity *gen_entity = nullptr;
 	if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
+		gb_mutex_lock(&c->checker->poly_proc_mutex);
 		PolyProcData poly_proc_data = {};
 		if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 			gen_entity = poly_proc_data.gen_entity;
@@ -4701,6 +4703,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			proc_type = gept;
 			pt = &gept->Proc;
 		}
+		gb_mutex_unlock(&c->checker->poly_proc_mutex);
 	}
 
 
@@ -5039,7 +5042,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
 			if (entity_to_use != nullptr) {
-				update_expr_type(c, operand->expr, entity_to_use->type, true);
+				update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 			}
 			return data;
 		}
@@ -5313,7 +5316,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
 			if (entity_to_use != nullptr) {
-				update_expr_type(c, operand->expr, entity_to_use->type, true);
+				update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 			}
 
 			if (data.gen_entity != nullptr) {
@@ -5346,7 +5349,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
 		if (entity_to_use != nullptr) {
-			update_expr_type(c, operand->expr, entity_to_use->type, true);
+			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 		}
 
 		if (data.gen_entity != nullptr) {
@@ -5775,6 +5778,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				operand->type = t_invalid;;
 				return Expr_Expr;
 			}
+			gb_mutex_lock(&c->checker->poly_type_mutex);
 
 			auto err = check_polymorphic_record_type(c, operand, call);
 			if (err == 0) {
@@ -5792,6 +5796,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;
 			}
+
+			gb_mutex_unlock(&c->checker->poly_type_mutex);
 		} else {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -5821,7 +5827,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				operand->type = t;
 				operand->expr = call;
 				if (operand->mode != Addressing_Invalid) {
-					update_expr_type(c, arg, t, false);
+					update_untyped_expr_type(c, arg, t, false);
 				}
 				break;
 			}
@@ -6555,7 +6561,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		if (type_hint != nullptr && is_type_untyped(type)) {
 			if (check_cast_internal(c, &x, type_hint) &&
 			    check_cast_internal(c, &y, type_hint)) {
-				update_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
+				update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
 				o->type = type_hint;
 			}
 		}
@@ -8251,7 +8257,7 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 		gb_string_free(xs);
 	}
 	if (o->type != nullptr && is_type_untyped(o->type)) {
-		add_untyped(c->info, node, false, o->mode, o->type, o->value);
+		add_untyped(c, node, o->mode, o->type, o->value);
 	}
 	add_type_and_value(c->info, node, o->mode, o->type, o->value);
 	return kind;

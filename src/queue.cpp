@@ -1,5 +1,3 @@
-#include <atomic> // Because I wanted the C++11 memory order semantics, of which gb.h does not offer (because it was a C89 library)
-
 template <typename T>
 struct MPMCQueueNode {
 	T data;
