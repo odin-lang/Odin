@@ -6367,32 +6367,33 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 		return LLVMConstNull(lb_type(m, original_type));
 	}
 
-	u8 *rop = nullptr;
+	size_t sz = cast(size_t)type_size_of(original_type);
+	u8 rop[64] = {};
 	size_t max_count = 0;
 	size_t written = 0;
 	size_t size = 1;
 	size_t nails = 0;
-	mp_endian endian = MP_NATIVE_ENDIAN;
+	mp_endian endian = MP_LITTLE_ENDIAN;
 
 	max_count = mp_pack_count(a, nails, size);
-	rop = cast(u8 *)gb_alloc_align(permanent_allocator(), max_count, gb_align_of(u64));
-	mp_err err = mp_pack(rop, max_count, &written,
+	GB_ASSERT(max_count <= sz);
+
+	mp_err err = mp_pack(rop, sz, &written,
 	                     MP_LSB_FIRST,
 	                     size, endian, nails,
 	                     a);
 	GB_ASSERT(err == MP_OKAY);
 
-	i64 sz = type_size_of(original_type);
-	if (is_type_different_to_arch_endianness(original_type)) {
-		GB_ASSERT_MSG(sz == cast(i64)written, "max_count: %tu, sz: %lld, written: %tu", max_count, sz, written);
-		for (i64 i = 0; i < sz/2; i++) {
+	if (!is_type_endian_little(original_type)) {
+		GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu", max_count, sz, written);
+		for (size_t i = 0; i < sz/2; i++) {
 			u8 tmp = rop[i];
 			rop[i] = rop[sz-1-i];
 			rop[sz-1-i] = tmp;
 		}
 	}
 
-	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((written+7)/8), cast(u64 *)rop);
+	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)(sz+7/8), cast(u64 *)rop);
 	if (big_int_is_neg(a)) {
 		value = LLVMConstNeg(value);
 	}
