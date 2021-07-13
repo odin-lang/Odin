@@ -4562,145 +4562,7 @@ void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 	map_clear(untyped);
 }
 
-
-void check_parsed_files(Checker *c) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
-	TIME_SECTION("map full filepaths to scope");
-	add_type_info_type(&c->builtin_ctx, t_invalid);
-
-	// Map full filepaths to Scopes
-	for_array(i, c->parser->packages) {
-		AstPackage *p = c->parser->packages[i];
-		Scope *scope = create_scope_from_package(&c->builtin_ctx, p);
-		p->decl_info = make_decl_info(scope, c->builtin_ctx.decl);
-		string_map_set(&c->info.packages, p->fullpath, p);
-
-		if (scope->flags&ScopeFlag_Init) {
-			c->info.init_package = p;
-			c->info.init_scope = scope;
-		}
-		if (p->kind == Package_Runtime) {
-			GB_ASSERT(c->info.runtime_package == nullptr);
-			c->info.runtime_package = p;
-		}
-	}
-
-	TIME_SECTION("collect entities");
-	// Collect Entities
-	CheckerContext collect_entity_ctx = make_checker_context(c);
-	defer (destroy_checker_context(&collect_entity_ctx));
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
-
-		CheckerContext *ctx = &collect_entity_ctx;
-
-		for_array(j, pkg->files) {
-			AstFile *f = pkg->files[j];
-			string_map_set(&c->info.files, f->fullpath, f);
-
-			create_scope_from_file(nullptr, f);
-			reset_checker_context(ctx, f);
-			check_collect_entities(ctx, f->decls);
-		}
-
-		pkg->used = true;
-	}
-
-	TIME_SECTION("import entities");
-	check_import_entities(c);
-
-	TIME_SECTION("check all global entities");
-	check_all_global_entities(c);
-
-	TIME_SECTION("init preload");
-	init_preload(c);
-
-	TIME_SECTION("add global untyped expression to queue");
-	add_untyped_expressions(&c->info, &c->info.global_untyped);
-
-	CheckerContext prev_context = c->builtin_ctx;
-	defer (c->builtin_ctx = prev_context);
-	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
-
-	TIME_SECTION("check procedure bodies");
-	check_procedure_bodies(c);
-
-	TIME_SECTION("check scope usage");
-	for_array(i, c->info.files.entries) {
-		AstFile *f = c->info.files.entries[i].value;
-		check_scope_usage(c, f->scope);
-	}
-
-	TIME_SECTION("generate minimum dependency set");
-	generate_minimum_dependency_set(c, c->info.entry_point);
-
-	TIME_SECTION("check test names");
-	check_test_names(c);
-
-	TIME_SECTION("calculate global init order");
-	// Calculate initialization order of global variables
-	calculate_global_init_order(c);
-
-	TIME_SECTION("check bodies have all been checked");
-	check_unchecked_bodies(c);
-
-	TIME_SECTION("add untyped expression values");
-	// Add untyped expression values
-	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->info.untyped_queue, &u); /**/) {
-		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
-		if (is_type_typed(u.info->type)) {
-			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
-		}
-		add_type_and_value(&c->info, u.expr, u.info->mode, u.info->type, u.info->value);
-	}
-
-	// TODO(bill): Check for unused imports (and remove) or even warn/err
-	// TODO(bill): Any other checks?
-
-
-	TIME_SECTION("add type information");
-	// Add "Basic" type information
-	for (isize i = 0; i < Basic_COUNT; i++) {
-		Type *t = &basic_types[i];
-		if (t->Basic.size > 0 &&
-		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
-			add_type_info_type(&c->builtin_ctx, t);
-		}
-	}
-
-	TIME_SECTION("check for type cycles and inline cycles");
-	// NOTE(bill): Check for illegal cyclic type declarations
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			(void)type_align_of(e->type);
-		} else if (e->kind == Entity_Procedure) {
-			DeclInfo *decl = e->decl_info;
-			ast_node(pl, ProcLit, decl->proc_lit);
-			if (pl->inlining == ProcInlining_inline) {
-				for_array(j, decl->deps.entries) {
-					Entity *dep = decl->deps.entries[j].ptr;
-					if (dep == e) {
-						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
-						break;
-					}
-				}
-			}
-		}
-	}
-	TIME_SECTION("add type info for type definitions");
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			i64 align = type_align_of(e->type);
-			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
-				add_type_info_type(&c->builtin_ctx, e->type);
-			}
-		}
-	}
-
-	TIME_SECTION("check deferred procedures");
+void check_deferred_procedures(Checker *c) {
 	for (Entity *src = nullptr; mpmc_dequeue(&c->procs_with_deferred_to_check, &src); /**/) {
 		GB_ASSERT(src->kind == Entity_Procedure);
 
@@ -4851,6 +4713,172 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+}
+
+void check_unique_package_names(Checker *c) {
+	StringMap<AstPackage *> pkgs = {}; // Key: package name
+	string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
+	defer (string_map_destroy(&pkgs));
+
+	for_array(i, c->info.packages.entries) {
+		AstPackage *pkg = c->info.packages.entries[i].value;
+		if (pkg->files.count == 0) {
+			continue; // Sanity check
+		}
+
+		String name = pkg->name;
+		auto key = string_hash_string(name);
+		auto *found = string_map_get(&pkgs, key);
+		if (found == nullptr) {
+			string_map_set(&pkgs, key, pkg);
+			continue;
+		}
+
+		error(pkg->files[0]->pkg_decl, "Duplicate declaration of 'package %.*s'", LIT(name));
+		error_line("\tA package name must be unique\n"
+		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
+		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
+		error((*found)->files[0]->pkg_decl, "found at previous location");
+	}
+}
+
+
+void check_parsed_files(Checker *c) {
+#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
+	TIME_SECTION("map full filepaths to scope");
+	add_type_info_type(&c->builtin_ctx, t_invalid);
+
+	// Map full filepaths to Scopes
+	for_array(i, c->parser->packages) {
+		AstPackage *p = c->parser->packages[i];
+		Scope *scope = create_scope_from_package(&c->builtin_ctx, p);
+		p->decl_info = make_decl_info(scope, c->builtin_ctx.decl);
+		string_map_set(&c->info.packages, p->fullpath, p);
+
+		if (scope->flags&ScopeFlag_Init) {
+			c->info.init_package = p;
+			c->info.init_scope = scope;
+		}
+		if (p->kind == Package_Runtime) {
+			GB_ASSERT(c->info.runtime_package == nullptr);
+			c->info.runtime_package = p;
+		}
+	}
+
+	TIME_SECTION("collect entities");
+	// Collect Entities
+	CheckerContext collect_entity_ctx = make_checker_context(c);
+	defer (destroy_checker_context(&collect_entity_ctx));
+	for_array(i, c->parser->packages) {
+		AstPackage *pkg = c->parser->packages[i];
+
+		CheckerContext *ctx = &collect_entity_ctx;
+
+		for_array(j, pkg->files) {
+			AstFile *f = pkg->files[j];
+			string_map_set(&c->info.files, f->fullpath, f);
+
+			create_scope_from_file(nullptr, f);
+			reset_checker_context(ctx, f);
+			check_collect_entities(ctx, f->decls);
+		}
+
+		pkg->used = true;
+	}
+
+	TIME_SECTION("import entities");
+	check_import_entities(c);
+
+	TIME_SECTION("check all global entities");
+	check_all_global_entities(c);
+
+	TIME_SECTION("init preload");
+	init_preload(c);
+
+	TIME_SECTION("add global untyped expression to queue");
+	add_untyped_expressions(&c->info, &c->info.global_untyped);
+
+	CheckerContext prev_context = c->builtin_ctx;
+	defer (c->builtin_ctx = prev_context);
+	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
+
+	TIME_SECTION("check procedure bodies");
+	check_procedure_bodies(c);
+
+	TIME_SECTION("check scope usage");
+	for_array(i, c->info.files.entries) {
+		AstFile *f = c->info.files.entries[i].value;
+		check_scope_usage(c, f->scope);
+	}
+
+	TIME_SECTION("generate minimum dependency set");
+	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check test names");
+	check_test_names(c);
+
+	TIME_SECTION("calculate global init order");
+	// Calculate initialization order of global variables
+	calculate_global_init_order(c);
+
+	TIME_SECTION("check bodies have all been checked");
+	check_unchecked_bodies(c);
+
+	TIME_SECTION("add untyped expression values");
+	// Add untyped expression values
+	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->info.untyped_queue, &u); /**/) {
+		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
+		if (is_type_typed(u.info->type)) {
+			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
+		}
+		add_type_and_value(&c->info, u.expr, u.info->mode, u.info->type, u.info->value);
+	}
+
+
+	TIME_SECTION("add type information");
+	// Add "Basic" type information
+	for (isize i = 0; i < Basic_COUNT; i++) {
+		Type *t = &basic_types[i];
+		if (t->Basic.size > 0 &&
+		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
+			add_type_info_type(&c->builtin_ctx, t);
+		}
+	}
+
+	TIME_SECTION("check for type cycles and inline cycles");
+	// NOTE(bill): Check for illegal cyclic type declarations
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			(void)type_align_of(e->type);
+		} else if (e->kind == Entity_Procedure) {
+			DeclInfo *decl = e->decl_info;
+			ast_node(pl, ProcLit, decl->proc_lit);
+			if (pl->inlining == ProcInlining_inline) {
+				for_array(j, decl->deps.entries) {
+					Entity *dep = decl->deps.entries[j].ptr;
+					if (dep == e) {
+						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
+						break;
+					}
+				}
+			}
+		}
+	}
+	TIME_SECTION("add type info for type definitions");
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			i64 align = type_align_of(e->type);
+			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
+				add_type_info_type(&c->builtin_ctx, e->type);
+			}
+		}
+	}
+
+	TIME_SECTION("check deferred procedures");
+	check_deferred_procedures(c);
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {
@@ -4875,32 +4903,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 	TIME_SECTION("check unique package names");
-	{
-		StringMap<AstPackage *> pkgs = {}; // Key: package name
-		string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
-		defer (string_map_destroy(&pkgs));
-
-		for_array(i, c->info.packages.entries) {
-			AstPackage *pkg = c->info.packages.entries[i].value;
-			if (pkg->files.count == 0) {
-				continue; // Sanity check
-			}
-
-			String name = pkg->name;
-			auto key = string_hash_string(name);
-			auto *found = string_map_get(&pkgs, key);
-			if (found == nullptr) {
-				string_map_set(&pkgs, key, pkg);
-				continue;
-			}
-
-			error(pkg->files[0]->pkg_decl, "Duplicate declaration of 'package %.*s'", LIT(name));
-			error_line("\tA package name must be unique\n"
-			           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
-			           "\tA package name is required for link name prefixing to have a consistent ABI\n");
-			error((*found)->files[0]->pkg_decl, "found at previous location");
-		}
-	}
+	check_unique_package_names(c);
 
 	TIME_SECTION("type check finish");
 
