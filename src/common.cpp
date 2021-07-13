@@ -27,6 +27,7 @@
 
 #include <math.h>
 #include <string.h>
+#include <atomic> // Because I wanted the C++11 memory order semantics, of which gb.h does not offer (because it was a C89 library)
 
 gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);

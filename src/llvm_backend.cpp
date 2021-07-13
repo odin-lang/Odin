@@ -6580,6 +6580,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				}
 				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
 				LLVMValueRef values[2] = {ptr, str_len};
+				GB_ASSERT(is_type_string(original_type));
 
 				res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
 			}

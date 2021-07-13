@@ -1103,7 +1103,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					if (y.mode != Addressing_Constant) {
 						continue;
 					}
-					update_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
+					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
 					add_constant_switch_case(ctx, &seen, y);
 				}
 			}
@@ -1706,7 +1706,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				Operand *o = &operands[i];
 				check_assignment(ctx, o, e->type, str_lit("return statement"));
 				if (is_type_untyped(o->type)) {
-					update_expr_type(ctx, o->expr, e->type, true);
+					update_untyped_expr_type(ctx, o->expr, e->type, true);
 				}
 			}
 		}

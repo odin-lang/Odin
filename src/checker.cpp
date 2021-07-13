@@ -4,7 +4,6 @@
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
-void check_proc_info(Checker *c, ProcInfo *pi);
 
 
 bool is_operand_value(Operand o) {
@@ -835,7 +834,7 @@ void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
-	map_init(&i->untyped,         a);
+	map_init(&i->global_untyped, a);
 	string_map_init(&i->foreigns, a);
 	map_init(&i->gen_procs,       a);
 	map_init(&i->gen_types,       a);
@@ -847,6 +846,7 @@ void init_checker_info(CheckerInfo *i) {
 	array_init(&i->required_foreign_imports_through_force, a);
 	array_init(&i->required_global_variables, a);
 	array_init(&i->testing_procedures, a, 0, 0);
+	mpmc_init(&i->untyped_queue, heap_allocator(), 1<<20);
 
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
@@ -854,7 +854,6 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
-	gb_mutex_init(&i->untyped_mutex);
 	gb_mutex_init(&i->gen_procs_mutex);
 	gb_mutex_init(&i->gen_types_mutex);
 	gb_mutex_init(&i->type_info_mutex);
@@ -869,7 +868,7 @@ void init_checker_info(CheckerInfo *i) {
 void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->definitions);
 	array_free(&i->entities);
-	map_destroy(&i->untyped);
+	map_destroy(&i->global_untyped);
 	string_map_destroy(&i->foreigns);
 	map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
@@ -881,8 +880,8 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
 	array_free(&i->required_global_variables);
+	mpmc_destroy(&i->untyped_queue);
 
-	gb_mutex_destroy(&i->untyped_mutex);
 	gb_mutex_destroy(&i->gen_procs_mutex);
 	gb_mutex_destroy(&i->gen_types_mutex);
 	gb_mutex_destroy(&i->type_info_mutex);
@@ -956,6 +955,9 @@ bool init_checker(Checker *c, Parser *parser) {
 	// NOTE(bill): 1 Mi elements should be enough on average
 	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
 	gb_semaphore_init(&c->procs_to_check_semaphore);
+
+	gb_mutex_init(&c->poly_type_mutex);
+	gb_mutex_init(&c->poly_proc_mutex);
 	return true;
 }
 
@@ -1041,13 +1043,23 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 Scope *scope_of_node(Ast *node) {
 	return node->scope;
 }
-ExprInfo *check_get_expr_info(CheckerInfo *i, Ast *expr) {
-	ExprInfo *res = nullptr;
-	ExprInfo **found = map_get(&i->untyped, hash_node(expr));
+ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
+	UntypedExprInfoMap *untyped = c->untyped ? c->untyped : &c->info->global_untyped;
+	ExprInfo **found = map_get(untyped, hash_pointer(expr));
 	if (found) {
-		res = *found;
+		return *found;
 	}
-	return res;
+	return nullptr;
+}
+
+void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+	UntypedExprInfoMap *untyped = c->untyped ? c->untyped : &c->info->global_untyped;
+	map_set(untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+}
+
+void check_remove_expr_info(CheckerContext *c, Ast *e) {
+	UntypedExprInfoMap *untyped = c->untyped ? c->untyped : &c->info->global_untyped;
+	map_remove(untyped, hash_pointer(e));
 }
 
 
@@ -1089,19 +1101,21 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 }
 
 
-void add_untyped(CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode, Type *type, ExactValue value) {
-	if (expression == nullptr) {
+void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+	if (expr == nullptr) {
 		return;
 	}
 	if (mode == Addressing_Invalid) {
 		return;
 	}
+
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
-	gb_mutex_lock(&i->untyped_mutex);
-	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
-	gb_mutex_unlock(&i->untyped_mutex);
+	if (!is_type_untyped(type)) {
+		return;
+	}
+	check_set_expr_info(c, expr, mode, type, value);
 }
 
 void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
@@ -3336,12 +3350,14 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 }
 
 void check_all_global_entities(Checker *c) {
-	Scope *prev_file = nullptr;
-
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
 		DeclInfo *d = e->decl_info;
 		check_single_global_entity(c, e, d);
+		if (e->type != nullptr && is_type_typed(e->type)) {
+			(void)type_size_of(e->type);
+			(void)type_align_of(e->type);
+		}
 	}
 }
 
@@ -4258,7 +4274,7 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
-void check_proc_info(Checker *c, ProcInfo *pi) {
+void check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return;
 	}
@@ -4273,6 +4289,7 @@ void check_proc_info(Checker *c, ProcInfo *pi) {
 	defer (destroy_checker_context(&ctx));
 	reset_checker_context(&ctx, pi->file);
 	ctx.decl = pi->decl;
+	ctx.untyped = untyped;
 
 	TypeProc *pt = &pi->type->Proc;
 	String name = pi->token.string;
@@ -4312,24 +4329,21 @@ void check_proc_info(Checker *c, ProcInfo *pi) {
 		pi->decl->entity->flags |= EntityFlag_ProcBodyChecked;
 	}
 	pi->decl->proc_checked = true;
-
+	add_untyped_expressions(&c->info, ctx.untyped);
 }
 
 GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
-
-GB_THREAD_PROC(check_proc_info_worker_proc) {
-	if (thread == nullptr) return 0;
-	auto *c = cast(Checker *)thread->user_data;
-	ProcInfo *pi = cast(ProcInfo *)cast(uintptr)thread->user_index;
-	check_proc_info(c, pi);
-	return 0;
-}
 
 void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Sanity checker
 	// This is a partial hack to make sure all procedure bodies have been checked
 	// even ones which should not exist, due to the multithreaded nature of the parser
 	// HACK TODO(2021-02-26, bill): Actually fix this race condition
+
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
 	for_array(i, c->info.minimum_dependency_set.entries) {
 		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
 		if (e == nullptr || e->kind != Entity_Procedure) {
@@ -4355,7 +4369,8 @@ void check_unchecked_bodies(Checker *c) {
 				continue;
 			}
 
-			check_proc_info(c, &pi);
+			map_clear(&untyped);
+			check_proc_info(c, &pi, &untyped);
 		}
 	}
 }
@@ -4399,6 +4414,10 @@ GB_THREAD_PROC(thread_proc_body) {
 	auto *q = &c->procs_to_check_queue;
 	ProcInfo *pi = nullptr;
 
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
 	while (proc_bodies_is_running) {
 		gb_semaphore_wait(&c->procs_to_check_semaphore);
 
@@ -4413,7 +4432,8 @@ GB_THREAD_PROC(thread_proc_body) {
 					continue;
 				}
 			}
-			check_proc_info(c, pi);
+			map_clear(&untyped);
+			check_proc_info(c, pi, &untyped);
 		}
 	}
 
@@ -4426,81 +4446,34 @@ void check_procedure_bodies(Checker *c) {
 	auto *q = &c->procs_to_check_queue;
 	ProcInfo *pi = nullptr;
 
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	if (!build_context.threaded_checker) {
-		worker_count = 0;
+	while (mpmc_dequeue(q, &pi)) {
+		GB_ASSERT(pi->decl != nullptr);
+		if (pi->decl->parent && pi->decl->parent->entity) {
+			Entity *parent = pi->decl->parent->entity;
+			// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+			// This is prevent any possible race conditions in evaluation when multithreaded
+			// NOTE(bill): In single threaded mode, this should never happen
+			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+				mpmc_enqueue(q, pi);
+				continue;
+			}
+		}
+		check_proc_info(c, pi, nullptr);
 	}
+}
 
-	if (worker_count == 0) {
-		while (mpmc_dequeue(q, &pi)) {
-			if (pi->decl->parent && pi->decl->parent->entity) {
-				Entity *parent = pi->decl->parent->entity;
-				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
-				// This is prevent any possible race conditions in evaluation when multithreaded
-				// NOTE(bill): In single threaded mode, this should never happen
-				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-					mpmc_enqueue(q, pi);
-					continue;
-				}
-			}
-			check_proc_info(c, pi);
-		}
-	} else {
-		proc_bodies_is_running = true;
-
-		gbThread threads[64] = {};
-		for (isize i = 0; i < worker_count; i++) {
-			gb_thread_init(threads+i);
-		}
-
-		for (isize i = 0; i < worker_count; i++) {
-			gb_thread_start(threads+i, thread_proc_body, c);
-		}
-
-		while (q->count.load(std::memory_order_relaxed) > 0) {
-			if (mpmc_dequeue(q, &pi)) {
-				if (pi->decl->parent && pi->decl->parent->entity) {
-					Entity *parent = pi->decl->parent->entity;
-					// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
-					// This is prevent any possible race conditions in evaluation when multithreaded
-					// NOTE(bill): In single threaded mode, this should never happen
-					if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-						mpmc_enqueue(q, pi);
-
-						gb_yield();
-						continue;
-					}
-				}
-				check_proc_info(c, pi);
-			}
-
-			gb_yield();
-		}
-
-		proc_bodies_is_running = false;
-		gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)worker_count);
-
-		gb_yield();
-
-		for (isize i = 0; i < worker_count; i++) {
-			gb_thread_destroy(threads+i);
-		}
-
-		while (mpmc_dequeue(q, &pi)) {
-			if (pi->decl->parent && pi->decl->parent->entity) {
-				Entity *parent = pi->decl->parent->entity;
-				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
-				// This is prevent any possible race conditions in evaluation when multithreaded
-				// NOTE(bill): In single threaded mode, this should never happen
-				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-					mpmc_enqueue(q, pi);
-					continue;
-				}
-			}
-			check_proc_info(c, pi);
+void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
+	if (untyped == nullptr) {
+		return;
+	}
+	for_array(i, untyped->entries) {
+		Ast *expr = cast(Ast *)cast(uintptr)untyped->entries[i].key.key;
+		ExprInfo *info = untyped->entries[i].value;
+		if (expr != nullptr && info != nullptr) {
+			mpmc_enqueue(&cinfo->untyped_queue, UntypedExprInfo{expr, info});
 		}
 	}
+	map_clear(untyped);
 }
 
 
@@ -4557,6 +4530,9 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("init preload");
 	init_preload(c);
 
+	TIME_SECTION("add global untyped expression to queue");
+	add_untyped_expressions(&c->info, &c->info.global_untyped);
+
 	CheckerContext prev_context = c->builtin_ctx;
 	defer (c->builtin_ctx = prev_context);
 	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
@@ -4585,24 +4561,12 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
-	for_array(i, c->info.untyped.entries) {
-		auto *entry = &c->info.untyped.entries[i];
-		HashKey key = entry->key;
-		Ast *expr = cast(Ast *)cast(uintptr)key.key;
-		ExprInfo *info = entry->value;
-		if (info != nullptr && expr != nullptr) {
-			if (is_type_typed(info->type)) {
-				compiler_error("%s (type %s) is typed!", expr_to_string(expr), type_to_string(info->type));
-			}
-			if (info->mode == Addressing_Constant) {
-			} else if (info->type == t_untyped_nil) {
-			} else if (info->type == t_untyped_undef) {
-			} else if (info->type == t_untyped_bool) {
-			} else {
-				// gb_printf_err("UNTYPED %s %s\n", expr_to_string(expr), type_to_string(info->type));
-			}
-			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
+	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->info.untyped_queue, &u); /**/) {
+		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
+		if (is_type_typed(u.info->type)) {
+			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
 		}
+		add_type_and_value(&c->info, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
 
 	// TODO(bill): Check for unused imports (and remove) or even warn/err

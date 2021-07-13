@@ -259,6 +259,13 @@ struct AtomOpMapEntry {
 
 struct CheckerContext;
 
+struct UntypedExprInfo {
+	Ast *expr;
+	ExprInfo *info;
+};
+
+typedef Map<ExprInfo *> UntypedExprInfoMap; // Key: Ast *
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -275,6 +282,8 @@ struct CheckerInfo {
 	PtrSet<Entity *>      minimum_dependency_set;
 	PtrSet<isize>         minimum_dependency_type_info_set;
 
+	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
+	                                   // as it needs to be iterated across afterwards
 
 	Array<Entity *> testing_procedures;
 
@@ -282,7 +291,6 @@ struct CheckerInfo {
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
 
-	gbMutex untyped_mutex;
 	gbMutex gen_procs_mutex;
 	gbMutex gen_types_mutex;
 	gbMutex type_info_mutex;
@@ -291,10 +299,6 @@ struct CheckerInfo {
 	gbMutex entity_mutex;
 	gbMutex foreign_mutex;
 	gbMutex scope_mutex;
-
-	Map<ExprInfo *>       untyped; // Key: Ast * | Expression -> ExprInfo *
-	                               // NOTE(bill): This needs to be a map and not on the Ast
-	                               // as it needs to be iterated across
 
 	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
 	Map<Array<Entity *> > gen_types;       // Key: Type *
@@ -311,6 +315,8 @@ struct CheckerInfo {
 
 	Array<Entity *>       required_global_variables;
 	Array<Entity *>       required_foreign_imports_through_force;
+
+	MPMCQueue<UntypedExprInfo> untyped_queue;
 };
 
 struct CheckerContext {
@@ -337,6 +343,8 @@ struct CheckerContext {
 	CheckerPolyPath *poly_path;
 	isize            poly_level; // TODO(bill): Actually handle correctly
 
+	UntypedExprInfoMap *untyped;
+
 #define MAX_INLINE_FOR_DEPTH 1024ll
 	i64 inline_for_depth;
 
@@ -362,6 +370,9 @@ struct Checker {
 
 	MPMCQueue<ProcInfo *> procs_to_check_queue;
 	gbSemaphore procs_to_check_semaphore;
+
+	gbMutex poly_type_mutex;
+	gbMutex poly_proc_mutex;
 };
 
 
@@ -399,9 +410,9 @@ void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entit
 Entity *scope_insert (Scope *s, Entity *entity);
 
 
-ExprInfo *check_get_expr_info     (CheckerInfo *i, Ast *expr);
-void      add_untyped             (CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
 void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
+ExprInfo *check_get_expr_info     (CheckerContext *c, Ast *expr);
+void      add_untyped             (CheckerContext *c, Ast *expression, AddressingMode mode, Type *basic_type, ExactValue value);
 void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);
 void      add_implicit_entity     (CheckerContext *c, Ast *node, Entity *e);
 void      add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported=true);
@@ -434,3 +445,5 @@ Type *check_poly_path_pop (CheckerContext *c);
 
 void init_core_context(Checker *c);
 void init_mem_allocator(Checker *c);
+
+void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped);
