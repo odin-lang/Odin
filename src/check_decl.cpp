@@ -901,9 +901,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 
 	if (ac.require_declaration) {
-		gb_mutex_lock(&ctx->info->entity_mutex);
-		array_add(&ctx->info->required_global_variables, e);
-		gb_mutex_unlock(&ctx->info->entity_mutex);
+		mpmc_enqueue(&ctx->info->required_global_variable_queue, e);
 	}
 
 

@@ -225,15 +225,13 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		return false;
 	}
 
-
-	gb_mutex_lock(&info->gen_procs_mutex);
-	defer (gb_mutex_unlock(&info->gen_procs_mutex));
-
 	String name = base_entity->token.string;
 
 	Type *src = base_type(base_entity->type);
 	Type *dst = nullptr;
-	if (type != nullptr) dst = base_type(type);
+	if (type != nullptr) {
+		dst = base_type(type);
+	}
 
 	if (param_operands == nullptr) {
 		GB_ASSERT(dst != nullptr);
@@ -242,6 +240,8 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		GB_ASSERT(dst == nullptr);
 	}
 
+	gb_mutex_lock(&info->gen_procs_mutex);
+	defer (gb_mutex_unlock(&info->gen_procs_mutex));
 
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
 		return false;
@@ -314,9 +314,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 
 	auto *found_gen_procs = map_get(&info->gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
-		// gb_mutex_lock(&info->gen_procs_mutex);
-		// defer (gb_mutex_unlock(&info->gen_procs_mutex));
-
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
 			Entity *other = procs[i];
@@ -353,9 +350,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 
 		if (found_gen_procs) {
-			// gb_mutex_lock(&info->gen_procs_mutex);
-			// defer (gb_mutex_unlock(&info->gen_procs_mutex));
-
 			auto procs = *found_gen_procs;
 			for_array(i, procs) {
 				Entity *other = procs[i];
@@ -425,7 +419,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
 
-	// gb_mutex_lock(&info->gen_procs_mutex);
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);
 	} else {
@@ -433,7 +426,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		array_add(&array, entity);
 		map_set(&info->gen_procs, hash_pointer(base_entity->identifier), array);
 	}
-	// gb_mutex_unlock(&info->gen_procs_mutex);
 
 	GB_ASSERT(entity != nullptr);
 
