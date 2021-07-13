@@ -6162,7 +6162,7 @@ void gb_shuffle(void *base, isize count, isize size) {
 
 	a = cast(u8 *)base + (count-1) * size;
 	for (i = count; i > 1; i--) {
-		j = gb_random_gen_isize(&random) % i;
+		j = cast(usize)gb_random_gen_u64(&random) % i;
 		gb_memswap(a, cast(u8 *)base + j*size, size);
 		a -= size;
 	}
