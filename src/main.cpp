@@ -1474,7 +1474,7 @@ void show_timings(Checker *c, Timings *t) {
 	}
 
 	timings_print_all(t);
-	if (build_context.show_more_timings) {
+	if (build_context.show_debug_messages && build_context.show_more_timings) {
 		{
 			gb_printf("\n");
 			gb_printf("Total Lines     - %td\n", lines);
