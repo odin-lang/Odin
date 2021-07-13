@@ -3977,19 +3977,6 @@ void check_create_file_scopes(Checker *c) {
 }
 
 void check_collect_entities_all(Checker *c) {
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
-
-		for_array(j, pkg->files) {
-			AstFile *f = pkg->files[j];
-			string_map_set(&c->info.files, f->fullpath, f);
-
-			create_scope_from_file(nullptr, f);
-		}
-
-		pkg->used = true;
-	}
-
 	CheckerContext collect_entity_ctx = make_checker_context(c);
 	defer (destroy_checker_context(&collect_entity_ctx));
 
