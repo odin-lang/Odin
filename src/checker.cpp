@@ -233,6 +233,7 @@ Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capaci
 	s->delayed_directives.allocator = heap_allocator();
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
+		// TODO(bill): make this an atomic operation
 		if (info) gb_mutex_lock(&info->scope_mutex);
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 		if (info) gb_mutex_unlock(&info->scope_mutex);
@@ -844,9 +845,7 @@ void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->packages, a);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->required_foreign_imports_through_force, a);
-	array_init(&i->required_global_variables, a);
 	array_init(&i->testing_procedures, a, 0, 0);
-	mpmc_init(&i->untyped_queue, heap_allocator(), 1<<20);
 
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
@@ -854,12 +853,15 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
+	mpmc_init(&i->entity_queue, a, 1<<20);
+	mpmc_init(&i->definition_queue, a, 1<<20);
+	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
+
 	gb_mutex_init(&i->gen_procs_mutex);
 	gb_mutex_init(&i->gen_types_mutex);
 	gb_mutex_init(&i->type_info_mutex);
 	gb_mutex_init(&i->deps_mutex);
 	gb_mutex_init(&i->identifier_uses_mutex);
-	gb_mutex_init(&i->entity_mutex);
 	gb_mutex_init(&i->foreign_mutex);
 	gb_mutex_init(&i->scope_mutex);
 
@@ -879,15 +881,16 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->variable_init_order);
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
-	array_free(&i->required_global_variables);
-	mpmc_destroy(&i->untyped_queue);
+
+	mpmc_destroy(&i->entity_queue);
+	mpmc_destroy(&i->definition_queue);
+	mpmc_destroy(&i->required_global_variable_queue);
 
 	gb_mutex_destroy(&i->gen_procs_mutex);
 	gb_mutex_destroy(&i->gen_types_mutex);
 	gb_mutex_destroy(&i->type_info_mutex);
 	gb_mutex_destroy(&i->deps_mutex);
 	gb_mutex_destroy(&i->identifier_uses_mutex);
-	gb_mutex_destroy(&i->entity_mutex);
 	gb_mutex_destroy(&i->foreign_mutex);
 	gb_mutex_destroy(&i->scope_mutex);
 }
@@ -958,6 +961,8 @@ bool init_checker(Checker *c, Parser *parser) {
 	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
 	gb_semaphore_init(&c->procs_to_check_semaphore);
 
+	mpmc_init(&c->global_untyped_queue, a, 1<<20);
+
 	gb_mutex_init(&c->poly_type_mutex);
 	gb_mutex_init(&c->poly_proc_mutex);
 	return true;
@@ -970,6 +975,8 @@ void destroy_checker(Checker *c) {
 
 	mpmc_destroy(&c->procs_to_check_queue);
 	gb_semaphore_destroy(&c->procs_to_check_semaphore);
+
+	mpmc_destroy(&c->global_untyped_queue);
 }
 
 
@@ -1165,9 +1172,7 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(entity != nullptr);
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
-	gb_mutex_lock(&i->entity_mutex);
-	array_add(&i->definitions, entity);
-	gb_mutex_unlock(&i->entity_mutex);
+	mpmc_enqueue(&i->definition_queue, entity);
 }
 
 bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -1290,13 +1295,12 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 	CheckerInfo *info = c->info;
 	add_entity_definition(info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
-	gb_mutex_lock(&info->entity_mutex);
 	e->decl_info = d;
 	d->entity = e;
-	array_add(&info->entities, e);
-	e->order_in_src = info->entities.count; // Is this even correct?
 	e->pkg = c->pkg;
-	gb_mutex_unlock(&info->entity_mutex);
+
+	// Is this even correct?
+	e->order_in_src = 1+mpmc_enqueue(&info->entity_queue, e);
 }
 
 
@@ -1307,11 +1311,7 @@ void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
 	clause->CaseClause.implicit_entity = e;
 }
 
-
-
-
-
-void add_type_info_type(CheckerContext *c, Type *t) {
+void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -1363,12 +1363,12 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	if (t->kind == Type_Named) {
 		// NOTE(bill): Just in case
-		add_type_info_type(c, t->Named.base);
+		add_type_info_type_internal(c, t->Named.base);
 		return;
 	}
 
 	Type *bt = base_type(t);
-	add_type_info_type(c, bt);
+	add_type_info_type_internal(c, bt);
 
 	switch (bt->kind) {
 	case Type_Invalid:
@@ -1376,84 +1376,84 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	case Type_Basic:
 		switch (bt->Basic.kind) {
 		case Basic_cstring:
-			add_type_info_type(c, t_u8_ptr);
+			add_type_info_type_internal(c, t_u8_ptr);
 			break;
 		case Basic_string:
-			add_type_info_type(c, t_u8_ptr);
-			add_type_info_type(c, t_int);
+			add_type_info_type_internal(c, t_u8_ptr);
+			add_type_info_type_internal(c, t_int);
 			break;
 		case Basic_any:
-			add_type_info_type(c, t_type_info_ptr);
-			add_type_info_type(c, t_rawptr);
+			add_type_info_type_internal(c, t_type_info_ptr);
+			add_type_info_type_internal(c, t_rawptr);
 			break;
 		case Basic_typeid:
 			break;
 
 		case Basic_complex64:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f32);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f32);
 			break;
 		case Basic_complex128:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f64);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f64);
 			break;
 		case Basic_quaternion128:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f32);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f32);
 			break;
 		case Basic_quaternion256:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f64);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f64);
 			break;
 		}
 		break;
 
 	case Type_BitSet:
-		add_type_info_type(c, bt->BitSet.elem);
-		add_type_info_type(c, bt->BitSet.underlying);
+		add_type_info_type_internal(c, bt->BitSet.elem);
+		add_type_info_type_internal(c, bt->BitSet.underlying);
 		break;
 
 	case Type_Pointer:
-		add_type_info_type(c, bt->Pointer.elem);
+		add_type_info_type_internal(c, bt->Pointer.elem);
 		break;
 
 	case Type_Array:
-		add_type_info_type(c, bt->Array.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->Array.elem));
-		add_type_info_type(c, t_int);
+		add_type_info_type_internal(c, bt->Array.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->Array.elem));
+		add_type_info_type_internal(c, t_int);
 		break;
 
 	case Type_EnumeratedArray:
-		add_type_info_type(c, bt->EnumeratedArray.index);
-		add_type_info_type(c, t_int);
-		add_type_info_type(c, bt->EnumeratedArray.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->EnumeratedArray.elem));
+		add_type_info_type_internal(c, bt->EnumeratedArray.index);
+		add_type_info_type_internal(c, t_int);
+		add_type_info_type_internal(c, bt->EnumeratedArray.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->EnumeratedArray.elem));
 		break;
 
 	case Type_DynamicArray:
-		add_type_info_type(c, bt->DynamicArray.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->DynamicArray.elem));
-		add_type_info_type(c, t_int);
-		add_type_info_type(c, t_allocator);
+		add_type_info_type_internal(c, bt->DynamicArray.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->DynamicArray.elem));
+		add_type_info_type_internal(c, t_int);
+		add_type_info_type_internal(c, t_allocator);
 		break;
 	case Type_Slice:
-		add_type_info_type(c, bt->Slice.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->Slice.elem));
-		add_type_info_type(c, t_int);
+		add_type_info_type_internal(c, bt->Slice.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->Slice.elem));
+		add_type_info_type_internal(c, t_int);
 		break;
 
 	case Type_Enum:
-		add_type_info_type(c, bt->Enum.base_type);
+		add_type_info_type_internal(c, bt->Enum.base_type);
 		break;
 
 	case Type_Union:
 		if (union_tag_size(t) > 0) {
-			add_type_info_type(c, union_tag_type(t));
+			add_type_info_type_internal(c, union_tag_type(t));
 		} else {
-			add_type_info_type(c, t_type_info_ptr);
+			add_type_info_type_internal(c, t_type_info_ptr);
 		}
 		for_array(i, bt->Union.variants) {
-			add_type_info_type(c, bt->Union.variants[i]);
+			add_type_info_type_internal(c, bt->Union.variants[i]);
 		}
 		break;
 
@@ -1463,56 +1463,56 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
-					add_type_info_type(c, t_allocator);
+					add_type_info_type_internal(c, t_allocator);
 					/*fallthrough*/
 				case StructSoa_Slice:
 				case StructSoa_Fixed:
-					add_type_info_type(c, alloc_type_pointer(e->type));
+					add_type_info_type_internal(c, alloc_type_pointer(e->type));
 					break;
 				default:
-					add_type_info_type(c, e->type);
+					add_type_info_type_internal(c, e->type);
 					break;
 				}
 			}
 		}
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
-			add_type_info_type(c, f->type);
+			add_type_info_type_internal(c, f->type);
 		}
 		add_comparison_procedures_for_fields(c, bt);
 		break;
 
 	case Type_Map:
 		init_map_internal_types(bt);
-		add_type_info_type(c, bt->Map.key);
-		add_type_info_type(c, bt->Map.value);
-		add_type_info_type(c, bt->Map.generated_struct_type);
+		add_type_info_type_internal(c, bt->Map.key);
+		add_type_info_type_internal(c, bt->Map.value);
+		add_type_info_type_internal(c, bt->Map.generated_struct_type);
 		break;
 
 	case Type_Tuple:
 		for_array(i, bt->Tuple.variables) {
 			Entity *var = bt->Tuple.variables[i];
-			add_type_info_type(c, var->type);
+			add_type_info_type_internal(c, var->type);
 		}
 		break;
 
 	case Type_Proc:
-		add_type_info_type(c, bt->Proc.params);
-		add_type_info_type(c, bt->Proc.results);
+		add_type_info_type_internal(c, bt->Proc.params);
+		add_type_info_type_internal(c, bt->Proc.results);
 		break;
 
 	case Type_SimdVector:
-		add_type_info_type(c, bt->SimdVector.elem);
+		add_type_info_type_internal(c, bt->SimdVector.elem);
 		break;
 
 	case Type_RelativePointer:
-		add_type_info_type(c, bt->RelativePointer.pointer_type);
-		add_type_info_type(c, bt->RelativePointer.base_integer);
+		add_type_info_type_internal(c, bt->RelativePointer.pointer_type);
+		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
 		break;
 
 	case Type_RelativeSlice:
-		add_type_info_type(c, bt->RelativeSlice.slice_type);
-		add_type_info_type(c, bt->RelativeSlice.base_integer);
+		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
+		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
 		break;
 
 	default:
@@ -1520,6 +1520,13 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		break;
 	}
 }
+
+void add_type_info_type(CheckerContext *c, Type *t) {
+	gb_mutex_lock(&c->info->type_info_mutex);
+	add_type_info_type_internal(c, t);
+	gb_mutex_unlock(&c->info->type_info_mutex);
+}
+
 
 gb_global bool global_procedure_body_in_worker_queue = false;
 
@@ -1887,8 +1894,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		add_dependency_to_set(c, e);
 	}
 
-	for_array(i, c->info.required_global_variables) {
-		Entity *e = c->info.required_global_variables[i];
+	for (Entity *e; mpmc_dequeue(&c->info.required_global_variable_queue, &e); /**/) {
 		e->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, e);
 	}
@@ -4532,11 +4538,6 @@ void check_procedure_bodies(Checker *c) {
 	gbThread dummy_main_thread = {};
 	dummy_main_thread.user_data = thread_data+worker_count;
 	thread_proc_body(&dummy_main_thread);
-	gb_semaphore_release(&c->procs_to_check_semaphore);
-
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_join(threads+i);
-	}
 
 	gb_semaphore_wait(&c->procs_to_check_semaphore);
 
@@ -4544,10 +4545,8 @@ void check_procedure_bodies(Checker *c) {
 		gb_thread_destroy(threads+i);
 	}
 
-	{
-		isize remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
-		GB_ASSERT(remaining == 0);
-	}
+	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
+	GB_ASSERT(global_remaining == 0);
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
@@ -4561,7 +4560,7 @@ void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 		Ast *expr = cast(Ast *)cast(uintptr)untyped->entries[i].key.key;
 		ExprInfo *info = untyped->entries[i].value;
 		if (expr != nullptr && info != nullptr) {
-			mpmc_enqueue(&cinfo->untyped_queue, UntypedExprInfo{expr, info});
+			mpmc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});
 		}
 	}
 	map_clear(untyped);
@@ -4747,6 +4746,23 @@ void check_unique_package_names(Checker *c) {
 	}
 }
 
+void check_add_entities_from_queues(Checker *c) {
+	{
+		isize cap = c->info.entities.count + c->info.entity_queue.count.load(std::memory_order_relaxed);
+		array_reserve(&c->info.entities, cap);
+		for (Entity *e; mpmc_dequeue(&c->info.entity_queue, &e); /**/) {
+			array_add(&c->info.entities, e);
+		}
+	}
+	{
+		isize cap = c->info.definitions.count + c->info.definition_queue.count.load(std::memory_order_relaxed);
+		array_reserve(&c->info.definitions, cap);
+		for (Entity *e; mpmc_dequeue(&c->info.definition_queue, &e); /**/) {
+			array_add(&c->info.definitions, e);
+		}
+	}
+}
+
 
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
@@ -4795,6 +4811,9 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("import entities");
 	check_import_entities(c);
 
+	TIME_SECTION("add entities from packages");
+	check_add_entities_from_queues(c);
+
 	TIME_SECTION("check all global entities");
 	check_all_global_entities(c);
 
@@ -4810,6 +4829,9 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check procedure bodies");
 	check_procedure_bodies(c);
+
+	TIME_SECTION("add entities from procedure bodiess");
+	check_add_entities_from_queues(c);
 
 	TIME_SECTION("check scope usage");
 	for_array(i, c->info.files.entries) {
@@ -4832,7 +4854,7 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
-	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->info.untyped_queue, &u); /**/) {
+	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
 		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
 		if (is_type_typed(u.info->type)) {
 			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));

@@ -288,18 +288,20 @@ struct CheckerInfo {
 
 	Array<Entity *> testing_procedures;
 
+	Array<Entity *> definitions;
+	Array<Entity *> entities;
+
+
 	// Below are accessed within procedures
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
 
-	gbMutex gen_procs_mutex;
-	gbMutex gen_types_mutex;
-	gbMutex type_info_mutex;
-	gbMutex deps_mutex;
-	gbMutex identifier_uses_mutex;
-	gbMutex entity_mutex;
-	gbMutex foreign_mutex;
-	gbMutex scope_mutex;
+	gbMutex gen_procs_mutex; // Possibly recursive
+	gbMutex gen_types_mutex; // Possibly recursive
+	gbMutex type_info_mutex; // NOT recursive
+	gbMutex deps_mutex;      // NOT recursive & Only used in `check_proc_body`
+	gbMutex foreign_mutex;   // NOT recursive
+	gbMutex scope_mutex;     // NOT recursive & Only used in `create_scope`
 
 	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
 	Map<Array<Entity *> > gen_types;       // Key: Type *
@@ -307,17 +309,20 @@ struct CheckerInfo {
 	Array<Type *>         type_info_types;
 	Map<isize>            type_info_map;   // Key: Type *
 
-	bool allow_identifier_uses;
-	Array<Ast *> identifier_uses; // only used by 'odin query'
+	StringMap<Entity *> foreigns;
+	Array<Entity *>     required_foreign_imports_through_force;
 
-	Array<Entity *>       definitions;
-	Array<Entity *>       entities;
-	StringMap<Entity *>   foreigns;
+	// only used by 'odin query'
+	bool         allow_identifier_uses;
+	gbMutex      identifier_uses_mutex;
+	Array<Ast *> identifier_uses;
 
-	Array<Entity *>       required_global_variables;
-	Array<Entity *>       required_foreign_imports_through_force;
+	// NOTE(bill): These are actually MPSC queues
+	// TODO(bill): Convert them to be MPSC queues
+	MPMCQueue<Entity *> definition_queue;
+	MPMCQueue<Entity *> entity_queue;
+	MPMCQueue<Entity *> required_global_variable_queue;
 
-	MPMCQueue<UntypedExprInfo> untyped_queue;
 };
 
 struct CheckerContext {
@@ -363,6 +368,7 @@ struct CheckerContext {
 	ProcBodyQueue *procs_to_check_queue;
 };
 
+
 struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
@@ -373,6 +379,7 @@ struct Checker {
 
 	ProcBodyQueue procs_to_check_queue;
 	gbSemaphore procs_to_check_semaphore;
+	MPMCQueue<UntypedExprInfo> global_untyped_queue;
 
 	gbMutex poly_type_mutex;
 	gbMutex poly_proc_mutex;
