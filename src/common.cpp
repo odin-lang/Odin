@@ -1299,3 +1299,41 @@ Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) {
 	}
 	return slice_array(d->distances, 0, count);
 }
+
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+	struct BlockingMutex {
+		SRWLOCK srwlock;
+	};
+	void mutex_init(BlockingMutex *m) {
+	}
+	void mutex_destroy(BlockingMutex *m) {
+	}
+	void mutex_lock(BlockingMutex *m) {
+		AcquireSRWLockExclusive(&m->srwlock);
+	}
+	bool mutex_try_lock(BlockingMutex *m) {
+		return !!TryAcquireSRWLockExclusive(&m->srwlock);
+	}
+	void mutex_unlock(BlockingMutex *m) {
+		ReleaseSRWLockExclusive(&m->srwlock);
+	}
+#else
+	typedef gbMutex BlockingMutex;
+	void mutex_init(BlockingMutex *m) {
+		gb_mutex_init(m);
+	}
+	void mutex_destroy(BlockingMutex *m) {
+		gb_mutex_destroy(m);
+	}
+	void mutex_lock(BlockingMutex *m) {
+		gb_mutex_lock(m);
+	}
+	bool mutex_try_lock(BlockingMutex *m) {
+		return !!gb_mutex_try_lock(m);
+	}
+	void mutex_unlock(BlockingMutex *m) {
+		gb_mutex_unlock(m);
+	}
+#endif

@@ -1,7 +1,13 @@
 template <typename T>
 struct MPMCQueueNode {
-	T data;
 	std::atomic<isize> idx;
+	T                  data;
+};
+
+template <typename T>
+struct MPMCQueueNodeNonAtomic {
+	isize idx;
+	T     data;
 };
 
 typedef char CacheLinePad[64];
@@ -27,14 +33,25 @@ struct MPMCQueue {
 
 template <typename T>
 void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size) {
+	size = gb_max(size, 8);
 	size = next_pow2_isize(size);
 	GB_ASSERT(gb_is_power_of_two(size));
 
 	gb_mutex_init(&q->mutex);
 	q->mask = size-1;
 	array_init(&q->buffer, a, size);
-	for (isize i = 0; i < size; i++) {
-		q->buffer[i].idx.store(i, std::memory_order_relaxed);
+
+	// NOTE(bill): pretend it's not atomic for performance
+	auto *raw_data = cast(MPMCQueueNodeNonAtomic<T> *)q->buffer.data;
+	for (isize i = 0; i < size; i += 8) {
+		raw_data[i+0].idx = i+0;
+		raw_data[i+1].idx = i+1;
+		raw_data[i+2].idx = i+2;
+		raw_data[i+3].idx = i+3;
+		raw_data[i+4].idx = i+4;
+		raw_data[i+5].idx = i+5;
+		raw_data[i+6].idx = i+6;
+		raw_data[i+7].idx = i+7;
 	}
 }
 
@@ -71,8 +88,10 @@ isize mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 				gb_mutex_unlock(&q->mutex);
 				return -1;
 			}
+			// NOTE(bill): pretend it's not atomic for performance
+			auto *raw_data = cast(MPMCQueueNodeNonAtomic<T> *)q->buffer.data;
 			for (isize i = old_size; i < new_size; i++) {
-				q->buffer.data[i].idx.store(i, std::memory_order_relaxed);
+				raw_data[i].idx = i;
 			}
 			q->mask = new_size-1;
 			gb_mutex_unlock(&q->mutex);
