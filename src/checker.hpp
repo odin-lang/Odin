@@ -265,6 +265,7 @@ struct UntypedExprInfo {
 };
 
 typedef Map<ExprInfo *> UntypedExprInfoMap; // Key: Ast *
+typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
@@ -358,6 +359,8 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
+
+	ProcBodyQueue *procs_to_check_queue;
 };
 
 struct Checker {
@@ -368,7 +371,7 @@ struct Checker {
 
 	MPMCQueue<Entity *> procs_with_deferred_to_check;
 
-	MPMCQueue<ProcInfo *> procs_to_check_queue;
+	ProcBodyQueue procs_to_check_queue;
 	gbSemaphore procs_to_check_semaphore;
 
 	gbMutex poly_type_mutex;
