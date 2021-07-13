@@ -234,9 +234,9 @@ Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capaci
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		// TODO(bill): make this an atomic operation
-		if (info) gb_mutex_lock(&info->scope_mutex);
+		if (info) mutex_lock(&info->scope_mutex);
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
-		if (info) gb_mutex_unlock(&info->scope_mutex);
+		if (info) mutex_unlock(&info->scope_mutex);
 	}
 
 	if (parent != nullptr && parent->flags & ScopeFlag_ContextDefined) {
@@ -832,7 +832,12 @@ void init_universal(void) {
 
 
 void init_checker_info(CheckerInfo *i) {
+#define TIME_SECTION(str) do { debugf("[Subsection] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	gbAllocator a = heap_allocator();
+
+	TIME_SECTION("checker info: general");
+
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
 	map_init(&i->global_untyped, a);
@@ -853,18 +858,25 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
+
+	TIME_SECTION("checker info: mpmc queues");
+
 	mpmc_init(&i->entity_queue, a, 1<<20);
 	mpmc_init(&i->definition_queue, a, 1<<20);
 	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
 
+	TIME_SECTION("checker info: mutexes");
+
 	gb_mutex_init(&i->gen_procs_mutex);
 	gb_mutex_init(&i->gen_types_mutex);
-	gb_mutex_init(&i->type_info_mutex);
-	gb_mutex_init(&i->deps_mutex);
-	gb_mutex_init(&i->identifier_uses_mutex);
-	gb_mutex_init(&i->foreign_mutex);
-	gb_mutex_init(&i->scope_mutex);
 
+	mutex_init(&i->type_info_mutex);
+	mutex_init(&i->deps_mutex);
+	mutex_init(&i->identifier_uses_mutex);
+	mutex_init(&i->foreign_mutex);
+	mutex_init(&i->scope_mutex);
+
+#undef TIME_SECTION
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -888,11 +900,11 @@ void destroy_checker_info(CheckerInfo *i) {
 
 	gb_mutex_destroy(&i->gen_procs_mutex);
 	gb_mutex_destroy(&i->gen_types_mutex);
-	gb_mutex_destroy(&i->type_info_mutex);
-	gb_mutex_destroy(&i->deps_mutex);
-	gb_mutex_destroy(&i->identifier_uses_mutex);
-	gb_mutex_destroy(&i->foreign_mutex);
-	gb_mutex_destroy(&i->scope_mutex);
+	mutex_destroy(&i->type_info_mutex);
+	mutex_destroy(&i->deps_mutex);
+	mutex_destroy(&i->identifier_uses_mutex);
+	mutex_destroy(&i->foreign_mutex);
+	mutex_destroy(&i->scope_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -937,32 +949,27 @@ void reset_checker_context(CheckerContext *ctx, AstFile *file) {
 
 
 
-bool init_checker(Checker *c, Parser *parser) {
-	c->parser = parser;
-
-	if (global_error_collector.count > 0) {
-		return false;
-	}
+void init_checker(Checker *c) {
+#define TIME_SECTION(str) do { debugf("[Subsection] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 	gbAllocator a = heap_allocator();
 
+	TIME_SECTION("init checker info");
 	init_checker_info(&c->info);
+
 	c->info.checker = c;
 
+	TIME_SECTION("init proc queues");
 	mpmc_init(&c->procs_with_deferred_to_check, a, 1<<10);
-
-	// NOTE(bill): Is this big enough or too small?
-	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
-	isize total_token_count = c->parser->total_token_count;
-	isize arena_size = 2 * item_size * total_token_count;
-
-	c->builtin_ctx = make_checker_context(c);
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
 	gb_semaphore_init(&c->procs_to_check_semaphore);
 
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
-	return true;
+
+	c->builtin_ctx = make_checker_context(c);
+
+#undef TIME_SECTION
 }
 
 void destroy_checker(Checker *c) {
@@ -1075,7 +1082,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		type = t_bool;
 	}
 
-	gb_mutex_lock(&info->type_info_mutex);
+	mutex_lock(&info->type_info_mutex);
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
@@ -1098,7 +1105,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		}
 	}
 
-	gb_mutex_unlock(&info->type_info_mutex);
+	mutex_unlock(&info->type_info_mutex);
 
 	if (error_on_failure && entry_index < 0) {
 		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
@@ -1251,9 +1258,9 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 		identifier->Ident.entity = entity;
 
 		if (c->info->allow_identifier_uses) {
-			gb_mutex_lock(&c->info->identifier_uses_mutex);
+			mutex_lock(&c->info->identifier_uses_mutex);
 			array_add(&c->info->identifier_uses, identifier);
-			gb_mutex_unlock(&c->info->identifier_uses_mutex);
+			mutex_unlock(&c->info->identifier_uses_mutex);
 		}
 
 		String dmsg = entity->deprecated_message;
@@ -1308,6 +1315,14 @@ void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
 	clause->CaseClause.implicit_entity = e;
 }
 
+void add_type_info_type(CheckerContext *c, Type *t) {
+	void add_type_info_type_internal(CheckerContext *c, Type *t);
+
+	mutex_lock(&c->info->type_info_mutex);
+	add_type_info_type_internal(c, t);
+	mutex_unlock(&c->info->type_info_mutex);
+}
+
 void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (t == nullptr) {
 		return;
@@ -1319,9 +1334,6 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (is_type_polymorphic(base_type(t))) {
 		return;
 	}
-
-	gb_mutex_lock(&c->info->type_info_mutex);
-	defer (gb_mutex_unlock(&c->info->type_info_mutex));
 
 	add_type_info_dependency(c->decl, t);
 
@@ -1518,11 +1530,6 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	}
 }
 
-void add_type_info_type(CheckerContext *c, Type *t) {
-	gb_mutex_lock(&c->info->type_info_mutex);
-	add_type_info_type_internal(c, t);
-	gb_mutex_unlock(&c->info->type_info_mutex);
-}
 
 
 gb_global bool global_procedure_body_in_worker_queue = false;
@@ -3361,6 +3368,8 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 }
 
 void check_all_global_entities(Checker *c) {
+	// NOTE(bill): This must be single threaded
+	// Don't bother trying
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
 		DeclInfo *d = e->decl_info;
@@ -3784,9 +3793,9 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
 	if (ac.require_declaration) {
-		gb_mutex_lock(&ctx->info->foreign_mutex);
+		mutex_lock(&ctx->info->foreign_mutex);
 		array_add(&ctx->info->required_foreign_imports_through_force, e);
-		gb_mutex_unlock(&ctx->info->foreign_mutex);
+		mutex_unlock(&ctx->info->foreign_mutex);
 		add_entity_use(ctx, nullptr, e);
 	}
 }
@@ -3950,6 +3959,49 @@ bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 	}
 
 	return false;
+}
+
+void check_create_file_scopes(Checker *c) {
+	for_array(i, c->parser->packages) {
+		AstPackage *pkg = c->parser->packages[i];
+
+		for_array(j, pkg->files) {
+			AstFile *f = pkg->files[j];
+			string_map_set(&c->info.files, f->fullpath, f);
+
+			create_scope_from_file(nullptr, f);
+		}
+
+		pkg->used = true;
+	}
+}
+
+void check_collect_entities_all(Checker *c) {
+	for_array(i, c->parser->packages) {
+		AstPackage *pkg = c->parser->packages[i];
+
+		for_array(j, pkg->files) {
+			AstFile *f = pkg->files[j];
+			string_map_set(&c->info.files, f->fullpath, f);
+
+			create_scope_from_file(nullptr, f);
+		}
+
+		pkg->used = true;
+	}
+
+	CheckerContext collect_entity_ctx = make_checker_context(c);
+	defer (destroy_checker_context(&collect_entity_ctx));
+
+	CheckerContext *ctx = &collect_entity_ctx;
+
+	for_array(i, c->info.files.entries) {
+		AstFile *f = c->info.files.entries[i].value;
+		reset_checker_context(ctx, f);
+		check_collect_entities(ctx, f->decls);
+		GB_ASSERT(ctx->collect_delayed_decls == false);
+	}
+
 }
 
 void check_import_entities(Checker *c) {
@@ -4387,7 +4439,7 @@ void check_unchecked_bodies(Checker *c) {
 	}
 }
 
-void check_test_names(Checker *c) {
+void check_test_procedures(Checker *c) {
 	if (build_context.test_names.entries.count == 0) {
 		return;
 	}
@@ -4784,26 +4836,12 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("create file scopes");
+	check_create_file_scopes(c);
+
 	TIME_SECTION("collect entities");
 	// Collect Entities
-	CheckerContext collect_entity_ctx = make_checker_context(c);
-	defer (destroy_checker_context(&collect_entity_ctx));
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
-
-		CheckerContext *ctx = &collect_entity_ctx;
-
-		for_array(j, pkg->files) {
-			AstFile *f = pkg->files[j];
-			string_map_set(&c->info.files, f->fullpath, f);
-
-			create_scope_from_file(nullptr, f);
-			reset_checker_context(ctx, f);
-			check_collect_entities(ctx, f->decls);
-		}
-
-		pkg->used = true;
-	}
+	check_collect_entities_all(c);
 
 	TIME_SECTION("import entities");
 	check_import_entities(c);
@@ -4839,8 +4877,8 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
 
-	TIME_SECTION("check test names");
-	check_test_names(c);
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
 
 	TIME_SECTION("calculate global init order");
 	// Calculate initialization order of global variables

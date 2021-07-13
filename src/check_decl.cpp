@@ -821,7 +821,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 		init_entity_foreign_library(ctx, e);
 
-		gb_mutex_lock(&ctx->info->foreign_mutex);
+		mutex_lock(&ctx->info->foreign_mutex);
 
 		auto *fp = &ctx->info->foreigns;
 		StringHashKey key = string_hash_string(name);
@@ -850,14 +850,14 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			string_map_set(fp, key, e);
 		}
 
-		gb_mutex_unlock(&ctx->info->foreign_mutex);
+		mutex_unlock(&ctx->info->foreign_mutex);
 	} else {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {
 			name = e->Procedure.link_name;
 		}
 		if (e->Procedure.link_name.len > 0 || is_export) {
-			gb_mutex_lock(&ctx->info->foreign_mutex);
+			mutex_lock(&ctx->info->foreign_mutex);
 
 			auto *fp = &ctx->info->foreigns;
 			StringHashKey key = string_hash_string(name);
@@ -876,7 +876,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				string_map_set(fp, key, e);
 			}
 
-			gb_mutex_unlock(&ctx->info->foreign_mutex);
+			mutex_unlock(&ctx->info->foreign_mutex);
 		}
 	}
 }
@@ -1326,7 +1326,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
 			return;
 		} else {
-			gb_mutex_lock(&ctx->info->deps_mutex);
+			mutex_lock(&ctx->info->deps_mutex);
 
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
@@ -1339,7 +1339,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
 
-			gb_mutex_unlock(&ctx->info->deps_mutex);
+			mutex_unlock(&ctx->info->deps_mutex);
 		}
 	}
 }

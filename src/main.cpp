@@ -1976,6 +1976,8 @@ int main(int arg_count, char const **arg_ptr) {
 	timings_init(&global_timings, str_lit("Total Time"), 2048);
 	defer (timings_destroy(&global_timings));
 
+	TIME_SECTION("initialization");
+
 	arena_init(&permanent_arena, heap_allocator());
 	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
 	arena_init(&global_ast_arena, heap_allocator());
@@ -2138,9 +2140,11 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
+	Parser parser = {0};
+	Checker checker = {0};
+
 	TIME_SECTION("parse files");
 
-	Parser parser = {0};
 	if (!init_parser(&parser)) {
 		return 1;
 	}
@@ -2158,16 +2162,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 	TIME_SECTION("type check");
 
-	Checker checker = {0};
+	checker.parser = &parser;
+	init_checker(&checker);
+	defer (destroy_checker(&checker));
 
-	bool checked_inited = init_checker(&checker, &parser);
-	defer (if (checked_inited) {
-		destroy_checker(&checker);
-	});
-
-	if (checked_inited) {
-		check_parsed_files(&checker);
-	}
+	check_parsed_files(&checker);
 	if (any_errors()) {
 		return 1;
 	}
@@ -2200,10 +2199,6 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		return 0;
-	}
-
-	if (!checked_inited) {
-		return 1;
 	}
 
 	TIME_SECTION("LLVM API Code Gen");

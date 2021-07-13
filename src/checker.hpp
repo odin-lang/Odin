@@ -187,12 +187,13 @@ enum { DEFAULT_SCOPE_CAPACITY = 29 };
 struct Scope {
 	Ast *         node;
 	Scope *       parent;
+	// TODO(bill): make this is an ATOMIC singular linked list
 	Scope *       prev;
 	Scope *       next;
 	Scope *       first_child;
 	Scope *       last_child;
-	StringMap<Entity *> elements;
 
+	StringMap<Entity *> elements;
 	Array<Ast *>    delayed_directives;
 	Array<Ast *>    delayed_imports;
 	PtrSet<Scope *> imported;
@@ -298,10 +299,10 @@ struct CheckerInfo {
 
 	gbMutex gen_procs_mutex; // Possibly recursive
 	gbMutex gen_types_mutex; // Possibly recursive
-	gbMutex type_info_mutex; // NOT recursive
-	gbMutex deps_mutex;      // NOT recursive & Only used in `check_proc_body`
-	gbMutex foreign_mutex;   // NOT recursive
-	gbMutex scope_mutex;     // NOT recursive & Only used in `create_scope`
+	BlockingMutex type_info_mutex; // NOT recursive
+	BlockingMutex deps_mutex;      // NOT recursive & Only used in `check_proc_body`
+	BlockingMutex foreign_mutex;   // NOT recursive
+	BlockingMutex scope_mutex;     // NOT recursive & Only used in `create_scope`
 
 	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
 	Map<Array<Entity *> > gen_types;       // Key: Type *
@@ -313,9 +314,9 @@ struct CheckerInfo {
 	Array<Entity *>     required_foreign_imports_through_force;
 
 	// only used by 'odin query'
-	bool         allow_identifier_uses;
-	gbMutex      identifier_uses_mutex;
-	Array<Ast *> identifier_uses;
+	bool          allow_identifier_uses;
+	BlockingMutex identifier_uses_mutex;
+	Array<Ast *>  identifier_uses;
 
 	// NOTE(bill): These are actually MPSC queues
 	// TODO(bill): Convert them to be MPSC queues
@@ -379,6 +380,8 @@ struct Checker {
 
 	ProcBodyQueue procs_to_check_queue;
 	gbSemaphore procs_to_check_semaphore;
+
+	// TODO(bill): Technically MPSC queue
 	MPMCQueue<UntypedExprInfo> global_untyped_queue;
 };
 
