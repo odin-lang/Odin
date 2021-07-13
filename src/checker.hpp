@@ -380,9 +380,6 @@ struct Checker {
 	ProcBodyQueue procs_to_check_queue;
 	gbSemaphore procs_to_check_semaphore;
 	MPMCQueue<UntypedExprInfo> global_untyped_queue;
-
-	gbMutex poly_type_mutex;
-	gbMutex poly_proc_mutex;
 };
 
 

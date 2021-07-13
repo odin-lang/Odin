@@ -962,9 +962,6 @@ bool init_checker(Checker *c, Parser *parser) {
 	gb_semaphore_init(&c->procs_to_check_semaphore);
 
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
-
-	gb_mutex_init(&c->poly_type_mutex);
-	gb_mutex_init(&c->poly_proc_mutex);
 	return true;
 }
 

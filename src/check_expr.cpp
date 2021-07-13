@@ -628,8 +628,6 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		if (are_types_identical(src, dst)) {
 			return 3;
 		}
-		gb_mutex_lock(&c->checker->poly_proc_mutex);
-		defer (gb_mutex_unlock(&c->checker->poly_proc_mutex));
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
@@ -4402,8 +4400,6 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		} else {
 			// NOTE(bill): Generate the procedure type for this generic instance
 			if (pt->is_polymorphic && !pt->is_poly_specialized) {
-				gb_mutex_lock(&c->checker->poly_proc_mutex);
-
 				PolyProcData poly_proc_data = {};
 				if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &operands, call, &poly_proc_data)) {
 					gen_entity = poly_proc_data.gen_entity;
@@ -4412,8 +4408,6 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				} else {
 					err = CallArgumentError_WrongTypes;
 				}
-
-				gb_mutex_unlock(&c->checker->poly_proc_mutex);
 			}
 
 			GB_ASSERT(is_type_proc(final_proc_type));
@@ -4686,7 +4680,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 	Entity *gen_entity = nullptr;
 	if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
-		gb_mutex_lock(&c->checker->poly_proc_mutex);
 		PolyProcData poly_proc_data = {};
 		if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 			gen_entity = poly_proc_data.gen_entity;
@@ -4695,7 +4688,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			proc_type = gept;
 			pt = &gept->Proc;
 		}
-		gb_mutex_unlock(&c->checker->poly_proc_mutex);
 	}
 
 
@@ -5770,8 +5762,6 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				operand->type = t_invalid;;
 				return Expr_Expr;
 			}
-			gb_mutex_lock(&c->checker->poly_type_mutex);
-
 			auto err = check_polymorphic_record_type(c, operand, call);
 			if (err == 0) {
 				Ast *ident = operand->expr;
@@ -5788,8 +5778,6 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;
 			}
-
-			gb_mutex_unlock(&c->checker->poly_type_mutex);
 		} else {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
