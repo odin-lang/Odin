@@ -4416,37 +4416,49 @@ void check_test_names(Checker *c) {
 
 }
 
+
+gb_global std::atomic<isize> total_bodies_checked;
+
+bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped) {
+	GB_ASSERT(pi->decl != nullptr);
+	if (pi->decl->parent && pi->decl->parent->entity) {
+		Entity *parent = pi->decl->parent->entity;
+		// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+		// This is prevent any possible race conditions in evaluation when multithreaded
+		// NOTE(bill): In single threaded mode, this should never happen
+		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+			mpmc_enqueue(q, pi);
+			return true;
+		}
+	}
+	if (untyped) {
+		map_clear(untyped);
+	}
+	check_proc_info(c, pi, untyped, q);
+	total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+	return false;
+}
+
 struct ThreadProcBodyData {
 	Checker *checker;
 	ProcBodyQueue *queue;
+	isize thread_index;
+	ThreadProcBodyData *all_data;
+	isize thread_count;
 };
-
-gb_global std::atomic<isize> total_bodies_checked;
 
 GB_THREAD_PROC(thread_proc_body) {
 	ThreadProcBodyData *data = cast(ThreadProcBodyData *)thread->user_data;
 	Checker *c = data->checker;
 	ProcBodyQueue *q = data->queue;
+	ProcInfo *pi = nullptr;
+
 	UntypedExprInfoMap untyped = {};
 	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
-	ProcInfo *pi = nullptr;
 	while (mpmc_dequeue(q, &pi)) {
-		GB_ASSERT(pi->decl != nullptr);
-		if (pi->decl->parent && pi->decl->parent->entity) {
-			Entity *parent = pi->decl->parent->entity;
-			// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
-			// This is prevent any possible race conditions in evaluation when multithreaded
-			// NOTE(bill): In single threaded mode, this should never happen
-			if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-				mpmc_enqueue(q, pi);
-				continue;
-			}
-		}
-		map_clear(&untyped);
-		check_proc_info(c, pi, &untyped, q);
-		total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+		consume_proc_info_queue(c, pi, q, &untyped);
 	}
 
 	gb_semaphore_release(&c->procs_to_check_semaphore);
@@ -4463,19 +4475,7 @@ void check_procedure_bodies(Checker *c) {
 		auto *q = &c->procs_to_check_queue;
 		ProcInfo *pi = nullptr;
 		while (mpmc_dequeue(q, &pi)) {
-			GB_ASSERT(pi->decl != nullptr);
-			if (pi->decl->parent && pi->decl->parent->entity) {
-				Entity *parent = pi->decl->parent->entity;
-				// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
-				// This is prevent any possible race conditions in evaluation when multithreaded
-				// NOTE(bill): In single threaded mode, this should never happen
-				if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-					mpmc_enqueue(q, pi);
-					continue;
-				}
-			}
-			check_proc_info(c, pi, nullptr, nullptr);
-			total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+			consume_proc_info_queue(c, pi, q, nullptr);
 		}
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
@@ -4492,15 +4492,18 @@ void check_procedure_bodies(Checker *c) {
 		ThreadProcBodyData *data = thread_data + i;
 		data->checker = c;
 		data->queue = gb_alloc_item(permanent_allocator(), ProcBodyQueue);
+		data->thread_index = i;
+		data->all_data = data;
+		data->thread_count = thread_count;
 		// NOTE(bill) 2x the amount assumes on average only 1 nested procedure
 		// TODO(bill): Determine a good heuristic
 		mpmc_init(data->queue, heap_allocator(), next_pow2_isize(load_count*2));
 	}
 
 	// Distibute the work load into multiple queues
-	for (isize i = 0; i < thread_count; i++) {
-		ProcBodyQueue *queue = thread_data[i].queue;
-		for (isize j = 0; j < load_count; j++) {
+	for (isize j = 0; j < load_count; j++) {
+		for (isize i = 0; i < thread_count; i++) {
+			ProcBodyQueue *queue = thread_data[i].queue;
 			ProcInfo *pi = nullptr;
 			if (!mpmc_dequeue(&c->procs_to_check_queue, &pi)) {
 				break;
