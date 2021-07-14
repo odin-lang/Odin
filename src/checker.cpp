@@ -4089,20 +4089,7 @@ void check_import_entities(Checker *c) {
 			auto path = find_import_path(c, pkg, pkg, &visited);
 			defer (array_free(&path));
 
-			// TODO(bill): This needs better TokenPos finding
-			auto const fn = [](ImportPathItem item) -> String {
-				return item.pkg->name;
-			};
-
-		#if 1
-			if (path.count == 1) {
-				// TODO(bill): Should this be allowed or disabled?
-			#if 0
-				ImportPathItem item = path[0];
-				String filename = fn(item);
-				error(item.decl, "Self importation of '%.*s'", LIT(filename));
-			#endif
-			} else if (path.count > 0) {
+			if (path.count > 1) {
 				ImportPathItem item = path[path.count-1];
 				String pkg_name = item.pkg->name;
 				error(item.decl, "Cyclic importation of '%.*s'", LIT(pkg_name));
@@ -4113,7 +4100,6 @@ void check_import_entities(Checker *c) {
 				}
 				error(item.decl, "'%.*s'", LIT(pkg_name));
 			}
-		#endif
 		}
 
 		for_array(i, n->pred.entries) {
