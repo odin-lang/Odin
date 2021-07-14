@@ -32,8 +32,7 @@ bool is_operand_undef(Operand o) {
 void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
-	scope->first_child = nullptr;
-	scope->last_child  = nullptr;
+	scope->head_child.store(nullptr, std::memory_order_relaxed);
 	string_map_clear(&scope->elements);
 	ptr_set_clear(&scope->imported);
 }
@@ -233,10 +232,10 @@ Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capaci
 	s->delayed_directives.allocator = heap_allocator();
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
-		// TODO(bill): make this an atomic operation
-		if (info) mutex_lock(&info->scope_mutex);
-		DLIST_APPEND(parent->first_child, parent->last_child, s);
-		if (info) mutex_unlock(&info->scope_mutex);
+		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
+		if (prev_head_child) {
+			prev_head_child->next.store(s, std::memory_order_release);
+		}
 	}
 
 	if (parent != nullptr && parent->flags & ScopeFlag_ContextDefined) {
@@ -305,7 +304,7 @@ void destroy_scope(Scope *scope) {
 		}
 	}
 
-	for (Scope *child = scope->first_child; child != nullptr; child = child->next) {
+	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		destroy_scope(child);
 	}
 
@@ -625,9 +624,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 	array_free(&vetted_entities);
 
-	for (Scope *child = scope->first_child;
-	     child != nullptr;
-	     child = child->next) {
+	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
 			// Ignore these
 		} else {
@@ -875,7 +872,6 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->deps_mutex);
 	mutex_init(&i->identifier_uses_mutex);
 	mutex_init(&i->foreign_mutex);
-	mutex_init(&i->scope_mutex);
 
 #undef TIME_SECTION
 }
@@ -906,7 +902,6 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->deps_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
 	mutex_destroy(&i->foreign_mutex);
-	mutex_destroy(&i->scope_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {

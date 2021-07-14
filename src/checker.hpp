@@ -187,11 +187,8 @@ enum { DEFAULT_SCOPE_CAPACITY = 29 };
 struct Scope {
 	Ast *         node;
 	Scope *       parent;
-	// TODO(bill): make this is an ATOMIC singular linked list
-	Scope *       prev;
-	Scope *       next;
-	Scope *       first_child;
-	Scope *       last_child;
+	std::atomic<Scope *> next;
+	std::atomic<Scope *> head_child;
 
 	StringMap<Entity *> elements;
 	Array<Ast *>    delayed_directives;
@@ -299,7 +296,6 @@ struct CheckerInfo {
 	// these variables will be of contention
 
 	BlockingMutex deps_mutex;  // NOT recursive & Only used in `check_proc_body`
-	BlockingMutex scope_mutex; // NOT recursive & Only used in `create_scope`
 
 	gbMutex gen_procs_mutex;         // Possibly recursive
 	gbMutex gen_types_mutex;         // Possibly recursive
