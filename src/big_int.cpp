@@ -1,5 +1,36 @@
 #include "libtommath/tommath.h"
 
+#if 0
+void *MP_MALLOC(size_t size) {
+	return malloc(size);
+}
+void *MP_REALLOC(void *mem, size_t oldsize, size_t newsize) {
+	return realloc(mem, newsize);
+}
+void *MP_CALLOC(size_t nmemb, size_t size) {
+	return calloc(nmemb, size);
+}
+void MP_FREE(void *mem, size_t size) {
+	free(mem);
+}
+#else
+
+void *MP_MALLOC(size_t size) {
+	return gb_alloc(permanent_allocator(), cast(isize)size);
+}
+void *MP_REALLOC(void *mem, size_t oldsize, size_t newsize) {
+	return gb_resize(permanent_allocator(), mem, cast(isize)oldsize, cast(isize)newsize);
+}
+void *MP_CALLOC(size_t nmemb, size_t size) {
+	size_t total = nmemb*size;
+	return gb_alloc(permanent_allocator(), cast(isize)total);
+}
+void MP_FREE(void *mem, size_t size) {
+	// DO NOTHING
+}
+#endif
+
+
 #ifndef MAX_BIG_INT_SHIFT
 #define MAX_BIG_INT_SHIFT 1024
 #endif

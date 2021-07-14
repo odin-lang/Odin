@@ -291,27 +291,27 @@ struct CheckerInfo {
 
 	Array<Entity *> definitions;
 	Array<Entity *> entities;
+	Array<Entity *> required_foreign_imports_through_force;
 
 
 	// Below are accessed within procedures
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
 
-	gbMutex gen_procs_mutex; // Possibly recursive
-	gbMutex gen_types_mutex; // Possibly recursive
+	BlockingMutex deps_mutex;  // NOT recursive & Only used in `check_proc_body`
+	BlockingMutex scope_mutex; // NOT recursive & Only used in `create_scope`
+
+	gbMutex gen_procs_mutex;         // Possibly recursive
+	gbMutex gen_types_mutex;         // Possibly recursive
+	Map<Array<Entity *> > gen_procs; // Key: Ast * | Identifier -> Entity
+	Map<Array<Entity *> > gen_types; // Key: Type *
+
 	BlockingMutex type_info_mutex; // NOT recursive
-	BlockingMutex deps_mutex;      // NOT recursive & Only used in `check_proc_body`
-	BlockingMutex foreign_mutex;   // NOT recursive
-	BlockingMutex scope_mutex;     // NOT recursive & Only used in `create_scope`
+	Array<Type *> type_info_types;
+	Map<isize>    type_info_map;   // Key: Type *
 
-	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
-	Map<Array<Entity *> > gen_types;       // Key: Type *
-
-	Array<Type *>         type_info_types;
-	Map<isize>            type_info_map;   // Key: Type *
-
+	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
-	Array<Entity *>     required_foreign_imports_through_force;
 
 	// only used by 'odin query'
 	bool          allow_identifier_uses;
@@ -323,6 +323,7 @@ struct CheckerInfo {
 	MPMCQueue<Entity *> definition_queue;
 	MPMCQueue<Entity *> entity_queue;
 	MPMCQueue<Entity *> required_global_variable_queue;
+	MPMCQueue<Entity *> required_foreign_imports_through_force_queue;
 
 };
 
