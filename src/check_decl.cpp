@@ -1343,7 +1343,3 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		}
 	}
 }
-
-
-
-

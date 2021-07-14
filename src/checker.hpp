@@ -295,7 +295,10 @@ struct CheckerInfo {
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
 
-	BlockingMutex deps_mutex;  // NOT recursive & Only used in `check_proc_body`
+	// NOT recursive & Only used at the end of `check_proc_body`
+	// This is a possible source of contention but probably not
+	// too much of a problem in practice
+	BlockingMutex deps_mutex;
 
 	gbMutex gen_procs_mutex;         // Possibly recursive
 	gbMutex gen_types_mutex;         // Possibly recursive
