@@ -849,8 +849,8 @@ void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->files,    a);
 	string_map_init(&i->packages, a);
 	array_init(&i->variable_init_order, a);
-	array_init(&i->required_foreign_imports_through_force, a);
 	array_init(&i->testing_procedures, a, 0, 0);
+	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
@@ -864,6 +864,7 @@ void init_checker_info(CheckerInfo *i) {
 	mpmc_init(&i->entity_queue, a, 1<<20);
 	mpmc_init(&i->definition_queue, a, 1<<20);
 	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
+	mpmc_init(&i->required_foreign_imports_through_force_queue, a, 1<<10);
 
 	TIME_SECTION("checker info: mutexes");
 
@@ -897,6 +898,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	mpmc_destroy(&i->entity_queue);
 	mpmc_destroy(&i->definition_queue);
 	mpmc_destroy(&i->required_global_variable_queue);
+	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
 
 	gb_mutex_destroy(&i->gen_procs_mutex);
 	gb_mutex_destroy(&i->gen_types_mutex);
@@ -1893,8 +1895,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		}
 	}
 
-	for_array(i, c->info.required_foreign_imports_through_force) {
-		Entity *e = c->info.required_foreign_imports_through_force[i];
+	for (Entity *e; mpmc_dequeue(&c->info.required_foreign_imports_through_force_queue, &e); /**/) {
+		array_add(&c->info.required_foreign_imports_through_force, e);
 		add_dependency_to_set(c, e);
 	}
 
@@ -3793,9 +3795,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
 	if (ac.require_declaration) {
-		mutex_lock(&ctx->info->foreign_mutex);
-		array_add(&ctx->info->required_foreign_imports_through_force, e);
-		mutex_unlock(&ctx->info->foreign_mutex);
+		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
 }
