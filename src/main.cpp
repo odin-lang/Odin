@@ -2140,17 +2140,17 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	Parser parser = {0};
-	Checker checker = {0};
+	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
+	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
 
 	TIME_SECTION("parse files");
 
-	if (!init_parser(&parser)) {
+	if (!init_parser(parser)) {
 		return 1;
 	}
-	defer (destroy_parser(&parser));
+	defer (destroy_parser(parser));
 
-	if (parse_packages(&parser, init_filename) != ParseFile_None) {
+	if (parse_packages(parser, init_filename) != ParseFile_None) {
 		return 1;
 	}
 
@@ -2162,11 +2162,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 	TIME_SECTION("type check");
 
-	checker.parser = &parser;
-	init_checker(&checker);
-	defer (destroy_checker(&checker));
+	checker->parser = parser;
+	init_checker(checker);
+	defer (destroy_checker(checker));
 
-	check_parsed_files(&checker);
+	check_parsed_files(checker);
 	if (any_errors()) {
 		return 1;
 	}
@@ -2177,20 +2177,20 @@ int main(int arg_count, char const **arg_ptr) {
 		if (global_error_collector.count != 0) {
 			return 1;
 		}
-		generate_documentation(&checker);
+		generate_documentation(checker);
 		return 0;
 	}
 
 	if (build_context.no_output_files) {
 		if (build_context.show_unused) {
-			print_show_unused(&checker);
+			print_show_unused(checker);
 		}
 
 		if (build_context.query_data_set_settings.ok) {
-			generate_and_print_query_data(&checker, &global_timings);
+			generate_and_print_query_data(checker, &global_timings);
 		} else {
 			if (build_context.show_timings) {
-				show_timings(&checker, &global_timings);
+				show_timings(checker, &global_timings);
 			}
 		}
 
@@ -2202,21 +2202,21 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	TIME_SECTION("LLVM API Code Gen");
-	lbGenerator gen = {};
-	if (!lb_init_generator(&gen, &checker)) {
+	lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+	if (!lb_init_generator(gen, checker)) {
 		return 1;
 	}
-	lb_generate_code(&gen);
+	lb_generate_code(gen);
 
 	temp_allocator_free_all(&temporary_allocator_data);
 
 	switch (build_context.build_mode) {
 	case BuildMode_Executable:
 	case BuildMode_DynamicLibrary:
-		i32 result = linker_stage(&gen);
+		i32 result = linker_stage(gen);
 		if (result != 0) {
 			if (build_context.show_timings) {
-				show_timings(&checker, &global_timings);
+				show_timings(checker, &global_timings);
 			}
 			return 1;
 		}
@@ -2224,19 +2224,19 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_timings) {
-		show_timings(&checker, &global_timings);
+		show_timings(checker, &global_timings);
 	}
 
-	remove_temp_files(&gen);
+	remove_temp_files(gen);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)
-		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen.output_base), LIT(run_args_string));
+		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen->output_base), LIT(run_args_string));
 	#else
 		//NOTE(thebirk): This whole thing is a little leaky
 		String output_ext = {};
-		String complete_path = concatenate_strings(heap_allocator(), gen.output_base, output_ext);
-		complete_path = path_to_full_path(heap_allocator(), complete_path);
+		String complete_path = concatenate_strings(permanent_allocator(), gen->output_base, output_ext);
+		complete_path = path_to_full_path(permanent_allocator(), complete_path);
 		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 	#endif
 	}

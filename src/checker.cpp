@@ -4562,6 +4562,7 @@ struct ThreadProcBodyData {
 GB_THREAD_PROC(thread_proc_body) {
 	ThreadProcBodyData *data = cast(ThreadProcBodyData *)thread->user_data;
 	Checker *c = data->checker;
+	GB_ASSERT(c != nullptr);
 	ThreadProcBodyData *all_data = data->all_data;
 	ProcBodyQueue *this_queue = data->queue;
 
@@ -4572,13 +4573,10 @@ GB_THREAD_PROC(thread_proc_body) {
 	gbRandom r = {}; gb_random_init(&r);
 
 	for (ProcInfo *pi; mpmc_dequeue(this_queue, &pi); /**/) {
-		// NOTE(bill): Randomize the load balancing of procs
-		// adding more procs to the queues
-		u32 index = gb_random_gen_u32(&r) % data->thread_count;
-		ProcBodyQueue *q = all_data[index].queue;
-		consume_proc_info_queue(c, pi, q, &untyped);
+		consume_proc_info_queue(c, pi, this_queue, &untyped);
 	}
 
+#if 0
 	// Greedy Work Stealing
 retry:;
 	isize max_count = 0;
@@ -4598,6 +4596,7 @@ retry:;
 		}
 		goto retry;
 	}
+#endif
 
 	gb_semaphore_release(&c->procs_to_check_semaphore);
 
@@ -4605,6 +4604,8 @@ retry:;
 }
 
 void check_procedure_bodies(Checker *c) {
+	GB_ASSERT(c != nullptr);
+
 	u32 thread_count = cast(u32)gb_max(build_context.thread_count, 1);
 	u32 worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	if (!build_context.threaded_checker) {
