@@ -13,6 +13,12 @@ import "core:mem"
 import "core:intrinsics"
 
 /*
+	===========================
+	    User-level routines    
+	===========================
+*/
+
+/*
 	High-level addition. Handles sign.
 */
 add :: proc(dest, a, b: ^Int) -> (err: Error) {
@@ -39,6 +45,49 @@ add :: proc(dest, a, b: ^Int) -> (err: Error) {
     dest.sign = x.sign;
     return _sub(dest, x, y);
 }
+
+/*
+	High-level subtraction, dest = number - decrease. Handles signs.
+*/
+sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
+	dest := dest; x := number; y := decrease;
+	_panic_if_uninitialized(number); _panic_if_uninitialized(decrease); _panic_if_uninitialized(dest);
+
+	if x.sign != y.sign {
+		/*
+			Subtract a negative from a positive, OR subtract a positive from a negative.
+			In either case, ADD their magnitudes and use the sign of the first number.
+		*/
+		dest.sign = x.sign;
+		return _add(dest, x, y);
+	}
+
+	/*
+		Subtract a positive from a positive, OR negative from a negative.
+		First, take the difference between their magnitudes, then...
+	*/
+	if cmp_mag(x, y) == .Less_Than {
+		/*
+			The second has a larger magnitude.
+			The result has the *opposite* sign from the first number.
+		*/
+		dest.sign = .Negative if is_pos(x) else .Zero_or_Positive;
+		x, y = y, x;
+	} else {
+		/*
+			The first has a larger or equal magnitude.
+			Copy the sign from the first.
+		*/
+		dest.sign = x.sign;
+	}
+	return _sub(dest, x, y);
+}
+
+/*
+	==========================
+	    Low-level routines    
+	==========================
+*/
 
 /*
 	Low-level addition, unsigned.
@@ -121,23 +170,17 @@ _add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	return .OK;
 }
 
-
 /*
-	Low-level subtraction. Assumes |a| > |b|.
+	Low-level subtraction, dest = number - decrease. Assumes |number| > |decrease|.
 	Handbook of Applied Cryptography, algorithm 14.9.
 */
-_sub :: proc(dest, a, b: ^Int) -> (err: Error) {
-	dest := dest; x := a; y := b;
-	_panic_if_uninitialized(a); _panic_if_uninitialized(b); _panic_if_uninitialized(dest);
-
-	for n in 0..=12 {
-		dest.digit[n] = DIGIT(n);
-		dest.used = n+1;
-	}
+_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
+	dest := dest; x := number; y := decrease;
+	_panic_if_uninitialized(number); _panic_if_uninitialized(decrease); _panic_if_uninitialized(dest);
 
 	old_used := dest.used;
 	min_used := y.used;
-	max_used := a.used;
+	max_used := x.used;
 	i: int;
 
 	err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT));
