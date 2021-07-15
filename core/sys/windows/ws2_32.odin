@@ -1,3 +1,4 @@
+// +build windows
 package sys_windows
 
 foreign import ws2_32 "system:Ws2_32.lib"

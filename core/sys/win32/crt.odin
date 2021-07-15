@@ -1,3 +1,4 @@
+// +build windows
 package win32
 
 import "core:strings";
