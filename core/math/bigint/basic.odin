@@ -14,14 +14,14 @@ import "core:intrinsics"
 
 /*
 	===========================
-	    User-level routines    
+		User-level routines    
 	===========================
 */
 
 /*
 	High-level addition. Handles sign.
 */
-add :: proc(dest, a, b: ^Int) -> (err: Error) {
+add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
 	_panic_if_uninitialized(a); _panic_if_uninitialized(b); _panic_if_uninitialized(dest);
 
@@ -34,22 +34,35 @@ add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	}
 
 	/*
-    	One positive, the other negative.
-    	Subtract the one with the greater magnitude from the other.
-    	The result gets the sign of the one with the greater magnitude.
-    */
-    if cmp_mag(x, y) == .Less_Than {
-    	x, y = y, x;
-    }
+		One positive, the other negative.
+		Subtract the one with the greater magnitude from the other.
+		The result gets the sign of the one with the greater magnitude.
+	*/
+	if cmp_mag(x, y) == .Less_Than {
+		x, y = y, x;
+	}
 
-    dest.sign = x.sign;
-    return _sub(dest, x, y);
+	dest.sign = x.sign;
+	return _sub(dest, x, y);
 }
+
+/*
+	Adds the unsigned `DIGIT` immediate to an `Int`,
+	such that the `DIGIT` doesn't have to be turned into an `Int` first.
+
+	dest = a + digit;
+*/
+add_digit :: proc(dest, a: ^int, digit: DIGIT) -> (err: Error) {
+
+	return .Unimplemented;
+}
+
+add :: proc{add_two_ints, add_digit};
 
 /*
 	High-level subtraction, dest = number - decrease. Handles signs.
 */
-sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
+sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
 	_panic_if_uninitialized(number); _panic_if_uninitialized(decrease); _panic_if_uninitialized(dest);
 
@@ -84,8 +97,21 @@ sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 }
 
 /*
+	Adds the unsigned `DIGIT` immediate to an `Int`,
+	such that the `DIGIT` doesn't have to be turned into an `Int` first.
+
+	dest = number - decrease;
+*/
+sub_digit :: proc(dest, number: ^int, decrease: DIGIT) -> (err: Error) {
+
+	return .Unimplemented;
+}
+
+sub :: proc{sub_two_ints, sub_digit};
+
+/*
 	==========================
-	    Low-level routines    
+		Low-level routines    
 	==========================
 */
 
@@ -235,5 +261,5 @@ _sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 		Adjust dest.used based on leading zeroes.
 	*/
 	clamp(dest);
-   	return .OK;
+	return .OK;
 }
