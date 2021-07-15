@@ -1,3 +1,4 @@
+// +build windows
 package sys_windows
 
 foreign import shell32 "system:Shell32.lib"
