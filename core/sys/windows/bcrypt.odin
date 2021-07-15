@@ -1,3 +1,4 @@
+// +build windows
 package sys_windows
 
 foreign import bcrypt "system:Bcrypt.lib"
