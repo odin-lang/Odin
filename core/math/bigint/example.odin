@@ -17,11 +17,11 @@ demo :: proc() {
 	a, b, c: ^Int;
 	err:  Error;
 
-	a, err = init(-21);
+	a, err = init(21);
 	defer destroy(a);
 	fmt.printf("a: %v, err: %v\n\n", a, err);
 
-	b, err = init(42);
+	b, err = init(-21);
 	defer destroy(b);
 
 	fmt.printf("b: %v, err: %v\n\n", b, err);
@@ -29,7 +29,7 @@ demo :: proc() {
 	c, err = init();
 	defer destroy(c);
 
-	err = add(c, a, b);
+	err = sub(c, a, b);
 	fmt.printf("c: %v, err: %v\n\n", c, err);
 }
 
