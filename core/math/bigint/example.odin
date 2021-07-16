@@ -75,9 +75,9 @@ demo :: proc() {
 	err = sub(c, a, b);
 	// err = add(c, a, b);
 	fmt.printf("Error: %v\n", err);
-	fmt.printf("a: %v\n", print_int(a));
-	fmt.printf("b: %v\n", print_int(b));
-	fmt.printf("c: %v\n", print_int(c));
+	fmt.printf("a: %v, bits: %v\n", print_int(a), count_bits(a));
+	fmt.printf("b: %v, bits: %v\n", print_int(b), count_bits(b));
+	fmt.printf("c: %v, bits: %v\n", print_int(c), count_bits(c));
 }
 
 main :: proc() {

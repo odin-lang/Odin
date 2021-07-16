@@ -9,6 +9,8 @@ package bigint
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
 
+import "core:intrinsics"
+
 /*
 	Tunables
 */
@@ -97,26 +99,23 @@ when size_of(rawptr) == 8 {
 	/*
 		We can use u128 as an intermediary.
 	*/
-	DIGIT       :: distinct(u64);
-	_DIGIT_BITS :: 60;
-	_WORD       :: u128;
-	_MAX_COMBA  :: 1 <<  (128 - (2 * _DIGIT_BITS))     ;
-	_WARRAY     :: 1 << ((128 - (2 * _DIGIT_BITS)) + 1);
+	DIGIT        :: distinct(u64);
+	_WORD        :: distinct(u128);
 } else {
-	DIGIT       :: distinct(u32);
-	_DIGIT_BITS :: 28;
-	_WORD       :: u64;
-	_MAX_COMBA  :: 1 <<  ( 64 - (2 * _DIGIT_BITS))     ;
-	_WARRAY     :: 1 << (( 64 - (2 * _DIGIT_BITS)) + 1);
+	DIGIT        :: distinct(u32);
+	_WORD        :: distinct(u64);
 }
 #assert(size_of(_WORD) == 2 * size_of(DIGIT));
-_MASK          :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1);
-_DIGIT_MAX     :: _MASK;
 
-_BITS_IN_BYTE :: 8;
-_BITS_IN_TYPE :: #force_inline proc($T) -> int where intrinsics.type_is_integer(T) {
-	return _BITS_IN_BYTE * size_of(T);
-}
+_DIGIT_TYPE_BITS :: 8 * size_of(DIGIT);
+_WORD_TYPE_BITS  :: 8 * size_of(_WORD);
+
+_DIGIT_BITS      :: _DIGIT_TYPE_BITS - 4;
+
+_MASK            :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1);
+_DIGIT_MAX       :: _MASK;
+_MAX_COMBA       :: 1 <<  (_WORD_TYPE_BITS - (2 * _DIGIT_BITS))     ;
+_WARRAY          :: 1 << ((_WORD_TYPE_BITS - (2 * _DIGIT_BITS)) + 1);
 
 Order :: enum i8 {
 	LSB_First = -1,

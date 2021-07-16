@@ -218,6 +218,29 @@ minus_one :: proc(a: ^Int, minimize := false) -> (err: Error) {
 }
 
 /*
+	Count bits in an `Int`.
+*/
+count_bits :: proc(a: ^Int) -> (count: int) {
+	assert_initialized(a);
+	/*
+		Fast path for zero.
+	*/
+	if is_zero(a) {
+		return 0;
+	}
+	/*
+		Get the number of DIGITs and use it.
+	*/
+	count  = (a.used - 1) * _DIGIT_BITS;
+	/*
+		Take the last DIGIT and count the bits in it.
+	*/
+	clz   := int(intrinsics.count_leading_zeros(a.digit[a.used - 1]));
+	count += (_DIGIT_TYPE_BITS - clz);
+	return;
+}
+
+/*
 	Internal helpers.
 */
 

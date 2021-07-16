@@ -89,7 +89,6 @@ add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
 	*/
 	if is_neg(a) && (a.used > 1 || a.digit[0] >= digit) {
-		fmt.print("a = neg, %v\n", print_int(a));
 		/*
 			Temporarily fix `a`'s sign.
 		*/
