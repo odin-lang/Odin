@@ -11,6 +11,7 @@ package bigint
 
 import "core:mem"
 import "core:intrinsics"
+import "core:fmt"
 
 /*
 	===========================
@@ -23,7 +24,7 @@ import "core:intrinsics"
 */
 add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	_panic_if_uninitialized(a); _panic_if_uninitialized(b); _panic_if_uninitialized(dest);
+	assert_initialized(dest); assert_initialized(a); assert_initialized(b);
 
 	/*
 		Handle both negative or both positive.
@@ -52,9 +53,116 @@ add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
 
 	dest = a + digit;
 */
-add_digit :: proc(dest, a: ^int, digit: DIGIT) -> (err: Error) {
+add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
+	dest := dest; x := a; digit := digit;
+	assert_initialized(dest); assert_initialized(a);
 
-	return .Unimplemented;
+	/*
+		Fast paths for destination and input Int being the same.
+	*/
+	if dest == a {
+		/*
+			Fast path for dest.digit[0] + digit fits in dest.digit[0] without overflow.
+		*/
+		if is_pos(dest) && (dest.digit[0] + digit < _DIGIT_MAX) {
+			dest.digit[0] += digit;
+			return .OK;
+		}
+		/*
+			Can be subtracted from dest.digit[0] without underflow.
+		*/
+		if is_neg(a) && (dest.digit[0] > digit) {
+			dest.digit[0] -= digit;
+			return .OK;
+		}
+	}
+
+	/*
+		Grow destination as required.
+	*/
+	err = grow(dest, a.used + 1);
+	if err != .OK {
+		return err;
+	}
+
+	/*
+		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
+	*/
+	if is_neg(a) && (a.used > 1 || a.digit[0] >= digit) {
+		/*
+			Temporarily fix `a`'s sign.
+		*/
+		a.sign = .Zero_or_Positive;
+		/*
+			dest = |a| - digit
+		*/
+		err = sub(dest, a, digit);
+		/*
+			Restore sign and set `dest` sign.
+		*/
+		dest.sign = .Negative;
+		a.sign    = .Negative;
+
+		clamp(dest);
+
+		return err;
+	}
+
+	/*
+		Remember the currently used number of digits in `dest`.
+	*/
+	old_used := dest.used;
+
+	/*
+		If `a` is positive
+	*/
+	if is_pos(a) {
+		/*
+			Add digits, use `carry`.
+		*/
+		i: int;
+		carry := digit;
+		for i = 0; i < a.used; i += 1 {
+			dest.digit[i] = a.digit[i] + carry;
+			carry = dest.digit[i] >> _DIGIT_BITS;
+			dest.digit[i] &= _MASK;
+		}
+		/*
+			Set final carry.
+		*/
+		dest.digit[i] = carry;
+		/*
+			Set `dest` size.
+		*/
+		dest.used = a.used + 1;
+	} else {
+		/*
+			`a` was negative and |a| < digit.
+		*/
+		dest.used = 1;
+		/*
+			The result is a single DIGIT.
+		*/
+		dest.digit[0] = digit - a.digit[0] if a.used == 1 else digit;
+	}
+	/*
+		Sign is always positive.
+	*/
+	dest.sign = .Zero_or_Positive;
+
+	zero_count := old_used - dest.used;
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
+	}
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	clamp(dest);
+
+	return .OK;
 }
 
 add :: proc{add_two_ints, add_digit};
@@ -64,7 +172,7 @@ add :: proc{add_two_ints, add_digit};
 */
 sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	_panic_if_uninitialized(number); _panic_if_uninitialized(decrease); _panic_if_uninitialized(dest);
+	assert_initialized(number); assert_initialized(decrease); assert_initialized(dest);
 
 	if x.sign != y.sign {
 		/*
@@ -102,7 +210,7 @@ sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 
 	dest = number - decrease;
 */
-sub_digit :: proc(dest, number: ^int, decrease: DIGIT) -> (err: Error) {
+sub_digit :: proc(dest, number: ^Int, decrease: DIGIT) -> (err: Error) {
 
 	return .Unimplemented;
 }
@@ -121,7 +229,7 @@ sub :: proc{sub_two_ints, sub_digit};
 */
 _add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	_panic_if_uninitialized(a); _panic_if_uninitialized(b); _panic_if_uninitialized(dest);
+	assert_initialized(a); assert_initialized(b); assert_initialized(dest);
 
 	old_used, min_used, max_used, i: int;
 
@@ -202,7 +310,7 @@ _add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 _sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	_panic_if_uninitialized(number); _panic_if_uninitialized(decrease); _panic_if_uninitialized(dest);
+	assert_initialized(number); assert_initialized(decrease); assert_initialized(dest);
 
 	old_used := dest.used;
 	min_used := y.used;
