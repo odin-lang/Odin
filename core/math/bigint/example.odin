@@ -30,11 +30,11 @@ demo :: proc() {
 	a, b, c: ^Int;
 	err:  Error;
 
-	a, err = init(21);
+	a, err = init(512);
 	defer destroy(a);
 	fmt.printf("a: %v, err: %v\n\n", print_int(a), err);
 
-	b, err = init(21);
+	b, err = init(42);
 	defer destroy(b);
 
 	fmt.printf("b: %v, err: %v\n\n", print_int(b), err);
@@ -44,7 +44,7 @@ demo :: proc() {
 	fmt.printf("c: %v\n", print_int(c, true));
 
 	fmt.println("=== Add ===");
-	err = add(c, a, DIGIT(42));
+	err = sub(a, a, DIGIT(42));
 	// err = add(c, a, b);
 	fmt.printf("Error: %v\n", err);
 	fmt.printf("a: %v\n", print_int(a));
