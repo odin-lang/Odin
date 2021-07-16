@@ -19,14 +19,20 @@ when _LOW_MEMORY {
 	_DEFAULT_DIGIT_COUNT :: 32;
 }
 
-// /* tunable cutoffs */
-// #ifndef MP_FIXED_CUTOFFS
-// extern int
-// MP_MUL_KARATSUBA_CUTOFF,
-// MP_SQR_KARATSUBA_CUTOFF,
-// MP_MUL_TOOM_CUTOFF,
-// MP_SQR_TOOM_CUTOFF;
-// #endif
+_MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
+_SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, _DEFAULT_SQR_KARATSUBA_CUTOFF);
+_MUL_TOOM_CUTOFF      :: #config(MUL_TOOM_CUTOFF,      _DEFAULT_MUL_TOOM_CUTOFF);
+_SQR_TOOM_CUTOFF      :: #config(SQR_TOOM_CUTOFF,      _DEFAULT_SQR_TOOM_CUTOFF);
+
+/*
+	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
+	TODO(Jeroen): Port this tuning algorithm and tune them for more modern processors.
+*/
+_DEFAULT_MUL_KARATSUBA_CUTOFF ::  80;
+_DEFAULT_SQR_KARATSUBA_CUTOFF :: 120;
+_DEFAULT_MUL_TOOM_CUTOFF      :: 350;
+_DEFAULT_SQR_TOOM_CUTOFF      :: 400;
+
 
 Sign :: enum u8 {
 	Zero_or_Positive = 0,
@@ -94,14 +100,23 @@ when size_of(rawptr) == 8 {
 	DIGIT       :: distinct(u64);
 	_DIGIT_BITS :: 60;
 	_WORD       :: u128;
+	_MAX_COMBA  :: 1 <<  (128 - (2 * _DIGIT_BITS))     ;
+	_WARRAY     :: 1 << ((128 - (2 * _DIGIT_BITS)) + 1);
 } else {
 	DIGIT       :: distinct(u32);
 	_DIGIT_BITS :: 28;
 	_WORD       :: u64;
+	_MAX_COMBA  :: 1 <<  ( 64 - (2 * _DIGIT_BITS))     ;
+	_WARRAY     :: 1 << (( 64 - (2 * _DIGIT_BITS)) + 1);
 }
 #assert(size_of(_WORD) == 2 * size_of(DIGIT));
 _MASK          :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1);
 _DIGIT_MAX     :: _MASK;
+
+_BITS_IN_BYTE :: 8;
+_BITS_IN_TYPE :: #force_inline proc($T) -> int where intrinsics.type_is_integer(T) {
+	return _BITS_IN_BYTE * size_of(T);
+}
 
 Order :: enum i8 {
 	LSB_First = -1,
