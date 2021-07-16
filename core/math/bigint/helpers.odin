@@ -11,6 +11,7 @@ package bigint
 
 import "core:mem"
 import "core:intrinsics"
+import "core:fmt"
 
 /*
 	Deallocates the backing memory of an Int.
@@ -84,9 +85,9 @@ init :: proc{init_new, init_new_integer};
 	Helpers to set an `Int` to a specific value.
 */
 
-set_integer :: proc(a: ^Int, n: $T, minimize := false) where intrinsics.type_is_integer(T) {
+set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) where intrinsics.type_is_integer(T) {
 	n := n;
-	_panic_if_uninitialized(a);
+	assert_initialized(a, loc);
 
 	a.used = 0;
 	a.sign = .Zero_or_Positive if n >= 0 else .Negative;
@@ -118,24 +119,45 @@ shrink :: proc(a: ^Int) -> (err: Error) {
 	return .OK;
 }
 
-grow :: proc(a: ^Int, n: int) -> (err: Error) {
-    _panic_if_uninitialized(a);
+grow :: proc(a: ^Int, n: int, allow_shrink := false) -> (err: Error) {
+	assert_initialized(a);
+	/*
+		By default, calling `grow` with `n` <= a.allocated won't resize.
+		With `allow_shrink` set to `true`, will call resize and shrink the `Int` as a result.
+	*/
 
-    resize(&a.digit, n);
-    if len(a.digit) != n {
-    	return .Out_of_Memory;
-    }
+	/*
+		We need at least _MIN_DIGIT_COUNT or a.used digits, whichever is bigger.
+	*/
+	needed := max(_MIN_DIGIT_COUNT, a.used);
+	/*
+		The caller is asking for `n`. Let's be accomodating.
+	*/
+	needed  = max(needed, n);
+	/*
+		If `allow_shrink` == `false`, we need to needed >= `a.allocated`.
+	*/
+	if !allow_shrink {
+		needed = max(needed, a.allocated);
+	}
 
-    a.used = min(n, a.used);
-    a.allocated = n;
-    return .OK;
+	if a.allocated != needed {
+		resize(&a.digit, needed);
+		if len(a.digit) != needed {
+			return .Out_of_Memory;
+		}
+	}
+
+	// a.used      = min(size, a.used);
+	a.allocated = needed;
+	return .OK;
 }
 
 /*
 	Clear `Int` and resize it to the default size.
 */
 clear :: proc(a: ^Int) -> (err: Error) {
-	_panic_if_uninitialized(a);
+	assert_initialized(a);
 
 	mem.zero_slice(a.digit[:]);
 	a.sign = .Zero_or_Positive;
@@ -149,11 +171,11 @@ clear :: proc(a: ^Int) -> (err: Error) {
 	Set the `Int` to 0 and optionally shrink it to the minimum backing size.
 */
 zero :: proc(a: ^Int, minimize := false) -> (err: Error) {
-	_panic_if_uninitialized(a);
+	assert_initialized(a);
 
-	mem.zero_slice(a.digit[:]);
 	a.sign = .Zero_or_Positive;
 	a.used = 0;
+	mem.zero_slice(a.digit[a.used:]);
 	if minimize {
 		return shrink(a);
 	}
@@ -165,12 +187,12 @@ zero :: proc(a: ^Int, minimize := false) -> (err: Error) {
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 one :: proc(a: ^Int, minimize := false) -> (err: Error) {
-	_panic_if_uninitialized(a);
+	assert_initialized(a);
 
-	mem.zero_slice(a.digit[:]);
 	a.sign     = .Zero_or_Positive;
 	a.used     = 1;
 	a.digit[0] = 1;
+	mem.zero_slice(a.digit[a.used:]);
 	if minimize {
 		return shrink(a);
 	}
@@ -182,12 +204,12 @@ one :: proc(a: ^Int, minimize := false) -> (err: Error) {
 	Set the `Int` to -1 and optionally shrink it to the minimum backing size.
 */
 minus_one :: proc(a: ^Int, minimize := false) -> (err: Error) {
-	_panic_if_uninitialized(a);
+	assert_initialized(a);
 
-	mem.zero_slice(a.digit[:]);
 	a.sign     = .Negative;
 	a.used     = 1;
 	a.digit[0] = 1;
+	mem.zero_slice(a.digit[a.used:]);
 	if minimize {
 		return shrink(a);
 	}
@@ -199,27 +221,25 @@ minus_one :: proc(a: ^Int, minimize := false) -> (err: Error) {
 	Internal helpers.
 */
 
-_panic_if_uninitialized :: proc(a: ^Int, loc := #caller_location) {
-	if !is_initialized(a) {
-		panic("Int was not properly initialized.", loc);
-	}
+assert_initialized :: proc(a: ^Int, loc := #caller_location) {
+	assert(is_initialized(a), "`Int` was not properly initialized.", loc);
 }
 
 _zero_unused :: proc(a: ^Int) {
-	_panic_if_uninitialized(a);
+	assert_initialized(a);
 	if a.used < a.allocated {
 		mem.zero_slice(a.digit[a.used:]);
 	}
 }
 
 clamp :: proc(a: ^Int) {
-	_panic_if_uninitialized(a);
+	assert_initialized(a);
 	/*
 		Trim unused digits
-	 	This is used to ensure that leading zero digits are
-	 	trimmed and the leading "used" digit will be non-zero.
+		This is used to ensure that leading zero digits are
+		trimmed and the leading "used" digit will be non-zero.
 		Typically very fast.  Also fixes the sign if there
-	 	are no more leading digits.
+		are no more leading digits.
 	*/
 
 	for a.used > 0 && a.digit[a.used - 1] == 0 {

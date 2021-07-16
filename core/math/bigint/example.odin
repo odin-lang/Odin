@@ -13,24 +13,43 @@ package bigint
 import "core:fmt"
 import "core:mem"
 
+print_int :: proc(a: ^Int, print_raw := false) -> string {
+	if print_raw {
+		return fmt.tprintf("%v", a);
+	}
+	sign := "-" if a.sign == .Negative else "";
+	if a.used <= 2 {
+		v := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
+		return fmt.tprintf("%v%v", sign, v);
+	} else {
+		return fmt.tprintf("[%2d/%2d] %v%v", a.used, a.allocated, sign, a.digit[:a.used]);
+	}
+}
+
 demo :: proc() {
 	a, b, c: ^Int;
 	err:  Error;
 
 	a, err = init(21);
 	defer destroy(a);
-	fmt.printf("a: %v, err: %v\n\n", a, err);
+	fmt.printf("a: %v, err: %v\n\n", print_int(a), err);
 
-	b, err = init(-21);
+	b, err = init(21);
 	defer destroy(b);
 
-	fmt.printf("b: %v, err: %v\n\n", b, err);
+	fmt.printf("b: %v, err: %v\n\n", print_int(b), err);
 
 	c, err = init();
 	defer destroy(c);
+	fmt.printf("c: %v\n", print_int(c, true));
 
-	err = sub(c, a, b);
-	fmt.printf("c: %v, err: %v\n\n", c, err);
+	fmt.println("=== Add ===");
+	err = add(c, a, DIGIT(42));
+	// err = add(c, a, b);
+	fmt.printf("Error: %v\n", err);
+	fmt.printf("a: %v\n", print_int(a));
+	fmt.printf("b: %v\n", print_int(b));
+	fmt.printf("c: %v\n", print_int(c));
 }
 
 main :: proc() {
