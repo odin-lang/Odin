@@ -13,6 +13,34 @@ package bigint
 import "core:fmt"
 import "core:mem"
 
+print_configation :: proc() {
+	fmt.printf(
+`Configuration:
+	DIGIT_BITS           %v
+	MIN_DIGIT_COUNT      %v
+	MAX_DIGIT_COUNT      %v
+	EFAULT_DIGIT_COUNT   %v
+	MAX_COMBA            %v
+	WARRAY               %v
+	MUL_KARATSUBA_CUTOFF %v
+	SQR_KARATSUBA_CUTOFF %v
+	MUL_TOOM_CUTOFF      %v
+	SQR_TOOM_CUTOFF      %v
+`, _DIGIT_BITS,
+_MIN_DIGIT_COUNT,
+_MAX_DIGIT_COUNT,
+_DEFAULT_DIGIT_COUNT,
+_MAX_COMBA,
+_WARRAY,
+_MUL_KARATSUBA_CUTOFF,
+_SQR_KARATSUBA_CUTOFF,
+_MUL_TOOM_CUTOFF,
+_SQR_TOOM_CUTOFF,
+);
+
+	fmt.println();
+}
+
 print_int :: proc(a: ^Int, print_raw := false) -> string {
 	if print_raw {
 		return fmt.tprintf("%v", a);
@@ -44,7 +72,7 @@ demo :: proc() {
 	fmt.printf("c: %v\n", print_int(c, true));
 
 	fmt.println("=== Add ===");
-	err = sub(a, a, DIGIT(42));
+	err = sub(c, a, b);
 	// err = add(c, a, b);
 	fmt.printf("Error: %v\n", err);
 	fmt.printf("a: %v\n", print_int(a));
@@ -57,8 +85,7 @@ main :: proc() {
 	mem.tracking_allocator_init(&ta, context.allocator);
 	context.allocator = mem.tracking_allocator(&ta);
 
-	fmt.printf("_DIGIT_BITS: %v\n_MIN_DIGIT_COUNT: %v\n_MAX_DIGIT_COUNT: %v\n_DEFAULT_DIGIT_COUNT: %v\n\n", _DIGIT_BITS, _MIN_DIGIT_COUNT, _MAX_DIGIT_COUNT, _DEFAULT_DIGIT_COUNT);
-
+	// print_configation();
 	demo();
 
 	if len(ta.allocation_map) > 0 {
