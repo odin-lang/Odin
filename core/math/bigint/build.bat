@@ -1,2 +1,3 @@
 @echo off
-odin run . -vet
+odin run .
+rem -vet
