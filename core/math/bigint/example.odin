@@ -76,7 +76,7 @@ demo :: proc() {
 	fmt.printf("c: %v, bits: %v\n", cs, count_bits(c));
 	delete(as); delete(bs); delete(cs);
 
-	fmt.println("log2:", log_n(a, 8));
+	fmt.println("radix_size:", radix_size(a, 10));
 }
 
 main :: proc() {
