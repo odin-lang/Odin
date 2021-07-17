@@ -16,7 +16,6 @@ import "core:fmt"
 /*
 	Deallocates the backing memory of an Int.
 */
-
 destroy :: proc(a: ^Int, allocator_zeroes := false, free_int := true, loc := #caller_location) {
 	if !is_initialized(a) {
 		// Nothing to do.
@@ -37,7 +36,6 @@ destroy :: proc(a: ^Int, allocator_zeroes := false, free_int := true, loc := #ca
 /*
 	Creates and returns a new `Int`.
 */
-
 init_new :: proc(allocator_zeroes := true, allocator := context.allocator, size := _DEFAULT_DIGIT_COUNT) -> (a: ^Int, err: Error) {
 	/*
 		Allocating a new variable.
@@ -64,7 +62,6 @@ init_new :: proc(allocator_zeroes := true, allocator := context.allocator, size 
 	Initialize from a signed or unsigned integer.
 	Inits a new `Int` and then calls the appropriate `set` routine.
 */
-
 init_new_integer :: proc(u: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) where intrinsics.type_is_integer(T) {
 
 	n := _DEFAULT_DIGIT_COUNT;
@@ -84,7 +81,6 @@ init :: proc{init_new, init_new_integer};
 /*
 	Helpers to set an `Int` to a specific value.
 */
-
 set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) where intrinsics.type_is_integer(T) {
 	n := n;
 	assert_initialized(a, loc);
@@ -109,7 +105,6 @@ set :: proc{set_integer};
 /*
 	Resize backing store.
 */
-
 shrink :: proc(a: ^Int) -> (err: Error) {
 	needed := max(_MIN_DIGIT_COUNT, a.used);
 
@@ -243,7 +238,6 @@ count_bits :: proc(a: ^Int) -> (count: int) {
 /*
 	Internal helpers.
 */
-
 assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 	assert(is_initialized(a), "`Int` was not properly initialized.", loc);
 }

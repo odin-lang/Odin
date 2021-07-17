@@ -41,43 +41,42 @@ _SQR_TOOM_CUTOFF,
 	fmt.println();
 }
 
-print_int :: proc(a: ^Int, print_raw := false) -> string {
-	if print_raw {
-		return fmt.tprintf("%v", a);
-	}
-	sign := "-" if a.sign == .Negative else "";
-	if a.used <= 2 {
-		v := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
-		return fmt.tprintf("%v%v", sign, v);
-	} else {
-		return fmt.tprintf("[%2d/%2d] %v%v", a.used, a.allocated, sign, a.digit[:a.used]);
-	}
-}
-
 demo :: proc() {
-	a, b, c: ^Int;
+	a,  b,  c: ^Int;
+	as, bs, cs: string;
 	err:  Error;
 
 	a, err = init(512);
 	defer destroy(a);
-	fmt.printf("a: %v, err: %v\n\n", print_int(a), err);
+	as, err = itoa(a, 10);
+	fmt.printf("a: %v, err: %v\n\n", as, err);
+	delete(as);
 
 	b, err = init(42);
 	defer destroy(b);
-
-	fmt.printf("b: %v, err: %v\n\n", print_int(b), err);
+	bs, err = itoa(b, 10);
+	fmt.printf("b: %v, err: %v\n\n", bs, err);
+	delete(bs);
 
 	c, err = init();
 	defer destroy(c);
-	fmt.printf("c: %v\n", print_int(c, true));
+	cs, err = itoa(c, 10);
+	fmt.printf("c: %v\n", cs);
+	delete(cs);
 
 	fmt.println("=== Add ===");
 	err = sub(c, a, b);
-	// err = add(c, a, b);
+
 	fmt.printf("Error: %v\n", err);
-	fmt.printf("a: %v, bits: %v\n", print_int(a), count_bits(a));
-	fmt.printf("b: %v, bits: %v\n", print_int(b), count_bits(b));
-	fmt.printf("c: %v, bits: %v\n", print_int(c), count_bits(c));
+	as, err = itoa(a, 10);
+	bs, err = itoa(b, 10);
+	cs, err = itoa(c, 10);
+	fmt.printf("a: %v, bits: %v\n", as, count_bits(a));
+	fmt.printf("b: %v, bits: %v\n", bs, count_bits(b));
+	fmt.printf("c: %v, bits: %v\n", cs, count_bits(c));
+	delete(as); delete(bs); delete(cs);
+
+	fmt.println("log2:", log_n(a, 8));
 }
 
 main :: proc() {
