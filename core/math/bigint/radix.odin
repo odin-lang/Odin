@@ -26,8 +26,7 @@ itoa :: proc(a: ^Int, radix: int, allocator := context.allocator) -> (res: strin
 	/*
 		Fast path for radixes that are a power of two.
 	*/
-	if radix & 1 == 0 {
-
+	if is_power_of_two(radix) {
 
 	}
 
@@ -51,30 +50,34 @@ itoa :: proc(a: ^Int, radix: int, allocator := context.allocator) -> (res: strin
 
 int_to_string :: itoa;
 
+/*
+	We size for `string`, not `cstring`.
+*/
+radix_size :: proc(a: ^Int, radix: int) -> (size: int, err: Error) {
+	t := a;
 
-radix_size :: proc(a: ^Int, base: int) -> (size: int, err: Error) {
-   // mp_err err;
-   // mp_int a_;
-   // int b;
+	if radix < 2 || radix > 64 {
+		return -1, .Invalid_Input;
+	}
 
-   // /* make sure the radix is in range */
-   // if ((radix < 2) || (radix > 64)) {
-   //    return MP_VAL;
-   // }
+ 	if is_zero(a) {
+ 		return 1, .OK;
+ 	}
 
-   // if (mp_iszero(a)) {
-   //    *size = 2;
-   //    return MP_OKAY;
-   // }
+ 	t.sign = .Zero_or_Positive;
+ 	log: int;
 
-   // a_ = *a;
-   // a_.sign = MP_ZPOS;
-   // if ((err = mp_log_n(&a_, radix, &b)) != MP_OKAY) {
-   //    return err;
-   // }
+ 	log, err = log_n(t, radix);
+ 	if err != .OK {
+ 		return log, err;
+ 	}
 
-   // /* mp_ilogb truncates to zero, hence we need one extra put on top and one for `\0`. */
-   // *size = (size_t)b + 2U + (mp_isneg(a) ? 1U : 0U);
-
-   return size, .OK;
+ 	/*
+		log truncates to zero, so we need to add one more, and one for `-` if negative.
+ 	*/
+ 	if is_neg(a) {
+ 		return log + 2, .OK;
+ 	} else {
+ 		return log + 1, .OK;
+ 	}
 }
