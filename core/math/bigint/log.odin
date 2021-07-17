@@ -11,7 +11,7 @@ package bigint
 
 import "core:fmt"
 
-log_n_int :: proc(a: ^Int, base: int) -> (log: int, err: Error) {
+log_n_int :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
 	assert_initialized(a);
 	if is_neg(a) || is_zero(a) || base < 2 || DIGIT(base) > _DIGIT_MAX {
 		return -1, .Invalid_Input;
@@ -20,7 +20,7 @@ log_n_int :: proc(a: ^Int, base: int) -> (log: int, err: Error) {
 	/*
 		Fast path for bases that are a power of two.
 	*/
-	if is_power_of_two(base) {
+	if is_power_of_two(int(base)) {
 		return _log_power_of_two(a, base), .OK;
 	}
 
@@ -44,7 +44,7 @@ log_n :: proc{log_n_int, log_n_digit};
 	Returns the log2 of an `Int`, provided `base` is a power of two.
 	Don't call it if it isn't.
 */
-_log_power_of_two :: proc(a: ^Int, base: int) -> (log: int) {
+_log_power_of_two :: proc(a: ^Int, base: DIGIT) -> (log: int) {
 	base := base;
 	y: int;
 	for y = 0; base & 1 == 0; {

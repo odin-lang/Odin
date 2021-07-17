@@ -46,37 +46,35 @@ demo :: proc() {
 	as, bs, cs: string;
 	err:  Error;
 
-	a, err = init(512);
+	a, err = init(4);
 	defer destroy(a);
-	as, err = itoa(a, 10);
+	as, err = itoa(a);
 	fmt.printf("a: %v, err: %v\n\n", as, err);
 	delete(as);
 
-	b, err = init(42);
+	b, err = init(4);
 	defer destroy(b);
-	bs, err = itoa(b, 10);
-	fmt.printf("b: %v, err: %v\n\n", bs, err);
+	bs, err = itoa(b);
+	fmt.printf("b: %s, err: %v\n\n", bs, err);
 	delete(bs);
 
 	c, err = init();
 	defer destroy(c);
-	cs, err = itoa(c, 10);
-	fmt.printf("c: %v\n", cs);
+	cs, err = itoa(c);
+	fmt.printf("b: %s, err: %v\n\n", cs, err);
 	delete(cs);
 
 	fmt.println("=== Add ===");
 	err = sub(c, a, b);
 
 	fmt.printf("Error: %v\n", err);
-	as, err = itoa(a, 10);
-	bs, err = itoa(b, 10);
-	cs, err = itoa(c, 10);
+	as, err = itoa(a);
+	bs, err = itoa(b);
+	cs, err = itoa(c);
 	fmt.printf("a: %v, bits: %v\n", as, count_bits(a));
 	fmt.printf("b: %v, bits: %v\n", bs, count_bits(b));
 	fmt.printf("c: %v, bits: %v\n", cs, count_bits(c));
 	delete(as); delete(bs); delete(cs);
-
-	fmt.println("radix_size:", radix_size(a, 10));
 }
 
 main :: proc() {
