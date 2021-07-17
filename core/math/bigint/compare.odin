@@ -29,6 +29,29 @@ is_negative :: proc(a: ^Int) -> bool {
 }
 is_neg :: is_negative;
 
+is_even :: proc(a: ^Int) -> bool {
+	if is_initialized(a) {
+		if is_zero(a) {
+			return true;
+		}
+		if a.used > 0 && a.digit[0] & 1 == 0 {
+			return true;
+		}
+	}
+	return false;
+}
+
+is_odd :: proc(a: ^Int) -> bool {
+	if is_initialized(a) {
+		return !is_even(a);
+	}
+	return false;
+}
+
+is_power_of_two :: proc(x: int) -> bool {
+	return ((x) != 0) && (((x) & ((x) - 1)) == 0);
+}
+
 /*
 	Compare two `Int`s, signed.
 */
