@@ -46,13 +46,13 @@ demo :: proc() {
 	as, bs, cs: string;
 	err:  Error;
 
-	a, err = init(4);
+	a, err = init(-512);
 	defer destroy(a);
 	as, err = itoa(a);
 	fmt.printf("a: %v, err: %v\n\n", as, err);
 	delete(as);
 
-	b, err = init(4);
+	b, err = init(42);
 	defer destroy(b);
 	bs, err = itoa(b);
 	fmt.printf("b: %s, err: %v\n\n", bs, err);
@@ -68,7 +68,7 @@ demo :: proc() {
 	err = sub(c, a, b);
 
 	fmt.printf("Error: %v\n", err);
-	as, err = itoa(a);
+	as, err = itoa(a, 8);
 	bs, err = itoa(b);
 	cs, err = itoa(c);
 	fmt.printf("a: %v, bits: %v\n", as, count_bits(a));
