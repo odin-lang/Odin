@@ -103,13 +103,19 @@ itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -
 
 	Use `radix_size` or `radix_size_estimate` to determine a buffer size big enough.
 
-	`written` includes the sign if negative, and the zero terminator if asked for.
-	If you want a 2s complement negative number, adjust it before calling.
-
 	You can pass the output of `radix_size` to `size` if you've previously called it to size
 	the output buffer. If you haven't, this routine will call it. This way it knows if the buffer
-	is the appropriate size, and it can avoid writing backwards and then reversing.
+	is the appropriate size, and we can write directly in place without a reverse step at the end.
 
+					=== === === IMPORTANT === === ===
+
+	If you determined the buffer size using `radix_size_estimate`, or have a buffer
+	that you reuse that you know is large enough, don't pass this size unless you know what you are doing,
+	because we will always write backwards starting at last byte of the buffer.
+
+	Keep in mind that if you set `size` yourself and it's smaller than the buffer,
+	it'll result in buffer overflows, as we use it to avoid reversing at the end
+	and having to perform a buffer overflow check each character.
 */
 itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	assert_initialized(a); size := size;
@@ -145,17 +151,20 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			return 0, .Buffer_Overflow;
 		}
 
-		if is_neg(a) {
-			buffer[written] = '-';
-			written += 1;
+		if zero_terminate {
+			available -= 1;
+			buffer[available] = 0;
+			written   += 1;
 		}
 
-		buffer[written] = RADIX_TABLE[a.digit[0]];
-		written += 1;
+		available -= 1;
+		buffer[available] = RADIX_TABLE[a.digit[0]];
+		written   += 1;
 
-		if zero_terminate {
-			buffer[written] = 0;
-			written += 1;
+		if is_neg(a) {
+			available -= 1;
+			buffer[available] = '-';
+			written   += 1;
 		}
 
 		return written, .OK;
@@ -165,6 +174,15 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 		Fast path for when `Int` fits within a `_WORD`.
 	*/
 	if a.used == 1 || a.used == 2 {
+		if zero_terminate {
+			if available == 0 {
+				return written, .Buffer_Overflow;
+			}
+			available -= 1;
+			buffer[available] = 0;
+			written   += 1;
+		}
+
 		val := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
 		for val > 0 {
 			if available == 0 {
@@ -172,8 +190,8 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			}
 
 			q := val / _WORD(radix);
-			buffer[written] = RADIX_TABLE[val - (q * _WORD(radix))];
 			available -= 1;
+			buffer[available] = RADIX_TABLE[val - (q * _WORD(radix))];
 			written   += 1;
 
 			val = q;
@@ -182,19 +200,8 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			if available == 0 {
 				return written, .Buffer_Overflow;
 			}
-			buffer[written] = '-';
 			available -= 1;
-			written   += 1;
-		}
-		/*
-			Reverse output.
-		*/
-		slice.reverse(buffer[:written]);
-		if zero_terminate {
-			if available == 0 {
-				return written, .Buffer_Overflow;
-			}
-			buffer[written] = 0;
+			buffer[available] = '-';
 			written   += 1;
 		}
 		return written, .OK;

@@ -58,11 +58,17 @@ demo :: proc() {
 	fmt.printf("b: %s, err: %v\n\n", bs, err);
 	delete(bs);
 
-	c, err = init();
+	c, err = init(-4);
 	defer destroy(c);
 	cs, err = itoa(c);
-	fmt.printf("b: %s, err: %v\n\n", cs, err);
+	fmt.printf("c: %s, err: %v\n\n", cs, err);
 	delete(cs);
+
+	cstr: cstring;
+	defer delete(cstr);
+
+	cstr, err = itoa_cstring(a);
+	fmt.printf("cstring: %v, err: %v\n\n", cstr, err);
 
 	fmt.println("=== Add ===");
 	err = sub(c, a, b);
