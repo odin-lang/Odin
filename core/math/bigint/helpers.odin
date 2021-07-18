@@ -88,6 +88,7 @@ set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) 
 	a.used = 0;
 	a.sign = .Zero_or_Positive if n >= 0 else .Negative;
 	n = abs(n);
+
 	for n != 0 {
 		a.digit[a.used] = DIGIT(n) & _MASK;
 		a.used += 1;
@@ -96,7 +97,6 @@ set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) 
 	if minimize {
 		shrink(a);
 	}
-
 	_zero_unused(a);
 }
 

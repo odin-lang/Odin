@@ -114,6 +114,9 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (
 		Radix defaults to 10.
 	*/
 	radix := radix if radix > 0 else 10;
+	if radix < 2 || radix > 64 {
+		return 0, .Invalid_Input;
+	}
 
 	/*
 		Early exit if we were given an empty buffer.
@@ -123,7 +126,7 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (
 		return 0, .Buffer_Overflow;
 	}
 	/*
-		Early exit if `Int` == 0 or the entire `Int` fits in a single radix digit.
+		Fast path for when `Int` == 0 or the entire `Int` fits in a single radix digit.
 	*/
 	if is_zero(a) || (a.used == 1 && a.digit[0] < DIGIT(radix)) {
 		needed := 2 if is_neg(a) else 1;
@@ -148,15 +151,51 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (
 		return written, .OK;
 	}
 
+	/*
+		Fast path for when `Int` fits within a `_WORD`.
+	*/
+	if a.used == 1 || a.used == 2 {
+		val := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
+		for val > 0 {
+			if available == 0 {
+				return written, .Buffer_Overflow;
+			}
+
+			q := val / _WORD(radix);
+			buffer[written] = RADIX_TABLE[val - (q * _WORD(radix))];
+			available -= 1;
+			written   += 1;
+
+			val = q;
+		}
+		if is_neg(a) {
+			if available == 0 {
+				return written, .Buffer_Overflow;
+			}
+			buffer[written] = '-';
+			available -= 1;
+			written   += 1;
+		}
+		/*
+			Reverse output.
+		*/
+		slice.reverse(buffer[:written]);
+		if zero_terminate {
+			if available == 0 {
+				return written, .Buffer_Overflow;
+			}
+			buffer[written] = 0;
+			written   += 1;
+		}
+		return written, .OK;
+	}
 
 	/*
 		Fast path for radixes that are a power of two.
 	*/
 	if is_power_of_two(int(radix)) {
 
-
-
-		return len(buffer), .OK;
+		// return len(buffer), .OK;
 	}
 
 	return -1, .Unimplemented;
@@ -170,8 +209,6 @@ int_to_cstring :: itoa_cstring;
 	We size for `string`, not `cstring`.
 */
 radix_size :: proc(a: ^Int, radix: i8) -> (size: int, err: Error) {
-	t := a;
-
 	if radix < 2 || radix > 64 {
 		return -1, .Invalid_Input;
 	}
@@ -180,22 +217,26 @@ radix_size :: proc(a: ^Int, radix: i8) -> (size: int, err: Error) {
  		return 1, .OK;
  	}
 
- 	t.sign = .Zero_or_Positive;
- 	log: int;
+ 	/*
+		Calculate `log` on a temporary "copy" with its sign set to positive.
+ 	*/
+	t := &Int{
+		used      = a.used,
+		allocated = a.allocated,
+		sign      = .Zero_or_Positive,
+		digit     = a.digit,
+	};
 
- 	log, err = log_n(t, DIGIT(radix));
+ 	size, err = log_n(t, DIGIT(radix));
  	if err != .OK {
- 		return log, err;
+ 		return;
  	}
 
  	/*
 		log truncates to zero, so we need to add one more, and one for `-` if negative.
  	*/
- 	if is_neg(a) {
- 		return log + 2, .OK;
- 	} else {
- 		return log + 1, .OK;
- 	}
+ 	size += 2 if is_neg(a) else 1;
+ 	return size, .OK;
 }
 
 /*
