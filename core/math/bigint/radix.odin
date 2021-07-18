@@ -37,15 +37,16 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 	*/
 	size: int;
 	size, err = radix_size(a, radix, zero_terminate);
-
 	/*
 		Exit if calculating the size returned an error.
 	*/
 	if err != .OK {
+		f := strings.clone(fallback(a), allocator);
 		if zero_terminate {
-			return string(cstring("")), err;
+			c := strings.clone_to_cstring(f);
+			return string(c), err;
 		}
-		return "", err;
+		return f, err;
 	}
 
 	/*
@@ -149,7 +150,6 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			available -= 1;
 			buffer[available] = 0;
 		}
-
 		available -= 1;
 		buffer[available] = RADIX_TABLE[a.digit[0]];
 
@@ -184,13 +184,40 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 		}
 		return len(buffer) - available, .OK;
 	}
+	/*
+		At least 3 DIGITs are in use if we made it this far.
+	*/
 
 	/*
 		Fast path for radixes that are a power of two.
 	*/
 	if is_power_of_two(int(radix)) {
+		if zero_terminate {
+			available -= 1;
+			buffer[available] = 0;
+		}
 
-		// return len(buffer), .OK;
+		mask  := _WORD(radix - 1);
+		shift := int(log_n(DIGIT(radix), 2));
+		count := int(count_bits(a));
+		digit: _WORD;
+
+		for offset := 0; offset < count; offset += 4 {
+			bits_to_get := int(min(count - offset, shift));
+			digit, err  := extract_bits(a, offset, bits_to_get);
+			if err != .OK {
+				return len(buffer) - available, .Invalid_Input;
+			}
+			available -= 1;
+			buffer[available] = RADIX_TABLE[digit];
+		}
+
+		if is_neg(a) {
+			available -= 1;
+			buffer[available] = '-';
+		}
+
+		return len(buffer) - available, .OK;
 	}
 
 	return -1, .Unimplemented;
@@ -209,6 +236,9 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 	}
 
  	if is_zero(a) {
+ 		if zero_terminate {
+ 			return 2, .OK;
+ 		}
  		return 1, .OK;
  	}
 

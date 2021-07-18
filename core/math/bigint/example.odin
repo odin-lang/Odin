@@ -46,37 +46,39 @@ demo :: proc() {
 	as, bs, cs: string;
 	err:  Error;
 
-	a, err = init(-512);
+	a, err = init();
+	a.digit[2] = 512;
+	a.used = 3;
 	defer destroy(a);
-	as, err = itoa(a);
+	as, err = itoa(a, 16);
 	fmt.printf("a: %v, err: %v\n\n", as, err);
 	delete(as);
 
 	b, err = init(42);
 	defer destroy(b);
-	bs, err = itoa(b);
+	bs, err = itoa(b, 16);
 	fmt.printf("b: %s, err: %v\n\n", bs, err);
 	delete(bs);
 
 	c, err = init(-4);
 	defer destroy(c);
-	cs, err = itoa(c);
+	cs, err = itoa(c, 16);
 	fmt.printf("c: %s, err: %v\n\n", cs, err);
 	delete(cs);
 
-	cstr: cstring;
-	defer delete(cstr);
+	// cstr: cstring;
+	// defer delete(cstr);
 
-	cstr, err = itoa_cstring(a);
-	fmt.printf("cstring: %v, err: %v\n\n", cstr, err);
+	// cstr, err = itoa_cstring(a);
+	// fmt.printf("cstring: %v, err: %v\n\n", cstr, err);
 
 	fmt.println("=== Add ===");
 	err = sub(c, a, b);
 
 	fmt.printf("Error: %v\n", err);
-	as, err = itoa(a, 8);
-	bs, err = itoa(b);
-	cs, err = itoa(c);
+	as, err = itoa(a, 16);
+	bs, err = itoa(b, 16);
+	cs, err = itoa(c, 16);
 	fmt.printf("a: %v, bits: %v\n", as, count_bits(a));
 	fmt.printf("b: %v, bits: %v\n", bs, count_bits(b));
 	fmt.printf("c: %v, bits: %v\n", cs, count_bits(c));
