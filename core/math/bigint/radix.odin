@@ -36,10 +36,7 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 		Calculate the size of the buffer we need.
 	*/
 	size: int;
-	size, err = radix_size(a, radix);
-	if zero_terminate {
-		size += 1;
-	}
+	size, err = radix_size(a, radix, zero_terminate);
 
 	/*
 		Exit if calculating the size returned an error.
@@ -60,7 +57,7 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 		Write the digits out into the buffer.
 	*/
 	written: int;
-	written, err = itoa_raw(a, radix, buffer, zero_terminate);
+	written, err = itoa_raw(a, radix, buffer, size, zero_terminate);
 
 	/*
 		For now, delete the buffer and fall back to the below on failure.
@@ -107,9 +104,15 @@ itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -
 	Use `radix_size` or `radix_size_estimate` to determine a buffer size big enough.
 
 	`written` includes the sign if negative, and the zero terminator if asked for.
+	If you want a 2s complement negative number, adjust it before calling.
+
+	You can pass the output of `radix_size` to `size` if you've previously called it to size
+	the output buffer. If you haven't, this routine will call it. This way it knows if the buffer
+	is the appropriate size, and it can avoid writing backwards and then reversing.
+
 */
-itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (written: int, err: Error) {
-	assert_initialized(a);
+itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
+	assert_initialized(a); size := size;
 	/*
 		Radix defaults to 10.
 	*/
@@ -119,10 +122,17 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (
 	}
 
 	/*
-		Early exit if we were given an empty buffer.
+		We weren't given a size. Let's compute it.
+	*/
+	if size == -1 {
+		size, err = radix_size(a, radix, zero_terminate);
+	}
+
+	/*
+		Early exit if the buffer we were given is too small.
 	*/
 	available := len(buffer);
-	if available == 0 {
+	if available < size {
 		return 0, .Buffer_Overflow;
 	}
 	/*
@@ -208,7 +218,7 @@ int_to_cstring :: itoa_cstring;
 /*
 	We size for `string`, not `cstring`.
 */
-radix_size :: proc(a: ^Int, radix: i8) -> (size: int, err: Error) {
+radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, err: Error) {
 	if radix < 2 || radix > 64 {
 		return -1, .Invalid_Input;
 	}
@@ -236,6 +246,7 @@ radix_size :: proc(a: ^Int, radix: i8) -> (size: int, err: Error) {
 		log truncates to zero, so we need to add one more, and one for `-` if negative.
  	*/
  	size += 2 if is_neg(a) else 1;
+ 	size += 1 if zero_terminate else 0;
  	return size, .OK;
 }
 
