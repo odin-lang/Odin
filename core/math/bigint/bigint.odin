@@ -111,6 +111,7 @@ _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT);
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD);
 
 _DIGIT_BITS      :: _DIGIT_TYPE_BITS - 4;
+_WORD_BITS       :: 2 * _DIGIT_BITS;
 
 _MASK            :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1);
 _DIGIT_MAX       :: _MASK;

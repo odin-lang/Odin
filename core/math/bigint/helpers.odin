@@ -103,6 +103,39 @@ set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) 
 set :: proc{set_integer};
 
 /*
+	Helpers to extract values from the `Int`.
+*/
+extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
+	limb := bit_offset / _DIGIT_BITS;
+	if limb < 0 || limb >= a.used {
+		return 0, .Invalid_Input;
+	}
+
+	i := DIGIT(1 << DIGIT((bit_offset % _DIGIT_BITS)));
+
+	return 1 if ((a.digit[limb] & i) != 0) else 0, .OK;
+}
+
+extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
+	if count > _WORD_BITS || count < 1 {
+		return 0, .Invalid_Input;
+	}
+
+	v: DIGIT;
+	e: Error;
+	for shift := 0; shift < count; shift += 1 {
+		o   := offset + shift;
+		v, e = extract_bit(a, o);
+		if e != .OK {
+			break;
+		}
+		res = res + _WORD(v) << uint(shift);
+	}
+
+	return res, e;
+}
+
+/*
 	Resize backing store.
 */
 shrink :: proc(a: ^Int) -> (err: Error) {
