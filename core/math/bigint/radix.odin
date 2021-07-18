@@ -145,29 +145,20 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 		Fast path for when `Int` == 0 or the entire `Int` fits in a single radix digit.
 	*/
 	if is_zero(a) || (a.used == 1 && a.digit[0] < DIGIT(radix)) {
-		needed := 2 if is_neg(a) else 1;
-		needed += 1 if zero_terminate else 0;
-		if available < needed {
-			return 0, .Buffer_Overflow;
-		}
-
 		if zero_terminate {
 			available -= 1;
 			buffer[available] = 0;
-			written   += 1;
 		}
 
 		available -= 1;
 		buffer[available] = RADIX_TABLE[a.digit[0]];
-		written   += 1;
 
 		if is_neg(a) {
 			available -= 1;
 			buffer[available] = '-';
-			written   += 1;
 		}
 
-		return written, .OK;
+		return len(buffer) - available, .OK;
 	}
 
 	/*
@@ -175,36 +166,23 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 	*/
 	if a.used == 1 || a.used == 2 {
 		if zero_terminate {
-			if available == 0 {
-				return written, .Buffer_Overflow;
-			}
 			available -= 1;
 			buffer[available] = 0;
-			written   += 1;
 		}
 
 		val := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
 		for val > 0 {
-			if available == 0 {
-				return written, .Buffer_Overflow;
-			}
-
 			q := val / _WORD(radix);
 			available -= 1;
 			buffer[available] = RADIX_TABLE[val - (q * _WORD(radix))];
-			written   += 1;
 
 			val = q;
 		}
 		if is_neg(a) {
-			if available == 0 {
-				return written, .Buffer_Overflow;
-			}
 			available -= 1;
 			buffer[available] = '-';
-			written   += 1;
 		}
-		return written, .OK;
+		return len(buffer) - available, .OK;
 	}
 
 	/*
