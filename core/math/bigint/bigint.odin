@@ -93,7 +93,8 @@ _MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS);
  	- Must be small enough such that `_radix_size` for base 2 does not overflow.
 	`_radix_size` needs two additional bytes for zero termination and sign.
 */
-_MAX_DIGIT_COUNT :: (max(int) - 2) / _DIGIT_BITS;
+_MAX_BIT_COUNT   :: (max(int) - 2);
+_MAX_DIGIT_COUNT :: _MAX_BIT_COUNT / _DIGIT_BITS;
 
 when size_of(rawptr) == 8 {
 	/*
