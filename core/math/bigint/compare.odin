@@ -48,9 +48,43 @@ is_odd :: proc(a: ^Int) -> bool {
 	return false;
 }
 
-is_power_of_two :: proc(x: int) -> bool {
-	return ((x) != 0) && (((x) & ((x) - 1)) == 0);
+is_power_of_two_small :: proc(a: int) -> bool {
+	return ((a) != 0) && (((a) & ((a) - 1)) == 0);
 }
+
+is_power_of_two_large :: proc(a: ^Int) -> (res: bool) {
+	/*
+		Early out for Int == 0.
+	*/
+	if a.used == 0 {
+		return false;
+	}
+
+	/*
+		For an `Int` to be a power of two, its top limb has to be a power of two.
+	*/
+	if !is_power_of_two_small(int(a.digit[a.used - 1])) {
+		return false;
+	}
+
+	/*
+		That was the only limb, so it's a power of two.
+	*/
+	if a.used == 1 {
+		return true;
+	}
+
+	/*
+		For an Int to be a power of two, all limbs except the top one have to be zero.
+	*/
+	for i := 1; i < a.used; i += 1 {
+		if a.digit[i - 1] != 0 {
+			return false;
+		}
+	}
+	return true;
+}
+is_power_of_two :: proc{is_power_of_two_small, is_power_of_two_large};
 
 /*
 	Compare two `Int`s, signed.
