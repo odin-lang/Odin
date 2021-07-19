@@ -103,6 +103,116 @@ set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) 
 set :: proc{set_integer};
 
 /*
+	Copy one `Int` to another.
+*/
+copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	/*
+		If dest == src, do nothing
+	*/
+	if (dest == src) {
+		return .OK;
+	}
+
+	/*
+		Check they're both initialized.
+	*/
+	if !(is_initialized(dest) && is_initialized(src)) {
+		return .Invalid_Input;
+	}
+
+	/*
+		Grow `dest` to fit `src`.
+	*/
+	if err = grow(dest, min(src.used, _DEFAULT_DIGIT_COUNT)); err != .OK {
+		return err;
+	}
+
+	/*
+		Copy everything over and zero high digits.
+	*/
+	assert(dest.allocated >= src.used);
+	for v, i in src.digit[:src.used+1] {
+		dest.digit[i] = v;
+	}
+	dest.used = src.used;
+	dest.sign = src.sign;
+	_zero_unused(dest);
+	return .OK;
+}
+
+/*
+	Set `dest` to |`src`|.
+*/
+abs_bigint :: proc(dest, src: ^Int) -> (err: Error) {
+	/*
+		If `dest == src`, just fix `dest`'s sign.
+	*/
+	if (dest == src) {
+		dest.sign = .Zero_or_Positive;
+		return .OK;
+	}
+
+	/*
+		Check they're both initialized.
+	*/
+	if !(is_initialized(dest) && is_initialized(src)) {
+		return .Invalid_Input;
+	}
+
+	/*
+		Copy `src` to `dest`
+	*/
+	if err = copy(dest, src); err != .OK {
+		return err;
+	}
+
+	/*
+		Fix sign.
+	*/
+	dest.sign = .Zero_or_Positive;
+	return .OK;
+}
+
+abs_integer :: proc(n: $T) -> T where intrinsics.type_is_integer(T) {
+	return n if n >= 0 else -n;
+}
+abs :: proc{abs_bigint, abs_integer};
+
+/*
+	Set `dest` to `-src`.
+*/
+neg :: proc(dest, src: ^Int) -> (err: Error) {
+	/*
+		If `dest == src`, just fix `dest`'s sign.
+	*/
+	sign := Sign.Negative if !(is_zero(src) && is_neg(src)) else Sign.Zero_or_Positive;
+	if dest == src {
+		dest.sign = sign;
+		return .OK;
+	}
+
+	/*
+		Check they're both initialized.
+	*/
+	if !(is_initialized(dest) && is_initialized(src)) {
+		return .Invalid_Input;
+	}
+
+	/*
+		Copy `src` to `dest`
+	*/
+	if err = copy(dest, src); err != .OK {
+		return err;
+	}
+
+	/*
+		Fix sign.
+	*/
+	dest.sign = sign;
+	return .OK;
+}
+
+/*
 	Helpers to extract values from the `Int`.
 */
 extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
@@ -243,6 +353,35 @@ minus_one :: proc(a: ^Int, minimize := false) -> (err: Error) {
 	}
 
 	return .OK;
+}
+
+power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
+	assert_initialized(a);
+
+	/*
+
+	*/
+	if power < 0 || power > _MAX_BIT_COUNT {
+		return .Invalid_Input;
+	}
+
+	/*
+		Grow to accomodate the single bit.
+	*/
+	a.used = (power / _DIGIT_BITS) + 1;
+	if err = grow(a, a.used); err != .OK {
+		return err;
+	}
+	/*
+		Zero the entirety.
+	*/
+	mem.zero_slice(a.digit[:]);
+
+	/*
+		Set the bit.
+	*/
+	a.digit[power / _DIGIT_BITS] = 1 << uint((power % _DIGIT_BITS));
+   	return .OK;
 }
 
 /*

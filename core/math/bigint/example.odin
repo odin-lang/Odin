@@ -41,48 +41,58 @@ _SQR_TOOM_CUTOFF,
 	fmt.println();
 }
 
+print :: proc(name: string, a: ^Int, base := i8(16)) {
+	as, err := itoa(a, base);
+	defer delete(as);
+
+	if err == .OK {
+		fmt.printf("%v (base: %v, bits used: %v): %v\n", name, base, count_bits(a), as);
+	} else {
+		fmt.printf("%v (error: %v): %v\n", name, err, a);
+	}
+}
+
 demo :: proc() {
-	a,  b,  c: ^Int;
-	as, bs, cs: string;
-	err:  Error;
+	a, b, c: ^Int;
+	err: Error;
 
-	a, err = init();
-	a.digit[2] = 512;
-	a.used = 3;
 	defer destroy(a);
-	as, err = itoa(a, 16);
-	fmt.printf("a: %v, err: %v\n\n", as, err);
-	delete(as);
-
-	b, err = init(42);
 	defer destroy(b);
-	bs, err = itoa(b, 16);
-	fmt.printf("b: %s, err: %v\n\n", bs, err);
-	delete(bs);
+	defer destroy(c);
+
+	a, err = init(1+4+16+64);
+
+	b, err = init(1+2+8+32+128);
 
 	c, err = init(-4);
-	defer destroy(c);
-	cs, err = itoa(c, 16);
-	fmt.printf("c: %s, err: %v\n\n", cs, err);
-	delete(cs);
 
-	// cstr: cstring;
-	// defer delete(cstr);
+	print("a", a, 2);
+	print("b", b, 2);
+	print("c", c, 2);
 
-	// cstr, err = itoa_cstring(a);
-	// fmt.printf("cstring: %v, err: %v\n\n", cstr, err);
+	fmt.println("=== a = a & b ===");
+	err = and(a, a, b);
+	fmt.printf("a &= b error: %v\n", err);
 
-	fmt.println("=== Add ===");
-	err = sub(c, a, b);
+	print("a", a, 2);
+	print("b", b, 10);
 
-	fmt.printf("Error: %v\n", err);
-	as, err = itoa(a, 16);
-	bs, err = itoa(b, 16);
-	cs, err = itoa(c, 16);
-	fmt.printf("a: %v, bits: %v\n", as, count_bits(a));
-	fmt.printf("b: %v, bits: %v\n", bs, count_bits(b));
-	fmt.printf("c: %v, bits: %v\n", cs, count_bits(c));
-	delete(as); delete(bs); delete(cs);
+	fmt.println("\n\n=== b = abs(c) ===");
+	c.sign = .Negative;
+	abs(b, c); // copy c to b.
+
+	print("b", b);
+	print("c", c);
+
+	fmt.println("\n\n=== Set a to (1 << 120) - 1 ===");
+	if err = power_of_two(a, 120); err != .OK {
+		fmt.printf("Error %v while setting a to 1 << 120.\n", err);
+	}
+	if err = sub(a, a, 1); err != .OK {
+		fmt.printf("Error %v while subtracting 1 from a\n", err);	
+	}
+	print("a", a, 16);
+	fmt.println("Expected a to be:        FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 }
 
 main :: proc() {
