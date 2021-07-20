@@ -141,15 +141,11 @@ cmp_mag :: compare_magnitude;
 
 destroy :: proc {
 	/*
-		Deallocates the backing memory of an `Int` and resets it.
+		Clears one or more `Int`s and dellocates their backing memory.
 
-		int_destroy :: proc(a: ^Int, allocator_zeroes := false, allocator := context.allocator)
+		int_destroy :: proc(integers: ..^Int)
 	*/
 	int_destroy,
 };
 
-init :: proc{
-	int_init_sized,
-	int_init_from_integer,
-	int_init_copy,
-};
+
