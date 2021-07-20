@@ -1,4 +1,4 @@
-package bigint
+package big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.

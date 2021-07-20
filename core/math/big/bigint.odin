@@ -1,4 +1,4 @@
-package bigint
+package big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
@@ -35,7 +35,13 @@ _DEFAULT_SQR_KARATSUBA_CUTOFF :: 120;
 _DEFAULT_MUL_TOOM_CUTOFF      :: 350;
 _DEFAULT_SQR_TOOM_CUTOFF      :: 400;
 
+/*
+	TODO(Jeroen): Decide whether to turn `Sign` into `Flags :: bit_set{Flag; u8}`.
+	This would hold the sign and float class, as appropriate, and would allow us
+	to set an `Int` to +/- Inf, or NaN.
 
+	The operations would need to be updated to propagate these as expected.
+*/
 Sign :: enum u8 {
 	Zero_or_Positive = 0,
 	Negative         = 1,
@@ -44,8 +50,8 @@ Sign :: enum u8 {
 Int :: struct {
 	used:      int,
 	allocated: int,
-	sign:      Sign,
 	digit:     [dynamic]DIGIT,
+	sign:      Sign,
 };
 
 Comparison_Flag :: enum i8 {
@@ -72,7 +78,7 @@ Error :: enum i8 {
 Primality_Flag :: enum u8 {
 	Blum_Blum_Shub = 0,	/* BBS style prime */
 	Safe           = 1,	/* Safe prime (p-1)/2 == prime */
-	Second_MSB_On  = 3, /* force 2nd MSB to 1 */
+	Second_MSB_On  = 3,  /* force 2nd MSB to 1 */
 };
 Primality_Flags :: bit_set[Primality_Flag; u8];
 
