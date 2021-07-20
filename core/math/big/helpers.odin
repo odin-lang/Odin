@@ -1,4 +1,4 @@
-package bigint
+package big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
@@ -11,7 +11,6 @@ package bigint
 
 import "core:mem"
 import "core:intrinsics"
-import "core:fmt"
 
 /*
 	Deallocates the backing memory of an Int.
@@ -62,7 +61,7 @@ init_new :: proc(allocator_zeroes := true, allocator := context.allocator, size 
 	Initialize from a signed or unsigned integer.
 	Inits a new `Int` and then calls the appropriate `set` routine.
 */
-init_new_integer :: proc(u: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) where intrinsics.type_is_integer(T) {
+init_from_integer :: proc(src: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) where intrinsics.type_is_integer(T) {
 
 	n := _DEFAULT_DIGIT_COUNT;
 	if minimize {
@@ -71,12 +70,27 @@ init_new_integer :: proc(u: $T, minimize := false, allocator_zeroes := true, all
 
 	a, err = init_new(allocator_zeroes, allocator, n);
 	if err == .OK {
-		set(a, u, minimize);
+		set(a, src, minimize);
 	}
 	return;
 }
 
-init :: proc{init_new, init_new_integer};
+/*
+	Initialize an `Int` as a copy from another `Int`.
+*/
+init_copy :: proc(src: ^Int, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) {
+	if !is_initialized(src) {
+		return nil, .Invalid_Input;
+	}
+
+	a, err = init_new(allocator_zeroes, allocator, src.used);
+	if err == .OK {
+		copy(a, src);
+	}
+	return;
+}
+
+init :: proc{init_new, init_from_integer, init_copy};
 
 /*
 	Helpers to set an `Int` to a specific value.
@@ -123,7 +137,7 @@ copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Grow `dest` to fit `src`.
 	*/
-	if err = grow(dest, min(src.used, _DEFAULT_DIGIT_COUNT)); err != .OK {
+	if err = grow(dest, src.used); err != .OK {
 		return err;
 	}
 
@@ -226,6 +240,9 @@ extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
 	return 1 if ((a.digit[limb] & i) != 0) else 0, .OK;
 }
 
+/*
+	TODO: Optimize.
+*/
 extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 	if count > _WORD_BITS || count < 1 {
 		return 0, .Invalid_Input;

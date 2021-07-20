@@ -1,4 +1,4 @@
-package bigint
+package big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
@@ -11,21 +11,20 @@ package bigint
 	This file contains radix conversions, `string_to_int` (atoi) and `int_to_string` (itoa).
 */
 
-import "core:mem"
 import "core:intrinsics"
 import "core:fmt"
 import "core:strings"
-import "core:slice"
 
 /*
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
+	radix := radix;
 	assert_initialized(a);
 	/*
 		Radix defaults to 10.
 	*/
-	radix := radix if radix > 0 else 10;
+	radix = radix if radix > 0 else 10;
 
 	/*
 		TODO: If we want to write a prefix for some of the radixes, we can oversize the buffer.
@@ -87,11 +86,12 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
+	radix := radix;
 	assert_initialized(a);
 	/*
 		Radix defaults to 10.
 	*/
-	radix := radix if radix > 0 else 10;
+	radix = radix if radix > 0 else 10;
 
 	s: string;
 	s, err = itoa_string(a, radix, true, allocator);
@@ -119,11 +119,12 @@ itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -
 	and having to perform a buffer overflow check each character.
 */
 itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
+	radix := radix;
 	assert_initialized(a); size := size;
 	/*
 		Radix defaults to 10.
 	*/
-	radix := radix if radix > 0 else 10;
+	radix = radix if radix > 0 else 10;
 	if radix < 2 || radix > 64 {
 		return 0, .Invalid_Input;
 	}
@@ -197,10 +198,10 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			buffer[available] = 0;
 		}
 
-		mask  := _WORD(radix - 1);
+		// mask  := _WORD(radix - 1);
 		shift := int(log_n(DIGIT(radix), 2));
 		count := int(count_bits(a));
-		digit: _WORD;
+		// digit: _WORD;
 
 		for offset := 0; offset < count; offset += 4 {
 			bits_to_get := int(min(count - offset, shift));

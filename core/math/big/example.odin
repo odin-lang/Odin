@@ -1,5 +1,5 @@
 //+ignore
-package bigint
+package big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
@@ -60,9 +60,9 @@ demo :: proc() {
 	defer destroy(b);
 	defer destroy(c);
 
-	a, err = init(1+4+16+64);
+	a, err = init(512);
 
-	b, err = init(1+2+8+32+128);
+	b, err = init(a);
 
 	c, err = init(-4);
 
@@ -106,6 +106,12 @@ main :: proc() {
 	if len(ta.allocation_map) > 0 {
 		for _, v in ta.allocation_map {
 			fmt.printf("Leaked %v bytes @ %v\n", v.size, v.location);
+		}
+	}
+	if len(ta.bad_free_array) > 0 {
+		fmt.println("Bad frees:");
+		for v in ta.bad_free_array {
+			fmt.println(v);
 		}
 	}
 }
