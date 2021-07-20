@@ -4,7 +4,7 @@ package big
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-2 license.
 
-	A BigInt implementation in Odin.
+	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
@@ -23,7 +23,7 @@ import "core:intrinsics"
 /*
 	High-level addition. Handles sign.
 */
-add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
+int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
 	assert_initialized(dest); assert_initialized(a); assert_initialized(b);
 
@@ -32,7 +32,7 @@ add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
 	*/
 	if x.sign == y.sign {
 		dest.sign = x.sign;
-		return _add(dest, x, y);
+		return _int_add(dest, x, y);
 	}
 
 	/*
@@ -45,7 +45,7 @@ add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
 	}
 
 	dest.sign = x.sign;
-	return _sub(dest, x, y);
+	return _int_sub(dest, x, y);
 }
 
 /*
@@ -54,7 +54,7 @@ add_two_ints :: proc(dest, a, b: ^Int) -> (err: Error) {
 
 	dest = a + digit;
 */
-add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
+int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
 	assert_initialized(dest); assert_initialized(a);
 
@@ -165,12 +165,10 @@ add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	return .OK;
 }
 
-add :: proc{add_two_ints, add_digit};
-
 /*
 	High-level subtraction, dest = number - decrease. Handles signs.
 */
-sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
+int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
 	assert_initialized(number); assert_initialized(decrease); assert_initialized(dest);
 
@@ -180,7 +178,7 @@ sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 			In either case, ADD their magnitudes and use the sign of the first number.
 		*/
 		dest.sign = x.sign;
-		return _add(dest, x, y);
+		return _int_add(dest, x, y);
 	}
 
 	/*
@@ -201,7 +199,7 @@ sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 		*/
 		dest.sign = x.sign;
 	}
-	return _sub(dest, x, y);
+	return _int_sub(dest, x, y);
 }
 
 /*
@@ -210,7 +208,7 @@ sub_two_ints :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 
 	dest = a - digit;
 */
-sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
+int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
 	assert_initialized(dest); assert_initialized(a);
 
@@ -296,8 +294,6 @@ sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	return .OK;
 }
 
-sub :: proc{sub_two_ints, sub_digit};
-
 /*
 	==========================
 		Low-level routines    
@@ -308,7 +304,7 @@ sub :: proc{sub_two_ints, sub_digit};
 	Low-level addition, unsigned.
 	Handbook of Applied Cryptography, algorithm 14.7.
 */
-_add :: proc(dest, a, b: ^Int) -> (err: Error) {
+_int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
 	assert_initialized(a); assert_initialized(b); assert_initialized(dest);
 
@@ -389,7 +385,7 @@ _add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	Low-level subtraction, dest = number - decrease. Assumes |number| > |decrease|.
 	Handbook of Applied Cryptography, algorithm 14.9.
 */
-_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
+_int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
 	assert_initialized(number); assert_initialized(decrease); assert_initialized(dest);
 

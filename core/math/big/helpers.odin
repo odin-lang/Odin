@@ -4,7 +4,7 @@ package big
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-2 license.
 
-	A BigInt implementation in Odin.
+	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
@@ -13,13 +13,10 @@ import "core:mem"
 import "core:intrinsics"
 
 /*
-	Deallocates the backing memory of an Int.
+	Deallocates the backing memory of an `Int`.
 */
-destroy :: proc(a: ^Int, allocator_zeroes := false, free_int := true, loc := #caller_location) {
-	if !is_initialized(a) {
-		// Nothing to do.
-		return;
-	}
+int_destroy :: proc(a: ^Int, allocator_zeroes := false, allocator := context.allocator) {
+	if !is_initialized(a) { return; }
 
 	if !allocator_zeroes {
 		mem.zero_slice(a.digit[:]);
@@ -27,15 +24,15 @@ destroy :: proc(a: ^Int, allocator_zeroes := false, free_int := true, loc := #ca
 	free(&a.digit[0]);
 	a.used      = 0;
 	a.allocated = 0;
-	if free_int {
-		free(a);
-	}
+	free(a);
 }
 
 /*
 	Creates and returns a new `Int`.
+	Size is the last parameter so it doesn't conflict with `int_init_from_integer`,
+	and we can say `init(512)` to init & set to 512.
 */
-init_new :: proc(allocator_zeroes := true, allocator := context.allocator, size := _DEFAULT_DIGIT_COUNT) -> (a: ^Int, err: Error) {
+int_init_sized :: proc(allocator_zeroes := true, allocator := context.allocator, size := _DEFAULT_DIGIT_COUNT) -> (a: ^Int, err: Error) {
 	/*
 		Allocating a new variable.
 	*/
@@ -46,10 +43,10 @@ init_new :: proc(allocator_zeroes := true, allocator := context.allocator, size 
 	a.used      = 0;
 	a.sign      = .Zero_or_Positive;
 
-	if len(a.digit) != size {
+	if len(a.digit) != int(size) {
 		return a, .Out_of_Memory;
 	}
-	a.allocated = size;
+	a.allocated = int(size);
 
 	if !allocator_zeroes {
 		_zero_unused(a);
@@ -58,17 +55,17 @@ init_new :: proc(allocator_zeroes := true, allocator := context.allocator, size 
 }
 
 /*
-	Initialize from a signed or unsigned integer.
+	Initialize from a signed or unsigned platform integer.
 	Inits a new `Int` and then calls the appropriate `set` routine.
 */
-init_from_integer :: proc(src: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) where intrinsics.type_is_integer(T) {
+int_init_from_integer :: proc(src: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) where intrinsics.type_is_integer(T) {
 
 	n := _DEFAULT_DIGIT_COUNT;
 	if minimize {
 		n = _MIN_DIGIT_COUNT;
 	}
 
-	a, err = init_new(allocator_zeroes, allocator, n);
+	a, err = init(allocator_zeroes, allocator, n);
 	if err == .OK {
 		set(a, src, minimize);
 	}
@@ -78,43 +75,41 @@ init_from_integer :: proc(src: $T, minimize := false, allocator_zeroes := true, 
 /*
 	Initialize an `Int` as a copy from another `Int`.
 */
-init_copy :: proc(src: ^Int, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) {
+int_init_copy :: proc(src: ^Int, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) {
 	if !is_initialized(src) {
 		return nil, .Invalid_Input;
 	}
 
-	a, err = init_new(allocator_zeroes, allocator, src.used);
+	a, err = init(allocator_zeroes, allocator, src.used);
 	if err == .OK {
 		copy(a, src);
 	}
 	return;
 }
 
-init :: proc{init_new, init_from_integer, init_copy};
-
 /*
 	Helpers to set an `Int` to a specific value.
 */
-set_integer :: proc(a: ^Int, n: $T, minimize := false, loc := #caller_location) where intrinsics.type_is_integer(T) {
-	n := n;
-	assert_initialized(a, loc);
+int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, loc := #caller_location) where intrinsics.type_is_integer(T) {
+	src := src;
+	assert_initialized(dest, loc);
 
-	a.used = 0;
-	a.sign = .Zero_or_Positive if n >= 0 else .Negative;
-	n = abs(n);
+	dest.used = 0;
+	dest.sign = .Zero_or_Positive if src >= 0 else .Negative;
+	src = abs(src);
 
-	for n != 0 {
-		a.digit[a.used] = DIGIT(n) & _MASK;
-		a.used += 1;
-		n >>= _DIGIT_BITS;
+	for src != 0 {
+		dest.digit[dest.used] = DIGIT(src) & _MASK;
+		dest.used += 1;
+		src >>= _DIGIT_BITS;
 	}
 	if minimize {
-		shrink(a);
+		shrink(dest);
 	}
-	_zero_unused(a);
+	_zero_unused(dest);
 }
 
-set :: proc{set_integer};
+set :: proc{int_set_from_integer};
 
 /*
 	Copy one `Int` to another.
@@ -375,9 +370,6 @@ minus_one :: proc(a: ^Int, minimize := false) -> (err: Error) {
 power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 	assert_initialized(a);
 
-	/*
-
-	*/
 	if power < 0 || power > _MAX_BIT_COUNT {
 		return .Invalid_Input;
 	}
