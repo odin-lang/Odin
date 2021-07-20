@@ -11,7 +11,7 @@ package big
 
 import "core:mem"
 import "core:intrinsics"
-
+//import "core:fmt"
 /*
 	Deallocates the backing memory of an `Int`.
 */
@@ -24,7 +24,6 @@ int_destroy :: proc(a: ^Int, allocator_zeroes := false, allocator := context.all
 	free(&a.digit[0]);
 	a.used      = 0;
 	a.allocated = 0;
-	free(a);
 }
 
 /*
@@ -32,57 +31,52 @@ int_destroy :: proc(a: ^Int, allocator_zeroes := false, allocator := context.all
 	Size is the last parameter so it doesn't conflict with `int_init_from_integer`,
 	and we can say `init(512)` to init & set to 512.
 */
-int_init_sized :: proc(allocator_zeroes := true, allocator := context.allocator, size := _DEFAULT_DIGIT_COUNT) -> (a: ^Int, err: Error) {
+int_init_sized :: proc(a: ^Int, allocator_zeroes := true, allocator := context.allocator, size := _DEFAULT_DIGIT_COUNT) -> (err: Error) {
 	/*
 		Allocating a new variable.
 	*/
-	a = new(Int, allocator);
 
 	a.digit     = mem.make_dynamic_array_len_cap([dynamic]DIGIT, size, size, allocator);
 	a.allocated = 0;
 	a.used      = 0;
 	a.sign      = .Zero_or_Positive;
 
-	if len(a.digit) != int(size) {
-		return a, .Out_of_Memory;
+	if len(a.digit) != size {
+		return .Out_of_Memory;
 	}
-	a.allocated = int(size);
+	a.allocated = size;
 
 	if !allocator_zeroes {
 		_zero_unused(a);
 	}
-	return a, .OK;
+	return .OK;
 }
 
 /*
 	Initialize from a signed or unsigned platform integer.
 	Inits a new `Int` and then calls the appropriate `set` routine.
 */
-int_init_from_integer :: proc(src: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) where intrinsics.type_is_integer(T) {
+int_init_from_integer :: proc(a: ^Int, src: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (err: Error)
+	where intrinsics.type_is_integer(T) {
 
 	n := _DEFAULT_DIGIT_COUNT;
 	if minimize {
 		n = _MIN_DIGIT_COUNT;
 	}
 
-	a, err = init(allocator_zeroes, allocator, n);
-	if err == .OK {
-		set(a, src, minimize);
-	}
-	return;
+	return set(a, src, minimize);
 }
 
 /*
 	Initialize an `Int` as a copy from another `Int`.
 */
-int_init_copy :: proc(src: ^Int, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (a: ^Int, err: Error) {
+int_init_copy :: proc(dest, src: ^Int, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (err: Error) {
 	if !is_initialized(src) {
-		return nil, .Invalid_Input;
+		return .Invalid_Input;
 	}
 
-	a, err = init(allocator_zeroes, allocator, src.used);
 	if err == .OK {
-		copy(a, src);
+		err = copy(dest, src);
 	}
 	return;
 }
@@ -90,9 +84,12 @@ int_init_copy :: proc(src: ^Int, minimize := false, allocator_zeroes := true, al
 /*
 	Helpers to set an `Int` to a specific value.
 */
-int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, loc := #caller_location) where intrinsics.type_is_integer(T) {
+int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator_zeroes := true, allocator := context.allocator) -> (err: Error)
+	where intrinsics.type_is_integer(T) {
 	src := src;
-	assert_initialized(dest, loc);
+	if !is_initialized(dest) {
+		grow(dest, _DEFAULT_DIGIT_COUNT);
+	}
 
 	dest.used = 0;
 	dest.sign = .Zero_or_Positive if src >= 0 else .Negative;
@@ -107,6 +104,7 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, loc := #cal
 		shrink(dest);
 	}
 	_zero_unused(dest);
+	return .OK;
 }
 
 set :: proc{int_set_from_integer};
@@ -123,9 +121,9 @@ copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	}
 
 	/*
-		Check they're both initialized.
+		Check `src` is initialized.
 	*/
-	if !(is_initialized(dest) && is_initialized(src)) {
+	if !is_initialized(src) {
 		return .Invalid_Input;
 	}
 
@@ -270,7 +268,6 @@ shrink :: proc(a: ^Int) -> (err: Error) {
 }
 
 grow :: proc(a: ^Int, n: int, allow_shrink := false) -> (err: Error) {
-	assert_initialized(a);
 	/*
 		By default, calling `grow` with `n` <= a.allocated won't resize.
 		With `allow_shrink` set to `true`, will call resize and shrink the `Int` as a result.
