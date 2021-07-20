@@ -53,18 +53,16 @@ print :: proc(name: string, a: ^Int, base := i8(16)) {
 }
 
 demo :: proc() {
-	a, b, c: ^Int;
+	a, b, c := &Int{}, &Int{}, &Int{};
 	err: Error;
 
 	defer destroy(a);
 	defer destroy(b);
 	defer destroy(c);
 
-	a, err = init(512);
-
-	b, err = init(a);
-
-	c, err = init(-4);
+	err = set(a, 512);
+	err = init(b, a);
+	err = init(c, -4);
 
 	print("a", a, 2);
 	print("b", b, 2);

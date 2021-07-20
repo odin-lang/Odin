@@ -14,7 +14,7 @@ package big
 import "core:intrinsics"
 
 int_is_initialized :: proc(a: ^Int) -> bool {
-	return a != rawptr(uintptr(0));
+	return a != rawptr(uintptr(0)) && a.allocated >= _MIN_DIGIT_COUNT;
 }
 
 int_is_zero :: proc(a: ^Int) -> bool {
