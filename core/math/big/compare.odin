@@ -12,9 +12,14 @@ package big
 */
 
 import "core:intrinsics"
+import "core:mem"
 
 int_is_initialized :: proc(a: ^Int) -> bool {
-	return a != rawptr(uintptr(0)) && a.allocated >= _MIN_DIGIT_COUNT;
+	if a == nil {
+		return false;
+	}
+	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
+	return raw.cap >= _MIN_DIGIT_COUNT;
 }
 
 int_is_zero :: proc(a: ^Int) -> bool {

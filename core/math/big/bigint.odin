@@ -49,7 +49,6 @@ Sign :: enum u8 {
 
 Int :: struct {
 	used:      int,
-	allocated: int,
 	digit:     [dynamic]DIGIT,
 	sign:      Sign,
 };
@@ -71,6 +70,8 @@ Error :: enum i8 {
 	Max_Iterations_Reached = -4,
 	Buffer_Overflow        = -5,
 	Integer_Overflow       = -6,
+	Nil_Pointer_Passed     = -7,
+	Int_Not_Initialized    = -8,
 
 	Unimplemented          = -127,
 };

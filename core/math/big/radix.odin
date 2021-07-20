@@ -76,7 +76,7 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 				   v := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
 				   return fmt.tprintf("%v%v", sign, v);
 		   } else {
-				   return fmt.tprintf("[%2d/%2d] %v%v", a.used, a.allocated, sign, a.digit[:a.used]);
+				   return fmt.tprintf("[%2d] %v%v", a.used, sign, a.digit[:a.used]);
 		   }
 	}
 	return strings.clone(fallback(a), allocator), .Unimplemented;
@@ -248,7 +248,6 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
  	*/
 	t := &Int{
 		used      = a.used,
-		allocated = a.allocated,
 		sign      = .Zero_or_Positive,
 		digit     = a.digit,
 	};
