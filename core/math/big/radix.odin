@@ -19,8 +19,10 @@ import "core:strings"
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
-	radix := radix;
-	assert_initialized(a);
+	a := a; radix := radix;
+	if err = clear_if_uninitialized(a); err != .None {
+		return "", err;
+	}
 	/*
 		Radix defaults to 10.
 	*/
@@ -32,14 +34,13 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 	*/
 
 	/*
-		Calculate the size of the buffer we need.
+		Calculate the size of the buffer we need, and 
 	*/
 	size: int;
-	size, err = radix_size(a, radix, zero_terminate);
 	/*
 		Exit if calculating the size returned an error.
 	*/
-	if err != .OK {
+	if size, err = radix_size(a, radix, zero_terminate); err != .None {
 		f := strings.clone(fallback(a), allocator);
 		if zero_terminate {
 			c := strings.clone_to_cstring(f);
@@ -57,14 +58,13 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 		Write the digits out into the buffer.
 	*/
 	written: int;
-	written, err = itoa_raw(a, radix, buffer, size, zero_terminate);
+	if written, err = itoa_raw(a, radix, buffer, size, zero_terminate); err == .None {
+		return string(buffer[:written]), .None;
+	}
 
 	/*
 		For now, delete the buffer and fall back to the below on failure.
 	*/
-	if err == .OK {
-		return string(buffer[:written]), .OK;
-	}
 	delete(buffer);
 
 	fallback :: proc(a: ^Int, print_raw := false) -> string {
@@ -86,8 +86,10 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
-	radix := radix;
-	assert_initialized(a);
+	a := a; radix := radix;
+	if err = clear_if_uninitialized(a); err != .None {
+		return "", err;
+	}
 	/*
 		Radix defaults to 10.
 	*/
@@ -119,21 +121,25 @@ itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -
 	and having to perform a buffer overflow check each character.
 */
 itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
-	radix := radix;
-	assert_initialized(a); size := size;
+	a := a; radix := radix; size := size;
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
+	}
 	/*
 		Radix defaults to 10.
 	*/
 	radix = radix if radix > 0 else 10;
 	if radix < 2 || radix > 64 {
-		return 0, .Invalid_Input;
+		return 0, .Invalid_Argument;
 	}
 
 	/*
 		We weren't given a size. Let's compute it.
 	*/
 	if size == -1 {
-		size, err = radix_size(a, radix, zero_terminate);
+		if size, err = radix_size(a, radix, zero_terminate); err != .None {
+			return 0, err;
+		}
 	}
 
 	/*
@@ -146,7 +152,8 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 	/*
 		Fast path for when `Int` == 0 or the entire `Int` fits in a single radix digit.
 	*/
-	if is_zero(a) || (a.used == 1 && a.digit[0] < DIGIT(radix)) {
+	z, _ := is_zero(a);
+	if z || (a.used == 1 && a.digit[0] < DIGIT(radix)) {
 		if zero_terminate {
 			available -= 1;
 			buffer[available] = 0;
@@ -154,12 +161,12 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 		available -= 1;
 		buffer[available] = RADIX_TABLE[a.digit[0]];
 
-		if is_neg(a) {
+		if n, _ := is_neg(a); n {
 			available -= 1;
 			buffer[available] = '-';
 		}
 
-		return len(buffer) - available, .OK;
+		return len(buffer) - available, .None;
 	}
 
 	/*
@@ -179,11 +186,11 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 
 			val = q;
 		}
-		if is_neg(a) {
+		if n, _ := is_neg(a); n {
 			available -= 1;
 			buffer[available] = '-';
 		}
-		return len(buffer) - available, .OK;
+		return len(buffer) - available, .None;
 	}
 	/*
 		At least 3 DIGITs are in use if we made it this far.
@@ -202,24 +209,23 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 		// mask  := _WORD(radix - 1);
 		shift, err = log_n(DIGIT(radix), 2);
 		count, err = count_bits(a);
-		// digit: _WORD;
+		digit: _WORD;
 
 		for offset := 0; offset < count; offset += 4 {
 			bits_to_get := int(min(count - offset, shift));
-			digit, err  := extract_bits(a, offset, bits_to_get);
-			if err != .OK {
-				return len(buffer) - available, .Invalid_Input;
+			if digit, err = extract_bits(a, offset, bits_to_get); err != .None {
+				return len(buffer) - available, .Invalid_Argument;
 			}
 			available -= 1;
 			buffer[available] = RADIX_TABLE[digit];
 		}
 
-		if is_neg(a) {
+		if n, _ := is_neg(a); n {
 			available -= 1;
 			buffer[available] = '-';
 		}
 
-		return len(buffer) - available, .OK;
+		return len(buffer) - available, .None;
 	}
 
 	return -1, .Unimplemented;
@@ -233,37 +239,41 @@ int_to_cstring :: itoa_cstring;
 	We size for `string`, not `cstring`.
 */
 radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, err: Error) {
+	a := a;
 	if radix < 2 || radix > 64 {
-		return -1, .Invalid_Input;
+		return -1, .Invalid_Argument;
+	}
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
 	}
 
- 	if is_zero(a) {
- 		if zero_terminate {
- 			return 2, .OK;
- 		}
- 		return 1, .OK;
- 	}
+	if z, _ := is_zero(a); z {
+		if zero_terminate {
+			return 2, .None;
+		}
+		return 1, .None;
+	}
 
- 	/*
+	/*
 		Calculate `log` on a temporary "copy" with its sign set to positive.
- 	*/
+	*/
 	t := &Int{
 		used      = a.used,
 		sign      = .Zero_or_Positive,
 		digit     = a.digit,
 	};
 
- 	size, err = log_n(t, DIGIT(radix));
- 	if err != .OK {
- 		return;
- 	}
+	if size, err = log_n(t, DIGIT(radix)); err != .None {
+		return 0, err;
+	}
 
- 	/*
+	/*
 		log truncates to zero, so we need to add one more, and one for `-` if negative.
- 	*/
- 	size += 2 if is_neg(a) else 1;
- 	size += 1 if zero_terminate else 0;
- 	return size, .OK;
+	*/
+	n, _ := is_neg(a);
+	size += 2 if n else 1;
+	size += 1 if zero_terminate else 0;
+	return size, .None;
 }
 
 /*
