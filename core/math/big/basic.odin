@@ -25,11 +25,19 @@ import "core:intrinsics"
 */
 int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	if dest == nil || a == nil || b == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(a) || !is_initialized(b) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(a); err != .None {
+		return err;
 	}
+	if err = clear_if_uninitialized(b); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
+	}
+	/*
+		All parameters have been initialized.
+		We can now safely ignore errors from comparison routines.
+	*/
 
 	/*
 		Handle both negative or both positive.
@@ -44,7 +52,7 @@ int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 		Subtract the one with the greater magnitude from the other.
 		The result gets the sign of the one with the greater magnitude.
 	*/
-	if cmp_mag(x, y) == .Less_Than {
+	if c, _ := cmp_mag(a, b); c == -1 {
 		x, y = y, x;
 	}
 
@@ -60,11 +68,22 @@ int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
-	if dest == nil || a == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(a); err != .None {
+		return err;
 	}
+	/*
+		Grow destination as required.
+	*/
+	if dest != a {
+		if err = grow(dest, a.used + 1); err != .None {
+			return err;
+		}
+	}
+	/*
+		All parameters have been initialized.
+		We can now safely ignore errors from comparison routines.
+	*/
+
 	/*
 		Fast paths for destination and input Int being the same.
 	*/
@@ -72,46 +91,44 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 		/*
 			Fast path for dest.digit[0] + digit fits in dest.digit[0] without overflow.
 		*/
-		if is_pos(dest) && (dest.digit[0] + digit < _DIGIT_MAX) {
+		if p, _ := is_pos(dest); p && (dest.digit[0] + digit < _DIGIT_MAX) {
 			dest.digit[0] += digit;
-			return .OK;
+			return .None;
 		}
 		/*
 			Can be subtracted from dest.digit[0] without underflow.
 		*/
-		if is_neg(a) && (dest.digit[0] > digit) {
+		if n, _ := is_neg(a); n && (dest.digit[0] > digit) {
 			dest.digit[0] -= digit;
-			return .OK;
+			return .None;
 		}
-	}
-
-	/*
-		Grow destination as required.
-	*/
-	if err = grow(dest, a.used + 1); err != .OK {
-		return err;
 	}
 
 	/*
 		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
 	*/
-	if is_neg(a) && (a.used > 1 || a.digit[0] >= digit) {
+	if n, _ := is_neg(a); n && (a.used > 1 || a.digit[0] >= digit) {
 		/*
 			Temporarily fix `a`'s sign.
 		*/
-		t := a;
-		t.sign = .Zero_or_Positive;
+		a.sign = .Zero_or_Positive;
 		/*
 			dest = |a| - digit
 		*/
-		err = sub(dest, t, digit);
+		if err = sub(dest, a, digit); err != .None {
+			/*
+				Restore a's sign.
+			*/
+			a.sign = .Negative;
+			return err;
+		}
 		/*
 			Restore sign and set `dest` sign.
 		*/
+		a.sign    = .Negative;
 		dest.sign = .Negative;
-		clamp(dest);
 
-		return err;
+		return clamp(dest);
 	}
 
 	/*
@@ -122,7 +139,7 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	/*
 		If `a` is positive
 	*/
-	if is_pos(a) {
+	if p, _ := is_pos(a); p {
 		/*
 			Add digits, use `carry`.
 		*/
@@ -166,9 +183,7 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
-	clamp(dest);
-
-	return .OK;
+	return clamp(dest);
 }
 
 /*
@@ -176,11 +191,19 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 */
 int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	if dest == nil || number == nil || decrease == nil {
-		return .Nil_Pointer_Passed;
-	} else if !(is_initialized(number) && is_initialized(decrease)) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
 	}
+	if err = clear_if_uninitialized(x); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(y); err != .None {
+		return err;
+	}
+	/*
+		All parameters have been initialized.
+		We can now safely ignore errors from comparison routines.
+	*/
 
 	if x.sign != y.sign {
 		/*
@@ -195,12 +218,16 @@ int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 		Subtract a positive from a positive, OR negative from a negative.
 		First, take the difference between their magnitudes, then...
 	*/
-	if cmp_mag(x, y) == .Less_Than {
+	if c, _ := cmp_mag(x, y); c == -1 {
 		/*
 			The second has a larger magnitude.
 			The result has the *opposite* sign from the first number.
 		*/
-		dest.sign = .Negative if is_pos(x) else .Zero_or_Positive;
+		if p, _ := is_pos(x); p {
+			dest.sign = .Negative;
+		} else {
+			dest.sign = .Zero_or_Positive;
+		}
 		x, y = y, x;
 	} else {
 		/*
@@ -220,11 +247,21 @@ int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 */
 int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
-	if dest == nil || a == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
 	}
+	/*
+		Grow destination as required.
+	*/
+	if dest != a {
+		if err = grow(dest, a.used + 1); err != .None {
+			return err;
+		}
+	}
+	/*
+		All parameters have been initialized.
+		We can now safely ignore errors from comparison routines.
+	*/
 
 	/*
 		Fast paths for destination and input Int being the same.
@@ -233,31 +270,23 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 		/*
 			Fast path for `dest` is negative and unsigned addition doesn't overflow the lowest digit.
 		*/
-		if is_neg(dest) && (dest.digit[0] + digit < _DIGIT_MAX) {
+		if n, _ := is_neg(dest); n && (dest.digit[0] + digit < _DIGIT_MAX) {
 			dest.digit[0] += digit;
-			return .OK;
+			return .None;
 		}
 		/*
 			Can be subtracted from dest.digit[0] without underflow.
 		*/
-		if is_pos(a) && (dest.digit[0] > digit) {
+		if p, _ := is_pos(a); p && (dest.digit[0] > digit) {
 			dest.digit[0] -= digit;
-			return .OK;
+			return .None;
 		}
-	}
-
-	/*
-		Grow destination as required.
-	*/
-	err = grow(dest, a.used + 1);
-	if err != .OK {
-		return err;
 	}
 
 	/*
 		If `a` is negative, just do an unsigned addition (with fudged signs).
 	*/
-	if is_neg(a) {
+	if n, _ := is_neg(a); n {
 		t := a;
 		t.sign = .Zero_or_Positive;
 
@@ -273,7 +302,9 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	/*
 		if `a`<= digit, simply fix the single digit.
 	*/
-	if a.used == 1 && (a.digit[0] <= digit || is_zero(a)) {
+	z, _ := is_zero(a);
+
+	if a.used == 1 && (a.digit[0] <= digit) || z {
 		dest.digit[0] = digit - a.digit[0] if a.used == 1 else digit;
 		dest.sign = .Negative;
 		dest.used = 1;
@@ -303,9 +334,7 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
-	clamp(dest);
-
-	return .OK;
+	return clamp(dest);
 }
 
 /*
@@ -320,10 +349,11 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 */
 _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	if dest == nil || a == nil || b == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(a) || !is_initialized(b) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(x); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(y); err != .None {
+		return err;
 	}
 
 	old_used, min_used, max_used, i: int;
@@ -336,10 +366,13 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	max_used = y.used;
 	old_used = dest.used;
 
-	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != .OK {
+	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != .None {
 		return err;
 	}
 	dest.used = max_used + 1;
+	/*
+		All parameters have been initialized.
+	*/
 
 	/* Zero the carry */
 	carry := DIGIT(0);
@@ -393,9 +426,7 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
-	clamp(dest);
-
-	return .OK;
+	return clamp(dest);
 }
 
 /*
@@ -404,10 +435,11 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	if dest == nil || number == nil || decrease == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(number) || !is_initialized(decrease) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(x); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(y); err != .None {
+		return err;
 	}
 
 	old_used := dest.used;
@@ -415,10 +447,13 @@ _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	max_used := x.used;
 	i: int;
 
-	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != .OK {
+	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != .None {
 		return err;
 	}
 	dest.used = max_used;
+	/*
+		All parameters have been initialized.
+	*/
 
 	borrow := DIGIT(0);
 
@@ -465,6 +500,5 @@ _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
-	clamp(dest);
-	return .OK;
+	return clamp(dest);
 }

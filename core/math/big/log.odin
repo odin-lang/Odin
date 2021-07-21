@@ -10,13 +10,18 @@ package big
 */
 
 log_n_int :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
-	if a == nil {
-		return 0, .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return 0, .Int_Not_Initialized;
+	if base < 2 || DIGIT(base) > _DIGIT_MAX {
+		return -1, .Invalid_Argument;
 	}
-	if is_neg(a) || is_zero(a) || base < 2 || DIGIT(base) > _DIGIT_MAX {
-		return -1, .Invalid_Input;
+
+	if err = clear_if_uninitialized(a); err != .None {
+		return -1, err;
+	}
+	if n, _ := is_neg(a); n {
+		return -1, .Invalid_Argument;
+	}
+	if z, _ := is_zero(a); z {
+		return -1, .Invalid_Argument;
 	}
 
 	/*
@@ -80,14 +85,14 @@ log_n_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 		Therefore, we return 0.
 	*/
 	if a < base {
-		return 0, .OK;
+		return 0, .None;
 	}
 
 	/*
 		If a number equals the base, the log is 1.
 	*/
 	if a == base {
-		return 1, .OK;
+		return 1, .None;
 	}
 
 	N := _WORD(a);
@@ -116,13 +121,13 @@ log_n_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 			bracket_low = bracket_mid;
 		}
 		if N == bracket_mid {
-			return mid, .OK;
+			return mid, .None;
 		}
    	}
 
    	if bracket_high == N {
-   		return high, .OK;
+   		return high, .None;
    	} else {
-   		return low, .OK;
+   		return low, .None;
    	}
 }

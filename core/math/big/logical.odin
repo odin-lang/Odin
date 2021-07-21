@@ -20,21 +20,25 @@ package big
 	2's complement `and`, returns `dest = a & b;`
 */
 and :: proc(dest, a, b: ^Int) -> (err: Error) {
-	assert_initialized(dest); assert_initialized(a); assert_initialized(b);
-
+	if err = clear_if_uninitialized(a); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(b); err != .None {
+		return err;
+	}
 	used := max(a.used, b.used) + 1;
-	neg: bool;
-
-	neg  = is_neg(a) && is_neg(b);
-
-	ac, bc, cc := DIGIT(1), DIGIT(1), DIGIT(1);
-
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .OK {
+	if err = grow(dest, used); err != .None {
 		return err;
 	}
+
+	neg_a, _ := is_neg(a);
+	neg_b, _ := is_neg(b);
+	neg      := neg_a && neg_b;
+
+	ac, bc, cc := DIGIT(1), DIGIT(1), DIGIT(1);
 
 	for i := 0; i < used; i += 1 {
 		x, y: DIGIT;
@@ -42,7 +46,7 @@ and :: proc(dest, a, b: ^Int) -> (err: Error) {
 		/*
 			Convert to 2's complement if negative.
 		*/
-		if is_neg(a) {
+		if neg_a {
 			ac += _MASK if i >= a.used else (~a.digit[i] & _MASK);
 			x = ac & _MASK;
 			ac >>= _DIGIT_BITS;
@@ -53,7 +57,7 @@ and :: proc(dest, a, b: ^Int) -> (err: Error) {
 		/*
 			Convert to 2's complement if negative.
 		*/
-		if is_neg(a) {
+		if neg_b {
 			bc += _MASK if i >= b.used else (~b.digit[i] & _MASK);
 			y = bc & _MASK;
 			bc >>= _DIGIT_BITS;
@@ -75,29 +79,32 @@ and :: proc(dest, a, b: ^Int) -> (err: Error) {
 
 	dest.used = used;
 	dest.sign = .Negative if neg else .Zero_or_Positive;
-	clamp(dest);
-	return .OK;
+	return clamp(dest);
 }
 
 /*
 	2's complement `or`, returns `dest = a | b;`
 */
 or :: proc(dest, a, b: ^Int) -> (err: Error) {
-	assert_initialized(dest); assert_initialized(a); assert_initialized(b);
-
+	if err = clear_if_uninitialized(a); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(b); err != .None {
+		return err;
+	}
 	used := max(a.used, b.used) + 1;
-	neg: bool;
-
-	neg  = is_neg(a) || is_neg(b);
-
-	ac, bc, cc := DIGIT(1), DIGIT(1), DIGIT(1);
-
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .OK {
+	if err = grow(dest, used); err != .None {
 		return err;
 	}
+
+	neg_a, _ := is_neg(a);
+	neg_b, _ := is_neg(b);
+	neg      := neg_a || neg_b;
+
+	ac, bc, cc := DIGIT(1), DIGIT(1), DIGIT(1);
 
 	for i := 0; i < used; i += 1 {
 		x, y: DIGIT;
@@ -105,7 +112,7 @@ or :: proc(dest, a, b: ^Int) -> (err: Error) {
 		/*
 			Convert to 2's complement if negative.
 		*/
-		if is_neg(a) {
+		if neg_a {
 			ac += _MASK if i >= a.used else (~a.digit[i] & _MASK);
 			x = ac & _MASK;
 			ac >>= _DIGIT_BITS;
@@ -116,7 +123,7 @@ or :: proc(dest, a, b: ^Int) -> (err: Error) {
 		/*
 			Convert to 2's complement if negative.
 		*/
-		if is_neg(a) {
+		if neg_b {
 			bc += _MASK if i >= b.used else (~b.digit[i] & _MASK);
 			y = bc & _MASK;
 			bc >>= _DIGIT_BITS;
@@ -138,29 +145,32 @@ or :: proc(dest, a, b: ^Int) -> (err: Error) {
 
 	dest.used = used;
 	dest.sign = .Negative if neg else .Zero_or_Positive;
-	clamp(dest);
-	return .OK;
+	return clamp(dest);
 }
 
 /*
 	2's complement `xor`, returns `dest = a ~ b;`
 */
 xor :: proc(dest, a, b: ^Int) -> (err: Error) {
-	assert_initialized(dest); assert_initialized(a); assert_initialized(b);
-
+	if err = clear_if_uninitialized(a); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(b); err != .None {
+		return err;
+	}
 	used := max(a.used, b.used) + 1;
-	neg: bool;
-
-	neg  = is_neg(a) != is_neg(b);
-
-	ac, bc, cc := DIGIT(1), DIGIT(1), DIGIT(1);
-
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .OK {
+	if err = grow(dest, used); err != .None {
 		return err;
 	}
+
+	neg_a, _ := is_neg(a);
+	neg_b, _ := is_neg(b);
+	neg      := neg_a != neg_b;
+
+	ac, bc, cc := DIGIT(1), DIGIT(1), DIGIT(1);
 
 	for i := 0; i < used; i += 1 {
 		x, y: DIGIT;
@@ -168,7 +178,7 @@ xor :: proc(dest, a, b: ^Int) -> (err: Error) {
 		/*
 			Convert to 2's complement if negative.
 		*/
-		if is_neg(a) {
+		if neg_a {
 			ac += _MASK if i >= a.used else (~a.digit[i] & _MASK);
 			x = ac & _MASK;
 			ac >>= _DIGIT_BITS;
@@ -179,7 +189,7 @@ xor :: proc(dest, a, b: ^Int) -> (err: Error) {
 		/*
 			Convert to 2's complement if negative.
 		*/
-		if is_neg(a) {
+		if neg_b {
 			bc += _MASK if i >= b.used else (~b.digit[i] & _MASK);
 			y = bc & _MASK;
 			bc >>= _DIGIT_BITS;
@@ -201,6 +211,5 @@ xor :: proc(dest, a, b: ^Int) -> (err: Error) {
 
 	dest.used = used;
 	dest.sign = .Negative if neg else .Zero_or_Positive;
-	clamp(dest);
-	return .OK;
+	return clamp(dest);
 }

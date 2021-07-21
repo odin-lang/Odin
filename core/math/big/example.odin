@@ -44,7 +44,7 @@ _SQR_TOOM_CUTOFF,
 print :: proc(name: string, a: ^Int, base := i8(16)) {
 	as, err := itoa(a, base);
 	defer delete(as);
-	if err == .OK {
+	if err == .None {
 		cb, _ := count_bits(a);
 		fmt.printf("%v (base: %v, bits used: %v): %v\n", name, base, cb, as);
 	} else {
@@ -80,10 +80,10 @@ demo :: proc() {
 	print("c", c);
 
 	fmt.println("\n\n=== Set a to (1 << 120) - 1 ===");
-	if err = power_of_two(a, 120); err != .OK {
+	if err = power_of_two(a, 120); err != .None {
 		fmt.printf("Error %v while setting a to 1 << 120.\n", err);
 	}
-	if err = sub(a, a, 1); err != .OK {
+	if err = sub(a, a, 1); err != .None {
 		fmt.printf("Error %v while subtracting 1 from a\n", err);	
 	}
 	print("a", a, 16);

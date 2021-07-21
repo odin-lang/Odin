@@ -53,27 +53,21 @@ Int :: struct {
 	sign:      Sign,
 };
 
-Comparison_Flag :: enum i8 {
-	Less_Than     = -1,
-	Equal         =  0,
-	Greater_Than  =  1,
+/*
+	Errors are a strict superset of runtime.Allocation_Error.
+*/
+Error :: enum byte {
+	None                   = 0,
+	Out_Of_Memory          = 1,
+	Invalid_Pointer        = 2,
+	Invalid_Argument       = 3,
 
-	/* One of the numbers was uninitialized */
-	Uninitialized = -127,
-};
+	Unknown_Error          = 4,
+	Max_Iterations_Reached = 5,
+	Buffer_Overflow        = 6,
+	Integer_Overflow       = 7,
 
-Error :: enum i8 {
-	OK                     =  0,
-	Unknown_Error          = -1,
-	Out_of_Memory          = -2,
-	Invalid_Input          = -3,
-	Max_Iterations_Reached = -4,
-	Buffer_Overflow        = -5,
-	Integer_Overflow       = -6,
-	Nil_Pointer_Passed     = -7,
-	Int_Not_Initialized    = -8,
-
-	Unimplemented          = -127,
+	Unimplemented          = 127,
 };
 
 Primality_Flag :: enum u8 {

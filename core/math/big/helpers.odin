@@ -30,14 +30,9 @@ int_destroy :: proc(integers: ..^Int) {
 int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator := context.allocator) -> (err: Error)
 	where intrinsics.type_is_integer(T) {
 	src := src;
-	/*
-		Check that dest is usable.
-	*/
-	if dest == nil {
-		return .Nil_Pointer_Passed;
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
 	}
-
-	if err = _grow_if_uninitialized(dest, minimize); err != .OK { return err; }
 
 	dest.used = 0;
 	dest.sign = .Zero_or_Positive if src >= 0 else .Negative;
@@ -49,7 +44,7 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 		src >>= _DIGIT_BITS;
 	}
 	_zero_unused(dest);
-	return .OK;
+	return .None;
 }
 
 set :: proc { int_set_from_integer, int_copy };
@@ -58,27 +53,20 @@ set :: proc { int_set_from_integer, int_copy };
 	Copy one `Int` to another.
 */
 int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
-	/*
-		Check that src and dest are usable.
-	*/
-	if dest == nil || src == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(src) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(src); err != .None {
+		return err;
 	}
-
 	/*
 		If dest == src, do nothing
 	*/
 	if (dest == src) {
-		return .OK;
+		return .None;
 	}
-
 	/*
 		Grow `dest` to fit `src`.
 		If `dest` is not yet initialized, it will be using `allocator`.
 	*/
-	if err = grow(dest, src.used, false, allocator); err != .OK {
+	if err = grow(dest, src.used, false, allocator); err != .None {
 		return err;
 	}
 
@@ -91,7 +79,7 @@ int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error
 	dest.used = src.used;
 	dest.sign = src.sign;
 	_zero_unused(dest);
-	return .OK;
+	return .None;
 }
 copy :: proc { int_copy, };
 
@@ -100,26 +88,23 @@ copy :: proc { int_copy, };
 */
 int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
-		Check that src and dest are usable.
+		Check that src is usable.
 	*/
-	if dest == nil || src == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(src) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(src); err != .None {
+		return err;
 	}
-
 	/*
 		If `dest == src`, just fix `dest`'s sign.
 	*/
 	if (dest == src) {
 		dest.sign = .Zero_or_Positive;
-		return .OK;
+		return .None;
 	}
 
 	/*
 		Copy `src` to `dest`
 	*/
-	if err = copy(dest, src, allocator); err != .OK {
+	if err = copy(dest, src, allocator); err != .None {
 		return err;
 	}
 
@@ -127,7 +112,7 @@ int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 		Fix sign.
 	*/
 	dest.sign = .Zero_or_Positive;
-	return .OK;
+	return .None;
 }
 
 platform_abs :: proc(n: $T) -> T where intrinsics.type_is_integer(T) {
@@ -140,27 +125,29 @@ abs :: proc{int_abs, platform_abs};
 */
 neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
-		Check that src and dest are usable.
+		Check that src is usable.
 	*/
-	if dest == nil || src == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(src) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(src); err != .None {
+		return err;
 	}
-
 	/*
 		If `dest == src`, just fix `dest`'s sign.
 	*/
-	sign := Sign.Negative if !(is_zero(src) && is_neg(src)) else Sign.Zero_or_Positive;
-	if dest == src {
-		dest.sign = sign;
-		return .OK;
+	sign := Sign.Zero_or_Positive;
+	if z, _ := is_zero(src); z {
+		sign = .Negative;
 	}
-
+	if n, _ := is_neg(src); n {
+		sign = .Negative;
+	}
+	if (dest == src) {
+		dest.sign = sign;
+		return .None;
+	}
 	/*
 		Copy `src` to `dest`
 	*/
-	if err = copy(dest, src, allocator); err != .OK {
+	if err = copy(dest, src, allocator); err != .None {
 		return err;
 	}
 
@@ -168,7 +155,7 @@ neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 		Fix sign.
 	*/
 	dest.sign = sign;
-	return .OK;
+	return .None;
 }
 
 /*
@@ -176,22 +163,20 @@ neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 */
 extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
 	/*
-		Check that `a` is usable.
+		Check that `a`is usable.
 	*/
-	if a == nil {
-		return 0, .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return 0, .Int_Not_Initialized;
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
 	}
 
 	limb := bit_offset / _DIGIT_BITS;
 	if limb < 0 || limb >= a.used {
-		return 0, .Invalid_Input;
+		return 0, .Invalid_Argument;
 	}
 
 	i := DIGIT(1 << DIGIT((bit_offset % _DIGIT_BITS)));
 
-	return 1 if ((a.digit[limb] & i) != 0) else 0, .OK;
+	return 1 if ((a.digit[limb] & i) != 0) else 0, .None;
 }
 
 /*
@@ -199,16 +184,14 @@ extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
 */
 extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 	/*
-		Check that `a` is usable.
+		Check that `a`is usable.
 	*/
-	if a == nil {
-		return 0, .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return 0, .Int_Not_Initialized;
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
 	}
 
 	if count > _WORD_BITS || count < 1 {
-		return 0, .Invalid_Input;
+		return 0, .Invalid_Argument;
 	}
 
 	v: DIGIT;
@@ -216,7 +199,7 @@ extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 	for shift := 0; shift < count; shift += 1 {
 		o   := offset + shift;
 		v, e = extract_bit(a, o);
-		if e != .OK {
+		if e != .None {
 			break;
 		}
 		res = res + _WORD(v) << uint(shift);
@@ -230,7 +213,7 @@ extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 */
 shrink :: proc(a: ^Int) -> (err: Error) {
 	if a == nil {
-		return .Nil_Pointer_Passed;
+		return .Invalid_Pointer;
 	}
 
 	needed := max(_MIN_DIGIT_COUNT, a.used);
@@ -238,12 +221,12 @@ shrink :: proc(a: ^Int) -> (err: Error) {
 	if a.used != needed {
 		return grow(a, needed);
 	}
-	return .OK;
+	return .None;
 }
 
 int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := context.allocator) -> (err: Error) {
 	if a == nil {
-		return .Nil_Pointer_Passed;
+		return .Invalid_Pointer;
 	}
 	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
 
@@ -269,9 +252,9 @@ int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := conte
 		Let's see if the allocation/resize worked as expected.
 	*/
 	if len(a.digit) != needed {
-		return .Out_of_Memory;
+		return .Out_Of_Memory;
 	}
-	return .OK;
+	return .None;
 }
 grow :: proc { int_grow, };
 
@@ -280,7 +263,7 @@ grow :: proc { int_grow, };
 */
 int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
 	if a == nil {
-		return .Nil_Pointer_Passed;
+		return .Invalid_Pointer;
 	}
 
 	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
@@ -299,14 +282,14 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if err = clear(a, minimize, allocator); err != .OK {
+	if err = clear(a, minimize, allocator); err != .None {
 		return err;
 	}
 
 	a.used     = 1;
 	a.digit[0] = 1;
 	a.sign     = .Zero_or_Positive;
-	return .OK;
+	return .None;
 }
 one :: proc { int_one, };
 
@@ -314,14 +297,14 @@ one :: proc { int_one, };
 	Set the `Int` to -1 and optionally shrink it to the minimum backing size.
 */
 int_minus_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if err = clear(a, minimize, allocator); err != .OK {
+	if err = clear(a, minimize, allocator); err != .None {
 		return err;
 	}
 
 	a.used     = 1;
 	a.digit[0] = 1;
 	a.sign     = .Negative;
-	return .OK;
+	return .None;
 }
 minus_one :: proc { int_minus_one, };
 
@@ -332,18 +315,18 @@ power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 		Check that `a` is usable.
 	*/
 	if a == nil {
-		return .Nil_Pointer_Passed;
+		return .Invalid_Pointer;
 	}
 
 	if power < 0 || power > _MAX_BIT_COUNT {
-		return .Invalid_Input;
+		return .Invalid_Argument;
 	}
 
 	/*
 		Grow to accomodate the single bit.
 	*/
 	a.used = (power / _DIGIT_BITS) + 1;
-	if err = grow(a, a.used); err != .OK {
+	if err = grow(a, a.used); err != .None {
 		return err;
 	}
 	/*
@@ -355,23 +338,21 @@ power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 		Set the bit.
 	*/
 	a.digit[power / _DIGIT_BITS] = 1 << uint((power % _DIGIT_BITS));
-   	return .OK;
+   	return .None;
 }
 
 /*
 	Count bits in an `Int`.
 */
 count_bits :: proc(a: ^Int) -> (count: int, err: Error) {
-	if a == nil {
-		return 0, .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return 0, .Int_Not_Initialized;
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
 	}
 	/*
 		Fast path for zero.
 	*/
-	if is_zero(a) {
-		return 0, .OK;
+	if z, _ := is_zero(a); z {
+		return 0, .None;
 	}
 	/*
 		Get the number of DIGITs and use it.
@@ -404,11 +385,11 @@ _zero_unused :: proc(a: ^Int) {
 	}
 }
 
-_grow_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
+clear_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
 	if !is_initialized(dest) {
 		return grow(dest, _MIN_DIGIT_COUNT if minimize else _DEFAULT_DIGIT_COUNT);
 	}
-	return .OK;
+	return .None;
 }
 
 /*
@@ -418,19 +399,17 @@ _grow_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
 	Typically very fast.  Also fixes the sign if there are no more leading digits.
 */
 clamp :: proc(a: ^Int) -> (err: Error) {
-	if a == nil {
-		return .Nil_Pointer_Passed;
-	} else if !is_initialized(a) {
-		return .Int_Not_Initialized;
+	if err = clear_if_uninitialized(a); err != .None {
+		return err;
 	}
 
 	for a.used > 0 && a.digit[a.used - 1] == 0 {
 		a.used -= 1;
 	}
 
-	if is_zero(a) {
+	if z, _ := is_zero(a); z {
 		a.sign = .Zero_or_Positive;
 	}
 
-	return .OK;
+	return .None;
 }
