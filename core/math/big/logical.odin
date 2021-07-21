@@ -213,3 +213,35 @@ xor :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest.sign = .Negative if neg else .Zero_or_Positive;
 	return clamp(dest);
 }
+
+/*
+	dest = ~src
+*/
+int_complement :: proc(dest, src: ^Int) -> (err: Error) {
+	/*
+		Check that src and dest are usable.
+	*/
+	if err = clear_if_uninitialized(src); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
+	}
+
+	/*
+		Temporarily fix sign.
+	*/
+	old_sign := src.sign;
+	z, _ := is_zero(src);
+
+	src.sign = .Negative if (src.sign == .Zero_or_Positive || z) else .Zero_or_Positive;
+
+	err = sub(dest, src, 1);
+	/*
+		Restore sign.
+	*/
+	src.sign = old_sign;
+
+	return err;
+}
+complement :: proc { int_complement, };

@@ -58,12 +58,17 @@ demo :: proc() {
 	defer destroy(a, b, c);
 
 	err = set(a, 512);
-	err = set(b, a);
+	err = set(b, 1);
+	for x := 0; x < 11; x += 1 {
+		err = shl1(b, b);
+		print("b", b, 16);
+	}
+	fmt.println();
 	err = set(c, -4);
 
-	print("a", a, 2);
-	print("b", b, 2);
-	print("c", c, 2);
+	print("a", a, 10);
+	print("b", b, 10);
+	print("c", c, 10);
 
 	fmt.println("=== a = a & b ===");
 	err = and(a, a, b);

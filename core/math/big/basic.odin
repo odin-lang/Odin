@@ -8,7 +8,7 @@ package big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
-	This file contains basic arithmetic operations like `add` and `sub`.
+	This file contains basic arithmetic operations like `add`, `sub`, `div`, ...
 */
 
 import "core:mem"
@@ -336,6 +336,132 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	*/
 	return clamp(dest);
 }
+
+
+/*
+	dest = src  / 2
+	dest = src >> 1
+*/
+int_halve :: proc(dest, src: ^Int) -> (err: Error) {
+	dest := dest; src := src;
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
+	}
+	/*
+		Grow destination as required.
+	*/
+	if dest != src {
+		if err = grow(dest, src.used); err != .None {
+			return err;
+		}
+	}
+
+	old_used  := dest.used;
+	dest.used  = src.used;
+
+	/*
+		Carry
+	*/
+	fwd_carry := DIGIT(0);
+
+	for x := dest.used; x >= 0; x -= 1 {
+		/*
+			Get the carry for the next iteration.
+		*/
+		src_digit := src.digit[x];
+		carry     := src_digit & 1;
+		/*
+			Shift the current digit, add in carry and store.
+		*/
+		dest.digit[x] = (src_digit >> 1) | (fwd_carry << (_DIGIT_BITS - 1));
+      	/*
+      		Forward carry to next iteration.
+      	*/
+      	fwd_carry = carry;
+   	}
+
+ 	zero_count := old_used - dest.used;
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
+	}
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	dest.sign = src.sign;
+	return clamp(dest);
+}
+halve :: proc { int_halve, };
+shr1  :: halve;
+
+/*
+	dest = src  * 2
+	dest = src << 1
+*/
+int_double :: proc(dest, src: ^Int) -> (err: Error) {
+	dest := dest; src := src;
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
+	}
+	/*
+		Grow destination as required.
+	*/
+	if dest != src {
+		if err = grow(dest, src.used + 1); err != .None {
+			return err;
+		}
+	}
+
+	old_used  := dest.used;
+	dest.used  = src.used + 1;
+
+	/*
+		Forward carry
+	*/
+	carry := DIGIT(0);
+	for x := 0; x < src.used; x += 1 {
+		/*
+			Get what will be the *next* carry bit from the MSB of the current digit.
+		*/
+		src_digit := src.digit[x];
+		fwd_carry := src_digit >> (_DIGIT_BITS - 1);
+
+		/*
+			Now shift up this digit, add in the carry [from the previous]
+		*/
+		dest.digit[x] = (src_digit << 1 | carry) & _MASK;
+
+		/*
+			Update carry
+		*/
+		carry = fwd_carry;
+	}
+	/*
+		New leading digit?
+	*/
+	if carry != 0 {
+		/*
+			Add a MSB which is always 1 at this point.
+		*/
+		dest.digit[dest.used] = 1;
+	}
+ 	zero_count := old_used - dest.used;
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
+	}
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	dest.sign = src.sign;
+	return clamp(dest);
+}
+double :: proc { int_double, };
+shl1   :: double;
 
 /*
 	==========================

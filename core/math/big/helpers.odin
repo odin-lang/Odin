@@ -11,6 +11,7 @@ package big
 
 import "core:mem"
 import "core:intrinsics"
+
 /*
 	Deallocates the backing memory of one or more `Int`s.
 */
@@ -367,6 +368,49 @@ count_bits :: proc(a: ^Int) -> (count: int, err: Error) {
 }
 
 /*
+	Counts the number of LSBs which are zero before the first zero bit
+*/
+count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
+	}
+
+	lnz := []u8{4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0};
+
+	q: DIGIT;
+
+	/*
+		Early out for zero.
+	*/
+	if z, _ := is_zero(a); z {
+		return 0, .None;
+	}
+
+	/*
+		Scan lower digits until non-zero.
+	*/
+	for count = 0; (count < a.used && a.digit[count] == 0); count += 1 {}
+	q = a.digit[count];
+	count *= _DIGIT_BITS;
+
+   	/*
+   		Now scan this digit until a 1 is found.
+   	*/
+   	if q & 1 == 0 {
+    	p: DIGIT;
+      	for {
+        	p = q & 15;
+        	count += int(lnz[p]);
+        	q >>= 4;
+        	if p != 0 {
+	         	break;
+        	}
+		}
+	}
+   	return count, .None;
+}
+
+/*
 	Internal helpers.
 */
 assert_initialized :: proc(a: ^Int, loc := #caller_location) {
@@ -402,7 +446,6 @@ clamp :: proc(a: ^Int) -> (err: Error) {
 	if err = clear_if_uninitialized(a); err != .None {
 		return err;
 	}
-
 	for a.used > 0 && a.digit[a.used - 1] == 0 {
 		a.used -= 1;
 	}
@@ -410,6 +453,5 @@ clamp :: proc(a: ^Int) -> (err: Error) {
 	if z, _ := is_zero(a); z {
 		a.sign = .Zero_or_Positive;
 	}
-
 	return .None;
 }
