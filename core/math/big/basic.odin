@@ -25,7 +25,11 @@ import "core:intrinsics"
 */
 int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	assert_initialized(dest); assert_initialized(a); assert_initialized(b);
+	if dest == nil || a == nil || b == nil {
+		return .Nil_Pointer_Passed;
+	} else if !is_initialized(a) || !is_initialized(b) {
+		return .Int_Not_Initialized;
+	}
 
 	/*
 		Handle both negative or both positive.
@@ -56,8 +60,11 @@ int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
-	assert_initialized(dest); assert_initialized(a);
-
+	if dest == nil || a == nil {
+		return .Nil_Pointer_Passed;
+	} else if !is_initialized(a) {
+		return .Int_Not_Initialized;
+	}
 	/*
 		Fast paths for destination and input Int being the same.
 	*/
@@ -81,8 +88,7 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	/*
 		Grow destination as required.
 	*/
-	err = grow(dest, a.used + 1);
-	if err != .OK {
+	if err = grow(dest, a.used + 1); err != .OK {
 		return err;
 	}
 
@@ -170,7 +176,11 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 */
 int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	assert_initialized(number); assert_initialized(decrease); assert_initialized(dest);
+	if dest == nil || number == nil || decrease == nil {
+		return .Nil_Pointer_Passed;
+	} else if !(is_initialized(number) && is_initialized(decrease)) {
+		return .Int_Not_Initialized;
+	}
 
 	if x.sign != y.sign {
 		/*
@@ -210,7 +220,11 @@ int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 */
 int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
-	assert_initialized(dest); assert_initialized(a);
+	if dest == nil || a == nil {
+		return .Nil_Pointer_Passed;
+	} else if !is_initialized(a) {
+		return .Int_Not_Initialized;
+	}
 
 	/*
 		Fast paths for destination and input Int being the same.
@@ -306,7 +320,11 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 */
 _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	assert_initialized(a); assert_initialized(b); assert_initialized(dest);
+	if dest == nil || a == nil || b == nil {
+		return .Nil_Pointer_Passed;
+	} else if !is_initialized(a) || !is_initialized(b) {
+		return .Int_Not_Initialized;
+	}
 
 	old_used, min_used, max_used, i: int;
 
@@ -318,8 +336,7 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	max_used = y.used;
 	old_used = dest.used;
 
-	err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT));
-	if err != .OK {
+	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != .OK {
 		return err;
 	}
 	dest.used = max_used + 1;
@@ -387,15 +404,18 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	assert_initialized(number); assert_initialized(decrease); assert_initialized(dest);
+	if dest == nil || number == nil || decrease == nil {
+		return .Nil_Pointer_Passed;
+	} else if !is_initialized(number) || !is_initialized(decrease) {
+		return .Int_Not_Initialized;
+	}
 
 	old_used := dest.used;
 	min_used := y.used;
 	max_used := x.used;
 	i: int;
 
-	err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT));
-	if err != .OK {
+	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != .OK {
 		return err;
 	}
 	dest.used = max_used;

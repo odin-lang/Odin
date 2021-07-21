@@ -198,9 +198,10 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			buffer[available] = 0;
 		}
 
+		shift, count: int;
 		// mask  := _WORD(radix - 1);
-		shift := int(log_n(DIGIT(radix), 2));
-		count := int(count_bits(a));
+		shift, err = log_n(DIGIT(radix), 2);
+		count, err = count_bits(a);
 		// digit: _WORD;
 
 		for offset := 0; offset < count; offset += 4 {
