@@ -328,7 +328,12 @@ minus_one :: proc { int_minus_one, };
 
 
 power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
-	assert_initialized(a);
+	/*
+		Check that `a` is usable.
+	*/
+	if a == nil {
+		return .Nil_Pointer_Passed;
+	}
 
 	if power < 0 || power > _MAX_BIT_COUNT {
 		return .Invalid_Input;
@@ -356,13 +361,17 @@ power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 /*
 	Count bits in an `Int`.
 */
-count_bits :: proc(a: ^Int) -> (count: int) {
-	assert_initialized(a);
+count_bits :: proc(a: ^Int) -> (count: int, err: Error) {
+	if a == nil {
+		return 0, .Nil_Pointer_Passed;
+	} else if !is_initialized(a) {
+		return 0, .Int_Not_Initialized;
+	}
 	/*
 		Fast path for zero.
 	*/
 	if is_zero(a) {
-		return 0;
+		return 0, .OK;
 	}
 	/*
 		Get the number of DIGITs and use it.
@@ -384,7 +393,12 @@ assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 }
 
 _zero_unused :: proc(a: ^Int) {
-	assert_initialized(a);
+	if a == nil {
+		return;
+	} else if !is_initialized(a) {
+		return;
+	}
+
 	if a.used < len(a.digit) {
 		mem.zero_slice(a.digit[a.used:]);
 	}
@@ -397,15 +411,18 @@ _grow_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
 	return .OK;
 }
 
-clamp :: proc(a: ^Int) {
-	assert_initialized(a);
-	/*
-		Trim unused digits
-		This is used to ensure that leading zero digits are
-		trimmed and the leading "used" digit will be non-zero.
-		Typically very fast.  Also fixes the sign if there
-		are no more leading digits.
-	*/
+/*
+	Trim unused digits.
+
+	This is used to ensure that leading zero digits are trimmed and the leading "used" digit will be non-zero.
+	Typically very fast.  Also fixes the sign if there are no more leading digits.
+*/
+clamp :: proc(a: ^Int) -> (err: Error) {
+	if a == nil {
+		return .Nil_Pointer_Passed;
+	} else if !is_initialized(a) {
+		return .Int_Not_Initialized;
+	}
 
 	for a.used > 0 && a.digit[a.used - 1] == 0 {
 		a.used -= 1;
@@ -414,5 +431,6 @@ clamp :: proc(a: ^Int) {
 	if is_zero(a) {
 		a.sign = .Zero_or_Positive;
 	}
-}
 
+	return .OK;
+}
