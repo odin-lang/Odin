@@ -322,7 +322,7 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 			carry := dest.digit[i] >> ((size_of(DIGIT) * 8) - 1);
 			dest.digit[i] &= _MASK;
 		}
-   	}
+	}
 
 	zero_count := old_used - dest.used;
 	/*
@@ -374,13 +374,13 @@ int_halve :: proc(dest, src: ^Int) -> (err: Error) {
 			Shift the current digit, add in carry and store.
 		*/
 		dest.digit[x] = (src_digit >> 1) | (fwd_carry << (_DIGIT_BITS - 1));
-      	/*
-      		Forward carry to next iteration.
-      	*/
-      	fwd_carry = carry;
-   	}
+		/*
+			Forward carry to next iteration.
+		*/
+		fwd_carry = carry;
+	}
 
- 	zero_count := old_used - dest.used;
+	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
 	*/
@@ -447,7 +447,7 @@ int_double :: proc(dest, src: ^Int) -> (err: Error) {
 		*/
 		dest.digit[dest.used] = 1;
 	}
- 	zero_count := old_used - dest.used;
+	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
 	*/
@@ -462,6 +462,49 @@ int_double :: proc(dest, src: ^Int) -> (err: Error) {
 }
 double :: proc { int_double, };
 shl1   :: double;
+
+
+/*
+	dest = src % (2^power);
+*/
+int_mod_power_of_two :: proc(dest, src: ^Int, power: int) -> (err: Error) {
+	dest := dest; src := src;
+	if err = clear_if_uninitialized(dest); err != .None {
+		return err;
+	}
+	if err = clear_if_uninitialized(src); err != .None {
+		return err;
+	}
+
+	if power  < 0 { return .Invalid_Argument; }
+	if power == 0 { return zero(dest); }
+
+	/*
+		If the modulus is larger than the value, return the value.
+	*/
+	err = copy(dest, src);
+	if power >= (src.used * _DIGIT_BITS) || err != .None {
+		return;
+	}
+
+	/*
+		Zero digits above the last digit of the modulus.
+	*/
+	zero_count := (power / _DIGIT_BITS) + 0 if (power % _DIGIT_BITS == 0) else 1;
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[zero_count:]);
+	}
+
+	/*
+		Clear the digit that is not completely outside/inside the modulus.
+	*/
+	dest.digit[power / _DIGIT_BITS] &= DIGIT(1 << DIGIT(power % _DIGIT_BITS)) - DIGIT(1);
+	return clamp(dest);
+}
+mod_power_of_two :: proc { int_mod_power_of_two, };
 
 /*
 	==========================
