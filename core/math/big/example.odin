@@ -57,16 +57,11 @@ demo :: proc() {
 	a, b, c := &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c);
 
-	err = set(a, -512);
+	err = set(a, 1);
 	err = set(b, 1);
 	err = set(c, -4);
 
-
-	err = mod_power_of_two(a, a, 10);
-	fmt.printf("%v (%v)\n", int_get_float(a));
-
-
-	print("a", a, 10);
+	print("a", a, 16);
 	print("b", b, 10);
 	print("c", c, 10);
 
