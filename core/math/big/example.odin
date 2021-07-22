@@ -57,16 +57,16 @@ demo :: proc() {
 	a, b, c := &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c);
 
-	err = set(a, 512);
+	err = set(a, 0);
+	a.used = 2;
+	a.digit[1] = 1;
 	err = set(b, 1);
-	for x := 0; x < 11; x += 1 {
-		err = shl1(b, b);
-		print("b", b, 16);
-	}
-	fmt.println();
 	err = set(c, -4);
 
-	print("a", a, 10);
+	fmt.printf("%v (%v)\n", int_get_float(a));
+
+
+	print("a", a, 16);
 	print("b", b, 10);
 	print("c", c, 10);
 
