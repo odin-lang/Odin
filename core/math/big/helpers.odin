@@ -20,7 +20,10 @@ int_destroy :: proc(integers: ..^Int) {
 
 	for a in &integers {
 		mem.zero_slice(a.digit[:]);
-		free(&a.digit[0]);
+		raw := transmute(mem.Raw_Dynamic_Array)a.digit;
+		if raw.cap > 0 {
+			free(&a.digit[0]);
+		}
 		a = &Int{};
 	}
 }
@@ -83,6 +86,20 @@ int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error
 	return .None;
 }
 copy :: proc { int_copy, };
+
+/*
+	In normal code, you can also write `a, b = b, a`.
+	However, that only swaps within the current scope.
+	This helper swaps completely.
+*/
+int_swap :: proc(a, b: ^Int) {
+	a := a; b := b;
+
+	a.used,  b.used  = b.used,  a.used;
+	a.sign,  b.sign  = b.sign,  a.sign;
+	a.digit, b.digit = b.digit, a.digit;
+}
+swap :: proc { int_swap, };
 
 /*
 	Set `dest` to |`src`|.
