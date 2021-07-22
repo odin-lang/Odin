@@ -19,7 +19,7 @@ print_configation :: proc() {
 	DIGIT_BITS           %v
 	MIN_DIGIT_COUNT      %v
 	MAX_DIGIT_COUNT      %v
-	EFAULT_DIGIT_COUNT   %v
+	DEFAULT_DIGIT_COUNT  %v
 	MAX_COMBA            %v
 	WARRAY               %v
 	MUL_KARATSUBA_CUTOFF %v
@@ -57,37 +57,18 @@ demo :: proc() {
 	a, b, c := &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c);
 
-	err = set(a, 1);
-	err = set(b, 1);
-	err = set(c, -4);
+	err = set(a, -512);
+	err = set(b, 1024);
 
 	print("a", a, 16);
-	print("b", b, 10);
-	print("c", c, 10);
+	print("b", b, 16);
 
-	fmt.println("=== a = a & b ===");
-	err = and(a, a, b);
-	fmt.printf("a &= b error: %v\n", err);
+	fmt.println("--- swap ---");
+	foo(a, b);
 
-	print("a", a, 2);
-	print("b", b, 10);
-
-	fmt.println("\n\n=== b = abs(c) ===");
-	c.sign = .Negative;
-	abs(b, c); // copy c to b.
-
-	print("b", b);
-	print("c", c);
-
-	fmt.println("\n\n=== Set a to (1 << 120) - 1 ===");
-	if err = power_of_two(a, 120); err != .None {
-		fmt.printf("Error %v while setting a to 1 << 120.\n", err);
-	}
-	if err = sub(a, a, 1); err != .None {
-		fmt.printf("Error %v while subtracting 1 from a\n", err);	
-	}
 	print("a", a, 16);
-	fmt.println("Expected a to be:        FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+	print("b", b, 16);
+
 }
 
 main :: proc() {
@@ -95,7 +76,7 @@ main :: proc() {
 	mem.tracking_allocator_init(&ta, context.allocator);
 	context.allocator = mem.tracking_allocator(&ta);
 
-	// print_configation();
+	print_configation();
 	demo();
 
 	if len(ta.allocation_map) > 0 {

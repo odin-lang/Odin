@@ -670,3 +670,64 @@ _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	*/
 	return clamp(dest);
 }
+
+
+/*
+	Multiplies |a| * |b| and only computes upto digs digits of result.
+	HAC pp. 595, Algorithm 14.12  Modified so you can control how
+	many digits of output are created.
+*/
+_int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
+
+	/*
+		Can we use the fast multiplier?
+	*/
+	when false { // Have Comba?
+		if digits < _WARRAY && min(a.used, b.used) < _MAX_COMBA {
+			return _int_mul_comba(dest, a, b, digits);
+		}
+	}
+
+	if err = grow(dest, digits); err != .None { return err; }
+	dest.used = digits;
+
+	/*
+
+	/* compute the digits of the product directly */
+	pa = a->used;
+	for (ix = 0; ix < pa; ix++) {
+		int iy, pb;
+		mp_digit u = 0;
+
+		/* limit ourselves to making digs digits of output */
+		pb = MP_MIN(b->used, digs - ix);
+
+		/* compute the columns of the output and propagate the carry */
+		for (iy = 0; iy < pb; iy++) {
+			/* compute the column as a mp_word */
+			mp_word r = (mp_word)t.dp[ix + iy] +
+							((mp_word)a->dp[ix] * (mp_word)b->dp[iy]) +
+							(mp_word)u;
+
+			/* the new column is the lower part of the result */
+			t.dp[ix + iy] = (mp_digit)(r & (mp_word)MP_MASK);
+
+			/* get the carry word from the result */
+			u       = (mp_digit)(r >> (mp_word)MP_DIGIT_BIT);
+		}
+		/* set carry if it is placed below digs */
+		if ((ix + iy) < digs) {
+			t.dp[ix + pb] = u;
+		}
+	}
+
+	mp_clamp(&t);
+	mp_exch(&t, c);
+
+	mp_clear(&t);
+	return MP_OKAY;
+}
+
+*/
+	return .None;
+}
