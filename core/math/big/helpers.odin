@@ -309,8 +309,6 @@ int_minus_one :: proc(a: ^Int, minimize := false, allocator := context.allocator
 }
 minus_one :: proc { int_minus_one, };
 
-
-
 power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 	/*
 		Check that `a` is usable.
@@ -339,7 +337,91 @@ power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 		Set the bit.
 	*/
 	a.digit[power / _DIGIT_BITS] = 1 << uint((power % _DIGIT_BITS));
-   	return .None;
+	return .None;
+}
+
+int_get_u128 :: proc(a: ^Int) -> (res: u128, err: Error) {
+	return int_get(a, u128);
+}
+get_u128 :: proc { int_get_u128, };
+
+int_get_i128 :: proc(a: ^Int) -> (res: i128, err: Error) {
+	return int_get(a, i128);
+}
+get_i128 :: proc { int_get_i128, };
+
+int_get_u64 :: proc(a: ^Int) -> (res: u64, err: Error) {
+	return int_get(a, u64);
+}
+get_u64 :: proc { int_get_u64, };
+
+int_get_i64 :: proc(a: ^Int) -> (res: i64, err: Error) {
+	return int_get(a, i64);
+}
+get_i64 :: proc { int_get_i64, };
+
+int_get_u32 :: proc(a: ^Int) -> (res: u32, err: Error) {
+	return int_get(a, u32);
+}
+get_u32 :: proc { int_get_u32, };
+
+int_get_i32 :: proc(a: ^Int) -> (res: i32, err: Error) {
+	return int_get(a, i32);
+}
+get_i32 :: proc { int_get_i32, };
+
+/*
+	TODO: Think about using `count_bits` to check if the value could be returned completely,
+	and maybe return max(T), .Integer_Overflow if not?
+*/
+int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
+	}
+
+	size_in_bits := int(size_of(T) * 8);
+	i := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS);
+	i  = min(int(a.used), i);
+
+	for ; i >= 0; i -= 1 {
+		res <<= uint(0) if size_in_bits <= _DIGIT_BITS else _DIGIT_BITS;
+		res |= T(a.digit[i]);
+		if size_in_bits <= _DIGIT_BITS {
+			break;
+		};
+	}
+
+	when !intrinsics.type_is_unsigned(T) {
+		/*
+			Mask off sign bit.
+		*/
+		res ~= 1 << uint(size_in_bits - 1);
+		/*
+			Set the sign.
+		*/
+		if a.sign == .Negative {
+			res = -res;
+		}
+	}
+	return;
+}
+get :: proc { int_get, };
+
+int_get_float :: proc(a: ^Int) -> (res: f64, err: Error) {
+	if err = clear_if_uninitialized(a); err != .None {
+		return 0, err;
+	}	
+
+	l   := min(a.used, 17); // log2(max(f64)) is approximately 1020, or 17 legs.
+	fac := f64(1 << _DIGIT_BITS);
+	d   := 0.0;
+
+	for i := l; i >= 0; i -= 1 {
+		d = (d * fac) + f64(a.digit[i]);
+	}
+
+	res = -d if a.sign == .Negative else d;
+	return;
 }
 
 /*
@@ -393,21 +475,21 @@ count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 	q = a.digit[count];
 	count *= _DIGIT_BITS;
 
-   	/*
-   		Now scan this digit until a 1 is found.
-   	*/
-   	if q & 1 == 0 {
-    	p: DIGIT;
-      	for {
-        	p = q & 15;
-        	count += int(lnz[p]);
-        	q >>= 4;
-        	if p != 0 {
-	         	break;
-        	}
+	/*
+		Now scan this digit until a 1 is found.
+	*/
+	if q & 1 == 0 {
+		p: DIGIT;
+		for {
+			p = q & 15;
+			count += int(lnz[p]);
+			q >>= 4;
+			if p != 0 {
+				break;
+			}
 		}
 	}
-   	return count, .None;
+	return count, .None;
 }
 
 /*
