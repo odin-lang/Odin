@@ -94,11 +94,11 @@ when size_of(rawptr) == 8 {
 	/*
 		We can use u128 as an intermediary.
 	*/
-	DIGIT        :: distinct(u64);
-	_WORD        :: distinct(u128);
+	DIGIT        :: distinct u64;
+	_WORD        :: distinct u128;
 } else {
-	DIGIT        :: distinct(u32);
-	_WORD        :: distinct(u64);
+	DIGIT        :: distinct u32;
+	_WORD        :: distinct u64;
 }
 #assert(size_of(_WORD) == 2 * size_of(DIGIT));
 
