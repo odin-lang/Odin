@@ -207,7 +207,7 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 
 		shift, count: int;
 		// mask  := _WORD(radix - 1);
-		shift, err = log_n(DIGIT(radix), 2);
+		shift, err = log(DIGIT(radix), 2);
 		count, err = count_bits(a);
 		digit: _WORD;
 
@@ -263,7 +263,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 		digit     = a.digit,
 	};
 
-	if size, err = log_n(t, DIGIT(radix)); err != .None {
+	if size, err = log(t, DIGIT(radix)); err != .None {
 		return 0, err;
 	}
 
