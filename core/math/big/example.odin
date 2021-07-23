@@ -57,17 +57,15 @@ demo :: proc() {
 	a, b, c := &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c);
 
-	err = set(a, -512);
-	err = set(b, 1024);
+	err = set(a, -1024);
+	err = set(b, -1024);
 
-	print("a", a, 16);
-	print("b", b, 16);
+	print("a", a, 10);
+	print("b", b, 10);
 
-	fmt.println("--- swap ---");
-	foo(a, b);
-
-	print("a", a, 16);
-	print("b", b, 16);
+	fmt.println("--- mul ---");
+	mul(c, a, b);
+	print("c", c, 10);
 
 }
 
