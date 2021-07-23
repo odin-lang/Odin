@@ -57,9 +57,7 @@ set :: proc { int_set_from_integer, int_copy };
 	Copy one `Int` to another.
 */
 int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
-	if err = clear_if_uninitialized(src); err != .None {
-		return err;
-	}
+	if err = clear_if_uninitialized(src); err != .None { return err; }
 	/*
 		If dest == src, do nothing
 	*/
@@ -532,6 +530,22 @@ clear_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
 	if !is_initialized(dest) {
 		return grow(dest, _MIN_DIGIT_COUNT if minimize else _DEFAULT_DIGIT_COUNT);
 	}
+	return .None;
+}
+
+_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
+	digits := digits;
+	if err = clear_if_uninitialized(src);  err != .None { return err; }
+	if err = clear_if_uninitialized(dest); err != .None { return err; }
+	/*
+		If dest == src, do nothing
+	*/
+	if (dest == src) {
+		return .None;
+	}
+
+	digits = min(digits, len(src.digit), len(dest.digit));
+	mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
 	return .None;
 }
 

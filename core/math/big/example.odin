@@ -64,9 +64,8 @@ demo :: proc() {
 	print("b", b, 10);
 
 	fmt.println("--- mul ---");
-	mul(c, a, b);
+	mul(c, a, a);
 	print("c", c, 10);
-
 }
 
 main :: proc() {
