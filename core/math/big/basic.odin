@@ -516,7 +516,7 @@ int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT) -> (err: Error) {
 	}
 	if is_power_of_two(int(multiplier)) {
 		ix: int;
-		if ix, err = log_n(multiplier, 2); err != .None { return err; }
+		if ix, err = log(multiplier, 2); err != .None { return err; }
 		return shl(dest, src, ix);
 	}
 
@@ -647,6 +647,11 @@ int_mul :: proc(dest, src, multiplier: ^Int) -> (err: Error) {
 }
 
 mul :: proc { int_mul, int_mul_digit, };
+
+sqr :: proc(dest, src: ^Int) -> (err: Error) {
+	return mul(dest, src, src);
+}
+
 
 /*
 	==========================

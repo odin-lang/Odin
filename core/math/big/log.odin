@@ -9,7 +9,7 @@ package big
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
 
-log_n_int :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
+int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	if base < 2 || DIGIT(base) > _DIGIT_MAX {
 		return -1, .Invalid_Argument;
 	}
@@ -35,7 +35,7 @@ log_n_int :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
 	if a.used == 1 {
-		return log_n_digit(a.digit[0], DIGIT(base));
+		return log(a.digit[0], DIGIT(base));
 	}
 
     // if (MP_HAS(S_MP_LOG)) {
@@ -45,7 +45,49 @@ log_n_int :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
 	return -1, .Unimplemented;
 }
 
-log_n :: proc{log_n_int, log_n_digit};
+log :: proc { int_log, int_log_digit, };
+
+/*
+	Calculate c = a**b  using a square-multiply algorithm.
+*/
+int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
+	if err = clear_if_uninitialized(dest); err != .None { return err; }
+	if err = clear_if_uninitialized(base); err != .None { return err; }
+
+// 	if ((err = mp_init_copy(&g, a)) != MP_OKAY) {
+// 		return err;
+// 	}
+
+// 	/* set initial result */
+// 	mp_set(c, 1uL);
+
+// 	while (b > 0) {
+// 		/* if the bit is set multiply */
+// 		if ((b & 1) != 0) {
+// 			if ((err = mp_mul(c, &g, c)) != MP_OKAY) {
+// 				goto LBL_ERR;
+// 			}
+// 		}
+
+// 		/* square */
+// 		if (b > 1) {
+// 			if ((err = mp_sqr(&g, &g)) != MP_OKAY) {
+// 				goto LBL_ERR;
+// 			}
+// 		}
+
+// 		/* shift to next bit */
+// 		b >>= 1;
+// 	}
+
+// LBL_ERR:
+// 	mp_clear(&g);
+// 	return err;
+	return err;
+}
+
+
+pow :: proc { int_pow, };
 
 /*
 	Returns the log2 of an `Int`, provided `base` is a power of two.
@@ -79,7 +121,7 @@ small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
    	return result;
 }
 
-log_n_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
+int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 	/*
 		If the number is smaller than the base, it fits within a fraction.
 		Therefore, we return 0.
