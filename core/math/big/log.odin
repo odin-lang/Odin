@@ -13,36 +13,22 @@ int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	if base < 2 || DIGIT(base) > _DIGIT_MAX {
 		return -1, .Invalid_Argument;
 	}
-
-	if err = clear_if_uninitialized(a); err != .None {
-		return -1, err;
-	}
-	if n, _ := is_neg(a); n {
-		return -1, .Invalid_Argument;
-	}
-	if z, _ := is_zero(a); z {
-		return -1, .Invalid_Argument;
-	}
+	if err = clear_if_uninitialized(a); err != .None { return -1, err; }
+	if n, _ := is_neg(a);  n { return -1, .Invalid_Argument; }
+	if z, _ := is_zero(a); z { return -1, .Invalid_Argument; }
 
 	/*
 		Fast path for bases that are a power of two.
 	*/
-	if is_power_of_two(int(base)) {
-		return _log_power_of_two(a, base);
-	}
+	if is_power_of_two(int(base)) { return _log_power_of_two(a, base); }
 
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
-	if a.used == 1 {
-		return log(a.digit[0], DIGIT(base));
-	}
+	if a.used == 1 { return log(a.digit[0], DIGIT(base)); }
 
-    // if (MP_HAS(S_MP_LOG)) {
-    //    return s_mp_log(a, (mp_digit)base, c);
-    // }
+	return _int_log(a, base);
 
-	return -1, .Unimplemented;
 }
 
 log :: proc { int_log, int_log_digit, };
@@ -222,4 +208,92 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
    	} else {
    		return low, .None;
    	}
+}
+
+
+/*
+	Internal implementation of log.	
+*/
+_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
+	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+
+	cnt := 0;
+
+	ic, _ := cmp(a, base);
+	if ic == -1 || ic == 0 {
+		return 1 if ic == 0 else 0, .None;
+	}
+
+	if err = set(bi_base, base);          err != .None { return -1, err; }
+	if err = _init_multi(bracket_mid, t); err != .None { return -1, err; }
+	if err = one(bracket_low);            err != .None { return -1, err; }
+	if err = set(bracket_high, base);     err != .None { return -1, err; }
+
+	low  := 0; high := 1;
+
+	/*
+		A kind of Giant-step/baby-step algorithm.
+		Idea shamelessly stolen from https://programmingpraxis.com/2010/05/07/integer-logarithms/2/
+		The effect is asymptotic, hence needs benchmarks to test if the Giant-step should be skipped
+		for small n.
+	*/
+
+	for {
+		/*
+			Iterate until `a` is bracketed between low + high.
+		*/
+		if bc, _ := cmp(bracket_high, a); bc != -1 {
+			break;
+		}
+
+	 	low = high;
+	 	if err = copy(bracket_low, bracket_high); err != .None {
+			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+			return -1, err;
+	 	}
+	 	high <<= 1;
+	 	if err = sqr(bracket_high, bracket_high); err != .None {
+			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+			return -1, err;
+	 	}
+
+	 	cnt += 1;
+	 	if cnt == 7 {
+		 	destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+			return -2, .Max_Iterations_Reached;
+	 	}
+	}
+
+	for (high - low) > 1 {
+		mid := (high + low) >> 1;
+
+		if err = pow(t, bi_base, mid - low); err != .None {
+			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+			return -1, err;
+		}
+
+		if err = mul(bracket_mid, bracket_low, t); err != .None {
+			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+			return -1, err;
+		}
+		mc, _ := cmp(a, bracket_mid);
+		if mc == -1 {
+			high = mid;
+			swap(bracket_mid, bracket_high);
+		}
+		if mc == 1 {
+			low = mid;
+			swap(bracket_mid, bracket_low);
+		}
+		if mc == 0 {
+			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+			return mid, .None;
+		}
+	}
+
+	fc, _ := cmp(bracket_high, a);
+	res = high if fc == 0 else low;
+
+	destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+	return;
 }

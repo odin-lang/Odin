@@ -75,7 +75,7 @@ int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error
 	/*
 		Copy everything over and zero high digits.
 	*/
-	for v, i in src.digit[:src.used+1] {
+	for v, i in src.digit[:src.used] {
 		dest.digit[i] = v;
 	}
 	dest.used = src.used;
@@ -532,6 +532,19 @@ clear_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
 	}
 	return .None;
 }
+
+/*
+	Allocates several `Int`s at once.
+*/
+_int_init_multi :: proc(integers: ..^Int) -> (err: Error) {
+	integers := integers;
+	for a in &integers {
+		if err = clear(a); err != .None { return err; }
+	}
+	return .None;
+}
+
+_init_multi :: proc { _int_init_multi, };
 
 _copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
 	digits := digits;
