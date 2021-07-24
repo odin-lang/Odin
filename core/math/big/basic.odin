@@ -954,3 +954,107 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 	destroy(t);
 	return err;
 }
+
+/*
+	Fivide by three (based on routine from MPI and the GMP manual).
+*/
+_int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
+	/*
+		b = 2**MP_DIGIT_BIT / 3
+	*/
+ 	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3);
+
+	q := &Int{};
+	if err = grow(q, numerator.used); err != .None { return -1, err; }
+	q.used = numerator.used;
+	q.sign = numerator.sign;
+
+	w, t: _WORD;
+	for ix := numerator.used; ix >= 0; ix -= 1 {
+		w = (w << _WORD(_DIGIT_BITS)) | _WORD(numerator.digit[ix]);
+		if w >= 3 {
+			/*
+				Multiply w by [1/3].
+			*/
+			t = (w * b) >> _WORD(_DIGIT_BITS);
+
+			/*
+				Now subtract 3 * [w/3] from w, to get the remainder.
+			*/
+			w -= t+t+t;
+
+			/*
+				Fixup the remainder as required since the optimization is not exact.
+			*/
+			for w >= 3 {
+				t += 1;
+				w -= 3;
+			}
+		} else {
+			t = 0;
+		}
+		q.digit[ix] = DIGIT(t);
+	}
+
+	remainder = int(w);
+
+	/*
+		[optional] store the quotient.
+	*/
+	if quotient != nil {
+		err = clamp(q);
+ 		swap(q, quotient);
+ 	}
+	destroy(q);
+	return remainder, .None;
+}
+
+/*
+	Slower bit-bang division... also smaller.
+*/
+_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
+
+// 	mp_int ta, tb, tq, q;
+// 	int n;
+// 	bool neg;
+// 	mp_err err;
+
+// 	/* init our temps */
+// 	if ((err = mp_init_multi(&ta, &tb, &tq, &q, NULL)) != MP_OKAY) {
+// 		return err;
+// 	}
+
+// 	mp_set(&tq, 1uL);
+// 	n = mp_count_bits(a) - mp_count_bits(b);
+// 	if ((err = mp_abs(a, &ta)) != MP_OKAY)                         goto LBL_ERR;
+// 	if ((err = mp_abs(b, &tb)) != MP_OKAY)                         goto LBL_ERR;
+// 	if ((err = mp_mul_2d(&tb, n, &tb)) != MP_OKAY)                 goto LBL_ERR;
+// 	if ((err = mp_mul_2d(&tq, n, &tq)) != MP_OKAY)                 goto LBL_ERR;
+
+// 	while (n-- >= 0) {
+// 		if (mp_cmp(&tb, &ta) != MP_GT) {
+// 			if ((err = mp_sub(&ta, &tb, &ta)) != MP_OKAY)            goto LBL_ERR;
+// 			if ((err = mp_add(&q, &tq, &q)) != MP_OKAY)              goto LBL_ERR;
+// 		}
+// 		if ((err = mp_div_2d(&tb, 1, &tb, NULL)) != MP_OKAY)        goto LBL_ERR;
+// 		if ((err = mp_div_2d(&tq, 1, &tq, NULL)) != MP_OKAY)        goto LBL_ERR;
+// 	}
+
+// 	/* now q == quotient and ta == remainder */
+
+// 	neg = (a->sign != b->sign);
+// 	if (c != NULL) {
+// 		mp_exch(c, &q);
+// 		c->sign = ((neg && !mp_iszero(c)) ? MP_NEG : MP_ZPOS);
+// 	}
+// 	if (d != NULL) {
+// 		mp_exch(d, &ta);
+// 		d->sign = (mp_iszero(d) ? MP_ZPOS : a->sign);
+// 	}
+// LBL_ERR:
+// 	mp_clear_multi(&ta, &tb, &tq, &q, NULL);
+// 	return err;
+
+
+	return .None;
+}

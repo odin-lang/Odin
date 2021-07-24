@@ -26,6 +26,7 @@ print_configation :: proc() {
 	SQR_KARATSUBA_CUTOFF %v
 	MUL_TOOM_CUTOFF      %v
 	SQR_TOOM_CUTOFF      %v
+
 `, _DIGIT_BITS,
 _MIN_DIGIT_COUNT,
 _MAX_DIGIT_COUNT,
@@ -37,8 +38,6 @@ _SQR_KARATSUBA_CUTOFF,
 _MUL_TOOM_CUTOFF,
 _SQR_TOOM_CUTOFF,
 );
-
-	fmt.println();
 }
 
 print :: proc(name: string, a: ^Int, base := i8(16)) {
@@ -54,11 +53,21 @@ print :: proc(name: string, a: ^Int, base := i8(16)) {
 
 demo :: proc() {
 	err: Error;
-	a, b, c := &Int{}, &Int{}, &Int{};
-	defer destroy(a, b, c);
+	i:   int;
+	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	err = set(a, 5125);
-	print("a", a);
+	err = set(numerator,   15625);
+	err = set(denominator,     3);
+
+	print("numerator  ", numerator,   10);
+	print("denominator", denominator, 10);
+
+	i, err = _int_div_3(quotient, numerator);
+
+	print("quotient   ", quotient,    10);
+	fmt.println("remainder  ", i);
+	fmt.println("error", err);
 }
 
 main :: proc() {
