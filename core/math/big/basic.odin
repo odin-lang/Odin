@@ -898,7 +898,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 	/*
 		Grow `t` to maximum needed size, or `_DEFAULT_DIGIT_COUNT`, whichever is bigger.
 	*/
-	if err = grow(t, min((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != .None { return err; }
+	if err = grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != .None { return err; }
 	t.used = (2 * pa) + 1;
 
 	for ix = 0; ix < pa; ix += 1 {
@@ -906,13 +906,12 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 		/*
 			First calculate the digit at 2*ix; calculate double precision result.
 		*/
-		r := _WORD(t.digit[ix+ix]) + _WORD(src.digit[ix] * src.digit[ix]);
+		r := _WORD(t.digit[ix+ix]) + (_WORD(src.digit[ix]) * _WORD(src.digit[ix]));
 
 		/*
 			Store lower part in result.
 		*/
 		t.digit[ix+ix] = DIGIT(r & _WORD(_MASK));
-
 		/*
 			Get the carry.
 		*/
@@ -924,7 +923,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 			*/
 			r = _WORD(src.digit[ix]) * _WORD(src.digit[iy]);
 
-			/* Now calculate the double precision result. Nte we use
+			/* Now calculate the double precision result. Nóte we use
 			 * addition instead of *2 since it's easier to optimize
 			 */
 			r = _WORD(t.digit[ix+iy]) + r + r + _WORD(carry);

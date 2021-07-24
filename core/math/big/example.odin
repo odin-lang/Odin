@@ -57,14 +57,8 @@ demo :: proc() {
 	a, b, c := &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c);
 
-	for base in -3..=3 {
-		for power in -3..=3 {
-			err = pow(a, base, power);
-			fmt.printf("err: %v | pow(%v, %v) = ", err, base, power); print("", a, 10);
-		}
-	}
-
-
+	err = set(a, 5125);
+	print("a", a);
 }
 
 main :: proc() {
