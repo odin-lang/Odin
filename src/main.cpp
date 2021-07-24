@@ -610,6 +610,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_ThreadedChecker,
+	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
 	BuildFlag_VetExtra,
@@ -734,6 +735,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,str_lit("use-separate-modules"),BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ThreadedChecker,   str_lit("threaded-checker"),    BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoThreadedChecker, str_lit("no-threaded-checker"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages, str_lit("show-debug-messages"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
@@ -1220,7 +1222,19 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_ThreadedChecker:
+							#if defined(GB_SYSTEM_WINDOWS)
+							gb_printf_err("-threaded-checker is the default on this platform\n");
+							bad_flags = true;
+							#endif
 							build_context.threaded_checker = true;
+							break;
+
+						case BuildFlag_NoThreadedChecker:
+							#if !defined(GB_SYSTEM_WINDOWS)
+							gb_printf_err("-no-threaded-checker is the default on this platform\n");
+							bad_flags = true;
+							#endif
+							build_context.threaded_checker = false;
 							break;
 
 						case BuildFlag_ShowDebugMessages:
@@ -1767,10 +1781,16 @@ void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (check) {
+		#if defined(GB_SYSTEM_WINDOWS)
+		print_usage_line(1, "-no-threaded-checker");
+		print_usage_line(2, "Disabled multithreading in the semantic checker stage");
+		print_usage_line(0, "");
+		#else
 		print_usage_line(1, "-threaded-checker");
 		print_usage_line(1, "[EXPERIMENTAL]");
 		print_usage_line(2, "Multithread the semantic checker stage");
 		print_usage_line(0, "");
+		#endif
 
 		print_usage_line(1, "-vet");
 		print_usage_line(2, "Do extra checks on the code");

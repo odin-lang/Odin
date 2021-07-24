@@ -823,6 +823,10 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
 
+	#if defined(GB_SYSTEM_WINDOWS)
+	bc->threaded_checker = true;
+	#endif
+
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
