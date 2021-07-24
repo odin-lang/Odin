@@ -60,6 +60,9 @@ Error :: enum byte {
 	Buffer_Overflow        = 6,
 	Integer_Overflow       = 7,
 
+	Division_by_Zero       = 8,
+	Math_Domain_Error      = 9,
+
 	Unimplemented          = 127,
 };
 
