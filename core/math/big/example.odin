@@ -57,15 +57,14 @@ demo :: proc() {
 	a, b, c := &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c);
 
-	err = set(a, -1024);
-	err = set(b, -1024);
+	for base in -3..=3 {
+		for power in -3..=3 {
+			err = pow(a, base, power);
+			fmt.printf("err: %v | pow(%v, %v) = ", err, base, power); print("", a, 10);
+		}
+	}
 
-	print("a", a, 10);
-	print("b", b, 10);
 
-	fmt.println("--- mul ---");
-	mul(c, a, a);
-	print("c", c, 10);
 }
 
 main :: proc() {
