@@ -43,47 +43,44 @@ _SQR_TOOM_CUTOFF,
 print :: proc(name: string, a: ^Int, base := i8(16)) {
 	as, err := itoa(a, base);
 	defer delete(as);
-	if err == .None {
-		cb, _ := count_bits(a);
-		fmt.printf("%v (base: %v, bits used: %v): %v\n", name, base, cb, as);
-	} else {
-		fmt.printf("%v (error: %v): %v\n", name, err, a);
+	cb, _ := count_bits(a);
+	fmt.printf("%v (base: %v, bits used: %v): %v\n", name, base, cb, as);
+	if err != .None {
+		fmt.printf("%v (error: %v | %v)\n", name, err, a);
 	}
+	
+}
+
+num_threads :: 16;
+global_traces_indexes := [num_threads]u16{};
+@thread_local local_traces_index : ^u16;
+
+init_thread_tracing :: proc(thread_id: u8) {
+    
+    fmt.printf("%p\n", &global_traces_indexes[thread_id]);
+    fmt.printf("%p\n", local_traces_index);
 }
 
 demo :: proc() {
 	err: Error;
-	i:   int;
+
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	err = set(numerator,   15625);
-	err = set(denominator,     3);
-
-	print("numerator  ", numerator,   10);
-	print("denominator", denominator, 10);
-
-	i, err = _int_div_3(quotient, numerator);
-
-	print("quotient   ", quotient,    10);
-	fmt.println("remainder  ", i);
-	fmt.println("error", err);
-
-	fmt.println(); fmt.println();
-
-	err = set (numerator,   15625);
-	err = set (denominator,     3);
+	err = set (numerator,   2);
+	err = set (denominator, 3);
 	err = zero(quotient);
+	err = zero(remainder);
 
-	print("numerator  ", numerator,   10);
-	print("denominator", denominator, 10);
-
-	err = _int_div_small(quotient, remainder, numerator, denominator);
-
-	print("quotient   ", quotient,    10);
-	print("remainder  ", remainder,   10);
-
-
+	err = pow(numerator, numerator, 260);
+	if err != .None {
+		fmt.printf("Error: %v\n", err);
+	} else {
+		print("numerator  ", numerator,   16);
+		print("denominator", denominator, 10);
+		print("quotient   ", quotient,    10);
+		print("remainder  ", remainder,   10);
+	}
 }
 
 main :: proc() {

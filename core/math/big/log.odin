@@ -217,8 +217,6 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 
-	cnt := 0;
-
 	ic, _ := cmp(a, base);
 	if ic == -1 || ic == 0 {
 		return 1 if ic == 0 else 0, .None;
@@ -255,12 +253,6 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	 	if err = sqr(bracket_high, bracket_high); err != .None {
 			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
 			return -1, err;
-	 	}
-
-	 	cnt += 1;
-	 	if cnt == 7 {
-		 	destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
-			return -2, .Max_Iterations_Reached;
 	 	}
 	}
 
