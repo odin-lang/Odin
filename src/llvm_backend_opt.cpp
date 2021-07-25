@@ -40,11 +40,16 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 
 	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
 	if (optimization_level == 0) {
-		LLVMAddMemCpyOptPass(fpm);
+		if (!ignore_memcpy_pass) {
+			LLVMAddMemCpyOptPass(fpm);
+		}
+
 		return;
 	}
-	else if (ignore_memcpy_pass) {
+
+	if (ignore_memcpy_pass) {
 		lb_basic_populate_function_pass_manager(fpm);
+		
 		return;
 	} 
 
