@@ -39,15 +39,14 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
 	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
-
-	if (ignore_memcpy_pass) {
-		lb_basic_populate_function_pass_manager(fpm);
-		return;
-	} else if (optimization_level == 0) {
+	if (optimization_level == 0) {
 		LLVMAddMemCpyOptPass(fpm);
-		lb_basic_populate_function_pass_manager(fpm);
 		return;
 	}
+	else if (ignore_memcpy_pass) {
+		lb_basic_populate_function_pass_manager(fpm);
+		return;
+	} 
 
 #if 0
 	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
@@ -83,10 +82,7 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
 	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
-
-	if (optimization_level == 0) {
-		LLVMAddMemCpyOptPass(fpm);
-		lb_basic_populate_function_pass_manager(fpm);
+	if (optimization_level == 0) { //NOTE(Jesse): This is the only path taken for opt:[1,2]
 		return;
 	}
 
@@ -119,6 +115,10 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 }
 
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
+	if (optimization_level == 0) { //NOTE(Jesse): Compiling demo.odin or my program under opt:0 never calls this.
+		return;
+	}
+
 	LLVMAddEarlyCSEMemSSAPass(mpm);
 
 	LLVMAddGVNPass(mpm);
@@ -175,14 +175,14 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
+	if (optimization_level == 0) {
+		return;
+	}
 
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
 	LLVMAddPruneEHPass(mpm);
-	if (optimization_level == 0) {
-		return;
-	}
 
 	LLVMAddGlobalDCEPass(mpm);
 
