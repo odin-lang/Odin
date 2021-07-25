@@ -87,8 +87,8 @@ void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
 int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *x = data[i];
 	EntityGraphNode *y = data[j];
-	isize a = x->entity->order_in_src;
-	isize b = y->entity->order_in_src;
+	u64 a = x->entity->order_in_src;
+	u64 b = y->entity->order_in_src;
 	if (x->dep_count < y->dep_count) {
 		return -1;
 	}
@@ -867,6 +867,7 @@ void init_checker_info(CheckerInfo *i) {
 
 	gb_mutex_init(&i->gen_procs_mutex);
 	gb_mutex_init(&i->gen_types_mutex);
+	gb_mutex_init(&i->lazy_mutex);
 
 	mutex_init(&i->type_info_mutex);
 	mutex_init(&i->deps_mutex);
@@ -898,6 +899,7 @@ void destroy_checker_info(CheckerInfo *i) {
 
 	gb_mutex_destroy(&i->gen_procs_mutex);
 	gb_mutex_destroy(&i->gen_types_mutex);
+	gb_mutex_destroy(&i->lazy_mutex);
 	mutex_destroy(&i->type_info_mutex);
 	mutex_destroy(&i->deps_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
@@ -1219,10 +1221,25 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 	return false;
 }
 
+void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope *scope) {
+	if (c->file != nullptr && (c->file->flags & AstFile_IsLazy) != 0 && scope->flags & ScopeFlag_File) {
+		AstPackage *pkg = c->file->pkg;
+		if (pkg->kind == Package_Init && e->kind == Entity_Procedure && e->token.string == "main") {
+			// Do nothing
+		} else if (e->flags & EntityFlag_Test) {
+			// Do nothing
+		} else {
+			e->flags |= EntityFlag_Lazy;
+		}
+	}
+}
+
 bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
 	if (scope == nullptr) {
 		return false;
 	}
+
+
 	if (!is_blank_ident(name)) {
 		Entity *ie = scope_insert(scope, entity);
 		if (ie != nullptr) {
@@ -1274,10 +1291,61 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 }
 
 
+bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
+	if ((e->flags & EntityFlag_Lazy) == 0) {
+		return false;
+	}
+
+	if (e->flags & EntityFlag_Test) {
+		return false;
+	} else if (e->kind == Entity_Variable && e->Variable.is_export) {
+		return false;
+	} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
+		return false;
+	}
+
+	for_array(i, d->attributes) {
+		Ast *attr = d->attributes[i];
+		if (attr->kind != Ast_Attribute) continue;
+		for_array(j, attr->Attribute.elems) {
+			Ast *elem = attr->Attribute.elems[j];
+			String name = {};
+
+			switch (elem->kind) {
+			case_ast_node(i, Ident, elem);
+				name = i->token.string;
+			case_end;
+			case_ast_node(i, Implicit, elem);
+				name = i->string;
+			case_end;
+			case_ast_node(fv, FieldValue, elem);
+				if (fv->field->kind == Ast_Ident) {
+					name = fv->field->Ident.token.string;
+				}
+			case_end;
+			}
+
+			if (name.len != 0) {
+				if (name == "test") {
+					return false;
+				} else if (name == "export") {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
 void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
 	GB_ASSERT(identifier->kind == Ast_Ident);
 	GB_ASSERT(e != nullptr && d != nullptr);
 	GB_ASSERT(identifier->Ident.token.string == e->token.string);
+
+	if (!could_entity_be_lazy(e, d)) {
+		e->flags &= ~EntityFlag_Lazy;
+	}
 
 	if (e->scope != nullptr) {
 		Scope *scope = e->scope;
@@ -1300,8 +1368,20 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 	d->entity = e;
 	e->pkg = c->pkg;
 
-	// Is this even correct?
-	e->order_in_src = 1+mpmc_enqueue(&info->entity_queue, e);
+	isize queue_count = -1;
+	bool is_lazy = false;
+
+	// is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
+	// if (!is_lazy) {
+		queue_count = mpmc_enqueue(&info->entity_queue, e);
+	// }
+
+	if (e->token.pos.file_id != 0) {
+		e->order_in_src = cast(u64)(e->token.pos.file_id)<<32 | u32(e->token.pos.offset);
+	} else {
+		GB_ASSERT(!is_lazy);
+		e->order_in_src = cast(u64)(1+queue_count);
+	}
 }
 
 
@@ -2998,6 +3078,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	ast_node(vd, ValueDecl, decl);
 
 	EntityVisiblityKind entity_visibility_kind = c->foreign_context.visibility_kind;
+	bool is_test = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -3050,6 +3131,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				slice_unordered_remove(elems, j);
 				j -= 1;
+			} else if (name == "test") {
+				is_test = true;
 			}
 		}
 	}
@@ -3171,6 +3254,10 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				d->proc_lit = init;
 				d->init_expr = init;
+
+				if (is_test) {
+					e->flags |= EntityFlag_Test;
+				}
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
 				e = alloc_entity_proc_group(d->scope, token, nullptr);
@@ -3185,6 +3272,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
 			}
+			add_entity_flags_from_file(c, e, c->scope);
 
 			if (vd->is_using) {
 				if (e->kind == Entity_TypeName && init->kind == Ast_EnumType) {
@@ -3369,6 +3457,9 @@ void check_all_global_entities(Checker *c) {
 	// Don't bother trying
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
+		if (e->flags & EntityFlag_Lazy) {
+			continue;
+		}
 		DeclInfo *d = e->decl_info;
 		check_single_global_entity(c, e, d);
 		if (e->type != nullptr && is_type_typed(e->type)) {
@@ -3784,6 +3875,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
+	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, parent_scope, nullptr, e);
 
 
@@ -4366,7 +4458,7 @@ void calculate_global_init_order(Checker *c) {
 		for_array(i, info->variable_init_order) {
 			DeclInfo *d = info->variable_init_order[i];
 			Entity *e = d->entity;
-			gb_printf("\t'%.*s' %td\n", LIT(e->token.string), e->order_in_src);
+			gb_printf("\t'%.*s' %llu\n", LIT(e->token.string), cast(unsigned long long)e->order_in_src);
 		}
 		gb_printf("\n");
 	}
