@@ -12,8 +12,7 @@ package big
 */
 
 import "core:intrinsics"
-import "core:fmt"
-import "core:strings"
+import "core:mem"
 
 /*
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
@@ -41,12 +40,7 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 		Exit if calculating the size returned an error.
 	*/
 	if size, err = radix_size(a, radix, zero_terminate); err != .None {
-		f := strings.clone(fallback(a), allocator);
-		if zero_terminate {
-			c := strings.clone_to_cstring(f);
-			return string(c), err;
-		}
-		return f, err;
+		return "", err;
 	}
 
 	/*
@@ -58,28 +52,9 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 		Write the digits out into the buffer.
 	*/
 	written: int;
-	if written, err = itoa_raw(a, radix, buffer, size, zero_terminate); err == .None {
-		return string(buffer[:written]), .None;
-	}
+	written, err = itoa_raw(a, radix, buffer, size, zero_terminate);
 
-	/*
-		For now, delete the buffer and fall back to the below on failure.
-	*/
-	delete(buffer);
-
-	fallback :: proc(a: ^Int, print_raw := false) -> string {
-		   if print_raw {
-				   return fmt.tprintf("%v", a);
-		   }
-		   sign := "-" if a.sign == .Negative else "";
-		   if a.used <= 2 {
-				   v := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
-				   return fmt.tprintf("%v%v", sign, v);
-		   } else {
-				   return fmt.tprintf("[%2d] %v%v", a.used, sign, a.digit[:a.used]);
-		   }
-	}
-	return strings.clone(fallback(a), allocator), .Unimplemented;
+	return string(buffer[:written]), err;
 }
 
 /*
@@ -166,7 +141,15 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			buffer[available] = '-';
 		}
 
-		return len(buffer) - available, .None;
+		/*
+			If we overestimated the size, we need to move the buffer left.
+		*/
+		written = len(buffer) - available;
+		if written < size {
+			diff := size - written;
+			mem.copy(&buffer[0], &buffer[diff], written);
+		}
+		return written, .None;
 	}
 
 	/*
@@ -190,11 +173,17 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			available -= 1;
 			buffer[available] = '-';
 		}
-		return len(buffer) - available, .None;
+
+		/*
+			If we overestimated the size, we need to move the buffer left.
+		*/
+		written = len(buffer) - available;
+		if written < size {
+			diff := size - written;
+			mem.copy(&buffer[0], &buffer[diff], written);
+		}
+		return written, .None;
 	}
-	/*
-		At least 3 DIGITs are in use if we made it this far.
-	*/
 
 	/*
 		Fast path for radixes that are a power of two.
@@ -225,10 +214,18 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 			buffer[available] = '-';
 		}
 
-		return len(buffer) - available, .None;
+		/*
+			If we overestimated the size, we need to move the buffer left.
+		*/
+		written = len(buffer) - available;
+		if written < size {
+			diff := size - written;
+			mem.copy(&buffer[0], &buffer[diff], written);
+		}
+		return written, .None;
 	}
 
-	return -1, .Unimplemented;
+	return _itoa_raw_full(a, radix, buffer, zero_terminate);
 }
 
 itoa :: proc{itoa_string, itoa_raw};
@@ -236,7 +233,7 @@ int_to_string  :: itoa;
 int_to_cstring :: itoa_cstring;
 
 /*
-	We size for `string`, not `cstring`.
+	We size for `string` by default.
 */
 radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, err: Error) {
 	a := a;
@@ -270,8 +267,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 	/*
 		log truncates to zero, so we need to add one more, and one for `-` if negative.
 	*/
-	n, _ := is_neg(a);
-	size += 2 if n else 1;
+	size += 2 if a.sign == .Negative else 1;
 	size += 1 if zero_terminate else 0;
 	return size, .None;
 }
@@ -290,3 +286,54 @@ RADIX_TABLE_REVERSE := [80]u8{
    0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, /* ghijklmnop */
    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, /* qrstuvwxyz */
 };
+
+/*
+	Stores a bignum as a ASCII string in a given radix (2..64)
+	The buffer must be appropriately sized. This routine doesn't check.
+*/
+_itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (written: int, err: Error) {
+	temp, denominator := &Int{}, &Int{};
+
+	if err = copy(temp, a); err != .None { return 0, err; }
+	if err = set(denominator, radix); err != .None { return 0, err; }
+
+	available := len(buffer);
+	if zero_terminate {
+		available -= 1;
+		buffer[available] = 0;
+	}
+
+	if a.sign == .Negative {
+		temp.sign = .Zero_or_Positive;
+	}
+
+	remainder: int;
+	for {
+		if remainder, err = _int_div_digit(temp, temp, DIGIT(radix)); err != .None {
+			destroy(temp, denominator);
+			return len(buffer) - available, err;
+		}
+		available -= 1;
+		buffer[available] = RADIX_TABLE[remainder];
+		if temp.used == 0 {
+			break;
+		}
+	}
+
+	if a.sign == .Negative {
+		available -= 1;
+		buffer[available] = '-';
+	}
+
+	destroy(temp, denominator);
+
+	/*
+		If we overestimated the size, we need to move the buffer left.
+	*/
+	written = len(buffer) - available;
+	if written < len(buffer) {
+		diff := len(buffer) - written;
+		mem.copy(&buffer[0], &buffer[diff], written);
+	}
+	return written, .None;
+}

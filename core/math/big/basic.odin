@@ -666,7 +666,7 @@ int_div :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Erro
 	if err = clear_if_uninitialized(numerator);			err != .None { return err; }
 	if err = clear_if_uninitialized(denominator);		err != .None { return err; }
 
-	return _int_div(quotient, remainder, numerator, denominator);
+	return _int_div_small(quotient, remainder, numerator, denominator);
 }
 div :: proc{ int_div, };
 
@@ -1077,4 +1077,90 @@ _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (er
 	}
 	destroy(ta, tb, tq, q);
 	return err;
+}
+
+/*
+	Single digit division (based on routine from MPI).
+*/
+_int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: int, err: Error) {
+	q := &Int{};
+	ix: int;
+
+	/*
+		Cannot divide by zero.
+	*/
+	if denominator == 0 {
+		return 0, .Division_by_Zero;
+	}
+
+	/*
+		Quick outs.
+	*/
+	if denominator == 1 || numerator.used == 0 {
+		err = .None;
+		if quotient != nil {
+			err = copy(quotient, numerator);
+		}
+		return 0, err;
+	}
+	/*
+		Power of two?
+	*/
+	if denominator == 2 {
+		if odd, _ := is_odd(numerator); odd {
+			remainder = 1;
+		}
+		if quotient == nil {
+			return remainder, .None;
+		}
+		return remainder, shr(quotient, numerator, 1);
+	}
+
+	if is_power_of_two(int(denominator)) {
+		ix = 1;
+		for ix < _DIGIT_BITS && denominator != (1 << uint(ix)) {
+			ix += 1;
+		}
+		remainder = int(numerator.digit[0]) & ((1 << uint(ix)) - 1);
+		if quotient == nil {
+			return remainder, .None;
+		}
+
+		return remainder, shr(quotient, numerator, int(ix));
+	}
+
+	/*
+		Three?
+	*/
+	if denominator == 3 {
+		return _int_div_3(quotient, numerator);
+	}
+
+	/*
+		No easy answer [c'est la vie].  Just division.
+	*/
+	if err = grow(q, numerator.used); err != .None { return 0, err; }
+
+	q.used = numerator.used;
+	q.sign = numerator.sign;
+
+	w := _WORD(0);
+
+	for ix = numerator.used - 1; ix >= 0; ix -= 1 {
+		t := DIGIT(0);
+		w = (w << _WORD(_DIGIT_BITS) | _WORD(numerator.digit[ix]));
+		if w >= _WORD(denominator) {
+			t = DIGIT(w / _WORD(denominator));
+			w -= _WORD(t) * _WORD(denominator);
+		}
+		q.digit[ix] = t;
+	}
+	remainder = int(w);
+
+	if quotient != nil {
+		clamp(q);
+		swap(q, quotient);
+	}
+	destroy(q);
+	return remainder, .None;
 }
