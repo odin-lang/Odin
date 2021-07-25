@@ -464,12 +464,12 @@ i32 linker_stage(lbGenerator *gen) {
 				" -e _main "
 			#endif
 			, linker, object_files, LIT(output_base), LIT(output_ext),
-      			#if defined(GB_SYSTEM_OSX)
-        			"-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
-      			#else
-        			"-lc -lm",
-      			#endif
-      			lib_str,
+			#if defined(GB_SYSTEM_OSX)
+			  "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
+			#else
+			  "-lc -lm",
+			#endif
+			lib_str,
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
@@ -637,6 +637,7 @@ enum BuildFlagKind {
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_VerboseErrors,
+	BuildFlag_IgnoreLazy, // internal use only
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -644,6 +645,7 @@ enum BuildFlagKind {
 	BuildFlag_WindowsPdbName,
 	BuildFlag_Subsystem,
 #endif
+
 
 	BuildFlag_COUNT,
 };
@@ -761,6 +763,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,    str_lit("verbose-errors"),     BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_IgnoreLazy,       str_lit("ignore_lazy"),        BuildFlagParam_None, Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
@@ -768,6 +771,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),          BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"),         BuildFlagParam_String, Command__does_build);
 #endif
+
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -1362,6 +1366,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_VerboseErrors:
 							build_context.show_error_line = true;
+							break;
+
+						case BuildFlag_IgnoreLazy:
+							build_context.ignore_lazy = true;
 							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)

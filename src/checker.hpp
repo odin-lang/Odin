@@ -300,6 +300,8 @@ struct CheckerInfo {
 	// too much of a problem in practice
 	BlockingMutex deps_mutex;
 
+	gbMutex lazy_mutex; // Mutex required for lazy type checking of specific files
+
 	gbMutex gen_procs_mutex;         // Possibly recursive
 	gbMutex gen_types_mutex;         // Possibly recursive
 	Map<Array<Entity *> > gen_procs; // Key: Ast * | Identifier -> Entity

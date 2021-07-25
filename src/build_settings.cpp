@@ -203,6 +203,8 @@ struct BuildContext {
 	bool   warnings_as_errors;
 	bool   show_error_line;
 
+	bool   ignore_lazy;
+
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;

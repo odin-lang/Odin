@@ -1115,71 +1115,66 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
+	if (e->flags & EntityFlag_Lazy) {
+		gb_mutex_lock(&ctx->info->lazy_mutex);
+	}
+
 	String name = e->token.string;
 
 	if (e->type != nullptr || e->state != EntityState_Unresolved) {
 		error(e->token, "Illegal declaration cycle of `%.*s`", LIT(name));
-		return;
-	}
-
-	GB_ASSERT(e->state == EntityState_Unresolved);
-
-#if 0
-	char buf[256] = {};
-	isize n = gb_snprintf(buf, 256, "%.*s %d", LIT(name), e->kind);
-	Timings timings = {};
-	timings_init(&timings, make_string(cast(u8 *)buf, n-1), 16);
-	defer ({
-		timings_print_all(&timings);
-		timings_destroy(&timings);
-	});
-#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
-#else
-#define TIME_SECTION(str)
-#endif
-
-	if (d == nullptr) {
-		d = decl_info_of_entity(e);
+	} else {
+		GB_ASSERT(e->state == EntityState_Unresolved);
 		if (d == nullptr) {
-			// TODO(bill): Err here?
-			e->type = t_invalid;
-			e->state = EntityState_Resolved;
-			set_base_type(named_type, t_invalid);
-			return;
-			// GB_PANIC("'%.*s' should been declared!", LIT(name));
+			d = decl_info_of_entity(e);
+			if (d == nullptr) {
+				// TODO(bill): Err here?
+				e->type = t_invalid;
+				e->state = EntityState_Resolved;
+				set_base_type(named_type, t_invalid);
+				goto end;
+			}
 		}
+
+		CheckerContext c = *ctx;
+		c.scope = d->scope;
+		c.decl  = d;
+		c.type_level = 0;
+
+		e->parent_proc_decl = c.curr_proc_decl;
+		e->state = EntityState_InProgress;
+
+		switch (e->kind) {
+		case Entity_Variable:
+			check_global_variable_decl(&c, e, d->type_expr, d->init_expr);
+			break;
+		case Entity_Constant:
+			check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
+			break;
+		case Entity_TypeName: {
+			check_type_decl(&c, e, d->init_expr, named_type);
+			break;
+		}
+		case Entity_Procedure:
+			check_proc_decl(&c, e, d);
+			break;
+		case Entity_ProcGroup:
+			check_proc_group_decl(&c, e, d);
+			break;
+		}
+
+		e->state = EntityState_Resolved;
+
+	}
+end:;
+	// NOTE(bill): Add it to the list of checked entities
+	if (e->flags & EntityFlag_Lazy) {
+		array_add(&ctx->info->entities, e);
 	}
 
-	CheckerContext c = *ctx;
-	c.scope = d->scope;
-	c.decl  = d;
-	c.type_level = 0;
-
-	e->parent_proc_decl = c.curr_proc_decl;
-	e->state = EntityState_InProgress;
-
-	switch (e->kind) {
-	case Entity_Variable:
-		check_global_variable_decl(&c, e, d->type_expr, d->init_expr);
-		break;
-	case Entity_Constant:
-		check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
-		break;
-	case Entity_TypeName: {
-		check_type_decl(&c, e, d->init_expr, named_type);
-		break;
+	if (e->flags & EntityFlag_Lazy) {
+		gb_mutex_unlock(&ctx->info->lazy_mutex);
 	}
-	case Entity_Procedure:
-		check_proc_decl(&c, e, d);
-		break;
-	case Entity_ProcGroup:
-		check_proc_group_decl(&c, e, d);
-		break;
-	}
-
-	e->state = EntityState_Resolved;
-
-#undef TIME_SECTION
 }
 
 

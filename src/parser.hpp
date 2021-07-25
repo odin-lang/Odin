@@ -77,8 +77,16 @@ struct ImportedFile {
 	isize       index;
 };
 
+enum AstFileFlag : u32 {
+	AstFile_IsPrivate = 1<<0,
+	AstFile_IsTest    = 1<<1,
+	AstFile_IsLazy    = 1<<2,
+};
+
+
 struct AstFile {
 	i32          id;
+	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;
 
@@ -113,9 +121,6 @@ struct AstFile {
 	ParseFileError last_error;
 	f64            time_to_tokenize; // seconds
 	f64            time_to_parse;    // seconds
-
-	bool is_private;
-	bool is_test;
 
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
