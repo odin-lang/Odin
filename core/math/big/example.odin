@@ -68,6 +68,22 @@ demo :: proc() {
 	print("quotient   ", quotient,    10);
 	fmt.println("remainder  ", i);
 	fmt.println("error", err);
+
+	fmt.println(); fmt.println();
+
+	err = set (numerator,   15625);
+	err = set (denominator,     3);
+	err = zero(quotient);
+
+	print("numerator  ", numerator,   10);
+	print("denominator", denominator, 10);
+
+	err = _int_div_small(quotient, remainder, numerator, denominator);
+
+	print("quotient   ", quotient,    10);
+	print("remainder  ", remainder,   10);
+
+
 }
 
 main :: proc() {
