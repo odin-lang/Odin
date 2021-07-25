@@ -1371,10 +1371,10 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 	isize queue_count = -1;
 	bool is_lazy = false;
 
-	// is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
-	// if (!is_lazy) {
+	is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
+	if (!is_lazy) {
 		queue_count = mpmc_enqueue(&info->entity_queue, e);
-	// }
+	}
 
 	if (e->token.pos.file_id != 0) {
 		e->order_in_src = cast(u64)(e->token.pos.file_id)<<32 | u32(e->token.pos.offset);
