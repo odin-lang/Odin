@@ -5486,6 +5486,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	ast_node(is, IfStmt, node);
 	lb_open_scope(p, node->scope); // Scope #1
+	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
 
 	if (is->init != nullptr) {
 		// TODO(bill): Should this have a separate block to begin with?
@@ -5503,30 +5504,67 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		else_ = lb_create_block(p, "if.else");
 	}
 
-	lb_build_cond(p, is->cond, then, else_);
-	lb_start_block(p, then);
+	lbValue cond = lb_build_cond(p, is->cond, then, else_);
 
 	if (is->label != nullptr) {
 		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
 		tl->is_block = true;
 	}
 
-	lb_build_stmt(p, is->body);
+	if (LLVMIsConstant(cond.value)) {
+		// NOTE(bill): Do a compile time short circuit for when the condition is constantly known.
+		// This done manually rather than relying on the SSA passes because sometimes the SSA passes
+		// miss some even if they are constantly known, especially with few optimization passes.
 
-	lb_emit_jump(p, done);
+		bool const_cond = LLVMConstIntGetZExtValue(cond.value) != 0;
 
-	if (is->else_stmt != nullptr) {
-		lb_start_block(p, else_);
+		LLVMValueRef if_instr = LLVMGetLastInstruction(p->curr_block->block);
+		GB_ASSERT(LLVMGetInstructionOpcode(if_instr) == LLVMBr);
+		GB_ASSERT(LLVMIsConditional(if_instr));
+		LLVMInstructionEraseFromParent(if_instr);
 
-		lb_open_scope(p, is->else_stmt->scope);
-		lb_build_stmt(p, is->else_stmt);
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
+
+		if (const_cond) {
+			lb_emit_jump(p, then);
+			lb_start_block(p, then);
+
+			lb_build_stmt(p, is->body);
+			lb_emit_jump(p, done);
+		} else {
+			if (is->else_stmt != nullptr) {
+				lb_emit_jump(p, else_);
+				lb_start_block(p, else_);
+
+				lb_open_scope(p, is->else_stmt->scope);
+				lb_build_stmt(p, is->else_stmt);
+				lb_close_scope(p, lbDeferExit_Default, nullptr);
+			}
+			lb_emit_jump(p, done);
+
+		}
+	} else {
+		lb_start_block(p, then);
+
+		lb_build_stmt(p, is->body);
 
 		lb_emit_jump(p, done);
+
+		if (is->else_stmt != nullptr) {
+			lb_start_block(p, else_);
+
+			lb_open_scope(p, is->else_stmt->scope);
+			lb_build_stmt(p, is->else_stmt);
+			lb_close_scope(p, lbDeferExit_Default, nullptr);
+
+			lb_emit_jump(p, done);
+		}
+	}
+
+	if (is->label != nullptr) {
+		lb_pop_target_list(p);
 	}
 
 	lb_start_block(p, done);
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
 }
 
 void lb_build_for_stmt(lbProcedure *p, Ast *node) {
@@ -5841,6 +5879,10 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		if (done != nullptr) {
 			lb_emit_jump(p, done);
 			lb_start_block(p, done);
+		}
+
+		if (bs->label != nullptr) {
+			lb_pop_target_list(p);
 		}
 	case_end;
 
