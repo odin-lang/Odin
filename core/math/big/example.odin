@@ -67,16 +67,16 @@ demo :: proc() {
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	err = set (numerator,   2);
-	err = set (denominator, 3);
-	err = zero(quotient);
+	err = set (numerator,   3);
+	err = set (denominator, 2);
+	err = set (quotient,    3);
 	err = zero(remainder);
 
-	err = pow(numerator, numerator, 260);
+	err = addmod(remainder, numerator, denominator, quotient);
 	if err != .None {
 		fmt.printf("Error: %v\n", err);
 	} else {
-		print("numerator  ", numerator,   16);
+		print("numerator  ", numerator,   10);
 		print("denominator", denominator, 10);
 		print("quotient   ", quotient,    10);
 		print("remainder  ", remainder,   10);

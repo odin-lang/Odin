@@ -662,14 +662,60 @@ int_div :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Erro
 	*/
 	if quotient == nil && remainder == nil 		        { return .None; }
 
-
 	if err = clear_if_uninitialized(numerator);			err != .None { return err; }
 	if err = clear_if_uninitialized(denominator);		err != .None { return err; }
 
-	return _int_div_small(quotient, remainder, numerator, denominator);
+	z: bool;
+	if z, err = is_zero(denominator);                   z { return .Division_by_Zero; }
+
+	/*
+		If numerator < denominator then quotient = 0, remainder = numerator.
+	*/
+	c: int;
+	if c, err = cmp_mag(numerator, denominator); c == -1 {
+		if remainder != nil {
+			if err = copy(remainder, numerator); 		err != .None { return err; }
+		}
+		if quotient != nil {
+			zero(quotient);
+		}
+		return .None;
+	}
+
+	if false && (denominator.used > 2 * _MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
+		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
+	} else if false {
+		// err = _int_div_school(quotient, remainder, numerator, denominator);
+	} else {
+		err = _int_div_small(quotient, remainder, numerator, denominator);
+	}
+
+	return err;
 }
 div :: proc{ int_div, };
 
+/*
+	remainder = numerator % denominator.
+	0 <= remainder < denominator if denominator > 0
+	denominator < remainder <= 0 if denominator < 0
+*/
+int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
+	if err = div(nil, remainder, numerator, denominator); err != .None { return err; }
+
+	z: bool;
+	if z, err = is_zero(remainder); z || denominator.sign == remainder.sign { return .None; }
+	return add(remainder, remainder, numerator);
+}
+mod :: proc { int_mod, };
+
+/*
+	remainder = (number + addend) % modulus.
+*/
+int_addmod :: proc(remainder, number, addend, modulus: ^Int) -> (err: Error) {
+	if err = add(remainder, number, addend); err != .None { return err; }
+	return mod(remainder, remainder, modulus);
+}
+addmod :: proc { int_addmod, };
 
 /*
 	==========================
@@ -974,7 +1020,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 }
 
 /*
-	Fivide by three (based on routine from MPI and the GMP manual).
+	Divide by three (based on routine from MPI and the GMP manual).
 */
 _int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
 	/*
