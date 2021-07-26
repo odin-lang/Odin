@@ -656,7 +656,7 @@ sqr :: proc(dest, src: ^Int) -> (err: Error) {
 	divmod.
 	Both the quotient and remainder are optional and may be passed a nil.
 */
-int_div :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
+int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
 	/*
 		Early out if neither of the results is wanted.
 	*/
@@ -692,7 +692,12 @@ int_div :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Erro
 
 	return err;
 }
-div :: proc{ int_div, };
+divmod :: proc{ int_divmod, };
+
+int_div :: proc(quotient, numerator, denominator: ^Int) -> (err: Error) {
+	return int_divmod(quotient, nil, numerator, denominator);
+}
+div :: proc { int_div, };
 
 /*
 	remainder = numerator % denominator.
@@ -700,7 +705,7 @@ div :: proc{ int_div, };
 	denominator < remainder <= 0 if denominator < 0
 */
 int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
-	if err = div(nil, remainder, numerator, denominator); err != .None { return err; }
+	if err = divmod(nil, remainder, numerator, denominator); err != .None { return err; }
 
 	z: bool;
 	if z, err = is_zero(remainder); z || denominator.sign == remainder.sign { return .None; }
@@ -716,6 +721,33 @@ int_addmod :: proc(remainder, number, addend, modulus: ^Int) -> (err: Error) {
 	return mod(remainder, remainder, modulus);
 }
 addmod :: proc { int_addmod, };
+
+/*
+	remainder = (number - decrease) % modulus.
+*/
+int_submod :: proc(remainder, number, decrease, modulus: ^Int) -> (err: Error) {
+	if err = add(remainder, number, decrease); err != .None { return err; }
+	return mod(remainder, remainder, modulus);
+}
+submod :: proc { int_submod, };
+
+/*
+	remainder = (number * multiplicand) % modulus.
+*/
+int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int) -> (err: Error) {
+	if err = mul(remainder, number, multiplicand); err != .None { return err; }
+	return mod(remainder, remainder, modulus);
+}
+mulmod :: proc { int_mulmod, };
+
+/*
+	remainder = (number * number) % modulus.
+*/
+int_sqrmod :: proc(remainder, number, modulus: ^Int) -> (err: Error) {
+	if err = sqr(remainder, number); err != .None { return err; }
+	return mod(remainder, remainder, modulus);
+}
+sqrmod :: proc { int_sqrmod, };
 
 /*
 	==========================

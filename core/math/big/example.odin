@@ -69,10 +69,10 @@ demo :: proc() {
 
 	err = set (numerator,   3);
 	err = set (denominator, 2);
-	err = set (quotient,    3);
+	err = set (quotient,    5);
 	err = zero(remainder);
 
-	err = addmod(remainder, numerator, denominator, quotient);
+	err = mulmod(remainder, numerator, denominator, quotient);
 	if err != .None {
 		fmt.printf("Error: %v\n", err);
 	} else {
