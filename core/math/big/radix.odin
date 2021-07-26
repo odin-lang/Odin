@@ -17,7 +17,7 @@ import "core:mem"
 /*
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
-itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
+int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	a := a; radix := radix;
 	if err = clear_if_uninitialized(a); err != .None {
 		return "", err;
@@ -52,7 +52,7 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 		Write the digits out into the buffer.
 	*/
 	written: int;
-	written, err = itoa_raw(a, radix, buffer, size, zero_terminate);
+	written, err = int_itoa_raw(a, radix, buffer, size, zero_terminate);
 
 	return string(buffer[:written]), err;
 }
@@ -60,7 +60,7 @@ itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator
 /*
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
-itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
+int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
 	a := a; radix := radix;
 	if err = clear_if_uninitialized(a); err != .None {
 		return "", err;
@@ -71,7 +71,7 @@ itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -
 	radix = radix if radix > 0 else 10;
 
 	s: string;
-	s, err = itoa_string(a, radix, true, allocator);
+	s, err = int_itoa_string(a, radix, true, allocator);
 	return cstring(raw_data(s)), err;
 }
 
@@ -95,7 +95,7 @@ itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -
 	it'll result in buffer overflows, as we use it to avoid reversing at the end
 	and having to perform a buffer overflow check each character.
 */
-itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
+int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	a := a; radix := radix; size := size;
 	if err = clear_if_uninitialized(a); err != .None {
 		return 0, err;
@@ -228,11 +228,96 @@ itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_termina
 	return _itoa_raw_full(a, radix, buffer, zero_terminate);
 }
 
-itoa :: proc{itoa_string, itoa_raw};
-int_to_string  :: itoa;
-int_to_cstring :: itoa_cstring;
+itoa :: proc{int_itoa_string, int_itoa_raw};
+int_to_string  :: int_itoa_string;
+int_to_cstring :: int_itoa_cstring;
+
+/*
+	Read a string [ASCII] in a given radix.
+*/
+int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
+	input := input;
+	/*
+		Make sure the radix is ok.
+	*/
+	if radix < 2 || radix > 64 {
+		return .Invalid_Argument;
+	}
+
+	/*
+		Set the integer to the default of zero.
+	*/
+	if err = zero(res); err != .None { return err; }
+
+	/*
+		We'll interpret an empty string as zero.
+	*/
+	if len(input) == 0 {
+		return .None;
+	}
+
+	/*
+		If the leading digit is a minus set the sign to negative.
+		Given the above early out, the length should be at least 1.
+	*/
+	sign := Sign.Zero_or_Positive;
+	if input[0] == '-' {
+		input = input[1:];
+		sign = .Negative;
+	}
+
+	/*
+		Process each digit of the string.
+	*/
+	ch: rune;
+	for len(input) > 0 {
+		/* if the radix <= 36 the conversion is case insensitive
+		 * this allows numbers like 1AB and 1ab to represent the same value
+		 * [e.g. in hex]
+		*/
+
+		ch = rune(input[0]);
+		if radix <= 36 && ch >= 'a' && ch <= 'z' {
+			ch += 'a' - 'A';
+		}
+
+		pos := ch - '+';
+		if RADIX_TABLE_REVERSE_SIZE <= pos {
+			break;
+		}
+		y := RADIX_TABLE_REVERSE[pos];
+		/* if the char was found in the map
+		 * and is less than the given radix add it
+		 * to the number, otherwise exit the loop.
+		 */
+		if y >= u8(radix) {
+			break;
+		}
+
+		if err = mul(res, res, DIGIT(radix)); err != .None { return err; }
+		if err = add(res, res, DIGIT(y));     err != .None { return err; }
+
+		input = input[1:];
+	}
+
+	/*
+		If an illegal character was found, fail.
+	*/
+	if len(input) > 0 && ch != 0 && ch != '\r' && ch != '\n' {
+		return .Invalid_Argument;
+	}
+	/*
+		Set the sign only if res != 0.
+	*/
+	if res.used > 0 {
+		res.sign = sign;
+	}
+
+	return .None;
+}
 
 
+atoi :: proc { int_atoi, };
 
 /*
 	We size for `string` by default.
@@ -331,7 +416,7 @@ _log_bases :: [65]u32{
 	Characters used in radix conversions.
 */
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
-RADIX_TABLE_REVERSE := [80]u8{
+RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
    0x3e, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x01, 0x02, 0x03, 0x04, /* +,-./01234 */
    0x05, 0x06, 0x07, 0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, /* 56789:;<=> */
    0xff, 0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, /* ?@ABCDEFGH */
@@ -341,6 +426,7 @@ RADIX_TABLE_REVERSE := [80]u8{
    0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, /* ghijklmnop */
    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, /* qrstuvwxyz */
 };
+RADIX_TABLE_REVERSE_SIZE :: 80;
 
 /*
 	Stores a bignum as a ASCII string in a given radix (2..64)

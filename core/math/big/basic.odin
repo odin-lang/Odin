@@ -13,7 +13,6 @@ package big
 
 import "core:mem"
 import "core:intrinsics"
-
 /*
 	===========================
 		User-level routines    
@@ -68,11 +67,10 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	/*
 		Grow destination as required.
 	*/
-	if dest != a {
-		if err = grow(dest, a.used + 1); err != .None {
-			return err;
-		}
+	if err = grow(dest, a.used + 1); err != .None {
+		return err;
 	}
+
 	/*
 		All parameters have been initialized.
 		We can now safely ignore errors from comparison routines.
@@ -87,14 +85,16 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 		*/
 		if p, _ := is_pos(dest); p && (dest.digit[0] + digit < _DIGIT_MAX) {
 			dest.digit[0] += digit;
-			return .None;
+			dest.used += 1;
+			return clamp(dest);
 		}
 		/*
 			Can be subtracted from dest.digit[0] without underflow.
 		*/
 		if n, _ := is_neg(a); n && (dest.digit[0] > digit) {
 			dest.digit[0] -= digit;
-			return .None;
+			dest.used += 1;
+			return clamp(dest);
 		}
 	}
 
@@ -561,7 +561,6 @@ int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT) -> (err: Error) {
 	*/
 	dest.digit[ix] = DIGIT(carry);
 	dest.used = src.used + 1;
-
 	/*
 		Zero unused digits.
 	*/

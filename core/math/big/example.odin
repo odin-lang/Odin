@@ -40,7 +40,7 @@ _SQR_TOOM_CUTOFF,
 );
 }
 
-print :: proc(name: string, a: ^Int, base := i8(16)) {
+print :: proc(name: string, a: ^Int, base := i8(10)) {
 	as, err := itoa(a, base);
 	defer delete(as);
 	cb, _ := count_bits(a);
@@ -67,12 +67,11 @@ demo :: proc() {
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	err = set (numerator,   3);
-	err = set (denominator, 2);
-	err = set (quotient,    5);
+	err = set (numerator,   2);
+	err = set (denominator, 1);
+	err = set (quotient,    u128(1 << 120));
 	err = zero(remainder);
-
-	err = mulmod(remainder, numerator, denominator, quotient);
+	err = pow(remainder, numerator, 120);
 	if err != .None {
 		fmt.printf("Error: %v\n", err);
 	} else {
@@ -80,6 +79,21 @@ demo :: proc() {
 		print("denominator", denominator, 10);
 		print("quotient   ", quotient,    10);
 		print("remainder  ", remainder,   10);
+	}
+	if c, _ := cmp(quotient, remainder); c == 0 {
+		fmt.println("c == r");
+	} else {
+		fmt.println("c != r");
+	}
+
+	foozle := "-1329227995784915872903807060280344576";
+	err = atoi(destination, foozle, 10);
+	if err != .None {
+		fmt.printf("Error %v while parsing `%v`", err, foozle);
+	} else {
+		print("destination", destination);
+		err = add(remainder, remainder, destination);
+		print("remainder + destination", remainder);
 	}
 }
 
