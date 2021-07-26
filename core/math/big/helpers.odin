@@ -37,7 +37,6 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 	if err = clear_if_uninitialized(dest); err != .None {
 		return err;
 	}
-
 	dest.used = 0;
 	dest.sign = .Zero_or_Positive if src >= 0 else .Negative;
 	src = abs(src);

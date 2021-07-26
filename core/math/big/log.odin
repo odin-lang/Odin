@@ -210,7 +210,6 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
    	}
 }
 
-
 /*
 	Internal implementation of log.	
 */

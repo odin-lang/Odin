@@ -232,6 +232,8 @@ itoa :: proc{itoa_string, itoa_raw};
 int_to_string  :: itoa;
 int_to_cstring :: itoa_cstring;
 
+
+
 /*
 	We size for `string` by default.
 */
@@ -251,17 +253,39 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 		return 1, .None;
 	}
 
-	/*
-		Calculate `log` on a temporary "copy" with its sign set to positive.
-	*/
-	t := &Int{
-		used      = a.used,
-		sign      = .Zero_or_Positive,
-		digit     = a.digit,
-	};
+	if pot, _ := is_power_of_two(a); pot {
+		/*
+			Calculate `log` on a temporary "copy" with its sign set to positive.
+		*/
+		t := &Int{
+			used      = a.used,
+			sign      = .Zero_or_Positive,
+			digit     = a.digit,
+		};
 
-	if size, err = log(t, DIGIT(radix)); err != .None {
-		return 0, err;
+		if size, err = log(t, DIGIT(radix)); err != .None {
+			return 0, err;
+		}
+	} else {
+		la, k := &Int{}, &Int{};
+		defer destroy(la, k);
+
+		/* la = floor(log_2(a)) + 1 */
+		bit_count, _ := count_bits(a);
+		err = set(la, bit_count);
+
+		/* k = floor(2^29/log_2(radix)) + 1 */
+		lb := _log_bases;
+		err = set(k, lb[radix]);
+
+		/* n = floor((la *  k) / 2^29) + 1 */
+		if err = mul(k, la, k); err != .None { return 0, err; }
+		if err = shr(k, k, _RADIX_SIZE_SCALE); err != .None { return 0, err; }
+
+		/* The "+1" here is the "+1" in "floor((la *  k) / 2^29) + 1" */
+		/* n = n + 1 + EOS + sign */
+		size_, _ := get(k, u128);
+		size = int(size_);
 	}
 
 	/*
@@ -271,6 +295,37 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 	size += 1 if zero_terminate else 0;
 	return size, .None;
 }
+
+/*
+	Overestimate the size needed for the bigint to string conversion by a very small amount.
+	The error is about 10^-8; it will overestimate the result by at most 11 elements for
+	a number of the size 2^(2^31)-1 which is currently the largest possible in this library.
+	Some short tests gave no results larger than 5 (plus 2 for sign and EOS).
+ */
+
+/*
+	Table of {0, INT(log_2([1..64])*2^p)+1 } where p is the scale
+	factor defined in MP_RADIX_SIZE_SCALE and INT() extracts the integer part (truncating).
+	Good for 32 bit "int". Set MP_RADIX_SIZE_SCALE = 61 and recompute values
+	for 64 bit "int".
+ */
+
+_RADIX_SIZE_SCALE :: 29;
+_log_bases :: [65]u32{
+			0,         0, 0x20000001, 0x14309399, 0x10000001,
+	0xdc81a35, 0xc611924,  0xb660c9e,  0xaaaaaab,  0xa1849cd,
+	0x9a209a9, 0x94004e1,  0x8ed19c2,  0x8a5ca7d,  0x867a000,
+	0x830cee3, 0x8000001,  0x7d42d60,  0x7ac8b32,  0x7887847,
+	0x7677349, 0x749131f,  0x72d0163,  0x712f657,  0x6fab5db,
+	0x6e40d1b, 0x6ced0d0,  0x6badbde,  0x6a80e3b,  0x6964c19,
+	0x6857d31, 0x6758c38,  0x6666667,  0x657fb21,  0x64a3b9f,
+	0x63d1ab4, 0x6308c92,  0x624869e,  0x618ff47,  0x60dedea,
+	0x6034ab0, 0x5f90e7b,  0x5ef32cb,  0x5e5b1b2,  0x5dc85c3,
+	0x5d3aa02, 0x5cb19d9,  0x5c2d10f,  0x5bacbbf,  0x5b3064f,
+	0x5ab7d68, 0x5a42df0,  0x59d1506,  0x5962ffe,  0x58f7c57,
+	0x588f7bc, 0x582a000,  0x57c7319,  0x5766f1d,  0x5709243,
+	0x56adad9, 0x565474d,  0x55fd61f,  0x55a85e8,  0x5555556,
+};
 
 /*
 	Characters used in radix conversions.
