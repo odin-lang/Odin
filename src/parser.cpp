@@ -5428,8 +5428,14 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
-		} else if (file->tokens.count > 0 && pkg->name != file->package_name) {
-			syntax_error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+		} else if (pkg->name != file->package_name) {
+			if (file->tokens.count > 0 && file->tokens[0].kind != Token_EOF) {
+				Token tok = file->package_token;
+				tok.pos.file_id = file->id;
+				tok.pos.line = gb_max(tok.pos.line, 1);
+				tok.pos.column = gb_max(tok.pos.column, 1);
+				syntax_error(tok, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+			}
 		}
 
 		p->total_line_count += file->tokenizer.line_count;
