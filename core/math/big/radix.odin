@@ -46,7 +46,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 	/*
 		Allocate the buffer we need.
 	*/
-	buffer := make([]u8, size);
+	buffer := make([]u8, size, allocator);
 
 	/*
 		Write the digits out into the buffer.

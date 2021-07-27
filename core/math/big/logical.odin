@@ -349,6 +349,24 @@ int_shr_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
 shr_digit :: proc { int_shr_digit, };
 
 /*
+	Shift right by a certain bit count with sign extension.
+*/
+int_shr_signed :: proc(dest, src: ^Int, bits: int) -> (err: Error) {
+	if err = clear_if_uninitialized(src);	err != .None { return err; }
+	if err = clear_if_uninitialized(dest);	err != .None { return err; }
+
+	if src.sign == .Zero_or_Positive {
+		return shr(dest, src, bits);
+	}
+	if err = add(dest, src, DIGIT(1));		err != .None { return err; }
+
+	if err = shr(dest, dest, bits);			err != .None { return err; }
+	return sub(dest, src, DIGIT(1));
+}
+
+shr_signed :: proc { int_shr_signed, };
+
+/*
 	Shift left by a certain bit count.
 */
 int_shl :: proc(dest, src: ^Int, bits: int) -> (err: Error) {
