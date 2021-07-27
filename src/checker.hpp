@@ -279,8 +279,7 @@ struct CheckerInfo {
 	PtrSet<Entity *>      minimum_dependency_set;
 	PtrSet<isize>         minimum_dependency_type_info_set;
 
-	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
-	                                   // as it needs to be iterated across afterwards
+
 
 	Array<Entity *> testing_procedures;
 
@@ -294,6 +293,10 @@ struct CheckerInfo {
 	// these variables will be of contention
 
 	gbSemaphore collect_semaphore;
+
+	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
+	                                   // as it needs to be iterated across afterwards
+	BlockingMutex global_untyped_mutex;
 
 	// NOT recursive & Only used at the end of `check_proc_body`
 	// This is a possible source of contention but probably not

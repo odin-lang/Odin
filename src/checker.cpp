@@ -845,6 +845,7 @@ void init_checker_info(CheckerInfo *i) {
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
 
+
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
 	if (i->allow_identifier_uses) {
 		array_init(&i->identifier_uses, a);
@@ -863,7 +864,7 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->gen_procs_mutex);
 	mutex_init(&i->gen_types_mutex);
 	mutex_init(&i->lazy_mutex);
-
+	mutex_init(&i->global_untyped_mutex);
 	mutex_init(&i->type_info_mutex);
 	mutex_init(&i->deps_mutex);
 	mutex_init(&i->identifier_uses_mutex);
@@ -898,6 +899,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->gen_procs_mutex);
 	mutex_destroy(&i->gen_types_mutex);
 	mutex_destroy(&i->lazy_mutex);
+	mutex_destroy(&i->global_untyped_mutex);
 	mutex_destroy(&i->type_info_mutex);
 	mutex_destroy(&i->deps_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
@@ -932,7 +934,7 @@ void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
 		ctx->pkg   = file->pkg;
 	}
 }
-void reset_checker_context(CheckerContext *ctx, AstFile *file) {
+void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMap *untyped) {
 	if (ctx == nullptr) {
 		return;
 	}
@@ -941,6 +943,7 @@ void reset_checker_context(CheckerContext *ctx, AstFile *file) {
 	*ctx = make_checker_context(ctx->checker);
 	add_curr_ast_file(ctx, file);
 	ctx->procs_to_check_queue = queue;
+	ctx->untyped = untyped;
 }
 
 
@@ -1054,22 +1057,41 @@ Scope *scope_of_node(Ast *node) {
 	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
-	UntypedExprInfoMap *untyped = c->untyped ? c->untyped : &c->info->global_untyped;
-	ExprInfo **found = map_get(untyped, hash_pointer(expr));
-	if (found) {
-		return *found;
+	if (c->untyped != nullptr) {
+		ExprInfo **found = map_get(c->untyped, hash_pointer(expr));
+		if (found) {
+			return *found;
+		}
+		return nullptr;
+	} else {
+		mutex_lock(&c->info->global_untyped_mutex);
+		defer (mutex_unlock(&c->info->global_untyped_mutex));
+		ExprInfo **found = map_get(&c->info->global_untyped, hash_pointer(expr));
+		if (found) {
+			return *found;
+		}
+		return nullptr;
 	}
-	return nullptr;
 }
 
 void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
-	UntypedExprInfoMap *untyped = c->untyped ? c->untyped : &c->info->global_untyped;
-	map_set(untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+	if (c->untyped != nullptr) {
+		map_set(c->untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+	} else {
+		mutex_lock(&c->info->global_untyped_mutex);
+		map_set(&c->info->global_untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+		mutex_unlock(&c->info->global_untyped_mutex);
+	}
 }
 
 void check_remove_expr_info(CheckerContext *c, Ast *e) {
-	UntypedExprInfoMap *untyped = c->untyped ? c->untyped : &c->info->global_untyped;
-	map_remove(untyped, hash_pointer(e));
+	if (c->untyped != nullptr) {
+		map_remove(c->untyped, hash_pointer(e));
+	} else {
+		mutex_lock(&c->info->global_untyped_mutex);
+		map_remove(&c->info->global_untyped, hash_pointer(e));
+		mutex_unlock(&c->info->global_untyped_mutex);
+	}
 }
 
 
@@ -4132,14 +4154,21 @@ GB_THREAD_PROC(thread_proc_collect_entities) {
 
 	CheckerContext *ctx = &collect_entity_ctx;
 
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
 	isize offset = data->offset;
 	isize file_end = gb_min(offset+data->count, c->info.files.entries.count);
 
 	for (isize i = offset; i < file_end; i++) {
 		AstFile *f = c->info.files.entries[i].value;
-		reset_checker_context(ctx, f);
+		reset_checker_context(ctx, f, &untyped);
+
 		check_collect_entities(ctx, f->decls);
 		GB_ASSERT(ctx->collect_delayed_decls == false);
+
+		add_untyped_expressions(&c->info, ctx->untyped);
 	}
 
 	gb_semaphore_release(&c->info.collect_semaphore);
@@ -4151,15 +4180,16 @@ void check_collect_entities_all(Checker *c) {
 	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
 }
 
-void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg) {
+void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
 	if (pkg->files.count != 0) {
 		AstPackageExportedEntity item = {};
 		while (mpmc_dequeue(&pkg->exported_entity_queue, &item)) {
 			AstFile *f = item.entity->file;
 			if (ctx->file != f) {
-				reset_checker_context(ctx, f);
+				reset_checker_context(ctx, f, untyped);
 			}
 			add_entity(ctx, pkg->scope, item.identifier, item.entity);
+			add_untyped_expressions(ctx->info, untyped);
 		}
 	}
 }
@@ -4171,10 +4201,14 @@ GB_THREAD_PROC(thread_proc_check_export_entites) {
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
 
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
 	isize end = gb_min(data->offset + data->count, c->info.packages.entries.count);
 	for (isize i = data->offset; i < end; i++) {
 		AstPackage *pkg = c->info.packages.entries[i].value;
-		check_export_entites_in_pkg(&ctx, pkg);
+		check_export_entites_in_pkg(&ctx, pkg, &untyped);
 	}
 
 	gb_semaphore_release(&c->info.collect_semaphore);
@@ -4254,6 +4288,10 @@ void check_import_entities(Checker *c) {
 	TIME_SECTION("check_import_entities - collect file decls");
 	CheckerContext ctx = make_checker_context(c);
 
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
 	isize min_pkg_index = 0;
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
 		ImportGraphNode *node = package_order[pkg_index];
@@ -4262,7 +4300,7 @@ void check_import_entities(Checker *c) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 
-			reset_checker_context(&ctx, f);
+			reset_checker_context(&ctx, f, &untyped);
 			ctx.collect_delayed_decls = true;
 
 			MPMCQueue<Ast *> *q = nullptr;
@@ -4273,10 +4311,12 @@ void check_import_entities(Checker *c) {
 			}
 
 			if (collect_file_decls(&ctx, f->decls)) {
-				check_export_entites_in_pkg(&ctx, pkg);
+				check_export_entites_in_pkg(&ctx, pkg, &untyped);
 				pkg_index = min_pkg_index-1;
 				break;
 			}
+
+			add_untyped_expressions(ctx.info, &untyped);
 		}
 		if (pkg_index < 0) {
 			continue;
@@ -4292,22 +4332,24 @@ void check_import_entities(Checker *c) {
 
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
-			reset_checker_context(&ctx, f);
+			reset_checker_context(&ctx, f, &untyped);
 
 			auto *q = &f->delayed_decls_queues[AstDelayQueue_Import];
 			for (Ast *decl = nullptr; mpmc_dequeue(q, &decl); /**/) {
 				check_add_import_decl(&ctx, decl);
 			}
+			add_untyped_expressions(ctx.info, &untyped);
 		}
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
-			reset_checker_context(&ctx, f);
+			reset_checker_context(&ctx, f, &untyped);
 
 			auto *q = &f->delayed_decls_queues[AstDelayQueue_Expr];
 			for (Ast *expr = nullptr; mpmc_dequeue(q, &expr); /**/) {
 				Operand o = {};
 				check_expr(&ctx, &o, expr);
 			}
+			add_untyped_expressions(ctx.info, &untyped);
 		}
 	}
 
@@ -4495,9 +4537,8 @@ void check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
-	reset_checker_context(&ctx, pi->file);
+	reset_checker_context(&ctx, pi->file, untyped);
 	ctx.decl = pi->decl;
-	ctx.untyped = untyped;
 	ctx.procs_to_check_queue = procs_to_check_queue;
 
 	TypeProc *pt = &pi->type->Proc;
@@ -5009,9 +5050,6 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("init preload");
 	init_preload(c);
-
-	TIME_SECTION("add global untyped expression to queue");
-	add_untyped_expressions(&c->info, &c->info.global_untyped);
 
 	CheckerContext prev_context = c->builtin_ctx;
 	defer (c->builtin_ctx = prev_context);
