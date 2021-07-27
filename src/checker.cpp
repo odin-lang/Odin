@@ -4078,7 +4078,18 @@ void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
 		worker_count = 0;
 	}
 
-	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)worker_count);
+	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
+
+	if (worker_count == 0) {
+		ThreadProcCheckerSection section_all = {};
+		section_all.checker = c;
+		section_all.offset = 0;
+		section_all.count = total_count;
+		gbThread dummy_main_thread = {};
+		dummy_main_thread.user_data = &section_all;
+		proc(&dummy_main_thread);
+		return;
+	}
 
 	isize file_load_count = (total_count+thread_count-1)/thread_count;
 	isize remaining_count = total_count;
@@ -4713,7 +4724,7 @@ void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(total_queued == original_queue_count);
 
 
-	gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)worker_count);
+	gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
 
 	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
 	for (isize i = 0; i < worker_count; i++) {
