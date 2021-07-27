@@ -240,8 +240,8 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		GB_ASSERT(dst == nullptr);
 	}
 
-	gb_mutex_lock(&info->gen_procs_mutex);
-	defer (gb_mutex_unlock(&info->gen_procs_mutex));
+	mutex_lock(&info->gen_procs_mutex);
+	defer (mutex_unlock(&info->gen_procs_mutex));
 
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
 		return false;

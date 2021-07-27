@@ -4664,9 +4664,9 @@ bool init_parser(Parser *p) {
 	string_map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->package_imports, heap_allocator());
-	gb_mutex_init(&p->import_mutex);
-	gb_mutex_init(&p->file_add_mutex);
-	gb_mutex_init(&p->file_decl_mutex);
+	mutex_init(&p->import_mutex);
+	mutex_init(&p->file_add_mutex);
+	mutex_init(&p->file_decl_mutex);
 	mpmc_init(&p->file_error_queue, heap_allocator(), 1024);
 	return true;
 }
@@ -4691,9 +4691,9 @@ void destroy_parser(Parser *p) {
 	array_free(&p->package_imports);
 	string_set_destroy(&p->imported_files);
 	string_map_destroy(&p->package_map);
-	gb_mutex_destroy(&p->import_mutex);
-	gb_mutex_destroy(&p->file_add_mutex);
-	gb_mutex_destroy(&p->file_decl_mutex);
+	mutex_destroy(&p->import_mutex);
+	mutex_destroy(&p->file_add_mutex);
+	mutex_destroy(&p->file_decl_mutex);
 	mpmc_destroy(&p->file_error_queue);
 }
 
@@ -4760,9 +4760,9 @@ WORKER_TASK_PROC(foreign_file_worker_proc) {
 		// TODO(bill): Actually do something with it
 		break;
 	}
-	gb_mutex_lock(&p->file_add_mutex);
+	mutex_lock(&p->file_add_mutex);
 	array_add(&pkg->foreign_files, foreign_file);
-	gb_mutex_unlock(&p->file_add_mutex);
+	mutex_unlock(&p->file_add_mutex);
 	return 0;
 }
 
@@ -4782,8 +4782,8 @@ void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFi
 AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
-	gb_mutex_lock(&p->import_mutex);
-	defer (gb_mutex_unlock(&p->import_mutex));
+	mutex_lock(&p->import_mutex);
+	defer (mutex_unlock(&p->import_mutex));
 
 	if (string_set_exists(&p->imported_files, path)) {
 		return nullptr;
@@ -4962,7 +4962,7 @@ bool is_package_name_reserved(String const &name) {
 }
 
 
-bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
+bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
@@ -5052,8 +5052,8 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 		return true;
 	}
 
-	if (file_mutex) gb_mutex_lock(file_mutex);
-	defer (if (file_mutex) gb_mutex_unlock(file_mutex));
+	if (file_mutex) mutex_lock(file_mutex);
+	defer (if (file_mutex) mutex_unlock(file_mutex));
 
 
 	if (node->kind == Ast_ForeignImportDecl) {
@@ -5452,8 +5452,8 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 	}
 
 	if (parse_file(p, file)) {
-		gb_mutex_lock(&p->file_add_mutex);
-		defer (gb_mutex_unlock(&p->file_add_mutex));
+		mutex_lock(&p->file_add_mutex);
+		defer (mutex_unlock(&p->file_add_mutex));
 
 		array_add(&file->pkg->files, file);
 

@@ -192,9 +192,9 @@ struct Parser {
 	isize                     file_to_process_count;
 	isize                     total_token_count;
 	isize                     total_line_count;
-	gbMutex                   import_mutex;
-	gbMutex                   file_add_mutex;
-	gbMutex                   file_decl_mutex;
+	BlockingMutex             import_mutex;
+	BlockingMutex             file_add_mutex;
+	BlockingMutex             file_decl_mutex;
 	MPMCQueue<ParseFileError> file_error_queue;
 };
 

@@ -1116,7 +1116,7 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 		return;
 	}
 	if (e->flags & EntityFlag_Lazy) {
-		gb_mutex_lock(&ctx->info->lazy_mutex);
+		mutex_lock(&ctx->info->lazy_mutex);
 	}
 
 	String name = e->token.string;
@@ -1173,7 +1173,7 @@ end:;
 	}
 
 	if (e->flags & EntityFlag_Lazy) {
-		gb_mutex_unlock(&ctx->info->lazy_mutex);
+		mutex_unlock(&ctx->info->lazy_mutex);
 	}
 }
 
