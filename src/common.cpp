@@ -763,7 +763,19 @@ isize next_pow2_isize(isize n) {
 	n++;
 	return n;
 }
-
+u32 next_pow2_u32(u32 n) {
+	if (n == 0) {
+		return 0;
+	}
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n++;
+	return n;
+}
 
 
 i32 bit_set_count(u32 x) {
