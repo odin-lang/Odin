@@ -864,6 +864,7 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->gen_procs_mutex);
 	mutex_init(&i->gen_types_mutex);
 	mutex_init(&i->lazy_mutex);
+	mutex_init(&i->builtin_mutex);
 	mutex_init(&i->global_untyped_mutex);
 	mutex_init(&i->type_info_mutex);
 	mutex_init(&i->deps_mutex);
@@ -899,6 +900,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->gen_procs_mutex);
 	mutex_destroy(&i->gen_types_mutex);
 	mutex_destroy(&i->lazy_mutex);
+	mutex_destroy(&i->builtin_mutex);
 	mutex_destroy(&i->global_untyped_mutex);
 	mutex_destroy(&i->type_info_mutex);
 	mutex_destroy(&i->deps_mutex);
@@ -3074,6 +3076,7 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 			}
 
 			if (name == "builtin") {
+				mutex_lock(&ctx->info->builtin_mutex);
 				add_entity(ctx, builtin_pkg->scope, nullptr, e);
 				GB_ASSERT(scope_lookup(builtin_pkg->scope, e->token.string) != nullptr);
 				if (value != nullptr) {
@@ -3083,6 +3086,8 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
 				attr->Attribute.elems.count -= 1;
 				k--;
+
+				mutex_unlock(&ctx->info->builtin_mutex);
 			}
 		}
 	}
@@ -4156,7 +4161,6 @@ GB_THREAD_PROC(thread_proc_collect_entities) {
 
 	UntypedExprInfoMap untyped = {};
 	map_init(&untyped, heap_allocator());
-	defer (map_destroy(&untyped));
 
 	isize offset = data->offset;
 	isize file_end = gb_min(offset+data->count, c->info.files.entries.count);
@@ -4171,6 +4175,8 @@ GB_THREAD_PROC(thread_proc_collect_entities) {
 		add_untyped_expressions(&c->info, ctx->untyped);
 	}
 
+	map_destroy(&untyped);
+
 	gb_semaphore_release(&c->info.collect_semaphore);
 	return 0;
 }
@@ -4180,7 +4186,7 @@ void check_collect_entities_all(Checker *c) {
 	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
 }
 
-void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
+void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
 	if (pkg->files.count != 0) {
 		AstPackageExportedEntity item = {};
 		while (mpmc_dequeue(&pkg->exported_entity_queue, &item)) {
@@ -4194,7 +4200,7 @@ void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedEx
 	}
 }
 
-GB_THREAD_PROC(thread_proc_check_export_entites) {
+GB_THREAD_PROC(thread_proc_check_export_entities) {
 	auto data = cast(ThreadProcCheckerSection *)thread->user_data;
 	Checker *c = data->checker;
 
@@ -4203,20 +4209,21 @@ GB_THREAD_PROC(thread_proc_check_export_entites) {
 
 	UntypedExprInfoMap untyped = {};
 	map_init(&untyped, heap_allocator());
-	defer (map_destroy(&untyped));
 
 	isize end = gb_min(data->offset + data->count, c->info.packages.entries.count);
 	for (isize i = data->offset; i < end; i++) {
 		AstPackage *pkg = c->info.packages.entries[i].value;
-		check_export_entites_in_pkg(&ctx, pkg, &untyped);
+		check_export_entities_in_pkg(&ctx, pkg, &untyped);
 	}
+
+	map_destroy(&untyped);
 
 	gb_semaphore_release(&c->info.collect_semaphore);
 	return 0;
 }
 
-void check_export_entites(Checker *c) {
-	check_with_workers(c, thread_proc_check_export_entites, c->info.packages.entries.count);
+void check_export_entities(Checker *c) {
+	check_with_workers(c, thread_proc_check_export_entities, c->info.packages.entries.count);
 }
 
 void check_import_entities(Checker *c) {
@@ -4311,7 +4318,7 @@ void check_import_entities(Checker *c) {
 			}
 
 			if (collect_file_decls(&ctx, f->decls)) {
-				check_export_entites_in_pkg(&ctx, pkg, &untyped);
+				check_export_entities_in_pkg(&ctx, pkg, &untyped);
 				pkg_index = min_pkg_index-1;
 				break;
 			}
@@ -4697,13 +4704,12 @@ GB_THREAD_PROC(thread_proc_body) {
 
 	UntypedExprInfoMap untyped = {};
 	map_init(&untyped, heap_allocator());
-	defer (map_destroy(&untyped));
-
-	gbRandom r = {}; gb_random_init(&r);
 
 	for (ProcInfo *pi; mpmc_dequeue(this_queue, &pi); /**/) {
 		consume_proc_info_queue(c, pi, this_queue, &untyped);
 	}
+
+	map_destroy(&untyped);
 
 	gb_semaphore_release(&c->procs_to_check_semaphore);
 
@@ -5034,13 +5040,13 @@ void check_parsed_files(Checker *c) {
 	check_collect_entities_all(c);
 
 	TIME_SECTION("export entities - pre");
-	check_export_entites(c);
+	check_export_entities(c);
 
 	// NOTE: Timing Section handled internally
 	check_import_entities(c);
 
 	TIME_SECTION("export entities - post");
-	check_export_entites(c);
+	check_export_entities(c);
 
 	TIME_SECTION("add entities from packages");
 	check_add_entities_from_queues(c);
@@ -5061,7 +5067,7 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("check procedure bodies");
 	check_procedure_bodies(c);
 
-	TIME_SECTION("add entities from procedure bodiess");
+	TIME_SECTION("add entities from procedure bodies");
 	check_add_entities_from_queues(c);
 
 	TIME_SECTION("check scope usage");

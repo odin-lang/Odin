@@ -297,6 +297,7 @@ struct CheckerInfo {
 	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
 	                                   // as it needs to be iterated across afterwards
 	BlockingMutex global_untyped_mutex;
+	BlockingMutex builtin_mutex;
 
 	// NOT recursive & Only used at the end of `check_proc_body`
 	// This is a possible source of contention but probably not
