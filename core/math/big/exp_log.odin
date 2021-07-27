@@ -406,7 +406,7 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	}
 
 	if err = set(bi_base, base);          err != .None { return -1, err; }
-	if err = _init_multi(bracket_mid, t); err != .None { return -1, err; }
+	if err = init_multi(bracket_mid, t);  err != .None { return -1, err; }
 	if err = one(bracket_low);            err != .None { return -1, err; }
 	if err = set(bracket_high, base);     err != .None { return -1, err; }
 
