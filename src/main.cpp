@@ -1226,7 +1226,7 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_ThreadedChecker:
-							#if defined(GB_SYSTEM_WINDOWS)
+							#if defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-threaded-checker is the default on this platform\n");
 							bad_flags = true;
 							#endif
@@ -1234,7 +1234,7 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_NoThreadedChecker:
-							#if !defined(GB_SYSTEM_WINDOWS)
+							#if !defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-no-threaded-checker is the default on this platform\n");
 							bad_flags = true;
 							#endif
