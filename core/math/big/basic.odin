@@ -750,50 +750,6 @@ int_sqrmod :: proc(remainder, number, modulus: ^Int) -> (err: Error) {
 sqrmod :: proc { int_sqrmod, };
 
 /*
-	This function is less generic than `nth_root`, simpler and faster.
-*/
-int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(dest);			err != .None { return err; }
-	if err = clear_if_uninitialized(src);			err != .None { return err; }
-
-	/*						Must be positive. 					*/
-	if src.sign == .Negative						{ return .Invalid_Argument; }
-
-	/*			Easy out. If src is zero, so is dest.			*/
-	if z, _ := is_zero(src); 						z { return zero(dest); }
-
-	/*						Set up temporaries.					*/
-	t1, t2 := &Int{}, &Int{};
-	defer destroy(t1, t2);
-
-	if err = copy(t1, src);							err != .None { return err; }
-	if err = zero(t2);								err != .None { return err; }
-
-	/*	First approximation. Not very bad for large arguments.	*/
-	if err = shr_digit(t1, t1.used / 2);			err != .None { return err; }
-	/*							t1 > 0 							*/
-	if err = div(t2, src, t1);						err != .None { return err; }
-	if err = add(t1, t1, t2);						err != .None { return err; }
-	if err = shr(t1, t1, 1);						err != .None { return err; }
-
-	/*					And now t1 > sqrt(arg).					*/
-	for {
-		if err = div(t2, src, t1);						err != .None { return err; }
-		if err = add(t1, t1, t2);						err != .None { return err; }
-		if err = shr(t1, t1, 1);						err != .None { return err; }
-		/* t1 >= sqrt(arg) >= t2 at this point */
-
-		cm, _ := cmp_mag(t1, t2);
-		if cm != 1 { break; }
-	}
-
-	swap(dest, t1);
-	return err;
-}
-
-sqrt :: proc { int_sqrt, };
-
-/*
 	==========================
 		Low-level routines    
 	==========================

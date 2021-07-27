@@ -63,15 +63,19 @@ demo :: proc() {
 	// defer delete(string_buffer);
 
 	err = set (numerator,   1024);
-	err = int_sqrt(destination, numerator);
+	err = sqrt(destination, numerator);
 	fmt.printf("int_sqrt returned: %v\n", err);
 
-	print("destination", destination);
-	// print("source     ", source);
-	// print("quotient   ", quotient);
-	// print("remainder  ", remainder);
-	print("numerator  ", numerator);
-	// print("denominator", denominator);
+	print("num      ", numerator);
+	print("sqrt(num)", destination);
+
+	fmt.println("\n\n");
+
+	err = root_n(destination, numerator, 2);
+	fmt.printf("root_n(2) returned: %v\n", err);
+
+	print("num        ", numerator);
+	print("root_n(num)", destination);
 }
 
 main :: proc() {
