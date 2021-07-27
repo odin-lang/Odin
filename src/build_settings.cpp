@@ -4,9 +4,9 @@
 #endif
 
 
-#if defined(GB_SYSTEM_WINDOWS)
+// #if defined(GB_SYSTEM_WINDOWS)
 #define DEFAULT_TO_THREADED_CHECKER
-#endif
+// #endif
 
 enum TargetOsKind {
 	TargetOs_Invalid,
