@@ -397,6 +397,8 @@ when size_of(uintptr) == 4 {
 		szDescription: [WSADESCRIPTION_LEN + 1]u8,
 		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
 	}
+} else {
+	#panic("unknown word size");
 }
 
 WSABUF :: struct {

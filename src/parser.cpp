@@ -5370,6 +5370,9 @@ bool parse_file(Parser *p, AstFile *f) {
 				}
 
 				f->total_file_decl_count += calc_decl_count(stmt);
+				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl) {
+					f->delayed_decl_count += 1;
+				}
 			}
 		}
 
@@ -5380,6 +5383,10 @@ bool parse_file(Parser *p, AstFile *f) {
 
 	u64 end = time_stamp_time_now();
 	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
+
+	for (int i = 0; i < AstDelayQueue_COUNT; i++) {
+		mpmc_init(f->delayed_decls_queues+i, heap_allocator(), f->delayed_decl_count);
+	}
 
 
 	return f->error_count == 0;

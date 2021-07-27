@@ -83,6 +83,11 @@ enum AstFileFlag : u32 {
 	AstFile_IsLazy    = 1<<2,
 };
 
+enum AstDelayQueueKind {
+	AstDelayQueue_Import,
+	AstDelayQueue_Expr,
+	AstDelayQueue_COUNT,
+};
 
 struct AstFile {
 	i32          id;
@@ -113,6 +118,7 @@ struct AstFile {
 	bool         allow_type;
 
 	isize total_file_decl_count;
+	isize delayed_decl_count;
 	Slice<Ast *> decls;
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;
@@ -128,6 +134,9 @@ struct AstFile {
 	CommentGroup *docs;             // current docs
 	Array<CommentGroup *> comments; // All the comments!
 
+	// TODO(bill): make this a basic queue as it does not require
+	// any multiple thread capabilities
+	MPMCQueue<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
@@ -151,6 +160,11 @@ struct AstForeignFile {
 };
 
 
+struct AstPackageExportedEntity {
+	Ast *identifier;
+	Entity *entity;
+};
+
 struct AstPackage {
 	PackageKind           kind;
 	isize                 id;
@@ -160,10 +174,11 @@ struct AstPackage {
 	Array<AstForeignFile> foreign_files;
 	bool                  is_single_file;
 
+	MPMCQueue<AstPackageExportedEntity> exported_entity_queue;
+
 	// NOTE(bill): Created/set in checker
 	Scope *   scope;
 	DeclInfo *decl_info;
-	bool      used;
 	bool      is_extra;
 };
 
