@@ -869,6 +869,9 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->identifier_uses_mutex);
 	mutex_init(&i->foreign_mutex);
 
+	gb_semaphore_init(&i->collect_semaphore);
+
+
 #undef TIME_SECTION
 }
 
@@ -4061,7 +4064,6 @@ void check_create_file_scopes(Checker *c) {
 	}
 }
 
-gb_global gbSemaphore global_collect_entities_all_sempaphore;
 
 struct ThreadProcCollectEntities {
 	Checker *checker;
@@ -4087,7 +4089,7 @@ GB_THREAD_PROC(thread_proc_collect_entities) {
 		GB_ASSERT(ctx->collect_delayed_decls == false);
 	}
 
-	gb_semaphore_release(&global_collect_entities_all_sempaphore);
+	gb_semaphore_release(&c->info.collect_semaphore);
 	return 0;
 }
 
@@ -4113,8 +4115,7 @@ void check_collect_entities_all(Checker *c) {
 		return;
 	}
 
-	gb_semaphore_init(&global_collect_entities_all_sempaphore);
-	gb_semaphore_post(&global_collect_entities_all_sempaphore, cast(i32)thread_count);
+	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)worker_count);
 
 	isize total_file_count = c->info.files.entries.count;
 	isize file_load_count = (total_file_count+thread_count-1)/thread_count;
@@ -4143,7 +4144,7 @@ void check_collect_entities_all(Checker *c) {
 	dummy_main_thread.user_data = thread_data+worker_count;
 	thread_proc_collect_entities(&dummy_main_thread);
 
-	gb_semaphore_wait(&global_collect_entities_all_sempaphore);
+	gb_semaphore_wait(&c->info.collect_semaphore);
 
 	for (isize i = 0; i < worker_count; i++) {
 		gb_thread_destroy(threads+i);
@@ -4163,13 +4164,76 @@ void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg) {
 	}
 }
 
+struct ThreadProcExportEntities {
+	Checker *checker;
+	isize offset;
+	isize count;
+};
 
-void check_export_entites(Checker *c) {
+GB_THREAD_PROC(thread_proc_check_export_entites) {
+	auto data = cast(ThreadProcExportEntities *)thread->user_data;
+	Checker *c = data->checker;
+
 	CheckerContext ctx = make_checker_context(c);
+	defer (destroy_checker_context(&ctx));
 
-	for_array(i, c->info.packages.entries) {
+	isize end = gb_min(data->offset + data->count, c->info.packages.entries.count);
+	for (isize i = data->offset; i < end; i++) {
 		AstPackage *pkg = c->info.packages.entries[i].value;
 		check_export_entites_in_pkg(&ctx, pkg);
+	}
+
+	gb_semaphore_release(&c->info.collect_semaphore);
+	return 0;
+}
+
+void check_export_entites(Checker *c) {
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	if (!build_context.threaded_checker) {
+		worker_count = 0;
+	}
+	if (worker_count == 0) {
+		CheckerContext ctx = make_checker_context(c);
+		for_array(i, c->info.packages.entries) {
+			AstPackage *pkg = c->info.packages.entries[i].value;
+			check_export_entites_in_pkg(&ctx, pkg);
+		}
+		return;
+	}
+
+	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)worker_count);
+
+	isize total_pkg_count = c->info.packages.entries.count;
+	isize pkg_load_count = (total_pkg_count+thread_count-1)/thread_count;
+	isize remaining_pkg_count = c->info.packages.entries.count;
+
+	ThreadProcExportEntities *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcExportEntities, thread_count);
+	for (isize i = 0; i < thread_count; i++) {
+		ThreadProcExportEntities *data = thread_data + i;
+		data->checker = c;
+		data->offset = total_pkg_count-remaining_pkg_count;
+		data->count = pkg_load_count;
+		remaining_pkg_count -= pkg_load_count;
+	}
+	GB_ASSERT(remaining_pkg_count <= 0);
+
+	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_init(threads+i);
+	}
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_start(threads+i, thread_proc_check_export_entites, thread_data+i);
+	}
+	gbThread dummy_main_thread = {};
+	dummy_main_thread.user_data = thread_data+worker_count;
+	thread_proc_check_export_entites(&dummy_main_thread);
+
+	gb_semaphore_wait(&c->info.collect_semaphore);
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_destroy(threads+i);
 	}
 }
 
@@ -5005,15 +5069,11 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("export entities - pre");
 	check_export_entites(c);
 
-	// TIME_SECTION("import entities");
+	// NOTE: Timing Section handled internally
 	check_import_entities(c);
 
 	TIME_SECTION("export entities - post");
 	check_export_entites(c);
-
-	// if (true) {
-	// 	return;
-	// }
 
 	TIME_SECTION("add entities from packages");
 	check_add_entities_from_queues(c);
