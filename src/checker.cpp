@@ -5051,6 +5051,9 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("init preload");
 	init_preload(c);
 
+	TIME_SECTION("add global untyped expression to queue");
+	add_untyped_expressions(&c->info, &c->info.global_untyped);
+
 	CheckerContext prev_context = c->builtin_ctx;
 	defer (c->builtin_ctx = prev_context);
 	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
