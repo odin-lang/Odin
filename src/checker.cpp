@@ -860,9 +860,9 @@ void init_checker_info(CheckerInfo *i) {
 
 	TIME_SECTION("checker info: mutexes");
 
-	gb_mutex_init(&i->gen_procs_mutex);
-	gb_mutex_init(&i->gen_types_mutex);
-	gb_mutex_init(&i->lazy_mutex);
+	mutex_init(&i->gen_procs_mutex);
+	mutex_init(&i->gen_types_mutex);
+	mutex_init(&i->lazy_mutex);
 
 	mutex_init(&i->type_info_mutex);
 	mutex_init(&i->deps_mutex);
@@ -895,9 +895,9 @@ void destroy_checker_info(CheckerInfo *i) {
 	mpmc_destroy(&i->required_global_variable_queue);
 	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
 
-	gb_mutex_destroy(&i->gen_procs_mutex);
-	gb_mutex_destroy(&i->gen_types_mutex);
-	gb_mutex_destroy(&i->lazy_mutex);
+	mutex_destroy(&i->gen_procs_mutex);
+	mutex_destroy(&i->gen_types_mutex);
+	mutex_destroy(&i->lazy_mutex);
 	mutex_destroy(&i->type_info_mutex);
 	mutex_destroy(&i->deps_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);

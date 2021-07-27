@@ -236,8 +236,8 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 
 
 Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure) {
-	gb_mutex_lock(&ctx->info->gen_types_mutex);
-	defer (gb_mutex_unlock(&ctx->info->gen_types_mutex));
+	mutex_lock(&ctx->info->gen_types_mutex);
+	defer (mutex_unlock(&ctx->info->gen_types_mutex));
 
 	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
@@ -318,7 +318,7 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 
 	named_type->Named.type_name = e;
 
-	gb_mutex_lock(&ctx->info->gen_types_mutex);
+	mutex_lock(&ctx->info->gen_types_mutex);
 	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types) {
 		array_add(found_gen_types, e);
@@ -327,7 +327,7 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 		array_add(&array, e);
 		map_set(&ctx->info->gen_types, hash_pointer(original_type), array);
 	}
-	gb_mutex_unlock(&ctx->info->gen_types_mutex);
+	mutex_unlock(&ctx->info->gen_types_mutex);
 }
 
 Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,

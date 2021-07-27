@@ -242,7 +242,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			String original_string = o.value.value_string;
 
 
-			gbMutex *ignore_mutex = nullptr;
+			BlockingMutex *ignore_mutex = nullptr;
 			String path = {};
 			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
 

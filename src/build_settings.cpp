@@ -518,8 +518,8 @@ String internal_odin_root_dir(void) {
 	}
 	len += 1; // NOTE(bill): It needs an extra 1 for some reason
 
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -576,8 +576,8 @@ String internal_odin_root_dir(void) {
 		}
 	}
 
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -653,8 +653,8 @@ String internal_odin_root_dir(void) {
 		array_resize(&path_buf, 2*path_buf.count + 300);
 	}
 
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -683,8 +683,8 @@ String internal_odin_root_dir(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -711,9 +711,9 @@ String path_to_fullpath(gbAllocator a, String s) {
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
 	char *p;
-	gb_mutex_lock(&string_buffer_mutex);
+	mutex_lock(&string_buffer_mutex);
 	p = realpath(cast(char *)s.text, 0);
-	gb_mutex_unlock(&string_buffer_mutex);
+	mutex_unlock(&string_buffer_mutex);
 	if(p == nullptr) return String{};
 	return make_string_c(p);
 }

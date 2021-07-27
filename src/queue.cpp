@@ -18,7 +18,7 @@ struct MPMCQueue {
 	CacheLinePad pad0;
 	isize mask;
 	Array<MPMCQueueNode<T>> buffer;
-	gbMutex mutex;
+	BlockingMutex mutex;
 	std::atomic<isize> count;
 
 	CacheLinePad pad1;
@@ -37,7 +37,7 @@ void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size) {
 	size = next_pow2_isize(size);
 	GB_ASSERT(gb_is_power_of_two(size));
 
-	gb_mutex_init(&q->mutex);
+	mutex_init(&q->mutex);
 	q->mask = size-1;
 	array_init(&q->buffer, a, size);
 
@@ -57,7 +57,7 @@ void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size) {
 
 template <typename T>
 void mpmc_destroy(MPMCQueue<T> *q) {
-	gb_mutex_destroy(&q->mutex);
+	mutex_destroy(&q->mutex);
 	gb_free(q->buffer.allocator, q->buffer.data);
 }
 
@@ -83,13 +83,13 @@ isize mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 				return q->count.fetch_add(1, std::memory_order_release);
 			}
 		} else if (diff < 0) {
-			gb_mutex_lock(&q->mutex);
+			mutex_lock(&q->mutex);
 			isize old_size = q->buffer.count;
 			isize new_size = old_size*2;
 			array_resize(&q->buffer, new_size);
 			if (q->buffer.data == nullptr) {
 				GB_PANIC("Unable to resize enqueue: %td -> %td", old_size, new_size);
-				gb_mutex_unlock(&q->mutex);
+				mutex_unlock(&q->mutex);
 				return -1;
 			}
 			// NOTE(bill): pretend it's not atomic for performance
@@ -98,7 +98,7 @@ isize mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 				raw_data[i].idx = i;
 			}
 			q->mask = new_size-1;
-			gb_mutex_unlock(&q->mutex);
+			mutex_unlock(&q->mutex);
 		} else {
 			head_idx = q->head_idx.load(std::memory_order_relaxed);
 		}

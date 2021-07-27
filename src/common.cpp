@@ -29,6 +29,64 @@
 #include <string.h>
 #include <atomic> // Because I wanted the C++11 memory order semantics, of which gb.h does not offer (because it was a C89 library)
 
+
+#if defined(GB_SYSTEM_WINDOWS)
+	struct BlockingMutex {
+		SRWLOCK srwlock;
+	};
+	void mutex_init(BlockingMutex *m) {
+	}
+	void mutex_destroy(BlockingMutex *m) {
+	}
+	void mutex_lock(BlockingMutex *m) {
+		AcquireSRWLockExclusive(&m->srwlock);
+	}
+	bool mutex_try_lock(BlockingMutex *m) {
+		return !!TryAcquireSRWLockExclusive(&m->srwlock);
+	}
+	void mutex_unlock(BlockingMutex *m) {
+		ReleaseSRWLockExclusive(&m->srwlock);
+	}
+#else
+	typedef gbMutex BlockingMutex;
+	void mutex_init(BlockingMutex *m) {
+		gb_mutex_init(m);
+	}
+	void mutex_destroy(BlockingMutex *m) {
+		gb_mutex_destroy(m);
+	}
+	void mutex_lock(BlockingMutex *m) {
+		gb_mutex_lock(m);
+	}
+	bool mutex_try_lock(BlockingMutex *m) {
+		return !!gb_mutex_try_lock(m);
+	}
+	void mutex_unlock(BlockingMutex *m) {
+		gb_mutex_unlock(m);
+	}
+#endif
+
+struct RecursiveMutex {
+	gbMutex mutex;
+};
+void mutex_init(RecursiveMutex *m) {
+	gb_mutex_init(&m->mutex);
+}
+void mutex_destroy(RecursiveMutex *m) {
+	gb_mutex_destroy(&m->mutex);
+}
+void mutex_lock(RecursiveMutex *m) {
+	gb_mutex_lock(&m->mutex);
+}
+bool mutex_try_lock(RecursiveMutex *m) {
+	return gb_mutex_try_lock(&m->mutex);
+}
+void mutex_unlock(RecursiveMutex *m) {
+	gb_mutex_unlock(&m->mutex);
+}
+
+
+
 gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);
 }
@@ -1300,41 +1358,3 @@ Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) {
 	}
 	return slice_array(d->distances, 0, count);
 }
-
-
-
-#if defined(GB_SYSTEM_WINDOWS)
-	struct BlockingMutex {
-		SRWLOCK srwlock;
-	};
-	void mutex_init(BlockingMutex *m) {
-	}
-	void mutex_destroy(BlockingMutex *m) {
-	}
-	void mutex_lock(BlockingMutex *m) {
-		AcquireSRWLockExclusive(&m->srwlock);
-	}
-	bool mutex_try_lock(BlockingMutex *m) {
-		return !!TryAcquireSRWLockExclusive(&m->srwlock);
-	}
-	void mutex_unlock(BlockingMutex *m) {
-		ReleaseSRWLockExclusive(&m->srwlock);
-	}
-#else
-	typedef gbMutex BlockingMutex;
-	void mutex_init(BlockingMutex *m) {
-		gb_mutex_init(m);
-	}
-	void mutex_destroy(BlockingMutex *m) {
-		gb_mutex_destroy(m);
-	}
-	void mutex_lock(BlockingMutex *m) {
-		gb_mutex_lock(m);
-	}
-	bool mutex_try_lock(BlockingMutex *m) {
-		return !!gb_mutex_try_lock(m);
-	}
-	void mutex_unlock(BlockingMutex *m) {
-		gb_mutex_unlock(m);
-	}
-#endif
