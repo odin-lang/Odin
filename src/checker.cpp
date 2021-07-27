@@ -4064,25 +4064,67 @@ void check_create_file_scopes(Checker *c) {
 	}
 }
 
-
-struct ThreadProcCollectEntities {
+struct ThreadProcCheckerSection {
 	Checker *checker;
-	isize file_offset;
-	isize file_count;
+	isize offset;
+	isize count;
 };
 
+
+void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	if (!build_context.threaded_checker) {
+		worker_count = 0;
+	}
+
+	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)worker_count);
+
+	isize file_load_count = (total_count+thread_count-1)/thread_count;
+	isize remaining_count = total_count;
+
+	ThreadProcCheckerSection *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcCheckerSection, thread_count);
+	for (isize i = 0; i < thread_count; i++) {
+		ThreadProcCheckerSection *data = thread_data + i;
+		data->checker = c;
+		data->offset = total_count-remaining_count;
+		data->count = file_load_count;
+		remaining_count -= file_load_count;
+	}
+	GB_ASSERT(remaining_count <= 0);
+
+	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_init(threads+i);
+	}
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_start(threads+i, proc, thread_data+i);
+	}
+	gbThread dummy_main_thread = {};
+	dummy_main_thread.user_data = thread_data+worker_count;
+	proc(&dummy_main_thread);
+
+	gb_semaphore_wait(&c->info.collect_semaphore);
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_destroy(threads+i);
+	}
+}
+
+
 GB_THREAD_PROC(thread_proc_collect_entities) {
-	auto *data = cast(ThreadProcCollectEntities *)thread->user_data;
+	auto *data = cast(ThreadProcCheckerSection *)thread->user_data;
 	Checker *c = data->checker;
 	CheckerContext collect_entity_ctx = make_checker_context(c);
 	defer (destroy_checker_context(&collect_entity_ctx));
 
 	CheckerContext *ctx = &collect_entity_ctx;
 
-	isize file_offset = data->file_offset;
-	isize file_end = gb_min(file_offset+data->file_count, c->info.files.entries.count);
+	isize offset = data->offset;
+	isize file_end = gb_min(offset+data->count, c->info.files.entries.count);
 
-	for (isize i = file_offset; i < file_end; i++) {
+	for (isize i = offset; i < file_end; i++) {
 		AstFile *f = c->info.files.entries[i].value;
 		reset_checker_context(ctx, f);
 		check_collect_entities(ctx, f->decls);
@@ -4095,60 +4137,7 @@ GB_THREAD_PROC(thread_proc_collect_entities) {
 
 
 void check_collect_entities_all(Checker *c) {
-	CheckerContext collect_entity_ctx = make_checker_context(c);
-	defer (destroy_checker_context(&collect_entity_ctx));
-
-	CheckerContext *ctx = &collect_entity_ctx;
-
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	if (!build_context.threaded_checker) {
-		worker_count = 0;
-	}
-	if (worker_count == 0) {
-		for_array(i, c->info.files.entries) {
-			AstFile *f = c->info.files.entries[i].value;
-			reset_checker_context(ctx, f);
-			check_collect_entities(ctx, f->decls);
-			GB_ASSERT(ctx->collect_delayed_decls == false);
-		}
-		return;
-	}
-
-	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)worker_count);
-
-	isize total_file_count = c->info.files.entries.count;
-	isize file_load_count = (total_file_count+thread_count-1)/thread_count;
-	isize remaining_file_count = c->info.files.entries.count;
-
-
-	ThreadProcCollectEntities *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcCollectEntities, thread_count);
-	for (isize i = 0; i < thread_count; i++) {
-		ThreadProcCollectEntities *data = thread_data + i;
-		data->checker = c;
-		data->file_offset = total_file_count-remaining_file_count;
-		data->file_count = file_load_count;
-		remaining_file_count -= file_load_count;
-	}
-	GB_ASSERT(remaining_file_count <= 0);
-
-	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_init(threads+i);
-	}
-
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_start(threads+i, thread_proc_collect_entities, thread_data+i);
-	}
-	gbThread dummy_main_thread = {};
-	dummy_main_thread.user_data = thread_data+worker_count;
-	thread_proc_collect_entities(&dummy_main_thread);
-
-	gb_semaphore_wait(&c->info.collect_semaphore);
-
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_destroy(threads+i);
-	}
+	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
 }
 
 void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg) {
@@ -4164,14 +4153,8 @@ void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg) {
 	}
 }
 
-struct ThreadProcExportEntities {
-	Checker *checker;
-	isize offset;
-	isize count;
-};
-
 GB_THREAD_PROC(thread_proc_check_export_entites) {
-	auto data = cast(ThreadProcExportEntities *)thread->user_data;
+	auto data = cast(ThreadProcCheckerSection *)thread->user_data;
 	Checker *c = data->checker;
 
 	CheckerContext ctx = make_checker_context(c);
@@ -4188,53 +4171,7 @@ GB_THREAD_PROC(thread_proc_check_export_entites) {
 }
 
 void check_export_entites(Checker *c) {
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	if (!build_context.threaded_checker) {
-		worker_count = 0;
-	}
-	if (worker_count == 0) {
-		CheckerContext ctx = make_checker_context(c);
-		for_array(i, c->info.packages.entries) {
-			AstPackage *pkg = c->info.packages.entries[i].value;
-			check_export_entites_in_pkg(&ctx, pkg);
-		}
-		return;
-	}
-
-	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)worker_count);
-
-	isize total_pkg_count = c->info.packages.entries.count;
-	isize pkg_load_count = (total_pkg_count+thread_count-1)/thread_count;
-	isize remaining_pkg_count = c->info.packages.entries.count;
-
-	ThreadProcExportEntities *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcExportEntities, thread_count);
-	for (isize i = 0; i < thread_count; i++) {
-		ThreadProcExportEntities *data = thread_data + i;
-		data->checker = c;
-		data->offset = total_pkg_count-remaining_pkg_count;
-		data->count = pkg_load_count;
-		remaining_pkg_count -= pkg_load_count;
-	}
-	GB_ASSERT(remaining_pkg_count <= 0);
-
-	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_init(threads+i);
-	}
-
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_start(threads+i, thread_proc_check_export_entites, thread_data+i);
-	}
-	gbThread dummy_main_thread = {};
-	dummy_main_thread.user_data = thread_data+worker_count;
-	thread_proc_check_export_entites(&dummy_main_thread);
-
-	gb_semaphore_wait(&c->info.collect_semaphore);
-
-	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_destroy(threads+i);
-	}
+	check_with_workers(c, thread_proc_check_export_entites, c->info.packages.entries.count);
 }
 
 void check_import_entities(Checker *c) {
@@ -4716,28 +4653,6 @@ GB_THREAD_PROC(thread_proc_body) {
 		consume_proc_info_queue(c, pi, this_queue, &untyped);
 	}
 
-#if 0
-	// Greedy Work Stealing
-retry:;
-	isize max_count = 0;
-	isize best_index = -1;
-	for (u32 i = 0; i < data->thread_count; i++) {
-		ProcBodyQueue *q = all_data[i].queue;
-		isize count = q->count.load(std::memory_order_relaxed);
-		if (max_count < count)  {
-			max_count = count;
-			best_index = i;
-		}
-	}
-	if (best_index >= 0) {
-		ProcBodyQueue *other_queue = all_data[best_index].queue;
-		for (ProcInfo *pi; mpmc_dequeue(other_queue, &pi); /**/) {
-			consume_proc_info_queue(c, pi, this_queue, &untyped);
-		}
-		goto retry;
-	}
-#endif
-
 	gb_semaphore_release(&c->procs_to_check_semaphore);
 
 	return 0;
@@ -4798,7 +4713,7 @@ void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(total_queued == original_queue_count);
 
 
-	gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
+	gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)worker_count);
 
 	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
 	for (isize i = 0; i < worker_count; i++) {
