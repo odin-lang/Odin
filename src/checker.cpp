@@ -3913,13 +3913,16 @@ bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
 		error(ws->cond, "Invalid body for 'when' statement");
 	} else {
 		if (ws->determined_cond) {
-			//
+			check_collect_entities(ctx, ws->body->BlockStmt.stmts);
+			return true;
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
 			case Ast_BlockStmt:
-				return false;
+				check_collect_entities(ctx, ws->else_stmt->BlockStmt.stmts);
+				return true;
 			case Ast_WhenStmt:
-				return collect_when_stmt_from_file(ctx, &ws->else_stmt->WhenStmt);
+				collect_when_stmt_from_file(ctx, &ws->else_stmt->WhenStmt);
+				return true;
 			default:
 				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 				break;
@@ -4149,24 +4152,26 @@ void check_collect_entities_all(Checker *c) {
 	}
 }
 
+void check_export_entites_in_pkg(CheckerContext *ctx, AstPackage *pkg) {
+	if (pkg->files.count != 0) {
+		AstPackageExportedEntity item = {};
+		while (mpmc_dequeue(&pkg->exported_entity_queue, &item)) {
+			AstFile *f = item.entity->file;
+			if (ctx->file != f) {
+				reset_checker_context(ctx, f);
+			}
+			add_entity(ctx, pkg->scope, item.identifier, item.entity);
+		}
+	}
+}
+
+
 void check_export_entites(Checker *c) {
 	CheckerContext ctx = make_checker_context(c);
 
 	for_array(i, c->info.packages.entries) {
 		AstPackage *pkg = c->info.packages.entries[i].value;
-		if (pkg->files.count == 0) {
-			continue; // Sanity check
-		}
-
-
-		AstPackageExportedEntity item = {};
-		while (mpmc_dequeue(&pkg->exported_entity_queue, &item)) {
-			AstFile *f = item.entity->file;
-			if (ctx.file != f) {
-				reset_checker_context(&ctx, f);
-			}
-			add_entity(&ctx, pkg->scope, item.identifier, item.entity);
-		}
+		check_export_entites_in_pkg(&ctx, pkg);
 	}
 }
 
@@ -4239,7 +4244,8 @@ void check_import_entities(Checker *c) {
 	TIME_SECTION("check_import_entities - collect file decls");
 	CheckerContext ctx = make_checker_context(c);
 
-	for_array(pkg_index, package_order) {
+	isize min_pkg_index = 0;
+	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
 		ImportGraphNode *node = package_order[pkg_index];
 		AstPackage *pkg = node->pkg;
 
@@ -4256,8 +4262,16 @@ void check_import_entities(Checker *c) {
 				check_add_import_decl(&ctx, id);
 			}
 
-			collect_file_decls(&ctx, f->decls);
+			if (collect_file_decls(&ctx, f->decls)) {
+				check_export_entites_in_pkg(&ctx, pkg);
+				pkg_index = min_pkg_index-1;
+				break;
+			}
 		}
+		if (pkg_index < 0) {
+			continue;
+		}
+		min_pkg_index = pkg_index;
 	}
 
 	TIME_SECTION("check_import_entities - check delayed entities");
