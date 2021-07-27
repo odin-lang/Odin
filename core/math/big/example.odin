@@ -51,15 +51,7 @@ print :: proc(name: string, a: ^Int, base := i8(10)) {
 	
 }
 
-num_threads :: 16;
-global_traces_indexes := [num_threads]u16{};
-@thread_local local_traces_index : ^u16;
-
-init_thread_tracing :: proc(thread_id: u8) {
-    
-    fmt.printf("%p\n", &global_traces_indexes[thread_id]);
-    fmt.printf("%p\n", local_traces_index);
-}
+@thread_local string_buffer: [1024]u8;
 
 demo :: proc() {
 	err: Error;
@@ -67,34 +59,19 @@ demo :: proc() {
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	err = set (numerator,   2);
-	err = set (denominator, 1);
-	err = set (quotient,    u128(1 << 120));
-	err = zero(remainder);
-	err = pow(remainder, numerator, 120);
-	if err != .None {
-		fmt.printf("Error: %v\n", err);
-	} else {
-		print("numerator  ", numerator,   10);
-		print("denominator", denominator, 10);
-		print("quotient   ", quotient,    10);
-		print("remainder  ", remainder,   10);
-	}
-	if c, _ := cmp(quotient, remainder); c == 0 {
-		fmt.println("c == r");
-	} else {
-		fmt.println("c != r");
-	}
+	// string_buffer := make([]u8, 1024);
+	// defer delete(string_buffer);
 
-	foozle := "-1329227995784915872903807060280344576";
-	err = atoi(destination, foozle, 10);
-	if err != .None {
-		fmt.printf("Error %v while parsing `%v`", err, foozle);
-	} else {
-		print("destination", destination);
-		err = add(remainder, remainder, destination);
-		print("remainder + destination", remainder);
-	}
+	err = set (numerator,   1024);
+	err = int_sqrt(destination, numerator);
+	fmt.printf("int_sqrt returned: %v\n", err);
+
+	print("destination", destination);
+	// print("source     ", source);
+	// print("quotient   ", quotient);
+	// print("remainder  ", remainder);
+	print("numerator  ", numerator);
+	// print("denominator", denominator);
 }
 
 main :: proc() {
