@@ -3,6 +3,11 @@
 #include <sys/sysctl.h>
 #endif
 
+
+#if defined(GB_SYSTEM_WINDOWS)
+#define DEFAULT_TO_THREADED_CHECKER
+#endif
+
 enum TargetOsKind {
 	TargetOs_Invalid,
 
@@ -825,7 +830,7 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
 
-	#if defined(GB_SYSTEM_WINDOWS)
+	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;
 	#endif
 
