@@ -191,8 +191,6 @@ struct Scope {
 	std::atomic<Scope *> head_child;
 
 	StringMap<Entity *> elements;
-	Array<Ast *>    delayed_directives;
-	Array<Ast *>    delayed_imports;
 	PtrSet<Scope *> imported;
 
 	i32             flags; // ScopeFlag
@@ -294,6 +292,8 @@ struct CheckerInfo {
 	// Below are accessed within procedures
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
+
+	BlockingMutex scope_mutex;
 
 	// NOT recursive & Only used at the end of `check_proc_body`
 	// This is a possible source of contention but probably not

@@ -64,6 +64,10 @@ void mpmc_destroy(MPMCQueue<T> *q) {
 
 template <typename T>
 isize mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
+	if (q->mask == 0) {
+		return -1;
+	}
+
 	isize head_idx = q->head_idx.load(std::memory_order_relaxed);
 
 	for (;;) {
@@ -101,9 +105,12 @@ isize mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 	}
 }
 
-
 template <typename T>
 bool mpmc_dequeue(MPMCQueue<T> *q, T *data_) {
+	if (q->mask == 0) {
+		return false;
+	}
+
 	isize tail_idx = q->tail_idx.load(std::memory_order_relaxed);
 
 	for (;;) {
