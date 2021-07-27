@@ -11,6 +11,7 @@ package big
 
 import "core:mem"
 import "core:intrinsics"
+import "core:math/rand"
 
 /*
 	Deallocates the backing memory of one or more `Int`s.
@@ -506,6 +507,43 @@ count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 	return count, .None;
 }
 
+int_random_digit :: proc(r: ^rand.Rand = nil) -> (res: DIGIT) {
+	when _DIGIT_BITS == 60 { // DIGIT = u64
+		return DIGIT(rand.uint64(r)) & _MASK;
+	} else when _DIGIT_BITS == 28 { // DIGIT = u32
+		return DIGIT(rand.uint32(r)) & _MASK;
+	} else {
+		panic("Unsupported DIGIT size.");
+	}
+
+	return 0; // We shouldn't get here.
+}
+
+int_rand :: proc(dest: ^Int, bits: int, r: ^rand.Rand = nil) -> (err: Error) {
+	bits := bits;
+
+	if bits <= 0 { return .Invalid_Argument; }
+
+	digits := bits / _DIGIT_BITS;
+	bits   %= _DIGIT_BITS;
+
+	if bits > 0 {
+		digits += 1;
+	}
+
+	if err = grow(dest, digits); err != .None { return err; }
+
+	for i := 0; i < digits; i += 1 {
+		dest.digit[i] = int_random_digit(r) & _MASK;
+	}
+	if bits > 0 {
+		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1);
+	}
+	dest.used = digits;
+	return .None;
+}
+rand :: proc { int_rand, };
+
 /*
 	Internal helpers.
 */
@@ -532,10 +570,12 @@ clear_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
 	return .None;
 }
 
+
+
 /*
 	Allocates several `Int`s at once.
 */
-_int_init_multi :: proc(integers: ..^Int) -> (err: Error) {
+int_init_multi :: proc(integers: ..^Int) -> (err: Error) {
 	integers := integers;
 	for a in &integers {
 		if err = clear(a); err != .None { return err; }
@@ -543,7 +583,7 @@ _int_init_multi :: proc(integers: ..^Int) -> (err: Error) {
 	return .None;
 }
 
-_init_multi :: proc { _int_init_multi, };
+init_multi :: proc { int_init_multi, };
 
 _copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
 	digits := digits;

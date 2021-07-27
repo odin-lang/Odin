@@ -59,23 +59,15 @@ demo :: proc() {
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	// string_buffer := make([]u8, 1024);
-	// defer delete(string_buffer);
-
-	err = set (numerator,   1024);
-	err = sqrt(destination, numerator);
-	fmt.printf("int_sqrt returned: %v\n", err);
-
-	print("num      ", numerator);
-	print("sqrt(num)", destination);
-
-	fmt.println("\n\n");
-
-	err = root_n(destination, numerator, 2);
-	fmt.printf("root_n(2) returned: %v\n", err);
-
-	print("num        ", numerator);
-	print("root_n(num)", destination);
+	for i in 1..=10 {
+		err = rand(destination, 1200); // 1200 random bits
+		if err != .None {
+			fmt.printf("rand error: %v\n", err);
+		} else {
+			fmt.printf("#%3d: ", i);
+			print("", destination);
+		}
+	}
 }
 
 main :: proc() {
