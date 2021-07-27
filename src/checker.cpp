@@ -865,7 +865,6 @@ void init_checker_info(CheckerInfo *i) {
 	gb_mutex_init(&i->lazy_mutex);
 
 	mutex_init(&i->type_info_mutex);
-	mutex_init(&i->scope_mutex);
 	mutex_init(&i->deps_mutex);
 	mutex_init(&i->identifier_uses_mutex);
 	mutex_init(&i->foreign_mutex);
@@ -897,7 +896,6 @@ void destroy_checker_info(CheckerInfo *i) {
 	gb_mutex_destroy(&i->gen_types_mutex);
 	gb_mutex_destroy(&i->lazy_mutex);
 	mutex_destroy(&i->type_info_mutex);
-	mutex_destroy(&i->scope_mutex);
 	mutex_destroy(&i->deps_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
 	mutex_destroy(&i->foreign_mutex);
