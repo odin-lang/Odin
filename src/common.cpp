@@ -605,7 +605,8 @@ GB_ALLOCATOR_PROC(temp_allocator_proc) {
 
 
 gbAllocator temporary_allocator() {
-	return {temp_allocator_proc, &temporary_allocator_data};
+	return permanent_allocator();
+	// return {temp_allocator_proc, &temporary_allocator_data};
 }
 
 

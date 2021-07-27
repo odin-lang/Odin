@@ -1638,7 +1638,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 		}
 		StringSet name_set = {};
-		string_set_init(&name_set, temporary_allocator(), 2*ce->args.count);
+		string_set_init(&name_set, heap_allocator(), 2*ce->args.count);
 
 		for_array(i, ce->args) {
 			String name = {};

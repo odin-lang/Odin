@@ -112,6 +112,7 @@ struct AstFile {
 	bool         in_foreign_block;
 	bool         allow_type;
 
+	isize total_file_decl_count;
 	Slice<Ast *> decls;
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;

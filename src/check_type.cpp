@@ -2228,7 +2228,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = count;
 
-		scope = create_scope(ctx->info, ctx->scope);
+		scope = create_scope(ctx->info, ctx->scope, 8);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {

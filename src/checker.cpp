@@ -250,7 +250,8 @@ Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	GB_ASSERT(f->pkg != nullptr);
 	GB_ASSERT(f->pkg->scope != nullptr);
 
-	Scope *s = create_scope(info, f->pkg->scope);
+	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*f->total_file_decl_count);
+	Scope *s = create_scope(info, f->pkg->scope, init_elements_capacity);
 
 	array_reserve(&s->delayed_imports, f->imports.count);
 	array_reserve(&s->delayed_directives, f->directive_count);
@@ -265,11 +266,12 @@ Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 	GB_ASSERT(pkg != nullptr);
 
-	isize decl_count = 0;
-	for_array(i, pkg->files) {
-		decl_count += pkg->files[i]->decls.count;
+	isize total_pkg_decl_count = 0;
+	for_array(j, pkg->files) {
+		total_pkg_decl_count += pkg->files.data[j]->total_file_decl_count;
 	}
-	isize init_elements_capacity = 2*decl_count;
+
+	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
 	Scope *s = create_scope(c->info, builtin_pkg->scope, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
@@ -3993,6 +3995,10 @@ bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 
 	for_array(i, decls) {
 		Ast *decl = decls[i];
+		if (decl->state_flags & StateFlag_BeenHandled) {
+			continue;
+		}
+
 		switch (decl->kind) {
 		case_ast_node(vd, ValueDecl, decl);
 			check_collect_value_decl(ctx, decl);
@@ -4051,6 +4057,7 @@ bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 void check_create_file_scopes(Checker *c) {
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
+		isize total_pkg_decl_count = 0;
 
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
@@ -4149,6 +4156,8 @@ void check_collect_entities_all(Checker *c) {
 }
 
 void check_import_entities(Checker *c) {
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
 	defer ({
 		for_array(i, dep_graph) {
@@ -4157,6 +4166,8 @@ void check_import_entities(Checker *c) {
 		array_free(&dep_graph);
 	});
 
+
+	TIME_SECTION("check_import_entities - cycles");
 	// NOTE(bill): Priority queue
 	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
 
@@ -4210,6 +4221,7 @@ void check_import_entities(Checker *c) {
 		array_add(&package_order, n);
 	}
 
+	TIME_SECTION("check_import_entities - used");
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 		switch (pkg->kind) {
@@ -4220,6 +4232,7 @@ void check_import_entities(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("check_import_entities - collect checked packages from decl list");
 	CheckerContext ctx = make_checker_context(c);
 
 	for (isize loop_count = 0; ; loop_count++) {
@@ -4244,6 +4257,7 @@ void check_import_entities(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("check_import_entities - collect file decls");
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
 		ImportGraphNode *node = package_order[pkg_index];
 		AstPackage *pkg = node->pkg;
@@ -4272,6 +4286,7 @@ void check_import_entities(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("check_import_entities - check delayed entities");
 	for_array(i, package_order) {
 		ImportGraphNode *node = package_order[i];
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
@@ -4297,6 +4312,8 @@ void check_import_entities(Checker *c) {
 			}
 		}
 	}
+
+#undef TIME_SECTION
 }
 
 
