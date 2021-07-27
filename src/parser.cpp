@@ -5261,6 +5261,28 @@ String dir_from_path(String path) {
 	return base_dir;
 }
 
+isize calc_decl_count(Ast *decl) {
+	isize count = 0;
+	switch (decl->kind) {
+	case Ast_BlockStmt:
+		for_array(i, decl->BlockStmt.stmts) {
+			count += calc_decl_count(decl->BlockStmt.stmts.data[i]);
+		}
+		break;
+	case Ast_ValueDecl:
+		count = decl->ValueDecl.names.count;
+		break;
+	case Ast_ForeignBlockDecl:
+		count = calc_decl_count(decl->ForeignBlockDecl.body);
+		break;
+	case Ast_ImportDecl:
+	case Ast_ForeignImportDecl:
+		count = 1;
+		break;
+	}
+	return count;
+}
+
 bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -5346,6 +5368,8 @@ bool parse_file(Parser *p, AstFile *f) {
 				    stmt->ExprStmt.expr->kind == Ast_ProcLit) {
 					syntax_error(stmt, "Procedure literal evaluated but not used");
 				}
+
+				f->total_file_decl_count += calc_decl_count(stmt);
 			}
 		}
 
