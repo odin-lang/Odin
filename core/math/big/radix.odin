@@ -200,7 +200,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		count, err = count_bits(a);
 		digit: _WORD;
 
-		for offset := 0; offset < count; offset += 4 {
+		for offset := 0; offset < count; offset += shift {
 			bits_to_get := int(min(count - offset, shift));
 			if digit, err = int_bitfield_extract(a, offset, bits_to_get); err != .None {
 				return len(buffer) - available, .Invalid_Argument;
