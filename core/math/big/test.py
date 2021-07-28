@@ -54,26 +54,61 @@ except:
 	print("Couldn't find exported function 'test_error_string'")
 	exit(2)
 
-def error(res: Res, param=[]):
-	if res.err != E_None:
+def test(test_name: "", res: Res, param=[], expected_result = "", expected_error = E_None):
+	had_error = False
+	r = None
+
+	if res.err != expected_error:
 		error_type = l.test_error_string(res.err).decode('utf-8')
 		error_loc  = res.res.decode('utf-8')
 
-		error_string = "'{}' error in '{}'".format(error_type, error_loc)
+		error_string = "{}: '{}' error in '{}'".format(test_name, error_type, error_loc)
 		if len(param):
 			error_string += " with params {}".format(param)
 
 		print(error_string, flush=True)
-		os._exit(res.err)
+		had_error = True
+	elif res.err == E_None:
+		try:
+			r = res.res.decode('utf-8')
+		except:
+			pass
 
+		r = eval(res.res)
+		if r != expected_result:
+			error_string = "{}: Result was '{}', expected '{}'".format(test_name, r, expected_result)
+			if len(param):
+				error_string += " with params {}".format(param)
 
-def test_add_two(a = 0, b = 0, radix = 10):
+			print(error_string, flush=True)
+			had_error = True
+
+	return had_error
+
+def test_add_two(a = 0, b = 0, radix = 10, expected_result = "", expected_error = E_None):
 	res = add_two(str(a).encode('utf-8'), str(b).encode('utf-8'), radix)
-	error(res, [str(a), str(b), radix])
+	return test("test_add_two", res, [str(a), str(b), radix], expected_result, expected_error)
+
+
+ADD_TESTS = [
+	[	1234, 5432, 10,
+		6666, E_None, ],
+	[ 	1234, 5432, 110,
+		6666, E_Invalid_Argument, ],
+]
 
 if __name__ == '__main__':
 	print("---- core:math/big tests ----")
 	print()
 
-	test_add_two(1234, 5432, 10)
-	test_add_two(1234, 5432, 110)
+	count_pass = 0
+	count_fail = 0
+
+	for t in ADD_TESTS:
+		res = test_add_two(*t)
+		if res:
+			count_fail += 1
+		else:
+			count_pass += 1
+
+	print("ADD_TESTS: {} passes, {} failures.".format(count_pass, count_fail))
