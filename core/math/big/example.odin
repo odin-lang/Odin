@@ -12,6 +12,8 @@ package big
 
 import "core:fmt"
 import "core:mem"
+import "core:time"
+import rnd "core:math/rand"
 
 print_configation :: proc() {
 	fmt.printf(
@@ -40,32 +42,51 @@ _SQR_TOOM_CUTOFF,
 );
 }
 
+Category :: enum {
+	itoa,
+	atoi,
+};
+Event :: struct {
+	t: time.Duration,
+	c: int,
+}
+Timings := [Category]Event{};
+
 print :: proc(name: string, a: ^Int, base := i8(10)) {
+	s := time.tick_now();
 	as, err := itoa(a, base);
+	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
+
 	defer delete(as);
 	cb, _ := count_bits(a);
 	fmt.printf("%v (base: %v, bits used: %v): %v\n", name, base, cb, as);
 	if err != .None {
 		fmt.printf("%v (error: %v | %v)\n", name, err, a);
 	}
-	
 }
-
-@thread_local string_buffer: [1024]u8;
 
 demo :: proc() {
 	err: Error;
+	as:  string;
+
+	r := &rnd.Rand{};
+	rnd.init(r, 12345);
 
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	for i in 1..=10 {
-		err = rand(destination, 1200); // 1200 random bits
+	err = rand(destination, 120, r);
+	// print("destination", destination, 10);
+	for _ in 0 ..< 10_000 {
 		if err != .None {
-			fmt.printf("rand error: %v\n", err);
+			fmt.printf("set error: %v\n", err);
 		} else {
-			fmt.printf("#%3d: ", i);
-			print("", destination);
+			s := time.tick_now();
+			as, err = itoa(destination, 16);
+			e := time.tick_since(s);
+			Timings[.itoa].t += e; Timings[.itoa].c += 1;
+			assert(as == "B38677A01B8EF75CF434CA68677495", as);
+			delete(as);
 		}
 	}
 }
@@ -75,8 +96,17 @@ main :: proc() {
 	mem.tracking_allocator_init(&ta, context.allocator);
 	context.allocator = mem.tracking_allocator(&ta);
 
-	print_configation();
+	// print_configation();
 	demo();
+
+	fmt.printf("\nTimings:\n");
+	for v, i in Timings {
+		if v.c > 0 {
+			avg   := time.duration_milliseconds(time.Duration(f64(v.t) / f64(v.c)));
+			total := time.duration_milliseconds(time.Duration(v.t));
+			fmt.printf("%v: %.3f ms (avg), %.3f (total, %v calls)\n", i, avg, total, v.c);
+		}
+	}
 
 	if len(ta.allocation_map) > 0 {
 		for _, v in ta.allocation_map {
