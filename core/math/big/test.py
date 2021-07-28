@@ -54,8 +54,8 @@ except:
 	print("Couldn't find exported function 'test_error_string'")
 	exit(2)
 
-def test(test_name: "", res: Res, param=[], expected_result = "", expected_error = E_None):
-	had_error = False
+def test(test_name: "", res: Res, param=[], expected_error = E_None, expected_result = ""):
+	passed = True
 	r = None
 
 	if res.err != expected_error:
@@ -67,7 +67,7 @@ def test(test_name: "", res: Res, param=[], expected_result = "", expected_error
 			error_string += " with params {}".format(param)
 
 		print(error_string, flush=True)
-		had_error = True
+		passed = False
 	elif res.err == E_None:
 		try:
 			r = res.res.decode('utf-8')
@@ -81,34 +81,35 @@ def test(test_name: "", res: Res, param=[], expected_result = "", expected_error
 				error_string += " with params {}".format(param)
 
 			print(error_string, flush=True)
-			had_error = True
+			passed = False
 
-	return had_error
+	return passed
 
-def test_add_two(a = 0, b = 0, radix = 10, expected_result = "", expected_error = E_None):
+def test_add_two(a = 0, b = 0, radix = 10, expected_error = E_None, expected_result = None):
 	res = add_two(str(a).encode('utf-8'), str(b).encode('utf-8'), radix)
-	return test("test_add_two", res, [str(a), str(b), radix], expected_result, expected_error)
+	if expected_result == None:
+		expected_result = a + b
+	return test("test_add_two", res, [str(a), str(b), radix], expected_error, expected_result)
 
 
-ADD_TESTS = [
-	[	1234, 5432, 10,
-		6666, E_None, ],
-	[ 	1234, 5432, 110,
-		6666, E_Invalid_Argument, ],
-]
+TESTS = {
+	test_add_two: [
+		[ 1234, 5432,  10,                     ],
+		[ 1234, 5432, 110, E_Invalid_Argument, ],
+	],
+}
 
 if __name__ == '__main__':
 	print("---- core:math/big tests ----")
 	print()
 
-	count_pass = 0
-	count_fail = 0
+	for test_proc in TESTS:
+		count_pass = 0
+		count_fail = 0
+		for t in TESTS[test_proc]:
+			if test_proc(*t):
+				count_pass += 1
+			else:
+				count_fail += 1
 
-	for t in ADD_TESTS:
-		res = test_add_two(*t)
-		if res:
-			count_fail += 1
-		else:
-			count_pass += 1
-
-	print("ADD_TESTS: {} passes, {} failures.".format(count_pass, count_fail))
+		print("{}: {} passes, {} failures.".format(test_proc.__name__, count_pass, count_fail))
