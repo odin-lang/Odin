@@ -13,7 +13,7 @@ package big
 import "core:fmt"
 import "core:mem"
 import "core:time"
-import rnd "core:math/rand"
+// import rnd "core:math/rand"
 
 print_configation :: proc() {
 	fmt.printf(
@@ -66,28 +66,13 @@ print :: proc(name: string, a: ^Int, base := i8(10)) {
 }
 
 demo :: proc() {
-	err: Error;
-	as:  string;
+	// err: Error;
 
-	r := &rnd.Rand{};
-	rnd.init(r, 12345);
+	// r := &rnd.Rand{};
+	// rnd.init(r, 12345);
 
-	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(destination, source, quotient, remainder, numerator, denominator);
-
-	err = rand(destination, 120, r);
-	for _ in 0 ..< 10_000 {
-		if err != .None {
-			fmt.printf("set error: %v\n", err);
-		} else {
-			s := time.tick_now();
-			as, err = itoa(destination, 16);
-			e := time.tick_since(s);
-			Timings[.itoa].t += e; Timings[.itoa].c += 1;
-			//assert(as == "ADCC737B67B0FCD7F189074CBE088B718141A383F9CF09B4D3824A09A3AEBAC155B810C29D62385F8F85616794C25393A757CEDEEBE3B0FE24573894DF7842A76F543D64A78FFD24D325CE044E9A0F69DE00CFFCC41427170096BC6D3537C856CD930A3794F03DB558CD5DB6A65971E618C5D0DBAE1E7AF52DDB8F5F84CD5BFC0B2EEEDBFB70E6B38677A01B8EF75CF434CA68677495", as);
-			delete(as);
-		}
-	}
+	// destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	// defer destroy(destination, source, quotient, remainder, numerator, denominator);
 }
 
 main :: proc() {

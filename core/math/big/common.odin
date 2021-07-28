@@ -66,6 +66,23 @@ Error :: enum byte {
 	Unimplemented          = 127,
 };
 
+Error_String :: #partial [Error]string{
+	.None                   = "None",
+	.Out_Of_Memory          = "Out of memory",
+	.Invalid_Pointer        = "Invalid pointer",
+	.Invalid_Argument       = "Invalid argument",
+
+	.Unknown_Error          = "Unknown error",
+	.Max_Iterations_Reached = "Max iterations reached",
+	.Buffer_Overflow        = "Buffer overflow",
+	.Integer_Overflow       = "Integer overflow",
+
+	.Division_by_Zero       = "Division by zero",
+	.Math_Domain_Error      = "Math domain error",
+
+	.Unimplemented          = "Unimplemented",
+};
+
 Primality_Flag :: enum u8 {
 	Blum_Blum_Shub = 0,	/* BBS style prime */
 	Safe           = 1,	/* Safe prime (p-1)/2 == prime */
