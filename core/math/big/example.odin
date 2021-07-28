@@ -76,7 +76,6 @@ demo :: proc() {
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
 	err = rand(destination, 120, r);
-	// print("destination", destination, 10);
 	for _ in 0 ..< 10_000 {
 		if err != .None {
 			fmt.printf("set error: %v\n", err);
@@ -85,7 +84,7 @@ demo :: proc() {
 			as, err = itoa(destination, 16);
 			e := time.tick_since(s);
 			Timings[.itoa].t += e; Timings[.itoa].c += 1;
-			assert(as == "B38677A01B8EF75CF434CA68677495", as);
+			//assert(as == "ADCC737B67B0FCD7F189074CBE088B718141A383F9CF09B4D3824A09A3AEBAC155B810C29D62385F8F85616794C25393A757CEDEEBE3B0FE24573894DF7842A76F543D64A78FFD24D325CE044E9A0F69DE00CFFCC41427170096BC6D3537C856CD930A3794F03DB558CD5DB6A65971E618C5D0DBAE1E7AF52DDB8F5F84CD5BFC0B2EEEDBFB70E6B38677A01B8EF75CF434CA68677495", as);
 			delete(as);
 		}
 	}
@@ -104,7 +103,7 @@ main :: proc() {
 		if v.c > 0 {
 			avg   := time.duration_milliseconds(time.Duration(f64(v.t) / f64(v.c)));
 			total := time.duration_milliseconds(time.Duration(v.t));
-			fmt.printf("%v: %.3f ms (avg), %.3f (total, %v calls)\n", i, avg, total, v.c);
+			fmt.printf("%v: %.3f ms (avg), %.3f ms (total, %v calls)\n", i, avg, total, v.c);
 		}
 	}
 
