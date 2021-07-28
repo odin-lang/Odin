@@ -11,7 +11,7 @@ package big
 
 import "core:mem"
 import "core:intrinsics"
-import "core:math/rand"
+import rnd "core:math/rand"
 
 /*
 	Deallocates the backing memory of one or more `Int`s.
@@ -177,7 +177,7 @@ neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 /*
 	Helpers to extract values from the `Int`.
 */
-extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
+int_extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
 	/*
 		Check that `a`is usable.
 	*/
@@ -195,10 +195,7 @@ extract_bit :: proc(a: ^Int, bit_offset: int) -> (bit: DIGIT, err: Error) {
 	return 1 if ((a.digit[limb] & i) != 0) else 0, .None;
 }
 
-/*
-	TODO: Optimize.
-*/
-extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
+int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 	/*
 		Check that `a`is usable.
 	*/
@@ -210,18 +207,40 @@ extract_bits :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 		return 0, .Invalid_Argument;
 	}
 
-	v: DIGIT;
-	e: Error;
-	for shift := 0; shift < count; shift += 1 {
-		o   := offset + shift;
-		v, e = extract_bit(a, o);
-		if e != .None {
-			break;
-		}
-		res = res + _WORD(v) << uint(shift);
+	limb_lo :=  offset          / _DIGIT_BITS;
+	bits_lo :=  offset          % _DIGIT_BITS;
+	limb_hi := (offset + count) / _DIGIT_BITS;
+	bits_hi := (offset + count) % _DIGIT_BITS;
+
+	if limb_lo < 0 || limb_lo >= a.used || limb_hi < 0 || limb_hi >= a.used {
+		return 0, .Invalid_Argument;
 	}
 
-	return res, e;
+	for i := limb_hi; i >= limb_lo; i -= 1 {
+		res <<= _DIGIT_BITS;
+
+		/*
+			Determine which bits to extract from each DIGIT. The whole DIGIT's worth by default.
+		*/
+		bit_count  := _DIGIT_BITS;
+		bit_offset := 0;
+		if i == limb_lo {
+			bit_count  -= bits_lo;
+			bit_offset = _DIGIT_BITS - bit_count;
+		} else if i == limb_hi {
+			bit_count  = bits_hi;
+			bit_offset = 0;
+		}
+
+		d := a.digit[i];
+
+		v := (d >> uint(bit_offset)) & DIGIT(1 << uint(bit_count - 1));
+		m := DIGIT(1 << uint(bit_count-1));
+		r := v & m;
+
+		res |= _WORD(r);
+	}
+	return res, .None;
 }
 
 /*
@@ -507,9 +526,9 @@ count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 	return count, .None;
 }
 
-int_random_digit :: proc(r: ^rand.Rand = nil) -> (res: DIGIT) {
+int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rand.uint64(r)) & _MASK;
+		return DIGIT(rnd.uint64(r)) & _MASK;
 	} else when _DIGIT_BITS == 28 { // DIGIT = u32
 		return DIGIT(rand.uint32(r)) & _MASK;
 	} else {
@@ -519,7 +538,7 @@ int_random_digit :: proc(r: ^rand.Rand = nil) -> (res: DIGIT) {
 	return 0; // We shouldn't get here.
 }
 
-int_rand :: proc(dest: ^Int, bits: int, r: ^rand.Rand = nil) -> (err: Error) {
+int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil) -> (err: Error) {
 	bits := bits;
 
 	if bits <= 0 { return .Invalid_Argument; }
