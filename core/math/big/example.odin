@@ -67,7 +67,6 @@ print :: proc(name: string, a: ^Int, base := i8(10)) {
 
 demo :: proc() {
 	// err: Error;
-
 	// r := &rnd.Rand{};
 	// rnd.init(r, 12345);
 
