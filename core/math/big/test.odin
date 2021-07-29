@@ -42,3 +42,57 @@ PyRes :: struct {
 	if err != .None { return PyRes{res=":add_two:itoa(sum):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
+
+@export test_sub_two :: proc "c" (a, b: cstring, radix := int(10)) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	aa, bb, sum := &Int{}, &Int{}, &Int{};
+	defer destroy(aa, bb, sum);
+
+	if err = atoi(aa, string(a), i8(radix)); err != .None { return PyRes{res=":sub_two:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), i8(radix)); err != .None { return PyRes{res=":sub_two:atoi(b):", err=err}; }
+	if err = sub(sum, aa, bb);               err != .None { return PyRes{res=":sub_two:sub(sum,a,b):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(sum, i8(radix), context.temp_allocator);
+	if err != .None { return PyRes{res=":sub_two:itoa(sum):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+@export test_mul_two :: proc "c" (a, b: cstring, radix := int(10)) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	aa, bb, product := &Int{}, &Int{}, &Int{};
+	defer destroy(aa, bb, product);
+
+	if err = atoi(aa, string(a), i8(radix)); err != .None { return PyRes{res=":mul_two:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), i8(radix)); err != .None { return PyRes{res=":mul_two:atoi(b):", err=err}; }
+	if err = mul(product, aa, bb);           err != .None { return PyRes{res=":mul_two:mul(product,a,b):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(product, i8(radix), context.temp_allocator);
+	if err != .None { return PyRes{res=":mul_two:itoa(product):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+/*
+	NOTE(Jeroen): For simplicity, we don't return the quotient and the remainder, just the quotient.
+*/
+@export test_div_two :: proc "c" (a, b: cstring, radix := int(10)) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	aa, bb, quotient := &Int{}, &Int{}, &Int{};
+	defer destroy(aa, bb, quotient);
+
+	if err = atoi(aa, string(a), i8(radix)); err != .None { return PyRes{res=":div_two:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), i8(radix)); err != .None { return PyRes{res=":div_two:atoi(b):", err=err}; }
+	if err = div(quotient, aa, bb);          err != .None { return PyRes{res=":div_two:div(quotient,a,b):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(quotient, i8(radix), context.temp_allocator);
+	if err != .None { return PyRes{res=":div_two:itoa(quotient):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
