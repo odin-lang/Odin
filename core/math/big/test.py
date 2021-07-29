@@ -2,17 +2,30 @@ from  math import *
 from ctypes import *
 from random import *
 import os
+import platform
 import time
 
 #
 # Where is the DLL? If missing, build using: `odin build . -build-mode:dll`
 #
-LIB_PATH = os.getcwd() + os.sep + "big.dll"
-
+if platform.system() == "Windows":
+	LIB_PATH = os.getcwd() + os.sep + "big.dll"
+elif platform.system() == "Linux":
+	LIB_PATH = os.getcwd() + os.sep + "big.so"
+elif platform.system() == "Darwin":
+	LIB_PATH = os.getcwd() + os.sep + "big.dylib"
+else:
+	print("Platform is unsupported.")
+	os.exit(1)
 #
 # How many iterations of each random test do we want to run?
 #
-RANDOM_ITERATIONS = 10_000
+BITS_AND_ITERATIONS = [
+	(   120, 10_000),
+	( 1_200,  1_000),
+	( 4_096,    100),
+	(12_000,     10),
+]
 
 #
 # Result values will be passed in a struct { res: cstring, err: Error }
@@ -203,67 +216,74 @@ TESTS = {
 	],
 }
 
-TIMINGS = {}
+TOTAL_TIME     = 0
+total_failures = 0
 
 if __name__ == '__main__':
-	print()
 	print("---- core:math/big tests ----")
 	print()
 
 	for test_proc in TESTS:
 		count_pass = 0
 		count_fail = 0
+		TIMINGS    = {}
 		for t in TESTS[test_proc]:
 			start = time.perf_counter()
 			res   = test_proc(*t)
 			diff  = time.perf_counter() - start
+			TOTAL_TIME += diff
+
 			if test_proc not in TIMINGS:
 				TIMINGS[test_proc] = diff
 			else:
 				TIMINGS[test_proc] += diff
 
 			if res:
-				count_pass += 1
+				count_pass     += 1
 			else:
-				count_fail += 1
+				count_fail     += 1
+				total_failures += 1
 
-		print("{name}: {count_pass:,} passes, {count_fail:,} failures.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail))
+		print("{name}: {count_pass:,} passes and {count_fail:,} failures in {timing:.3f} ms.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail, timing=TIMINGS[test_proc] * 1_000))
 
-	print()		
-	print("---- core:math/big random tests ----")
-	print()
+	for BITS, ITERATIONS in BITS_AND_ITERATIONS:
+		print()		
+		print("---- core:math/big with two random {bits:,} bit numbers ----".format(bits=BITS))
+		print()
 
-	for test_proc in [test_add_two, test_sub_two, test_mul_two, test_div_two]:
-		count_pass = 0
-		count_fail = 0
+		for test_proc in [test_add_two, test_sub_two, test_mul_two, test_div_two]:
+			count_pass = 0
+			count_fail = 0
+			TIMINGS    = {}
 
-		for i in range(RANDOM_ITERATIONS):
-			a = randint(0, 1 << 120)
-			b = randint(0, 1 << 120)
-			res = None
+			for i in range(ITERATIONS):
+				a = randint(0, 1 << BITS)
+				b = randint(0, 1 << BITS)
+				res = None
 
-			# We've already tested division by zero above.
-			if b == 0 and test_proc == test_div_two:
-				b = b + 1
+				# We've already tested division by zero above.
+				if b == 0 and test_proc == test_div_two:
+					b = b + 1
 
-			start = time.perf_counter()
-			res   = test_proc(a, b)
-			diff  = time.perf_counter() - start
-			if test_proc not in TIMINGS:
-				TIMINGS[test_proc] = diff
-			else:
-				TIMINGS[test_proc] += diff
+				start = time.perf_counter()
+				res   = test_proc(a, b)
+				diff  = time.perf_counter() - start
+				TOTAL_TIME += diff
 
-			if res:
-				count_pass += 1
-			else:
-				count_fail += 1
+				if test_proc not in TIMINGS:
+					TIMINGS[test_proc] = diff
+				else:
+					TIMINGS[test_proc] += diff
 
-		print("{name}: {count_pass:,} passes, {count_fail:,} failures.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail))
+				if res:
+					count_pass     += 1
+				else:
+					count_fail     += 1
+					total_failures += 1
 
-	print()
-	total = 0
-	for k in TIMINGS:
-		print("{name}: {total:.3f} ms in {calls:,} calls".format(name=k.__name__, total=TIMINGS[k] * 1_000, calls=RANDOM_ITERATIONS + len(TESTS[k])))
-		total += TIMINGS[k]
-	print("\ntotal: {0:.3f} ms".format(total * 1_000))
+			print("{name}: {count_pass:,} passes and {count_fail:,} failures in {timing:.3f} ms.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail, timing=TIMINGS[test_proc] * 1_000))
+
+	print("\ntotal: {0:.3f} ms".format(TOTAL_TIME * 1_000))
+
+	if total_failures:
+		os.exit(1)
