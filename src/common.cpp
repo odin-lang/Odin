@@ -79,7 +79,7 @@ void mutex_lock(RecursiveMutex *m) {
 	gb_mutex_lock(&m->mutex);
 }
 bool mutex_try_lock(RecursiveMutex *m) {
-	return gb_mutex_try_lock(&m->mutex);
+	return !!gb_mutex_try_lock(&m->mutex);
 }
 void mutex_unlock(RecursiveMutex *m) {
 	gb_mutex_unlock(&m->mutex);

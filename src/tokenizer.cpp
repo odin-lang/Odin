@@ -267,6 +267,7 @@ struct ErrorCollector {
 	BlockingMutex mutex;
 	BlockingMutex error_out_mutex;
 	BlockingMutex string_mutex;
+	RecursiveMutex block_mutex;
 
 	Array<u8> error_buffer;
 	Array<String> errors;
@@ -283,6 +284,7 @@ bool any_errors(void) {
 
 void init_global_error_collector(void) {
 	mutex_init(&global_error_collector.mutex);
+	mutex_init(&global_error_collector.block_mutex);
 	mutex_init(&global_error_collector.error_out_mutex);
 	mutex_init(&global_error_collector.string_mutex);
 	array_init(&global_error_collector.errors, heap_allocator());
@@ -357,7 +359,7 @@ AstFile *get_ast_file_from_id(i32 index) {
 
 
 void begin_error_block(void) {
-	mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.block_mutex);
 	global_error_collector.in_block = true;
 }
 
@@ -373,7 +375,7 @@ void end_error_block(void) {
 	}
 
 	global_error_collector.in_block = false;
-	mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.block_mutex);
 }
 
 
