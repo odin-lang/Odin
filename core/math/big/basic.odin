@@ -950,7 +950,7 @@ _int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 			Limit ourselves to `digits` DIGITs of output.
 		*/
 		pb    := min(b.used, digits - ix);
-		carry := DIGIT(0);
+		carry := _WORD(0);
 		iy    := 0;
 		/*
 			Compute the column of the output and propagate the carry.
@@ -959,12 +959,12 @@ _int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 			/*
 				Compute the column as a _WORD.
 			*/
-			column := t.digit[ix + iy] + a.digit[ix] * b.digit[iy] + carry;
+			column := _WORD(t.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + carry;
 
 			/*
 				The new column is the lower part of the result.
 			*/
-			t.digit[ix + iy] = column & _MASK;
+			t.digit[ix + iy] = DIGIT(column & _WORD(_MASK));
 
 			/*
 				Get the carry word from the result.
@@ -975,7 +975,7 @@ _int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 			Set carry if it is placed below digits
 		*/
 		if ix + iy < digits {
-			t.digit[ix + pb] = carry;
+			t.digit[ix + pb] = DIGIT(carry);
 		}
 	}
 
