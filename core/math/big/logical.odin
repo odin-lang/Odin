@@ -402,7 +402,7 @@ int_shl :: proc(dest, src: ^Int, bits: int) -> (err: Error) {
 		shift := DIGIT(_DIGIT_BITS - bits);
 		carry := DIGIT(0);
 
-		for x:= 0; x <= dest.used; x+= 1 {		
+		for x:= 0; x < dest.used; x+= 1 {		
 			fwd_carry := (dest.digit[x] >> shift) & mask;
 			dest.digit[x] = (dest.digit[x] << uint(bits) | carry) & _MASK;
 			carry = fwd_carry;
