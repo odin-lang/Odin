@@ -171,7 +171,15 @@ def test_div_two(a = 0, b = 0, radix = 10, expected_error = E_None, expected_res
 		print("Exception with arguments:", a, b, radix)
 		return False
 	if expected_result == None:
-		expected_result = a // b if b != 0 else None
+		#
+		# We don't round the division results, so if one component is negative, we're off by one.
+		#
+		if a < 0 and b > 0:
+			expected_result = int(-(abs(a) / b))
+		elif b < 0 and a > 0:
+			expected_result = int(-(a / abs((b))))
+		else:
+			expected_result = a // b if b != 0 else None
 	return test("test_div_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
 
 
@@ -264,11 +272,13 @@ if __name__ == '__main__':
 			TIMINGS    = {}
 
 			for i in range(ITERATIONS):
-				a = randint(0, 1 << BITS)
+				a = randint(-(1 << BITS), 1 << BITS)
+				b = randint(-(1 << BITS), 1 << BITS)
 
 				if test_proc == test_div_two:
 					# We've already tested division by zero above.
-					b = randint(1, 1 << BITS)
+					if b == 0:
+						b == 42
 				elif test_proc == test_log:
 					# We've already tested log's domain errors.
 					a = randint(1, 1 << BITS)
