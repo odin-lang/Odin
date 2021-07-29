@@ -14,8 +14,8 @@ int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 		return -1, .Invalid_Argument;
 	}
 	if err = clear_if_uninitialized(a); err != .None { return -1, err; }
-	if n, _ := is_neg(a);  n { return -1, .Invalid_Argument; }
-	if z, _ := is_zero(a); z { return -1, .Invalid_Argument; }
+	if n, _ := is_neg(a);  n { return -1, .Math_Domain_Error; }
+	if z, _ := is_zero(a); z { return -1, .Math_Domain_Error; }
 
 	/*
 		Fast path for bases that are a power of two.
