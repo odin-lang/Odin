@@ -96,3 +96,30 @@ PyRes :: struct {
 	if err != .None { return PyRes{res=":div_two:itoa(quotient):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
+
+
+/*
+	res = log(a, base)
+*/
+@export test_log :: proc "c" (a: cstring, base := DIGIT(2), radix := int(10)) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+	l: int;
+
+	aa := &Int{};
+	defer destroy(aa);
+
+	if err = atoi(aa, string(a), i8(radix)); err != .None { return PyRes{res=":log:atoi(a):", err=err}; }
+	if l, err = log(aa, base);               err != .None { return PyRes{res=":log:log(a, base):", err=err}; }
+
+	zero(aa);
+	aa.digit[0] = DIGIT(l)  & _MASK;
+	aa.digit[1] = DIGIT(l) >> _DIGIT_BITS;
+	aa.used = 2;
+	clamp(aa);
+
+	r: cstring;
+	r, err = int_itoa_cstring(aa, i8(radix), context.temp_allocator);
+	if err != .None { return PyRes{res=":log:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
