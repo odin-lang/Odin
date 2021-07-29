@@ -70,6 +70,11 @@ demo :: proc() {
 	// r := &rnd.Rand{};
 	// rnd.init(r, 12345);
 
+	// as := cstring("596360079055148742691396559496540363");
+	// bs := cstring("159671292010002348397151706347412301");
+
+	// res := test_div_two(as, bs);
+	// fmt.print(res);
 	// destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	// defer destroy(destination, source, quotient, remainder, numerator, denominator);
 }

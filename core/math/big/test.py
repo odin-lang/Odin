@@ -2,11 +2,17 @@ from  math import *
 from ctypes import *
 from random import *
 import os
+import time
 
 #
 # Where is the DLL? If missing, build using: `odin build . -build-mode:dll`
 #
 LIB_PATH = os.getcwd() + os.sep + "big.dll"
+
+#
+# How many iterations of each random test do we want to run?
+#
+RANDOM_ITERATIONS = 10_000
 
 #
 # Result values will be passed in a struct { res: cstring, err: Error }
@@ -128,28 +134,48 @@ def test(test_name: "", res: Res, param=[], expected_error = E_None, expected_re
 	return passed
 
 def test_add_two(a = 0, b = 0, radix = 10, expected_error = E_None, expected_result = None):
-	res = add_two(str(a).encode('utf-8'), str(b).encode('utf-8'), radix)
+	sa   = str(a)
+	sb   = str(b)
+	sa_c = sa.encode('utf-8')
+	sb_c = sb.encode('utf-8')
+	res  = add_two(sa_c, sb_c, radix)
 	if expected_result == None:
 		expected_result = a + b
-	return test("test_add_two", res, [str(a), str(b), radix], expected_error, expected_result)
+	return test("test_add_two", res, [sa, sb, radix], expected_error, expected_result)
 
 def test_sub_two(a = 0, b = 0, radix = 10, expected_error = E_None, expected_result = None):
-	res = sub_two(str(a).encode('utf-8'), str(b).encode('utf-8'), radix)
+	sa   = str(a)
+	sb   = str(b)
+	sa_c = sa.encode('utf-8')
+	sb_c = sb.encode('utf-8')
+	res  = sub_two(sa_c, sb_c, radix)
 	if expected_result == None:
 		expected_result = a - b
-	return test("test_sub_two", res, [str(a), str(b), radix], expected_error, expected_result)
+	return test("test_sub_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
 
 def test_mul_two(a = 0, b = 0, radix = 10, expected_error = E_None, expected_result = None):
-	res = mul_two(str(a).encode('utf-8'), str(b).encode('utf-8'), radix)
+	sa   = str(a)
+	sb   = str(b)
+	sa_c = sa.encode('utf-8')
+	sb_c = sb.encode('utf-8')
+	res  = mul_two(sa_c, sb_c, radix)
 	if expected_result == None:
 		expected_result = a * b
-	return test("test_mul_two", res, [str(a), str(b), radix], expected_error, expected_result)
+	return test("test_mul_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
 
 def test_div_two(a = 0, b = 0, radix = 10, expected_error = E_None, expected_result = None):
-	res = div_two(str(a).encode('utf-8'), str(b).encode('utf-8'), radix)
+	sa   = str(a)
+	sb   = str(b)
+	sa_c = sa.encode('utf-8')
+	sb_c = sb.encode('utf-8')
+	try:
+		res  = div_two(sa_c, sb_c, radix)
+	except:
+		print("Exception with arguments:", a, b, radix)
+		return False
 	if expected_result == None:
 		expected_result = a // b if b != 0 else None
-	return test("test_add_two", res, [str(a), str(b), radix], expected_error, expected_result)
+	return test("test_div_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
 
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #
@@ -177,6 +203,8 @@ TESTS = {
 	],
 }
 
+TIMINGS = {}
+
 if __name__ == '__main__':
 	print()
 	print("---- core:math/big tests ----")
@@ -186,12 +214,20 @@ if __name__ == '__main__':
 		count_pass = 0
 		count_fail = 0
 		for t in TESTS[test_proc]:
-			if test_proc(*t):
+			start = time.perf_counter()
+			res   = test_proc(*t)
+			diff  = time.perf_counter() - start
+			if test_proc not in TIMINGS:
+				TIMINGS[test_proc] = diff
+			else:
+				TIMINGS[test_proc] += diff
+
+			if res:
 				count_pass += 1
 			else:
 				count_fail += 1
 
-		print("{}: {} passes, {} failures.".format(test_proc.__name__, count_pass, count_fail))
+		print("{name}: {count_pass:,} passes, {count_fail:,} failures.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail))
 
 	print()		
 	print("---- core:math/big random tests ----")
@@ -201,17 +237,33 @@ if __name__ == '__main__':
 		count_pass = 0
 		count_fail = 0
 
-		a = randint(0, 1 << 120)
-		b = randint(0, 1 << 120)
-		res = None
+		for i in range(RANDOM_ITERATIONS):
+			a = randint(0, 1 << 120)
+			b = randint(0, 1 << 120)
+			res = None
 
-		# We've already tested division by zero above.
-		if b == 0 and test_proc == test_div_two:
-			b = b + 1
+			# We've already tested division by zero above.
+			if b == 0 and test_proc == test_div_two:
+				b = b + 1
 
-		if test_proc(a, b):
-			count_pass += 1
-		else:
-			count_fail += 1
+			start = time.perf_counter()
+			res   = test_proc(a, b)
+			diff  = time.perf_counter() - start
+			if test_proc not in TIMINGS:
+				TIMINGS[test_proc] = diff
+			else:
+				TIMINGS[test_proc] += diff
 
-		print("{} random: {} passes, {} failures.".format(test_proc.__name__, count_pass, count_fail))
+			if res:
+				count_pass += 1
+			else:
+				count_fail += 1
+
+		print("{name}: {count_pass:,} passes, {count_fail:,} failures.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail))
+
+	print()
+	total = 0
+	for k in TIMINGS:
+		print("{name}: {total:.3f} ms in {calls:,} calls".format(name=k.__name__, total=TIMINGS[k] * 1_000, calls=RANDOM_ITERATIONS + len(TESTS[k])))
+		total += TIMINGS[k]
+	print("\ntotal: {0:.3f} ms".format(total * 1_000))
