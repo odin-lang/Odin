@@ -1,4 +1,5 @@
 @echo off
+clear
 :odin run   . -vet
 :odin build . -build-mode:shared -show-timings -o:minimal -use-separate-modules
 odin build . -build-mode:shared -show-timings -o:size -use-separate-modules
