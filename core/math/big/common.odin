@@ -49,7 +49,7 @@ Int :: struct {
 /*
 	Errors are a strict superset of runtime.Allocation_Error.
 */
-Error :: enum byte {
+Error :: enum int {
 	None                   = 0,
 	Out_Of_Memory          = 1,
 	Invalid_Pointer        = 2,
