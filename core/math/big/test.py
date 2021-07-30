@@ -7,14 +7,21 @@ import time
 from enum import Enum
 
 #
-# How many iterations of each random test do we want to run?
+# Normally, we report the number of passes and fails.
+# With EXIT_ON_FAIL set, we exit at the first fail.
 #
-BITS_AND_ITERATIONS = [
-	(   120, 10_000),
-	( 1_200,  1_000),
-	( 4_096,    100),
-	(12_000,     10),
-]
+EXIT_ON_FAIL = False
+
+#
+# We skip randomized tests altogether if NO_RANDOM_TESTS is set.
+#
+NO_RANDOM_TESTS = False
+
+#
+# If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
+# See below.
+#
+FAST_TESTS = True
 
 #
 # For timed tests we budget a second per `n` bits and iterate until we hit that time.
@@ -24,15 +31,22 @@ TIMED_TESTS = False
 TIMED_BITS_PER_SECOND = 20_000
 
 #
-# If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
-# See below.
+# How many iterations of each random test do we want to run?
 #
-FAST_TESTS = True
+BITS_AND_ITERATIONS = [
+	(   120, 10_000),
+	( 1_200,  1_000),
+	( 4_096,    100),
+	(12_000,     10),
+]
 
 if FAST_TESTS:
 	for k in range(len(BITS_AND_ITERATIONS)):
 		b, i = BITS_AND_ITERATIONS[k]
 		BITS_AND_ITERATIONS[k] = (b, i // 10 if i >= 100 else 5)
+
+if NO_RANDOM_TESTS:
+	BITS_AND_ITERATIONS = []
 
 #
 # Where is the DLL? If missing, build using: `odin build . -build-mode:shared`
@@ -99,13 +113,13 @@ class Res(Structure):
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
-add_two = load(l.test_add_two, [c_char_p, c_char_p, c_longlong], Res)
-sub_two = load(l.test_sub_two, [c_char_p, c_char_p, c_longlong], Res)
-mul_two = load(l.test_mul_two, [c_char_p, c_char_p, c_longlong], Res)
-div_two = load(l.test_div_two, [c_char_p, c_char_p, c_longlong], Res)
+add_two = load(l.test_add_two, [c_char_p, c_char_p], Res)
+sub_two = load(l.test_sub_two, [c_char_p, c_char_p], Res)
+mul_two = load(l.test_mul_two, [c_char_p, c_char_p], Res)
+div_two = load(l.test_div_two, [c_char_p, c_char_p], Res)
 
-int_log = load(l.test_log, [c_char_p, c_longlong, c_longlong], Res)
-
+int_log = load(l.test_log, [c_char_p, c_longlong], Res)
+int_pow = load(l.test_pow, [c_char_p, c_longlong], Res)
 
 def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = ""):
 	passed = True
@@ -137,46 +151,45 @@ def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expecte
 			print(error, flush=True)
 			passed = False
 
-	if not passed:
-		exit()
+	if EXIT_ON_FAIL and not passed: exit(res.err)
 
 	return passed
 
 
-def test_add_two(a = 0, b = 0, radix = 10, expected_error = Error.Okay):
-	args = [str(a), str(b), radix]
+def test_add_two(a = 0, b = 0, expected_error = Error.Okay):
+	args = [str(a), str(b)]
 	sa_c, sb_c = args[0].encode('utf-8'), args[1].encode('utf-8')
-	res  = add_two(sa_c, sb_c, radix)
+	res  = add_two(sa_c, sb_c)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a + b
 	return test("test_add_two", res, args, expected_error, expected_result)
 
-def test_sub_two(a = 0, b = 0, radix = 10, expected_error = Error.Okay):
+def test_sub_two(a = 0, b = 0, expected_error = Error.Okay):
 	sa,     sb = str(a), str(b)
 	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	res  = sub_two(sa_c, sb_c, radix)
+	res  = sub_two(sa_c, sb_c)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a - b
-	return test("test_sub_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
+	return test("test_sub_two", res, [sa_c, sb_c], expected_error, expected_result)
 
-def test_mul_two(a = 0, b = 0, radix = 10, expected_error = Error.Okay):
+def test_mul_two(a = 0, b = 0, expected_error = Error.Okay):
 	sa,     sb = str(a), str(b)
 	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	res  = mul_two(sa_c, sb_c, radix)
+	res  = mul_two(sa_c, sb_c)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a * b
-	return test("test_mul_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
+	return test("test_mul_two", res, [sa_c, sb_c], expected_error, expected_result)
 
-def test_div_two(a = 0, b = 0, radix = 10, expected_error = Error.Okay):
+def test_div_two(a = 0, b = 0, expected_error = Error.Okay):
 	sa,     sb = str(a), str(b)
 	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
 	try:
-		res  = div_two(sa_c, sb_c, radix)
+		res  = div_two(sa_c, sb_c)
 	except:
-		print("Exception with arguments:", a, b, radix)
+		print("Exception with arguments:", a, b)
 		return False
 	expected_result = None
 	if expected_error == Error.Okay:
@@ -189,19 +202,31 @@ def test_div_two(a = 0, b = 0, radix = 10, expected_error = Error.Okay):
 			expected_result = int(-(a / abs((b))))
 		else:
 			expected_result = a // b if b != 0 else None
-	return test("test_div_two", res, [sa_c, sb_c, radix], expected_error, expected_result)
+	return test("test_div_two", res, [sa_c, sb_c], expected_error, expected_result)
 
 
-def test_log(a = 0, base = 0, radix = 10, expected_error = Error.Okay):
-	args  = [str(a), base, radix]
+def test_log(a = 0, base = 0, expected_error = Error.Okay):
+	args  = [str(a), base]
 	sa_c  = args[0].encode('utf-8')
-	res   = int_log(sa_c, base, radix)
+	res   = int_log(sa_c, base)
 
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = int(log(a, base))
 	return test("test_log", res, args, expected_error, expected_result)
 
+def test_pow(base = 0, power = 0, expected_error = Error.Okay):
+	args  = [str(base), power]
+	sa_c  = args[0].encode('utf-8')
+	res   = int_pow(sa_c, power)
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		if power < 0:
+			expected_result = 0
+		else:
+			expected_result = pow(base, power)
+	return test("test_pow", res, args, expected_error, expected_result)
 
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #
@@ -213,25 +238,33 @@ def test_log(a = 0, base = 0, radix = 10, expected_error = Error.Okay):
 
 TESTS = {
 	test_add_two: [
-		[ 1234,   5432,    10, ],
-		[ 1234,   5432,   110, Error.Invalid_Argument],
+		[ 1234,   5432],
 	],
 	test_sub_two: [
-		[ 1234,   5432,    10, ],
+		[ 1234,   5432],
 	],
 	test_mul_two: [
-		[ 1234,   5432,    10, ],
-		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7, 10, ]
+		[ 1234,   5432],
+		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7]
 	],
 	test_div_two: [
-		[ 54321,	12345,		10, ],
-		[ 55431,		0,		10,		Error.Division_by_Zero],
+		[ 54321,	12345],
+		[ 55431,		0, Error.Division_by_Zero],
 	],
 	test_log: [
-		[ 3192,			1,		10,		Error.Invalid_Argument],
-		[ -1234,		2,		10,		Error.Math_Domain_Error],
-		[ 0,			2,		10,		Error.Math_Domain_Error],
-		[ 1024,			2,		10, ],
+		[ 3192,			1, Error.Invalid_Argument],
+		[ -1234,		2, Error.Math_Domain_Error],
+		[ 0,			2, Error.Math_Domain_Error],
+		[ 1024,			2],
+	],
+	test_pow: [
+		[ 0,  -1, Error.Math_Domain_Error ], # Math
+		[ 0,   0 ], # 1
+	 	[ 0,   2 ], # 0
+	 	[ 42, -1,], # 0
+	 	[ 42,  1 ], # 1
+	 	[ 42,  0 ], # 42
+	 	[ 42,  2 ], # 42*42
 	],
 }
 
@@ -240,12 +273,13 @@ RANDOM_TESTS = [test_add_two, test_sub_two, test_mul_two, test_div_two, test_log
 total_passes   = 0
 total_failures = 0
 
+# Untimed warmup.
+for test_proc in TESTS:
+	for t in TESTS[test_proc]:
+		res   = test_proc(*t)
 
 if __name__ == '__main__':
-
-	test_log(1234, 2, 10)
-
-	print("---- core:math/big tests ----")
+	print("---- math/big tests ----")
 	print()
 
 	for test_proc in TESTS:
@@ -274,7 +308,7 @@ if __name__ == '__main__':
 
 	for BITS, ITERATIONS in BITS_AND_ITERATIONS:
 		print()		
-		print("---- core:math/big with two random {bits:,} bit numbers ----".format(bits=BITS))
+		print("---- math/big with two random {bits:,} bit numbers ----".format(bits=BITS))
 		print()
 
 		for test_proc in RANDOM_TESTS:
