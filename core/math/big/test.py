@@ -15,7 +15,7 @@ EXIT_ON_FAIL = False
 #
 # We skip randomized tests altogether if NO_RANDOM_TESTS is set.
 #
-NO_RANDOM_TESTS = False
+NO_RANDOM_TESTS = False #True
 
 #
 # If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
@@ -225,7 +225,7 @@ def test_pow(base = 0, power = 0, expected_error = Error.Okay):
 		if power < 0:
 			expected_result = 0
 		else:
-			expected_result = pow(base, power)
+			expected_result = int(base**power)
 	return test("test_pow", res, args, expected_error, expected_result)
 
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
@@ -265,13 +265,18 @@ TESTS = {
 	 	[ 42,  1 ], # 1
 	 	[ 42,  0 ], # 42
 	 	[ 42,  2 ], # 42*42
+
+
 	],
 }
 
-RANDOM_TESTS = [test_add_two, test_sub_two, test_mul_two, test_div_two, test_log]
-
 total_passes   = 0
 total_failures = 0
+
+RANDOM_TESTS = [
+	test_add_two, test_sub_two, test_mul_two, test_div_two,
+	test_log, test_pow,
+]
 
 # Untimed warmup.
 for test_proc in TESTS:
@@ -312,6 +317,8 @@ if __name__ == '__main__':
 		print()
 
 		for test_proc in RANDOM_TESTS:
+			if test_proc == test_pow and BITS > 1_200: continue
+
 			count_pass = 0
 			count_fail = 0
 			TIMINGS    = {}
@@ -332,6 +339,8 @@ if __name__ == '__main__':
 					# We've already tested log's domain errors.
 					a = randint(1, 1 << BITS)
 					b = randint(2, 1 << 60)
+				elif test_proc == test_pow:
+					b = randint(1, 10)
 				else:
 					b = randint(0, 1 << BITS)					
 
