@@ -121,9 +121,10 @@ mul  = load(l.test_mul, [c_char_p, c_char_p], Res)
 div  = load(l.test_div, [c_char_p, c_char_p], Res)
 
 # Powers and such
-int_log  = load(l.test_log,  [c_char_p, c_longlong], Res)
-int_pow  = load(l.test_pow,  [c_char_p, c_longlong], Res)
-int_sqrt = load(l.test_sqrt, [c_char_p], Res)
+int_log    = load(l.test_log,  [c_char_p, c_longlong], Res)
+int_pow    = load(l.test_pow,  [c_char_p, c_longlong], Res)
+int_sqrt   = load(l.test_sqrt, [c_char_p], Res)
+int_root_n = load(l.test_root_n, [c_char_p, c_longlong], Res)
 
 # Logical operations
 
@@ -266,6 +267,23 @@ def root_n(number, root):
 		u = t // root
 	return s
 
+def test_root_n(number = 0, root = 0, expected_error = Error.Okay):
+	args  = [str(number), root]
+	sa_c  = args[0].encode('utf-8')
+	try:
+		res   = int_root_n(sa_c, root)
+	except:
+		print("root_n:", number, root)
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		if number < 0:
+			expected_result = 0
+		else:
+			expected_result = root_n(number, root)
+
+	return test("test_root_n", res, args, expected_error, expected_result)
+
 def test_shl_digit(a = 0, digits = 0, expected_error = Error.Okay):
 	args  = [str(a), digits]
 	sa_c  = args[0].encode('utf-8')
@@ -384,6 +402,9 @@ TESTS = {
 		[  12345678901234567890, Error.Okay, ],
 		[  1298074214633706907132624082305024, Error.Okay, ],
 	],
+	test_root_n: [
+		[  1298074214633706907132624082305024, 2, Error.Okay, ],	
+	],
 	test_shl_digit: [
 		[ 3192,			1 ],
 		[ 1298074214633706907132624082305024, 2 ],
@@ -420,38 +441,18 @@ total_failures = 0
 #
 RANDOM_TESTS = [
 	test_add, test_sub, test_mul, test_div,
-	test_log, test_pow, test_sqrt,
+	test_log, test_pow, test_sqrt, test_root_n,
 	test_shl_digit, test_shr_digit, test_shl, test_shr_signed,
 ]
-SKIP_LARGE   = [test_pow]
+SKIP_LARGE   = [
+	test_pow, test_root_n,
+]
 SKIP_LARGEST = []
 
 # Untimed warmup.
 for test_proc in TESTS:
 	for t in TESTS[test_proc]:
 		res   = test_proc(*t)
-
-
-def isqrt(x):
-	n = int(x)
-	a, b = divmod(n.bit_length(), 2)
-	print("isqrt({}), a: {}, b: {}". format(n, a, b))
-	x = 2**(a+b)
-	print("initial: {}".format(x))
-	i = 0
-	while True:
-		# y = (x + n//x)//2
-		t1 = n // x
-		t2 = x + t1
-		t3 = t2 // 2
-		y = (x + n//x)//2
-
-		i += 1
-		print("iter {}\n\t x: {}\n\t y: {}\n\tt1: {}\n\tt2: {}\n\tsrc: {}".format(i, x, y, t1, t2, n));
-
-		if y >= x:
-			return x
-		x = y
 
 if __name__ == '__main__':
 	print("---- math/big tests ----")
@@ -517,6 +518,9 @@ if __name__ == '__main__':
 				elif test_proc == test_sqrt:
 					a = randint(1, 1 << BITS)
 					b = Error.Okay
+				elif test_proc == test_root_n:
+					a = randint(1, 1 << BITS)
+					b = randint(1, 10);
 				elif test_proc == test_shl_digit:
 					b = randint(0, 10);
 				elif test_proc == test_shr_digit:

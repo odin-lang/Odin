@@ -162,6 +162,24 @@ PyRes :: struct {
 	return PyRes{res = r, err = .None};
 }
 
+/*
+	dest = root_n(src, power)
+*/
+@export test_root_n :: proc "c" (source: cstring, power: int) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":root_n:atoi(src):", err=err}; }
+	if err = root_n(src, src, power);       err != .None { return PyRes{res=":root_n:root_n(src):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":root_n:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
 
 /*
 	dest = shr_digit(src, digits)

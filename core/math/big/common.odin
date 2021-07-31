@@ -35,6 +35,8 @@ _DEFAULT_SQR_KARATSUBA_CUTOFF :: 120;
 _DEFAULT_MUL_TOOM_CUTOFF      :: 350;
 _DEFAULT_SQR_TOOM_CUTOFF      :: 400;
 
+_MAX_ITERATIONS_ROOT_N        :: 500;
+
 Sign :: enum u8 {
 	Zero_or_Positive = 0,
 	Negative         = 1,

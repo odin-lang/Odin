@@ -233,15 +233,9 @@ int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
 		if count, err = count_bits(src); err != .None { return err; }
 
 		a, b := count >> 1, count & 1;
-		err = power_of_two(x, a+b);
+		if err = power_of_two(x, a+b);                  err != .None { return err; }
 
-		iter := 0;
 		for {
-			iter += 1;
-			if iter > 100 {
-				swap(dest, x);
-				return .Max_Iterations_Reached;
-			}
 			/*
 				y = (x + n//x)//2
 			*/
@@ -274,7 +268,7 @@ sqrt :: proc { int_sqrt, };
 */
 int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 	/*						Fast path for n == 2 						*/
-	// if n == 2 { return sqrt(dest, src); }
+	if n == 2 { return sqrt(dest, src); }
 
 	/*					Initialize dest + src if needed. 				*/
 	if err = clear_if_uninitialized(dest);			err != .None { return err; }
@@ -366,7 +360,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 		}
 		if c, err = cmp(t1, t2); c == 0 { break; }
 		iterations += 1;
-		if iterations == 101 {
+		if iterations == _MAX_ITERATIONS_ROOT_N {
 			return .Max_Iterations_Reached;
 		}
 	}
@@ -376,12 +370,6 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 
 	iterations = 0;
 	for {
-		if iterations == 101 {
-			return .Max_Iterations_Reached;
-		}
-		//fmt.printf("root_n iteration: %v\n", iterations);
-		iterations += 1;
-
 		if err = pow(t2, t1, n); err != .None { return err; }
 
 		c, err = cmp(t2, a);
@@ -393,16 +381,16 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 		} else {
 			break;
 		}
+
+		iterations += 1;
+		if iterations == _MAX_ITERATIONS_ROOT_N {
+			return .Max_Iterations_Reached;
+		}
 	}
 
 	iterations = 0;
 	/*					Correct overshoot from above or from recurrence.			*/
 	for {
-		if iterations == 101 {
-			return .Max_Iterations_Reached;
-		}
-		iterations += 1;
-
 		if err = pow(t2, t1, n); err != .None { return err; }
 
 		c, err = cmp(t2, a);
@@ -410,6 +398,11 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 			if err = sub(t1, t1, DIGIT(1)); err != .None { return err; }
 		} else {
 			break;
+		}
+
+		iterations += 1;
+		if iterations == _MAX_ITERATIONS_ROOT_N {
+			return .Max_Iterations_Reached;
 		}
 	}
 
