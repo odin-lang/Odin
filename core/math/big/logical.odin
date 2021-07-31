@@ -285,7 +285,7 @@ int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int) -> (err: Err
 		shift := DIGIT(_DIGIT_BITS - bits);
 		carry := DIGIT(0);
 
-		for x := quotient.used; x >= 0; x -= 1 {
+		for x := quotient.used - 1; x >= 0; x -= 1 {
 			/*
 				Get the lower bits of this word in a temp.
 			*/
@@ -344,7 +344,7 @@ int_shr_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
 	}
 	quotient.used -= digits;
 	_zero_unused(quotient);
-	return .None;
+	return clamp(quotient);
 }
 shr_digit :: proc { int_shr_digit, };
 
@@ -446,16 +446,16 @@ int_shl_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
 	/*
 		Increment the used by the shift amount then copy upwards.
 	*/
-   	quotient.used += digits;
 
 	/*
 		Much like `int_shr_digit`, this is implemented using a sliding window,
 		except the window goes the other way around.
     */
-    for x := quotient.used; x >= digits; x -= 1 {
-    	quotient.digit[x] = quotient.digit[x - digits];
+    for x := quotient.used; x > 0; x -= 1 {
+    	quotient.digit[x+digits-1] = quotient.digit[x-1];
     }
 
+   	quotient.used += digits;
     mem.zero_slice(quotient.digit[:digits]);
     return .None;
 }

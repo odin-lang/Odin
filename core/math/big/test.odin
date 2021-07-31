@@ -26,74 +26,74 @@ PyRes :: struct {
 	return strings.clone_to_cstring(es[err], context.temp_allocator);
 }
 
-@export test_add_two :: proc "c" (a, b: cstring) -> (res: PyRes) {
+@export test_add :: proc "c" (a, b: cstring) -> (res: PyRes) {
 	context = runtime.default_context();
 	err: Error;
 
 	aa, bb, sum := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, sum);
 
-	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":add_two:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":add_two:atoi(b):", err=err}; }
-	if err = add(sum, aa, bb);        err != .None { return PyRes{res=":add_two:add(sum,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":add:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":add:atoi(b):", err=err}; }
+	if err = add(sum, aa, bb);        err != .None { return PyRes{res=":add:add(sum,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(sum, 10, context.temp_allocator);
-	if err != .None { return PyRes{res=":add_two:itoa(sum):", err=err}; }
+	if err != .None { return PyRes{res=":add:itoa(sum):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
 
-@export test_sub_two :: proc "c" (a, b: cstring) -> (res: PyRes) {
+@export test_sub :: proc "c" (a, b: cstring) -> (res: PyRes) {
 	context = runtime.default_context();
 	err: Error;
 
 	aa, bb, sum := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, sum);
 
-	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":sub_two:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":sub_two:atoi(b):", err=err}; }
-	if err = sub(sum, aa, bb);        err != .None { return PyRes{res=":sub_two:sub(sum,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":sub:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":sub:atoi(b):", err=err}; }
+	if err = sub(sum, aa, bb);        err != .None { return PyRes{res=":sub:sub(sum,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(sum, 10, context.temp_allocator);
-	if err != .None { return PyRes{res=":sub_two:itoa(sum):", err=err}; }
+	if err != .None { return PyRes{res=":sub:itoa(sum):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
 
-@export test_mul_two :: proc "c" (a, b: cstring) -> (res: PyRes) {
+@export test_mul :: proc "c" (a, b: cstring) -> (res: PyRes) {
 	context = runtime.default_context();
 	err: Error;
 
 	aa, bb, product := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, product);
 
-	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":mul_two:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":mul_two:atoi(b):", err=err}; }
-	if err = mul(product, aa, bb);    err != .None { return PyRes{res=":mul_two:mul(product,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":mul:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":mul:atoi(b):", err=err}; }
+	if err = mul(product, aa, bb);    err != .None { return PyRes{res=":mul:mul(product,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(product, 10, context.temp_allocator);
-	if err != .None { return PyRes{res=":mul_two:itoa(product):", err=err}; }
+	if err != .None { return PyRes{res=":mul:itoa(product):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
 
 /*
 	NOTE(Jeroen): For simplicity, we don't return the quotient and the remainder, just the quotient.
 */
-@export test_div_two :: proc "c" (a, b: cstring) -> (res: PyRes) {
+@export test_div :: proc "c" (a, b: cstring) -> (res: PyRes) {
 	context = runtime.default_context();
 	err: Error;
 
 	aa, bb, quotient := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, quotient);
 
-	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":div_two:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":div_two:atoi(b):", err=err}; }
-	if err = div(quotient, aa, bb);   err != .None { return PyRes{res=":div_two:div(quotient,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 10); err != .None { return PyRes{res=":div:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 10); err != .None { return PyRes{res=":div:atoi(b):", err=err}; }
+	if err = div(quotient, aa, bb);   err != .None { return PyRes{res=":div:div(quotient,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(quotient, 10, context.temp_allocator);
-	if err != .None { return PyRes{res=":div_two:itoa(quotient):", err=err}; }
+	if err != .None { return PyRes{res=":div:itoa(quotient):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
 
@@ -130,7 +130,6 @@ PyRes :: struct {
 @export test_pow :: proc "c" (base: cstring, power := int(2)) -> (res: PyRes) {
 	context = runtime.default_context();
 	err: Error;
-	l: int;
 
 	dest, bb := &Int{}, &Int{};
 	defer destroy(dest, bb);
@@ -143,3 +142,119 @@ PyRes :: struct {
 	if err != .None { return PyRes{res=":log:itoa(res):", err=err}; }
 	return PyRes{res = r, err = .None};
 }
+
+/*
+	dest = sqrt(src)
+*/
+@export test_sqrt :: proc "c" (source: cstring) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":sqrt:atoi(src):", err=err}; }
+	if err = sqrt(src, src);                err != .None { return PyRes{res=":sqrt:sqrt(src):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":log:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+
+/*
+	dest = shr_digit(src, digits)
+*/
+@export test_shr_digit :: proc "c" (source: cstring, digits: int) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":shr_digit:atoi(src):", err=err}; }
+	if err = shr_digit(src, digits);        err != .None { return PyRes{res=":shr_digit:shr_digit(src):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":shr_digit:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+/*
+	dest = shl_digit(src, digits)
+*/
+@export test_shl_digit :: proc "c" (source: cstring, digits: int) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":shl_digit:atoi(src):", err=err}; }
+	if err = shl_digit(src, digits);        err != .None { return PyRes{res=":shl_digit:shr_digit(src):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":shl_digit:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+/*
+	dest = shr(src, bits)
+*/
+@export test_shr :: proc "c" (source: cstring, bits: int) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":shr:atoi(src):", err=err}; }
+	if err = shr(src, src, bits);           err != .None { return PyRes{res=":shr:shr(src, bits):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":shr:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+/*
+	dest = shr_signed(src, bits)
+*/
+@export test_shr_signed :: proc "c" (source: cstring, bits: int) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":shr_signed:atoi(src):", err=err}; }
+	if err = shr_signed(src, src, bits);    err != .None { return PyRes{res=":shr_signed:shr_signed(src, bits):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":shr_signed:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
+/*
+	dest = shl(src, bits)
+*/
+@export test_shl :: proc "c" (source: cstring, bits: int) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	src := &Int{};
+	defer destroy(src);
+
+	if err = atoi(src, string(source), 10); err != .None { return PyRes{res=":shl:atoi(src):", err=err}; }
+	if err = shl(src, src, bits);           err != .None { return PyRes{res=":shl:shl(src, bits):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(src, 10, context.temp_allocator);
+	if err != .None { return PyRes{res=":shl:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+

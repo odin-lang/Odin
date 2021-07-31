@@ -359,7 +359,7 @@ int_halve :: proc(dest, src: ^Int) -> (err: Error) {
 	*/
 	fwd_carry := DIGIT(0);
 
-	for x := dest.used; x >= 0; x -= 1 {
+	for x := dest.used - 1; x >= 0; x -= 1 {
 		/*
 			Get the carry for the next iteration.
 		*/
@@ -761,21 +761,16 @@ sqrmod :: proc { int_sqrmod, };
 */
 _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	if err = clear_if_uninitialized(x); err != .None {
-		return err;
-	}
-	if err = clear_if_uninitialized(y); err != .None {
-		return err;
-	}
 
 	old_used, min_used, max_used, i: int;
 
 	if x.used < y.used {
 		x, y = y, x;
+		assert(x.used >= y.used);
 	}
 
-	min_used = x.used;
-	max_used = y.used;
+	min_used = y.used;
+	max_used = x.used;
 	old_used = dest.used;
 
 	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != .None {
@@ -827,7 +822,6 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 		Add remaining carry.
 	*/
 	dest.digit[i] = carry;
-
 	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
@@ -1111,6 +1105,7 @@ _int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
 _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{};
+	c: int;
 
 	goto_end: for {
 		if err = one(tq);									err != .None { break goto_end; }
@@ -1121,20 +1116,21 @@ _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (er
 
 		if err = abs(ta, numerator);						err != .None { break goto_end; }
 		if err = abs(tb, denominator);						err != .None { break goto_end; }
-
 		if err = shl(tb, tb, n);							err != .None { break goto_end; }
 		if err = shl(tq, tq, n);							err != .None { break goto_end; }
 
-		for ; n >= 0; n -= 1 {
-			c: int;
-			if c, err = cmp(tb, ta);						err != .None { break goto_end; }
-			if c != 1 {
+		for n >= 0 {
+			if c, _ = cmp_mag(ta, tb); c == 0 || c == 1 {
+				// ta -= tb
 				if err = sub(ta, ta, tb);					err != .None { break goto_end; }
-				if err = add( q, tq,  q);					err != .None { break goto_end; }
+				//  q += tq
+				if err = add( q, q,  tq);					err != .None { break goto_end; }
 			}
 			if err = shr1(tb, tb);							err != .None { break goto_end; }
 			if err = shr1(tq, tq);							err != .None { break goto_end; }
-		}		
+
+			n -= 1;
+		}
 
 		/*
 			Now q == quotient and ta == remainder.
