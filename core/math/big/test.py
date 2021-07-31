@@ -134,6 +134,8 @@ int_shl        = load(l.test_shl, [c_char_p, c_longlong], Res)
 int_shr        = load(l.test_shr, [c_char_p, c_longlong], Res)
 int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
 
+int_factorial  = load(l.test_factorial, [c_uint64], Res)
+
 def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = "", radix=16):
 	passed = True
 	r = None
@@ -321,6 +323,16 @@ def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
 		
 	return test("test_shr_signed", res, [a, bits], expected_error, expected_result)
 
+def test_factorial(n = 0, expected_error = Error.Okay):
+	args  = [n]
+	res   = int_factorial(*args)
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = math.factorial(n)
+		
+	return test("test_factorial", res, [n], expected_error, expected_result)
+
+
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #
 # The last two arguments in tests are the expected error and expected result.
@@ -394,7 +406,10 @@ TESTS = {
 		[ -149195686190273039203651143129455, 12 ],
 		[ 611105530635358368578155082258244262, 12 ],
 		[ 149195686190273039203651143129455, 12 ],
-	]
+	],
+	test_factorial: [
+		[ 12_345 ],
+	],
 }
 
 total_passes   = 0
