@@ -12,6 +12,11 @@ package big
 import "core:intrinsics"
 
 /*
+	TODO: Make the tunables runtime adjustable where practical.
+	This allows to benchmark and/or setting optimized values for a certain CPU without recompiling.
+*/
+
+/*
 	Tunables
 */
 _LOW_MEMORY          :: #config(BIGINT_SMALL_MEMORY, false);
@@ -20,6 +25,7 @@ when _LOW_MEMORY {
 } else {
 	_DEFAULT_DIGIT_COUNT :: 32;
 }
+
 
 _MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
 _SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, _DEFAULT_SQR_KARATSUBA_CUTOFF);
