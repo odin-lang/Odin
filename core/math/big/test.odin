@@ -276,3 +276,21 @@ PyRes :: struct {
 	return PyRes{res = r, err = .None};
 }
 
+/*
+	dest = factorial(n)
+*/
+@export test_factorial :: proc "c" (n: DIGIT) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	dest := &Int{};
+	defer destroy(dest);
+
+	if err = factorial(dest, n); err != .None { return PyRes{res=":factorial:factorial(n):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(dest, 16, context.temp_allocator);
+	if err != .None { return PyRes{res=":factorial:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
