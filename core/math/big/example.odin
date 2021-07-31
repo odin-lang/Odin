@@ -45,6 +45,7 @@ _SQR_TOOM_CUTOFF,
 Category :: enum {
 	itoa,
 	atoi,
+	factorial,
 };
 Event :: struct {
 	t: time.Duration,
@@ -52,14 +53,21 @@ Event :: struct {
 }
 Timings := [Category]Event{};
 
-print :: proc(name: string, a: ^Int, base := i8(10)) {
+print :: proc(name: string, a: ^Int, base := i8(10), print_extra_info := false, print_name := false) {
 	s := time.tick_now();
 	as, err := itoa(a, base);
 	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
 
 	defer delete(as);
 	cb, _ := count_bits(a);
-	fmt.printf("%v (base: %v, bits used: %v): %v\n", name, base, cb, as);
+	if print_name {
+		fmt.printf("%v ", name);
+	}
+	if print_extra_info {
+		fmt.printf("(base: %v, bits used: %v): %v\n", base, cb, as);
+	} else {
+		fmt.printf("%v\n", as);
+	}
 	if err != .None {
 		fmt.printf("%v (error: %v | %v)\n", name, err, a);
 	}
@@ -70,22 +78,21 @@ demo :: proc() {
 	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	err = atoi(source, "711456452774621215865929644892071691538299606591173717356248653735056872543694196490784640730887936656406546625676792022", 10);
-	print("src    ", source);	
+	a :=  "4d2";
+	b := "1538";
 
-	fmt.println("sqrt should be 843478780275248664696797599030708027195155136953848512749494");
-
-	fmt.println();
-	err = sqrt(destination, source);
-	fmt.printf("sqrt returned: %v\n", err);
-	print("sqrt   ", destination);
-
-	err = atoi(denominator, "711456452774621215865929644892071691538299606591173717356248653735056872543694196490784640730887936656406546625676792022", 10);
-	err = root_n(quotient, denominator, 2);
-	fmt.printf("root_n(2) returned: %v\n", err);
-	print("root_n(2)", quotient);
-
-	// fmt.println();
+	if err = atoi(destination, a, 16); err != .None {
+		fmt.printf("atoi(a) returned %v\n", err);
+		return;
+	}
+	if err = atoi(source, b, 16); err != .None {
+		fmt.printf("atoi(b) returned %v\n", err);
+		return;
+	}
+	if err = add(destination, destination, source); err != .None {
+		fmt.printf("add(a, b) returned %v\n", err);
+		return;
+	}
 }
 
 main :: proc() {

@@ -134,7 +134,7 @@ int_shl        = load(l.test_shl, [c_char_p, c_longlong], Res)
 int_shr        = load(l.test_shr, [c_char_p, c_longlong], Res)
 int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
 
-def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = ""):
+def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = "", radix=16):
 	passed = True
 	r = None
 	err = Error(res.err)
@@ -152,7 +152,7 @@ def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expecte
 		r = None
 		try:
 			r = res.res.decode('utf-8')
-			r = int(res.res, 10)
+			r = int(res.res, radix)
 		except:
 			pass
 
@@ -168,42 +168,40 @@ def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expecte
 
 	return passed
 
+def arg_to_odin(a):
+	if a >= 0:
+		s = hex(a)[2:]
+	else:
+		s = '-' + hex(a)[3:]
+	return s.encode('utf-8')
 
 def test_add(a = 0, b = 0, expected_error = Error.Okay):
-	args = [str(a), str(b)]
-	sa_c, sb_c = args[0].encode('utf-8'), args[1].encode('utf-8')
-	res  = add(sa_c, sb_c)
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	res  = add(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a + b
-	return test("test_add", res, args, expected_error, expected_result)
+	return test("test_add", res, [a, b], expected_error, expected_result)
 
 def test_sub(a = 0, b = 0, expected_error = Error.Okay):
-	sa,     sb = str(a), str(b)
-	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	res  = sub(sa_c, sb_c)
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	res  = sub(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a - b
-	return test("test_sub", res, [sa_c, sb_c], expected_error, expected_result)
+	return test("test_sub", res, [a, b], expected_error, expected_result)
 
 def test_mul(a = 0, b = 0, expected_error = Error.Okay):
-	sa,     sb = str(a), str(b)
-	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	res  = mul(sa_c, sb_c)
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	res  = mul(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a * b
-	return test("test_mul", res, [sa_c, sb_c], expected_error, expected_result)
+	return test("test_mul", res, [a, b], expected_error, expected_result)
 
 def test_div(a = 0, b = 0, expected_error = Error.Okay):
-	sa,     sb = str(a), str(b)
-	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	try:
-		res  = div(sa_c, sb_c)
-	except:
-		print("Exception with arguments:", a, b)
-		return False
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	res  = div(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		#
@@ -215,23 +213,21 @@ def test_div(a = 0, b = 0, expected_error = Error.Okay):
 			expected_result = int(-(a // abs((b))))
 		else:
 			expected_result = a // b if b != 0 else None
-	return test("test_div", res, [sa_c, sb_c], expected_error, expected_result)
+	return test("test_div", res, [a, b], expected_error, expected_result)
 
 
 def test_log(a = 0, base = 0, expected_error = Error.Okay):
-	args  = [str(a), base]
-	sa_c  = args[0].encode('utf-8')
-	res   = int_log(sa_c, base)
+	args = [arg_to_odin(a), base]
+	res  = int_log(*args)
 
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = int(math.log(a, base))
-	return test("test_log", res, args, expected_error, expected_result)
+	return test("test_log", res, [a, base], expected_error, expected_result)
 
 def test_pow(base = 0, power = 0, expected_error = Error.Okay):
-	args  = [str(base), power]
-	sa_c  = args[0].encode('utf-8')
-	res   = int_pow(sa_c, power)
+	args = [arg_to_odin(base), power]
+	res  = int_pow(*args)
 
 	expected_result = None
 	if expected_error == Error.Okay:
@@ -241,23 +237,18 @@ def test_pow(base = 0, power = 0, expected_error = Error.Okay):
 			# NOTE(Jeroen): Don't use `math.pow`, it's a floating point approximation.
 			#               Use built-in `pow` or `a**b` instead.
 			expected_result = pow(base, power)
-	return test("test_pow", res, args, expected_error, expected_result)
+	return test("test_pow", res, [base, power], expected_error, expected_result)
 
 def test_sqrt(number = 0, expected_error = Error.Okay):
-	args  = [str(number)]
-	sa_c  = args[0].encode('utf-8')
-	try:
-		res   = int_sqrt(sa_c)
-	except:
-		print("sqrt:", number)
-
+	args  = [arg_to_odin(number)]
+	res   = int_sqrt(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		if number < 0:
 			expected_result = 0
 		else:
 			expected_result = int(math.isqrt(number))
-	return test("test_sqrt", res, args, expected_error, expected_result)
+	return test("test_sqrt", res, [number], expected_error, expected_result)
 
 def root_n(number, root):
 	u, s = number, number + 1
@@ -268,13 +259,8 @@ def root_n(number, root):
 	return s
 
 def test_root_n(number = 0, root = 0, expected_error = Error.Okay):
-	args  = [str(number), root]
-	sa_c  = args[0].encode('utf-8')
-	try:
-		res   = int_root_n(sa_c, root)
-	except:
-		print("root_n:", number, root)
-
+	args = [arg_to_odin(number), root]
+	res  = int_root_n(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		if number < 0:
@@ -282,27 +268,19 @@ def test_root_n(number = 0, root = 0, expected_error = Error.Okay):
 		else:
 			expected_result = root_n(number, root)
 
-	return test("test_root_n", res, args, expected_error, expected_result)
+	return test("test_root_n", res, [number, root], expected_error, expected_result)
 
 def test_shl_digit(a = 0, digits = 0, expected_error = Error.Okay):
-	args  = [str(a), digits]
-	sa_c  = args[0].encode('utf-8')
-	res   = int_shl_digit(sa_c, digits)
-
+	args  = [arg_to_odin(a), digits]
+	res   = int_shl_digit(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a << (digits * 60)
-	return test("test_shl_digit", res, args, expected_error, expected_result)
+	return test("test_shl_digit", res, [a, digits], expected_error, expected_result)
 
 def test_shr_digit(a = 0, digits = 0, expected_error = Error.Okay):
-	args  = [str(a), digits]
-	sa_c  = args[0].encode('utf-8')
-	try:
-		res   = int_shr_digit(sa_c, digits)
-	except:
-		print("int_shr_digit", a, digits)
-		exit()
-
+	args  = [arg_to_odin(a), digits]
+	res   = int_shr_digit(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		if a < 0:
@@ -311,27 +289,19 @@ def test_shr_digit(a = 0, digits = 0, expected_error = Error.Okay):
 		else:
 			expected_result = a >> (digits * 60)
 		
-	return test("test_shr_digit", res, args, expected_error, expected_result)
+	return test("test_shr_digit", res, [a, digits], expected_error, expected_result)
 
 def test_shl(a = 0, bits = 0, expected_error = Error.Okay):
-	args  = [str(a), bits]
-	sa_c  = args[0].encode('utf-8')
-	res   = int_shl(sa_c, bits)
-
+	args  = [arg_to_odin(a), bits]
+	res   = int_shl(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a << bits
-	return test("test_shl", res, args, expected_error, expected_result)
+	return test("test_shl", res, [a, bits], expected_error, expected_result)
 
 def test_shr(a = 0, bits = 0, expected_error = Error.Okay):
-	args  = [str(a), bits]
-	sa_c  = args[0].encode('utf-8')
-	try:
-		res   = int_shr(sa_c, bits)
-	except:
-		print("int_shr", a, bits)
-		exit()
-
+	args  = [arg_to_odin(a), bits]
+	res   = int_shr(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		if a < 0:
@@ -340,22 +310,16 @@ def test_shr(a = 0, bits = 0, expected_error = Error.Okay):
 		else:
 			expected_result = a >> bits
 		
-	return test("test_shr", res, args, expected_error, expected_result)
+	return test("test_shr", res, [a, bits], expected_error, expected_result)
 
 def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
-	args  = [str(a), bits]
-	sa_c  = args[0].encode('utf-8')
-	try:
-		res   = int_shr_signed(sa_c, bits)
-	except:
-		print("int_shr_signed", a, bits)
-		exit()
-
+	args  = [arg_to_odin(a), bits]
+	res   = int_shr_signed(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a >> bits
 		
-	return test("test_shr_signed", res, args, expected_error, expected_result)
+	return test("test_shr_signed", res, [a, bits], expected_error, expected_result)
 
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #

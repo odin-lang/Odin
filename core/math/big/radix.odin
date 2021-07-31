@@ -240,6 +240,7 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 	/*
 		Make sure the radix is ok.
 	*/
+
 	if radix < 2 || radix > 64 {
 		return .Invalid_Argument;
 	}
@@ -278,7 +279,7 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 
 		ch = rune(input[0]);
 		if radix <= 36 && ch >= 'a' && ch <= 'z' {
-			ch += 'a' - 'A';
+			ch -= 32; // 'a' - 'A'
 		}
 
 		pos := ch - '+';
@@ -299,7 +300,6 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 
 		input = input[1:];
 	}
-
 	/*
 		If an illegal character was found, fail.
 	*/
