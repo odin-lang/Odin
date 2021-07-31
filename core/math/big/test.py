@@ -1,6 +1,6 @@
-from  math import *
 from ctypes import *
 from random import *
+import math
 import os
 import platform
 import time
@@ -10,12 +10,14 @@ from enum import Enum
 # Normally, we report the number of passes and fails.
 # With EXIT_ON_FAIL set, we exit at the first fail.
 #
+EXIT_ON_FAIL = True
 EXIT_ON_FAIL = False
 
 #
 # We skip randomized tests altogether if NO_RANDOM_TESTS is set.
 #
-NO_RANDOM_TESTS = False #True
+NO_RANDOM_TESTS = True
+NO_RANDOM_TESTS = False
 
 #
 # If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
@@ -113,13 +115,23 @@ class Res(Structure):
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
-add_two = load(l.test_add_two, [c_char_p, c_char_p], Res)
-sub_two = load(l.test_sub_two, [c_char_p, c_char_p], Res)
-mul_two = load(l.test_mul_two, [c_char_p, c_char_p], Res)
-div_two = load(l.test_div_two, [c_char_p, c_char_p], Res)
+add  = load(l.test_add, [c_char_p, c_char_p], Res)
+sub  = load(l.test_sub, [c_char_p, c_char_p], Res)
+mul  = load(l.test_mul, [c_char_p, c_char_p], Res)
+div  = load(l.test_div, [c_char_p, c_char_p], Res)
 
-int_log = load(l.test_log, [c_char_p, c_longlong], Res)
-int_pow = load(l.test_pow, [c_char_p, c_longlong], Res)
+# Powers and such
+int_log  = load(l.test_log,  [c_char_p, c_longlong], Res)
+int_pow  = load(l.test_pow,  [c_char_p, c_longlong], Res)
+int_sqrt = load(l.test_sqrt, [c_char_p], Res)
+
+# Logical operations
+
+int_shl_digit  = load(l.test_shl_digit, [c_char_p, c_longlong], Res)
+int_shr_digit  = load(l.test_shr_digit, [c_char_p, c_longlong], Res)
+int_shl        = load(l.test_shl, [c_char_p, c_longlong], Res)
+int_shr        = load(l.test_shr, [c_char_p, c_longlong], Res)
+int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
 
 def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = ""):
 	passed = True
@@ -156,38 +168,38 @@ def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expecte
 	return passed
 
 
-def test_add_two(a = 0, b = 0, expected_error = Error.Okay):
+def test_add(a = 0, b = 0, expected_error = Error.Okay):
 	args = [str(a), str(b)]
 	sa_c, sb_c = args[0].encode('utf-8'), args[1].encode('utf-8')
-	res  = add_two(sa_c, sb_c)
+	res  = add(sa_c, sb_c)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a + b
-	return test("test_add_two", res, args, expected_error, expected_result)
+	return test("test_add", res, args, expected_error, expected_result)
 
-def test_sub_two(a = 0, b = 0, expected_error = Error.Okay):
+def test_sub(a = 0, b = 0, expected_error = Error.Okay):
 	sa,     sb = str(a), str(b)
 	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	res  = sub_two(sa_c, sb_c)
+	res  = sub(sa_c, sb_c)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a - b
-	return test("test_sub_two", res, [sa_c, sb_c], expected_error, expected_result)
+	return test("test_sub", res, [sa_c, sb_c], expected_error, expected_result)
 
-def test_mul_two(a = 0, b = 0, expected_error = Error.Okay):
+def test_mul(a = 0, b = 0, expected_error = Error.Okay):
 	sa,     sb = str(a), str(b)
 	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
-	res  = mul_two(sa_c, sb_c)
+	res  = mul(sa_c, sb_c)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a * b
-	return test("test_mul_two", res, [sa_c, sb_c], expected_error, expected_result)
+	return test("test_mul", res, [sa_c, sb_c], expected_error, expected_result)
 
-def test_div_two(a = 0, b = 0, expected_error = Error.Okay):
+def test_div(a = 0, b = 0, expected_error = Error.Okay):
 	sa,     sb = str(a), str(b)
 	sa_c, sb_c = sa.encode('utf-8'), sb.encode('utf-8')
 	try:
-		res  = div_two(sa_c, sb_c)
+		res  = div(sa_c, sb_c)
 	except:
 		print("Exception with arguments:", a, b)
 		return False
@@ -197,12 +209,12 @@ def test_div_two(a = 0, b = 0, expected_error = Error.Okay):
 		# We don't round the division results, so if one component is negative, we're off by one.
 		#
 		if a < 0 and b > 0:
-			expected_result = int(-(abs(a) / b))
+			expected_result = int(-(abs(a) // b))
 		elif b < 0 and a > 0:
-			expected_result = int(-(a / abs((b))))
+			expected_result = int(-(a // abs((b))))
 		else:
 			expected_result = a // b if b != 0 else None
-	return test("test_div_two", res, [sa_c, sb_c], expected_error, expected_result)
+	return test("test_div", res, [sa_c, sb_c], expected_error, expected_result)
 
 
 def test_log(a = 0, base = 0, expected_error = Error.Okay):
@@ -212,7 +224,7 @@ def test_log(a = 0, base = 0, expected_error = Error.Okay):
 
 	expected_result = None
 	if expected_error == Error.Okay:
-		expected_result = int(log(a, base))
+		expected_result = int(math.log(a, base))
 	return test("test_log", res, args, expected_error, expected_result)
 
 def test_pow(base = 0, power = 0, expected_error = Error.Okay):
@@ -225,8 +237,107 @@ def test_pow(base = 0, power = 0, expected_error = Error.Okay):
 		if power < 0:
 			expected_result = 0
 		else:
-			expected_result = int(base**power)
+			# NOTE(Jeroen): Don't use `math.pow`, it's a floating point approximation.
+			#               Use built-in `pow` or `a**b` instead.
+			expected_result = pow(base, power)
 	return test("test_pow", res, args, expected_error, expected_result)
+
+def test_sqrt(number = 0, expected_error = Error.Okay):
+	args  = [str(number)]
+	sa_c  = args[0].encode('utf-8')
+	try:
+		res   = int_sqrt(sa_c)
+	except:
+		print("sqrt:", number)
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		if number < 0:
+			expected_result = 0
+		else:
+			expected_result = int(math.isqrt(number))
+	return test("test_sqrt", res, args, expected_error, expected_result)
+
+def root_n(number, root):
+	u, s = number, number + 1
+	while u < s:
+		s = u
+		t = (root-1) * s + number // pow(s, root - 1)
+		u = t // root
+	return s
+
+def test_shl_digit(a = 0, digits = 0, expected_error = Error.Okay):
+	args  = [str(a), digits]
+	sa_c  = args[0].encode('utf-8')
+	res   = int_shl_digit(sa_c, digits)
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a << (digits * 60)
+	return test("test_shl_digit", res, args, expected_error, expected_result)
+
+def test_shr_digit(a = 0, digits = 0, expected_error = Error.Okay):
+	args  = [str(a), digits]
+	sa_c  = args[0].encode('utf-8')
+	try:
+		res   = int_shr_digit(sa_c, digits)
+	except:
+		print("int_shr_digit", a, digits)
+		exit()
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		if a < 0:
+			# Don't pass negative numbers. We have a shr_signed.
+			return False
+		else:
+			expected_result = a >> (digits * 60)
+		
+	return test("test_shr_digit", res, args, expected_error, expected_result)
+
+def test_shl(a = 0, bits = 0, expected_error = Error.Okay):
+	args  = [str(a), bits]
+	sa_c  = args[0].encode('utf-8')
+	res   = int_shl(sa_c, bits)
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a << bits
+	return test("test_shl", res, args, expected_error, expected_result)
+
+def test_shr(a = 0, bits = 0, expected_error = Error.Okay):
+	args  = [str(a), bits]
+	sa_c  = args[0].encode('utf-8')
+	try:
+		res   = int_shr(sa_c, bits)
+	except:
+		print("int_shr", a, bits)
+		exit()
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		if a < 0:
+			# Don't pass negative numbers. We have a shr_signed.
+			return False
+		else:
+			expected_result = a >> bits
+		
+	return test("test_shr", res, args, expected_error, expected_result)
+
+def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
+	args  = [str(a), bits]
+	sa_c  = args[0].encode('utf-8')
+	try:
+		res   = int_shr_signed(sa_c, bits)
+	except:
+		print("int_shr_signed", a, bits)
+		exit()
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a >> bits
+		
+	return test("test_shr_signed", res, args, expected_error, expected_result)
 
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #
@@ -237,19 +348,20 @@ def test_pow(base = 0, power = 0, expected_error = Error.Okay):
 # You can override that by supplying an expected result as the last argument instead.
 
 TESTS = {
-	test_add_two: [
+	test_add: [
 		[ 1234,   5432],
 	],
-	test_sub_two: [
+	test_sub: [
 		[ 1234,   5432],
 	],
-	test_mul_two: [
+	test_mul: [
 		[ 1234,   5432],
 		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7]
 	],
-	test_div_two: [
+	test_div: [
 		[ 54321,	12345],
 		[ 55431,		0, Error.Division_by_Zero],
+		[ 12980742146337069150589594264770969721, 4611686018427387904 ],
 	],
 	test_log: [
 		[ 3192,			1, Error.Invalid_Argument],
@@ -260,28 +372,86 @@ TESTS = {
 	test_pow: [
 		[ 0,  -1, Error.Math_Domain_Error ], # Math
 		[ 0,   0 ], # 1
-	 	[ 0,   2 ], # 0
-	 	[ 42, -1,], # 0
-	 	[ 42,  1 ], # 1
-	 	[ 42,  0 ], # 42
-	 	[ 42,  2 ], # 42*42
-
-
+		[ 0,   2 ], # 0
+		[ 42, -1,], # 0
+		[ 42,  1 ], # 1
+		[ 42,  0 ], # 42
+		[ 42,  2 ], # 42*42
 	],
+	test_sqrt: [
+		[  -1, Error.Invalid_Argument, ],
+		[  42, Error.Okay, ],
+		[  12345678901234567890, Error.Okay, ],
+		[  1298074214633706907132624082305024, Error.Okay, ],
+	],
+	test_shl_digit: [
+		[ 3192,			1 ],
+		[ 1298074214633706907132624082305024, 2 ],
+		[ 1024,			3 ],
+	],
+	test_shr_digit: [
+		[ 3680125442705055547392, 1 ],
+		[ 1725436586697640946858688965569256363112777243042596638790631055949824, 2 ],
+		[ 219504133884436710204395031992179571, 2 ],
+	],
+	test_shl: [
+		[ 3192,			1 ],
+		[ 1298074214633706907132624082305024, 2 ],
+		[ 1024,			3 ],
+	],
+	test_shr: [
+		[ 3680125442705055547392, 1 ],
+		[ 1725436586697640946858688965569256363112777243042596638790631055949824, 2 ],
+		[ 219504133884436710204395031992179571, 2 ],
+	],
+	test_shr_signed: [
+		[ -611105530635358368578155082258244262, 12 ],
+		[ -149195686190273039203651143129455, 12 ],
+		[ 611105530635358368578155082258244262, 12 ],
+		[ 149195686190273039203651143129455, 12 ],
+	]
 }
 
 total_passes   = 0
 total_failures = 0
 
+#
+# test_shr_signed also tests shr, so we're not going to test shr randomly.
+#
 RANDOM_TESTS = [
-	test_add_two, test_sub_two, test_mul_two, test_div_two,
-	test_log, test_pow,
+	test_add, test_sub, test_mul, test_div,
+	test_log, test_pow, test_sqrt,
+	test_shl_digit, test_shr_digit, test_shl, test_shr_signed,
 ]
+SKIP_LARGE   = [test_pow]
+SKIP_LARGEST = []
 
 # Untimed warmup.
 for test_proc in TESTS:
 	for t in TESTS[test_proc]:
 		res   = test_proc(*t)
+
+
+def isqrt(x):
+	n = int(x)
+	a, b = divmod(n.bit_length(), 2)
+	print("isqrt({}), a: {}, b: {}". format(n, a, b))
+	x = 2**(a+b)
+	print("initial: {}".format(x))
+	i = 0
+	while True:
+		# y = (x + n//x)//2
+		t1 = n // x
+		t2 = x + t1
+		t3 = t2 // 2
+		y = (x + n//x)//2
+
+		i += 1
+		print("iter {}\n\t x: {}\n\t y: {}\n\tt1: {}\n\tt2: {}\n\tsrc: {}".format(i, x, y, t1, t2, n));
+
+		if y >= x:
+			return x
+		x = y
 
 if __name__ == '__main__':
 	print("---- math/big tests ----")
@@ -317,7 +487,8 @@ if __name__ == '__main__':
 		print()
 
 		for test_proc in RANDOM_TESTS:
-			if test_proc == test_pow and BITS > 1_200: continue
+			if BITS >  1_200 and test_proc in SKIP_LARGE: continue
+			if BITS >  4_096 and test_proc in SKIP_LARGEST: continue
 
 			count_pass = 0
 			count_fail = 0
@@ -331,8 +502,10 @@ if __name__ == '__main__':
 				a = randint(-(1 << BITS), 1 << BITS)
 				b = randint(-(1 << BITS), 1 << BITS)
 
-				if test_proc == test_div_two:
+				if test_proc == test_div:
 					# We've already tested division by zero above.
+					bits = int(BITS * 0.6)
+					b = randint(-(1 << bits), 1 << bits)
 					if b == 0:
 						b == 42
 				elif test_proc == test_log:
@@ -341,6 +514,18 @@ if __name__ == '__main__':
 					b = randint(2, 1 << 60)
 				elif test_proc == test_pow:
 					b = randint(1, 10)
+				elif test_proc == test_sqrt:
+					a = randint(1, 1 << BITS)
+					b = Error.Okay
+				elif test_proc == test_shl_digit:
+					b = randint(0, 10);
+				elif test_proc == test_shr_digit:
+					a = abs(a)
+					b = randint(0, 10);
+				elif test_proc == test_shl:
+					b = randint(0, min(BITS, 120));
+				elif test_proc == test_shr_signed:
+					b = randint(0, min(BITS, 120));
 				else:
 					b = randint(0, 1 << BITS)					
 

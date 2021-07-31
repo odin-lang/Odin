@@ -214,42 +214,53 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 	This function is less generic than `root_n`, simpler and faster.
 */
 int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(dest);			err != .None { return err; }
-	if err = clear_if_uninitialized(src);			err != .None { return err; }
 
-	/*						Must be positive. 					*/
-	if src.sign == .Negative						{ return .Invalid_Argument; }
+	when true {
+		if err = clear_if_uninitialized(dest);			err != .None { return err; }
+		if err = clear_if_uninitialized(src);			err != .None { return err; }
 
-	/*			Easy out. If src is zero, so is dest.			*/
-	if z, _ := is_zero(src); 						z { return zero(dest); }
+		/*						Must be positive. 					*/
+		if src.sign == .Negative						{ return .Invalid_Argument; }
 
-	/*						Set up temporaries.					*/
-	t1, t2 := &Int{}, &Int{};
-	defer destroy(t1, t2);
+		/*			Easy out. If src is zero, so is dest.			*/
+		if z, _ := is_zero(src); 						z { return zero(dest); }
 
-	if err = copy(t1, src);							err != .None { return err; }
-	if err = zero(t2);								err != .None { return err; }
+		/*						Set up temporaries.					*/
+		x, y, t1, t2 := &Int{}, &Int{}, &Int{}, &Int{};
+		defer destroy(x, y, t1, t2);
 
-	/*	First approximation. Not very bad for large arguments.	*/
-	if err = shr_digit(t1, t1.used / 2);			err != .None { return err; }
-	/*							t1 > 0 							*/
-	if err = div(t2, src, t1);						err != .None { return err; }
-	if err = add(t1, t1, t2);						err != .None { return err; }
-	if err = shr(t1, t1, 1);						err != .None { return err; }
+		count: int;
+		if count, err = count_bits(src); err != .None { return err; }
 
-	/*					And now t1 > sqrt(arg).					*/
-	for {
-		if err = div(t2, src, t1);						err != .None { return err; }
-		if err = add(t1, t1, t2);						err != .None { return err; }
-		if err = shr(t1, t1, 1);						err != .None { return err; }
-		/* t1 >= sqrt(arg) >= t2 at this point */
+		a, b := count >> 1, count & 1;
+		err = power_of_two(x, a+b);
 
-		cm, _ := cmp_mag(t1, t2);
-		if cm != 1 { break; }
+		iter := 0;
+		for {
+			iter += 1;
+			if iter > 100 {
+				swap(dest, x);
+				return .Max_Iterations_Reached;
+			}
+			/*
+				y = (x + n//x)//2
+			*/
+			div(t1, src, x);
+			add(t2, t1, x);
+			shr(y, t2, 1);
+
+			if c, _ := cmp(y, x); c == 0 || c == 1 {
+				swap(dest, x);
+				return .None;
+			}
+			swap(x, y);
+		}
+
+		swap(dest, x);
+		return err;
+	} else {
+		// return root_n(dest, src, 2);
 	}
-
-	swap(dest, t1);
-	return err;
 }
 sqrt :: proc { int_sqrt, };
 
@@ -263,7 +274,7 @@ sqrt :: proc { int_sqrt, };
 */
 int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 	/*						Fast path for n == 2 						*/
-	if n == 2 { return sqrt(dest, src); }
+	// if n == 2 { return sqrt(dest, src); }
 
 	/*					Initialize dest + src if needed. 				*/
 	if err = clear_if_uninitialized(dest);			err != .None { return err; }
@@ -321,6 +332,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 	if err = power_of_two(t2, ilog2); err != .None { return err; }
 
 	c: int;
+	iterations := 0;
 	for {
 		/* t1 = t2 */
 		if err = copy(t1, t2); err != .None { return err; }
@@ -353,12 +365,23 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 			break;
 		}
 		if c, err = cmp(t1, t2); c == 0 { break; }
+		iterations += 1;
+		if iterations == 101 {
+			return .Max_Iterations_Reached;
+		}
 	}
 
 	/*						Result can be off by a few so check.					*/
 	/* Loop beneath can overshoot by one if found root is smaller than actual root. */
 
+	iterations = 0;
 	for {
+		if iterations == 101 {
+			return .Max_Iterations_Reached;
+		}
+		//fmt.printf("root_n iteration: %v\n", iterations);
+		iterations += 1;
+
 		if err = pow(t2, t1, n); err != .None { return err; }
 
 		c, err = cmp(t2, a);
@@ -372,8 +395,14 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 		}
 	}
 
+	iterations = 0;
 	/*					Correct overshoot from above or from recurrence.			*/
 	for {
+		if iterations == 101 {
+			return .Max_Iterations_Reached;
+		}
+		iterations += 1;
+
 		if err = pow(t2, t1, n); err != .None { return err; }
 
 		c, err = cmp(t2, a);

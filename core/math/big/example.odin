@@ -66,17 +66,26 @@ print :: proc(name: string, a: ^Int, base := i8(10)) {
 }
 
 demo :: proc() {
-	// err: Error;
-	// r := &rnd.Rand{};
-	// rnd.init(r, 12345);
+	err: Error;
+	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	// as := cstring("12341234");
-	// bs := cstring("159671292010002348397151706347412301");
+	err = atoi(source, "711456452774621215865929644892071691538299606591173717356248653735056872543694196490784640730887936656406546625676792022", 10);
+	print("src    ", source);	
 
-	// res := test_log(as, 2, 10);
-	// fmt.print(res);
-	// destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	// defer destroy(destination, source, quotient, remainder, numerator, denominator);
+	fmt.println("sqrt should be 843478780275248664696797599030708027195155136953848512749494");
+
+	fmt.println();
+	err = sqrt(destination, source);
+	fmt.printf("sqrt returned: %v\n", err);
+	print("sqrt   ", destination);
+
+	err = atoi(denominator, "711456452774621215865929644892071691538299606591173717356248653735056872543694196490784640730887936656406546625676792022", 10);
+	err = root_n(quotient, denominator, 2);
+	fmt.printf("root_n(2) returned: %v\n", err);
+	print("root_n(2)", quotient);
+
+	// fmt.println();
 }
 
 main :: proc() {
