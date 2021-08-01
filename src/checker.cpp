@@ -2521,7 +2521,7 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		if (ev.kind == ExactValue_String) {
 			auto cc = string_to_calling_convention(ev.value_string);
 			if (cc == ProcCC_Invalid) {
-				error(elem, "Unknown procedure calling convention: '%.*s'\n", LIT(ev.value_string));
+				error(elem, "Unknown procedure calling convention: '%.*s'", LIT(ev.value_string));
 			} else {
 				c->foreign_context.default_cc = cc;
 			}
@@ -2533,7 +2533,7 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		if (ev.kind == ExactValue_String) {
 			String link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(link_prefix)) {
-				error(elem, "Invalid link prefix: '%.*s'\n", LIT(link_prefix));
+				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
 				c->foreign_context.link_prefix = link_prefix;
 			}
@@ -3138,7 +3138,10 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				bool success = false;
 				if (value != nullptr) {
 					if (value->kind == Ast_BasicLit && value->BasicLit.token.kind == Token_String) {
-						String v = value->BasicLit.token.string;
+						String v = {};
+						if (value->tav.value.kind == ExactValue_String) {
+							v = value->tav.value.value_string;
+						}
 						if (v == "file") {
 							kind = EntityVisiblity_PrivateToFile;
 							success = true;

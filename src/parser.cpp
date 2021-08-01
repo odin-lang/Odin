@@ -583,12 +583,38 @@ Ast *ast_undef(AstFile *f, Token token) {
 	return result;
 }
 
+ExactValue exact_value_from_token(AstFile *f, Token const &token) {
+	String s = token.string;
+	switch (token.kind) {
+	case Token_Rune:
+		if (!unquote_string(ast_allocator(f), &s, 0)) {
+			syntax_error(token, "Invalid rune literal");
+		}
+		break;
+	case Token_String:
+		if (!unquote_string(ast_allocator(f), &s, 0, s.text[0] == '`')) {
+			syntax_error(token, "Invalid string literal");
+		}
+		break;
+	}
+	return exact_value_from_basic_literal(token.kind, s);
+}
+
+String string_value_from_token(AstFile *f, Token const &token) {
+	ExactValue value = exact_value_from_token(f, token);
+	String str = {};
+	if (value.kind == ExactValue_String) {
+		str = value.value_string;
+	}
+	return str;
+}
+
 
 Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
 	result->tav.mode = Addressing_Constant;
-	result->tav.value = exact_value_from_basic_literal(basic_lit);
+	result->tav.value = exact_value_from_token(f, basic_lit);
 	return result;
 }
 
@@ -3227,9 +3253,9 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	ProcCallingConvention cc = ProcCC_Invalid;
 	if (f->curr_token.kind == Token_String) {
 		Token token = expect_token(f, Token_String);
-		auto c = string_to_calling_convention(token.string);
+		auto c = string_to_calling_convention(string_value_from_token(f, token));
 		if (c == ProcCC_Invalid) {
-			syntax_error(token, "Unknown procedure calling convention: '%.*s'\n", LIT(token.string));
+			syntax_error(token, "Unknown procedure calling convention: '%.*s'", LIT(token.string));
 		} else {
 			cc = c;
 		}
@@ -5114,7 +5140,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *>
 		} else if (node->kind == Ast_ImportDecl) {
 			ast_node(id, ImportDecl, node);
 
-			String original_string = string_trim_whitespace(id->relpath.string);
+			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
@@ -5134,7 +5160,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *>
 			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
 
 			for_array(fp_idx, fl->filepaths) {
-				String file_str = fl->filepaths[fp_idx].string;
+				String file_str = string_trim_whitespace(string_value_from_token(f, fl->filepaths[fp_idx]));
 				String fullpath = file_str;
 				if (allow_check_foreign_filepath()) {
 					String foreign_path = {};

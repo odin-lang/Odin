@@ -717,7 +717,6 @@ struct Tokenizer {
 	i32   line_count;
 
 	i32 error_count;
-	Array<String> allocated_strings;
 
 	TokenizerFlags flags;
 	bool insert_semicolon;
@@ -806,12 +805,6 @@ void init_tokenizer_with_file_contents(Tokenizer *t, String const &fullpath, gbF
 	if (t->curr_rune == GB_RUNE_BOM) {
 		advance_to_next_rune(t); // Ignore BOM at file beginning
 	}
-
-	if (t->allocated_strings.count != 0) {
-		array_clear(&t->allocated_strings);
-	} else {
-		array_init(&t->allocated_strings, heap_allocator());
-	}
 }
 
 TokenizerInitError init_tokenizer(Tokenizer *t, String const &fullpath, TokenizerFlags flags = TokenizerFlag_None) {
@@ -857,10 +850,6 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 	if (t->start != nullptr) {
 		gb_free(heap_allocator(), t->start);
 	}
-	for_array(i, t->allocated_strings) {
-		gb_free(heap_allocator(), t->allocated_strings[i].text);
-	}
-	array_free(&t->allocated_strings);
 }
 
 gb_inline i32 digit_value(Rune r) {
@@ -1237,15 +1226,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				tokenizer_err(t, "Invalid rune literal");
 			}
 			token->string.len = t->curr - token->string.text;
-			success = unquote_string(heap_allocator(), &token->string, 0);
-			if (success > 0) {
-				if (success == 2) {
-					array_add(&t->allocated_strings, token->string);
-				}
-			} else {
-				tokenizer_err(t, "Invalid rune literal");
-			}
-
 			goto semicolon_check;
 		} break;
 
@@ -1288,15 +1268,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				}
 			}
 			token->string.len = t->curr - token->string.text;
-			success = unquote_string(heap_allocator(), &token->string, 0, has_carriage_return);
-			if (success > 0) {
-				if (success == 2) {
-					array_add(&t->allocated_strings, token->string);
-				}
-			} else {
-				tokenizer_err(t, "Invalid string literal");
-			}
-
 			goto semicolon_check;
 		} break;
 
