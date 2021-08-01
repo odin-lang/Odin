@@ -1266,31 +1266,110 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 	return remainder, .None;
 }
 
+/*
+	Function computing both GCD and (if target isn't `nil`) also LCM.
+*/
+int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(res_gcd, res_lcm, a, b); err != .None { return err; }
+	return #force_inline _int_gcd_lcm(res_gcd, res_lcm, a, b);
+}
+gcd_lcm :: proc { int_gcd_lcm, };
 
 /*
 	Greatest Common Divisor using the binary method.
-
-	TODO(Jeroen):
-	- Maybe combine with LCM and have an `_int_gcd_lcm` proc that can return both with work shared.
 */
 int_gcd :: proc(res, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a, b, res);    err != .None { return err; }
+	if err = clear_if_uninitialized(res, a, b); err != .None { return err; }
 
 	/*
 		If both `a` and `b` are zero, return zero.
 		If either `a` or `b`, return the other one.
 	*/
-	az, _ := is_zero(a);
-	bz, _ := is_zero(b);
+	az, _ := is_zero(a); bz, _ := is_zero(b);
+	if az && bz { return zero(res); }
+	else if az {  return abs(res, b); }
+	else if bz {  return abs(res, a); }
+
+	return #force_inline _int_gcd_lcm(res, nil, a, b);
+}
+gcd :: proc { int_gcd, };
+
+/*
+	Least Common Multiple.
+*/
+int_lcm :: proc(res, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(res, a, b); err != .None { return err; }
+
+	/*
+		If both `a` and `b` are zero, return zero.
+	*/
+	az, _ := is_zero(a); bz, _ := is_zero(b);
+	if az || bz { return zero(res); }
+
+	return #force_inline _int_gcd_lcm(nil, res, a, b);
+}
+lcm :: proc { int_lcm, };
+
+/*
+	Internal function computing both GCD and (if target isn't `nil`) also LCM.
+	Expects the arguments to have been initialized.
+*/
+_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
+	/*
+		If both `a` and `b` are zero, return zero.
+		If either `a` or `b`, return the other one.
+
+		The `gcd` and `lcm` wrappers have already done this test,
+		but `gcd_lcm` wouldn't have, so we still need to perform it.
+
+		If neither result is wanted, we have nothing to do.
+	*/
+	if res_gcd == nil && res_lcm == nil { return .None; }
+
+	/*
+		We need a temporary because `res_gcd` is allowed to be `nil`.
+	*/
+	az, _ := is_zero(a); bz, _ := is_zero(b);
 	if az && bz {
-		return zero(res);
+		/*
+			GCD(0, 0) and LCM(0, 0) are both 0.
+		*/
+		if res_gcd != nil {
+			if err = zero(res_gcd);	err != .None { return err; }
+		}
+		if res_lcm != nil {
+			if err = zero(res_lcm);	err != .None { return err; }
+		}
+		return .None;
 	} else if az {
-		return abs(res, b);
+		/*
+			We can early out with GCD = B and LCM = 0
+		*/
+		if res_gcd != nil {
+			if err = abs(res_gcd, b); err != .None { return err; }
+		}
+		if res_lcm != nil {
+			if err = zero(res_lcm); err != .None { return err; }
+		}
+		return .None;
 	} else if bz {
-		return abs(res, a);
+		/*
+			We can early out with GCD = A and LCM = 0
+		*/
+		if res_gcd != nil {
+			if err = abs(res_gcd, a); err != .None { return err; }
+		}
+		if res_lcm != nil {
+			if err = zero(res_lcm); err != .None { return err; }
+		}
+		return .None;
 	}
 
- 	/*
+	temp_gcd_res := &Int{};
+	defer destroy(temp_gcd_res);
+
+	/*
+		If neither `a` or `b` was zero, we need to compute `gcd`.
  		Get copies of `a` and `b` we can modify.
  	*/
 	u, v := &Int{}, &Int{};
@@ -1354,62 +1433,47 @@ int_gcd :: proc(res, a, b: ^Int) -> (err: Error) {
  	/*
  		Multiply by 2**k which we divided out at the beginning.
  	*/
- 	if err = shl(res, u, k); err != .None { return err; }
- 	res.sign = .Zero_or_Positive;
-	return err;
-}
-gcd :: proc { int_gcd, };
-
-
-/*
-	Least Common Multiple.
-	Computes least common multiple as `|a*b|/(a, b)`
-
-	TODO(Jeroen):
-	- Maybe combine with GCD and have an `_int_gcd_lcm` proc that can return both with work shared.
-*/
-int_lcm :: proc(res, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a, b, res); err != .None { return err; }
-
-	t1, t2 := &Int{}, &Int{};
-	defer destroy(t1, t2);
+ 	if err = shl(temp_gcd_res, u, k); err != .None { return err; }
+ 	temp_gcd_res.sign = .Zero_or_Positive;
 
 	/*
-		Special case: lcm(0, 0) is defined as zero.
+		We've computed `gcd`, either the long way, or because one of the inputs was zero.
+		If we don't want `lcm`, we're done.
 	*/
-	az, _ := is_zero(a);
-	bz, _ := is_zero(b);
-	if az && bz { return zero(res); }
+	if res_lcm == nil {
+		swap(temp_gcd_res, res_gcd);
+		return .None;
+	}
 
 	/*
-		t1 = get the GCD of the two inputs.
-	*/
-	if err = gcd(t1, a, b); err != .None { return err; }
-
-	/*
+		Computes least common multiple as `|a*b|/gcd(a,b)`
 		Divide the smallest by the GCD.
 	*/
 	if c, _ := cmp_mag(a, b); c == -1 {
 		/*
 			Store quotient in `t2` such that `t2 * b` is the LCM.
 		*/
-		if err = div(t2, a, t1); err != .None { return err; }
-		err = mul(res, t2, b);
+		if err = div(res_lcm, a, temp_gcd_res); err != .None { return err; }
+		err = mul(res_lcm, res_lcm, b);
 	} else {
 		/*
 			Store quotient in `t2` such that `t2 * a` is the LCM.
 		*/
-		if err = div(t2, a, t1); err != .None { return err; }
-		err = mul(res, t2, b);
+		if err = div(res_lcm, a, temp_gcd_res); err != .None { return err; }
+		err = mul(res_lcm, res_lcm, b);
+	}
+
+	if res_gcd != nil {
+		swap(temp_gcd_res, res_gcd);
 	}
 
 	/*
 		Fix the sign to positive and return.
 	*/
-	res.sign = .Zero_or_Positive;
+	res_lcm.sign = .Zero_or_Positive;
 	return err;
 }
-lcm :: proc { int_lcm, };
+
 
 when size_of(rawptr) == 8 {
 	_factorial_table := [35]_WORD{
