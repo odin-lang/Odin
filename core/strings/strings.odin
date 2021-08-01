@@ -165,6 +165,40 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	return string(b);
 }
 
+/*
+	`rune_offset` and `rune_length` are in runes, not bytes.
+	If `rune_length` <= 0, then it'll return the remainder of the string starting with `rune_offset`.
+*/
+cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.temp_allocator) -> (res: string) {
+	s := s; rune_length := rune_length;
+	l := utf8.rune_count_in_string(s);
+
+	if rune_offset >= l { return ""; }
+	if rune_offset == 0 && rune_length == 0 {
+		return clone(s, allocator);
+	}
+	if rune_length == 0 { rune_length = l; }
+
+	bytes_needed := min(rune_length * 4, len(s));
+	buf := make([]u8, bytes_needed, allocator);
+
+	byte_offset := 0;
+	for i := 0; i < l; i += 1 {
+		_, w := utf8.decode_rune_in_string(s);
+		if i >= rune_offset {
+			for j := 0; j < w; j += 1 {
+				buf[byte_offset+j] = s[j];
+			}
+			byte_offset += w;
+		}
+		if rune_length > 0 {
+			if i == rune_offset + rune_length - 1 { break; }
+		}
+		s = s[w:];
+	}
+	return string(buf[:byte_offset]);
+}
+
 @private
 _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator) -> []string {
 	s, n := s_, n_;
