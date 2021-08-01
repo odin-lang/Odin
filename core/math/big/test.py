@@ -135,6 +135,8 @@ int_shr        = load(l.test_shr, [c_char_p, c_longlong], Res)
 int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
 
 int_factorial  = load(l.test_factorial, [c_uint64], Res)
+int_gcd        = load(l.test_gcd, [c_char_p, c_char_p], Res)
+
 
 def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = "", radix=16):
 	passed = True
@@ -332,6 +334,15 @@ def test_factorial(n = 0, expected_error = Error.Okay):
 		
 	return test("test_factorial", res, [n], expected_error, expected_result)
 
+def test_gcd(a = 0, b = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), arg_to_odin(b)]
+	res   = int_gcd(*args)
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = math.gcd(a, b)
+		
+	return test("test_gcd", res, [a, b], expected_error, expected_result)
+
 
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #
@@ -410,6 +421,10 @@ TESTS = {
 	test_factorial: [
 		[ 12_345 ],
 	],
+	test_gcd: [
+		[ 123, 25, ],
+		[ 125, 25, ],
+	],
 }
 
 total_passes   = 0
@@ -422,9 +437,10 @@ RANDOM_TESTS = [
 	test_add, test_sub, test_mul, test_div,
 	test_log, test_pow, test_sqrt, test_root_n,
 	test_shl_digit, test_shr_digit, test_shl, test_shr_signed,
+	test_gcd,
 ]
 SKIP_LARGE   = [
-	test_pow, test_root_n,
+	test_pow, test_root_n, # test_gcd,
 ]
 SKIP_LARGEST = []
 

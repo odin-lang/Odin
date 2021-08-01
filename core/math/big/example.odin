@@ -13,7 +13,6 @@ package big
 import "core:fmt"
 import "core:mem"
 import "core:time"
-// import rnd "core:math/rand"
 
 print_configation :: proc() {
 	fmt.printf(
@@ -42,10 +41,43 @@ _SQR_TOOM_CUTOFF,
 );
 }
 
+print_timings :: proc() {
+	fmt.printf("\nTimings:\n");
+	for v, i in Timings {
+		if v.c > 0 {
+			avg   := time.Duration(f64(v.t) / f64(v.c));
+
+			avg_s: string;
+			switch {
+			case avg < time.Microsecond:
+				avg_s = fmt.tprintf("%v ns", time.duration_nanoseconds(avg));
+			case avg < time.Millisecond:
+				avg_s = fmt.tprintf("%v µs", time.duration_microseconds(avg));
+			case:
+				avg_s = fmt.tprintf("%v", time.duration_milliseconds(avg));
+			}
+
+			total_s: string;
+			switch {
+			case v.t < time.Microsecond:
+				total_s = fmt.tprintf("%v ns", time.duration_nanoseconds(v.t));
+			case v.t < time.Millisecond:
+				total_s = fmt.tprintf("%v µs", time.duration_microseconds(v.t));
+			case:
+				total_s = fmt.tprintf("%v", time.duration_milliseconds(v.t));
+			}
+
+			fmt.printf("\t%v: %s (avg), %s (total, %v calls)\n", i, avg_s, total_s, v.c);
+		}
+	}
+}
+
 Category :: enum {
 	itoa,
 	atoi,
 	factorial,
+	lsb,
+	ctz,
 };
 Event :: struct {
 	t: time.Duration,
@@ -53,7 +85,7 @@ Event :: struct {
 }
 Timings := [Category]Event{};
 
-print :: proc(name: string, a: ^Int, base := i8(10), print_extra_info := false, print_name := false) {
+print :: proc(name: string, a: ^Int, base := i8(10), print_extra_info := false, print_name := false, newline := true) {
 	s := time.tick_now();
 	as, err := itoa(a, base);
 	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
@@ -64,35 +96,33 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_extra_info := false, 
 		fmt.printf("%v ", name);
 	}
 	if print_extra_info {
-		fmt.printf("(base: %v, bits used: %v): %v\n", base, cb, as);
+		fmt.printf("(base: %v, bits used: %v): %v", base, cb, as);
 	} else {
-		fmt.printf("%v\n", as);
+		fmt.printf("%v", as);
 	}
 	if err != .None {
-		fmt.printf("%v (error: %v | %v)\n", name, err, a);
+		fmt.printf("%v (error: %v | %v)", name, err, a);
+	}
+	if newline {
+		fmt.println();
 	}
 }
 
 demo :: proc() {
-	err: Error;
-	destination, source, quotient, remainder, numerator, denominator := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(destination, source, quotient, remainder, numerator, denominator);
 
-	a :=  "4d2";
-	b := "1538";
+	// err: Error;
+	// a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	// defer destroy(a, b, c, d, e, f);
 
-	if err = atoi(destination, a, 16); err != .None {
-		fmt.printf("atoi(a) returned %v\n", err);
-		return;
-	}
-	if err = atoi(source, b, 16); err != .None {
-		fmt.printf("atoi(b) returned %v\n", err);
-		return;
-	}
-	if err = add(destination, destination, source); err != .None {
-		fmt.printf("add(a, b) returned %v\n", err);
-		return;
-	}
+	// set(a, 25);
+	// set(b, 15);
+
+	// err = gcd(c, a, b);
+	// fmt.printf("gcd(");
+	// print("a =",   a, 10, false, true, false);
+	// print(", b =", b, 10, false, true, false);
+	// print(") =",   c, 10, false, true, false);
+	// fmt.printf(" (err = %v)\n", err);
 }
 
 main :: proc() {
@@ -102,15 +132,8 @@ main :: proc() {
 
 	// print_configation();
 	demo();
+	print_timings();
 
-	fmt.printf("\nTimings:\n");
-	for v, i in Timings {
-		if v.c > 0 {
-			avg   := time.duration_milliseconds(time.Duration(f64(v.t) / f64(v.c)));
-			total := time.duration_milliseconds(time.Duration(v.t));
-			fmt.printf("%v: %.3f ms (avg), %.3f ms (total, %v calls)\n", i, avg, total, v.c);
-		}
-	}
 
 	if len(ta.allocation_map) > 0 {
 		for _, v in ta.allocation_map {

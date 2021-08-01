@@ -294,3 +294,23 @@ PyRes :: struct {
 	return PyRes{res = r, err = .None};
 }
 
+/*
+	dest = gcd(a, b)
+*/
+@export test_gcd :: proc "c" (a, b: cstring) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	ai, bi, dest := &Int{}, &Int{}, &Int{};
+	defer destroy(ai, bi, dest);
+
+	if err = atoi(ai, string(a), 16); err != .None { return PyRes{res=":gcd:atoi(a):", err=err}; }
+	if err = atoi(bi, string(b), 16); err != .None { return PyRes{res=":gcd:atoi(b):", err=err}; }
+	if err = gcd(dest, ai, bi); err != .None { return PyRes{res=":gcd:gcd(a, b):", err=err}; }	
+
+	r: cstring;
+	r, err = int_itoa_cstring(dest, 16, context.temp_allocator);
+	if err != .None { return PyRes{res=":gcd:itoa(res):", err=err}; }
+	return PyRes{res = r, err = .None};
+}
+
