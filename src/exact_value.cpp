@@ -297,13 +297,13 @@ ExactValue exact_value_float_from_string(String string) {
 }
 
 
-ExactValue exact_value_from_basic_literal(Token token) {
-	switch (token.kind) {
-	case Token_String:  return exact_value_string(token.string);
-	case Token_Integer: return exact_value_integer_from_string(token.string);
-	case Token_Float:   return exact_value_float_from_string(token.string);
+ExactValue exact_value_from_basic_literal(TokenKind kind, String const &string) {
+	switch (kind) {
+	case Token_String:  return exact_value_string(string);
+	case Token_Integer: return exact_value_integer_from_string(string);
+	case Token_Float:   return exact_value_float_from_string(string);
 	case Token_Imag: {
-		String str = token.string;
+		String str = string;
 		Rune last_rune = cast(Rune)str[str.len-1];
 		str.len--; // Ignore the 'i|j|k'
 		f64 imag = float_from_string(str);
@@ -317,7 +317,7 @@ ExactValue exact_value_from_basic_literal(Token token) {
 	}
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
-		utf8_decode(token.string.text, token.string.len, &r);
+		utf8_decode(string.text, string.len, &r);
 		return exact_value_i64(r);
 	}
 	default:
