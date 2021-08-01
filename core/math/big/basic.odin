@@ -1271,26 +1271,45 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 */
 int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 	if err = clear_if_uninitialized(res_gcd, res_lcm, a, b); err != .None { return err; }
+
+	az, _ := is_zero(a); bz, _ := is_zero(b);
+	if az && bz {
+		if res_gcd != nil {
+			if err = zero(res_gcd); err != .None { return err; }
+		}
+		if res_lcm != nil {
+			if err = zero(res_lcm); err != .None { return err; }
+		}
+		return .None;
+	}
+	else if az {
+		if res_gcd != nil {
+			if err = abs(res_gcd, b); err != .None { return err; }
+		}
+		if res_lcm != nil {
+			if err = zero(res_lcm);   err != .None { return err; }
+		}
+		return .None;
+	}
+	else if bz {
+		if res_gcd != nil {
+			if err = abs(res_gcd, a); err != .None { return err; }
+		}
+		if res_lcm != nil {
+			if err = zero(res_lcm);   err != .None { return err; }
+		}
+		return .None;
+	}
+
 	return #force_inline _int_gcd_lcm(res_gcd, res_lcm, a, b);
 }
 gcd_lcm :: proc { int_gcd_lcm, };
 
 /*
-	Greatest Common Divisor using the binary method.
+	Greatest Common Divisor.
 */
 int_gcd :: proc(res, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(res, a, b); err != .None { return err; }
-
-	/*
-		If both `a` and `b` are zero, return zero.
-		If either `a` or `b`, return the other one.
-	*/
-	az, _ := is_zero(a); bz, _ := is_zero(b);
-	if az && bz { return zero(res); }
-	else if az {  return abs(res, b); }
-	else if bz {  return abs(res, a); }
-
-	return #force_inline _int_gcd_lcm(res, nil, a, b);
+	return #force_inline int_gcd_lcm(res, nil, a, b);
 }
 gcd :: proc { int_gcd, };
 
@@ -1298,20 +1317,13 @@ gcd :: proc { int_gcd, };
 	Least Common Multiple.
 */
 int_lcm :: proc(res, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(res, a, b); err != .None { return err; }
-
-	/*
-		If both `a` and `b` are zero, return zero.
-	*/
-	az, _ := is_zero(a); bz, _ := is_zero(b);
-	if az || bz { return zero(res); }
-
-	return #force_inline _int_gcd_lcm(nil, res, a, b);
+	return #force_inline int_gcd_lcm(nil, res, a, b);
 }
 lcm :: proc { int_lcm, };
 
 /*
-	Internal function computing both GCD and (if target isn't `nil`) also LCM.
+	Internal function computing both GCD using the binary method,
+	and, if target isn't `nil`, also LCM.
 	Expects the arguments to have been initialized.
 */
 _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
