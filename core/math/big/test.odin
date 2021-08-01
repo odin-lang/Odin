@@ -324,8 +324,8 @@ PyRes :: struct {
 	ai, bi, dest := &Int{}, &Int{}, &Int{};
 	defer destroy(ai, bi, dest);
 
-	if err = atoi(ai, string(a), 16); err != .None { return PyRes{res=":gcd:atoi(a):", err=err}; }
-	if err = atoi(bi, string(b), 16); err != .None { return PyRes{res=":gcd:atoi(b):", err=err}; }
+	if err = atoi(ai, string(a), 16); err != .None { return PyRes{res=":lcm:atoi(a):", err=err}; }
+	if err = atoi(bi, string(b), 16); err != .None { return PyRes{res=":lcm:atoi(b):", err=err}; }
 	if err = lcm(dest, ai, bi); err != .None { return PyRes{res=":lcm:lcm(a, b):", err=err}; }	
 
 	r: cstring;

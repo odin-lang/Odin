@@ -115,7 +115,7 @@ demo :: proc() {
 	defer destroy(a, b, c, d, e, f);
 
 	set(a, 125);
-	set(b, 0);
+	set(b, 75);
 
 	err = gcd_lcm(c, d, a, b);
 	fmt.printf("gcd_lcm(");
@@ -138,8 +138,6 @@ demo :: proc() {
 	print(", b =", b, 10, false, true, false);
 	print(") =",   c, 10, false, true, false);
 	fmt.printf(" (err = %v)\n", err);
-
-
 }
 
 main :: proc() {
