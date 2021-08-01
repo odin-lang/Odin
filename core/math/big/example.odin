@@ -110,19 +110,20 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_extra_info := false, 
 
 demo :: proc() {
 
-	// err: Error;
-	// a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	// defer destroy(a, b, c, d, e, f);
+	err: Error;
+	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(a, b, c, d, e, f);
 
-	// set(a, 25);
-	// set(b, 15);
+	set(a, 25);
+	set(b, 15);
 
-	// err = gcd(c, a, b);
-	// fmt.printf("gcd(");
-	// print("a =",   a, 10, false, true, false);
-	// print(", b =", b, 10, false, true, false);
-	// print(") =",   c, 10, false, true, false);
-	// fmt.printf(" (err = %v)\n", err);
+	err = gcd(c, a, b);
+	fmt.printf("gcd(");
+	print("a =",   a, 10, false, true, false);
+	print(", b =", b, 10, false, true, false);
+	print(") =",   c, 10, false, true, false);
+	fmt.printf(" (err = %v)\n", err);
+
 }
 
 main :: proc() {
@@ -133,7 +134,6 @@ main :: proc() {
 	// print_configation();
 	demo();
 	print_timings();
-
 
 	if len(ta.allocation_map) > 0 {
 		for _, v in ta.allocation_map {
