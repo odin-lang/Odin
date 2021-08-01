@@ -1277,10 +1277,18 @@ int_gcd :: proc(res, a, b: ^Int) -> (err: Error) {
 	if err = clear_if_uninitialized(a, b, res);    err != .None { return err; }
 
 	/*
+		If both `a` and `b` are zero, return zero.
 		If either `a` or `b`, return the other one.
 	*/
-	if z, _ := is_zero(a); z { return abs(res, b); }
-	if z, _ := is_zero(b); z { return abs(res, a); }
+	az, _ := is_zero(a);
+	bz, _ := is_zero(b);
+	if az && bz {
+		return zero(res);
+	} else if az {
+		return abs(res, b);
+	} else if bz {
+		return abs(res, a);
+	}
 
  	/*
  		Get copies of `a` and `b` we can modify.
@@ -1365,6 +1373,13 @@ int_lcm :: proc(res, a, b: ^Int) -> (err: Error) {
 
 	t1, t2 := &Int{}, &Int{};
 	defer destroy(t1, t2);
+
+	/*
+		Special case: lcm(0, 0) is defined as zero.
+	*/
+	az, _ := is_zero(a);
+	bz, _ := is_zero(b);
+	if az && bz { return zero(res); }
 
 	/*
 		t1 = get the GCD of the two inputs.
