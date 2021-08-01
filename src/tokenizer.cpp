@@ -789,26 +789,27 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 
 void advance_to_next_rune(Tokenizer *t) {
 	if (t->read_curr < t->end) {
-		Rune rune;
-		isize width = 1;
-
 		t->curr = t->read_curr;
 		if (t->curr_rune == '\n') {
 			t->line = t->curr;
 			t->line_count++;
 		}
-		rune = *t->read_curr;
+
+		Rune rune = *t->read_curr;
 		if (rune == 0) {
 			tokenizer_err(t, "Illegal character NUL");
-		} else if (rune >= 0x80) { // not ASCII
-			width = gb_utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
+			t->read_curr++;
+		} else if (rune & 0x80) { // not ASCII
+			isize width = utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
+			t->read_curr += width;
 			if (rune == GB_RUNE_INVALID && width == 1) {
 				tokenizer_err(t, "Illegal UTF-8 encoding");
 			} else if (rune == GB_RUNE_BOM && t->curr-t->start > 0){
 				tokenizer_err(t, "Illegal byte order mark");
 			}
+		} else {
+			t->read_curr++;
 		}
-		t->read_curr += width;
 		t->curr_rune = rune;
 	} else {
 		t->curr = t->end;
@@ -820,7 +821,28 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath, TokenizerFlags flags = TokenizerFlag_None) {
+void init_tokenizer_with_file_contents(Tokenizer *t, String const &fullpath, gbFileContents *fc, TokenizerFlags flags) {
+	t->flags = flags;
+	t->fullpath = fullpath;
+	t->line_count = 1;
+
+	t->start = cast(u8 *)fc->data;
+	t->line = t->read_curr = t->curr = t->start;
+	t->end = t->start + fc->size;
+
+	advance_to_next_rune(t);
+	if (t->curr_rune == GB_RUNE_BOM) {
+		advance_to_next_rune(t); // Ignore BOM at file beginning
+	}
+
+	if (t->allocated_strings.count != 0) {
+		array_clear(&t->allocated_strings);
+	} else {
+		array_init(&t->allocated_strings, heap_allocator());
+	}
+}
+
+TokenizerInitError init_tokenizer(Tokenizer *t, String const &fullpath, TokenizerFlags flags = TokenizerFlag_None) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = alloc_cstring(heap_allocator(), fullpath);
@@ -829,25 +851,18 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath, TokenizerFlags 
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 
-	t->flags = flags;
-	t->fullpath = fullpath;
-	t->line_count = 1;
-
 	if (fc.size > I32_MAX) {
+		t->flags = flags;
+		t->fullpath = fullpath;
+		t->line_count = 1;
 		err = TokenizerInit_FileTooLarge;
 		gb_file_free_contents(&fc);
 	} else if (fc.data != nullptr) {
-		t->start = cast(u8 *)fc.data;
-		t->line = t->read_curr = t->curr = t->start;
-		t->end = t->start + fc.size;
-
-		advance_to_next_rune(t);
-		if (t->curr_rune == GB_RUNE_BOM) {
-			advance_to_next_rune(t); // Ignore BOM at file beginning
-		}
-
-		array_init(&t->allocated_strings, heap_allocator());
+		init_tokenizer_with_file_contents(t, fullpath, &fc, flags);
 	} else {
+		t->flags = flags;
+		t->fullpath = fullpath;
+		t->line_count = 1;
 		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
 		defer (gb_file_close(&f));
@@ -1093,8 +1108,24 @@ bool scan_escape(Tokenizer *t) {
 }
 
 
-void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
+gb_inline void tokenizer_skip_line(Tokenizer *t) {
+#if 0
+	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+		advance_to_next_rune(t);
+	}
+#else
+	while (t->read_curr != t->end && t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+		t->curr = t->read_curr;
+		t->curr_rune = *t->read_curr;
+		if (t->curr_rune == 0) {
+			tokenizer_err(t, "Illegal character NUL");
+		}
+		t->read_curr++;
+	}
+#endif
+}
 
+void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	// Skip whitespace
 	if (t->flags & TokenizerFlag_InsertSemicolon && t->insert_semicolon) {
 		for (;;) {
@@ -1405,10 +1436,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			token->kind = Token_Hash;
 			if (t->curr_rune == '!') {
 				token->kind = Token_Comment;
-
-				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-					advance_to_next_rune(t);
-				}
+				tokenizer_skip_line(t);
 			}
 			break;
 		case '/':
@@ -1416,9 +1444,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			switch (t->curr_rune) {
 			case '/':
 				token->kind = Token_Comment;
-				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-					advance_to_next_rune(t);
-				}
+				tokenizer_skip_line(t);
 				break;
 			case '*':
 				token->kind = Token_Comment;
