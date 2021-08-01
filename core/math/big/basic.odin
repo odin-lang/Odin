@@ -1353,6 +1353,49 @@ int_gcd :: proc(res, a, b: ^Int) -> (err: Error) {
 gcd :: proc { int_gcd, };
 
 
+/*
+	Least Common Multiple.
+	Computes least common multiple as `|a*b|/(a, b)`
+
+	TODO(Jeroen):
+	- Maybe combine with GCD and have an `_int_gcd_lcm` proc that can return both with work shared.
+*/
+int_lcm :: proc(res, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(a, b, res); err != .None { return err; }
+
+	t1, t2 := &Int{}, &Int{};
+	defer destroy(t1, t2);
+
+	/*
+		t1 = get the GCD of the two inputs.
+	*/
+	if err = gcd(t1, a, b); err != .None { return err; }
+
+	/*
+		Divide the smallest by the GCD.
+	*/
+	if c, _ := cmp_mag(a, b); c == -1 {
+		/*
+			Store quotient in `t2` such that `t2 * b` is the LCM.
+		*/
+		if err = div(t2, a, t1); err != .None { return err; }
+		err = mul(res, t2, b);
+	} else {
+		/*
+			Store quotient in `t2` such that `t2 * a` is the LCM.
+		*/
+		if err = div(t2, a, t1); err != .None { return err; }
+		err = mul(res, t2, b);
+	}
+
+	/*
+		Fix the sign to positive and return.
+	*/
+	res.sign = .Zero_or_Positive;
+	return err;
+}
+lcm :: proc { int_lcm, };
+
 when size_of(rawptr) == 8 {
 	_factorial_table := [35]_WORD{
 /* f(00): */                                                   1,
