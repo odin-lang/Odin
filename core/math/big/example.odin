@@ -114,8 +114,16 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	set(a, 25);
-	set(b, 15);
+	set(a, 125);
+	set(b, 0);
+
+	err = gcd_lcm(c, d, a, b);
+	fmt.printf("gcd_lcm(");
+	print("a =",   a, 10, false, true, false);
+	print(", b =", b, 10, false, true, false);
+	print("), gcd =",   c, 10, false, true, false);
+	print(", lcm =",   d, 10, false, true, false);
+	fmt.printf(" (err = %v)\n", err);
 
 	err = gcd(c, a, b);
 	fmt.printf("gcd(");
@@ -123,6 +131,14 @@ demo :: proc() {
 	print(", b =", b, 10, false, true, false);
 	print(") =",   c, 10, false, true, false);
 	fmt.printf(" (err = %v)\n", err);
+
+	err = lcm(c, a, b);
+	fmt.printf("lcm(");
+	print("a =",   a, 10, false, true, false);
+	print(", b =", b, 10, false, true, false);
+	print(") =",   c, 10, false, true, false);
+	fmt.printf(" (err = %v)\n", err);
+
 
 }
 
