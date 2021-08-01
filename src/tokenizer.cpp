@@ -699,15 +699,6 @@ enum TokenizerInitError {
 };
 
 
-struct TokenizerState {
-	Rune  curr_rune;   // current character
-	u8 *  curr;        // character pos
-	u8 *  read_curr;   // pos from start
-	u8 *  line;        // current line pos
-	i32   line_count;
-	bool  insert_semicolon;
-};
-
 enum TokenizerFlags {
 	TokenizerFlag_None = 0,
 	TokenizerFlag_InsertSemicolon = 1<<0,
@@ -722,7 +713,7 @@ struct Tokenizer {
 	Rune  curr_rune;   // current character
 	u8 *  curr;        // character pos
 	u8 *  read_curr;   // pos from start
-	u8 *  line;        // current line pos
+	i32   column_minus_one;
 	i32   line_count;
 
 	i32 error_count;
@@ -733,30 +724,9 @@ struct Tokenizer {
 };
 
 
-TokenizerState save_tokenizer_state(Tokenizer *t) {
-	TokenizerState state = {};
-	state.curr_rune  = t->curr_rune;
-	state.curr       = t->curr;
-	state.read_curr  = t->read_curr;
-	state.line       = t->line;
-	state.line_count = t->line_count;
-	state.insert_semicolon = t->insert_semicolon;
-	return state;
-}
-
-void restore_tokenizer_state(Tokenizer *t, TokenizerState *state) {
-	t->curr_rune  = state->curr_rune;
-	t->curr       = state->curr;
-	t->read_curr  = state->read_curr;
-	t->line       = state->line;
-	t->line_count = state->line_count;
-	t->insert_semicolon = state->insert_semicolon;
-}
-
-
 void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	va_list va;
-	isize column = t->read_curr - t->line+1;
+	i32 column = t->column_minus_one+1;
 	if (column < 1) {
 		column = 1;
 	}
@@ -775,7 +745,7 @@ void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 
 void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 	va_list va;
-	isize column = t->read_curr - t->line+1;
+	i32 column = t->column_minus_one+1;
 	if (column < 1) {
 		column = 1;
 	}
@@ -788,13 +758,19 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 }
 
 void advance_to_next_rune(Tokenizer *t) {
+#if 1
+	if (t->curr_rune == '\n') {
+		t->column_minus_one = 0;
+		t->line_count++;
+	}
+#else
+	// NOTE(bill, 2021-08-02): This is branchless but it is slower in practice
+	i32 is_newline = t->curr_rune == '\n';
+	t->column_minus_one *= 1-is_newline;
+	t->line_count += is_newline;
+#endif
 	if (t->read_curr < t->end) {
 		t->curr = t->read_curr;
-		if (t->curr_rune == '\n') {
-			t->line = t->curr;
-			t->line_count++;
-		}
-
 		Rune rune = *t->read_curr;
 		if (rune == 0) {
 			tokenizer_err(t, "Illegal character NUL");
@@ -813,10 +789,6 @@ void advance_to_next_rune(Tokenizer *t) {
 		t->curr_rune = rune;
 	} else {
 		t->curr = t->end;
-		if (t->curr_rune == '\n') {
-			t->line = t->curr;
-			t->line_count++;
-		}
 		t->curr_rune = GB_RUNE_EOF;
 	}
 }
@@ -827,7 +799,7 @@ void init_tokenizer_with_file_contents(Tokenizer *t, String const &fullpath, gbF
 	t->line_count = 1;
 
 	t->start = cast(u8 *)fc->data;
-	t->line = t->read_curr = t->curr = t->start;
+	t->read_curr = t->curr = t->start;
 	t->end = t->start + fc->size;
 
 	advance_to_next_rune(t);
@@ -921,7 +893,7 @@ void scan_number_to_token(Tokenizer *t, Token *token, bool seen_decimal_point) {
 	token->string = {t->curr, 1};
 	token->pos.file_id = t->curr_file_id;
 	token->pos.line = t->line_count;
-	token->pos.column = cast(i32)(t->curr-t->line+1);
+	token->pos.column = t->column_minus_one+1;
 
 	if (seen_decimal_point) {
 		token->string.text -= 1;
@@ -1113,6 +1085,15 @@ gb_inline void tokenizer_skip_line(Tokenizer *t) {
 	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 		advance_to_next_rune(t);
 	}
+#elif 0
+	while (t->read_curr != t->end && t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+		t->curr = t->read_curr;
+		t->curr_rune = *t->read_curr;
+		if (t->curr_rune == 0) {
+			tokenizer_err(t, "Illegal character NUL");
+		}
+		t->read_curr++;
+	}
 #else
 	while (t->read_curr != t->end && t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 		t->curr = t->read_curr;
@@ -1161,7 +1142,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	token->pos.file_id = t->curr_file_id;
 	token->pos.line = t->line_count;
 	token->pos.offset = cast(i32)(t->curr - t->start);
-	token->pos.column = cast(i32)(t->curr - t->line + 1);
+	token->pos.column = t->column_minus_one+1;
 
 	TokenPos current_pos = token->pos;
 
