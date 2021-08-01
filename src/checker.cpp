@@ -3512,7 +3512,7 @@ bool is_string_an_identifier(String s) {
 	while (offset < s.len) {
 		bool ok = false;
 		Rune r = -1;
-		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
+		isize size = utf8_decode(s.text+offset, s.len-offset, &r);
 		if (offset == 0) {
 			ok = rune_is_letter(r);
 		} else {

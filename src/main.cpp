@@ -561,7 +561,7 @@ bool string_is_valid_identifier(String str) {
 	isize offset = 0;
 	while (offset < str.len) {
 		Rune r = 0;
-		w = gb_utf8_decode(str.text, str.len, &r);
+		w = utf8_decode(str.text, str.len, &r);
 		if (r == GB_RUNE_INVALID) {
 			return false;
 		}

@@ -1705,7 +1705,7 @@ bool is_foreign_name_valid(String name) {
 	while (offset < name.len) {
 		Rune rune;
 		isize remaining = name.len - offset;
-		isize width = gb_utf8_decode(name.text+offset, remaining, &rune);
+		isize width = utf8_decode(name.text+offset, remaining, &rune);
 		if (rune == GB_RUNE_INVALID && width == 1) {
 			return false;
 		} else if (rune == GB_RUNE_BOM && remaining > 0) {
@@ -4612,7 +4612,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 	u64 start = time_stamp_time_now();
 
-	while (f->curr_token.kind != Token_EOF) {
+	for (;;) {
 		Token *token = array_add_and_get(&f->tokens);
 		tokenizer_get_token(&f->tokenizer, token);
 		if (token->kind == Token_Invalid) {
@@ -4887,7 +4887,7 @@ bool is_import_path_valid(String path) {
 			isize width = 1;
 			Rune r = *curr;
 			if (r >= 0x80) {
-				width = gb_utf8_decode(curr, end-curr, &r);
+				width = utf8_decode(curr, end-curr, &r);
 				if (r == GB_RUNE_INVALID && width == 1) {
 					return false;
 				}
@@ -4920,7 +4920,7 @@ bool is_build_flag_path_valid(String path) {
 			isize width = 1;
 			Rune r = *curr;
 			if (r >= 0x80) {
-				width = gb_utf8_decode(curr, end-curr, &r);
+				width = utf8_decode(curr, end-curr, &r);
 				if (r == GB_RUNE_INVALID && width == 1) {
 					return false;
 				}
@@ -5170,7 +5170,7 @@ String build_tag_get_token(String s, String *out) {
 	isize n = 0;
 	while (n < s.len) {
 		Rune rune = 0;
-		isize width = gb_utf8_decode(&s[n], s.len-n, &rune);
+		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
 		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {

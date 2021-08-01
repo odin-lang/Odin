@@ -317,7 +317,7 @@ ExactValue exact_value_from_basic_literal(Token token) {
 	}
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
-		gb_utf8_decode(token.string.text, token.string.len, &r);
+		utf8_decode(token.string.text, token.string.len, &r);
 		return exact_value_i64(r);
 	}
 	default:

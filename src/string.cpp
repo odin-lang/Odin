@@ -500,7 +500,7 @@ String quote_to_ascii(gbAllocator a, String str, u8 quote='"') {
 		Rune r = cast(Rune)s[0];
 		width = 1;
 		if (r >= 0x80) {
-			width = gb_utf8_decode(s, n, &r);
+			width = utf8_decode(s, n, &r);
 		}
 		if (width == 1 && r == GB_RUNE_INVALID) {
 			array_add(&buf, cast(u8)'\\');
@@ -576,7 +576,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 		return false;
 	} else if (s[0] >= 0x80) {
 		Rune r = -1;
-		isize size = gb_utf8_decode(s.text, s.len, &r);
+		isize size = utf8_decode(s.text, s.len, &r);
 		*rune = r;
 		*multiple_bytes = true;
 		*tail_string = make_string(s.text+size, s.len-size);
@@ -736,7 +736,7 @@ i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_carriage_retu
 			return 1;
 		} else if (quote == '\'') {
 			Rune r = GB_RUNE_INVALID;
-			isize size = gb_utf8_decode(s.text, s.len, &r);
+			isize size = utf8_decode(s.text, s.len, &r);
 			if ((size == s.len) && (r != -1 || size != 1)) {
 				*s_ = s;
 				return 1;

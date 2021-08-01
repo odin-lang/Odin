@@ -4712,7 +4712,7 @@ void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 				Rune codepoint = 0;
 				isize offset = 0;
 				do {
-					isize width = gb_utf8_decode(str.text+offset, str.len-offset, &codepoint);
+					isize width = utf8_decode(str.text+offset, str.len-offset, &codepoint);
 					if (val0_type) lb_addr_store(p, val0_addr, lb_const_value(m, val0_type, exact_value_i64(codepoint)));
 					if (val1_type) lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, exact_value_i64(offset)));
 					lb_build_stmt(p, rs->body);
@@ -6563,7 +6563,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 
 			for (i64 i = 0; i < count && offset < s.len; i++) {
-				width = gb_utf8_decode(s.text+offset, s.len-offset, &rune);
+				width = utf8_decode(s.text+offset, s.len-offset, &rune);
 				offset += width;
 
 				elems[i] = LLVMConstInt(et, rune, true);
