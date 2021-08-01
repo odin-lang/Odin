@@ -152,7 +152,6 @@ gb_global bool keyword_indices[16] = {};
 
 gb_inline u32 keyword_hash(u8 const *text, isize len) {
 	return fnv32a(text, len);
-	// return murmur3_32(text, len, 0x6f64696e);
 }
 void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	max_keyword_size = gb_max(max_keyword_size, s.len);
@@ -164,7 +163,7 @@ void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	// NOTE(bill): This is a bit of an empirical hack in order to speed things up
 	u32 index = hash & KEYWORD_HASH_TABLE_MASK;
 	KeywordHashEntry *entry = &keyword_hash_table[index];
-	GB_ASSERT_MSG(entry->kind == Token_Invalid, "Keyword hash table initialtion collision: %.*s %.*s %08x %08x", LIT(s), LIT(token_strings[entry->kind]), hash, entry->hash);
+	GB_ASSERT_MSG(entry->kind == Token_Invalid, "Keyword hash table initialtion collision: %.*s %.*s 0x%08x 0x%08x", LIT(s), LIT(token_strings[entry->kind]), hash, entry->hash);
 	entry->hash = hash;
 	entry->kind = kind;
 	entry->text = s;
@@ -1095,22 +1094,35 @@ bool scan_escape(Tokenizer *t) {
 
 
 void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
+
 	// Skip whitespace
-	for (;;) {
-		switch (t->curr_rune) {
-		case '\n':
-			if (t->insert_semicolon) {
+	if (t->flags & TokenizerFlag_InsertSemicolon && t->insert_semicolon) {
+		for (;;) {
+			switch (t->curr_rune) {
+			case '\n':
 				break;
+			case ' ':
+			case '\t':
+			case '\r':
+				advance_to_next_rune(t);
+				continue;
 			}
-			/*fallthrough*/
-		case ' ':
-		case '\t':
-		case '\r':
-			advance_to_next_rune(t);
-			continue;
+			break;
 		}
-		break;
+	} else {
+		for (;;) {
+			switch (t->curr_rune) {
+			case '\n': // only on t->insert_semicolon
+			case ' ':
+			case '\t':
+			case '\r':
+				advance_to_next_rune(t);
+				continue;
+			}
+			break;
+		}
 	}
+
 
 	token->kind = Token_Invalid;
 	token->string.text = t->curr;
@@ -1121,8 +1133,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	token->pos.column = cast(i32)(t->curr - t->line + 1);
 
 	TokenPos current_pos = token->pos;
-
-	bool insert_semicolon = false;
 
 	Rune curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
@@ -1148,28 +1158,15 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			}
 		}
 
-		switch (token->kind) {
-		case Token_Ident:
-		case Token_context:
-		case Token_typeid: // Dunno?
-		case Token_break:
-		case Token_continue:
-		case Token_fallthrough:
-		case Token_return:
-			insert_semicolon = true;
-			break;
-		}
-
-
-		if (t->flags & TokenizerFlag_InsertSemicolon) {
-			t->insert_semicolon = insert_semicolon;
-		}
-		return;
-
-	} else if (gb_is_between(curr_rune, '0', '9')) {
-		insert_semicolon = true;
-		scan_number_to_token(t, token, false);
+		goto semicolon_check;
 	} else {
+		switch (curr_rune) {
+		case '0': case '1': case '2': case '3': case '4':
+		case '5': case '6': case '7': case '8': case '9':
+			scan_number_to_token(t, token, false);
+			goto semicolon_check;
+		}
+
 		advance_to_next_rune(t);
 		switch (curr_rune) {
 		case GB_RUNE_EOF:
@@ -1201,8 +1198,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 
 		case '\'': // Rune Literal
 		{
-			insert_semicolon = true;
-
 			token->kind = Token_Rune;
 			Rune quote = curr_rune;
 			bool valid = true;
@@ -1239,18 +1234,12 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				tokenizer_err(t, "Invalid rune literal");
 			}
 
-			if (t->flags & TokenizerFlag_InsertSemicolon) {
-				t->insert_semicolon = insert_semicolon;
-			}
-
-			return;
+			goto semicolon_check;
 		} break;
 
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
-			insert_semicolon = true;
-
 			bool has_carriage_return = false;
 			i32 success;
 			Rune quote = curr_rune;
@@ -1296,15 +1285,13 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				tokenizer_err(t, "Invalid string literal");
 			}
 
-			if (t->flags & TokenizerFlag_InsertSemicolon) {
-				t->insert_semicolon = insert_semicolon;
-			}
-
-			return;
+			goto semicolon_check;
 		} break;
 
 		case '.':
-			if (t->curr_rune == '.') {
+			token->kind = Token_Period;
+			switch (t->curr_rune) {
+			case '.':
 				advance_to_next_rune(t);
 				token->kind = Token_Ellipsis;
 				if (t->curr_rune == '<') {
@@ -1314,54 +1301,41 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 					advance_to_next_rune(t);
 					token->kind = Token_RangeFull;
 				}
-			} else if ('0' <= t->curr_rune && t->curr_rune <= '9') {
+				break;
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
 				scan_number_to_token(t, token, true);
-			} else {
-				token->kind = Token_Period;
+				break;
 			}
 			break;
-
-		case '@':  token->kind = Token_At;           break;
-		case '$':  token->kind = Token_Dollar;       break;
-		case '?':
-			insert_semicolon = true;
-			token->kind = Token_Question;
-			break;
-		case '^':
-			insert_semicolon = true;
-			token->kind = Token_Pointer;
-			break;
-		case ';':  token->kind = Token_Semicolon;    break;
-		case ',':  token->kind = Token_Comma;        break;
-		case ':':  token->kind = Token_Colon;        break;
-		case '(':  token->kind = Token_OpenParen;    break;
-		case ')':
-			insert_semicolon = true;
-			token->kind = Token_CloseParen;
-			break;
+		case '@': token->kind = Token_At;           break;
+		case '$': token->kind = Token_Dollar;       break;
+		case '?': token->kind = Token_Question;     break;
+		case '^': token->kind = Token_Pointer;      break;
+		case ';': token->kind = Token_Semicolon;    break;
+		case ',': token->kind = Token_Comma;        break;
+		case ':': token->kind = Token_Colon;        break;
+		case '(': token->kind = Token_OpenParen;    break;
+		case ')': token->kind = Token_CloseParen;   break;
 		case '[': token->kind = Token_OpenBracket;  break;
-		case ']':
-			insert_semicolon = true;
-			token->kind = Token_CloseBracket;
-			break;
-		case '{':  token->kind = Token_OpenBrace;    break;
-		case '}':
-			insert_semicolon = true;
-			token->kind = Token_CloseBrace;
-			break;
-
+		case ']': token->kind = Token_CloseBracket; break;
+		case '{': token->kind = Token_OpenBrace;    break;
+		case '}': token->kind = Token_CloseBrace;   break;
 		case '%':
 			token->kind = Token_Mod;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_ModEq;
-			} else if (t->curr_rune == '%') {
+				break;
+			case '%':
 				token->kind = Token_ModMod;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_ModModEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
 
@@ -1395,63 +1369,61 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			break;
 		case '+':
 			token->kind = Token_Add;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_AddEq;
-			} else if (t->curr_rune == '+') {
+				break;
+			case '+':
 				advance_to_next_rune(t);
 				token->kind = Token_Increment;
-				insert_semicolon = true;
+				break;
 			}
 			break;
 		case '-':
 			token->kind = Token_Sub;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_SubEq;
-			} else if (t->curr_rune == '-') {
-				insert_semicolon = true;
+				break;
+			case '-':
 				advance_to_next_rune(t);
 				token->kind = Token_Decrement;
 				if (t->curr_rune == '-') {
 					advance_to_next_rune(t);
 					token->kind = Token_Undef;
 				}
-			} else if (t->curr_rune == '>') {
+				break;
+			case '>':
 				advance_to_next_rune(t);
 				token->kind = Token_ArrowRight;
+				break;
 			}
 			break;
-
 		case '#':
+			token->kind = Token_Hash;
 			if (t->curr_rune == '!') {
-				insert_semicolon = t->insert_semicolon;
 				token->kind = Token_Comment;
 
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 					advance_to_next_rune(t);
 				}
-			} else {
-				token->kind = Token_Hash;
 			}
 			break;
-
-
-		case '/': {
+		case '/':
 			token->kind = Token_Quo;
-			if (t->curr_rune == '/') {
-				insert_semicolon = t->insert_semicolon;
+			switch (t->curr_rune) {
+			case '/':
 				token->kind = Token_Comment;
-
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 					advance_to_next_rune(t);
 				}
-			} else if (t->curr_rune == '*') {
+				break;
+			case '*':
 				token->kind = Token_Comment;
-
-				isize comment_scope = 1;
 				advance_to_next_rune(t);
-				while (comment_scope > 0) {
+				for (isize comment_scope = 1; comment_scope > 0; /**/) {
 					if (t->curr_rune == GB_RUNE_EOF) {
 						break;
 					} else if (t->curr_rune == '/') {
@@ -1470,97 +1442,140 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 						advance_to_next_rune(t);
 					}
 				}
-			} else if (t->curr_rune == '=') {
+				break;
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_QuoEq;
+				break;
 			}
-		} break;
-
+			break;
 		case '<':
 			token->kind = Token_Lt;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				token->kind = Token_LtEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '<') {
+				break;
+			case '<':
 				token->kind = Token_Shl;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_ShlEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		case '>':
 			token->kind = Token_Gt;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				token->kind = Token_GtEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '>') {
+				break;
+			case '>':
 				token->kind = Token_Shr;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_ShrEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		case '&':
 			token->kind = Token_And;
-			if (t->curr_rune == '~') {
+			switch (t->curr_rune) {
+			case '~':
 				token->kind = Token_AndNot;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_AndNotEq;
 					advance_to_next_rune(t);
 				}
-			} else if (t->curr_rune == '=') {
+				break;
+			case '=':
 				token->kind = Token_AndEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '&') {
+				break;
+			case '&':
 				token->kind = Token_CmpAnd;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_CmpAndEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		case '|':
 			token->kind = Token_Or;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				token->kind = Token_OrEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '|') {
+				break;
+			case '|':
 				token->kind = Token_CmpOr;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_CmpOrEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		default:
+			token->kind = Token_Invalid;
 			if (curr_rune != GB_RUNE_BOM) {
 				u8 str[4] = {};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
 			}
-			insert_semicolon = t->insert_semicolon; // Preserve insert_semicolon info
-			token->kind = Token_Invalid;
 			break;
 		}
 	}
 
-	if (t->flags & TokenizerFlag_InsertSemicolon) {
-		t->insert_semicolon = insert_semicolon;
-	}
-
 	token->string.len = t->curr - token->string.text;
 
+semicolon_check:;
+	if (t->flags & TokenizerFlag_InsertSemicolon) {
+		switch (token->kind) {
+		case Token_Invalid:
+		case Token_Comment:
+			// Preserve insert_semicolon info
+			break;
+		case Token_Ident:
+		case Token_context:
+		case Token_typeid:
+		case Token_break:
+		case Token_continue:
+		case Token_fallthrough:
+		case Token_return:
+			/*fallthrough*/
+		case Token_Integer:
+		case Token_Float:
+		case Token_Imag:
+		case Token_Rune:
+		case Token_String:
+		case Token_Undef:
+			/*fallthrough*/
+		case Token_Question:
+		case Token_Pointer:
+		case Token_CloseParen:
+		case Token_CloseBracket:
+		case Token_CloseBrace:
+			/*fallthrough*/
+		case Token_Increment:
+		case Token_Decrement:
+			/*fallthrough*/
+			t->insert_semicolon = true;
+			break;
+		default:
+			t->insert_semicolon = false;
+			break;
+		}
+	}
 
 	return;
 }
