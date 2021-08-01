@@ -475,6 +475,9 @@ if __name__ == '__main__':
 			TIMINGS    = {}
 
 			UNTIL_ITERS = ITERATIONS
+			if test_proc == test_root_n and BITS == 1_200:
+				UNTIL_ITERS /= 10
+
 			UNTIL_TIME  = TOTAL_TIME + BITS / TIMED_BITS_PER_SECOND
 			# We run each test for a second per 20k bits
 
