@@ -25,8 +25,8 @@ import "core:intrinsics"
 */
 int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	if err = clear_if_uninitialized(a);    err != .None { return err; }
-	if err = clear_if_uninitialized(b);    err != .None { return err; }
+	if err = clear_if_uninitialized(x); err != .None { return err; }
+	if err = clear_if_uninitialized(y); err != .None { return err; }
 	if err = clear_if_uninitialized(dest); err != .None { return err; }
 	/*
 		All parameters have been initialized.
@@ -773,6 +773,9 @@ int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 }
 factorial :: proc { int_factorial, };
 
+
+
+
 /*
 	==========================
 		Low-level routines    
@@ -1262,6 +1265,92 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 	destroy(q);
 	return remainder, .None;
 }
+
+
+/*
+	Greatest Common Divisor using the binary method.
+
+	TODO(Jeroen):
+	- Maybe combine with LCM and have an `_int_gcd_lcm` proc that can return both with work shared.
+*/
+int_gcd :: proc(res, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(a, b, res);    err != .None { return err; }
+
+	/*
+		If either `a` or `b`, return the other one.
+	*/
+	if z, _ := is_zero(a); z { return abs(res, b); }
+	if z, _ := is_zero(b); z { return abs(res, a); }
+
+ 	/*
+ 		Get copies of `a` and `b` we can modify.
+ 	*/
+	u, v := &Int{}, &Int{};
+	defer destroy(u, v);
+	if err = copy(u, a); err != .None { return err; }
+	if err = copy(v, b); err != .None { return err; }
+
+ 	/*
+ 		Must be positive for the remainder of the algorithm.
+ 	*/
+	u.sign = .Zero_or_Positive; v.sign = .Zero_or_Positive;
+
+ 	/*
+ 		B1.  Find the common power of two for `u` and `v`.
+ 	*/
+ 	u_lsb, _ := count_lsb(u);
+ 	v_lsb, _ := count_lsb(v);
+ 	k        := min(u_lsb, v_lsb);
+
+	if k > 0 {
+		/*
+			Divide the power of two out.
+		*/
+		if err = shr(u, u, k); err != .None { return err; }
+		if err = shr(v, v, k); err != .None { return err; }
+	}
+
+	/*
+		Divide any remaining factors of two out.
+	*/
+	if u_lsb != k {
+		if err = shr(u, u, u_lsb - k); err != .None { return err; }
+	}
+	if v_lsb != k {
+		if err = shr(v, v, v_lsb - k); err != .None { return err; }
+	}
+
+	for v.used != 0 {
+		/*
+			Make sure `v` is the largest.
+		*/
+		if c, _ := cmp_mag(u, v); c == 1 {
+			/*
+				Swap `u` and `v` to make sure `v` is >= `u`.
+			*/
+			swap(u, v);
+		}
+
+		/*
+			Subtract smallest from largest.
+		*/
+		if err = sub(v, v, u); err != .None { return err; }
+
+		/*
+			Divide out all factors of two.
+		*/
+		b, _ := count_lsb(v);
+		if err = shr(v, v, b); err != .None { return err; }
+	}
+
+ 	/*
+ 		Multiply by 2**k which we divided out at the beginning.
+ 	*/
+ 	if err = shl(res, u, k); err != .None { return err; }
+ 	res.sign = .Zero_or_Positive;
+	return err;
+}
+gcd :: proc { int_gcd, };
 
 
 when size_of(rawptr) == 8 {

@@ -504,47 +504,35 @@ count_bits :: proc(a: ^Int) -> (count: int, err: Error) {
 }
 
 /*
-	Counts the number of LSBs which are zero before the first zero bit
+	Returns the number of trailing zeroes before the first one.
+	Differs from regular `ctz` in that 0 returns 0.
 */
-count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
-		return 0, err;
-	}
+int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
+	if err = clear_if_uninitialized(a); err != .None { return -1, err; }
 
-	lnz := []u8{4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0};
-
-	q: DIGIT;
-
+	_ctz :: intrinsics.count_trailing_zeros;
 	/*
-		Early out for zero.
+		Easy out.
 	*/
-	if z, _ := is_zero(a); z {
-		return 0, .None;
-	}
+	if z, _ := is_zero(a); z { return 0, .None; }
 
 	/*
 		Scan lower digits until non-zero.
 	*/
-	for count = 0; (count < a.used && a.digit[count] == 0); count += 1 {}
-	q = a.digit[count];
-	count *= _DIGIT_BITS;
+	x: int;
+	for x = 0; x < a.used && a.digit[x] == 0; x += 1 {}
 
-	/*
-		Now scan this digit until a 1 is found.
-	*/
-	if q & 1 == 0 {
-		p: DIGIT;
-		for {
-			p = q & 15;
-			count += int(lnz[p]);
-			q >>= 4;
-			if p != 0 {
-				break;
-			}
-		}
-	}
-	return count, .None;
+	q := a.digit[x];
+	x *= _DIGIT_BITS;
+	return x + count_lsb(q), .None;
 }
+
+platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
+	where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) {
+	return int(intrinsics.count_trailing_zeros(a)) if a > 0 else 0;
+}
+
+count_lsb :: proc { int_count_lsb, platform_count_lsb, };
 
 int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
@@ -602,14 +590,24 @@ _zero_unused :: proc(a: ^Int) {
 	}
 }
 
-clear_if_uninitialized :: proc(dest: ^Int, minimize := false) -> (err: Error) {
-	if !is_initialized(dest) {
-		return grow(dest, _MIN_DIGIT_COUNT if minimize else _DEFAULT_DIGIT_COUNT);
+clear_if_uninitialized_single :: proc(arg: ^Int) -> (err: Error) {
+	if !is_initialized(arg) {
+		return grow(arg, _DEFAULT_DIGIT_COUNT);
 	}
-	return .None;
+	return err;
 }
 
+clear_if_uninitialized_multi :: proc(args: ..^Int) -> (err: Error) {
+	for i in args {
+		if i != nil && !is_initialized(i) {
+			e := grow(i, _DEFAULT_DIGIT_COUNT);
+			if e != .None { err = e; }
+		}
+	}
+	return err;
+}
 
+clear_if_uninitialized :: proc {clear_if_uninitialized_single, clear_if_uninitialized_multi, };
 
 /*
 	Allocates several `Int`s at once.
