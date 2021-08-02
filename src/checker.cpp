@@ -1303,6 +1303,10 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 		if (dmsg.len > 0) {
 			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
 		}
+		String wmsg = entity->warning_message;
+		if (wmsg.len > 0) {
+			warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
+		}
 	}
 	entity->flags |= EntityFlag_Used;
 	add_declaration_dependency(c, entity);
@@ -2693,6 +2697,20 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 				error(elem, "Deprecation message cannot be an empty string");
 			} else {
 				ac->deprecated_message = msg;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "warning") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			String msg = ev.value_string;
+			if (msg.len == 0) {
+				error(elem, "Warning message cannot be an empty string");
+			} else {
+				ac->warning_message = msg;
 			}
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));

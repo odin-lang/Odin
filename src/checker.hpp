@@ -113,6 +113,7 @@ struct AttributeContext {
 	isize   init_expr_list_count;
 	String  thread_local_model;
 	String  deprecated_message;
+	String  warning_message;
 	DeferredProcedure deferred_procedure;
 	u32 optimization_mode; // ProcedureOptimizationMode
 };
