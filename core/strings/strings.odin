@@ -169,12 +169,12 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	`rune_offset` and `rune_length` are in runes, not bytes.
 	If `rune_length` <= 0, then it'll return the remainder of the string starting with `rune_offset`.
 */
-cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.temp_allocator) -> (res: string) {
+cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator) -> (res: string) {
 	s := s; rune_length := rune_length;
 	l := utf8.rune_count_in_string(s);
 
 	if rune_offset >= l { return ""; }
-	if rune_offset == 0 && rune_length == 0 {
+	if rune_offset == 0 && rune_length <= 0 {
 		return clone(s, allocator);
 	}
 	if rune_length == 0 { rune_length = l; }
