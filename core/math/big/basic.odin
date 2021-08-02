@@ -580,9 +580,8 @@ int_mul :: proc(dest, src, multiplier: ^Int) -> (err: Error) {
 	/*
 		Early out for `multiplier` is zero; Set `dest` to zero.
 	*/
-	if z, _ := is_zero(multiplier); z {
-		return zero(dest);
-	}
+	if z, _ := is_zero(multiplier); z { return zero(dest); }
+	if z, _ := is_zero(src);        z { return zero(dest); }
 
 	if src == multiplier {
 		/*
@@ -748,6 +747,10 @@ int_sqrmod :: proc(remainder, number, modulus: ^Int) -> (err: Error) {
 sqrmod :: proc { int_sqrmod, };
 
 
+/*
+	TODO: Use Sterling's Approximation to estimate log2(N!) to size the result.
+	This way we'll have to reallocate less, possibly not at all.
+*/
 int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 	if n < 0 || n > _FACTORIAL_MAX_N || res == nil { return .Invalid_Argument; }
 
@@ -759,12 +762,7 @@ int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 		return int_factorial_binary_split(res, n);
 	}
 
-	a := &Int{};
-	defer destroy(a);
-
-	if err = set(  a, i - 1); err != .None { return err; }
 	if err = set(res, _factorial_table[i - 1]); err != .None { return err; }
-
 	for {
 		if err = mul(res, res, DIGIT(i)); err != .None || i == n { return err; }
 		i += 1;
@@ -1168,12 +1166,12 @@ _int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 	old_used := dest.used;
 	dest.used = pa;
 
-	for ix = 0; ix < pa; ix += 1 {
-		/*
-			Now extract the previous digit [below the carry].
-		*/
-		dest.digit[ix] = W[ix];
-	}
+	/*
+		Now extract the previous digit [below the carry].
+	*/
+	// for ix = 0; ix < pa; ix += 1 { dest.digit[ix] = W[ix]; }
+
+	copy_slice(dest.digit[0:], W[:pa]);	
 
 	/*
 		Clear unused digits [that existed in the old copy of dest].
