@@ -5014,21 +5014,21 @@ void check_unique_package_names(Checker *c) {
 }
 
 void check_add_entities_from_queues(Checker *c) {
-	{
-		isize cap = c->info.entities.count + c->info.entity_queue.count.load(std::memory_order_relaxed);
-		array_reserve(&c->info.entities, cap);
-		for (Entity *e; mpmc_dequeue(&c->info.entity_queue, &e); /**/) {
-			array_add(&c->info.entities, e);
-		}
-	}
-	{
-		isize cap = c->info.definitions.count + c->info.definition_queue.count.load(std::memory_order_relaxed);
-		array_reserve(&c->info.definitions, cap);
-		for (Entity *e; mpmc_dequeue(&c->info.definition_queue, &e); /**/) {
-			array_add(&c->info.definitions, e);
-		}
+	isize cap = c->info.entities.count + c->info.entity_queue.count.load(std::memory_order_relaxed);
+	array_reserve(&c->info.entities, cap);
+	for (Entity *e; mpmc_dequeue(&c->info.entity_queue, &e); /**/) {
+		array_add(&c->info.entities, e);
 	}
 }
+
+void check_add_definitions_from_queues(Checker *c) {
+	isize cap = c->info.definitions.count + c->info.definition_queue.count.load(std::memory_order_relaxed);
+	array_reserve(&c->info.definitions, cap);
+	for (Entity *e; mpmc_dequeue(&c->info.definition_queue, &e); /**/) {
+		array_add(&c->info.definitions, e);
+	}
+}
+
 
 
 void check_parsed_files(Checker *c) {
@@ -5071,6 +5071,7 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add entities from packages");
 	check_add_entities_from_queues(c);
+	check_add_definitions_from_queues(c);
 
 	TIME_SECTION("check all global entities");
 	check_all_global_entities(c);
@@ -5090,6 +5091,7 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add entities from procedure bodies");
 	check_add_entities_from_queues(c);
+	check_add_definitions_from_queues(c);
 
 	TIME_SECTION("check scope usage");
 	for_array(i, c->info.files.entries) {
@@ -5132,6 +5134,8 @@ void check_parsed_files(Checker *c) {
 	}
 
 	TIME_SECTION("check for type cycles and inline cycles");
+	check_add_definitions_from_queues(c);
+
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
@@ -5189,6 +5193,11 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check unique package names");
 	check_unique_package_names(c);
+
+
+	TIME_SECTION("sanity checks");
+	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
+	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
 
 	TIME_SECTION("type check finish");
 

@@ -1171,9 +1171,6 @@ end:;
 	// NOTE(bill): Add it to the list of checked entities
 	if (e->flags & EntityFlag_Lazy) {
 		array_add(&ctx->info->entities, e);
-	}
-
-	if (e->flags & EntityFlag_Lazy) {
 		mutex_unlock(&ctx->info->lazy_mutex);
 	}
 }
