@@ -26,7 +26,6 @@ when _LOW_MEMORY {
 	_DEFAULT_DIGIT_COUNT :: 32;
 }
 
-
 _MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
 _SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, _DEFAULT_SQR_KARATSUBA_CUTOFF);
 _MUL_TOOM_CUTOFF      :: #config(MUL_TOOM_CUTOFF,      _DEFAULT_MUL_TOOM_CUTOFF);
@@ -42,6 +41,17 @@ _DEFAULT_MUL_TOOM_CUTOFF      :: 350;
 _DEFAULT_SQR_TOOM_CUTOFF      :: 400;
 
 _MAX_ITERATIONS_ROOT_N        :: 500;
+
+/*
+	Largest `N` for which we'll compute `N!`
+*/
+_FACTORIAL_MAX_N              :: 100_000;
+
+/*
+	Cutoff to switch to int_factorial_binary_split, and its max recursion level.
+*/
+_FACTORIAL_BINARY_SPLIT_CUTOFF         :: 6100;
+_FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS :: 100;
 
 Sign :: enum u8 {
 	Zero_or_Positive = 0,

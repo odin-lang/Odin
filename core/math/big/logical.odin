@@ -16,25 +16,21 @@ import "core:mem"
 /*
 	The `and`, `or` and `xor` binops differ in two lines only.
 	We could handle those with a switch, but that adds overhead.
+
+	TODO: Implement versions that take a DIGIT immediate.
 */
 
 /*
 	2's complement `and`, returns `dest = a & b;`
 */
-and :: proc(dest, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
-		return err;
-	}
-	if err = clear_if_uninitialized(b); err != .None {
-		return err;
-	}
+int_and :: proc(dest, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(a, b); err != .None { return err; }
+
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .None {
-		return err;
-	}
+	if err = grow(dest, used); err != .None { return err; }
 
 	neg_a, _ := is_neg(a);
 	neg_b, _ := is_neg(b);
@@ -83,24 +79,18 @@ and :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest.sign = .Negative if neg else .Zero_or_Positive;
 	return clamp(dest);
 }
+and :: proc { int_add, };
 
 /*
 	2's complement `or`, returns `dest = a | b;`
 */
-or :: proc(dest, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
-		return err;
-	}
-	if err = clear_if_uninitialized(b); err != .None {
-		return err;
-	}
+int_or :: proc(dest, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(a, b); err != .None { return err; }
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .None {
-		return err;
-	}
+	if err = grow(dest, used); err != .None { return err; }
 
 	neg_a, _ := is_neg(a);
 	neg_b, _ := is_neg(b);
@@ -149,24 +139,19 @@ or :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest.sign = .Negative if neg else .Zero_or_Positive;
 	return clamp(dest);
 }
+or :: proc { int_or, };
 
 /*
 	2's complement `xor`, returns `dest = a ~ b;`
 */
-xor :: proc(dest, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
-		return err;
-	}
-	if err = clear_if_uninitialized(b); err != .None {
-		return err;
-	}
+int_xor :: proc(dest, a, b: ^Int) -> (err: Error) {
+	if err = clear_if_uninitialized(a, b); err != .None { return err; }
+
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .None {
-		return err;
-	}
+	if err = grow(dest, used); err != .None { return err; }
 
 	neg_a, _ := is_neg(a);
 	neg_b, _ := is_neg(b);
@@ -215,20 +200,16 @@ xor :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest.sign = .Negative if neg else .Zero_or_Positive;
 	return clamp(dest);
 }
+xor :: proc { int_xor, };
 
 /*
 	dest = ~src
 */
 int_complement :: proc(dest, src: ^Int) -> (err: Error) {
 	/*
-		Check that src and dest are usable.
+		Check that src is usable. Dest will get checked by `sub`.
 	*/
-	if err = clear_if_uninitialized(src); err != .None {
-		return err;
-	}
-	if err = clear_if_uninitialized(dest); err != .None {
-		return err;
-	}
+	if err = clear_if_uninitialized(src); err != .None { return err; }
 
 	/*
 		Temporarily fix sign.
@@ -254,8 +235,7 @@ complement :: proc { int_complement, };
 */
 int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int) -> (err: Error) {
 	bits := bits;
-	if err = clear_if_uninitialized(quotient);  err != .None { return err; }
-	if err = clear_if_uninitialized(numerator); err != .None { return err; }
+	if err = clear_if_uninitialized(quotient, numerator);  err != .None { return err; }
 
 	if bits < 0 { return .Invalid_Argument; }
 
@@ -371,8 +351,7 @@ shr_signed :: proc { int_shr_signed, };
 */
 int_shl :: proc(dest, src: ^Int, bits: int) -> (err: Error) {
 	bits := bits;
-	if err = clear_if_uninitialized(src);  err != .None { return err; }
-	if err = clear_if_uninitialized(dest); err != .None { return err; }
+	if err = clear_if_uninitialized(src, dest);  err != .None { return err; }
 
 	if bits < 0 {
 		return .Invalid_Argument;
