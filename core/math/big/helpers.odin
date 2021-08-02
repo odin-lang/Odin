@@ -337,9 +337,7 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if err = clear(a, minimize, allocator); err != .None {
-		return err;
-	}
+	if err = clear(a, minimize, allocator); err != .None { return err; }
 
 	a.used     = 1;
 	a.digit[0] = 1;
@@ -429,9 +427,7 @@ get_i32 :: proc { int_get_i32, };
 	and maybe return max(T), .Integer_Overflow if not?
 */
 int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
-	if err = clear_if_uninitialized(a); err != .None {
-		return 0, err;
-	}
+	if err = clear_if_uninitialized(a); err != .None { return 0, err; }
 
 	size_in_bits := int(size_of(T) * 8);
 	i := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS);
@@ -657,3 +653,9 @@ clamp :: proc(a: ^Int) -> (err: Error) {
 	}
 	return .None;
 }
+
+
+_STATIC_ZERO := &Int{
+	used = 0,
+	sign = .Zero_or_Positive,
+};

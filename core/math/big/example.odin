@@ -42,7 +42,7 @@ _SQR_TOOM_CUTOFF,
 }
 
 print_timings :: proc() {
-	fmt.printf("\nTimings:\n");
+	fmt.printf("Timings:\n");
 	for v, i in Timings {
 		if v.c > 0 {
 			avg   := time.Duration(f64(v.t) / f64(v.c));
@@ -76,6 +76,7 @@ Category :: enum {
 	itoa,
 	atoi,
 	factorial,
+	factorial_bin,
 	choose,
 	lsb,
 	ctz,
@@ -116,10 +117,11 @@ demo :: proc() {
 	defer destroy(a, b, c, d, e, f);
 
 	s := time.tick_now();
-	err = choose(a, 65535, 255);
+	err = choose(a, 1024, 255);
 	Timings[.choose].t += time.tick_since(s); Timings[.choose].c += 1;
-	print("choose", a);
-	fmt.println(err);
+
+	print("1024 choose 255", a, 10, true, true, true);
+	fmt.printf("Error: %v\n", err);
 }
 
 main :: proc() {

@@ -751,11 +751,14 @@ sqrmod :: proc { int_sqrmod, };
 
 
 int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
-	if n < 0 { return .Invalid_Argument; }
+	if n < 0 || n > _FACTORIAL_MAX_N || res == nil { return .Invalid_Argument; }
 
 	i := DIGIT(len(_factorial_table));
 	if n < i {
 		return set(res, _factorial_table[n]);
+	}
+	if n >= _FACTORIAL_BINARY_SPLIT_CUTOFF {
+		return int_factorial_binary_split(res, n);
 	}
 
 	a := &Int{};
@@ -771,6 +774,58 @@ int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 
 	return .None;
 }
+
+_int_recursive_product :: proc(res: ^Int, start, stop: DIGIT, level := int(0)) -> (err: Error) {
+	t1, t2 := &Int{}, &Int{};
+	defer destroy(t1, t2);
+
+	if level > _FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS { return .Max_Iterations_Reached; }
+
+	num_factors := (stop - start) >> 1;
+	if num_factors == 2 {
+		if err = set(t1, start); err != .None { return err; }
+		if err = add(t2, t1, 2); err != .None { return err; }
+		return mul(res, t1, t2);
+	}
+
+	if num_factors > 1 {
+		mid := (start + num_factors) | 1;
+		if err = _int_recursive_product(t1, start,  mid, level + 1); err != .None { return err; }
+		if err = _int_recursive_product(t2,   mid, stop, level + 1); err != .None { return err; }
+		return mul(res, t1, t2);
+	}
+
+	if num_factors == 1 { return set(res, start); }
+
+	return one(res);
+}
+
+/*
+	Binary split factorial algo due to: http://www.luschny.de/math/factorial/binarysplitfact.html
+*/
+int_factorial_binary_split :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
+	if n < 0 || n > _FACTORIAL_MAX_N || res == nil { return .Invalid_Argument; }
+
+	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(inner, outer, start, stop, temp);
+
+	if err = one(inner); err != .None { return err; }
+	if err = one(outer); err != .None { return err; }
+
+	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
+
+	for i := bits_used; i >= 0; i -= 1 {
+		start := (n >> (uint(i) + 1)) + 1 | 1;
+		stop  := (n >> uint(i)) + 1 | 1;
+		if err = _int_recursive_product(temp, start, stop); err != .None { return err; }
+		if err = mul(inner, inner, temp);                   err != .None { return err; }
+		if err = mul(outer, outer, inner);                  err != .None { return err; }
+	}
+	shift := n - intrinsics.count_ones(n);
+
+	return shl(res, outer, int(shift));
+}
+
 factorial :: proc { int_factorial, };
 
 /*
