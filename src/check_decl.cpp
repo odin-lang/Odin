@@ -724,6 +724,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
+	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {

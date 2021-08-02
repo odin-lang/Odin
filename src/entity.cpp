@@ -136,6 +136,7 @@ struct Entity {
 
 	u64         order_in_src;
 	String      deprecated_message;
+	String      warning_message;
 
 	// IMPORTANT NOTE(bill): This must be a discriminated union because of patching
 	// later entity kinds
