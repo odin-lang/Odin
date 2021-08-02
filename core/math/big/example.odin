@@ -54,7 +54,7 @@ print_timings :: proc() {
 			case avg < time.Millisecond:
 				avg_s = fmt.tprintf("%v µs", time.duration_microseconds(avg));
 			case:
-				avg_s = fmt.tprintf("%v", time.duration_milliseconds(avg));
+				avg_s = fmt.tprintf("%v ms", time.duration_milliseconds(avg));
 			}
 
 			total_s: string;
@@ -64,7 +64,7 @@ print_timings :: proc() {
 			case v.t < time.Millisecond:
 				total_s = fmt.tprintf("%v µs", time.duration_microseconds(v.t));
 			case:
-				total_s = fmt.tprintf("%v", time.duration_milliseconds(v.t));
+				total_s = fmt.tprintf("%v ms", time.duration_milliseconds(v.t));
 			}
 
 			fmt.printf("\t%v: %s (avg), %s (total, %v calls)\n", i, avg_s, total_s, v.c);
@@ -76,6 +76,7 @@ Category :: enum {
 	itoa,
 	atoi,
 	factorial,
+	choose,
 	lsb,
 	ctz,
 };
@@ -114,30 +115,11 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	set(a, 125);
-	set(b, 75);
-
-	err = gcd_lcm(c, d, a, b);
-	fmt.printf("gcd_lcm(");
-	print("a =",   a, 10, false, true, false);
-	print(", b =", b, 10, false, true, false);
-	print("), gcd =",   c, 10, false, true, false);
-	print(", lcm =",   d, 10, false, true, false);
-	fmt.printf(" (err = %v)\n", err);
-
-	err = gcd(c, a, b);
-	fmt.printf("gcd(");
-	print("a =",   a, 10, false, true, false);
-	print(", b =", b, 10, false, true, false);
-	print(") =",   c, 10, false, true, false);
-	fmt.printf(" (err = %v)\n", err);
-
-	err = lcm(c, a, b);
-	fmt.printf("lcm(");
-	print("a =",   a, 10, false, true, false);
-	print(", b =", b, 10, false, true, false);
-	print(") =",   c, 10, false, true, false);
-	fmt.printf(" (err = %v)\n", err);
+	s := time.tick_now();
+	err = choose(a, 65535, 255);
+	Timings[.choose].t += time.tick_since(s); Timings[.choose].c += 1;
+	print("choose", a);
+	fmt.println(err);
 }
 
 main :: proc() {
