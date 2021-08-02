@@ -87,7 +87,7 @@ Event :: struct {
 }
 Timings := [Category]Event{};
 
-print :: proc(name: string, a: ^Int, base := i8(10), print_extra_info := false, print_name := false, newline := true) {
+print :: proc(name: string, a: ^Int, base := i8(10), print_name := false, newline := true, print_extra_info := false) {
 	s := time.tick_now();
 	as, err := itoa(a, base);
 	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
@@ -117,10 +117,10 @@ demo :: proc() {
 	defer destroy(a, b, c, d, e, f);
 
 	s := time.tick_now();
-	err = choose(a, 1024, 255);
+	err = choose(a, 65535, 255);
 	Timings[.choose].t += time.tick_since(s); Timings[.choose].c += 1;
 
-	print("1024 choose 255", a, 10, true, true, true);
+	print("65535 choose 255", a, 10, true, true, true);
 	fmt.printf("Error: %v\n", err);
 }
 
