@@ -45,7 +45,7 @@ _MAX_ITERATIONS_ROOT_N        :: 500;
 /*
 	Largest `N` for which we'll compute `N!`
 */
-_FACTORIAL_MAX_N              :: 100_000;
+_FACTORIAL_MAX_N              :: 1_000_000;
 
 /*
 	Cutoff to switch to int_factorial_binary_split, and its max recursion level.

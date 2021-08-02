@@ -111,17 +111,30 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := false, newlin
 }
 
 demo :: proc() {
-
 	err: Error;
+	as: string;
+	defer delete(as);
+
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	s := time.tick_now();
-	err = choose(a, 65535, 255);
-	Timings[.choose].t += time.tick_since(s); Timings[.choose].c += 1;
+	N :: 5_000;
 
-	print("65535 choose 255", a, 10, true, true, true);
-	fmt.printf("Error: %v\n", err);
+	s := time.tick_now();
+	err = factorial(a, N);
+	Timings[.factorial].t += time.tick_since(s); Timings[.factorial].c += 1;
+	if err != .None {
+		fmt.printf("factorial(%v) returned %v\n", N, err);
+	}
+
+	s = time.tick_now();
+	as, err = itoa(a, 16);
+	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
+	if err != .None {
+		fmt.printf("itoa(factorial(%v), 16) returned %v\n", N, err);
+	}
+
+	fmt.printf("factorial(%v): %v (first 10 hex digits)\n", N, as[:10]);
 }
 
 main :: proc() {
