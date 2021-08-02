@@ -773,8 +773,43 @@ int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 }
 factorial :: proc { int_factorial, };
 
+/*
+	Number of ways to choose `k` items from `n` items.
+	Also known as the binomial coefficient.
 
+	TODO: Speed up.
 
+	Could be done faster by reusing code from factorial and reusing the common "prefix" results for n!, k! and n-k!
+	We know that n >= k, otherwise we early out with res = 0.
+
+	So:
+		n-k, keep result
+		n, start from previous result
+		k, start from previous result
+
+*/
+int_choose_digit :: proc(res: ^Int, n, k: DIGIT) -> (err: Error) {
+	if res == nil  { return .Invalid_Pointer; }
+	if err = clear_if_uninitialized(res); err != .None { return err; }
+
+	if k > n { return zero(res); }
+
+	/*
+		res = n! / (k! * (n - k)!)
+	*/
+	n_fac, k_fac, n_minus_k_fac := &Int{}, &Int{}, &Int{};
+	defer destroy(n_fac, k_fac, n_minus_k_fac);
+
+	if err = factorial(n_minus_k_fac, n - k);  err != .None { return err; }
+	if err = factorial(k_fac, k);              err != .None { return err; }
+	if err = mul(k_fac, k_fac, n_minus_k_fac); err != .None { return err; }
+
+	if err = factorial(n_fac, n);              err != .None { return err; }
+	if err = div(res, n_fac, k_fac);           err != .None { return err; }
+
+	return err;	
+}
+choose :: proc { int_choose_digit, };
 
 /*
 	==========================
