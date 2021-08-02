@@ -4095,10 +4095,20 @@ bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 	return false;
 }
 
+GB_COMPARE_PROC(sort_file_by_name) {
+	AstFile const *x = *cast(AstFile const **)a;
+	AstFile const *y = *cast(AstFile const **)b;
+	String x_name = filename_from_path(x->fullpath);
+	String y_name = filename_from_path(y->fullpath);
+	return string_compare(x_name, y_name);
+}
+
 void check_create_file_scopes(Checker *c) {
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 		isize total_pkg_decl_count = 0;
+
+		gb_sort_array(pkg->files.data, pkg->files.count, sort_file_by_name);
 
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
