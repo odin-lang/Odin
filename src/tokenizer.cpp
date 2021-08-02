@@ -1070,38 +1070,51 @@ bool scan_escape(Tokenizer *t) {
 
 
 gb_inline void tokenizer_skip_line(Tokenizer *t) {
-#if 0
-	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-		advance_to_next_rune(t);
-	}
-#elif 0
+#if 1
 	while (t->read_curr != t->end && t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-		t->curr = t->read_curr;
-		t->curr_rune = *t->read_curr;
+		t->column_minus_one++;
+		t->curr = t->read_curr++;
+		t->curr_rune = *t->curr;
 		if (t->curr_rune == 0) {
 			tokenizer_err(t, "Illegal character NUL");
 		}
-		t->read_curr++;
 	}
 #else
-	while (t->read_curr != t->end && t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-		t->curr = t->read_curr;
-		t->curr_rune = *t->read_curr;
-		if (t->curr_rune == 0) {
-			tokenizer_err(t, "Illegal character NUL");
+loop_start:;
+	u8 *p = t->read_curr;
+	for (; p < t->end; p++) {
+		switch (*p) {
+		case '\n':
+		case 0xff:
+			goto loop_end;
+		case 0:
+			goto illegal_nul;
 		}
-		t->read_curr++;
 	}
+
+loop_end:
+	p = gb_min(p, t->end);
+	t->column_minus_one += cast(i32)(p - t->read_curr);
+	t->read_curr = p;
+	t->curr = p-1;
+	t->curr_rune = *t->curr;
+	return;
+
+illegal_nul:;
+	p = gb_min(p, t->end);
+	t->column_minus_one += cast(i32)(p - t->read_curr);
+	t->read_curr = p;
+	t->curr = p-1;
+	t->curr_rune = *t->curr;
+	tokenizer_err(t, "Illegal character NUL");
+	goto loop_start;
 #endif
 }
 
-void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
-	// Skip whitespace
-	if (t->flags & TokenizerFlag_InsertSemicolon && t->insert_semicolon) {
+gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
+	if (on_newline) {
 		for (;;) {
 			switch (t->curr_rune) {
-			case '\n':
-				break;
 			case ' ':
 			case '\t':
 			case '\r':
@@ -1113,7 +1126,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	} else {
 		for (;;) {
 			switch (t->curr_rune) {
-			case '\n': // only on t->insert_semicolon
+			case '\n':
 			case ' ':
 			case '\t':
 			case '\r':
@@ -1123,7 +1136,10 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			break;
 		}
 	}
+}
 
+void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
+	tokenizer_skip_whitespace(t, t->insert_semicolon);
 
 	token->kind = Token_Invalid;
 	token->string.text = t->curr;

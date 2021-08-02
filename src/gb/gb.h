@@ -8233,7 +8233,7 @@ gbFileContents gb_file_read_contents(gbAllocator a, b32 zero_terminate, char con
 		isize file_size = cast(isize)gb_file_size(&file);
 		if (file_size > 0) {
 			isize total_size = file_size + !!zero_terminate;
-			total_size = (total_size+7)&~7;
+			total_size = (total_size+15)&~15;
 			result.data = gb_alloc(a, total_size);
 			result.size = file_size;
 			gb_file_read_at(&file, result.data, result.size, 0);
