@@ -19,6 +19,12 @@ import "core:intrinsics"
 /*
 	Tunables
 */
+
+MATH_BIG_FORCE_64_BIT :: false;
+MATH_BIG_FORCE_32_BIT :: false;
+when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously."); };
+
+
 _LOW_MEMORY          :: #config(BIGINT_SMALL_MEMORY, false);
 when _LOW_MEMORY {
 	_DEFAULT_DIGIT_COUNT :: 8;
@@ -140,7 +146,7 @@ _MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS);
 _MAX_BIT_COUNT   :: (max(int) - 2);
 _MAX_DIGIT_COUNT :: _MAX_BIT_COUNT / _DIGIT_BITS;
 
-when size_of(rawptr) == 8 {
+when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	/*
 		We can use u128 as an intermediary.
 	*/
