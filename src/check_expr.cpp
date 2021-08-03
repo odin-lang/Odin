@@ -869,7 +869,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			}
 		}
 		if (modify_type) {
-			Type *ds = default_type(source); // IMPORTANT TODO(bill): IS THIS CORRECT?
+			Type *ds = default_type(source);
 			gb_memmove(poly, ds, gb_size_of(Type));
 		}
 		return true;
@@ -885,9 +885,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 		return false;
 	case Type_Array:
 		if (source->kind == Type_Array) {
-
-			// IMPORTANT TODO(bill): Which is correct?
-			// if (poly->Array.generic_count != nullptr && modify_type) {
 			if (poly->Array.generic_count != nullptr) {
 				Type *gt = poly->Array.generic_count;
 				GB_ASSERT(gt->kind == Type_Generic);
@@ -918,8 +915,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
 			}
 		} else if (source->kind == Type_EnumeratedArray) {
-			// IMPORTANT TODO(bill): Which is correct?
-			// if (poly->Array.generic_count != nullptr && modify_type) {
 			if (poly->Array.generic_count != nullptr) {
 				Type *gt = poly->Array.generic_count;
 				GB_ASSERT(gt->kind == Type_Generic);
