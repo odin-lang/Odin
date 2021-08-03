@@ -2003,9 +2003,6 @@ or_else_procedure :: proc() {
 	fmt.println("\n#'or_else'");
 	// IMPORTANT NOTE: 'or_else' is experimental features and subject to change/removal
 	{
-		// 'or_else' does a similar value check as 'try' but instead of doing an
-		// early return, it will give a default value to be used instead
-
 		m: map[string]int;
 		i: int;
 		ok: bool;
@@ -2068,3 +2065,4 @@ main :: proc() {
 		or_else_procedure();
 	}
 }
+//
