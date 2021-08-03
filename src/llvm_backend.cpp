@@ -192,7 +192,7 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		offset = lb_emit_load(p, offset);
 
 		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
-		offset = lb_emit_conv(p, offset, t_i64);
+			offset = lb_emit_conv(p, offset, t_i64);
 		}
 		offset = lb_emit_conv(p, offset, t_uintptr);
 		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
@@ -2741,6 +2741,9 @@ void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
+	if (!entity->Procedure.is_foreign) {
+		GB_ASSERT(entity->flags |= EntityFlag_ProcBodyChecked);
+	}
 
 	String link_name = {};
 
