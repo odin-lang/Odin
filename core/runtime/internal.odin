@@ -716,7 +716,7 @@ floattidf :: proc(a: i128) -> f64 {
 		a <<= u128(DBL_MANT_DIG - sd);
 	}
 	fb: [2]u32;
-	fb[1] = (u32(s) & 0x80000000) |           // sign
+	fb[0] = (u32(s) & 0x80000000) |           // sign
 	        ((e + 1023) << 20)    |           // exponent
 	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
 	fb[1] = u32(a);                           // mantissa-low
@@ -757,7 +757,7 @@ floattidf_unsigned :: proc(a: u128) -> f64 {
 		a <<= u128(DBL_MANT_DIG - sd);
 	}
 	fb: [2]u32;
-	fb[1] = (0) |                             // sign
+	fb[0] = (0) |                             // sign
 	        ((e + 1023) << 20) |              // exponent
 	        u32((u64(a) >> 32) & 0x000FFFFF); // mantissa-high
 	fb[1] = u32(a);                           // mantissa-low

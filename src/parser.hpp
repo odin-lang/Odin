@@ -6,7 +6,7 @@ struct DeclInfo;
 struct AstFile;
 struct AstPackage;
 
-enum AddressingMode {
+enum AddressingMode : u8 {
 	Addressing_Invalid   = 0,        // invalid addressing mode
 	Addressing_NoValue   = 1,        // no value (void in C)
 	Addressing_Value     = 2,        // computed value (rvalue)
@@ -29,6 +29,7 @@ enum AddressingMode {
 
 struct TypeAndValue {
 	AddressingMode mode;
+	bool           is_lhs; // Debug info
 	Type *         type;
 	ExactValue     value;
 };
@@ -76,8 +77,21 @@ struct ImportedFile {
 	isize       index;
 };
 
+enum AstFileFlag : u32 {
+	AstFile_IsPrivate = 1<<0,
+	AstFile_IsTest    = 1<<1,
+	AstFile_IsLazy    = 1<<2,
+};
+
+enum AstDelayQueueKind {
+	AstDelayQueue_Import,
+	AstDelayQueue_Expr,
+	AstDelayQueue_COUNT,
+};
+
 struct AstFile {
 	i32          id;
+	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;
 
@@ -103,6 +117,8 @@ struct AstFile {
 	bool         in_foreign_block;
 	bool         allow_type;
 
+	isize total_file_decl_count;
+	isize delayed_decl_count;
 	Slice<Ast *> decls;
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;
@@ -113,14 +129,14 @@ struct AstFile {
 	f64            time_to_tokenize; // seconds
 	f64            time_to_parse;    // seconds
 
-	bool is_private;
-	bool is_test;
-
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
 	CommentGroup *docs;             // current docs
 	Array<CommentGroup *> comments; // All the comments!
 
+	// TODO(bill): make this a basic queue as it does not require
+	// any multiple thread capabilities
+	MPMCQueue<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
@@ -144,6 +160,11 @@ struct AstForeignFile {
 };
 
 
+struct AstPackageExportedEntity {
+	Ast *identifier;
+	Entity *entity;
+};
+
 struct AstPackage {
 	PackageKind           kind;
 	isize                 id;
@@ -153,25 +174,28 @@ struct AstPackage {
 	Array<AstForeignFile> foreign_files;
 	bool                  is_single_file;
 
+	MPMCQueue<AstPackageExportedEntity> exported_entity_queue;
+
 	// NOTE(bill): Created/set in checker
 	Scope *   scope;
 	DeclInfo *decl_info;
-	bool      used;
 	bool      is_extra;
 };
 
 
 struct Parser {
-	String                  init_fullpath;
-	StringSet               imported_files; // fullpath
-	StringMap<AstPackage *> package_map; // Key(package name)
-	Array<AstPackage *>     packages;
-	Array<ImportedPackage>  package_imports;
-	isize                   file_to_process_count;
-	isize                   total_token_count;
-	isize                   total_line_count;
-	gbMutex                 file_add_mutex;
-	gbMutex                 file_decl_mutex;
+	String                    init_fullpath;
+	StringSet                 imported_files; // fullpath
+	StringMap<AstPackage *>   package_map; // Key(package name)
+	Array<AstPackage *>       packages;
+	Array<ImportedPackage>    package_imports;
+	isize                     file_to_process_count;
+	isize                     total_token_count;
+	isize                     total_line_count;
+	BlockingMutex             import_mutex;
+	BlockingMutex             file_add_mutex;
+	BlockingMutex             file_decl_mutex;
+	MPMCQueue<ParseFileError> file_error_queue;
 };
 
 

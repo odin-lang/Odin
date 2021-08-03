@@ -187,7 +187,7 @@ T *odin_doc_get_item(OdinDocWriter *w, OdinDocWriterItemTracker<T> *t, u32 index
 	if (w->state != OdinDocWriterState_Writing) {
 		return nullptr;
 	}
-	GB_ASSERT(index < t->len);
+	GB_ASSERT(index < cast(u32)t->len);
 	uintptr data = cast(uintptr)w->data + cast(uintptr)(t->offset + gb_size_of(T)*index);
 	return cast(T *)data;
 }

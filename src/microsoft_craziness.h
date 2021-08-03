@@ -448,7 +448,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             auto version_bytes = (tools_file_size.QuadPart + 1) * 2;  // Warning: This multiplication by 2 presumes there is no variable-length encoding in the wchars (wacky characters in the file could betray this expectation).
             if (version_bytes > 0x7FFFFFFF) continue;   // Avoid overflow.
 
-            wchar_t *version = (wchar_t *)calloc(1, version_bytes);
+            wchar_t *version = (wchar_t *)calloc(1, (usize)version_bytes);
             defer (free(version));
 
             auto read_result = fgetws(version, (int)version_bytes, f);

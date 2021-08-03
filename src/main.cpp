@@ -7,6 +7,15 @@
 #include "exact_value.cpp"
 #include "build_settings.cpp"
 
+void debugf(char const *fmt, ...) {
+	if (build_context.show_debug_messages) {
+		gb_printf_err("[DEBUG] ");
+		va_list va;
+		va_start(va, fmt);
+		(void)gb_printf_err_va(fmt, va);
+		va_end(va);
+	}
+}
 
 gb_global Timings global_timings = {0};
 
@@ -455,12 +464,12 @@ i32 linker_stage(lbGenerator *gen) {
 				" -e _main "
 			#endif
 			, linker, object_files, LIT(output_base), LIT(output_ext),
-      			#if defined(GB_SYSTEM_OSX)
-        			"-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
-      			#else
-        			"-lc -lm",
-      			#endif
-      			lib_str,
+			#if defined(GB_SYSTEM_OSX)
+			  "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
+			#else
+			  "-lc -lm",
+			#endif
+			lib_str,
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
@@ -552,7 +561,7 @@ bool string_is_valid_identifier(String str) {
 	isize offset = 0;
 	while (offset < str.len) {
 		Rune r = 0;
-		w = gb_utf8_decode(str.text, str.len, &r);
+		w = utf8_decode(str.text, str.len, &r);
 		if (r == GB_RUNE_INVALID) {
 			return false;
 		}
@@ -600,6 +609,9 @@ enum BuildFlagKind {
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
+	BuildFlag_ThreadedChecker,
+	BuildFlag_NoThreadedChecker,
+	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
 	BuildFlag_VetExtra,
 	BuildFlag_UseLLVMApi,
@@ -625,6 +637,7 @@ enum BuildFlagKind {
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_VerboseErrors,
+	BuildFlag_IgnoreLazy, // internal use only
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -632,6 +645,7 @@ enum BuildFlagKind {
 	BuildFlag_WindowsPdbName,
 	BuildFlag_Subsystem,
 #endif
+
 
 	BuildFlag_COUNT,
 };
@@ -722,6 +736,9 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,str_lit("use-separate-modules"),BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ThreadedChecker,   str_lit("threaded-checker"),    BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoThreadedChecker, str_lit("no-threaded-checker"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowDebugMessages, str_lit("show-debug-messages"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
@@ -746,6 +763,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,    str_lit("verbose-errors"),     BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_IgnoreLazy,       str_lit("ignore-lazy"),        BuildFlagParam_None, Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
@@ -753,6 +771,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),          BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"),         BuildFlagParam_String, Command__does_build);
 #endif
+
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -1106,24 +1125,24 @@ bool parse_build_flags(Array<String> args) {
 							}
 
 							if (!found) {
-								struct DistanceAndTarget {
+								struct DistanceAndTargetIndex {
 									isize distance;
 									isize target_index;
 								};
-								DistanceAndTarget distances[gb_count_of(named_targets)] = {};
+
+								DistanceAndTargetIndex distances[gb_count_of(named_targets)] = {};
 								for (isize i = 0; i < gb_count_of(named_targets); i++) {
 									distances[i].target_index = i;
 									distances[i].distance = levenstein_distance_case_insensitive(str, named_targets[i].name);
 								}
-								gb_sort_array(distances, gb_count_of(distances), gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
+								gb_sort_array(distances, gb_count_of(distances), gb_isize_cmp(gb_offset_of(DistanceAndTargetIndex, distance)));
 
 								gb_printf_err("Unknown target '%.*s'\n", LIT(str));
 
-								enum {MAX_SMALLEST_DISTANCE = 3};
-								if (distances[0].distance <= MAX_SMALLEST_DISTANCE) {
+								if (distances[0].distance <= MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
 									gb_printf_err("Did you mean:\n");
 									for (isize i = 0; i < gb_count_of(named_targets); i++) {
-										if (distances[i].distance > MAX_SMALLEST_DISTANCE) {
+										if (distances[i].distance > MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
 											break;
 										}
 										gb_printf_err("\t%.*s\n", LIT(named_targets[distances[i].target_index].name));
@@ -1204,6 +1223,26 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
+							break;
+
+						case BuildFlag_ThreadedChecker:
+							#if defined(DEFAULT_TO_THREADED_CHECKER)
+							gb_printf_err("-threaded-checker is the default on this platform\n");
+							bad_flags = true;
+							#endif
+							build_context.threaded_checker = true;
+							break;
+
+						case BuildFlag_NoThreadedChecker:
+							#if !defined(DEFAULT_TO_THREADED_CHECKER)
+							gb_printf_err("-no-threaded-checker is the default on this platform\n");
+							bad_flags = true;
+							#endif
+							build_context.threaded_checker = false;
+							break;
+
+						case BuildFlag_ShowDebugMessages:
+							build_context.show_debug_messages = true;
 							break;
 
 						case BuildFlag_Vet:
@@ -1327,6 +1366,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_VerboseErrors:
 							build_context.show_error_line = true;
+							break;
+
+						case BuildFlag_IgnoreLazy:
+							build_context.ignore_lazy = true;
 							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
@@ -1453,7 +1496,7 @@ void show_timings(Checker *c, Timings *t) {
 	}
 
 	timings_print_all(t);
-	if (build_context.show_more_timings) {
+	if (build_context.show_debug_messages && build_context.show_more_timings) {
 		{
 			gb_printf("\n");
 			gb_printf("Total Lines     - %td\n", lines);
@@ -1746,6 +1789,17 @@ void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (check) {
+		#if defined(GB_SYSTEM_WINDOWS)
+		print_usage_line(1, "-no-threaded-checker");
+		print_usage_line(2, "Disabled multithreading in the semantic checker stage");
+		print_usage_line(0, "");
+		#else
+		print_usage_line(1, "-threaded-checker");
+		print_usage_line(1, "[EXPERIMENTAL]");
+		print_usage_line(2, "Multithread the semantic checker stage");
+		print_usage_line(0, "");
+		#endif
+
 		print_usage_line(1, "-vet");
 		print_usage_line(2, "Do extra checks on the code");
 		print_usage_line(2, "Extra checks include:");
@@ -1808,6 +1862,10 @@ void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-warnings-as-errors");
 		print_usage_line(2, "Treats warning messages as error messages");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-verbose-errors");
+		print_usage_line(2, "Prints verbose error messages showing the code on that line and the location in that line");
 		print_usage_line(0, "");
 	}
 
@@ -1936,15 +1994,17 @@ bool check_env(void) {
 
 
 int main(int arg_count, char const **arg_ptr) {
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
 	}
 
-	Timings *timings = &global_timings;
+	timings_init(&global_timings, str_lit("Total Time"), 2048);
+	defer (timings_destroy(&global_timings));
 
-	timings_init(timings, str_lit("Total Time"), 2048);
-	defer (timings_destroy(timings));
+	TIME_SECTION("initialization");
 
 	arena_init(&permanent_arena, heap_allocator());
 	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
@@ -1955,7 +2015,7 @@ int main(int arg_count, char const **arg_ptr) {
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
-	global_big_int_init();
+	init_type_mutex();
 
 	if (!check_env()) {
 		return 1;
@@ -2108,15 +2168,17 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	timings_start_section(timings, str_lit("parse files"));
+	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
+	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
 
-	Parser parser = {0};
-	if (!init_parser(&parser)) {
+	TIME_SECTION("parse files");
+
+	if (!init_parser(parser)) {
 		return 1;
 	}
-	defer (destroy_parser(&parser));
+	defer (destroy_parser(parser));
 
-	if (parse_packages(&parser, init_filename) != ParseFile_None) {
+	if (parse_packages(parser, init_filename) != ParseFile_None) {
 		return 1;
 	}
 
@@ -2126,18 +2188,13 @@ int main(int arg_count, char const **arg_ptr) {
 
 	temp_allocator_free_all(&temporary_allocator_data);
 
-	timings_start_section(timings, str_lit("type check"));
+	TIME_SECTION("type check");
 
-	Checker checker = {0};
+	checker->parser = parser;
+	init_checker(checker);
+	defer (destroy_checker(checker));
 
-	bool checked_inited = init_checker(&checker, &parser);
-	defer (if (checked_inited) {
-		destroy_checker(&checker);
-	});
-
-	if (checked_inited) {
-		check_parsed_files(&checker);
-	}
+	check_parsed_files(checker);
 	if (any_errors()) {
 		return 1;
 	}
@@ -2148,20 +2205,20 @@ int main(int arg_count, char const **arg_ptr) {
 		if (global_error_collector.count != 0) {
 			return 1;
 		}
-		generate_documentation(&checker);
+		generate_documentation(checker);
 		return 0;
 	}
 
 	if (build_context.no_output_files) {
 		if (build_context.show_unused) {
-			print_show_unused(&checker);
+			print_show_unused(checker);
 		}
 
 		if (build_context.query_data_set_settings.ok) {
-			generate_and_print_query_data(&checker, timings);
+			generate_and_print_query_data(checker, &global_timings);
 		} else {
 			if (build_context.show_timings) {
-				show_timings(&checker, timings);
+				show_timings(checker, &global_timings);
 			}
 		}
 
@@ -2172,26 +2229,22 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-	if (!checked_inited) {
+	TIME_SECTION("LLVM API Code Gen");
+	lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+	if (!lb_init_generator(gen, checker)) {
 		return 1;
 	}
-
-	timings_start_section(timings, str_lit("LLVM API Code Gen"));
-	lbGenerator gen = {};
-	if (!lb_init_generator(&gen, &checker)) {
-		return 1;
-	}
-	lb_generate_code(&gen);
+	lb_generate_code(gen);
 
 	temp_allocator_free_all(&temporary_allocator_data);
 
 	switch (build_context.build_mode) {
 	case BuildMode_Executable:
 	case BuildMode_DynamicLibrary:
-		i32 result = linker_stage(&gen);
+		i32 result = linker_stage(gen);
 		if (result != 0) {
 			if (build_context.show_timings) {
-				show_timings(&checker, timings);
+				show_timings(checker, &global_timings);
 			}
 			return 1;
 		}
@@ -2199,19 +2252,19 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_timings) {
-		show_timings(&checker, timings);
+		show_timings(checker, &global_timings);
 	}
 
-	remove_temp_files(&gen);
+	remove_temp_files(gen);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)
-		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen.output_base), LIT(run_args_string));
+		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen->output_base), LIT(run_args_string));
 	#else
 		//NOTE(thebirk): This whole thing is a little leaky
 		String output_ext = {};
-		String complete_path = concatenate_strings(heap_allocator(), gen.output_base, output_ext);
-		complete_path = path_to_full_path(heap_allocator(), complete_path);
+		String complete_path = concatenate_strings(permanent_allocator(), gen->output_base, output_ext);
+		complete_path = path_to_full_path(permanent_allocator(), complete_path);
 		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 	#endif
 	}

@@ -39,7 +39,6 @@ Thread_Os_Specific :: struct #align 16 {
 _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		context = runtime.default_context();
-
 		t := (^Thread)(t);
 		sync.condition_wait_for(&t.start_gate);
 		sync.condition_destroy(&t.start_gate);
@@ -47,11 +46,7 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 		t.start_gate = {};
 		t.start_mutex = {};
 
-		c := context;
-		if ic, ok := t.init_context.?; ok {
-			c = ic;
-		}
-		context = c;
+		context = or_else(t.init_context.?, runtime.default_context());
 
 		t.procedure(t);
 

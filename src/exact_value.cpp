@@ -27,18 +27,18 @@ Quaternion256 quaternion256_inverse(Quaternion256 x) {
 
 
 enum ExactValueKind {
-	ExactValue_Invalid,
+	ExactValue_Invalid    = 0,
 
-	ExactValue_Bool,
-	ExactValue_String,
-	ExactValue_Integer,
-	ExactValue_Float,
-	ExactValue_Complex,
-	ExactValue_Quaternion,
-	ExactValue_Pointer,
-	ExactValue_Compound,  // TODO(bill): Is this good enough?
-	ExactValue_Procedure, // TODO(bill): Is this good enough?
-	ExactValue_Typeid,
+	ExactValue_Bool       = 1,
+	ExactValue_String     = 2,
+	ExactValue_Integer    = 3,
+	ExactValue_Float      = 4,
+	ExactValue_Complex    = 5,
+	ExactValue_Quaternion = 6,
+	ExactValue_Pointer    = 7,
+	ExactValue_Compound   = 8,  // TODO(bill): Is this good enough?
+	ExactValue_Procedure  = 9, // TODO(bill): Is this good enough?
+	ExactValue_Typeid     = 10,
 
 	ExactValue_Count,
 };
@@ -75,8 +75,8 @@ HashKey hash_exact_value(ExactValue v) {
 		}
 	case ExactValue_Integer:
 		{
-			HashKey key = hashing_proc(big_int_ptr(&v.value_integer), v.value_integer.len * gb_size_of(u64));
-			u8 last = (u8)v.value_integer.neg;
+			HashKey key = hashing_proc(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
+			u8 last = (u8)v.value_integer.sign;
 			key.key = (key.key ^ last) * 0x100000001b3ll;
 			return key;
 		}
@@ -297,13 +297,13 @@ ExactValue exact_value_float_from_string(String string) {
 }
 
 
-ExactValue exact_value_from_basic_literal(Token token) {
-	switch (token.kind) {
-	case Token_String:  return exact_value_string(token.string);
-	case Token_Integer: return exact_value_integer_from_string(token.string);
-	case Token_Float:   return exact_value_float_from_string(token.string);
+ExactValue exact_value_from_basic_literal(TokenKind kind, String const &string) {
+	switch (kind) {
+	case Token_String:  return exact_value_string(string);
+	case Token_Integer: return exact_value_integer_from_string(string);
+	case Token_Float:   return exact_value_float_from_string(string);
 	case Token_Imag: {
-		String str = token.string;
+		String str = string;
 		Rune last_rune = cast(Rune)str[str.len-1];
 		str.len--; // Ignore the 'i|j|k'
 		f64 imag = float_from_string(str);
@@ -317,7 +317,7 @@ ExactValue exact_value_from_basic_literal(Token token) {
 	}
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
-		gb_utf8_decode(token.string.text, token.string.len, &r);
+		utf8_decode(string.text, string.len, &r);
 		return exact_value_i64(r);
 	}
 	default:
@@ -719,7 +719,6 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Shr:    big_int_shr(&c, a, b);     break;
 		default: goto error;
 		}
-		big_int_normalize(&c);
 		ExactValue res = {ExactValue_Integer};
 		res.value_integer = c;
 		return res;

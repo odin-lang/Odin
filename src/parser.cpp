@@ -583,12 +583,38 @@ Ast *ast_undef(AstFile *f, Token token) {
 	return result;
 }
 
+ExactValue exact_value_from_token(AstFile *f, Token const &token) {
+	String s = token.string;
+	switch (token.kind) {
+	case Token_Rune:
+		if (!unquote_string(ast_allocator(f), &s, 0)) {
+			syntax_error(token, "Invalid rune literal");
+		}
+		break;
+	case Token_String:
+		if (!unquote_string(ast_allocator(f), &s, 0, s.text[0] == '`')) {
+			syntax_error(token, "Invalid string literal");
+		}
+		break;
+	}
+	return exact_value_from_basic_literal(token.kind, s);
+}
+
+String string_value_from_token(AstFile *f, Token const &token) {
+	ExactValue value = exact_value_from_token(f, token);
+	String str = {};
+	if (value.kind == ExactValue_String) {
+		str = value.value_string;
+	}
+	return str;
+}
+
 
 Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
 	result->tav.mode = Addressing_Constant;
-	result->tav.value = exact_value_from_basic_literal(basic_lit);
+	result->tav.value = exact_value_from_token(f, basic_lit);
 	return result;
 }
 
@@ -679,6 +705,7 @@ Ast *ast_auto_cast(AstFile *f, Token token, Ast *expr) {
 	result->AutoCast.expr  = expr;
 	return result;
 }
+
 
 Ast *ast_inline_asm_expr(AstFile *f, Token token, Token open, Token close,
                          Array<Ast *> const &param_types,
@@ -1704,7 +1731,7 @@ bool is_foreign_name_valid(String name) {
 	while (offset < name.len) {
 		Rune rune;
 		isize remaining = name.len - offset;
-		isize width = gb_utf8_decode(name.text+offset, remaining, &rune);
+		isize width = utf8_decode(name.text+offset, remaining, &rune);
 		if (rune == GB_RUNE_INVALID && width == 1) {
 			return false;
 		} else if (rune == GB_RUNE_BOM && remaining > 0) {
@@ -1878,13 +1905,13 @@ Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 		if (e->kind == Ast_ProcLit) {
 			if (expr->ProcLit.inlining != ProcInlining_none &&
 			    expr->ProcLit.inlining != pi) {
-				syntax_error(expr, "You cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
+				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
 			}
 			expr->ProcLit.inlining = pi;
 		} else if (e->kind == Ast_CallExpr) {
 			if (expr->CallExpr.inlining != ProcInlining_none &&
 			    expr->CallExpr.inlining != pi) {
-				syntax_error(expr, "You cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
+				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
 			}
 			expr->CallExpr.inlining = pi;
 		}
@@ -1924,6 +1951,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
+		if (f->prev_token.kind == Token_CloseParen) {
+			close = expect_token(f, Token_CloseParen);
+			syntax_error(open, "Invalid parentheses expression with no inside expression");
+			return ast_bad_expr(f, open, close);
+		}
+
 		allow_newline = f->allow_newline;
 		if (f->expr_level < 0) {
 			f->allow_newline = false;
@@ -2395,7 +2428,13 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		f->allow_range = true;
 		elem = parse_expr(f, true);
 		f->allow_range = prev_allow_range;
+
 		if (allow_token(f, Token_Semicolon)) {
+			underlying = parse_type(f);
+		} else if (allow_token(f, Token_Comma)) {
+			String p = token_to_string(f->prev_token);
+			syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
+
 			underlying = parse_type(f);
 		}
 
@@ -2722,7 +2761,6 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		Ast *expr = parse_unary_expr(f, lhs);
 		return ast_auto_cast(f, token, expr);
 	}
-
 
 	case Token_Add:
 	case Token_Sub:
@@ -3221,9 +3259,9 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	ProcCallingConvention cc = ProcCC_Invalid;
 	if (f->curr_token.kind == Token_String) {
 		Token token = expect_token(f, Token_String);
-		auto c = string_to_calling_convention(token.string);
+		auto c = string_to_calling_convention(string_value_from_token(f, token));
 		if (c == ProcCC_Invalid) {
-			syntax_error(token, "Unknown procedure calling convention: '%.*s'\n", LIT(token.string));
+			syntax_error(token, "Unknown procedure calling convention: '%.*s'", LIT(token.string));
 		} else {
 			cc = c;
 		}
@@ -3555,7 +3593,9 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 			Ast *tt = unparen_expr(type);
-			if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			if (tt == nullptr) {
+				syntax_error(f->prev_token, "Invalid type expression in field list");
+			} else if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 			}
 		}
@@ -4604,7 +4644,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 	u64 start = time_stamp_time_now();
 
-	while (f->curr_token.kind != Token_EOF) {
+	for (;;) {
 		Token *token = array_add_and_get(&f->tokens);
 		tokenizer_get_token(&f->tokenizer, token);
 		if (token->kind == Token_Invalid) {
@@ -4656,8 +4696,10 @@ bool init_parser(Parser *p) {
 	string_map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->package_imports, heap_allocator());
-	gb_mutex_init(&p->file_add_mutex);
-	gb_mutex_init(&p->file_decl_mutex);
+	mutex_init(&p->import_mutex);
+	mutex_init(&p->file_add_mutex);
+	mutex_init(&p->file_decl_mutex);
+	mpmc_init(&p->file_error_queue, heap_allocator(), 1024);
 	return true;
 }
 
@@ -4681,8 +4723,10 @@ void destroy_parser(Parser *p) {
 	array_free(&p->package_imports);
 	string_set_destroy(&p->imported_files);
 	string_map_destroy(&p->package_map);
-	gb_mutex_destroy(&p->file_add_mutex);
-	gb_mutex_destroy(&p->file_decl_mutex);
+	mutex_destroy(&p->import_mutex);
+	mutex_destroy(&p->file_add_mutex);
+	mutex_destroy(&p->file_decl_mutex);
+	mpmc_destroy(&p->file_error_queue);
 }
 
 
@@ -4710,6 +4754,9 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
 	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
+	if (err != ParseFile_None) {
+		mpmc_enqueue(&wd->parser->file_error_queue, err);
+	}
 	return cast(isize)err;
 }
 
@@ -4745,9 +4792,9 @@ WORKER_TASK_PROC(foreign_file_worker_proc) {
 		// TODO(bill): Actually do something with it
 		break;
 	}
-	gb_mutex_lock(&p->file_add_mutex);
+	mutex_lock(&p->file_add_mutex);
 	array_add(&pkg->foreign_files, foreign_file);
-	gb_mutex_unlock(&p->file_add_mutex);
+	mutex_unlock(&p->file_add_mutex);
 	return 0;
 }
 
@@ -4767,8 +4814,8 @@ void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFi
 AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
-	gb_mutex_lock(&p->file_add_mutex);
-	defer (gb_mutex_unlock(&p->file_add_mutex));
+	mutex_lock(&p->import_mutex);
+	defer (mutex_unlock(&p->import_mutex));
 
 	if (string_set_exists(&p->imported_files, path)) {
 		return nullptr;
@@ -4872,7 +4919,7 @@ bool is_import_path_valid(String path) {
 			isize width = 1;
 			Rune r = *curr;
 			if (r >= 0x80) {
-				width = gb_utf8_decode(curr, end-curr, &r);
+				width = utf8_decode(curr, end-curr, &r);
 				if (r == GB_RUNE_INVALID && width == 1) {
 					return false;
 				}
@@ -4905,7 +4952,7 @@ bool is_build_flag_path_valid(String path) {
 			isize width = 1;
 			Rune r = *curr;
 			if (r >= 0x80) {
-				width = gb_utf8_decode(curr, end-curr, &r);
+				width = utf8_decode(curr, end-curr, &r);
 				if (r == GB_RUNE_INVALID && width == 1) {
 					return false;
 				}
@@ -4947,7 +4994,7 @@ bool is_package_name_reserved(String const &name) {
 }
 
 
-bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
+bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
@@ -5037,8 +5084,8 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 		return true;
 	}
 
-	if (file_mutex) gb_mutex_lock(file_mutex);
-	defer (if (file_mutex) gb_mutex_unlock(file_mutex));
+	if (file_mutex) mutex_lock(file_mutex);
+	defer (if (file_mutex) mutex_unlock(file_mutex));
 
 
 	if (node->kind == Ast_ForeignImportDecl) {
@@ -5099,7 +5146,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *>
 		} else if (node->kind == Ast_ImportDecl) {
 			ast_node(id, ImportDecl, node);
 
-			String original_string = string_trim_whitespace(id->relpath.string);
+			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
@@ -5119,7 +5166,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *>
 			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
 
 			for_array(fp_idx, fl->filepaths) {
-				String file_str = fl->filepaths[fp_idx].string;
+				String file_str = string_trim_whitespace(string_value_from_token(f, fl->filepaths[fp_idx]));
 				String fullpath = file_str;
 				if (allow_check_foreign_filepath()) {
 					String foreign_path = {};
@@ -5155,7 +5202,7 @@ String build_tag_get_token(String s, String *out) {
 	isize n = 0;
 	while (n < s.len) {
 		Rune rune = 0;
-		isize width = gb_utf8_decode(&s[n], s.len-n, &rune);
+		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
 		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
@@ -5246,6 +5293,28 @@ String dir_from_path(String path) {
 	return base_dir;
 }
 
+isize calc_decl_count(Ast *decl) {
+	isize count = 0;
+	switch (decl->kind) {
+	case Ast_BlockStmt:
+		for_array(i, decl->BlockStmt.stmts) {
+			count += calc_decl_count(decl->BlockStmt.stmts.data[i]);
+		}
+		break;
+	case Ast_ValueDecl:
+		count = decl->ValueDecl.names.count;
+		break;
+	case Ast_ForeignBlockDecl:
+		count = calc_decl_count(decl->ForeignBlockDecl.body);
+		break;
+	case Ast_ImportDecl:
+	case Ast_ForeignImportDecl:
+		count = 1;
+		break;
+	}
+	return count;
+}
+
 bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -5297,7 +5366,18 @@ bool parse_file(Parser *p, AstFile *f) {
 							return false;
 						}
 					} else if (lc == "+private") {
-						f->is_private = true;
+						f->flags |= AstFile_IsPrivate;
+					} else if (lc == "+lazy") {
+						if (build_context.ignore_lazy) {
+							// Ignore
+						} else if (f->flags & AstFile_IsTest) {
+							// Ignore
+						} else if (build_context.command_kind == Command_doc &&
+						           f->pkg->kind == Package_Init) {
+							// Ignore
+						} else {
+							f->flags |= AstFile_IsLazy;
+						}
 					}
 				}
 			}
@@ -5320,6 +5400,11 @@ bool parse_file(Parser *p, AstFile *f) {
 				    stmt->ExprStmt.expr->kind == Ast_ProcLit) {
 					syntax_error(stmt, "Procedure literal evaluated but not used");
 				}
+
+				f->total_file_decl_count += calc_decl_count(stmt);
+				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl) {
+					f->delayed_decl_count += 1;
+				}
 			}
 		}
 
@@ -5330,6 +5415,10 @@ bool parse_file(Parser *p, AstFile *f) {
 
 	u64 end = time_stamp_time_now();
 	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
+
+	for (int i = 0; i < AstDelayQueue_COUNT; i++) {
+		mpmc_init(f->delayed_decls_queues+i, heap_allocator(), f->delayed_decl_count);
+	}
 
 
 	return f->error_count == 0;
@@ -5390,20 +5479,26 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 
 		String test_suffix = str_lit("_test");
 		if (string_ends_with(name, test_suffix) && name != test_suffix) {
-			file->is_test = true;
+			file->flags |= AstFile_IsTest;
 		}
 	}
 
 	if (parse_file(p, file)) {
-		gb_mutex_lock(&p->file_add_mutex);
-		defer (gb_mutex_unlock(&p->file_add_mutex));
+		mutex_lock(&p->file_add_mutex);
+		defer (mutex_unlock(&p->file_add_mutex));
 
 		array_add(&file->pkg->files, file);
 
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
-		} else if (file->tokens.count > 0 && pkg->name != file->package_name) {
-			syntax_error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+		} else if (pkg->name != file->package_name) {
+			if (file->tokens.count > 0 && file->tokens[0].kind != Token_EOF) {
+				Token tok = file->package_token;
+				tok.pos.file_id = file->id;
+				tok.pos.line = gb_max(tok.pos.line, 1);
+				tok.pos.column = gb_max(tok.pos.column, 1);
+				syntax_error(tok, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+			}
 		}
 
 		p->total_line_count += file->tokenizer.line_count;
@@ -5463,10 +5558,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	thread_pool_start(&parser_thread_pool);
 	thread_pool_wait_to_process(&parser_thread_pool);
 
-	// NOTE(bill): Get the last error and use that
-	for (isize i = parser_thread_pool.task_tail-1; i >= 0; i--) {
-		WorkerTask *task = &parser_thread_pool.tasks[i];
-		ParseFileError err = cast(ParseFileError)task->result;
+	for (ParseFileError err = ParseFile_None; mpmc_dequeue(&p->file_error_queue, &err); /**/) {
 		if (err != ParseFile_None) {
 			return err;
 		}

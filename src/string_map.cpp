@@ -54,6 +54,10 @@ template <typename T> T *  string_map_get              (StringMap<T> *h, char co
 template <typename T> T *  string_map_get              (StringMap<T> *h, String const &key);
 template <typename T> T *  string_map_get              (StringMap<T> *h, StringHashKey const &key);
 
+template <typename T> T &  string_map_must_get         (StringMap<T> *h, char const *key);
+template <typename T> T &  string_map_must_get         (StringMap<T> *h, String const &key);
+template <typename T> T &  string_map_must_get         (StringMap<T> *h, StringHashKey const &key);
+
 template <typename T> void string_map_set              (StringMap<T> *h, StringHashKey const &key, T const &value);
 template <typename T> void string_map_set              (StringMap<T> *h, String const &key, T const &value);
 template <typename T> void string_map_set              (StringMap<T> *h, char const *key,   T const &value);
@@ -92,13 +96,13 @@ gb_internal StringMapFindResult string_map__find(StringMap<T> *h, StringHashKey 
 	StringMapFindResult fr = {-1, -1, -1};
 	if (h->hashes.count > 0) {
 		fr.hash_index = key.hash % h->hashes.count;
-		fr.entry_index = h->hashes[fr.hash_index];
+		fr.entry_index = h->hashes.data[fr.hash_index];
 		while (fr.entry_index >= 0) {
-			if (string_hash_key_equal(h->entries[fr.entry_index].key, key)) {
+			if (string_hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
-			fr.entry_index = h->entries[fr.entry_index].next;
+			fr.entry_index = h->entries.data[fr.entry_index].next;
 		}
 	}
 	return fr;
@@ -109,13 +113,13 @@ gb_internal StringMapFindResult string_map__find_from_entry(StringMap<T> *h, Str
 	StringMapFindResult fr = {-1, -1, -1};
 	if (h->hashes.count > 0) {
 		fr.hash_index  = e->key.hash % h->hashes.count;
-		fr.entry_index = h->hashes[fr.hash_index];
+		fr.entry_index = h->hashes.data[fr.hash_index];
 		while (fr.entry_index >= 0) {
-			if (&h->entries[fr.entry_index] == e) {
+			if (&h->entries.data[fr.entry_index] == e) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
-			fr.entry_index = h->entries[fr.entry_index].next;
+			fr.entry_index = h->entries.data[fr.entry_index].next;
 		}
 	}
 	return fr;
@@ -143,10 +147,10 @@ void string_map_rehash(StringMap<T> *h, isize new_count) {
 	array_resize(&nh.hashes, new_count);
 	array_reserve(&nh.entries, h->entries.count);
 	for (i = 0; i < new_count; i++) {
-		nh.hashes[i] = -1;
+		nh.hashes.data[i] = -1;
 	}
 	for (i = 0; i < h->entries.count; i++) {
-		StringMapEntry<T> *e = &h->entries[i];
+		StringMapEntry<T> *e = &h->entries.data[i];
 		StringMapFindResult fr;
 		if (nh.hashes.count == 0) {
 			string_map_grow(&nh);
@@ -154,12 +158,12 @@ void string_map_rehash(StringMap<T> *h, isize new_count) {
 		fr = string_map__find(&nh, e->key);
 		j = string_map__add_entry(&nh, e->key);
 		if (fr.entry_prev < 0) {
-			nh.hashes[fr.hash_index] = j;
+			nh.hashes.data[fr.hash_index] = j;
 		} else {
-			nh.entries[fr.entry_prev].next = j;
+			nh.entries.data[fr.entry_prev].next = j;
 		}
-		nh.entries[j].next = fr.entry_index;
-		nh.entries[j].value = e->value;
+		nh.entries.data[j].next = fr.entry_index;
+		nh.entries.data[j].value = e->value;
 		if (string_map__full(&nh)) {
 			string_map_grow(&nh);
 		}
@@ -172,7 +176,7 @@ template <typename T>
 T *string_map_get(StringMap<T> *h, StringHashKey const &key) {
 	isize index = string_map__find(h, key).entry_index;
 	if (index >= 0) {
-		return &h->entries[index].value;
+		return &h->entries.data[index].value;
 	}
 	return nullptr;
 }
@@ -188,6 +192,23 @@ gb_inline T *string_map_get(StringMap<T> *h, char const *key) {
 }
 
 template <typename T>
+T &string_map_must_get(StringMap<T> *h, StringHashKey const &key) {
+	isize index = string_map__find(h, key).entry_index;
+	GB_ASSERT(index >= 0);
+	return h->entries.data[index].value;
+}
+
+template <typename T>
+gb_inline T &string_map_must_get(StringMap<T> *h, String const &key) {
+	return string_map_must_get(h, string_hash_string(key));
+}
+
+template <typename T>
+gb_inline T &string_map_must_get(StringMap<T> *h, char const *key) {
+	return string_map_must_get(h, string_hash_string(make_string_c(key)));
+}
+
+template <typename T>
 void string_map_set(StringMap<T> *h, StringHashKey const &key, T const &value) {
 	isize index;
 	StringMapFindResult fr;
@@ -200,12 +221,12 @@ void string_map_set(StringMap<T> *h, StringHashKey const &key, T const &value) {
 	} else {
 		index = string_map__add_entry(h, key);
 		if (fr.entry_prev >= 0) {
-			h->entries[fr.entry_prev].next = index;
+			h->entries.data[fr.entry_prev].next = index;
 		} else {
-			h->hashes[fr.hash_index] = index;
+			h->hashes.data[fr.hash_index] = index;
 		}
 	}
-	h->entries[index].value = value;
+	h->entries.data[index].value = value;
 
 	if (string_map__full(h)) {
 		string_map_grow(h);
@@ -227,20 +248,20 @@ template <typename T>
 void string_map__erase(StringMap<T> *h, StringMapFindResult const &fr) {
 	StringMapFindResult last;
 	if (fr.entry_prev < 0) {
-		h->hashes[fr.hash_index] = h->entries[fr.entry_index].next;
+		h->hashes.data[fr.hash_index] = h->entries.data[fr.entry_index].next;
 	} else {
-		h->entries[fr.entry_prev].next = h->entries[fr.entry_index].next;
+		h->entries.data[fr.entry_prev].next = h->entries.data[fr.entry_index].next;
 	}
 	if (fr.entry_index == h->entries.count-1) {
 		array_pop(&h->entries);
 		return;
 	}
-	h->entries[fr.entry_index] = h->entries[h->entries.count-1];
-	last = string_map__find(h, h->entries[fr.entry_index].key);
+	h->entries.data[fr.entry_index] = h->entries.data[h->entries.count-1];
+	last = string_map__find(h, h->entries.data[fr.entry_index].key);
 	if (last.entry_prev >= 0) {
-		h->entries[last.entry_prev].next = fr.entry_index;
+		h->entries.data[last.entry_prev].next = fr.entry_index;
 	} else {
-		h->hashes[last.hash_index] = fr.entry_index;
+		h->hashes.data[last.hash_index] = fr.entry_index;
 	}
 }
 

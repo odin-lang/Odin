@@ -558,7 +558,7 @@ void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	}
 
 	Entity *e = alloc_entity_label(ctx->scope, l->name->Ident.token, t_invalid, label, parent);
-	add_entity(ctx->checker, ctx->scope, l->name, e);
+	add_entity(ctx, ctx->scope, l->name, e);
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
 	if (ok) {
@@ -587,7 +587,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 				Entity *found = scope_insert(ctx->scope, f);
 				if (found != nullptr) {
 					gbString expr_str = expr_to_string(expr);
-					error(us->token, "Namespace collision while 'using' '%s' of: %.*s", expr_str, LIT(found->token.string));
+					error(us->token, "Namespace collision while 'using' enum '%s' of: %.*s", expr_str, LIT(found->token.string));
 					gb_string_free(expr_str);
 					return false;
 				}
@@ -611,7 +611,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
-				      "Namespace collision while 'using' '%s' of: %.*s\n"
+				      "Namespace collision while 'using' import name '%s' of: %.*s\n"
 				      "\tat %s\n"
 				      "\tat %s",
 				      expr_str, LIT(found->token.string),
@@ -861,7 +861,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 
 	for (isize i = 0; i < entity_count; i++) {
-		add_entity(ctx->checker, ctx->scope, entities[i]->identifier, entities[i]);
+		add_entity(ctx, ctx->scope, entities[i]->identifier, entities[i]);
 	}
 
 
@@ -1103,7 +1103,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					if (y.mode != Addressing_Constant) {
 						continue;
 					}
-
+					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
 					add_constant_switch_case(ctx, &seen, y);
 				}
 			}
@@ -1344,7 +1344,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (!is_reference) {
 				tag_var->flags |= EntityFlag_Value;
 			}
-			add_entity(ctx->checker, ctx->scope, lhs, tag_var);
+			add_entity(ctx, ctx->scope, lhs, tag_var);
 			add_entity_use(ctx, lhs, tag_var);
 			add_implicit_entity(ctx, stmt, tag_var);
 		}
@@ -1667,7 +1667,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		GB_ASSERT(ctx->curr_proc_sig != nullptr);
 
 		if (ctx->in_defer) {
-			error(rs->token, "You cannot 'return' within a defer statement");
+			error(rs->token, "'return' cannot be used within a defer statement");
 			break;
 		}
 
@@ -1706,7 +1706,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				Operand *o = &operands[i];
 				check_assignment(ctx, o, e->type, str_lit("return statement"));
 				if (is_type_untyped(o->type)) {
-					update_expr_type(ctx, o->expr, e->type, true);
+					update_untyped_expr_type(ctx, o->expr, e->type, true);
 				}
 			}
 		}
@@ -1884,7 +1884,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
 
 				if (rs->vals.count == 1) {
-					if (is_type_map(operand.type) || is_type_bit_set(operand.type)) {
+					Type *t = type_deref(operand.type);
+					if (is_type_map(t) || is_type_bit_set(t)) {
 						gbString v = expr_to_string(rs->vals[0]);
 						defer (gb_string_free(v));
 						error_line("\tSuggestion: place parentheses around the expression\n");
@@ -1965,7 +1966,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			Entity *e = entities[i];
 			DeclInfo *d = decl_info_of_entity(e);
 			GB_ASSERT(d == nullptr);
-			add_entity(ctx->checker, ctx->scope, e->identifier, e);
+			add_entity(ctx, ctx->scope, e->identifier, e);
 			d = make_decl_info(ctx->scope, ctx->decl);
 			add_entity_and_decl_info(ctx, e->identifier, e, d);
 		}
@@ -2285,7 +2286,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						}
 					}
 				}
-				add_entity(ctx->checker, ctx->scope, e->identifier, e);
+				add_entity(ctx, ctx->scope, e->identifier, e);
 			}
 
 			if (vd->is_using != 0) {

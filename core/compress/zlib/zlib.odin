@@ -1,17 +1,34 @@
 package zlib
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation, optimization.
+		Ginger Bill:     Cosmetic changes.
+*/
+
 import "core:compress"
 
 import "core:mem"
 import "core:io"
-import "core:bytes"
 import "core:hash"
+import "core:bytes"
+
 /*
 	zlib.inflate decompresses a ZLIB stream passed in as a []u8 or io.Stream.
 	Returns: Error.
 */
 
-Context :: compress.Context;
+/*
+	Do we do Adler32 as we write bytes to output?
+	It used to be faster to do it inline, now it's faster to do it at the end of `inflate`.
+
+	We'll see what's faster after more optimization, and might end up removing
+	`Context.rolling_hash` if not inlining it is still faster.
+
+*/
 
 Compression_Method :: enum u8 {
 	DEFLATE  = 8,
@@ -102,7 +119,7 @@ Huffman_Table :: struct {
 };
 
 // Implementation starts here
-
+@(optimization_mode="speed")
 z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	assert(bits <= 16);
 	// NOTE: Can optimize with llvm.bitreverse.i64 or some bit twiddling
@@ -117,25 +134,114 @@ z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	return;
 }
 
-write_byte :: #force_inline proc(z: ^Context, c: u8) -> (err: io.Error) #no_bounds_check {
-	c := c;
-	buf := transmute([]u8)mem.Raw_Slice{data=&c, len=1};
-	z.rolling_hash = hash.adler32(buf, z.rolling_hash);
 
-	_, e := z.output->impl_write(buf);
-	if e != .None {
-		return e;
+@(optimization_mode="speed")
+grow_buffer :: proc(buf: ^[dynamic]u8) -> (err: compress.Error) {
+	/*
+		That we get here at all means that we didn't pass an expected output size,
+		or that it was too little.
+	*/
+
+	/*
+		Double until we reach the maximum allowed.
+	*/
+	new_size := min(len(buf) << 1, compress.COMPRESS_OUTPUT_ALLOCATE_MAX);
+	resize(buf, new_size);
+	if len(buf) != new_size {
+		/*
+			Resize failed.
+		*/
+		return .Resize_Failed;
 	}
-	z.last[z.bytes_written % z.window_size] = c;
 
+	return nil;
+}
+
+/*
+	TODO: Make these return compress.Error.
+*/
+
+@(optimization_mode="speed")
+write_byte :: #force_inline proc(z: ^$C, c: u8) -> (err: io.Error) #no_bounds_check {
+	/*
+		Resize if needed.
+	*/
+	if int(z.bytes_written) + 1 >= len(z.output.buf) {
+		e := grow_buffer(&z.output.buf);
+		if e != nil {
+			return .Short_Write;
+		}
+	}
+
+	#no_bounds_check {
+		z.output.buf[z.bytes_written] = c;
+	}
 	z.bytes_written += 1;
 	return .None;
 }
+
+@(optimization_mode="speed")
+repl_byte :: proc(z: ^$C, count: u16, c: u8) -> (err: io.Error) 	#no_bounds_check {
+	/*
+		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
+		without having to worry about wrapping, so no need for a temp allocation to give to
+		the output stream, just give it _that_ slice.
+	*/
+
+	/*
+	Resize if needed.
+	*/
+	if int(z.bytes_written) + int(count) >= len(z.output.buf) {
+		e := grow_buffer(&z.output.buf);
+		if e != nil {
+			return .Short_Write;
+		}
+	}
+
+	#no_bounds_check {
+		for _ in 0..<count {
+			z.output.buf[z.bytes_written] = c;
+			z.bytes_written += 1;
+		}
+	}
+
+	return .None;
+}
+
+@(optimization_mode="speed")
+repl_bytes :: proc(z: ^$C, count: u16, distance: u16) -> (err: io.Error) {
+	/*
+		TODO(Jeroen): Once we have a magic ring buffer, we can just peek/write into it
+		without having to worry about wrapping, so no need for a temp allocation to give to
+		the output stream, just give it _that_ slice.
+	*/
+
+	offset := i64(distance);
+
+	if int(z.bytes_written) + int(count) >= len(z.output.buf) {
+		e := grow_buffer(&z.output.buf);
+		if e != nil {
+			return .Short_Write;
+		}
+	}
+
+	#no_bounds_check {
+		for _ in 0..<count {
+			c := z.output.buf[z.bytes_written - offset];
+			z.output.buf[z.bytes_written] = c;
+			z.bytes_written += 1;
+		}
+	}
+
+	return .None;
+}
+
 
 allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_Table, err: Error) {
 	return new(Huffman_Table, allocator), nil;
 }
 
+@(optimization_mode="speed")
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	sizes:     [HUFFMAN_MAX_BITS+1]int;
 	next_code: [HUFFMAN_MAX_BITS]int;
@@ -194,8 +300,9 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	return nil;
 }
 
-decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
-	code := u16(compress.peek_bits_lsb(z, 16));
+@(optimization_mode="speed")
+decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+	code := u16(compress.peek_bits_lsb(z,16));
 
 	k := int(z_bit_reverse(code, 16));
 	s: u8;
@@ -224,13 +331,14 @@ decode_huffman_slowpath :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err:
 	return r, nil;
 }
 
-decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
+@(optimization_mode="speed")
+decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	if z.num_bits < 16 {
-		if z.num_bits == -100 {
+		if z.num_bits > 63 {
 			return 0, E_ZLIB.Code_Buffer_Malformed;
 		}
 		compress.refill_lsb(z);
-		if z.eof {
+		if z.num_bits > 63 {
 			return 0, E_General.Stream_Too_Short;
 		}
 	}
@@ -243,7 +351,8 @@ decode_huffman :: proc(z: ^Context, t: ^Huffman_Table) -> (r: u16, err: Error) #
 	return decode_huffman_slowpath(z, t);
 }
 
-parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
+@(optimization_mode="speed")
+parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err: Error) #no_bounds_check {
 	#no_bounds_check for {
 		value, e := decode_huffman(z, z_repeat);
 		if e != nil {
@@ -256,8 +365,8 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 			}
 		} else {
 			if value == 256 {
-      				// End of block
-      				return nil;
+					// End of block
+					return nil;
 			}
 
 			value -= 257;
@@ -281,7 +390,6 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 				return E_Deflate.Bad_Distance;
 			}
 
-			offset := i64(z.bytes_written - i64(distance));
 			/*
 				These might be sped up with a repl_byte call that copies
 				from the already written output more directly, and that
@@ -294,23 +402,17 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 					Replicate the last outputted byte, length times.
 				*/
 				if length > 0 {
-					b, e := compress.peek_back_byte(z, offset);
+					c := z.output.buf[z.bytes_written - i64(distance)];
+					e := repl_byte(z, length, c);
 					if e != .None {
 						return E_General.Output_Too_Short;
-					}
-					#no_bounds_check for _ in 0..<length {
-						write_byte(z, b);
 					}
 				}
 			} else {
 				if length > 0 {
-					#no_bounds_check for _ in 0..<length {
-						b, e := compress.peek_back_byte(z, offset);
-						if e != .None {
-							return E_General.Output_Too_Short;
-						}
-						write_byte(z, b);
-						offset += 1;
+					e := repl_bytes(z, length, distance);
+					if e != .None {
+						return E_General.Output_Too_Short;
 					}
 				}
 			}
@@ -318,22 +420,18 @@ parse_huffman_block :: proc(z: ^Context, z_repeat, z_offset: ^Huffman_Table) -> 
 	}
 }
 
-inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+@(optimization_mode="speed")
+inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
 	/*
-		ctx.input must be an io.Stream backed by an implementation that supports:
-		- read
-		- size
-
-		ctx.output must be an io.Stream backed by an implementation that supports:
-		- write
+		ctx.output must be a bytes.Buffer for now. We'll add a separate implementation that writes to a stream.
 
 		raw determines whether the ZLIB header is processed, or we're inflating a raw
 		DEFLATE stream.
 	*/
 
 	if !raw {
-		data_size := io.size(ctx.input);
-		if data_size < 6 {
+		size, size_err := compress.input_size(ctx);
+		if size < 6 || size_err != nil {
 			return E_General.Stream_Too_Short;
 		}
 
@@ -348,8 +446,6 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 		if cinfo > 7 {
 			return E_ZLIB.Unsupported_Window_Size;
 		}
-		ctx.window_size = 1 << (cinfo + 8);
-
 		flg, _ := compress.read_u8(ctx);
 
 		fcheck  := flg & 0x1f;
@@ -374,12 +470,10 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 			at the end to compare checksums.
 		*/
 
-		// Seed the Adler32 rolling checksum.
-		ctx.rolling_hash = 1;
 	}
 
- 	// Parse ZLIB stream without header.
-	err = inflate_raw(ctx);
+	// Parse ZLIB stream without header.
+	err = inflate_raw(z=ctx, expected_output_size=expected_output_size);
 	if err != nil {
 		return err;
 	}
@@ -387,20 +481,47 @@ inflate_from_stream :: proc(using ctx: ^Context, raw := false, allocator := cont
 	if !raw {
 		compress.discard_to_next_byte_lsb(ctx);
 
-		adler32 := compress.read_bits_lsb(ctx, 8) << 24 | compress.read_bits_lsb(ctx, 8) << 16 | compress.read_bits_lsb(ctx, 8) << 8 | compress.read_bits_lsb(ctx, 8);
-		if ctx.rolling_hash != u32(adler32) {
+		adler_b: [4]u8;
+		for _, i in adler_b {
+			adler_b[i], _ = compress.read_u8_prefer_code_buffer_lsb(ctx);
+		}
+		adler := transmute(u32be)adler_b;
+
+		output_hash := hash.adler32(ctx.output.buf[:]);
+
+		if output_hash != u32(adler) {
 			return E_General.Checksum_Failed;
 		}
 	}
 	return nil;
 }
 
-// @(optimization_mode="speed")
-inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> (err: Error) #no_bounds_check {
-	final := u32(0);
-	type := u32(0);
+// TODO: Check alignment of reserve/resize.
 
-	z.num_bits = 0;
+@(optimization_mode="speed")
+inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+	expected_output_size := expected_output_size;
+
+	/*
+		Always set up a minimum allocation size.
+	*/
+	expected_output_size = max(max(expected_output_size, compress.COMPRESS_OUTPUT_ALLOCATE_MIN), 512);
+
+	// fmt.printf("\nZLIB: Expected Payload Size: %v\n\n", expected_output_size);
+
+	if expected_output_size > 0 && expected_output_size <= compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
+		/*
+			Try to pre-allocate the output buffer.
+		*/
+		reserve(&z.output.buf, expected_output_size);
+		resize (&z.output.buf, expected_output_size);
+	};
+
+	if len(z.output.buf) != expected_output_size {
+		return .Resize_Failed;
+	}
+
+	z.num_bits    = 0;
 	z.code_buffer = 0;
 
 	z_repeat:      ^Huffman_Table;
@@ -423,14 +544,8 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 	defer free(z_offset);
 	defer free(codelength_ht);
 
-	if z.window_size == 0 {
-		z.window_size = DEFLATE_MAX_DISTANCE;
-	}
-
-	// Allocate rolling window buffer.
-	last_b := mem.make_dynamic_array_len_cap([dynamic]u8, z.window_size, z.window_size, allocator);
-	z.last = &last_b;
-	defer delete(last_b);
+	final := u32(0);
+	type  := u32(0);
 
 	for {
 		final = compress.read_bits_lsb(z, 1);
@@ -531,7 +646,7 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 						case 18:
 							c = u16(compress.read_bits_no_refill_lsb(z, 7) + 11);
 						case:
-					         	return E_Deflate.Huffman_Bad_Code_Lengths;
+								return E_Deflate.Huffman_Bad_Code_Lengths;
 						}
 
 						if ntot - n < u32(c) {
@@ -569,29 +684,32 @@ inflate_from_stream_raw :: proc(z: ^Context, allocator := context.allocator) -> 
 			break;
 		}
 	}
+
+	if int(z.bytes_written) != len(z.output.buf) {
+		resize(&z.output.buf, int(z.bytes_written));
+	}
+
 	return nil;
 }
 
-inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
-	ctx := Context{};
+inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
+	ctx := compress.Context_Memory_Input{};
 
-	r := bytes.Reader{};
-	bytes.reader_init(&r, input);
-	rs := bytes.reader_to_stream(&r);
-	ctx.input = rs;
+	ctx.input_data = input;
+	ctx.output = buf;
 
-	buf := buf;
-	ws := bytes.buffer_to_stream(buf);
-	ctx.output = ws;
-
-	err = inflate_from_stream(&ctx, raw);
+	err = inflate_from_context(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
 
 	return err;
 }
 
-inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false) -> (err: Error) {
-	return inflate_from_byte_array(input, buf, true);
+inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
+	ctx := compress.Context_Memory_Input{};
+
+	ctx.input_data = input;
+	ctx.output = buf;
+
+	return inflate_raw(z=&ctx, expected_output_size=expected_output_size);
 }
 
-inflate     :: proc{inflate_from_stream, inflate_from_byte_array};
-inflate_raw :: proc{inflate_from_stream_raw, inflate_from_byte_array_raw};
+inflate     :: proc{inflate_from_context, inflate_from_byte_array};

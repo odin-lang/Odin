@@ -5,6 +5,7 @@ void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 
+
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
 	case Addressing_Value:
@@ -31,8 +32,7 @@ bool is_operand_undef(Operand o) {
 void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
-	scope->first_child = nullptr;
-	scope->last_child  = nullptr;
+	scope->head_child.store(nullptr, std::memory_order_relaxed);
 	string_map_clear(&scope->elements);
 	ptr_set_clear(&scope->imported);
 }
@@ -87,8 +87,8 @@ void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
 int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *x = data[i];
 	EntityGraphNode *y = data[j];
-	isize a = x->entity->order_in_src;
-	isize b = y->entity->order_in_src;
+	u64 a = x->entity->order_in_src;
+	u64 b = y->entity->order_in_src;
 	if (x->dep_count < y->dep_count) {
 		return -1;
 	}
@@ -222,17 +222,17 @@ bool decl_info_has_init(DeclInfo *d) {
 
 
 
-Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
+Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
 
-	s->delayed_imports.allocator = heap_allocator();
-	s->delayed_directives.allocator = heap_allocator();
-
 	if (parent != nullptr && parent != builtin_pkg->scope) {
-		DLIST_APPEND(parent->first_child, parent->last_child, s);
+		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
+		if (prev_head_child) {
+			prev_head_child->next.store(s, std::memory_order_release);
+		}
 	}
 
 	if (parent != nullptr && parent->flags & ScopeFlag_ContextDefined) {
@@ -242,15 +242,14 @@ Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CA
 	return s;
 }
 
-Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
+Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	GB_ASSERT(f != nullptr);
 	GB_ASSERT(f->pkg != nullptr);
 	GB_ASSERT(f->pkg->scope != nullptr);
 
-	Scope *s = create_scope(f->pkg->scope);
+	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*f->total_file_decl_count);
+	Scope *s = create_scope(info, f->pkg->scope, init_elements_capacity);
 
-	array_reserve(&s->delayed_imports, f->imports.count);
-	array_reserve(&s->delayed_directives, f->directive_count);
 
 	s->flags |= ScopeFlag_File;
 	s->file = f;
@@ -262,12 +261,13 @@ Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
 Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 	GB_ASSERT(pkg != nullptr);
 
-	isize decl_count = 0;
-	for_array(i, pkg->files) {
-		decl_count += pkg->files[i]->decls.count;
+	isize total_pkg_decl_count = 0;
+	for_array(j, pkg->files) {
+		total_pkg_decl_count += pkg->files.data[j]->total_file_decl_count;
 	}
-	isize init_elements_capacity = 2*decl_count;
-	Scope *s = create_scope(builtin_pkg->scope, init_elements_capacity);
+
+	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
+	Scope *s = create_scope(c->info, builtin_pkg->scope, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -301,13 +301,11 @@ void destroy_scope(Scope *scope) {
 		}
 	}
 
-	for (Scope *child = scope->first_child; child != nullptr; child = child->next) {
+	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		destroy_scope(child);
 	}
 
 	string_map_destroy(&scope->elements);
-	array_free(&scope->delayed_imports);
-	array_free(&scope->delayed_directives);
 	ptr_set_destroy(&scope->imported);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
@@ -327,7 +325,7 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
 	          is_ast_type(node));
-	Scope *scope = create_scope(c->scope);
+	Scope *scope = create_scope(c->info, c->scope);
 	add_scope(c, node, scope);
 	switch (node->kind) {
 	case Ast_ProcType:
@@ -621,9 +619,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 	array_free(&vetted_entities);
 
-	for (Scope *child = scope->first_child;
-	     child != nullptr;
-	     child = child->next) {
+	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
 			// Ignore these
 		} else {
@@ -713,7 +709,7 @@ AstPackage *create_builtin_package(char const *name) {
 	pkg->name = make_string_c(name);
 	pkg->kind = Package_Normal;
 
-	pkg->scope = create_scope(nullptr);
+	pkg->scope = create_scope(nullptr, nullptr);
 	pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
 	pkg->scope->pkg = pkg;
 	return pkg;
@@ -828,10 +824,15 @@ void init_universal(void) {
 
 
 void init_checker_info(CheckerInfo *i) {
+#define TIME_SECTION(str) do { debugf("[Subsection] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	gbAllocator a = heap_allocator();
+
+	TIME_SECTION("checker info: general");
+
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
-	map_init(&i->untyped,         a);
+	map_init(&i->global_untyped, a);
 	string_map_init(&i->foreigns, a);
 	map_init(&i->gen_procs,       a);
 	map_init(&i->gen_types,       a);
@@ -840,9 +841,9 @@ void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->files,    a);
 	string_map_init(&i->packages, a);
 	array_init(&i->variable_init_order, a);
-	array_init(&i->required_foreign_imports_through_force, a);
-	array_init(&i->required_global_variables, a);
 	array_init(&i->testing_procedures, a, 0, 0);
+	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
+
 
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
@@ -850,14 +851,36 @@ void init_checker_info(CheckerInfo *i) {
 		array_init(&i->identifier_uses, a);
 	}
 
-	map_init(&i->atom_op_map, a);
 
+	TIME_SECTION("checker info: mpmc queues");
+
+	mpmc_init(&i->entity_queue, a, 1<<20);
+	mpmc_init(&i->definition_queue, a, 1<<20);
+	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
+	mpmc_init(&i->required_foreign_imports_through_force_queue, a, 1<<10);
+
+	TIME_SECTION("checker info: mutexes");
+
+	mutex_init(&i->gen_procs_mutex);
+	mutex_init(&i->gen_types_mutex);
+	mutex_init(&i->lazy_mutex);
+	mutex_init(&i->builtin_mutex);
+	mutex_init(&i->global_untyped_mutex);
+	mutex_init(&i->type_info_mutex);
+	mutex_init(&i->deps_mutex);
+	mutex_init(&i->identifier_uses_mutex);
+	mutex_init(&i->foreign_mutex);
+
+	gb_semaphore_init(&i->collect_semaphore);
+
+
+#undef TIME_SECTION
 }
 
 void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->definitions);
 	array_free(&i->entities);
-	map_destroy(&i->untyped);
+	map_destroy(&i->global_untyped);
 	string_map_destroy(&i->foreigns);
 	map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
@@ -868,13 +891,25 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->variable_init_order);
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
-	array_free(&i->required_global_variables);
 
-	map_destroy(&i->atom_op_map);
+	mpmc_destroy(&i->entity_queue);
+	mpmc_destroy(&i->definition_queue);
+	mpmc_destroy(&i->required_global_variable_queue);
+	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
+
+	mutex_destroy(&i->gen_procs_mutex);
+	mutex_destroy(&i->gen_types_mutex);
+	mutex_destroy(&i->lazy_mutex);
+	mutex_destroy(&i->builtin_mutex);
+	mutex_destroy(&i->global_untyped_mutex);
+	mutex_destroy(&i->type_info_mutex);
+	mutex_destroy(&i->deps_mutex);
+	mutex_destroy(&i->identifier_uses_mutex);
+	mutex_destroy(&i->foreign_mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
-	CheckerContext ctx = c->init_ctx;
+	CheckerContext ctx = {};
 	ctx.checker   = c;
 	ctx.info      = &c->info;
 	ctx.scope     = builtin_pkg->scope;
@@ -886,42 +921,68 @@ CheckerContext make_checker_context(Checker *c) {
 	ctx.poly_level = 0;
 	return ctx;
 }
-
 void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_type_path(ctx->type_path);
 	destroy_checker_poly_path(ctx->poly_path);
 }
 
-bool init_checker(Checker *c, Parser *parser) {
-	c->parser = parser;
-
-	if (global_error_collector.count > 0) {
-		return false;
+void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
+	if (file != nullptr) {
+		TokenPos zero_pos = {};
+		global_error_collector.prev = zero_pos;
+		ctx->file  = file;
+		ctx->decl  = file->pkg->decl_info;
+		ctx->scope = file->scope;
+		ctx->pkg   = file->pkg;
 	}
+}
+void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMap *untyped) {
+	if (ctx == nullptr) {
+		return;
+	}
+	destroy_checker_context(ctx);
+	auto *queue = ctx->procs_to_check_queue;
+	*ctx = make_checker_context(ctx->checker);
+	add_curr_ast_file(ctx, file);
+	ctx->procs_to_check_queue = queue;
+	ctx->untyped = untyped;
+}
+
+
+
+
+void init_checker(Checker *c) {
+#define TIME_SECTION(str) do { debugf("[Subsection] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 	gbAllocator a = heap_allocator();
 
+	TIME_SECTION("init checker info");
 	init_checker_info(&c->info);
+
 	c->info.checker = c;
 
-	array_init(&c->procs_to_check, a);
-	array_init(&c->procs_with_deferred_to_check, a);
+	TIME_SECTION("init proc queues");
+	mpmc_init(&c->procs_with_deferred_to_check, a, 1<<10);
 
-	// NOTE(bill): Is this big enough or too small?
-	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
-	isize total_token_count = c->parser->total_token_count;
-	isize arena_size = 2 * item_size * total_token_count;
+	// NOTE(bill): 1 Mi elements should be enough on average
+	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
+	gb_semaphore_init(&c->procs_to_check_semaphore);
 
-	c->init_ctx = make_checker_context(c);
-	return true;
+	mpmc_init(&c->global_untyped_queue, a, 1<<20);
+
+	c->builtin_ctx = make_checker_context(c);
+
+#undef TIME_SECTION
 }
 
 void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
-	array_free(&c->procs_to_check);
-	array_free(&c->procs_with_deferred_to_check);
+	destroy_checker_context(&c->builtin_ctx);
 
-	destroy_checker_context(&c->init_ctx);
+	mpmc_destroy(&c->procs_to_check_queue);
+	gb_semaphore_destroy(&c->procs_to_check_semaphore);
+
+	mpmc_destroy(&c->global_untyped_queue);
 }
 
 
@@ -997,16 +1058,43 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 Scope *scope_of_node(Ast *node) {
 	return node->scope;
 }
-ExprInfo *check_get_expr_info(CheckerInfo *i, Ast *expr) {
-	return map_get(&i->untyped, hash_node(expr));
-}
-void check_set_expr_info(CheckerInfo *i, Ast *expr, ExprInfo info) {
-	map_set(&i->untyped, hash_node(expr), info);
-}
-void check_remove_expr_info(CheckerInfo *i, Ast *expr) {
-	map_remove(&i->untyped, hash_node(expr));
+ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
+	if (c->untyped != nullptr) {
+		ExprInfo **found = map_get(c->untyped, hash_pointer(expr));
+		if (found) {
+			return *found;
+		}
+		return nullptr;
+	} else {
+		mutex_lock(&c->info->global_untyped_mutex);
+		defer (mutex_unlock(&c->info->global_untyped_mutex));
+		ExprInfo **found = map_get(&c->info->global_untyped, hash_pointer(expr));
+		if (found) {
+			return *found;
+		}
+		return nullptr;
+	}
 }
 
+void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+	if (c->untyped != nullptr) {
+		map_set(c->untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+	} else {
+		mutex_lock(&c->info->global_untyped_mutex);
+		map_set(&c->info->global_untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+		mutex_unlock(&c->info->global_untyped_mutex);
+	}
+}
+
+void check_remove_expr_info(CheckerContext *c, Ast *e) {
+	if (c->untyped != nullptr) {
+		map_remove(c->untyped, hash_pointer(e));
+	} else {
+		mutex_lock(&c->info->global_untyped_mutex);
+		map_remove(&c->info->global_untyped, hash_pointer(e));
+		mutex_unlock(&c->info->global_untyped_mutex);
+	}
+}
 
 
 isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
@@ -1014,6 +1102,8 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	if (type == t_llvm_bool) {
 		type = t_bool;
 	}
+
+	mutex_lock(&info->type_info_mutex);
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
@@ -1036,6 +1126,8 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		}
 	}
 
+	mutex_unlock(&info->type_info_mutex);
+
 	if (error_on_failure && entry_index < 0) {
 		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
 	}
@@ -1043,17 +1135,21 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 }
 
 
-void add_untyped(CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode, Type *type, ExactValue value) {
-	if (expression == nullptr) {
+void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+	if (expr == nullptr) {
 		return;
 	}
 	if (mode == Addressing_Invalid) {
 		return;
 	}
+
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
-	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
+	if (!is_type_untyped(type)) {
+		return;
+	}
+	check_set_expr_info(c, expr, mode, type, value);
 }
 
 void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
@@ -1101,7 +1197,7 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(entity != nullptr);
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
-	array_add(&i->definitions, entity);
+	mpmc_enqueue(&i->definition_queue, entity);
 }
 
 bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -1147,10 +1243,25 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 	return false;
 }
 
-bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
+void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope *scope) {
+	if (c->file != nullptr && (c->file->flags & AstFile_IsLazy) != 0 && scope->flags & ScopeFlag_File) {
+		AstPackage *pkg = c->file->pkg;
+		if (pkg->kind == Package_Init && e->kind == Entity_Procedure && e->token.string == "main") {
+			// Do nothing
+		} else if (e->flags & EntityFlag_Test) {
+			// Do nothing
+		} else {
+			e->flags |= EntityFlag_Lazy;
+		}
+	}
+}
+
+bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
 	if (scope == nullptr) {
 		return false;
 	}
+
+
 	if (!is_blank_ident(name)) {
 		Entity *ie = scope_insert(scope, entity);
 		if (ie != nullptr) {
@@ -1159,14 +1270,13 @@ bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *ent
 	}
 	if (identifier != nullptr) {
 		if (entity->file == nullptr) {
-			GB_ASSERT(c->curr_ctx != nullptr);
-			entity->file = c->curr_ctx->file;
+			entity->file = c->file;
 		}
-		add_entity_definition(&c->info, identifier, entity);
+		add_entity_definition(c->info, identifier, entity);
 	}
 	return true;
 }
-bool add_entity(Checker *c, Scope *scope, Ast *identifier, Entity *entity) {
+bool add_entity(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity) {
 	return add_entity_with_name(c, scope, identifier, entity, entity->token.string);
 }
 
@@ -1184,12 +1294,18 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 		identifier->Ident.entity = entity;
 
 		if (c->info->allow_identifier_uses) {
+			mutex_lock(&c->info->identifier_uses_mutex);
 			array_add(&c->info->identifier_uses, identifier);
+			mutex_unlock(&c->info->identifier_uses_mutex);
 		}
 
 		String dmsg = entity->deprecated_message;
 		if (dmsg.len > 0) {
 			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+		}
+		String wmsg = entity->warning_message;
+		if (wmsg.len > 0) {
+			warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
 		}
 	}
 	entity->flags |= EntityFlag_Used;
@@ -1201,32 +1317,104 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 }
 
 
+bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
+	if ((e->flags & EntityFlag_Lazy) == 0) {
+		return false;
+	}
+
+	if (e->flags & EntityFlag_Test) {
+		return false;
+	} else if (e->kind == Entity_Variable && e->Variable.is_export) {
+		return false;
+	} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
+		return false;
+	}
+
+	for_array(i, d->attributes) {
+		Ast *attr = d->attributes[i];
+		if (attr->kind != Ast_Attribute) continue;
+		for_array(j, attr->Attribute.elems) {
+			Ast *elem = attr->Attribute.elems[j];
+			String name = {};
+
+			switch (elem->kind) {
+			case_ast_node(i, Ident, elem);
+				name = i->token.string;
+			case_end;
+			case_ast_node(i, Implicit, elem);
+				name = i->string;
+			case_end;
+			case_ast_node(fv, FieldValue, elem);
+				if (fv->field->kind == Ast_Ident) {
+					name = fv->field->Ident.token.string;
+				}
+			case_end;
+			}
+
+			if (name.len != 0) {
+				if (name == "test") {
+					return false;
+				} else if (name == "export") {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
 void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
 	GB_ASSERT(identifier->kind == Ast_Ident);
 	GB_ASSERT(e != nullptr && d != nullptr);
 	GB_ASSERT(identifier->Ident.token.string == e->token.string);
 
+	if (!could_entity_be_lazy(e, d)) {
+		e->flags &= ~EntityFlag_Lazy;
+	}
+
 	if (e->scope != nullptr) {
 		Scope *scope = e->scope;
 
-		if (scope->flags & ScopeFlag_File) {
-			if (is_entity_kind_exported(e->kind) && is_exported) {
-				AstPackage *pkg = scope->file->pkg;
-				GB_ASSERT(pkg->scope == scope->parent);
-				GB_ASSERT(c->pkg == pkg);
-				scope = pkg->scope;
-			}
+		if (scope->flags & ScopeFlag_File && is_entity_kind_exported(e->kind) && is_exported) {
+			AstPackage *pkg = scope->file->pkg;
+			GB_ASSERT(pkg->scope == scope->parent);
+			GB_ASSERT(c->pkg == pkg);
+
+			// NOTE(bill): as multiple threads could be accessing this, it needs to be wrapped
+			// The current hash map for scopes is not thread safe
+			AstPackageExportedEntity ee = {identifier, e};
+			mpmc_enqueue(&pkg->exported_entity_queue, ee);
+
+			// mutex_lock(&c->info->scope_mutex);
+			// add_entity(c, pkg->scope, identifier, e);
+			// mutex_unlock(&c->info->scope_mutex);
+		} else {
+			add_entity(c, scope, identifier, e);
 		}
-		add_entity(c->checker, scope, identifier, e);
 	}
 
-	add_entity_definition(&c->checker->info, identifier, e);
+	CheckerInfo *info = c->info;
+	add_entity_definition(info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
 	e->decl_info = d;
 	d->entity = e;
-	array_add(&c->checker->info.entities, e);
-	e->order_in_src = c->checker->info.entities.count;
 	e->pkg = c->pkg;
+
+	isize queue_count = -1;
+	bool is_lazy = false;
+
+	is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
+	if (!is_lazy) {
+		queue_count = mpmc_enqueue(&info->entity_queue, e);
+	}
+
+	if (e->token.pos.file_id != 0) {
+		e->order_in_src = cast(u64)(e->token.pos.file_id)<<32 | u32(e->token.pos.offset);
+	} else {
+		GB_ASSERT(!is_lazy);
+		e->order_in_src = cast(u64)(1+queue_count);
+	}
 }
 
 
@@ -1237,11 +1425,15 @@ void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
 	clause->CaseClause.implicit_entity = e;
 }
 
-
-
-
-
 void add_type_info_type(CheckerContext *c, Type *t) {
+	void add_type_info_type_internal(CheckerContext *c, Type *t);
+
+	mutex_lock(&c->info->type_info_mutex);
+	add_type_info_type_internal(c, t);
+	mutex_unlock(&c->info->type_info_mutex);
+}
+
+void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -1290,12 +1482,12 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	if (t->kind == Type_Named) {
 		// NOTE(bill): Just in case
-		add_type_info_type(c, t->Named.base);
+		add_type_info_type_internal(c, t->Named.base);
 		return;
 	}
 
 	Type *bt = base_type(t);
-	add_type_info_type(c, bt);
+	add_type_info_type_internal(c, bt);
 
 	switch (bt->kind) {
 	case Type_Invalid:
@@ -1303,84 +1495,84 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	case Type_Basic:
 		switch (bt->Basic.kind) {
 		case Basic_cstring:
-			add_type_info_type(c, t_u8_ptr);
+			add_type_info_type_internal(c, t_u8_ptr);
 			break;
 		case Basic_string:
-			add_type_info_type(c, t_u8_ptr);
-			add_type_info_type(c, t_int);
+			add_type_info_type_internal(c, t_u8_ptr);
+			add_type_info_type_internal(c, t_int);
 			break;
 		case Basic_any:
-			add_type_info_type(c, t_type_info_ptr);
-			add_type_info_type(c, t_rawptr);
+			add_type_info_type_internal(c, t_type_info_ptr);
+			add_type_info_type_internal(c, t_rawptr);
 			break;
 		case Basic_typeid:
 			break;
 
 		case Basic_complex64:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f32);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f32);
 			break;
 		case Basic_complex128:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f64);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f64);
 			break;
 		case Basic_quaternion128:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f32);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f32);
 			break;
 		case Basic_quaternion256:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f64);
+			add_type_info_type_internal(c, t_type_info_float);
+			add_type_info_type_internal(c, t_f64);
 			break;
 		}
 		break;
 
 	case Type_BitSet:
-		add_type_info_type(c, bt->BitSet.elem);
-		add_type_info_type(c, bt->BitSet.underlying);
+		add_type_info_type_internal(c, bt->BitSet.elem);
+		add_type_info_type_internal(c, bt->BitSet.underlying);
 		break;
 
 	case Type_Pointer:
-		add_type_info_type(c, bt->Pointer.elem);
+		add_type_info_type_internal(c, bt->Pointer.elem);
 		break;
 
 	case Type_Array:
-		add_type_info_type(c, bt->Array.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->Array.elem));
-		add_type_info_type(c, t_int);
+		add_type_info_type_internal(c, bt->Array.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->Array.elem));
+		add_type_info_type_internal(c, t_int);
 		break;
 
 	case Type_EnumeratedArray:
-		add_type_info_type(c, bt->EnumeratedArray.index);
-		add_type_info_type(c, t_int);
-		add_type_info_type(c, bt->EnumeratedArray.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->EnumeratedArray.elem));
+		add_type_info_type_internal(c, bt->EnumeratedArray.index);
+		add_type_info_type_internal(c, t_int);
+		add_type_info_type_internal(c, bt->EnumeratedArray.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->EnumeratedArray.elem));
 		break;
 
 	case Type_DynamicArray:
-		add_type_info_type(c, bt->DynamicArray.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->DynamicArray.elem));
-		add_type_info_type(c, t_int);
-		add_type_info_type(c, t_allocator);
+		add_type_info_type_internal(c, bt->DynamicArray.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->DynamicArray.elem));
+		add_type_info_type_internal(c, t_int);
+		add_type_info_type_internal(c, t_allocator);
 		break;
 	case Type_Slice:
-		add_type_info_type(c, bt->Slice.elem);
-		add_type_info_type(c, alloc_type_pointer(bt->Slice.elem));
-		add_type_info_type(c, t_int);
+		add_type_info_type_internal(c, bt->Slice.elem);
+		add_type_info_type_internal(c, alloc_type_pointer(bt->Slice.elem));
+		add_type_info_type_internal(c, t_int);
 		break;
 
 	case Type_Enum:
-		add_type_info_type(c, bt->Enum.base_type);
+		add_type_info_type_internal(c, bt->Enum.base_type);
 		break;
 
 	case Type_Union:
 		if (union_tag_size(t) > 0) {
-			add_type_info_type(c, union_tag_type(t));
+			add_type_info_type_internal(c, union_tag_type(t));
 		} else {
-			add_type_info_type(c, t_type_info_ptr);
+			add_type_info_type_internal(c, t_type_info_ptr);
 		}
 		for_array(i, bt->Union.variants) {
-			add_type_info_type(c, bt->Union.variants[i]);
+			add_type_info_type_internal(c, bt->Union.variants[i]);
 		}
 		break;
 
@@ -1390,56 +1582,56 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
-					add_type_info_type(c, t_allocator);
+					add_type_info_type_internal(c, t_allocator);
 					/*fallthrough*/
 				case StructSoa_Slice:
 				case StructSoa_Fixed:
-					add_type_info_type(c, alloc_type_pointer(e->type));
+					add_type_info_type_internal(c, alloc_type_pointer(e->type));
 					break;
 				default:
-					add_type_info_type(c, e->type);
+					add_type_info_type_internal(c, e->type);
 					break;
 				}
 			}
 		}
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
-			add_type_info_type(c, f->type);
+			add_type_info_type_internal(c, f->type);
 		}
 		add_comparison_procedures_for_fields(c, bt);
 		break;
 
 	case Type_Map:
 		init_map_internal_types(bt);
-		add_type_info_type(c, bt->Map.key);
-		add_type_info_type(c, bt->Map.value);
-		add_type_info_type(c, bt->Map.generated_struct_type);
+		add_type_info_type_internal(c, bt->Map.key);
+		add_type_info_type_internal(c, bt->Map.value);
+		add_type_info_type_internal(c, bt->Map.generated_struct_type);
 		break;
 
 	case Type_Tuple:
 		for_array(i, bt->Tuple.variables) {
 			Entity *var = bt->Tuple.variables[i];
-			add_type_info_type(c, var->type);
+			add_type_info_type_internal(c, var->type);
 		}
 		break;
 
 	case Type_Proc:
-		add_type_info_type(c, bt->Proc.params);
-		add_type_info_type(c, bt->Proc.results);
+		add_type_info_type_internal(c, bt->Proc.params);
+		add_type_info_type_internal(c, bt->Proc.results);
 		break;
 
 	case Type_SimdVector:
-		add_type_info_type(c, bt->SimdVector.elem);
+		add_type_info_type_internal(c, bt->SimdVector.elem);
 		break;
 
 	case Type_RelativePointer:
-		add_type_info_type(c, bt->RelativePointer.pointer_type);
-		add_type_info_type(c, bt->RelativePointer.base_integer);
+		add_type_info_type_internal(c, bt->RelativePointer.pointer_type);
+		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
 		break;
 
 	case Type_RelativeSlice:
-		add_type_info_type(c, bt->RelativeSlice.slice_type);
-		add_type_info_type(c, bt->RelativeSlice.base_integer);
+		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
+		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
 		break;
 
 	default:
@@ -1448,33 +1640,33 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	}
 }
 
-void check_procedure_later(Checker *c, ProcInfo info) {
-	GB_ASSERT(info.decl != nullptr);
-	array_add(&c->procs_to_check, info);
+
+
+gb_global bool global_procedure_body_in_worker_queue = false;
+
+void check_procedure_later(CheckerContext *c, ProcInfo *info) {
+	GB_ASSERT(info != nullptr);
+	GB_ASSERT(info->decl != nullptr);
+
+	if (build_context.threaded_checker && global_procedure_body_in_worker_queue) {
+		GB_ASSERT(c->procs_to_check_queue != nullptr);
+	}
+
+	auto *queue = c->procs_to_check_queue ? c->procs_to_check_queue : &c->checker->procs_to_check_queue;
+	mpmc_enqueue(queue, info);
 }
 
-void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
-	ProcInfo info = {};
-	info.file  = file;
-	info.token = token;
-	info.decl  = decl;
-	info.type  = type;
-	info.body  = body;
-	info.tags  = tags;
+void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
+	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	info->file  = file;
+	info->token = token;
+	info->decl  = decl;
+	info->type  = type;
+	info->body  = body;
+	info->tags  = tags;
 	check_procedure_later(c, info);
 }
 
-void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
-	if (file != nullptr) {
-		TokenPos zero_pos = {};
-		global_error_collector.prev = zero_pos;
-		ctx->file  = file;
-		ctx->decl  = file->pkg->decl_info;
-		ctx->scope = file->scope;
-		ctx->pkg   = file->pkg;
-		ctx->checker->curr_ctx = ctx;
-	}
-}
 
 void add_min_dep_type_info(Checker *c, Type *t) {
 	if (t == nullptr) {
@@ -1492,7 +1684,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	isize ti_index = type_info_index(&c->info, t, false);
 	if (ti_index < 0) {
-		add_type_info_type(&c->init_ctx, t); // Missing the type information
+		add_type_info_type(&c->builtin_ctx, t); // Missing the type information
 		ti_index = type_info_index(&c->info, t, false);
 	}
 	GB_ASSERT(ti_index >= 0);
@@ -1811,13 +2003,12 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		}
 	}
 
-	for_array(i, c->info.required_foreign_imports_through_force) {
-		Entity *e = c->info.required_foreign_imports_through_force[i];
+	for (Entity *e; mpmc_dequeue(&c->info.required_foreign_imports_through_force_queue, &e); /**/) {
+		array_add(&c->info.required_foreign_imports_through_force, e);
 		add_dependency_to_set(c, e);
 	}
 
-	for_array(i, c->info.required_global_variables) {
-		Entity *e = c->info.required_global_variables[i];
+	for (Entity *e; mpmc_dequeue(&c->info.required_global_variable_queue, &e); /**/) {
 		e->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, e);
 	}
@@ -1933,7 +2124,7 @@ void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, 
 }
 
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
 	map_init(&M, allocator, info->entities.count);
@@ -2286,8 +2477,7 @@ void init_core_map_type(Checker *c) {
 	if (t_map_hash == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Map_Hash"));
 		if (e->state == EntityState_Unresolved) {
-			auto ctx = c->init_ctx;
-			check_entity_decl(&ctx, e, nullptr, nullptr);
+			check_entity_decl(&c->builtin_ctx, e, nullptr, nullptr);
 		}
 		t_map_hash = e->type;
 		GB_ASSERT(t_map_hash != nullptr);
@@ -2296,8 +2486,7 @@ void init_core_map_type(Checker *c) {
 	if (t_map_header == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Map_Header"));
 		if (e->state == EntityState_Unresolved) {
-			auto ctx = c->init_ctx;
-			check_entity_decl(&ctx, e, nullptr, nullptr);
+			check_entity_decl(&c->builtin_ctx, e, nullptr, nullptr);
 		}
 		t_map_header = e->type;
 		GB_ASSERT(t_map_header != nullptr);
@@ -2336,7 +2525,7 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		if (ev.kind == ExactValue_String) {
 			auto cc = string_to_calling_convention(ev.value_string);
 			if (cc == ProcCC_Invalid) {
-				error(elem, "Unknown procedure calling convention: '%.*s'\n", LIT(ev.value_string));
+				error(elem, "Unknown procedure calling convention: '%.*s'", LIT(ev.value_string));
 			} else {
 				c->foreign_context.default_cc = cc;
 			}
@@ -2348,7 +2537,7 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		if (ev.kind == ExactValue_String) {
 			String link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(link_prefix)) {
-				error(elem, "Invalid link prefix: '%.*s'\n", LIT(link_prefix));
+				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
 				c->foreign_context.link_prefix = link_prefix;
 			}
@@ -2508,6 +2697,20 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 				error(elem, "Deprecation message cannot be an empty string");
 			} else {
 				ac->deprecated_message = msg;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "warning") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			String msg = ev.value_string;
+			if (msg.len == 0) {
+				error(elem, "Warning message cannot be an empty string");
+			} else {
+				ac->warning_message = msg;
 			}
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
@@ -2891,7 +3094,8 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 			}
 
 			if (name == "builtin") {
-				add_entity(ctx->checker, builtin_pkg->scope, nullptr, e);
+				mutex_lock(&ctx->info->builtin_mutex);
+				add_entity(ctx, builtin_pkg->scope, nullptr, e);
 				GB_ASSERT(scope_lookup(builtin_pkg->scope, e->token.string) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
@@ -2900,6 +3104,8 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
 				attr->Attribute.elems.count -= 1;
 				k--;
+
+				mutex_unlock(&ctx->info->builtin_mutex);
 			}
 		}
 	}
@@ -2922,6 +3128,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	ast_node(vd, ValueDecl, decl);
 
 	EntityVisiblityKind entity_visibility_kind = c->foreign_context.visibility_kind;
+	bool is_test = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -2949,7 +3156,10 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				bool success = false;
 				if (value != nullptr) {
 					if (value->kind == Ast_BasicLit && value->BasicLit.token.kind == Token_String) {
-						String v = value->BasicLit.token.string;
+						String v = {};
+						if (value->tav.value.kind == ExactValue_String) {
+							v = value->tav.value.value_string;
+						}
 						if (v == "file") {
 							kind = EntityVisiblity_PrivateToFile;
 							success = true;
@@ -2974,6 +3184,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				slice_unordered_remove(elems, j);
 				j -= 1;
+			} else if (name == "test") {
+				is_test = true;
 			}
 		}
 	}
@@ -3095,6 +3307,10 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				d->proc_lit = init;
 				d->init_expr = init;
+
+				if (is_test) {
+					e->flags |= EntityFlag_Test;
+				}
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
 				e = alloc_entity_proc_group(d->scope, token, nullptr);
@@ -3109,6 +3325,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
 			}
+			add_entity_flags_from_file(c, e, c->scope);
 
 			if (vd->is_using) {
 				if (e->kind == Entity_TypeName && init->kind == Ast_EnumType) {
@@ -3164,14 +3381,23 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
+	AstFile *curr_file = nullptr;
+	if ((c->scope->flags&ScopeFlag_File) != 0) {
+		curr_file = c->scope->file;
+		GB_ASSERT(curr_file != nullptr);
+	}
+
+
 	for_array(decl_index, nodes) {
 		Ast *decl = nodes[decl_index];
 		if (!is_ast_decl(decl) && !is_ast_when_stmt(decl)) {
-			if ((c->scope->flags&ScopeFlag_File) != 0 && decl->kind == Ast_ExprStmt) {
+			if (curr_file && decl->kind == Ast_ExprStmt) {
 				Ast *expr = decl->ExprStmt.expr;
 				if (expr->kind == Ast_CallExpr && expr->CallExpr.proc->kind == Ast_BasicDirective) {
 					if (c->collect_delayed_decls) {
-						array_add(&c->scope->delayed_directives, expr);
+						if (decl->state_flags & StateFlag_BeenHandled) return;
+						decl->state_flags |= StateFlag_BeenHandled;
+						mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], expr);
 					}
 					continue;
 				}
@@ -3192,15 +3418,14 @@ void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 		case_end;
 
 		case_ast_node(id, ImportDecl, decl);
-			if ((c->scope->flags&ScopeFlag_File) == 0) {
+			if (curr_file == nullptr) {
 				error(decl, "import declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->collect_delayed_decls) {
-				array_add(&c->scope->delayed_imports, decl);
-			}
+			// Will be handled later
+			mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Import], decl);
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
@@ -3225,23 +3450,22 @@ void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 		}
 	}
 
+
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
-	if ((c->scope->flags&ScopeFlag_File) == 0 || c->collect_delayed_decls) {
-		for_array(i, nodes) {
-			Ast *node = nodes[i];
-			switch (node->kind) {
-			case_ast_node(ws, WhenStmt, node);
-				check_collect_entities_from_when_stmt(c, ws);
-			case_end;
+	if (curr_file == nullptr) {
+		for_array(decl_index, nodes) {
+			Ast *decl = nodes[decl_index];
+			if (decl->kind == Ast_WhenStmt) {
+				check_collect_entities_from_when_stmt(c, &decl->WhenStmt);
 			}
 		}
 	}
 }
 
 CheckerContext *create_checker_context(Checker *c) {
-	CheckerContext *ctx = gb_alloc_item(heap_allocator(), CheckerContext);
-	*ctx = c->init_ctx;
+	CheckerContext *ctx = gb_alloc_item(permanent_allocator(), CheckerContext);
+	*ctx = make_checker_context(c);
 	return ctx;
 }
 
@@ -3268,11 +3492,6 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 	ctx->decl = d;
 	ctx->scope = d->scope;
 
-	if (!e->pkg->used) {
-		return;
-	}
-
-
 	if (pkg->kind == Package_Init) {
 		if (e->kind != Entity_Procedure && e->token.string == "main") {
 			error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
@@ -3289,12 +3508,19 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 }
 
 void check_all_global_entities(Checker *c) {
-	Scope *prev_file = nullptr;
-
+	// NOTE(bill): This must be single threaded
+	// Don't bother trying
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
+		if (e->flags & EntityFlag_Lazy) {
+			continue;
+		}
 		DeclInfo *d = e->decl_info;
 		check_single_global_entity(c, e, d);
+		if (e->type != nullptr && is_type_typed(e->type)) {
+			(void)type_size_of(e->type);
+			(void)type_align_of(e->type);
+		}
 	}
 }
 
@@ -3307,7 +3533,7 @@ bool is_string_an_identifier(String s) {
 	while (offset < s.len) {
 		bool ok = false;
 		Rune r = -1;
-		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
+		isize size = utf8_decode(s.text+offset, s.len-offset, &r);
 		if (offset == 0) {
 			ok = rune_is_letter(r);
 		} else {
@@ -3560,11 +3786,9 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	if (id->fullpath == "builtin") {
 		scope = builtin_pkg->scope;
-		builtin_pkg->used = true;
 		force_use = true;
 	} else if (id->fullpath == "intrinsics") {
 		scope = intrinsics_pkg->scope;
-		intrinsics_pkg->used = true;
 		force_use = true;
 	} else {
 		AstPackage **found = string_map_get(pkgs, id->fullpath);
@@ -3577,7 +3801,6 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
 		} else {
 			AstPackage *pkg = *found;
-			pkg->used = true;
 			scope = pkg->scope;
 		}
 	}
@@ -3615,7 +3838,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		                                     id->fullpath, id->import_name.string,
 		                                     scope);
 
-		add_entity(ctx->checker, parent_scope, nullptr, e);
+		add_entity(ctx, parent_scope, nullptr, e);
 		if (force_use || id->is_using) {
 			add_entity_use(ctx, nullptr, e);
 		}
@@ -3642,7 +3865,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 					// file scope otherwise the error would be the wrong way around
 					redeclaration_error(name, found, e);
 				} else {
-					add_entity_with_name(ctx->checker, parent_scope, e->identifier, e, name);
+					add_entity_with_name(ctx, parent_scope, e->identifier, e, name);
 				}
 			}
 		}
@@ -3704,36 +3927,16 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
-	add_entity(ctx->checker, parent_scope, nullptr, e);
+	add_entity_flags_from_file(ctx, e, parent_scope);
+	add_entity(ctx, parent_scope, nullptr, e);
 
 
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
 	if (ac.require_declaration) {
-		array_add(&ctx->info->required_foreign_imports_through_force, e);
+		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
-}
-
-bool collect_checked_packages_from_decl_list(Checker *c, Slice<Ast *> const &decls) {
-	bool new_files = false;
-	for_array(i, decls) {
-		Ast *decl = decls[i];
-		switch (decl->kind) {
-		case_ast_node(id, ImportDecl, decl);
-			AstPackage **found = string_map_get(&c->info.packages, id->fullpath);
-			if (found == nullptr) {
-				continue;
-			}
-			AstPackage *pkg = *found;
-			if (!pkg->used) {
-				new_files = true;
-				pkg->used = true;
-			}
-		case_end;
-		}
-	}
-	return new_files;
 }
 
 // Returns true if a new package is present
@@ -3759,13 +3962,16 @@ bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
 		error(ws->cond, "Invalid body for 'when' statement");
 	} else {
 		if (ws->determined_cond) {
-			return collect_checked_packages_from_decl_list(ctx->checker, ws->body->BlockStmt.stmts);
+			check_collect_entities(ctx, ws->body->BlockStmt.stmts);
+			return true;
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
 			case Ast_BlockStmt:
-				return collect_checked_packages_from_decl_list(ctx->checker, ws->else_stmt->BlockStmt.stmts);
+				check_collect_entities(ctx, ws->else_stmt->BlockStmt.stmts);
+				return true;
 			case Ast_WhenStmt:
-				return collect_when_stmt_from_file(ctx, &ws->else_stmt->WhenStmt);
+				collect_when_stmt_from_file(ctx, &ws->else_stmt->WhenStmt);
+				return true;
 			default:
 				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 				break;
@@ -3812,71 +4018,248 @@ bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
 	return false;
 }
 
+
+bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
+	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
+
+	AstFile *curr_file = ctx->scope->file;
+	GB_ASSERT(curr_file != nullptr);
+
+	if (decl->state_flags & StateFlag_BeenHandled) {
+		return false;
+	}
+
+	switch (decl->kind) {
+	case_ast_node(vd, ValueDecl, decl);
+		check_collect_value_decl(ctx, decl);
+	case_end;
+
+	case_ast_node(id, ImportDecl, decl);
+		check_add_import_decl(ctx, decl);
+	case_end;
+
+	case_ast_node(fl, ForeignImportDecl, decl);
+		check_add_foreign_import_decl(ctx, decl);
+	case_end;
+
+	case_ast_node(fb, ForeignBlockDecl, decl);
+		check_add_foreign_block_decl(ctx, decl);
+	case_end;
+
+	case_ast_node(ws, WhenStmt, decl);
+		if (!ws->is_cond_determined) {
+			if (collect_when_stmt_from_file(ctx, ws)) {
+				return true;
+			}
+
+			CheckerContext nctx = *ctx;
+			nctx.collect_delayed_decls = true;
+
+			if (collect_file_decls_from_when_stmt(&nctx, ws)) {
+				return true;
+			}
+		} else {
+			CheckerContext nctx = *ctx;
+			nctx.collect_delayed_decls = true;
+
+			if (collect_file_decls_from_when_stmt(&nctx, ws)) {
+				return true;
+			}
+		}
+	case_end;
+
+	case_ast_node(es, ExprStmt, decl);
+		GB_ASSERT(ctx->collect_delayed_decls);
+		decl->state_flags |= StateFlag_BeenHandled;
+		if (es->expr->kind == Ast_CallExpr) {
+			ast_node(ce, CallExpr, es->expr);
+			if (ce->proc->kind == Ast_BasicDirective) {
+				mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], es->expr);
+			}
+		}
+	case_end;
+	}
+
+	return false;
+}
+
 bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
 
-	if (collect_checked_packages_from_decl_list(ctx->checker, decls)) {
-		return true;
-	}
-
 	for_array(i, decls) {
-		Ast *decl = decls[i];
-		switch (decl->kind) {
-		case_ast_node(vd, ValueDecl, decl);
-			check_collect_value_decl(ctx, decl);
-		case_end;
-
-		case_ast_node(id, ImportDecl, decl);
-			check_add_import_decl(ctx, decl);
-		case_end;
-
-		case_ast_node(fl, ForeignImportDecl, decl);
-			check_add_foreign_import_decl(ctx, decl);
-		case_end;
-
-		case_ast_node(fb, ForeignBlockDecl, decl);
-			check_add_foreign_block_decl(ctx, decl);
-		case_end;
-
-		case_ast_node(ws, WhenStmt, decl);
-			if (!ws->is_cond_determined) {
-				if (collect_when_stmt_from_file(ctx, ws)) {
-					return true;
-				}
-
-				CheckerContext nctx = *ctx;
-				nctx.collect_delayed_decls = true;
-
-				if (collect_file_decls_from_when_stmt(&nctx, ws)) {
-					return true;
-				}
-			} else {
-				CheckerContext nctx = *ctx;
-				nctx.collect_delayed_decls = true;
-
-				if (collect_file_decls_from_when_stmt(&nctx, ws)) {
-					return true;
-				}
-			}
-		case_end;
-
-		case_ast_node(es, ExprStmt, decl);
-			if (es->expr->kind == Ast_CallExpr) {
-				ast_node(ce, CallExpr, es->expr);
-				if (ce->proc->kind == Ast_BasicDirective) {
-					if (ctx->collect_delayed_decls) {
-						array_add(&ctx->scope->delayed_directives, es->expr);
-					}
-				}
-			}
-		case_end;
+		if (collect_file_decl(ctx, decls[i])) {
+			return true;
 		}
 	}
 
 	return false;
 }
 
+GB_COMPARE_PROC(sort_file_by_name) {
+	AstFile const *x = *cast(AstFile const **)a;
+	AstFile const *y = *cast(AstFile const **)b;
+	String x_name = filename_from_path(x->fullpath);
+	String y_name = filename_from_path(y->fullpath);
+	return string_compare(x_name, y_name);
+}
+
+void check_create_file_scopes(Checker *c) {
+	for_array(i, c->parser->packages) {
+		AstPackage *pkg = c->parser->packages[i];
+		isize total_pkg_decl_count = 0;
+
+		gb_sort_array(pkg->files.data, pkg->files.count, sort_file_by_name);
+
+		for_array(j, pkg->files) {
+			AstFile *f = pkg->files[j];
+			string_map_set(&c->info.files, f->fullpath, f);
+
+			create_scope_from_file(nullptr, f);
+			total_pkg_decl_count += f->total_file_decl_count;
+		}
+
+		mpmc_init(&pkg->exported_entity_queue, heap_allocator(), total_pkg_decl_count);
+	}
+}
+
+struct ThreadProcCheckerSection {
+	Checker *checker;
+	isize offset;
+	isize count;
+};
+
+
+void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	if (!build_context.threaded_checker) {
+		worker_count = 0;
+	}
+
+	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
+
+	if (worker_count == 0) {
+		ThreadProcCheckerSection section_all = {};
+		section_all.checker = c;
+		section_all.offset = 0;
+		section_all.count = total_count;
+		gbThread dummy_main_thread = {};
+		dummy_main_thread.user_data = &section_all;
+		proc(&dummy_main_thread);
+		return;
+	}
+
+	isize file_load_count = (total_count+thread_count-1)/thread_count;
+	isize remaining_count = total_count;
+
+	ThreadProcCheckerSection *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcCheckerSection, thread_count);
+	for (isize i = 0; i < thread_count; i++) {
+		ThreadProcCheckerSection *data = thread_data + i;
+		data->checker = c;
+		data->offset = total_count-remaining_count;
+		data->count = file_load_count;
+		remaining_count -= file_load_count;
+	}
+	GB_ASSERT(remaining_count <= 0);
+
+	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_init(threads+i);
+	}
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_start(threads+i, proc, thread_data+i);
+	}
+	gbThread dummy_main_thread = {};
+	dummy_main_thread.user_data = thread_data+worker_count;
+	proc(&dummy_main_thread);
+
+	gb_semaphore_wait(&c->info.collect_semaphore);
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_destroy(threads+i);
+	}
+}
+
+
+GB_THREAD_PROC(thread_proc_collect_entities) {
+	auto *data = cast(ThreadProcCheckerSection *)thread->user_data;
+	Checker *c = data->checker;
+	CheckerContext collect_entity_ctx = make_checker_context(c);
+	defer (destroy_checker_context(&collect_entity_ctx));
+
+	CheckerContext *ctx = &collect_entity_ctx;
+
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+
+	isize offset = data->offset;
+	isize file_end = gb_min(offset+data->count, c->info.files.entries.count);
+
+	for (isize i = offset; i < file_end; i++) {
+		AstFile *f = c->info.files.entries[i].value;
+		reset_checker_context(ctx, f, &untyped);
+
+		check_collect_entities(ctx, f->decls);
+		GB_ASSERT(ctx->collect_delayed_decls == false);
+
+		add_untyped_expressions(&c->info, ctx->untyped);
+	}
+
+	map_destroy(&untyped);
+
+	gb_semaphore_release(&c->info.collect_semaphore);
+	return 0;
+}
+
+
+void check_collect_entities_all(Checker *c) {
+	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
+}
+
+void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
+	if (pkg->files.count != 0) {
+		AstPackageExportedEntity item = {};
+		while (mpmc_dequeue(&pkg->exported_entity_queue, &item)) {
+			AstFile *f = item.entity->file;
+			if (ctx->file != f) {
+				reset_checker_context(ctx, f, untyped);
+			}
+			add_entity(ctx, pkg->scope, item.identifier, item.entity);
+			add_untyped_expressions(ctx->info, untyped);
+		}
+	}
+}
+
+GB_THREAD_PROC(thread_proc_check_export_entities) {
+	auto data = cast(ThreadProcCheckerSection *)thread->user_data;
+	Checker *c = data->checker;
+
+	CheckerContext ctx = make_checker_context(c);
+	defer (destroy_checker_context(&ctx));
+
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+
+	isize end = gb_min(data->offset + data->count, c->info.packages.entries.count);
+	for (isize i = data->offset; i < end; i++) {
+		AstPackage *pkg = c->info.packages.entries[i].value;
+		check_export_entities_in_pkg(&ctx, pkg, &untyped);
+	}
+
+	map_destroy(&untyped);
+
+	gb_semaphore_release(&c->info.collect_semaphore);
+	return 0;
+}
+
+void check_export_entities(Checker *c) {
+	check_with_workers(c, thread_proc_check_export_entities, c->info.packages.entries.count);
+}
+
 void check_import_entities(Checker *c) {
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
 	defer ({
 		for_array(i, dep_graph) {
@@ -3885,6 +4268,8 @@ void check_import_entities(Checker *c) {
 		array_free(&dep_graph);
 	});
 
+
+	TIME_SECTION("check_import_entities - sort packages");
 	// NOTE(bill): Priority queue
 	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
 
@@ -3909,20 +4294,7 @@ void check_import_entities(Checker *c) {
 			auto path = find_import_path(c, pkg, pkg, &visited);
 			defer (array_free(&path));
 
-			// TODO(bill): This needs better TokenPos finding
-			auto const fn = [](ImportPathItem item) -> String {
-				return item.pkg->name;
-			};
-
-		#if 1
-			if (path.count == 1) {
-				// TODO(bill): Should this be allowed or disabled?
-			#if 0
-				ImportPathItem item = path[0];
-				String filename = fn(item);
-				error(item.decl, "Self importation of '%.*s'", LIT(filename));
-			#endif
-			} else if (path.count > 0) {
+			if (path.count > 1) {
 				ImportPathItem item = path[path.count-1];
 				String pkg_name = item.pkg->name;
 				error(item.decl, "Cyclic importation of '%.*s'", LIT(pkg_name));
@@ -3933,7 +4305,6 @@ void check_import_entities(Checker *c) {
 				}
 				error(item.decl, "'%.*s'", LIT(pkg_name));
 			}
-		#endif
 		}
 
 		for_array(i, n->pred.entries) {
@@ -3952,68 +4323,46 @@ void check_import_entities(Checker *c) {
 		array_add(&package_order, n);
 	}
 
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
-		switch (pkg->kind) {
-		case Package_Init:
-		case Package_Runtime:
-			pkg->used = true;
-			break;
-		}
-	}
+	TIME_SECTION("check_import_entities - collect file decls");
+	CheckerContext ctx = make_checker_context(c);
 
-	for (isize loop_count = 0; ; loop_count++) {
-		bool new_files = false;
-		for_array(i, package_order) {
-			ImportGraphNode *node = package_order[i];
-			GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
-			AstPackage *pkg = node->scope->pkg;
-			if (!pkg->used) {
-				continue;
-			}
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
 
-			for_array(i, pkg->files) {
-				AstFile *f = pkg->files[i];
-				CheckerContext ctx = c->init_ctx;
-				add_curr_ast_file(&ctx, f);
-				new_files |= collect_checked_packages_from_decl_list(c, f->decls);
-			}
-		}
-
-		if (!new_files) {
-			break;
-		}
-	}
-
+	isize min_pkg_index = 0;
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
 		ImportGraphNode *node = package_order[pkg_index];
 		AstPackage *pkg = node->pkg;
 
-		if (!pkg->used) {
-			continue;
-		}
-
-		bool new_packages = false;
-
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 
-			CheckerContext ctx = c->init_ctx;
+			reset_checker_context(&ctx, f, &untyped);
 			ctx.collect_delayed_decls = true;
-			add_curr_ast_file(&ctx, f);
+
+			MPMCQueue<Ast *> *q = nullptr;
+
+			// Check import declarations first to simplify things
+			for (Ast *id = nullptr; mpmc_dequeue(&f->delayed_decls_queues[AstDelayQueue_Import], &id); /**/) {
+				check_add_import_decl(&ctx, id);
+			}
 
 			if (collect_file_decls(&ctx, f->decls)) {
-				new_packages = true;
+				check_export_entities_in_pkg(&ctx, pkg, &untyped);
+				pkg_index = min_pkg_index-1;
 				break;
 			}
-		}
 
-		if (new_packages) {
-			pkg_index = -1;
+			add_untyped_expressions(ctx.info, &untyped);
+		}
+		if (pkg_index < 0) {
 			continue;
 		}
+		min_pkg_index = pkg_index;
 	}
 
+	TIME_SECTION("check_import_entities - check delayed entities");
 	for_array(i, package_order) {
 		ImportGraphNode *node = package_order[i];
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
@@ -4021,26 +4370,28 @@ void check_import_entities(Checker *c) {
 
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
-			CheckerContext ctx = c->init_ctx;
-			add_curr_ast_file(&ctx, f);
+			reset_checker_context(&ctx, f, &untyped);
 
-			for_array(j, f->scope->delayed_imports) {
-				Ast *decl = f->scope->delayed_imports[j];
+			auto *q = &f->delayed_decls_queues[AstDelayQueue_Import];
+			for (Ast *decl = nullptr; mpmc_dequeue(q, &decl); /**/) {
 				check_add_import_decl(&ctx, decl);
 			}
+			add_untyped_expressions(ctx.info, &untyped);
 		}
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
-			CheckerContext ctx = c->init_ctx;
-			add_curr_ast_file(&ctx, f);
+			reset_checker_context(&ctx, f, &untyped);
 
-			for_array(j, f->scope->delayed_directives) {
-				Ast *expr = f->scope->delayed_directives[j];
+			auto *q = &f->delayed_decls_queues[AstDelayQueue_Expr];
+			for (Ast *expr = nullptr; mpmc_dequeue(q, &expr); /**/) {
 				Operand o = {};
 				check_expr(&ctx, &o, expr);
 			}
+			add_untyped_expressions(ctx.info, &untyped);
 		}
 	}
+
+#undef TIME_SECTION
 }
 
 
@@ -4133,7 +4484,7 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 
 
 void calculate_global_init_order(Checker *c) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	CheckerInfo *info = &c->info;
 
@@ -4202,7 +4553,7 @@ void calculate_global_init_order(Checker *c) {
 		for_array(i, info->variable_init_order) {
 			DeclInfo *d = info->variable_init_order[i];
 			Entity *e = d->entity;
-			gb_printf("\t'%.*s' %td\n", LIT(e->token.string), e->order_in_src);
+			gb_printf("\t'%.*s' %llu\n", LIT(e->token.string), cast(unsigned long long)e->order_in_src);
 		}
 		gb_printf("\n");
 	}
@@ -4211,37 +4562,44 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
-void check_proc_info(Checker *c, ProcInfo pi) {
-	if (pi.type == nullptr) {
+void check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, ProcBodyQueue *procs_to_check_queue) {
+	if (pi == nullptr) {
+		return;
+	}
+	if (pi->type == nullptr) {
+		return;
+	}
+	if (pi->decl->proc_checked) {
 		return;
 	}
 
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
-	add_curr_ast_file(&ctx, pi.file);
-	ctx.decl = pi.decl;
+	reset_checker_context(&ctx, pi->file, untyped);
+	ctx.decl = pi->decl;
+	ctx.procs_to_check_queue = procs_to_check_queue;
 
-	TypeProc *pt = &pi.type->Proc;
-	String name = pi.token.string;
+	TypeProc *pt = &pi->type->Proc;
+	String name = pi->token.string;
 	if (pt->is_polymorphic && !pt->is_poly_specialized) {
-		Token token = pi.token;
-		if (pi.poly_def_node != nullptr) {
-			token = ast_token(pi.poly_def_node);
+		Token token = pi->token;
+		if (pi->poly_def_node != nullptr) {
+			token = ast_token(pi->poly_def_node);
 		}
 		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
 		return;
 	}
 
 	if (pt->is_polymorphic && pt->is_poly_specialized) {
-		Entity *e = pi.decl->entity;
+		Entity *e = pi->decl->entity;
 		if ((e->flags & EntityFlag_Used) == 0) {
 			// NOTE(bill, 2019-08-31): It was never used, don't check
 			return;
 		}
 	}
 
-	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
-	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
+	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
+	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
 	if (bounds_check) {
 		ctx.state_flags |= StateFlag_bounds_check;
@@ -4250,26 +4608,30 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 		ctx.state_flags |= StateFlag_no_bounds_check;
 		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
-
-	check_proc_body(&ctx, pi.token, pi.decl, pi.type, pi.body);
-	if (pi.body != nullptr && pi.decl->entity != nullptr) {
-		pi.decl->entity->flags |= EntityFlag_ProcBodyChecked;
+	if (pi->body != nullptr && pi->decl->entity != nullptr) {
+		GB_ASSERT((pi->decl->entity->flags & EntityFlag_ProcBodyChecked) == 0);
 	}
+
+	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	if (pi->body != nullptr && pi->decl->entity != nullptr) {
+		pi->decl->entity->flags |= EntityFlag_ProcBodyChecked;
+	}
+	pi->decl->proc_checked = true;
+	add_untyped_expressions(&c->info, ctx.untyped);
 }
 
-GB_THREAD_PROC(check_proc_info_worker_proc) {
-	if (thread == nullptr) return 0;
-	auto *c = cast(Checker *)thread->user_data;
-	isize index = thread->user_index;
-	check_proc_info(c, c->procs_to_check[index]);
-	return 0;
-}
+GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
 void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Sanity checker
 	// This is a partial hack to make sure all procedure bodies have been checked
 	// even ones which should not exist, due to the multithreaded nature of the parser
 	// HACK TODO(2021-02-26, bill): Actually fix this race condition
+
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
 	for_array(i, c->info.minimum_dependency_set.entries) {
 		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
 		if (e == nullptr || e->kind != Entity_Procedure) {
@@ -4295,12 +4657,13 @@ void check_unchecked_bodies(Checker *c) {
 				continue;
 			}
 
-			check_proc_info(c, pi);
+			map_clear(&untyped);
+			check_proc_info(c, &pi, &untyped, nullptr);
 		}
 	}
 }
 
-void check_test_names(Checker *c) {
+void check_test_procedures(Checker *c) {
 	if (build_context.test_names.entries.count == 0) {
 		return;
 	}
@@ -4332,148 +4695,156 @@ void check_test_names(Checker *c) {
 
 }
 
-void check_parsed_files(Checker *c) {
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
-	TIME_SECTION("map full filepaths to scope");
-	add_type_info_type(&c->init_ctx, t_invalid);
+gb_global std::atomic<isize> total_bodies_checked;
 
-	// Map full filepaths to Scopes
-	for_array(i, c->parser->packages) {
-		AstPackage *p = c->parser->packages[i];
-		Scope *scope = create_scope_from_package(&c->init_ctx, p);
-		p->decl_info = make_decl_info(scope, c->init_ctx.decl);
-		string_map_set(&c->info.packages, p->fullpath, p);
-
-		if (scope->flags&ScopeFlag_Init) {
-			c->info.init_package = p;
-			c->info.init_scope = scope;
-		}
-		if (p->kind == Package_Runtime) {
-			GB_ASSERT(c->info.runtime_package == nullptr);
-			c->info.runtime_package = p;
+bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped) {
+	GB_ASSERT(pi->decl != nullptr);
+	if (pi->decl->parent && pi->decl->parent->entity) {
+		Entity *parent = pi->decl->parent->entity;
+		// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+		// This is prevent any possible race conditions in evaluation when multithreaded
+		// NOTE(bill): In single threaded mode, this should never happen
+		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+			mpmc_enqueue(q, pi);
+			return true;
 		}
 	}
+	if (untyped) {
+		map_clear(untyped);
+	}
+	check_proc_info(c, pi, untyped, q);
+	total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+	return false;
+}
 
-	TIME_SECTION("collect entities");
-	// Collect Entities
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
+struct ThreadProcBodyData {
+	Checker *checker;
+	ProcBodyQueue *queue;
+	u32 thread_index;
+	u32 thread_count;
+	ThreadProcBodyData *all_data;
+};
 
-		CheckerContext ctx = make_checker_context(c);
-		defer (destroy_checker_context(&ctx));
-		ctx.pkg = pkg;
-		ctx.collect_delayed_decls = false;
+GB_THREAD_PROC(thread_proc_body) {
+	ThreadProcBodyData *data = cast(ThreadProcBodyData *)thread->user_data;
+	Checker *c = data->checker;
+	GB_ASSERT(c != nullptr);
+	ThreadProcBodyData *all_data = data->all_data;
+	ProcBodyQueue *this_queue = data->queue;
 
-		for_array(j, pkg->files) {
-			AstFile *f = pkg->files[j];
-			create_scope_from_file(&ctx, f);
-			string_map_set(&c->info.files, f->fullpath, f);
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
 
-			add_curr_ast_file(&ctx, f);
-			check_collect_entities(&ctx, f->decls);
+	for (ProcInfo *pi; mpmc_dequeue(this_queue, &pi); /**/) {
+		consume_proc_info_queue(c, pi, this_queue, &untyped);
+	}
+
+	map_destroy(&untyped);
+
+	gb_semaphore_release(&c->procs_to_check_semaphore);
+
+	return 0;
+}
+
+void check_procedure_bodies(Checker *c) {
+	GB_ASSERT(c != nullptr);
+
+	u32 thread_count = cast(u32)gb_max(build_context.thread_count, 1);
+	u32 worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	if (!build_context.threaded_checker) {
+		worker_count = 0;
+
+		auto *q = &c->procs_to_check_queue;
+		ProcInfo *pi = nullptr;
+		while (mpmc_dequeue(q, &pi)) {
+			consume_proc_info_queue(c, pi, q, nullptr);
 		}
 
-		pkg->used = true;
+		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+		return;
 	}
 
-	TIME_SECTION("import entities");
-	check_import_entities(c);
+	global_procedure_body_in_worker_queue = true;
 
-	TIME_SECTION("check all global entities");
-	check_all_global_entities(c);
+	isize original_queue_count = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
+	isize load_count = (original_queue_count+thread_count-1)/thread_count;
 
-	TIME_SECTION("init preload");
-	init_preload(c);
-
-	CheckerContext prev_context = c->init_ctx;
-	defer (c->init_ctx = prev_context);
-	c->init_ctx.decl = make_decl_info(nullptr, nullptr);
-
-	TIME_SECTION("check procedure bodies");
-	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs_to_check) {
-		ProcInfo pi = c->procs_to_check[i];
-		check_proc_info(c, pi);
+	ThreadProcBodyData *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcBodyData, thread_count);
+	for (u32 i = 0; i < thread_count; i++) {
+		ThreadProcBodyData *data = thread_data + i;
+		data->checker = c;
+		data->queue = gb_alloc_item(permanent_allocator(), ProcBodyQueue);
+		data->thread_index = i;
+		data->thread_count = thread_count;
+		data->all_data = thread_data;
+		// NOTE(bill) 2x the amount assumes on average only 1 nested procedure
+		// TODO(bill): Determine a good heuristic
+		mpmc_init(data->queue, heap_allocator(), next_pow2_isize(load_count*2));
 	}
 
-	TIME_SECTION("check scope usage");
-	for_array(i, c->info.files.entries) {
-		AstFile *f = c->info.files.entries[i].value;
-		check_scope_usage(c, f->scope);
-	}
-
-	TIME_SECTION("generate minimum dependency set");
-	generate_minimum_dependency_set(c, c->info.entry_point);
-
-	TIME_SECTION("check test names");
-	check_test_names(c);
-
-	TIME_SECTION("calculate global init order");
-	// Calculate initialization order of global variables
-	calculate_global_init_order(c);
-
-	TIME_SECTION("check bodies have all been checked");
-	check_unchecked_bodies(c);
-
-	TIME_SECTION("add untyped expression values");
-	// Add untyped expression values
-	for_array(i, c->info.untyped.entries) {
-		auto *entry = &c->info.untyped.entries[i];
-		HashKey key = entry->key;
-		Ast *expr = cast(Ast *)cast(uintptr)key.key;
-		ExprInfo *info = &entry->value;
-		if (info != nullptr && expr != nullptr) {
-			if (is_type_typed(info->type)) {
-				compiler_error("%s (type %s) is typed!", expr_to_string(expr), type_to_string(info->type));
+	// Distibute the work load into multiple queues
+	for (isize j = 0; j < load_count; j++) {
+		for (isize i = 0; i < thread_count; i++) {
+			ProcBodyQueue *queue = thread_data[i].queue;
+			ProcInfo *pi = nullptr;
+			if (!mpmc_dequeue(&c->procs_to_check_queue, &pi)) {
+				break;
 			}
-			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
+			mpmc_enqueue(queue, pi);
 		}
 	}
+	isize total_queued = 0;
+	for (isize i = 0; i < thread_count; i++) {
+		ProcBodyQueue *queue = thread_data[i].queue;
+		total_queued += queue->count.load();
+	}
+	GB_ASSERT(total_queued == original_queue_count);
 
-	// TODO(bill): Check for unused imports (and remove) or even warn/err
-	// TODO(bill): Any other checks?
 
+	gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
 
-	TIME_SECTION("add type information");
-	// Add "Basic" type information
-	for (isize i = 0; i < Basic_COUNT; i++) {
-		Type *t = &basic_types[i];
-		if (t->Basic.size > 0 &&
-		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
-			add_type_info_type(&c->init_ctx, t);
-		}
+	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_init(threads+i);
 	}
 
-	TIME_SECTION("check for type cycles and inline cycles");
-	// NOTE(bill): Check for illegal cyclic type declarations
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			// i64 size  = type_size_of(c->allocator, e->type);
-			i64 align = type_align_of(e->type);
-			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
-				add_type_info_type(&c->init_ctx, e->type);
-			}
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_start(threads+i, thread_proc_body, thread_data+i);
+	}
+	gbThread dummy_main_thread = {};
+	dummy_main_thread.user_data = thread_data+worker_count;
+	thread_proc_body(&dummy_main_thread);
 
-		} else if (e->kind == Entity_Procedure) {
-			DeclInfo *decl = e->decl_info;
-			ast_node(pl, ProcLit, decl->proc_lit);
-			if (pl->inlining == ProcInlining_inline) {
-				for_array(j, decl->deps.entries) {
-					Entity *dep = decl->deps.entries[j].ptr;
-					if (dep == e) {
-						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
-						break;
-					}
-				}
-			}
-		}
+	gb_semaphore_wait(&c->procs_to_check_semaphore);
+
+	for (isize i = 0; i < worker_count; i++) {
+		gb_thread_destroy(threads+i);
 	}
 
-	TIME_SECTION("check deferred procedures");
-	for_array(i, c->procs_with_deferred_to_check) {
-		Entity *src = c->procs_with_deferred_to_check[i];
+	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
+	GB_ASSERT(global_remaining == 0);
+
+	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
+	global_procedure_body_in_worker_queue = false;
+}
+void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
+	if (untyped == nullptr) {
+		return;
+	}
+	for_array(i, untyped->entries) {
+		Ast *expr = cast(Ast *)cast(uintptr)untyped->entries[i].key.key;
+		ExprInfo *info = untyped->entries[i].value;
+		if (expr != nullptr && info != nullptr) {
+			mpmc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});
+		}
+	}
+	map_clear(untyped);
+}
+
+void check_deferred_procedures(Checker *c) {
+	for (Entity *src = nullptr; mpmc_dequeue(&c->procs_with_deferred_to_check, &src); /**/) {
 		GB_ASSERT(src->kind == Entity_Procedure);
 
 		DeferredProcedureKind dst_kind = src->Procedure.deferred_procedure.kind;
@@ -4623,6 +4994,193 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+}
+
+void check_unique_package_names(Checker *c) {
+	StringMap<AstPackage *> pkgs = {}; // Key: package name
+	string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
+	defer (string_map_destroy(&pkgs));
+
+	for_array(i, c->info.packages.entries) {
+		AstPackage *pkg = c->info.packages.entries[i].value;
+		if (pkg->files.count == 0) {
+			continue; // Sanity check
+		}
+
+		String name = pkg->name;
+		auto key = string_hash_string(name);
+		auto *found = string_map_get(&pkgs, key);
+		if (found == nullptr) {
+			string_map_set(&pkgs, key, pkg);
+			continue;
+		}
+
+		error(pkg->files[0]->pkg_decl, "Duplicate declaration of 'package %.*s'", LIT(name));
+		error_line("\tA package name must be unique\n"
+		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
+		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
+		error((*found)->files[0]->pkg_decl, "found at previous location");
+	}
+}
+
+void check_add_entities_from_queues(Checker *c) {
+	isize cap = c->info.entities.count + c->info.entity_queue.count.load(std::memory_order_relaxed);
+	array_reserve(&c->info.entities, cap);
+	for (Entity *e; mpmc_dequeue(&c->info.entity_queue, &e); /**/) {
+		array_add(&c->info.entities, e);
+	}
+}
+
+void check_add_definitions_from_queues(Checker *c) {
+	isize cap = c->info.definitions.count + c->info.definition_queue.count.load(std::memory_order_relaxed);
+	array_reserve(&c->info.definitions, cap);
+	for (Entity *e; mpmc_dequeue(&c->info.definition_queue, &e); /**/) {
+		array_add(&c->info.definitions, e);
+	}
+}
+
+void check_merge_queues_into_arrays(Checker *c) {
+	check_add_entities_from_queues(c);
+	check_add_definitions_from_queues(c);
+}
+
+
+void check_parsed_files(Checker *c) {
+#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
+	TIME_SECTION("map full filepaths to scope");
+	add_type_info_type(&c->builtin_ctx, t_invalid);
+
+	// Map full filepaths to Scopes
+	for_array(i, c->parser->packages) {
+		AstPackage *p = c->parser->packages[i];
+		Scope *scope = create_scope_from_package(&c->builtin_ctx, p);
+		p->decl_info = make_decl_info(scope, c->builtin_ctx.decl);
+		string_map_set(&c->info.packages, p->fullpath, p);
+
+		if (scope->flags&ScopeFlag_Init) {
+			c->info.init_package = p;
+			c->info.init_scope = scope;
+		}
+		if (p->kind == Package_Runtime) {
+			GB_ASSERT(c->info.runtime_package == nullptr);
+			c->info.runtime_package = p;
+		}
+	}
+
+	TIME_SECTION("create file scopes");
+	check_create_file_scopes(c);
+
+	TIME_SECTION("collect entities");
+	check_collect_entities_all(c);
+
+	TIME_SECTION("export entities - pre");
+	check_export_entities(c);
+
+	// NOTE: Timing Section handled internally
+	check_import_entities(c);
+
+	TIME_SECTION("export entities - post");
+	check_export_entities(c);
+
+	TIME_SECTION("add entities from packages");
+	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("check all global entities");
+	check_all_global_entities(c);
+
+	TIME_SECTION("init preload");
+	init_preload(c);
+
+	TIME_SECTION("add global untyped expression to queue");
+	add_untyped_expressions(&c->info, &c->info.global_untyped);
+
+	CheckerContext prev_context = c->builtin_ctx;
+	defer (c->builtin_ctx = prev_context);
+	c->builtin_ctx.decl = make_decl_info(nullptr, nullptr);
+
+	TIME_SECTION("check procedure bodies");
+	check_procedure_bodies(c);
+
+	TIME_SECTION("add entities from procedure bodies");
+	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("check scope usage");
+	for_array(i, c->info.files.entries) {
+		AstFile *f = c->info.files.entries[i].value;
+		check_scope_usage(c, f->scope);
+	}
+
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
+
+	TIME_SECTION("add untyped expression values");
+	// Add untyped expression values
+	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
+		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
+		if (is_type_typed(u.info->type)) {
+			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
+		}
+		add_type_and_value(&c->info, u.expr, u.info->mode, u.info->type, u.info->value);
+	}
+
+
+	TIME_SECTION("add type information");
+	// Add "Basic" type information
+	for (isize i = 0; i < Basic_COUNT; i++) {
+		Type *t = &basic_types[i];
+		if (t->Basic.size > 0 &&
+		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
+			add_type_info_type(&c->builtin_ctx, t);
+		}
+	}
+	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("check for type cycles and inline cycles");
+	// NOTE(bill): Check for illegal cyclic type declarations
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			(void)type_align_of(e->type);
+		} else if (e->kind == Entity_Procedure) {
+			DeclInfo *decl = e->decl_info;
+			ast_node(pl, ProcLit, decl->proc_lit);
+			if (pl->inlining == ProcInlining_inline) {
+				for_array(j, decl->deps.entries) {
+					Entity *dep = decl->deps.entries[j].ptr;
+					if (dep == e) {
+						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	TIME_SECTION("check deferred procedures");
+	check_deferred_procedures(c);
+
+	TIME_SECTION("calculate global init order");
+	calculate_global_init_order(c);
+
+	TIME_SECTION("generate minimum dependency set");
+	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check bodies have all been checked");
+	check_unchecked_bodies(c);
+
+	TIME_SECTION("add type info for type definitions");
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			i64 align = type_align_of(e->type);
+			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
+				add_type_info_type(&c->builtin_ctx, e->type);
+			}
+		}
+	}
+
+	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {
@@ -4647,32 +5205,12 @@ void check_parsed_files(Checker *c) {
 	}
 
 	TIME_SECTION("check unique package names");
-	{
-		StringMap<AstPackage *> pkgs = {}; // Key: package name
-		string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
-		defer (string_map_destroy(&pkgs));
+	check_unique_package_names(c);
 
-		for_array(i, c->info.packages.entries) {
-			AstPackage *pkg = c->info.packages.entries[i].value;
-			if (pkg->files.count == 0) {
-				continue; // Sanity check
-			}
 
-			String name = pkg->name;
-			auto key = string_hash_string(name);
-			auto *found = string_map_get(&pkgs, key);
-			if (found == nullptr) {
-				string_map_set(&pkgs, key, pkg);
-				continue;
-			}
-
-			error(pkg->files[0]->pkg_decl, "Duplicate declaration of 'package %.*s'", LIT(name));
-			error_line("\tA package name must be unique\n"
-			           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
-			           "\tA package name is required for link name prefixing to have a consistent ABI\n");
-			error((*found)->files[0]->pkg_decl, "found at previous location");
-		}
-	}
+	TIME_SECTION("sanity checks");
+	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
+	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
 
 	TIME_SECTION("type check finish");
 

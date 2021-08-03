@@ -15,6 +15,8 @@ Writer :: struct {
 
 	err: io.Error,
 
+	max_consecutive_empty_writes: int,
+
 }
 
 writer_init :: proc(b: ^Writer, wr: io.Writer, size: int = DEFAULT_BUF_SIZE, allocator := context.allocator) {
@@ -185,16 +187,20 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 				return n, ferr;
 			}
 		}
+		if b.max_consecutive_empty_writes <= 0 {
+			b.max_consecutive_empty_writes = DEFAULT_MAX_CONSECUTIVE_EMPTY_READS;
+		}
+
 		m: int;
 		nr := 0;
-		for nr < MAX_CONSECUTIVE_EMPTY_READS {
+		for nr < b.max_consecutive_empty_writes {
 			m, err = io.read(r, b.buf[b.n:]);
 			if m != 0 || err != nil {
 				break;
 			}
 			nr += 1;
 		}
-		if nr == MAX_CONSECUTIVE_EMPTY_READS {
+		if nr == b.max_consecutive_empty_writes {
 			return n, .No_Progress;
 		}
 		b.n += m;

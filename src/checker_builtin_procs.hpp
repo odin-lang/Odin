@@ -33,6 +33,8 @@ enum BuiltinProcId {
 	BuiltinProc_soa_zip,
 	BuiltinProc_soa_unzip,
 
+	BuiltinProc_or_else,
+
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
@@ -238,7 +240,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("align_of"),         1, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("offset_of"),        2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("offset_of"),        1, true, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("type_of"),          1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("type_info_of"),     1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("typeid_of"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
@@ -262,6 +264,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("soa_zip"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("soa_unzip"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
+
+	{STR_LIT("or_else"),          2, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 

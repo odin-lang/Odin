@@ -66,6 +66,8 @@ enum EntityFlag : u64 {
 	EntityFlag_Disabled      = 1ull<<24,
 	EntityFlag_Cold          = 1ull<<25, // procedure is rarely called
 
+	EntityFlag_Lazy          = 1ull<<26, // Lazily type checked
+
 	EntityFlag_Test          = 1ull<<30,
 
 	EntityFlag_Overridden    = 1ull<<63,
@@ -132,8 +134,9 @@ struct Entity {
 	lbModule *   code_gen_module;
 	lbProcedure *code_gen_procedure;
 
-	isize       order_in_src;
+	u64         order_in_src;
 	String      deprecated_message;
+	String      warning_message;
 
 	// IMPORTANT NOTE(bill): This must be a discriminated union because of patching
 	// later entity kinds
@@ -225,7 +228,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
-	if (e->file != nullptr && e->file->is_private) {
+	if (e->file != nullptr && (e->file->flags & AstFile_IsPrivate) != 0) {
 		return false;
 	}
 

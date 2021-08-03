@@ -1,9 +1,20 @@
 //+ignore
 package png
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Ginger Bill:     Cosmetic changes.
+
+	An example of how to use `load`.
+*/
+
 import "core:compress"
 import "core:image"
-import "core:image/png"
+// import "core:image/png"
 import "core:bytes"
 import "core:fmt"
 
@@ -12,41 +23,57 @@ import "core:mem"
 import "core:os"
 
 main :: proc() {
+	track := mem.Tracking_Allocator{};
+	mem.tracking_allocator_init(&track, context.allocator);
+
+	context.allocator = mem.tracking_allocator(&track);
+
+	demo();
+
+	if len(track.allocation_map) > 0 {
+		fmt.println("Leaks:");
+		for _, v in track.allocation_map {
+			fmt.printf("\t%v\n\n", v);
+		}
+	}
+}
+
+demo :: proc() {
 	file: string;
 
-	options := image.Options{};
+	options := image.Options{}; // {.return_metadata};
 	err:       compress.Error;
 	img:      ^image.Image;
 
 	file = "../../../misc/logo-slim.png";
 
-	img, err = png.load(file, options);
-	defer png.destroy(img);
+	img, err = load(file, options);
+	defer destroy(img);
 
 	if err != nil {
 		fmt.printf("Trying to read PNG file %v returned %v\n", file, err);
 	} else {
-		v:  png.Info;
-		ok: bool;
+		v: ^Info;
 
 		fmt.printf("Image: %vx%vx%v, %v-bit.\n", img.width, img.height, img.channels, img.depth);
+		if img.metadata_ptr != nil && img.metadata_type == Info {
+			v = (^Info)(img.metadata_ptr);
 
-		if v, ok = img.sidecar.(png.Info); ok {
 			// Handle ancillary chunks as you wish.
 			// We provide helper functions for a few types.
 			for c in v.chunks {
 				#partial switch c.header.type {
 				case .tIME:
-					t, _ := png.core_time(c);
+					t, _ := core_time(c);
 					fmt.printf("[tIME]: %v\n", t);
 				case .gAMA:
-					fmt.printf("[gAMA]: %v\n", png.gamma(c));
+					fmt.printf("[gAMA]: %v\n", gamma(c));
 				case .pHYs:
-					phys := png.phys(c);
+					phys := phys(c);
 					if phys.unit == .Meter {
 						xm    := f32(img.width)  / f32(phys.ppu_x);
 						ym    := f32(img.height) / f32(phys.ppu_y);
-						dpi_x, dpi_y := png.phys_to_dpi(phys);
+						dpi_x, dpi_y := phys_to_dpi(phys);
 						fmt.printf("[pHYs] Image resolution is %v x %v pixels per meter.\n", phys.ppu_x, phys.ppu_y);
 						fmt.printf("[pHYs] Image resolution is %v x %v DPI.\n", dpi_x, dpi_y);
 						fmt.printf("[pHYs] Image dimensions are %v x %v meters.\n", xm, ym);
@@ -54,7 +81,7 @@ main :: proc() {
 						fmt.printf("[pHYs] x: %v, y: %v pixels per unknown unit.\n", phys.ppu_x, phys.ppu_y);
 					}
 				case .iTXt, .zTXt, .tEXt:
-					res, ok_text := png.text(c);
+					res, ok_text := text(c);
 					if ok_text {
 						if c.header.type == .iTXt {
 							fmt.printf("[iTXt] %v (%v:%v): %v\n", res.keyword, res.language, res.keyword_localized, res.text);
@@ -62,11 +89,11 @@ main :: proc() {
 							fmt.printf("[tEXt/zTXt] %v: %v\n", res.keyword, res.text);
 						}
 					}
-					defer png.text_destroy(res);
+					defer text_destroy(res);
 				case .bKGD:
 					fmt.printf("[bKGD] %v\n", img.background);
 				case .eXIf:
-					res, ok_exif := png.exif(c);
+					res, ok_exif := exif(c);
 					if ok_exif {
 						/*
 							Other than checking the signature and byte order, we don't handle Exif data.
@@ -75,45 +102,45 @@ main :: proc() {
 						fmt.printf("[eXIf] %v\n", res);
 					}
 				case .PLTE:
-					plte, plte_ok := png.plte(c);
+					plte, plte_ok := plte(c);
 					if plte_ok {
 						fmt.printf("[PLTE] %v\n", plte);
 					} else {
 						fmt.printf("[PLTE] Error\n");
 					}
 				case .hIST:
-					res, ok_hist := png.hist(c);
+					res, ok_hist := hist(c);
 					if ok_hist {
 						fmt.printf("[hIST] %v\n", res);
 					}
 				case .cHRM:
-					res, ok_chrm := png.chrm(c);
+					res, ok_chrm := chrm(c);
 					if ok_chrm {
 						fmt.printf("[cHRM] %v\n", res);
 					}
 				case .sPLT:
-					res, ok_splt := png.splt(c);
+					res, ok_splt := splt(c);
 					if ok_splt {
 						fmt.printf("[sPLT] %v\n", res);
 					}
-					png.splt_destroy(res);
+					splt_destroy(res);
 				case .sBIT:
-					if res, ok_sbit := png.sbit(c); ok_sbit {
+					if res, ok_sbit := sbit(c); ok_sbit {
 						fmt.printf("[sBIT] %v\n", res);
 					}
 				case .iCCP:
-					res, ok_iccp := png.iccp(c);
+					res, ok_iccp := iccp(c);
 					if ok_iccp {
 						fmt.printf("[iCCP] %v\n", res);
 					}
-					png.iccp_destroy(res);
+					iccp_destroy(res);
 				case .sRGB:
-					if res, ok_srgb := png.srgb(c); ok_srgb {
+					if res, ok_srgb := srgb(c); ok_srgb {
 						fmt.printf("[sRGB] Rendering intent: %v\n", res);
 					}
 				case:
 					type := c.header.type;
-					name := png.chunk_type_to_name(&type);
+					name := chunk_type_to_name(&type);
 					fmt.printf("[%v]: %v\n", name, c.data);
 				}
 			}
@@ -195,7 +222,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	defer close(fd);
 
 	write_string(fd,
-		fmt.tprintf("P6\n%v %v\n%v\n", width, height, (1 << depth -1)),
+		fmt.tprintf("P6\n%v %v\n%v\n", width, height, (1 << uint(depth) - 1)),
 	);
 
 	if channels == 3 {

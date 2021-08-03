@@ -152,7 +152,6 @@ gb_global bool keyword_indices[16] = {};
 
 gb_inline u32 keyword_hash(u8 const *text, isize len) {
 	return fnv32a(text, len);
-	// return murmur3_32(text, len, 0x6f64696e);
 }
 void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	max_keyword_size = gb_max(max_keyword_size, s.len);
@@ -164,7 +163,7 @@ void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	// NOTE(bill): This is a bit of an empirical hack in order to speed things up
 	u32 index = hash & KEYWORD_HASH_TABLE_MASK;
 	KeywordHashEntry *entry = &keyword_hash_table[index];
-	GB_ASSERT_MSG(entry->kind == Token_Invalid, "Keyword hash table initialtion collision: %.*s %.*s %08x %08x", LIT(s), LIT(token_strings[entry->kind]), hash, entry->hash);
+	GB_ASSERT_MSG(entry->kind == Token_Invalid, "Keyword hash table initialtion collision: %.*s %.*s 0x%08x 0x%08x", LIT(s), LIT(token_strings[entry->kind]), hash, entry->hash);
 	entry->hash = hash;
 	entry->kind = kind;
 	entry->text = s;
@@ -264,8 +263,10 @@ struct ErrorCollector {
 	i64     count;
 	i64     warning_count;
 	bool    in_block;
-	gbMutex mutex;
-	gbMutex string_mutex;
+	BlockingMutex mutex;
+	BlockingMutex error_out_mutex;
+	BlockingMutex string_mutex;
+	RecursiveMutex block_mutex;
 
 	Array<u8> error_buffer;
 	Array<String> errors;
@@ -281,8 +282,10 @@ bool any_errors(void) {
 }
 
 void init_global_error_collector(void) {
-	gb_mutex_init(&global_error_collector.mutex);
-	gb_mutex_init(&global_error_collector.string_mutex);
+	mutex_init(&global_error_collector.mutex);
+	mutex_init(&global_error_collector.block_mutex);
+	mutex_init(&global_error_collector.error_out_mutex);
+	mutex_init(&global_error_collector.string_mutex);
 	array_init(&global_error_collector.errors, heap_allocator());
 	array_init(&global_error_collector.error_buffer, heap_allocator());
 	array_init(&global_file_path_strings, heap_allocator(), 4096);
@@ -293,7 +296,7 @@ void init_global_error_collector(void) {
 bool set_file_path_string(i32 index, String const &path) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
-	gb_mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.string_mutex);
 
 	if (index >= global_file_path_strings.count) {
 		array_resize(&global_file_path_strings, index);
@@ -304,14 +307,14 @@ bool set_file_path_string(i32 index, String const &path) {
 		ok = true;
 	}
 
-	gb_mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.string_mutex);
 	return ok;
 }
 
 bool set_ast_file_from_id(i32 index, AstFile *file) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
-	gb_mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.string_mutex);
 
 	if (index >= global_files.count) {
 		array_resize(&global_files, index);
@@ -322,39 +325,40 @@ bool set_ast_file_from_id(i32 index, AstFile *file) {
 		ok = true;
 	}
 
-	gb_mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.string_mutex);
 	return ok;
 }
 
 String get_file_path_string(i32 index) {
 	GB_ASSERT(index >= 0);
-	gb_mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.string_mutex);
 
 	String path = {};
 	if (index < global_file_path_strings.count) {
 		path = global_file_path_strings[index];
 	}
 
-	gb_mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.string_mutex);
 	return path;
 }
 
 AstFile *get_ast_file_from_id(i32 index) {
 	GB_ASSERT(index >= 0);
-	gb_mutex_lock(&global_error_collector.string_mutex);
+	mutex_lock(&global_error_collector.string_mutex);
 
 	AstFile *file = nullptr;
 	if (index < global_files.count) {
 		file = global_files[index];
 	}
 
-	gb_mutex_unlock(&global_error_collector.string_mutex);
+	mutex_unlock(&global_error_collector.string_mutex);
 	return file;
 }
 
 
+
 void begin_error_block(void) {
-	gb_mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.block_mutex);
 	global_error_collector.in_block = true;
 }
 
@@ -367,13 +371,10 @@ void end_error_block(void) {
 		String s = {text, n};
 		array_add(&global_error_collector.errors, s);
 		global_error_collector.error_buffer.count = 0;
-
-		// gbFile *f = gb_file_get_standard(gbFileStandard_Error);
-		// gb_file_write(f, text, n);
 	}
 
 	global_error_collector.in_block = false;
-	gb_mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.block_mutex);
 }
 
 
@@ -393,14 +394,14 @@ ERROR_OUT_PROC(default_error_out_va) {
 		gb_memmove(data, buf, n);
 		global_error_collector.error_buffer.count += n;
 	} else {
-		gb_mutex_lock(&global_error_collector.mutex);
+		mutex_lock(&global_error_collector.error_out_mutex);
 		{
 			u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
 			gb_memmove(text, buf, n);
 			text[n] = 0;
 			array_add(&global_error_collector.errors, make_string(text, n));
 		}
-		gb_mutex_unlock(&global_error_collector.mutex);
+		mutex_unlock(&global_error_collector.error_out_mutex);
 
 	}
 	gb_file_write(f, buf, n);
@@ -491,7 +492,7 @@ bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 }
 
 void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
-	gb_mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
@@ -503,7 +504,7 @@ void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 		          gb_bprintf_va(fmt, va));
 		show_error_on_line(pos, end);
 	}
-	gb_mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
 		gb_exit(1);
 	}
@@ -514,7 +515,7 @@ void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) 
 		error_va(pos, end, fmt, va);
 		return;
 	}
-	gb_mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	if (!global_ignore_warnings()) {
 		// NOTE(bill): Duplicate error, skip it
@@ -528,18 +529,16 @@ void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) 
 			show_error_on_line(pos, end);
 		}
 	}
-	gb_mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.mutex);
 }
 
 
 void error_line_va(char const *fmt, va_list va) {
-	gb_mutex_lock(&global_error_collector.mutex);
 	error_out_va(fmt, va);
-	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
 void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
-	gb_mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
@@ -550,7 +549,7 @@ void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 		          token_pos_to_string(pos),
 		          gb_bprintf_va(fmt, va));
 	}
-	gb_mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
 		gb_exit(1);
 	}
@@ -558,7 +557,7 @@ void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 
 
 void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
-	gb_mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (global_error_collector.prev != pos) {
@@ -571,7 +570,7 @@ void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list
 		error_out("Syntax Error: %s\n", gb_bprintf_va(fmt, va));
 	}
 
-	gb_mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
 		gb_exit(1);
 	}
@@ -582,7 +581,7 @@ void syntax_warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_li
 		syntax_error_va(pos, end, fmt, va);
 		return;
 	}
-	gb_mutex_lock(&global_error_collector.mutex);
+	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	if (!global_ignore_warnings()) {
 		// NOTE(bill): Duplicate error, skip it
@@ -596,7 +595,7 @@ void syntax_warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_li
 			error_out("Warning: %s\n", gb_bprintf_va(fmt, va));
 		}
 	}
-	gb_mutex_unlock(&global_error_collector.mutex);
+	mutex_unlock(&global_error_collector.mutex);
 }
 
 
@@ -700,15 +699,6 @@ enum TokenizerInitError {
 };
 
 
-struct TokenizerState {
-	Rune  curr_rune;   // current character
-	u8 *  curr;        // character pos
-	u8 *  read_curr;   // pos from start
-	u8 *  line;        // current line pos
-	i32   line_count;
-	bool  insert_semicolon;
-};
-
 enum TokenizerFlags {
 	TokenizerFlag_None = 0,
 	TokenizerFlag_InsertSemicolon = 1<<0,
@@ -723,41 +713,19 @@ struct Tokenizer {
 	Rune  curr_rune;   // current character
 	u8 *  curr;        // character pos
 	u8 *  read_curr;   // pos from start
-	u8 *  line;        // current line pos
+	i32   column_minus_one;
 	i32   line_count;
 
 	i32 error_count;
-	Array<String> allocated_strings;
 
 	TokenizerFlags flags;
 	bool insert_semicolon;
 };
 
 
-TokenizerState save_tokenizer_state(Tokenizer *t) {
-	TokenizerState state = {};
-	state.curr_rune  = t->curr_rune;
-	state.curr       = t->curr;
-	state.read_curr  = t->read_curr;
-	state.line       = t->line;
-	state.line_count = t->line_count;
-	state.insert_semicolon = t->insert_semicolon;
-	return state;
-}
-
-void restore_tokenizer_state(Tokenizer *t, TokenizerState *state) {
-	t->curr_rune  = state->curr_rune;
-	t->curr       = state->curr;
-	t->read_curr  = state->read_curr;
-	t->line       = state->line;
-	t->line_count = state->line_count;
-	t->insert_semicolon = state->insert_semicolon;
-}
-
-
 void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	va_list va;
-	isize column = t->read_curr - t->line+1;
+	i32 column = t->column_minus_one+1;
 	if (column < 1) {
 		column = 1;
 	}
@@ -776,7 +744,7 @@ void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 
 void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 	va_list va;
-	isize column = t->read_curr - t->line+1;
+	i32 column = t->column_minus_one+1;
 	if (column < 1) {
 		column = 1;
 	}
@@ -789,39 +757,50 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 }
 
 void advance_to_next_rune(Tokenizer *t) {
+	if (t->curr_rune == '\n') {
+		t->column_minus_one = 0;
+		t->line_count++;
+	}
 	if (t->read_curr < t->end) {
-		Rune rune;
-		isize width = 1;
-
 		t->curr = t->read_curr;
-		if (t->curr_rune == '\n') {
-			t->line = t->curr;
-			t->line_count++;
-		}
-		rune = *t->read_curr;
+		Rune rune = *t->read_curr;
 		if (rune == 0) {
 			tokenizer_err(t, "Illegal character NUL");
-		} else if (rune >= 0x80) { // not ASCII
-			width = gb_utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
+			t->read_curr++;
+		} else if (rune & 0x80) { // not ASCII
+			isize width = utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
+			t->read_curr += width;
 			if (rune == GB_RUNE_INVALID && width == 1) {
 				tokenizer_err(t, "Illegal UTF-8 encoding");
 			} else if (rune == GB_RUNE_BOM && t->curr-t->start > 0){
 				tokenizer_err(t, "Illegal byte order mark");
 			}
+		} else {
+			t->read_curr++;
 		}
-		t->read_curr += width;
 		t->curr_rune = rune;
 	} else {
 		t->curr = t->end;
-		if (t->curr_rune == '\n') {
-			t->line = t->curr;
-			t->line_count++;
-		}
 		t->curr_rune = GB_RUNE_EOF;
 	}
 }
 
-TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath, TokenizerFlags flags = TokenizerFlag_None) {
+void init_tokenizer_with_file_contents(Tokenizer *t, String const &fullpath, gbFileContents *fc, TokenizerFlags flags) {
+	t->flags = flags;
+	t->fullpath = fullpath;
+	t->line_count = 1;
+
+	t->start = cast(u8 *)fc->data;
+	t->read_curr = t->curr = t->start;
+	t->end = t->start + fc->size;
+
+	advance_to_next_rune(t);
+	if (t->curr_rune == GB_RUNE_BOM) {
+		advance_to_next_rune(t); // Ignore BOM at file beginning
+	}
+}
+
+TokenizerInitError init_tokenizer(Tokenizer *t, String const &fullpath, TokenizerFlags flags = TokenizerFlag_None) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = alloc_cstring(heap_allocator(), fullpath);
@@ -830,25 +809,18 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath, TokenizerFlags 
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 
-	t->flags = flags;
-	t->fullpath = fullpath;
-	t->line_count = 1;
-
 	if (fc.size > I32_MAX) {
+		t->flags = flags;
+		t->fullpath = fullpath;
+		t->line_count = 1;
 		err = TokenizerInit_FileTooLarge;
 		gb_file_free_contents(&fc);
 	} else if (fc.data != nullptr) {
-		t->start = cast(u8 *)fc.data;
-		t->line = t->read_curr = t->curr = t->start;
-		t->end = t->start + fc.size;
-
-		advance_to_next_rune(t);
-		if (t->curr_rune == GB_RUNE_BOM) {
-			advance_to_next_rune(t); // Ignore BOM at file beginning
-		}
-
-		array_init(&t->allocated_strings, heap_allocator());
+		init_tokenizer_with_file_contents(t, fullpath, &fc, flags);
 	} else {
+		t->flags = flags;
+		t->fullpath = fullpath;
+		t->line_count = 1;
 		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
 		defer (gb_file_close(&f));
@@ -871,10 +843,6 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 	if (t->start != nullptr) {
 		gb_free(heap_allocator(), t->start);
 	}
-	for_array(i, t->allocated_strings) {
-		gb_free(heap_allocator(), t->allocated_strings[i].text);
-	}
-	array_free(&t->allocated_strings);
 }
 
 gb_inline i32 digit_value(Rune r) {
@@ -907,7 +875,7 @@ void scan_number_to_token(Tokenizer *t, Token *token, bool seen_decimal_point) {
 	token->string = {t->curr, 1};
 	token->pos.file_id = t->curr_file_id;
 	token->pos.line = t->line_count;
-	token->pos.column = cast(i32)(t->curr-t->line+1);
+	token->pos.column = t->column_minus_one+1;
 
 	if (seen_decimal_point) {
 		token->string.text -= 1;
@@ -1094,23 +1062,41 @@ bool scan_escape(Tokenizer *t) {
 }
 
 
-void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
-	// Skip whitespace
-	for (;;) {
-		switch (t->curr_rune) {
-		case '\n':
-			if (t->insert_semicolon) {
-				break;
-			}
-			/*fallthrough*/
-		case ' ':
-		case '\t':
-		case '\r':
-			advance_to_next_rune(t);
-			continue;
-		}
-		break;
+gb_inline void tokenizer_skip_line(Tokenizer *t) {
+	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+		advance_to_next_rune(t);
 	}
+}
+
+gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
+	if (on_newline) {
+		for (;;) {
+			switch (t->curr_rune) {
+			case ' ':
+			case '\t':
+			case '\r':
+				advance_to_next_rune(t);
+				continue;
+			}
+			break;
+		}
+	} else {
+		for (;;) {
+			switch (t->curr_rune) {
+			case '\n':
+			case ' ':
+			case '\t':
+			case '\r':
+				advance_to_next_rune(t);
+				continue;
+			}
+			break;
+		}
+	}
+}
+
+void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
+	tokenizer_skip_whitespace(t, t->insert_semicolon);
 
 	token->kind = Token_Invalid;
 	token->string.text = t->curr;
@@ -1118,11 +1104,9 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	token->pos.file_id = t->curr_file_id;
 	token->pos.line = t->line_count;
 	token->pos.offset = cast(i32)(t->curr - t->start);
-	token->pos.column = cast(i32)(t->curr - t->line + 1);
+	token->pos.column = t->column_minus_one+1;
 
 	TokenPos current_pos = token->pos;
-
-	bool insert_semicolon = false;
 
 	Rune curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
@@ -1148,28 +1132,15 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			}
 		}
 
-		switch (token->kind) {
-		case Token_Ident:
-		case Token_context:
-		case Token_typeid: // Dunno?
-		case Token_break:
-		case Token_continue:
-		case Token_fallthrough:
-		case Token_return:
-			insert_semicolon = true;
-			break;
-		}
-
-
-		if (t->flags & TokenizerFlag_InsertSemicolon) {
-			t->insert_semicolon = insert_semicolon;
-		}
-		return;
-
-	} else if (gb_is_between(curr_rune, '0', '9')) {
-		insert_semicolon = true;
-		scan_number_to_token(t, token, false);
+		goto semicolon_check;
 	} else {
+		switch (curr_rune) {
+		case '0': case '1': case '2': case '3': case '4':
+		case '5': case '6': case '7': case '8': case '9':
+			scan_number_to_token(t, token, false);
+			goto semicolon_check;
+		}
+
 		advance_to_next_rune(t);
 		switch (curr_rune) {
 		case GB_RUNE_EOF:
@@ -1201,8 +1172,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 
 		case '\'': // Rune Literal
 		{
-			insert_semicolon = true;
-
 			token->kind = Token_Rune;
 			Rune quote = curr_rune;
 			bool valid = true;
@@ -1230,27 +1199,12 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				tokenizer_err(t, "Invalid rune literal");
 			}
 			token->string.len = t->curr - token->string.text;
-			success = unquote_string(heap_allocator(), &token->string, 0);
-			if (success > 0) {
-				if (success == 2) {
-					array_add(&t->allocated_strings, token->string);
-				}
-			} else {
-				tokenizer_err(t, "Invalid rune literal");
-			}
-
-			if (t->flags & TokenizerFlag_InsertSemicolon) {
-				t->insert_semicolon = insert_semicolon;
-			}
-
-			return;
+			goto semicolon_check;
 		} break;
 
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
-			insert_semicolon = true;
-
 			bool has_carriage_return = false;
 			i32 success;
 			Rune quote = curr_rune;
@@ -1287,24 +1241,13 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				}
 			}
 			token->string.len = t->curr - token->string.text;
-			success = unquote_string(heap_allocator(), &token->string, 0, has_carriage_return);
-			if (success > 0) {
-				if (success == 2) {
-					array_add(&t->allocated_strings, token->string);
-				}
-			} else {
-				tokenizer_err(t, "Invalid string literal");
-			}
-
-			if (t->flags & TokenizerFlag_InsertSemicolon) {
-				t->insert_semicolon = insert_semicolon;
-			}
-
-			return;
+			goto semicolon_check;
 		} break;
 
 		case '.':
-			if (t->curr_rune == '.') {
+			token->kind = Token_Period;
+			switch (t->curr_rune) {
+			case '.':
 				advance_to_next_rune(t);
 				token->kind = Token_Ellipsis;
 				if (t->curr_rune == '<') {
@@ -1314,54 +1257,41 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 					advance_to_next_rune(t);
 					token->kind = Token_RangeFull;
 				}
-			} else if ('0' <= t->curr_rune && t->curr_rune <= '9') {
+				break;
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
 				scan_number_to_token(t, token, true);
-			} else {
-				token->kind = Token_Period;
+				break;
 			}
 			break;
-
-		case '@':  token->kind = Token_At;           break;
-		case '$':  token->kind = Token_Dollar;       break;
-		case '?':
-			insert_semicolon = true;
-			token->kind = Token_Question;
-			break;
-		case '^':
-			insert_semicolon = true;
-			token->kind = Token_Pointer;
-			break;
-		case ';':  token->kind = Token_Semicolon;    break;
-		case ',':  token->kind = Token_Comma;        break;
-		case ':':  token->kind = Token_Colon;        break;
-		case '(':  token->kind = Token_OpenParen;    break;
-		case ')':
-			insert_semicolon = true;
-			token->kind = Token_CloseParen;
-			break;
+		case '@': token->kind = Token_At;           break;
+		case '$': token->kind = Token_Dollar;       break;
+		case '?': token->kind = Token_Question;     break;
+		case '^': token->kind = Token_Pointer;      break;
+		case ';': token->kind = Token_Semicolon;    break;
+		case ',': token->kind = Token_Comma;        break;
+		case ':': token->kind = Token_Colon;        break;
+		case '(': token->kind = Token_OpenParen;    break;
+		case ')': token->kind = Token_CloseParen;   break;
 		case '[': token->kind = Token_OpenBracket;  break;
-		case ']':
-			insert_semicolon = true;
-			token->kind = Token_CloseBracket;
-			break;
-		case '{':  token->kind = Token_OpenBrace;    break;
-		case '}':
-			insert_semicolon = true;
-			token->kind = Token_CloseBrace;
-			break;
-
+		case ']': token->kind = Token_CloseBracket; break;
+		case '{': token->kind = Token_OpenBrace;    break;
+		case '}': token->kind = Token_CloseBrace;   break;
 		case '%':
 			token->kind = Token_Mod;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_ModEq;
-			} else if (t->curr_rune == '%') {
+				break;
+			case '%':
 				token->kind = Token_ModMod;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_ModModEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
 
@@ -1395,63 +1325,56 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			break;
 		case '+':
 			token->kind = Token_Add;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_AddEq;
-			} else if (t->curr_rune == '+') {
+				break;
+			case '+':
 				advance_to_next_rune(t);
 				token->kind = Token_Increment;
-				insert_semicolon = true;
+				break;
 			}
 			break;
 		case '-':
 			token->kind = Token_Sub;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_SubEq;
-			} else if (t->curr_rune == '-' && peek_byte(t) == '-') {
-				advance_to_next_rune(t);
-				advance_to_next_rune(t);
-				token->kind = Token_Undef;
-			} else if (t->curr_rune == '-') {
+				break;
+			case '-':
 				advance_to_next_rune(t);
 				token->kind = Token_Decrement;
-				insert_semicolon = true;
-			} else if (t->curr_rune == '>') {
+				if (t->curr_rune == '-') {
+					advance_to_next_rune(t);
+					token->kind = Token_Undef;
+				}
+				break;
+			case '>':
 				advance_to_next_rune(t);
 				token->kind = Token_ArrowRight;
+				break;
 			}
 			break;
-
 		case '#':
+			token->kind = Token_Hash;
 			if (t->curr_rune == '!') {
-				insert_semicolon = t->insert_semicolon;
 				token->kind = Token_Comment;
-
-				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-					advance_to_next_rune(t);
-				}
-			} else {
-				token->kind = Token_Hash;
+				tokenizer_skip_line(t);
 			}
 			break;
-
-
-		case '/': {
+		case '/':
 			token->kind = Token_Quo;
-			if (t->curr_rune == '/') {
-				insert_semicolon = t->insert_semicolon;
+			switch (t->curr_rune) {
+			case '/':
 				token->kind = Token_Comment;
-
-				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-					advance_to_next_rune(t);
-				}
-			} else if (t->curr_rune == '*') {
+				tokenizer_skip_line(t);
+				break;
+			case '*':
 				token->kind = Token_Comment;
-
-				isize comment_scope = 1;
 				advance_to_next_rune(t);
-				while (comment_scope > 0) {
+				for (isize comment_scope = 1; comment_scope > 0; /**/) {
 					if (t->curr_rune == GB_RUNE_EOF) {
 						break;
 					} else if (t->curr_rune == '/') {
@@ -1470,97 +1393,140 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 						advance_to_next_rune(t);
 					}
 				}
-			} else if (t->curr_rune == '=') {
+				break;
+			case '=':
 				advance_to_next_rune(t);
 				token->kind = Token_QuoEq;
+				break;
 			}
-		} break;
-
+			break;
 		case '<':
 			token->kind = Token_Lt;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				token->kind = Token_LtEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '<') {
+				break;
+			case '<':
 				token->kind = Token_Shl;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_ShlEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		case '>':
 			token->kind = Token_Gt;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				token->kind = Token_GtEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '>') {
+				break;
+			case '>':
 				token->kind = Token_Shr;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_ShrEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		case '&':
 			token->kind = Token_And;
-			if (t->curr_rune == '~') {
+			switch (t->curr_rune) {
+			case '~':
 				token->kind = Token_AndNot;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_AndNotEq;
 					advance_to_next_rune(t);
 				}
-			} else if (t->curr_rune == '=') {
+				break;
+			case '=':
 				token->kind = Token_AndEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '&') {
+				break;
+			case '&':
 				token->kind = Token_CmpAnd;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_CmpAndEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		case '|':
 			token->kind = Token_Or;
-			if (t->curr_rune == '=') {
+			switch (t->curr_rune) {
+			case '=':
 				token->kind = Token_OrEq;
 				advance_to_next_rune(t);
-			} else if (t->curr_rune == '|') {
+				break;
+			case '|':
 				token->kind = Token_CmpOr;
 				advance_to_next_rune(t);
 				if (t->curr_rune == '=') {
 					token->kind = Token_CmpOrEq;
 					advance_to_next_rune(t);
 				}
+				break;
 			}
 			break;
-
 		default:
+			token->kind = Token_Invalid;
 			if (curr_rune != GB_RUNE_BOM) {
 				u8 str[4] = {};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
 			}
-			insert_semicolon = t->insert_semicolon; // Preserve insert_semicolon info
-			token->kind = Token_Invalid;
 			break;
 		}
 	}
 
-	if (t->flags & TokenizerFlag_InsertSemicolon) {
-		t->insert_semicolon = insert_semicolon;
-	}
-
 	token->string.len = t->curr - token->string.text;
 
+semicolon_check:;
+	if (t->flags & TokenizerFlag_InsertSemicolon) {
+		switch (token->kind) {
+		case Token_Invalid:
+		case Token_Comment:
+			// Preserve insert_semicolon info
+			break;
+		case Token_Ident:
+		case Token_context:
+		case Token_typeid:
+		case Token_break:
+		case Token_continue:
+		case Token_fallthrough:
+		case Token_return:
+			/*fallthrough*/
+		case Token_Integer:
+		case Token_Float:
+		case Token_Imag:
+		case Token_Rune:
+		case Token_String:
+		case Token_Undef:
+			/*fallthrough*/
+		case Token_Question:
+		case Token_Pointer:
+		case Token_CloseParen:
+		case Token_CloseBracket:
+		case Token_CloseBrace:
+			/*fallthrough*/
+		case Token_Increment:
+		case Token_Decrement:
+			/*fallthrough*/
+			t->insert_semicolon = true;
+			break;
+		default:
+			t->insert_semicolon = false;
+			break;
+		}
+	}
 
 	return;
 }

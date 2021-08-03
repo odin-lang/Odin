@@ -313,7 +313,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 					if (is_blank_ident(name)) {
 						continue;
 					}
-					add_entity(ctx->checker, parent, nullptr, f);
+					add_entity(ctx, parent, nullptr, f);
 				}
 			}
 		}
@@ -724,6 +724,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
+	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {
@@ -786,7 +787,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pl->body->kind == Ast_BlockStmt);
 		if (!pt->is_polymorphic) {
-			check_procedure_later(ctx->checker, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
+			check_procedure_later(ctx, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
 		if (e->Procedure.is_export) {
@@ -808,7 +809,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.deferred_procedure.entity != nullptr) {
 		e->Procedure.deferred_procedure = ac.deferred_procedure;
-		array_add(&ctx->checker->procs_with_deferred_to_check, e);
+		mpmc_enqueue(&ctx->checker->procs_with_deferred_to_check, e);
 	}
 
 	if (is_foreign) {
@@ -820,6 +821,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->Procedure.link_name = name;
 
 		init_entity_foreign_library(ctx, e);
+
+		mutex_lock(&ctx->info->foreign_mutex);
 
 		auto *fp = &ctx->info->foreigns;
 		StringHashKey key = string_hash_string(name);
@@ -847,12 +850,16 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		} else {
 			string_map_set(fp, key, e);
 		}
+
+		mutex_unlock(&ctx->info->foreign_mutex);
 	} else {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {
 			name = e->Procedure.link_name;
 		}
 		if (e->Procedure.link_name.len > 0 || is_export) {
+			mutex_lock(&ctx->info->foreign_mutex);
+
 			auto *fp = &ctx->info->foreigns;
 			StringHashKey key = string_hash_string(name);
 			Entity **found = string_map_get(fp, key);
@@ -869,6 +876,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			} else {
 				string_map_set(fp, key, e);
 			}
+
+			mutex_unlock(&ctx->info->foreign_mutex);
 		}
 	}
 }
@@ -893,7 +902,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 
 	if (ac.require_declaration) {
-		array_add(&ctx->info->required_global_variables, e);
+		mpmc_enqueue(&ctx->info->required_global_variable_queue, e);
 	}
 
 
@@ -1107,71 +1116,63 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
+	if (e->flags & EntityFlag_Lazy) {
+		mutex_lock(&ctx->info->lazy_mutex);
+	}
+
 	String name = e->token.string;
 
 	if (e->type != nullptr || e->state != EntityState_Unresolved) {
 		error(e->token, "Illegal declaration cycle of `%.*s`", LIT(name));
-		return;
-	}
-
-	GB_ASSERT(e->state == EntityState_Unresolved);
-
-#if 0
-	char buf[256] = {};
-	isize n = gb_snprintf(buf, 256, "%.*s %d", LIT(name), e->kind);
-	Timings timings = {};
-	timings_init(&timings, make_string(cast(u8 *)buf, n-1), 16);
-	defer ({
-		timings_print_all(&timings);
-		timings_destroy(&timings);
-	});
-#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
-#else
-#define TIME_SECTION(str)
-#endif
-
-	if (d == nullptr) {
-		d = decl_info_of_entity(e);
+	} else {
+		GB_ASSERT(e->state == EntityState_Unresolved);
 		if (d == nullptr) {
-			// TODO(bill): Err here?
-			e->type = t_invalid;
-			e->state = EntityState_Resolved;
-			set_base_type(named_type, t_invalid);
-			return;
-			// GB_PANIC("'%.*s' should been declared!", LIT(name));
+			d = decl_info_of_entity(e);
+			if (d == nullptr) {
+				// TODO(bill): Err here?
+				e->type = t_invalid;
+				e->state = EntityState_Resolved;
+				set_base_type(named_type, t_invalid);
+				goto end;
+			}
 		}
+
+		CheckerContext c = *ctx;
+		c.scope = d->scope;
+		c.decl  = d;
+		c.type_level = 0;
+
+		e->parent_proc_decl = c.curr_proc_decl;
+		e->state = EntityState_InProgress;
+
+		switch (e->kind) {
+		case Entity_Variable:
+			check_global_variable_decl(&c, e, d->type_expr, d->init_expr);
+			break;
+		case Entity_Constant:
+			check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
+			break;
+		case Entity_TypeName: {
+			check_type_decl(&c, e, d->init_expr, named_type);
+			break;
+		}
+		case Entity_Procedure:
+			check_proc_decl(&c, e, d);
+			break;
+		case Entity_ProcGroup:
+			check_proc_group_decl(&c, e, d);
+			break;
+		}
+
+		e->state = EntityState_Resolved;
+
 	}
-
-	CheckerContext c = *ctx;
-	c.scope = d->scope;
-	c.decl  = d;
-	c.type_level = 0;
-
-	e->parent_proc_decl = c.curr_proc_decl;
-	e->state = EntityState_InProgress;
-
-	switch (e->kind) {
-	case Entity_Variable:
-		check_global_variable_decl(&c, e, d->type_expr, d->init_expr);
-		break;
-	case Entity_Constant:
-		check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
-		break;
-	case Entity_TypeName: {
-		check_type_decl(&c, e, d->init_expr, named_type);
-		break;
+end:;
+	// NOTE(bill): Add it to the list of checked entities
+	if (e->flags & EntityFlag_Lazy) {
+		array_add(&ctx->info->entities, e);
+		mutex_unlock(&ctx->info->lazy_mutex);
 	}
-	case Entity_Procedure:
-		check_proc_decl(&c, e, d);
-		break;
-	case Entity_ProcGroup:
-		check_proc_group_decl(&c, e, d);
-		break;
-	}
-
-	e->state = EntityState_Resolved;
-
-#undef TIME_SECTION
 }
 
 
@@ -1265,7 +1266,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		Entity *uvar = using_entities[i].uvar;
 		Entity *prev = scope_insert(ctx->scope, uvar);
 		if (prev != nullptr) {
-			error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
+			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
+			error_line("%.*s != %.*s\n", LIT(uvar->token.string), LIT(prev->token.string));
 			break;
 		}
 	}
@@ -1317,6 +1319,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
 			return;
 		} else {
+			mutex_lock(&ctx->info->deps_mutex);
+
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
 			for_array(i, decl->deps.entries) {
@@ -1327,10 +1331,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				Type *t = decl->type_info_deps.entries[i].ptr;
 				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
+
+			mutex_unlock(&ctx->info->deps_mutex);
 		}
 	}
 }
-
-
-
-

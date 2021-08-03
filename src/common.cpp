@@ -27,6 +27,65 @@
 
 #include <math.h>
 #include <string.h>
+#include <atomic> // Because I wanted the C++11 memory order semantics, of which gb.h does not offer (because it was a C89 library)
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+	struct BlockingMutex {
+		SRWLOCK srwlock;
+	};
+	void mutex_init(BlockingMutex *m) {
+	}
+	void mutex_destroy(BlockingMutex *m) {
+	}
+	void mutex_lock(BlockingMutex *m) {
+		AcquireSRWLockExclusive(&m->srwlock);
+	}
+	bool mutex_try_lock(BlockingMutex *m) {
+		return !!TryAcquireSRWLockExclusive(&m->srwlock);
+	}
+	void mutex_unlock(BlockingMutex *m) {
+		ReleaseSRWLockExclusive(&m->srwlock);
+	}
+#else
+	typedef gbMutex BlockingMutex;
+	void mutex_init(BlockingMutex *m) {
+		gb_mutex_init(m);
+	}
+	void mutex_destroy(BlockingMutex *m) {
+		gb_mutex_destroy(m);
+	}
+	void mutex_lock(BlockingMutex *m) {
+		gb_mutex_lock(m);
+	}
+	bool mutex_try_lock(BlockingMutex *m) {
+		return !!gb_mutex_try_lock(m);
+	}
+	void mutex_unlock(BlockingMutex *m) {
+		gb_mutex_unlock(m);
+	}
+#endif
+
+struct RecursiveMutex {
+	gbMutex mutex;
+};
+void mutex_init(RecursiveMutex *m) {
+	gb_mutex_init(&m->mutex);
+}
+void mutex_destroy(RecursiveMutex *m) {
+	gb_mutex_destroy(&m->mutex);
+}
+void mutex_lock(RecursiveMutex *m) {
+	gb_mutex_lock(&m->mutex);
+}
+bool mutex_try_lock(RecursiveMutex *m) {
+	return !!gb_mutex_try_lock(&m->mutex);
+}
+void mutex_unlock(RecursiveMutex *m) {
+	gb_mutex_unlock(&m->mutex);
+}
+
+
 
 gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);
@@ -34,6 +93,11 @@ gb_inline void zero_size(void *ptr, isize len) {
 
 #define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
 
+
+i32 next_pow2(i32 n);
+i64 next_pow2(i64 n);
+isize next_pow2_isize(isize n);
+void debugf(char const *fmt, ...);
 
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
@@ -167,6 +231,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 #include "unicode.cpp"
 #include "array.cpp"
 #include "string.cpp"
+#include "queue.cpp"
 
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
@@ -325,17 +390,17 @@ gb_global u64 const unsigned_integer_maxs[] = {
 
 
 bool add_overflow_u64(u64 x, u64 y, u64 *result) {
-   *result = x + y;
-   return *result < x || *result < y;
+	*result = x + y;
+	return *result < x || *result < y;
 }
 
 bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
-   *result = x - y;
-   return *result > x;
+	*result = x - y;
+	return *result > x;
 }
 
 void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
-#if defined(GB_COMPILER_MSVC)
+#if defined(GB_COMPILER_MSVC) && defined(GB_ARCH_64_BIT)
 	*lo = _umul128(x, y, hi);
 #else
 	// URL(bill): https://stackoverflow.com/questions/25095741/how-can-i-multiply-64-bit-operands-and-get-128-bit-result-portably#25096197
@@ -393,6 +458,7 @@ gb_global Arena permanent_arena = {};
 void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
 	arena->backing = backing;
 	arena->block_size = block_size;
+	arena->use_mutex = true;
 	array_init(&arena->blocks, backing, 0, 2);
 	gb_mutex_init(&arena->mutex);
 }
@@ -515,6 +581,7 @@ struct Temp_Allocator {
 	isize curr_offset;
 	gbAllocator backup_allocator;
 	Array<void *> leaked_allocations;
+	gbMutex mutex;
 };
 
 gb_global Temp_Allocator temporary_allocator_data = {};
@@ -525,6 +592,7 @@ void temp_allocator_init(Temp_Allocator *s, isize size) {
 	s->len = size;
 	s->curr_offset = 0;
 	s->leaked_allocations.allocator = s->backup_allocator;
+	gb_mutex_init(&s->mutex);
 }
 
 void *temp_allocator_alloc(Temp_Allocator *s, isize size, isize alignment) {
@@ -567,6 +635,9 @@ GB_ALLOCATOR_PROC(temp_allocator_proc) {
 	Temp_Allocator *s = cast(Temp_Allocator *)allocator_data;
 	GB_ASSERT_NOT_NULL(s);
 
+	gb_mutex_lock(&s->mutex);
+	defer (gb_mutex_unlock(&s->mutex));
+
 	switch (type) {
 	case gbAllocation_Alloc:
 		return temp_allocator_alloc(s, size, alignment);
@@ -592,7 +663,8 @@ GB_ALLOCATOR_PROC(temp_allocator_proc) {
 
 
 gbAllocator temporary_allocator() {
-	return {temp_allocator_proc, &temporary_allocator_data};
+	return permanent_allocator();
+	// return {temp_allocator_proc, &temporary_allocator_data};
 }
 
 
@@ -675,6 +747,36 @@ i64 next_pow2(i64 n) {
 	n++;
 	return n;
 }
+isize next_pow2_isize(isize n) {
+	if (n <= 0) {
+		return 0;
+	}
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	#if defined(GB_ARCH_64_BIT)
+		n |= n >> 32;
+	#endif
+	n++;
+	return n;
+}
+u32 next_pow2_u32(u32 n) {
+	if (n == 0) {
+		return 0;
+	}
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n++;
+	return n;
+}
+
 
 i32 bit_set_count(u32 x) {
 	x -= ((x >> 1) & 0x55555555);
@@ -1174,3 +1276,97 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 #else
 #error Implement read_directory
 #endif
+
+
+
+#define USE_DAMERAU_LEVENSHTEIN 1
+
+isize levenstein_distance_case_insensitive(String const &a, String const &b) {
+	isize w = a.len+1;
+	isize h = b.len+1;
+	isize *matrix = gb_alloc_array(temporary_allocator(), isize, w*h);
+	for (isize i = 0; i <= a.len; i++) {
+		matrix[i*w + 0] = i;
+	}
+	for (isize i = 0; i <= b.len; i++) {
+		matrix[0*w + i] = i;
+	}
+
+	for (isize i = 1; i <= a.len; i++) {
+		char a_c = gb_char_to_lower(cast(char)a.text[i-1]);
+		for (isize j = 1; j <= b.len; j++) {
+			char b_c = gb_char_to_lower(cast(char)b.text[j-1]);
+			if (a_c == b_c) {
+				matrix[i*w + j] = matrix[(i-1)*w + j-1];
+			} else {
+				isize remove = matrix[(i-1)*w + j] + 1;
+				isize insert = matrix[i*w + j-1] + 1;
+				isize substitute = matrix[(i-1)*w + j-1] + 1;
+				isize minimum = remove;
+				if (insert < minimum) {
+					minimum = insert;
+				}
+				if (substitute < minimum) {
+					minimum = substitute;
+				}
+				// Damerau-Levenshtein (transposition extension)
+				#if USE_DAMERAU_LEVENSHTEIN
+				if (i > 1 && j > 1) {
+					isize transpose = matrix[(i-2)*w + j-2] + 1;
+					if (transpose < minimum) {
+						minimum = transpose;
+					}
+				}
+				#endif
+
+				matrix[i*w + j] = minimum;
+			}
+		}
+	}
+
+	return matrix[a.len*w + b.len];
+}
+
+
+struct DistanceAndTarget {
+	isize distance;
+	String target;
+};
+
+struct DidYouMeanAnswers {
+	Array<DistanceAndTarget> distances;
+	String key;
+};
+
+enum {MAX_SMALLEST_DID_YOU_MEAN_DISTANCE = 3-USE_DAMERAU_LEVENSHTEIN};
+
+DidYouMeanAnswers did_you_mean_make(gbAllocator allocator, isize cap, String const &key) {
+	DidYouMeanAnswers d = {};
+	array_init(&d.distances, allocator, 0, cap);
+	d.key = key;
+	return d;
+}
+void did_you_mean_destroy(DidYouMeanAnswers *d) {
+	array_free(&d->distances);
+}
+void did_you_mean_append(DidYouMeanAnswers *d, String const &target) {
+	if (target.len == 0 || target == "_") {
+		return;
+	}
+	DistanceAndTarget dat = {};
+	dat.target = target;
+	dat.distance = levenstein_distance_case_insensitive(d->key, target);
+	array_add(&d->distances, dat);
+}
+Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) {
+	gb_sort_array(d->distances.data, d->distances.count, gb_isize_cmp(gb_offset_of(DistanceAndTarget, distance)));
+	isize count = 0;
+	for (isize i = 0; i < d->distances.count; i++) {
+		isize distance = d->distances[i].distance;
+		if (distance > MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
+			break;
+		}
+		count += 1;
+	}
+	return slice_array(d->distances, 0, count);
+}

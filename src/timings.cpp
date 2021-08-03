@@ -104,14 +104,14 @@ u64 time_stamp__freq(void) {
 #endif
 }
 
-TimeStamp make_time_stamp(String label) {
+TimeStamp make_time_stamp(String const &label) {
 	TimeStamp ts = {0};
 	ts.start = time_stamp_time_now();
 	ts.label = label;
 	return ts;
 }
 
-void timings_init(Timings *t, String label, isize buffer_size) {
+void timings_init(Timings *t, String const &label, isize buffer_size) {
 	array_init(&t->sections, heap_allocator(), 0, buffer_size);
 	t->total = make_time_stamp(label);
 	t->freq  = time_stamp__freq();
@@ -127,7 +127,7 @@ void timings__stop_current_section(Timings *t) {
 	}
 }
 
-void timings_start_section(Timings *t, String label) {
+void timings_start_section(Timings *t, String const &label) {
 	timings__stop_current_section(t);
 	array_add(&t->sections, make_time_stamp(label));
 }

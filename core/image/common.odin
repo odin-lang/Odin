@@ -1,21 +1,32 @@
 package image
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation, optimization.
+		Ginger Bill:     Cosmetic changes.
+*/
+
 import "core:bytes"
 import "core:mem"
 
 Image :: struct {
-	width:      int,
-	height:     int,
-	channels:   int,
-	depth:      u8,
-	pixels:     bytes.Buffer,
+	width:         int,
+	height:        int,
+	channels:      int,
+	depth:         int,
+	pixels:        bytes.Buffer,
 	/*
 		Some image loaders/writers can return/take an optional background color.
 		For convenience, we return them as u16 so we don't need to switch on the type
 		in our viewer, and can just test against nil.
 	*/
-	background: Maybe([3]u16),
-	sidecar:    any,
+	background:    Maybe([3]u16),
+
+	metadata_ptr:  rawptr,
+	metadata_type: typeid,
 }
 
 /*
@@ -64,10 +75,10 @@ Image_Option:
 		If the image has an alpha channel, drop it.
 		You may want to use `.alpha_premultiply` in this case.
 
-        NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
-        unless you select `alpha_premultiply`.
-        In this case it'll premultiply the specified pixels in question only,
-        as the others are implicitly fully opaque.	
+		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
+		unless you select `alpha_premultiply`.
+		In this case it'll premultiply the specified pixels in question only,
+		as the others are implicitly fully opaque.	
 
 	`.alpha_premultiply`
 		If the image has an alpha channel, returns image data as follows:
@@ -190,13 +201,14 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 	}
 
 	res = new(Image);
-	res.width      = img.width;
-	res.height     = img.height;
-	res.channels   = 1;
-	res.depth      = img.depth;
-	res.pixels     = t;
-	res.background = img.background;
-	res.sidecar    = img.sidecar;
+	res.width         = img.width;
+	res.height        = img.height;
+	res.channels      = 1;
+	res.depth         = img.depth;
+	res.pixels        = t;
+	res.background    = img.background;
+	res.metadata_ptr  = img.metadata_ptr;
+	res.metadata_type = img.metadata_type;
 
 	return res, true;
 }

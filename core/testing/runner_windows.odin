@@ -68,12 +68,7 @@ Thread_Os_Specific :: struct {
 thread_create :: proc(procedure: Thread_Proc) -> ^Thread {
 	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_);
-		context = runtime.default_context();
-		c := context;
-		if ic, ok := t.init_context.?; ok {
-			c = ic;
-		}
-		context = c;
+		context = or_else(t.init_context.?, runtime.default_context());
 
 		t.procedure(t);
 
@@ -153,7 +148,7 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 		}
 		global_exception_handler = win32.AddVectoredExceptionHandler(0, exception_handler_proc);
 
-		context.assertion_failure_proc = proc(prefix, message: string, loc: runtime.Source_Code_Location) {
+		context.assertion_failure_proc = proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
 			errorf(t=global_current_t, format="%s %s", args={prefix, message}, loc=loc);
 			intrinsics.trap();
 		};

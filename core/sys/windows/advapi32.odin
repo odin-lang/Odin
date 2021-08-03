@@ -1,3 +1,4 @@
+// +build windows
 package sys_windows
 
 foreign import advapi32 "system:Advapi32.lib"

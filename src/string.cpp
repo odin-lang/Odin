@@ -1,12 +1,12 @@
-gb_global gbArena     string_buffer_arena = {};
-gb_global gbAllocator string_buffer_allocator = {};
-gb_global gbMutex     string_buffer_mutex = {};
+gb_global gbArena       string_buffer_arena = {};
+gb_global gbAllocator   string_buffer_allocator = {};
+gb_global BlockingMutex string_buffer_mutex = {};
 
 void init_string_buffer_memory(void) {
 	// NOTE(bill): This should be enough memory for file systems
 	gb_arena_init_from_allocator(&string_buffer_arena, heap_allocator(), gb_megabytes(1));
 	string_buffer_allocator = gb_arena_allocator(&string_buffer_arena);
-	gb_mutex_init(&string_buffer_mutex);
+	mutex_init(&string_buffer_mutex);
 }
 
 
@@ -500,7 +500,7 @@ String quote_to_ascii(gbAllocator a, String str, u8 quote='"') {
 		Rune r = cast(Rune)s[0];
 		width = 1;
 		if (r >= 0x80) {
-			width = gb_utf8_decode(s, n, &r);
+			width = utf8_decode(s, n, &r);
 		}
 		if (width == 1 && r == GB_RUNE_INVALID) {
 			array_add(&buf, cast(u8)'\\');
@@ -576,7 +576,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 		return false;
 	} else if (s[0] >= 0x80) {
 		Rune r = -1;
-		isize size = gb_utf8_decode(s.text, s.len, &r);
+		isize size = utf8_decode(s.text, s.len, &r);
 		*rune = r;
 		*multiple_bytes = true;
 		*tail_string = make_string(s.text+size, s.len-size);
@@ -736,7 +736,7 @@ i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_carriage_retu
 			return 1;
 		} else if (quote == '\'') {
 			Rune r = GB_RUNE_INVALID;
-			isize size = gb_utf8_decode(s.text, s.len, &r);
+			isize size = utf8_decode(s.text, s.len, &r);
 			if ((size == s.len) && (r != -1 || size != 1)) {
 				*s_ = s;
 				return 1;
@@ -779,41 +779,3 @@ i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_carriage_retu
 	return 2;
 }
 
-
-isize levenstein_distance_case_insensitive(String const &a, String const &b) {
-	isize w = a.len+1;
-	isize h = b.len+1;
-	isize *matrix = gb_alloc_array(heap_allocator(), isize, w*h);
-	for (isize i = 0; i <= a.len; i++) {
-		matrix[i*w + 0] = i;
-	}
-	for (isize i = 0; i <= b.len; i++) {
-		matrix[0*w + i] = i;
-	}
-
-	for (isize i = 1; i <= a.len; i++) {
-		char a_c = gb_char_to_lower(cast(char)a.text[i-1]);
-		for (isize j = 1; j <= b.len; j++) {
-			char b_c = gb_char_to_lower(cast(char)b.text[j-1]);
-			if (a_c == b_c) {
-				matrix[i*w + j] = matrix[(i-1)*w + j-1];
-			} else {
-				isize remove = matrix[(i-1)*w + j] + 1;
-				isize insert = matrix[i*w + j-1] + 1;
-				isize substitute = matrix[(i-1)*w + j-1] + 1;
-				isize minimum = remove;
-				if (insert < minimum) {
-					minimum = insert;
-				}
-				if (substitute < minimum) {
-					minimum = substitute;
-				}
-				matrix[i*w + j] = minimum;
-			}
-		}
-	}
-
-	isize res = matrix[a.len*w + b.len];
-	gb_free(heap_allocator(), matrix);
-	return res;
-}

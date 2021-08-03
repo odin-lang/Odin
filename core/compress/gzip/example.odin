@@ -1,9 +1,21 @@
 //+ignore
 package gzip
 
-import "core:compress/gzip"
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-2 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Ginger Bill:     Cosmetic changes.
+
+	A small GZIP implementation as an example.
+*/
+
 import "core:bytes"
 import "core:os"
+import "core:compress"
+import "core:fmt"
 
 // Small GZIP file with fextra, fname and fcomment present.
 @private
@@ -20,8 +32,7 @@ TEST: []u8 = {
 
 main :: proc() {
 	// Set up output buffer.
-	buf: bytes.Buffer;
-	defer bytes.buffer_destroy(&buf);
+	buf := bytes.Buffer{};
 
 	stdout :: proc(s: string) {
 		os.write_string(os.stdout, s);
@@ -34,25 +45,32 @@ main :: proc() {
 
 	if len(args) < 2 {
 		stderr("No input file specified.\n");
-		err := gzip.load(TEST, &buf);
-		if err != nil {
+		err := load(slice=TEST, buf=&buf, known_gzip_size=len(TEST));
+		if err == nil {
 			stdout("Displaying test vector: ");
 			stdout(bytes.buffer_to_string(&buf));
 			stdout("\n");
+		} else {
+			fmt.printf("gzip.load returned %v\n", err);
 		}
+		bytes.buffer_destroy(&buf);
+		os.exit(0);
 	}
 
 	// The rest are all files.
 	args = args[1:];
-	err: gzip.Error;
+	err: Error;
 
 	for file in args {
 		if file == "-" {
 			// Read from stdin
 			s := os.stream_from_handle(os.stdin);
-			err = gzip.load(s, &buf);
+			ctx := &compress.Context_Stream_Input{
+				input = s,
+			};
+			err = load(ctx, &buf);
 		} else {
-			err = gzip.load(file, &buf);
+			err = load(file, &buf);
 		}
 		if err != nil {
 			if err != E_General.File_Not_Found {
@@ -62,9 +80,10 @@ main :: proc() {
 				os.exit(1);
 			}
 			stderr("GZIP returned an error.\n");
+				bytes.buffer_destroy(&buf);
 			os.exit(2);
 		}
 		stdout(bytes.buffer_to_string(&buf));
 	}
-	os.exit(0);
+	bytes.buffer_destroy(&buf);
 }

@@ -41,7 +41,7 @@ scalar_dot :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
 	return a * b;
 }
 
-vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) {
+vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
 	for i in 0..<N {
 		c += a[i] * b[i];
 	}
@@ -60,7 +60,7 @@ quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
 dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quaternion256_dot};
 
 inner_product :: dot;
-outer_product :: proc(a: $A/[$M]$E, b: $B/[$N]E) -> (out: [M][N]E) where IS_NUMERIC(E) {
+outer_product :: proc(a: $A/[$M]$E, b: $B/[$N]E) -> (out: [M][N]E) where IS_NUMERIC(E) #no_bounds_check {
 	for i in 0..<M {
 		for j in 0..<N {
 			out[i][j] = a[i]*b[j];
@@ -156,7 +156,7 @@ projection :: proc(x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	return dot(x, normal) / dot(normal, normal) * normal;
 }
 
-identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
+identity :: proc($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 	for i in 0..<N {
 		m[i][i] = E(1);
 	}
@@ -170,8 +170,7 @@ trace :: proc(m: $T/[$N][N]$E) -> (tr: E) {
 	return;
 }
 
-
-transpose :: proc(a: $T/[$N][$M]$E) -> (m: [M][N]E) {
+transpose :: proc(a: $T/[$N][$M]$E) -> (m: (T when N == M else [M][N]E)) #no_bounds_check {
 	for j in 0..<M {
 		for i in 0..<N {
 			m[j][i] = a[i][j];
@@ -181,8 +180,7 @@ transpose :: proc(a: $T/[$N][$M]$E) -> (m: [M][N]E) {
 }
 
 matrix_mul :: proc(a, b: $M/[$N][N]$E) -> (c: M)
-	where !IS_ARRAY(E),
-		  IS_NUMERIC(E) {
+	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	for i in 0..<N {
 		for k in 0..<N {
 			for j in 0..<N {
@@ -194,8 +192,7 @@ matrix_mul :: proc(a, b: $M/[$N][N]$E) -> (c: M)
 }
 
 matrix_comp_mul :: proc(a, b: $M/[$J][$I]$E) -> (c: M)
-	where !IS_ARRAY(E),
-	     IS_NUMERIC(E) {
+	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	for j in 0..<J {
 		for i in 0..<I {
 			c[j][i] = a[j][i] * b[j][i];
@@ -205,9 +202,7 @@ matrix_comp_mul :: proc(a, b: $M/[$J][$I]$E) -> (c: M)
 }
 
 matrix_mul_differ :: proc(a: $A/[$J][$I]$E, b: $B/[$K][J]E) -> (c: [K][I]E)
-	where !IS_ARRAY(E),
-		  IS_NUMERIC(E),
-		  I != K {
+	where !IS_ARRAY(E), IS_NUMERIC(E), I != K #no_bounds_check {
 	for k in 0..<K {
 		for j in 0..<J {
 			for i in 0..<I {
@@ -220,8 +215,7 @@ matrix_mul_differ :: proc(a: $A/[$J][$I]$E, b: $B/[$K][J]E) -> (c: [K][I]E)
 
 
 matrix_mul_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
-	where !IS_ARRAY(E),
-		  IS_NUMERIC(E) {
+	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	for i in 0..<I {
 		for j in 0..<J {
 			c[j] += a[i][j] * b[i];
@@ -329,14 +323,14 @@ cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 
 
 
-array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) {
+array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bounds_check {
 	for i in 0..<N {
 		w[i] = Elem_Type(v[i]);
 	}
 	return;
 }
 
-matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) {
+matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) #no_bounds_check {
 	for i in 0..<M {
 		for j in 0..<N {
 			w[i][j] = Elem_Type(v[i][j]);

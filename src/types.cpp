@@ -661,6 +661,8 @@ gb_global Type *t_map_header                     = nullptr;
 gb_global Type *t_equal_proc  = nullptr;
 gb_global Type *t_hasher_proc = nullptr;
 
+gb_global RecursiveMutex g_type_mutex;
+
 
 i64      type_size_of               (Type *t);
 i64      type_align_of              (Type *t);
@@ -673,6 +675,10 @@ bool are_types_identical(Type *x, Type *y);
 bool is_type_pointer(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
+
+void init_type_mutex(void) {
+	mutex_init(&g_type_mutex);
+}
 
 bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
 	if (ptr_set_exists(s, t)) {
@@ -1261,6 +1267,20 @@ bool is_type_rune_array(Type *t) {
 	return false;
 }
 
+
+bool is_type_array_like(Type *t) {
+	return is_type_array(t) || is_type_enumerated_array(t);
+}
+i64 get_array_type_count(Type *t) {
+	Type *bt = base_type(t);
+	if (bt->kind == Type_Array) {
+		return bt->Array.count;
+	} else if (bt->kind == Type_EnumeratedArray) {
+		return bt->EnumeratedArray.count;
+	}
+	GB_ASSERT(is_type_array_like(t));
+	return -1;
+}
 
 
 
@@ -2713,7 +2733,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	GB_ASSERT(start_index < tp->path.count);
 	Entity *e = tp->path[start_index];
 	GB_ASSERT(e != nullptr);
-	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(e->token.string));
+	error(e->token, "Illegal type declaration cycle of `%.*s`", LIT(e->token.string));
 	// NOTE(bill): Print cycle, if it's deep enough
 	for (isize j = start_index; j < tp->path.count; j++) {
 		Entity *e = tp->path[j];
@@ -2830,6 +2850,8 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
+	mutex_lock(&g_type_mutex);
+	defer (mutex_unlock(&g_type_mutex));
 
 	t = base_type(t);
 
@@ -3024,6 +3046,9 @@ Array<i64> type_set_offsets_of(Array<Entity *> const &fields, bool is_packed, bo
 }
 
 bool type_set_offsets(Type *t) {
+	mutex_lock(&g_type_mutex);
+	defer (mutex_unlock(&g_type_mutex));
+
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		if (!t->Struct.are_offsets_set) {
@@ -3052,6 +3077,9 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
+	mutex_lock(&g_type_mutex);
+	defer (mutex_unlock(&g_type_mutex));
+
 
 	switch (t->kind) {
 	case Type_Named: {

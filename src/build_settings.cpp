@@ -3,6 +3,11 @@
 #include <sys/sysctl.h>
 #endif
 
+
+// #if defined(GB_SYSTEM_WINDOWS)
+#define DEFAULT_TO_THREADED_CHECKER
+// #endif
+
 enum TargetOsKind {
 	TargetOs_Invalid,
 
@@ -203,11 +208,16 @@ struct BuildContext {
 	bool   warnings_as_errors;
 	bool   show_error_line;
 
+	bool   ignore_lazy;
+
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
 	bool use_separate_modules;
+	bool threaded_checker;
+
+	bool show_debug_messages;
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
@@ -513,8 +523,8 @@ String internal_odin_root_dir(void) {
 	}
 	len += 1; // NOTE(bill): It needs an extra 1 for some reason
 
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -571,8 +581,8 @@ String internal_odin_root_dir(void) {
 		}
 	}
 
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -648,8 +658,8 @@ String internal_odin_root_dir(void) {
 		array_resize(&path_buf, 2*path_buf.count + 300);
 	}
 
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -678,8 +688,8 @@ String internal_odin_root_dir(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
-	gb_mutex_lock(&string_buffer_mutex);
-	defer (gb_mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&string_buffer_mutex);
+	defer (mutex_unlock(&string_buffer_mutex));
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -706,9 +716,9 @@ String path_to_fullpath(gbAllocator a, String s) {
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
 	char *p;
-	gb_mutex_lock(&string_buffer_mutex);
+	mutex_lock(&string_buffer_mutex);
 	p = realpath(cast(char *)s.text, 0);
-	gb_mutex_unlock(&string_buffer_mutex);
+	mutex_unlock(&string_buffer_mutex);
 	if(p == nullptr) return String{};
 	return make_string_c(p);
 }
@@ -819,6 +829,10 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->word_size   = metrics->word_size;
 	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
+
+	#if defined(DEFAULT_TO_THREADED_CHECKER)
+	bc->threaded_checker = true;
+	#endif
 
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
