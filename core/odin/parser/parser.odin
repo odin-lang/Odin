@@ -392,6 +392,30 @@ allow_token :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> bool {
 	return false;
 }
 
+end_of_line_pos :: proc(p: ^Parser, tok: tokenizer.Token) -> tokenizer.Pos {
+	offset := clamp(tok.pos.offset, 0, len(p.tok.src)-1);
+	s := p.tok.src[offset:];
+	pos := tok.pos;
+	pos.column -= 1;
+	for len(s) != 0 && s[0] != 0 && s[0] != '\n' {
+		s = s[1:];
+		pos.column += 1;
+	}
+	return pos;
+}
+
+expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
+	token := p.curr_tok;
+	if allow_token(p, .Close_Brace) {
+		return token;
+	}
+	if allow_token(p, .Semicolon) {
+		str := tokenizer.token_to_string(token);
+		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", p);
+	}
+	return expect_token(p, .Close_Brace);
+}
+
 
 is_blank_ident :: proc{
 	is_blank_ident_string,
@@ -2520,7 +2544,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		skip_possible_newline_for_literal(p);
 		expect_token(p, .Open_Brace);
 		fields, name_count = parse_field_list(p, .Close_Brace, ast.Field_Flags_Struct);
-		close := expect_token(p, .Close_Brace);
+		close := expect_closing_brace_of_field_list(p);
 
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close));
 		st.poly_params   = poly_params;
@@ -2598,7 +2622,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			}
 		}
 
-		close := expect_token(p, .Close_Brace);
+		close := expect_closing_brace_of_field_list(p);
 
 		ut := ast.new(ast.Union_Type, tok.pos, end_pos(close));
 		ut.poly_params   = poly_params;
@@ -2620,7 +2644,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		skip_possible_newline_for_literal(p);
 		open := expect_token(p, .Open_Brace);
 		fields := parse_elem_list(p);
-		close := expect_token(p, .Close_Brace);
+		close := expect_closing_brace_of_field_list(p);
 
 		et := ast.new(ast.Enum_Type, tok.pos, end_pos(close));
 		et.base_type = base_type;
@@ -2722,7 +2746,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		expect_token(p, .Comma);
 		constraints_string := parse_expr(p, false);
 		allow_token(p, .Comma);
-		close := expect_token(p, .Close_Brace);
+		close := expect_closing_brace_of_field_list(p);
 
 		e := ast.new(ast.Inline_Asm_Expr, tok.pos, end_pos(close));
 		e.tok                = tok;
@@ -3047,6 +3071,13 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 				loop = false;
 			}
 
+		case .Increment, .Decrement:
+			if !lhs {
+				tok := advance_token(p);
+				error(p, tok.pos, "postfix '%s' operator is not supported", tok.text);
+			} else {
+				loop = false;
+			}
 		}
 
 		is_lhs = false;
@@ -3089,6 +3120,16 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	     .Not, .Xor,
 	     .And:
 		op := advance_token(p);
+		expr := parse_unary_expr(p, lhs);
+
+		ue := ast.new(ast.Unary_Expr, op.pos, expr.end);
+		ue.op   = op;
+		ue.expr = expr;
+		return ue;
+
+	case .Increment, .Decrement:
+		op := advance_token(p);
+		error(p, op.pos, "unary '%s' operator is not supported", op.text);
 		expr := parse_unary_expr(p, lhs);
 
 		ue := ast.new(ast.Unary_Expr, op.pos, expr.end);
@@ -3279,6 +3320,12 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 	if len(lhs) > 1 {
 		error(p, op.pos, "expected 1 expression, got %d", len(lhs));
 		return ast.new(ast.Bad_Stmt, start_tok.pos, end_pos(p.curr_tok));
+	}
+
+	#partial switch op.kind {
+	case .Increment, .Decrement:
+		advance_token(p);
+		error(p, op.pos, "postfix '%s' statement is not supported", op.text);
 	}
 
 	es := ast.new(ast.Expr_Stmt, lhs[0].pos, lhs[0].end);
