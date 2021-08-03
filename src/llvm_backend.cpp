@@ -16230,6 +16230,7 @@ void lb_generate_code(lbGenerator *gen) {
 		lbModule *m = gen->modules.entries[j].value;
 		for_array(i, m->missing_procedures_to_check) {
 			lbProcedure *p = m->missing_procedures_to_check[i];
+			debugf("Generate missing procedure: %.*s", LIT(p->name));
 			lb_generate_procedure(m, p);
 		}
 	}
