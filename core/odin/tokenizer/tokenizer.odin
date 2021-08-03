@@ -140,7 +140,7 @@ is_letter :: proc(r: rune) -> bool {
 		switch r {
 		case '_':
 			return true;
-		case 'A'..'Z', 'a'..'z':
+		case 'A'..='Z', 'a'..='z':
 			return true;
 		}
 	}
@@ -256,11 +256,11 @@ scan_raw_string :: proc(t: ^Tokenizer) -> string {
 
 digit_val :: proc(r: rune) -> int {
 	switch r {
-	case '0'..'9':
+	case '0'..='9':
 		return int(r-'0');
-	case 'A'..'F':
+	case 'A'..='F':
 		return int(r-'A' + 10);
-	case 'a'..'f':
+	case 'a'..='f':
 		return int(r-'a' + 10);
 	}
 	return 16;
@@ -276,7 +276,7 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 		advance_rune(t);
 		return true;
 
-	case '0'..'7':
+	case '0'..='7':
 		n, base, max = 3, 8, 255;
 	case 'x':
 		advance_rune(t);
@@ -485,7 +485,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		kind = .Ident;
 		check_keyword: if len(lit) > 1 {
 			// TODO(bill): Maybe have a hash table lookup rather than this linear search
-			for i in Token_Kind.B_Keyword_Begin .. Token_Kind.B_Keyword_End {
+			for i in Token_Kind.B_Keyword_Begin ..= Token_Kind.B_Keyword_End {
 				if lit == tokens[i] {
 					kind = Token_Kind(i);
 					break check_keyword;
