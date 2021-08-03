@@ -56,7 +56,8 @@ set :: proc { int_set_from_integer, int_copy };
 /*
 	Copy one `Int` to another.
 */
-int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
+	if err = error_if_immutable(dest);    err != nil { return err; }
 	if err = clear_if_uninitialized(src); err != nil { return err; }
 	/*
 		If dest == src, do nothing
@@ -68,7 +69,7 @@ int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error
 		Grow `dest` to fit `src`.
 		If `dest` is not yet initialized, it will be using `allocator`.
 	*/
-	if err = grow(dest, src.used, false, allocator); err != nil {
+	if err = grow(dest, src.used, minimize, allocator); err != nil {
 		return err;
 	}
 
@@ -78,8 +79,10 @@ int_copy :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error
 	for v, i in src.digit[:src.used] {
 		dest.digit[i] = v;
 	}
-	dest.used = src.used;
-	dest.sign = src.sign;
+	dest.used  = src.used;
+	dest.sign  = src.sign;
+	dest.flags = src.flags &~ {.Immutable};
+
 	_zero_unused(dest);
 	return nil;
 }
@@ -120,7 +123,7 @@ int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 	/*
 		Copy `src` to `dest`
 	*/
-	if err = copy(dest, src, allocator); err != nil {
+	if err = copy(dest, src, false, allocator); err != nil {
 		return err;
 	}
 
@@ -163,7 +166,7 @@ neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Copy `src` to `dest`
 	*/
-	if err = copy(dest, src, allocator); err != nil {
+	if err = copy(dest, src, false, allocator); err != nil {
 		return err;
 	}
 
@@ -337,12 +340,7 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if err = clear(a, minimize, allocator); err != nil { return err; }
-
-	a.used     = 1;
-	a.digit[0] = 1;
-	a.sign     = .Zero_or_Positive;
-	return nil;
+	return copy(a, ONE, minimize, allocator);
 }
 one :: proc { int_one, };
 
@@ -350,16 +348,33 @@ one :: proc { int_one, };
 	Set the `Int` to -1 and optionally shrink it to the minimum backing size.
 */
 int_minus_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if err = clear(a, minimize, allocator); err != nil {
-		return err;
-	}
-
-	a.used     = 1;
-	a.digit[0] = 1;
-	a.sign     = .Negative;
-	return nil;
+	return copy(a, MINUS_ONE, minimize, allocator);
 }
 minus_one :: proc { int_minus_one, };
+
+/*
+	Set the `Int` to Inf and optionally shrink it to the minimum backing size.
+*/
+int_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
+	return copy(a, INF, minimize, allocator);
+}
+inf :: proc { int_inf, };
+
+/*
+	Set the `Int` to -Inf and optionally shrink it to the minimum backing size.
+*/
+int_minus_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
+	return copy(a, MINUS_INF, minimize, allocator);
+}
+minus_inf :: proc { int_inf, };
+
+/*
+	Set the `Int` to NaN and optionally shrink it to the minimum backing size.
+*/
+int_nan :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
+	return copy(a, NAN, minimize, allocator);
+}
+nan :: proc { int_nan, };
 
 power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 	/*
@@ -602,8 +617,20 @@ clear_if_uninitialized_multi :: proc(args: ..^Int) -> (err: Error) {
 	}
 	return err;
 }
-
 clear_if_uninitialized :: proc {clear_if_uninitialized_single, clear_if_uninitialized_multi, };
+
+error_if_immutable_single :: proc(arg: ^Int) -> (err: Error) {
+	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable; }
+	return nil;
+}
+
+error_if_immutable_multi :: proc(args: ..^Int) -> (err: Error) {
+	for i in args {
+		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable; }
+	}
+	return nil;
+}
+error_if_immutable :: proc {error_if_immutable_single, error_if_immutable_multi, };
 
 /*
 	Allocates several `Int`s at once.
@@ -655,7 +682,23 @@ clamp :: proc(a: ^Int) -> (err: Error) {
 }
 
 
-_STATIC_ZERO := &Int{
-	used = 0,
-	sign = .Zero_or_Positive,
-};
+/*
+	Initialize constants.
+*/
+ONE, ZERO, MINUS_ONE, INF, MINUS_INF, NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+
+initialize_constants :: proc() -> (res: int) {
+	set(     ZERO,  0);      ZERO.flags = {.Immutable};
+	set(      ONE,  1);       ONE.flags = {.Immutable};
+	set(MINUS_ONE, -1); MINUS_ONE.flags = {.Immutable};
+	set(      INF,  0);       INF.flags = {.Immutable, .Inf};
+	set(      INF,  0); MINUS_INF.flags = {.Immutable, .Inf}; MINUS_INF.sign = .Negative;
+	set(      NAN,  0);       NAN.flags = {.Immutable, .NaN};
+
+	return #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
+}
+
+destroy_constants :: proc() {
+	destroy(ONE, ZERO, MINUS_ONE, INF, NAN);
+}
+

@@ -26,10 +26,15 @@ when _LOW_MEMORY {
 	_DEFAULT_DIGIT_COUNT :: 32;
 }
 
-_MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
-_SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, _DEFAULT_SQR_KARATSUBA_CUTOFF);
-_MUL_TOOM_CUTOFF      :: #config(MUL_TOOM_CUTOFF,      _DEFAULT_MUL_TOOM_CUTOFF);
-_SQR_TOOM_CUTOFF      :: #config(SQR_TOOM_CUTOFF,      _DEFAULT_SQR_TOOM_CUTOFF);
+/*
+	`initialize_constants` returns `#config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF)`
+	and we initialize this cutoff that way so that the procedure is used and called,
+	because it handles initializing the constants ONE, ZERO, MINUS_ONE, NAN and INF.
+*/
+_MUL_KARATSUBA_CUTOFF := initialize_constants();
+_SQR_KARATSUBA_CUTOFF := #config(SQR_KARATSUBA_CUTOFF, _DEFAULT_SQR_KARATSUBA_CUTOFF);
+_MUL_TOOM_CUTOFF      := #config(MUL_TOOM_CUTOFF,      _DEFAULT_MUL_TOOM_CUTOFF);
+_SQR_TOOM_CUTOFF      := #config(SQR_TOOM_CUTOFF,      _DEFAULT_SQR_TOOM_CUTOFF);
 
 /*
 	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
@@ -59,9 +64,10 @@ Sign :: enum u8 {
 };
 
 Int :: struct {
-	used:      int,
-	digit:     [dynamic]DIGIT,
-	sign:      Sign,
+	used:  int,
+	digit: [dynamic]DIGIT,
+	sign:  Sign,
+	flags: Flags,
 };
 
 Flag :: enum u8 {
@@ -76,35 +82,35 @@ Flags :: bit_set[Flag; u8];
 	Errors are a strict superset of runtime.Allocation_Error.
 */
 Error :: enum int {
-	Out_Of_Memory          = 1,
-	Invalid_Pointer        = 2,
-	Invalid_Argument       = 3,
+	Out_Of_Memory           = 1,
+	Invalid_Pointer         = 2,
+	Invalid_Argument        = 3,
 
-	Unknown_Error          = 4,
-	Max_Iterations_Reached = 5,
-	Buffer_Overflow        = 6,
-	Integer_Overflow       = 7,
+	Assignment_To_Immutable = 4,
+	Max_Iterations_Reached  = 5,
+	Buffer_Overflow         = 6,
+	Integer_Overflow        = 7,
 
-	Division_by_Zero       = 8,
-	Math_Domain_Error      = 9,
+	Division_by_Zero        = 8,
+	Math_Domain_Error       = 9,
 
-	Unimplemented          = 127,
+	Unimplemented           = 127,
 };
 
 Error_String :: #partial [Error]string{
-	.Out_Of_Memory          = "Out of memory",
-	.Invalid_Pointer        = "Invalid pointer",
-	.Invalid_Argument       = "Invalid argument",
+	.Out_Of_Memory           = "Out of memory",
+	.Invalid_Pointer         = "Invalid pointer",
+	.Invalid_Argument        = "Invalid argument",
 
-	.Unknown_Error          = "Unknown error",
-	.Max_Iterations_Reached = "Max iterations reached",
-	.Buffer_Overflow        = "Buffer overflow",
-	.Integer_Overflow       = "Integer overflow",
+	.Assignment_To_Immutable = "Assignment to immutable",
+	.Max_Iterations_Reached  = "Max iterations reached",
+	.Buffer_Overflow         = "Buffer overflow",
+	.Integer_Overflow        = "Integer overflow",
 
-	.Division_by_Zero       = "Division by zero",
-	.Math_Domain_Error      = "Math domain error",
+	.Division_by_Zero        = "Division by zero",
+	.Math_Domain_Error       = "Math domain error",
 
-	.Unimplemented          = "Unimplemented",
+	.Unimplemented           = "Unimplemented",
 };
 
 Primality_Flag :: enum u8 {
