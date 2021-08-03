@@ -549,7 +549,7 @@ int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
 		return DIGIT(rnd.uint64(r)) & _MASK;
 	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rand.uint32(r)) & _MASK;
+		return DIGIT(rnd.uint32(r)) & _MASK;
 	} else {
 		panic("Unsupported DIGIT size.");
 	}

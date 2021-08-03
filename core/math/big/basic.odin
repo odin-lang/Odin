@@ -1672,7 +1672,7 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 }
 
 
-when size_of(rawptr) == 8 {
+when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	_factorial_table := [35]_WORD{
 /* f(00): */                                                   1,
 /* f(01): */                                                   1,
