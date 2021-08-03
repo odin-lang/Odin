@@ -2428,7 +2428,13 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		f->allow_range = true;
 		elem = parse_expr(f, true);
 		f->allow_range = prev_allow_range;
+
 		if (allow_token(f, Token_Semicolon)) {
+			underlying = parse_type(f);
+		} else if (allow_token(f, Token_Comma)) {
+			String p = token_to_string(f->prev_token);
+			syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
+
 			underlying = parse_type(f);
 		}
 
