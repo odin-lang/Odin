@@ -83,6 +83,8 @@ Token_Kind :: enum u32 {
 		Cmp_Or_Eq,  // ||=
 	B_Assign_Op_End,
 
+		Increment,          // ++
+		Decrement,          // --
 		Arrow_Right,        // ->
 		Undef,              // ---
 
@@ -108,7 +110,6 @@ Token_Kind :: enum u32 {
 		Ellipsis,      // ..
 		Range_Half,    // ..<
 		Range_Full,    // ..=
-		Back_Slash,    // \
 	B_Operator_End,
 
 	B_Keyword_Begin,
@@ -210,6 +211,8 @@ tokens := [Token_Kind.COUNT]string {
 	"||=",
 	"",
 
+	"++",
+	"--",
 	"->",
 	"---",
 
@@ -235,7 +238,6 @@ tokens := [Token_Kind.COUNT]string {
 	"..",
 	"..<",
 	"..=",
-	"\\",
 	"",
 
 	"",
