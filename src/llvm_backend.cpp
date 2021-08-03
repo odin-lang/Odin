@@ -6301,14 +6301,16 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 		return *found;
 	}
 
-	gb_printf_err("%.*s\n", LIT(e->token.string));
-
 	bool ignore_body = false;
 
+	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
-		ignore_body = other_module != m;
+		other_module = lb_pkg_module(m->gen, e->pkg);
 	}
+	if (other_module == m) {
+		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s", LIT(e->token.string));
+	}
+	ignore_body = other_module != m;
 
 	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
 	if (!ignore_body) {
