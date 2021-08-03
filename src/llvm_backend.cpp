@@ -6308,7 +6308,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 		other_module = lb_pkg_module(m->gen, e->pkg);
 	}
 	if (other_module == m) {
-		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s", LIT(e->token.string));
+		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s\n", LIT(e->token.string));
 	}
 	ignore_body = other_module != m;
 
@@ -16230,7 +16230,7 @@ void lb_generate_code(lbGenerator *gen) {
 		lbModule *m = gen->modules.entries[j].value;
 		for_array(i, m->missing_procedures_to_check) {
 			lbProcedure *p = m->missing_procedures_to_check[i];
-			debugf("Generate missing procedure: %.*s", LIT(p->name));
+			debugf("Generate missing procedure: %.*s\n", LIT(p->name));
 			lb_generate_procedure(m, p);
 		}
 	}
