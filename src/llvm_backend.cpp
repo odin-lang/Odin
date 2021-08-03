@@ -1,7 +1,7 @@
 #define MULTITHREAD_OBJECT_GENERATION 1
 
-#ifndef USE_SEPARTE_MODULES
-#define USE_SEPARTE_MODULES build_context.use_separate_modules
+#ifndef USE_SEPARATE_MODULES
+#define USE_SEPARATE_MODULES build_context.use_separate_modules
 #endif
 
 #ifndef MULTITHREAD_OBJECT_GENERATION
@@ -2877,7 +2877,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
 		}
 	} else if (!p->is_foreign) {
-		if (!USE_SEPARTE_MODULES) {
+		if (!USE_SEPARATE_MODULES) {
 			LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 			// NOTE(bill): if a procedure is defined in package runtime and uses a custom link name,
@@ -6295,19 +6295,25 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	GB_ASSERT(is_type_proc(e->type));
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
+
 	auto *found = map_get(&m->values, hash_entity(e));
 	if (found) {
 		return *found;
 	}
 
+	gb_printf_err("%.*s\n", LIT(e->token.string));
+
 	bool ignore_body = false;
 
-	if (USE_SEPARTE_MODULES) {
+	if (USE_SEPARATE_MODULES) {
 		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
 		ignore_body = other_module != m;
 	}
 
 	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
+	if (!ignore_body) {
+		array_add(&m->missing_procedures_to_check, missing_proc);
+	}
 	found = map_get(&m->values, hash_entity(e));
 	if (found) {
 		return *found;
@@ -6349,7 +6355,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 		return *found;
 	}
 
-	if (USE_SEPARTE_MODULES) {
+	if (USE_SEPARATE_MODULES) {
 		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
 
 		// TODO(bill): correct this logic
@@ -12459,7 +12465,7 @@ lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
 	if (e->kind == Entity_Procedure) {
 		return lb_find_procedure_value_from_entity(m, e);
 	}
-	if (USE_SEPARTE_MODULES) {
+	if (USE_SEPARATE_MODULES) {
 		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
 		if (other_module != m) {
 
@@ -14316,7 +14322,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	if (m->pkg) {
 		module_name = gb_string_appendc(module_name, "-");
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
-	} else if (USE_SEPARTE_MODULES) {
+	} else if (USE_SEPARATE_MODULES) {
 		module_name = gb_string_appendc(module_name, "-builtin");
 	}
 
@@ -14363,6 +14369,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->hasher_procs, a);
 	array_init(&m->procedures_to_generate, a, 0, 1024);
 	array_init(&m->foreign_library_paths,  a, 0, 1024);
+	array_init(&m->missing_procedures_to_check, a, 0, 16);
 
 	map_init(&m->debug_values, a);
 	array_init(&m->debug_incomplete_types, a, 0, 1024);
@@ -14422,7 +14429,7 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	gb_mutex_init(&gen->mutex);
 
-	if (USE_SEPARTE_MODULES) {
+	if (USE_SEPARATE_MODULES) {
 		for_array(i, gen->info->packages.entries) {
 			AstPackage *pkg = gen->info->packages.entries[i].value;
 
@@ -15530,7 +15537,7 @@ String lb_filepath_ll_for_module(lbModule *m) {
 	String path = m->gen->output_base;
 	if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
-	} else if (USE_SEPARTE_MODULES) {
+	} else if (USE_SEPARATE_MODULES) {
 		path = concatenate_strings(permanent_allocator(), path, STR_LIT("-builtin"));
 	}
 	path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
@@ -15705,6 +15712,46 @@ WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 }
 
 
+void lb_generate_procedure(lbModule *m, lbProcedure *p) {
+	if (p->is_done) {
+		return;
+	}
+	if (p->body != nullptr) { // Build Procedure
+		m->curr_procedure = p;
+		lb_begin_procedure_body(p);
+		lb_build_stmt(p, p->body);
+		lb_end_procedure_body(p);
+		p->is_done = true;
+		m->curr_procedure = nullptr;
+	}
+	lb_end_procedure(p);
+
+	// Add Flags
+	if (p->body != nullptr) {
+		if (p->name == "memcpy" || p->name == "memmove" ||
+		    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
+		    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
+		    string_starts_with(p->name, str_lit("llvm.memmove"))) {
+			p->flags |= lbProcedureFlag_WithoutMemcpyPass;
+		}
+	}
+
+	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+		char *llvm_error = nullptr;
+
+		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
+		LLVMDumpValue(p->value);
+		gb_printf_err("\n\n\n\n");
+		String filepath_ll = lb_filepath_ll_for_module(m);
+		if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+			gb_printf_err("LLVM Error: %s\n", llvm_error);
+		}
+		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
+		gb_exit(1);
+	}
+}
+
+
 void lb_generate_code(lbGenerator *gen) {
 	#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 	#define TIME_SECTION_WITH_LEN(str, len) do { if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
@@ -15714,7 +15761,7 @@ void lb_generate_code(lbGenerator *gen) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1;
 
-	LLVMBool do_threading = (LLVMIsMultithreaded() && USE_SEPARTE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+	LLVMBool do_threading = (LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
 
 	thread_pool_init(&lb_thread_pool, heap_allocator(), worker_count, "LLVMBackend");
 	defer (thread_pool_destroy(&lb_thread_pool));
@@ -15851,7 +15898,7 @@ void lb_generate_code(lbGenerator *gen) {
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
 			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-			if (!USE_SEPARTE_MODULES) {
+			if (!USE_SEPARATE_MODULES) {
 				LLVMSetLinkage(g, LLVMInternalLinkage);
 			}
 
@@ -16026,7 +16073,7 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else if (!is_foreign) {
-			if (USE_SEPARTE_MODULES) {
+			if (USE_SEPARATE_MODULES) {
 				LLVMSetLinkage(g.value, LLVMExternalLinkage);
 			} else {
 				LLVMSetLinkage(g.value, LLVMInternalLinkage);
@@ -16135,7 +16182,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		lbModule *m = &gen->default_module;
-		if (USE_SEPARTE_MODULES) {
+		if (USE_SEPARATE_MODULES) {
 			m = lb_pkg_module(gen, e->pkg);
 		}
 
@@ -16167,40 +16214,11 @@ void lb_generate_code(lbGenerator *gen) {
 		lbModule *m = gen->modules.entries[j].value;
 		for_array(i, m->procedures_to_generate) {
 			lbProcedure *p = m->procedures_to_generate[i];
-			if (p->is_done) {
-				continue;
-			}
-			if (p->body != nullptr) { // Build Procedure
-				m->curr_procedure = p;
-				lb_begin_procedure_body(p);
-				lb_build_stmt(p, p->body);
-				lb_end_procedure_body(p);
-				p->is_done = true;
-				m->curr_procedure = nullptr;
-			}
-			lb_end_procedure(p);
-
-			// Add Flags
-			if (p->body != nullptr) {
-				if (p->name == "memcpy" || p->name == "memmove" ||
-				    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
-				    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
-				    string_starts_with(p->name, str_lit("llvm.memmove"))) {
-					p->flags |= lbProcedureFlag_WithoutMemcpyPass;
-				}
-			}
-
-			if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-				gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-				LLVMDumpValue(p->value);
-				gb_printf_err("\n\n\n\n");
-				String filepath_ll = lb_filepath_ll_for_module(m);
-				if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-					gb_printf_err("LLVM Error: %s\n", llvm_error);
-				}
-				LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-				gb_exit(1);
-			}
+			lb_generate_procedure(m, p);
+		}
+		for_array(i, m->missing_procedures_to_check) {
+			lbProcedure *p = m->missing_procedures_to_check[i];
+			lb_generate_procedure(m, p);
 		}
 	}
 
