@@ -64,11 +64,18 @@ Int :: struct {
 	sign:      Sign,
 };
 
+Flag :: enum u8 {
+	NaN,
+	Inf,
+	Immutable,
+};
+
+Flags :: bit_set[Flag; u8];
+
 /*
 	Errors are a strict superset of runtime.Allocation_Error.
 */
 Error :: enum int {
-	None                   = 0,
 	Out_Of_Memory          = 1,
 	Invalid_Pointer        = 2,
 	Invalid_Argument       = 3,
@@ -85,7 +92,6 @@ Error :: enum int {
 };
 
 Error_String :: #partial [Error]string{
-	.None                   = "None",
 	.Out_Of_Memory          = "Out of memory",
 	.Invalid_Pointer        = "Invalid pointer",
 	.Invalid_Argument       = "Invalid argument",

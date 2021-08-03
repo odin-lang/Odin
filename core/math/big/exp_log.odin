@@ -13,7 +13,7 @@ int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	if base < 2 || DIGIT(base) > _DIGIT_MAX {
 		return -1, .Invalid_Argument;
 	}
-	if err = clear_if_uninitialized(a); err != .None { return -1, err; }
+	if err = clear_if_uninitialized(a); err != nil { return -1, err; }
 	if n, _ := is_neg(a);  n { return -1, .Math_Domain_Error; }
 	if z, _ := is_zero(a); z { return -1, .Math_Domain_Error; }
 
@@ -38,8 +38,8 @@ log :: proc { int_log, int_log_digit, };
 */
 int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 	power := power;
-	if err = clear_if_uninitialized(base); err != .None { return err; }
-	if err = clear_if_uninitialized(dest); err != .None { return err; }
+	if err = clear_if_uninitialized(base); err != nil { return err; }
+	if err = clear_if_uninitialized(dest); err != nil { return err; }
 	/*
 		Early outs.
 	*/
@@ -48,7 +48,7 @@ int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 			A zero base is a special case.
 		*/
 		if power  < 0 {
-			if err = zero(dest); err != .None { return err; }
+			if err = zero(dest); err != nil { return err; }
 			return .Math_Domain_Error;
 		}
 		if power == 0 { return  one(dest); }
@@ -77,19 +77,19 @@ int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 	}
 
 	g := &Int{};
-	if err = copy(g, base); err != .None { return err; }
+	if err = copy(g, base); err != nil { return err; }
 
 	/*
 		Set initial result.
 	*/
-	if err = set(dest, 1); err != .None { return err; }
+	if err = set(dest, 1); err != nil { return err; }
 
 	loop: for power > 0 {
 		/*
 			If the bit is set, multiply.
 		*/
 		if power & 1 != 0 {
-			if err = mul(dest, g, dest); err != .None {
+			if err = mul(dest, g, dest); err != nil {
 				break loop;
 			}
 		}
@@ -97,7 +97,7 @@ int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 			Square.
 		*/
 		if power > 1 {
-			if err = sqr(g, g); err != .None {
+			if err = sqr(g, g); err != nil {
 				break loop;
 			}
 		}
@@ -117,7 +117,7 @@ int_pow_int :: proc(dest: ^Int, base, power: int) -> (err: Error) {
 	base_t := &Int{};
 	defer destroy(base_t);
 
-	if err = set(base_t, base); err != .None { return err; }
+	if err = set(base_t, base); err != nil { return err; }
 
 	return int_pow(dest, base_t, power);
 }
@@ -163,14 +163,14 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 		Therefore, we return 0.
 	*/
 	if a < base {
-		return 0, .None;
+		return 0, nil;
 	}
 
 	/*
 		If a number equals the base, the log is 1.
 	*/
 	if a == base {
-		return 1, .None;
+		return 1, nil;
 	}
 
 	N := _WORD(a);
@@ -199,14 +199,14 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 			bracket_low = bracket_mid;
 		}
 		if N == bracket_mid {
-			return mid, .None;
+			return mid, nil;
 		}
    	}
 
    	if bracket_high == N {
-   		return high, .None;
+   		return high, nil;
    	} else {
-   		return low, .None;
+   		return low, nil;
    	}
 }
 
@@ -216,8 +216,8 @@ int_log_digit :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
 
 	when true {
-		if err = clear_if_uninitialized(dest);			err != .None { return err; }
-		if err = clear_if_uninitialized(src);			err != .None { return err; }
+		if err = clear_if_uninitialized(dest);			err != nil { return err; }
+		if err = clear_if_uninitialized(src);			err != nil { return err; }
 
 		/*						Must be positive. 					*/
 		if src.sign == .Negative						{ return .Invalid_Argument; }
@@ -230,10 +230,10 @@ int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
 		defer destroy(x, y, t1, t2);
 
 		count: int;
-		if count, err = count_bits(src); err != .None { return err; }
+		if count, err = count_bits(src); err != nil { return err; }
 
 		a, b := count >> 1, count & 1;
-		if err = power_of_two(x, a+b);                  err != .None { return err; }
+		if err = power_of_two(x, a+b);                  err != nil { return err; }
 
 		for {
 			/*
@@ -245,7 +245,7 @@ int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
 
 			if c, _ := cmp(y, x); c == 0 || c == 1 {
 				swap(dest, x);
-				return .None;
+				return nil;
 			}
 			swap(x, y);
 		}
@@ -271,8 +271,8 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 	if n == 2 { return sqrt(dest, src); }
 
 	/*					Initialize dest + src if needed. 				*/
-	if err = clear_if_uninitialized(dest);			err != .None { return err; }
-	if err = clear_if_uninitialized(src);			err != .None { return err; }
+	if err = clear_if_uninitialized(dest);			err != nil { return err; }
+	if err = clear_if_uninitialized(src);			err != nil { return err; }
 
 	if n < 0 || n > int(_DIGIT_MAX) {
 		return .Invalid_Argument;
@@ -280,7 +280,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 
 	neg: bool;
 	if n & 1 == 0 {
-		if neg, err = is_neg(src); neg || err != .None { return .Invalid_Argument; }
+		if neg, err = is_neg(src); neg || err != nil { return .Invalid_Argument; }
 	}
 
 	/*							Set up temporaries.						*/
@@ -323,33 +323,33 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 
 	/*					Start value must be larger than root.			*/
 	ilog2 += 2;
-	if err = power_of_two(t2, ilog2); err != .None { return err; }
+	if err = power_of_two(t2, ilog2); err != nil { return err; }
 
 	c: int;
 	iterations := 0;
 	for {
 		/* t1 = t2 */
-		if err = copy(t1, t2); err != .None { return err; }
+		if err = copy(t1, t2); err != nil { return err; }
 
 		/* t2 = t1 - ((t1**b - a) / (b * t1**(b-1))) */
 
 		/* t3 = t1**(b-1) */
-		if err = pow(t3, t1, n-1); err != .None { return err; }
+		if err = pow(t3, t1, n-1); err != nil { return err; }
 
 		/* numerator */
 		/* t2 = t1**b */
-		if err = mul(t2, t1, t3); err != .None { return err; }
+		if err = mul(t2, t1, t3); err != nil { return err; }
 
 		/* t2 = t1**b - a */
-		if err = sub(t2, t2, a); err != .None { return err; }
+		if err = sub(t2, t2, a); err != nil { return err; }
 
 		/* denominator */
 		/* t3 = t1**(b-1) * b  */
-		if err = mul(t3, t3, DIGIT(n)); err != .None { return err; }
+		if err = mul(t3, t3, DIGIT(n)); err != nil { return err; }
 
 		/* t3 = (t1**b - a)/(b * t1**(b-1)) */
-		if err = div(t3, t2, t3); err != .None { return err; }
-		if err = sub(t2, t1, t3); err != .None { return err; }
+		if err = div(t3, t2, t3); err != nil { return err; }
+		if err = sub(t2, t1, t3); err != nil { return err; }
 
 		/*
 			 Number of rounds is at most log_2(root). If it is more it
@@ -370,14 +370,14 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 
 	iterations = 0;
 	for {
-		if err = pow(t2, t1, n); err != .None { return err; }
+		if err = pow(t2, t1, n); err != nil { return err; }
 
 		c, err = cmp(t2, a);
 		if c == 0 {
 			swap(dest, t1);
-			return .None;
+			return nil;
 		} else if c == -1 {
-			if err = add(t1, t1, DIGIT(1)); err != .None { return err; }
+			if err = add(t1, t1, DIGIT(1)); err != nil { return err; }
 		} else {
 			break;
 		}
@@ -391,11 +391,11 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 	iterations = 0;
 	/*					Correct overshoot from above or from recurrence.			*/
 	for {
-		if err = pow(t2, t1, n); err != .None { return err; }
+		if err = pow(t2, t1, n); err != nil { return err; }
 
 		c, err = cmp(t2, a);
 		if c == 1 {
-			if err = sub(t1, t1, DIGIT(1)); err != .None { return err; }
+			if err = sub(t1, t1, DIGIT(1)); err != nil { return err; }
 		} else {
 			break;
 		}
@@ -424,13 +424,13 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 
 	ic, _ := cmp(a, base);
 	if ic == -1 || ic == 0 {
-		return 1 if ic == 0 else 0, .None;
+		return 1 if ic == 0 else 0, nil;
 	}
 
-	if err = set(bi_base, base);          err != .None { return -1, err; }
-	if err = init_multi(bracket_mid, t);  err != .None { return -1, err; }
-	if err = one(bracket_low);            err != .None { return -1, err; }
-	if err = set(bracket_high, base);     err != .None { return -1, err; }
+	if err = set(bi_base, base);          err != nil { return -1, err; }
+	if err = init_multi(bracket_mid, t);  err != nil { return -1, err; }
+	if err = one(bracket_low);            err != nil { return -1, err; }
+	if err = set(bracket_high, base);     err != nil { return -1, err; }
 
 	low  := 0; high := 1;
 
@@ -450,12 +450,12 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 		}
 
 	 	low = high;
-	 	if err = copy(bracket_low, bracket_high); err != .None {
+	 	if err = copy(bracket_low, bracket_high); err != nil {
 			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
 			return -1, err;
 	 	}
 	 	high <<= 1;
-	 	if err = sqr(bracket_high, bracket_high); err != .None {
+	 	if err = sqr(bracket_high, bracket_high); err != nil {
 			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
 			return -1, err;
 	 	}
@@ -464,12 +464,12 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	for (high - low) > 1 {
 		mid := (high + low) >> 1;
 
-		if err = pow(t, bi_base, mid - low); err != .None {
+		if err = pow(t, bi_base, mid - low); err != nil {
 			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
 			return -1, err;
 		}
 
-		if err = mul(bracket_mid, bracket_low, t); err != .None {
+		if err = mul(bracket_mid, bracket_low, t); err != nil {
 			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
 			return -1, err;
 		}
@@ -484,7 +484,7 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 		}
 		if mc == 0 {
 			destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
-			return mid, .None;
+			return mid, nil;
 		}
 	}
 

@@ -23,47 +23,47 @@ int_is_initialized :: proc(a: ^Int) -> bool {
 }
 
 int_is_zero :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return false, err;
 	}
-	return a.used == 0, .None;
+	return a.used == 0, nil;
 }
 
 int_is_positive :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return false, err;
 	}
-	return a.sign == .Zero_or_Positive, .None;
+	return a.sign == .Zero_or_Positive, nil;
 }
 
 int_is_negative :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return false, err;
 	}
-	return a.sign == .Negative, .None;
+	return a.sign == .Negative, nil;
 }
 
 int_is_even :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return false, err;
 	}
 
 	res, err = is_zero(a);
-	if err != .None {
+	if err != nil {
 		return false, err;
 	} else if res == true {
-		return true, .None;
+		return true, nil;
 	}
 
 	res = false;
 	if a.used > 0 && a.digit[0] & 1 == 0 {
 		res = true;
 	}
-	return res, .None;
+	return res, nil;
 }
 
 int_is_odd :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return false, err;
 	}
 
@@ -76,7 +76,7 @@ platform_int_is_power_of_two :: proc(a: int) -> bool {
 }
 
 int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return false, err;
 	}
 
@@ -84,21 +84,21 @@ int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
 		Early out for Int == 0.
 	*/
 	if a.used == 0 {
-		return false, .None;
+		return false, nil;
 	}
 
 	/*
 		For an `Int` to be a power of two, its top limb has to be a power of two.
 	*/
 	if !platform_int_is_power_of_two(int(a.digit[a.used - 1])) {
-		return false, .None;
+		return false, nil;
 	}
 
 	/*
 		That was the only limb, so it's a power of two.
 	*/
 	if a.used == 1 {
-		return true, .None;
+		return true, nil;
 	}
 
 	/*
@@ -106,32 +106,32 @@ int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
 	*/
 	for i := 1; i < a.used; i += 1 {
 		if a.digit[i - 1] != 0 {
-			return false, .None;
+			return false, nil;
 		}
 	}
-	return true, .None;
+	return true, nil;
 }
 
 /*
 	Compare two `Int`s, signed.
 */
 int_compare :: proc(a, b: ^Int) -> (res: int, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return 0, err;
 	}
-	if err = clear_if_uninitialized(b); err != .None {
+	if err = clear_if_uninitialized(b); err != nil {
 		return 0, err;
 	}
 
 	neg: bool;
-	if neg, err = is_negative(a); err != .None {
+	if neg, err = is_negative(a); err != nil {
 		return 0, err;
 	}
 
 	/* Compare based on sign */
 	if a.sign != b.sign {
 		res = -1 if neg else +1;
-		return res, .None;
+		return res, nil;
 	}
 
 	/* If negative, compare in the opposite direction */
@@ -145,63 +145,63 @@ int_compare :: proc(a, b: ^Int) -> (res: int, err: Error) {
 	Compare an `Int` to an unsigned number upto the size of the backing type.
 */
 int_compare_digit :: proc(a: ^Int, u: DIGIT) -> (res: int, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return 0, err;
 	}
 
 	/* Compare based on sign */
 	neg: bool;
-	if neg, err = is_neg(a); err != .None {
+	if neg, err = is_neg(a); err != nil {
 		return 0, err;
 	}
 	if neg {
-		return -1, .None;
+		return -1, nil;
 	}
 
 	/* Compare based on magnitude */
 	if a.used > 1 {
-		return +1, .None;
+		return +1, nil;
 	}
 
 	/* Compare the only digit in `a` to `u`. */
 	if a.digit[0] != u {
 		if a.digit[0] > u {
-			return +1, .None;
+			return +1, nil;
 		}
-		return -1, .None;
+		return -1, nil;
 	}
 
-	return 0, .None;
+	return 0, nil;
 }
 
 /*
 	Compare the magnitude of two `Int`s, unsigned.
 */
 int_compare_magnitude :: proc(a, b: ^Int) -> (res: int, err: Error) {
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return 0, err;
 	}
-	if err = clear_if_uninitialized(b); err != .None {
+	if err = clear_if_uninitialized(b); err != nil {
 		return 0, err;
 	}
 
 	/* Compare based on used digits */
 	if a.used != b.used {
 		if a.used > b.used {
-			return +1, .None;
+			return +1, nil;
 		}
-		return -1, .None;
+		return -1, nil;
 	}
 
 	/* Same number of used digits, compare based on their value */
 	for n := a.used - 1; n >= 0; n -= 1 {
 		if a.digit[n] != b.digit[n] {
 			if a.digit[n] > b.digit[n] {
-				return +1, .None;
+				return +1, nil;
 			}
-			return -1, .None;
+			return -1, nil;
 		}
 	}
 
-   	return 0, .None;
+   	return 0, nil;
 }

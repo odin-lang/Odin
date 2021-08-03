@@ -19,7 +19,7 @@ import "core:mem"
 */
 int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return "", err;
 	}
 	/*
@@ -39,7 +39,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 	/*
 		Exit if calculating the size returned an error.
 	*/
-	if size, err = radix_size(a, radix, zero_terminate); err != .None {
+	if size, err = radix_size(a, radix, zero_terminate); err != nil {
 		return "", err;
 	}
 
@@ -62,7 +62,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 */
 int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return "", err;
 	}
 	/*
@@ -97,7 +97,7 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocato
 */
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	a := a; radix := radix; size := size;
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return 0, err;
 	}
 	/*
@@ -112,7 +112,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		We weren't given a size. Let's compute it.
 	*/
 	if size == -1 {
-		if size, err = radix_size(a, radix, zero_terminate); err != .None {
+		if size, err = radix_size(a, radix, zero_terminate); err != nil {
 			return 0, err;
 		}
 	}
@@ -149,7 +149,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			diff := size - written;
 			mem.copy(&buffer[0], &buffer[diff], written);
 		}
-		return written, .None;
+		return written, nil;
 	}
 
 	/*
@@ -182,7 +182,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			diff := size - written;
 			mem.copy(&buffer[0], &buffer[diff], written);
 		}
-		return written, .None;
+		return written, nil;
 	}
 
 	/*
@@ -202,7 +202,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 
 		for offset := 0; offset < count; offset += shift {
 			bits_to_get := int(min(count - offset, shift));
-			if digit, err = int_bitfield_extract(a, offset, bits_to_get); err != .None {
+			if digit, err = int_bitfield_extract(a, offset, bits_to_get); err != nil {
 				return len(buffer) - available, .Invalid_Argument;
 			}
 			available -= 1;
@@ -222,7 +222,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			diff := size - written;
 			mem.copy(&buffer[0], &buffer[diff], written);
 		}
-		return written, .None;
+		return written, nil;
 	}
 
 	return _itoa_raw_full(a, radix, buffer, zero_terminate);
@@ -248,13 +248,13 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 	/*
 		Set the integer to the default of zero.
 	*/
-	if err = zero(res); err != .None { return err; }
+	if err = zero(res); err != nil { return err; }
 
 	/*
 		We'll interpret an empty string as zero.
 	*/
 	if len(input) == 0 {
-		return .None;
+		return nil;
 	}
 
 	/*
@@ -295,8 +295,8 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 			break;
 		}
 
-		if err = mul(res, res, DIGIT(radix)); err != .None { return err; }
-		if err = add(res, res, DIGIT(y));     err != .None { return err; }
+		if err = mul(res, res, DIGIT(radix)); err != nil { return err; }
+		if err = add(res, res, DIGIT(y));     err != nil { return err; }
 
 		input = input[1:];
 	}
@@ -313,7 +313,7 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 		res.sign = sign;
 	}
 
-	return .None;
+	return nil;
 }
 
 
@@ -327,15 +327,15 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 	if radix < 2 || radix > 64 {
 		return -1, .Invalid_Argument;
 	}
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return 0, err;
 	}
 
 	if z, _ := is_zero(a); z {
 		if zero_terminate {
-			return 2, .None;
+			return 2, nil;
 		}
-		return 1, .None;
+		return 1, nil;
 	}
 
 	if pot, _ := is_power_of_two(a); pot {
@@ -348,7 +348,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 			digit     = a.digit,
 		};
 
-		if size, err = log(t, DIGIT(radix)); err != .None {
+		if size, err = log(t, DIGIT(radix)); err != nil {
 			return 0, err;
 		}
 	} else {
@@ -364,8 +364,8 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 		err = set(k, lb[radix]);
 
 		/* n = floor((la *  k) / 2^29) + 1 */
-		if err = mul(k, la, k); err != .None { return 0, err; }
-		if err = shr(k, k, _RADIX_SIZE_SCALE); err != .None { return 0, err; }
+		if err = mul(k, la, k); err != nil { return 0, err; }
+		if err = shr(k, k, _RADIX_SIZE_SCALE); err != nil { return 0, err; }
 
 		/* The "+1" here is the "+1" in "floor((la *  k) / 2^29) + 1" */
 		/* n = n + 1 + EOS + sign */
@@ -378,7 +378,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 	*/
 	size += 2 if a.sign == .Negative else 1;
 	size += 1 if zero_terminate else 0;
-	return size, .None;
+	return size, nil;
 }
 
 /*
@@ -435,8 +435,8 @@ RADIX_TABLE_REVERSE_SIZE :: 80;
 _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (written: int, err: Error) {
 	temp, denominator := &Int{}, &Int{};
 
-	if err = copy(temp, a); err != .None { return 0, err; }
-	if err = set(denominator, radix); err != .None { return 0, err; }
+	if err = copy(temp, a); err != nil { return 0, err; }
+	if err = set(denominator, radix); err != nil { return 0, err; }
 
 	available := len(buffer);
 	if zero_terminate {
@@ -450,7 +450,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 
 	remainder: int;
 	for {
-		if remainder, err = _int_div_digit(temp, temp, DIGIT(radix)); err != .None {
+		if remainder, err = _int_div_digit(temp, temp, DIGIT(radix)); err != nil {
 			destroy(temp, denominator);
 			return len(buffer) - available, err;
 		}
@@ -476,5 +476,5 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		diff := len(buffer) - written;
 		mem.copy(&buffer[0], &buffer[diff], written);
 	}
-	return written, .None;
+	return written, nil;
 }

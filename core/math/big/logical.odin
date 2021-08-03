@@ -24,13 +24,13 @@ import "core:mem"
 	2's complement `and`, returns `dest = a & b;`
 */
 int_and :: proc(dest, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a, b); err != .None { return err; }
+	if err = clear_if_uninitialized(a, b); err != nil { return err; }
 
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .None { return err; }
+	if err = grow(dest, used); err != nil { return err; }
 
 	neg_a, _ := is_neg(a);
 	neg_b, _ := is_neg(b);
@@ -85,12 +85,12 @@ and :: proc { int_add, };
 	2's complement `or`, returns `dest = a | b;`
 */
 int_or :: proc(dest, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a, b); err != .None { return err; }
+	if err = clear_if_uninitialized(a, b); err != nil { return err; }
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .None { return err; }
+	if err = grow(dest, used); err != nil { return err; }
 
 	neg_a, _ := is_neg(a);
 	neg_b, _ := is_neg(b);
@@ -145,13 +145,13 @@ or :: proc { int_or, };
 	2's complement `xor`, returns `dest = a ~ b;`
 */
 int_xor :: proc(dest, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a, b); err != .None { return err; }
+	if err = clear_if_uninitialized(a, b); err != nil { return err; }
 
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = grow(dest, used); err != .None { return err; }
+	if err = grow(dest, used); err != nil { return err; }
 
 	neg_a, _ := is_neg(a);
 	neg_b, _ := is_neg(b);
@@ -209,7 +209,7 @@ int_complement :: proc(dest, src: ^Int) -> (err: Error) {
 	/*
 		Check that src is usable. Dest will get checked by `sub`.
 	*/
-	if err = clear_if_uninitialized(src); err != .None { return err; }
+	if err = clear_if_uninitialized(src); err != nil { return err; }
 
 	/*
 		Temporarily fix sign.
@@ -235,25 +235,25 @@ complement :: proc { int_complement, };
 */
 int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int) -> (err: Error) {
 	bits := bits;
-	if err = clear_if_uninitialized(quotient, numerator);  err != .None { return err; }
+	if err = clear_if_uninitialized(quotient, numerator);  err != nil { return err; }
 
 	if bits < 0 { return .Invalid_Argument; }
 
-	if err = copy(quotient, numerator); err != .None { return err; }
+	if err = copy(quotient, numerator); err != nil { return err; }
 
 	/*
 		Shift right by a certain bit count (store quotient and optional remainder.)
 	   `numerator` should not be used after this.
 	*/
 	if remainder != nil {
-		if err = mod_bits(remainder, numerator, bits); err != .None { return err; }
+		if err = mod_bits(remainder, numerator, bits); err != nil { return err; }
 	}
 
 	/*
 		Shift by as many digits in the bit count.
 	*/
 	if bits >= _DIGIT_BITS {
-		if err = shr_digit(quotient, bits / _DIGIT_BITS); err != .None { return err; }
+		if err = shr_digit(quotient, bits / _DIGIT_BITS); err != nil { return err; }
 	}
 
 	/*
@@ -299,9 +299,9 @@ int_shr_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
 	/*
 		Check that `quotient` is usable.
 	*/
-	if err = clear_if_uninitialized(quotient); err != .None { return err; }
+	if err = clear_if_uninitialized(quotient); err != nil { return err; }
 
-	if digits <= 0 { return .None; }
+	if digits <= 0 { return nil; }
 
 	/*
 		If digits > used simply zero and return.
@@ -332,15 +332,15 @@ shr_digit :: proc { int_shr_digit, };
 	Shift right by a certain bit count with sign extension.
 */
 int_shr_signed :: proc(dest, src: ^Int, bits: int) -> (err: Error) {
-	if err = clear_if_uninitialized(src);	err != .None { return err; }
-	if err = clear_if_uninitialized(dest);	err != .None { return err; }
+	if err = clear_if_uninitialized(src);	err != nil { return err; }
+	if err = clear_if_uninitialized(dest);	err != nil { return err; }
 
 	if src.sign == .Zero_or_Positive {
 		return shr(dest, src, bits);
 	}
-	if err = add(dest, src, DIGIT(1));		err != .None { return err; }
+	if err = add(dest, src, DIGIT(1));		err != nil { return err; }
 
-	if err = shr(dest, dest, bits);			err != .None { return err; }
+	if err = shr(dest, dest, bits);			err != nil { return err; }
 	return sub(dest, src, DIGIT(1));
 }
 
@@ -351,25 +351,25 @@ shr_signed :: proc { int_shr_signed, };
 */
 int_shl :: proc(dest, src: ^Int, bits: int) -> (err: Error) {
 	bits := bits;
-	if err = clear_if_uninitialized(src, dest);  err != .None { return err; }
+	if err = clear_if_uninitialized(src, dest);  err != nil { return err; }
 
 	if bits < 0 {
 		return .Invalid_Argument;
 	}
 
-	if err = copy(dest, src); err != .None { return err; }
+	if err = copy(dest, src); err != nil { return err; }
 
 	/*
 		Grow `dest` to accommodate the additional bits.
 	*/
 	digits_needed := dest.used + (bits / _DIGIT_BITS) + 1;
-	if err = grow(dest, digits_needed); err != .None { return err; }
+	if err = grow(dest, digits_needed); err != nil { return err; }
 	dest.used = digits_needed;
 	/*
 		Shift by as many digits in the bit count as we have.
 	*/
 	if bits >= _DIGIT_BITS {
-		if err = shl_digit(dest, bits / _DIGIT_BITS); err != .None { return err; }
+		if err = shl_digit(dest, bits / _DIGIT_BITS); err != nil { return err; }
 	}
 
 	/*
@@ -407,20 +407,20 @@ int_shl_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
 	/*
 		Check that `quotient` is usable.
 	*/
-	if err = clear_if_uninitialized(quotient); err != .None { return err; }
+	if err = clear_if_uninitialized(quotient); err != nil { return err; }
 
-	if digits <= 0 { return .None; }
+	if digits <= 0 { return nil; }
 
 	/*
 		No need to shift a zero.
 	*/
 	z: bool;
-	if z, err = is_zero(quotient); z || err != .None { return err; }
+	if z, err = is_zero(quotient); z || err != nil { return err; }
 
 	/*
 		Resize `quotient` to accomodate extra digits.
 	*/
-	if err = grow(quotient, quotient.used + digits); err != .None { return err; }
+	if err = grow(quotient, quotient.used + digits); err != nil { return err; }
 
 	/*
 		Increment the used by the shift amount then copy upwards.
@@ -436,6 +436,6 @@ int_shl_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
 
    	quotient.used += digits;
     mem.zero_slice(quotient.digit[:digits]);
-    return .None;
+    return nil;
 }
 shl_digit :: proc { int_shl_digit, };

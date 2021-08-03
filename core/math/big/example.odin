@@ -102,7 +102,7 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := false, newlin
 	} else {
 		fmt.printf("%v", as);
 	}
-	if err != .None {
+	if err != nil {
 		fmt.printf("%v (error: %v | %v)", name, err, a);
 	}
 	if newline {
@@ -118,19 +118,22 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	N :: 5_000;
+	factorial(a, 128); // Untimed warmup.
+
+	N :: 128;
 
 	s := time.tick_now();
 	err = factorial(a, N);
 	Timings[.factorial].t += time.tick_since(s); Timings[.factorial].c += 1;
-	if err != .None {
+
+	if err != nil {
 		fmt.printf("factorial(%v) returned %v\n", N, err);
 	}
 
 	s = time.tick_now();
 	as, err = itoa(a, 16);
 	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
-	if err != .None {
+	if err != nil {
 		fmt.printf("itoa(factorial(%v), 16) returned %v\n", N, err);
 	}
 

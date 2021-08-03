@@ -33,14 +33,14 @@ PyRes :: struct {
 	aa, bb, sum := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, sum);
 
-	if err = atoi(aa, string(a), 16); err != .None { return PyRes{res=":add:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 16); err != .None { return PyRes{res=":add:atoi(b):", err=err}; }
-	if err = add(sum, aa, bb);        err != .None { return PyRes{res=":add:add(sum,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":add:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 16); err != nil { return PyRes{res=":add:atoi(b):", err=err}; }
+	if err = add(sum, aa, bb);        err != nil { return PyRes{res=":add:add(sum,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(sum, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":add:itoa(sum):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":add:itoa(sum):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 @export test_sub :: proc "c" (a, b: cstring) -> (res: PyRes) {
@@ -50,14 +50,14 @@ PyRes :: struct {
 	aa, bb, sum := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, sum);
 
-	if err = atoi(aa, string(a), 16); err != .None { return PyRes{res=":sub:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 16); err != .None { return PyRes{res=":sub:atoi(b):", err=err}; }
-	if err = sub(sum, aa, bb);        err != .None { return PyRes{res=":sub:sub(sum,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":sub:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 16); err != nil { return PyRes{res=":sub:atoi(b):", err=err}; }
+	if err = sub(sum, aa, bb);        err != nil { return PyRes{res=":sub:sub(sum,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(sum, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":sub:itoa(sum):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":sub:itoa(sum):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 @export test_mul :: proc "c" (a, b: cstring) -> (res: PyRes) {
@@ -67,14 +67,14 @@ PyRes :: struct {
 	aa, bb, product := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, product);
 
-	if err = atoi(aa, string(a), 16); err != .None { return PyRes{res=":mul:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 16); err != .None { return PyRes{res=":mul:atoi(b):", err=err}; }
-	if err = mul(product, aa, bb);    err != .None { return PyRes{res=":mul:mul(product,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":mul:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 16); err != nil { return PyRes{res=":mul:atoi(b):", err=err}; }
+	if err = mul(product, aa, bb);    err != nil { return PyRes{res=":mul:mul(product,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(product, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":mul:itoa(product):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":mul:itoa(product):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -87,14 +87,14 @@ PyRes :: struct {
 	aa, bb, quotient := &Int{}, &Int{}, &Int{};
 	defer destroy(aa, bb, quotient);
 
-	if err = atoi(aa, string(a), 16); err != .None { return PyRes{res=":div:atoi(a):", err=err}; }
-	if err = atoi(bb, string(b), 16); err != .None { return PyRes{res=":div:atoi(b):", err=err}; }
-	if err = div(quotient, aa, bb);   err != .None { return PyRes{res=":div:div(quotient,a,b):", err=err}; }
+	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":div:atoi(a):", err=err}; }
+	if err = atoi(bb, string(b), 16); err != nil { return PyRes{res=":div:atoi(b):", err=err}; }
+	if err = div(quotient, aa, bb);   err != nil { return PyRes{res=":div:div(quotient,a,b):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(quotient, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":div:itoa(quotient):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":div:itoa(quotient):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 
@@ -109,8 +109,8 @@ PyRes :: struct {
 	aa := &Int{};
 	defer destroy(aa);
 
-	if err = atoi(aa, string(a), 16); err != .None { return PyRes{res=":log:atoi(a):", err=err}; }
-	if l, err = log(aa, base);        err != .None { return PyRes{res=":log:log(a, base):", err=err}; }
+	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":log:atoi(a):", err=err}; }
+	if l, err = log(aa, base);        err != nil { return PyRes{res=":log:log(a, base):", err=err}; }
 
 	zero(aa);
 	aa.digit[0] = DIGIT(l)  & _MASK;
@@ -120,8 +120,8 @@ PyRes :: struct {
 
 	r: cstring;
 	r, err = int_itoa_cstring(aa, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":log:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":log:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -134,13 +134,13 @@ PyRes :: struct {
 	dest, bb := &Int{}, &Int{};
 	defer destroy(dest, bb);
 
-	if err = atoi(bb, string(base), 16); err != .None { return PyRes{res=":pow:atoi(base):", err=err}; }
-	if err = pow(dest, bb, power);       err != .None { return PyRes{res=":pow:pow(dest, base, power):", err=err}; }
+	if err = atoi(bb, string(base), 16); err != nil { return PyRes{res=":pow:atoi(base):", err=err}; }
+	if err = pow(dest, bb, power);       err != nil { return PyRes{res=":pow:pow(dest, base, power):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(dest, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":log:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":log:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -153,13 +153,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":sqrt:atoi(src):", err=err}; }
-	if err = sqrt(src, src);                err != .None { return PyRes{res=":sqrt:sqrt(src):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":sqrt:atoi(src):", err=err}; }
+	if err = sqrt(src, src);                err != nil { return PyRes{res=":sqrt:sqrt(src):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":log:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":log:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -172,13 +172,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":root_n:atoi(src):", err=err}; }
-	if err = root_n(src, src, power);       err != .None { return PyRes{res=":root_n:root_n(src):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":root_n:atoi(src):", err=err}; }
+	if err = root_n(src, src, power);       err != nil { return PyRes{res=":root_n:root_n(src):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":root_n:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":root_n:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -191,13 +191,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":shr_digit:atoi(src):", err=err}; }
-	if err = shr_digit(src, digits);        err != .None { return PyRes{res=":shr_digit:shr_digit(src):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":shr_digit:atoi(src):", err=err}; }
+	if err = shr_digit(src, digits);        err != nil { return PyRes{res=":shr_digit:shr_digit(src):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":shr_digit:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":shr_digit:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -210,13 +210,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":shl_digit:atoi(src):", err=err}; }
-	if err = shl_digit(src, digits);        err != .None { return PyRes{res=":shl_digit:shr_digit(src):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":shl_digit:atoi(src):", err=err}; }
+	if err = shl_digit(src, digits);        err != nil { return PyRes{res=":shl_digit:shr_digit(src):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":shl_digit:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":shl_digit:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -229,13 +229,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":shr:atoi(src):", err=err}; }
-	if err = shr(src, src, bits);           err != .None { return PyRes{res=":shr:shr(src, bits):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":shr:atoi(src):", err=err}; }
+	if err = shr(src, src, bits);           err != nil { return PyRes{res=":shr:shr(src, bits):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":shr:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":shr:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -248,13 +248,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":shr_signed:atoi(src):", err=err}; }
-	if err = shr_signed(src, src, bits);    err != .None { return PyRes{res=":shr_signed:shr_signed(src, bits):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":shr_signed:atoi(src):", err=err}; }
+	if err = shr_signed(src, src, bits);    err != nil { return PyRes{res=":shr_signed:shr_signed(src, bits):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":shr_signed:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":shr_signed:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -267,13 +267,13 @@ PyRes :: struct {
 	src := &Int{};
 	defer destroy(src);
 
-	if err = atoi(src, string(source), 16); err != .None { return PyRes{res=":shl:atoi(src):", err=err}; }
-	if err = shl(src, src, bits);           err != .None { return PyRes{res=":shl:shl(src, bits):", err=err}; }
+	if err = atoi(src, string(source), 16); err != nil { return PyRes{res=":shl:atoi(src):", err=err}; }
+	if err = shl(src, src, bits);           err != nil { return PyRes{res=":shl:shl(src, bits):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(src, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":shl:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":shl:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -286,12 +286,12 @@ PyRes :: struct {
 	dest := &Int{};
 	defer destroy(dest);
 
-	if err = factorial(dest, n); err != .None { return PyRes{res=":factorial:factorial(n):", err=err}; }
+	if err = factorial(dest, n); err != nil { return PyRes{res=":factorial:factorial(n):", err=err}; }
 
 	r: cstring;
 	r, err = int_itoa_cstring(dest, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":factorial:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":factorial:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -304,14 +304,14 @@ PyRes :: struct {
 	ai, bi, dest := &Int{}, &Int{}, &Int{};
 	defer destroy(ai, bi, dest);
 
-	if err = atoi(ai, string(a), 16); err != .None { return PyRes{res=":gcd:atoi(a):", err=err}; }
-	if err = atoi(bi, string(b), 16); err != .None { return PyRes{res=":gcd:atoi(b):", err=err}; }
-	if err = gcd(dest, ai, bi); err != .None { return PyRes{res=":gcd:gcd(a, b):", err=err}; }	
+	if err = atoi(ai, string(a), 16); err != nil { return PyRes{res=":gcd:atoi(a):", err=err}; }
+	if err = atoi(bi, string(b), 16); err != nil { return PyRes{res=":gcd:atoi(b):", err=err}; }
+	if err = gcd(dest, ai, bi); err != nil { return PyRes{res=":gcd:gcd(a, b):", err=err}; }	
 
 	r: cstring;
 	r, err = int_itoa_cstring(dest, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":gcd:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":gcd:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 
 /*
@@ -324,13 +324,13 @@ PyRes :: struct {
 	ai, bi, dest := &Int{}, &Int{}, &Int{};
 	defer destroy(ai, bi, dest);
 
-	if err = atoi(ai, string(a), 16); err != .None { return PyRes{res=":lcm:atoi(a):", err=err}; }
-	if err = atoi(bi, string(b), 16); err != .None { return PyRes{res=":lcm:atoi(b):", err=err}; }
-	if err = lcm(dest, ai, bi); err != .None { return PyRes{res=":lcm:lcm(a, b):", err=err}; }	
+	if err = atoi(ai, string(a), 16); err != nil { return PyRes{res=":lcm:atoi(a):", err=err}; }
+	if err = atoi(bi, string(b), 16); err != nil { return PyRes{res=":lcm:atoi(b):", err=err}; }
+	if err = lcm(dest, ai, bi); err != nil { return PyRes{res=":lcm:lcm(a, b):", err=err}; }	
 
 	r: cstring;
 	r, err = int_itoa_cstring(dest, 16, context.temp_allocator);
-	if err != .None { return PyRes{res=":lcm:itoa(res):", err=err}; }
-	return PyRes{res = r, err = .None};
+	if err != nil { return PyRes{res=":lcm:itoa(res):", err=err}; }
+	return PyRes{res = r, err = nil};
 }
 

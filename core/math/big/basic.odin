@@ -25,9 +25,9 @@ import "core:intrinsics"
 */
 int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	dest := dest; x := a; y := b;
-	if err = clear_if_uninitialized(x); err != .None { return err; }
-	if err = clear_if_uninitialized(y); err != .None { return err; }
-	if err = clear_if_uninitialized(dest); err != .None { return err; }
+	if err = clear_if_uninitialized(x); err != nil { return err; }
+	if err = clear_if_uninitialized(y); err != nil { return err; }
+	if err = clear_if_uninitialized(dest); err != nil { return err; }
 	/*
 		All parameters have been initialized.
 		We can now safely ignore errors from comparison routines.
@@ -62,13 +62,13 @@ int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
-	if err = clear_if_uninitialized(a); err != .None {
+	if err = clear_if_uninitialized(a); err != nil {
 		return err;
 	}
 	/*
 		Grow destination as required.
 	*/
-	if err = grow(dest, a.used + 1); err != .None {
+	if err = grow(dest, a.used + 1); err != nil {
 		return err;
 	}
 
@@ -110,7 +110,7 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 		/*
 			dest = |a| - digit
 		*/
-		if err = sub(dest, a, digit); err != .None {
+		if err = sub(dest, a, digit); err != nil {
 			/*
 				Restore a's sign.
 			*/
@@ -186,13 +186,13 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 */
 int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	if err = clear_if_uninitialized(dest); err != .None {
+	if err = clear_if_uninitialized(dest); err != nil {
 		return err;
 	}
-	if err = clear_if_uninitialized(x); err != .None {
+	if err = clear_if_uninitialized(x); err != nil {
 		return err;
 	}
-	if err = clear_if_uninitialized(y); err != .None {
+	if err = clear_if_uninitialized(y); err != nil {
 		return err;
 	}
 	/*
@@ -242,14 +242,14 @@ int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 */
 int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	dest := dest; digit := digit;
-	if err = clear_if_uninitialized(dest); err != .None {
+	if err = clear_if_uninitialized(dest); err != nil {
 		return err;
 	}
 	/*
 		Grow destination as required.
 	*/
 	if dest != a {
-		if err = grow(dest, a.used + 1); err != .None {
+		if err = grow(dest, a.used + 1); err != nil {
 			return err;
 		}
 	}
@@ -267,14 +267,14 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 		*/
 		if n, _ := is_neg(dest); n && (dest.digit[0] + digit < _DIGIT_MAX) {
 			dest.digit[0] += digit;
-			return .None;
+			return nil;
 		}
 		/*
 			Can be subtracted from dest.digit[0] without underflow.
 		*/
 		if p, _ := is_pos(a); p && (dest.digit[0] > digit) {
 			dest.digit[0] -= digit;
-			return .None;
+			return nil;
 		}
 	}
 
@@ -339,14 +339,14 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 */
 int_halve :: proc(dest, src: ^Int) -> (err: Error) {
 	dest := dest; src := src;
-	if err = clear_if_uninitialized(dest); err != .None {
+	if err = clear_if_uninitialized(dest); err != nil {
 		return err;
 	}
 	/*
 		Grow destination as required.
 	*/
 	if dest != src {
-		if err = grow(dest, src.used); err != .None {
+		if err = grow(dest, src.used); err != nil {
 			return err;
 		}
 	}
@@ -397,14 +397,14 @@ shr1  :: halve;
 */
 int_double :: proc(dest, src: ^Int) -> (err: Error) {
 	dest := dest; src := src;
-	if err = clear_if_uninitialized(dest); err != .None {
+	if err = clear_if_uninitialized(dest); err != nil {
 		return err;
 	}
 	/*
 		Grow destination as required.
 	*/
 	if dest != src {
-		if err = grow(dest, src.used + 1); err != .None {
+		if err = grow(dest, src.used + 1); err != nil {
 			return err;
 		}
 	}
@@ -462,8 +462,8 @@ shl1   :: double;
 	remainder = numerator % (1 << bits)
 */
 int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
-	if err = clear_if_uninitialized(remainder); err != .None { return err; }
-	if err = clear_if_uninitialized(numerator); err != .None { return err; }
+	if err = clear_if_uninitialized(remainder); err != nil { return err; }
+	if err = clear_if_uninitialized(numerator); err != nil { return err; }
 
 	if bits  < 0 { return .Invalid_Argument; }
 	if bits == 0 { return zero(remainder); }
@@ -472,7 +472,7 @@ int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
 		If the modulus is larger than the value, return the value.
 	*/
 	err = copy(remainder, numerator);
-	if bits >= (numerator.used * _DIGIT_BITS) || err != .None {
+	if bits >= (numerator.used * _DIGIT_BITS) || err != nil {
 		return;
 	}
 
@@ -499,7 +499,7 @@ mod_bits :: proc { int_mod_bits, };
 	Multiply by a DIGIT.
 */
 int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT) -> (err: Error) {
-	if err = clear_if_uninitialized(src, dest); err != .None { return err; }
+	if err = clear_if_uninitialized(src, dest); err != nil { return err; }
 
 	if multiplier == 0 {
 		return zero(dest);
@@ -516,14 +516,14 @@ int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT) -> (err: Error) {
 	}
 	if is_power_of_two(int(multiplier)) {
 		ix: int;
-		if ix, err = log(multiplier, 2); err != .None { return err; }
+		if ix, err = log(multiplier, 2); err != nil { return err; }
 		return shl(dest, src, ix);
 	}
 
 	/*
 		Ensure `dest` is big enough to hold `src` * `multiplier`.
 	*/
-	if err = grow(dest, max(src.used + 1, _DEFAULT_DIGIT_COUNT)); err != .None { return err; }
+	if err = grow(dest, max(src.used + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 
 	/*
 		Save the original used count.
@@ -575,7 +575,7 @@ int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT) -> (err: Error) {
 	High level multiplication (handles sign).
 */
 int_mul :: proc(dest, src, multiplier: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(dest, src, multiplier); err != .None { return err; }
+	if err = clear_if_uninitialized(dest, src, multiplier); err != nil { return err; }
 
 	/*
 		Early out for `multiplier` is zero; Set `dest` to zero.
@@ -657,10 +657,10 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 	/*
 		Early out if neither of the results is wanted.
 	*/
-	if quotient == nil && remainder == nil 		        { return .None; }
+	if quotient == nil && remainder == nil 		        { return nil; }
 
-	if err = clear_if_uninitialized(numerator);			err != .None { return err; }
-	if err = clear_if_uninitialized(denominator);		err != .None { return err; }
+	if err = clear_if_uninitialized(numerator);			err != nil { return err; }
+	if err = clear_if_uninitialized(denominator);		err != nil { return err; }
 
 	z: bool;
 	if z, err = is_zero(denominator);                   z { return .Division_by_Zero; }
@@ -671,12 +671,12 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 	c: int;
 	if c, err = cmp_mag(numerator, denominator); c == -1 {
 		if remainder != nil {
-			if err = copy(remainder, numerator); 		err != .None { return err; }
+			if err = copy(remainder, numerator); 		err != nil { return err; }
 		}
 		if quotient != nil {
 			zero(quotient);
 		}
-		return .None;
+		return nil;
 	}
 
 	if false && (denominator.used > 2 * _MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
@@ -702,10 +702,10 @@ div :: proc { int_div, };
 	denominator < remainder <= 0 if denominator < 0
 */
 int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
-	if err = divmod(nil, remainder, numerator, denominator); err != .None { return err; }
+	if err = divmod(nil, remainder, numerator, denominator); err != nil { return err; }
 
 	z: bool;
-	if z, err = is_zero(remainder); z || denominator.sign == remainder.sign { return .None; }
+	if z, err = is_zero(remainder); z || denominator.sign == remainder.sign { return nil; }
 	return add(remainder, remainder, numerator);
 }
 mod :: proc { int_mod, };
@@ -714,7 +714,7 @@ mod :: proc { int_mod, };
 	remainder = (number + addend) % modulus.
 */
 int_addmod :: proc(remainder, number, addend, modulus: ^Int) -> (err: Error) {
-	if err = add(remainder, number, addend); err != .None { return err; }
+	if err = add(remainder, number, addend); err != nil { return err; }
 	return mod(remainder, remainder, modulus);
 }
 addmod :: proc { int_addmod, };
@@ -723,7 +723,7 @@ addmod :: proc { int_addmod, };
 	remainder = (number - decrease) % modulus.
 */
 int_submod :: proc(remainder, number, decrease, modulus: ^Int) -> (err: Error) {
-	if err = add(remainder, number, decrease); err != .None { return err; }
+	if err = add(remainder, number, decrease); err != nil { return err; }
 	return mod(remainder, remainder, modulus);
 }
 submod :: proc { int_submod, };
@@ -732,7 +732,7 @@ submod :: proc { int_submod, };
 	remainder = (number * multiplicand) % modulus.
 */
 int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int) -> (err: Error) {
-	if err = mul(remainder, number, multiplicand); err != .None { return err; }
+	if err = mul(remainder, number, multiplicand); err != nil { return err; }
 	return mod(remainder, remainder, modulus);
 }
 mulmod :: proc { int_mulmod, };
@@ -741,7 +741,7 @@ mulmod :: proc { int_mulmod, };
 	remainder = (number * number) % modulus.
 */
 int_sqrmod :: proc(remainder, number, modulus: ^Int) -> (err: Error) {
-	if err = sqr(remainder, number); err != .None { return err; }
+	if err = sqr(remainder, number); err != nil { return err; }
 	return mod(remainder, remainder, modulus);
 }
 sqrmod :: proc { int_sqrmod, };
@@ -762,13 +762,13 @@ int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 		return int_factorial_binary_split(res, n);
 	}
 
-	if err = set(res, _factorial_table[i - 1]); err != .None { return err; }
+	if err = set(res, _factorial_table[i - 1]); err != nil { return err; }
 	for {
-		if err = mul(res, res, DIGIT(i)); err != .None || i == n { return err; }
+		if err = mul(res, res, DIGIT(i)); err != nil || i == n { return err; }
 		i += 1;
 	}
 
-	return .None;
+	return nil;
 }
 
 _int_recursive_product :: proc(res: ^Int, start, stop: DIGIT, level := int(0)) -> (err: Error) {
@@ -779,15 +779,15 @@ _int_recursive_product :: proc(res: ^Int, start, stop: DIGIT, level := int(0)) -
 
 	num_factors := (stop - start) >> 1;
 	if num_factors == 2 {
-		if err = set(t1, start); err != .None { return err; }
-		if err = add(t2, t1, 2); err != .None { return err; }
+		if err = set(t1, start); err != nil { return err; }
+		if err = add(t2, t1, 2); err != nil { return err; }
 		return mul(res, t1, t2);
 	}
 
 	if num_factors > 1 {
 		mid := (start + num_factors) | 1;
-		if err = _int_recursive_product(t1, start,  mid, level + 1); err != .None { return err; }
-		if err = _int_recursive_product(t2,   mid, stop, level + 1); err != .None { return err; }
+		if err = _int_recursive_product(t1, start,  mid, level + 1); err != nil { return err; }
+		if err = _int_recursive_product(t2,   mid, stop, level + 1); err != nil { return err; }
 		return mul(res, t1, t2);
 	}
 
@@ -805,17 +805,17 @@ int_factorial_binary_split :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(inner, outer, start, stop, temp);
 
-	if err = one(inner); err != .None { return err; }
-	if err = one(outer); err != .None { return err; }
+	if err = one(inner); err != nil { return err; }
+	if err = one(outer); err != nil { return err; }
 
 	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
 
 	for i := bits_used; i >= 0; i -= 1 {
 		start := (n >> (uint(i) + 1)) + 1 | 1;
 		stop  := (n >> uint(i)) + 1 | 1;
-		if err = _int_recursive_product(temp, start, stop); err != .None { return err; }
-		if err = mul(inner, inner, temp);                   err != .None { return err; }
-		if err = mul(outer, outer, inner);                  err != .None { return err; }
+		if err = _int_recursive_product(temp, start, stop); err != nil { return err; }
+		if err = mul(inner, inner, temp);                   err != nil { return err; }
+		if err = mul(outer, outer, inner);                  err != nil { return err; }
 	}
 	shift := n - intrinsics.count_ones(n);
 
@@ -841,7 +841,7 @@ factorial :: proc { int_factorial, };
 */
 int_choose_digit :: proc(res: ^Int, n, k: DIGIT) -> (err: Error) {
 	if res == nil  { return .Invalid_Pointer; }
-	if err = clear_if_uninitialized(res); err != .None { return err; }
+	if err = clear_if_uninitialized(res); err != nil { return err; }
 
 	if k > n { return zero(res); }
 
@@ -851,12 +851,12 @@ int_choose_digit :: proc(res: ^Int, n, k: DIGIT) -> (err: Error) {
 	n_fac, k_fac, n_minus_k_fac := &Int{}, &Int{}, &Int{};
 	defer destroy(n_fac, k_fac, n_minus_k_fac);
 
-	if err = factorial(n_minus_k_fac, n - k);  err != .None { return err; }
-	if err = factorial(k_fac, k);              err != .None { return err; }
-	if err = mul(k_fac, k_fac, n_minus_k_fac); err != .None { return err; }
+	if err = factorial(n_minus_k_fac, n - k);  err != nil { return err; }
+	if err = factorial(k_fac, k);              err != nil { return err; }
+	if err = mul(k_fac, k_fac, n_minus_k_fac); err != nil { return err; }
 
-	if err = factorial(n_fac, n);              err != .None { return err; }
-	if err = div(res, n_fac, k_fac);           err != .None { return err; }
+	if err = factorial(n_fac, n);              err != nil { return err; }
+	if err = div(res, n_fac, k_fac);           err != nil { return err; }
 
 	return err;	
 }
@@ -886,7 +886,7 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	max_used = x.used;
 	old_used = dest.used;
 
-	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != .None {
+	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != nil {
 		return err;
 	}
 	dest.used = max_used + 1;
@@ -954,10 +954,10 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 */
 _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	dest := dest; x := number; y := decrease;
-	if err = clear_if_uninitialized(x); err != .None {
+	if err = clear_if_uninitialized(x); err != nil {
 		return err;
 	}
-	if err = clear_if_uninitialized(y); err != .None {
+	if err = clear_if_uninitialized(y); err != nil {
 		return err;
 	}
 
@@ -966,7 +966,7 @@ _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	max_used := x.used;
 	i: int;
 
-	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != .None {
+	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != nil {
 		return err;
 	}
 	dest.used = max_used;
@@ -1042,7 +1042,7 @@ _int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 
 	t := &Int{};
 
-	if err = grow(t, max(digits, _DEFAULT_DIGIT_COUNT)); err != .None { return err; }
+	if err = grow(t, max(digits, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	t.used = digits;
 
 	/*
@@ -1113,7 +1113,7 @@ _int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 	/*
 		Grow the destination as required.
 	*/
-	if err = grow(dest, digits); err != .None { return err; }
+	if err = grow(dest, digits); err != nil { return err; }
 
 	/*
 		Number of output digits to produce.
@@ -1200,7 +1200,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 	/*
 		Grow `t` to maximum needed size, or `_DEFAULT_DIGIT_COUNT`, whichever is bigger.
 	*/
-	if err = grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != .None { return err; }
+	if err = grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	t.used = (2 * pa) + 1;
 
 	for ix = 0; ix < pa; ix += 1 {
@@ -1267,7 +1267,7 @@ _int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
  	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3);
 
 	q := &Int{};
-	if err = grow(q, numerator.used); err != .None { return -1, err; }
+	if err = grow(q, numerator.used); err != nil { return -1, err; }
 	q.used = numerator.used;
 	q.sign = numerator.sign;
 
@@ -1308,7 +1308,7 @@ _int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
  		swap(q, quotient);
  	}
 	destroy(q);
-	return remainder, .None;
+	return remainder, nil;
 }
 
 /*
@@ -1320,26 +1320,26 @@ _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (er
 	c: int;
 
 	goto_end: for {
-		if err = one(tq);									err != .None { break goto_end; }
+		if err = one(tq);									err != nil { break goto_end; }
 
 		num_bits, _ := count_bits(numerator);
 		den_bits, _ := count_bits(denominator);
 		n := num_bits - den_bits;
 
-		if err = abs(ta, numerator);						err != .None { break goto_end; }
-		if err = abs(tb, denominator);						err != .None { break goto_end; }
-		if err = shl(tb, tb, n);							err != .None { break goto_end; }
-		if err = shl(tq, tq, n);							err != .None { break goto_end; }
+		if err = abs(ta, numerator);						err != nil { break goto_end; }
+		if err = abs(tb, denominator);						err != nil { break goto_end; }
+		if err = shl(tb, tb, n);							err != nil { break goto_end; }
+		if err = shl(tq, tq, n);							err != nil { break goto_end; }
 
 		for n >= 0 {
 			if c, _ = cmp_mag(ta, tb); c == 0 || c == 1 {
 				// ta -= tb
-				if err = sub(ta, ta, tb);					err != .None { break goto_end; }
+				if err = sub(ta, ta, tb);					err != nil { break goto_end; }
 				//  q += tq
-				if err = add( q, q,  tq);					err != .None { break goto_end; }
+				if err = add( q, q,  tq);					err != nil { break goto_end; }
 			}
-			if err = shr1(tb, tb);							err != .None { break goto_end; }
-			if err = shr1(tq, tq);							err != .None { break goto_end; }
+			if err = shr1(tb, tb);							err != nil { break goto_end; }
+			if err = shr1(tq, tq);							err != nil { break goto_end; }
 
 			n -= 1;
 		}
@@ -1383,7 +1383,7 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 		Quick outs.
 	*/
 	if denominator == 1 || numerator.used == 0 {
-		err = .None;
+		err = nil;
 		if quotient != nil {
 			err = copy(quotient, numerator);
 		}
@@ -1397,7 +1397,7 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 			remainder = 1;
 		}
 		if quotient == nil {
-			return remainder, .None;
+			return remainder, nil;
 		}
 		return remainder, shr(quotient, numerator, 1);
 	}
@@ -1409,7 +1409,7 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 		}
 		remainder = int(numerator.digit[0]) & ((1 << uint(ix)) - 1);
 		if quotient == nil {
-			return remainder, .None;
+			return remainder, nil;
 		}
 
 		return remainder, shr(quotient, numerator, int(ix));
@@ -1425,7 +1425,7 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 	/*
 		No easy answer [c'est la vie].  Just division.
 	*/
-	if err = grow(q, numerator.used); err != .None { return 0, err; }
+	if err = grow(q, numerator.used); err != nil { return 0, err; }
 
 	q.used = numerator.used;
 	q.sign = numerator.sign;
@@ -1448,42 +1448,42 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 		swap(q, quotient);
 	}
 	destroy(q);
-	return remainder, .None;
+	return remainder, nil;
 }
 
 /*
 	Function computing both GCD and (if target isn't `nil`) also LCM.
 */
 int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(res_gcd, res_lcm, a, b); err != .None { return err; }
+	if err = clear_if_uninitialized(res_gcd, res_lcm, a, b); err != nil { return err; }
 
 	az, _ := is_zero(a); bz, _ := is_zero(b);
 	if az && bz {
 		if res_gcd != nil {
-			if err = zero(res_gcd); err != .None { return err; }
+			if err = zero(res_gcd); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm); err != .None { return err; }
+			if err = zero(res_lcm); err != nil { return err; }
 		}
-		return .None;
+		return nil;
 	}
 	else if az {
 		if res_gcd != nil {
-			if err = abs(res_gcd, b); err != .None { return err; }
+			if err = abs(res_gcd, b); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm);   err != .None { return err; }
+			if err = zero(res_lcm);   err != nil { return err; }
 		}
-		return .None;
+		return nil;
 	}
 	else if bz {
 		if res_gcd != nil {
-			if err = abs(res_gcd, a); err != .None { return err; }
+			if err = abs(res_gcd, a); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm);   err != .None { return err; }
+			if err = zero(res_lcm);   err != nil { return err; }
 		}
-		return .None;
+		return nil;
 	}
 
 	return #force_inline _int_gcd_lcm(res_gcd, res_lcm, a, b);
@@ -1521,7 +1521,7 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 
 		If neither result is wanted, we have nothing to do.
 	*/
-	if res_gcd == nil && res_lcm == nil { return .None; }
+	if res_gcd == nil && res_lcm == nil { return nil; }
 
 	/*
 		We need a temporary because `res_gcd` is allowed to be `nil`.
@@ -1532,34 +1532,34 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 			GCD(0, 0) and LCM(0, 0) are both 0.
 		*/
 		if res_gcd != nil {
-			if err = zero(res_gcd);	err != .None { return err; }
+			if err = zero(res_gcd);	err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm);	err != .None { return err; }
+			if err = zero(res_lcm);	err != nil { return err; }
 		}
-		return .None;
+		return nil;
 	} else if az {
 		/*
 			We can early out with GCD = B and LCM = 0
 		*/
 		if res_gcd != nil {
-			if err = abs(res_gcd, b); err != .None { return err; }
+			if err = abs(res_gcd, b); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm); err != .None { return err; }
+			if err = zero(res_lcm); err != nil { return err; }
 		}
-		return .None;
+		return nil;
 	} else if bz {
 		/*
 			We can early out with GCD = A and LCM = 0
 		*/
 		if res_gcd != nil {
-			if err = abs(res_gcd, a); err != .None { return err; }
+			if err = abs(res_gcd, a); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm); err != .None { return err; }
+			if err = zero(res_lcm); err != nil { return err; }
 		}
-		return .None;
+		return nil;
 	}
 
 	temp_gcd_res := &Int{};
@@ -1571,8 +1571,8 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
  	*/
 	u, v := &Int{}, &Int{};
 	defer destroy(u, v);
-	if err = copy(u, a); err != .None { return err; }
-	if err = copy(v, b); err != .None { return err; }
+	if err = copy(u, a); err != nil { return err; }
+	if err = copy(v, b); err != nil { return err; }
 
  	/*
  		Must be positive for the remainder of the algorithm.
@@ -1590,18 +1590,18 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		/*
 			Divide the power of two out.
 		*/
-		if err = shr(u, u, k); err != .None { return err; }
-		if err = shr(v, v, k); err != .None { return err; }
+		if err = shr(u, u, k); err != nil { return err; }
+		if err = shr(v, v, k); err != nil { return err; }
 	}
 
 	/*
 		Divide any remaining factors of two out.
 	*/
 	if u_lsb != k {
-		if err = shr(u, u, u_lsb - k); err != .None { return err; }
+		if err = shr(u, u, u_lsb - k); err != nil { return err; }
 	}
 	if v_lsb != k {
-		if err = shr(v, v, v_lsb - k); err != .None { return err; }
+		if err = shr(v, v, v_lsb - k); err != nil { return err; }
 	}
 
 	for v.used != 0 {
@@ -1618,19 +1618,19 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		/*
 			Subtract smallest from largest.
 		*/
-		if err = sub(v, v, u); err != .None { return err; }
+		if err = sub(v, v, u); err != nil { return err; }
 
 		/*
 			Divide out all factors of two.
 		*/
 		b, _ := count_lsb(v);
-		if err = shr(v, v, b); err != .None { return err; }
+		if err = shr(v, v, b); err != nil { return err; }
 	}
 
  	/*
  		Multiply by 2**k which we divided out at the beginning.
  	*/
- 	if err = shl(temp_gcd_res, u, k); err != .None { return err; }
+ 	if err = shl(temp_gcd_res, u, k); err != nil { return err; }
  	temp_gcd_res.sign = .Zero_or_Positive;
 
 	/*
@@ -1639,7 +1639,7 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 	*/
 	if res_lcm == nil {
 		swap(temp_gcd_res, res_gcd);
-		return .None;
+		return nil;
 	}
 
 	/*
@@ -1650,13 +1650,13 @@ _int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		/*
 			Store quotient in `t2` such that `t2 * b` is the LCM.
 		*/
-		if err = div(res_lcm, a, temp_gcd_res); err != .None { return err; }
+		if err = div(res_lcm, a, temp_gcd_res); err != nil { return err; }
 		err = mul(res_lcm, res_lcm, b);
 	} else {
 		/*
 			Store quotient in `t2` such that `t2 * a` is the LCM.
 		*/
-		if err = div(res_lcm, a, temp_gcd_res); err != .None { return err; }
+		if err = div(res_lcm, a, temp_gcd_res); err != nil { return err; }
 		err = mul(res_lcm, res_lcm, b);
 	}
 
