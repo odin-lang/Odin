@@ -16216,16 +16216,20 @@ void lb_generate_code(lbGenerator *gen) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			lb_generate_procedure(m, p);
 		}
-		for_array(i, m->missing_procedures_to_check) {
-			lbProcedure *p = m->missing_procedures_to_check[i];
-			lb_generate_procedure(m, p);
-		}
 	}
 
 
 	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
 		TIME_SECTION("LLVM main");
 		lb_create_main_procedure(default_module, startup_runtime);
+	}
+
+	for_array(j, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[j].value;
+		for_array(i, m->missing_procedures_to_check) {
+			lbProcedure *p = m->missing_procedures_to_check[i];
+			lb_generate_procedure(m, p);
+		}
 	}
 
 	if (build_context.ODIN_DEBUG) {
