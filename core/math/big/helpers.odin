@@ -340,7 +340,7 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, ONE, minimize, allocator);
+	return set(a, 1);
 }
 one :: proc { int_one, };
 
@@ -348,7 +348,7 @@ one :: proc { int_one, };
 	Set the `Int` to -1 and optionally shrink it to the minimum backing size.
 */
 int_minus_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, MINUS_ONE, minimize, allocator);
+	return set(a, -1);
 }
 minus_one :: proc { int_minus_one, };
 
