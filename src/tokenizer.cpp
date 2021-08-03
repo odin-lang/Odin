@@ -757,17 +757,10 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 }
 
 void advance_to_next_rune(Tokenizer *t) {
-#if 1
 	if (t->curr_rune == '\n') {
 		t->column_minus_one = 0;
 		t->line_count++;
 	}
-#else
-	// NOTE(bill, 2021-08-02): This is branchless but it is slower in practice
-	i32 is_newline = t->curr_rune == '\n';
-	t->column_minus_one *= 1-is_newline;
-	t->line_count += is_newline;
-#endif
 	if (t->read_curr < t->end) {
 		t->curr = t->read_curr;
 		Rune rune = *t->read_curr;
@@ -1070,45 +1063,9 @@ bool scan_escape(Tokenizer *t) {
 
 
 gb_inline void tokenizer_skip_line(Tokenizer *t) {
-#if 1
-	while (t->read_curr != t->end && t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
-		t->column_minus_one++;
-		t->curr = t->read_curr++;
-		t->curr_rune = *t->curr;
-		if (t->curr_rune == 0) {
-			tokenizer_err(t, "Illegal character NUL");
-		}
+	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+		advance_to_next_rune(t);
 	}
-#else
-loop_start:;
-	u8 *p = t->read_curr;
-	for (; p < t->end; p++) {
-		switch (*p) {
-		case '\n':
-		case 0xff:
-			goto loop_end;
-		case 0:
-			goto illegal_nul;
-		}
-	}
-
-loop_end:
-	p = gb_min(p, t->end);
-	t->column_minus_one += cast(i32)(p - t->read_curr);
-	t->read_curr = p;
-	t->curr = p-1;
-	t->curr_rune = *t->curr;
-	return;
-
-illegal_nul:;
-	p = gb_min(p, t->end);
-	t->column_minus_one += cast(i32)(p - t->read_curr);
-	t->read_curr = p;
-	t->curr = p-1;
-	t->curr_rune = *t->curr;
-	tokenizer_err(t, "Illegal character NUL");
-	goto loop_start;
-#endif
 }
 
 gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
