@@ -681,10 +681,9 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 
 	if false && (denominator.used > 2 * _MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
 		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
-	} else if false {
-		// err = _int_div_school(quotient, remainder, numerator, denominator);
 	} else {
-		err = _int_div_small(quotient, remainder, numerator, denominator);
+		err = _int_div_school(quotient, remainder, numerator, denominator);
+		// err = _int_div_small(quotient, remainder, numerator, denominator);
 	}
 
 	return err;
@@ -1309,6 +1308,176 @@ _int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
  	}
 	destroy(q);
 	return remainder, nil;
+}
+
+/*
+	Signed Integer Division
+
+	c*b + d == a [i.e. a/b, c=quotient, d=remainder], HAC pp.598 Algorithm 14.20
+
+	Note that the description in HAC is horribly incomplete.
+	For example, it doesn't consider the case where digits are removed from 'x' in
+	the inner loop.
+
+	It also doesn't consider the case that y has fewer than three digits, etc.
+	The overall algorithm is as described as 14.20 from HAC but fixed to treat these cases.
+*/
+_int_div_school :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
+	if err = error_if_immutable(quotient, remainder); err != nil { return err; }
+	if err = clear_if_uninitialized(quotient, numerator, denominator); err != nil { return err; }
+
+	q, x, y, t1, t2 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(q, x, y, t1, t2);
+
+	if err = grow(q, numerator.used + 2); err != nil { return err; }
+	q.used = numerator.used + 2;
+
+	if err = init_multi(t1, t2);   err != nil { return err; }
+	if err = copy(x, numerator);   err != nil { return err; }
+	if err = copy(y, denominator); err != nil { return err; }
+
+	/*
+		Fix the sign.
+	*/
+	neg   := numerator.sign != denominator.sign;
+	x.sign = .Zero_or_Positive;
+	y.sign = .Zero_or_Positive;
+
+	/*
+		Normalize both x and y, ensure that y >= b/2, [b == 2**MP_DIGIT_BIT]
+	*/
+	norm, _ := count_bits(y);
+	norm %= _DIGIT_BITS;
+
+	if norm < _DIGIT_BITS - 1 {
+		norm = (_DIGIT_BITS - 1) - norm;
+		if err = shl(x, x, norm); err != nil { return err; }
+		if err = shl(y, y, norm); err != nil { return err; }
+	} else {
+		norm = 0;
+	}
+
+	/*
+		Note: HAC does 0 based, so if used==5 then it's 0,1,2,3,4, i.e. use 4
+	*/
+	n := x.used - 1;
+	t := y.used - 1;
+
+	/*
+		while (x >= y*b**n-t) do { q[n-t] += 1; x -= y*b**{n-t} }
+		y = y*b**{n-t}
+	*/
+
+	if err = shl_digit(y, n - t); err != nil { return err; }
+
+	c, _ := cmp(x, y);
+	for c != -1 {
+		q.digit[n - t] += 1;
+		if err = sub(x, x, y); err != nil { return err; }
+		c, _ = cmp(x, y);
+	}
+
+	/*
+		Reset y by shifting it back down.
+	*/
+	shr_digit(y, n - t);
+
+	/*
+		Step 3. for i from n down to (t + 1).
+	*/
+	for i := n; i >= (t + 1); i -= 1 {
+		if (i > x.used) { continue; }
+
+		/*
+			step 3.1 if xi == yt then set q{i-t-1} to b-1, otherwise set q{i-t-1} to (xi*b + x{i-1})/yt
+		*/
+		if x.digit[i] == y.digit[t] {
+			q.digit[(i - t) - 1] = 1 << (_DIGIT_BITS - 1);
+		} else {
+
+			tmp := _WORD(x.digit[i]) << _DIGIT_BITS;
+			tmp |= _WORD(x.digit[i - 1]);
+			tmp /= _WORD(y.digit[t]);
+			if tmp > _WORD(_MASK) {
+				tmp = _WORD(_MASK);
+			}
+			q.digit[(i - t) - 1] = DIGIT(tmp & _WORD(_MASK));
+		}
+
+		/* while (q{i-t-1} * (yt * b + y{t-1})) >
+					xi * b**2 + xi-1 * b + xi-2
+
+			do q{i-t-1} -= 1;
+		*/
+
+		iter := 0;
+
+		q.digit[(i - t) - 1] = (q.digit[(i - t) - 1] + 1) & _MASK;
+		for {
+			q.digit[(i - t) - 1] = (q.digit[(i - t) - 1] - 1) & _MASK;
+
+			/*
+				Find left hand.
+			*/
+			zero(t1);
+			t1.digit[0] = ((t - 1) < 0) ? 0 : y.digit[t - 1];
+			t1.digit[1] = y.digit[t];
+			t1.used = 2;
+			if err = mul(t1, t1, q.digit[(i - t) - 1]); err != nil { return err; }
+
+			/*
+				Find right hand.
+			*/
+			t2.digit[0] = ((i - 2) < 0) ? 0 : x.digit[i - 2];
+			t2.digit[1] = x.digit[i - 1]; /* i >= 1 always holds */
+			t2.digit[2] = x.digit[i];
+			t2.used = 3;
+
+			if t1_t2, _ := cmp_mag(t1, t2); t1_t2 != 1 {
+
+				break;
+			}
+			iter += 1; if iter > 100 { return .Max_Iterations_Reached; }
+		}
+
+		/*
+			Step 3.3 x = x - q{i-t-1} * y * b**{i-t-1}
+		*/
+		if err = int_mul_digit(t1, y, q.digit[(i - t) - 1]); err != nil { return err; }
+		if err = shl_digit(t1, (i - t) - 1);       err != nil { return err; }
+		if err = sub(x, x, t1); err != nil { return err; }
+
+		/*
+			if x < 0 then { x = x + y*b**{i-t-1}; q{i-t-1} -= 1; }
+		*/
+		if x.sign == .Negative {
+			if err = copy(t1, y); err != nil { return err; }
+			if err = shl_digit(t1, (i - t) - 1); err != nil { return err; }
+			if err = add(x, x, t1); err != nil { return err; }
+
+			q.digit[(i - t) - 1] = (q.digit[(i - t) - 1] - 1) & _MASK;
+		}
+	}
+
+	/*
+		Now q is the quotient and x is the remainder, [which we have to normalize]
+		Get sign before writing to c.
+	*/
+	z, _ := is_zero(x);
+	x.sign = .Zero_or_Positive if z else numerator.sign;
+
+	if quotient != nil {
+		clamp(q);
+		swap(q, quotient);
+		quotient.sign = .Negative if neg else .Zero_or_Positive;
+	}
+
+	if remainder != nil {
+		if err = shr(x, x, norm); err != nil { return err; }
+		swap(x, remainder);
+	}
+
+	return nil;
 }
 
 /*
