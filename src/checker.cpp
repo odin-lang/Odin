@@ -5039,6 +5039,10 @@ void check_add_definitions_from_queues(Checker *c) {
 	}
 }
 
+void check_merge_queues_into_arrays(Checker *c) {
+	check_add_entities_from_queues(c);
+	check_add_definitions_from_queues(c);
+}
 
 
 void check_parsed_files(Checker *c) {
@@ -5080,8 +5084,7 @@ void check_parsed_files(Checker *c) {
 	check_export_entities(c);
 
 	TIME_SECTION("add entities from packages");
-	check_add_entities_from_queues(c);
-	check_add_definitions_from_queues(c);
+	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check all global entities");
 	check_all_global_entities(c);
@@ -5100,8 +5103,7 @@ void check_parsed_files(Checker *c) {
 	check_procedure_bodies(c);
 
 	TIME_SECTION("add entities from procedure bodies");
-	check_add_entities_from_queues(c);
-	check_add_definitions_from_queues(c);
+	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check scope usage");
 	for_array(i, c->info.files.entries) {
@@ -5109,15 +5111,8 @@ void check_parsed_files(Checker *c) {
 		check_scope_usage(c, f->scope);
 	}
 
-	TIME_SECTION("generate minimum dependency set");
-	generate_minimum_dependency_set(c, c->info.entry_point);
-
 	TIME_SECTION("check test procedures");
 	check_test_procedures(c);
-
-	TIME_SECTION("calculate global init order");
-	// Calculate initialization order of global variables
-	calculate_global_init_order(c);
 
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);
@@ -5142,10 +5137,9 @@ void check_parsed_files(Checker *c) {
 			add_type_info_type(&c->builtin_ctx, t);
 		}
 	}
+	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check for type cycles and inline cycles");
-	check_add_definitions_from_queues(c);
-
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
@@ -5165,6 +5159,16 @@ void check_parsed_files(Checker *c) {
 			}
 		}
 	}
+
+	TIME_SECTION("check deferred procedures");
+	check_deferred_procedures(c);
+
+	TIME_SECTION("calculate global init order");
+	calculate_global_init_order(c);
+
+	TIME_SECTION("generate minimum dependency set");
+	generate_minimum_dependency_set(c, c->info.entry_point);
+
 	TIME_SECTION("add type info for type definitions");
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
@@ -5176,8 +5180,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	TIME_SECTION("check deferred procedures");
-	check_deferred_procedures(c);
+	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {
