@@ -39,6 +39,7 @@ _SQR_KARATSUBA_CUTOFF,
 _MUL_TOOM_CUTOFF,
 _SQR_TOOM_CUTOFF,
 );
+
 }
 
 print_timings :: proc() {
@@ -95,15 +96,14 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := false, newlin
 	defer delete(as);
 	cb, _ := count_bits(a);
 	if print_name {
-		fmt.printf("%v ", name);
-	}
-	if print_extra_info {
-		fmt.printf("(base: %v, bits used: %v): %v", base, cb, as);
-	} else {
-		fmt.printf("%v", as);
+		fmt.printf("%v", name);
 	}
 	if err != nil {
 		fmt.printf("%v (error: %v | %v)", name, err, a);
+	}
+	fmt.printf("%v", as);
+	if print_extra_info {
+		fmt.printf(" (base: %v, bits used: %v, flags: %v)", base, cb, a.flags);
 	}
 	if newline {
 		fmt.println();
@@ -117,6 +117,31 @@ demo :: proc() {
 
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
+
+	fmt.println();
+	print(" ONE: ",       ONE, 10, true, true, true);
+	fmt.println();
+
+	one(a);
+	print(" one: ",         a, 10, true, true, true);
+	fmt.println();
+
+	minus_one(a);
+	print("-one: ",         a, 10, true, true, true);
+	fmt.println();
+
+	nan(a);
+	print(" nan: ",         a, 10, true, true, true);
+	fmt.println();
+
+	inf(a);
+	print(" inf: ",         a, 10, true, true, true);
+	fmt.println();
+
+	minus_inf(a);
+	print("-inf: ",         a, 10, true, true, true);
+	fmt.println();
+
 
 	factorial(a, 128); // Untimed warmup.
 
@@ -145,8 +170,8 @@ main :: proc() {
 	mem.tracking_allocator_init(&ta, context.allocator);
 	context.allocator = mem.tracking_allocator(&ta);
 
-	// print_configation();
 	demo();
+
 	print_timings();
 
 	if len(ta.allocation_map) > 0 {
