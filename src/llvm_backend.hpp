@@ -104,6 +104,7 @@ struct lbModule {
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
+	Array<lbProcedure *> missing_procedures_to_check;
 
 	StringMap<LLVMValueRef> const_strings;
 
