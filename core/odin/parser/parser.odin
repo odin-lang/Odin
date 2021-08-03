@@ -44,7 +44,12 @@ Parser :: struct {
 	curr_proc: ^ast.Node,
 
 	error_count: int,
+
+	fix_count: int,
+	fix_prev_pos: tokenizer.Pos,
 }
+
+MAX_FIX_COUNT :: 10;
 
 Stmt_Allow_Flag :: enum {
 	In,
@@ -140,9 +145,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		p.line_comment     = nil;
 	}
 
-	if .Optional_Semicolons in p.flags {
-		p.tok.flags += {.Insert_Semicolon};
-	}
+	p.tok.flags += {.Insert_Semicolon};
 
 	p.file = file;
 	tokenizer.init(&p.tok, file.src, file.fullpath, p.err);
@@ -229,7 +232,7 @@ peek_token :: proc(p: ^Parser, lookahead := 0) -> (tok: tokenizer.Token) {
 	return;
 }
 skip_possible_newline :: proc(p: ^Parser) -> bool {
-	if .Insert_Semicolon not_in p.tok.flags {
+	if .Optional_Semicolons not_in p.flags {
 		return false;
 	}
 
@@ -242,7 +245,7 @@ skip_possible_newline :: proc(p: ^Parser) -> bool {
 }
 
 skip_possible_newline_for_literal :: proc(p: ^Parser) -> bool {
-	if .Insert_Semicolon not_in p.tok.flags {
+	if .Optional_Semicolons not_in p.flags {
 		return false;
 	}
 
@@ -411,6 +414,33 @@ is_blank_ident_node :: proc(node: ^ast.Node) -> bool {
 	return true;
 }
 
+fix_advance_to_next_stmt :: proc(p: ^Parser) {
+	for {
+		#partial switch t := p.curr_tok; t.kind {
+		case .EOF, .Semicolon:
+			return;
+
+		case .Package, .Foreign, .Import,
+		     .If, .For, .When, .Return, .Switch,
+		     .Defer, .Using,
+		     .Break, .Continue, .Fallthrough,
+		     .Hash:
+
+
+			if t.pos == p.fix_prev_pos && p.fix_count < MAX_FIX_COUNT {
+				p.fix_count += 1;
+				return;
+			}
+			if t.pos.offset < p.fix_prev_pos.offset {
+				p.fix_prev_pos = t.pos;
+				p.fix_count = 0;
+				return;
+			}
+		}
+		advance_token(p);
+	}
+}
+
 
 is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 	if node == nil {
@@ -526,6 +556,7 @@ expect_semicolon :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 	}
 
 	error(p, prev.pos, "expected ';', got %s", tokenizer.token_to_string(p.curr_tok));
+	fix_advance_to_next_stmt(p);
 	return false;
 }
 
@@ -597,12 +628,16 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 	}
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
+		if cond.pos.line != body.pos.line {
+			error(p, body.pos, "the body of a 'do' must be on the same line as when statement");
+		}
 	} else {
 		body = parse_block_stmt(p, true);
 	}
 
 	skip_possible_newline_for_literal(p);
-	if allow_token(p, .Else) {
+	if p.curr_tok.kind == .Else {
+		else_tok := expect_token(p, .Else);
 		#partial switch p.curr_tok.kind {
 		case .When:
 			else_stmt = parse_when_stmt(p);
@@ -611,6 +646,9 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 		case .Do:
 			expect_token(p, .Do);
 			else_stmt = convert_stmt_to_body(p, parse_stmt(p));
+			if else_tok.pos.line != else_stmt.pos.line {
+				error(p, else_stmt.pos, "the body of a 'do' must be on the same line as 'else'");
+			}
 		case:
 			error(p, p.curr_tok.pos, "expected when statement block statement");
 			else_stmt = ast.new(ast.Bad_Stmt, p.curr_tok.pos, end_pos(p.curr_tok));
@@ -673,6 +711,9 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	}
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
+		if cond.pos.line != body.pos.line {
+			error(p, body.pos, "the body of a 'do' must be on the same line as the if condition");
+		}
 	} else {
 		body = parse_block_stmt(p, false);
 	}
@@ -680,7 +721,8 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	else_tok := p.curr_tok.pos;
 
 	skip_possible_newline_for_literal(p);
-	if allow_token(p, .Else) {
+	if p.curr_tok.kind == .Else {
+		else_tok := expect_token(p, .Else);
 		#partial switch p.curr_tok.kind {
 		case .If:
 			else_stmt = parse_if_stmt(p);
@@ -689,6 +731,9 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 		case .Do:
 			expect_token(p, .Do);
 			else_stmt = convert_stmt_to_body(p, parse_stmt(p));
+			if else_tok.pos.line != else_stmt.pos.line {
+				error(p, body.pos, "the body of a 'do' must be on the same line as 'else'");
+			}
 		case:
 			error(p, p.curr_tok.pos, "expected if statement block statement");
 			else_stmt = ast.new(ast.Bad_Stmt, p.curr_tok.pos, end_pos(p.curr_tok));
@@ -750,6 +795,10 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 			if allow_token(p, .Do) {
 				body = convert_stmt_to_body(p, parse_stmt(p));
+				if tok.pos.line != body.pos.line {
+					error(p, body.pos, "the body of a 'do' must be on the same line as 'else'");
+				}
+
 			} else {
 				body = parse_body(p);
 			}
@@ -784,6 +833,9 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
+		if tok.pos.line != body.pos.line {
+			error(p, body.pos, "the body of a 'do' must be on the same line as the 'for' token");
+		}
 	} else {
 		body = parse_body(p);
 	}
@@ -1129,6 +1181,9 @@ parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast
 
 	if allow_token(p, .Do) {
 		body = convert_stmt_to_body(p, parse_stmt(p));
+		if for_tok.pos.line != body.pos.line {
+			error(p, body.pos, "the body of a 'do' must be on the same line as the 'for' token");
+		}
 	} else {
 		body = parse_block_stmt(p, false);
 	}
@@ -1150,7 +1205,6 @@ parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast
 
 parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	#partial switch p.curr_tok.kind {
-
 	case .Inline:
 		if peek_token_kind(p, .For) {
 			inline_tok := expect_token(p, .Inline);
@@ -1158,15 +1212,15 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		}
 		fallthrough;
 	// Operands
-	case .Context, // Also allows for 'context = '
+	case .No_Inline,
+	     .Context, // Also allows for 'context = '
 	     .Proc,
-	     .No_Inline,
-	     .Asm, // Inline assembly
 	     .Ident,
 	     .Integer, .Float, .Imag,
 	     .Rune, .String,
 	     .Open_Paren,
 	     .Pointer,
+	     .Asm, // Inline assembly
 	     // Unary Expressions
 	     .Add, .Sub, .Xor, .Not, .And:
 
@@ -1175,8 +1229,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		return s;
 
 
-	case .Import:  return parse_import_decl(p);
 	case .Foreign: return parse_foreign_decl(p);
+	case .Import:  return parse_import_decl(p);
 	case .If:      return parse_if_stmt(p);
 	case .When:    return parse_when_stmt(p);
 	case .For:     return parse_for_stmt(p);
@@ -1309,6 +1363,12 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			es := ast.new(ast.Expr_Stmt, ce.pos, ce.end);
 			es.expr = ce;
 			return es;
+
+		case "force_inline", "force_no_inline":
+			expr := parse_inlining_operand(p, true, tok);
+			es := ast.new(ast.Expr_Stmt, expr.pos, expr.end);
+			es.expr = expr;
+			return es;
 		case "unroll":
 			return parse_unrolled_for_loop(p, tag);
 		case "include":
@@ -1320,6 +1380,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			te.op   = tok;
 			te.name = name;
 			te.stmt = stmt;
+
+			fix_advance_to_next_stmt(p);
 			return te;
 		}
 	case .Open_Brace:
@@ -1331,8 +1393,31 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		return s;
 	}
 
+
+	#partial switch p.curr_tok.kind {
+	case .Else:
+		token := expect_token(p, .Else);
+		error(p, token.pos, "'else' unattached to an 'if' statement");
+		#partial switch p.curr_tok.kind {
+		case .If:
+			return parse_if_stmt(p);
+		case .When:
+			return parse_when_stmt(p);
+		case .Open_Brace:
+			return parse_block_stmt(p, true);
+		case .Do:
+			expect_token(p, .Do);
+			return convert_stmt_to_body(p, parse_stmt(p));
+		case:
+			fix_advance_to_next_stmt(p);
+			return ast.new(ast.Bad_Stmt, token.pos, end_pos(p.curr_tok));
+		}
+	}
+
+
 	tok := advance_token(p);
 	error(p, tok.pos, "expected a statement, got %s", tokenizer.token_to_string(tok));
+	fix_advance_to_next_stmt(p);
 	s := ast.new(ast.Bad_Stmt, tok.pos, end_pos(tok));
 	return s;
 }
@@ -2232,9 +2317,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		}
 
 		type := parse_proc_type(p, tok);
-		tags := parse_proc_tags(p);
-		type.tags = tags;
-
+		tags: ast.Proc_Tags;
 		where_token: tokenizer.Token;
 		where_clauses: []^ast.Expr;
 
@@ -2246,8 +2329,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.expr_level = -1;
 			where_clauses = parse_rhs_expr_list(p);
 			p.expr_level = prev_level;
-			tags = parse_proc_tags(p);
 		}
+		tags = parse_proc_tags(p);
+		type.tags = tags;
+
 		if p.allow_type && p.expr_level < 0 {
 			if where_token.kind != .Invalid {
 				error(p, where_token.pos, "'where' clauses are not allowed on procedure types");
@@ -2273,6 +2358,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.curr_proc = type;
 			body = convert_stmt_to_body(p, parse_stmt(p));
 			p.curr_proc = prev_proc;
+			if type.pos.line != body.pos.line {
+				error(p, body.pos, "the body of a 'do' must be on the same line as the signature");
+			}
 		} else {
 			return type;
 		}
@@ -2495,11 +2583,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			p.expr_level = where_prev_level;
 		}
 
-		variants: [dynamic]^ast.Expr;
 
 		skip_possible_newline_for_literal(p);
 		expect_token_after(p, .Open_Brace, "union");
 
+		variants: [dynamic]^ast.Expr;
 		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
 			type := parse_type(p);
 			if _, ok := type.derived.(ast.Bad_Expr); !ok {
@@ -2811,8 +2899,8 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			return nil;
 		}
 		error(p, p.curr_tok.pos, "expected an operand");
+		fix_advance_to_next_stmt(p);
 		be := ast.new(ast.Bad_Expr, p.curr_tok.pos, end_pos(p.curr_tok));
-		advance_token(p);
 		operand = be;
 	}
 

@@ -2169,7 +2169,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			if (build_context.disallow_do) {
 				syntax_error(body, "'do' has been disallowed");
 			} else if (!ast_on_same_line(type, body)) {
-				syntax_error(body, "The body of a 'do' be on the same line as the signature");
+				syntax_error(body, "The body of a 'do' must be on the same line as the signature");
 			}
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
@@ -3840,7 +3840,7 @@ Ast *parse_if_stmt(AstFile *f) {
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
-			} else if (!ast_on_same_line(else_stmt, else_stmt)) {
+			} else if (!ast_on_same_line(else_token, else_stmt)) {
 				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
 			}
 		} break;
