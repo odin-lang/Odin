@@ -114,17 +114,23 @@ peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 }
 
 skip_whitespace :: proc(t: ^Tokenizer) {
-	for {
-		switch t.ch {
-		case ' ', '\t', '\r':
-			advance_rune(t);
-		case '\n':
-			if t.insert_semicolon {
+	if t.insert_semicolon {
+		for {
+			switch t.ch {
+			case ' ', '\t', '\r':
+				advance_rune(t);
+			case:
 				return;
 			}
-			advance_rune(t);
-		case:
-			return;
+		}
+	} else {
+		for {
+			switch t.ch {
+			case ' ', '\t', '\r', '\n':
+				advance_rune(t);
+			case:
+				return;
+			}
 		}
 	}
 }
@@ -465,50 +471,13 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Token_Kind, str
 
 
 scan :: proc(t: ^Tokenizer) -> Token {
-	switch2 :: proc(t: ^Tokenizer, tok0, tok1: Token_Kind) -> Token_Kind {
-		if t.ch == '=' {
-			advance_rune(t);
-			return tok1;
-		}
-		return tok0;
-	}
-	switch3 :: proc(t: ^Tokenizer, tok0, tok1: Token_Kind, ch2: rune, tok2: Token_Kind) -> Token_Kind {
-		if t.ch == '=' {
-			advance_rune(t);
-			return tok1;
-		}
-		if t.ch == ch2 {
-			advance_rune(t);
-			return tok2;
-		}
-		return tok0;
-	}
-	switch4 :: proc(t: ^Tokenizer, tok0, tok1: Token_Kind, ch2: rune, tok2, tok3: Token_Kind) -> Token_Kind {
-		if t.ch == '=' {
-			advance_rune(t);
-			return tok1;
-		}
-		if t.ch == ch2 {
-			advance_rune(t);
-			if t.ch == '=' {
-				advance_rune(t);
-				return tok3;
-			}
-			return tok2;
-		}
-		return tok0;
-	}
-
-
 	skip_whitespace(t);
 
 	offset := t.offset;
 
 	kind: Token_Kind;
-	lit:  string;
+	lit: string;
 	pos := offset_to_pos(t, offset);
-
-	insert_semicolon := false;
 
 	switch ch := t.ch; true {
 	case is_letter(ch):
@@ -528,14 +497,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					break check_keyword;
 				}
 			}
-
-			#partial switch kind {
-			case .Ident, .Context, .Typeid, .Break, .Continue, .Fallthrough, .Return:
-				insert_semicolon = true;
-			}
+			break check_keyword;
 		}
 	case '0' <= ch && ch <= '9':
-		insert_semicolon = true;
 		kind, lit = scan_number(t, false);
 	case:
 		advance_rune(t);
@@ -546,118 +510,227 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				t.insert_semicolon = false;
 				kind = .Semicolon;
 				lit = "\n";
+				return Token{kind, lit, pos};
 			}
 		case '\n':
 			t.insert_semicolon = false;
 			kind = .Semicolon;
 			lit = "\n";
-		case '"':
-			insert_semicolon = true;
-			kind = .String;
-			lit = scan_string(t);
+		case '\\':
+			if .Insert_Semicolon in t.flags {
+				t.insert_semicolon = false;
+			}
+			token := scan(t);
+			if token.pos.line == pos.line {
+				error(t, token.pos.offset, "expected a newline after \\");
+			}
+			return token;
+
 		case '\'':
-			insert_semicolon = true;
 			kind = .Rune;
 			lit = scan_rune(t);
+		case '"':
+			kind = .String;
+			lit = scan_string(t);
 		case '`':
-			insert_semicolon = true;
 			kind = .String;
 			lit = scan_raw_string(t);
-		case '=': kind = switch2(t, .Eq, .Cmp_Eq);
-		case '!': kind = switch2(t, .Not, .Not_Eq);
+		case '.':
+			kind = .Period;
+			switch t.ch {
+			case '0'..='9':
+				kind, lit = scan_number(t, true);
+			case '.':
+				advance_rune(t);
+				kind = .Ellipsis;
+				switch t.ch {
+				case '<':
+					advance_rune(t);
+					kind = .Range_Half;
+				case '=':
+					advance_rune(t);
+					kind = .Range_Full;
+				}
+			}
+		case '@': kind = .At;
+		case '$': kind = .Dollar;
+		case '?': kind = .Question;
+		case '^': kind = .Pointer;
+		case ';': kind = .Semicolon;
+		case ',': kind = .Comma;
+		case ':': kind = .Colon;
+		case '(': kind = .Open_Paren;
+		case ')': kind = .Close_Paren;
+		case '[': kind = .Open_Bracket;
+		case ']': kind = .Close_Bracket;
+		case '{': kind = .Open_Brace;
+		case '}': kind = .Close_Brace;
+		case '%':
+			kind = .Mod;
+			switch t.ch {
+			case '=':
+				advance_rune(t);
+				kind = .Mod_Eq;
+			case '%':
+				advance_rune(t);
+				kind = .Mod_Mod;
+				if t.ch == '=' {
+					advance_rune(t);
+					kind = .Mod_Mod_Eq;
+				}
+			}
+		case '*':
+			kind = .Mul;
+			if t.ch == '=' {
+				advance_rune(t);
+				kind = .Mul_Eq;
+			}
+		case '=':
+			kind = .Eq;
+			if t.ch == '=' {
+				advance_rune(t);
+				kind = .Cmp_Eq;
+			}
+		case '~':
+			kind = .Xor;
+			if t.ch == '=' {
+				advance_rune(t);
+				kind = .Xor_Eq;
+			}
+		case '!':
+			kind = .Not;
+			if t.ch == '=' {
+				advance_rune(t);
+				kind = .Not_Eq;
+			}
+		case '+':
+			kind = .Add;
+			switch t.ch {
+			case '=':
+				advance_rune(t);
+				kind = .Add_Eq;
+			case '+':
+				advance_rune(t);
+				kind = .Increment;
+			}
+		case '-':
+			kind = .Sub;
+			switch t.ch {
+			case '-':
+				advance_rune(t);
+				kind = .Decrement;
+				if t.ch == '-' {
+					advance_rune(t);
+					kind = .Undef;
+				}
+			case '>':
+				advance_rune(t);
+				kind = .Arrow_Right;
+			case '=':
+				advance_rune(t);
+				kind = .Sub_Eq;
+			}
 		case '#':
 			kind = .Hash;
 			if t.ch == '!' {
-				insert_semicolon = t.insert_semicolon;
 				kind = .Comment;
 				lit = scan_comment(t);
 			}
-		case '?':
-			insert_semicolon = true;
-			kind = .Question;
-		case '@': kind = .At;
-		case '$': kind = .Dollar;
-		case '^': kind = .Pointer;
-		case '+': kind = switch2(t, .Add, .Add_Eq);
-		case '-':
-			if t.ch == '>' {
-				advance_rune(t);
-				kind = .Arrow_Right;
-			} else if t.ch == '-' && peek_byte(t) == '-' {
-				advance_rune(t);
-				advance_rune(t);
-				kind = .Undef;
-			} else {
-				kind = switch2(t, .Sub, .Sub_Eq);
-			}
-		case '*': kind = switch2(t, .Mul, .Mul_Eq);
 		case '/':
-			if t.ch == '/' || t.ch == '*' {
-				insert_semicolon = t.insert_semicolon;
+			kind = .Quo;
+			switch t.ch {
+			case '/', '*':
 				kind = .Comment;
 				lit = scan_comment(t);
-			} else {
-				kind = switch2(t, .Quo, .Quo_Eq);
-			}
-		case '%': kind = switch4(t, .Mod, .Mod_Eq, '%', .Mod_Mod, .Mod_Mod_Eq);
-		case '&':
-			if t.ch == '~' {
+			case '=':
 				advance_rune(t);
-				kind = switch2(t, .And_Not, .And_Not_Eq);
-			} else {
-				kind = switch3(t, .And, .And_Eq, '&', .Cmp_And);
+				kind = .Quo_Eq;
 			}
-		case '|': kind = switch3(t, .Or, .Or_Eq, '|', .Cmp_Or);
-		case '~': kind = switch2(t, .Xor, .Xor_Eq);
-		case '<': kind = switch4(t, .Lt, .Lt_Eq, '<', .Shl, .Shl_Eq);
-		case '>': kind = switch4(t, .Gt, .Gt_Eq, '>', .Shr,.Shr_Eq);
-
-		case '.':
-			if '0' <= t.ch && t.ch <= '9' {
-				kind, lit = scan_number(t, true);
-			} else {
-				kind = .Period;
-				if t.ch == '.' {
+		case '<':
+			kind = .Lt;
+			switch t.ch {
+			case '=':
+				advance_rune(t);
+				kind = .Lt_Eq;
+			case '<':
+				advance_rune(t);
+				kind = .Shl;
+				if t.ch == '=' {
 					advance_rune(t);
-					kind = .Ellipsis;
-					if t.ch == '<' {
-						advance_rune(t);
-						kind = .Range_Half;
-					} else if t.ch == '=' {
-						advance_rune(t);
-						kind = .Range_Full;
-					}
+					kind = .Shl_Eq;
 				}
 			}
-		case ':': kind = .Colon;
-		case ',': kind = .Comma;
-		case ';': kind = .Semicolon;
-		case '(': kind = .Open_Paren;
-		case ')':
-			insert_semicolon = true;
-			kind = .Close_Paren;
-		case '[': kind = .Open_Bracket;
-		case ']':
-			insert_semicolon = true;
-			kind = .Close_Bracket;
-		case '{': kind = .Open_Brace;
-		case '}':
-			insert_semicolon = true;
-			kind = .Close_Brace;
-
-		case '\\': kind = .Back_Slash;
-
+		case '>':
+			kind = .Gt;
+			switch t.ch {
+			case '=':
+				advance_rune(t);
+				kind = .Gt_Eq;
+			case '<':
+				advance_rune(t);
+				kind = .Shr;
+				if t.ch == '=' {
+					advance_rune(t);
+					kind = .Shr_Eq;
+				}
+			}
+		case '&':
+			kind = .And;
+			switch t.ch {
+			case '~':
+				advance_rune(t);
+				kind = .And_Not;
+				if t.ch == '=' {
+					advance_rune(t);
+					kind = .And_Not_Eq;
+				}
+			case '=':
+				advance_rune(t);
+				kind = .And_Eq;
+			case '&':
+				advance_rune(t);
+				kind = .Cmp_And;
+				if t.ch == '=' {
+					advance_rune(t);
+					kind = .Cmp_And_Eq;
+				}
+			}
+		case '|':
+			kind = .Or;
+			switch t.ch {
+			case '=':
+				advance_rune(t);
+				kind = .Or_Eq;
+			case '|':
+				advance_rune(t);
+				kind = .Cmp_Or;
+				if t.ch == '=' {
+					advance_rune(t);
+					kind = .Cmp_Or_Eq;
+				}
+			}
 		case:
 			if ch != utf8.RUNE_BOM {
 				error(t, t.offset, "illegal character '%r': %d", ch, ch);
 			}
-			insert_semicolon = t.insert_semicolon; // preserve insert_semicolon info
 			kind = .Invalid;
 		}
 	}
 
 	if .Insert_Semicolon in t.flags {
-		t.insert_semicolon = insert_semicolon;
+		#partial switch kind {
+		case .Invalid, .Comment:
+			// Preserve insert_semicolon info
+		case .Ident, .Context, .Typeid, .Break, .Continue, .Fallthrough, .Return,
+		     .Integer, .Float, .Imag, .Rune, .String, .Undef,
+		     .Question, .Pointer, .Close_Paren, .Close_Bracket, .Close_Brace,
+		     .Increment, .Decrement:
+			/*fallthrough*/
+			t.insert_semicolon = true;
+		case:
+			t.insert_semicolon = false;
+			break;
+		}
 	}
 
 	if lit == "" {
