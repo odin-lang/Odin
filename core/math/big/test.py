@@ -11,13 +11,13 @@ from enum import Enum
 # With EXIT_ON_FAIL set, we exit at the first fail.
 #
 EXIT_ON_FAIL = True
-#EXIT_ON_FAIL = False
+EXIT_ON_FAIL = False
 
 #
 # We skip randomized tests altogether if NO_RANDOM_TESTS is set.
 #
 NO_RANDOM_TESTS = True
-#NO_RANDOM_TESTS = False
+NO_RANDOM_TESTS = False
 
 #
 # If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.

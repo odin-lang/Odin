@@ -81,8 +81,7 @@ Category :: enum {
 	choose,
 	lsb,
 	ctz,
-	bitfield_extract_old,
-	bitfield_extract_new,
+	bitfield_extract,
 };
 Event :: struct {
 	t: time.Duration,
@@ -123,20 +122,8 @@ demo :: proc() {
 	err = factorial(a, 1224);
 	count, _ := count_bits(a);
 
-	bits   :=  101;
-	be1, be2: _WORD;
-
-	/*
-		Sanity check loop.
-	*/
-	for o := 0; o < count - bits; o += 1 {
-		be1, _ = int_bitfield_extract(a, o, bits);
-		be2, _ = int_bitfield_extract_fast(a, o, bits);
-		if be1 != be2 {
-			fmt.printf("Offset: %v | Expected: %v | Got: %v\n", o, be1, be2);
-			assert(false);
-		}
-	}
+	bits :=  51;
+	be1: _WORD;
 
 	/*
 		Timing loop
@@ -145,16 +132,9 @@ demo :: proc() {
 	for o := 0; o < count - bits; o += 1 {
 		be1, _ = int_bitfield_extract(a, o, bits);
 	}
-	Timings[.bitfield_extract_old].t += time.tick_since(s_old);
-	Timings[.bitfield_extract_old].c += (count - bits);
-
-	s_new := time.tick_now();
-	for o := 0; o < count - bits; o += 1 {
-		be2, _ = int_bitfield_extract_fast(a, o, bits);
-	}
-	Timings[.bitfield_extract_new].t += time.tick_since(s_new);
-	Timings[.bitfield_extract_new].c += (count - bits);
-	assert(be1 == be2);
+	Timings[.bitfield_extract].t += time.tick_since(s_old);
+	Timings[.bitfield_extract].c += (count - bits);
+	fmt.printf("be1: %v\n", be1);
 }
 
 main :: proc() {
