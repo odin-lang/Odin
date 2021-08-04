@@ -11,13 +11,13 @@ from enum import Enum
 # With EXIT_ON_FAIL set, we exit at the first fail.
 #
 EXIT_ON_FAIL = True
-EXIT_ON_FAIL = False
+#EXIT_ON_FAIL = False
 
 #
 # We skip randomized tests altogether if NO_RANDOM_TESTS is set.
 #
 NO_RANDOM_TESTS = True
-NO_RANDOM_TESTS = False
+#NO_RANDOM_TESTS = False
 
 #
 # If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
@@ -197,7 +197,13 @@ def test_sub(a = 0, b = 0, expected_error = Error.Okay):
 
 def test_mul(a = 0, b = 0, expected_error = Error.Okay):
 	args = [arg_to_odin(a), arg_to_odin(b)]
-	res  = mul(*args)
+	try:
+		res  = mul(*args)
+	except OSError as e:
+		print("{} while trying to multiply {} x {}.".format(e, a, b))
+		if EXIT_ON_FAIL: exit(3)
+		return False
+
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a * b
@@ -369,7 +375,7 @@ TESTS = {
 	],
 	test_mul: [
 		[ 1234,   5432],
-		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7]
+		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7],
 	],
 	test_div: [
 		[ 54321,	12345],
