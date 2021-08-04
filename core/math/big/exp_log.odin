@@ -51,7 +51,7 @@ int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 			if err = zero(dest); err != nil { return err; }
 			return .Math_Domain_Error;
 		}
-		if power == 0 { return  one(dest); }
+		if power == 0 { return  set(dest, 1); }
 		if power  > 0 { return zero(dest); }
 
 	}
@@ -429,7 +429,7 @@ _int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 
 	if err = set(bi_base, base);          err != nil { return -1, err; }
 	if err = init_multi(bracket_mid, t);  err != nil { return -1, err; }
-	if err = one(bracket_low);            err != nil { return -1, err; }
+	if err = set(bracket_low, 1);         err != nil { return -1, err; }
 	if err = set(bracket_high, base);     err != nil { return -1, err; }
 
 	low  := 0; high := 1;

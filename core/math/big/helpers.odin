@@ -14,6 +14,10 @@ import "core:intrinsics"
 import rnd "core:math/rand"
 
 /*
+	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
+*/
+
+/*
 	Deallocates the backing memory of one or more `Int`s.
 */
 int_destroy :: proc(integers: ..^Int) {
@@ -35,10 +39,13 @@ int_destroy :: proc(integers: ..^Int) {
 int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator := context.allocator) -> (err: Error)
 	where intrinsics.type_is_integer(T) {
 	src := src;
-	if err = clear_if_uninitialized(dest); err != nil {
-		return err;
-	}
-	dest.used = 0;
+
+	if err = error_if_immutable(dest); err != nil { return err; }
+	if err = clear_if_uninitialized(dest); err != nil { return err; }
+
+	dest.flags = {}; // We're not -Inf, Inf, NaN or Immutable.
+
+	dest.used  = 0;
 	dest.sign = .Zero_or_Positive if src >= 0 else .Negative;
 	src = abs(src);
 
@@ -57,19 +64,21 @@ set :: proc { int_set_from_integer, int_copy };
 	Copy one `Int` to another.
 */
 int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if err = error_if_immutable(dest);    err != nil { return err; }
-	if err = clear_if_uninitialized(src); err != nil { return err; }
 	/*
 		If dest == src, do nothing
 	*/
-	if (dest == src) {
-		return nil;
-	}
+	if (dest == src) { return nil; }
+
+	if err = error_if_immutable(dest);    err != nil { return err; }
+	if err = clear_if_uninitialized(src); err != nil { return err; }
+
 	/*
 		Grow `dest` to fit `src`.
 		If `dest` is not yet initialized, it will be using `allocator`.
 	*/
-	if err = grow(dest, src.used, minimize, allocator); err != nil {
+	needed := src.used if minimize else max(src.used, _DEFAULT_DIGIT_COUNT);
+
+	if err = grow(dest, needed, minimize, allocator); err != nil {
 		return err;
 	}
 
@@ -340,7 +349,7 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return set(a, 1);
+	return set(a, 1, minimize, allocator);
 }
 one :: proc { int_one, };
 
@@ -348,7 +357,7 @@ one :: proc { int_one, };
 	Set the `Int` to -1 and optionally shrink it to the minimum backing size.
 */
 int_minus_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return set(a, -1);
+	return set(a, -1, minimize, allocator);
 }
 minus_one :: proc { int_minus_one, };
 
@@ -356,7 +365,9 @@ minus_one :: proc { int_minus_one, };
 	Set the `Int` to Inf and optionally shrink it to the minimum backing size.
 */
 int_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, INF, minimize, allocator);
+	err = set(a, 1, minimize, allocator);
+	a.flags |= { .Inf, };
+	return err;
 }
 inf :: proc { int_inf, };
 
@@ -364,7 +375,9 @@ inf :: proc { int_inf, };
 	Set the `Int` to -Inf and optionally shrink it to the minimum backing size.
 */
 int_minus_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, MINUS_INF, minimize, allocator);
+	err = set(a, -1, minimize, allocator);
+	a.flags |= { .Inf, };
+	return err;
 }
 minus_inf :: proc { int_inf, };
 
@@ -372,7 +385,9 @@ minus_inf :: proc { int_inf, };
 	Set the `Int` to NaN and optionally shrink it to the minimum backing size.
 */
 int_nan :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, NAN, minimize, allocator);
+	err = set(a, 1, minimize, allocator);
+	a.flags |= { .NaN, };
+	return err;
 }
 nan :: proc { int_nan, };
 
@@ -691,9 +706,14 @@ initialize_constants :: proc() -> (res: int) {
 	set(     ZERO,  0);      ZERO.flags = {.Immutable};
 	set(      ONE,  1);       ONE.flags = {.Immutable};
 	set(MINUS_ONE, -1); MINUS_ONE.flags = {.Immutable};
-	set(      INF,  0);       INF.flags = {.Immutable, .Inf};
-	set(      INF,  0); MINUS_INF.flags = {.Immutable, .Inf}; MINUS_INF.sign = .Negative;
-	set(      NAN,  0);       NAN.flags = {.Immutable, .NaN};
+
+	/*
+		We set these special values to -1 or 1 so they don't get mistake for zero accidentally.
+		This allows for shortcut tests of is_zero as .used == 0.
+	*/
+	set(      INF,  1);       INF.flags = {.Immutable, .Inf};
+	set(      INF, -1); MINUS_INF.flags = {.Immutable, .Inf};
+	set(      NAN,  1);       NAN.flags = {.Immutable, .NaN};
 
 	return #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
 }
