@@ -81,6 +81,8 @@ Category :: enum {
 	choose,
 	lsb,
 	ctz,
+	bitfield_extract_old,
+	bitfield_extract_new,
 };
 Event :: struct {
 	t: time.Duration,
@@ -118,39 +120,41 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	nan(a);
-	print(" nan: ", a, 10, true, true, true);
-	fmt.println();
+	err = factorial(a, 1224);
+	count, _ := count_bits(a);
 
-	inf(a);
-	print(" inf: ", a, 10, true, true, true);
-	fmt.println();
+	bits   :=  101;
+	be1, be2: _WORD;
 
-	minus_inf(a);
-	print("-inf: ", a, 10, true, true, true);
-	fmt.println();
-
-
-	factorial(a, 128); // Untimed warmup.
-
-	N :: 128;
-
-	s := time.tick_now();
-	err = factorial(a, N);
-	Timings[.factorial].t += time.tick_since(s); Timings[.factorial].c += 1;
-
-	if err != nil {
-		fmt.printf("factorial(%v) returned %v\n", N, err);
+	/*
+		Sanity check loop.
+	*/
+	for o := 0; o < count - bits; o += 1 {
+		be1, _ = int_bitfield_extract(a, o, bits);
+		be2, _ = int_bitfield_extract_fast(a, o, bits);
+		if be1 != be2 {
+			fmt.printf("Offset: %v | Expected: %v | Got: %v\n", o, be1, be2);
+			assert(false);
+		}
 	}
 
-	s = time.tick_now();
-	as, err = itoa(a, 16);
-	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
-	if err != nil {
-		fmt.printf("itoa(factorial(%v), 16) returned %v\n", N, err);
+	/*
+		Timing loop
+	*/
+	s_old := time.tick_now();
+	for o := 0; o < count - bits; o += 1 {
+		be1, _ = int_bitfield_extract(a, o, bits);
 	}
+	Timings[.bitfield_extract_old].t += time.tick_since(s_old);
+	Timings[.bitfield_extract_old].c += (count - bits);
 
-	fmt.printf("factorial(%v): %v (first 10 hex digits)\n", N, as[:10]);
+	s_new := time.tick_now();
+	for o := 0; o < count - bits; o += 1 {
+		be2, _ = int_bitfield_extract_fast(a, o, bits);
+	}
+	Timings[.bitfield_extract_new].t += time.tick_since(s_new);
+	Timings[.bitfield_extract_new].c += (count - bits);
+	assert(be1 == be2);
 }
 
 main :: proc() {

@@ -202,7 +202,9 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 
 		for offset := 0; offset < count; offset += shift {
 			bits_to_get := int(min(count - offset, shift));
-			if digit, err = int_bitfield_extract(a, offset, bits_to_get); err != nil {
+
+			digit, err = int_bitfield_extract(a, offset, bits_to_get);
+			if err != nil {
 				return len(buffer) - available, .Invalid_Argument;
 			}
 			available -= 1;
@@ -448,7 +450,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		temp.sign = .Zero_or_Positive;
 	}
 
-	remainder: int;
+	remainder: DIGIT;
 	for {
 		if remainder, err = _int_div_digit(temp, temp, DIGIT(radix)); err != nil {
 			destroy(temp, denominator);

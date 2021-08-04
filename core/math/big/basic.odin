@@ -711,7 +711,12 @@ int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
 	if z, err = is_zero(remainder); z || denominator.sign == remainder.sign { return nil; }
 	return add(remainder, remainder, numerator);
 }
-mod :: proc { int_mod, };
+
+int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
+	return _int_div_digit(nil, numerator, denominator);
+}
+
+mod :: proc { int_mod, int_mod_digit, };
 
 /*
 	remainder = (number + addend) % modulus.
@@ -1263,14 +1268,14 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 /*
 	Divide by three (based on routine from MPI and the GMP manual).
 */
-_int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
+_int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: DIGIT, err: Error) {
 	/*
 		b = 2**MP_DIGIT_BIT / 3
 	*/
  	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3);
 
 	q := &Int{};
-	if err = grow(q, numerator.used); err != nil { return -1, err; }
+	if err = grow(q, numerator.used); err != nil { return 0, err; }
 	q.used = numerator.used;
 	q.sign = numerator.sign;
 
@@ -1300,8 +1305,7 @@ _int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: int, err: Error) {
 		}
 		q.digit[ix] = DIGIT(t);
 	}
-
-	remainder = int(w);
+	remainder = DIGIT(w);
 
 	/*
 		[optional] store the quotient.
@@ -1542,7 +1546,7 @@ _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (er
 /*
 	Single digit division (based on routine from MPI).
 */
-_int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: int, err: Error) {
+_int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
 	q := &Int{};
 	ix: int;
 
@@ -1581,7 +1585,7 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 		for ix < _DIGIT_BITS && denominator != (1 << uint(ix)) {
 			ix += 1;
 		}
-		remainder = int(numerator.digit[0]) & ((1 << uint(ix)) - 1);
+		remainder = numerator.digit[0] & ((1 << uint(ix)) - 1);
 		if quotient == nil {
 			return remainder, nil;
 		}
@@ -1615,7 +1619,7 @@ _int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remain
 		}
 		q.digit[ix] = t;
 	}
-	remainder = int(w);
+	remainder = DIGIT(w);
 
 	if quotient != nil {
 		clamp(q);
