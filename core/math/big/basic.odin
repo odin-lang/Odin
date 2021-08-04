@@ -683,7 +683,11 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
 	} else {
 		err = _int_div_school(quotient, remainder, numerator, denominator);
-		// err = _int_div_small(quotient, remainder, numerator, denominator);
+		/*
+			NOTE(Jeroen): We no longer need or use `_int_div_small`.
+			We'll keep it around for a bit.
+			err = _int_div_small(quotient, remainder, numerator, denominator);
+		*/
 	}
 
 	return err;
@@ -792,7 +796,7 @@ _int_recursive_product :: proc(res: ^Int, start, stop: DIGIT, level := int(0)) -
 
 	if num_factors == 1 { return set(res, start); }
 
-	return one(res);
+	return set(res, 1);
 }
 
 /*
@@ -804,8 +808,8 @@ int_factorial_binary_split :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
 	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(inner, outer, start, stop, temp);
 
-	if err = one(inner); err != nil { return err; }
-	if err = one(outer); err != nil { return err; }
+	if err = set(inner, 1); err != nil { return err; }
+	if err = set(outer, 1); err != nil { return err; }
 
 	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
 
@@ -896,7 +900,7 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 	/* Zero the carry */
 	carry := DIGIT(0);
 
-	for i = 0; i < min_used; i += 1 {
+	#no_bounds_check for i = 0; i < min_used; i += 1 {
 		/*
 			Compute the sum one _DIGIT at a time.
 			dest[i] = a[i] + b[i] + carry;
@@ -918,7 +922,7 @@ _int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 			Now copy higher words, if any, in A+B.
 			If A or B has more digits, add those in.
 		*/
-		for ; i < max_used; i += 1 {
+		#no_bounds_check for ; i < max_used; i += 1 {
 			dest.digit[i] = x.digit[i] + carry;
 			/*
 				Compute carry
@@ -975,7 +979,7 @@ _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 
 	borrow := DIGIT(0);
 
-	for i = 0; i < min_used; i += 1 {
+	#no_bounds_check for i = 0; i < min_used; i += 1 {
 		dest.digit[i] = (x.digit[i] - y.digit[i] - borrow);
 		/*
 			borrow = carry bit of dest[i]
@@ -993,7 +997,7 @@ _int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 	/*
 		Now copy higher words if any, e.g. if A has more digits than B
 	*/
-	for ; i < max_used; i += 1 {
+	#no_bounds_check for ; i < max_used; i += 1 {
 		dest.digit[i] = x.digit[i] - borrow;
 		/*
 			borrow = carry bit of dest[i]
@@ -1058,7 +1062,7 @@ _int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 		/*
 			Compute the column of the output and propagate the carry.
 		*/
-		for iy = 0; iy < pb; iy += 1 {
+		#no_bounds_check for iy = 0; iy < pb; iy += 1 {
 			/*
 				Compute the column as a _WORD.
 			*/
@@ -1144,7 +1148,7 @@ _int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 		/*
 			Execute loop.
 		*/
-		for iz = 0; iz < iy; iz += 1 {
+		#no_bounds_check for iz = 0; iz < iy; iz += 1 {
 			_W += _WORD(a.digit[tx + iz]) * _WORD(b.digit[ty - iz]);
 		}
 
@@ -1202,7 +1206,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 	if err = grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	t.used = (2 * pa) + 1;
 
-	for ix = 0; ix < pa; ix += 1 {
+	#no_bounds_check for ix = 0; ix < pa; ix += 1 {
 		carry := DIGIT(0);
 		/*
 			First calculate the digit at 2*ix; calculate double precision result.
@@ -1218,7 +1222,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 		*/
 		carry = DIGIT(r >> _DIGIT_BITS);
 
-		for iy = ix + 1; iy < pa; iy += 1 {
+		#no_bounds_check for iy = ix + 1; iy < pa; iy += 1 {
 			/*
 				First calculate the product.
 			*/
@@ -1242,7 +1246,7 @@ _int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 		/*
 			Propagate upwards.
 		*/
-		for carry != 0 {
+		#no_bounds_check for carry != 0 {
 			r     = _WORD(t.digit[ix+iy]) + _WORD(carry);
 			t.digit[ix+iy] = DIGIT(r & _WORD(_MASK));
 			carry = DIGIT(r >> _WORD(_DIGIT_BITS));
@@ -1483,6 +1487,7 @@ _int_div_school :: proc(quotient, remainder, numerator, denominator: ^Int) -> (e
 /*
 	Slower bit-bang division... also smaller.
 */
+@(deprecated="Use `_int_div_school`, it's 3.5x faster.")
 _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{};

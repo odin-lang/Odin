@@ -88,7 +88,7 @@ Event :: struct {
 }
 Timings := [Category]Event{};
 
-print :: proc(name: string, a: ^Int, base := i8(10), print_name := false, newline := true, print_extra_info := false) {
+print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline := true, print_extra_info := false) {
 	s := time.tick_now();
 	as, err := itoa(a, base);
 	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
@@ -118,28 +118,16 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	fmt.println();
-	print(" ONE: ",       ONE, 10, true, true, true);
-	fmt.println();
-
-	one(a);
-	print(" one: ",         a, 10, true, true, true);
-	fmt.println();
-
-	minus_one(a);
-	print("-one: ",         a, 10, true, true, true);
-	fmt.println();
-
 	nan(a);
-	print(" nan: ",         a, 10, true, true, true);
+	print(" nan: ", a, 10, true, true, true);
 	fmt.println();
 
 	inf(a);
-	print(" inf: ",         a, 10, true, true, true);
+	print(" inf: ", a, 10, true, true, true);
 	fmt.println();
 
 	minus_inf(a);
-	print("-inf: ",         a, 10, true, true, true);
+	print("-inf: ", a, 10, true, true, true);
 	fmt.println();
 
 
