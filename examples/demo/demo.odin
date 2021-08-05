@@ -778,16 +778,6 @@ using_statement :: proc() {
 
 		// Note: using’d fields can still be referred by name.
 	}
-	{ // using on an enum declaration
-
-		using Foo :: enum {A, B, C};
-
-		f0 := A;
-		f1 := B;
-		f2 := C;
-		fmt.println(f0, f1, f2);
-		fmt.println(len(Foo));
-	}
 }
 
 
@@ -1337,7 +1327,7 @@ bit_set_type :: proc() {
 	fmt.println("\n# bit_set type");
 
 	{
-		using Day :: enum {
+		Day :: enum {
 			Sunday,
 			Monday,
 			Tuesday,
@@ -1348,20 +1338,20 @@ bit_set_type :: proc() {
 		};
 
 		Days :: distinct bit_set[Day];
-		WEEKEND :: Days{Sunday, Saturday};
+		WEEKEND :: Days{.Sunday, .Saturday};
 
 		d: Days;
-		d = {Sunday, Monday};
+		d = {.Sunday, .Monday};
 		e := d + WEEKEND;
-		e += {Monday};
+		e += {.Monday};
 		fmt.println(d, e);
 
-		ok := Saturday in e; // `in` is only allowed for `map` and `bit_set` types
+		ok := .Saturday in e; // `in` is only allowed for `map` and `bit_set` types
 		fmt.println(ok);
-		if Saturday in e {
+		if .Saturday in e {
 			fmt.println("Saturday in", e);
 		}
-		X :: Saturday in WEEKEND; // Constant evaluation
+		X :: .Saturday in WEEKEND; // Constant evaluation
 		fmt.println(X);
 		fmt.println("Cardinality:", card(e));
 	}

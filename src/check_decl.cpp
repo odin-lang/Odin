@@ -294,6 +294,8 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 
 	// using decl
 	if (decl->is_using) {
+		warning(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
+		#if 0
 		// NOTE(bill): Must be an enum declaration
 		if (te->kind == Ast_EnumType) {
 			Scope *parent = e->scope;
@@ -317,6 +319,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 				}
 			}
 		}
+		#endif
 	}
 }
 
