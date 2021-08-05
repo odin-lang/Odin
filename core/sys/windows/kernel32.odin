@@ -474,10 +474,12 @@ foreign kernel32 {
 }
 
 
-using MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
+MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
 	LowMemoryResourceNotification,
 	HighMemoryResourceNotification,
 }
+LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification;
+HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification;
 
 
 foreign kernel32 {
@@ -598,12 +600,16 @@ foreign kernel32 {
 	) -> BOOL ---;
 }
 
-using OFFER_PRIORITY :: enum c_int {
+OFFER_PRIORITY :: enum c_int {
 	VmOfferPriorityVeryLow = 1,
 	VmOfferPriorityLow,
 	VmOfferPriorityBelowNormal,
 	VmOfferPriorityNormal,
 }
+VmOfferPriorityVeryLow     :: OFFER_PRIORITY.VmOfferPriorityVeryLow;
+VmOfferPriorityLow         :: OFFER_PRIORITY.VmOfferPriorityLow;
+VmOfferPriorityBelowNormal :: OFFER_PRIORITY.VmOfferPriorityBelowNormal;
+VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal;
 
 foreign kernel32 {
 	OfferVirtualMemory :: proc(
@@ -638,9 +644,11 @@ foreign kernel32 {
 	) -> HANDLE ---;
 }
 
-using WIN32_MEMORY_INFORMATION_CLASS :: enum c_int {
+WIN32_MEMORY_INFORMATION_CLASS :: enum c_int {
 	MemoryRegionInfo,
 }
+MemoryRegionInfo :: WIN32_MEMORY_INFORMATION_CLASS.MemoryRegionInfo;
+
 WIN32_MEMORY_REGION_INFORMATION :: struct {
 	AllocationBase: PVOID,
 	AllocationProtect: ULONG,
