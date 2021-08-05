@@ -9,7 +9,11 @@ package big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
-	This file contains basic arithmetic operations like `add`, `sub`, `mul`, `div`, ...
+	This file exports procedures for use with the test.py test suite.
+*/
+
+/*
+	TODO: Write tests for `internal_*` and test reusing parameters with the public implementations.
 */
 
 import "core:runtime"
@@ -35,7 +39,11 @@ PyRes :: struct {
 
 	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":add:atoi(a):", err=err}; }
 	if err = atoi(bb, string(b), 16); err != nil { return PyRes{res=":add:atoi(b):", err=err}; }
-	if err = add(sum, aa, bb);        err != nil { return PyRes{res=":add:add(sum,a,b):", err=err}; }
+	if bb.used == 1 {
+		if err = add(sum, aa, bb.digit[0]); err != nil { return PyRes{res=":add:add(sum,a,b):", err=err}; }	
+	} else {
+		if err = add(sum, aa, bb);          err != nil { return PyRes{res=":add:add(sum,a,b):", err=err}; }
+	}
 
 	r: cstring;
 	r, err = int_itoa_cstring(sum, 16, context.temp_allocator);
@@ -52,7 +60,11 @@ PyRes :: struct {
 
 	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":sub:atoi(a):", err=err}; }
 	if err = atoi(bb, string(b), 16); err != nil { return PyRes{res=":sub:atoi(b):", err=err}; }
-	if err = sub(sum, aa, bb);        err != nil { return PyRes{res=":sub:sub(sum,a,b):", err=err}; }
+	if bb.used == 1 {
+		if err = sub(sum, aa, bb.digit[0]); err != nil { return PyRes{res=":sub:sub(sum,a,b):", err=err}; }
+	} else {
+		if err = sub(sum, aa, bb);          err != nil { return PyRes{res=":sub:sub(sum,a,b):", err=err}; }
+	}
 
 	r: cstring;
 	r, err = int_itoa_cstring(sum, 16, context.temp_allocator);

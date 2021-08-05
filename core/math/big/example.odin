@@ -12,7 +12,6 @@ package big
 
 import "core:fmt"
 import "core:mem"
-import "core:time"
 
 print_configation :: proc() {
 	fmt.printf(
@@ -41,74 +40,6 @@ _SQR_TOOM_CUTOFF,
 );
 
 }
-
-print_timings :: proc() {
-	fmt.printf("Timings:\n");
-	for v, i in Timings {
-		if v.count > 0 {
-			avg_ticks  := time.Duration(f64(v.ticks) / f64(v.count));
-			avg_cycles := f64(v.cycles) / f64(v.count);
-
-			avg_s: string;
-			switch {
-			case avg_ticks < time.Microsecond:
-				avg_s = fmt.tprintf("%v ns / %v cycles", time.duration_nanoseconds(avg_ticks), avg_cycles);
-			case avg_ticks < time.Millisecond:
-				avg_s = fmt.tprintf("%v µs / %v cycles", time.duration_microseconds(avg_ticks), avg_cycles);
-			case:
-				avg_s = fmt.tprintf("%v ms / %v cycles", time.duration_milliseconds(avg_ticks), avg_cycles);
-			}
-
-			total_s: string;
-			switch {
-			case v.ticks < time.Microsecond:
-				total_s = fmt.tprintf("%v ns / %v cycles", time.duration_nanoseconds(v.ticks), v.cycles);
-			case v.ticks < time.Millisecond:
-				total_s = fmt.tprintf("%v µs / %v cycles", time.duration_microseconds(v.ticks), v.cycles);
-			case:
-				total_s = fmt.tprintf("%v ms / %v cycles", time.duration_milliseconds(v.ticks), v.cycles);
-			}
-
-			fmt.printf("\t%v: %s (avg), %s (total, %v calls)\n", i, avg_s, total_s, v.count);
-		}
-	}
-}
-
-@(deferred_in_out=_SCOPE_END)
-SCOPED_TIMING :: #force_inline proc(c: Category) -> (ticks: time.Tick, cycles: u64) {
-	cycles = time.read_cycle_counter();
-	ticks  = time.tick_now();
-	return;
-}
-_SCOPE_END :: #force_inline proc(c: Category, ticks: time.Tick, cycles: u64) {
-	cycles_now := time.read_cycle_counter();
-	ticks_now  := time.tick_now();
-
-	Timings[c].ticks  = time.tick_diff(ticks, ticks_now);
-	Timings[c].cycles = cycles_now - cycles;
-	Timings[c].count += 1;
-}
-SCOPED_COUNT_ADD :: #force_inline proc(c: Category, count: int) {
-	Timings[c].count += count;
-}
-
-Category :: enum {
-	itoa,
-	atoi,
-	factorial,
-	factorial_bin,
-	choose,
-	lsb,
-	ctz,
-	bitfield_extract,
-};
-
-Event :: struct {
-	ticks:  time.Duration,
-	count:  int,
-	cycles: u64,
-}
-Timings := [Category]Event{};
 
 print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline := true, print_extra_info := false) {
 	as, err := itoa(a, base);

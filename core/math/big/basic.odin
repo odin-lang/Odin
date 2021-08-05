@@ -23,35 +23,12 @@ import "core:intrinsics"
 /*
 	High-level addition. Handles sign.
 */
-int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
-	dest := dest; x := a; y := b;
-	if err = clear_if_uninitialized(x); err != nil { return err; }
-	if err = clear_if_uninitialized(y); err != nil { return err; }
-	if err = clear_if_uninitialized(dest); err != nil { return err; }
+int_add :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	if err = clear_if_uninitialized(dest, a, b); err != nil { return err; }
 	/*
 		All parameters have been initialized.
-		We can now safely ignore errors from comparison routines.
 	*/
-
-	/*
-		Handle both negative or both positive.
-	*/
-	if x.sign == y.sign {
-		dest.sign = x.sign;
-		return _int_add(dest, x, y);
-	}
-
-	/*
-		One positive, the other negative.
-		Subtract the one with the greater magnitude from the other.
-		The result gets the sign of the one with the greater magnitude.
-	*/
-	if c, _ := cmp_mag(a, b); c == -1 {
-		x, y = y, x;
-	}
-
-	dest.sign = x.sign;
-	return _int_sub(dest, x, y);
+	return #force_inline internal_int_add_signed(dest, a, b, allocator);
 }
 
 /*
@@ -60,178 +37,28 @@ int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
 
 	dest = a + digit;
 */
-int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
-	dest := dest; digit := digit;
-	if err = clear_if_uninitialized(a); err != nil {
-		return err;
-	}
+int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
+	if err = clear_if_uninitialized(a); err != nil { return err; }
 	/*
 		Grow destination as required.
 	*/
-	if err = grow(dest, a.used + 1); err != nil {
-		return err;
-	}
+	if err = grow(dest, a.used + 1, false, allocator); err != nil { return err; }
 
 	/*
 		All parameters have been initialized.
-		We can now safely ignore errors from comparison routines.
 	*/
-
-	/*
-		Fast paths for destination and input Int being the same.
-	*/
-	if dest == a {
-		/*
-			Fast path for dest.digit[0] + digit fits in dest.digit[0] without overflow.
-		*/
-		if p, _ := is_pos(dest); p && (dest.digit[0] + digit < _DIGIT_MAX) {
-			dest.digit[0] += digit;
-			dest.used += 1;
-			return clamp(dest);
-		}
-		/*
-			Can be subtracted from dest.digit[0] without underflow.
-		*/
-		if n, _ := is_neg(a); n && (dest.digit[0] > digit) {
-			dest.digit[0] -= digit;
-			dest.used += 1;
-			return clamp(dest);
-		}
-	}
-
-	/*
-		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
-	*/
-	if n, _ := is_neg(a); n && (a.used > 1 || a.digit[0] >= digit) {
-		/*
-			Temporarily fix `a`'s sign.
-		*/
-		a.sign = .Zero_or_Positive;
-		/*
-			dest = |a| - digit
-		*/
-		if err = sub(dest, a, digit); err != nil {
-			/*
-				Restore a's sign.
-			*/
-			a.sign = .Negative;
-			return err;
-		}
-		/*
-			Restore sign and set `dest` sign.
-		*/
-		a.sign    = .Negative;
-		dest.sign = .Negative;
-
-		return clamp(dest);
-	}
-
-	/*
-		Remember the currently used number of digits in `dest`.
-	*/
-	old_used := dest.used;
-
-	/*
-		If `a` is positive
-	*/
-	if p, _ := is_pos(a); p {
-		/*
-			Add digits, use `carry`.
-		*/
-		i: int;
-		carry := digit;
-		for i = 0; i < a.used; i += 1 {
-			dest.digit[i] = a.digit[i] + carry;
-			carry = dest.digit[i] >> _DIGIT_BITS;
-			dest.digit[i] &= _MASK;
-		}
-		/*
-			Set final carry.
-		*/
-		dest.digit[i] = carry;
-		/*
-			Set `dest` size.
-		*/
-		dest.used = a.used + 1;
-	} else {
-		/*
-			`a` was negative and |a| < digit.
-		*/
-		dest.used = 1;
-		/*
-			The result is a single DIGIT.
-		*/
-		dest.digit[0] = digit - a.digit[0] if a.used == 1 else digit;
-	}
-	/*
-		Sign is always positive.
-	*/
-	dest.sign = .Zero_or_Positive;
-
-	zero_count := old_used - dest.used;
-	/*
-		Zero remainder.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
-	/*
-		Adjust dest.used based on leading zeroes.
-	*/
-	return clamp(dest);
+	return #force_inline internal_int_add_digit(dest, a, digit);
 }
 
 /*
 	High-level subtraction, dest = number - decrease. Handles signs.
 */
-int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
-	dest := dest; x := number; y := decrease;
-	if err = clear_if_uninitialized(dest); err != nil {
-		return err;
-	}
-	if err = clear_if_uninitialized(x); err != nil {
-		return err;
-	}
-	if err = clear_if_uninitialized(y); err != nil {
-		return err;
-	}
+int_sub :: proc(dest, number, decrease: ^Int, allocator := context.allocator) -> (err: Error) {
+	if err = clear_if_uninitialized(dest, number, decrease); err != nil { return err; }
 	/*
 		All parameters have been initialized.
-		We can now safely ignore errors from comparison routines.
 	*/
-
-	if x.sign != y.sign {
-		/*
-			Subtract a negative from a positive, OR subtract a positive from a negative.
-			In either case, ADD their magnitudes and use the sign of the first number.
-		*/
-		dest.sign = x.sign;
-		return _int_add(dest, x, y);
-	}
-
-	/*
-		Subtract a positive from a positive, OR negative from a negative.
-		First, take the difference between their magnitudes, then...
-	*/
-	if c, _ := cmp_mag(x, y); c == -1 {
-		/*
-			The second has a larger magnitude.
-			The result has the *opposite* sign from the first number.
-		*/
-		if p, _ := is_pos(x); p {
-			dest.sign = .Negative;
-		} else {
-			dest.sign = .Zero_or_Positive;
-		}
-		x, y = y, x;
-	} else {
-		/*
-			The first has a larger or equal magnitude.
-			Copy the sign from the first.
-		*/
-		dest.sign = x.sign;
-	}
-	return _int_sub(dest, x, y);
+	return #force_inline internal_int_sub_signed(dest, number, decrease, allocator);
 }
 
 /*
@@ -240,98 +67,18 @@ int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
 
 	dest = a - digit;
 */
-int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
-	dest := dest; digit := digit;
-	if err = clear_if_uninitialized(dest); err != nil {
-		return err;
-	}
+int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
+	if err = clear_if_uninitialized(a); err != nil { return err; }
 	/*
 		Grow destination as required.
 	*/
-	if dest != a {
-		if err = grow(dest, a.used + 1); err != nil {
-			return err;
-		}
-	}
+	if err = grow(dest, a.used + 1, false, allocator); err != nil { return err; }
+
 	/*
 		All parameters have been initialized.
-		We can now safely ignore errors from comparison routines.
 	*/
-
-	/*
-		Fast paths for destination and input Int being the same.
-	*/
-	if dest == a {
-		/*
-			Fast path for `dest` is negative and unsigned addition doesn't overflow the lowest digit.
-		*/
-		if n, _ := is_neg(dest); n && (dest.digit[0] + digit < _DIGIT_MAX) {
-			dest.digit[0] += digit;
-			return nil;
-		}
-		/*
-			Can be subtracted from dest.digit[0] without underflow.
-		*/
-		if p, _ := is_pos(a); p && (dest.digit[0] > digit) {
-			dest.digit[0] -= digit;
-			return nil;
-		}
-	}
-
-	/*
-		If `a` is negative, just do an unsigned addition (with fudged signs).
-	*/
-	if n, _ := is_neg(a); n {
-		t := a;
-		t.sign = .Zero_or_Positive;
-
-		err = add(dest, t, digit);
-		dest.sign = .Negative;
-
-		clamp(dest);
-		return err;
-	}
-
-	old_used := dest.used;
-
-	/*
-		if `a`<= digit, simply fix the single digit.
-	*/
-	z, _ := is_zero(a);
-
-	if a.used == 1 && (a.digit[0] <= digit) || z {
-		dest.digit[0] = digit - a.digit[0] if a.used == 1 else digit;
-		dest.sign = .Negative;
-		dest.used = 1;
-	} else {
-		dest.sign = .Zero_or_Positive;
-		dest.used = a.used;
-
-		/*
-			Subtract with carry.
-		*/
-		carry := digit;
-
-		for i := 0; i < a.used; i += 1 {
-			dest.digit[i] = a.digit[i] - carry;
-			carry := dest.digit[i] >> ((size_of(DIGIT) * 8) - 1);
-			dest.digit[i] &= _MASK;
-		}
-	}
-
-	zero_count := old_used - dest.used;
-	/*
-		Zero remainder.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
-	/*
-		Adjust dest.used based on leading zeroes.
-	*/
-	return clamp(dest);
+	return #force_inline internal_int_sub_digit(dest, a, digit);
 }
-
 
 /*
 	dest = src  / 2
@@ -869,167 +616,6 @@ int_choose_digit :: proc(res: ^Int, n, k: DIGIT) -> (err: Error) {
 	return err;	
 }
 choose :: proc { int_choose_digit, };
-
-/*
-	==========================
-		Low-level routines    
-	==========================
-*/
-
-/*
-	Low-level addition, unsigned.
-	Handbook of Applied Cryptography, algorithm 14.7.
-*/
-_int_add :: proc(dest, a, b: ^Int) -> (err: Error) {
-	dest := dest; x := a; y := b;
-
-	old_used, min_used, max_used, i: int;
-
-	if x.used < y.used {
-		x, y = y, x;
-		assert(x.used >= y.used);
-	}
-
-	min_used = y.used;
-	max_used = x.used;
-	old_used = dest.used;
-
-	if err = grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != nil {
-		return err;
-	}
-	dest.used = max_used + 1;
-	/*
-		All parameters have been initialized.
-	*/
-
-	/* Zero the carry */
-	carry := DIGIT(0);
-
-	#no_bounds_check for i = 0; i < min_used; i += 1 {
-		/*
-			Compute the sum one _DIGIT at a time.
-			dest[i] = a[i] + b[i] + carry;
-		*/
-		dest.digit[i] = x.digit[i] + y.digit[i] + carry;
-
-		/*
-			Compute carry
-		*/
-		carry = dest.digit[i] >> _DIGIT_BITS;
-		/*
-			Mask away carry from result digit.
-		*/
-		dest.digit[i] &= _MASK;
-	}
-
-	if min_used != max_used {
-		/*
-			Now copy higher words, if any, in A+B.
-			If A or B has more digits, add those in.
-		*/
-		#no_bounds_check for ; i < max_used; i += 1 {
-			dest.digit[i] = x.digit[i] + carry;
-			/*
-				Compute carry
-			*/
-			carry = dest.digit[i] >> _DIGIT_BITS;
-			/*
-				Mask away carry from result digit.
-			*/
-			dest.digit[i] &= _MASK;
-		}
-	}
-	/*
-		Add remaining carry.
-	*/
-	dest.digit[i] = carry;
-	zero_count := old_used - dest.used;
-	/*
-		Zero remainder.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
-	/*
-		Adjust dest.used based on leading zeroes.
-	*/
-	return clamp(dest);
-}
-
-/*
-	Low-level subtraction, dest = number - decrease. Assumes |number| > |decrease|.
-	Handbook of Applied Cryptography, algorithm 14.9.
-*/
-_int_sub :: proc(dest, number, decrease: ^Int) -> (err: Error) {
-	dest := dest; x := number; y := decrease;
-	if err = clear_if_uninitialized(x); err != nil {
-		return err;
-	}
-	if err = clear_if_uninitialized(y); err != nil {
-		return err;
-	}
-
-	old_used := dest.used;
-	min_used := y.used;
-	max_used := x.used;
-	i: int;
-
-	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != nil {
-		return err;
-	}
-	dest.used = max_used;
-	/*
-		All parameters have been initialized.
-	*/
-
-	borrow := DIGIT(0);
-
-	#no_bounds_check for i = 0; i < min_used; i += 1 {
-		dest.digit[i] = (x.digit[i] - y.digit[i] - borrow);
-		/*
-			borrow = carry bit of dest[i]
-			Note this saves performing an AND operation since if a carry does occur,
-			it will propagate all the way to the MSB.
-			As a result a single shift is enough to get the carry.
-		*/
-		borrow = dest.digit[i] >> ((size_of(DIGIT) * 8) - 1);
-		/*
-			Clear borrow from dest[i].
-		*/
-		dest.digit[i] &= _MASK;
-	}
-
-	/*
-		Now copy higher words if any, e.g. if A has more digits than B
-	*/
-	#no_bounds_check for ; i < max_used; i += 1 {
-		dest.digit[i] = x.digit[i] - borrow;
-		/*
-			borrow = carry bit of dest[i]
-			Note this saves performing an AND operation since if a carry does occur,
-			it will propagate all the way to the MSB.
-			As a result a single shift is enough to get the carry.
-		*/
-		borrow = dest.digit[i] >> ((size_of(DIGIT) * 8) - 1);
-		/*
-			Clear borrow from dest[i].
-		*/
-		dest.digit[i] &= _MASK;
-	}
-
-	zero_count := old_used - dest.used;
-	/*
-		Zero remainder.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
-	/*
-		Adjust dest.used based on leading zeroes.
-	*/
-	return clamp(dest);
-}
-
 
 /*
 	Multiplies |a| * |b| and only computes upto digs digits of result.
