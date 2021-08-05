@@ -8,7 +8,7 @@ package big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
-	This file collects public procs into proc maps, as well as any of their aliases.
+	This file collects public proc maps and their aliases.
 /*
 
 */
@@ -19,15 +19,18 @@ package big
 */
 
 /*
-	err = add(dest, a, b);
+	High-level addition. Handles sign.
 */
 add :: proc {
 	/*
-		int_add :: proc(dest, a, b: ^Int) -> (err: Error)
+		int_add :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error)
 	*/
 	int_add,
 	/*
-		int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error)
+		Adds the unsigned `DIGIT` immediate to an `Int`, such that the
+		`DIGIT` doesn't have to be turned into an `Int` first.
+
+		int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error)
 	*/
 	int_add_digit,
 };

@@ -287,7 +287,7 @@ int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := conte
 
 	/*
 		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
-		Otherwise, `[dynamic]DIGIT` already knows what allocator was used for it, so reuse will do the right thing.
+		Otherwise, `[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 	*/
 	if raw.cap == 0 {
 		a.digit = mem.make_dynamic_array_len_cap([dynamic]DIGIT, needed, needed, allocator);
@@ -314,7 +314,7 @@ int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) ->
 
 	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
 	if raw.cap != 0 {
-		mem.zero_slice(a.digit[:]);
+		mem.zero_slice(a.digit[:a.used]);
 	}
 	a.sign = .Zero_or_Positive;
 	a.used = 0;
@@ -328,7 +328,7 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return set(a, 1, minimize, allocator);
+	return copy(a, ONE, minimize, allocator);
 }
 one :: proc { int_one, };
 
@@ -597,6 +597,7 @@ _zero_unused :: proc(a: ^Int) {
 
 clear_if_uninitialized_single :: proc(arg: ^Int) -> (err: Error) {
 	if !is_initialized(arg) {
+		if arg == nil { return nil; }
 		return grow(arg, _DEFAULT_DIGIT_COUNT);
 	}
 	return err;
@@ -604,7 +605,8 @@ clear_if_uninitialized_single :: proc(arg: ^Int) -> (err: Error) {
 
 clear_if_uninitialized_multi :: proc(args: ..^Int) -> (err: Error) {
 	for i in args {
-		if i != nil && !is_initialized(i) {
+		if i == nil { continue; }
+		if !is_initialized(i) {
 			e := grow(i, _DEFAULT_DIGIT_COUNT);
 			if e != nil { err = e; }
 		}
@@ -690,9 +692,9 @@ initialize_constants :: proc() -> (res: int) {
 		We set these special values to -1 or 1 so they don't get mistake for zero accidentally.
 		This allows for shortcut tests of is_zero as .used == 0.
 	*/
+	set(      NAN,  1);       NAN.flags = {.Immutable, .NaN};
 	set(      INF,  1);       INF.flags = {.Immutable, .Inf};
 	set(      INF, -1); MINUS_INF.flags = {.Immutable, .Inf};
-	set(      NAN,  1);       NAN.flags = {.Immutable, .NaN};
 
 	return #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
 }

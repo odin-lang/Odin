@@ -444,3 +444,240 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT) -> (err: Error)
 }
 
 internal_sub :: proc { internal_int_sub_signed, internal_int_sub_digit, };
+
+/*
+	dest = src  / 2
+	dest = src >> 1
+*/
+internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
+	old_used  := dest.used; dest.used = src.used;
+	/*
+		Carry
+	*/
+	fwd_carry := DIGIT(0);
+
+	#no_bounds_check for x := dest.used - 1; x >= 0; x -= 1 {
+		/*
+			Get the carry for the next iteration.
+		*/
+		src_digit := src.digit[x];
+		carry     := src_digit & 1;
+		/*
+			Shift the current digit, add in carry and store.
+		*/
+		dest.digit[x] = (src_digit >> 1) | (fwd_carry << (_DIGIT_BITS - 1));
+		/*
+			Forward carry to next iteration.
+		*/
+		fwd_carry = carry;
+	}
+
+	zero_count := old_used - dest.used;
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
+	}
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	dest.sign = src.sign;
+	return clamp(dest);	
+}
+
+/*
+	dest = src  * 2
+	dest = src << 1
+*/
+internal_int_shl1 :: proc(dest, src: ^Int) -> (err: Error) {
+	old_used  := dest.used; dest.used  = src.used + 1;
+
+	/*
+		Forward carry
+	*/
+	carry := DIGIT(0);
+	#no_bounds_check for x := 0; x < src.used; x += 1 {
+		/*
+			Get what will be the *next* carry bit from the MSB of the current digit.
+		*/
+		src_digit := src.digit[x];
+		fwd_carry := src_digit >> (_DIGIT_BITS - 1);
+
+		/*
+			Now shift up this digit, add in the carry [from the previous]
+		*/
+		dest.digit[x] = (src_digit << 1 | carry) & _MASK;
+
+		/*
+			Update carry
+		*/
+		carry = fwd_carry;
+	}
+	/*
+		New leading digit?
+	*/
+	if carry != 0 {
+		/*
+			Add a MSB which is always 1 at this point.
+		*/
+		dest.digit[dest.used] = 1;
+	}
+	zero_count := old_used - dest.used;
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
+	}
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	dest.sign = src.sign;
+	return clamp(dest);
+}
+
+/*
+	Multiply by a DIGIT.
+*/
+internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.allocator) -> (err: Error) {
+	if multiplier == 0 {
+		return zero(dest);
+	}
+	if multiplier == 1 {
+		return copy(dest, src);
+	}
+
+	/*
+		Power of two?
+	*/
+	if multiplier == 2 {
+		return #force_inline shl1(dest, src);
+	}
+	if is_power_of_two(int(multiplier)) {
+		ix: int;
+		if ix, err = log(multiplier, 2); err != nil { return err; }
+		return shl(dest, src, ix);
+	}
+
+	/*
+		Ensure `dest` is big enough to hold `src` * `multiplier`.
+	*/
+	if err = grow(dest, max(src.used + 1, _DEFAULT_DIGIT_COUNT), false, allocator); err != nil { return err; }
+
+	/*
+		Save the original used count.
+	*/
+	old_used := dest.used;
+	/*
+		Set the sign.
+	*/
+	dest.sign = src.sign;
+	/*
+		Set up carry.
+	*/
+	carry := _WORD(0);
+	/*
+		Compute columns.
+	*/
+	ix := 0;
+	#no_bounds_check for ; ix < src.used; ix += 1 {
+		/*
+			Compute product and carry sum for this term
+		*/
+		product := carry + _WORD(src.digit[ix]) * _WORD(multiplier);
+		/*
+			Mask off higher bits to get a single DIGIT.
+		*/
+		dest.digit[ix] = DIGIT(product & _WORD(_MASK));
+		/*
+			Send carry into next iteration
+		*/
+		carry = product >> _DIGIT_BITS;
+	}
+
+	/*
+		Store final carry [if any] and increment used.
+	*/
+	dest.digit[ix] = DIGIT(carry);
+	dest.used = src.used + 1;
+	/*
+		Zero unused digits.
+	*/
+	zero_count := old_used - dest.used;
+	if zero_count > 0 {
+		mem.zero_slice(dest.digit[zero_count:]);
+	}
+	return clamp(dest);
+}
+
+/*
+	High level multiplication (handles sign).
+*/
+internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> (err: Error) {
+	/*
+		Early out for `multiplier` is zero; Set `dest` to zero.
+	*/
+	if multiplier.used == 0 || src.used == 0 { return zero(dest); }
+
+	if src == multiplier {
+		/*
+			Do we need to square?
+		*/
+		if        false && src.used >= _SQR_TOOM_CUTOFF {
+			/* Use Toom-Cook? */
+			// err = s_mp_sqr_toom(a, c);
+		} else if false && src.used >= _SQR_KARATSUBA_CUTOFF {
+			/* Karatsuba? */
+			// err = s_mp_sqr_karatsuba(a, c);
+		} else if false && ((src.used * 2) + 1) < _WARRAY &&
+		                   src.used < (_MAX_COMBA / 2) {
+			/* Fast comba? */
+			// err = s_mp_sqr_comba(a, c);
+		} else {
+			err = _int_sqr(dest, src);
+		}
+	} else {
+		/*
+			Can we use the balance method? Check sizes.
+			* The smaller one needs to be larger than the Karatsuba cut-off.
+			* The bigger one needs to be at least about one `_MUL_KARATSUBA_CUTOFF` bigger
+			* to make some sense, but it depends on architecture, OS, position of the
+			* stars... so YMMV.
+			* Using it to cut the input into slices small enough for _mul_comba
+			* was actually slower on the author's machine, but YMMV.
+		*/
+
+		min_used := min(src.used, multiplier.used);
+		max_used := max(src.used, multiplier.used);
+		digits   := src.used + multiplier.used + 1;
+
+		if        false &&  min_used     >= _MUL_KARATSUBA_CUTOFF &&
+						    max_used / 2 >= _MUL_KARATSUBA_CUTOFF &&
+			/*
+				Not much effect was observed below a ratio of 1:2, but again: YMMV.
+			*/
+							max_used     >= 2 * min_used {
+			// err = s_mp_mul_balance(a,b,c);
+		} else if false && min_used >= _MUL_TOOM_CUTOFF {
+			// err = s_mp_mul_toom(a, b, c);
+		} else if false && min_used >= _MUL_KARATSUBA_CUTOFF {
+			// err = s_mp_mul_karatsuba(a, b, c);
+		} else if digits < _WARRAY && min_used <= _MAX_COMBA {
+			/*
+				Can we use the fast multiplier?
+				* The fast multiplier can be used if the output will
+				* have less than MP_WARRAY digits and the number of
+				* digits won't affect carry propagation
+			*/
+			err = _int_mul_comba(dest, src, multiplier, digits);
+		} else {
+			err = _int_mul(dest, src, multiplier, digits);
+		}
+	}
+	neg      := src.sign != multiplier.sign;
+	dest.sign = .Negative if dest.used > 0 && neg else .Zero_or_Positive;
+	return err;
+}
+
+internal_mul :: proc { internal_int_mul, internal_int_mul_digit, };

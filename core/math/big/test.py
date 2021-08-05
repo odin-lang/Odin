@@ -113,6 +113,9 @@ def load(export_name, args, res):
 class Res(Structure):
 	_fields_ = [("res", c_char_p), ("err", c_uint64)]
 
+initialize_constants = load(l.test_initialize_constants, [], c_uint64)
+initialize_constants()
+
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
 add  = load(l.test_add, [c_char_p, c_char_p], Res)
