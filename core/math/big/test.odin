@@ -24,6 +24,11 @@ PyRes :: struct {
 	err: Error,
 }
 
+@export test_initialize_constants :: proc "c" () -> (res: int) {
+	context = runtime.default_context();
+	return initialize_constants();
+}
+
 @export test_error_string :: proc "c" (err: Error) -> (res: cstring) {
 	context = runtime.default_context();
 	es := Error_String;
