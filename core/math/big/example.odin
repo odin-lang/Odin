@@ -45,32 +45,51 @@ _SQR_TOOM_CUTOFF,
 print_timings :: proc() {
 	fmt.printf("Timings:\n");
 	for v, i in Timings {
-		if v.c > 0 {
-			avg   := time.Duration(f64(v.t) / f64(v.c));
+		if v.count > 0 {
+			avg_ticks  := time.Duration(f64(v.ticks) / f64(v.count));
+			avg_cycles := f64(v.cycles) / f64(v.count);
 
 			avg_s: string;
 			switch {
-			case avg < time.Microsecond:
-				avg_s = fmt.tprintf("%v ns", time.duration_nanoseconds(avg));
-			case avg < time.Millisecond:
-				avg_s = fmt.tprintf("%v µs", time.duration_microseconds(avg));
+			case avg_ticks < time.Microsecond:
+				avg_s = fmt.tprintf("%v ns / %v cycles", time.duration_nanoseconds(avg_ticks), avg_cycles);
+			case avg_ticks < time.Millisecond:
+				avg_s = fmt.tprintf("%v µs / %v cycles", time.duration_microseconds(avg_ticks), avg_cycles);
 			case:
-				avg_s = fmt.tprintf("%v ms", time.duration_milliseconds(avg));
+				avg_s = fmt.tprintf("%v ms / %v cycles", time.duration_milliseconds(avg_ticks), avg_cycles);
 			}
 
 			total_s: string;
 			switch {
-			case v.t < time.Microsecond:
-				total_s = fmt.tprintf("%v ns", time.duration_nanoseconds(v.t));
-			case v.t < time.Millisecond:
-				total_s = fmt.tprintf("%v µs", time.duration_microseconds(v.t));
+			case v.ticks < time.Microsecond:
+				total_s = fmt.tprintf("%v ns / %v cycles", time.duration_nanoseconds(v.ticks), v.cycles);
+			case v.ticks < time.Millisecond:
+				total_s = fmt.tprintf("%v µs / %v cycles", time.duration_microseconds(v.ticks), v.cycles);
 			case:
-				total_s = fmt.tprintf("%v ms", time.duration_milliseconds(v.t));
+				total_s = fmt.tprintf("%v ms / %v cycles", time.duration_milliseconds(v.ticks), v.cycles);
 			}
 
-			fmt.printf("\t%v: %s (avg), %s (total, %v calls)\n", i, avg_s, total_s, v.c);
+			fmt.printf("\t%v: %s (avg), %s (total, %v calls)\n", i, avg_s, total_s, v.count);
 		}
 	}
+}
+
+@(deferred_in_out=_SCOPE_END)
+SCOPED_TIMING :: #force_inline proc(c: Category) -> (ticks: time.Tick, cycles: u64) {
+	cycles = time.read_cycle_counter();
+	ticks  = time.tick_now();
+	return;
+}
+_SCOPE_END :: #force_inline proc(c: Category, ticks: time.Tick, cycles: u64) {
+	cycles_now := time.read_cycle_counter();
+	ticks_now  := time.tick_now();
+
+	Timings[c].ticks  = time.tick_diff(ticks, ticks_now);
+	Timings[c].cycles = cycles_now - cycles;
+	Timings[c].count += 1;
+}
+SCOPED_COUNT_ADD :: #force_inline proc(c: Category, count: int) {
+	Timings[c].count += count;
 }
 
 Category :: enum {
@@ -83,16 +102,16 @@ Category :: enum {
 	ctz,
 	bitfield_extract,
 };
+
 Event :: struct {
-	t: time.Duration,
-	c: int,
+	ticks:  time.Duration,
+	count:  int,
+	cycles: u64,
 }
 Timings := [Category]Event{};
 
 print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline := true, print_extra_info := false) {
-	s := time.tick_now();
 	as, err := itoa(a, base);
-	Timings[.itoa].t += time.tick_since(s); Timings[.itoa].c += 1;
 
 	defer delete(as);
 	cb, _ := count_bits(a);
@@ -128,12 +147,13 @@ demo :: proc() {
 	/*
 		Timing loop
 	*/
-	s_old := time.tick_now();
-	for o := 0; o < count - bits; o += 1 {
-		be1, _ = int_bitfield_extract(a, o, bits);
+	{
+		SCOPED_TIMING(.bitfield_extract);
+		for o := 0; o < count - bits; o += 1 {
+			be1, _ = int_bitfield_extract(a, o, bits);
+		}
 	}
-	Timings[.bitfield_extract].t += time.tick_since(s_old);
-	Timings[.bitfield_extract].c += (count - bits);
+	SCOPED_COUNT_ADD(.bitfield_extract, count - bits - 1);
 	fmt.printf("be1: %v\n", be1);
 }
 

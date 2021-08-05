@@ -205,19 +205,19 @@ int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: E
 	*/
 	if count == 1 {
 		limb := offset / _DIGIT_BITS;
-		if limb < 0 || limb >= a.used { return 0, .Invalid_Argument; }
+		if limb < 0 || limb >= a.used  { return 0, .Invalid_Argument; }
 		i := _WORD(1 << _WORD((offset % _DIGIT_BITS)));
 		return 1 if ((_WORD(a.digit[limb]) & i) != 0) else 0, nil;
 	}
 
-	if count > _WORD_BITS || count < 1             { return 0, .Invalid_Argument; }
+	if count > _WORD_BITS || count < 1 { return 0, .Invalid_Argument; }
 
 	/*
 		There are 3 possible cases.
 		-	[offset:][:count] covers 1 DIGIT,
-				e.g. offset: 0, count: 60 = bits 0..59
+				e.g. offset:  0, count:  60 = bits 0..59
 		-	[offset:][:count] covers 2 DIGITS,
-				e.g. offset: 5, count: 60 = bits 5..59, 0..4
+				e.g. offset:  5, count:  60 = bits 5..59, 0..4
 				e.g. offset:  0, count: 120 = bits 0..59, 60..119
 		-	[offset:][:count] covers 3 DIGITS,
 				e.g. offset: 40, count: 100 = bits 40..59, 0..59, 0..19
@@ -230,41 +230,26 @@ int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: E
 
 	num_bits    := min(bits_left, _DIGIT_BITS - bits_offset);
 
-	// fmt.printf("offset: %v | count: %v\n\n", offset, count);
-	// fmt.printf("left:   %v | bits_offset: %v | limb:  %v | num: %v\n\n", bits_left, bits_offset, limb, num_bits);
-
-	shift := offset % _DIGIT_BITS;
-	mask  := (_WORD(1) << uint(num_bits)) - 1;
-
-	// fmt.printf("shift: %v | mask: %v\n", shift, mask);
-	// fmt.printf("d: %v\n", a.digit[limb]);
-
-	res  = (_WORD(a.digit[limb]) >> uint(shift)) & mask;
-
-	// fmt.printf("res: %v\n", res);
+	shift       := offset % _DIGIT_BITS;
+	mask        := (_WORD(1) << uint(num_bits)) - 1;
+	res          = (_WORD(a.digit[limb]) >> uint(shift)) & mask;
 
 	bits_left -= num_bits;
 	if bits_left == 0 { return res, nil; }
 
 	res_shift := num_bits;
+	num_bits   = min(bits_left, _DIGIT_BITS);
+	mask       = (1 << uint(num_bits)) - 1;
 
-	num_bits = min(bits_left, _DIGIT_BITS);
-	mask     = (1 << uint(num_bits)) - 1;
-
-	v := (_WORD(a.digit[limb + 1]) & mask) << uint(res_shift);
-	res |= v;
+	res |= (_WORD(a.digit[limb + 1]) & mask) << uint(res_shift);
 
 	bits_left -= num_bits;
 	if bits_left == 0 { return res, nil; }
 
-	// fmt.printf("bits_left: %v | offset: %v | num: %v\n", bits_left, offset, num_bits);
-
 	mask     = (1 << uint(bits_left)) - 1;
 	res_shift += _DIGIT_BITS;
 
-	v = (_WORD(a.digit[limb + 2]) & mask) << uint(res_shift);
-	res |= v;
-
+	res |= (_WORD(a.digit[limb + 2]) & mask) << uint(res_shift);
 
 	return res, nil;
 }
