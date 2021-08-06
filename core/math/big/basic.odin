@@ -12,7 +12,6 @@ package big
 */
 
 import "core:mem"
-import "core:intrinsics"
 
 /*
 	===========================
@@ -140,9 +139,7 @@ int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> 
 
 mul :: proc { int_mul, int_mul_digit, };
 
-sqr :: proc(dest, src: ^Int) -> (err: Error) {
-	return mul(dest, src, src);
-}
+sqr :: proc(dest, src: ^Int) -> (err: Error) { return mul(dest, src, src); }
 
 /*
 	divmod.
@@ -205,8 +202,10 @@ mod :: proc { int_mod, int_mod_digit, };
 	remainder = (number + addend) % modulus.
 */
 int_addmod :: proc(remainder, number, addend, modulus: ^Int) -> (err: Error) {
-	if err = add(remainder, number, addend); err != nil { return err; }
-	return mod(remainder, remainder, modulus);
+	if remainder == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(number, addend, modulus); err != nil { return err; }
+
+	return #force_inline internal_addmod(remainder, number, addend, modulus);
 }
 addmod :: proc { int_addmod, };
 
@@ -214,8 +213,10 @@ addmod :: proc { int_addmod, };
 	remainder = (number - decrease) % modulus.
 */
 int_submod :: proc(remainder, number, decrease, modulus: ^Int) -> (err: Error) {
-	if err = add(remainder, number, decrease); err != nil { return err; }
-	return mod(remainder, remainder, modulus);
+	if remainder == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(number, decrease, modulus); err != nil { return err; }
+
+	return #force_inline internal_submod(remainder, number, decrease, modulus);
 }
 submod :: proc { int_submod, };
 
@@ -223,8 +224,10 @@ submod :: proc { int_submod, };
 	remainder = (number * multiplicand) % modulus.
 */
 int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int) -> (err: Error) {
-	if err = mul(remainder, number, multiplicand); err != nil { return err; }
-	return mod(remainder, remainder, modulus);
+	if remainder == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(number, multiplicand, modulus); err != nil { return err; }
+
+	return #force_inline internal_mulmod(remainder, number, multiplicand, modulus);
 }
 mulmod :: proc { int_mulmod, };
 
@@ -232,88 +235,22 @@ mulmod :: proc { int_mulmod, };
 	remainder = (number * number) % modulus.
 */
 int_sqrmod :: proc(remainder, number, modulus: ^Int) -> (err: Error) {
-	if err = sqr(remainder, number); err != nil { return err; }
-	return mod(remainder, remainder, modulus);
+	if remainder == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(number, modulus); err != nil { return err; }
+
+	return #force_inline internal_sqrmod(remainder, number, modulus);
 }
 sqrmod :: proc { int_sqrmod, };
 
 
-/*
-	TODO: Use Sterling's Approximation to estimate log2(N!) to size the result.
-	This way we'll have to reallocate less, possibly not at all.
-*/
-int_factorial :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
-	if n < 0 || n > _FACTORIAL_MAX_N || res == nil { return .Invalid_Argument; }
+int_factorial :: proc(res: ^Int, n: int) -> (err: Error) {
+	if n < 0 || n > _FACTORIAL_MAX_N { return .Invalid_Argument; }
+	if res == nil { return .Invalid_Pointer; }
 
-	i := DIGIT(len(_factorial_table));
-	if n < i {
-		return set(res, _factorial_table[n]);
-	}
-	if n >= _FACTORIAL_BINARY_SPLIT_CUTOFF {
-		return int_factorial_binary_split(res, n);
-	}
-
-	if err = set(res, _factorial_table[i - 1]); err != nil { return err; }
-	for {
-		if err = mul(res, res, DIGIT(i)); err != nil || i == n { return err; }
-		i += 1;
-	}
-
-	return nil;
+	return #force_inline internal_int_factorial(res, n);
 }
-
-_int_recursive_product :: proc(res: ^Int, start, stop: DIGIT, level := int(0)) -> (err: Error) {
-	t1, t2 := &Int{}, &Int{};
-	defer destroy(t1, t2);
-
-	if level > _FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS { return .Max_Iterations_Reached; }
-
-	num_factors := (stop - start) >> 1;
-	if num_factors == 2 {
-		if err = set(t1, start); err != nil { return err; }
-		if err = add(t2, t1, 2); err != nil { return err; }
-		return mul(res, t1, t2);
-	}
-
-	if num_factors > 1 {
-		mid := (start + num_factors) | 1;
-		if err = _int_recursive_product(t1, start,  mid, level + 1); err != nil { return err; }
-		if err = _int_recursive_product(t2,   mid, stop, level + 1); err != nil { return err; }
-		return mul(res, t1, t2);
-	}
-
-	if num_factors == 1 { return set(res, start); }
-
-	return set(res, 1);
-}
-
-/*
-	Binary split factorial algo due to: http://www.luschny.de/math/factorial/binarysplitfact.html
-*/
-int_factorial_binary_split :: proc(res: ^Int, n: DIGIT) -> (err: Error) {
-	if n < 0 || n > _FACTORIAL_MAX_N || res == nil { return .Invalid_Argument; }
-
-	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(inner, outer, start, stop, temp);
-
-	if err = set(inner, 1); err != nil { return err; }
-	if err = set(outer, 1); err != nil { return err; }
-
-	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
-
-	for i := bits_used; i >= 0; i -= 1 {
-		start := (n >> (uint(i) + 1)) + 1 | 1;
-		stop  := (n >> uint(i)) + 1 | 1;
-		if err = _int_recursive_product(temp, start, stop); err != nil { return err; }
-		if err = mul(inner, inner, temp);                   err != nil { return err; }
-		if err = mul(outer, outer, inner);                  err != nil { return err; }
-	}
-	shift := n - intrinsics.count_ones(n);
-
-	return shl(res, outer, int(shift));
-}
-
 factorial :: proc { int_factorial, };
+
 
 /*
 	Number of ways to choose `k` items from `n` items.
@@ -330,7 +267,7 @@ factorial :: proc { int_factorial, };
 		k, start from previous result
 
 */
-int_choose_digit :: proc(res: ^Int, n, k: DIGIT) -> (err: Error) {
+int_choose_digit :: proc(res: ^Int, n, k: int) -> (err: Error) {
 	if res == nil  { return .Invalid_Pointer; }
 	if err = clear_if_uninitialized(res); err != nil { return err; }
 
@@ -1120,66 +1057,3 @@ int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
 mod_bits :: proc { int_mod_bits, };
 
 
-when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
-	_factorial_table := [35]_WORD{
-/* f(00): */                                                   1,
-/* f(01): */                                                   1,
-/* f(02): */                                                   2,
-/* f(03): */                                                   6,
-/* f(04): */                                                  24,
-/* f(05): */                                                 120,
-/* f(06): */                                                 720,
-/* f(07): */                                               5_040,
-/* f(08): */                                              40_320,
-/* f(09): */                                             362_880,
-/* f(10): */                                           3_628_800,
-/* f(11): */                                          39_916_800,
-/* f(12): */                                         479_001_600,
-/* f(13): */                                       6_227_020_800,
-/* f(14): */                                      87_178_291_200,
-/* f(15): */                                   1_307_674_368_000,
-/* f(16): */                                  20_922_789_888_000,
-/* f(17): */                                 355_687_428_096_000,
-/* f(18): */                               6_402_373_705_728_000,
-/* f(19): */                             121_645_100_408_832_000,
-/* f(20): */                           2_432_902_008_176_640_000,
-/* f(21): */                          51_090_942_171_709_440_000,
-/* f(22): */                       1_124_000_727_777_607_680_000,
-/* f(23): */                      25_852_016_738_884_976_640_000,
-/* f(24): */                     620_448_401_733_239_439_360_000,
-/* f(25): */                  15_511_210_043_330_985_984_000_000,
-/* f(26): */                 403_291_461_126_605_635_584_000_000,
-/* f(27): */              10_888_869_450_418_352_160_768_000_000,
-/* f(28): */             304_888_344_611_713_860_501_504_000_000,
-/* f(29): */           8_841_761_993_739_701_954_543_616_000_000,
-/* f(30): */         265_252_859_812_191_058_636_308_480_000_000,
-/* f(31): */       8_222_838_654_177_922_817_725_562_880_000_000,
-/* f(32): */     263_130_836_933_693_530_167_218_012_160_000_000,
-/* f(33): */   8_683_317_618_811_886_495_518_194_401_280_000_000,
-/* f(34): */ 295_232_799_039_604_140_847_618_609_643_520_000_000,
-	};
-} else {
-	_factorial_table := [21]_WORD{
-/* f(00): */                                                   1,
-/* f(01): */                                                   1,
-/* f(02): */                                                   2,
-/* f(03): */                                                   6,
-/* f(04): */                                                  24,
-/* f(05): */                                                 120,
-/* f(06): */                                                 720,
-/* f(07): */                                               5_040,
-/* f(08): */                                              40_320,
-/* f(09): */                                             362_880,
-/* f(10): */                                           3_628_800,
-/* f(11): */                                          39_916_800,
-/* f(12): */                                         479_001_600,
-/* f(13): */                                       6_227_020_800,
-/* f(14): */                                      87_178_291_200,
-/* f(15): */                                   1_307_674_368_000,
-/* f(16): */                                  20_922_789_888_000,
-/* f(17): */                                 355_687_428_096_000,
-/* f(18): */                               6_402_373_705_728_000,
-/* f(19): */                             121_645_100_408_832_000,
-/* f(20): */                           2_432_902_008_176_640_000,
-	};
-};

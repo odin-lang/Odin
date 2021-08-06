@@ -65,19 +65,26 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	N :: 12345;
-	D :: 4;
+	N := 10_000;
 
-	set(a, N);
-	print("a: ", a);
-	div(b, a, D);
-	rem, _ := mod(a, D);
-	print("b: ", b);
-	fmt.printf("rem: %v\n", rem);
+	FACTORIAL_10_000_FIRST_100 :: "46AB3AE48966202D0FDE097BFA88FADC512AE8AFC0EA1D1D376A4109F10105E9E21F1E907151E85F926B8D82737B9030D572";
 
-	mul(b, b, D);
-	add(b, b, rem);
-	print("b: ", b);
+	for _ in 0..10 
+	{
+		SCOPED_TIMING(.factorial);
+		factorial(a, N);
+	}
+
+	as, _ := itoa(a, 16);
+	defer delete(as);
+
+	fmt.printf("factorial(%v): %v (first 50 hex digits)\n", N, as[:50]);
+
+	if as[:100] == FACTORIAL_10_000_FIRST_100 {
+		fmt.println("\nCorrect!");
+	} else {
+		fmt.printf("\nWrong. Expected: %v\n", FACTORIAL_10_000_FIRST_100);
+	}
 }
 
 main :: proc() {

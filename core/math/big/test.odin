@@ -296,7 +296,7 @@ PyRes :: struct {
 /*
 	dest = factorial(n)
 */
-@export test_factorial :: proc "c" (n: DIGIT) -> (res: PyRes) {
+@export test_factorial :: proc "c" (n: int) -> (res: PyRes) {
 	context = runtime.default_context();
 	err: Error;
 
