@@ -659,7 +659,11 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
-	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+	String name = str_lit(LB_STARTUP_RUNTIME_PROC_NAME);
+	if (build_context.build_mode == BuildMode_DynamicLibrary && build_context.metrics.os == TargetOs_windows) {
+	    name = str_lit("DllMain");
+	}
+	lbProcedure *p = lb_create_dummy_procedure(main_module, name, proc_type);
 	p->is_startup = true;
 
 	lb_begin_procedure_body(p);
