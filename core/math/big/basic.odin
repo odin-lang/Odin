@@ -269,7 +269,7 @@ factorial :: proc { int_factorial, };
 */
 int_choose_digit :: proc(res: ^Int, n, k: int) -> (err: Error) {
 	if res == nil  { return .Invalid_Pointer; }
-	if err = clear_if_uninitialized(res); err != nil { return err; }
+	if n < 0 || n > _FACTORIAL_MAX_N { return .Invalid_Argument; }
 
 	if k > n { return zero(res); }
 
@@ -279,12 +279,12 @@ int_choose_digit :: proc(res: ^Int, n, k: int) -> (err: Error) {
 	n_fac, k_fac, n_minus_k_fac := &Int{}, &Int{}, &Int{};
 	defer destroy(n_fac, k_fac, n_minus_k_fac);
 
-	if err = factorial(n_minus_k_fac, n - k);  err != nil { return err; }
-	if err = factorial(k_fac, k);              err != nil { return err; }
-	if err = mul(k_fac, k_fac, n_minus_k_fac); err != nil { return err; }
+	if err = #force_inline internal_int_factorial(n_minus_k_fac, n - k);  err != nil { return err; }
+	if err = #force_inline internal_int_factorial(k_fac, k);              err != nil { return err; }
+	if err = #force_inline internal_mul(k_fac, k_fac, n_minus_k_fac);     err != nil { return err; }
 
-	if err = factorial(n_fac, n);              err != nil { return err; }
-	if err = div(res, n_fac, k_fac);           err != nil { return err; }
+	if err = #force_inline internal_int_factorial(n_fac, n);              err != nil { return err; }
+	if err = #force_inline internal_div(res, n_fac, k_fac);               err != nil { return err; }
 
 	return err;	
 }
@@ -323,6 +323,7 @@ _int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 		pb    := min(b.used, digits - ix);
 		carry := _WORD(0);
 		iy    := 0;
+
 		/*
 			Compute the column of the output and propagate the carry.
 		*/
