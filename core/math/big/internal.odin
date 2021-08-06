@@ -96,13 +96,11 @@ internal_int_add_unsigned :: proc(dest, a, b: ^Int, allocator := context.allocat
 		Add remaining carry.
 	*/
 	dest.digit[i] = carry;
-	zero_count := old_used - dest.used;
+
 	/*
 		Zero remainder.
 	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	internal_zero_unused(dest, old_used);
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
@@ -237,13 +235,11 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	*/
 	dest.sign = .Zero_or_Positive;
 
-	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
 	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	internal_zero_unused(dest, old_used);
+
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
@@ -307,13 +303,11 @@ internal_int_sub_unsigned :: proc(dest, number, decrease: ^Int, allocator := con
 		dest.digit[i] &= _MASK;
 	}
 
-	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
 	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	internal_zero_unused(dest, old_used);
+
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
@@ -430,13 +424,11 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT) -> (err: Error)
 		}
 	}
 
-	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
 	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	internal_zero_unused(dest, old_used);
+
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
@@ -472,13 +464,11 @@ internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
 		fwd_carry = carry;
 	}
 
-	zero_count := old_used - dest.used;
 	/*
 		Zero remainder.
 	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	internal_zero_unused(dest, old_used);
+
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
@@ -522,6 +512,8 @@ internal_int_shl1 :: proc(dest, src: ^Int) -> (err: Error) {
 	Multiply by a DIGIT.
 */
 internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.allocator) -> (err: Error) {
+	assert(dest != nil && src != nil);
+
 	if multiplier == 0 {
 		return zero(dest);
 	}
@@ -581,16 +573,13 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 		Store final carry [if any] and increment used.
 	*/
 	dest.digit[ix] = DIGIT(carry);
-
 	dest.used = src.used + 1;
+
 	/*
-		Zero unused digits.
+		Zero remainder.
 	*/
-	//_zero_unused(dest);
-	zero_count := old_used - dest.used;
-	if zero_count > 0  {
-	 	mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	internal_zero_unused(dest, old_used);
+
 	return clamp(dest);
 }
 
@@ -702,7 +691,93 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	}
 	return;
 }
-internal_divmod :: proc { internal_int_divmod, };
+
+/*
+	Single digit division (based on routine from MPI).
+	The quotient is optional and may be passed a nil.
+*/
+internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
+	/*
+		Cannot divide by zero.
+	*/
+	if denominator == 0 { return 0, .Division_by_Zero; }
+
+	/*
+		Quick outs.
+	*/
+	if denominator == 1 || numerator.used == 0 {
+		if quotient != nil {
+			return 0, copy(quotient, numerator);
+		}
+		return 0, err;
+	}
+	/*
+		Power of two?
+	*/
+	if denominator == 2 {
+		if numerator.used > 0 && numerator.digit[0] & 1 != 0 {
+			// Remainder is 1 if numerator is odd.
+			remainder = 1;
+		}
+		if quotient == nil {
+			return remainder, nil;
+		}
+		return remainder, shr(quotient, numerator, 1);
+	}
+
+	ix: int;
+	if is_power_of_two(int(denominator)) {
+		ix = 1;
+		for ix < _DIGIT_BITS && denominator != (1 << uint(ix)) {
+			ix += 1;
+		}
+		remainder = numerator.digit[0] & ((1 << uint(ix)) - 1);
+		if quotient == nil {
+			return remainder, nil;
+		}
+
+		return remainder, shr(quotient, numerator, int(ix));
+	}
+
+	/*
+		Three?
+	*/
+	if denominator == 3 {
+		return _int_div_3(quotient, numerator);
+	}
+
+	/*
+		No easy answer [c'est la vie].  Just division.
+	*/
+	q := &Int{};
+
+	if err = grow(q, numerator.used); err != nil { return 0, err; }
+
+	q.used = numerator.used;
+	q.sign = numerator.sign;
+
+	w := _WORD(0);
+
+	for ix = numerator.used - 1; ix >= 0; ix -= 1 {
+		t := DIGIT(0);
+		w = (w << _WORD(_DIGIT_BITS) | _WORD(numerator.digit[ix]));
+		if w >= _WORD(denominator) {
+			t = DIGIT(w / _WORD(denominator));
+			w -= _WORD(t) * _WORD(denominator);
+		}
+		q.digit[ix] = t;
+	}
+	remainder = DIGIT(w);
+
+	if quotient != nil {
+		clamp(q);
+		swap(q, quotient);
+	}
+	destroy(q);
+	return remainder, nil;
+}
+
+internal_divmod :: proc { internal_int_divmod, internal_int_divmod_digit, };
 
 /*
 	Asssumes quotient, numerator and denominator to have been initialized and not to be nil.
@@ -727,3 +802,26 @@ internal_int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error
 	return #force_inline internal_add(remainder, remainder, numerator);
 }
 internal_mod :: proc{ internal_int_mod, };
+
+
+
+internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
+	/*
+		If we don't pass the number of previously used DIGITs, we zero all remaining ones.
+	*/
+	zero_count: int;
+	if old_used == -1 {
+		zero_count = len(dest.digit) - dest.used;
+	} else {
+		zero_count = old_used - dest.used;
+	}
+
+	/*
+		Zero remainder.
+	*/
+	if zero_count > 0 && dest.used < len(dest.digit) {
+		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
+	}
+}
+
+internal_zero_unused :: proc { internal_int_zero_unused, };

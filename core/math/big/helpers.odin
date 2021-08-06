@@ -56,7 +56,7 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 		dest.used += 1;
 		src >>= _DIGIT_BITS;
 	}
-	_zero_unused(dest);
+	zero_unused(dest);
 	return nil;
 }
 
@@ -94,7 +94,7 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 	dest.sign  = src.sign;
 	dest.flags = src.flags &~ {.Immutable};
 
-	_zero_unused(dest);
+	zero_unused(dest);
 	return nil;
 }
 copy :: proc { int_copy, };
@@ -583,16 +583,11 @@ assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 	assert(is_initialized(a), "`Int` was not properly initialized.", loc);
 }
 
-_zero_unused :: proc(a: ^Int) {
-	if a == nil {
-		return;
-	} else if !is_initialized(a) {
-		return;
-	}
+zero_unused :: proc(dest: ^Int, old_used := -1) {
+	if dest == nil { return; }
+	if ! #force_inline is_initialized(dest) { return; }
 
-	if a.used < len(a.digit) {
-		mem.zero_slice(a.digit[a.used:]);
-	}
+	internal_zero_unused(dest, old_used);
 }
 
 clear_if_uninitialized_single :: proc(arg: ^Int) -> (err: Error) {

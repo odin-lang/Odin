@@ -43,7 +43,13 @@ print_timings :: proc() {
 		}
 	}
 
-	fmt.println("\nTimings:");
+	for v in Timings {
+		if v.count > 0 {
+			fmt.println("Timings:");
+			break;
+		}
+	}
+
 	for v, i in Timings {
 		if v.count > 0 {
 			avg_ticks  := time.Duration(f64(v.ticks) / f64(v.count));
