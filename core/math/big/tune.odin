@@ -45,7 +45,7 @@ print_timings :: proc() {
 
 	for v in Timings {
 		if v.count > 0 {
-			fmt.println("Timings:");
+			fmt.println("\nTimings:");
 			break;
 		}
 	}

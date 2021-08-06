@@ -17,7 +17,7 @@ EXIT_ON_FAIL = False
 # We skip randomized tests altogether if NO_RANDOM_TESTS is set.
 #
 NO_RANDOM_TESTS = True
-NO_RANDOM_TESTS = False
+#NO_RANDOM_TESTS = False
 
 #
 # If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
@@ -444,7 +444,9 @@ TESTS = {
 		[ 149195686190273039203651143129455, 12 ],
 	],
 	test_factorial: [
-		[ 12_345 ],
+		[  6_000 ],   # Regular factorial, see cutoff in common.odin.
+		[ 12_345 ],   # Binary split factorial
+		[ 100_000 ],
 	],
 	test_gcd: [
 		[  23, 25, ],
