@@ -152,45 +152,18 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 	/*
 		Early out if neither of the results is wanted.
 	*/
-	if quotient == nil && remainder == nil 		        { return nil; }
+	if quotient == nil && remainder == nil { return nil; }
+	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
 
-	if err = clear_if_uninitialized(numerator);			err != nil { return err; }
-	if err = clear_if_uninitialized(denominator);		err != nil { return err; }
-
-	z: bool;
-	if z, err = is_zero(denominator);                   z { return .Division_by_Zero; }
-
-	/*
-		If numerator < denominator then quotient = 0, remainder = numerator.
-	*/
-	c: int;
-	if c, err = cmp_mag(numerator, denominator); c == -1 {
-		if remainder != nil {
-			if err = copy(remainder, numerator); 		err != nil { return err; }
-		}
-		if quotient != nil {
-			zero(quotient);
-		}
-		return nil;
-	}
-
-	if false && (denominator.used > 2 * _MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
-		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
-	} else {
-		err = _int_div_school(quotient, remainder, numerator, denominator);
-		/*
-			NOTE(Jeroen): We no longer need or use `_int_div_small`.
-			We'll keep it around for a bit.
-			err = _int_div_small(quotient, remainder, numerator, denominator);
-		*/
-	}
-
-	return err;
+	return #force_inline internal_int_divmod(quotient, remainder, numerator, denominator);
 }
 divmod :: proc{ int_divmod, };
 
 int_div :: proc(quotient, numerator, denominator: ^Int) -> (err: Error) {
-	return int_divmod(quotient, nil, numerator, denominator);
+	if quotient == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
+
+	return #force_inline internal_int_divmod(quotient, nil, numerator, denominator);
 }
 div :: proc { int_div, };
 
@@ -200,11 +173,10 @@ div :: proc { int_div, };
 	denominator < remainder <= 0 if denominator < 0
 */
 int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
-	if err = divmod(nil, remainder, numerator, denominator); err != nil { return err; }
+	if remainder == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
 
-	z: bool;
-	if z, err = is_zero(remainder); z || denominator.sign == remainder.sign { return nil; }
-	return add(remainder, remainder, numerator);
+	return #force_inline internal_int_mod(remainder, numerator, denominator);
 }
 
 int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
@@ -776,7 +748,6 @@ _int_div_school :: proc(quotient, remainder, numerator, denominator: ^Int) -> (e
 			t2.used = 3;
 
 			if t1_t2, _ := cmp_mag(t1, t2); t1_t2 != 1 {
-
 				break;
 			}
 			iter += 1; if iter > 100 { return .Max_Iterations_Reached; }

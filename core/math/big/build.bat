@@ -1,5 +1,5 @@
 @echo off
-:odin run . -vet-more
+:odin run . -vet
 : -o:size -no-bounds-check
 :odin build . -build-mode:shared -show-timings -o:minimal -no-bounds-check
 :odin build . -build-mode:shared -show-timings -o:size -no-bounds-check
