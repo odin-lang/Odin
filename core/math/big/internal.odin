@@ -491,49 +491,30 @@ internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
 	dest = src << 1
 */
 internal_int_shl1 :: proc(dest, src: ^Int) -> (err: Error) {
-	old_used  := dest.used; dest.used  = src.used + 1;
-
+	if err = copy(dest, src); err != nil { return err; }
 	/*
-		Forward carry
+		Grow `dest` to accommodate the additional bits.
 	*/
+	digits_needed := dest.used + 1;
+	if err = grow(dest, digits_needed); err != nil { return err; }
+	dest.used = digits_needed;
+
+	mask  := (DIGIT(1) << uint(1)) - DIGIT(1);
+	shift := DIGIT(_DIGIT_BITS - 1);
 	carry := DIGIT(0);
-	#no_bounds_check for x := 0; x < src.used; x += 1 {
-		/*
-			Get what will be the *next* carry bit from the MSB of the current digit.
-		*/
-		src_digit := src.digit[x];
-		fwd_carry := src_digit >> (_DIGIT_BITS - 1);
 
-		/*
-			Now shift up this digit, add in the carry [from the previous]
-		*/
-		dest.digit[x] = (src_digit << 1 | carry) & _MASK;
-
-		/*
-			Update carry
-		*/
+	#no_bounds_check for x:= 0; x < dest.used; x+= 1 {		
+		fwd_carry := (dest.digit[x] >> shift) & mask;
+		dest.digit[x] = (dest.digit[x] << uint(1) | carry) & _MASK;
 		carry = fwd_carry;
 	}
 	/*
-		New leading digit?
+		Use final carry.
 	*/
 	if carry != 0 {
-		/*
-			Add a MSB which is always 1 at this point.
-		*/
-		dest.digit[dest.used] = 1;
+		dest.digit[dest.used] = carry;
+		dest.used += 1;
 	}
-	zero_count := old_used - dest.used;
-	/*
-		Zero remainder.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
-	/*
-		Adjust dest.used based on leading zeroes.
-	*/
-	dest.sign = src.sign;
 	return clamp(dest);
 }
 
@@ -552,7 +533,7 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 		Power of two?
 	*/
 	if multiplier == 2 {
-		return #force_inline shl1(dest, src);
+		return #force_inline internal_int_shl1(dest, src);
 	}
 	if is_power_of_two(int(multiplier)) {
 		ix: int;
@@ -581,7 +562,7 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 		Compute columns.
 	*/
 	ix := 0;
-	#no_bounds_check for ; ix < src.used; ix += 1 {
+	for ; ix < src.used; ix += 1 {
 		/*
 			Compute product and carry sum for this term
 		*/
@@ -600,13 +581,15 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 		Store final carry [if any] and increment used.
 	*/
 	dest.digit[ix] = DIGIT(carry);
+
 	dest.used = src.used + 1;
 	/*
 		Zero unused digits.
 	*/
+	//_zero_unused(dest);
 	zero_count := old_used - dest.used;
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[zero_count:]);
+	if zero_count > 0  {
+	 	mem.zero_slice(dest.digit[dest.used:][:zero_count]);
 	}
 	return clamp(dest);
 }
@@ -675,9 +658,72 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			err = _int_mul(dest, src, multiplier, digits);
 		}
 	}
-	neg      := src.sign != multiplier.sign;
+	neg := src.sign != multiplier.sign;
 	dest.sign = .Negative if dest.used > 0 && neg else .Zero_or_Positive;
 	return err;
 }
 
 internal_mul :: proc { internal_int_mul, internal_int_mul_digit, };
+
+/*
+	divmod.
+	Both the quotient and remainder are optional and may be passed a nil.
+*/
+internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
+
+	if denominator.used == 0 { return .Division_by_Zero; }
+	/*
+		If numerator < denominator then quotient = 0, remainder = numerator.
+	*/
+	c: int;
+	if c, err = #force_inline cmp_mag(numerator, denominator); c == -1 {
+		if remainder != nil {
+			if err = copy(remainder, numerator, false, allocator); err != nil { return err; }
+		}
+		if quotient != nil {
+			zero(quotient);
+		}
+		return nil;
+	}
+
+	if false && (denominator.used > 2 * _MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
+		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
+	} else {
+		when true {
+			err = _int_div_school(quotient, remainder, numerator, denominator);
+		} else {
+			/*
+				NOTE(Jeroen): We no longer need or use `_int_div_small`.
+				We'll keep it around for a bit until we're reasonably certain div_school is bug free.
+				err = _int_div_small(quotient, remainder, numerator, denominator);
+			*/
+			err = _int_div_small(quotient, remainder, numerator, denominator);
+		}
+	}
+	return;
+}
+internal_divmod :: proc { internal_int_divmod, };
+
+/*
+	Asssumes quotient, numerator and denominator to have been initialized and not to be nil.
+*/
+internal_int_div :: proc(quotient, numerator, denominator: ^Int) -> (err: Error) {
+	return #force_inline internal_int_divmod(quotient, nil, numerator, denominator);
+}
+internal_div :: proc { internal_int_div, };
+
+/*
+	remainder = numerator % denominator.
+	0 <= remainder < denominator if denominator > 0
+	denominator < remainder <= 0 if denominator < 0
+
+	Asssumes quotient, numerator and denominator to have been initialized and not to be nil.
+*/
+internal_int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
+	if err = #force_inline internal_int_divmod(nil, remainder, numerator, denominator); err != nil { return err; }
+
+	if remainder.used == 0 || denominator.sign == remainder.sign { return nil; }
+
+	return #force_inline internal_add(remainder, remainder, numerator);
+}
+internal_mod :: proc{ internal_int_mod, };

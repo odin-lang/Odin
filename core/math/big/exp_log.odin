@@ -253,7 +253,7 @@ int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
 		swap(dest, x);
 		return err;
 	} else {
-		// return root_n(dest, src, 2);
+		return root_n(dest, src, 2);
 	}
 }
 sqrt :: proc { int_sqrt, };
