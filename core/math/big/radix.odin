@@ -452,7 +452,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 
 	remainder: DIGIT;
 	for {
-		if remainder, err = _int_div_digit(temp, temp, DIGIT(radix)); err != nil {
+		if remainder, err = #force_inline internal_divmod(temp, temp, DIGIT(radix)); err != nil {
 			destroy(temp, denominator);
 			return len(buffer) - available, err;
 		}

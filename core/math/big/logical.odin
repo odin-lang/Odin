@@ -323,7 +323,7 @@ int_shr_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
     	quotient.digit[x] = quotient.digit[x + digits];
 	}
 	quotient.used -= digits;
-	_zero_unused(quotient);
+	zero_unused(quotient);
 	return clamp(quotient);
 }
 shr_digit :: proc { int_shr_digit, };

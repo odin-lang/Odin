@@ -155,17 +155,33 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 	if quotient == nil && remainder == nil { return nil; }
 	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
 
-	return #force_inline internal_int_divmod(quotient, remainder, numerator, denominator);
+	return #force_inline internal_divmod(quotient, remainder, numerator, denominator);
 }
-divmod :: proc{ int_divmod, };
+
+int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
+	if quotient == nil { return 0, .Invalid_Pointer; };
+	if err = clear_if_uninitialized(numerator); err != nil { return 0, err; }
+
+	return #force_inline internal_divmod(quotient, numerator, denominator);
+}
+divmod :: proc{ int_divmod, int_divmod_digit, };
 
 int_div :: proc(quotient, numerator, denominator: ^Int) -> (err: Error) {
 	if quotient == nil { return .Invalid_Pointer; };
 	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
 
-	return #force_inline internal_int_divmod(quotient, nil, numerator, denominator);
+	return #force_inline internal_divmod(quotient, nil, numerator, denominator);
 }
-div :: proc { int_div, };
+
+int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (err: Error) {
+	if quotient == nil { return .Invalid_Pointer; };
+	if err = clear_if_uninitialized(numerator); err != nil { return err; }
+
+	remainder: DIGIT;
+	remainder, err = #force_inline internal_divmod(quotient, numerator, denominator);
+	return err;
+}
+div :: proc { int_div, int_div_digit, };
 
 /*
 	remainder = numerator % denominator.
@@ -180,7 +196,7 @@ int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
 }
 
 int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
-	return _int_div_digit(nil, numerator, denominator);
+	return #force_inline internal_divmod(nil, numerator, denominator);
 }
 
 mod :: proc { int_mod, int_mod_digit, };
@@ -490,13 +506,8 @@ _int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 	/*
 		Clear unused digits [that existed in the old copy of dest].
 	*/
-	zero_count := old_used - dest.used;
-	/*
-		Zero remainder.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count]);
-	}
+	zero_unused(dest, old_used);
+
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
@@ -849,92 +860,6 @@ _int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (er
 }
 
 /*
-	Single digit division (based on routine from MPI).
-*/
-_int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
-	q := &Int{};
-	ix: int;
-
-	/*
-		Cannot divide by zero.
-	*/
-	if denominator == 0 {
-		return 0, .Division_by_Zero;
-	}
-
-	/*
-		Quick outs.
-	*/
-	if denominator == 1 || numerator.used == 0 {
-		err = nil;
-		if quotient != nil {
-			err = copy(quotient, numerator);
-		}
-		return 0, err;
-	}
-	/*
-		Power of two?
-	*/
-	if denominator == 2 {
-		if odd, _ := is_odd(numerator); odd {
-			remainder = 1;
-		}
-		if quotient == nil {
-			return remainder, nil;
-		}
-		return remainder, shr(quotient, numerator, 1);
-	}
-
-	if is_power_of_two(int(denominator)) {
-		ix = 1;
-		for ix < _DIGIT_BITS && denominator != (1 << uint(ix)) {
-			ix += 1;
-		}
-		remainder = numerator.digit[0] & ((1 << uint(ix)) - 1);
-		if quotient == nil {
-			return remainder, nil;
-		}
-
-		return remainder, shr(quotient, numerator, int(ix));
-	}
-
-	/*
-		Three?
-	*/
-	if denominator == 3 {
-		return _int_div_3(quotient, numerator);
-	}
-
-	/*
-		No easy answer [c'est la vie].  Just division.
-	*/
-	if err = grow(q, numerator.used); err != nil { return 0, err; }
-
-	q.used = numerator.used;
-	q.sign = numerator.sign;
-
-	w := _WORD(0);
-
-	for ix = numerator.used - 1; ix >= 0; ix -= 1 {
-		t := DIGIT(0);
-		w = (w << _WORD(_DIGIT_BITS) | _WORD(numerator.digit[ix]));
-		if w >= _WORD(denominator) {
-			t = DIGIT(w / _WORD(denominator));
-			w -= _WORD(t) * _WORD(denominator);
-		}
-		q.digit[ix] = t;
-	}
-	remainder = DIGIT(w);
-
-	if quotient != nil {
-		clamp(q);
-		swap(q, quotient);
-	}
-	destroy(q);
-	return remainder, nil;
-}
-
-/*
 	Function computing both GCD and (if target isn't `nil`) also LCM.
 */
 int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
@@ -1176,9 +1101,11 @@ int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
 	/*
 		Zero digits above the last digit of the modulus.
 	*/
-	zero_count := (bits / _DIGIT_BITS) + 0 if (bits % _DIGIT_BITS == 0) else 1;
+	zero_count := (bits / _DIGIT_BITS);
+	zero_count += 0 if (bits % _DIGIT_BITS == 0) else 1;
+
 	/*
-		Zero remainder.
+		Zero remainder. Special case, can't use `zero_unused`.
 	*/
 	if zero_count > 0 {
 		mem.zero_slice(remainder.digit[zero_count:]);
