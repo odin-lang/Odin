@@ -25,6 +25,8 @@ package big
 	Exceptions include `quotient` and `remainder`, which are allowed to be `nil` when the calling code doesn't need them.
 
 	Check the comments above each `internal_*` implementation to see what constraints it expects to have met.
+
+	TODO: Handle +/- Infinity and NaN.
 */
 
 import "core:mem"
@@ -107,6 +109,7 @@ internal_int_add_unsigned :: proc(dest, a, b: ^Int, allocator := context.allocat
 	*/
 	return clamp(dest);
 }
+internal_add_unsigned :: proc { internal_int_add_unsigned, };
 
 /*
 	Low-level addition, signed. Handbook of Applied Cryptography, algorithm 14.7.
@@ -136,6 +139,7 @@ internal_int_add_signed :: proc(dest, a, b: ^Int, allocator := context.allocator
 	dest.sign = x.sign;
 	return #force_inline internal_int_sub_unsigned(dest, x, y, allocator);
 }
+internal_add_signed :: proc { internal_int_add_signed, };
 
 /*
 	Low-level addition Int+DIGIT, signed. Handbook of Applied Cryptography, algorithm 14.7.
@@ -246,7 +250,6 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error) {
 	*/
 	return clamp(dest);	
 }
-
 internal_add :: proc { internal_int_add_signed, internal_int_add_digit, };
 
 /*
@@ -314,6 +317,7 @@ internal_int_sub_unsigned :: proc(dest, number, decrease: ^Int, allocator := con
 	*/
 	return clamp(dest);
 }
+internal_sub_unsigned :: proc { internal_int_sub_unsigned, };
 
 /*
 	Low-level subtraction, signed. Handbook of Applied Cryptography, algorithm 14.9.
@@ -914,6 +918,204 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Er
 	remainder.digit[bits / _DIGIT_BITS] &= DIGIT(1 << DIGIT(bits % _DIGIT_BITS)) - DIGIT(1);
 	return clamp(remainder);
 }
+
+/*
+	=============================    Low-level helpers    =============================
+
+
+	`internal_*` helpers don't return an `Error` like their public counterparts do,
+	because they expect not to be passed `nil` or uninitialized inputs.
+
+	This makes them more suitable for `internal_*` functions and some of the
+	public ones that have already satisfied these constraints.
+*/
+
+/*
+	This procedure will return `true` if the `Int` is initialized, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_initialized :: #force_inline proc(a: ^Int) -> (initialized: bool) {
+	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
+	return raw.cap >= _MIN_DIGIT_COUNT;
+}
+internal_is_initialized :: proc { internal_int_is_initialized, };
+
+/*
+	This procedure will return `true` if the `Int` is zero, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_zero :: #force_inline proc(a: ^Int) -> (zero: bool) {
+	return a.used == 0;
+}
+internal_is_zero :: proc { internal_int_is_zero, };
+
+/*
+	This procedure will return `true` if the `Int` is positive, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_positive :: #force_inline proc(a: ^Int) -> (positive: bool) {
+	return a.sign == .Zero_or_Positive;
+}
+internal_is_positive :: proc { internal_int_is_positive, };
+
+/*
+	This procedure will return `true` if the `Int` is negative, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_negative :: #force_inline proc(a: ^Int) -> (negative: bool) {
+	return a.sign == .Negative;
+}
+internal_is_negative :: proc { internal_int_is_negative, };
+
+/*
+	This procedure will return `true` if the `Int` is even, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_even :: #force_inline proc(a: ^Int) -> (even: bool) {
+	if internal_is_zero(a) { return true; }
+
+	/*
+		`a.used` > 0 here, because the above handled `is_zero`.
+		We don't need to explicitly test it.
+	*/
+	return a.digit[0] & 1 == 0;
+}
+internal_is_even :: proc { internal_int_is_even, };
+
+/*
+	This procedure will return `true` if the `Int` is even, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_odd :: #force_inline proc(a: ^Int) -> (odd: bool) {
+	return !internal_int_is_even(a);
+}
+internal_is_odd :: proc { internal_int_is_odd, };
+
+
+/*
+	This procedure will return `true` if the `Int` is a power of two, `false` if not.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_is_power_of_two :: #force_inline proc(a: ^Int) -> (power_of_two: bool) {
+	/*
+		Early out for Int == 0.
+	*/
+	if #force_inline internal_is_zero(a) { return true; }
+
+	/*
+		For an `Int` to be a power of two, its bottom limb has to be a power of two.
+	*/
+	if ! #force_inline platform_int_is_power_of_two(int(a.digit[a.used - 1])) { return false; }
+
+	/*
+		We've established that the bottom limb is a power of two.
+		If it's the only limb, that makes the entire Int a power of two.
+	*/
+	if a.used == 1 { return true; }
+
+	/*
+		For an `Int` to be a power of two, all limbs except the top one have to be zero.
+	*/
+	for i := 1; i < a.used && a.digit[i - 1] != 0; i += 1 { return false; }
+
+	return true;
+}
+internal_is_power_of_two :: proc { internal_int_is_power_of_two, };
+
+/*
+	Compare two `Int`s, signed.
+	Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
+
+	Expects `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
+*/
+internal_int_compare :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
+	a_is_negative := #force_inline internal_is_negative(a);
+
+	/*
+		Compare based on sign.
+	*/
+	if a.sign != b.sign { return -1 if a_is_negative else +1; }
+
+	/*
+		If `a` is negative, compare in the opposite direction */
+	if a_is_negative { return #force_inline internal_compare_magnitude(b, a); }
+
+	return #force_inline internal_compare_magnitude(a, b);
+}
+internal_compare :: proc { internal_int_compare, internal_int_compare_digit, };
+internal_cmp :: internal_compare;
+
+/*
+	Compare an `Int` to an unsigned number upto the size of the backing type.
+
+	Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
+
+	Expects `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
+*/
+internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparison: int) {
+	/*
+		Compare based on sign.
+	*/
+
+	if #force_inline internal_is_negative(a) { return -1; }
+
+	/*
+		Compare based on magnitude.
+	*/
+	if a.used > 1 { return +1; }
+
+	/*
+		Compare the only digit in `a` to `b`.
+	*/
+	switch {
+	case a.digit[0] < b:
+		return -1;
+	case a.digit[0] == b:
+		return  0;
+	case a.digit[0] > b:
+		return +1;
+	case:
+		/*
+			Unreachable.
+			Just here because Odin complains about a missing return value at the bottom of the proc otherwise.
+		*/
+		return;
+	}
+}
+internal_compare_digit :: proc { internal_int_compare_digit, };
+internal_cmp_digit :: internal_compare_digit;
+
+/*
+	Compare the magnitude of two `Int`s, unsigned.
+*/
+internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
+	/*
+		Compare based on used digits.
+	*/
+	if a.used != b.used {
+		if a.used > b.used {
+			return +1;
+		}
+		return -1;
+	}
+
+	/*
+		Same number of used digits, compare based on their value.
+	*/
+	#no_bounds_check for n := a.used - 1; n >= 0; n -= 1 {
+		if a.digit[n] != b.digit[n] {
+			if a.digit[n] > b.digit[n] {
+				return +1;
+			}
+			return -1;
+		}
+	}
+
+   	return 0;
+}
+internal_compare_magnitude :: proc { internal_int_compare_magnitude, };
+internal_cmp_mag :: internal_compare_magnitude;
+
 
 internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 	/*
@@ -1689,67 +1891,105 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 	Tables used by `internal_*` and `_*`.
 */
 
+_private_prime_table := []DIGIT{
+	0x0002, 0x0003, 0x0005, 0x0007, 0x000B, 0x000D, 0x0011, 0x0013,
+	0x0017, 0x001D, 0x001F, 0x0025, 0x0029, 0x002B, 0x002F, 0x0035,
+	0x003B, 0x003D, 0x0043, 0x0047, 0x0049, 0x004F, 0x0053, 0x0059,
+	0x0061, 0x0065, 0x0067, 0x006B, 0x006D, 0x0071, 0x007F, 0x0083,
+	0x0089, 0x008B, 0x0095, 0x0097, 0x009D, 0x00A3, 0x00A7, 0x00AD,
+	0x00B3, 0x00B5, 0x00BF, 0x00C1, 0x00C5, 0x00C7, 0x00D3, 0x00DF,
+	0x00E3, 0x00E5, 0x00E9, 0x00EF, 0x00F1, 0x00FB, 0x0101, 0x0107,
+	0x010D, 0x010F, 0x0115, 0x0119, 0x011B, 0x0125, 0x0133, 0x0137,
+
+	0x0139, 0x013D, 0x014B, 0x0151, 0x015B, 0x015D, 0x0161, 0x0167,
+	0x016F, 0x0175, 0x017B, 0x017F, 0x0185, 0x018D, 0x0191, 0x0199,
+	0x01A3, 0x01A5, 0x01AF, 0x01B1, 0x01B7, 0x01BB, 0x01C1, 0x01C9,
+	0x01CD, 0x01CF, 0x01D3, 0x01DF, 0x01E7, 0x01EB, 0x01F3, 0x01F7,
+	0x01FD, 0x0209, 0x020B, 0x021D, 0x0223, 0x022D, 0x0233, 0x0239,
+	0x023B, 0x0241, 0x024B, 0x0251, 0x0257, 0x0259, 0x025F, 0x0265,
+	0x0269, 0x026B, 0x0277, 0x0281, 0x0283, 0x0287, 0x028D, 0x0293,
+	0x0295, 0x02A1, 0x02A5, 0x02AB, 0x02B3, 0x02BD, 0x02C5, 0x02CF,
+
+	0x02D7, 0x02DD, 0x02E3, 0x02E7, 0x02EF, 0x02F5, 0x02F9, 0x0301,
+	0x0305, 0x0313, 0x031D, 0x0329, 0x032B, 0x0335, 0x0337, 0x033B,
+	0x033D, 0x0347, 0x0355, 0x0359, 0x035B, 0x035F, 0x036D, 0x0371,
+	0x0373, 0x0377, 0x038B, 0x038F, 0x0397, 0x03A1, 0x03A9, 0x03AD,
+	0x03B3, 0x03B9, 0x03C7, 0x03CB, 0x03D1, 0x03D7, 0x03DF, 0x03E5,
+	0x03F1, 0x03F5, 0x03FB, 0x03FD, 0x0407, 0x0409, 0x040F, 0x0419,
+	0x041B, 0x0425, 0x0427, 0x042D, 0x043F, 0x0443, 0x0445, 0x0449,
+	0x044F, 0x0455, 0x045D, 0x0463, 0x0469, 0x047F, 0x0481, 0x048B,
+
+	0x0493, 0x049D, 0x04A3, 0x04A9, 0x04B1, 0x04BD, 0x04C1, 0x04C7,
+	0x04CD, 0x04CF, 0x04D5, 0x04E1, 0x04EB, 0x04FD, 0x04FF, 0x0503,
+	0x0509, 0x050B, 0x0511, 0x0515, 0x0517, 0x051B, 0x0527, 0x0529,
+	0x052F, 0x0551, 0x0557, 0x055D, 0x0565, 0x0577, 0x0581, 0x058F,
+	0x0593, 0x0595, 0x0599, 0x059F, 0x05A7, 0x05AB, 0x05AD, 0x05B3,
+	0x05BF, 0x05C9, 0x05CB, 0x05CF, 0x05D1, 0x05D5, 0x05DB, 0x05E7,
+	0x05F3, 0x05FB, 0x0607, 0x060D, 0x0611, 0x0617, 0x061F, 0x0623,
+	0x062B, 0x062F, 0x063D, 0x0641, 0x0647, 0x0649, 0x064D, 0x0653,
+};
+
 when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	_factorial_table := [35]_WORD{
-/* f(00): */                                                   1,
-/* f(01): */                                                   1,
-/* f(02): */                                                   2,
-/* f(03): */                                                   6,
-/* f(04): */                                                  24,
-/* f(05): */                                                 120,
-/* f(06): */                                                 720,
-/* f(07): */                                               5_040,
-/* f(08): */                                              40_320,
-/* f(09): */                                             362_880,
-/* f(10): */                                           3_628_800,
-/* f(11): */                                          39_916_800,
-/* f(12): */                                         479_001_600,
-/* f(13): */                                       6_227_020_800,
-/* f(14): */                                      87_178_291_200,
-/* f(15): */                                   1_307_674_368_000,
-/* f(16): */                                  20_922_789_888_000,
-/* f(17): */                                 355_687_428_096_000,
-/* f(18): */                               6_402_373_705_728_000,
-/* f(19): */                             121_645_100_408_832_000,
-/* f(20): */                           2_432_902_008_176_640_000,
-/* f(21): */                          51_090_942_171_709_440_000,
-/* f(22): */                       1_124_000_727_777_607_680_000,
-/* f(23): */                      25_852_016_738_884_976_640_000,
-/* f(24): */                     620_448_401_733_239_439_360_000,
-/* f(25): */                  15_511_210_043_330_985_984_000_000,
-/* f(26): */                 403_291_461_126_605_635_584_000_000,
-/* f(27): */              10_888_869_450_418_352_160_768_000_000,
-/* f(28): */             304_888_344_611_713_860_501_504_000_000,
-/* f(29): */           8_841_761_993_739_701_954_543_616_000_000,
-/* f(30): */         265_252_859_812_191_058_636_308_480_000_000,
-/* f(31): */       8_222_838_654_177_922_817_725_562_880_000_000,
-/* f(32): */     263_130_836_933_693_530_167_218_012_160_000_000,
-/* f(33): */   8_683_317_618_811_886_495_518_194_401_280_000_000,
-/* f(34): */ 295_232_799_039_604_140_847_618_609_643_520_000_000,
+/* f(00): */                                                     1,
+/* f(01): */                                                     1,
+/* f(02): */                                                     2,
+/* f(03): */                                                     6,
+/* f(04): */                                                    24,
+/* f(05): */                                                   120,
+/* f(06): */                                                   720,
+/* f(07): */                                                 5_040,
+/* f(08): */                                                40_320,
+/* f(09): */                                               362_880,
+/* f(10): */                                             3_628_800,
+/* f(11): */                                            39_916_800,
+/* f(12): */                                           479_001_600,
+/* f(13): */                                         6_227_020_800,
+/* f(14): */                                        87_178_291_200,
+/* f(15): */                                     1_307_674_368_000,
+/* f(16): */                                    20_922_789_888_000,
+/* f(17): */                                   355_687_428_096_000,
+/* f(18): */                                 6_402_373_705_728_000,
+/* f(19): */                               121_645_100_408_832_000,
+/* f(20): */                             2_432_902_008_176_640_000,
+/* f(21): */                            51_090_942_171_709_440_000,
+/* f(22): */                         1_124_000_727_777_607_680_000,
+/* f(23): */                        25_852_016_738_884_976_640_000,
+/* f(24): */                       620_448_401_733_239_439_360_000,
+/* f(25): */                    15_511_210_043_330_985_984_000_000,
+/* f(26): */                   403_291_461_126_605_635_584_000_000,
+/* f(27): */                10_888_869_450_418_352_160_768_000_000,
+/* f(28): */               304_888_344_611_713_860_501_504_000_000,
+/* f(29): */             8_841_761_993_739_701_954_543_616_000_000,
+/* f(30): */           265_252_859_812_191_058_636_308_480_000_000,
+/* f(31): */         8_222_838_654_177_922_817_725_562_880_000_000,
+/* f(32): */       263_130_836_933_693_530_167_218_012_160_000_000,
+/* f(33): */     8_683_317_618_811_886_495_518_194_401_280_000_000,
+/* f(34): */   295_232_799_039_604_140_847_618_609_643_520_000_000,
 	};
 } else {
 	_factorial_table := [21]_WORD{
-/* f(00): */                                                   1,
-/* f(01): */                                                   1,
-/* f(02): */                                                   2,
-/* f(03): */                                                   6,
-/* f(04): */                                                  24,
-/* f(05): */                                                 120,
-/* f(06): */                                                 720,
-/* f(07): */                                               5_040,
-/* f(08): */                                              40_320,
-/* f(09): */                                             362_880,
-/* f(10): */                                           3_628_800,
-/* f(11): */                                          39_916_800,
-/* f(12): */                                         479_001_600,
-/* f(13): */                                       6_227_020_800,
-/* f(14): */                                      87_178_291_200,
-/* f(15): */                                   1_307_674_368_000,
-/* f(16): */                                  20_922_789_888_000,
-/* f(17): */                                 355_687_428_096_000,
-/* f(18): */                               6_402_373_705_728_000,
-/* f(19): */                             121_645_100_408_832_000,
-/* f(20): */                           2_432_902_008_176_640_000,
+/* f(00): */                                                     1,
+/* f(01): */                                                     1,
+/* f(02): */                                                     2,
+/* f(03): */                                                     6,
+/* f(04): */                                                    24,
+/* f(05): */                                                   120,
+/* f(06): */                                                   720,
+/* f(07): */                                                 5_040,
+/* f(08): */                                                40_320,
+/* f(09): */                                               362_880,
+/* f(10): */                                             3_628_800,
+/* f(11): */                                            39_916_800,
+/* f(12): */                                           479_001_600,
+/* f(13): */                                         6_227_020_800,
+/* f(14): */                                        87_178_291_200,
+/* f(15): */                                     1_307_674_368_000,
+/* f(16): */                                    20_922_789_888_000,
+/* f(17): */                                   355_687_428_096_000,
+/* f(18): */                                 6_402_373_705_728_000,
+/* f(19): */                               121_645_100_408_832_000,
+/* f(20): */                             2_432_902_008_176_640_000,
 	};
 };
 
