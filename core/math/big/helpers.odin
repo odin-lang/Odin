@@ -691,7 +691,7 @@ initialize_constants :: proc() -> (res: int) {
 	set(      INF,  1);       INF.flags = {.Immutable, .Inf};
 	set(      INF, -1); MINUS_INF.flags = {.Immutable, .Inf};
 
-	return #config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF);
+	return _DEFAULT_MUL_KARATSUBA_CUTOFF;
 }
 
 destroy_constants :: proc() {

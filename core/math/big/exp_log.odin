@@ -360,7 +360,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 		}
 		if c, err = cmp(t1, t2); c == 0 { break; }
 		iterations += 1;
-		if iterations == _MAX_ITERATIONS_ROOT_N {
+		if iterations == MAX_ITERATIONS_ROOT_N {
 			return .Max_Iterations_Reached;
 		}
 	}
@@ -383,7 +383,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 		}
 
 		iterations += 1;
-		if iterations == _MAX_ITERATIONS_ROOT_N {
+		if iterations == MAX_ITERATIONS_ROOT_N {
 			return .Max_Iterations_Reached;
 		}
 	}
@@ -401,7 +401,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 		}
 
 		iterations += 1;
-		if iterations == _MAX_ITERATIONS_ROOT_N {
+		if iterations == MAX_ITERATIONS_ROOT_N {
 			return .Max_Iterations_Reached;
 		}
 	}

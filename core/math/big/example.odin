@@ -15,17 +15,23 @@ import "core:mem"
 
 print_configation :: proc() {
 	fmt.printf(
-`Configuration:
-	DIGIT_BITS           %v
-	MIN_DIGIT_COUNT      %v
-	MAX_DIGIT_COUNT      %v
-	DEFAULT_DIGIT_COUNT  %v
-	MAX_COMBA            %v
-	WARRAY               %v
-	MUL_KARATSUBA_CUTOFF %v
-	SQR_KARATSUBA_CUTOFF %v
-	MUL_TOOM_CUTOFF      %v
-	SQR_TOOM_CUTOFF      %v
+`
+Configuration:
+	_DIGIT_BITS                           %v
+	_MIN_DIGIT_COUNT                      %v
+	_MAX_DIGIT_COUNT                      %v
+	_DEFAULT_DIGIT_COUNT                  %v
+	_MAX_COMBA                            %v
+	_WARRAY                               %v
+Runtime tunable:
+	MUL_KARATSUBA_CUTOFF                  %v
+	SQR_KARATSUBA_CUTOFF                  %v
+	MUL_TOOM_CUTOFF                       %v
+	SQR_TOOM_CUTOFF                       %v
+	MAX_ITERATIONS_ROOT_N                 %v
+	FACTORIAL_MAX_N                       %v
+	FACTORIAL_BINARY_SPLIT_CUTOFF         %v
+	FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS %v
 
 `, _DIGIT_BITS,
 _MIN_DIGIT_COUNT,
@@ -33,10 +39,14 @@ _MAX_DIGIT_COUNT,
 _DEFAULT_DIGIT_COUNT,
 _MAX_COMBA,
 _WARRAY,
-_MUL_KARATSUBA_CUTOFF,
-_SQR_KARATSUBA_CUTOFF,
-_MUL_TOOM_CUTOFF,
-_SQR_TOOM_CUTOFF,
+MUL_KARATSUBA_CUTOFF,
+SQR_KARATSUBA_CUTOFF,
+MUL_TOOM_CUTOFF,
+SQR_TOOM_CUTOFF,
+MAX_ITERATIONS_ROOT_N,
+FACTORIAL_MAX_N,
+FACTORIAL_BINARY_SPLIT_CUTOFF,
+FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
 );
 
 }
@@ -83,6 +93,8 @@ main :: proc() {
 	context.allocator = mem.tracking_allocator(&ta);
 
 	demo();
+
+	print_configation();
 
 	print_timings();
 

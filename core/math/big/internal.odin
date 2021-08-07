@@ -597,10 +597,10 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 		/*
 			Do we need to square?
 		*/
-		if        false && src.used >= _SQR_TOOM_CUTOFF {
+		if        false && src.used >= SQR_TOOM_CUTOFF {
 			/* Use Toom-Cook? */
 			// err = s_mp_sqr_toom(a, c);
-		} else if false && src.used >= _SQR_KARATSUBA_CUTOFF {
+		} else if false && src.used >= SQR_KARATSUBA_CUTOFF {
 			/* Karatsuba? */
 			// err = s_mp_sqr_karatsuba(a, c);
 		} else if false && ((src.used * 2) + 1) < _WARRAY &&
@@ -625,16 +625,16 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 		max_used := max(src.used, multiplier.used);
 		digits   := src.used + multiplier.used + 1;
 
-		if        false &&  min_used     >= _MUL_KARATSUBA_CUTOFF &&
-						    max_used / 2 >= _MUL_KARATSUBA_CUTOFF &&
+		if        false &&  min_used     >= MUL_KARATSUBA_CUTOFF &&
+						    max_used / 2 >= MUL_KARATSUBA_CUTOFF &&
 			/*
 				Not much effect was observed below a ratio of 1:2, but again: YMMV.
 			*/
 							max_used     >= 2 * min_used {
 			// err = s_mp_mul_balance(a,b,c);
-		} else if false && min_used >= _MUL_TOOM_CUTOFF {
+		} else if false && min_used >= MUL_TOOM_CUTOFF {
 			// err = s_mp_mul_toom(a, b, c);
-		} else if false && min_used >= _MUL_KARATSUBA_CUTOFF {
+		} else if false && min_used >= MUL_KARATSUBA_CUTOFF {
 			// err = s_mp_mul_karatsuba(a, b, c);
 		} else if digits < _WARRAY && min_used <= _MAX_COMBA {
 			/*
@@ -676,7 +676,7 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 		return nil;
 	}
 
-	if false && (denominator.used > 2 * _MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
+	if false && (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
 		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
 	} else {
 		when true {
@@ -846,7 +846,7 @@ internal_sqrmod :: proc { internal_int_sqrmod, };
 	This way we'll have to reallocate less, possibly not at all.
 */
 internal_int_factorial :: proc(res: ^Int, n: int) -> (err: Error) {
-	if n >= _FACTORIAL_BINARY_SPLIT_CUTOFF {
+	if n >= FACTORIAL_BINARY_SPLIT_CUTOFF {
 		return #force_inline _private_int_factorial_binary_split(res, n);
 	}
 
@@ -1490,7 +1490,7 @@ _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int
 	t1, t2 := &Int{}, &Int{};
 	defer destroy(t1, t2);
 
-	if level > _FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS { return .Max_Iterations_Reached; }
+	if level > FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS { return .Max_Iterations_Reached; }
 
 	num_factors := (stop - start) >> 1;
 	if num_factors == 2 {
