@@ -65,7 +65,7 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	n := 50_000;
+	n := 1_024;
 	k := 3;
 
 	{
