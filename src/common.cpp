@@ -228,6 +228,28 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	return ptr;
 }
 
+
+template <typename T>
+void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
+	GB_ASSERT(new_count >= 0);
+	if (new_count == 0) {
+		gb_free(a, *array);
+		*array = nullptr;
+		return;
+	}
+	if (new_count < old_count) {
+		return;
+	}
+	isize old_size = old_count * gb_size_of(T);
+	isize new_size = new_count * gb_size_of(T);
+	isize alignment = gb_align_of(T);
+	auto new_data = cast(T *)gb_resize_align(a, *array, old_size, new_size, alignment);
+	GB_ASSERT(new_data != nullptr);
+	*array = new_data;
+}
+
+
+
 #include "unicode.cpp"
 #include "array.cpp"
 #include "string.cpp"
