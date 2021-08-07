@@ -1988,6 +1988,38 @@ bool is_type_simple_compare(Type *t) {
 	return false;
 }
 
+String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
+	Type *prev_src = src;
+	// Type *prev_dst = dst;
+	src = base_type(type_deref(src));
+	// dst = base_type(type_deref(dst));
+	bool src_is_ptr = src != prev_src;
+	// bool dst_is_ptr = dst != prev_dst;
+
+	GB_ASSERT(is_type_struct(src) || is_type_union(src));
+	for_array(i, src->Struct.fields) {
+		Entity *f = src->Struct.fields[i];
+		if (f->kind == Entity_Variable && f->flags & EntityFlag_Using) {
+			if (are_types_identical(dst, f->type)) {
+				return f->token.string;
+			}
+			if (src_is_ptr && is_type_pointer(dst)) {
+				if (are_types_identical(type_deref(dst), f->type)) {
+					return f->token.string;
+				}
+			}
+			if (is_type_struct(f->type)) {
+				String name = lookup_subtype_polymorphic_field(dst, f->type);
+				if (name.len > 0) {
+					return name;
+				}
+			}
+		}
+	}
+	return str_lit("");
+}
+
+
 
 Type *strip_type_aliasing(Type *x) {
 	if (x == nullptr) {
