@@ -5014,8 +5014,9 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #if defined(GB_COMPILER_MSVC)
 	case gbAllocation_Alloc:
 		ptr = _aligned_malloc(size, alignment);
-		if (flags & gbAllocatorFlag_ClearToZero)
+		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
+		}
 		break;
 	case gbAllocation_Free:
 		_aligned_free(old_memory);
@@ -5028,29 +5029,37 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
 		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-		// ptr = malloc(size+alignment);
-
-		if (flags & gbAllocatorFlag_ClearToZero) {
-			gb_zero_size(ptr, size);
-		}
+		gb_zero_size(ptr, size);
 	} break;
 
 	case gbAllocation_Free: {
 		free(old_memory);
 	} break;
 
-	case gbAllocation_Resize: {
-		// ptr = realloc(old_memory, size);
-		ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
-	} break;
+	case gbAllocation_Resize:
+		if (new_size == 0) {
+			free(old_memory);
+			break;
+		}
+		if (!old_memory) {
+			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+			gb_zero_size(ptr, size);
+			break;
+		}
+		if (new_size <= old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+		gb_memmove(ptr, old_memory, old_size);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(new_size-old_size, 0));
+		break;
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
 		posix_memalign(&ptr, alignment, size);
-
-		if (flags & gbAllocatorFlag_ClearToZero) {
-			gb_zero_size(ptr, size);
-		}
+		gb_zero_size(ptr, size);
 	} break;
 
 	case gbAllocation_Free: {
@@ -5058,7 +5067,24 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Resize: {
-		ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
+		if (new_size == 0) {
+			free(old_memory);
+			break;
+		}
+		if (!old_memory) {
+			posix_memalign(&ptr, alignment, size);
+			gb_zero_size(ptr, size);
+			break;
+		}
+		if (new_size <= old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		posix_memalign(&ptr, alignment, size);
+		gb_memmove(ptr, old_memory, old_size);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(new_size-old_size, 0));
+
 	} break;
 #endif
 

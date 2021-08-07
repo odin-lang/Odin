@@ -149,20 +149,6 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 // TODO(bill): Throughly test!
 	switch (type) {
 #if defined(GB_COMPILER_MSVC)
-	#if 0
-	case gbAllocation_Alloc:
-		ptr = _aligned_malloc(size, alignment);
-		if (flags & gbAllocatorFlag_ClearToZero) {
-			zero_size(ptr, size);
-		}
-		break;
-	case gbAllocation_Free:
-		_aligned_free(old_memory);
-		break;
-	case gbAllocation_Resize:
-		ptr = _aligned_realloc(old_memory, size, alignment);
-		break;
-	#else
 	case gbAllocation_Alloc: {
 		isize aligned_size = align_formula_isize(size, alignment);
 		// TODO(bill): Make sure this is aligned correctly
@@ -175,50 +161,66 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		isize aligned_size = align_formula_isize(size, alignment);
 		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
 	} break;
-	#endif
-
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
 		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-		// ptr = malloc(size+alignment);
-
-		if (flags & gbAllocatorFlag_ClearToZero) {
-			zero_size(ptr, size);
-		}
-		break;
-	}
+		gb_zero_size(ptr, size);
+	} break;
 
 	case gbAllocation_Free: {
 		free(old_memory);
-		break;
-	}
+	} break;
 
-	case gbAllocation_Resize: {
-		// ptr = realloc(old_memory, size);
-		ptr = gb_default_resize_align(heap_allocator(), old_memory, old_size, size, alignment);
+	case gbAllocation_Resize:
+		if (new_size == 0) {
+			free(old_memory);
+			break;
+		}
+		if (!old_memory) {
+			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+			gb_zero_size(ptr, size);
+			break;
+		}
+		if (new_size <= old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+		gb_memmove(ptr, old_memory, old_size);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(new_size-old_size, 0));
 		break;
-	}
 #else
 	// TODO(bill): *nix version that's decent
-	case gbAllocation_Alloc: {
+	case gbAllocation_Alloc:
 		posix_memalign(&ptr, alignment, size);
-
-		if (flags & gbAllocatorFlag_ClearToZero) {
-			zero_size(ptr, size);
-		}
+		gb_zero_size(ptr, size);
 		break;
-	}
 
-	case gbAllocation_Free: {
+	case gbAllocation_Free:
 		free(old_memory);
 		break;
-	}
 
-	case gbAllocation_Resize: {
-		ptr = gb_default_resize_align(heap_allocator(), old_memory, old_size, size, alignment);
+	case gbAllocation_Resize:
+		if (new_size == 0) {
+			free(old_memory);
+			break;
+		}
+		if (!old_memory) {
+			posix_memalign(&ptr, alignment, size);
+			gb_zero_size(ptr, size);
+			break;
+		}
+		if (new_size <= old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		posix_memalign(&ptr, alignment, size);
+		gb_memmove(ptr, old_memory, old_size);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(new_size-old_size, 0));
 		break;
-	}
 #endif
 
 	case gbAllocation_FreeAll:
