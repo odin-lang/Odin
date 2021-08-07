@@ -1445,6 +1445,17 @@ void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	}
 }
 
+bool all_operands_valid(Array<Operand> const &operands) {
+	if (any_errors()) {
+		for_array(i, operands) {
+			if (operands[i].type == t_invalid) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1699,7 +1710,10 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		} else if (has_named_results && operands.count == 0) {
 			// Okay
 		} else if (operands.count != result_count) {
-			error(node, "Expected %td return values, got %td", result_count, operands.count);
+			// Ignore error message as it has most likely already been reported
+			if (all_operands_valid(operands)) {
+				error(node, "Expected %td return values, got %td", result_count, operands.count);
+			}
 		} else {
 			for (isize i = 0; i < result_count; i++) {
 				Entity *e = pt->results->Tuple.variables[i];
