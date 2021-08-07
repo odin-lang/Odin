@@ -10,12 +10,12 @@ jobs:
         run: sudo apt-get install llvm-11 clang-11 llvm
       - name: build odin
         run: make release
-      - name: Odin run
-        run: ./odin run examples/demo/demo.odin
-      - name: Odin check
-        run: ./odin check examples/demo/demo.odin -vet
       - name: Odin version
         run: ./odin version
+      - name: Odin check
+        run: ./odin check examples/demo/demo.odin -vet
+      - name: Odin run
+        run: ./odin run examples/demo/demo.odin
   build_macOS:
     runs-on: macos-latest
     steps:
@@ -28,12 +28,12 @@ jobs:
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make release
-      - name: Odin run
-        run: ./odin run examples/demo/demo.odin
-      - name: Odin check
-        run: ./odin check examples/demo/demo.odin -vet
       - name: Odin version
         run: ./odin version
+      - name: Odin check
+        run: ./odin check examples/demo/demo.odin -vet
+      - name: Odin run
+        run: ./odin run examples/demo/demo.odin
   build_windows:
     runs-on: windows-latest
     steps:
@@ -43,17 +43,17 @@ jobs:
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           ./build.bat 1
-      - name: Odin run
-        shell: cmd
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin run examples/demo/demo.odin
+      - name: Odin version
+        run: ./odin version
       - name: Odin check
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo/demo.odin -vet
-      - name: Odin version
-        run: ./odin version
+      - name: Odin run
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin run examples/demo/demo.odin
 
 
