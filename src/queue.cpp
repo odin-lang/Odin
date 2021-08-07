@@ -10,22 +10,45 @@ struct MPMCQueueNodeNonAtomic {
 	T   data;
 };
 
+#define MPMC_CACHE_LINE_SIZE 64
+
 // Multiple Producer Multiple Consumer Queue
 template <typename T>
 struct MPMCQueue {
-	static size_t const PAD0_OFFSET = (sizeof(i32) + sizeof(Array<MPMCQueueNode<T>>) + sizeof(BlockingMutex) + sizeof(i32));
+	static size_t const PAD0_OFFSET = (sizeof(Array<MPMCQueueNode<T>>) + sizeof(BlockingMutex) + sizeof(i32) + sizeof(i32));
 
-	i32 mask;
 	Array<MPMCQueueNode<T>> buffer;
 	BlockingMutex mutex;
 	std::atomic<i32> count;
+	i32 mask;
 
-	char pad0[(128 - PAD0_OFFSET) % 64];
+	char pad0[(MPMC_CACHE_LINE_SIZE*2 - PAD0_OFFSET) % MPMC_CACHE_LINE_SIZE];
 	std::atomic<i32> head_idx;
 
-	char pad1[64 - sizeof(i32)];
+	char pad1[MPMC_CACHE_LINE_SIZE - sizeof(i32)];
 	std::atomic<i32> tail_idx;
 };
+
+
+template <typename T>
+void mpmc_internal_init_buffer(Array<MPMCQueueNode<T>> *buffer, i32 offset) {
+	i32 size = cast(i32)buffer->count;
+	GB_ASSERT(offset % 8 == 0);
+	GB_ASSERT(size % 8 == 0);
+
+	// NOTE(bill): pretend it's not atomic for performance
+	auto *raw_data = cast(MPMCQueueNodeNonAtomic<T> *)buffer->data;
+	for (i32 i = offset; i < size; i += 8) {
+		raw_data[i+0].idx = i+0;
+		raw_data[i+1].idx = i+1;
+		raw_data[i+2].idx = i+2;
+		raw_data[i+3].idx = i+3;
+		raw_data[i+4].idx = i+4;
+		raw_data[i+5].idx = i+5;
+		raw_data[i+6].idx = i+6;
+		raw_data[i+7].idx = i+7;
+	}
+}
 
 
 template <typename T>
@@ -42,19 +65,10 @@ void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
 	q->mask = size-1;
 	array_init(&q->buffer, a, size);
 
-	// NOTE(bill): pretend it's not atomic for performance
-	auto *raw_data = cast(MPMCQueueNodeNonAtomic<T> *)q->buffer.data;
-	for (i32 i = 0; i < size; i += 8) {
-		raw_data[i+0].idx = i+0;
-		raw_data[i+1].idx = i+1;
-		raw_data[i+2].idx = i+2;
-		raw_data[i+3].idx = i+3;
-		raw_data[i+4].idx = i+4;
-		raw_data[i+5].idx = i+5;
-		raw_data[i+6].idx = i+6;
-		raw_data[i+7].idx = i+7;
-	}
+	mpmc_internal_init_buffer(&q->buffer, 0);
 }
+
+
 
 template <typename T>
 void mpmc_destroy(MPMCQueue<T> *q) {
@@ -93,9 +107,7 @@ i32 mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 			}
 			// NOTE(bill): pretend it's not atomic for performance
 			auto *raw_data = cast(MPMCQueueNodeNonAtomic<T> *)q->buffer.data;
-			for (i32 i = old_size; i < new_size; i++) {
-				raw_data[i].idx = i;
-			}
+			mpmc_internal_init_buffer(&q->buffer, old_size);
 			q->mask = new_size-1;
 			mutex_unlock(&q->mutex);
 		} else {
@@ -131,72 +143,5 @@ bool mpmc_dequeue(MPMCQueue<T> *q, T *data_) {
 			tail_idx = q->tail_idx.load(std::memory_order_relaxed);
 		}
 	}
-}
-
-
-template <typename T>
-struct MPSCQueueNode {
-	std::atomic<MPSCQueueNode<T> *> next;
-	T data;
-};
-
-template <typename T>
-struct MPSCQueue {
-	gbAllocator allocator;
-
-	std::atomic<isize> count;
-	std::atomic<MPSCQueueNode<T> *> head;
-	std::atomic<MPSCQueueNode<T> *> tail;
-};
-
-template <typename T>
-void mpsc_init(MPSCQueue<T> *q, gbAllocator a) {
-	using Node = MPSCQueueNode<T>;
-
-	q->allocator = a;
-	Node *front = cast(Node *)gb_alloc_align(q->allocator, gb_size_of(Node), 64);
-	front->next.store(nullptr, std::memory_order_relaxed);
-	q->head.store(front, std::memory_order_relaxed);
-	q->tail.store(front, std::memory_order_relaxed);
-}
-
-
-template <typename T>
-isize mpsc_enqueue(MPSCQueue<T> *q, T const &value) {
-	using Node = MPSCQueueNode<T>;
-
-	Node *node = cast(Node *)gb_alloc_align(q->allocator, gb_size_of(Node), 64);
-	node->data = value;
-	node->next.store(nullptr, std::memory_order_relaxed);
-
-	auto *prev_head = q->head.exchange(node, std::memory_order_acq_rel);
-	prev_head->next.store(node, std::memory_order_release);
-	return q->count.fetch_add(1, std::memory_order_release);
-}
-
-template <typename T>
-bool mpsc_dequeue(MPSCQueue<T> *q, T *value_) {
-	auto *tail = q->tail.load(std::memory_order_relaxed);
-	auto *next = tail->next.load(std::memory_order_acquire);
-	if (next == nullptr) {
-		return false;
-	}
-
-	if (value_) *value_ = next->data;
-	q->tail.store(next, std::memory_order_release);
-	q->count.fetch_sub(1, std::memory_order_release);
-	gb_free(q->allocator, tail);
-	return true;
-}
-
-
-template <typename T>
-void mpsc_destroy(MPSCQueue<T> *q) {
-	T output = {};
-	while (mpsc_dequeue(q, &output)) {
-		// okay
-	}
-	auto *front = q->head.load(std::memory_order_relaxed);
-	gb_free(q->allocator, front);
 }
 
