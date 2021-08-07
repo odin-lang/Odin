@@ -1046,40 +1046,34 @@ internal_compare :: proc { internal_int_compare, internal_int_compare_digit, };
 internal_cmp :: internal_compare;
 
 /*
-	Compare an `Int` to an unsigned number upto the size of the backing type.
+    Compare an `Int` to an unsigned number upto `DIGIT & _MASK`.
+    Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
 
-	Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
-
-	Expects `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
+    Expects: `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
 */
 internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparison: int) {
-	/*
-		Compare based on sign.
-	*/
+	a_is_negative := #force_inline internal_is_negative(a);
 
-	if #force_inline internal_is_negative(a) { return -1; }
-
-	/*
-		Compare based on magnitude.
-	*/
-	if a.used > 1 { return +1; }
-
-	/*
-		Compare the only digit in `a` to `b`.
-	*/
 	switch {
-	case a.digit[0] < b:
-		return -1;
-	case a.digit[0] == b:
-		return  0;
-	case a.digit[0] > b:
-		return +1;
-	case:
+	/*
+		Compare based on sign first.
+	*/
+	case a_is_negative:     return -1;
+	/*
+		Then compare on magnitude.
+	*/
+	case a.used > 1:        return +1;
+	/*
+		We have only one digit. Compare it against `b`.
+	*/
+	case a.digit[0] < b:    return -1;
+	case a.digit[0] == b:   return  0;
+	case a.digit[0] > b:    return +1;
 		/*
 			Unreachable.
 			Just here because Odin complains about a missing return value at the bottom of the proc otherwise.
 		*/
-		return;
+	case:                   return;
 	}
 }
 internal_compare_digit :: proc { internal_int_compare_digit, };

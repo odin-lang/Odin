@@ -89,6 +89,7 @@ int_compare_digit :: proc(a: ^Int, b: DIGIT) -> (comparison: int, err: Error) {
 
 	return #force_inline internal_cmp_digit(a, b), nil;
 }
+int_cmp_digit :: int_compare_digit;
 
 /*
 	Compare the magnitude of two `Int`s, unsigned.
