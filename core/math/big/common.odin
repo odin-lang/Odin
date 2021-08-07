@@ -13,19 +13,68 @@ import "core:intrinsics"
 
 /*
 	TODO: Make the tunables runtime adjustable where practical.
+
 	This allows to benchmark and/or setting optimized values for a certain CPU without recompiling.
 */
 
 /*
-	Tunables
+	==========================    TUNABLES     ==========================
+
+	`initialize_constants` returns `#config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF)`
+	and we initialize this cutoff that way so that the procedure is used and called,
+	because it handles initializing the constants ONE, ZERO, MINUS_ONE, NAN and INF.
+
+	`initialize_constants` also replaces the other `_DEFAULT_*` cutoffs with custom compile-time values if so `#config`ured.
+
+*/
+MUL_KARATSUBA_CUTOFF := initialize_constants();
+SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF;
+MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF;
+SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF;
+
+/*
+	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
+
+	TODO(Jeroen): Port this tuning algorithm and tune them for more modern processors.
+
+	It would also be cool if we collected some data across various processor families.
+	This would let uss set reasonable defaults at runtime as this library initializes
+	itself by using `cpuid` or the ARM equivalent.
 */
 
-MATH_BIG_FORCE_64_BIT :: false;
-MATH_BIG_FORCE_32_BIT :: false;
+_DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF,  80);
+_DEFAULT_SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, 120);
+_DEFAULT_MUL_TOOM_CUTOFF      :: #config(MUL_TOOM_CUTOFF,      350);
+_DEFAULT_SQR_TOOM_CUTOFF      :: #config(SQR_TOOM_CUTOFF,      400);
+
+
+MAX_ITERATIONS_ROOT_N := 500;
+
+/*
+	Largest `N` for which we'll compute `N!`
+*/
+FACTORIAL_MAX_N       := 1_000_000;
+
+/*
+	Cutoff to switch to int_factorial_binary_split, and its max recursion level.
+*/
+FACTORIAL_BINARY_SPLIT_CUTOFF         := 6100;
+FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100;
+
+
+/*
+	We don't allow these to be switched at runtime for two reasons:
+
+	1) 32-bit and 64-bit versions of procedures use different types for their storage,
+		so we'd have to double the number of procedures, and they couldn't interact.
+
+	2) Optimizations thanks to precomputed masks wouldn't work.
+*/
+MATH_BIG_FORCE_64_BIT :: #config(MATH_BIG_FORCE_64_BIT, false);
+MATH_BIG_FORCE_32_BIT :: #config(MATH_BIG_FORCE_32_BIT, false);
 when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously."); };
 
-
-_LOW_MEMORY          :: #config(BIGINT_SMALL_MEMORY, false);
+_LOW_MEMORY           :: #config(BIGINT_SMALL_MEMORY, false);
 when _LOW_MEMORY {
 	_DEFAULT_DIGIT_COUNT :: 8;
 } else {
@@ -33,36 +82,8 @@ when _LOW_MEMORY {
 }
 
 /*
-	`initialize_constants` returns `#config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF)`
-	and we initialize this cutoff that way so that the procedure is used and called,
-	because it handles initializing the constants ONE, ZERO, MINUS_ONE, NAN and INF.
+	=======================    END OF TUNABLES     =======================
 */
-_MUL_KARATSUBA_CUTOFF := initialize_constants();
-_SQR_KARATSUBA_CUTOFF := #config(SQR_KARATSUBA_CUTOFF, _DEFAULT_SQR_KARATSUBA_CUTOFF);
-_MUL_TOOM_CUTOFF      := #config(MUL_TOOM_CUTOFF,      _DEFAULT_MUL_TOOM_CUTOFF);
-_SQR_TOOM_CUTOFF      := #config(SQR_TOOM_CUTOFF,      _DEFAULT_SQR_TOOM_CUTOFF);
-
-/*
-	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
-	TODO(Jeroen): Port this tuning algorithm and tune them for more modern processors.
-*/
-_DEFAULT_MUL_KARATSUBA_CUTOFF ::  80;
-_DEFAULT_SQR_KARATSUBA_CUTOFF :: 120;
-_DEFAULT_MUL_TOOM_CUTOFF      :: 350;
-_DEFAULT_SQR_TOOM_CUTOFF      :: 400;
-
-_MAX_ITERATIONS_ROOT_N        :: 500;
-
-/*
-	Largest `N` for which we'll compute `N!`
-*/
-_FACTORIAL_MAX_N              :: 1_000_000;
-
-/*
-	Cutoff to switch to int_factorial_binary_split, and its max recursion level.
-*/
-_FACTORIAL_BINARY_SPLIT_CUTOFF         :: 6100;
-_FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS :: 100;
 
 Sign :: enum u8 {
 	Zero_or_Positive = 0,

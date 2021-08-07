@@ -11,8 +11,6 @@ package big
 	This file contains basic arithmetic operations like `add`, `sub`, `mul`, `div`, ...
 */
 
-import "core:mem"
-
 /*
 	===========================
 		User-level routines    
@@ -244,7 +242,7 @@ sqrmod :: proc { int_sqrmod, };
 
 
 int_factorial :: proc(res: ^Int, n: int) -> (err: Error) {
-	if n < 0 || n > _FACTORIAL_MAX_N { return .Invalid_Argument; }
+	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument; }
 	if res == nil { return .Invalid_Pointer; }
 
 	return #force_inline internal_int_factorial(res, n);
@@ -269,7 +267,7 @@ factorial :: proc { int_factorial, };
 */
 int_choose_digit :: proc(res: ^Int, n, k: int) -> (err: Error) {
 	if res == nil  { return .Invalid_Pointer; }
-	if n < 0 || n > _FACTORIAL_MAX_N { return .Invalid_Argument; }
+	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument; }
 
 	if k > n { return zero(res); }
 
