@@ -321,39 +321,11 @@ lcm :: proc { int_lcm, };
 	remainder = numerator % (1 << bits)
 */
 int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
-	if err = clear_if_uninitialized(remainder); err != nil { return err; }
-	if err = clear_if_uninitialized(numerator); err != nil { return err; }
-
+	if remainder == nil || numerator == nil { return .Invalid_Pointer; }
+	if err = clear_if_uninitialized(remainder, numerator); err != nil { return err; }
 	if bits  < 0 { return .Invalid_Argument; }
-	if bits == 0 { return zero(remainder); }
 
-	/*
-		If the modulus is larger than the value, return the value.
-	*/
-	err = copy(remainder, numerator);
-	if bits >= (numerator.used * _DIGIT_BITS) || err != nil {
-		return;
-	}
-
-	/*
-		Zero digits above the last digit of the modulus.
-	*/
-	zero_count := (bits / _DIGIT_BITS);
-	zero_count += 0 if (bits % _DIGIT_BITS == 0) else 1;
-
-	/*
-		Zero remainder. Special case, can't use `zero_unused`.
-	*/
-	if zero_count > 0 {
-		mem.zero_slice(remainder.digit[zero_count:]);
-	}
-
-	/*
-		Clear the digit that is not completely outside/inside the modulus.
-	*/
-	remainder.digit[bits / _DIGIT_BITS] &= DIGIT(1 << DIGIT(bits % _DIGIT_BITS)) - DIGIT(1);
-	return clamp(remainder);
+	return #force_inline internal_int_mod_bits(remainder, numerator, bits);
 }
+
 mod_bits :: proc { int_mod_bits, };
-
-
