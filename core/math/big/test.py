@@ -446,7 +446,6 @@ TESTS = {
 	test_factorial: [
 		[  6_000 ],   # Regular factorial, see cutoff in common.odin.
 		[ 12_345 ],   # Binary split factorial
-		[ 100_000 ],
 	],
 	test_gcd: [
 		[  23, 25, ],
@@ -463,6 +462,12 @@ TESTS = {
 		[   0, 125,],
 	],
 }
+
+if not FAST_TESTS:
+	TESTS[test_factorial].append(
+		# This one on its own takes around 800ms, so we exclude it for FAST_TESTS
+		[ 100_000 ],
+	)
 
 total_passes   = 0
 total_failures = 0
