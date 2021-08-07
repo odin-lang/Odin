@@ -96,11 +96,11 @@ class Error(Enum):
 # Set up exported procedures
 #
 
-try:
-	l = cdll.LoadLibrary(LIB_PATH)
-except:
-	print("Couldn't find or load " + LIB_PATH + ".")
-	exit(1)
+# try:
+l = cdll.LoadLibrary(LIB_PATH)
+# except:
+# 	print("Couldn't find or load " + LIB_PATH + ".")
+# 	exit(1)
 
 def load(export_name, args, res):
 	export_name.argtypes = args
