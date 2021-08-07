@@ -5037,7 +5037,7 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Resize:
-		if (new_size == 0) {
+		if (size == 0) {
 			free(old_memory);
 			break;
 		}
@@ -5046,14 +5046,14 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 			gb_zero_size(ptr, size);
 			break;
 		}
-		if (new_size <= old_size) {
+		if (size <= old_size) {
 			ptr = old_memory;
 			break;
 		}
 
 		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
 		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(new_size-old_size, 0));
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
 		break;
 #else
 	// TODO(bill): *nix version that's decent
@@ -5067,7 +5067,7 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Resize: {
-		if (new_size == 0) {
+		if (size == 0) {
 			free(old_memory);
 			break;
 		}
@@ -5076,14 +5076,14 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 			gb_zero_size(ptr, size);
 			break;
 		}
-		if (new_size <= old_size) {
+		if (size <= old_size) {
 			ptr = old_memory;
 			break;
 		}
 
 		posix_memalign(&ptr, alignment, size);
 		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(new_size-old_size, 0));
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
 
 	} break;
 #endif
