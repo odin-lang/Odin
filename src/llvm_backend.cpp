@@ -538,7 +538,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 			i64 length = LLVMConstIntGetSExtValue(len);
 			char const *text = nullptr;
 			if (false && length != 0) {
-				if (LLVMGetConstOpcode(data) != LLVMGetElementPtr) {
+			if (LLVMGetConstOpcode(data) != LLVMGetElementPtr) {
 					return {};
 				}
 				// TODO(bill): THIS IS BROKEN! THIS NEEDS FIXING :P

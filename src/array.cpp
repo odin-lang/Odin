@@ -326,18 +326,17 @@ void array_set_capacity(Array<T> *array, isize capacity) {
 		array_resize(array, capacity);
 	}
 
-	T *new_data = nullptr;
-#if 0
-	// NOTE(bill): try gb_resize_align first, and then fallback to alloc+memmove+free
 	isize old_size = array->capacity * gb_size_of(T);
 	isize new_size = capacity * gb_size_of(T);
+	T *new_data = nullptr;
+
+	// NOTE(bill): try gb_resize_align first, and then fallback to alloc+memmove+free
 	new_data = cast(T *)gb_resize_align(array->allocator, array->data, old_size, new_size, gb_align_of(T));
-#endif
 	if (new_data == nullptr) {
 		if (capacity > 0) {
 			new_data = gb_alloc_array(array->allocator, T, capacity);
 			GB_ASSERT(new_data != nullptr);
-			gb_memmove(new_data, array->data, gb_size_of(T) * array->capacity);
+			gb_memmove(new_data, array->data, old_size);
 		}
 		gb_free(array->allocator, array->data);
 	}
