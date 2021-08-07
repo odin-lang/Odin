@@ -333,6 +333,7 @@ void array_set_capacity(Array<T> *array, isize capacity) {
 	if (new_data == nullptr) {
 		if (capacity > 0) {
 			new_data = gb_alloc_array(array->allocator, T, capacity);
+			GB_ASSERT(new_data != nullptr);
 			gb_memmove(new_data, array->data, gb_size_of(T) * array->capacity);
 		}
 		gb_free(array->allocator, array->data);
