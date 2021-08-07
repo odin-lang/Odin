@@ -876,6 +876,44 @@ internal_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 	return #force_inline _private_int_gcd_lcm(res_gcd, res_lcm, a, b);
 }
 
+/*
+	remainder = numerator % (1 << bits)
+
+	Assumes `remainder` and `numerator` both not to be `nil` and `bits` to be >= 0.
+*/
+internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
+	/*
+		Everything is divisible by 1 << 0 == 1, so this returns 0.
+	*/
+	if bits == 0 { return zero(remainder); }
+
+	/*
+		If the modulus is larger than the value, return the value.
+	*/
+	err = copy(remainder, numerator);
+	if bits >= (numerator.used * _DIGIT_BITS) || err != nil {
+		return;
+	}
+
+	/*
+		Zero digits above the last digit of the modulus.
+	*/
+	zero_count := (bits / _DIGIT_BITS);
+	zero_count += 0 if (bits % _DIGIT_BITS == 0) else 1;
+
+	/*
+		Zero remainder. Special case, can't use `zero_unused`.
+	*/
+	if zero_count > 0 {
+		mem.zero_slice(remainder.digit[zero_count:]);
+	}
+
+	/*
+		Clear the digit that is not completely outside/inside the modulus.
+	*/
+	remainder.digit[bits / _DIGIT_BITS] &= DIGIT(1 << DIGIT(bits % _DIGIT_BITS)) - DIGIT(1);
+	return clamp(remainder);
+}
 
 internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 	/*
@@ -1590,7 +1628,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		/*
 			Subtract smallest from largest.
 		*/
-		if err = sub(v, v, u); err != nil { return err; }
+		if err = internal_sub(v, v, u); err != nil { return err; }
 
 		/*
 			Divide out all factors of two.
@@ -1622,14 +1660,14 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		/*
 			Store quotient in `t2` such that `t2 * b` is the LCM.
 		*/
-		if err = div(res_lcm, a, temp_gcd_res); err != nil { return err; }
-		err = mul(res_lcm, res_lcm, b);
+		if err = internal_div(res_lcm, a, temp_gcd_res); err != nil { return err; }
+		err = internal_mul(res_lcm, res_lcm, b);
 	} else {
 		/*
 			Store quotient in `t2` such that `t2 * a` is the LCM.
 		*/
-		if err = div(res_lcm, a, temp_gcd_res); err != nil { return err; }
-		err = mul(res_lcm, res_lcm, b);
+		if err = internal_div(res_lcm, a, temp_gcd_res); err != nil { return err; }
+		err = internal_mul(res_lcm, res_lcm, b);
 	}
 
 	if res_gcd != nil {
