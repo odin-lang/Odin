@@ -75,16 +75,12 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	n := 1_024;
-	k := 3;
-
-	{
-		SCOPED_TIMING(.choose);
-		choose(a, n, k);
-	}
-	
-	fmt.printf("%v choose %v ", n, k);
-	print("= ", a);
+	power_of_two(a, 3112);
+	fmt.printf("a is power of two: %v\n", internal_is_power_of_two(a));
+	sub(a, a, 1);
+	fmt.printf("a is power of two: %v\n", internal_is_power_of_two(a));
+	add(a, a, 1);
+	fmt.printf("a is power of two: %v\n", internal_is_power_of_two(a));
 }
 
 main :: proc() {
