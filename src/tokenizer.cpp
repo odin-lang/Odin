@@ -278,7 +278,11 @@ gb_global ErrorCollector global_error_collector;
 
 
 bool any_errors(void) {
-	return global_error_collector.error_buffer.count > 0;
+	bool any_errors = false;
+	mutex_lock(&global_error_collector.block_mutex);
+	any_errors = global_error_collector.error_buffer.count > 0;
+	mutex_unlock(&global_error_collector.block_mutex);
+	return any_errors;
 }
 
 void init_global_error_collector(void) {
