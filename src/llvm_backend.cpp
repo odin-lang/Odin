@@ -9372,7 +9372,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index) {
 	Type *t = s.type;
-	GB_ASSERT(is_type_pointer(t));
+	GB_ASSERT_MSG(is_type_pointer(t), "%s", type_to_string(t));
 	Type *st = base_type(type_deref(t));
 	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st), "%s", type_to_string(st));
 	GB_ASSERT_MSG(is_type_integer(core_type(index.type)), "%s", type_to_string(index.type));
@@ -13346,8 +13346,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_And:
-			return lb_build_addr(p, ue->expr);
+		case Token_And: {
+			lbValue ptr = lb_build_expr(p, expr);
+			return lb_addr(lb_address_from_load_or_generate_local(p, ptr));
+		}
 		default:
 			GB_PANIC("Invalid unary expression for lb_build_addr");
 		}
