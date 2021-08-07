@@ -1,27 +1,29 @@
 #define MPMC_CACHE_LINE_SIZE 64
 
+typedef std::atomic<i32> MPMCQueueAtomicIdx;
+
 // Multiple Producer Multiple Consumer Queue
 template <typename T>
 struct MPMCQueue {
-	static size_t const PAD0_OFFSET = (sizeof(T *) + sizeof(std::atomic<i32> *) + sizeof(gbAllocator) + sizeof(BlockingMutex) + sizeof(i32) + sizeof(i32));
+	static size_t const PAD0_OFFSET = (sizeof(T *) + sizeof(MPMCQueueAtomicIdx *) + sizeof(gbAllocator) + sizeof(BlockingMutex) + sizeof(i32) + sizeof(i32));
 
-	T *               nodes;
-	std::atomic<i32> *indices;
-	gbAllocator       allocator;
-	BlockingMutex     mutex;
-	std::atomic<i32>  count;
-	i32               mask;
+	T *                 nodes;
+	MPMCQueueAtomicIdx *indices;
+	gbAllocator         allocator;
+	BlockingMutex       mutex;
+	MPMCQueueAtomicIdx  count;
+	i32                 mask; // capacity-1, because capacity must be a power of 2
 
 	char pad0[(MPMC_CACHE_LINE_SIZE*2 - PAD0_OFFSET) % MPMC_CACHE_LINE_SIZE];
-	std::atomic<i32> head_idx;
+	MPMCQueueAtomicIdx head_idx;
 
 	char pad1[MPMC_CACHE_LINE_SIZE - sizeof(i32)];
-	std::atomic<i32> tail_idx;
+	MPMCQueueAtomicIdx tail_idx;
 };
 
 
 
-void mpmc_internal_init_indices(std::atomic<i32> *indices, i32 offset, i32 size) {
+void mpmc_internal_init_indices(MPMCQueueAtomicIdx *indices, i32 offset, i32 size) {
 	GB_ASSERT(offset % 8 == 0);
 	GB_ASSERT(size % 8 == 0);
 
@@ -54,7 +56,7 @@ void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
 	q->mask = size-1;
 	q->allocator = a;
 	q->nodes   = gb_alloc_array(a, T, size);
-	q->indices = cast(std::atomic<i32> *)gb_alloc_array(a, i32, size);
+	q->indices = gb_alloc_array(a, MPMCQueueAtomicIdx, size);
 
 	mpmc_internal_init_indices(q->indices, 0, q->mask+1);
 }

@@ -523,7 +523,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 
 	lbValue hashed_key = {};
 
-
+#if 0
 	if (lb_is_const(key)) {
 		u64 hash = 0xcbf29ce484222325;
 		if (is_type_cstring(key_type)) {
@@ -545,7 +545,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 
 				size_t ulength = 0;
 				text = LLVMGetAsString(data, &ulength);
-				gb_printf_err("%td %td %s\n", length, ulength, text);
+				gb_printf_err("%lld %llu %s\n", length, ulength, text);
 				length = gb_min(length, cast(i64)ulength);
 			}
 			hash = fnv64a(text, cast(isize)length);
@@ -559,7 +559,7 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 		}
 		hashed_key = lb_const_int(m, t_uintptr, hash);
 	}
-
+#endif
 	return hashed_key;
 }
 
