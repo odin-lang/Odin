@@ -425,6 +425,23 @@ lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x);
 
 void lb_mem_zero_addr(lbProcedure *p, LLVMValueRef ptr, Type *type);
 
+void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e);
+lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *type);
+lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
+
+LLVMValueRef llvm_const_named_struct(LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
+void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
+
+lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);
+bool lb_is_expr_untyped_const(Ast *expr);
+
+void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
+
+void lb_emit_init_context(lbProcedure *p, lbAddr addr);
+
+lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, Ast *ast);
+void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint);
+lbValue lb_consume_copy_elision_hint(lbProcedure *p);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
