@@ -17,7 +17,7 @@ EXIT_ON_FAIL = False
 # We skip randomized tests altogether if NO_RANDOM_TESTS is set.
 #
 NO_RANDOM_TESTS = True
-#NO_RANDOM_TESTS = False
+NO_RANDOM_TESTS = False
 
 #
 # If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
@@ -96,11 +96,11 @@ class Error(Enum):
 # Set up exported procedures
 #
 
-# try:
-l = cdll.LoadLibrary(LIB_PATH)
-# except:
-# 	print("Couldn't find or load " + LIB_PATH + ".")
-# 	exit(1)
+try:
+	l = cdll.LoadLibrary(LIB_PATH)
+except:
+ 	print("Couldn't find or load " + LIB_PATH + ".")
+ 	exit(1)
 
 def load(export_name, args, res):
 	export_name.argtypes = args
