@@ -4605,7 +4605,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
 
-	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath, tokenizer_flags);
+	TokenizerInitError err = init_tokenizer_from_fullpath(&f->tokenizer, f->fullpath, tokenizer_flags);
 	if (err != TokenizerInit_None) {
 		switch (err) {
 		case TokenizerInit_Empty:
