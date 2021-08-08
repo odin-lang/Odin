@@ -31,21 +31,19 @@ marshal :: proc(v: any, allocator := context.allocator) -> ([]byte, Marshal_Erro
 
 
 marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
-	using strings;
-	using runtime;
 	if v == nil {
-		write_string(b, "null");
+		strings.write_string(b, "null");
 		return .None;
 	}
 
-	ti := type_info_base(type_info_of(v.id));
+	ti := runtime.type_info_base(type_info_of(v.id));
 	a := any{v.data, ti.id};
 
 	switch info in ti.variant {
-	case Type_Info_Named:
+	case runtime.Type_Info_Named:
 		unreachable();
 
-	case Type_Info_Integer:
+	case runtime.Type_Info_Integer:
 		buf: [21]byte;
 		u: u64;
 		switch i in a {
@@ -77,16 +75,16 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		}
 
 		s := strconv.append_bits(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil);
-		write_string(b, s);
+		strings.write_string(b, s);
 
 
-	case Type_Info_Rune:
+	case runtime.Type_Info_Rune:
 		r := a.(rune);
-		write_byte(b, '"');
-		write_escaped_rune(b, r, '"', true);
-		write_byte(b, '"');
+		strings.write_byte(b, '"');
+		strings.write_escaped_rune(b, r, '"', true);
+		strings.write_byte(b, '"');
 
-	case Type_Info_Float:
+	case runtime.Type_Info_Float:
 		val: f64;
 		switch f in a {
 		case f16: val = f64(f);
@@ -107,21 +105,21 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			s = s[1:];
 		}
 
-		write_string(b, string(s));
+		strings.write_string(b, string(s));
 
-	case Type_Info_Complex:
+	case runtime.Type_Info_Complex:
 		return .Unsupported_Type;
 
-	case Type_Info_Quaternion:
+	case runtime.Type_Info_Quaternion:
 		return .Unsupported_Type;
 
-	case Type_Info_String:
+	case runtime.Type_Info_String:
 		switch s in a {
-		case string:  write_quoted_string(b, s);
-		case cstring: write_quoted_string(b, string(s));
+		case string:  strings.write_quoted_string(b, s);
+		case cstring: strings.write_quoted_string(b, string(s));
 		}
 
-	case Type_Info_Boolean:
+	case runtime.Type_Info_Boolean:
 		val: bool;
 		switch b in a {
 		case bool: val = bool(b);
@@ -130,109 +128,109 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		case b32:  val = bool(b);
 		case b64:  val = bool(b);
 		}
-		write_string_builder(b, val ? "true" : "false");
+		strings.write_string(b, val ? "true" : "false");
 
-	case Type_Info_Any:
+	case runtime.Type_Info_Any:
 		return .Unsupported_Type;
 
-	case Type_Info_Type_Id:
+	case runtime.Type_Info_Type_Id:
 		return .Unsupported_Type;
 
-	case Type_Info_Pointer:
+	case runtime.Type_Info_Pointer:
 		return .Unsupported_Type;
 
-	case Type_Info_Procedure:
+	case runtime.Type_Info_Procedure:
 		return .Unsupported_Type;
 
-	case Type_Info_Tuple:
+	case runtime.Type_Info_Tuple:
 		return .Unsupported_Type;
 
-	case Type_Info_Enumerated_Array:
+	case runtime.Type_Info_Enumerated_Array:
 		return .Unsupported_Type;
 
-	case Type_Info_Simd_Vector:
+	case runtime.Type_Info_Simd_Vector:
 		return .Unsupported_Type;
 
-	case Type_Info_Relative_Pointer:
+	case runtime.Type_Info_Relative_Pointer:
 		return .Unsupported_Type;
 
-	case Type_Info_Relative_Slice:
+	case runtime.Type_Info_Relative_Slice:
 		return .Unsupported_Type;
 
-	case Type_Info_Array:
-		write_byte(b, '[');
+	case runtime.Type_Info_Array:
+		strings.write_byte(b, '[');
 		for i in 0..<info.count {
-			if i > 0 { write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", "); }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
 			marshal_arg(b, any{rawptr(data), info.elem.id});
 		}
-		write_byte(b, ']');
+		strings.write_byte(b, ']');
 
-	case Type_Info_Dynamic_Array:
-		write_byte(b, '[');
+	case runtime.Type_Info_Dynamic_Array:
+		strings.write_byte(b, '[');
 		array := cast(^mem.Raw_Dynamic_Array)v.data;
 		for i in 0..<array.len {
-			if i > 0 { write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", "); }
 
 			data := uintptr(array.data) + uintptr(i*info.elem_size);
 			marshal_arg(b, any{rawptr(data), info.elem.id});
 		}
-		write_byte(b, ']');
+		strings.write_byte(b, ']');
 
-	case Type_Info_Slice:
-		write_byte(b, '[');
+	case runtime.Type_Info_Slice:
+		strings.write_byte(b, '[');
 		slice := cast(^mem.Raw_Slice)v.data;
 		for i in 0..<slice.len {
-			if i > 0 { write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", "); }
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size);
 			marshal_arg(b, any{rawptr(data), info.elem.id});
 		}
-		write_byte(b, ']');
+		strings.write_byte(b, ']');
 
-	case Type_Info_Map:
+	case runtime.Type_Info_Map:
 		m := (^mem.Raw_Map)(v.data);
 
-		write_byte(b, '{');
+		strings.write_byte(b, '{');
 		if m != nil {
 			if info.generated_struct == nil {
 				return .Unsupported_Type;
 			}
 			entries    := &m.entries;
-			gs         := type_info_base(info.generated_struct).variant.(Type_Info_Struct);
-			ed         := type_info_base(gs.types[1]).variant.(Type_Info_Dynamic_Array);
-			entry_type := ed.elem.variant.(Type_Info_Struct);
+			gs         := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct);
+			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array);
+			entry_type := ed.elem.variant.(runtime.Type_Info_Struct);
 			entry_size := ed.elem_size;
 
 			for i in 0..<entries.len {
-				if i > 0 { write_string(b, ", "); }
+				if i > 0 { strings.write_string(b, ", "); }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				key   := rawptr(data + entry_type.offsets[2]);
 				value := rawptr(data + entry_type.offsets[3]);
 
 				marshal_arg(b, any{key, info.key.id});
-				write_string(b, ": ");
+				strings.write_string(b, ": ");
 				marshal_arg(b, any{value, info.value.id});
 			}
 		}
-		write_byte(b, '}');
+		strings.write_byte(b, '}');
 
-	case Type_Info_Struct:
-		write_byte(b, '{');
+	case runtime.Type_Info_Struct:
+		strings.write_byte(b, '{');
 		for name, i in info.names {
-			if i > 0 { write_string(b, ", "); }
-			write_quoted_string(b, name);
-			write_string(b, ": ");
+			if i > 0 { strings.write_string(b, ", "); }
+			strings.write_quoted_string(b, name);
+			strings.write_string(b, ": ");
 
 			id := info.types[i].id;
 			data := rawptr(uintptr(v.data) + info.offsets[i]);
 			marshal_arg(b, any{data, id});
 		}
-		write_byte(b, '}');
+		strings.write_byte(b, '}');
 
-	case Type_Info_Union:
+	case runtime.Type_Info_Union:
 		tag_ptr := uintptr(v.data) + info.tag_offset;
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id};
 
@@ -250,16 +248,16 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		}
 
 		if v.data == nil || tag == 0 {
-			write_string(b, "null");
+			strings.write_string(b, "null");
 		} else {
 			id := info.variants[tag-1].id;
 			marshal_arg(b, any{v.data, id});
 		}
 
-	case Type_Info_Enum:
+	case runtime.Type_Info_Enum:
 		return marshal_arg(b, any{v.data, info.base.id});
 
-	case Type_Info_Bit_Set:
+	case runtime.Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
 			if ti == nil {
 				return false;
@@ -306,7 +304,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			bit_data = u64(x);
 		case: panic("unknown bit_size size");
 		}
-		write_u64(b, bit_data);
+		strings.write_u64(b, bit_data);
 
 
 		return .Unsupported_Type;

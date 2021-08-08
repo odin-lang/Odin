@@ -68,36 +68,33 @@ expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 
 
 parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
-	value.pos = p.curr_token.pos;
-	defer value.end = token_end_pos(p.prev_token);
-
 	token := p.curr_token;
 	#partial switch token.kind {
 	case .Null:
-		value.value = Null{};
+		value = Null{};
 		advance_token(p);
 		return;
 	case .False:
-		value.value = Boolean(false);
+		value = Boolean(false);
 		advance_token(p);
 		return;
 	case .True:
-		value.value = Boolean(true);
+		value = Boolean(true);
 		advance_token(p);
 		return;
 
 	case .Integer:
 		i, _ := strconv.parse_i64(token.text);
-		value.value = Integer(i);
+		value = Integer(i);
 		advance_token(p);
 		return;
 	case .Float:
 		f, _ := strconv.parse_f64(token.text);
-		value.value = Float(f);
+		value = Float(f);
 		advance_token(p);
 		return;
 	case .String:
-		value.value = String(unquote_string(token, p.spec, p.allocator));
+		value = String(unquote_string(token, p.spec, p.allocator));
 		advance_token(p);
 		return;
 
@@ -115,7 +112,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 				if token.text[0] == '-' {
 					inf = 0xfff0000000000000;
 				}
-				value.value = transmute(f64)inf;
+				value = transmute(f64)inf;
 				advance_token(p);
 				return;
 			case .NaN:
@@ -123,7 +120,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 				if token.text[0] == '-' {
 					nan = 0xfff7ffffffffffff;
 				}
-				value.value = transmute(f64)nan;
+				value = transmute(f64)nan;
 				advance_token(p);
 				return;
 			}
@@ -136,8 +133,6 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 }
 
 parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
-	value.pos = p.curr_token.pos;
-	defer value.end = token_end_pos(p.prev_token);
 	if err = expect_token(p, .Open_Bracket); err != .None {
 		return;
 	}
@@ -171,7 +166,7 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		return;
 	}
 
-	value.value = array;
+	value = array;
 	return;
 }
 
@@ -205,11 +200,7 @@ parse_object_key :: proc(p: ^Parser) -> (key: string, err: Error) {
 }
 
 parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
-	value.pos = p.curr_token.pos;
-	defer value.end = token_end_pos(p.prev_token);
-
 	if err = expect_token(p, .Open_Brace); err != .None {
-		value.pos = p.curr_token.pos;
 		return;
 	}
 
@@ -228,26 +219,22 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		key, err = parse_object_key(p);
 		if err != .None {
 			delete(key, p.allocator);
-			value.pos = p.curr_token.pos;
 			return;
 		}
 
 		if colon_err := expect_token(p, .Colon); colon_err != .None {
 			err = .Expected_Colon_After_Key;
-			value.pos = p.curr_token.pos;
 			return;
 		}
 
 		elem, elem_err := parse_value(p);
 		if elem_err != .None {
 			err = elem_err;
-			value.pos = p.curr_token.pos;
 			return;
 		}
 
 		if key in obj {
 			err = .Duplicate_Object_Key;
-			value.pos = p.curr_token.pos;
 			delete(key, p.allocator);
 			return;
 		}
@@ -270,11 +257,10 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	}
 
 	if err = expect_token(p, .Close_Brace); err != .None {
-		value.pos = p.curr_token.pos;
 		return;
 	}
 
-	value.value = obj;
+	value = obj;
 	return;
 }
 
