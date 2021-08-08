@@ -75,12 +75,8 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	power_of_two(a, 3112);
-	fmt.printf("a is power of two: %v\n", internal_is_power_of_two(a));
-	sub(a, a, 1);
-	fmt.printf("a is power of two: %v\n", internal_is_power_of_two(a));
-	add(a, a, 1);
-	fmt.printf("a is power of two: %v\n", internal_is_power_of_two(a));
+	err := set(a, 1);
+	fmt.printf("err: %v\n", err);
 }
 
 main :: proc() {

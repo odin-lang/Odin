@@ -109,6 +109,7 @@ Flags :: bit_set[Flag; u8];
 	Errors are a strict superset of runtime.Allocation_Error.
 */
 Error :: enum int {
+	Okay                    = 0,
 	Out_Of_Memory           = 1,
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,

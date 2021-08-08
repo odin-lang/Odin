@@ -327,3 +327,80 @@ int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
 }
 
 mod_bits :: proc { int_mod_bits, };
+
+
+/*
+	Logs and roots and such.
+*/
+int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
+	if a == nil { return 0, .Invalid_Pointer; }
+	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
+
+	return #force_inline internal_int_log(a, base);
+}
+
+digit_log :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
+	return #force_inline internal_digit_log(a, base);
+}
+log :: proc { int_log, digit_log, };
+
+/*
+	Calculate `dest = base^power` using a square-multiply algorithm.
+*/
+int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
+	if dest == nil || base == nil { return .Invalid_Pointer; }
+	if err = clear_if_uninitialized(dest, base); err != nil { return err; }
+
+	return #force_inline internal_int_pow(dest, base, power);
+}
+
+/*
+	Calculate `dest = base^power` using a square-multiply algorithm.
+*/
+int_pow_int :: proc(dest: ^Int, base, power: int) -> (err: Error) {
+	if dest == nil { return .Invalid_Pointer; }
+
+	return #force_inline internal_pow(dest, base, power);
+}
+
+pow :: proc { int_pow, int_pow_int, small_pow, };
+exp :: pow;
+
+small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
+	return #force_inline internal_small_pow(base, exponent);
+}
+
+/*
+	This function is less generic than `root_n`, simpler and faster.
+*/
+int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
+	if dest == nil || src == nil { return .Invalid_Pointer; }
+	if err = clear_if_uninitialized(dest, src);	err != nil { return err; }
+
+	return #force_inline internal_int_sqrt(dest, src);
+}
+sqrt :: proc { int_sqrt, };
+
+
+/*
+	Find the nth root of an Integer.
+	Result found such that `(dest)**n <= src` and `(dest+1)**n > src`
+
+	This algorithm uses Newton's approximation `x[i+1] = x[i] - f(x[i])/f'(x[i])`,
+	which will find the root in `log(n)` time where each step involves a fair bit.
+*/
+int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
+	/*
+		Fast path for n == 2.
+	*/
+	if n == 2 { return sqrt(dest, src); }
+
+	if dest == nil || src == nil { return .Invalid_Pointer; }
+	/*
+		Initialize dest + src if needed.
+	*/
+	if err = clear_if_uninitialized(dest, src);	err != nil { return err; }
+
+	return #force_inline internal_int_root_n(dest, src, n);
+}
+root_n :: proc { int_root_n, };
