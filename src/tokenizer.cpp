@@ -804,7 +804,7 @@ void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, 
 	}
 }
 
-TokenizerInitError init_tokenizer(Tokenizer *t, String const &fullpath, TokenizerFlags flags = TokenizerFlag_None) {
+TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, TokenizerFlags flags = TokenizerFlag_None) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = alloc_cstring(heap_allocator(), fullpath);
