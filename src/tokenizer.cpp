@@ -789,14 +789,14 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-void init_tokenizer_with_file_contents(Tokenizer *t, String const &fullpath, gbFileContents *fc, TokenizerFlags flags) {
+void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, isize size, TokenizerFlags flags) {
 	t->flags = flags;
 	t->fullpath = fullpath;
 	t->line_count = 1;
 
-	t->start = cast(u8 *)fc->data;
+	t->start = cast(u8 *)data;
 	t->read_curr = t->curr = t->start;
-	t->end = t->start + fc->size;
+	t->end = t->start + size;
 
 	advance_to_next_rune(t);
 	if (t->curr_rune == GB_RUNE_BOM) {
@@ -820,7 +820,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String const &fullpath, Tokenize
 		err = TokenizerInit_FileTooLarge;
 		gb_file_free_contents(&fc);
 	} else if (fc.data != nullptr) {
-		init_tokenizer_with_file_contents(t, fullpath, &fc, flags);
+		init_tokenizer_with_data(t, fullpath, fc.data, fc.size, flags);
 	} else {
 		t->flags = flags;
 		t->fullpath = fullpath;
