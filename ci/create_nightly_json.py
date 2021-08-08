@@ -18,7 +18,7 @@ def main():
             name = remove_prefix(data['fileName'], "nightly/")
             url = f"https://f001.backblazeb2.com/file/{bucket}/nightly/{urllib.parse.quote_plus(name)}"
             sha1 = data['contentSha1']
-            size = int(data['contentLength'])
+            size = int(data['size'])
             ts = int(data['fileInfo']['src_last_modified_millis'])
             date = datetime.datetime.fromtimestamp(ts/1000).strftime('%Y-%m-%d')
             
