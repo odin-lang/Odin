@@ -1,4 +1,4 @@
-#define ARRAY_GROW_FORMULA(x) (2*(x) + 8)
+#define ARRAY_GROW_FORMULA(x) (gb_max(((x)+1)*3 >> 1, 8))
 GB_STATIC_ASSERT(ARRAY_GROW_FORMULA(0) > 0);
 
 #if 1
@@ -82,6 +82,23 @@ Slice<T> slice_make(gbAllocator const &allocator, isize count) {
 	s.data = gb_alloc_array(allocator, T, count);
 	s.count = count;
 	return s;
+}
+
+template <typename T>
+void slice_init(Slice<T> *s, gbAllocator const &allocator, isize count) {
+	s->data = gb_alloc_array(allocator, T, count);
+	s->count = count;
+}
+
+template <typename T>
+void slice_free(Slice<T> *s, gbAllocator const &allocator) {
+	gb_free(allocator, s->data);
+}
+
+template <typename T>
+void slice_resize(Slice<T> *s, gbAllocator const &allocator, isize new_count) {
+	resize_array_raw(&s->data, allocator, s->count, new_count);
+	s->count = new_count;
 }
 
 
