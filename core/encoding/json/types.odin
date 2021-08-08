@@ -14,25 +14,15 @@ String  :: string;
 Array   :: distinct [dynamic]Value;
 Object  :: distinct map[string]Value;
 
-Value :: struct {
-	pos, end: Pos,
-	value: union {
-		Null,
-		Integer,
-		Float,
-		Boolean,
-		String,
-		Array,
-		Object,
-	},
+Value :: union {
+	Null,
+	Integer,
+	Float,
+	Boolean,
+	String,
+	Array,
+	Object,
 }
-
-Pos :: struct {
-	offset: int,
-	line:   int,
-	column: int,
-}
-
 
 Error :: enum {
 	None,
@@ -57,7 +47,7 @@ Error :: enum {
 
 
 destroy_value :: proc(value: Value) {
-	#partial switch v in value.value {
+	#partial switch v in value {
 	case Object:
 		for key, elem in v {
 			delete(key);

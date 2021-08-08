@@ -2,6 +2,12 @@ package json
 
 import "core:unicode/utf8"
 
+Pos :: struct {
+	offset: int,
+	line:   int,
+	column: int,
+}
+
 Token :: struct {
 	using pos: Pos,
 	kind: Token_Kind,
