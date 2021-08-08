@@ -164,7 +164,7 @@ control_flow :: proc() {
 		for j in 0..<10 {
 			fmt.println(j);
 		}
-		for j in 0..9 {
+		for j in 0..=9 {
 			fmt.println(j);
 		}
 
@@ -282,7 +282,7 @@ control_flow :: proc() {
 
 		// A `switch` statement can also use ranges like a range-based loop:
 		switch c := 'j'; c {
-		case 'A'..'Z', 'a'..'z', '0'..'9':
+		case 'A'..='Z', 'a'..='z', '0'..='9':
 			fmt.println("c is alphanumeric");
 		}
 
@@ -1009,8 +1009,8 @@ parametric_polymorphism :: proc() {
 
 		table: Table(string, int);
 
-		for i in 0..36 { put(&table, "Hellope", i); }
-		for i in 0..42 { put(&table, "World!",  i); }
+		for i in 0..=36 { put(&table, "Hellope", i); }
+		for i in 0..=42 { put(&table, "World!",  i); }
 
 		found, _ := find(&table, "Hellope");
 		fmt.printf("`found` is %v\n", found);
@@ -1109,7 +1109,7 @@ threading_example :: proc() {
 	{ // Basic Threads
 		fmt.println("\n## Basic Threads");
 			worker_proc :: proc(t: ^thread.Thread) {
-			for iteration in 1..5 {
+			for iteration in 1..=5 {
 				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
 				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
 				time.sleep(1 * time.Millisecond);
@@ -1146,7 +1146,7 @@ threading_example :: proc() {
 		fmt.println("\n## Thread Pool");
 		task_proc :: proc(t: ^thread.Task) {
 			index := t.user_index % len(prefix_table);
-			for iteration in 1..5 {
+			for iteration in 1..=5 {
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration);
 				fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration);
 				time.sleep(1 * time.Millisecond);
@@ -1356,11 +1356,11 @@ bit_set_type :: proc() {
 		fmt.println("Cardinality:", card(e));
 	}
 	{
-		x: bit_set['A'..'Z'];
+		x: bit_set['A'..='Z'];
 		#assert(size_of(x) == size_of(u32));
-		y: bit_set[0..8; u16];
-		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
-		fmt.println(typeid_of(type_of(y))); // bit_set[0..8; u16]
+		y: bit_set[0..=8; u16];
+		fmt.println(typeid_of(type_of(x))); // bit_set[A..=Z]
+		fmt.println(typeid_of(type_of(y))); // bit_set[0..=8; u16]
 
 		x += {'F'};
 		assert('F' in x);
@@ -1371,7 +1371,7 @@ bit_set_type :: proc() {
 		assert(2 in y);
 	}
 	{
-		Letters :: bit_set['A'..'Z'];
+		Letters :: bit_set['A'..='Z'];
 		a := Letters{'A', 'B'};
 		b := Letters{'A', 'B', 'C', 'D', 'F'};
 		c := Letters{'A', 'B'};
@@ -1661,7 +1661,7 @@ ranged_fields_for_array_compound_literals :: proc() {
 		i := 2;
 		foo := [?]int {
 			0 = 123,
-			5..9 = 54,
+			5..=9 = 54,
 			10..<16 = i*3 + (i-1)*2,
 		};
 		#assert(len(foo) == 16);
@@ -1671,7 +1671,7 @@ ranged_fields_for_array_compound_literals :: proc() {
 		i := 2;
 		foo_slice := []int {
 			0 = 123,
-			5..9 = 54,
+			5..=9 = 54,
 			10..<16 = i*3 + (i-1)*2,
 		};
 		assert(len(foo_slice) == 16);
@@ -1679,7 +1679,7 @@ ranged_fields_for_array_compound_literals :: proc() {
 
 		foo_dynamic_array := [dynamic]int {
 			0 = 123,
-			5..9 = 54,
+			5..=9 = 54,
 			10..<16 = i*3 + (i-1)*2,
 		};
 		assert(len(foo_dynamic_array) == 16);
@@ -1905,7 +1905,7 @@ constant_literal_expressions :: proc() {
 	fmt.println("-------");
 
 	Baz :: enum{A=5, B, C, D};
-	ENUM_ARRAY_CONST :: [Baz]int{.A .. .C = 1, .D = 16};
+	ENUM_ARRAY_CONST :: [Baz]int{.A ..= .C = 1, .D = 16};
 
 	fmt.println(ENUM_ARRAY_CONST[.A]);
 	fmt.println(ENUM_ARRAY_CONST[.B]);
@@ -1916,7 +1916,7 @@ constant_literal_expressions :: proc() {
 
 	Partial_Baz :: enum{A=5, B, C, D=16};
 	#assert(len(Partial_Baz) < len(#partial [Partial_Baz]int));
-	PARTIAL_ENUM_ARRAY_CONST :: #partial [Partial_Baz]int{.A .. .C = 1, .D = 16};
+	PARTIAL_ENUM_ARRAY_CONST :: #partial [Partial_Baz]int{.A ..= .C = 1, .D = 16};
 
 	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.A]);
 	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.B]);
