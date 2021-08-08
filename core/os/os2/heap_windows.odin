@@ -84,7 +84,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		aligned_free(old_memory);
 
 	case .Free_All:
-		// NOTE(tetra): Do nothing.
+		return nil, .Mode_Not_Implemented;
 
 	case .Resize:
 		if old_memory == nil {
