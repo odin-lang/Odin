@@ -23,15 +23,15 @@ gb_inline StringHashKey string_hash_string(String const &s) {
 }
 
 
-bool string_hash_key_equal(StringHashKey a, StringHashKey b) {
+bool string_hash_key_equal(StringHashKey const &a, StringHashKey const &b) {
 	if (a.hash == b.hash) {
 		// NOTE(bill): If two string's hashes collide, compare the strings themselves
 		return a.string == b.string;
 	}
 	return false;
 }
-bool operator==(StringHashKey a, StringHashKey b) { return string_hash_key_equal(a, b); }
-bool operator!=(StringHashKey a, StringHashKey b) { return !string_hash_key_equal(a, b); }
+bool operator==(StringHashKey const &a, StringHashKey const &b) { return string_hash_key_equal(a, b); }
+bool operator!=(StringHashKey const &a, StringHashKey const &b) { return !string_hash_key_equal(a, b); }
 
 template <typename T>
 struct StringMapEntry {
@@ -42,7 +42,7 @@ struct StringMapEntry {
 
 template <typename T>
 struct StringMap {
-	Array<isize>              hashes;
+	Slice<isize>              hashes;
 	Array<StringMapEntry<T> > entries;
 };
 
@@ -69,7 +69,8 @@ template <typename T> void string_map_rehash           (StringMap<T> *h, isize n
 
 template <typename T>
 gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize capacity) {
-	array_init(&h->hashes,  a, capacity);
+	capacity = next_pow2_isize(capacity);
+	slice_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		h->hashes.data[i] = -1;
@@ -78,8 +79,8 @@ gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize capacity) {
 
 template <typename T>
 gb_inline void string_map_destroy(StringMap<T> *h) {
+	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
-	array_free(&h->hashes);
 }
 
 template <typename T>
@@ -94,8 +95,8 @@ gb_internal isize string_map__add_entry(StringMap<T> *h, StringHashKey const &ke
 template <typename T>
 gb_internal StringMapFindResult string_map__find(StringMap<T> *h, StringHashKey const &key) {
 	StringMapFindResult fr = {-1, -1, -1};
-	if (h->hashes.count > 0) {
-		fr.hash_index = key.hash % h->hashes.count;
+	if (h->hashes.count != 0) {
+		fr.hash_index = key.hash & (h->hashes.count-1);
 		fr.entry_index = h->hashes.data[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (string_hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
@@ -111,8 +112,8 @@ gb_internal StringMapFindResult string_map__find(StringMap<T> *h, StringHashKey 
 template <typename T>
 gb_internal StringMapFindResult string_map__find_from_entry(StringMap<T> *h, StringMapEntry<T> *e) {
 	StringMapFindResult fr = {-1, -1, -1};
-	if (h->hashes.count > 0) {
-		fr.hash_index  = e->key.hash % h->hashes.count;
+	if (h->hashes.count != 0) {
+		fr.hash_index  = e->key.hash & (h->hashes.count-1);
 		fr.entry_index = h->hashes.data[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (&h->entries.data[fr.entry_index] == e) {
@@ -130,12 +131,9 @@ gb_internal b32 string_map__full(StringMap<T> *h) {
 	return 0.75f * h->hashes.count <= h->entries.count;
 }
 
-#define STRING_MAP_ARRAY_GROW_FORMULA(x) (4*(x) + 7)
-GB_STATIC_ASSERT(STRING_MAP_ARRAY_GROW_FORMULA(0) > 0);
-
 template <typename T>
 gb_inline void string_map_grow(StringMap<T> *h) {
-	isize new_count = STRING_MAP_ARRAY_GROW_FORMULA(h->entries.count);
+	isize new_count = gb_max(h->hashes.count<<1, 16);
 	string_map_rehash(h, new_count);
 }
 
@@ -143,12 +141,14 @@ template <typename T>
 void string_map_rehash(StringMap<T> *h, isize new_count) {
 	isize i, j;
 	StringMap<T> nh = {};
-	string_map_init(&nh, h->hashes.allocator, new_count);
-	array_resize(&nh.hashes, new_count);
-	array_reserve(&nh.entries, h->entries.count);
+	new_count = next_pow2_isize(new_count);
+	nh.hashes = h->hashes;
+	nh.entries.allocator = h->entries.allocator;
+	slice_resize(&nh.hashes, h->entries.allocator, new_count);
 	for (i = 0; i < new_count; i++) {
 		nh.hashes.data[i] = -1;
 	}
+	array_reserve(&nh.entries, ARRAY_GROW_FORMULA(h->entries.count));
 	for (i = 0; i < h->entries.count; i++) {
 		StringMapEntry<T> *e = &h->entries.data[i];
 		StringMapFindResult fr;
@@ -168,7 +168,7 @@ void string_map_rehash(StringMap<T> *h, isize new_count) {
 			string_map_grow(&nh);
 		}
 	}
-	string_map_destroy(h);
+	array_free(&h->entries);
 	*h = nh;
 }
 
@@ -275,7 +275,9 @@ void string_map_remove(StringMap<T> *h, StringHashKey const &key) {
 
 template <typename T>
 gb_inline void string_map_clear(StringMap<T> *h) {
-	array_clear(&h->hashes);
 	array_clear(&h->entries);
+	for (isize i = 0; i < h->hashes.count; i++) {
+		h->hashes.data[i] = -1;
+	}
 }
 

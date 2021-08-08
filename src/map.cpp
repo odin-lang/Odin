@@ -21,9 +21,7 @@ GB_STATIC_ASSERT(gb_size_of(u64) >= gb_size_of(void *));
 
 gb_inline HashKey hashing_proc(void const *data, isize len) {
 	HashKey h = {};
-	// h.key = u128_from_u64(gb_fnv64a(data, len));
 	h.key = gb_fnv64a(data, len);
-
 	return h;
 }
 
@@ -61,7 +59,7 @@ struct MapEntry {
 
 template <typename T>
 struct Map {
-	Array<isize>        hashes;
+	Slice<isize>        hashes;
 	Array<MapEntry<T> > entries;
 };
 
@@ -90,7 +88,8 @@ template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey const &key);
 
 template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
-	array_init(&h->hashes,  a, capacity);
+	capacity = next_pow2_isize(capacity);
+	slice_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		h->hashes.data[i] = -1;
@@ -99,8 +98,8 @@ gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
 
 template <typename T>
 gb_inline void map_destroy(Map<T> *h) {
+	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
-	array_free(&h->hashes);
 }
 
 template <typename T>
@@ -116,8 +115,7 @@ template <typename T>
 gb_internal MapFindResult map__find(Map<T> *h, HashKey const &key) {
 	MapFindResult fr = {-1, -1, -1};
 	if (h->hashes.count > 0) {
-		// fr.hash_index  = u128_to_i64(key.key % u128_from_i64(h->hashes.count));
-		fr.hash_index = key.key % h->hashes.count;
+		fr.hash_index = key.key & (h->hashes.count-1);
 		fr.entry_index = h->hashes.data[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
@@ -134,7 +132,7 @@ template <typename T>
 gb_internal MapFindResult map__find_from_entry(Map<T> *h, MapEntry<T> *e) {
 	MapFindResult fr = {-1, -1, -1};
 	if (h->hashes.count > 0) {
-		fr.hash_index  = e->key.key % h->hashes.count;
+		fr.hash_index  = e->key.key & (h->hashes.count-1);
 		fr.entry_index = h->hashes.data[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (&h->entries.data[fr.entry_index] == e) {
@@ -152,12 +150,9 @@ gb_internal b32 map__full(Map<T> *h) {
 	return 0.75f * h->hashes.count <= h->entries.count;
 }
 
-#define MAP_ARRAY_GROW_FORMULA(x) (4*(x) + 7)
-GB_STATIC_ASSERT(MAP_ARRAY_GROW_FORMULA(0) > 0);
-
 template <typename T>
 gb_inline void map_grow(Map<T> *h) {
-	isize new_count = MAP_ARRAY_GROW_FORMULA(h->entries.count);
+	isize new_count = gb_max(h->hashes.count<<1, 16);
 	map_rehash(h, new_count);
 }
 
@@ -165,12 +160,14 @@ template <typename T>
 void map_rehash(Map<T> *h, isize new_count) {
 	isize i, j;
 	Map<T> nh = {};
-	map_init(&nh, h->hashes.allocator, new_count);
-	array_resize(&nh.hashes, new_count);
-	array_reserve(&nh.entries, h->entries.count);
+	new_count = next_pow2_isize(new_count);
+	nh.hashes = h->hashes;
+	nh.entries.allocator = h->entries.allocator;
+	slice_resize(&nh.hashes, h->entries.allocator, new_count);
 	for (i = 0; i < new_count; i++) {
 		nh.hashes.data[i] = -1;
 	}
+	array_reserve(&nh.entries, ARRAY_GROW_FORMULA(h->entries.count));
 	for (i = 0; i < h->entries.count; i++) {
 		MapEntry<T> *e = &h->entries.data[i];
 		MapFindResult fr;
@@ -190,7 +187,7 @@ void map_rehash(Map<T> *h, isize new_count) {
 			map_grow(&nh);
 		}
 	}
-	map_destroy(h);
+	array_free(&h->entries);
 	*h = nh;
 }
 
@@ -267,8 +264,10 @@ void map_remove(Map<T> *h, HashKey const &key) {
 
 template <typename T>
 gb_inline void map_clear(Map<T> *h) {
-	array_clear(&h->hashes);
 	array_clear(&h->entries);
+	for (isize i = 0; i < h->hashes.count; i++) {
+		h->hashes.data[i] = -1;
+	}
 }
 
 
