@@ -3606,13 +3606,9 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 		}
 		AstPackage **found = string_map_get(&c->info.packages, path);
 		if (found == nullptr) {
-			for_array(pkg_index, c->info.packages.entries) {
-				AstPackage *pkg = c->info.packages.entries[pkg_index].value;
-				gb_printf_err("%.*s\n", LIT(pkg->fullpath));
-			}
 			Token token = ast_token(decl);
-			gb_printf_err("%s\n", token_pos_to_string(token.pos));
-			GB_PANIC("Unable to find package: %.*s", LIT(path));
+			error(token, "Unable to find package: %.*s", LIT(path));
+			gb_exit(1);
 		}
 		AstPackage *pkg = *found;
 		GB_ASSERT(pkg->scope != nullptr);
