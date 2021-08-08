@@ -196,6 +196,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 	new_header: Map_Header = header;
 	nm := Raw_Map{};
 	nm.entries.allocator = m.entries.allocator;
+	nm.hashes = m.hashes;
 	new_header.m = &nm;
 
 	c := context;
@@ -239,7 +240,6 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		}
 	}
 
-	delete(m.hashes, m.entries.allocator, loc);
 	free(m.entries.data, m.entries.allocator, loc);
 	header.m^ = nm;
 }

@@ -31,10 +31,11 @@ Allocator_Query_Info :: struct {
 Allocator_Error :: runtime.Allocator_Error;
 /*
 Allocator_Error :: enum byte {
-	None             = 0,
-	Out_Of_Memory    = 1,
-	Invalid_Pointer  = 2,
-	Invalid_Argument = 3,
+	None                 = 0,
+	Out_Of_Memory        = 1,
+	Invalid_Pointer      = 2,
+	Invalid_Argument     = 3,
+	Mode_Not_Implemented = 4,
 }
 */
 Allocator_Proc :: runtime.Allocator_Proc;
@@ -121,7 +122,15 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 		return nil;
 	}
 	data, err := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc);
-	_ = err;
+	if err == .Mode_Not_Implemented {
+		data, err = allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc);
+		if err != nil {
+			return nil;
+		}
+		runtime.copy(data, byte_slice(ptr, old_size));
+		_, err = allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc);
+		return raw_data(data);
+	}
 	return raw_data(data);
 }
 
@@ -140,7 +149,16 @@ resize_bytes :: proc(old_data: []byte, new_size: int, alignment: int = DEFAULT_A
 	} else if ptr == nil {
 		return allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc);
 	}
-	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc);
+	data, err := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc);
+	if err == .Mode_Not_Implemented {
+		data, err = allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc);
+		if err != nil {
+			return data, err;
+		}
+		runtime.copy(data, old_data);
+		_, err = allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc);
+	}
+	return data, err;
 }
 
 query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: Allocator_Mode_Set) {
