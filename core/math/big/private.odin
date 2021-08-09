@@ -481,7 +481,7 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 	c: int;
 
 	goto_end: for {
-		if err = one(tq);									err != nil { break goto_end; }
+		if err = internal_one(tq);							err != nil { break goto_end; }
 
 		num_bits, _ := count_bits(numerator);
 		den_bits, _ := count_bits(denominator);

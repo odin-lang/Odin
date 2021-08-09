@@ -13,8 +13,6 @@ import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
 
-// import "core:fmt"
-
 /*
 	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
 */
@@ -26,6 +24,7 @@ int_destroy :: proc(integers: ..^Int) {
 	integers := integers;
 
 	for a in &integers {
+		assert(a != nil, "int_destroy(nil)");
 		mem.zero_slice(a.digit[:]);
 		raw := transmute(mem.Raw_Dynamic_Array)a.digit;
 		if raw.cap > 0 {
@@ -328,7 +327,7 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, ONE, minimize, allocator);
+	return copy(a, INT_ONE, minimize, allocator);
 }
 one :: proc { int_one, };
 
@@ -676,25 +675,29 @@ clamp :: proc(a: ^Int) -> (err: Error) {
 /*
 	Initialize constants.
 */
-ONE, ZERO, MINUS_ONE, INF, MINUS_INF, NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 
 initialize_constants :: proc() -> (res: int) {
-	set(     ZERO,  0);      ZERO.flags = {.Immutable};
-	set(      ONE,  1);       ONE.flags = {.Immutable};
-	set(MINUS_ONE, -1); MINUS_ONE.flags = {.Immutable};
+	internal_set(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable};
+	internal_set(      INT_ONE,  1);       INT_ONE.flags = {.Immutable};
+	internal_set(INT_MINUS_ONE, -1); INT_MINUS_ONE.flags = {.Immutable};
 
 	/*
 		We set these special values to -1 or 1 so they don't get mistake for zero accidentally.
 		This allows for shortcut tests of is_zero as .used == 0.
 	*/
-	set(      NAN,  1);       NAN.flags = {.Immutable, .NaN};
-	set(      INF,  1);       INF.flags = {.Immutable, .Inf};
-	set(      INF, -1); MINUS_INF.flags = {.Immutable, .Inf};
+	internal_set(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN};
+	internal_set(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf};
+	internal_set(      INT_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf};
 
 	return _DEFAULT_MUL_KARATSUBA_CUTOFF;
 }
 
+/*
+	Destroy constants.
+	Optional for an EXE, as this would be called at the very end of a process.
+*/
 destroy_constants :: proc() {
-	destroy(ONE, ZERO, MINUS_ONE, INF, NAN);
+	internal_destroy(INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN);
 }
 

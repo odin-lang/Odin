@@ -4,6 +4,7 @@ import math
 import os
 import platform
 import time
+import gc
 from enum import Enum
 
 #
@@ -91,6 +92,11 @@ class Error(Enum):
 	Division_by_Zero       = 8
 	Math_Domain_Error      = 9
 	Unimplemented          = 127
+
+#
+# Disable garbage collection
+#
+gc.disable()
 
 #
 # Set up exported procedures
