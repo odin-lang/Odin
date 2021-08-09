@@ -15,11 +15,13 @@ package big
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
 */
-int_prime_is_divisible :: proc(a: ^Int) -> (res: bool, err: Error) {
+int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
+	assert_if_nil(a);
+	if err = internal_clear_if_uninitialized(a, allocator); err != nil { return {}, err; }
 
 	rem: DIGIT;
 	for prime in _private_prime_table {
-		if rem, err = mod(a, prime); err != nil { return false, err; }
+		if rem, err = #force_inline int_mod_digit(a, prime); err != nil { return false, err; }
 		if rem == 0 { return true, nil; }
 	}
 	/*

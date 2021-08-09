@@ -18,10 +18,10 @@ import "core:mem"
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
+	assert_if_nil(a);
+
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a); err != nil {
-		return "", err;
-	}
+	if err = clear_if_uninitialized(a, allocator); err != nil { return "", err; }
 	/*
 		Radix defaults to 10.
 	*/
@@ -61,10 +61,10 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
+	assert_if_nil(a);
+
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a); err != nil {
-		return "", err;
-	}
+	if err = clear_if_uninitialized(a, allocator); err != nil { return "", err; }
 	/*
 		Radix defaults to 10.
 	*/
@@ -96,10 +96,9 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocato
 	and having to perform a buffer overflow check each character.
 */
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
+	assert_if_nil(a);
 	a := a; radix := radix; size := size;
-	if err = clear_if_uninitialized(a); err != nil {
-		return 0, err;
-	}
+	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
 	/*
 		Radix defaults to 10.
 	*/
@@ -237,27 +236,23 @@ int_to_cstring :: int_itoa_cstring;
 /*
 	Read a string [ASCII] in a given radix.
 */
-int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
+int_atoi :: proc(res: ^Int, input: string, radix: i8, allocator := context.allocator) -> (err: Error) {
 	input := input;
 	/*
 		Make sure the radix is ok.
 	*/
 
-	if radix < 2 || radix > 64 {
-		return .Invalid_Argument;
-	}
+	if radix < 2 || radix > 64 { return .Invalid_Argument; }
 
 	/*
 		Set the integer to the default of zero.
 	*/
-	if err = zero(res); err != nil { return err; }
+	if err = zero(res, false, allocator); err != nil { return err; }
 
 	/*
 		We'll interpret an empty string as zero.
 	*/
-	if len(input) == 0 {
-		return nil;
-	}
+	if len(input) == 0 { return nil; }
 
 	/*
 		If the leading digit is a minus set the sign to negative.
@@ -297,8 +292,8 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8) -> (err: Error) {
 			break;
 		}
 
-		if err = mul(res, res, DIGIT(radix)); err != nil { return err; }
-		if err = add(res, res, DIGIT(y));     err != nil { return err; }
+		if err = internal_mul(res, res, DIGIT(radix)); err != nil { return err; }
+		if err = internal_add(res, res, DIGIT(y));     err != nil { return err; }
 
 		input = input[1:];
 	}
