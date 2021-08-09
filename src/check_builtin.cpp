@@ -406,6 +406,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
+		if (type_hint != nullptr) {
+			Type *bt = type_hint;
+			// bt = base_type(bt);
+			if (bt == t_int) {
+				type = type_hint;
+			} else if (bt == t_uint) {
+				type = type_hint;
+			}
+		}
+
 		AddressingMode mode = Addressing_Invalid;
 		ExactValue value = {};
 		if (is_type_string(op_type) && id == BuiltinProc_len) {
