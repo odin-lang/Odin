@@ -2497,6 +2497,41 @@ lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *expr) {
 	return lb_addr(v);
 }
 
+lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
+	isize index_count = ce->args.count-1;
+	lbAddr addr = lb_build_addr(p, ce->args[0]);
+	if (index_count == 0) {
+		return addr;
+	}
+	Type *type = base_type(lb_addr_type(addr));
+	GB_ASSERT(type->kind == Type_Array);
+	i64 count = type->Array.count;
+	if (count <= 4) {
+		u8 indices[4] = {};
+		u8 index_count = 0;
+		for (i32 i = 1; i < ce->args.count; i++) {
+			TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
+			GB_ASSERT(is_type_integer(tv.type));
+			GB_ASSERT(tv.value.kind == ExactValue_Integer);
+
+			i64 src_index = big_int_to_i64(&tv.value.value_integer);
+			indices[index_count++] = cast(u8)src_index;
+		}
+		return lb_addr_swizzle(lb_addr_get_ptr(p, addr), tv.type, index_count, indices);
+	}
+	auto indices = slice_make<i32>(permanent_allocator(), ce->args.count-1);
+	isize index_index = 0;
+	for (i32 i = 1; i < ce->args.count; i++) {
+		TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
+		GB_ASSERT(is_type_integer(tv.type));
+		GB_ASSERT(tv.value.kind == ExactValue_Integer);
+
+		i64 src_index = big_int_to_i64(&tv.value.value_integer);
+		indices[index_index++] = cast(i32)src_index;
+	}
+	return lb_addr_swizzle_large(lb_addr_get_ptr(p, addr), tv.type, indices);
+}
+
 
 lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
@@ -2614,6 +2649,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					}
 					return lb_addr(item);
 				} else if (addr.kind == lbAddr_Swizzle) {
+					GB_ASSERT(sel.index.count > 0);
+					// NOTE(bill): just patch the index in place
+					sel.index[0] = addr.swizzle.indices[sel.index[0]];
+				} else if (addr.kind == lbAddr_SwizzleLarge) {
 					GB_ASSERT(sel.index.count > 0);
 					// NOTE(bill): just patch the index in place
 					sel.index[0] = addr.swizzle.indices[sel.index[0]];
@@ -3028,6 +3067,23 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
+		BuiltinProcId builtin_id = BuiltinProc_Invalid;
+		if (ce->proc->tav.mode == Addressing_Builtin) {
+			Entity *e = entity_of_node(ce->proc);
+			if (e != nullptr) {
+				builtin_id = cast(BuiltinProcId)e->Builtin.id;
+			} else {
+				builtin_id = BuiltinProc_DIRECTIVE;
+			}
+		}
+		auto const &tv = expr->tav;
+		if (builtin_id == BuiltinProc_swizzle &&
+		    is_type_array(tv.type)) {
+		    	// NOTE(bill, 2021-08-09): `swizzle` has some bizarre semantics so it needs to be
+		    	// specialized here for to be addressable
+			return lb_build_array_swizzle_addr(p, ce, tv);
+		}
+
 		// NOTE(bill): This is make sure you never need to have an 'array_ev'
 		lbValue e = lb_build_expr(p, expr);
 	#if 1

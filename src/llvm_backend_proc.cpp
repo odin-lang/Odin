@@ -1018,32 +1018,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.type = tv.type;
 			res.value = LLVMBuildShuffleVector(p->builder, v1, v2, mask, "");
 			return res;
-
 		}
 
-		lbAddr addr = lb_build_addr(p, ce->args[0]);
-		if (index_count == 0) {
-			return lb_addr_load(p, addr);
-		}
-		lbValue src = lb_addr_get_ptr(p, addr);
-		// TODO(bill): Should this be zeroed or not?
-		lbAddr dst = lb_add_local_generated(p, tv.type, true);
-		lbValue dst_ptr = lb_addr_get_ptr(p, dst);
-
-		for (i32 i = 1; i < ce->args.count; i++) {
-			TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
-			GB_ASSERT(is_type_integer(tv.type));
-			GB_ASSERT(tv.value.kind == ExactValue_Integer);
-
-			i32 src_index = cast(i32)big_int_to_i64(&tv.value.value_integer);
-			i32 dst_index = i-1;
-
-			lbValue src_elem = lb_emit_array_epi(p, src, src_index);
-			lbValue dst_elem = lb_emit_array_epi(p, dst_ptr, dst_index);
-
-			lb_emit_store(p, dst_elem, lb_emit_load(p, src_elem));
-		}
-		return lb_addr_load(p, dst);
+		lbAddr addr = lb_build_array_swizzle_addr(p, ce, tv);
+		return lb_addr_load(p, addr);
 	}
 
 	case BuiltinProc_complex: {

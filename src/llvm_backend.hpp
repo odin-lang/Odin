@@ -48,6 +48,7 @@ enum lbAddrKind {
 	lbAddr_RelativeSlice,
 
 	lbAddr_Swizzle,
+	lbAddr_SwizzleLarge,
 };
 
 struct lbAddr {
@@ -78,6 +79,10 @@ struct lbAddr {
 			u8 count;      // 2, 3, or 4 components
 			u8 indices[4];
 		} swizzle;
+		struct {
+			Type *type;
+			Slice<i32> indices;
+		} swizzle_large;
 	};
 };
 
