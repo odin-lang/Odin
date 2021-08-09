@@ -1818,6 +1818,51 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
 		return;
+	} else if (lhs.kind == lbAddr_SwizzleLarge) {
+		GB_ASSERT(is_type_array(lhs_type));
+
+		struct ValueAndIndex {
+			lbValue value;
+			u32     index;
+		};
+
+		Type *bt = base_type(lhs_type);
+		GB_ASSERT(bt->kind == Type_Array);
+
+		auto indices_handled = slice_make<bool>(temporary_allocator(), bt->Array.count);
+		auto indices = slice_make<i32>(temporary_allocator(), bt->Array.count);
+		i32 index_count = 0;
+		for_array(i, lhs.swizzle_large.indices) {
+			i32 index = lhs.swizzle_large.indices[i];
+			if (indices_handled[index]) {
+				continue;
+			}
+			indices[index_count++] = index;
+		}
+		gb_sort_array(indices.data, index_count, gb_i32_cmp(0));
+
+		lbValue lhs_ptrs[4] = {};
+		lbValue x_loads[4]  = {};
+		lbValue y_loads[4]  = {};
+		lbValue ops[4]      = {};
+
+		for (i32 i = 0; i < index_count; i++) {
+			lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, indices[i]);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+			y_loads[i].type = elem_type;
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			lb_emit_store(p, lhs_ptrs[i], ops[i]);
+		}
+		return;
 	}
 
 

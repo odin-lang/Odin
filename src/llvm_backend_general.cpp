@@ -301,6 +301,14 @@ lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swiz
 	return v;
 }
 
+lbAddr lb_addr_swizzle_large(lbValue addr, Type *array_type, Slice<i32> const &swizzle_indices) {
+	GB_ASSERT_MSG(is_type_array(array_type), "%s", type_to_string(array_type));
+	lbAddr v = {lbAddr_SwizzleLarge, addr};
+	v.swizzle_large.type = array_type;
+	v.swizzle_large.indices = swizzle_indices;
+	return v;
+}
+
 Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		return nullptr;
@@ -312,6 +320,9 @@ Type *lb_addr_type(lbAddr const &addr) {
 	}
 	if (addr.kind == lbAddr_Swizzle) {
 		return addr.swizzle.type;
+	}
+	if (addr.kind == lbAddr_SwizzleLarge) {
+		return addr.swizzle_large.type;
 	}
 	return type_deref(addr.addr.type);
 }
@@ -372,6 +383,7 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		break;
 
 	case lbAddr_Swizzle:
+	case lbAddr_SwizzleLarge:
 		// TOOD(bill): is this good enough logic?
 		break;
 	}
@@ -690,6 +702,19 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			for (u8 i = 0; i < addr.swizzle.count; i++) {
 				lb_emit_store(p, dst_ptrs[i], src_loads[i]);
 			}
+		}
+		return;
+	} else if (addr.kind == lbAddr_SwizzleLarge) {
+		GB_ASSERT(value.value != nullptr);
+		value = lb_emit_conv(p, value, lb_addr_type(addr));
+
+		lbValue dst = lb_addr_get_ptr(p, addr);
+		lbValue src = lb_address_from_load_or_generate_local(p, value);
+		for_array(i, addr.swizzle_large.indices) {
+			lbValue src_ptr = lb_emit_array_epi(p, src, i);
+			lbValue dst_ptr = lb_emit_array_epi(p, dst, addr.swizzle_large.indices[i]);
+			lbValue src_load = lb_emit_load(p, src_ptr);
+			lb_emit_store(p, dst_ptr, src_load);
 		}
 		return;
 	}
@@ -1013,6 +1038,25 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 				lb_emit_store(p, dst, lb_emit_load(p, src));
 			}
 		}
+		return lb_addr_load(p, res);
+	}  else if (addr.kind == lbAddr_SwizzleLarge) {
+		Type *array_type = base_type(addr.swizzle_large.type);
+		GB_ASSERT(array_type->kind == Type_Array);
+
+		unsigned res_align = cast(unsigned)type_align_of(addr.swizzle_large.type);
+
+		Type *elem_type = base_type(array_type->Array.elem);
+		lbAddr res = lb_add_local_generated(p, addr.swizzle_large.type, false);
+		lbValue ptr = lb_addr_get_ptr(p, res);
+		GB_ASSERT(is_type_pointer(ptr.type));
+
+		for_array(i, addr.swizzle_large.indices) {
+			i32 index = addr.swizzle_large.indices[i];
+			lbValue dst = lb_emit_array_epi(p, ptr, i);
+			lbValue src = lb_emit_array_epi(p, addr.addr, index);
+			lb_emit_store(p, dst, lb_emit_load(p, src));
+		}
+
 		return lb_addr_load(p, res);
 	}
 
