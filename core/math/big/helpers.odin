@@ -336,7 +336,7 @@ count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err:
 	assert_if_nil(a);
 	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return 0, err; }
 
-	return #force_inline internal_count_bits(a);	
+	return #force_inline internal_count_bits(a), nil;
 }
 
 /*
