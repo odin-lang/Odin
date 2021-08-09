@@ -765,10 +765,20 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 
 	Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
 
+	bool has_args = false;
+	bool is_dll_main = false;
 	String name = str_lit("main");
-	if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
+	if (build_context.metrics.os == TargetOs_windows && build_context.build_mode == BuildMode_DynamicLibrary) {
+		is_dll_main = true;
+		name = str_lit("DllMain");
+		array_init(&params->Tuple.variables, permanent_allocator(), 3);
+		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("hinstDLL"),   t_rawptr, false, true);
+		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
+		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
+	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
 		name = str_lit("mainCRTStartup");
 	} else {
+		has_args = true;
 		array_init(&params->Tuple.variables, permanent_allocator(), 2);
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
@@ -787,7 +797,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 
 	lb_begin_procedure_body(p);
 
-	{ // initialize `runtime.args__`
+	if (has_args) { // initialize `runtime.args__`
 		lbValue argc = {LLVMGetParam(p->value, 0), t_i32};
 		lbValue argv = {LLVMGetParam(p->value, 1), t_ptr_cstring};
 		LLVMSetValueName2(argc.value, "argc", 4);
@@ -857,7 +867,13 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		}
 	}
 
-	LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
+
+
+	if (is_dll_main) {
+		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 1, false));
+	} else {
+		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
+	}
 
 	lb_end_procedure_body(p);
 
