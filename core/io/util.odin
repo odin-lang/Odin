@@ -1,6 +1,24 @@
 package io
 
+import "core:mem"
 import "core:strconv"
+
+
+read_ptr :: proc(r: Reader, p: rawptr, byte_size: int) -> (n: int, err: Error) {
+	return read(r, mem.byte_slice(p, byte_size));
+}
+
+write_ptr :: proc(w: Writer, p: rawptr, byte_size: int) -> (n: int, err: Error) {
+	return write(w, mem.byte_slice(p, byte_size));
+}
+
+read_ptr_at :: proc(r: Reader_At, p: rawptr, byte_size: int, offset: i64) -> (n: int, err: Error) {
+	return read_at(r, mem.byte_slice(p, byte_size), offset);
+}
+
+write_ptr_at :: proc(w: Writer_At, p: rawptr, byte_size: int, offset: i64) -> (n: int, err: Error) {
+	return write_at(w, mem.byte_slice(p, byte_size), offset);
+}
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10) -> (n: int, err: Error) {
 	buf: [32]byte;
