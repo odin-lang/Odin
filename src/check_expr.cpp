@@ -3860,10 +3860,29 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 				}
 			}
 
+			Type *original_type = operand->type;
+			Type *array_type = base_type(type_deref(original_type));
+			GB_ASSERT(array_type->kind == Type_Array);
+			i64 array_count = array_type->Array.count;
+			for (u8 i = 0; i < index_count; i++) {
+				u8 idx = indices>>(i*2) & 3;
+				if (idx >= array_count) {
+					char c = 0;
+					if (found_xyzw) {
+						c = swizzles_xyzw[idx];
+					} else if (found_rgba) {
+						c = swizzles_rgba[idx];
+					} else {
+						GB_PANIC("unknown swizzle kind");
+					}
+					error(selector->Ident.token, "Swizzle value is out of bounds, got %c, max count %lld", c, array_count);
+					break;
+				}
+			}
+
 			se->swizzle_count = index_count;
 			se->swizzle_indices = indices;
 
-			Type *original_type = operand->type;
 
 			AddressingMode prev_mode = operand->mode;
 			operand->mode = Addressing_SwizzleValue;
