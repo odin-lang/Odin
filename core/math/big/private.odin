@@ -531,59 +531,59 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 /*
 	Binary split factorial algo due to: http://www.luschny.de/math/factorial/binarysplitfact.html
 */
-_private_int_factorial_binary_split :: proc(res: ^Int, n: int) -> (err: Error) {
+_private_int_factorial_binary_split :: proc(res: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
 
 	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(inner, outer, start, stop, temp);
+	defer internal_destroy(inner, outer, start, stop, temp);
 
-	if err = set(inner, 1); err != nil { return err; }
-	if err = set(outer, 1); err != nil { return err; }
+	if err = internal_one(inner, false, allocator); err != nil { return err; }
+	if err = internal_one(outer, false, allocator); err != nil { return err; }
 
 	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
 
 	for i := bits_used; i >= 0; i -= 1 {
 		start := (n >> (uint(i) + 1)) + 1 | 1;
 		stop  := (n >> uint(i)) + 1 | 1;
-		if err = _private_int_recursive_product(temp, start, stop); err != nil { return err; }
-		if err = internal_mul(inner, inner, temp);                   err != nil { return err; }
-		if err = internal_mul(outer, outer, inner);                  err != nil { return err; }
+		if err = _private_int_recursive_product(temp, start, stop, 0, allocator); err != nil { return err; }
+		if err = internal_mul(inner, inner, temp, allocator);                   err != nil { return err; }
+		if err = internal_mul(outer, outer, inner, allocator);                  err != nil { return err; }
 	}
 	shift := n - intrinsics.count_ones(n);
 
-	return shl(res, outer, int(shift));
+	return internal_shl(res, outer, int(shift), allocator);
 }
 
 /*
 	Recursive product used by binary split factorial algorithm.
 */
-_private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int(0)) -> (err: Error) {
+_private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int(0), allocator := context.allocator) -> (err: Error) {
 	t1, t2 := &Int{}, &Int{};
-	defer destroy(t1, t2);
+	defer internal_destroy(t1, t2);
 
 	if level > FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS { return .Max_Iterations_Reached; }
 
 	num_factors := (stop - start) >> 1;
 	if num_factors == 2 {
-		if err = set(t1, start); err != nil { return err; }
+		if err = internal_set(t1, start, false, allocator); err != nil { return err; }
 		when true {
-			if err = grow(t2, t1.used + 1); err != nil { return err; }
-			if err = internal_add(t2, t1, 2); err != nil { return err; }
+			if err = internal_grow(t2, t1.used + 1, false, allocator); err != nil { return err; }
+			if err = internal_add(t2, t1, 2, allocator); err != nil { return err; }
 		} else {
 			if err = add(t2, t1, 2); err != nil { return err; }
 		}
-		return internal_mul(res, t1, t2);
+		return internal_mul(res, t1, t2, allocator);
 	}
 
 	if num_factors > 1 {
 		mid := (start + num_factors) | 1;
-		if err = _private_int_recursive_product(t1, start,  mid, level + 1); err != nil { return err; }
-		if err = _private_int_recursive_product(t2,   mid, stop, level + 1); err != nil { return err; }
-		return internal_mul(res, t1, t2);
+		if err = _private_int_recursive_product(t1, start,  mid, level + 1, allocator); err != nil { return err; }
+		if err = _private_int_recursive_product(t2,   mid, stop, level + 1, allocator); err != nil { return err; }
+		return internal_mul(res, t1, t2, allocator);
 	}
 
-	if num_factors == 1 { return #force_inline set(res, start); }
+	if num_factors == 1 { return #force_inline internal_set(res, start, true, allocator); }
 
-	return #force_inline set(res, 1);
+	return #force_inline internal_one(res, true, allocator);
 }
 
 /*
