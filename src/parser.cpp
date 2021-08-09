@@ -1548,6 +1548,15 @@ void expect_semicolon(AstFile *f, Ast *s) {
 		expect_semicolon_newline_error(f, f->prev_token, s);
 		return;
 	}
+	switch (f->curr_token.kind) {
+	case Token_CloseBrace:
+	case Token_CloseParen:
+		if (f->curr_token.pos.line == f->prev_token.pos.line) {
+			return;
+		}
+		break;
+	}
+
 	prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
 		expect_semicolon_newline_error(f, f->prev_token, s);
@@ -1557,6 +1566,8 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
+
+
 
 	if (s != nullptr) {
 		bool insert_semi = (f->tokenizer.flags & TokenizerFlag_InsertSemicolon) != 0;
@@ -3926,7 +3937,7 @@ Ast *parse_return_stmt(AstFile *f) {
 
 	auto results = array_make<Ast *>(heap_allocator());
 
-	while (f->curr_token.kind != Token_Semicolon) {
+	while (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
 		Ast *arg = parse_expr(f, false);
 		array_add(&results, arg);
 		if (f->curr_token.kind != Token_Comma ||
