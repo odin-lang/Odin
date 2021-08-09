@@ -21,7 +21,7 @@ package big
 	High-level addition. Handles sign.
 */
 int_add :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	if dest == nil || a == nil || b == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, a, b);
 	if err = clear_if_uninitialized(dest, a, b); err != nil { return err; }
 	/*
 		All parameters have been initialized.
@@ -36,7 +36,7 @@ int_add :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error
 	dest = a + digit;
 */
 int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
-	if dest == nil || a == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, a);
 	if err = clear_if_uninitialized(a); err != nil { return err; }
 	/*
 		Grow destination as required.
@@ -53,7 +53,7 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocato
 	High-level subtraction, dest = number - decrease. Handles signs.
 */
 int_sub :: proc(dest, number, decrease: ^Int, allocator := context.allocator) -> (err: Error) {
-	if dest == nil || number == nil || decrease == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, number, decrease);
 	if err = clear_if_uninitialized(dest, number, decrease); err != nil { return err; }
 	/*
 		All parameters have been initialized.
@@ -68,7 +68,7 @@ int_sub :: proc(dest, number, decrease: ^Int, allocator := context.allocator) ->
 	dest = a - digit;
 */
 int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
-	if dest == nil || a == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, a);
 	if err = clear_if_uninitialized(a); err != nil { return err; }
 	/*
 		Grow destination as required.
@@ -86,7 +86,7 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocato
 	dest = src >> 1
 */
 int_halve :: proc(dest, src: ^Int) -> (err: Error) {
-	if dest == nil || src == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, src);
 	if err = clear_if_uninitialized(dest, src); err != nil { return err; }
 	/*
 		Grow destination as required.
@@ -103,7 +103,7 @@ shr1  :: halve;
 	dest = src << 1
 */
 int_double :: proc(dest, src: ^Int) -> (err: Error) {
-	if dest == nil || src == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, src);
 	if err = clear_if_uninitialized(dest, src); err != nil { return err; }
 	/*
 		Grow destination as required.
@@ -119,7 +119,7 @@ shl1   :: double;
 	Multiply by a DIGIT.
 */
 int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.allocator) -> (err: Error) {
-	if dest == nil || src == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, src);
 	if err = clear_if_uninitialized(src, dest); err != nil { return err; }
 
 	return #force_inline internal_int_mul_digit(dest, src, multiplier, allocator);
@@ -129,7 +129,7 @@ int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.a
 	High level multiplication (handles sign).
 */
 int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> (err: Error) {
-	if dest == nil || src == nil || multiplier == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, src, multiplier);
 	if err = clear_if_uninitialized(dest, src, multiplier); err != nil { return err; }
 
 	return #force_inline internal_int_mul(dest, src, multiplier, allocator);
@@ -154,7 +154,7 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: E
 }
 
 int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
-	if quotient == nil { return 0, .Invalid_Pointer; };
+	assert_if_nil(quotient, numerator);
 	if err = clear_if_uninitialized(numerator); err != nil { return 0, err; }
 
 	return #force_inline internal_divmod(quotient, numerator, denominator);
@@ -162,14 +162,14 @@ int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (rema
 divmod :: proc{ int_divmod, int_divmod_digit, };
 
 int_div :: proc(quotient, numerator, denominator: ^Int) -> (err: Error) {
-	if quotient == nil { return .Invalid_Pointer; };
+	assert_if_nil(quotient, numerator, denominator);
 	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
 
 	return #force_inline internal_divmod(quotient, nil, numerator, denominator);
 }
 
 int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (err: Error) {
-	if quotient == nil { return .Invalid_Pointer; };
+	assert_if_nil(quotient, numerator);
 	if err = clear_if_uninitialized(numerator); err != nil { return err; }
 
 	remainder: DIGIT;
@@ -184,7 +184,7 @@ div :: proc { int_div, int_div_digit, };
 	denominator < remainder <= 0 if denominator < 0
 */
 int_mod :: proc(remainder, numerator, denominator: ^Int) -> (err: Error) {
-	if remainder == nil { return .Invalid_Pointer; };
+	assert_if_nil(remainder, numerator, denominator);
 	if err = clear_if_uninitialized(numerator, denominator); err != nil { return err; }
 
 	return #force_inline internal_int_mod(remainder, numerator, denominator);
@@ -200,7 +200,7 @@ mod :: proc { int_mod, int_mod_digit, };
 	remainder = (number + addend) % modulus.
 */
 int_addmod :: proc(remainder, number, addend, modulus: ^Int) -> (err: Error) {
-	if remainder == nil { return .Invalid_Pointer; };
+	assert_if_nil(remainder, number, addend);
 	if err = clear_if_uninitialized(number, addend, modulus); err != nil { return err; }
 
 	return #force_inline internal_addmod(remainder, number, addend, modulus);
@@ -211,7 +211,7 @@ addmod :: proc { int_addmod, };
 	remainder = (number - decrease) % modulus.
 */
 int_submod :: proc(remainder, number, decrease, modulus: ^Int) -> (err: Error) {
-	if remainder == nil { return .Invalid_Pointer; };
+	assert_if_nil(remainder, number, decrease);
 	if err = clear_if_uninitialized(number, decrease, modulus); err != nil { return err; }
 
 	return #force_inline internal_submod(remainder, number, decrease, modulus);
@@ -222,7 +222,7 @@ submod :: proc { int_submod, };
 	remainder = (number * multiplicand) % modulus.
 */
 int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int) -> (err: Error) {
-	if remainder == nil { return .Invalid_Pointer; };
+	assert_if_nil(remainder, number, multiplicand);
 	if err = clear_if_uninitialized(number, multiplicand, modulus); err != nil { return err; }
 
 	return #force_inline internal_mulmod(remainder, number, multiplicand, modulus);
@@ -233,7 +233,7 @@ mulmod :: proc { int_mulmod, };
 	remainder = (number * number) % modulus.
 */
 int_sqrmod :: proc(remainder, number, modulus: ^Int) -> (err: Error) {
-	if remainder == nil { return .Invalid_Pointer; };
+	assert_if_nil(remainder, number, modulus);
 	if err = clear_if_uninitialized(number, modulus); err != nil { return err; }
 
 	return #force_inline internal_sqrmod(remainder, number, modulus);
@@ -243,7 +243,7 @@ sqrmod :: proc { int_sqrmod, };
 
 int_factorial :: proc(res: ^Int, n: int) -> (err: Error) {
 	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument; }
-	if res == nil { return .Invalid_Pointer; }
+	assert_if_nil(res);
 
 	return #force_inline internal_int_factorial(res, n);
 }
@@ -266,7 +266,7 @@ factorial :: proc { int_factorial, };
 
 */
 int_choose_digit :: proc(res: ^Int, n, k: int) -> (err: Error) {
-	if res == nil  { return .Invalid_Pointer; }
+	assert_if_nil(res);
 	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument; }
 
 	if k > n { return zero(res); }
@@ -291,10 +291,12 @@ choose :: proc { int_choose_digit, };
 /*
 	Function computing both GCD and (if target isn't `nil`) also LCM.
 */
-int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
+int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	if res_gcd == nil && res_lcm == nil { return nil; }
-	if err = clear_if_uninitialized(res_gcd, res_lcm, a, b); err != nil { return err; }
+	assert_if_nil(a, b);
 
+	if err = clear_if_uninitialized(a, allocator); err != nil { return err; }
+	if err = clear_if_uninitialized(b, allocator); err != nil { return err; }
 	return #force_inline internal_int_gcd_lcm(res_gcd, res_lcm, a, b);
 }
 gcd_lcm :: proc { int_gcd_lcm, };
@@ -319,7 +321,8 @@ lcm :: proc { int_lcm, };
 	remainder = numerator % (1 << bits)
 */
 int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
-	if remainder == nil || numerator == nil { return .Invalid_Pointer; }
+	assert_if_nil(remainder, numerator);
+
 	if err = clear_if_uninitialized(remainder, numerator); err != nil { return err; }
 	if bits  < 0 { return .Invalid_Argument; }
 
@@ -333,7 +336,7 @@ mod_bits :: proc { int_mod_bits, };
 	Logs and roots and such.
 */
 int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
-	if a == nil { return 0, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
 
 	return #force_inline internal_int_log(a, base);
@@ -348,7 +351,7 @@ log :: proc { int_log, digit_log, };
 	Calculate `dest = base^power` using a square-multiply algorithm.
 */
 int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
-	if dest == nil || base == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, base);
 	if err = clear_if_uninitialized(dest, base); err != nil { return err; }
 
 	return #force_inline internal_int_pow(dest, base, power);
@@ -358,7 +361,7 @@ int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 	Calculate `dest = base^power` using a square-multiply algorithm.
 */
 int_pow_int :: proc(dest: ^Int, base, power: int) -> (err: Error) {
-	if dest == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest);
 
 	return #force_inline internal_pow(dest, base, power);
 }
@@ -374,7 +377,7 @@ small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
 	This function is less generic than `root_n`, simpler and faster.
 */
 int_sqrt :: proc(dest, src: ^Int) -> (err: Error) {
-	if dest == nil || src == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, src);
 	if err = clear_if_uninitialized(dest, src);	err != nil { return err; }
 
 	return #force_inline internal_int_sqrt(dest, src);
@@ -395,7 +398,7 @@ int_root_n :: proc(dest, src: ^Int, n: int) -> (err: Error) {
 	*/
 	if n == 2 { return sqrt(dest, src); }
 
-	if dest == nil || src == nil { return .Invalid_Pointer; }
+	assert_if_nil(dest, src);
 	/*
 		Initialize dest + src if needed.
 	*/
@@ -416,35 +419,35 @@ int_is_initialized :: proc(a: ^Int) -> bool {
 }
 
 int_is_zero :: proc(a: ^Int) -> (zero: bool, err: Error) {
-	if a == nil { return false, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return false, err; }
 
 	return #force_inline internal_is_zero(a), nil;
 }
 
 int_is_positive :: proc(a: ^Int) -> (positive: bool, err: Error) {
-	if a == nil { return false, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return false, err; }
 
 	return #force_inline internal_is_positive(a), nil;
 }
 
 int_is_negative :: proc(a: ^Int) -> (negative: bool, err: Error) {
-	if a == nil { return false, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return false, err; }
 
 	return #force_inline internal_is_negative(a), nil;
 }
 
 int_is_even :: proc(a: ^Int) -> (even: bool, err: Error) {
-	if a == nil { return false, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return false, err; }
 
 	return #force_inline internal_is_even(a), nil;
 }
 
 int_is_odd :: proc(a: ^Int) -> (odd: bool, err: Error) {
-	if a == nil { return false, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return false, err; }
 
 	return #force_inline internal_is_odd(a), nil;
@@ -455,7 +458,7 @@ platform_int_is_power_of_two :: #force_inline proc(a: int) -> bool {
 }
 
 int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
-	if a == nil { return false, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return false, err; }
 
 	return #force_inline internal_is_power_of_two(a), nil;
@@ -465,7 +468,7 @@ int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
 	Compare two `Int`s, signed.
 */
 int_compare :: proc(a, b: ^Int) -> (comparison: int, err: Error) {
-	if a == nil || b == nil { return 0, .Invalid_Pointer; }
+	assert_if_nil(a, b);
 	if err = clear_if_uninitialized(a, b); err != nil {	return 0, err; }
 
 	return #force_inline internal_cmp(a, b), nil;
@@ -476,7 +479,7 @@ int_cmp :: int_compare;
 	Compare an `Int` to an unsigned number upto the size of the backing type.
 */
 int_compare_digit :: proc(a: ^Int, b: DIGIT) -> (comparison: int, err: Error) {
-	if a == nil { return 0, .Invalid_Pointer; }
+	assert_if_nil(a);
 	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
 
 	return #force_inline internal_cmp_digit(a, b), nil;
@@ -487,7 +490,7 @@ int_cmp_digit :: int_compare_digit;
 	Compare the magnitude of two `Int`s, unsigned.
 */
 int_compare_magnitude :: proc(a, b: ^Int) -> (res: int, err: Error) {
-	if a == nil || b == nil { return 0, .Invalid_Pointer; }
+	assert_if_nil(a, b);
 	if err = clear_if_uninitialized(a, b); err != nil { return 0, err; }
 
 	return #force_inline internal_cmp_mag(a, b), nil;

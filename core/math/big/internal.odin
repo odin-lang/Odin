@@ -1850,10 +1850,6 @@ internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WOR
 	Assumes `a` not to be `nil`, and to have already been initialized.
 */
 internal_int_shrink :: proc(a: ^Int) -> (err: Error) {
-	if a == nil {
-		return .Invalid_Pointer;
-	}
-
 	needed := max(_MIN_DIGIT_COUNT, a.used);
 
 	if a.used != needed {
@@ -1864,9 +1860,6 @@ internal_int_shrink :: proc(a: ^Int) -> (err: Error) {
 internal_shrink :: proc { internal_int_shrink, };
 
 internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := context.allocator) -> (err: Error) {
-	if a == nil {
-		return .Invalid_Pointer;
-	}
 	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
 
 	/*
@@ -1899,12 +1892,9 @@ internal_grow :: proc { internal_int_grow, };
 
 /*
 	Clear `Int` and resize it to the default size.
+	Assumes `a` not to be `nil`.
 */
 internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if a == nil {
-		return .Invalid_Pointer;
-	}
-
 	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
 	if raw.cap != 0 {
 		mem.zero_slice(a.digit[:a.used]);
@@ -1912,7 +1902,7 @@ internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allo
 	a.sign = .Zero_or_Positive;
 	a.used = 0;
 
-	return grow(a, a.used, minimize, allocator);
+	return #force_inline internal_grow(a, a.used, minimize, allocator);
 }
 internal_clear :: proc { internal_int_clear, };
 internal_zero  :: internal_clear;
@@ -1967,9 +1957,7 @@ internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allo
 	/*
 		Check that `a` is usable.
 	*/
-	if a == nil {
-		return .Invalid_Pointer;
-	}
+	assert_if_nil(a);
 
 	if power < 0 || power > _MAX_BIT_COUNT {
 		return .Invalid_Argument;
@@ -2142,7 +2130,7 @@ internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0; // We shouldn't get here.
 }
 
-internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil) -> (err: Error) {
+internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
 	bits := bits;
 
 	if bits <= 0 { return .Invalid_Argument; }
@@ -2154,7 +2142,7 @@ internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil) -> (err: Er
 		digits += 1;
 	}
 
-	if err = grow(dest, digits); err != nil { return err; }
+	if err = grow(dest, digits, true, allocator); err != nil { return err; }
 
 	for i := 0; i < digits; i += 1 {
 		dest.digit[i] = int_random_digit(r) & _MASK;
@@ -2176,17 +2164,15 @@ internal_assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 
 internal_clear_if_uninitialized_single :: proc(arg: ^Int, allocator := context.allocator) -> (err: Error) {
 	if !internal_is_initialized(arg) {
-		if arg == nil { return nil; }
-		return internal_grow(arg, _DEFAULT_DIGIT_COUNT, true, allocator);
+		return #force_inline internal_grow(arg, _DEFAULT_DIGIT_COUNT, true, allocator);
 	}
 	return err;
 }
 
 internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocator) -> (err: Error) {
 	for i in args {
-		if i == nil { continue; }
 		if !internal_is_initialized(i) {
-			e := internal_grow(i, _DEFAULT_DIGIT_COUNT, true, allocator);
+			e := #force_inline internal_grow(i, _DEFAULT_DIGIT_COUNT, true, allocator);
 			if e != nil { err = e; }
 		}
 	}

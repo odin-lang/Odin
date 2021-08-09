@@ -41,7 +41,7 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest);
-	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest); err != nil { return err; }
 
 	return #force_inline internal_int_set_from_integer(dest, src, minimize, allocator);
 }
@@ -61,8 +61,8 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest, src);
-	if err = #force_inline internal_clear_if_uninitialized(src); err != nil { return err; }
-	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
+	if err = #force_inline internal_clear_if_uninitialized(src, allocator); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);               err != nil { return err; }
 
 	return #force_inline internal_int_copy(dest, src, minimize, allocator);
 }
@@ -87,8 +87,8 @@ int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest, src);
-	if err = #force_inline internal_clear_if_uninitialized(src); err != nil { return err; }
-	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
+	if err = #force_inline internal_clear_if_uninitialized(src, allocator); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);               err != nil { return err; }
 
 	return #force_inline internal_int_abs(dest, src, allocator);
 }
@@ -106,8 +106,8 @@ int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest, src);
-	if err = #force_inline internal_clear_if_uninitialized(src); err != nil { return err; }
-	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
+	if err = #force_inline internal_clear_if_uninitialized(src, allocator); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);               err != nil { return err; }
 
 	return #force_inline internal_int_neg(dest, src, allocator);
 }
@@ -116,16 +116,16 @@ neg :: proc { int_neg, };
 /*
 	Helpers to extract values from the `Int`.
 */
-int_bitfield_extract_single :: proc(a: ^Int, offset: int) -> (bit: _WORD, err: Error) {
-	return #force_inline int_bitfield_extract(a, offset, 1);
+int_bitfield_extract_single :: proc(a: ^Int, offset: int, allocator := context.allocator) -> (bit: _WORD, err: Error) {
+	return #force_inline int_bitfield_extract(a, offset, 1, allocator);
 }
 
-int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
+int_bitfield_extract :: proc(a: ^Int, offset, count: int, allocator := context.allocator) -> (res: _WORD, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a);
-	if err = #force_inline internal_clear_if_uninitialized(a); err != nil { return 0, err; }
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return {}, err; }
 
 	return #force_inline internal_int_bitfield_extract(a, offset, count);
 }
@@ -372,28 +372,13 @@ int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0; // We shouldn't get here.
 }
 
-int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil) -> (err: Error) {
-	bits := bits;
+int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(dest);
+	return #force_inline internal_int_rand(dest, bits, r, allocator);
 
-	if bits <= 0 { return .Invalid_Argument; }
-
-	digits := bits / _DIGIT_BITS;
-	bits   %= _DIGIT_BITS;
-
-	if bits > 0 {
-		digits += 1;
-	}
-
-	if err = grow(dest, digits); err != nil { return err; }
-
-	for i := 0; i < digits; i += 1 {
-		dest.digit[i] = int_random_digit(r) & _MASK;
-	}
-	if bits > 0 {
-		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1);
-	}
-	dest.used = digits;
-	return nil;
 }
 rand :: proc { int_rand, };
 
@@ -401,31 +386,28 @@ rand :: proc { int_rand, };
 	Internal helpers.
 */
 assert_initialized :: proc(a: ^Int, loc := #caller_location) {
+	assert_if_nil(a);
 	assert(is_initialized(a), "`Int` was not properly initialized.", loc);
 }
 
 zero_unused :: proc(dest: ^Int, old_used := -1) {
-	if dest == nil { return; }
+	assert_if_nil(dest);
 	if ! #force_inline is_initialized(dest) { return; }
 
-	internal_zero_unused(dest, old_used);
+	#force_inline internal_zero_unused(dest, old_used);
 }
 
-clear_if_uninitialized_single :: proc(arg: ^Int) -> (err: Error) {
-	if !is_initialized(arg) {
-		if arg == nil { return nil; }
-		return grow(arg, _DEFAULT_DIGIT_COUNT);
-	}
-	return err;
+clear_if_uninitialized_single :: proc(arg: ^Int, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(arg);
+	return #force_inline internal_clear_if_uninitialized_single(arg, allocator);
 }
 
-clear_if_uninitialized_multi :: proc(args: ..^Int) -> (err: Error) {
-	for i in args {
-		if i == nil { continue; }
-		if !is_initialized(i) {
-			e := grow(i, _DEFAULT_DIGIT_COUNT);
-			if e != nil { err = e; }
-		}
+clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocator) -> (err: Error) {
+	args := args;
+	assert_if_nil(..args);
+
+	for i in &args {
+		if err = #force_inline internal_clear_if_uninitialized_single(i, allocator); err != nil { return nil; }
 	}
 	return err;
 }
@@ -448,28 +430,33 @@ error_if_immutable :: proc {error_if_immutable_single, error_if_immutable_multi,
 	Allocates several `Int`s at once.
 */
 int_init_multi :: proc(integers: ..^Int) -> (err: Error) {
+	assert_if_nil(..integers);
+
 	integers := integers;
 	for a in &integers {
-		if err = clear(a); err != nil { return err; }
+		if err = #force_inline internal_clear(a); err != nil { return err; }
 	}
 	return nil;
 }
 
 init_multi :: proc { int_init_multi, };
 
-_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
+_copy_digits :: proc(dest, src: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
 	digits := digits;
-	if err = clear_if_uninitialized(src);  err != nil { return err; }
-	if err = clear_if_uninitialized(dest); err != nil { return err; }
+	/*
+		Check that `src` is usable and `dest` isn't immutable.
+	*/
+	assert_if_nil(dest, src);
+	if err = #force_inline internal_clear_if_uninitialized(src, allocator); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
+
 	/*
 		If dest == src, do nothing
 	*/
-	if (dest == src) {
-		return nil;
-	}
+	if (dest == src) { return nil; }
 
 	digits = min(digits, len(src.digit), len(dest.digit));
-	mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
+	#force_inline mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
 	return nil;
 }
 
@@ -479,10 +466,10 @@ _copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
 	This is used to ensure that leading zero digits are trimmed and the leading "used" digit will be non-zero.
 	Typically very fast.  Also fixes the sign if there are no more leading digits.
 */
-clamp :: proc(a: ^Int) -> (err: Error) {
-	if err = clear_if_uninitialized(a); err != nil {
-		return err;
-	}
+clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return err; }
+
 	for a.used > 0 && a.digit[a.used - 1] == 0 {
 		a.used -= 1;
 	}
@@ -492,7 +479,6 @@ clamp :: proc(a: ^Int) -> (err: Error) {
 	}
 	return nil;
 }
-
 
 /*
 	Initialize constants.
@@ -528,9 +514,6 @@ assert_if_nil :: #force_inline proc(integers: ..^Int, loc := #caller_location) {
 	integers := integers;
 
 	for i in &integers {
-		if i == nil {
-			msg := fmt.tprintf("%v(nil)", loc.procedure);
-			assert(false, msg, loc);
-		}
+		assert(i != nil, "(nil)", loc);
 	}
 }
