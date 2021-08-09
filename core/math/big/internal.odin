@@ -1740,7 +1740,7 @@ internal_abs :: proc{ internal_int_abs, internal_platform_abs, };
 /*
 	Set `dest` to `-src`.
 */
-internal_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Check that src is usable.
 	*/
@@ -1774,6 +1774,8 @@ internal_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: E
 	dest.sign = sign;
 	return nil;
 }
+internal_neg :: proc { internal_int_neg, };
+
 
 /*
 	Helpers to extract values from the `Int`.
@@ -1961,7 +1963,7 @@ internal_int_nan :: proc(a: ^Int, minimize := false, allocator := context.alloca
 }
 internal_nan :: proc { internal_int_nan, };
 
-internal_power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
+internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
@@ -1977,7 +1979,7 @@ internal_power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 		Grow to accomodate the single bit.
 	*/
 	a.used = (power / _DIGIT_BITS) + 1;
-	if err = internal_grow(a, a.used); err != nil {
+	if err = internal_grow(a, a.used, false, allocator); err != nil {
 		return err;
 	}
 	/*
@@ -2027,8 +2029,6 @@ internal_get_i32 :: proc { internal_int_get_i32, };
 	and maybe return max(T), .Integer_Overflow if not?
 */
 internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
-	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
-
 	size_in_bits := int(size_of(T) * 8);
 	i := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS);
 	i  = min(int(a.used), i);
@@ -2174,19 +2174,19 @@ internal_assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 	assert(internal_is_initialized(a), "`Int` was not properly initialized.", loc);
 }
 
-internal_clear_if_uninitialized_single :: proc(arg: ^Int) -> (err: Error) {
+internal_clear_if_uninitialized_single :: proc(arg: ^Int, allocator := context.allocator) -> (err: Error) {
 	if !internal_is_initialized(arg) {
 		if arg == nil { return nil; }
-		return internal_grow(arg, _DEFAULT_DIGIT_COUNT);
+		return internal_grow(arg, _DEFAULT_DIGIT_COUNT, true, allocator);
 	}
 	return err;
 }
 
-internal_clear_if_uninitialized_multi :: proc(args: ..^Int) -> (err: Error) {
+internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocator) -> (err: Error) {
 	for i in args {
 		if i == nil { continue; }
 		if !internal_is_initialized(i) {
-			e := internal_grow(i, _DEFAULT_DIGIT_COUNT);
+			e := internal_grow(i, _DEFAULT_DIGIT_COUNT, true, allocator);
 			if e != nil { err = e; }
 		}
 	}
