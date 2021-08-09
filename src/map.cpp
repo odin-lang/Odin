@@ -21,7 +21,7 @@ GB_STATIC_ASSERT(gb_size_of(u64) >= gb_size_of(void *));
 
 gb_inline HashKey hashing_proc(void const *data, isize len) {
 	HashKey h = {};
-	h.key = gb_fnv64a(data, len);
+	h.key = fnv64a(data, len);
 	return h;
 }
 
