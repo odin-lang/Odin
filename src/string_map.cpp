@@ -10,16 +10,15 @@ struct StringHashKey {
 	String string;
 };
 
-StringHashKey string_hashing_proc(void const *data, isize len) {
-	StringHashKey h = {};
-	h.hash = gb_fnv64a(data, len);
-	h.string.text = (u8 *)data;
-	h.string.len = len;
-	return h;
+u64 string_hashing_proc(void const *data, isize len) {
+	return fnv64a(data, len);
 }
 
 gb_inline StringHashKey string_hash_string(String const &s) {
-	return string_hashing_proc(s.text, s.len);
+	StringHashKey hash_key = {};
+	hash_key.hash = string_hashing_proc(s.text, s.len);
+	hash_key.string = s;
+	return hash_key;
 }
 
 
