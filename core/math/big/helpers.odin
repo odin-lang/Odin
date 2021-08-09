@@ -12,6 +12,7 @@ package big
 import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
+import "core:fmt"
 
 /*
 	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
@@ -24,14 +25,9 @@ int_destroy :: proc(integers: ..^Int) {
 	integers := integers;
 
 	for a in &integers {
-		assert(a != nil, "int_destroy(nil)");
-		mem.zero_slice(a.digit[:]);
-		raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-		if raw.cap > 0 {
-			free(&a.digit[0]);
-		}
-		a = &Int{};
+		assert_if_nil(a);
 	}
+	#force_inline internal_int_destroy(..integers);
 }
 
 /*
@@ -41,22 +37,13 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 	where intrinsics.type_is_integer(T) {
 	src := src;
 
-	if err = error_if_immutable(dest); err != nil { return err; }
-	if err = clear_if_uninitialized(dest); err != nil { return err; }
+	/*
+		Check that `src` is usable and `dest` isn't immutable.
+	*/
+	assert_if_nil(dest);
+	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
 
-	dest.flags = {}; // We're not -Inf, Inf, NaN or Immutable.
-
-	dest.used  = 0;
-	dest.sign = .Zero_or_Positive if src >= 0 else .Negative;
-	src = abs(src);
-
-	for src != 0 {
-		dest.digit[dest.used] = DIGIT(src) & _MASK;
-		dest.used += 1;
-		src >>= _DIGIT_BITS;
-	}
-	zero_unused(dest);
-	return nil;
+	return #force_inline internal_int_set_from_integer(dest, src, minimize, allocator);
 }
 
 set :: proc { int_set_from_integer, int_copy };
@@ -70,31 +57,14 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 	*/
 	if (dest == src) { return nil; }
 
-	if err = error_if_immutable(dest);    err != nil { return err; }
-	if err = clear_if_uninitialized(src); err != nil { return err; }
-
 	/*
-		Grow `dest` to fit `src`.
-		If `dest` is not yet initialized, it will be using `allocator`.
+		Check that `src` is usable and `dest` isn't immutable.
 	*/
-	needed := src.used if minimize else max(src.used, _DEFAULT_DIGIT_COUNT);
+	assert_if_nil(dest, src);
+	if err = #force_inline internal_clear_if_uninitialized(src); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
 
-	if err = grow(dest, needed, minimize, allocator); err != nil {
-		return err;
-	}
-
-	/*
-		Copy everything over and zero high digits.
-	*/
-	for v, i in src.digit[:src.used] {
-		dest.digit[i] = v;
-	}
-	dest.used  = src.used;
-	dest.sign  = src.sign;
-	dest.flags = src.flags &~ {.Immutable};
-
-	zero_unused(dest);
-	return nil;
+	return #force_inline internal_int_copy(dest, src, minimize, allocator);
 }
 copy :: proc { int_copy, };
 
@@ -104,11 +74,8 @@ copy :: proc { int_copy, };
 	This helper swaps completely.
 */
 int_swap :: proc(a, b: ^Int) {
-	a := a; b := b;
-
-	a.used,  b.used  = b.used,  a.used;
-	a.sign,  b.sign  = b.sign,  a.sign;
-	a.digit, b.digit = b.digit, a.digit;
+	assert_if_nil(a, b);
+	#force_inline internal_swap(a, b);
 }
 swap :: proc { int_swap, };
 
@@ -117,189 +84,72 @@ swap :: proc { int_swap, };
 */
 int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
-		Check that src is usable.
+		Check that `src` is usable and `dest` isn't immutable.
 	*/
-	if err = clear_if_uninitialized(src); err != nil {
-		return err;
-	}
-	/*
-		If `dest == src`, just fix `dest`'s sign.
-	*/
-	if (dest == src) {
-		dest.sign = .Zero_or_Positive;
-		return nil;
-	}
+	assert_if_nil(dest, src);
+	if err = #force_inline internal_clear_if_uninitialized(src); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
 
-	/*
-		Copy `src` to `dest`
-	*/
-	if err = copy(dest, src, false, allocator); err != nil {
-		return err;
-	}
-
-	/*
-		Fix sign.
-	*/
-	dest.sign = .Zero_or_Positive;
-	return nil;
+	return #force_inline internal_int_abs(dest, src, allocator);
 }
 
 platform_abs :: proc(n: $T) -> T where intrinsics.type_is_integer(T) {
 	return n if n >= 0 else -n;
 }
-abs :: proc{int_abs, platform_abs};
+abs :: proc{ int_abs, platform_abs, };
 
 /*
 	Set `dest` to `-src`.
 */
-neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	/*
-		Check that src is usable.
+		Check that `src` is usable and `dest` isn't immutable.
 	*/
-	if err = clear_if_uninitialized(src); err != nil {
-		return err;
-	}
-	/*
-		If `dest == src`, just fix `dest`'s sign.
-	*/
-	sign := Sign.Zero_or_Positive;
-	if z, _ := is_zero(src); z {
-		sign = .Negative;
-	}
-	if n, _ := is_neg(src); n {
-		sign = .Negative;
-	}
-	if (dest == src) {
-		dest.sign = sign;
-		return nil;
-	}
-	/*
-		Copy `src` to `dest`
-	*/
-	if err = copy(dest, src, false, allocator); err != nil {
-		return err;
-	}
+	assert_if_nil(dest, src);
+	if err = #force_inline internal_clear_if_uninitialized(src); err != nil { return err; }
+	if err = #force_inline internal_error_if_immutable(dest);    err != nil { return err; }
 
-	/*
-		Fix sign.
-	*/
-	dest.sign = sign;
-	return nil;
+	return #force_inline internal_int_neg(dest, src, allocator);
 }
+neg :: proc { int_neg, };
 
 /*
 	Helpers to extract values from the `Int`.
 */
 int_bitfield_extract_single :: proc(a: ^Int, offset: int) -> (bit: _WORD, err: Error) {
-	return int_bitfield_extract(a, offset, 1);
+	return #force_inline int_bitfield_extract(a, offset, 1);
 }
 
 int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
-	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
-	/*
-		Early out for single bit.
-	*/
-	if count == 1 {
-		limb := offset / _DIGIT_BITS;
-		if limb < 0 || limb >= a.used  { return 0, .Invalid_Argument; }
-		i := _WORD(1 << _WORD((offset % _DIGIT_BITS)));
-		return 1 if ((_WORD(a.digit[limb]) & i) != 0) else 0, nil;
-	}
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a); err != nil { return 0, err; }
 
-	if count > _WORD_BITS || count < 1 { return 0, .Invalid_Argument; }
-
-	/*
-		There are 3 possible cases.
-		-	[offset:][:count] covers 1 DIGIT,
-				e.g. offset:  0, count:  60 = bits 0..59
-		-	[offset:][:count] covers 2 DIGITS,
-				e.g. offset:  5, count:  60 = bits 5..59, 0..4
-				e.g. offset:  0, count: 120 = bits 0..59, 60..119
-		-	[offset:][:count] covers 3 DIGITS,
-				e.g. offset: 40, count: 100 = bits 40..59, 0..59, 0..19
-				e.g. offset: 40, count: 120 = bits 40..59, 0..59, 0..39
-	*/
-
-	limb        := offset / _DIGIT_BITS;
-	bits_left   := count;
-	bits_offset := offset % _DIGIT_BITS;
-
-	num_bits    := min(bits_left, _DIGIT_BITS - bits_offset);
-
-	shift       := offset % _DIGIT_BITS;
-	mask        := (_WORD(1) << uint(num_bits)) - 1;
-	res          = (_WORD(a.digit[limb]) >> uint(shift)) & mask;
-
-	bits_left -= num_bits;
-	if bits_left == 0 { return res, nil; }
-
-	res_shift := num_bits;
-	num_bits   = min(bits_left, _DIGIT_BITS);
-	mask       = (1 << uint(num_bits)) - 1;
-
-	res |= (_WORD(a.digit[limb + 1]) & mask) << uint(res_shift);
-
-	bits_left -= num_bits;
-	if bits_left == 0 { return res, nil; }
-
-	mask     = (1 << uint(bits_left)) - 1;
-	res_shift += _DIGIT_BITS;
-
-	res |= (_WORD(a.digit[limb + 2]) & mask) << uint(res_shift);
-
-	return res, nil;
+	return #force_inline internal_int_bitfield_extract(a, offset, count);
 }
 
 /*
 	Resize backing store.
 */
 shrink :: proc(a: ^Int) -> (err: Error) {
-	if a == nil {
-		return .Invalid_Pointer;
-	}
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a); err != nil { return err; }
 
-	needed := max(_MIN_DIGIT_COUNT, a.used);
-
-	if a.used != needed {
-		return grow(a, needed);
-	}
-	return nil;
+	return #force_inline internal_shrink(a);
 }
 
 int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := context.allocator) -> (err: Error) {
-	if a == nil {
-		return .Invalid_Pointer;
-	}
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
 
-	/*
-		We need at least _MIN_DIGIT_COUNT or a.used digits, whichever is bigger.
-		The caller is asking for `digits`. Let's be accomodating.
-	*/
-	needed := max(_MIN_DIGIT_COUNT, a.used, digits);
-	if !allow_shrink {
-		needed = max(needed, raw.cap);
-	}
-
-	/*
-		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
-		Otherwise, `[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
-	*/
-	if raw.cap == 0 {
-		a.digit = mem.make_dynamic_array_len_cap([dynamic]DIGIT, needed, needed, allocator);
-	} else if raw.cap != needed {
-		resize(&a.digit, needed);
-	}
-	/*
-		Let's see if the allocation/resize worked as expected.
-	*/
-	if len(a.digit) != needed {
-		return .Out_Of_Memory;
-	}
-	return nil;
+	return #force_inline internal_int_grow(a, digits, allow_shrink, allocator);
 }
 grow :: proc { int_grow, };
 
@@ -307,18 +157,12 @@ grow :: proc { int_grow, };
 	Clear `Int` and resize it to the default size.
 */
 int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	if a == nil {
-		return .Invalid_Pointer;
-	}
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
 
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-	if raw.cap != 0 {
-		mem.zero_slice(a.digit[:a.used]);
-	}
-	a.sign = .Zero_or_Positive;
-	a.used = 0;
-
-	return grow(a, a.used, minimize, allocator);
+	return #force_inline internal_int_clear(a, minimize, allocator);
 }
 clear :: proc { int_clear, };
 zero  :: clear;
@@ -327,7 +171,12 @@ zero  :: clear;
 	Set the `Int` to 1 and optionally shrink it to the minimum backing size.
 */
 int_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return copy(a, INT_ONE, minimize, allocator);
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
+	return #force_inline internal_one(a, minimize, allocator);
 }
 one :: proc { int_one, };
 
@@ -335,7 +184,12 @@ one :: proc { int_one, };
 	Set the `Int` to -1 and optionally shrink it to the minimum backing size.
 */
 int_minus_one :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	return set(a, -1, minimize, allocator);
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
+	return #force_inline internal_minus_one(a, minimize, allocator);
 }
 minus_one :: proc { int_minus_one, };
 
@@ -343,9 +197,12 @@ minus_one :: proc { int_minus_one, };
 	Set the `Int` to Inf and optionally shrink it to the minimum backing size.
 */
 int_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	err = set(a, 1, minimize, allocator);
-	a.flags |= { .Inf, };
-	return err;
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
+	return #force_inline internal_inf(a, minimize, allocator);
 }
 inf :: proc { int_inf, };
 
@@ -353,9 +210,12 @@ inf :: proc { int_inf, };
 	Set the `Int` to -Inf and optionally shrink it to the minimum backing size.
 */
 int_minus_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	err = set(a, -1, minimize, allocator);
-	a.flags |= { .Inf, };
-	return err;
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
+	return #force_inline internal_minus_inf(a, minimize, allocator);
 }
 minus_inf :: proc { int_inf, };
 
@@ -363,69 +223,80 @@ minus_inf :: proc { int_inf, };
 	Set the `Int` to NaN and optionally shrink it to the minimum backing size.
 */
 int_nan :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	err = set(a, 1, minimize, allocator);
-	a.flags |= { .NaN, };
-	return err;
-}
-nan :: proc { int_nan, };
-
-power_of_two :: proc(a: ^Int, power: int) -> (err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
-	if a == nil {
-		return .Invalid_Pointer;
-	}
+	assert_if_nil(a);
 
-	if power < 0 || power > _MAX_BIT_COUNT {
-		return .Invalid_Argument;
-	}
+	return #force_inline internal_nan(a, minimize, allocator);
+}
+nan :: proc { int_nan, };
 
+power_of_two :: proc(a: ^Int, power: int, allocator := context.allocator) -> (err: Error) {
 	/*
-		Grow to accomodate the single bit.
+		Check that `a` is usable.
 	*/
-	a.used = (power / _DIGIT_BITS) + 1;
-	if err = grow(a, a.used); err != nil {
-		return err;
-	}
-	/*
-		Zero the entirety.
-	*/
-	mem.zero_slice(a.digit[:]);
+	assert_if_nil(a);
 
-	/*
-		Set the bit.
-	*/
-	a.digit[power / _DIGIT_BITS] = 1 << uint((power % _DIGIT_BITS));
-	return nil;
+	return #force_inline internal_int_power_of_two(a, power, allocator);
 }
 
 int_get_u128 :: proc(a: ^Int) -> (res: u128, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
 	return int_get(a, u128);
 }
 get_u128 :: proc { int_get_u128, };
 
 int_get_i128 :: proc(a: ^Int) -> (res: i128, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
 	return int_get(a, i128);
 }
 get_i128 :: proc { int_get_i128, };
 
 int_get_u64 :: proc(a: ^Int) -> (res: u64, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
 	return int_get(a, u64);
 }
 get_u64 :: proc { int_get_u64, };
 
 int_get_i64 :: proc(a: ^Int) -> (res: i64, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
 	return int_get(a, i64);
 }
 get_i64 :: proc { int_get_i64, };
 
 int_get_u32 :: proc(a: ^Int) -> (res: u32, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
 	return int_get(a, u32);
 }
 get_u32 :: proc { int_get_u32, };
 
 int_get_i32 :: proc(a: ^Int) -> (res: i32, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+
 	return int_get(a, i32);
 }
 get_i32 :: proc { int_get_i32, };
@@ -434,101 +305,52 @@ get_i32 :: proc { int_get_i32, };
 	TODO: Think about using `count_bits` to check if the value could be returned completely,
 	and maybe return max(T), .Integer_Overflow if not?
 */
-int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
-	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
+int_get :: proc(a: ^Int, $T: typeid, allocator := context.allocator) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return T{}, err; }
 
-	size_in_bits := int(size_of(T) * 8);
-	i := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS);
-	i  = min(int(a.used), i);
-
-	for ; i >= 0; i -= 1 {
-		res <<= uint(0) if size_in_bits <= _DIGIT_BITS else _DIGIT_BITS;
-		res |= T(a.digit[i]);
-		if size_in_bits <= _DIGIT_BITS {
-			break;
-		};
-	}
-
-	when !intrinsics.type_is_unsigned(T) {
-		/*
-			Mask off sign bit.
-		*/
-		res ~= 1 << uint(size_in_bits - 1);
-		/*
-			Set the sign.
-		*/
-		if a.sign == .Negative {
-			res = -res;
-		}
-	}
-	return;
+	return #force_inline internal_int_get(a, T);
 }
 get :: proc { int_get, };
 
-int_get_float :: proc(a: ^Int) -> (res: f64, err: Error) {
-	if err = clear_if_uninitialized(a); err != nil {
-		return 0, err;
-	}	
+int_get_float :: proc(a: ^Int, allocator := context.allocator) -> (res: f64, err: Error) {
+	/*
+		Check that `a` is usable.
+	*/
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return 0, err; }
 
-	l   := min(a.used, 17); // log2(max(f64)) is approximately 1020, or 17 legs.
-	fac := f64(1 << _DIGIT_BITS);
-	d   := 0.0;
-
-	for i := l; i >= 0; i -= 1 {
-		d = (d * fac) + f64(a.digit[i]);
-	}
-
-	res = -d if a.sign == .Negative else d;
-	return;
+	return #force_inline internal_int_get_float(a);
 }
 
 /*
 	Count bits in an `Int`.
 */
-count_bits :: proc(a: ^Int) -> (count: int, err: Error) {
-	if err = clear_if_uninitialized(a); err != nil {
-		return 0, err;
-	}
+count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err: Error) {
 	/*
-		Fast path for zero.
+		Check that `a` is usable.
 	*/
-	if z, _ := is_zero(a); z {
-		return 0, nil;
-	}
-	/*
-		Get the number of DIGITs and use it.
-	*/
-	count  = (a.used - 1) * _DIGIT_BITS;
-	/*
-		Take the last DIGIT and count the bits in it.
-	*/
-	clz   := int(intrinsics.count_leading_zeros(a.digit[a.used - 1]));
-	count += (_DIGIT_TYPE_BITS - clz);
-	return;
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return 0, err; }
+
+	return #force_inline internal_count_bits(a);	
 }
 
 /*
 	Returns the number of trailing zeroes before the first one.
 	Differs from regular `ctz` in that 0 returns 0.
 */
-int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
-	if err = clear_if_uninitialized(a); err != nil { return -1, err; }
-
-	_ctz :: intrinsics.count_trailing_zeros;
+int_count_lsb :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err: Error) {
 	/*
-		Easy out.
+		Check that `a` is usable.
 	*/
-	if z, _ := is_zero(a); z { return 0, nil; }
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return 0, err; }
 
-	/*
-		Scan lower digits until non-zero.
-	*/
-	x: int;
-	for x = 0; x < a.used && a.digit[x] == 0; x += 1 {}
-
-	q := a.digit[x];
-	x *= _DIGIT_BITS;
-	return x + count_lsb(q), nil;
+	return #force_inline internal_int_count_lsb(a);
 }
 
 platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
@@ -701,3 +523,14 @@ destroy_constants :: proc() {
 	internal_destroy(INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN);
 }
 
+
+assert_if_nil :: #force_inline proc(integers: ..^Int, loc := #caller_location) {
+	integers := integers;
+
+	for i in &integers {
+		if i == nil {
+			msg := fmt.tprintf("%v(nil)", loc.procedure);
+			assert(false, msg, loc);
+		}
+	}
+}
