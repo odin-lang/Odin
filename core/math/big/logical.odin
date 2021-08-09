@@ -24,6 +24,7 @@ import "core:mem"
 	2's complement `and`, returns `dest = a & b;`
 */
 int_and :: proc(dest, a, b: ^Int) -> (err: Error) {
+	assert_if_nil(dest, a, b);
 	if err = clear_if_uninitialized(a, b); err != nil { return err; }
 
 	used := max(a.used, b.used) + 1;
