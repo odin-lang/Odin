@@ -1402,6 +1402,7 @@ void lb_generate_code(lbGenerator *gen) {
 	Entity *entry_point = info->entry_point;
 	bool has_dll_main = false;
 	bool has_win_main = false;
+    bool has_c_main = false;
 
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
@@ -1423,7 +1424,11 @@ void lb_generate_code(lbGenerator *gen) {
 					has_dll_main = true;
 				} else if (!has_win_main && name == "WinMain") {
 					has_win_main = true;
-				}
+				} else if (!has_c_main && name == "main") {
+					if (!(e == entry_point)) {
+						has_c_main = true;
+					}
+                }
 			}
 		}
 	}
@@ -1637,7 +1642,8 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
+	if ((build_context.build_mode == BuildMode_Executable && !(has_win_main || has_c_main))
+		|| (build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
 		TIME_SECTION("LLVM main");
 		lb_create_main_procedure(default_module, startup_runtime);
 	}
