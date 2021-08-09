@@ -3632,6 +3632,27 @@ void check_did_you_mean_scope(String const &name, Scope *scope) {
 	check_did_you_mean_print(&d);
 }
 
+Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize new_count) {
+	Type *array_type = base_type(type_deref(original_type));
+	GB_ASSERT(array_type->kind == Type_Array);
+	Type *elem_type = array_type->Array.elem;
+
+	Type *swizzle_array_type = nullptr;
+	Type *bth = base_type(type_deref(type_hint));
+	if (bth != nullptr && bth->kind == Type_Array &&
+	    bth->Array.count == new_count &&
+	    are_types_identical(bth->Array.elem, elem_type)) {
+		swizzle_array_type = type_hint;
+	} else {
+		i64 max_count = array_type->Array.count;
+		if (new_count == max_count) {
+			swizzle_array_type = original_type;
+		} else {
+			swizzle_array_type = alloc_type_array(elem_type, new_count);
+		}
+	}
+	return swizzle_array_type;
+}
 
 
 Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *type_hint) {
@@ -3842,21 +3863,11 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			se->swizzle_count = index_count;
 			se->swizzle_indices = indices;
 
-			Type *array_type = base_type(type_deref(operand->type));
-			GB_ASSERT(array_type->kind == Type_Array);
+			Type *original_type = operand->type;
 
-			Type *swizzle_array_type = nullptr;
-			Type *bth = base_type(type_hint);
-			if (bth != nullptr && bth->kind == Type_Array &&
-			    bth->Array.count == index_count &&
-			    are_types_identical(bth->Array.elem, array_type->Array.elem)) {
-				swizzle_array_type = type_hint;
-			} else {
-				swizzle_array_type = alloc_type_array(array_type->Array.elem, index_count);
-			}
 			AddressingMode prev_mode = operand->mode;
 			operand->mode = Addressing_SwizzleValue;
-			operand->type = swizzle_array_type;
+			operand->type = determine_swizzle_array_type(original_type, type_hint, index_count);
 			operand->expr = node;
 
 			switch (prev_mode) {

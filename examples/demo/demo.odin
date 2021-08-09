@@ -8,6 +8,9 @@ import "core:time"
 import "core:reflect"
 import "core:runtime"
 import "intrinsics"
+import "core:encoding/json"
+
+_ :: json;
 
 /*
 	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
@@ -1200,6 +1203,12 @@ array_programming :: proc() {
 		cross :: proc(a, b: Vector3) -> Vector3 {
 			i := swizzle(a, 1, 2, 0) * swizzle(b, 2, 0, 1);
 			j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
+			return i - j;
+		}
+
+		cross_shorter :: proc(a, b: Vector3) -> Vector3 {
+			i := a.yzx * b.zxy;
+			j := a.zxy * b.yzx;
 			return i - j;
 		}
 
