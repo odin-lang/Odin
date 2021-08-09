@@ -718,7 +718,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: [N]T, ..int) -> [M]T
-		Type *type = base_type(operand->type);
+		Type *original_type = operand->type;
+		Type *type = base_type(original_type);
 		i64 max_count = 0;
 		Type *elem_type = nullptr;
 
@@ -775,9 +776,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 
-		if (arg_count < max_count) {
-			operand->type = alloc_type_array(elem_type, arg_count);
-		}
 		if (type->kind == Type_Array) {
 			if (operand->mode == Addressing_Variable) {
 				operand->mode = Addressing_SwizzleVariable;
@@ -788,21 +786,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 		}
 
-		Type *array_type = base_type(type_deref(operand->type));
-		GB_ASSERT(array_type->kind == Type_Array);
-
-		Type *swizzle_array_type = nullptr;
-		Type *bth = base_type(type_hint);
-		if (bth != nullptr && bth->kind == Type_Array &&
-		    bth->Array.count == arg_count &&
-		    are_types_identical(bth->Array.elem, array_type->Array.elem)) {
-			swizzle_array_type = type_hint;
-		} else {
-			swizzle_array_type = alloc_type_array(array_type->Array.elem, arg_count);
-		}
-
-		operand->type = swizzle_array_type;
-
+		operand->type = determine_swizzle_array_type(original_type, type_hint, arg_count);
 		break;
 	}
 
