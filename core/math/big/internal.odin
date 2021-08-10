@@ -36,7 +36,7 @@ import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
 
-//import "core:fmt"
+// import "core:fmt"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -627,20 +627,22 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			Do we need to square?
 		*/
 		if src.used >= SQR_TOOM_CUTOFF {
-			/* Use Toom-Cook? */
-			// err = s_mp_sqr_toom(a, c);
+			/*
+				Use Toom-Cook?
+			*/
 			// fmt.printf("_private_int_sqr_toom: %v\n", src.used);
-			err = #force_inline _private_int_sqr(dest, src);
+			err = #force_inline _private_int_sqr_karatsuba(dest, src);
 		} else if src.used >= SQR_KARATSUBA_CUTOFF {
-			/* Karatsuba? */
-			// err = s_mp_sqr_karatsuba(a, c);
-			// fmt.printf("_private_int_sqr_karatsuba: %v\n", src.used);
-			err = #force_inline _private_int_sqr(dest, src);
+			/*
+				Karatsuba?
+			*/
+			err = #force_inline _private_int_sqr_karatsuba(dest, src);
 		} else if ((src.used * 2) + 1) < _WARRAY && src.used < (_MAX_COMBA / 2) {
 			/*
 				Fast comba?
 			*/
 			err = #force_inline _private_int_sqr_comba(dest, src);
+			//err = #force_inline _private_int_sqr(dest, src);
 		} else {
 			err = #force_inline _private_int_sqr(dest, src);
 		}

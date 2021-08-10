@@ -80,16 +80,27 @@ demo :: proc() {
 	err: Error;
 	bs: string;
 
-	if err = factorial(a, 500); err != nil { fmt.printf("factorial err: %v\n", err); return; }
+	// if err = factorial(a, 850); err != nil { fmt.printf("factorial err: %v\n", err); return; }
+
+	foo := "615037959146039477924633848896619112832171971562900618409305032006863881436080";
+	if err = atoi(a, foo, 10); err != nil { return; }
+	print("a: ", a, 10, true, true, true);
+	fmt.println();
+
 	{
 		SCOPED_TIMING(.sqr);
-		if err = sqr(b, a);     err != nil { fmt.printf("sqr err: %v\n", err); return; }
+		if err = sqr(b, a); err != nil { fmt.printf("sqr err: %v\n", err); return; }
 	}
+	fmt.println();
+	print("b _sqr_karatsuba: ", b);
+	fmt.println();
 
-	bs, err = itoa(b, 10);
+	bs, err = itoa(b, 16);
 	defer delete(bs);
 
-	assert(bs[:50] == "14887338741396604108836218987068397819515734169330");
+	if bs[:50] != "1C367982F3050A8A3C62A8A7906D165438B54B287AF3F15D36" {
+		fmt.println("sqr failed");
+	}
 }
 
 main :: proc() {

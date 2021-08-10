@@ -355,6 +355,72 @@ _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) 
 }
 
 /*
+	Karatsuba squaring, computes `dest` = `src` * `src` using three half-size squarings.
+ 
+ 	See comments of `_private_int_mul_karatsuba` for details.
+ 	It is essentially the same algorithm but merely tuned to perform recursive squarings.
+*/
+_private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	x0, x1, t1, t2, x0x0, x1x1 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(x0, x1, t1, t2, x0x0, x1x1);
+
+	/*
+		Min # of digits, divided by two.
+	*/
+	B := src.used >> 1;
+
+	/*
+		Init temps.
+	*/
+	if err = internal_grow(x0,   B);                  err != nil { return err; }
+	if err = internal_grow(x1,   src.used - B);       err != nil { return err; }
+	if err = internal_grow(t1,   src.used * 2);       err != nil { return err; }
+	if err = internal_grow(t2,   src.used * 2);       err != nil { return err; }
+	if err = internal_grow(x0x0, B * 2       );       err != nil { return err; }
+	if err = internal_grow(x1x1, (src.used - B) * 2); err != nil { return err; }
+
+	/*
+		Now shift the digits.
+	*/
+	x0.used = B;
+	x1.used = src.used - B;
+
+	internal_copy_digits(x0, src, x0.used);
+	#force_inline mem.copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used);
+	internal_clamp(x0);
+
+	/*
+		Now calc the products x0*x0 and x1*x1.
+	*/
+	if err = internal_sqr(x0x0, x0);          err != nil { return err; }
+	if err = internal_sqr(x1x1, x1);          err != nil { return err; }
+
+	/*
+		Now calc (x1+x0)^2
+	*/
+	if err = internal_add(t1, x0, x1);        err != nil { return err; }
+	if err = internal_sqr(t1, t1);            err != nil { return err; }
+
+	/*
+		Add x0y0
+	*/
+	if err = internal_add(t2, x0x0, x1x1);    err != nil { return err; }
+	if err = internal_sub(t1, t1, t2);        err != nil { return err; }
+
+	/*
+		Shift by B.
+	*/
+	if err = internal_shl_digit(t1, B);       err != nil { return err; }
+	if err = internal_shl_digit(x1x1, B * 2); err != nil { return err; }
+	if err = internal_add(t1, t1, x0x0);      err != nil { return err; }
+	if err = internal_add(dest, t1, x1x1);    err != nil { return err; }
+
+	return internal_clamp(dest);
+}
+
+/*
 	Divide by three (based on routine from MPI and the GMP manual).
 */
 _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
