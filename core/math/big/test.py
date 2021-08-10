@@ -530,6 +530,11 @@ if __name__ == '__main__':
 		print("---- math/big with two random {bits:,} bit numbers ----".format(bits=BITS))
 		print()
 
+		#
+		# We've already tested up to the 10th root.
+		#
+		TEST_ROOT_N_PARAMS = [2, 3, 4, 5, 6]
+
 		for test_proc in RANDOM_TESTS:
 			if BITS >  1_200 and test_proc in SKIP_LARGE: continue
 			if BITS >  4_096 and test_proc in SKIP_LARGEST: continue
@@ -544,6 +549,8 @@ if __name__ == '__main__':
 
 			UNTIL_TIME  = TOTAL_TIME + BITS / TIMED_BITS_PER_SECOND
 			# We run each test for a second per 20k bits
+
+			index = 0
 
 			while we_iterate():
 				a = randint(-(1 << BITS), 1 << BITS)
@@ -566,7 +573,8 @@ if __name__ == '__main__':
 					b = Error.Okay
 				elif test_proc == test_root_n:
 					a = randint(1, 1 << BITS)
-					b = randint(1, 10);
+					b = TEST_ROOT_N_PARAMS[index]
+					index = (index + 1) % len(TEST_ROOT_N_PARAMS)
 				elif test_proc == test_shl_digit:
 					b = randint(0, 10);
 				elif test_proc == test_shr_digit:

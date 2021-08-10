@@ -17,7 +17,9 @@ package big
 */
 int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
 	assert_if_nil(a);
-	if err = internal_clear_if_uninitialized(a, allocator); err != nil { return {}, err; }
+	context.allocator = allocator;
+
+	if err = internal_clear_if_uninitialized(a); err != nil { return {}, err; }
 
 	rem: DIGIT;
 	for prime in _private_prime_table {

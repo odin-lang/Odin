@@ -26,6 +26,9 @@ package big
 
 	Check the comments above each `internal_*` implementation to see what constraints it expects to have met.
 
+	We pass the custom allocator to procedures by default using the pattern `context.allocator = allocator`.
+	This way we don't have to add `, allocator` at the end of each call.
+
 	TODO: Handle +/- Infinity and NaN.
 */
 
@@ -41,6 +44,7 @@ import rnd "core:math/rand"
 */
 internal_int_add_unsigned :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	dest := dest; x := a; y := b;
+	context.allocator = allocator;
 
 	old_used, min_used, max_used, i: int;
 
@@ -52,7 +56,7 @@ internal_int_add_unsigned :: proc(dest, a, b: ^Int, allocator := context.allocat
 	max_used = x.used;
 	old_used = dest.used;
 
-	if err = internal_grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT), false, allocator); err != nil { return err; }
+	if err = internal_grow(dest, max(max_used + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	dest.used = max_used + 1;
 	/*
 		All parameters have been initialized.
@@ -119,12 +123,13 @@ internal_add_unsigned :: proc { internal_int_add_unsigned, };
 */
 internal_int_add_signed :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	x := a; y := b;
+	context.allocator = allocator;
 	/*
 		Handle both negative or both positive.
 	*/
 	if x.sign == y.sign {
 		dest.sign = x.sign;
-		return #force_inline internal_int_add_unsigned(dest, x, y, allocator);
+		return #force_inline internal_int_add_unsigned(dest, x, y);
 	}
 
 	/*
@@ -137,7 +142,7 @@ internal_int_add_signed :: proc(dest, a, b: ^Int, allocator := context.allocator
 	}
 
 	dest.sign = x.sign;
-	return #force_inline internal_int_sub_unsigned(dest, x, y, allocator);
+	return #force_inline internal_int_sub_unsigned(dest, x, y);
 }
 internal_add_signed :: proc { internal_int_add_signed, };
 
@@ -149,7 +154,9 @@ internal_add_signed :: proc { internal_int_add_signed, };
 		`dest` is large enough (a.used + 1) to fit result.
 */
 internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
-	if err = internal_grow(dest, a.used + 1, false, allocator); err != nil { return err; }
+	context.allocator = allocator;
+
+	if err = internal_grow(dest, a.used + 1); err != nil { return err; }
 	/*
 		Fast paths for destination and input Int being the same.
 	*/
@@ -183,7 +190,7 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 		/*
 			dest = |a| - digit
 		*/
-		if err =  #force_inline internal_int_add_digit(dest, a, digit, allocator); err != nil {
+		if err = #force_inline internal_int_add_digit(dest, a, digit); err != nil {
 			/*
 				Restore a's sign.
 			*/
@@ -261,13 +268,15 @@ internal_add :: proc { internal_int_add_signed, internal_int_add_digit, };
 		`dest`, `number` and `decrease` != `nil` and have been initalized.
 */
 internal_int_sub_unsigned :: proc(dest, number, decrease: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	dest := dest; x := number; y := decrease;
 	old_used := dest.used;
 	min_used := y.used;
 	max_used := x.used;
 	i: int;
 
-	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT), false, allocator); err != nil { return err; }
+	if err = grow(dest, max(max_used, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	dest.used = max_used;
 	/*
 		All parameters have been initialized.
@@ -328,6 +337,8 @@ internal_sub_unsigned :: proc { internal_int_sub_unsigned, };
 		`dest`, `number` and `decrease` != `nil` and have been initalized.
 */
 internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	number := number; decrease := decrease;
 	if number.sign != decrease.sign {
 		/*
@@ -335,14 +346,14 @@ internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := conte
 			In either case, ADD their magnitudes and use the sign of the first number.
 		*/
 		dest.sign = number.sign;
-		return #force_inline internal_int_add_unsigned(dest, number, decrease, allocator);
+		return #force_inline internal_int_add_unsigned(dest, number, decrease);
 	}
 
 	/*
 		Subtract a positive from a positive, OR negative from a negative.
 		First, take the difference between their magnitudes, then...
 	*/
-	if c, _ := #force_inline cmp_mag(number, decrease); c == -1 {
+	if #force_inline internal_cmp_mag(number, decrease) == -1 {
 		/*
 			The second has a larger magnitude.
 			The result has the *opposite* sign from the first number.
@@ -356,7 +367,7 @@ internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := conte
 		*/
 		dest.sign = number.sign;
 	}
-	return #force_inline internal_int_sub_unsigned(dest, number, decrease, allocator);
+	return #force_inline internal_int_sub_unsigned(dest, number, decrease);
 }
 
 /*
@@ -368,7 +379,9 @@ internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := conte
 		`dest` is large enough (number.used + 1) to fit result.
 */
 internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
-	if err = internal_grow(dest, number.used + 1, false, allocator); err != nil { return err; }
+	context.allocator = allocator;
+
+	if err = internal_grow(dest, number.used + 1); err != nil { return err; }
 
 	dest := dest; digit := digit;
 	/*
@@ -403,7 +416,7 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := co
 		err =  #force_inline internal_int_add_digit(dest, t, digit);
 		dest.sign = .Negative;
 
-		clamp(dest);
+		internal_clamp(dest);
 		return err;
 	}
 
@@ -448,6 +461,9 @@ internal_sub :: proc { internal_int_sub_signed, internal_int_sub_digit, };
 /*
 	dest = src  / 2
 	dest = src >> 1
+
+	Assumes `dest` and `src` not to be `nil` and have been initialized.
+	We make no allocations here.
 */
 internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
 	old_used  := dest.used; dest.used = src.used;
@@ -488,13 +504,15 @@ internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
 	dest = src  * 2
 	dest = src << 1
 */
-internal_int_shl1 :: proc(dest, src: ^Int) -> (err: Error) {
-	if err = copy(dest, src); err != nil { return err; }
+internal_int_shl1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	if err = internal_copy(dest, src); err != nil { return err; }
 	/*
 		Grow `dest` to accommodate the additional bits.
 	*/
 	digits_needed := dest.used + 1;
-	if err = grow(dest, digits_needed); err != nil { return err; }
+	if err = internal_grow(dest, digits_needed); err != nil { return err; }
 	dest.used = digits_needed;
 
 	mask  := (DIGIT(1) << uint(1)) - DIGIT(1);
@@ -520,13 +538,14 @@ internal_int_shl1 :: proc(dest, src: ^Int) -> (err: Error) {
 	Multiply by a DIGIT.
 */
 internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.allocator) -> (err: Error) {
-	assert(dest != nil && src != nil);
+	context.allocator = allocator;
+	assert_if_nil(dest, src);
 
 	if multiplier == 0 {
-		return zero(dest);
+		return internal_zero(dest);
 	}
 	if multiplier == 1 {
-		return copy(dest, src);
+		return internal_copy(dest, src);
 	}
 
 	/*
@@ -535,16 +554,16 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 	if multiplier == 2 {
 		return #force_inline internal_int_shl1(dest, src);
 	}
-	if is_power_of_two(int(multiplier)) {
+	if #force_inline platform_int_is_power_of_two(int(multiplier)) {
 		ix: int;
-		if ix, err = log(multiplier, 2); err != nil { return err; }
-		return shl(dest, src, ix);
+		if ix, err = internal_log(multiplier, 2); err != nil { return err; }
+		return internal_shl(dest, src, ix);
 	}
 
 	/*
 		Ensure `dest` is big enough to hold `src` * `multiplier`.
 	*/
-	if err = grow(dest, max(src.used + 1, _DEFAULT_DIGIT_COUNT), false, allocator); err != nil { return err; }
+	if err = grow(dest, max(src.used + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 
 	/*
 		Save the original used count.
@@ -562,7 +581,7 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 		Compute columns.
 	*/
 	ix := 0;
-	for ; ix < src.used; ix += 1 {
+	#no_bounds_check for ; ix < src.used; ix += 1 {
 		/*
 			Compute product and carry sum for this term
 		*/
@@ -595,10 +614,11 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 	High level multiplication (handles sign).
 */
 internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
 	/*
 		Early out for `multiplier` is zero; Set `dest` to zero.
 	*/
-	if multiplier.used == 0 || src.used == 0 { return zero(dest); }
+	if multiplier.used == 0 || src.used == 0 { return internal_zero(dest); }
 
 	if src == multiplier {
 		/*
@@ -676,6 +696,7 @@ internal_sqr :: proc (dest, src: ^Int, allocator := context.allocator) -> (res: 
 	`numerator` and `denominator` are expected not to be `nil` and have been initialized.
 */
 internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
 
 	if denominator.used == 0 { return .Division_by_Zero; }
 	/*
@@ -683,7 +704,7 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	*/
 	if #force_inline internal_cmp_mag(numerator, denominator) == -1 {
 		if remainder != nil {
-			if err = internal_copy(remainder, numerator, false, allocator); err != nil { return err; }
+			if err = internal_copy(remainder, numerator); err != nil { return err; }
 		}
 		if quotient != nil {
 			internal_zero(quotient);
@@ -711,7 +732,9 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	Single digit division (based on routine from MPI).
 	The quotient is optional and may be passed a nil.
 */
-internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT) -> (remainder: DIGIT, err: Error) {
+internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
+	context.allocator = allocator;
+
 	/*
 		Cannot divide by zero.
 	*/
@@ -722,7 +745,7 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT)
 	*/
 	if denominator == 1 || numerator.used == 0 {
 		if quotient != nil {
-			return 0, copy(quotient, numerator);
+			return 0, internal_copy(quotient, numerator);
 		}
 		return 0, err;
 	}
@@ -737,11 +760,11 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT)
 		if quotient == nil {
 			return remainder, nil;
 		}
-		return remainder, shr(quotient, numerator, 1);
+		return remainder, internal_shr(quotient, numerator, 1);
 	}
 
 	ix: int;
-	if is_power_of_two(int(denominator)) {
+	if platform_int_is_power_of_two(int(denominator)) {
 		ix = 1;
 		for ix < _DIGIT_BITS && denominator != (1 << uint(ix)) {
 			ix += 1;
@@ -751,7 +774,7 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT)
 			return remainder, nil;
 		}
 
-		return remainder, shr(quotient, numerator, int(ix));
+		return remainder, internal_shr(quotient, numerator, int(ix));
 	}
 
 	/*
@@ -766,7 +789,7 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT)
 	*/
 	q := &Int{};
 
-	if err = grow(q, numerator.used); err != nil { return 0, err; }
+	if err = internal_grow(q, numerator.used); err != nil { return 0, err; }
 
 	q.used = numerator.used;
 	q.sign = numerator.sign;
@@ -785,10 +808,10 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT)
 	remainder = DIGIT(w);
 
 	if quotient != nil {
-		clamp(q);
-		swap(q, quotient);
+		internal_clamp(q);
+		internal_swap(q, quotient);
 	}
-	destroy(q);
+	internal_destroy(q);
 	return remainder, nil;
 }
 
@@ -861,18 +884,20 @@ internal_sqrmod :: proc { internal_int_sqrmod, };
 	This way we'll have to reallocate less, possibly not at all.
 */
 internal_int_factorial :: proc(res: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	if n >= FACTORIAL_BINARY_SPLIT_CUTOFF {
-		return #force_inline _private_int_factorial_binary_split(res, n, allocator);
+		return #force_inline _private_int_factorial_binary_split(res, n);
 	}
 
 	i := len(_factorial_table);
 	if n < i {
-		return #force_inline internal_set(res, _factorial_table[n], true, allocator);
+		return #force_inline internal_set(res, _factorial_table[n]);
 	}
 
-	if err = #force_inline internal_set(res, _factorial_table[i - 1], true, allocator); err != nil { return err; }
+	if err = #force_inline internal_set(res, _factorial_table[i - 1]); err != nil { return err; }
 	for {
-		if err = #force_inline internal_mul(res, res, DIGIT(i), allocator); err != nil || i == n { return err; }
+		if err = #force_inline internal_mul(res, res, DIGIT(i)); err != nil || i == n { return err; }
 		i += 1;
 	}
 
@@ -885,10 +910,10 @@ internal_int_factorial :: proc(res: ^Int, n: int, allocator := context.allocator
 	Assumes `a` and `b` to have been initialized.
 	`res_gcd` and `res_lcm` can be nil or ^Int depending on which results are desired.
 */
-internal_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
+internal_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	if res_gcd == nil && res_lcm == nil { return nil; }
 
-	return #force_inline _private_int_gcd_lcm(res_gcd, res_lcm, a, b);
+	return #force_inline _private_int_gcd_lcm(res_gcd, res_lcm, a, b, allocator);
 }
 
 /*
@@ -896,7 +921,7 @@ internal_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 
 	Assumes `remainder` and `numerator` both not to be `nil` and `bits` to be >= 0.
 */
-internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int) -> (err: Error) {
+internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Everything is divisible by 1 << 0 == 1, so this returns 0.
 	*/
@@ -1139,14 +1164,14 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for bases that are a power of two.
 	*/
-	if platform_int_is_power_of_two(int(base)) { return private_log_power_of_two(a, base); }
+	if platform_int_is_power_of_two(int(base)) { return _private_log_power_of_two(a, base); }
 
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)); }
 
-	return private_int_log(a, base);
+	return _private_int_log(a, base);
 
 }
 
@@ -1207,7 +1232,9 @@ internal_log :: proc { internal_int_log, internal_digit_log, };
 	Calculate dest = base^power using a square-multiply algorithm.
 	Assumes `dest` and `base` not to be `nil` and to have been initialized.
 */
-internal_int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
+internal_int_pow :: proc(dest, base: ^Int, power: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	power := power;
 	/*
 		Early outs.
@@ -1217,18 +1244,18 @@ internal_int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 			A zero base is a special case.
 		*/
 		if power  < 0 {
-			if err = zero(dest); err != nil { return err; }
+			if err = internal_zero(dest); err != nil { return err; }
 			return .Math_Domain_Error;
 		}
-		if power == 0 { return  set(dest, 1); }
-		if power  > 0 { return zero(dest); }
+		if power == 0 { return  internal_one(dest); }
+		if power  > 0 { return internal_zero(dest); }
 
 	}
 	if power < 0 {
 		/*
 			Fraction, so we'll return zero.
 		*/
-		return zero(dest);
+		return internal_zero(dest);
 	}
 	switch(power) {
 	case 0:
@@ -1246,19 +1273,19 @@ internal_int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 	}
 
 	g := &Int{};
-	if err = copy(g, base); err != nil { return err; }
+	if err = internal_copy(g, base); err != nil { return err; }
 
 	/*
 		Set initial result.
 	*/
-	if err = set(dest, 1); err != nil { return err; }
+	if err = internal_one(dest); err != nil { return err; }
 
 	loop: for power > 0 {
 		/*
 			If the bit is set, multiply.
 		*/
 		if power & 1 != 0 {
-			if err = mul(dest, g, dest); err != nil {
+			if err = internal_mul(dest, g, dest); err != nil {
 				break loop;
 			}
 		}
@@ -1275,7 +1302,7 @@ internal_int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 		power >>= 1;
 	}
 
-	destroy(g);
+	internal_destroy(g);
 	return err;
 }
 
@@ -1283,33 +1310,19 @@ internal_int_pow :: proc(dest, base: ^Int, power: int) -> (err: Error) {
 	Calculate `dest = base^power`.
 	Assumes `dest` not to be `nil` and to have been initialized.
 */
-internal_int_pow_int :: proc(dest: ^Int, base, power: int) -> (err: Error) {
-	base_t := &Int{};
-	defer destroy(base_t);
+internal_int_pow_int :: proc(dest: ^Int, base, power: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
 
-	if err = set(base_t, base); err != nil { return err; }
+	base_t := &Int{};
+	defer internal_destroy(base_t);
+
+	if err = internal_set(base_t, base); err != nil { return err; }
 
 	return #force_inline internal_int_pow(dest, base_t, power);
 }
 
 internal_pow :: proc { internal_int_pow, internal_int_pow_int, };
 internal_exp :: pow;
-
-/*
-	Returns the log2 of an `Int`.
-	Assumes `a` not to be `nil` and to have been initialized.
-	Also assumes `base` is a power of two.
-*/
-private_log_power_of_two :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
-	base := base;
-	y: int;
-	for y = 0; base & 1 == 0; {
-		y += 1;
-		base >>= 1;
-	}
-	log, err = count_bits(a);
-	return (log - 1) / y, err;
-}
 
 /*
 
@@ -1333,6 +1346,8 @@ internal_small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
 	Assumes `dest` and `src` not to be `nil` and to have been initialized.
 */
 internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		Must be positive.
 	*/
@@ -1341,7 +1356,7 @@ internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 	/*
 		Easy out. If src is zero, so is dest.
 	*/
-	if #force_inline internal_is_zero(src)      { return zero(dest); }
+	if #force_inline internal_is_zero(src)      { return internal_zero(dest); }
 
 	/*
 		Set up temporaries.
@@ -1358,9 +1373,9 @@ internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 		/*
 			y = (x + n // x) // 2
 		*/
-		internal_div(t1, src, x);
-		internal_add(t2, t1, x);
-		internal_shr(y, t2, 1);
+		if err = internal_div(t1, src, x); err != nil { return err; }
+		if err = internal_add(t2, t1, x);  err != nil { return err; }
+		if err = internal_shr(y, t2, 1);   err != nil { return err; }
 
 		if c := internal_cmp(y, x); c == 0 || c == 1 {
 			internal_swap(dest, x);
@@ -1385,10 +1400,12 @@ internal_sqrt :: proc { internal_int_sqrt, };
 	Assumes `dest` and `src` not to be `nil` and have been initialized.
 */
 internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		Fast path for n == 2
 	*/
-	if n == 2 { return #force_inline internal_sqrt(dest, src, allocator); }
+	if n == 2 { return #force_inline internal_sqrt(dest, src); }
 
 	if n < 0 || n > int(_DIGIT_MAX) { return .Invalid_Argument; }
 
@@ -1427,14 +1444,14 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 		"src" is smaller than max(int), we can cast safely.
 	*/
 	if ilog2 < n {
-		err = internal_one(dest, true, allocator);
+		err = internal_one(dest);
 		dest.sign = a.sign;
 		return err;
 	}
 
 	ilog2 /= n;
 	if ilog2 == 0 {
-		err = internal_one(dest, true, allocator);
+		err = internal_one(dest);
 		dest.sign = a.sign;
 		return err;
 	}
@@ -1443,13 +1460,13 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 		Start value must be larger than root.
 	*/
 	ilog2 += 2;
-	if err = power_of_two(t2, ilog2, allocator); err != nil { return err; }
+	if err = internal_int_power_of_two(t2, ilog2); err != nil { return err; }
 
 	c: int;
 	iterations := 0;
 	for {
 		/* t1 = t2 */
-		if err = copy(t1, t2, false, allocator); err != nil { return err; }
+		if err = internal_copy(t1, t2); err != nil { return err; }
 
 		/* t2 = t1 - ((t1**b - a) / (b * t1**(b-1))) */
 
@@ -1458,24 +1475,24 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 
 		/* numerator */
 		/* t2 = t1**b */
-		if err = internal_mul(t2, t1, t3, allocator); err != nil { return err; }
+		if err = internal_mul(t2, t1, t3); err != nil { return err; }
 
 		/* t2 = t1**b - a */
-		if err = internal_sub(t2, t2, a, allocator); err != nil { return err; }
+		if err = internal_sub(t2, t2, a); err != nil { return err; }
 
 		/* denominator */
 		/* t3 = t1**(b-1) * b  */
-		if err = internal_mul(t3, t3, DIGIT(n), allocator); err != nil { return err; }
+		if err = internal_mul(t3, t3, DIGIT(n)); err != nil { return err; }
 
 		/* t3 = (t1**b - a)/(b * t1**(b-1)) */
-		if err = internal_div(t3, t2, t3, allocator); err != nil { return err; }
-		if err = internal_sub(t2, t1, t3, allocator); err != nil { return err; }
+		if err = internal_div(t3, t2, t3); err != nil { return err; }
+		if err = internal_sub(t2, t1, t3); err != nil { return err; }
 
 		/*
 			 Number of rounds is at most log_2(root). If it is more it
 			 got stuck, so break out of the loop and do the rest manually.
 		*/
-		if ilog2 -= 1; ilog2 == 0 { break; }
+		if ilog2 -= 1;    ilog2 == 0 { break; }
 		if internal_cmp(t1, t2) == 0 { break; }
 
 		iterations += 1;
@@ -1539,72 +1556,6 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 internal_root_n :: proc { internal_int_root_n, };
 
 /*
-	Internal implementation of log.
-	Assumes `a` not to be `nil` and to have been initialized.
-*/
-private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: int, err: Error) {
-	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
-
-	ic := #force_inline internal_cmp(a, base);
-	if ic == -1 || ic == 0 {
-		return 1 if ic == 0 else 0, nil;
-	}
-
-	if err = internal_set(bi_base, base, true, allocator);        err != nil { return -1, err; }
-	if err = internal_clear(bracket_mid, false, allocator);       err != nil { return -1, err; }
-	if err = internal_clear(t, false, allocator);                 err != nil { return -1, err; }
-	if err = internal_one(bracket_low, false, allocator);         err != nil { return -1, err; }
-	if err = internal_set(bracket_high, base, false, allocator);  err != nil { return -1, err; }
-
-	low := 0; high := 1;
-
-	/*
-		A kind of Giant-step/baby-step algorithm.
-		Idea shamelessly stolen from https://programmingpraxis.com/2010/05/07/integer-logarithms/2/
-		The effect is asymptotic, hence needs benchmarks to test if the Giant-step should be skipped
-		for small n.
-	*/
-
-	for {
-		/*
-			Iterate until `a` is bracketed between low + high.
-		*/
-		if #force_inline internal_cmp(bracket_high, a) != -1 { break; }
-
-		low = high;
-		if err = #force_inline internal_copy(bracket_low, bracket_high);                err != nil { return -1, err; }
-		high <<= 1;
-		if err = #force_inline internal_sqr(bracket_high, bracket_high);  err != nil { return -1, err; }
-	}
-
-	for (high - low) > 1 {
-		mid := (high + low) >> 1;
-
-		if err = #force_inline internal_pow(t, bi_base, mid - low);       err != nil { return -1, err; }
-
-		if err = #force_inline internal_mul(bracket_mid, bracket_low, t); err != nil { return -1, err; }
-
-		mc := #force_inline internal_cmp(a, bracket_mid);
-		switch mc {
-		case -1:
-			high = mid;
-			internal_swap(bracket_mid, bracket_high);
-		case  0:
-			return mid, nil;
-		case  1:
-			low = mid;
-			internal_swap(bracket_mid, bracket_low);
-		}
-	}
-
-	fc := #force_inline internal_cmp(bracket_high, a);
-	res = high if fc == 0 else low;
-
-	return;
-}
-
-/*
 	Other internal helpers
 */
 
@@ -1616,9 +1567,9 @@ internal_int_destroy :: proc(integers: ..^Int) {
 	integers := integers;
 
 	for a in &integers {
-		mem.zero_slice(a.digit[:]);
 		raw := transmute(mem.Raw_Dynamic_Array)a.digit;
 		if raw.cap > 0 {
+			mem.zero_slice(a.digit[:]);
 			free(&a.digit[0]);
 		}
 		a = &Int{};
@@ -1631,6 +1582,8 @@ internal_destroy :: proc{ internal_int_destroy, };
 */
 internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator := context.allocator) -> (err: Error)
 	where intrinsics.type_is_integer(T) {
+	context.allocator = allocator;
+
 	src := src;
 
 	if err = internal_error_if_immutable(dest); err != nil { return err; }
@@ -1638,7 +1591,7 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 		Most internal procs asssume an Int to have already been initialize,
 		but as this is one of the procs that initializes, we have to check the following.
 	*/
-	if err = internal_clear_if_uninitialized_single(dest, allocator); err != nil { return err; }
+	if err = internal_clear_if_uninitialized_single(dest); err != nil { return err; }
 
 	dest.flags = {}; // We're not -Inf, Inf, NaN or Immutable.
 
@@ -1657,10 +1610,24 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 
 internal_set :: proc { internal_int_set_from_integer, internal_int_copy };
 
+internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int) -> (err: Error) {
+	if err = #force_inline internal_error_if_immutable(dest); err != nil { return err; }
+
+	/*
+		If dest == src, do nothing
+	*/
+	if (dest == src) { return nil; }
+
+	#force_inline mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
+	return nil;
+}
+
 /*
 	Copy one `Int` to another.
 */
 internal_int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		If dest == src, do nothing
 	*/
@@ -1674,14 +1641,13 @@ internal_int_copy :: proc(dest, src: ^Int, minimize := false, allocator := conte
 	*/
 	needed := src.used if minimize else max(src.used, _DEFAULT_DIGIT_COUNT);
 
-	if err = internal_grow(dest, needed, minimize, allocator); err != nil { return err; }
+	if err = internal_grow(dest, needed, minimize); err != nil { return err; }
 
 	/*
 		Copy everything over and zero high digits.
 	*/
-	#no_bounds_check for v, i in src.digit[:src.used] {
-		dest.digit[i] = v;
-	}
+	internal_copy_digits(dest, src, src.used);
+
 	dest.used  = src.used;
 	dest.sign  = src.sign;
 	dest.flags = src.flags &~ {.Immutable};
@@ -1709,6 +1675,8 @@ internal_swap :: proc { internal_int_swap, };
 	Set `dest` to |`src`|.
 */
 internal_int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		If `dest == src`, just fix `dest`'s sign.
 	*/
@@ -1720,7 +1688,7 @@ internal_int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 	/*
 		Copy `src` to `dest`
 	*/
-	if err = internal_copy(dest, src, false, allocator); err != nil {
+	if err = internal_copy(dest, src); err != nil {
 		return err;
 	}
 
@@ -1740,6 +1708,8 @@ internal_abs :: proc{ internal_int_abs, internal_platform_abs, };
 	Set `dest` to `-src`.
 */
 internal_int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		If `dest == src`, just fix `dest`'s sign.
 	*/
@@ -1754,7 +1724,7 @@ internal_int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 	/*
 		Copy `src` to `dest`
 	*/
-	if err = internal_copy(dest, src, false, allocator); err != nil { return err; }
+	if err = internal_copy(dest, src); err != nil { return err; }
 
 	/*
 		Fix sign.
@@ -1836,7 +1806,7 @@ internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WOR
 internal_int_shrink :: proc(a: ^Int) -> (err: Error) {
 	needed := max(_MIN_DIGIT_COUNT, a.used);
 
-	if a.used != needed { return internal_grow(a, needed); }
+	if a.used != needed { return internal_grow(a, needed, true); }
 	return nil;
 }
 internal_shrink :: proc { internal_int_shrink, };
@@ -1932,13 +1902,15 @@ internal_int_nan :: proc(a: ^Int, minimize := false, allocator := context.alloca
 internal_nan :: proc { internal_int_nan, };
 
 internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	if power < 0 || power > _MAX_BIT_COUNT { return .Invalid_Argument; }
 
 	/*
 		Grow to accomodate the single bit.
 	*/
 	a.used = (power / _DIGIT_BITS) + 1;
-	if err = internal_grow(a, a.used, false, allocator); err != nil { return err; }
+	if err = internal_grow(a, a.used); err != nil { return err; }
 	/*
 		Zero the entirety.
 	*/
@@ -2036,11 +2008,13 @@ internal_int_get_float :: proc(a: ^Int) -> (res: f64, err: Error) {
 	2's complement `and`, returns `dest = a & b;`
 */
 internal_int_and :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = internal_grow(dest, used, false, allocator); err != nil { return err; }
+	if err = internal_grow(dest, used); err != nil { return err; }
 
 	neg_a := #force_inline internal_is_negative(a);
 	neg_b := #force_inline internal_is_negative(b);
@@ -2095,11 +2069,13 @@ internal_and :: proc { internal_int_and, };
 	2's complement `or`, returns `dest = a | b;`
 */
 internal_int_or :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = internal_grow(dest, used, false, allocator); err != nil { return err; }
+	if err = internal_grow(dest, used); err != nil { return err; }
 
 	neg_a := #force_inline internal_is_negative(a);
 	neg_b := #force_inline internal_is_negative(b);
@@ -2154,11 +2130,13 @@ internal_or :: proc { internal_int_or, };
 	2's complement `xor`, returns `dest = a ~ b;`
 */
 internal_int_xor :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	used := max(a.used, b.used) + 1;
 	/*
 		Grow the destination to accomodate the result.
 	*/
-	if err = internal_grow(dest, used, false, allocator); err != nil { return err; }
+	if err = internal_grow(dest, used); err != nil { return err; }
 
 	neg_a := #force_inline internal_is_negative(a);
 	neg_b := #force_inline internal_is_negative(b);
@@ -2213,6 +2191,8 @@ internal_xor :: proc { internal_int_xor, };
 	dest = ~src
 */
 internal_int_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		Temporarily fix sign.
 	*/
@@ -2237,10 +2217,12 @@ internal_complement :: proc { internal_int_complement, };
 	`remainder` is allowed to be passed a `nil`, in which case `mod` won't be computed.
 */
 internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	bits := bits;
 	if bits < 0 { return .Invalid_Argument; }
 
-	if err = internal_copy(quotient, numerator, true, allocator); err != nil { return err; }
+	if err = internal_copy(quotient, numerator); err != nil { return err; }
 
 	/*
 		Shift right by a certain bit count (store quotient and optional remainder.)
@@ -2297,12 +2279,14 @@ internal_shr :: proc { internal_int_shr, };
 	Shift right by `digits` * _DIGIT_BITS bits.
 */
 internal_int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	if digits <= 0 { return nil; }
 
 	/*
 		If digits > used simply zero and return.
 	*/
-	if digits > quotient.used { return internal_zero(quotient, true, allocator); }
+	if digits > quotient.used { return internal_zero(quotient); }
 
    	/*
 		Much like `int_shl_digit`, this is implemented using a sliding window,
@@ -2326,13 +2310,15 @@ internal_shr_digit :: proc { internal_int_shr_digit, };
 	Shift right by a certain bit count with sign extension.
 */
 internal_int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
-	if src.sign == .Zero_or_Positive {
-		return internal_shr(dest, src, bits, allocator);
-	}
-	if err = internal_int_add_digit(dest, src, DIGIT(1), allocator);		err != nil { return err; }
+	context.allocator = allocator;
 
-	if err = internal_shr(dest, dest, bits, allocator);			err != nil { return err; }
-	return internal_sub(dest, src, DIGIT(1), allocator);
+	if src.sign == .Zero_or_Positive {
+		return internal_shr(dest, src, bits);
+	}
+	if err = internal_int_add_digit(dest, src, DIGIT(1)); err != nil { return err; }
+
+	if err = internal_shr(dest, dest, bits);              err != nil { return err; }
+	return internal_sub(dest, src, DIGIT(1));
 }
 
 internal_shr_signed :: proc { internal_int_shr_signed, };
@@ -2341,11 +2327,13 @@ internal_shr_signed :: proc { internal_int_shr_signed, };
 	Shift left by a certain bit count.
 */
 internal_int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	bits := bits;
 
 	if bits < 0 { return .Invalid_Argument; }
 
-	if err = internal_copy(dest, src, false, allocator); err != nil { return err; }
+	if err = internal_copy(dest, src); err != nil { return err; }
 
 	/*
 		Grow `dest` to accommodate the additional bits.
@@ -2391,7 +2379,9 @@ internal_shl :: proc { internal_int_shl, };
 /*
 	Shift left by `digits` * _DIGIT_BITS bits.
 */
-internal_int_shl_digit :: proc(quotient: ^Int, digits: int) -> (err: Error) {
+internal_int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	if digits <= 0 { return nil; }
 
 	/*
@@ -2446,10 +2436,10 @@ internal_count_bits :: proc(a: ^Int) -> (count: int) {
 /*
 	Returns the number of trailing zeroes before the first one.
 	Differs from regular `ctz` in that 0 returns 0.
+
+	Assumes `a` not to be `nil` and have been initialized.
 */
 internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
-	if err = internal_clear_if_uninitialized_single(a); err != nil { return -1, err; }
-
 	/*
 		Easy out.
 	*/
@@ -2487,6 +2477,8 @@ internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 }
 
 internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	bits := bits;
 
 	if bits <= 0 { return .Invalid_Argument; }
@@ -2498,7 +2490,7 @@ internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator :
 		digits += 1;
 	}
 
-	if err = #force_inline internal_grow(dest, digits, true, allocator); err != nil { return err; }
+	if err = #force_inline internal_grow(dest, digits); err != nil { return err; }
 
 	for i := 0; i < digits; i += 1 {
 		dest.digit[i] = int_random_digit(r) & _MASK;
@@ -2519,16 +2511,20 @@ internal_assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 }
 
 internal_clear_if_uninitialized_single :: proc(arg: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	if ! #force_inline internal_is_initialized(arg) {
-		return #force_inline internal_grow(arg, _DEFAULT_DIGIT_COUNT, true, allocator);
+		return #force_inline internal_grow(arg, _DEFAULT_DIGIT_COUNT);
 	}
 	return err;
 }
 
 internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	for i in args {
 		if ! #force_inline internal_is_initialized(i) {
-			e := #force_inline internal_grow(i, _DEFAULT_DIGIT_COUNT, true, allocator);
+			e := #force_inline internal_grow(i, _DEFAULT_DIGIT_COUNT);
 			if e != nil { err = e; }
 		}
 	}
@@ -2553,30 +2549,16 @@ internal_error_if_immutable :: proc {internal_error_if_immutable_single, interna
 	Allocates several `Int`s at once.
 */
 internal_int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	integers := integers;
 	for a in &integers {
-		if err = internal_clear(a, false, allocator); err != nil { return err; }
+		if err = internal_clear(a); err != nil { return err; }
 	}
 	return nil;
 }
 
 internal_init_multi :: proc { internal_int_init_multi, };
-
-/*
-	Copies DIGITs from `src` to `dest`.
-	Assumes `src` and `dest` to not be `nil` and have been initialized.
-*/
-_private_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
-	digits := digits;
-	/*
-		If dest == src, do nothing
-	*/
-	if dest == src { return nil; }
-
-	digits = min(digits, len(src.digit), len(dest.digit));
-	mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
-	return nil;
-}
 
 /*
 	Trim unused digits.
