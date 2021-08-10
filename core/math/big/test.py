@@ -124,15 +124,16 @@ initialize_constants()
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
-add  = load(l.test_add, [c_char_p, c_char_p], Res)
-sub  = load(l.test_sub, [c_char_p, c_char_p], Res)
-mul  = load(l.test_mul, [c_char_p, c_char_p], Res)
-div  = load(l.test_div, [c_char_p, c_char_p], Res)
+add        = load(l.test_add,    [c_char_p, c_char_p],   Res)
+sub        = load(l.test_sub,    [c_char_p, c_char_p],   Res)
+mul        = load(l.test_mul,    [c_char_p, c_char_p],   Res)
+sqr        = load(l.test_sqr,    [c_char_p          ],   Res)
+div        = load(l.test_div,    [c_char_p, c_char_p],   Res)
 
 # Powers and such
-int_log    = load(l.test_log,  [c_char_p, c_longlong], Res)
-int_pow    = load(l.test_pow,  [c_char_p, c_longlong], Res)
-int_sqrt   = load(l.test_sqrt, [c_char_p], Res)
+int_log    = load(l.test_log,    [c_char_p, c_longlong], Res)
+int_pow    = load(l.test_pow,    [c_char_p, c_longlong], Res)
+int_sqrt   = load(l.test_sqrt,   [c_char_p            ], Res)
 int_root_n = load(l.test_root_n, [c_char_p, c_longlong], Res)
 
 # Logical operations
@@ -217,6 +218,20 @@ def test_mul(a = 0, b = 0, expected_error = Error.Okay):
 	if expected_error == Error.Okay:
 		expected_result = a * b
 	return test("test_mul", res, [a, b], expected_error, expected_result)
+
+def test_sqr(a = 0, b = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a)]
+	try:
+		res  = sqr(*args)
+	except OSError as e:
+		print("{} while trying to square {} x {}.".format(e, a))
+		if EXIT_ON_FAIL: exit(3)
+		return False
+
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a * a
+	return test("test_sqr", res, [a], expected_error, expected_result)
 
 def test_div(a = 0, b = 0, expected_error = Error.Okay):
 	args = [arg_to_odin(a), arg_to_odin(b)]
@@ -390,7 +405,11 @@ TESTS = {
 	],
 	test_mul: [
 		[ 1234,   5432],
-		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7],
+		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7 ],
+	],
+	test_sqr: [
+		[ 5432],
+		[ 0xd3b4e926aaba3040e1c12b5ea553b5 ],
 	],
 	test_div: [
 		[ 54321,	12345],
@@ -482,7 +501,7 @@ total_failures = 0
 # test_shr_signed also tests shr, so we're not going to test shr randomly.
 #
 RANDOM_TESTS = [
-	test_add, test_sub, test_mul, test_div,
+	test_add, test_sub, test_mul, test_sqr, test_div,
 	test_log, test_pow, test_sqrt, test_root_n,
 	test_shl_digit, test_shr_digit, test_shl, test_shr_signed,
 	test_gcd, test_lcm,
@@ -592,6 +611,7 @@ if __name__ == '__main__':
 				start = time.perf_counter()
 				res   = test_proc(a, b)
 				diff  = time.perf_counter() - start
+
 				TOTAL_TIME += diff
 
 				if test_proc not in TIMINGS:

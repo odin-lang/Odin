@@ -21,6 +21,7 @@ Category :: enum {
 	choose,
 	lsb,
 	ctz,
+	sqr,
 	bitfield_extract,
 };
 

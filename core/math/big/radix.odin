@@ -9,6 +9,10 @@ package big
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
 	This file contains radix conversions, `string_to_int` (atoi) and `int_to_string` (itoa).
+
+	TODO:
+		- Use Barrett reduction for non-powers-of-two.
+		- Also look at extracting and splatting several digits at once.
 */
 
 import "core:intrinsics"
