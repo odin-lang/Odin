@@ -52,10 +52,12 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
 }
 
 print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline := true, print_extra_info := false) {
-	as, err := itoa(a, base);
+	assert_if_nil(a);
 
+	as, err := itoa(a, base);
 	defer delete(as);
-	cb, _ := count_bits(a);
+
+	cb := internal_count_bits(a);
 	if print_name {
 		fmt.printf("%v", name);
 	}
@@ -64,7 +66,7 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 	fmt.printf("%v", as);
 	if print_extra_info {
-		fmt.printf(" (base: %v, bits used: %v, flags: %v)", base, cb, a.flags);
+		fmt.printf(" (base: %v, bits: %v (digits: %v), flags: %v)", base, cb, a.used, a.flags);
 	}
 	if newline {
 		fmt.println();
@@ -75,8 +77,19 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	err := set(a, 1);
-	fmt.printf("err: %v\n", err);
+	err: Error;
+	bs: string;
+
+	if err = factorial(a, 500); err != nil { fmt.printf("factorial err: %v\n", err); return; }
+	{
+		SCOPED_TIMING(.sqr);
+		if err = sqr(b, a);     err != nil { fmt.printf("sqr err: %v\n", err); return; }
+	}
+
+	bs, err = itoa(b, 10);
+	defer delete(bs);
+
+	assert(bs[:50] == "14887338741396604108836218987068397819515734169330");
 }
 
 main :: proc() {

@@ -9,10 +9,8 @@ package big
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
 
-import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
-import "core:fmt"
 
 /*
 	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.

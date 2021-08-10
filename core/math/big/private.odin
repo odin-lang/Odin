@@ -256,6 +256,105 @@ _private_int_sqr :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 }
 
 /*
+	The jist of squaring...
+	You do like mult except the offset of the tmpx [one that starts closer to zero] can't equal the offset of tmpy.
+	So basically you set up iy like before then you min it with (ty-tx) so that it never happens.
+	You double all those you add in the inner loop. After that loop you do the squares and add them in.
+
+	Assumes `dest` and `src` not to be `nil` and `src` to have been initialized.	
+*/
+_private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	W: [_WARRAY]DIGIT = ---;
+
+	/*
+		Grow the destination as required.
+	*/
+	pa := uint(src.used) + uint(src.used);
+	if err = internal_grow(dest, int(pa)); err != nil { return err; }
+
+	/*
+		Number of output digits to produce.
+	*/
+	W1 := _WORD(0);
+	_W  : _WORD = ---;
+	ix := uint(0);
+
+	#no_bounds_check for ; ix < pa; ix += 1 {
+		/*
+			Clear counter.
+		*/
+		_W = {};
+
+		/*
+			Get offsets into the two bignums.
+		*/
+		ty := min(uint(src.used) - 1, ix);
+		tx := ix - ty;
+
+		/*
+			This is the number of times the loop will iterate,
+			essentially while (tx++ < a->used && ty-- >= 0) { ... }
+		*/
+		iy := min(uint(src.used) - tx, ty + 1);
+
+		/*
+			Now for squaring, tx can never equal ty.
+			We halve the distance since they approach at a rate of 2x,
+			and we have to round because odd cases need to be executed.
+		*/
+		iy = min(iy, ((ty - tx) + 1) >> 1 );
+
+		/*
+			Execute loop.
+		*/
+		#no_bounds_check for iz := uint(0); iz < iy; iz += 1 {
+			_W += _WORD(src.digit[tx + iz]) * _WORD(src.digit[ty - iz]);
+		}
+
+		/*
+			Double the inner product and add carry.
+		*/
+		_W = _W + _W + W1;
+
+		/*
+			Even columns have the square term in them.
+		*/
+		if ix & 1 == 0 {
+			_W += _WORD(src.digit[ix >> 1]) * _WORD(src.digit[ix >> 1]);
+		}
+
+		/*
+			Store it.
+		*/
+		W[ix] = DIGIT(_W & _WORD(_MASK));
+
+		/*
+			Make next carry.
+		*/
+		W1 = _W >> _DIGIT_BITS;
+	}
+
+	/*
+		Setup dest.
+	*/
+	old_used := dest.used;
+	dest.used = src.used + src.used;
+
+	#no_bounds_check for ix = 0; ix < pa; ix += 1 {
+		dest.digit[ix] = W[ix] & _MASK;
+	}
+
+	/*
+		Clear unused digits [that existed in the old copy of dest].
+	*/
+	internal_zero_unused(dest, old_used);
+
+	return internal_clamp(dest);
+}
+
+/*
 	Divide by three (based on routine from MPI and the GMP manual).
 */
 _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {

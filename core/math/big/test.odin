@@ -94,6 +94,22 @@ PyRes :: struct {
 	return PyRes{res = r, err = nil};
 }
 
+@export test_sqr :: proc "c" (a: cstring) -> (res: PyRes) {
+	context = runtime.default_context();
+	err: Error;
+
+	aa, square := &Int{}, &Int{};
+	defer internal_destroy(aa, square);
+
+	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":sqr:atoi(a):", err=err}; }
+	if err = #force_inline internal_sqr(square, aa);        err != nil { return PyRes{res=":sqr:sqr(square,a):", err=err}; }
+
+	r: cstring;
+	r, err = int_itoa_cstring(square, 16, context.temp_allocator);
+	if err != nil { return PyRes{res=":sqr:itoa(square):", err=err}; }
+	return PyRes{res = r, err = nil};
+}
+
 /*
 	NOTE(Jeroen): For simplicity, we don't return the quotient and the remainder, just the quotient.
 */

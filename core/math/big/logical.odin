@@ -11,8 +11,6 @@ package big
 	This file contains logical operations like `and`, `or` and `xor`.
 */
 
-import "core:mem"
-
 /*
 	The `and`, `or` and `xor` binops differ in two lines only.
 	We could handle those with a switch, but that adds overhead.
