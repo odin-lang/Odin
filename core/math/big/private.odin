@@ -19,13 +19,16 @@ package big
 */
 
 import "core:intrinsics"
+import "core:mem"
 
 /*
 	Multiplies |a| * |b| and only computes upto digs digits of result.
 	HAC pp. 595, Algorithm 14.12  Modified so you can control how
 	many digits of output are created.
 */
-_private_int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
+_private_int_mul :: proc(dest, a, b: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		Can we use the fast multiplier?
 	*/
@@ -39,7 +42,7 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 
 	t := &Int{};
 
-	if err = grow(t, max(digits, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
+	if err = internal_grow(t, max(digits, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	t.used = digits;
 
 	/*
@@ -81,9 +84,9 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 		}
 	}
 
-	swap(dest, t);
-	destroy(t);
-	return clamp(dest);
+	internal_swap(dest, t);
+	internal_destroy(t);
+	return internal_clamp(dest);
 }
 
 /*
@@ -102,7 +105,9 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 
 	Based on Algorithm 14.12 on pp.595 of HAC.
 */
-_private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
+_private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	/*
 		Set up array.
 	*/
@@ -111,7 +116,7 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 	/*
 		Grow the destination as required.
 	*/
-	if err = grow(dest, digits); err != nil { return err; }
+	if err = internal_grow(dest, digits); err != nil { return err; }
 
 	/*
 		Number of output digits to produce.
@@ -172,27 +177,28 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int) -> (err: Error) {
 	/*
 		Clear unused digits [that existed in the old copy of dest].
 	*/
-	zero_unused(dest, old_used);
+	internal_zero_unused(dest, old_used);
 
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
 
-	return clamp(dest);
+	return internal_clamp(dest);
 }
 
 /*
 	Low level squaring, b = a*a, HAC pp.596-597, Algorithm 14.16
 	Assumes `dest` and `src` to not be `nil`, and `src` to have been initialized.
 */
-_private_int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
+_private_int_sqr :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
 	pa := src.used;
 
 	t := &Int{}; ix, iy: int;
 	/*
 		Grow `t` to maximum needed size, or `_DEFAULT_DIGIT_COUNT`, whichever is bigger.
 	*/
-	if err = grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
+	if err = internal_grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
 	t.used = (2 * pa) + 1;
 
 	#no_bounds_check for ix = 0; ix < pa; ix += 1 {
@@ -243,23 +249,25 @@ _private_int_sqr :: proc(dest, src: ^Int) -> (err: Error) {
 		}
 	}
 
-	err = clamp(t);
-	swap(dest, t);
-	destroy(t);
+	err = internal_clamp(t);
+	internal_swap(dest, t);
+	internal_destroy(t);
 	return err;
 }
 
 /*
 	Divide by three (based on routine from MPI and the GMP manual).
 */
-_private_int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: DIGIT, err: Error) {
+_private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
+	context.allocator = allocator;
+
 	/*
 		b = 2^_DIGIT_BITS / 3
 	*/
  	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3);
 
 	q := &Int{};
-	if err = grow(q, numerator.used); err != nil { return 0, err; }
+	if err = internal_grow(q, numerator.used); err != nil { return 0, err; }
 	q.used = numerator.used;
 	q.sign = numerator.sign;
 
@@ -296,9 +304,9 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: DIGIT, err:
 	*/
 	if quotient != nil {
 		err = clamp(q);
- 		swap(q, quotient);
+ 		internal_swap(q, quotient);
  	}
-	destroy(q);
+	internal_destroy(q);
 	return remainder, nil;
 }
 
@@ -314,19 +322,20 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int) -> (remainder: DIGIT, err:
 	It also doesn't consider the case that y has fewer than three digits, etc.
 	The overall algorithm is as described as 14.20 from HAC but fixed to treat these cases.
 */
-_private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
-	// if err = error_if_immutable(quotient, remainder); err != nil { return err; }
-	// if err = clear_if_uninitialized(quotient, numerator, denominator); err != nil { return err; }
+_private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	if err = error_if_immutable(quotient, remainder); err != nil { return err; }
 
 	q, x, y, t1, t2 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(q, x, y, t1, t2);
+	defer internal_destroy(q, x, y, t1, t2);
 
-	if err = grow(q, numerator.used + 2); err != nil { return err; }
+	if err = internal_grow(q, numerator.used + 2); err != nil { return err; }
 	q.used = numerator.used + 2;
 
-	if err = init_multi(t1, t2);   err != nil { return err; }
-	if err = copy(x, numerator);   err != nil { return err; }
-	if err = copy(y, denominator); err != nil { return err; }
+	if err = internal_init_multi(t1, t2);   err != nil { return err; }
+	if err = internal_copy(x, numerator);   err != nil { return err; }
+	if err = internal_copy(y, denominator); err != nil { return err; }
 
 	/*
 		Fix the sign.
@@ -338,13 +347,12 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 	/*
 		Normalize both x and y, ensure that y >= b/2, [b == 2**MP_DIGIT_BIT]
 	*/
-	norm, _ := count_bits(y);
-	norm %= _DIGIT_BITS;
+	norm := internal_count_bits(y) % _DIGIT_BITS;
 
 	if norm < _DIGIT_BITS - 1 {
 		norm = (_DIGIT_BITS - 1) - norm;
-		if err = shl(x, x, norm); err != nil { return err; }
-		if err = shl(y, y, norm); err != nil { return err; }
+		if err = internal_shl(x, x, norm); err != nil { return err; }
+		if err = internal_shl(y, y, norm); err != nil { return err; }
 	} else {
 		norm = 0;
 	}
@@ -360,19 +368,19 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		y = y*b**{n-t}
 	*/
 
-	if err = shl_digit(y, n - t); err != nil { return err; }
+	if err = internal_shl_digit(y, n - t); err != nil { return err; }
 
-	c, _ := cmp(x, y);
+	c := internal_cmp(x, y);
 	for c != -1 {
 		q.digit[n - t] += 1;
-		if err = sub(x, x, y); err != nil { return err; }
-		c, _ = cmp(x, y);
+		if err = internal_sub(x, x, y); err != nil { return err; }
+		c = internal_cmp(x, y);
 	}
 
 	/*
 		Reset y by shifting it back down.
 	*/
-	shr_digit(y, n - t);
+	internal_shr_digit(y, n - t);
 
 	/*
 		Step 3. for i from n down to (t + 1).
@@ -411,11 +419,11 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			/*
 				Find left hand.
 			*/
-			zero(t1);
+			internal_zero(t1);
 			t1.digit[0] = ((t - 1) < 0) ? 0 : y.digit[t - 1];
 			t1.digit[1] = y.digit[t];
 			t1.used = 2;
-			if err = mul(t1, t1, q.digit[(i - t) - 1]); err != nil { return err; }
+			if err = internal_mul(t1, t1, q.digit[(i - t) - 1]); err != nil { return err; }
 
 			/*
 				Find right hand.
@@ -425,7 +433,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			t2.digit[2] = x.digit[i];
 			t2.used = 3;
 
-			if t1_t2, _ := cmp_mag(t1, t2); t1_t2 != 1 {
+			if t1_t2 := internal_cmp_mag(t1, t2); t1_t2 != 1 {
 				break;
 			}
 			iter += 1; if iter > 100 { return .Max_Iterations_Reached; }
@@ -435,16 +443,16 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			Step 3.3 x = x - q{i-t-1} * y * b**{i-t-1}
 		*/
 		if err = int_mul_digit(t1, y, q.digit[(i - t) - 1]); err != nil { return err; }
-		if err = shl_digit(t1, (i - t) - 1);       err != nil { return err; }
-		if err = sub(x, x, t1); err != nil { return err; }
+		if err = internal_shl_digit(t1, (i - t) - 1);        err != nil { return err; }
+		if err = internal_sub(x, x, t1);                     err != nil { return err; }
 
 		/*
 			if x < 0 then { x = x + y*b**{i-t-1}; q{i-t-1} -= 1; }
 		*/
 		if x.sign == .Negative {
-			if err = copy(t1, y); err != nil { return err; }
-			if err = shl_digit(t1, (i - t) - 1); err != nil { return err; }
-			if err = add(x, x, t1); err != nil { return err; }
+			if err = internal_copy(t1, y);                err != nil { return err; }
+			if err = internal_shl_digit(t1, (i - t) - 1); err != nil { return err; }
+			if err = internal_add(x, x, t1);              err != nil { return err; }
 
 			q.digit[(i - t) - 1] = (q.digit[(i - t) - 1] - 1) & _MASK;
 		}
@@ -458,14 +466,14 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 	x.sign = .Zero_or_Positive if z else numerator.sign;
 
 	if quotient != nil {
-		clamp(q);
-		swap(q, quotient);
+		internal_clamp(q);
+		internal_swap(q, quotient);
 		quotient.sign = .Negative if neg else .Zero_or_Positive;
 	}
 
 	if remainder != nil {
-		if err = shr(x, x, norm); err != nil { return err; }
-		swap(x, remainder);
+		if err = internal_shr(x, x, norm); err != nil { return err; }
+		internal_swap(x, remainder);
 	}
 
 	return nil;
@@ -601,7 +609,9 @@ _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int
 
 	If neither result is wanted, we have nothing to do.
 */
-_private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
+_private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	if res_gcd == nil && res_lcm == nil { return nil; }
 
 	/*
@@ -612,10 +622,10 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 			GCD(0, 0) and LCM(0, 0) are both 0.
 		*/
 		if res_gcd != nil {
-			if err = zero(res_gcd);	err != nil { return err; }
+			if err = internal_zero(res_gcd);	err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm);	err != nil { return err; }
+			if err = internal_zero(res_lcm);	err != nil { return err; }
 		}
 		return nil;
 	} else if a.used == 0 {
@@ -623,10 +633,10 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 			We can early out with GCD = B and LCM = 0
 		*/
 		if res_gcd != nil {
-			if err = abs(res_gcd, b); err != nil { return err; }
+			if err = internal_abs(res_gcd, b); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm); err != nil { return err; }
+			if err = internal_zero(res_lcm); err != nil { return err; }
 		}
 		return nil;
 	} else if b.used == 0 {
@@ -634,25 +644,25 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 			We can early out with GCD = A and LCM = 0
 		*/
 		if res_gcd != nil {
-			if err = abs(res_gcd, a); err != nil { return err; }
+			if err = internal_abs(res_gcd, a); err != nil { return err; }
 		}
 		if res_lcm != nil {
-			if err = zero(res_lcm); err != nil { return err; }
+			if err = internal_zero(res_lcm); err != nil { return err; }
 		}
 		return nil;
 	}
 
 	temp_gcd_res := &Int{};
-	defer destroy(temp_gcd_res);
+	defer internal_destroy(temp_gcd_res);
 
 	/*
 		If neither `a` or `b` was zero, we need to compute `gcd`.
  		Get copies of `a` and `b` we can modify.
  	*/
 	u, v := &Int{}, &Int{};
-	defer destroy(u, v);
-	if err = copy(u, a); err != nil { return err; }
-	if err = copy(v, b); err != nil { return err; }
+	defer internal_destroy(u, v);
+	if err = internal_copy(u, a); err != nil { return err; }
+	if err = internal_copy(v, b); err != nil { return err; }
 
  	/*
  		Must be positive for the remainder of the algorithm.
@@ -662,37 +672,37 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
  	/*
  		B1.  Find the common power of two for `u` and `v`.
  	*/
- 	u_lsb, _ := count_lsb(u);
- 	v_lsb, _ := count_lsb(v);
+ 	u_lsb, _ := internal_count_lsb(u);
+ 	v_lsb, _ := internal_count_lsb(v);
  	k        := min(u_lsb, v_lsb);
 
 	if k > 0 {
 		/*
 			Divide the power of two out.
 		*/
-		if err = shr(u, u, k); err != nil { return err; }
-		if err = shr(v, v, k); err != nil { return err; }
+		if err = internal_shr(u, u, k); err != nil { return err; }
+		if err = internal_shr(v, v, k); err != nil { return err; }
 	}
 
 	/*
 		Divide any remaining factors of two out.
 	*/
 	if u_lsb != k {
-		if err = shr(u, u, u_lsb - k); err != nil { return err; }
+		if err = internal_shr(u, u, u_lsb - k); err != nil { return err; }
 	}
 	if v_lsb != k {
-		if err = shr(v, v, v_lsb - k); err != nil { return err; }
+		if err = internal_shr(v, v, v_lsb - k); err != nil { return err; }
 	}
 
 	for v.used != 0 {
 		/*
 			Make sure `v` is the largest.
 		*/
-		if c, _ := cmp_mag(u, v); c == 1 {
+		if internal_cmp_mag(u, v) == 1 {
 			/*
 				Swap `u` and `v` to make sure `v` is >= `u`.
 			*/
-			swap(u, v);
+			internal_swap(u, v);
 		}
 
 		/*
@@ -703,14 +713,14 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		/*
 			Divide out all factors of two.
 		*/
-		b, _ := count_lsb(v);
-		if err = shr(v, v, b); err != nil { return err; }
+		b, _ := internal_count_lsb(v);
+		if err = internal_shr(v, v, b); err != nil { return err; }
 	}
 
  	/*
  		Multiply by 2**k which we divided out at the beginning.
  	*/
- 	if err = shl(temp_gcd_res, u, k); err != nil { return err; }
+ 	if err = internal_shl(temp_gcd_res, u, k); err != nil { return err; }
  	temp_gcd_res.sign = .Zero_or_Positive;
 
 	/*
@@ -718,7 +728,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		If we don't want `lcm`, we're done.
 	*/
 	if res_lcm == nil {
-		swap(temp_gcd_res, res_gcd);
+		internal_swap(temp_gcd_res, res_gcd);
 		return nil;
 	}
 
@@ -726,7 +736,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 		Computes least common multiple as `|a*b|/gcd(a,b)`
 		Divide the smallest by the GCD.
 	*/
-	if c, _ := cmp_mag(a, b); c == -1 {
+	if internal_cmp_mag(a, b) == -1 {
 		/*
 			Store quotient in `t2` such that `t2 * b` is the LCM.
 		*/
@@ -741,7 +751,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 	}
 
 	if res_gcd != nil {
-		swap(temp_gcd_res, res_gcd);
+		internal_swap(temp_gcd_res, res_gcd);
 	}
 
 	/*
@@ -749,6 +759,104 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int) -> (err: Error) {
 	*/
 	res_lcm.sign = .Zero_or_Positive;
 	return err;
+}
+
+/*
+	Internal implementation of log.
+	Assumes `a` not to be `nil` and to have been initialized.
+*/
+_private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: int, err: Error) {
+	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+
+	ic := #force_inline internal_cmp(a, base);
+	if ic == -1 || ic == 0 {
+		return 1 if ic == 0 else 0, nil;
+	}
+
+	if err = internal_set(bi_base, base, true, allocator);        err != nil { return -1, err; }
+	if err = internal_clear(bracket_mid, false, allocator);       err != nil { return -1, err; }
+	if err = internal_clear(t, false, allocator);                 err != nil { return -1, err; }
+	if err = internal_one(bracket_low, false, allocator);         err != nil { return -1, err; }
+	if err = internal_set(bracket_high, base, false, allocator);  err != nil { return -1, err; }
+
+	low := 0; high := 1;
+
+	/*
+		A kind of Giant-step/baby-step algorithm.
+		Idea shamelessly stolen from https://programmingpraxis.com/2010/05/07/integer-logarithms/2/
+		The effect is asymptotic, hence needs benchmarks to test if the Giant-step should be skipped
+		for small n.
+	*/
+
+	for {
+		/*
+			Iterate until `a` is bracketed between low + high.
+		*/
+		if #force_inline internal_cmp(bracket_high, a) != -1 { break; }
+
+		low = high;
+		if err = #force_inline internal_copy(bracket_low, bracket_high);                err != nil { return -1, err; }
+		high <<= 1;
+		if err = #force_inline internal_sqr(bracket_high, bracket_high);  err != nil { return -1, err; }
+	}
+
+	for (high - low) > 1 {
+		mid := (high + low) >> 1;
+
+		if err = #force_inline internal_pow(t, bi_base, mid - low);       err != nil { return -1, err; }
+
+		if err = #force_inline internal_mul(bracket_mid, bracket_low, t); err != nil { return -1, err; }
+
+		mc := #force_inline internal_cmp(a, bracket_mid);
+		switch mc {
+		case -1:
+			high = mid;
+			internal_swap(bracket_mid, bracket_high);
+		case  0:
+			return mid, nil;
+		case  1:
+			low = mid;
+			internal_swap(bracket_mid, bracket_low);
+		}
+	}
+
+	fc := #force_inline internal_cmp(bracket_high, a);
+	res = high if fc == 0 else low;
+
+	return;
+}
+
+/*
+	Returns the log2 of an `Int`.
+	Assumes `a` not to be `nil` and to have been initialized.
+	Also assumes `base` is a power of two.
+*/
+_private_log_power_of_two :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error) {
+	base := base;
+	y: int;
+	for y = 0; base & 1 == 0; {
+		y += 1;
+		base >>= 1;
+	}
+	log = internal_count_bits(a);
+	return (log - 1) / y, err;
+}
+
+/*
+	Copies DIGITs from `src` to `dest`.
+	Assumes `src` and `dest` to not be `nil` and have been initialized.
+*/
+_private_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
+	digits := digits;
+	/*
+		If dest == src, do nothing
+	*/
+	if dest == src { return nil; }
+
+	digits = min(digits, len(src.digit), len(dest.digit));
+	mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
+	return nil;
 }
 
 /*	

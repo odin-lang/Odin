@@ -19,9 +19,10 @@ import "core:mem"
 */
 int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	assert_if_nil(a);
+	context.allocator = allocator;
 
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a, allocator); err != nil { return "", err; }
+	if err = clear_if_uninitialized(a); err != nil { return "", err; }
 	/*
 		Radix defaults to 10.
 	*/
@@ -46,7 +47,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 	/*
 		Allocate the buffer we need.
 	*/
-	buffer := make([]u8, size, allocator);
+	buffer := make([]u8, size);
 
 	/*
 		Write the digits out into the buffer.
@@ -62,16 +63,17 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 */
 int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
 	assert_if_nil(a);
+	context.allocator = allocator;
 
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a, allocator); err != nil { return "", err; }
+	if err = clear_if_uninitialized(a); err != nil { return "", err; }
 	/*
 		Radix defaults to 10.
 	*/
 	radix = radix if radix > 0 else 10;
 
 	s: string;
-	s, err = int_itoa_string(a, radix, true, allocator);
+	s, err = int_itoa_string(a, radix, true);
 	return cstring(raw_data(s)), err;
 }
 
@@ -237,7 +239,10 @@ int_to_cstring :: int_itoa_cstring;
 	Read a string [ASCII] in a given radix.
 */
 int_atoi :: proc(res: ^Int, input: string, radix: i8, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(res);
 	input := input;
+	context.allocator = allocator;
+
 	/*
 		Make sure the radix is ok.
 	*/
@@ -247,7 +252,7 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8, allocator := context.alloc
 	/*
 		Set the integer to the default of zero.
 	*/
-	if err = zero(res, false, allocator); err != nil { return err; }
+	if err = internal_zero(res); err != nil { return err; }
 
 	/*
 		We'll interpret an empty string as zero.
@@ -319,23 +324,21 @@ atoi :: proc { int_atoi, };
 /*
 	We size for `string` by default.
 */
-radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, err: Error) {
+radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := context.allocator) -> (size: int, err: Error) {
 	a := a;
-	if radix < 2 || radix > 64 {
-		return -1, .Invalid_Argument;
-	}
-	if err = clear_if_uninitialized(a); err != nil {
-		return 0, err;
-	}
+	assert_if_nil(a);
 
-	if z, _ := is_zero(a); z {
+	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument; }
+	if err = clear_if_uninitialized(a); err != nil { return {}, err; }
+
+	if internal_is_zero(a) {
 		if zero_terminate {
 			return 2, nil;
 		}
 		return 1, nil;
 	}
 
-	if pot, _ := is_power_of_two(a); pot {
+	if internal_is_power_of_two(a) {
 		/*
 			Calculate `log` on a temporary "copy" with its sign set to positive.
 		*/
@@ -345,28 +348,26 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false) -> (size: int, e
 			digit     = a.digit,
 		};
 
-		if size, err = log(t, DIGIT(radix)); err != nil {
-			return 0, err;
-		}
+		if size, err = internal_log(t, DIGIT(radix));   err != nil { return {}, err; }
 	} else {
 		la, k := &Int{}, &Int{};
-		defer destroy(la, k);
+		defer internal_destroy(la, k);
 
 		/* la = floor(log_2(a)) + 1 */
-		bit_count, _ := count_bits(a);
-		err = set(la, bit_count);
+		bit_count := internal_count_bits(a);
+		if err = internal_set(la, bit_count);           err != nil { return {}, err; }
 
 		/* k = floor(2^29/log_2(radix)) + 1 */
 		lb := _log_bases;
-		err = set(k, lb[radix]);
+		if err = internal_set(k, lb[radix]);            err != nil { return {}, err; }
 
 		/* n = floor((la *  k) / 2^29) + 1 */
-		if err = mul(k, la, k); err != nil { return 0, err; }
-		if err = shr(k, k, _RADIX_SIZE_SCALE); err != nil { return 0, err; }
+		if err = internal_mul(k, la, k);                err != nil { return 0, err; }
+		if err = internal_shr(k, k, _RADIX_SIZE_SCALE); err != nil { return {}, err; }
 
 		/* The "+1" here is the "+1" in "floor((la *  k) / 2^29) + 1" */
 		/* n = n + 1 + EOS + sign */
-		size_, _ := get(k, u128);
+		size_, _ := internal_get(k, u128);
 		size = int(size_);
 	}
 
@@ -429,11 +430,14 @@ RADIX_TABLE_REVERSE_SIZE :: 80;
 	Stores a bignum as a ASCII string in a given radix (2..64)
 	The buffer must be appropriately sized. This routine doesn't check.
 */
-_itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false) -> (written: int, err: Error) {
+_itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
 	temp, denominator := &Int{}, &Int{};
 
-	if err = copy(temp, a); err != nil { return 0, err; }
-	if err = set(denominator, radix); err != nil { return 0, err; }
+	if err = internal_copy(temp, a);           err != nil { return 0, err; }
+	if err = internal_set(denominator, radix); err != nil { return 0, err; }
 
 	available := len(buffer);
 	if zero_terminate {
@@ -448,7 +452,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	remainder: DIGIT;
 	for {
 		if remainder, err = #force_inline internal_divmod(temp, temp, DIGIT(radix)); err != nil {
-			destroy(temp, denominator);
+			internal_destroy(temp, denominator);
 			return len(buffer) - available, err;
 		}
 		available -= 1;
@@ -463,7 +467,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		buffer[available] = '-';
 	}
 
-	destroy(temp, denominator);
+	internal_destroy(temp, denominator);
 
 	/*
 		If we overestimated the size, we need to move the buffer left.
