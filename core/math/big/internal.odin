@@ -1719,9 +1719,9 @@ internal_int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 	/*
 		If `dest == src`, just fix `dest`'s sign.
 	*/
-	sign := Sign.Zero_or_Positive;
+	sign := Sign.Negative;
 	if #force_inline internal_is_zero(src) || #force_inline internal_is_negative(src) {
-		sign = .Negative;
+		sign = .Zero_or_Positive;
 	}
 	if dest == src {
 		dest.sign = sign;

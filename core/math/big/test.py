@@ -61,7 +61,6 @@ parser.add_argument(
 timed_or_fast.add_argument(
 	"-fast-tests",
 	help    = "Cut down on the number of iterations of each test",
-	default = True,
 	action  = "store_true",
 )
 
