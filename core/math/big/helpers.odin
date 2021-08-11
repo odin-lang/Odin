@@ -12,6 +12,8 @@ package math_big
 import "core:intrinsics"
 import rnd "core:math/rand"
 
+// import "core:fmt"
+
 /*
 	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
 */
@@ -608,16 +610,17 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 	if l == 0 { return .Invalid_Argument; }
 
 	sign: Sign;
-	size_in_bits   := l * 8;
+	size_in_bits := l * 8;
 	if signed { 
 		/*
 			First byte denotes the sign.
 		*/
 		size_in_bits -= 8;
 	}
-	size_in_digits := size_in_bits / _DIGIT_BITS;
+	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS;
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1;
-	if err = internal_grow(a, size_in_digits); err != nil { return err; }
+	if err = internal_zero(a, false, allocator); err != nil { return err; }
+	if err = internal_grow(a, size_in_digits, false, allocator); err != nil { return err; }
 
 	if signed {
 		sign = .Zero_or_Positive if buf[0] == 0 else .Negative;
@@ -629,7 +632,139 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 		a.digit[0] |= DIGIT(v);
 	}
 	a.sign = sign;
+	a.used = size_in_digits;
 	return internal_clamp(a);
+}
+
+/*
+	Read `Int` from a Big Endian Python binary representation.
+	Sign is detected from the first byte if `signed` is true.
+*/
+int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	buf := buf;
+	l := len(buf);
+	if l == 0 { return .Invalid_Argument; }
+
+	sign: Sign;
+	size_in_bits := l * 8;
+	if signed { 
+		/*
+			First byte denotes the sign.
+		*/
+		size_in_bits -= 8;
+	}
+	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS;
+	size_in_digits += 0 if size_in_bits % 8 == 0 else 1;
+	if err = internal_zero(a, false, allocator); err != nil { return err; }
+	if err = internal_grow(a, size_in_digits, false, allocator); err != nil { return err; }
+
+	if signed {
+		sign = .Zero_or_Positive if buf[0] == 0 else .Negative;
+		buf = buf[1:];
+	}
+
+	for v in buf {
+		if err = internal_shl(a, a, 8); err != nil { return err; }
+		if signed && sign == .Negative {
+			a.digit[0] |= DIGIT(255 - v);	
+		} else {
+			a.digit[0] |= DIGIT(v);
+		}
+	}
+	a.sign = sign;
+	a.used = size_in_digits;
+	if err = internal_clamp(a); err != nil { return err; }
+
+	if signed && sign == .Negative {
+		return internal_sub(a, a, 1);
+	}
+	return nil;
+}
+
+/*
+	Read `Int` from a Little Endian binary representation.
+	Sign is detected from the last byte if `signed` is true.
+*/
+int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	buf := buf;
+	l := len(buf);
+	if l == 0 { return .Invalid_Argument; }
+
+	sign: Sign;
+	size_in_bits   := l * 8;
+	if signed { 
+		/*
+			First byte denotes the sign.
+		*/
+		size_in_bits -= 8;
+	}
+	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS;
+	size_in_digits += 0 if size_in_bits % 8 == 0 else 1;
+	if err = internal_zero(a, false, allocator); err != nil { return err; }
+	if err = internal_grow(a, size_in_digits, false, allocator); err != nil { return err; }
+
+	if signed {
+		sign = .Zero_or_Positive if buf[l-1] == 0 else .Negative;
+		buf = buf[:l-1];
+		l -= 1;
+	}
+
+	for _, i in buf {
+		if err = internal_shl(a, a, 8); err != nil { return err; }
+		a.digit[0] |= DIGIT(buf[l-i-1]);
+	}
+	a.sign = sign;
+	a.used = size_in_digits;
+	return internal_clamp(a);
+}
+
+/*
+	Read `Int` from a Little Endian Python binary representation.
+	Sign is detected from the first byte if `signed` is true.
+*/
+int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	buf := buf;
+	l := len(buf);
+	if l == 0 { return .Invalid_Argument; }
+
+	sign: Sign;
+	size_in_bits := l * 8;
+	if signed { 
+		/*
+			First byte denotes the sign.
+		*/
+		size_in_bits -= 8;
+	}
+	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS;
+	size_in_digits += 0 if size_in_bits % 8 == 0 else 1;
+	if err = internal_zero(a, false, allocator); err != nil { return err; }
+	if err = internal_grow(a, size_in_digits, false, allocator); err != nil { return err; }
+
+	if signed {
+		sign = .Zero_or_Positive if buf[l-1] == 0 else .Negative;
+		buf = buf[:l-1];
+		l -= 1;
+	}
+
+	for _, i in buf {
+		if err = internal_shl(a, a, 8); err != nil { return err; }
+		if signed && sign == .Negative {
+			a.digit[0] |= DIGIT(255 - buf[l-i-1]);
+		} else {
+			a.digit[0] |= DIGIT(buf[l-i-1]);
+		}
+	}
+	a.sign = sign;
+	a.used = size_in_digits;
+	if err = internal_clamp(a); err != nil { return err; }
+
+	if signed && sign == .Negative {
+		return internal_sub(a, a, 1);
+	}
+	return nil;
 }
 
 /*
