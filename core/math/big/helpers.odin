@@ -481,22 +481,6 @@ int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocat
 }
 
 /*
-	Size binary representation, Python `._to_bytes(num_bytes, "endianness", signed=Bool)` compatible.
-*/
-int_to_bytes_size_python :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
-	assert_if_nil(a);
-	size_in_bytes, err = int_to_bytes_size(a, signed, allocator);
-
-	/*
-		Python uses a complement representation of negative numbers and doesn't add a prefix byte.
-	*/
-	if signed {
-		size_in_bytes -= 1;
-	}
-	return;
-}
-
-/*
 	Return Little Endian binary representation of `a`, either signed or unsigned.
 	If `a` is negative and we ask for the default unsigned representation, we return abs(a).
 */
@@ -505,13 +489,13 @@ int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := co
 	size_in_bytes: int;
 
 	if size_in_bytes, err = int_to_bytes_size(a, signed, allocator); err != nil { return err; }
-	if size_in_bytes > len(buf) { return .Buffer_Overflow; }
+	l := len(buf);
+	if size_in_bytes > l { return .Buffer_Overflow; }
 
 	size_in_bits := internal_count_bits(a);
 	i := 0;
 	if signed {
-		i += 1;
-		buf[0] = 1 if a.sign == .Negative else 0;
+		buf[l - 1] = 1 if a.sign == .Negative else 0;
 	}
 	for offset := 0; offset < size_in_bits; offset += 8 {
 		bits, _ := internal_int_bitfield_extract(a, offset, 8);
@@ -553,24 +537,31 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 	assert_if_nil(a);
 	size_in_bytes: int;
 
-	if a.sign == .Zero_or_Positive {
-		return int_to_bytes_little(a, buf, signed, allocator);
-	}
-	if a.sign == .Negative && !signed { return .Invalid_Argument; }
+	if !signed && a.sign == .Negative { return .Invalid_Argument; }
 
 	l := len(buf);
-	if size_in_bytes, err = int_to_bytes_size_python(a, signed, allocator); err != nil { return err; }
+	if size_in_bytes, err = int_to_bytes_size(a, signed, allocator); err != nil { return err; }
 	if size_in_bytes > l              { return .Buffer_Overflow;  }
 
-	t := &Int{};
-	defer destroy(t);
-	if err = complement(t, a, allocator); err != nil { return err; }
+	if a.sign == .Negative {
+		t := &Int{};
+		defer destroy(t);
+		if err = internal_complement(t, a, allocator); err != nil { return err; }
 
-	size_in_bits := internal_count_bits(t);
-	i := 0;
-	for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(t, offset, 8);
-		buf[i] = 255 - u8(bits & 255); i += 1;
+		size_in_bits := internal_count_bits(t);
+		i := 0;
+		for offset := 0; offset < size_in_bits; offset += 8 {
+			bits, _ := internal_int_bitfield_extract(t, offset, 8);
+			buf[i] = 255 - u8(bits & 255); i += 1;
+		}
+		buf[l-1] = 255;
+	} else {
+		size_in_bits := internal_count_bits(a);
+		i := 0;
+		for offset := 0; offset < size_in_bits; offset += 8 {
+			bits, _ := internal_int_bitfield_extract(a, offset, 8);
+			buf[i] = u8(bits & 255); i += 1;
+		}
 	}
 	return;
 }
@@ -583,27 +574,62 @@ int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator :
 	assert_if_nil(a);
 	size_in_bytes: int;
 
-	if a.sign == .Zero_or_Positive {
-		return int_to_bytes_big(a, buf, signed, allocator);
-	}
-	if a.sign == .Negative && !signed { return .Invalid_Argument; }
+	if !signed && a.sign == .Negative { return .Invalid_Argument; }
+	if a.sign == .Zero_or_Positive    { return int_to_bytes_big(a, buf, signed, allocator); }
 
 	l := len(buf);
-	if size_in_bytes, err = int_to_bytes_size_python(a, signed, allocator); err != nil { return err; }
+	if size_in_bytes, err = int_to_bytes_size(a, signed, allocator); err != nil { return err; }
 	if size_in_bytes > l              { return .Buffer_Overflow;  }
 
 	t := &Int{};
 	defer destroy(t);
-	if err = complement(t, a, allocator); err != nil { return err; }
+
+	if err = internal_complement(t, a, allocator); err != nil { return err; }
 
 	size_in_bits := internal_count_bits(t);
 	i := l - 1;
-
 	for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(a, offset, 8);
+		bits, _ := internal_int_bitfield_extract(t, offset, 8);
 		buf[i] = 255 - u8(bits & 255); i -= 1;
 	}
+	buf[0] = 255;
+
 	return;
+}
+
+/*
+	Read `Int` from a Big Endian binary representation.
+	Sign is detected from the first byte if `signed` is true.
+*/
+int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	buf := buf;
+	l := len(buf);
+	if l == 0 { return .Invalid_Argument; }
+
+	sign: Sign;
+	size_in_bits   := l * 8;
+	if signed { 
+		/*
+			First byte denotes the sign.
+		*/
+		size_in_bits -= 8;
+	}
+	size_in_digits := size_in_bits / _DIGIT_BITS;
+	size_in_digits += 0 if size_in_bits % 8 == 0 else 1;
+	if err = internal_grow(a, size_in_digits); err != nil { return err; }
+
+	if signed {
+		sign = .Zero_or_Positive if buf[0] == 0 else .Negative;
+		buf = buf[1:];
+	}
+
+	for v in buf {
+		if err = internal_shl(a, a, 8); err != nil { return err; }
+		a.digit[0] |= DIGIT(v);
+	}
+	a.sign = sign;
+	return internal_clamp(a);
 }
 
 /*

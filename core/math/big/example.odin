@@ -73,67 +73,115 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
+int_to_byte :: proc(v: ^Int) {
+	err: Error;
+	size: int;
+	print("v: ", v);
+	fmt.println();
+
+	if size, err = int_to_bytes_size(v); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b1 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_big(v, b1);
+	fmt.printf("big: %v | err: %v\n", b1, err);
+
+
+	if size, err = int_to_bytes_size(v); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b2 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_big_python(v, b2);
+	fmt.printf("big python: %v | err: %v\n", b2, err);
+
+
+	if size, err = int_to_bytes_size(v, true); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b3 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_big(v, b3, true);
+	fmt.printf("big signed: %v | err: %v\n", b3, err);
+
+	t := &Int{};
+	int_from_bytes_big(t, b3, true);
+	defer destroy(t);
+	print("t: ", t);
+
+	if size, err = int_to_bytes_size(v, true); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b4 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_big_python(v, b4, true);
+	fmt.printf("big signed python: %v | err: %v\n", b4, err);
+}
+
+int_to_byte_little :: proc(v: ^Int) {
+	err: Error;
+	size: int;
+	print("v: ", v);
+	fmt.println();
+
+	if size, err = int_to_bytes_size(v); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b1 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_little(v, b1);
+	fmt.printf("little: %v | err: %v\n", b1, err);
+
+
+	if size, err = int_to_bytes_size(v); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b2 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_little_python(v, b2);
+	fmt.printf("little python: %v | err: %v\n", b2, err);
+
+
+	if size, err = int_to_bytes_size(v, true); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b3 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_little(v, b3, true);
+	fmt.printf("little signed: %v | err: %v\n", b3, err);
+
+	// t := &Int{};
+	// int_from_bytes_little(t, b3, true);
+	// defer destroy(t);
+	// print("t: ", t);
+
+	if size, err = int_to_bytes_size(v, true); err != nil {
+		fmt.printf("int_to_bytes_size returned: %v\n", err);
+		return;
+	}
+	b4 := make([]u8, size, context.temp_allocator);
+	err = int_to_bytes_little_python(v, b4, true);
+	fmt.printf("little signed python: %v | err: %v\n", b4, err);
+}
+
 demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	err: Error;
+	set(a, 64336);
+	fmt.println("--- --- --- ---");
+	int_to_byte(a);
+	fmt.println("--- --- --- ---");
+	int_to_byte_little(a);
+	fmt.println("--- --- --- ---");
 
-	foo := "2291194942392555914538479778530519876003906024854260006581638127590953";
-	if err = atoi(a, foo, 10); err != nil { return; }
-	// print("a: ", a, 10, true, true, true);
-
-	byte_length, _ := int_to_bytes_size(a);
-
-	fmt.printf("byte_length(a): %v\n", byte_length);
-
-	buf := make([]u8, byte_length);
-	defer delete(buf);
-
-	err = int_to_bytes_big(a, buf);
-
-	python_big := []u8{
-		 84, 252,  50,  97,  27,  81,  11, 101,  58,  96, 138, 175,  65, 202, 109,
-		142, 106, 146, 117,  32, 200, 113,  36, 214, 188, 157, 242, 158,  41,
-	};
-
-	if mem.compare(python_big, buf) == 0 {
-		fmt.printf("int_to_bytes_big: pass\n");
-	} else {
-		fmt.printf("int_to_bytes_big: fail | %v\n", buf);
-	}
-	python_little := []u8{
-		 41, 158, 242, 157, 188, 214,  36, 113, 200,  32, 117, 146, 106, 142, 109,
-		202,  65, 175, 138,  96,  58, 101,  11,  81,  27,  97,  50, 252,  84,
-	};
-
-	err = int_to_bytes_little(a, buf);
-	if mem.compare(python_little, buf) == 0 {
-		fmt.printf("int_to_bytes_little: pass\n");
-	} else {
-		fmt.printf("int_to_bytes_little: fail | %v\n", buf);
-	}
-
-	_ = neg(b, a);
-
-	python_little_neg := []u8{
-		215,  97,  13,  98,  67,  41, 219, 142,  55, 223, 138, 109, 149, 113, 146,
-		 53, 190,  80, 117, 159, 197, 154, 244, 174, 228, 158, 205,   3, 171,
-	};
-
-	byte_length, _ = int_to_bytes_size_python(b, true);
-
-	fmt.printf("byte_length(a): %v\n", byte_length);
-
-	buf2 := make([]u8, byte_length);
-	defer delete(buf2);
-
-	err = int_to_bytes_little_python(b, buf, true);
-	if mem.compare(python_little_neg, buf) == 0 {
-		fmt.printf("int_to_bytes_little: pass\n");
-	} else {
-		fmt.printf("int_to_bytes_little: %v | %v\n", err, buf);
-	}
+	set(b, -64336);
+	fmt.println("--- --- --- ---");
+	int_to_byte(b);
+	fmt.println("--- --- --- ---");
+	int_to_byte_little(b);
+	fmt.println("--- --- --- ---");
 }
 
 main :: proc() {
