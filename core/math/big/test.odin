@@ -1,5 +1,5 @@
 //+ignore
-package big
+package math_big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
