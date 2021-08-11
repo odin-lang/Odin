@@ -40,6 +40,9 @@ SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF;
 	It would also be cool if we collected some data across various processor families.
 	This would let uss set reasonable defaults at runtime as this library initializes
 	itself by using `cpuid` or the ARM equivalent.
+
+	IMPORTANT: The 32_BIT path has largely gone untested. It needs to be tested and
+	debugged where necessary.
 */
 
 _DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF,  80);
