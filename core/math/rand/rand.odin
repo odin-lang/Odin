@@ -95,7 +95,7 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 
 int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	if n <= 0 {
-		panic("Invalid argument to int63_max");
+		panic("Invalid argument to int127_max");
 	}
 	if n&(n-1) == 0 {
 		return int127(r) & (n-1);
