@@ -1,4 +1,4 @@
-package big
+package math_big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
@@ -8,7 +8,7 @@ package big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
-	This file contains basic arithmetic operations like `add`, `sub`, `mul`, `div`, ...
+	This file contains prime finding operations.
 */
 
 /*

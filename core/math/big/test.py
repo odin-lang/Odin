@@ -6,32 +6,66 @@ import platform
 import time
 import gc
 from enum import Enum
+import argparse
 
-#
-# Normally, we report the number of passes and fails.
-# With EXIT_ON_FAIL set, we exit at the first fail.
-#
-EXIT_ON_FAIL = True
-EXIT_ON_FAIL = False
 
+parser = argparse.ArgumentParser(
+	description     = "Odin core:math/big test suite",
+	epilog          = "By default we run regression and random tests with preset parameters.",
+    formatter_class = argparse.ArgumentDefaultsHelpFormatter,
+)
 #
-# We skip randomized tests altogether if NO_RANDOM_TESTS is set.
+# Normally, we report the number of passes and fails. With this option set, we exit at first fail.
 #
-NO_RANDOM_TESTS = True
-NO_RANDOM_TESTS = False
+parser.add_argument(
+	"-exit-on-fail",
+	help    = "Exit when a test fails",
+	action  = "store_true",
+)
+#
+# We skip randomized tests altogether if this is set.
+#
 
-#
-# If TIMED_TESTS == False and FAST_TESTS == True, we cut down the number of iterations.
-# See below.
-#
-FAST_TESTS = True
+no_random = parser.add_mutually_exclusive_group()
 
+no_random.add_argument(
+	"-no-random",
+	help    = "No random tests",
+	action  = "store_true",
+)
+#
+# Normally we run a given number of cycles on each test.
+# Timed tests budget 1 second per 20_000 bits instead.
 #
 # For timed tests we budget a second per `n` bits and iterate until we hit that time.
-# Otherwise, we specify the number of iterations per bit depth in BITS_AND_ITERATIONS.
 #
-TIMED_TESTS = False
-TIMED_BITS_PER_SECOND = 20_000
+
+timed_or_fast = no_random.add_mutually_exclusive_group()
+
+timed_or_fast.add_argument(
+	"-timed",
+	type    = bool,
+	default = False,
+	help    = "Timed tests instead of a preset number of iterations.",
+)
+parser.add_argument(
+	"-timed-bits",
+	type    = int,
+	metavar = "BITS",
+	default = 20_000,
+	help    = "Timed tests. Every `BITS` worth of input is given a second of running time.",
+)
+#
+# For normal tests (non-timed), `-fast-tests` cuts down on the number of iterations.
+#
+timed_or_fast.add_argument(
+	"-fast-tests",
+	help    = "Cut down on the number of iterations of each test",
+	default = True,
+	action  = "store_true",
+)
+
+args = parser.parse_args()
 
 #
 # How many iterations of each random test do we want to run?
@@ -43,12 +77,12 @@ BITS_AND_ITERATIONS = [
 	(12_000,     10),
 ]
 
-if FAST_TESTS:
+if args.fast_tests:
 	for k in range(len(BITS_AND_ITERATIONS)):
 		b, i = BITS_AND_ITERATIONS[k]
 		BITS_AND_ITERATIONS[k] = (b, i // 10 if i >= 100 else 5)
 
-if NO_RANDOM_TESTS:
+if args.no_random:
 	BITS_AND_ITERATIONS = []
 
 #
@@ -70,7 +104,7 @@ UNTIL_TIME  = 0
 UNTIL_ITERS = 0
 
 def we_iterate():
-	if TIMED_TESTS:
+	if args.timed:
 		return TOTAL_TIME < UNTIL_TIME
 	else:
 		global UNTIL_ITERS
@@ -178,7 +212,7 @@ def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expecte
 			print(error, flush=True)
 			passed = False
 
-	if EXIT_ON_FAIL and not passed: exit(res.err)
+	if args.exit_on_fail and not passed: exit(res.err)
 
 	return passed
 
@@ -488,7 +522,7 @@ TESTS = {
 	],
 }
 
-if not FAST_TESTS:
+if not args.fast_tests:
 	TESTS[test_factorial].append(
 		# This one on its own takes around 800ms, so we exclude it for FAST_TESTS
 		[ 100_000 ],
@@ -517,7 +551,7 @@ for test_proc in TESTS:
 		res   = test_proc(*t)
 
 if __name__ == '__main__':
-	print("---- math/big tests ----")
+	print("\n---- math/big tests ----")
 	print()
 
 	for test_proc in TESTS:
@@ -566,7 +600,7 @@ if __name__ == '__main__':
 			if test_proc == test_root_n and BITS == 1_200:
 				UNTIL_ITERS /= 10
 
-			UNTIL_TIME  = TOTAL_TIME + BITS / TIMED_BITS_PER_SECOND
+			UNTIL_TIME  = TOTAL_TIME + BITS / args.timed_bits
 			# We run each test for a second per 20k bits
 
 			index = 0
