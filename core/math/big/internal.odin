@@ -36,8 +36,6 @@ import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
 
-// import "core:fmt"
-
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
 
@@ -630,8 +628,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			/*
 				Use Toom-Cook?
 			*/
-			// fmt.printf("_private_int_sqr_toom: %v\n", src.used);
-			err = #force_inline _private_int_sqr_karatsuba(dest, src);
+			err = #force_inline _private_int_sqr_toom(dest, src);
 		} else if src.used >= SQR_KARATSUBA_CUTOFF {
 			/*
 				Karatsuba?
