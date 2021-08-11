@@ -45,7 +45,7 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 	return #force_inline internal_int_set_from_integer(dest, src, minimize);
 }
 
-set :: proc { int_set_from_integer, int_copy };
+set :: proc { int_set_from_integer, int_copy, int_atoi, };
 
 /*
 	Copy one `Int` to another.
@@ -462,6 +462,148 @@ clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 		a.sign = .Zero_or_Positive;
 	}
 	return nil;
+}
+
+
+/*
+	Size binary representation	
+*/
+int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
+	assert_if_nil(a);
+	if err = #force_inline internal_clear_if_uninitialized(a, allocator); err != nil { return {}, err; }
+
+	size_in_bits := internal_count_bits(a);
+
+	size_in_bytes  = (size_in_bits / 8);
+	size_in_bytes += 0 if size_in_bits % 8 == 0 else 1;
+	size_in_bytes += 1 if signed else 0;
+	return;
+}
+
+/*
+	Size binary representation, Python `._to_bytes(num_bytes, "endianness", signed=Bool)` compatible.
+*/
+int_to_bytes_size_python :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
+	assert_if_nil(a);
+	size_in_bytes, err = int_to_bytes_size(a, signed, allocator);
+
+	/*
+		Python uses a complement representation of negative numbers and doesn't add a prefix byte.
+	*/
+	if signed {
+		size_in_bytes -= 1;
+	}
+	return;
+}
+
+/*
+	Return Little Endian binary representation of `a`, either signed or unsigned.
+	If `a` is negative and we ask for the default unsigned representation, we return abs(a).
+*/
+int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	size_in_bytes: int;
+
+	if size_in_bytes, err = int_to_bytes_size(a, signed, allocator); err != nil { return err; }
+	if size_in_bytes > len(buf) { return .Buffer_Overflow; }
+
+	size_in_bits := internal_count_bits(a);
+	i := 0;
+	if signed {
+		i += 1;
+		buf[0] = 1 if a.sign == .Negative else 0;
+	}
+	for offset := 0; offset < size_in_bits; offset += 8 {
+		bits, _ := internal_int_bitfield_extract(a, offset, 8);
+		buf[i] = u8(bits & 255); i += 1;
+	}
+	return;
+}
+
+/*
+	Return Big Endian binary representation of `a`, either signed or unsigned.
+	If `a` is negative and we ask for the default unsigned representation, we return abs(a).
+*/
+int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	size_in_bytes: int;
+
+	if size_in_bytes, err = int_to_bytes_size(a, signed, allocator); err != nil { return err; }
+	l := len(buf);
+	if size_in_bytes > l { return .Buffer_Overflow; }
+
+	size_in_bits := internal_count_bits(a);
+	i := l - 1;
+
+	if signed {
+		buf[0] = 1 if a.sign == .Negative else 0;
+	}
+	for offset := 0; offset < size_in_bits; offset += 8 {
+		bits, _ := internal_int_bitfield_extract(a, offset, 8);
+		buf[i] = u8(bits & 255); i -= 1;
+	}
+	return;
+}
+
+/*
+	Return Python 3.x compatible Little Endian binary representation of `a`, either signed or unsigned.
+	If `a` is negative when asking for an unsigned number, we return an error like Python does.
+*/
+int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	size_in_bytes: int;
+
+	if a.sign == .Zero_or_Positive {
+		return int_to_bytes_little(a, buf, signed, allocator);
+	}
+	if a.sign == .Negative && !signed { return .Invalid_Argument; }
+
+	l := len(buf);
+	if size_in_bytes, err = int_to_bytes_size_python(a, signed, allocator); err != nil { return err; }
+	if size_in_bytes > l              { return .Buffer_Overflow;  }
+
+	t := &Int{};
+	defer destroy(t);
+	if err = complement(t, a, allocator); err != nil { return err; }
+
+	size_in_bits := internal_count_bits(t);
+	i := 0;
+	for offset := 0; offset < size_in_bits; offset += 8 {
+		bits, _ := internal_int_bitfield_extract(t, offset, 8);
+		buf[i] = 255 - u8(bits & 255); i += 1;
+	}
+	return;
+}
+
+/*
+	Return Python 3.x compatible Big Endian binary representation of `a`, either signed or unsigned.
+	If `a` is negative when asking for an unsigned number, we return an error like Python does.
+*/
+int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a);
+	size_in_bytes: int;
+
+	if a.sign == .Zero_or_Positive {
+		return int_to_bytes_big(a, buf, signed, allocator);
+	}
+	if a.sign == .Negative && !signed { return .Invalid_Argument; }
+
+	l := len(buf);
+	if size_in_bytes, err = int_to_bytes_size_python(a, signed, allocator); err != nil { return err; }
+	if size_in_bytes > l              { return .Buffer_Overflow;  }
+
+	t := &Int{};
+	defer destroy(t);
+	if err = complement(t, a, allocator); err != nil { return err; }
+
+	size_in_bits := internal_count_bits(t);
+	i := l - 1;
+
+	for offset := 0; offset < size_in_bits; offset += 8 {
+		bits, _ := internal_int_bitfield_extract(a, offset, 8);
+		buf[i] = 255 - u8(bits & 255); i -= 1;
+	}
+	return;
 }
 
 /*

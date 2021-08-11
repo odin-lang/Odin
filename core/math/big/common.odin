@@ -114,7 +114,7 @@ Flags :: bit_set[Flag; u8];
 Error :: enum int {
 	Okay                    = 0,
 	Out_Of_Memory           = 1,
-	// Invalid_Pointer         = 2,
+	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
 
 	Assignment_To_Immutable = 4,
@@ -130,7 +130,7 @@ Error :: enum int {
 
 Error_String :: #partial [Error]string{
 	.Out_Of_Memory           = "Out of memory",
-	// .Invalid_Pointer         = "Invalid pointer",
+	.Invalid_Pointer         = "Invalid pointer",
 	.Invalid_Argument        = "Invalid argument",
 
 	.Assignment_To_Immutable = "Assignment to immutable",
