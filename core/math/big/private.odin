@@ -1100,6 +1100,300 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	return;
 }
 
+
+/*
+	hac 14.61, pp608
+*/
+_private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	x, y, u, v, A, B, C, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(x, y, u, v, A, B, C, D);
+
+	/*
+		`b` cannot be negative.
+	*/
+	if b.sign == .Negative || internal_is_zero(b)                    { return .Invalid_Argument; }
+
+	/*
+		init temps.
+	*/
+	if err = internal_init_multi(x, y, u, v, A, B, C, D); err != nil { return err; }
+
+	/*
+		`x` = `a` % `b`, `y` = `b`
+	*/
+	if err = internal_mod(x, a, b);                       err != nil { return err; }
+	if err = internal_copy(y, b);                         err != nil { return err; }
+
+	/*
+		2. [modified] if x,y are both even then return an error!
+	*/
+	if internal_is_even(x) && internal_is_even(y)                    { return .Invalid_Argument; }
+
+	/*
+		3. u=x, v=y, A=1, B=0, C=0, D=1
+	*/
+	if err = internal_copy(u, x);                         err != nil { return err; }
+	if err = internal_copy(v, y);                         err != nil { return err; }
+	if err = internal_one(A);                             err != nil { return err; }
+	if err = internal_one(D);                             err != nil { return err; }
+
+	for {
+		/*
+			4.  while `u` is even do:
+		*/
+		for internal_is_even(u) {
+			/*
+				4.1 `u` = `u` / 2
+			*/
+			if err = internal_int_shr1(u, u);             err != nil { return err; }
+
+			/*
+				4.2 if `A` or `B` is odd then:
+			*/
+			if internal_is_odd(A) || internal_is_odd(B) {
+				/*
+					`A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
+				*/
+				if err = internal_add(A, A, y);           err != nil { return err; }
+				if err = internal_add(B, B, x);           err != nil { return err; }
+			}
+			/*
+				`A` = `A` / 2, `B` = `B` / 2
+			*/
+			if err = internal_int_shr1(A, A);             err != nil { return err; }
+			if err = internal_int_shr1(B, B);             err != nil { return err; }
+		}
+
+		/*
+			5.  while `v` is even do:
+		*/
+		for internal_is_even(v) {
+			/*
+				5.1 `v` = `v` / 2
+			*/
+			if err = internal_int_shr1(v, v);             err != nil { return err; }
+
+			/*
+				5.2 if `C` or `D` is odd then:
+			*/
+			if internal_is_odd(C) || internal_is_odd(D) {
+				/*
+					`C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
+				*/
+				if err = internal_add(C, C, y);           err != nil { return err; }
+				if err = internal_add(D, D, x);           err != nil { return err; }
+			}
+			/*
+				`C` = `C` / 2, `D` = `D` / 2
+			*/
+			if err = internal_int_shr1(C, C);             err != nil { return err; }
+			if err = internal_int_shr1(D, D);             err != nil { return err; }
+		}
+
+		/*
+			6.  if `u` >= `v` then:
+		*/
+		if internal_cmp(u, v) != -1 {
+			/*
+				`u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
+			*/
+			if err = internal_sub(u, u, v);               err != nil { return err; }
+			if err = internal_sub(A, A, C);               err != nil { return err; }
+			if err = internal_sub(B, B, D);               err != nil { return err; }
+		} else {
+			/* v - v - u, C = C - A, D = D - B */
+			if err = internal_sub(v, v, u);               err != nil { return err; }
+			if err = internal_sub(C, C, A);               err != nil { return err; }
+			if err = internal_sub(D, D, B);               err != nil { return err; }
+		}
+
+		/*
+			If not zero goto step 4
+		*/
+		if internal_is_zero(u)                                       { break; }
+	}
+
+	/*
+		Now `a` = `C`, `b` = `D`, `gcd` == `g`*`v`
+	*/
+
+	/*
+		If `v` != `1` then there is no inverse.
+	*/
+	if internal_cmp(v, 1) !=  0                                      { return .Invalid_Argument; }
+
+	/*
+		If its too low.
+	*/
+	if internal_cmp(C, 0) == -1 {
+		if err = internal_add(C, C, b); err != nil                   { return err; }
+	}
+
+	/*
+		Too big.
+	*/
+	if internal_cmp(C, 0) != -1 {
+		if err = internal_sub(C, C, b); err != nil                   { return err; }
+	}
+
+	/*
+		`C` is now the inverse.
+	*/
+	swap(dest, C);
+
+	return;
+}
+
+/*
+	Computes the modular inverse via binary extended Euclidean algorithm, that is `dest` = 1 / `a` mod `b`.
+
+	Based on slow invmod except this is optimized for the case where `b` is odd,
+	as per HAC Note 14.64 on pp. 610.
+*/
+_private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	x, y, u, v, B, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(x, y, u, v, B, D);
+
+	sign: Sign;
+
+	/*
+		2. [modified] `b` must be odd.
+	*/
+	if internal_is_even(b)                                           { return .Invalid_Argument; }
+
+	/*
+		Init all our temps.
+	*/
+	if err = internal_init_multi(x, y, u, v, B, D); err != nil       { return err; }
+
+	/*
+		`x` == modulus, `y` == value to invert.
+	*/
+	if err = internal_copy(x, b);                   err != nil       { return err; }
+
+	/*
+		We need `y` = `|a|`.
+	*/
+	if err = internal_mod(y, a, b);                 err != nil       { return err; }
+
+	/*
+		If one of `x`, `y` is zero return an error!
+	*/
+	if internal_is_zero(x) || internal_is_zero(y)                    { return .Invalid_Argument; }
+
+	/*
+		3. `u` = `x`, `v` = `y`, `A` = 1, `B` = 0, `C` = 0, `D` = 1
+	*/
+	if err = internal_copy(u, x);                   err != nil       { return err; }
+	if err = internal_copy(v, y);                   err != nil       { return err; }
+
+	if err = internal_one(D);                       err != nil       { return err; }
+
+	for {
+		/*
+			4.  while `u` is even do.
+		*/
+		for internal_is_even(u) {
+			/*
+				4.1 `u` = `u` / 2
+			*/
+			if err = internal_int_shr1(u, u);       err != nil       { return err; }
+
+			/*
+				4.2 if `B` is odd then:
+			*/
+			if internal_is_odd(B) {
+				/*
+					`B` = (`B` - `x`) / 2
+				*/
+				if err = internal_sub(B, B, x);     err != nil       { return err; }
+			}
+
+			/*
+				`B` = `B` / 2
+			*/
+			if err = internal_int_shr1(B, B);       err != nil       { return err; }
+		}
+
+		/*
+			5.  while `v` is even do:
+		*/
+		for internal_is_even(v) {
+			/*
+				5.1 `v` = `v` / 2
+			*/
+			if err = internal_int_shr1(v, v);       err != nil       { return err; }
+
+			/*
+				5.2 if `D` is odd then:
+			*/
+			if internal_is_odd(D) {
+				/*
+					`D` = (`D` - `x`) / 2
+				*/
+				if err = internal_sub(D, D, x);     err != nil       { return err; }
+			}
+			/*
+				`D` = `D` / 2
+			*/
+			if err = internal_int_shr1(D, D);       err != nil       { return err; }
+		}
+
+		/*
+			6.  if `u` >= `v` then:
+		*/
+		if internal_cmp(u, v) != -1 {
+			/*
+				`u` = `u` - `v`, `B` = `B` - `D`
+			*/
+			if err = internal_sub(u, u, v);         err != nil       { return err; }
+			if err = internal_sub(B, B, D);         err != nil       { return err; }
+		} else {
+			/*
+				`v` - `v` - `u`, `D` = `D` - `B`
+			*/
+			if err = internal_sub(v, v, u);         err != nil       { return err; }
+			if err = internal_sub(D, D, B);         err != nil       { return err; }
+		}
+
+		/*
+			If not zero goto step 4.
+		*/
+		if internal_is_zero(u)                                       { break; }
+	}
+
+	/*
+		Now `a` = C, `b` = D, gcd == g*v
+	*/
+
+	/*
+		if `v` != 1 then there is no inverse
+	*/
+	if internal_cmp(v, 1) != 0                                       { return .Invalid_Argument; }
+
+	/*
+		`b` is now the inverse.
+	*/
+	sign = a.sign;
+	for internal_int_is_negative(D) {
+		if err = internal_add(D, D, b);             err != nil       { return err; }
+	}
+
+	/*
+		Too big.
+	*/
+	for internal_cmp_mag(D, b) != -1 {
+		if err = internal_sub(D, D, b);             err != nil       { return err; }
+	}
+
+	swap(dest, D);
+	dest.sign = sign;
+	return nil;
+}
+
+
 /*
 	Returns the log2 of an `Int`.
 	Assumes `a` not to be `nil` and to have been initialized.
