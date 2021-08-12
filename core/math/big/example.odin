@@ -206,19 +206,13 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	set(a, 64336);
-	fmt.println("--- --- --- ---");
-	int_to_byte(a);
-	fmt.println("--- --- --- ---");
-	int_to_byte_little(a);
-	fmt.println("--- --- --- ---");
-
-	set(b, -64336);
-	fmt.println("--- --- --- ---");
-	int_to_byte(b);
-	fmt.println("--- --- --- ---");
-	int_to_byte_little(b);
-	fmt.println("--- --- --- ---");
+	{
+		SCOPED_TIMING(.rm_trials);
+		for bits in 0..10242 {
+			_ = number_of_rabin_miller_trials(bits);
+		}
+	}
+	SCOPED_COUNT_ADD(.rm_trials, 10242);
 }
 
 main :: proc() {
