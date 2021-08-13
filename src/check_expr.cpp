@@ -5599,6 +5599,8 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 	}
 
 	if (minimum_param_count != param_count) {
+		array_resize(&ordered_operands, param_count);
+
 		isize missing_count = 0;
 		// NOTE(bill): Replace missing operands with the default values (if possible)
 		for_array(i, ordered_operands) {
@@ -5613,6 +5615,11 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 					if (e->Constant.param_value.kind == ParameterValue_Constant) {
 						o->value = e->Constant.param_value.value;
 					}
+				} else if (e->kind == Entity_TypeName) {
+					missing_count += 1;
+					o->mode = Addressing_Type;
+					o->type = e->type;
+					o->expr = e->identifier;
 				}
 			}
 		}

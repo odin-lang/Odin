@@ -2021,7 +2021,7 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	for_array(i, ce->args) {
 		Ast *arg = ce->args[i];
 		TypeAndValue tav = type_and_value_of_expr(arg);
-		GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(arg), expr_to_string(expr));
+		GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s %d", expr_to_string(arg), expr_to_string(expr), tav.mode);
 		GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
 		Type *at = tav.type;
 		if (at->kind == Type_Tuple) {
