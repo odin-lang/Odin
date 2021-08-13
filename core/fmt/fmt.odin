@@ -27,6 +27,7 @@ Info :: struct {
 
 	reordered:      bool,
 	good_arg_index: bool,
+	ignore_user_formatters: bool,
 
 	writer: io.Writer,
 	arg: any, // Temporary
@@ -1267,15 +1268,18 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		return;
 	}
 
-	if _user_formatters != nil {
+	if _user_formatters != nil && !fi.ignore_user_formatters {
 		formatter := _user_formatters[v.id];
 		if formatter != nil {
+			fi.ignore_user_formatters = false;
 			if ok := formatter(fi, v, verb); !ok {
+				fi.ignore_user_formatters = true;
 				fmt_bad_verb(fi, verb);
 			}
 			return;
 		}
 	}
+	fi.ignore_user_formatters = false;
 
 	type_info := type_info_of(v.id);
 	switch info in type_info.variant {
