@@ -296,6 +296,10 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 	mp_endian endian = MP_LITTLE_ENDIAN;
 
 	max_count = mp_pack_count(a, nails, size);
+	if (sz < max_count) {
+		debug_print_big_int(a);
+		gb_printf_err("%s -> %tu\n", type_to_string(original_type), sz);;
+	}
 	GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu", max_count, sz, written);
 	GB_ASSERT(gb_size_of(rop64) >= sz);
 
