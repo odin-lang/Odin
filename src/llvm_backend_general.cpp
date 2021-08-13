@@ -1572,7 +1572,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Pointer:
-		return LLVMPointerType(lb_type(m, type_deref(type)), 0);
+		return LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
 
 	case Type_Array: {
 		m->internal_type_level -= 1;
@@ -1611,7 +1611,30 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_Map:
-		return lb_type(m, type->Map.internal_type);
+		init_map_internal_types(type);
+		{
+			Type *internal_type = type->Map.internal_type;
+			GB_ASSERT(internal_type->kind == Type_Struct);
+
+			m->internal_type_level -= 1;
+			defer (m->internal_type_level += 1);
+
+			unsigned field_count = cast(unsigned)(internal_type->Struct.fields.count);
+			GB_ASSERT(field_count == 2);
+			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
+
+			LLVMTypeRef entries_fields[4] = {
+				lb_type(m, t_rawptr),
+				lb_type(m, t_int), // len
+				lb_type(m, t_int), // cap
+				lb_type(m, t_allocator), // allocator
+			};
+
+			fields[0] = lb_type(m, internal_type->Struct.fields[0]->type);
+			fields[1] = LLVMStructTypeInContext(ctx, entries_fields, gb_count_of(entries_fields), false);
+
+			return LLVMStructTypeInContext(ctx, fields, field_count, false);
+		}
 
 	case Type_Struct:
 		{
