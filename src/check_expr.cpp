@@ -2571,6 +2571,14 @@ bool is_ise_expr(Ast *node) {
 	return node->kind == Ast_ImplicitSelectorExpr;
 }
 
+bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type) {
+	if (use_lhs_as_type_hint) { // RHS in this case
+		return other_type != nullptr && other_type != t_invalid && is_type_typed(other_type);
+	}
+	return false;
+}
+
+
 void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint, bool use_lhs_as_type_hint=false) {
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
@@ -2707,14 +2715,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 			// Evalute the right before the left for an '.X' expression
 			check_expr_or_type(c, y, be->right, type_hint);
 
-			if (use_lhs_as_type_hint) { // RHS in this case
+			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, y->type)) { // RHS in this case
 				check_expr_or_type(c, x, be->left, y->type);
 			} else {
 				check_expr_with_type_hint(c, x, be->left, type_hint);
 			}
 		} else {
 			check_expr_with_type_hint(c, x, be->left, type_hint);
-			if (use_lhs_as_type_hint) {
+			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, x->type)) {
 				check_expr_with_type_hint(c, y, be->right, x->type);
 			} else {
 				check_expr_with_type_hint(c, y, be->right, type_hint);
@@ -6598,6 +6606,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
+		if (type != nullptr && is_type_untyped(type)) {
+			type = nullptr;
+		}
 		bool is_to_be_determined_array_count = false;
 		bool is_constant = true;
 		if (cl->type != nullptr) {
