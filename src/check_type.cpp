@@ -986,8 +986,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 					error(bs->elem, "Enum type for bit_set must be an integer");
 					return;
 				}
-				i64 lower = 0;
-				i64 upper = 0;
+				i64 lower = I64_MAX;
+				i64 upper = I64_MIN;
 
 				for_array(i, et->Enum.fields) {
 					Entity *e = et->Enum.fields[i];
@@ -1000,6 +1000,10 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 					i64 x = big_int_to_i64(&value.value_integer);
 					lower = gb_min(lower, x);
 					upper = gb_max(upper, x);
+				}
+				if (et->Enum.fields.count == 0) {
+					lower = 0;
+					upper = 0;
 				}
 
 				GB_ASSERT(lower <= upper);
