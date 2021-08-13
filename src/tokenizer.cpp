@@ -762,7 +762,7 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 
 void advance_to_next_rune(Tokenizer *t) {
 	if (t->curr_rune == '\n') {
-		t->column_minus_one = 0;
+		t->column_minus_one = -1;
 		t->line_count++;
 	}
 	if (t->read_curr < t->end) {
@@ -783,6 +783,7 @@ void advance_to_next_rune(Tokenizer *t) {
 			t->read_curr++;
 		}
 		t->curr_rune = rune;
+		t->column_minus_one++;
 	} else {
 		t->curr = t->end;
 		t->curr_rune = GB_RUNE_EOF;
