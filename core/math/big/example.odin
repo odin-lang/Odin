@@ -206,13 +206,16 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	{
-		SCOPED_TIMING(.rm_trials);
-		for bits in 0..10242 {
-			_ = number_of_rabin_miller_trials(bits);
-		}
+	power_of_two(a, 14_500);
+	print("a: ", a);
+
+	power_of_two(b, 10_500);
+
+	if err := internal_int_divmod(c, d, a, b); err != nil {
+		fmt.printf("Error: %v\n", err);
 	}
-	SCOPED_COUNT_ADD(.rm_trials, 10242);
+	print("c: ", c);
+	print("d: ", d);
 }
 
 main :: proc() {

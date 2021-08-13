@@ -260,6 +260,12 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 }
 internal_add :: proc { internal_int_add_signed, internal_int_add_digit, };
 
+
+internal_int_incr :: proc(dest: ^Int, allocator := context.allocator) -> (err: Error) {
+	return #force_inline internal_add(dest, dest, 1);
+}
+internal_incr :: proc { internal_int_incr, };
+
 /*
 	Low-level subtraction, dest = number - decrease. Assumes |number| > |decrease|.
 	Handbook of Applied Cryptography, algorithm 14.9.
@@ -457,6 +463,11 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := co
 }
 
 internal_sub :: proc { internal_int_sub_signed, internal_int_sub_digit, };
+
+internal_int_decr :: proc(dest: ^Int, allocator := context.allocator) -> (err: Error) {
+	return #force_inline internal_sub(dest, dest, 1);
+}
+internal_decr :: proc { internal_int_decr, };
 
 /*
 	dest = src  / 2
@@ -718,8 +729,9 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 		return nil;
 	}
 
-	if false && (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
-		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
+	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
+		err = _private_int_div_recursive(quotient, remainder, numerator, denominator);
+		// err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
 	} else {
 		when true {
 			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
