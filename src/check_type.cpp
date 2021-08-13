@@ -241,6 +241,8 @@ Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type,
 
 	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
+		// GB_ASSERT_MSG(ordered_operands.count >= param_count, "%td >= %td", ordered_operands.count, param_count);
+
 		for_array(i, *found_gen_types) {
 			Entity *e = (*found_gen_types)[i];
 			Type *t = base_type(e->type);
@@ -249,13 +251,14 @@ Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type,
 
 			bool skip = false;
 
-			GB_ASSERT(ordered_operands.count >= param_count);
-
 			for (isize j = 0; j < param_count; j++) {
 				Entity *p = tuple->variables[j];
-				Operand o = ordered_operands[j];
+				Operand o = {};
+				if (j < ordered_operands.count) {
+					o = ordered_operands[j];
+				}
 				if (o.expr == nullptr) {
-					return nullptr;
+					continue;
 				}
 				Entity *oe = entity_of_node(o.expr);
 				if (p == oe) {
