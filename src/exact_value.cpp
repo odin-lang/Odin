@@ -611,7 +611,7 @@ i32 exact_value_order(ExactValue const &v) {
 		// return 8;
 
 	default:
-		GB_PANIC("How'd you get here? Invalid Value.kind");
+		GB_PANIC("How'd you get here? Invalid Value.kind %d", v.kind);
 		return -1;
 	}
 }
