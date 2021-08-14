@@ -36,6 +36,8 @@ import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
 
+import "core:fmt"
+
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
 
@@ -260,6 +262,12 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 }
 internal_add :: proc { internal_int_add_signed, internal_int_add_digit, };
 
+
+internal_int_incr :: proc(dest: ^Int, allocator := context.allocator) -> (err: Error) {
+	return #force_inline internal_add(dest, dest, 1);
+}
+internal_incr :: proc { internal_int_incr, };
+
 /*
 	Low-level subtraction, dest = number - decrease. Assumes |number| > |decrease|.
 	Handbook of Applied Cryptography, algorithm 14.9.
@@ -457,6 +465,11 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := co
 }
 
 internal_sub :: proc { internal_int_sub_signed, internal_int_sub_digit, };
+
+internal_int_decr :: proc(dest: ^Int, allocator := context.allocator) -> (err: Error) {
+	return #force_inline internal_sub(dest, dest, 1);
+}
+internal_decr :: proc { internal_int_decr, };
 
 /*
 	dest = src  / 2
@@ -703,7 +716,6 @@ internal_sqr :: proc (dest, src: ^Int, allocator := context.allocator) -> (res: 
 */
 internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
-
 	if denominator.used == 0 { return .Division_by_Zero; }
 	/*
 		If numerator < denominator then quotient = 0, remainder = numerator.
@@ -718,8 +730,10 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 		return nil;
 	}
 
-	if false && (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
-		// err = _int_div_recursive(quotient, remainder, numerator, denominator);
+	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
+		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.");
+		err = _private_int_div_recursive(quotient, remainder, numerator, denominator);
+		// err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
 	} else {
 		when true {
 			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
@@ -1740,6 +1754,29 @@ internal_int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 }
 internal_neg :: proc { internal_int_neg, };
 
+/*
+	hac 14.61, pp608.
+*/
+internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	/*
+		For all n in N and n > 0, n = 0 mod 1.
+	*/
+	if internal_is_positive(a) && internal_cmp(b, 1) == 0 { return internal_zero(dest);	}
+
+	/*
+		`b` cannot be negative and has to be > 1
+	*/
+	if internal_is_negative(b) && internal_cmp(b, 1) != 1 { return .Invalid_Argument; }
+
+	/*
+		If the modulus is odd we can use a faster routine instead.
+	*/
+	if internal_is_odd(b) { return _private_inverse_modulo_odd(dest, a, b); }
+
+	return _private_inverse_modulo(dest, a, b);
+}
+internal_invmod :: proc{ internal_int_inverse_modulo, };
 
 /*
 	Helpers to extract values from the `Int`.
@@ -1991,7 +2028,11 @@ internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intr
 internal_get :: proc { internal_int_get, };
 
 internal_int_get_float :: proc(a: ^Int) -> (res: f64, err: Error) {
-	l   := min(a.used, 17); // log2(max(f64)) is approximately 1020, or 17 legs.
+	/*
+		log2(max(f64)) is approximately 1020, or 17 legs with the 64-bit storage.
+	*/
+	legs :: 1020 / _DIGIT_BITS;
+	l   := min(a.used, legs);
 	fac := f64(1 << _DIGIT_BITS);
 	d   := 0.0;
 
