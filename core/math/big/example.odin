@@ -206,19 +206,16 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	set(a, 64336);
-	fmt.println("--- --- --- ---");
-	int_to_byte(a);
-	fmt.println("--- --- --- ---");
-	int_to_byte_little(a);
-	fmt.println("--- --- --- ---");
+	atoi(a, "12980742146337069150589594264770969721", 10);
+	print("a: ", a, 10, true, true, true);
+	atoi(b, "4611686018427387904", 10);
+	print("b: ", b, 10, true, true, true);
 
-	set(b, -64336);
-	fmt.println("--- --- --- ---");
-	int_to_byte(b);
-	fmt.println("--- --- --- ---");
-	int_to_byte_little(b);
-	fmt.println("--- --- --- ---");
+	if err := internal_divmod(c, d, a, b); err != nil {
+		fmt.printf("Error: %v\n", err);
+	}
+	print("c: ", c);
+	print("c: ", d);
 }
 
 main :: proc() {
