@@ -26,7 +26,9 @@ PyRes :: struct {
 
 @export test_initialize_constants :: proc "c" () -> (res: u64) {
 	context = runtime.default_context();
-	return u64(initialize_constants());
+	res = u64(initialize_constants());
+	//assert(MUL_KARATSUBA_CUTOFF >= 40);
+	return res;
 }
 
 @export test_error_string :: proc "c" (err: Error) -> (res: cstring) {

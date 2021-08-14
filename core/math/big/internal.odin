@@ -36,6 +36,8 @@ import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
 
+import "core:fmt"
+
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
 
@@ -714,7 +716,6 @@ internal_sqr :: proc (dest, src: ^Int, allocator := context.allocator) -> (res: 
 */
 internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
-
 	if denominator.used == 0 { return .Division_by_Zero; }
 	/*
 		If numerator < denominator then quotient = 0, remainder = numerator.
@@ -729,7 +730,8 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 		return nil;
 	}
 
-	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used/3) * 2) {
+	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
+		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.");
 		err = _private_int_div_recursive(quotient, remainder, numerator, denominator);
 		// err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
 	} else {
