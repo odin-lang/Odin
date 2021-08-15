@@ -2102,8 +2102,8 @@ or_return_operator :: proc() {
 			return;
 		}
 
-		// If a non-bare 'return' is required, then a normal 'if' can be used as it is
-		// a lot clearer to read
+		// If using a non-bare 'return' statement is required, setting the return values
+		// using the normal idiom is a better choice and clearer to read.
 		if z, zerr := caller_2(); zerr != nil {
 			return -345 * z, zerr;
 		}
