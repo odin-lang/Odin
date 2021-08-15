@@ -662,23 +662,10 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		if (expr->kind == Ast_AutoCast) {
 			Operand x = *operand;
 			x.expr = expr->AutoCast.expr;
-			bool ok = check_cast_internal(c, &x, type);
-			if (ok) {
+			if (check_cast_internal(c, &x, type)) {
 				return MAXIMUM_TYPE_DISTANCE;
 			}
-		} /*else if (expr->kind == Ast_CallExpr) {
-			// NOTE(bill, 2021-04-19): Allow assignment of procedure calls with #optional_ok
-			ast_node(ce, CallExpr, expr);
-			Type *pt = base_type(type_of_expr(ce->proc));
-			if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
-				Operand x = *operand;
-				x.type = pt->Proc.results->Tuple.variables[0]->type;
-				i64 res = check_distance_between_types(c, &x, type);
-				if (res >= 0) {
-					return res+1;
-				}
-			}
-		}*/
+		}
 	}
 
 	return -1;

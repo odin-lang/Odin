@@ -48,7 +48,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 };
 
 
-void check_try_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
 	if (x->type->kind == Type_Tuple) {
@@ -75,11 +75,6 @@ void check_try_split_types(CheckerContext *c, Operand *x, String const &name, Ty
 		error(x->expr, "'%.*s' expects an \"optional ok\" like value, got %s", LIT(name), str);
 		gb_string_free(str);
 	}
-	// if (!type_has_nil(right_type) && !is_type_boolean(right_type)) {
-	// 	gbString str = type_to_string(right_type);
-	// 	error(x->expr, "'%.*s' expects an \"optional ok\" like value, or an n-valued expression where the last value is either a boolean or can be compared against 'nil', got %s", LIT(name), str);
-	// 	gb_string_free(str);
-	// }
 }
 
 
@@ -1829,7 +1824,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		Type *left_type = nullptr;
 		Type *right_type = nullptr;
-		check_try_split_types(c, &x, builtin_name, &left_type, &right_type);
+		check_or_else_split_types(c, &x, builtin_name, &left_type, &right_type);
 		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
 
 		if (left_type != nullptr) {
