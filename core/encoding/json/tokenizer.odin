@@ -112,6 +112,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 					return false;
 				}
 			}
+			return true;
 		case:
 			// Ignore the next rune regardless
 			next_rune(t);
