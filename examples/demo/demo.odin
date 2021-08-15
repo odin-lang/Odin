@@ -2098,6 +2098,7 @@ or_return_operator :: proc() {
 
 		// The above idiom can be transformed into the following
 		y := caller_2() or_return;
+		_ = y;
 
 		// And if the expression is 1-valued, it can be used like this
 		caller_1() or_return;
