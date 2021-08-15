@@ -1980,6 +1980,7 @@ Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 sta
 		case Ast_TypeSwitchStmt:
 		case Ast_ReturnStmt:
 		case Ast_DeferStmt:
+		case Ast_AssignStmt:
 			// Okay
 			break;
 
@@ -1989,7 +1990,7 @@ Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 sta
 			}
 			break;
 		default:
-			syntax_error(tag_token, "#%.*s may only be applied to the following statements: '{}', 'if', 'when', 'for', 'switch', 'return', 'defer', variable declaration", LIT(name));
+			syntax_error(tag_token, "#%.*s may only be applied to the following statements: '{}', 'if', 'when', 'for', 'switch', 'return', 'defer', assignment, variable declaration", LIT(name));
 			break;
 		}
 		break;

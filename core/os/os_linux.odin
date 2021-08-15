@@ -569,7 +569,7 @@ get_current_directory :: proc() -> string {
 	page_size := get_page_size();
 	buf := make([dynamic]u8, page_size);
 	for {
-		cwd := _unix_getcwd(cstring(#no_bounds_check &buf[0]), c.size_t(len(buf)));
+		#no_bounds_check cwd := _unix_getcwd(cstring(&buf[0]), c.size_t(len(buf)));
 		if cwd != nil {
 			return string(cwd);
 		}
