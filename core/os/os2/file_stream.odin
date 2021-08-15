@@ -13,7 +13,7 @@ error_to_io_error :: proc(ferr: Error) -> io.Error {
 	if ferr == nil {
 		return .None;
 	}
-	return or_else(ferr.(io.Error), .Unknown);
+	return ferr.(io.Error) or_else .Unknown;
 }
 
 

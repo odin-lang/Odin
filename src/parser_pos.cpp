@@ -41,6 +41,8 @@ Token ast_token(Ast *node) {
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryIfExpr:      return ast_token(node->TernaryIfExpr.x);
 	case Ast_TernaryWhenExpr:    return ast_token(node->TernaryWhenExpr.x);
+	case Ast_OrElseExpr:         return ast_token(node->OrElseExpr.x);
+	case Ast_OrReturnExpr:       return ast_token(node->OrReturnExpr.expr);
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
 	case Ast_TypeCast:           return node->TypeCast.token;
 	case Ast_AutoCast:           return node->AutoCast.token;
@@ -175,6 +177,8 @@ Token ast_end_token(Ast *node) {
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryIfExpr:      return ast_end_token(node->TernaryIfExpr.y);
 	case Ast_TernaryWhenExpr:    return ast_end_token(node->TernaryWhenExpr.y);
+	case Ast_OrElseExpr:         return ast_end_token(node->OrElseExpr.y);
+	case Ast_OrReturnExpr:       return node->OrReturnExpr.token;
 	case Ast_TypeAssertion:      return ast_end_token(node->TypeAssertion.type);
 	case Ast_TypeCast:           return ast_end_token(node->TypeCast.expr);
 	case Ast_AutoCast:           return ast_end_token(node->AutoCast.expr);

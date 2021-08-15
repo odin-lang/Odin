@@ -179,11 +179,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
-	case BuiltinProc_or_else:
-	case BuiltinProc_or_return:
-		// NOTE(bill): The arguments may be multi-expr
-		break;
-
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name.string;
@@ -1833,120 +1828,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->type = alloc_type_tuple_from_field_types(types.data, types.count, false, false);
 		operand->mode = Addressing_Value;
 		break;
-	}
-
-	case BuiltinProc_or_else: {
-		GB_ASSERT(ce->args.count == 2);
-		Ast *arg = ce->args[0];
-		Ast *default_value = ce->args[1];
-
-		Operand x = {};
-		Operand y = {};
-		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
-		if (x.mode == Addressing_Invalid) {
-			operand->mode = Addressing_Value;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		check_multi_expr_with_type_hint(c, &y, default_value, x.type);
-		error_operand_no_value(&y);
-		if (y.mode == Addressing_Invalid) {
-			operand->mode = Addressing_Value;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		Type *left_type = nullptr;
-		Type *right_type = nullptr;
-		check_or_else_split_types(c, &x, builtin_name, &left_type, &right_type);
-		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
-
-		if (left_type != nullptr) {
-			check_assignment(c, &y, left_type, builtin_name);
-		} else {
-			check_or_else_expr_no_value_error(c, builtin_name, x, type_hint);
-		}
-
-		if (left_type == nullptr) {
-			left_type = t_invalid;
-		}
-		operand->mode = Addressing_Value;
-		operand->type = left_type;
-		return true;
-	}
-
-	case BuiltinProc_or_return: {
-		GB_ASSERT(ce->args.count == 1);
-		Ast *arg = ce->args[0];
-
-		Operand x = {};
-		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
-		if (x.mode == Addressing_Invalid) {
-			operand->mode = Addressing_Value;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		Type *left_type = nullptr;
-		Type *right_type = nullptr;
-		check_or_return_split_types(c, &x, builtin_name, &left_type, &right_type);
-		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
-
-		if (right_type == nullptr) {
-			check_or_else_expr_no_value_error(c, builtin_name, x, type_hint);
-		} else {
-			Type *proc_type = base_type(c->curr_proc_sig);
-			GB_ASSERT(proc_type->kind == Type_Proc);
-			Type *result_type = proc_type->Proc.results;
-			if (result_type == nullptr) {
-				error(call, "'%.*s' requires the current procedure to have at least one return value", LIT(builtin_name));
-			} else {
-				GB_ASSERT(result_type->kind == Type_Tuple);
-
-				auto const &vars = result_type->Tuple.variables;
-				Type *end_type = vars[vars.count-1]->type;
-
-				if (vars.count > 1) {
-					if (!proc_type->Proc.has_named_results) {
-						error(call, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(builtin_name));
-					}
-				}
-
-				Operand rhs = {};
-				rhs.type = right_type;
-				rhs.mode = Addressing_Value;
-
-				// TODO(bill): better error message
-				if (!check_is_assignable_to(c, &rhs, end_type)) {
-					gbString a = type_to_string(right_type);
-					gbString b = type_to_string(end_type);
-					gbString ret_type = type_to_string(result_type);
-					error(call, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(builtin_name));
-					if (vars.count == 1) {
-						error_line("\tProcedure return value type: %s\n", ret_type);
-					} else {
-						error_line("\tProcedure return value types: (%s)\n", ret_type);
-					}
-					gb_string_free(ret_type);
-					gb_string_free(b);
-					gb_string_free(a);
-				}
-			}
-		}
-
-		operand->type = left_type;
-		if (left_type != nullptr) {
-			operand->mode = Addressing_Value;
-		} else {
-			operand->mode = Addressing_NoValue;
-		}
-
-		if (c->curr_proc_sig == nullptr) {
-			error(call, "'%.*s' can only be used within a procedure", LIT(builtin_name));
-		}
-
-		return true;
 	}
 
 	case BuiltinProc_simd_vector: {

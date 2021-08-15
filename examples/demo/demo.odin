@@ -2010,7 +2010,7 @@ or_else_procedure :: proc() {
 			i = 123;
 		}
 		// The above can be mapped to 'or_else'
-		i = or_else(m["hellope"], 123);
+		i = m["hellope"] or_else 123;
 
 		assert(i == 123);
 	}
@@ -2019,12 +2019,12 @@ or_else_procedure :: proc() {
 		// have optional ok semantics
 		v: union{int, f64};
 		i: int;
-		i = or_else(v.(int), 123);
-		i = or_else(v.?, 123); // Type inference magic
+		i = v.(int) or_else  123;
+		i = v.? or_else 123; // Type inference magic
 		assert(i == 123);
 
 		m: Maybe(int);
-		i = or_else(m.?, 456);
+		i = m.? or_else 456;
 		assert(i == 456);
 	}
 }

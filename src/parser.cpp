@@ -685,6 +685,21 @@ Ast *ast_ternary_when_expr(AstFile *f, Ast *x, Ast *cond, Ast *y) {
 	return result;
 }
 
+Ast *ast_or_else_expr(AstFile *f, Ast *x, Token const &token, Ast *y) {
+	Ast *result = alloc_ast_node(f, Ast_OrElseExpr);
+	result->OrElseExpr.x = x;
+	result->OrElseExpr.token = token;
+	result->OrElseExpr.y = y;
+	return result;
+}
+
+Ast *ast_or_return_expr(AstFile *f, Ast *expr, Token const &token) {
+	Ast *result = alloc_ast_node(f, Ast_OrReturnExpr);
+	result->OrReturnExpr.expr = expr;
+	result->OrReturnExpr.token = token;
+	return result;
+}
+
 Ast *ast_type_assertion(AstFile *f, Ast *expr, Token dot, Ast *type) {
 	Ast *result = alloc_ast_node(f, Ast_TypeAssertion);
 	result->TypeAssertion.expr = expr;
@@ -1339,6 +1354,8 @@ Token expect_operator(AstFile *f) {
 	if ((prev.kind == Token_in || prev.kind == Token_not_in) && (f->expr_level >= 0 || f->allow_in_expr)) {
 		// okay
 	} else if (prev.kind == Token_if || prev.kind == Token_when) {
+		// okay
+	} else if (prev.kind == Token_or_else || prev.kind == Token_or_return) {
 		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		String p = token_to_string(prev);
@@ -2870,6 +2887,8 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_Question:
 	case Token_if:
 	case Token_when:
+	case Token_or_else:
+	case Token_or_return:
 		return 1;
 	case Token_Ellipsis:
 	case Token_RangeFull:
@@ -2924,14 +2943,18 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				// NOTE(bill): This will also catch operators that are not valid "binary" operators
 				break;
 			}
-			if (op.kind == Token_if || op.kind == Token_when) {
-				Token prev = f->prev_token;
+			Token prev = f->prev_token;
+			switch (op.kind) {
+			case Token_if:
+			case Token_when:
+			case Token_or_else:
+			case Token_or_return:
 				if (prev.pos.line < op.pos.line) {
 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-					break;
+					goto loop_end;
 				}
+				break;
 			}
-
 			expect_operator(f); // NOTE(bill): error checks too
 
 			if (op.kind == Token_Question) {
@@ -2955,6 +2978,12 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				Token tok_else = expect_token(f, Token_else);
 				Ast *y = parse_expr(f, lhs);
 				expr = ast_ternary_when_expr(f, x, cond, y);
+			} else if (op.kind == Token_or_else) {
+				Ast *x = expr;
+				Ast *y = parse_expr(f, lhs);
+				expr = ast_or_else_expr(f, x, op, y);
+			} else if (op.kind == Token_or_return) {
+				expr = ast_or_return_expr(f, expr, op);
 			} else {
 				Ast *right = parse_binary_expr(f, false, prec+1);
 				if (right == nullptr) {
@@ -2965,6 +2994,7 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 
 			lhs = false;
 		}
+		loop_end:;
 	}
 	return expr;
 }
