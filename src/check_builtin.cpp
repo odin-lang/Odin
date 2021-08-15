@@ -48,6 +48,17 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 };
 
 
+void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, Type *right_type) {
+	if (right_type == nullptr) {
+		return;
+	}
+	if (!is_type_boolean(right_type) && !type_has_nil(right_type)) {
+		gbString str = type_to_string(right_type);
+		error(expr, "'%.*s' expects an \"optional ok\" like value, or an n-valued expression where the last value is either a boolean or can be compared against 'nil', got %s", LIT(name), str);
+		gb_string_free(str);
+	}
+}
+
 void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
@@ -70,15 +81,11 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 	if (left_type_)  *left_type_  = left_type;
 	if (right_type_) *right_type_ = right_type;
 
-	if (!is_type_boolean(right_type)) {
-		gbString str = type_to_string(right_type);
-		error(x->expr, "'%.*s' expects an \"optional ok\" like value, got %s", LIT(name), str);
-		gb_string_free(str);
-	}
+	check_or_else_right_type(c, x->expr, name, right_type);
 }
 
 
-void check_try_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
+void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
 	// TODO(bill): better error message
 	gbString t = type_to_string(x.type);
 	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
@@ -106,6 +113,33 @@ void check_try_expr_no_value_error(CheckerContext *c, String const &name, Operan
 	}
 	gb_string_free(t);
 }
+
+
+void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	if (x->type->kind == Type_Tuple) {
+		auto const &vars = x->type->Tuple.variables;
+		auto lhs = array_slice(vars, 0, vars.count-1);
+		auto rhs = vars[vars.count-1];
+		if (lhs.count == 1) {
+			left_type = lhs[0]->type;
+		} else if (lhs.count != 0) {
+			left_type = alloc_type_tuple();
+			left_type->Tuple.variables = array_make_from_ptr(lhs.data, lhs.count, lhs.count);
+		}
+
+		right_type = rhs->type;
+	} else {
+		check_promote_optional_ok(c, x, &left_type, &right_type);
+	}
+
+	if (left_type_)  *left_type_  = left_type;
+	if (right_type_) *right_type_ = right_type;
+
+	check_or_else_right_type(c, x->expr, name, right_type);
+}
+
 
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
@@ -146,6 +180,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_or_else:
+	case BuiltinProc_or_return:
 		// NOTE(bill): The arguments may be multi-expr
 		break;
 
@@ -1830,7 +1865,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (left_type != nullptr) {
 			check_assignment(c, &y, left_type, builtin_name);
 		} else {
-			check_try_expr_no_value_error(c, builtin_name, x, type_hint);
+			check_or_else_expr_no_value_error(c, builtin_name, x, type_hint);
 		}
 
 		if (left_type == nullptr) {
@@ -1838,6 +1873,79 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		operand->mode = Addressing_Value;
 		operand->type = left_type;
+		return true;
+	}
+
+	case BuiltinProc_or_return: {
+		GB_ASSERT(ce->args.count == 1);
+		Ast *arg = ce->args[0];
+
+		Operand x = {};
+		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
+		if (x.mode == Addressing_Invalid) {
+			operand->mode = Addressing_Value;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		Type *left_type = nullptr;
+		Type *right_type = nullptr;
+		check_or_return_split_types(c, &x, builtin_name, &left_type, &right_type);
+		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
+
+		if (right_type == nullptr) {
+			check_or_else_expr_no_value_error(c, builtin_name, x, type_hint);
+		} else {
+			Type *proc_type = base_type(c->curr_proc_sig);
+			GB_ASSERT(proc_type->kind == Type_Proc);
+			Type *result_type = proc_type->Proc.results;
+			if (result_type == nullptr) {
+				error(call, "'%.*s' requires the current procedure to have at least one return value", LIT(builtin_name));
+			} else {
+				GB_ASSERT(result_type->kind == Type_Tuple);
+
+				auto const &vars = result_type->Tuple.variables;
+				Type *end_type = vars[vars.count-1]->type;
+
+				if (vars.count > 1) {
+					if (!proc_type->Proc.has_named_results) {
+						error(call, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(builtin_name));
+					}
+				}
+
+				Operand rhs = {};
+				rhs.type = right_type;
+				rhs.mode = Addressing_Value;
+
+				// TODO(bill): better error message
+				if (!check_is_assignable_to(c, &rhs, end_type)) {
+					gbString a = type_to_string(right_type);
+					gbString b = type_to_string(end_type);
+					gbString ret_type = type_to_string(result_type);
+					error(call, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(builtin_name));
+					if (vars.count == 1) {
+						error_line("\tProcedure return value type: %s\n", ret_type);
+					} else {
+						error_line("\tProcedure return value types: (%s)\n", ret_type);
+					}
+					gb_string_free(ret_type);
+					gb_string_free(b);
+					gb_string_free(a);
+				}
+			}
+		}
+
+		operand->type = left_type;
+		if (left_type != nullptr) {
+			operand->mode = Addressing_Value;
+		} else {
+			operand->mode = Addressing_NoValue;
+		}
+
+		if (c->curr_proc_sig == nullptr) {
+			error(call, "'%.*s' can only be used within a procedure", LIT(builtin_name));
+		}
+
 		return true;
 	}
 
