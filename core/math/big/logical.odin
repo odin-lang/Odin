@@ -25,7 +25,7 @@ int_and :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error
 	assert_if_nil(dest, a, b);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(a, b); err != nil { return err; }
+	internal_clear_if_uninitialized(a, b) or_return;
 	return #force_inline internal_int_and(dest, a, b);
 }
 and :: proc { int_and, };
@@ -37,7 +37,7 @@ int_or :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error)
 	assert_if_nil(dest, a, b);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(a, b); err != nil { return err; }
+	internal_clear_if_uninitialized(a, b) or_return;
 	return #force_inline internal_int_or(dest, a, b);
 }
 or :: proc { int_or, };
@@ -49,7 +49,7 @@ int_xor :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error
 	assert_if_nil(dest, a, b);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(a, b); err != nil { return err; }
+	internal_clear_if_uninitialized(a, b) or_return;
 	return #force_inline internal_int_xor(dest, a, b);
 }
 xor :: proc { int_xor, };
@@ -64,7 +64,7 @@ int_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err:
 	assert_if_nil(dest, src);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(dest, src); err != nil { return err; }
+	internal_clear_if_uninitialized(dest, src) or_return;
 	return #force_inline internal_int_complement(dest, src);
 }
 complement :: proc { int_complement, };
@@ -97,7 +97,7 @@ int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocato
 	assert_if_nil(quotient);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(quotient); err != nil { return err; }
+	internal_clear_if_uninitialized(quotient) or_return;
 	return #force_inline internal_int_shr_digit(quotient, digits);
 }
 shr_digit :: proc { int_shr_digit, };
@@ -109,7 +109,7 @@ int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocato
 	assert_if_nil(dest, src);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(dest, src); err != nil { return err; }
+	internal_clear_if_uninitialized(dest, src) or_return;
 	return #force_inline internal_int_shr_signed(dest, src, bits);
 }
 
@@ -122,7 +122,7 @@ int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (
 	assert_if_nil(dest, src);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(dest, src); err != nil { return err; }
+	internal_clear_if_uninitialized(dest, src) or_return;
 	return #force_inline internal_int_shl(dest, src, bits);
 }
 shl :: proc { int_shl, };
@@ -138,7 +138,7 @@ int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocato
 	assert_if_nil(quotient);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(quotient); err != nil { return err; }
+	internal_clear_if_uninitialized(quotient) or_return;
 	return #force_inline internal_int_shl_digit(quotient, digits);
 }
 shl_digit :: proc { int_shl_digit, };
