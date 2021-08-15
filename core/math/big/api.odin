@@ -9,9 +9,7 @@ package math_big
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
 	This file collects public proc maps and their aliases.
-/*
 
-*/
 	=== === === === === === === === === === === === === === === === === === === === === === === ===
 	                                    Basic arithmetic.
 	                                    See `public.odin`.

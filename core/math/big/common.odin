@@ -27,10 +27,22 @@ import "core:intrinsics"
 	`initialize_constants` also replaces the other `_DEFAULT_*` cutoffs with custom compile-time values if so `#config`ured.
 
 */
-MUL_KARATSUBA_CUTOFF := initialize_constants();
-SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF;
-MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF;
-SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF;
+
+/*
+	There is a bug with DLL globals. They don't get set.
+	To allow tests to run we add `-define:MATH_BIG_EXE=false` to hardcode the cutoffs for now.
+*/
+when #config(MATH_BIG_EXE, true) {
+	MUL_KARATSUBA_CUTOFF := initialize_constants();
+	SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF;
+	MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF;
+	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF;
+} else {
+	MUL_KARATSUBA_CUTOFF := _DEFAULT_MUL_KARATSUBA_CUTOFF;
+	SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF;
+	MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF;
+	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF;	
+}
 
 /*
 	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
