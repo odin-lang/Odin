@@ -187,6 +187,13 @@ Ast *clone_ast(Ast *node) {
 		n->TernaryWhenExpr.cond = clone_ast(n->TernaryWhenExpr.cond);
 		n->TernaryWhenExpr.y    = clone_ast(n->TernaryWhenExpr.y);
 		break;
+	case Ast_OrElseExpr:
+		n->OrElseExpr.x = clone_ast(n->OrElseExpr.x);
+		n->OrElseExpr.y = clone_ast(n->OrElseExpr.y);
+		break;
+	case Ast_OrReturnExpr:
+		n->OrReturnExpr.expr = clone_ast(n->OrReturnExpr.expr);
+		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr);
 		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type);
