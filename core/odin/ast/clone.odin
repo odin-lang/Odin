@@ -129,10 +129,6 @@ clone_node :: proc(node: ^Node) -> ^Node {
 	case Field_Value:
 		r.field = clone(r.field);
 		r.value = clone(r.value);
-	case Ternary_Expr:
-		r.cond = clone(r.cond);
-		r.x    = clone(r.x);
-		r.y    = clone(r.y);
 	case Ternary_If_Expr:
 		r.x    = clone(r.x);
 		r.cond = clone(r.cond);
@@ -141,6 +137,11 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.x    = clone(r.x);
 		r.cond = clone(r.cond);
 		r.y    = clone(r.y);
+	case Or_Else_Expr:
+		r.x    = clone(r.x);
+		r.y    = clone(r.y);
+	case Or_Return_Expr:
+		r.expr = clone(r.expr);
 	case Type_Assertion:
 		r.expr = clone(r.expr);
 		r.type = clone(r.type);
