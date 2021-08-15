@@ -374,11 +374,14 @@ expect_token_after :: proc(p: ^Parser, kind: tokenizer.Token_Kind, msg: string) 
 
 expect_operator :: proc(p: ^Parser) -> tokenizer.Token {
 	prev := p.curr_tok;
-	if prev.kind == .If || prev.kind == .When {
+	#partial switch prev.kind {
+	case .If, .When, .Or_Else, .Or_Return:
 		// okay
-	} else if !tokenizer.is_operator(prev.kind) {
-		g := tokenizer.token_to_string(prev);
-		error(p, prev.pos, "expected an operator, got '%s'", g);
+	case:
+		if !tokenizer.is_operator(prev.kind) {
+			g := tokenizer.token_to_string(prev);
+			error(p, prev.pos, "expected an operator, got '%s'", g);
+		}
 	}
 	advance_token(p);
 	return prev;
@@ -1366,9 +1369,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			stmt := parse_stmt(p);
 			switch name {
 			case "bounds_check":
-				stmt.state_flags |= {.Bounds_Check};
+				stmt.state_flags += {.Bounds_Check};
 			case "no_bounds_check":
-				stmt.state_flags |= {.No_Bounds_Check};
+				stmt.state_flags += {.No_Bounds_Check};
 			}
 			return stmt;
 		case "partial":
@@ -1449,7 +1452,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
-	case .Question, .If, .When:
+	case .Question, .If, .When, .Or_Else, .Or_Return:
 		return 1;
 	case .Ellipsis, .Range_Half, .Range_Full:
 		if !p.allow_range {
@@ -1578,8 +1581,8 @@ Field_Prefix :: enum {
 	Using,
 	No_Alias,
 	C_Vararg,
-	In,
 	Auto_Cast,
+	Any_Int,
 }
 
 Field_Prefixes :: distinct bit_set[Field_Prefix];
@@ -1626,19 +1629,15 @@ convert_to_ident_list :: proc(p: ^Parser, list: []Expr_And_Flags, ignore_flags, 
 }
 
 is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
-	using Field_Prefix;
 	#partial switch p.curr_tok.kind {
 	case .EOF:
-		return Invalid;
+		return .Invalid;
 	case .Using:
 		advance_token(p);
-		return Using;
-	case .In:
-		advance_token(p);
-		return In;
+		return .Using;
 	case .Auto_Cast:
 		advance_token(p);
-		return Auto_Cast;
+		return .Auto_Cast;
 	case .Hash:
 		advance_token(p);
 		defer advance_token(p);
@@ -1646,14 +1645,16 @@ is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 		case .Ident:
 			switch p.curr_tok.text {
 			case "no_alias":
-				return No_Alias;
+				return .No_Alias;
 			case "c_vararg":
-				return C_Vararg;
+				return .C_Vararg;
+			case "any_int":
+				return .Any_Int;
 			}
 		}
-		return Unknown;
+		return .Unknown;
 	}
-	return Invalid;
+	return .Invalid;
 }
 
 parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
@@ -1677,24 +1678,23 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 
 	for kind in Field_Prefix {
 		count := counts[kind];
-		using Field_Prefix;
 		switch kind {
-		case Invalid, Unknown: // Ignore
-		case Using:
+		case .Invalid, .Unknown: // Ignore
+		case .Using:
 			if count > 1 { error(p, p.curr_tok.pos, "multiple 'using' in this field list"); }
-			if count > 0 { flags |= {.Using}; }
-		case No_Alias:
+			if count > 0 { flags += {.Using}; }
+		case .No_Alias:
 			if count > 1 { error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list"); }
-			if count > 0 { flags |= {.No_Alias}; }
-		case C_Vararg:
+			if count > 0 { flags += {.No_Alias}; }
+		case .C_Vararg:
 			if count > 1 { error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list"); }
-			if count > 0 { flags |= {.C_Vararg}; }
-		case In:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'in' in this field list"); }
-			if count > 0 { flags |= {.In}; }
-		case Auto_Cast:
+			if count > 0 { flags += {.C_Vararg}; }
+		case .Auto_Cast:
 			if count > 1 { error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list"); }
-			if count > 0 { flags |= {.Auto_Cast}; }
+			if count > 0 { flags += {.Auto_Cast}; }
+		case .Any_Int:
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '#any_int' in this field list"); }
+			if count > 0 { flags += {.Any_Int}; }
 		}
 	}
 
@@ -1705,7 +1705,7 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 	flags = set_flags;
 	if name_count > 1 && .Using in flags {
 		error(p, p.curr_tok.pos, "cannot apply 'using' to more than one of the same type");
-		flags &~= {.Using};
+		flags -= {.Using};
 	}
 
 	for flag in ast.Field_Flag {
@@ -1719,12 +1719,12 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 				error(p, p.curr_tok.pos, "'#c_vararg' is not allowed within this field list");
 			case .Auto_Cast:
 				error(p, p.curr_tok.pos, "'auto_cast' is not allowed within this field list");
-			case .In:
-				error(p, p.curr_tok.pos, "'in' is not allowed within this field list");
+			case .Any_Int:
+				error(p, p.curr_tok.pos, "'#any_int' is not allowed within this field list");
 			case .Tags, .Ellipsis, .Results, .Default_Parameters, .Typeid_Token:
 				panic("Impossible prefixes");
 			}
-			flags &~= {flag};
+			flags -= {flag};
 		}
 	}
 
@@ -2062,10 +2062,10 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 		ident := expect_token(p, .Ident);
 
 		switch ident.text {
-		case "bounds_check":    tags |= {.Bounds_Check};
-		case "no_bounds_check": tags |= {.No_Bounds_Check};
-		case "optional_ok":     tags |= {.Optional_Ok};
-		case "optional_second": tags |= {.Optional_Second};
+		case "bounds_check":    tags += {.Bounds_Check};
+		case "no_bounds_check": tags += {.No_Bounds_Check};
+		case "optional_ok":     tags += {.Optional_Ok};
+		case "optional_second": tags += {.Optional_Second};
 		case:
 		}
 	}
@@ -2267,12 +2267,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 			switch name.text {
 			case "bounds_check":
-				operand.state_flags |= {.Bounds_Check};
+				operand.state_flags += {.Bounds_Check};
 				if .No_Bounds_Check in operand.state_flags {
 					error(p, name.pos, "#bounds_check and #no_bounds_check cannot be applied together");
 				}
 			case "no_bounds_check":
-				operand.state_flags |= {.No_Bounds_Check};
+				operand.state_flags += {.No_Bounds_Check};
 				if .Bounds_Check in operand.state_flags {
 					error(p, name.pos, "#bounds_check and #no_bounds_check cannot be applied together");
 				}
@@ -3156,16 +3156,18 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 	}
 
 	for prec := token_precedence(p, p.curr_tok.kind); prec >= prec_in; prec -= 1 {
-		for {
+		loop: for {
 			op := p.curr_tok;
 			op_prec := token_precedence(p, op.kind);
 			if op_prec != prec {
-				break;
+				break loop;
 			}
-			if op.kind == .If || op.kind == .When {
+
+			#partial switch op.kind {
+			case .If, .When, .Or_Return, .Or_Else:
 				if p.prev_tok.pos.line < op.pos.line {
 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-					break;
+					break loop;
 				}
 			}
 
@@ -3178,7 +3180,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				x := parse_expr(p, lhs);
 				colon := expect_token(p, .Colon);
 				y := parse_expr(p, lhs);
-				te := ast.new(ast.Ternary_Expr, expr.pos, end_pos(p.prev_tok));
+				te := ast.new(ast.Ternary_If_Expr, expr.pos, end_pos(p.prev_tok));
 				te.cond = cond;
 				te.op1  = op;
 				te.x    = x;
@@ -3212,6 +3214,21 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				te.y    = y;
 
 				expr = te;
+			case .Or_Else:
+				x := expr;
+				y := parse_expr(p, lhs);
+				oe := ast.new(ast.Or_Else_Expr, expr.pos, end_pos(p.prev_tok));
+				oe.x     = x;
+				oe.token = op;
+				oe.y     = y;
+
+				expr = oe;
+			case .Or_Return:
+				oe := ast.new(ast.Or_Return_Expr, expr.pos, end_pos(p.prev_tok));
+				oe.expr  = expr;
+				oe.token = op;
+
+				expr = oe;
 			case:
 				right := parse_binary_expr(p, false, prec+1);
 				if right == nil {

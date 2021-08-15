@@ -241,15 +241,6 @@ Field_Value :: struct {
 	value: ^Expr,
 }
 
-Ternary_Expr :: struct {
-	using node: Expr,
-	cond: ^Expr,
-	op1:  tokenizer.Token,
-	x:    ^Expr,
-	op2:  tokenizer.Token,
-	y:    ^Expr,
-}
-
 Ternary_If_Expr :: struct {
 	using node: Expr,
 	x:    ^Expr,
@@ -261,11 +252,24 @@ Ternary_If_Expr :: struct {
 
 Ternary_When_Expr :: struct {
 	using node: Expr,
-	x: ^Expr,
+	x:    ^Expr,
 	op1:  tokenizer.Token,
 	cond: ^Expr,
 	op2:  tokenizer.Token,
 	y:    ^Expr,
+}
+
+Or_Else_Expr :: struct {
+	using node: Expr,
+	x:     ^Expr,
+	token: tokenizer.Token,
+	y:     ^Expr,
+}
+
+Or_Return_Expr :: struct {
+	using node: Expr,
+	expr:  ^Expr,
+	token: tokenizer.Token,
 }
 
 Type_Assertion :: struct {
@@ -542,7 +546,7 @@ Field_Flag :: enum {
 	No_Alias,
 	C_Vararg,
 	Auto_Cast,
-	In,
+	Any_Int,
 
 	Results,
 	Tags,
