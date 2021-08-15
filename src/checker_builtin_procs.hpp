@@ -34,6 +34,7 @@ enum BuiltinProcId {
 	BuiltinProc_soa_unzip,
 
 	BuiltinProc_or_else,
+	BuiltinProc_or_return,
 
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
@@ -266,6 +267,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("soa_unzip"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("or_else"),          2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("or_return"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
