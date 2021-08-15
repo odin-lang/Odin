@@ -372,8 +372,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	defer delete(data);
 
 	if ok {
-		img, err = load_from_slice(data, options, allocator);
-		return;
+		return load_from_slice(data, options, allocator);
 	} else {
 		img = new(Image);
 		return img, E_General.File_Not_Found;
@@ -453,10 +452,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			seen_ihdr = true;
 
-			header, err = read_header(ctx);
-			if err != nil {
-				return img, err;
-			}
+			header = read_header(ctx) or_return;
 
 			if .Paletted in header.color_type {
 				// Color type 3
@@ -506,10 +502,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				return img, E_PNG.PLTE_Encountered_Unexpectedly;
 			}
 
-			c, err = read_chunk(ctx);
-			if err != nil {
-				return img, err;
-			}
+			c = read_chunk(ctx) or_return;
 
 			if c.header.length % 3 != 0 || c.header.length > 768 {
 				return img, E_PNG.PLTE_Invalid_Length;
@@ -540,10 +533,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 			next := ch.type;
 			for next == .IDAT {
-				c, err = read_chunk(ctx);
-				if err != nil {
-					return img, err;
-				}
+				c = read_chunk(ctx) or_return;
 
 				bytes.buffer_write(&idat_b, c.data);
 				idat_length += c.header.length;
@@ -560,19 +550,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			seen_idat = true;
 		case .IEND:
-			c, err = read_chunk(ctx);
-			if err != nil {
-				return img, err;
-			}
+			c = read_chunk(ctx) or_return;
 			seen_iend = true;
 		case .bKGD:
 
 			// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
 
-			c, err = read_chunk(ctx);
-			if err != nil {
-				return img, err;
-			}
+			c = read_chunk(ctx) or_return;
 			seen_bkgd = true;
 			if .return_metadata in options {
 				append(&info.chunks, c);
@@ -604,10 +588,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])};
 			}
 		case .tRNS:
-			c, err = read_chunk(ctx);
-			if err != nil {
-				return img, err;
-			}
+			c = read_chunk(ctx) or_return;
 
 			if .Alpha in info.header.color_type {
 				return img, E_PNG.TRNS_Encountered_Unexpectedly;
@@ -646,10 +627,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			return img, E_PNG.PNG_Does_Not_Adhere_to_Spec;
 		case:
 			// Unhandled type
-			c, err = read_chunk(ctx);
-			if err != nil {
-				return img, err;
-			}
+			c = read_chunk(ctx) or_return;
+
 			if .return_metadata in options {
 				// NOTE: Chunk cata is currently allocated on the temp allocator.
 				append(&info.chunks, c);
