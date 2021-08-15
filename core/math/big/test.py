@@ -66,6 +66,8 @@ timed_or_fast.add_argument(
 
 args = parser.parse_args()
 
+EXIT_ON_FAIL = args.exit_on_fail
+
 #
 # How many iterations of each random test do we want to run?
 #
@@ -153,7 +155,7 @@ class Res(Structure):
 	_fields_ = [("res", c_char_p), ("err", c_uint64)]
 
 initialize_constants = load(l.test_initialize_constants, [], c_uint64)
-initialize_constants()
+print("initialize_constants: ", initialize_constants())
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
@@ -211,7 +213,7 @@ def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expecte
 			print(error, flush=True)
 			passed = False
 
-	if args.exit_on_fail and not passed: exit(res.err)
+	if EXIT_ON_FAIL and not passed: exit(res.err)
 
 	return passed
 
@@ -257,7 +259,7 @@ def test_sqr(a = 0, b = 0, expected_error = Error.Okay):
 	try:
 		res  = sqr(*args)
 	except OSError as e:
-		print("{} while trying to square {} x {}.".format(e, a))
+		print("{} while trying to square {}.".format(e, a))
 		if EXIT_ON_FAIL: exit(3)
 		return False
 
@@ -268,7 +270,12 @@ def test_sqr(a = 0, b = 0, expected_error = Error.Okay):
 
 def test_div(a = 0, b = 0, expected_error = Error.Okay):
 	args = [arg_to_odin(a), arg_to_odin(b)]
-	res  = div(*args)
+	try:
+		res  = div(*args)
+	except OSError as e:
+		print("{} while trying divide to {} / {}.".format(e, a, b))
+		if EXIT_ON_FAIL: exit(3)
+		return False
 	expected_result = None
 	if expected_error == Error.Okay:
 		#

@@ -430,7 +430,7 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	context.allocator = allocator;
 
 	S0, a0, a1, a2 := &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(S0, a0, a1, a2);
+	defer internal_destroy(S0, a0, a1, a2);
 
 	/*
 		Init temps.
@@ -753,6 +753,188 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 }
 
 /*
+	Direct implementation of algorithms 1.8 "RecursiveDivRem" and 1.9 "UnbalancedDivision" from:
+
+		Brent, Richard P., and Paul Zimmermann. "Modern computer arithmetic"
+		Vol. 18. Cambridge University Press, 2010
+		Available online at https://arxiv.org/pdf/1004.4710
+
+	pages 19ff. in the above online document.
+*/
+_private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	A1, A2, B1, B0, Q1, Q0, R1, R0, t := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(A1, A2, B1, B0, Q1, Q0, R1, R0, t);
+
+	m := a.used - b.used;
+	k := m / 2;
+
+	if m < MUL_KARATSUBA_CUTOFF { return _private_int_div_school(quotient, remainder, a, b); }
+
+	if err = internal_init_multi(A1, A2, B1, B0, Q1, Q0, R1, R0, t); err != nil { return err; }
+
+	/*
+		`B1` = `b` / `beta`^`k`, `B0` = `b` % `beta`^`k`
+	*/
+	if err = internal_shrmod(B1, B0, b, k * _DIGIT_BITS);            err != nil { return err; }
+
+	/*
+		(Q1, R1) =  RecursiveDivRem(A / beta^(2k), B1)
+	*/
+	if err = internal_shrmod(A1, t, a, 2 * k * _DIGIT_BITS);         err != nil { return err; }
+	if err = _private_div_recursion(Q1, R1, A1, B1);                 err != nil { return err; }
+
+	/*
+		A1 = (R1 * beta^(2k)) + (A % beta^(2k)) - (Q1 * B0 * beta^k)
+	*/
+	if err = internal_shl_digit(R1, 2 * k);                          err != nil { return err; }
+	if err = internal_add(A1, R1, t);                                err != nil { return err; }
+	if err = internal_mul(t, Q1, B0);                                err != nil { return err; }
+
+	/*
+		While A1 < 0 do Q1 = Q1 - 1, A1 = A1 + (beta^k * B)
+	*/
+	if internal_cmp(A1, 0) == -1 {
+		if internal_shl(t, b, k * _DIGIT_BITS);                      err != nil { return err; }
+
+		for {
+			if err = internal_decr(Q1);                              err != nil { return err; }
+			if err = internal_add(A1, A1, t);                        err != nil { return err; }
+			if internal_cmp(A1, 0) != -1 { break; }
+		}
+	}
+
+	/*
+		(Q0, R0) =  RecursiveDivRem(A1 / beta^(k), B1)
+	*/
+	if internal_shrmod(A1, t, A1, k * _DIGIT_BITS);                  err != nil { return err; }
+	if _private_div_recursion(Q0, R0, A1, B1);                       err != nil { return err; }
+
+	/*
+		A2 = (R0*beta^k) +  (A1 % beta^k) - (Q0*B0)
+	*/
+	if err = internal_shl_digit(R0, k);                              err != nil { return err; }
+	if err = internal_add(A2, R0, t);                                err != nil { return err; } 
+	if err = internal_mul(t, Q0, B0);                                err != nil { return err; }
+	if err = internal_sub(A2, A2, t);                                err != nil { return err; }
+
+	/*
+		While A2 < 0 do Q0 = Q0 - 1, A2 = A2 + B.
+	*/
+	for internal_cmp(A2, 0) == -1 {
+		if err = internal_decr(Q0);                                  err != nil { return err; }
+		if err = internal_add(A2, A2, b);                            err != nil { return err; }
+	}
+
+	/*
+		Return q = (Q1*beta^k) + Q0, r = A2.
+	*/
+	if err = internal_shl_digit(Q1, k);                              err != nil { return err; }
+	if err = internal_add(quotient, Q1, Q0);                         err != nil { return err; }
+
+	return internal_copy(remainder, A2);
+}
+
+_private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	A, B, Q, Q1, R, A_div, A_mod := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(A, B, Q, Q1, R, A_div, A_mod);
+
+	if err = internal_init_multi(A, B, Q, Q1, R, A_div, A_mod);      err != nil { return err; }
+
+	/*
+		Most significant bit of a limb.
+		Assumes  _DIGIT_MAX < (sizeof(DIGIT) * sizeof(u8)).
+	*/
+	msb := (_DIGIT_MAX + DIGIT(1)) >> 1;
+	sigma := 0;
+	msb_b := b.digit[b.used - 1];
+	for msb_b < msb {
+		sigma += 1;
+		msb_b <<= 1;
+	}
+
+	/*
+		Use that sigma to normalize B.
+	*/
+	if err = internal_shl(B, b, sigma);                              err != nil { return err; }
+	if err = internal_shl(A, a, sigma);                              err != nil { return err; }
+
+	/*
+		Fix the sign.
+	*/
+	neg := a.sign != b.sign;
+	A.sign = .Zero_or_Positive; B.sign = .Zero_or_Positive;
+
+	/*
+		If the magnitude of "A" is not more more than twice that of "B" we can work
+		on them directly, otherwise we need to work at "A" in chunks.
+	*/
+	n := B.used;
+	m := A.used - B.used;
+
+	/*
+		Q = 0. We already ensured that when we called `internal_init_multi`.
+	*/
+	for m > n {
+		/*
+			(q, r) = RecursiveDivRem(A / (beta^(m-n)), B)
+		*/
+		j := (m - n) * _DIGIT_BITS;
+		if err = internal_shrmod(A_div, A_mod, A, j);                err != nil { return err; }
+		if err = _private_div_recursion(Q1, R, A_div, B);            err != nil { return err; }
+
+		/*
+			Q = (Q*beta!(n)) + q
+		*/
+		if err = internal_shl(Q, Q, n * _DIGIT_BITS);                err != nil { return err; }
+		if err = internal_add(Q, Q, Q1);                             err != nil { return err; }
+
+		/*
+			A = (r * beta^(m-n)) + (A % beta^(m-n))
+		*/
+		if err = internal_shl(R, R, (m - n) * _DIGIT_BITS);          err != nil { return err; }
+		if err = internal_add(A, R, A_mod);                          err != nil { return err; }
+
+		/*
+			m = m - n
+		*/
+		m -= n;
+	}
+
+	/*
+		(q, r) = RecursiveDivRem(A, B)
+	*/
+	if err = _private_div_recursion(Q1, R, A, B);                    err != nil { return err; }
+
+	/*
+		Q = (Q * beta^m) + q, R = r
+	*/
+	if err = internal_shl(Q, Q, m * _DIGIT_BITS);                    err != nil { return err; }
+	if err = internal_add(Q, Q, Q1);                                 err != nil { return err; }
+
+	/*
+		Get sign before writing to dest.
+	*/
+	R.sign = .Zero_or_Positive if internal_is_zero(Q) else a.sign;
+
+	if quotient != nil {
+		swap(quotient, Q);
+		quotient.sign = .Negative if neg else .Zero_or_Positive;
+	}
+	if remainder != nil {
+		/*
+			De-normalize the remainder.
+		*/
+		if err = internal_shrmod(R, nil, R, sigma);                  err != nil { return err; }
+		swap(remainder, R);
+	}
+	return nil;
+}
+
+/*
 	Slower bit-bang division... also smaller.
 */
 @(deprecated="Use `_int_div_school`, it's 3.5x faster.")
@@ -1040,7 +1222,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 */
 _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: int, err: Error) {
 	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
+	defer internal_destroy(bracket_low, bracket_high, bracket_mid, t, bi_base);
 
 	ic := #force_inline internal_cmp(a, base);
 	if ic == -1 || ic == 0 {
@@ -1099,6 +1281,300 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 
 	return;
 }
+
+
+/*
+	hac 14.61, pp608
+*/
+_private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	x, y, u, v, A, B, C, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(x, y, u, v, A, B, C, D);
+
+	/*
+		`b` cannot be negative.
+	*/
+	if b.sign == .Negative || internal_is_zero(b)                    { return .Invalid_Argument; }
+
+	/*
+		init temps.
+	*/
+	if err = internal_init_multi(x, y, u, v, A, B, C, D); err != nil { return err; }
+
+	/*
+		`x` = `a` % `b`, `y` = `b`
+	*/
+	if err = internal_mod(x, a, b);                       err != nil { return err; }
+	if err = internal_copy(y, b);                         err != nil { return err; }
+
+	/*
+		2. [modified] if x,y are both even then return an error!
+	*/
+	if internal_is_even(x) && internal_is_even(y)                    { return .Invalid_Argument; }
+
+	/*
+		3. u=x, v=y, A=1, B=0, C=0, D=1
+	*/
+	if err = internal_copy(u, x);                         err != nil { return err; }
+	if err = internal_copy(v, y);                         err != nil { return err; }
+	if err = internal_one(A);                             err != nil { return err; }
+	if err = internal_one(D);                             err != nil { return err; }
+
+	for {
+		/*
+			4.  while `u` is even do:
+		*/
+		for internal_is_even(u) {
+			/*
+				4.1 `u` = `u` / 2
+			*/
+			if err = internal_int_shr1(u, u);             err != nil { return err; }
+
+			/*
+				4.2 if `A` or `B` is odd then:
+			*/
+			if internal_is_odd(A) || internal_is_odd(B) {
+				/*
+					`A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
+				*/
+				if err = internal_add(A, A, y);           err != nil { return err; }
+				if err = internal_add(B, B, x);           err != nil { return err; }
+			}
+			/*
+				`A` = `A` / 2, `B` = `B` / 2
+			*/
+			if err = internal_int_shr1(A, A);             err != nil { return err; }
+			if err = internal_int_shr1(B, B);             err != nil { return err; }
+		}
+
+		/*
+			5.  while `v` is even do:
+		*/
+		for internal_is_even(v) {
+			/*
+				5.1 `v` = `v` / 2
+			*/
+			if err = internal_int_shr1(v, v);             err != nil { return err; }
+
+			/*
+				5.2 if `C` or `D` is odd then:
+			*/
+			if internal_is_odd(C) || internal_is_odd(D) {
+				/*
+					`C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
+				*/
+				if err = internal_add(C, C, y);           err != nil { return err; }
+				if err = internal_add(D, D, x);           err != nil { return err; }
+			}
+			/*
+				`C` = `C` / 2, `D` = `D` / 2
+			*/
+			if err = internal_int_shr1(C, C);             err != nil { return err; }
+			if err = internal_int_shr1(D, D);             err != nil { return err; }
+		}
+
+		/*
+			6.  if `u` >= `v` then:
+		*/
+		if internal_cmp(u, v) != -1 {
+			/*
+				`u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
+			*/
+			if err = internal_sub(u, u, v);               err != nil { return err; }
+			if err = internal_sub(A, A, C);               err != nil { return err; }
+			if err = internal_sub(B, B, D);               err != nil { return err; }
+		} else {
+			/* v - v - u, C = C - A, D = D - B */
+			if err = internal_sub(v, v, u);               err != nil { return err; }
+			if err = internal_sub(C, C, A);               err != nil { return err; }
+			if err = internal_sub(D, D, B);               err != nil { return err; }
+		}
+
+		/*
+			If not zero goto step 4
+		*/
+		if internal_is_zero(u)                                       { break; }
+	}
+
+	/*
+		Now `a` = `C`, `b` = `D`, `gcd` == `g`*`v`
+	*/
+
+	/*
+		If `v` != `1` then there is no inverse.
+	*/
+	if internal_cmp(v, 1) !=  0                                      { return .Invalid_Argument; }
+
+	/*
+		If its too low.
+	*/
+	if internal_cmp(C, 0) == -1 {
+		if err = internal_add(C, C, b); err != nil                   { return err; }
+	}
+
+	/*
+		Too big.
+	*/
+	if internal_cmp(C, 0) != -1 {
+		if err = internal_sub(C, C, b); err != nil                   { return err; }
+	}
+
+	/*
+		`C` is now the inverse.
+	*/
+	swap(dest, C);
+
+	return;
+}
+
+/*
+	Computes the modular inverse via binary extended Euclidean algorithm, that is `dest` = 1 / `a` mod `b`.
+
+	Based on slow invmod except this is optimized for the case where `b` is odd,
+	as per HAC Note 14.64 on pp. 610.
+*/
+_private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	x, y, u, v, B, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(x, y, u, v, B, D);
+
+	sign: Sign;
+
+	/*
+		2. [modified] `b` must be odd.
+	*/
+	if internal_is_even(b)                                           { return .Invalid_Argument; }
+
+	/*
+		Init all our temps.
+	*/
+	if err = internal_init_multi(x, y, u, v, B, D); err != nil       { return err; }
+
+	/*
+		`x` == modulus, `y` == value to invert.
+	*/
+	if err = internal_copy(x, b);                   err != nil       { return err; }
+
+	/*
+		We need `y` = `|a|`.
+	*/
+	if err = internal_mod(y, a, b);                 err != nil       { return err; }
+
+	/*
+		If one of `x`, `y` is zero return an error!
+	*/
+	if internal_is_zero(x) || internal_is_zero(y)                    { return .Invalid_Argument; }
+
+	/*
+		3. `u` = `x`, `v` = `y`, `A` = 1, `B` = 0, `C` = 0, `D` = 1
+	*/
+	if err = internal_copy(u, x);                   err != nil       { return err; }
+	if err = internal_copy(v, y);                   err != nil       { return err; }
+
+	if err = internal_one(D);                       err != nil       { return err; }
+
+	for {
+		/*
+			4.  while `u` is even do.
+		*/
+		for internal_is_even(u) {
+			/*
+				4.1 `u` = `u` / 2
+			*/
+			if err = internal_int_shr1(u, u);       err != nil       { return err; }
+
+			/*
+				4.2 if `B` is odd then:
+			*/
+			if internal_is_odd(B) {
+				/*
+					`B` = (`B` - `x`) / 2
+				*/
+				if err = internal_sub(B, B, x);     err != nil       { return err; }
+			}
+
+			/*
+				`B` = `B` / 2
+			*/
+			if err = internal_int_shr1(B, B);       err != nil       { return err; }
+		}
+
+		/*
+			5.  while `v` is even do:
+		*/
+		for internal_is_even(v) {
+			/*
+				5.1 `v` = `v` / 2
+			*/
+			if err = internal_int_shr1(v, v);       err != nil       { return err; }
+
+			/*
+				5.2 if `D` is odd then:
+			*/
+			if internal_is_odd(D) {
+				/*
+					`D` = (`D` - `x`) / 2
+				*/
+				if err = internal_sub(D, D, x);     err != nil       { return err; }
+			}
+			/*
+				`D` = `D` / 2
+			*/
+			if err = internal_int_shr1(D, D);       err != nil       { return err; }
+		}
+
+		/*
+			6.  if `u` >= `v` then:
+		*/
+		if internal_cmp(u, v) != -1 {
+			/*
+				`u` = `u` - `v`, `B` = `B` - `D`
+			*/
+			if err = internal_sub(u, u, v);         err != nil       { return err; }
+			if err = internal_sub(B, B, D);         err != nil       { return err; }
+		} else {
+			/*
+				`v` - `v` - `u`, `D` = `D` - `B`
+			*/
+			if err = internal_sub(v, v, u);         err != nil       { return err; }
+			if err = internal_sub(D, D, B);         err != nil       { return err; }
+		}
+
+		/*
+			If not zero goto step 4.
+		*/
+		if internal_is_zero(u)                                       { break; }
+	}
+
+	/*
+		Now `a` = C, `b` = D, gcd == g*v
+	*/
+
+	/*
+		if `v` != 1 then there is no inverse
+	*/
+	if internal_cmp(v, 1) != 0                                       { return .Invalid_Argument; }
+
+	/*
+		`b` is now the inverse.
+	*/
+	sign = a.sign;
+	for internal_int_is_negative(D) {
+		if err = internal_add(D, D, b);             err != nil       { return err; }
+	}
+
+	/*
+		Too big.
+	*/
+	for internal_cmp_mag(D, b) != -1 {
+		if err = internal_sub(D, D, b);             err != nil       { return err; }
+	}
+
+	swap(dest, D);
+	dest.sign = sign;
+	return nil;
+}
+
 
 /*
 	Returns the log2 of an `Int`.
