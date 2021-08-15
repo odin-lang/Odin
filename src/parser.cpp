@@ -3393,17 +3393,34 @@ Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_typeid_token) {
 }
 
 
-enum FieldPrefixKind {
+enum FieldPrefixKind : i32 {
 	FieldPrefix_Unknown = -1,
 	FieldPrefix_Invalid = 0,
 
 	FieldPrefix_using,
 	FieldPrefix_const,
 	FieldPrefix_no_alias,
-	FieldPrefix_c_var_arg,
+	FieldPrefix_c_vararg,
 	FieldPrefix_auto_cast,
 	FieldPrefix_any_int,
 };
+
+struct ParseFieldPrefixMapping {
+	String          name;
+	TokenKind       token_kind;
+	FieldPrefixKind prefix;
+	FieldFlag       flag;
+};
+
+gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
+	{str_lit("using"),      Token_using,     FieldPrefix_using,     FieldFlag_using},
+	{str_lit("auto_cast"),  Token_auto_cast, FieldPrefix_auto_cast, FieldFlag_auto_cast},
+	{str_lit("no_alias"),   Token_Hash,      FieldPrefix_no_alias,  FieldFlag_no_alias},
+	{str_lit("c_vararg"),   Token_Hash,      FieldPrefix_c_vararg,  FieldFlag_c_vararg},
+	{str_lit("const"),      Token_Hash,      FieldPrefix_const,     FieldFlag_const},
+	{str_lit("any_int"),    Token_Hash,      FieldPrefix_any_int,   FieldFlag_any_int},
+};
+
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
 	switch (f->curr_token.kind) {
@@ -3420,14 +3437,13 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 		advance_token(f);
 		switch (f->curr_token.kind) {
 		case Token_Ident:
-			if (f->curr_token.string == "no_alias") {
-				return FieldPrefix_no_alias;
-			} else if (f->curr_token.string == "c_vararg") {
-				return FieldPrefix_c_var_arg;
-			} else if (f->curr_token.string == "const") {
-				return FieldPrefix_const;
-			} else if (f->curr_token.string == "any_int") {
-				return FieldPrefix_any_int;
+			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+				auto *mapping = parse_field_prefix_mappings + i;
+				if (mapping->token_kind == Token_Hash) {
+					if (f->curr_token.string == mapping->name) {
+						return mapping->prefix;
+					}
+				}
 			}
 			break;
 		}
@@ -3436,14 +3452,8 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 	return FieldPrefix_Invalid;
 }
 
-
 u32 parse_field_prefixes(AstFile *f) {
-	i32 using_count     = 0;
-	i32 no_alias_count  = 0;
-	i32 c_vararg_count  = 0;
-	i32 auto_cast_count = 0;
-	i32 const_count     = 0;
-	i32 any_int_count   = 0;
+	i32 counts[gb_count_of(parse_field_prefix_mappings)] = {};
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -3456,30 +3466,31 @@ u32 parse_field_prefixes(AstFile *f) {
 			continue;
 		}
 
-		switch (kind) {
-		case FieldPrefix_using:     using_count     += 1; advance_token(f); break;
-		case FieldPrefix_no_alias:  no_alias_count  += 1; advance_token(f); break;
-		case FieldPrefix_c_var_arg: c_vararg_count  += 1; advance_token(f); break;
-		case FieldPrefix_auto_cast: auto_cast_count += 1; advance_token(f); break;
-		case FieldPrefix_const:     const_count     += 1; advance_token(f); break;
-		case FieldPrefix_any_int:   any_int_count   += 1; advance_token(f); break;
+		for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+			if (parse_field_prefix_mappings[i].prefix == kind) {
+				counts[i] += 1;
+				advance_token(f);
+				break;
+			}
 		}
 	}
-	if (using_count     > 1) syntax_error(f->curr_token, "Multiple 'using' in this field list");
-	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
-	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
-	if (auto_cast_count > 1) syntax_error(f->curr_token, "Multiple 'auto_cast' in this field list");
-	if (const_count > 1)     syntax_error(f->curr_token, "Multiple '#const' in this field list");
-	if (any_int_count > 1)   syntax_error(f->curr_token, "Multiple '#any_int' in this field list");
-
 
 	u32 field_flags = 0;
-	if (using_count     > 0) field_flags |= FieldFlag_using;
-	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
-	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
-	if (auto_cast_count > 0) field_flags |= FieldFlag_auto_cast;
-	if (const_count     > 0) field_flags |= FieldFlag_const;
-	if (any_int_count  > 0)  field_flags |= FieldFlag_any_int;
+	for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+		if (counts[i] > 0) {
+			field_flags |= parse_field_prefix_mappings[i].flag;
+
+			if (counts[i] != 1) {
+				auto *mapping = parse_field_prefix_mappings + i;
+				String name = mapping->name;
+				char const *prefix = "";
+				if (mapping->token_kind == Token_Hash) {
+					prefix = "#";
+				}
+				syntax_error(f->curr_token, "Multiple '%s%.*s' in this field list", prefix, LIT(name));
+			}
+		}
+	}
 	return field_flags;
 }
 
