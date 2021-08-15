@@ -1932,6 +1932,73 @@ Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 }
 
 
+Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 state_flag) {
+	String name = tag_token.string;
+
+	if (s == nullptr) {
+		syntax_error(tag_token, "Invalid operand for #%.*s", LIT(name));
+		return nullptr;
+	}
+
+	if (s != nullptr && s->kind == Ast_EmptyStmt) {
+		if (s->EmptyStmt.token.string == "\n") {
+			syntax_error(tag_token, "#%.*s cannot be followed by a newline", LIT(name));
+		} else {
+			syntax_error(tag_token, "#%.*s cannot be applied to an empty statement ';'", LIT(name));
+		}
+	}
+
+	if (s->state_flags & state_flag) {
+		syntax_error(tag_token, "#%.*s has been applied multiple times", LIT(name));
+	}
+	s->state_flags |= state_flag;
+
+	switch (state_flag) {
+	case StateFlag_bounds_check:
+		if ((s->state_flags & StateFlag_no_bounds_check) != 0) {
+			syntax_error(tag_token, "#bounds_check and #no_bounds_check cannot be applied together");
+		}
+		break;
+	case StateFlag_no_bounds_check:
+		if ((s->state_flags & StateFlag_bounds_check) != 0) {
+			syntax_error(tag_token, "#bounds_check and #no_bounds_check cannot be applied together");
+		}
+		break;
+	}
+
+	switch (state_flag) {
+	case StateFlag_bounds_check:
+	case StateFlag_no_bounds_check:
+		switch (s->kind) {
+		case Ast_BlockStmt:
+		case Ast_IfStmt:
+		case Ast_WhenStmt:
+		case Ast_ForStmt:
+		case Ast_RangeStmt:
+		case Ast_UnrollRangeStmt:
+		case Ast_SwitchStmt:
+		case Ast_TypeSwitchStmt:
+		case Ast_ReturnStmt:
+		case Ast_DeferStmt:
+			// Okay
+			break;
+
+		case Ast_ValueDecl:
+			if (!s->ValueDecl.is_mutable) {
+				syntax_error(tag_token, "#%.*s may only be applied to a variable declaration, and not a constant value declaration", LIT(name));
+			}
+			break;
+		default:
+			syntax_error(tag_token, "#%.*s may only be applied to the following statements: '{}', 'if', 'when', 'for', 'switch', 'return', 'defer', variable declaration", LIT(name));
+			break;
+		}
+		break;
+	}
+
+	return s;
+}
+
+
 Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
 	switch (f->curr_token.kind) {
@@ -2040,26 +2107,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return original_type;
 		} else if (name.string == "bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
-			if (operand == nullptr) {
-				syntax_error(token, "Invalid expresssion for #%.*s", LIT(name.string));
-				return nullptr;
-			}
-			operand->state_flags |= StateFlag_bounds_check;
-			if ((operand->state_flags & StateFlag_no_bounds_check) != 0) {
-				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return operand;
+			return parse_check_directive_for_statement(operand, name, StateFlag_bounds_check);
 		} else if (name.string == "no_bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
-			if (operand == nullptr) {
-				syntax_error(token, "Invalid expresssion for #%.*s", LIT(name.string));
-				return nullptr;
-			}
-			operand->state_flags |= StateFlag_no_bounds_check;
-			if ((operand->state_flags & StateFlag_bounds_check) != 0) {
-				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return operand;
+			return parse_check_directive_for_statement(operand, name, StateFlag_no_bounds_check);
 		} else if (name.string == "relative") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			tag = parse_call_expr(f, tag);
@@ -4369,16 +4420,6 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	return ast_unroll_range_stmt(f, unroll_token, for_token, val0, val1, in_token, expr, body);
 }
 
-void parse_check_directive_for_empty_statement(Ast *s, Token const &name) {
-	if (s != nullptr && s->kind == Ast_EmptyStmt) {
-		if (s->EmptyStmt.token.string == "\n") {
-			syntax_error(name, "#%.*s cannot be followed by a newline", LIT(name.string));
-		} else {
-			syntax_error(name, "#%.*s cannot be applied to an empty statement ';'", LIT(name.string));
-		}
-	}
-}
-
 Ast *parse_stmt(AstFile *f) {
 	Ast *s = nullptr;
 	Token token = f->curr_token;
@@ -4485,20 +4526,10 @@ Ast *parse_stmt(AstFile *f) {
 
 		if (tag == "bounds_check") {
 			s = parse_stmt(f);
-			parse_check_directive_for_empty_statement(s, name);
-			s->state_flags |= StateFlag_bounds_check;
-			if ((s->state_flags & StateFlag_no_bounds_check) != 0) {
-				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return s;
+			return parse_check_directive_for_statement(s, name, StateFlag_bounds_check);
 		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
-			parse_check_directive_for_empty_statement(s, name);
-			s->state_flags |= StateFlag_no_bounds_check;
-			if ((s->state_flags & StateFlag_bounds_check) != 0) {
-				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return s;
+			return parse_check_directive_for_statement(s, name, StateFlag_no_bounds_check);
 		} else if (tag == "partial") {
 			s = parse_stmt(f);
 			switch (s->kind) {
@@ -4509,8 +4540,7 @@ Ast *parse_stmt(AstFile *f) {
 				s->TypeSwitchStmt.partial = true;
 				break;
 			case Ast_EmptyStmt:
-				parse_check_directive_for_empty_statement(s, name);
-				break;
+				return parse_check_directive_for_statement(s, name, 0);
 			default:
 				syntax_error(token, "#partial can only be applied to a switch statement");
 				break;

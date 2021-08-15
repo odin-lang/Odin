@@ -259,8 +259,6 @@ enum StateFlag : u16 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
 
-	StateFlag_no_deferred = 1<<5,
-
 	StateFlag_BeenHandled = 1<<15,
 };
 
