@@ -26,7 +26,7 @@ intern_destroy :: proc(m: ^Intern) {
 
 intern_get :: proc(m: ^Intern, text: string) -> string {
 	entry := _intern_get_entry(m, text);
-	return #no_bounds_check string(entry.str[:entry.len]);
+	#no_bounds_check return string(entry.str[:entry.len]);
 }
 intern_get_cstring :: proc(m: ^Intern, text: string) -> cstring {
 	entry := _intern_get_entry(m, text);
