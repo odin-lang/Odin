@@ -298,10 +298,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 
 	for fi in fis {
 		n := fi.name;
-		matched, err := match(pattern, n);
-		if err != nil {
-			return m, err;
-		}
+		matched := match(pattern, n) or_return;
 		if matched {
 			append(&m, join(dir, n));
 		}

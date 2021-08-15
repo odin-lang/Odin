@@ -442,24 +442,22 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 			return E_General.Unknown_Compression_Method;
 		}
 
-		cinfo  := (cmf >> 4) & 0xf;
-		if cinfo > 7 {
+		if cinfo := (cmf >> 4) & 0xf; cinfo > 7 {
 			return E_ZLIB.Unsupported_Window_Size;
 		}
 		flg, _ := compress.read_u8(ctx);
 
-		fcheck  := flg & 0x1f;
+		fcheck := flg & 0x1f;
 		fcheck_computed := (cmf << 8 | flg) & 0x1f;
 		if fcheck != fcheck_computed {
 			return E_General.Checksum_Failed;
 		}
 
-		fdict   := (flg >> 5) & 1;
 		/*
 			We don't handle built-in dictionaries for now.
 			They're application specific and PNG doesn't use them.
 		*/
-		if fdict != 0 {
+		if fdict := (flg >> 5) & 1; fdict != 0 {
 			return E_ZLIB.FDICT_Unsupported;
 		}
 
@@ -473,10 +471,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 	}
 
 	// Parse ZLIB stream without header.
-	err = inflate_raw(z=ctx, expected_output_size=expected_output_size);
-	if err != nil {
-		return err;
-	}
+	inflate_raw(z=ctx, expected_output_size=expected_output_size) or_return;
 
 	if !raw {
 		compress.discard_to_next_byte_lsb(ctx);
@@ -527,22 +522,13 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 	z_repeat:      ^Huffman_Table;
 	z_offset:      ^Huffman_Table;
 	codelength_ht: ^Huffman_Table;
-
-	z_repeat, err = allocate_huffman_table(allocator=context.allocator);
-	if err != nil {
-		return err;
-	}
-	z_offset, err = allocate_huffman_table(allocator=context.allocator);
-	if err != nil {
-		return err;
-	}
-	codelength_ht, err = allocate_huffman_table(allocator=context.allocator);
-	if err != nil {
-		return err;
-	}
 	defer free(z_repeat);
 	defer free(z_offset);
 	defer free(codelength_ht);
+
+	z_repeat      = allocate_huffman_table(allocator=context.allocator) or_return;
+	z_offset      = allocate_huffman_table(allocator=context.allocator) or_return;
+	codelength_ht = allocate_huffman_table(allocator=context.allocator) or_return;
 
 	final := u32(0);
 	type  := u32(0);
@@ -560,8 +546,8 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 			// Discard bits until next byte boundary
 			compress.discard_to_next_byte_lsb(z);
 
-			uncompressed_len  := i16(compress.read_bits_lsb(z, 16));
-			length_check      := i16(compress.read_bits_lsb(z, 16));
+			uncompressed_len := i16(compress.read_bits_lsb(z, 16));
+			length_check     := i16(compress.read_bits_lsb(z, 16));
 
 			// fmt.printf("LEN: %v, ~LEN: %v, NLEN: %v, ~NLEN: %v\n", uncompressed_len, ~uncompressed_len, length_check, ~length_check);
 
@@ -586,14 +572,8 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
 			if type == 1 {
 				// Use fixed code lengths.
-				err = build_huffman(z_repeat, Z_FIXED_LENGTH[:]);
-				if err != nil {
-					return err;
-				}
-				err = build_huffman(z_offset, Z_FIXED_DIST[:]);
-				if err != nil {
-					return err;
-				}
+				build_huffman(z_repeat, Z_FIXED_LENGTH[:]) or_return;
+				build_huffman(z_offset, Z_FIXED_DIST[:])  or_return;
 			} else {
 				lencodes: [286+32+137]u8;
 				codelength_sizes: [19]u8;
@@ -611,19 +591,13 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 					s := compress.read_bits_lsb(z, 3);
 					codelength_sizes[Z_LENGTH_DEZIGZAG[i]] = u8(s);
 				}
-				err = build_huffman(codelength_ht, codelength_sizes[:]);
-				if err != nil {
-					return err;
-				}
+				build_huffman(codelength_ht, codelength_sizes[:]) or_return;
 
 				n = 0;
 				c: u16;
 
 				for n < ntot {
-					c, err = decode_huffman(z, codelength_ht);
-					if err != nil {
-						return err;
-					}
+					c = decode_huffman(z, codelength_ht) or_return;
 
 					if c < 0 || c >= 19 {
 						return E_Deflate.Huffman_Bad_Code_Lengths;
@@ -664,21 +638,10 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 					return E_Deflate.Huffman_Bad_Code_Lengths;
 				}
 
-				err = build_huffman(z_repeat, lencodes[:hlit]);
-				if err != nil {
-					return err;
-				}
-
-				err = build_huffman(z_offset, lencodes[hlit:ntot]);
-				if err != nil {
-					return err;
-				}
+				build_huffman(z_repeat, lencodes[:hlit])     or_return;
+				build_huffman(z_offset, lencodes[hlit:ntot]) or_return;
 			}
-			err = parse_huffman_block(z, z_repeat, z_offset);
-			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
-			if err != nil {
-				return err;
-			}
+			parse_huffman_block(z, z_repeat, z_offset) or_return;
 		}
 		if final == 1 {
 			break;
@@ -698,9 +661,7 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, e
 	ctx.input_data = input;
 	ctx.output = buf;
 
-	err = inflate_from_context(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
-
-	return err;
+	return inflate_from_context(ctx=&ctx, raw=raw, expected_output_size=expected_output_size);
 }
 
 inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
@@ -712,4 +673,4 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 	return inflate_raw(z=&ctx, expected_output_size=expected_output_size);
 }
 
-inflate     :: proc{inflate_from_context, inflate_from_byte_array};
+inflate :: proc{inflate_from_context, inflate_from_byte_array};
