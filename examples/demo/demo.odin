@@ -2055,6 +2055,9 @@ or_return_operator :: proc() {
 	caller_2 :: proc() -> (int, Error) {
 		return 123, .None;
 	}
+	caller_3 :: proc() -> (int, int, Error) {
+		return 123, 345, .None;
+	}
 
 	foo_1 :: proc() -> Error {
 		// This can be a common idiom in many code bases
@@ -2074,7 +2077,10 @@ or_return_operator :: proc() {
 			return err1;
 		}
 
-		_, _ = n0, n1;
+		// Multiple return values still work with 'or_return' as it only
+		// pops off the end value in the multi-valued expression
+		n0, n1 = caller_3() or_return;
+
 		return .None;
 	}
 	foo_2 :: proc() -> (n: int, err: Error) {
