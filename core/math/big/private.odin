@@ -42,7 +42,7 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int, allocator := context.all
 
 	t := &Int{};
 
-	if err = internal_grow(t, max(digits, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
+	internal_grow(t, max(digits, _DEFAULT_DIGIT_COUNT)) or_return;
 	t.used = digits;
 
 	/*
@@ -116,7 +116,7 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := conte
 	/*
 		Grow the destination as required.
 	*/
-	if err = internal_grow(dest, digits); err != nil { return err; }
+	internal_grow(dest, digits) or_return;
 
 	/*
 		Number of output digits to produce.
@@ -198,7 +198,7 @@ _private_int_sqr :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 	/*
 		Grow `t` to maximum needed size, or `_DEFAULT_DIGIT_COUNT`, whichever is bigger.
 	*/
-	if err = internal_grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)); err != nil { return err; }
+	internal_grow(t, max((2 * pa) + 1, _DEFAULT_DIGIT_COUNT)) or_return;
 	t.used = (2 * pa) + 1;
 
 	#no_bounds_check for ix = 0; ix < pa; ix += 1 {
@@ -272,7 +272,7 @@ _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) 
 		Grow the destination as required.
 	*/
 	pa := uint(src.used) + uint(src.used);
-	if err = internal_grow(dest, int(pa)); err != nil { return err; }
+	internal_grow(dest, int(pa)) or_return;
 
 	/*
 		Number of output digits to produce.
@@ -374,12 +374,12 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 	/*
 		Init temps.
 	*/
-	if err = internal_grow(x0,   B);                  err != nil { return err; }
-	if err = internal_grow(x1,   src.used - B);       err != nil { return err; }
-	if err = internal_grow(t1,   src.used * 2);       err != nil { return err; }
-	if err = internal_grow(t2,   src.used * 2);       err != nil { return err; }
-	if err = internal_grow(x0x0, B * 2       );       err != nil { return err; }
-	if err = internal_grow(x1x1, (src.used - B) * 2); err != nil { return err; }
+	internal_grow(x0,   B) or_return;
+	internal_grow(x1,   src.used - B) or_return;
+	internal_grow(t1,   src.used * 2) or_return;
+	internal_grow(t2,   src.used * 2) or_return;
+	internal_grow(x0x0, B * 2       ) or_return;
+	internal_grow(x1x1, (src.used - B) * 2) or_return;
 
 	/*
 		Now shift the digits.
@@ -394,28 +394,28 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 	/*
 		Now calc the products x0*x0 and x1*x1.
 	*/
-	if err = internal_sqr(x0x0, x0);                  err != nil { return err; }
-	if err = internal_sqr(x1x1, x1);                  err != nil { return err; }
+	internal_sqr(x0x0, x0) or_return;
+	internal_sqr(x1x1, x1) or_return;
 
 	/*
 		Now calc (x1+x0)^2
 	*/
-	if err = internal_add(t1, x0, x1);                err != nil { return err; }
-	if err = internal_sqr(t1, t1);                    err != nil { return err; }
+	internal_add(t1, x0, x1) or_return;
+	internal_sqr(t1, t1) or_return;
 
 	/*
 		Add x0y0
 	*/
-	if err = internal_add(t2, x0x0, x1x1);            err != nil { return err; }
-	if err = internal_sub(t1, t1, t2);                err != nil { return err; }
+	internal_add(t2, x0x0, x1x1) or_return;
+	internal_sub(t1, t1, t2) or_return;
 
 	/*
 		Shift by B.
 	*/
-	if err = internal_shl_digit(t1, B);               err != nil { return err; }
-	if err = internal_shl_digit(x1x1, B * 2);         err != nil { return err; }
-	if err = internal_add(t1, t1, x0x0);              err != nil { return err; }
-	if err = internal_add(dest, t1, x1x1);            err != nil { return err; }
+	internal_shl_digit(t1, B) or_return;
+	internal_shl_digit(x1x1, B * 2) or_return;
+	internal_add(t1, t1, x0x0) or_return;
+	internal_add(dest, t1, x1x1) or_return;
 
 	return #force_inline internal_clamp(dest);
 }
@@ -435,7 +435,7 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	/*
 		Init temps.
 	*/
-	if err = internal_zero(S0);                     err != nil { return err; }
+	internal_zero(S0) or_return;
 
 	/*
 		B
@@ -445,9 +445,9 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	/*
 		a = a2 * x^2 + a1 * x + a0;
 	*/
-	if err = internal_grow(a0, B);                  err != nil { return err; }
-	if err = internal_grow(a1, B);                  err != nil { return err; }
-	if err = internal_grow(a2, src.used - (2 * B)); err != nil { return err; }
+	internal_grow(a0, B) or_return;
+	internal_grow(a1, B) or_return;
+	internal_grow(a2, src.used - (2 * B)) or_return;
 
 	a0.used = B;
 	a1.used = B;
@@ -462,67 +462,67 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	internal_clamp(a2);
 
 	/** S0 = a0^2;  */
-	if err = internal_sqr(S0, a0);                  err != nil { return err; }
+	internal_sqr(S0, a0) or_return;
 
 	/** \\S1 = (a2 + a1 + a0)^2 */
 	/** \\S2 = (a2 - a1 + a0)^2  */
 	/** \\S1 = a0 + a2; */
 	/** a0 = a0 + a2; */
-	if err = internal_add(a0, a0, a2);              err != nil { return err; }
+	internal_add(a0, a0, a2) or_return;
 	/** \\S2 = S1 - a1; */
 	/** b = a0 - a1; */
-	if err = internal_sub(dest, a0, a1);            err != nil { return err; }
+	internal_sub(dest, a0, a1) or_return;
 	/** \\S1 = S1 + a1; */
 	/** a0 = a0 + a1; */
-	if err = internal_add(a0, a0, a1);              err != nil { return err; }
+	internal_add(a0, a0, a1) or_return;
 	/** \\S1 = S1^2;  */
 	/** a0 = a0^2; */
-	if err = internal_sqr(a0, a0);                  err != nil { return err; }
+	internal_sqr(a0, a0) or_return;
 	/** \\S2 = S2^2;  */
 	/** b = b^2; */
-	if err = internal_sqr(dest, dest);              err != nil { return err; }
+	internal_sqr(dest, dest) or_return;
 	/** \\ S3 = 2 * a1 * a2  */
 	/** \\S3 = a1 * a2;  */
 	/** a1 = a1 * a2; */
-	if err = internal_mul(a1, a1, a2);              err != nil { return err; }
+	internal_mul(a1, a1, a2) or_return;
 	/** \\S3 = S3 << 1;  */
 	/** a1 = a1 << 1; */
-	if err = internal_shl(a1, a1, 1);               err != nil { return err; }
+	internal_shl(a1, a1, 1) or_return;
 	/** \\S4 = a2^2;  */
 	/** a2 = a2^2; */
-	if err = internal_sqr(a2, a2);                  err != nil { return err; }
+	internal_sqr(a2, a2) or_return;
 	/** \\ tmp = (S1 + S2)/2  */
 	/** \\tmp = S1 + S2; */
 	/** b = a0 + b; */
-	if err = internal_add(dest, a0, dest);          err != nil { return err; }
+	internal_add(dest, a0, dest) or_return;
 	/** \\tmp = tmp >> 1; */
 	/** b = b >> 1; */
-	if err = internal_shr(dest, dest, 1);           err != nil { return err; }
+	internal_shr(dest, dest, 1) or_return;
 	/** \\ S1 = S1 - tmp - S3  */
 	/** \\S1 = S1 - tmp; */
 	/** a0 = a0 - b; */
-	if err = internal_sub(a0, a0, dest);            err != nil { return err; }
+	internal_sub(a0, a0, dest) or_return;
 	/** \\S1 = S1 - S3;  */
 	/** a0 = a0 - a1; */
-	if err = internal_sub(a0, a0, a1);              err != nil { return err; }
+	internal_sub(a0, a0, a1) or_return;
 	/** \\S2 = tmp - S4 -S0  */
 	/** \\S2 = tmp - S4;  */
 	/** b = b - a2; */
-	if err = internal_sub(dest, dest, a2);          err != nil { return err; }
+	internal_sub(dest, dest, a2) or_return;
 	/** \\S2 = S2 - S0;  */
 	/** b = b - S0; */
-	if err = internal_sub(dest, dest, S0);          err != nil { return err; }
+	internal_sub(dest, dest, S0) or_return;
 	/** \\P = S4*x^4 + S3*x^3 + S2*x^2 + S1*x + S0; */
 	/** P = a2*x^4 + a1*x^3 + b*x^2 + a0*x + S0; */
-	if err = internal_shl_digit(  a2, 4 * B);       err != nil { return err; }
-	if err = internal_shl_digit(  a1, 3 * B);       err != nil { return err; }
-	if err = internal_shl_digit(dest, 2 * B);       err != nil { return err; }
-	if err = internal_shl_digit(  a0, 1 * B);       err != nil { return err; }
+	internal_shl_digit(  a2, 4 * B) or_return;
+	internal_shl_digit(  a1, 3 * B) or_return;
+	internal_shl_digit(dest, 2 * B) or_return;
+	internal_shl_digit(  a0, 1 * B) or_return;
 
-	if err = internal_add(a2, a2, a1);              err != nil { return err; }
-	if err = internal_add(dest, dest, a2);          err != nil { return err; }
-	if err = internal_add(dest, dest, a0);          err != nil { return err; }
-	if err = internal_add(dest, dest, S0);          err != nil { return err; }
+	internal_add(a2, a2, a1) or_return;
+	internal_add(dest, dest, a2) or_return;
+	internal_add(dest, dest, a0) or_return;
+	internal_add(dest, dest, S0) or_return;
 	/** a^2 - P  */
 
 	return #force_inline internal_clamp(dest);
@@ -540,7 +540,7 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
  	b := _WORD(1) << _WORD(_DIGIT_BITS) / _WORD(3);
 
 	q := &Int{};
-	if err = internal_grow(q, numerator.used); err != nil { return 0, err; }
+	internal_grow(q, numerator.used) or_return;
 	q.used = numerator.used;
 	q.sign = numerator.sign;
 
@@ -598,17 +598,17 @@ _private_int_div_3 :: proc(quotient, numerator: ^Int, allocator := context.alloc
 _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
-	if err = error_if_immutable(quotient, remainder); err != nil { return err; }
+	error_if_immutable(quotient, remainder) or_return;
 
 	q, x, y, t1, t2 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer internal_destroy(q, x, y, t1, t2);
 
-	if err = internal_grow(q, numerator.used + 2); err != nil { return err; }
+	internal_grow(q, numerator.used + 2) or_return;
 	q.used = numerator.used + 2;
 
-	if err = internal_init_multi(t1, t2);   err != nil { return err; }
-	if err = internal_copy(x, numerator);   err != nil { return err; }
-	if err = internal_copy(y, denominator); err != nil { return err; }
+	internal_init_multi(t1, t2) or_return;
+	internal_copy(x, numerator) or_return;
+	internal_copy(y, denominator) or_return;
 
 	/*
 		Fix the sign.
@@ -624,8 +624,8 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 
 	if norm < _DIGIT_BITS - 1 {
 		norm = (_DIGIT_BITS - 1) - norm;
-		if err = internal_shl(x, x, norm); err != nil { return err; }
-		if err = internal_shl(y, y, norm); err != nil { return err; }
+		internal_shl(x, x, norm) or_return;
+		internal_shl(y, y, norm) or_return;
 	} else {
 		norm = 0;
 	}
@@ -641,12 +641,12 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		y = y*b**{n-t}
 	*/
 
-	if err = internal_shl_digit(y, n - t); err != nil { return err; }
+	internal_shl_digit(y, n - t) or_return;
 
 	c := internal_cmp(x, y);
 	for c != -1 {
 		q.digit[n - t] += 1;
-		if err = internal_sub(x, x, y); err != nil { return err; }
+		internal_sub(x, x, y) or_return;
 		c = internal_cmp(x, y);
 	}
 
@@ -696,7 +696,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			t1.digit[0] = ((t - 1) < 0) ? 0 : y.digit[t - 1];
 			t1.digit[1] = y.digit[t];
 			t1.used = 2;
-			if err = internal_mul(t1, t1, q.digit[(i - t) - 1]); err != nil { return err; }
+			internal_mul(t1, t1, q.digit[(i - t) - 1]) or_return;
 
 			/*
 				Find right hand.
@@ -709,23 +709,25 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			if t1_t2 := internal_cmp_mag(t1, t2); t1_t2 != 1 {
 				break;
 			}
-			iter += 1; if iter > 100 { return .Max_Iterations_Reached; }
+			iter += 1; if iter > 100 {
+				return .Max_Iterations_Reached;
+			}
 		}
 
 		/*
 			Step 3.3 x = x - q{i-t-1} * y * b**{i-t-1}
 		*/
-		if err = int_mul_digit(t1, y, q.digit[(i - t) - 1]); err != nil { return err; }
-		if err = internal_shl_digit(t1, (i - t) - 1);        err != nil { return err; }
-		if err = internal_sub(x, x, t1);                     err != nil { return err; }
+		int_mul_digit(t1, y, q.digit[(i - t) - 1]) or_return;
+		internal_shl_digit(t1, (i - t) - 1) or_return;
+		internal_sub(x, x, t1) or_return;
 
 		/*
 			if x < 0 then { x = x + y*b**{i-t-1}; q{i-t-1} -= 1; }
 		*/
 		if x.sign == .Negative {
-			if err = internal_copy(t1, y);                err != nil { return err; }
-			if err = internal_shl_digit(t1, (i - t) - 1); err != nil { return err; }
-			if err = internal_add(x, x, t1);              err != nil { return err; }
+			internal_copy(t1, y) or_return;
+			internal_shl_digit(t1, (i - t) - 1) or_return;
+			internal_add(x, x, t1) or_return;
 
 			q.digit[(i - t) - 1] = (q.digit[(i - t) - 1] - 1) & _MASK;
 		}
@@ -745,7 +747,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 	}
 
 	if remainder != nil {
-		if err = internal_shr(x, x, norm); err != nil { return err; }
+		internal_shr(x, x, norm) or_return;
 		internal_swap(x, remainder);
 	}
 
@@ -770,68 +772,72 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	m := a.used - b.used;
 	k := m / 2;
 
-	if m < MUL_KARATSUBA_CUTOFF { return _private_int_div_school(quotient, remainder, a, b); }
+	if m < MUL_KARATSUBA_CUTOFF {
+		return _private_int_div_school(quotient, remainder, a, b);
+	}
 
-	if err = internal_init_multi(A1, A2, B1, B0, Q1, Q0, R1, R0, t); err != nil { return err; }
+	internal_init_multi(A1, A2, B1, B0, Q1, Q0, R1, R0, t) or_return;
 
 	/*
 		`B1` = `b` / `beta`^`k`, `B0` = `b` % `beta`^`k`
 	*/
-	if err = internal_shrmod(B1, B0, b, k * _DIGIT_BITS);            err != nil { return err; }
+	internal_shrmod(B1, B0, b, k * _DIGIT_BITS) or_return;
 
 	/*
 		(Q1, R1) =  RecursiveDivRem(A / beta^(2k), B1)
 	*/
-	if err = internal_shrmod(A1, t, a, 2 * k * _DIGIT_BITS);         err != nil { return err; }
-	if err = _private_div_recursion(Q1, R1, A1, B1);                 err != nil { return err; }
+	internal_shrmod(A1, t, a, 2 * k * _DIGIT_BITS) or_return;
+	_private_div_recursion(Q1, R1, A1, B1) or_return;
 
 	/*
 		A1 = (R1 * beta^(2k)) + (A % beta^(2k)) - (Q1 * B0 * beta^k)
 	*/
-	if err = internal_shl_digit(R1, 2 * k);                          err != nil { return err; }
-	if err = internal_add(A1, R1, t);                                err != nil { return err; }
-	if err = internal_mul(t, Q1, B0);                                err != nil { return err; }
+	internal_shl_digit(R1, 2 * k) or_return;
+	internal_add(A1, R1, t) or_return;
+	internal_mul(t, Q1, B0) or_return;
 
 	/*
 		While A1 < 0 do Q1 = Q1 - 1, A1 = A1 + (beta^k * B)
 	*/
 	if internal_cmp(A1, 0) == -1 {
-		if internal_shl(t, b, k * _DIGIT_BITS);                      err != nil { return err; }
+		internal_shl(t, b, k * _DIGIT_BITS) or_return;
 
 		for {
-			if err = internal_decr(Q1);                              err != nil { return err; }
-			if err = internal_add(A1, A1, t);                        err != nil { return err; }
-			if internal_cmp(A1, 0) != -1 { break; }
+			internal_decr(Q1) or_return;
+			internal_add(A1, A1, t) or_return;
+			if internal_cmp(A1, 0) != -1 {
+				break;
+			}
 		}
 	}
 
 	/*
 		(Q0, R0) =  RecursiveDivRem(A1 / beta^(k), B1)
 	*/
-	if internal_shrmod(A1, t, A1, k * _DIGIT_BITS);                  err != nil { return err; }
-	if _private_div_recursion(Q0, R0, A1, B1);                       err != nil { return err; }
+	internal_shrmod(A1, t, A1, k * _DIGIT_BITS) or_return;
+	_private_div_recursion(Q0, R0, A1, B1) or_return;
 
 	/*
 		A2 = (R0*beta^k) +  (A1 % beta^k) - (Q0*B0)
 	*/
-	if err = internal_shl_digit(R0, k);                              err != nil { return err; }
-	if err = internal_add(A2, R0, t);                                err != nil { return err; } 
-	if err = internal_mul(t, Q0, B0);                                err != nil { return err; }
-	if err = internal_sub(A2, A2, t);                                err != nil { return err; }
+	internal_shl_digit(R0, k) or_return;
+	internal_add(A2, R0, t) or_return;
+	internal_mul(t, Q0, B0) or_return;
+	internal_sub(A2, A2, t) or_return;
 
 	/*
 		While A2 < 0 do Q0 = Q0 - 1, A2 = A2 + B.
 	*/
 	for internal_cmp(A2, 0) == -1 {
-		if err = internal_decr(Q0);                                  err != nil { return err; }
-		if err = internal_add(A2, A2, b);                            err != nil { return err; }
+		internal_decr(Q0) or_return;
+		internal_add(A2, A2, b) or_return;
 	}
 
 	/*
 		Return q = (Q1*beta^k) + Q0, r = A2.
 	*/
-	if err = internal_shl_digit(Q1, k);                              err != nil { return err; }
-	if err = internal_add(quotient, Q1, Q0);                         err != nil { return err; }
+	internal_shl_digit(Q1, k) or_return;
+	internal_add(quotient, Q1, Q0) or_return;
 
 	return internal_copy(remainder, A2);
 }
@@ -842,7 +848,7 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 	A, B, Q, Q1, R, A_div, A_mod := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer internal_destroy(A, B, Q, Q1, R, A_div, A_mod);
 
-	if err = internal_init_multi(A, B, Q, Q1, R, A_div, A_mod);      err != nil { return err; }
+	internal_init_multi(A, B, Q, Q1, R, A_div, A_mod) or_return;
 
 	/*
 		Most significant bit of a limb.
@@ -859,8 +865,8 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 	/*
 		Use that sigma to normalize B.
 	*/
-	if err = internal_shl(B, b, sigma);                              err != nil { return err; }
-	if err = internal_shl(A, a, sigma);                              err != nil { return err; }
+	internal_shl(B, b, sigma) or_return;
+	internal_shl(A, a, sigma) or_return;
 
 	/*
 		Fix the sign.
@@ -883,20 +889,20 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 			(q, r) = RecursiveDivRem(A / (beta^(m-n)), B)
 		*/
 		j := (m - n) * _DIGIT_BITS;
-		if err = internal_shrmod(A_div, A_mod, A, j);                err != nil { return err; }
-		if err = _private_div_recursion(Q1, R, A_div, B);            err != nil { return err; }
+		internal_shrmod(A_div, A_mod, A, j) or_return;
+		_private_div_recursion(Q1, R, A_div, B) or_return;
 
 		/*
 			Q = (Q*beta!(n)) + q
 		*/
-		if err = internal_shl(Q, Q, n * _DIGIT_BITS);                err != nil { return err; }
-		if err = internal_add(Q, Q, Q1);                             err != nil { return err; }
+		internal_shl(Q, Q, n * _DIGIT_BITS) or_return;
+		internal_add(Q, Q, Q1) or_return;
 
 		/*
 			A = (r * beta^(m-n)) + (A % beta^(m-n))
 		*/
-		if err = internal_shl(R, R, (m - n) * _DIGIT_BITS);          err != nil { return err; }
-		if err = internal_add(A, R, A_mod);                          err != nil { return err; }
+		internal_shl(R, R, (m - n) * _DIGIT_BITS) or_return;
+		internal_add(A, R, A_mod) or_return;
 
 		/*
 			m = m - n
@@ -907,13 +913,13 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 	/*
 		(q, r) = RecursiveDivRem(A, B)
 	*/
-	if err = _private_div_recursion(Q1, R, A, B);                    err != nil { return err; }
+	_private_div_recursion(Q1, R, A, B) or_return;
 
 	/*
 		Q = (Q * beta^m) + q, R = r
 	*/
-	if err = internal_shl(Q, Q, m * _DIGIT_BITS);                    err != nil { return err; }
-	if err = internal_add(Q, Q, Q1);                                 err != nil { return err; }
+	internal_shl(Q, Q, m * _DIGIT_BITS) or_return;
+	internal_add(Q, Q, Q1) or_return;
 
 	/*
 		Get sign before writing to dest.
@@ -928,7 +934,7 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 		/*
 			De-normalize the remainder.
 		*/
-		if err = internal_shrmod(R, nil, R, sigma);                  err != nil { return err; }
+		internal_shrmod(R, nil, R, sigma) or_return;
 		swap(remainder, R);
 	}
 	return nil;
@@ -942,28 +948,29 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{};
 	c: int;
+	defer destroy(ta, tb, tq, q);
 
-	goto_end: for {
-		if err = internal_one(tq);							err != nil { break goto_end; }
+	for {
+		internal_one(tq) or_return;
 
 		num_bits, _ := count_bits(numerator);
 		den_bits, _ := count_bits(denominator);
 		n := num_bits - den_bits;
 
-		if err = abs(ta, numerator);						err != nil { break goto_end; }
-		if err = abs(tb, denominator);						err != nil { break goto_end; }
-		if err = shl(tb, tb, n);							err != nil { break goto_end; }
-		if err = shl(tq, tq, n);							err != nil { break goto_end; }
+		abs(ta, numerator)   or_return;
+		abs(tb, denominator) or_return;
+		shl(tb, tb, n)       or_return;
+		shl(tq, tq, n)       or_return;
 
 		for n >= 0 {
 			if c, _ = cmp_mag(ta, tb); c == 0 || c == 1 {
 				// ta -= tb
-				if err = sub(ta, ta, tb);					err != nil { break goto_end; }
+				sub(ta, ta, tb) or_return;
 				//  q += tq
-				if err = add( q, q,  tq);					err != nil { break goto_end; }
+				add( q, q,  tq) or_return;
 			}
-			if err = shr1(tb, tb);							err != nil { break goto_end; }
-			if err = shr1(tq, tq);							err != nil { break goto_end; }
+			shr1(tb, tb) or_return;
+			shr1(tq, tq) or_return;
 
 			n -= 1;
 		}
@@ -983,9 +990,8 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 			remainder.sign = .Zero_or_Positive if z else numerator.sign;
 		}
 
-		break goto_end;
+		break;
 	}
-	destroy(ta, tb, tq, q);
 	return err;
 }
 
@@ -999,17 +1005,17 @@ _private_int_factorial_binary_split :: proc(res: ^Int, n: int, allocator := cont
 	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer internal_destroy(inner, outer, start, stop, temp);
 
-	if err = internal_one(inner, false, allocator); err != nil { return err; }
-	if err = internal_one(outer, false, allocator); err != nil { return err; }
+	internal_one(inner, false, allocator) or_return;
+	internal_one(outer, false, allocator) or_return;
 
 	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
 
 	for i := bits_used; i >= 0; i -= 1 {
 		start := (n >> (uint(i) + 1)) + 1 | 1;
 		stop  := (n >> uint(i)) + 1 | 1;
-		if err = _private_int_recursive_product(temp, start, stop, 0, allocator); err != nil { return err; }
-		if err = internal_mul(inner, inner, temp, allocator);                   err != nil { return err; }
-		if err = internal_mul(outer, outer, inner, allocator);                  err != nil { return err; }
+		_private_int_recursive_product(temp, start, stop, 0, allocator) or_return;
+		internal_mul(inner, inner, temp, allocator) or_return;
+		internal_mul(outer, outer, inner, allocator) or_return;
 	}
 	shift := n - intrinsics.count_ones(n);
 
@@ -1023,28 +1029,32 @@ _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int
 	t1, t2 := &Int{}, &Int{};
 	defer internal_destroy(t1, t2);
 
-	if level > FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS { return .Max_Iterations_Reached; }
+	if level > FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS {
+		return .Max_Iterations_Reached;
+	}
 
 	num_factors := (stop - start) >> 1;
 	if num_factors == 2 {
-		if err = internal_set(t1, start, false, allocator); err != nil { return err; }
+		internal_set(t1, start, false, allocator) or_return;
 		when true {
-			if err = internal_grow(t2, t1.used + 1, false, allocator); err != nil { return err; }
-			if err = internal_add(t2, t1, 2, allocator); err != nil { return err; }
+			internal_grow(t2, t1.used + 1, false, allocator) or_return;
+			internal_add(t2, t1, 2, allocator) or_return;
 		} else {
-			if err = add(t2, t1, 2); err != nil { return err; }
+			add(t2, t1, 2) or_return;
 		}
 		return internal_mul(res, t1, t2, allocator);
 	}
 
 	if num_factors > 1 {
 		mid := (start + num_factors) | 1;
-		if err = _private_int_recursive_product(t1, start,  mid, level + 1, allocator); err != nil { return err; }
-		if err = _private_int_recursive_product(t2,   mid, stop, level + 1, allocator); err != nil { return err; }
+		_private_int_recursive_product(t1, start,  mid, level + 1, allocator) or_return;
+		_private_int_recursive_product(t2,   mid, stop, level + 1, allocator) or_return;
 		return internal_mul(res, t1, t2, allocator);
 	}
 
-	if num_factors == 1 { return #force_inline internal_set(res, start, true, allocator); }
+	if num_factors == 1 {
+		return #force_inline internal_set(res, start, true, allocator);
+	}
 
 	return #force_inline internal_one(res, true, allocator);
 }
@@ -1067,7 +1077,9 @@ _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int
 _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
-	if res_gcd == nil && res_lcm == nil { return nil; }
+	if res_gcd == nil && res_lcm == nil {
+		return nil;
+	}
 
 	/*
 		We need a temporary because `res_gcd` is allowed to be `nil`.
@@ -1077,10 +1089,10 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 			GCD(0, 0) and LCM(0, 0) are both 0.
 		*/
 		if res_gcd != nil {
-			if err = internal_zero(res_gcd);	err != nil { return err; }
+			internal_zero(res_gcd) or_return;
 		}
 		if res_lcm != nil {
-			if err = internal_zero(res_lcm);	err != nil { return err; }
+			internal_zero(res_lcm) or_return;
 		}
 		return nil;
 	} else if a.used == 0 {
@@ -1088,10 +1100,10 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 			We can early out with GCD = B and LCM = 0
 		*/
 		if res_gcd != nil {
-			if err = internal_abs(res_gcd, b); err != nil { return err; }
+			internal_abs(res_gcd, b) or_return;
 		}
 		if res_lcm != nil {
-			if err = internal_zero(res_lcm); err != nil { return err; }
+			internal_zero(res_lcm) or_return;
 		}
 		return nil;
 	} else if b.used == 0 {
@@ -1099,10 +1111,10 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 			We can early out with GCD = A and LCM = 0
 		*/
 		if res_gcd != nil {
-			if err = internal_abs(res_gcd, a); err != nil { return err; }
+			internal_abs(res_gcd, a) or_return;
 		}
 		if res_lcm != nil {
-			if err = internal_zero(res_lcm); err != nil { return err; }
+			internal_zero(res_lcm) or_return;
 		}
 		return nil;
 	}
@@ -1116,8 +1128,8 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
  	*/
 	u, v := &Int{}, &Int{};
 	defer internal_destroy(u, v);
-	if err = internal_copy(u, a); err != nil { return err; }
-	if err = internal_copy(v, b); err != nil { return err; }
+	internal_copy(u, a) or_return;
+	internal_copy(v, b) or_return;
 
  	/*
  		Must be positive for the remainder of the algorithm.
@@ -1135,18 +1147,18 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		/*
 			Divide the power of two out.
 		*/
-		if err = internal_shr(u, u, k); err != nil { return err; }
-		if err = internal_shr(v, v, k); err != nil { return err; }
+		internal_shr(u, u, k) or_return;
+		internal_shr(v, v, k) or_return;
 	}
 
 	/*
 		Divide any remaining factors of two out.
 	*/
 	if u_lsb != k {
-		if err = internal_shr(u, u, u_lsb - k); err != nil { return err; }
+		internal_shr(u, u, u_lsb - k) or_return;
 	}
 	if v_lsb != k {
-		if err = internal_shr(v, v, v_lsb - k); err != nil { return err; }
+		internal_shr(v, v, v_lsb - k) or_return;
 	}
 
 	for v.used != 0 {
@@ -1163,19 +1175,19 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		/*
 			Subtract smallest from largest.
 		*/
-		if err = internal_sub(v, v, u); err != nil { return err; }
+		internal_sub(v, v, u) or_return;
 
 		/*
 			Divide out all factors of two.
 		*/
 		b, _ := internal_count_lsb(v);
-		if err = internal_shr(v, v, b); err != nil { return err; }
+		internal_shr(v, v, b) or_return;
 	}
 
  	/*
  		Multiply by 2**k which we divided out at the beginning.
  	*/
- 	if err = internal_shl(temp_gcd_res, u, k); err != nil { return err; }
+ 	internal_shl(temp_gcd_res, u, k) or_return;
  	temp_gcd_res.sign = .Zero_or_Positive;
 
 	/*
@@ -1195,13 +1207,13 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		/*
 			Store quotient in `t2` such that `t2 * b` is the LCM.
 		*/
-		if err = internal_div(res_lcm, a, temp_gcd_res); err != nil { return err; }
+		internal_div(res_lcm, a, temp_gcd_res) or_return;
 		err = internal_mul(res_lcm, res_lcm, b);
 	} else {
 		/*
 			Store quotient in `t2` such that `t2 * a` is the LCM.
 		*/
-		if err = internal_div(res_lcm, a, temp_gcd_res); err != nil { return err; }
+		internal_div(res_lcm, a, temp_gcd_res) or_return;
 		err = internal_mul(res_lcm, res_lcm, b);
 	}
 
@@ -1228,12 +1240,15 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	if ic == -1 || ic == 0 {
 		return 1 if ic == 0 else 0, nil;
 	}
+	defer if err != nil {
+		res = -1;
+	}
 
-	if err = internal_set(bi_base, base, true, allocator);        err != nil { return -1, err; }
-	if err = internal_clear(bracket_mid, false, allocator);       err != nil { return -1, err; }
-	if err = internal_clear(t, false, allocator);                 err != nil { return -1, err; }
-	if err = internal_one(bracket_low, false, allocator);         err != nil { return -1, err; }
-	if err = internal_set(bracket_high, base, false, allocator);  err != nil { return -1, err; }
+	internal_set(bi_base, base, true, allocator)       or_return;
+	internal_clear(bracket_mid, false, allocator)      or_return;
+	internal_clear(t, false, allocator)                or_return;
+	internal_one(bracket_low, false, allocator)        or_return;
+	internal_set(bracket_high, base, false, allocator) or_return;
 
 	low := 0; high := 1;
 
@@ -1248,20 +1263,22 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 		/*
 			Iterate until `a` is bracketed between low + high.
 		*/
-		if #force_inline internal_cmp(bracket_high, a) != -1 { break; }
+		if #force_inline internal_cmp(bracket_high, a) != -1 {
+			break;
+		}
 
 		low = high;
-		if err = #force_inline internal_copy(bracket_low, bracket_high);                err != nil { return -1, err; }
+		(#force_inline internal_copy(bracket_low, bracket_high)) or_return;
 		high <<= 1;
-		if err = #force_inline internal_sqr(bracket_high, bracket_high);  err != nil { return -1, err; }
+		(#force_inline internal_sqr(bracket_high, bracket_high)) or_return;
 	}
 
 	for (high - low) > 1 {
 		mid := (high + low) >> 1;
 
-		if err = #force_inline internal_pow(t, bi_base, mid - low);       err != nil { return -1, err; }
+		(#force_inline internal_pow(t, bi_base, mid - low)) or_return;
 
-		if err = #force_inline internal_mul(bracket_mid, bracket_low, t); err != nil { return -1, err; }
+		(#force_inline internal_mul(bracket_mid, bracket_low, t)) or_return;
 
 		mc := #force_inline internal_cmp(a, bracket_mid);
 		switch mc {
@@ -1294,31 +1311,35 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 	/*
 		`b` cannot be negative.
 	*/
-	if b.sign == .Negative || internal_is_zero(b)                    { return .Invalid_Argument; }
+	if b.sign == .Negative || internal_is_zero(b) {
+		return .Invalid_Argument;
+	}
 
 	/*
 		init temps.
 	*/
-	if err = internal_init_multi(x, y, u, v, A, B, C, D); err != nil { return err; }
+	internal_init_multi(x, y, u, v, A, B, C, D) or_return;
 
 	/*
 		`x` = `a` % `b`, `y` = `b`
 	*/
-	if err = internal_mod(x, a, b);                       err != nil { return err; }
-	if err = internal_copy(y, b);                         err != nil { return err; }
+	internal_mod(x, a, b) or_return;
+	internal_copy(y, b) or_return;
 
 	/*
 		2. [modified] if x,y are both even then return an error!
 	*/
-	if internal_is_even(x) && internal_is_even(y)                    { return .Invalid_Argument; }
+	if internal_is_even(x) && internal_is_even(y) {
+		return .Invalid_Argument;
+	}
 
 	/*
 		3. u=x, v=y, A=1, B=0, C=0, D=1
 	*/
-	if err = internal_copy(u, x);                         err != nil { return err; }
-	if err = internal_copy(v, y);                         err != nil { return err; }
-	if err = internal_one(A);                             err != nil { return err; }
-	if err = internal_one(D);                             err != nil { return err; }
+	internal_copy(u, x) or_return;
+	internal_copy(v, y) or_return;
+	internal_one(A) or_return;
+	internal_one(D) or_return;
 
 	for {
 		/*
@@ -1328,7 +1349,7 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 			/*
 				4.1 `u` = `u` / 2
 			*/
-			if err = internal_int_shr1(u, u);             err != nil { return err; }
+			internal_int_shr1(u, u) or_return;
 
 			/*
 				4.2 if `A` or `B` is odd then:
@@ -1337,14 +1358,14 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 				/*
 					`A` = (`A`+`y`) / 2, `B` = (`B`-`x`) / 2
 				*/
-				if err = internal_add(A, A, y);           err != nil { return err; }
-				if err = internal_add(B, B, x);           err != nil { return err; }
+				internal_add(A, A, y) or_return;
+				internal_add(B, B, x) or_return;
 			}
 			/*
 				`A` = `A` / 2, `B` = `B` / 2
 			*/
-			if err = internal_int_shr1(A, A);             err != nil { return err; }
-			if err = internal_int_shr1(B, B);             err != nil { return err; }
+			internal_int_shr1(A, A) or_return;
+			internal_int_shr1(B, B) or_return;
 		}
 
 		/*
@@ -1354,7 +1375,7 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 			/*
 				5.1 `v` = `v` / 2
 			*/
-			if err = internal_int_shr1(v, v);             err != nil { return err; }
+			internal_int_shr1(v, v) or_return;
 
 			/*
 				5.2 if `C` or `D` is odd then:
@@ -1363,14 +1384,14 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 				/*
 					`C` = (`C`+`y`) / 2, `D` = (`D`-`x`) / 2
 				*/
-				if err = internal_add(C, C, y);           err != nil { return err; }
-				if err = internal_add(D, D, x);           err != nil { return err; }
+				internal_add(C, C, y) or_return;
+				internal_add(D, D, x) or_return;
 			}
 			/*
 				`C` = `C` / 2, `D` = `D` / 2
 			*/
-			if err = internal_int_shr1(C, C);             err != nil { return err; }
-			if err = internal_int_shr1(D, D);             err != nil { return err; }
+			internal_int_shr1(C, C) or_return;
+			internal_int_shr1(D, D) or_return;
 		}
 
 		/*
@@ -1380,20 +1401,22 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 			/*
 				`u` = `u` - `v`, `A` = `A` - `C`, `B` = `B` - `D`
 			*/
-			if err = internal_sub(u, u, v);               err != nil { return err; }
-			if err = internal_sub(A, A, C);               err != nil { return err; }
-			if err = internal_sub(B, B, D);               err != nil { return err; }
+			internal_sub(u, u, v) or_return;
+			internal_sub(A, A, C) or_return;
+			internal_sub(B, B, D) or_return;
 		} else {
 			/* v - v - u, C = C - A, D = D - B */
-			if err = internal_sub(v, v, u);               err != nil { return err; }
-			if err = internal_sub(C, C, A);               err != nil { return err; }
-			if err = internal_sub(D, D, B);               err != nil { return err; }
+			internal_sub(v, v, u) or_return;
+			internal_sub(C, C, A) or_return;
+			internal_sub(D, D, B) or_return;
 		}
 
 		/*
 			If not zero goto step 4
 		*/
-		if internal_is_zero(u)                                       { break; }
+		if internal_is_zero(u) {
+			break;
+		}
 	}
 
 	/*
@@ -1403,20 +1426,22 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 	/*
 		If `v` != `1` then there is no inverse.
 	*/
-	if internal_cmp(v, 1) !=  0                                      { return .Invalid_Argument; }
+	if internal_cmp(v, 1) != 0 {
+		return .Invalid_Argument;
+	}
 
 	/*
 		If its too low.
 	*/
 	if internal_cmp(C, 0) == -1 {
-		if err = internal_add(C, C, b); err != nil                   { return err; }
+		internal_add(C, C, b) or_return;
 	}
 
 	/*
 		Too big.
 	*/
 	if internal_cmp(C, 0) != -1 {
-		if err = internal_sub(C, C, b); err != nil                   { return err; }
+		internal_sub(C, C, b) or_return;
 	}
 
 	/*
@@ -1443,35 +1468,39 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		2. [modified] `b` must be odd.
 	*/
-	if internal_is_even(b)                                           { return .Invalid_Argument; }
+	if internal_is_even(b) {
+		return .Invalid_Argument;
+	}
 
 	/*
 		Init all our temps.
 	*/
-	if err = internal_init_multi(x, y, u, v, B, D); err != nil       { return err; }
+	internal_init_multi(x, y, u, v, B, D) or_return;
 
 	/*
 		`x` == modulus, `y` == value to invert.
 	*/
-	if err = internal_copy(x, b);                   err != nil       { return err; }
+	internal_copy(x, b) or_return;
 
 	/*
 		We need `y` = `|a|`.
 	*/
-	if err = internal_mod(y, a, b);                 err != nil       { return err; }
+	internal_mod(y, a, b) or_return;
 
 	/*
 		If one of `x`, `y` is zero return an error!
 	*/
-	if internal_is_zero(x) || internal_is_zero(y)                    { return .Invalid_Argument; }
+	if internal_is_zero(x) || internal_is_zero(y) {
+		return .Invalid_Argument;
+	}
 
 	/*
 		3. `u` = `x`, `v` = `y`, `A` = 1, `B` = 0, `C` = 0, `D` = 1
 	*/
-	if err = internal_copy(u, x);                   err != nil       { return err; }
-	if err = internal_copy(v, y);                   err != nil       { return err; }
+	internal_copy(u, x) or_return;
+	internal_copy(v, y) or_return;
 
-	if err = internal_one(D);                       err != nil       { return err; }
+	internal_one(D) or_return;
 
 	for {
 		/*
@@ -1481,7 +1510,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 			/*
 				4.1 `u` = `u` / 2
 			*/
-			if err = internal_int_shr1(u, u);       err != nil       { return err; }
+			internal_int_shr1(u, u) or_return;
 
 			/*
 				4.2 if `B` is odd then:
@@ -1490,13 +1519,13 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 				/*
 					`B` = (`B` - `x`) / 2
 				*/
-				if err = internal_sub(B, B, x);     err != nil       { return err; }
+				internal_sub(B, B, x) or_return;
 			}
 
 			/*
 				`B` = `B` / 2
 			*/
-			if err = internal_int_shr1(B, B);       err != nil       { return err; }
+			internal_int_shr1(B, B) or_return;
 		}
 
 		/*
@@ -1506,7 +1535,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 			/*
 				5.1 `v` = `v` / 2
 			*/
-			if err = internal_int_shr1(v, v);       err != nil       { return err; }
+			internal_int_shr1(v, v) or_return;
 
 			/*
 				5.2 if `D` is odd then:
@@ -1515,12 +1544,12 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 				/*
 					`D` = (`D` - `x`) / 2
 				*/
-				if err = internal_sub(D, D, x);     err != nil       { return err; }
+				internal_sub(D, D, x) or_return;
 			}
 			/*
 				`D` = `D` / 2
 			*/
-			if err = internal_int_shr1(D, D);       err != nil       { return err; }
+			internal_int_shr1(D, D) or_return;
 		}
 
 		/*
@@ -1530,20 +1559,22 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 			/*
 				`u` = `u` - `v`, `B` = `B` - `D`
 			*/
-			if err = internal_sub(u, u, v);         err != nil       { return err; }
-			if err = internal_sub(B, B, D);         err != nil       { return err; }
+			internal_sub(u, u, v) or_return;
+			internal_sub(B, B, D) or_return;
 		} else {
 			/*
 				`v` - `v` - `u`, `D` = `D` - `B`
 			*/
-			if err = internal_sub(v, v, u);         err != nil       { return err; }
-			if err = internal_sub(D, D, B);         err != nil       { return err; }
+			internal_sub(v, v, u) or_return;
+			internal_sub(D, D, B) or_return;
 		}
 
 		/*
 			If not zero goto step 4.
 		*/
-		if internal_is_zero(u)                                       { break; }
+		if internal_is_zero(u) {
+			break;
+		}
 	}
 
 	/*
@@ -1553,21 +1584,23 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		if `v` != 1 then there is no inverse
 	*/
-	if internal_cmp(v, 1) != 0                                       { return .Invalid_Argument; }
+	if internal_cmp(v, 1) != 0 {
+		return .Invalid_Argument;
+	}
 
 	/*
 		`b` is now the inverse.
 	*/
 	sign = a.sign;
 	for internal_int_is_negative(D) {
-		if err = internal_add(D, D, b);             err != nil       { return err; }
+		internal_add(D, D, b) or_return;
 	}
 
 	/*
 		Too big.
 	*/
 	for internal_cmp_mag(D, b) != -1 {
-		if err = internal_sub(D, D, b);             err != nil       { return err; }
+		internal_sub(D, D, b) or_return;
 	}
 
 	swap(dest, D);
@@ -1601,7 +1634,9 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
 	/*
 		If dest == src, do nothing
 	*/
-	if dest == src { return nil; }
+	if dest == src {
+		return nil;
+	}
 
 	digits = min(digits, len(src.digit), len(dest.digit));
 	mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
