@@ -1510,6 +1510,7 @@ semicolon_check:;
 		case Token_continue:
 		case Token_fallthrough:
 		case Token_return:
+		case Token_or_return:
 			/*fallthrough*/
 		case Token_Integer:
 		case Token_Float:
