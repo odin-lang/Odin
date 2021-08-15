@@ -267,7 +267,7 @@ enum ViralStateFlag : u16 {
 };
 
 
-enum FieldFlag {
+enum FieldFlag : u32 {
 	FieldFlag_NONE      = 0,
 	FieldFlag_ellipsis  = 1<<0,
 	FieldFlag_using     = 1<<1,
