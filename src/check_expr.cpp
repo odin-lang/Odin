@@ -4485,6 +4485,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					bool ok = false;
 					if (e->flags & EntityFlag_AutoCast) {
 						ok = check_is_castable_to(c, &o, t);
+					} else if (e->flags & EntityFlag_AnyInt) {
+						if (is_type_integer(t)) {
+							ok = check_is_castable_to(c, &o, t);
+						}
 					}
 					if (ok) {
 						s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
@@ -8729,6 +8733,12 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		}
 		if (f->flags&FieldFlag_auto_cast) {
 			str = gb_string_appendc(str, "auto_cast ");
+		}
+		if (f->flags&FieldFlag_any_int) {
+			str = gb_string_appendc(str, "#any_int ");
+		}
+		if (f->flags&FieldFlag_const) {
+			str = gb_string_appendc(str, "#const ");
 		}
 
 		for_array(i, f->names) {

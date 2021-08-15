@@ -186,7 +186,7 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 
 DEFAULT_RESERVE_CAPACITY :: 16;
 
-make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
+make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	make_slice_error_loc(loc, len);
 	data, err := mem_alloc_bytes(size_of(E)*len, alignment, allocator, loc);
 	if data == nil && size_of(E) != 0 {
@@ -197,7 +197,7 @@ make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, alloca
 }
 
 @builtin
-make_slice :: proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
+make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	return make_aligned(T, len, align_of(E), allocator, loc);
 }
 
@@ -207,12 +207,12 @@ make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocato
 }
 
 @builtin
-make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
+make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	return make_dynamic_array_len_cap(T, len, len, allocator, loc);
 }
 
 @builtin
-make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
+make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	make_dynamic_array_error_loc(loc, len, cap);
 	data, err := mem_alloc(size_of(E)*cap, align_of(E), allocator, loc);
 	s := Raw_Dynamic_Array{data, len, cap, allocator};
@@ -223,7 +223,7 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, a
 }
 
 @builtin
-make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
+make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
 	make_map_expr_error_loc(loc, cap);
 	context.allocator = allocator;
 
