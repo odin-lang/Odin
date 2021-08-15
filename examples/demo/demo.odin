@@ -2063,13 +2063,13 @@ or_return_operator :: proc() {
 			return err;
 		}
 
-		// The above idiom can be transformed into the follow
+		// The above idiom can be transformed into the following
 		n1 := caller_2() or_return;
 
 
-		// And if the expression has no other, it can be used like this
+		// And if the expression is 1-valued, it can be used like this
 		caller_1() or_return;
-		// which is functionally equivalen to
+		// which is functionally equivalent to
 		if err1 := caller_1(); err1 != nil {
 			return err1;
 		}
@@ -2090,30 +2090,28 @@ or_return_operator :: proc() {
 			return;
 		}
 
-		// The above idiom can be transformed
+		// The above idiom can be transformed into the following
 		y := caller_2() or_return;
 
-		// And if the expression has no other, it can be used like this
+		// And if the expression is 1-valued, it can be used like this
 		caller_1() or_return;
 
-		// which is functionally equivalen to
+		// which is functionally equivalent to
 		if err1 := caller_1(); err1 != nil {
 			err = err1;
 			return;
 		}
 
-		// If a the other values need to be set depending on what the end value is,
-		// the 'defer if' is can be used
-		defer if err != nil {
-			n = -1;
+		// If a non-bare 'return' is required, then a normal 'if' can be used as it is
+		// a lot clearer to read
+		if z, zerr := caller_2(); zerr != nil {
+			return -345 * z, zerr;
 		}
 
-		// If a non-bare return is required, then a normal if is a lot clearer
-		// and gets around the short circuiting
-		if z, zerr := caller_2(); zerr != nil {
-			n = -z;
-			err = zerr;
-			return;
+		// If the other return values need to be set depending on what the end value is,
+		// the 'defer if' idiom is can be used
+		defer if err != nil {
+			n = -1;
 		}
 
 		n = 123;
