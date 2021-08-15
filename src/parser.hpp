@@ -275,6 +275,7 @@ enum FieldFlag {
 	FieldFlag_c_vararg  = 1<<3,
 	FieldFlag_auto_cast = 1<<4,
 	FieldFlag_const     = 1<<5,
+	FieldFlag_any_int   = 1<<6,
 
 	FieldFlag_Tags = 1<<10,
 

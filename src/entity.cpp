@@ -62,11 +62,12 @@ enum EntityFlag : u64 {
 
 	EntityFlag_CVarArg       = 1ull<<22,
 	EntityFlag_AutoCast      = 1ull<<23,
+	EntityFlag_AnyInt        = 1ull<<24,
 
-	EntityFlag_Disabled      = 1ull<<24,
-	EntityFlag_Cold          = 1ull<<25, // procedure is rarely called
+	EntityFlag_Disabled      = 1ull<<25,
+	EntityFlag_Cold          = 1ull<<26, // procedure is rarely called
 
-	EntityFlag_Lazy          = 1ull<<26, // Lazily type checked
+	EntityFlag_Lazy          = 1ull<<27, // Lazily type checked
 
 	EntityFlag_Test          = 1ull<<30,
 

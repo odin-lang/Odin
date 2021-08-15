@@ -1526,6 +1526,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					error(name, "'#const' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_const;
 				}
+				if (p->flags&FieldFlag_any_int) {
+					error(name, "'#const' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_any_int;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -1572,6 +1576,12 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 							if (!check_is_castable_to(ctx, &op, type)) {
 								ok = false;
 							}
+						} else if (p->flags&FieldFlag_any_int) {
+							if (!is_type_integer(op.type) || !is_type_integer(type)) {
+								ok = false;
+							} else if (!check_is_castable_to(ctx, &op, type)) {
+								ok = false;
+							}
 						}
 						if (!ok) {
 							success = false;
@@ -1609,6 +1619,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						error(name, "'auto_cast' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_auto_cast;
 					}
+					if (p->flags&FieldFlag_any_int) {
+						error(name, "'#any_int' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_any_int;
+					}
 					if (p->flags&FieldFlag_const) {
 						error(name, "'#const' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_const;
@@ -1631,6 +1645,14 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 			if (p->flags&FieldFlag_auto_cast) {
 				param->flags |= EntityFlag_AutoCast;
+			}
+			if (p->flags&FieldFlag_any_int) {
+				if (!is_type_integer(param->type)) {
+					gbString str = type_to_string(param->type);
+					error(name, "A parameter with '#any_int' must be an integer, got %s", str);
+					gb_string_free(str);
+				}
+				param->flags |= EntityFlag_AnyInt;
 			}
 			if (p->flags&FieldFlag_const) {
 				param->flags |= EntityFlag_ConstInput;
