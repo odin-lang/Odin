@@ -3438,10 +3438,10 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_Ident:
 			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-				auto *mapping = parse_field_prefix_mappings + i;
-				if (mapping->token_kind == Token_Hash) {
-					if (f->curr_token.string == mapping->name) {
-						return mapping->prefix;
+				auto const &mapping = parse_field_prefix_mappings[i];
+				if (mapping.token_kind == Token_Hash) {
+					if (f->curr_token.string == mapping.name) {
+						return mapping.prefix;
 					}
 				}
 			}
@@ -3481,10 +3481,10 @@ u32 parse_field_prefixes(AstFile *f) {
 			field_flags |= parse_field_prefix_mappings[i].flag;
 
 			if (counts[i] != 1) {
-				auto *mapping = parse_field_prefix_mappings + i;
-				String name = mapping->name;
+				auto const &mapping = parse_field_prefix_mappings[i];
+				String name = mapping.name;
 				char const *prefix = "";
-				if (mapping->token_kind == Token_Hash) {
+				if (mapping.token_kind == Token_Hash) {
 					prefix = "#";
 				}
 				syntax_error(f->curr_token, "Multiple '%s%.*s' in this field list", prefix, LIT(name));
@@ -3495,22 +3495,29 @@ u32 parse_field_prefixes(AstFile *f) {
 }
 
 u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 set_flags) {
-	if (name_count > 1 && (set_flags&FieldFlag_using)) {
-		syntax_error(f->curr_token, "Cannot apply 'using' to more than one of the same type");
-		set_flags &= ~FieldFlag_using;
-	}
+	for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+		bool err = false;
+		auto const &m = parse_field_prefix_mappings[i];
 
-	if ((allowed_flags&FieldFlag_using) == 0 && (set_flags&FieldFlag_using)) {
-		syntax_error(f->curr_token, "'using' is not allowed within this field list");
-		set_flags &= ~FieldFlag_using;
-	}
-	if ((allowed_flags&FieldFlag_no_alias) == 0 && (set_flags&FieldFlag_no_alias)) {
-		syntax_error(f->curr_token, "'#no_alias' is not allowed within this field list");
-		set_flags &= ~FieldFlag_no_alias;
-	}
-	if ((allowed_flags&FieldFlag_c_vararg) == 0 && (set_flags&FieldFlag_c_vararg)) {
-		syntax_error(f->curr_token, "'#c_vararg' is not allowed within this field list");
-		set_flags &= ~FieldFlag_c_vararg;
+		if ((set_flags & m.flag) != 0) {
+			if (m.flag == FieldFlag_using && name_count > 1) {
+				err = true;
+				syntax_error(f->curr_token, "Cannot apply 'using' to more than one of the same type");
+			}
+
+			if ((allowed_flags & m.flag) == 0) {
+				err = true;
+				char const *prefix = "";
+				if (m.token_kind == Token_Hash) {
+					prefix = "#";
+				}
+				syntax_error(f->curr_token, "'%s%.*s' in not allowed within this field list", prefix, LIT(m.name));
+			}
+		}
+
+		if (err) {
+			set_flags &= ~m.flag;
+		}
 	}
 	return set_flags;
 }
