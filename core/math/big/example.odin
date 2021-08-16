@@ -206,16 +206,12 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	atoi(a, "12980742146337069150589594264770969721", 10);
+	power_of_two(a, 312);
 	print("a: ", a, 10, true, true, true);
-	atoi(b, "4611686018427387904", 10);
+	power_of_two(b, 314);
 	print("b: ", b, 10, true, true, true);
-
-	if err := internal_divmod(c, d, a, b); err != nil {
-		fmt.printf("Error: %v\n", err);
-	}
-	print("c: ", c);
-	print("c: ", d);
+	_private_mul_karatsuba(c, a, b);
+	print("c: ", c, 10, true, true, true);
 }
 
 main :: proc() {

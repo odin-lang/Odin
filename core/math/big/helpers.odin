@@ -432,18 +432,16 @@ int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err
 
 init_multi :: proc { int_init_multi, };
 
-copy_digits :: proc(dest, src: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0), allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
-	digits := digits;
 	/*
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest, src);
 	#force_inline internal_clear_if_uninitialized(src) or_return;
 
-	digits = min(digits, len(src.digit), len(dest.digit));
-	return #force_inline internal_copy_digits(dest, src, digits);
+	return #force_inline internal_copy_digits(dest, src, digits, offset);
 }
 
 /*
