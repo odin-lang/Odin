@@ -89,6 +89,143 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int, allocator := context.all
 	return internal_clamp(dest);
 }
 
+
+/*
+	Multiplication using the Toom-Cook 3-way algorithm.
+
+	Much more complicated than Karatsuba but has a lower asymptotic running time of O(N**1.464).
+	This algorithm is only particularly useful on VERY large inputs.
+	(We're talking 1000s of digits here...).
+
+	This file contains code from J. Arndt's book  "Matters Computational"
+	and the accompanying FXT-library with permission of the author.
+
+	Setup from:
+		Chung, Jaewook, and M. Anwar Hasan. "Asymmetric squaring formulae."
+		18th IEEE Symposium on Computer Arithmetic (ARITH'07). IEEE, 2007.
+
+	The interpolation from above needed one temporary variable more than the interpolation here:
+
+		Bodrato, Marco, and Alberto Zanoni. "What about Toom-Cook matrices optimality."
+		Centro Vito Volterra Universita di Roma Tor Vergata (2006)
+*/
+_private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	S1, S2, T1, a0, a1, a2, b0, b1, b2 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(S1, S2, T1, a0, a1, a2, b0, b1, b2);
+
+	/*
+		Init temps.
+	*/
+	internal_init_multi(S1, S2, T1)             or_return;
+
+	/*
+		B
+	*/
+	B := min(a.used, b.used) / 3;
+
+	/*
+		a = a2 * x^2 + a1 * x + a0;
+	*/
+	internal_grow(a0, B)                        or_return;
+	internal_grow(a1, B)                        or_return;
+	internal_grow(a2, a.used - 2 * B)           or_return;
+
+	a0.used, a1.used = B, B;
+	a2.used = a.used - 2 * B;
+
+	internal_copy_digits(a0, a, a0.used)        or_return;
+	internal_copy_digits(a1, a, a1.used, B)     or_return;
+	internal_copy_digits(a2, a, a2.used, 2 * B) or_return;
+
+	internal_clamp(a0);
+	internal_clamp(a1);
+	internal_clamp(a2);
+
+	/*
+		b = b2 * x^2 + b1 * x + b0;
+	*/
+	internal_grow(b0, B)                        or_return;
+	internal_grow(b1, B)                        or_return;
+	internal_grow(b2, b.used - 2 * B)           or_return;
+
+	b0.used, b1.used = B, B;
+	b2.used = b.used - 2 * B;
+
+	internal_copy_digits(b0, b, b0.used)        or_return;
+	internal_copy_digits(b1, b, b1.used, B)     or_return;
+	internal_copy_digits(b2, b, b2.used, 2 * B) or_return;
+
+	internal_clamp(b0);
+	internal_clamp(b1);
+	internal_clamp(b2);
+
+	/*
+		\\ S1 = (a2+a1+a0) * (b2+b1+b0);
+	*/
+	internal_add(T1, a2, a1)                    or_return; /*   T1 = a2 + a1; */
+	internal_add(S2, T1, a0)                    or_return; /*   S2 = T1 + a0; */
+	internal_add(dest, b2, b1)                  or_return; /* dest = b2 + b1; */
+	internal_add(S1, dest, b0)                  or_return; /*   S1 =  c + b0; */
+	internal_mul(S1, S1, S2)                    or_return; /*   S1 = S1 * S2; */
+
+	/*
+		\\S2 = (4*a2+2*a1+a0) * (4*b2+2*b1+b0);
+	*/
+	internal_add(T1, T1, a2)                    or_return; /*   T1 = T1 + a2; */
+	internal_int_shl1(T1, T1)                   or_return; /*   T1 = T1 << 1; */
+	internal_add(T1, T1, a0)                    or_return; /*   T1 = T1 + a0; */
+	internal_add(dest, dest, b2)                or_return; /*    c =  c + b2; */
+	internal_int_shl1(dest, dest)               or_return; /*    c =  c << 1; */
+	internal_add(dest, dest, b0)                or_return; /*    c =  c + b0; */
+	internal_mul(S2, T1, dest)                  or_return; /*   S2 = T1 *  c; */
+
+	/*
+		\\S3 = (a2-a1+a0) * (b2-b1+b0);
+	*/
+	internal_sub(a1, a2, a1)                    or_return; /*   a1 = a2 - a1; */
+	internal_add(a1, a1, a0)                    or_return; /*   a1 = a1 + a0; */
+	internal_sub(b1, b2, b1)                    or_return; /*   b1 = b2 - b1; */
+	internal_add(b1, b1, b0)                    or_return; /*   b1 = b1 + b0; */
+	internal_mul(a1, a1, b1)                    or_return; /*   a1 = a1 * b1; */
+	internal_mul(b1, a2, b2)                    or_return; /*   b1 = a2 * b2; */
+
+	/*
+		\\S2 = (S2 - S3) / 3;
+	*/
+	internal_sub(S2, S2, a1)                    or_return; /*   S2 = S2 - a1; */
+	_private_int_div_3(S2, S2)                  or_return; /*   S2 = S2 / 3; \\ this is an exact division  */
+	internal_sub(a1, S1, a1)                    or_return; /*   a1 = S1 - a1; */
+	internal_int_shr1(a1, a1)                   or_return; /*   a1 = a1 >> 1; */
+	internal_mul(a0, a0, b0)                    or_return; /*   a0 = a0 * b0; */
+	internal_sub(S1, S1, a0)                    or_return; /*   S1 = S1 - a0; */
+	internal_sub(S2, S2, S1)                    or_return; /*   S2 = S2 - S1; */
+	internal_int_shr1(S2, S2)                   or_return; /*   S2 = S2 >> 1; */
+	internal_sub(S1, S1, a1)                    or_return; /*   S1 = S1 - a1; */
+	internal_sub(S1, S1, b1)                    or_return; /*   S1 = S1 - b1; */
+	internal_int_shl1(T1, b1)                   or_return; /*   T1 = b1 << 1; */
+	internal_sub(S2, S2, T1)                    or_return; /*   S2 = S2 - T1; */
+	internal_sub(a1, a1, S2)                    or_return; /*   a1 = a1 - S2; */
+
+	/*
+		P = b1*x^4+ S2*x^3+ S1*x^2+ a1*x + a0;
+	*/
+	internal_shl_digit(b1, 4 * B)               or_return;
+	internal_shl_digit(S2, 3 * B)               or_return;
+	internal_add(b1, b1, S2)                    or_return;
+	internal_shl_digit(S1, 2 * B)               or_return;
+	internal_add(b1, b1, S1)                    or_return;
+	internal_shl_digit(a1, 1 * B)               or_return;
+	internal_add(b1, b1, a1)                    or_return;
+	internal_add(dest, b1, a0)                  or_return;
+
+	/*
+		a * b - P
+	*/
+	return nil;
+}
+
 /*
 	product = |a| * |b| using Karatsuba Multiplication using three half size multiplications.
 
@@ -116,7 +253,7 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int, allocator := context.all
 	baseline/comba methods use. Generally though, the overhead of this method doesn't pay off
 	until a certain size is reached, of around 80 used DIGITs.
 */
-_private_mul_karatsuba :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+_private_int_mul_karatsuba :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
 	x0, x1, y0, y1, t1, x0y0, x1y1 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};

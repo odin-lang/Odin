@@ -674,10 +674,10 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			*/
 							max_used     >= 2 * min_used {
 			// err = s_mp_mul_balance(a,b,c);
-		} else if false && min_used >= MUL_TOOM_CUTOFF {
-			// err = s_mp_mul_toom(a, b, c);
+		} else if min_used >= MUL_TOOM_CUTOFF {
+			err = #force_inline _private_int_mul_toom(dest, src, multiplier);
 		} else if min_used >= MUL_KARATSUBA_CUTOFF {
-			err = #force_inline _private_mul_karatsuba(dest, src, multiplier);
+			err = #force_inline _private_int_mul_karatsuba(dest, src, multiplier);
 		} else if digits < _WARRAY && min_used <= _MAX_COMBA {
 			/*
 				Can we use the fast multiplier?
