@@ -5018,10 +5018,9 @@ AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel
 
 gb_global Rune illegal_import_runes[] = {
 	'"', '\'', '`',
-	// ' ',
 	'\t', '\r', '\n', '\v', '\f',
 	'\\', // NOTE(bill): Disallow windows style filepaths
-	'!', '$', '%', '^', '&', '*', '(', ')', '=', '+',
+	'!', '$', '%', '^', '&', '*', '(', ')', '=',
 	'[', ']', '{', '}',
 	';',
 	':', // NOTE(bill): Disallow windows style absolute filepaths
