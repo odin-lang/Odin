@@ -115,8 +115,8 @@ enum ProcedureOptimizationMode : u32 {
 struct Entity {
 	EntityKind  kind;
 	u64         id;
-	u64         flags;
-	EntityState state;
+	std::atomic<u64>         flags;
+	std::atomic<EntityState> state;
 	Token       token;
 	Scope *     scope;
 	Type *      type;

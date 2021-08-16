@@ -923,7 +923,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 					poly->kind = Type_EnumeratedArray;
 					poly->cached_size  = -1;
 					poly->cached_align = -1;
-					poly->flags        = source->flags;
+					poly->flags.exchange(source->flags);
 					poly->failure      = false;
 					poly->EnumeratedArray.elem      = source->EnumeratedArray.elem;
 					poly->EnumeratedArray.index     = source->EnumeratedArray.index;
