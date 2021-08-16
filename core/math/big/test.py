@@ -532,7 +532,7 @@ TESTS = {
 if not args.fast_tests:
 	TESTS[test_factorial].append(
 		# This one on its own takes around 800ms, so we exclude it for FAST_TESTS
-		[ 100_000 ],
+		[ 10_000 ],
 	)
 
 total_passes   = 0
