@@ -67,17 +67,9 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	}
 
 	read_name :: proc(r: ^Reader) -> (value: string, err: Read_Error) {
-		len: u8;
-		data: []byte;
-		len, err = read_value(r, u8);
-		if err != nil {
-			return;
-		}
-		data, err = read_array(r, byte, int(len));
-		if err == nil {
-			value = string(data[:len]);
-		}
-		return;
+		len  := read_value(r, u8)             or_return;
+		data := read_array(r, byte, int(len)) or_return;
+		return string(data[:len]), nil;
 	}
 
 	read_meta :: proc(r: ^Reader, capacity: u32le) -> (meta_data: []Meta, err: Read_Error) {
@@ -85,10 +77,9 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		count := 0;
 		defer meta_data = meta_data[:count];
 		for m in &meta_data {
-			if m.name, err = read_name(r); err != nil { return };
+			m.name = read_name(r) or_return;
 
-			type: Meta_Value_Type;
-			if type, err = read_value(r, Meta_Value_Type); err != nil { return }
+			type := read_value(r, Meta_Value_Type) or_return;
 			if type > max(Meta_Value_Type) {
 				if r.print_error {
 					fmt.eprintf("HxA Error: file '%s' has meta value type %d. Maximum value is ", r.filename, u8(type), u8(max(Meta_Value_Type)));
@@ -96,22 +87,15 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 				err = .Invalid_Data;
 				return;
 			}
-			array_length: u32le;
-			if array_length, err = read_value(r, u32le); err != nil { return }
+			array_length := read_value(r, u32le) or_return;
 
 			switch type {
-			case .Int64:
-				if m.value, err = read_array(r, i64le, int(array_length)); err != nil { return }
-			case .Double:
-				if m.value, err = read_array(r, f64le, int(array_length)); err != nil { return }
-			case .Node:
-				if m.value, err = read_array(r, Node_Index, int(array_length)); err != nil { return }
-			case .Text:
-				if m.value, err = read_string(r, int(array_length)); err != nil { return }
-			case .Binary:
-				if m.value, err = read_array(r, byte, int(array_length)); err != nil { return }
-			case .Meta:
-				if m.value, err = read_meta(r, array_length); err != nil { return }
+			case .Int64:  m.value = read_array(r, i64le, int(array_length))      or_return;
+			case .Double: m.value = read_array(r, f64le, int(array_length))      or_return;
+			case .Node:   m.value = read_array(r, Node_Index, int(array_length)) or_return;
+			case .Text:   m.value = read_string(r, int(array_length))            or_return;
+			case .Binary: m.value = read_array(r, byte, int(array_length))       or_return;
+			case .Meta:   m.value = read_meta(r, array_length)                   or_return;
 			}
 
 			count += 1;
@@ -120,16 +104,14 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	}
 
 	read_layer_stack :: proc(r: ^Reader, capacity: u32le) -> (layers: Layer_Stack, err: Read_Error) {
-		stack_count: u32le;
-		if stack_count, err = read_value(r, u32le); err != nil { return }
+		stack_count := read_value(r, u32le) or_return;
 		layer_count := 0;
 		layers = make(Layer_Stack, stack_count);
 		defer layers = layers[:layer_count];
 		for layer in &layers {
-			type: Layer_Data_Type;
-			if layer.name, err = read_name(r); err != nil { return }
-			if layer.components, err = read_value(r, u8); err != nil { return }
-			if type, err = read_value(r, Layer_Data_Type); err != nil { return }
+			layer.name = read_name(r) or_return;
+			layer.components = read_value(r, u8) or_return;
+			type := read_value(r, Layer_Data_Type) or_return;
 			if type > max(type) {
 				if r.print_error {
 					fmt.eprintf("HxA Error: file '%s' has layer data type %d. Maximum value is ", r.filename, u8(type), u8(max(Layer_Data_Type)));
@@ -140,10 +122,10 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 			data_len := int(layer.components) * int(capacity);
 
 			switch type {
-			case .Uint8:  if layer.data, err = read_array(r, u8,    data_len); err != nil { return }
-			case .Int32:  if layer.data, err = read_array(r, i32le, data_len); err != nil { return }
-			case .Float:  if layer.data, err = read_array(r, f32le, data_len); err != nil { return }
-			case .Double: if layer.data, err = read_array(r, f64le, data_len); err != nil { return }
+			case .Uint8:  layer.data = read_array(r, u8,    data_len) or_return;
+			case .Int32:  layer.data = read_array(r, i32le, data_len) or_return;
+			case .Float:  layer.data = read_array(r, f32le, data_len) or_return;
+			case .Double: layer.data = read_array(r, f64le, data_len) or_return;
 			}
 			layer_count += 1;
 		}
@@ -177,8 +159,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 
 	for node_idx in 0..<header.internal_node_count {
 		node := &file.nodes[node_count];
-		type: Node_Type;
-		if type, err = read_value(r, Node_Type); err != nil { return }
+		type := read_value(r, Node_Type) or_return;
 		if type > max(Node_Type) {
 			if r.print_error {
 				fmt.eprintf("HxA Error: file '%s' has node type %d. Maximum value is ", r.filename, u8(type), u8(max(Node_Type)));
@@ -188,9 +169,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		}
 		node_count += 1;
 
-		meta_data_count: u32le;
-		if meta_data_count, err = read_value(r, u32le); err != nil { return }
-		if node.meta_data, err = read_meta(r, meta_data_count); err != nil { return }
+		node.meta_data = read_meta(r, read_value(r, u32le) or_return) or_return;
 
 		switch type {
 		case .Meta_Only:
@@ -198,35 +177,35 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		case .Geometry:
 			g: Node_Geometry;
 
-			if g.vertex_count, err = read_value(r, u32le); err != nil { return }
-			if g.vertex_stack, err = read_layer_stack(r, g.vertex_count); err != nil { return }
-			if g.edge_corner_count, err = read_value(r, u32le); err != nil { return }
-			if g.corner_stack, err = read_layer_stack(r, g.edge_corner_count); err != nil { return }
+			g.vertex_count      = read_value(r, u32le)                     or_return;
+			g.vertex_stack      = read_layer_stack(r, g.vertex_count)      or_return;
+			g.edge_corner_count = read_value(r, u32le)                     or_return;
+			g.corner_stack      = read_layer_stack(r, g.edge_corner_count) or_return;
 			if header.version > 2 {
-				if g.edge_stack, err = read_layer_stack(r, g.edge_corner_count); err != nil { return }
+				g.edge_stack = read_layer_stack(r, g.edge_corner_count) or_return;
 			}
-			if g.face_count, err = read_value(r, u32le); err != nil { return }
-			if g.face_stack, err = read_layer_stack(r, g.face_count); err != nil { return }
+			g.face_count = read_value(r, u32le)              or_return;
+			g.face_stack = read_layer_stack(r, g.face_count) or_return;
 
 			node.content = g;
 
 		case .Image:
 			img: Node_Image;
 
-			if img.type, err = read_value(r, Image_Type); err != nil { return }
+			img.type = read_value(r, Image_Type) or_return;
 			dimensions := int(img.type);
 			if img.type == .Image_Cube {
 				dimensions = 2;
 			}
 			img.resolution = {1, 1, 1};
 			for d in 0..<dimensions {
-				if img.resolution[d], err = read_value(r, u32le); err != nil { return }
+				img.resolution[d] = read_value(r, u32le) or_return;
 			}
 			size := img.resolution[0]*img.resolution[1]*img.resolution[2];
 			if img.type == .Image_Cube {
 				size *= 6;
 			}
-			if img.image_stack, err = read_layer_stack(r, size); err != nil { return }
+			img.image_stack = read_layer_stack(r, size) or_return;
 
 			node.content = img;
 		}

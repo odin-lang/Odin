@@ -114,6 +114,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, Type **ok_type_);
 
+void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, Type *right_type);
+void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
+void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
+void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
+
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
@@ -2958,6 +2963,25 @@ void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final)
 
 		update_untyped_expr_type(c, te->x, type, final);
 		update_untyped_expr_type(c, te->y, type, final);
+	case_end;
+
+	case_ast_node(ore, OrReturnExpr, e);
+		if (old->value.kind != ExactValue_Invalid) {
+			// See above note in UnaryExpr case
+			break;
+		}
+
+		update_untyped_expr_type(c, ore->expr, type, final);
+	case_end;
+
+	case_ast_node(oee, OrElseExpr, e);
+		if (old->value.kind != ExactValue_Invalid) {
+			// See above note in UnaryExpr case
+			break;
+		}
+
+		update_untyped_expr_type(c, oee->x, type, final);
+		update_untyped_expr_type(c, oee->y, type, final);
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
@@ -6602,6 +6626,123 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 	case_end;
 
+	case_ast_node(oe, OrElseExpr, node);
+		String name = oe->token.string;
+		Ast *arg = oe->x;
+		Ast *default_value = oe->y;
+
+		Operand x = {};
+		Operand y = {};
+		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
+		if (x.mode == Addressing_Invalid) {
+			o->mode = Addressing_Value;
+			o->type = t_invalid;
+			o->expr = node;
+			return Expr_Expr;
+		}
+
+		check_multi_expr_with_type_hint(c, &y, default_value, x.type);
+		error_operand_no_value(&y);
+		if (y.mode == Addressing_Invalid) {
+			o->mode = Addressing_Value;
+			o->type = t_invalid;
+			o->expr = node;
+			return Expr_Expr;
+		}
+
+		Type *left_type = nullptr;
+		Type *right_type = nullptr;
+		check_or_else_split_types(c, &x, name, &left_type, &right_type);
+		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
+
+		if (left_type != nullptr) {
+			check_assignment(c, &y, left_type, name);
+		} else {
+			check_or_else_expr_no_value_error(c, name, x, type_hint);
+		}
+
+		if (left_type == nullptr) {
+			left_type = t_invalid;
+		}
+		o->mode = Addressing_Value;
+		o->type = left_type;
+		o->expr = node;
+		return Expr_Expr;
+	case_end;
+
+	case_ast_node(re, OrReturnExpr, node);
+		String name = re->token.string;
+		Operand x = {};
+		check_multi_expr_with_type_hint(c, &x, re->expr, type_hint);
+		if (x.mode == Addressing_Invalid) {
+			o->mode = Addressing_Value;
+			o->type = t_invalid;
+			o->expr = node;
+			return Expr_Expr;
+		}
+
+		Type *left_type = nullptr;
+		Type *right_type = nullptr;
+		check_or_return_split_types(c, &x, name, &left_type, &right_type);
+		add_type_and_value(&c->checker->info, re->expr, x.mode, x.type, x.value);
+
+		if (right_type == nullptr) {
+			check_or_else_expr_no_value_error(c, name, x, type_hint);
+		} else {
+			Type *proc_type = base_type(c->curr_proc_sig);
+			GB_ASSERT(proc_type->kind == Type_Proc);
+			Type *result_type = proc_type->Proc.results;
+			if (result_type == nullptr) {
+				error(node, "'%.*s' requires the current procedure to have at least one return value", LIT(name));
+			} else {
+				GB_ASSERT(result_type->kind == Type_Tuple);
+
+				auto const &vars = result_type->Tuple.variables;
+				Type *end_type = vars[vars.count-1]->type;
+
+				if (vars.count > 1) {
+					if (!proc_type->Proc.has_named_results) {
+						error(node, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(name));
+					}
+				}
+
+				Operand rhs = {};
+				rhs.type = right_type;
+				rhs.mode = Addressing_Value;
+
+				// TODO(bill): better error message
+				if (!check_is_assignable_to(c, &rhs, end_type)) {
+					gbString a = type_to_string(right_type);
+					gbString b = type_to_string(end_type);
+					gbString ret_type = type_to_string(result_type);
+					error(node, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(name));
+					if (vars.count == 1) {
+						error_line("\tProcedure return value type: %s\n", ret_type);
+					} else {
+						error_line("\tProcedure return value types: (%s)\n", ret_type);
+					}
+					gb_string_free(ret_type);
+					gb_string_free(b);
+					gb_string_free(a);
+				}
+			}
+		}
+
+		o->expr = node;
+		o->type = left_type;
+		if (left_type != nullptr) {
+			o->mode = Addressing_Value;
+		} else {
+			o->mode = Addressing_NoValue;
+		}
+
+		if (c->curr_proc_sig == nullptr) {
+			error(node, "'%.*s' can only be used within a procedure", LIT(name));
+		}
+
+		return Expr_Expr;
+	case_end;
+
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
 		if (type != nullptr && is_type_untyped(type)) {
@@ -8565,6 +8706,16 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, te->y, shorthand);
 	case_end;
 
+	case_ast_node(oe, OrElseExpr, node);
+		str = write_expr_to_string(str, oe->x, shorthand);
+		str = gb_string_appendc(str, " or_else ");
+		str = write_expr_to_string(str, oe->y, shorthand);
+	case_end;
+
+	case_ast_node(oe, OrReturnExpr, node);
+		str = write_expr_to_string(str, oe->expr, shorthand);
+		str = gb_string_appendc(str, " or_return");
+	case_end;
 
 	case_ast_node(pe, ParenExpr, node);
 		str = gb_string_append_rune(str, '(');

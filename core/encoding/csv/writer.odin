@@ -64,21 +64,15 @@ write :: proc(w: ^Writer, record: []string) -> io.Error {
 		field := record[field_idx];
 
 		if field_idx > 0 {
-			if _, err := io.write_rune(w.w, w.comma); err != nil {
-				return err;
-			}
+			io.write_rune(w.w, w.comma) or_return;
 		}
 
 		if !field_needs_quoting(w, field) {
-			if _, err := io.write_string(w.w, field); err != nil {
-				return err;
-			}
+			io.write_string(w.w, field) or_return;
 			continue;
 		}
 
-		if err := io.write_byte(w.w, '"'); err != nil {
-			return err;
-		}
+		io.write_byte(w.w, '"') or_return;
 
 		for len(field) > 0 {
 			i := strings.index_any(field, CHAR_SET);
@@ -86,40 +80,28 @@ write :: proc(w: ^Writer, record: []string) -> io.Error {
 				i = len(field);
 			}
 
-			if _, err := io.write_string(w.w, field[:i]); err != nil {
-				return err;
-			}
+			io.write_string(w.w, field[:i]) or_return;
 			field = field[i:];
 
 			if len(field) > 0 {
 				switch field[0] {
 				case '\r':
 					if !w.use_crlf {
-						if err := io.write_byte(w.w, '\r'); err != nil {
-							return err;
-						}
+						io.write_byte(w.w, '\r') or_return;
 					}
 				case '\n':
 					if w.use_crlf {
-						if _, err := io.write_string(w.w, "\r\n"); err != nil {
-							return err;
-						}
+						io.write_string(w.w, "\r\n") or_return;
 					} else {
-						if err := io.write_byte(w.w, '\n'); err != nil {
-							return err;
-						}
+						io.write_byte(w.w, '\n') or_return;
 					}
 				case '"':
-					if _, err := io.write_string(w.w, `""`); err != nil {
-						return err;
-					}
+					io.write_string(w.w, `""`) or_return;
 				}
 				field = field[1:];
 			}
 		}
-		if err := io.write_byte(w.w, '"'); err != nil {
-			return err;
-		}
+		io.write_byte(w.w, '"') or_return;
 	}
 
 	if w.use_crlf {
@@ -132,10 +114,7 @@ write :: proc(w: ^Writer, record: []string) -> io.Error {
 // write_all writes multiple CSV records to w using write, and then flushes (if necessary).
 write_all :: proc(w: ^Writer, records: [][]string) -> io.Error {
 	for record in records {
-		err := write(w, record);
-		if err != nil {
-			return err;
-		}
+		write(w, record) or_return;
 	}
 	return writer_flush(w);
 }

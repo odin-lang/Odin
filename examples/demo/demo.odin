@@ -1998,9 +1998,9 @@ relative_data_types :: proc() {
 	fmt.println(rel_slice[1]);
 }
 
-or_else_procedure :: proc() {
+or_else_operator :: proc() {
 	fmt.println("\n#'or_else'");
-	// IMPORTANT NOTE: 'or_else' is experimental features and subject to change/removal
+	// IMPORTANT NOTE: 'or_else' is an experimental feature and subject to change/removal
 	{
 		m: map[string]int;
 		i: int;
@@ -2010,7 +2010,7 @@ or_else_procedure :: proc() {
 			i = 123;
 		}
 		// The above can be mapped to 'or_else'
-		i = or_else(m["hellope"], 123);
+		i = m["hellope"] or_else 123;
 
 		assert(i == 123);
 	}
@@ -2019,15 +2019,116 @@ or_else_procedure :: proc() {
 		// have optional ok semantics
 		v: union{int, f64};
 		i: int;
-		i = or_else(v.(int), 123);
-		i = or_else(v.?, 123); // Type inference magic
+		i = v.(int) or_else  123;
+		i = v.? or_else 123; // Type inference magic
 		assert(i == 123);
 
 		m: Maybe(int);
-		i = or_else(m.?, 456);
+		i = m.? or_else 456;
 		assert(i == 456);
 	}
 }
+
+or_return_operator :: proc() {
+	fmt.println("\n#'or_return'");
+	// IMPORTANT NOTE: 'or_return' is an experimental feature and subject to change/removal
+	//
+	// The concept of 'or_return' will work by popping off the end value in a multiple
+	// valued expression and checking whether it was not 'nil' or 'false', and if so,
+	// set the end return value to value if possible. If the procedure only has one
+	// return value, it will do a simple return. If the procedure had multiple return
+	// values, 'or_return' will require that all parameters be named so that the end
+	// value could be assigned to by name and then an empty return could be called.
+
+	Error :: enum {
+		None,
+		Something_Bad,
+		Something_Worse,
+		The_Worst,
+		Your_Mum,
+	};
+
+	caller_1 :: proc() -> Error {
+		return .None;
+	}
+
+	caller_2 :: proc() -> (int, Error) {
+		return 123, .None;
+	}
+	caller_3 :: proc() -> (int, int, Error) {
+		return 123, 345, .None;
+	}
+
+	foo_1 :: proc() -> Error {
+		// This can be a common idiom in many code bases
+		n0, err := caller_2();
+		if err != nil {
+			return err;
+		}
+
+		// The above idiom can be transformed into the following
+		n1 := caller_2() or_return;
+
+
+		// And if the expression is 1-valued, it can be used like this
+		caller_1() or_return;
+		// which is functionally equivalent to
+		if err1 := caller_1(); err1 != nil {
+			return err1;
+		}
+
+		// Multiple return values still work with 'or_return' as it only
+		// pops off the end value in the multi-valued expression
+		n0, n1 = caller_3() or_return;
+
+		return .None;
+	}
+	foo_2 :: proc() -> (n: int, err: Error) {
+		// It is more common that your procedure turns multiple values
+		// If 'or_return' is used within a procedure multiple parameters (2+),
+		// then all the parameters must be named so that the remaining parameters
+		// so that a bare 'return' statement can be used
+
+		// This can be a common idiom in many code bases
+		x: int;
+		x, err = caller_2();
+		if err != nil {
+			return;
+		}
+
+		// The above idiom can be transformed into the following
+		y := caller_2() or_return;
+		_ = y;
+
+		// And if the expression is 1-valued, it can be used like this
+		caller_1() or_return;
+
+		// which is functionally equivalent to
+		if err1 := caller_1(); err1 != nil {
+			err = err1;
+			return;
+		}
+
+		// If using a non-bare 'return' statement is required, setting the return values
+		// using the normal idiom is a better choice and clearer to read.
+		if z, zerr := caller_2(); zerr != nil {
+			return -345 * z, zerr;
+		}
+
+		// If the other return values need to be set depending on what the end value is,
+		// the 'defer if' idiom is can be used
+		defer if err != nil {
+			n = -1;
+		}
+
+		n = 123;
+		return;
+	}
+
+	foo_1();
+	foo_2();
+}
+
 
 main :: proc() {
 	when true {
@@ -2061,7 +2162,7 @@ main :: proc() {
 		union_maybe();
 		explicit_context_definition();
 		relative_data_types();
-		or_else_procedure();
+		or_else_operator();
+		or_return_operator();
 	}
 }
-//

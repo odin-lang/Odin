@@ -187,6 +187,13 @@ Ast *clone_ast(Ast *node) {
 		n->TernaryWhenExpr.cond = clone_ast(n->TernaryWhenExpr.cond);
 		n->TernaryWhenExpr.y    = clone_ast(n->TernaryWhenExpr.y);
 		break;
+	case Ast_OrElseExpr:
+		n->OrElseExpr.x = clone_ast(n->OrElseExpr.x);
+		n->OrElseExpr.y = clone_ast(n->OrElseExpr.y);
+		break;
+	case Ast_OrReturnExpr:
+		n->OrReturnExpr.expr = clone_ast(n->OrReturnExpr.expr);
+		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr);
 		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type);
@@ -682,6 +689,21 @@ Ast *ast_ternary_when_expr(AstFile *f, Ast *x, Ast *cond, Ast *y) {
 	result->TernaryWhenExpr.x = x;
 	result->TernaryWhenExpr.cond = cond;
 	result->TernaryWhenExpr.y = y;
+	return result;
+}
+
+Ast *ast_or_else_expr(AstFile *f, Ast *x, Token const &token, Ast *y) {
+	Ast *result = alloc_ast_node(f, Ast_OrElseExpr);
+	result->OrElseExpr.x = x;
+	result->OrElseExpr.token = token;
+	result->OrElseExpr.y = y;
+	return result;
+}
+
+Ast *ast_or_return_expr(AstFile *f, Ast *expr, Token const &token) {
+	Ast *result = alloc_ast_node(f, Ast_OrReturnExpr);
+	result->OrReturnExpr.expr = expr;
+	result->OrReturnExpr.token = token;
 	return result;
 }
 
@@ -1340,6 +1362,8 @@ Token expect_operator(AstFile *f) {
 		// okay
 	} else if (prev.kind == Token_if || prev.kind == Token_when) {
 		// okay
+	} else if (prev.kind == Token_or_else || prev.kind == Token_or_return) {
+		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		String p = token_to_string(prev);
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
@@ -1674,6 +1698,22 @@ Ast *unselector_expr(Ast *node) {
 	return node;
 }
 
+Ast *strip_or_return_expr(Ast *node) {
+	for (;;) {
+		if (node == nullptr) {
+			return node;
+		}
+		if (node->kind == Ast_OrReturnExpr) {
+			node = node->OrReturnExpr.expr;
+		} else if (node->kind == Ast_ParenExpr) {
+			node = node->ParenExpr.expr;
+		} else {
+			return node;
+		}
+	}
+}
+
+
 Ast *parse_value(AstFile *f);
 
 Array<Ast *> parse_element_list(AstFile *f) {
@@ -1892,7 +1932,7 @@ bool ast_on_same_line(Ast *x, Ast *y) {
 
 Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 	Ast *expr = parse_unary_expr(f, false);
-	Ast *e = unparen_expr(expr);
+	Ast *e = strip_or_return_expr(expr);
 	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
 		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
 		return ast_bad_expr(f, token, f->curr_token);
@@ -2777,6 +2817,10 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			operand = ast_deref_expr(f, operand, expect_token(f, Token_Pointer));
 			break;
 
+		case Token_or_return:
+			operand = ast_or_return_expr(f, operand, expect_token(f, Token_or_return));
+			break;
+
 		case Token_OpenBrace:
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
 				operand = parse_literal_value(f, operand);
@@ -2870,6 +2914,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_Question:
 	case Token_if:
 	case Token_when:
+	case Token_or_else:
 		return 1;
 	case Token_Ellipsis:
 	case Token_RangeFull:
@@ -2924,14 +2969,16 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				// NOTE(bill): This will also catch operators that are not valid "binary" operators
 				break;
 			}
-			if (op.kind == Token_if || op.kind == Token_when) {
-				Token prev = f->prev_token;
+			Token prev = f->prev_token;
+			switch (op.kind) {
+			case Token_if:
+			case Token_when:
 				if (prev.pos.line < op.pos.line) {
 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-					break;
+					goto loop_end;
 				}
+				break;
 			}
-
 			expect_operator(f); // NOTE(bill): error checks too
 
 			if (op.kind == Token_Question) {
@@ -2955,6 +3002,10 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				Token tok_else = expect_token(f, Token_else);
 				Ast *y = parse_expr(f, lhs);
 				expr = ast_ternary_when_expr(f, x, cond, y);
+			} else if (op.kind == Token_or_else) {
+				Ast *x = expr;
+				Ast *y = parse_expr(f, lhs);
+				expr = ast_or_else_expr(f, x, op, y);
 			} else {
 				Ast *right = parse_binary_expr(f, false, prec+1);
 				if (right == nullptr) {
@@ -2965,6 +3016,7 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 
 			lhs = false;
 		}
+		loop_end:;
 	}
 	return expr;
 }

@@ -129,7 +129,7 @@ _Recursive_Mutex :: struct {
 }
 
 _recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
-	tid := runtime.current_thread_id();
+	tid := _current_thread_id();
 	if tid != m.impl.owner {
 		mutex_lock(&m.impl.mutex);
 	}

@@ -1252,9 +1252,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_soa_unzip:
 		return lb_soa_unzip(p, ce, tv);
 
-	case BuiltinProc_or_else:
-		return lb_emit_or_else(p, ce->args[0], ce->args[1], tv);
-
 	// "Intrinsics"
 
 	case BuiltinProc_alloca:

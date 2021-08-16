@@ -133,9 +133,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 }
 
 parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
-	if err = expect_token(p, .Open_Bracket); err != .None {
-		return;
-	}
+	expect_token(p, .Open_Bracket) or_return;
 
 	array: Array;
 	array.allocator = p.allocator;
@@ -147,11 +145,7 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	}
 
 	for p.curr_token.kind != .Close_Bracket {
-		elem, elem_err := parse_value(p);
-		if elem_err != .None {
-			err = elem_err;
-			return;
-		}
+		elem := parse_value(p) or_return;
 		append(&array, elem);
 
 		// Disallow trailing commas for the time being
@@ -162,10 +156,7 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		}
 	}
 
-	if err = expect_token(p, .Close_Bracket); err != .None {
-		return;
-	}
-
+	expect_token(p, .Close_Bracket) or_return;
 	value = array;
 	return;
 }
@@ -200,9 +191,7 @@ parse_object_key :: proc(p: ^Parser) -> (key: string, err: Error) {
 }
 
 parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
-	if err = expect_token(p, .Open_Brace); err != .None {
-		return;
-	}
+	expect_token(p, .Open_Brace) or_return;
 
 	obj: Object;
 	obj.allocator = p.allocator;
@@ -227,11 +216,7 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 			return;
 		}
 
-		elem, elem_err := parse_value(p);
-		if elem_err != .None {
-			err = elem_err;
-			return;
-		}
+		elem := parse_value(p) or_return;
 
 		if key in obj {
 			err = .Duplicate_Object_Key;
@@ -256,10 +241,7 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		}
 	}
 
-	if err = expect_token(p, .Close_Brace); err != .None {
-		return;
-	}
-
+	expect_token(p, .Close_Brace) or_return;
 	value = obj;
 	return;
 }

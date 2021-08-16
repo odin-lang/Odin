@@ -2305,6 +2305,14 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		}
 	case_end;
 
+	case_ast_node(oe, OrElseExpr, expr);
+		return lb_emit_or_else(p, oe->x, oe->y, tv);
+	case_end;
+
+	case_ast_node(oe, OrReturnExpr, expr);
+		return lb_emit_or_return(p, oe->expr, tv);
+	case_end;
+
 	case_ast_node(ta, TypeAssertion, expr);
 		TokenPos pos = ast_token(expr).pos;
 		Type *type = tv.type;

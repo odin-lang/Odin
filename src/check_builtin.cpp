@@ -48,6 +48,17 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 };
 
 
+void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, Type *right_type) {
+	if (right_type == nullptr) {
+		return;
+	}
+	if (!is_type_boolean(right_type) && !type_has_nil(right_type)) {
+		gbString str = type_to_string(right_type);
+		error(expr, "'%.*s' expects an \"optional ok\" like value, or an n-valued expression where the last value is either a boolean or can be compared against 'nil', got %s", LIT(name), str);
+		gb_string_free(str);
+	}
+}
+
 void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
@@ -70,15 +81,11 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 	if (left_type_)  *left_type_  = left_type;
 	if (right_type_) *right_type_ = right_type;
 
-	if (!is_type_boolean(right_type)) {
-		gbString str = type_to_string(right_type);
-		error(x->expr, "'%.*s' expects an \"optional ok\" like value, got %s", LIT(name), str);
-		gb_string_free(str);
-	}
+	check_or_else_right_type(c, x->expr, name, right_type);
 }
 
 
-void check_try_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
+void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
 	// TODO(bill): better error message
 	gbString t = type_to_string(x.type);
 	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
@@ -106,6 +113,33 @@ void check_try_expr_no_value_error(CheckerContext *c, String const &name, Operan
 	}
 	gb_string_free(t);
 }
+
+
+void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	if (x->type->kind == Type_Tuple) {
+		auto const &vars = x->type->Tuple.variables;
+		auto lhs = array_slice(vars, 0, vars.count-1);
+		auto rhs = vars[vars.count-1];
+		if (lhs.count == 1) {
+			left_type = lhs[0]->type;
+		} else if (lhs.count != 0) {
+			left_type = alloc_type_tuple();
+			left_type->Tuple.variables = array_make_from_ptr(lhs.data, lhs.count, lhs.count);
+		}
+
+		right_type = rhs->type;
+	} else {
+		check_promote_optional_ok(c, x, &left_type, &right_type);
+	}
+
+	if (left_type_)  *left_type_  = left_type;
+	if (right_type_) *right_type_ = right_type;
+
+	check_or_else_right_type(c, x->expr, name, right_type);
+}
+
 
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
@@ -143,10 +177,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_min:
 	case BuiltinProc_max:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
-		break;
-
-	case BuiltinProc_or_else:
-		// NOTE(bill): The arguments may be multi-expr
 		break;
 
 	case BuiltinProc_DIRECTIVE: {
@@ -1798,47 +1828,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->type = alloc_type_tuple_from_field_types(types.data, types.count, false, false);
 		operand->mode = Addressing_Value;
 		break;
-	}
-
-	case BuiltinProc_or_else: {
-		GB_ASSERT(ce->args.count == 2);
-		Ast *arg = ce->args[0];
-		Ast *default_value = ce->args[1];
-
-		Operand x = {};
-		Operand y = {};
-		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
-		if (x.mode == Addressing_Invalid) {
-			operand->mode = Addressing_Value;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		check_multi_expr_with_type_hint(c, &y, default_value, x.type);
-		error_operand_no_value(&y);
-		if (y.mode == Addressing_Invalid) {
-			operand->mode = Addressing_Value;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		Type *left_type = nullptr;
-		Type *right_type = nullptr;
-		check_or_else_split_types(c, &x, builtin_name, &left_type, &right_type);
-		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
-
-		if (left_type != nullptr) {
-			check_assignment(c, &y, left_type, builtin_name);
-		} else {
-			check_try_expr_no_value_error(c, builtin_name, x, type_hint);
-		}
-
-		if (left_type == nullptr) {
-			left_type = t_invalid;
-		}
-		operand->mode = Addressing_Value;
-		operand->type = left_type;
-		return true;
 	}
 
 	case BuiltinProc_simd_vector: {

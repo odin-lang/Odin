@@ -144,10 +144,12 @@ Token_Kind :: enum u32 {
 		Transmute,   // transmute
 		Distinct,    // distinct
 		Using,       // using
+		Context,     // context
+		Or_Else,     // or_else
+		Or_Return,   // or_return
+		Asm,         // asm
 		Inline,      // inline
 		No_Inline,   // no_inline
-		Context,     // context
-		Asm,         // asm
 	B_Keyword_End,
 
 	COUNT,
@@ -272,10 +274,12 @@ tokens := [Token_Kind.COUNT]string {
 	"transmute",
 	"distinct",
 	"using",
+	"context",
+	"or_else",
+	"or_return",
+	"asm",
 	"inline",
 	"no_inline",
-	"context",
-	"asm",
 	"",
 };
 
