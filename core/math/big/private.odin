@@ -89,6 +89,245 @@ _private_int_mul :: proc(dest, a, b: ^Int, digits: int, allocator := context.all
 	return internal_clamp(dest);
 }
 
+
+/*
+	Multiplication using the Toom-Cook 3-way algorithm.
+
+	Much more complicated than Karatsuba but has a lower asymptotic running time of O(N**1.464).
+	This algorithm is only particularly useful on VERY large inputs.
+	(We're talking 1000s of digits here...).
+
+	This file contains code from J. Arndt's book  "Matters Computational"
+	and the accompanying FXT-library with permission of the author.
+
+	Setup from:
+		Chung, Jaewook, and M. Anwar Hasan. "Asymmetric squaring formulae."
+		18th IEEE Symposium on Computer Arithmetic (ARITH'07). IEEE, 2007.
+
+	The interpolation from above needed one temporary variable more than the interpolation here:
+
+		Bodrato, Marco, and Alberto Zanoni. "What about Toom-Cook matrices optimality."
+		Centro Vito Volterra Universita di Roma Tor Vergata (2006)
+*/
+_private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	S1, S2, T1, a0, a1, a2, b0, b1, b2 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(S1, S2, T1, a0, a1, a2, b0, b1, b2);
+
+	/*
+		Init temps.
+	*/
+	internal_init_multi(S1, S2, T1)             or_return;
+
+	/*
+		B
+	*/
+	B := min(a.used, b.used) / 3;
+
+	/*
+		a = a2 * x^2 + a1 * x + a0;
+	*/
+	internal_grow(a0, B)                        or_return;
+	internal_grow(a1, B)                        or_return;
+	internal_grow(a2, a.used - 2 * B)           or_return;
+
+	a0.used, a1.used = B, B;
+	a2.used = a.used - 2 * B;
+
+	internal_copy_digits(a0, a, a0.used)        or_return;
+	internal_copy_digits(a1, a, a1.used, B)     or_return;
+	internal_copy_digits(a2, a, a2.used, 2 * B) or_return;
+
+	internal_clamp(a0);
+	internal_clamp(a1);
+	internal_clamp(a2);
+
+	/*
+		b = b2 * x^2 + b1 * x + b0;
+	*/
+	internal_grow(b0, B)                        or_return;
+	internal_grow(b1, B)                        or_return;
+	internal_grow(b2, b.used - 2 * B)           or_return;
+
+	b0.used, b1.used = B, B;
+	b2.used = b.used - 2 * B;
+
+	internal_copy_digits(b0, b, b0.used)        or_return;
+	internal_copy_digits(b1, b, b1.used, B)     or_return;
+	internal_copy_digits(b2, b, b2.used, 2 * B) or_return;
+
+	internal_clamp(b0);
+	internal_clamp(b1);
+	internal_clamp(b2);
+
+	/*
+		\\ S1 = (a2+a1+a0) * (b2+b1+b0);
+	*/
+	internal_add(T1, a2, a1)                    or_return; /*   T1 = a2 + a1; */
+	internal_add(S2, T1, a0)                    or_return; /*   S2 = T1 + a0; */
+	internal_add(dest, b2, b1)                  or_return; /* dest = b2 + b1; */
+	internal_add(S1, dest, b0)                  or_return; /*   S1 =  c + b0; */
+	internal_mul(S1, S1, S2)                    or_return; /*   S1 = S1 * S2; */
+
+	/*
+		\\S2 = (4*a2+2*a1+a0) * (4*b2+2*b1+b0);
+	*/
+	internal_add(T1, T1, a2)                    or_return; /*   T1 = T1 + a2; */
+	internal_int_shl1(T1, T1)                   or_return; /*   T1 = T1 << 1; */
+	internal_add(T1, T1, a0)                    or_return; /*   T1 = T1 + a0; */
+	internal_add(dest, dest, b2)                or_return; /*    c =  c + b2; */
+	internal_int_shl1(dest, dest)               or_return; /*    c =  c << 1; */
+	internal_add(dest, dest, b0)                or_return; /*    c =  c + b0; */
+	internal_mul(S2, T1, dest)                  or_return; /*   S2 = T1 *  c; */
+
+	/*
+		\\S3 = (a2-a1+a0) * (b2-b1+b0);
+	*/
+	internal_sub(a1, a2, a1)                    or_return; /*   a1 = a2 - a1; */
+	internal_add(a1, a1, a0)                    or_return; /*   a1 = a1 + a0; */
+	internal_sub(b1, b2, b1)                    or_return; /*   b1 = b2 - b1; */
+	internal_add(b1, b1, b0)                    or_return; /*   b1 = b1 + b0; */
+	internal_mul(a1, a1, b1)                    or_return; /*   a1 = a1 * b1; */
+	internal_mul(b1, a2, b2)                    or_return; /*   b1 = a2 * b2; */
+
+	/*
+		\\S2 = (S2 - S3) / 3;
+	*/
+	internal_sub(S2, S2, a1)                    or_return; /*   S2 = S2 - a1; */
+	_private_int_div_3(S2, S2)                  or_return; /*   S2 = S2 / 3; \\ this is an exact division  */
+	internal_sub(a1, S1, a1)                    or_return; /*   a1 = S1 - a1; */
+	internal_int_shr1(a1, a1)                   or_return; /*   a1 = a1 >> 1; */
+	internal_mul(a0, a0, b0)                    or_return; /*   a0 = a0 * b0; */
+	internal_sub(S1, S1, a0)                    or_return; /*   S1 = S1 - a0; */
+	internal_sub(S2, S2, S1)                    or_return; /*   S2 = S2 - S1; */
+	internal_int_shr1(S2, S2)                   or_return; /*   S2 = S2 >> 1; */
+	internal_sub(S1, S1, a1)                    or_return; /*   S1 = S1 - a1; */
+	internal_sub(S1, S1, b1)                    or_return; /*   S1 = S1 - b1; */
+	internal_int_shl1(T1, b1)                   or_return; /*   T1 = b1 << 1; */
+	internal_sub(S2, S2, T1)                    or_return; /*   S2 = S2 - T1; */
+	internal_sub(a1, a1, S2)                    or_return; /*   a1 = a1 - S2; */
+
+	/*
+		P = b1*x^4+ S2*x^3+ S1*x^2+ a1*x + a0;
+	*/
+	internal_shl_digit(b1, 4 * B)               or_return;
+	internal_shl_digit(S2, 3 * B)               or_return;
+	internal_add(b1, b1, S2)                    or_return;
+	internal_shl_digit(S1, 2 * B)               or_return;
+	internal_add(b1, b1, S1)                    or_return;
+	internal_shl_digit(a1, 1 * B)               or_return;
+	internal_add(b1, b1, a1)                    or_return;
+	internal_add(dest, b1, a0)                  or_return;
+
+	/*
+		a * b - P
+	*/
+	return nil;
+}
+
+/*
+	product = |a| * |b| using Karatsuba Multiplication using three half size multiplications.
+
+	Let `B` represent the radix [e.g. 2**_DIGIT_BITS] and let `n` represent
+	half of the number of digits in the min(a,b)
+
+	`a` = `a1` * `B`**`n` + `a0`
+	`b` = `b`1 * `B`**`n` + `b0`
+
+	Then, a * b => 1b1 * B**2n + ((a1 + a0)(b1 + b0) - (a0b0 + a1b1)) * B + a0b0
+
+	Note that a1b1 and a0b0 are used twice and only need to be computed once.
+	So in total three half size (half # of digit) multiplications are performed,
+		a0b0, a1b1 and (a1+b1)(a0+b0)
+
+	Note that a multiplication of half the digits requires 1/4th the number of
+	single precision multiplications, so in total after one call 25% of the
+	single precision multiplications are saved.
+
+	Note also that the call to `internal_mul` can end up back in this function
+	if the a0, a1, b0, or b1 are above the threshold.
+
+	This is known as divide-and-conquer and leads to the famous O(N**lg(3)) or O(N**1.584)
+	work which is asymptopically lower than the standard O(N**2) that the
+	baseline/comba methods use. Generally though, the overhead of this method doesn't pay off
+	until a certain size is reached, of around 80 used DIGITs.
+*/
+_private_int_mul_karatsuba :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	x0, x1, y0, y1, t1, x0y0, x1y1 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(x0, x1, y0, y1, t1, x0y0, x1y1);
+
+	/*
+		min # of digits, divided by two.
+	*/
+	B := min(a.used, b.used) >> 1;
+
+	/*
+		Init all the temps.
+	*/
+	internal_grow(x0, B)          or_return;
+	internal_grow(x1, a.used - B) or_return;
+	internal_grow(y0, B)          or_return;
+	internal_grow(y1, b.used - B) or_return;
+	internal_grow(t1, B * 2)      or_return;
+	internal_grow(x0y0, B * 2)    or_return;
+	internal_grow(x1y1, B * 2)    or_return;
+
+	/*
+		Now shift the digits.
+	*/
+	x0.used, y0.used = B, B;
+	x1.used = a.used - B;
+	y1.used = b.used - B;
+
+	/*
+		We copy the digits directly instead of using higher level functions
+		since we also need to shift the digits.
+	*/
+	internal_copy_digits(x0, a, x0.used);
+	internal_copy_digits(y0, b, y0.used);
+	internal_copy_digits(x1, a, x1.used, B);
+	internal_copy_digits(y1, b, y1.used, B);
+
+	/*
+		Only need to clamp the lower words since by definition the
+		upper words x1/y1 must have a known number of digits.
+	*/
+	clamp(x0);
+	clamp(y0);
+
+	/*
+		Now calc the products x0y0 and x1y1,
+		after this x0 is no longer required, free temp [x0==t2]!
+	*/
+	internal_mul(x0y0, x0, y0)      or_return; /* x0y0 = x0*y0 */
+	internal_mul(x1y1, x1, y1)      or_return; /* x1y1 = x1*y1 */
+	internal_add(t1,   x1, x0)      or_return; /* now calc x1+x0 and */
+	internal_add(x0,   y1, y0)      or_return; /* t2 = y1 + y0 */
+	internal_mul(t1,   t1, x0)      or_return; /* t1 = (x1 + x0) * (y1 + y0) */
+
+	/*
+		Add x0y0.
+	*/
+	internal_add(x0, x0y0, x1y1)    or_return; /* t2 = x0y0 + x1y1 */
+	internal_sub(t1,   t1,   x0)    or_return; /* t1 = (x1+x0)*(y1+y0) - (x1y1 + x0y0) */
+
+	/*
+		shift by B.
+	*/
+	internal_shl_digit(t1, B)       or_return; /* t1 = (x0y0 + x1y1 - (x1-x0)*(y1-y0))<<B */
+	internal_shl_digit(x1y1, B * 2) or_return; /* x1y1 = x1y1 << 2*B */
+
+	internal_add(t1, x0y0, t1)      or_return; /* t1 = x0y0 + t1 */
+	internal_add(dest, t1, x1y1)    or_return; /* t1 = x0y0 + t1 + x1y1 */
+
+	return nil;
+}
+
+
+
 /*
 	Fast (comba) multiplier
 
@@ -1629,7 +1868,7 @@ _private_log_power_of_two :: proc(a: ^Int, base: DIGIT) -> (log: int, err: Error
 	Copies DIGITs from `src` to `dest`.
 	Assumes `src` and `dest` to not be `nil` and have been initialized.
 */
-_private_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
+_private_copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0)) -> (err: Error) {
 	digits := digits;
 	/*
 		If dest == src, do nothing
@@ -1639,7 +1878,7 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int) -> (err: Error) {
 	}
 
 	digits = min(digits, len(src.digit), len(dest.digit));
-	mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
+	mem.copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits);
 	return nil;
 }
 
