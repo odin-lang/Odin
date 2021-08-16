@@ -629,14 +629,16 @@ void check_scope_usage(Checker *c, Scope *scope) {
 }
 
 
-void add_dependency(DeclInfo *d, Entity *e) {
+void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
+	mutex_lock(&info->deps_mutex);
 	ptr_set_add(&d->deps, e);
+	mutex_unlock(&info->deps_mutex);
 }
 void add_type_info_dependency(DeclInfo *d, Type *type) {
 	if (d == nullptr) {
-		// GB_ASSERT(type == t_invalid);
 		return;
 	}
+	// NOTE(bill): no mutex is required here because the only procedure calling it is wrapped in a mutex already
 	ptr_set_add(&d->type_info_deps, type);
 }
 
@@ -657,7 +659,7 @@ void add_package_dependency(CheckerContext *c, char const *package_name, char co
 	e->flags |= EntityFlag_Used;
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
-	ptr_set_add(&c->decl->deps, e);
+	add_dependency(c->info, c->decl, e);
 }
 
 void add_declaration_dependency(CheckerContext *c, Entity *e) {
@@ -665,7 +667,7 @@ void add_declaration_dependency(CheckerContext *c, Entity *e) {
 		return;
 	}
 	if (c->decl != nullptr) {
-		add_dependency(c->decl, e);
+		add_dependency(c->info, c->decl, e);
 	}
 }
 

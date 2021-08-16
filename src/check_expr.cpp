@@ -4117,20 +4117,23 @@ bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **o
 }
 
 isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
-	if (lhs != nullptr) {
+	if (lhs != nullptr && c->decl != nullptr) {
+		mutex_lock(&c->info->deps_mutex);
+
 		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
 			Entity *e = lhs[tuple_index + j];
 			if (e != nullptr) {
 				DeclInfo *decl = decl_info_of_entity(e);
 				if (decl != nullptr) {
-					c->decl = decl; // will be reset by the 'defer' any way
 					for_array(k, decl->deps.entries) {
 						Entity *dep = decl->deps.entries[k].ptr;
-						add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
+						ptr_set_add(&c->decl->deps, dep);
 					}
 				}
 			}
 		}
+
+		mutex_unlock(&c->info->deps_mutex);
 	}
 	return tuple_count;
 }
