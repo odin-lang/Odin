@@ -46,7 +46,7 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 		t.start_gate = {};
 		t.start_mutex = {};
 
-		context = or_else(t.init_context.?, runtime.default_context());
+		context = t.init_context.? or_else runtime.default_context();
 
 		t.procedure(t);
 

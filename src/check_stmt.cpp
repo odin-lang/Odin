@@ -1480,8 +1480,10 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			if (kind == Expr_Stmt) {
 				return;
 			}
-			if (operand.expr->kind == Ast_CallExpr) {
-				AstCallExpr *ce = &operand.expr->CallExpr;
+			Ast *expr = strip_or_return_expr(operand.expr);
+
+			if (expr->kind == Ast_CallExpr) {
+				AstCallExpr *ce = &expr->CallExpr;
 				Type *t = type_of_expr(ce->proc);
 				if (is_type_proc(t)) {
 					if (t->Proc.require_results) {
@@ -1491,8 +1493,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					}
 				}
 				return;
-			} else if (operand.expr->kind == Ast_SelectorCallExpr) {
-				AstSelectorCallExpr *se = &operand.expr->SelectorCallExpr;
+			} else if (expr->kind == Ast_SelectorCallExpr) {
+				AstSelectorCallExpr *se = &expr->SelectorCallExpr;
 				ast_node(ce, CallExpr, se->call);
 				Type *t = type_of_expr(ce->proc);
 				if (is_type_proc(t)) {

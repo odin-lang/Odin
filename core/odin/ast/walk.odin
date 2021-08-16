@@ -126,10 +126,6 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 	case Field_Value:
 		walk(v, n.field);
 		walk(v, n.value);
-	case Ternary_Expr:
-		walk(v, n.cond);
-		walk(v, n.x);
-		walk(v, n.y);
 	case Ternary_If_Expr:
 		walk(v, n.x);
 		walk(v, n.cond);
@@ -138,6 +134,11 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.x);
 		walk(v, n.cond);
 		walk(v, n.y);
+	case Or_Else_Expr:
+		walk(v, n.x);
+		walk(v, n.y);
+	case Or_Return_Expr:
+		walk(v, n.expr);
 	case Type_Assertion:
 		walk(v, n.expr);
 		if n.type != nil {

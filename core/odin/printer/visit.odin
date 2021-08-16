@@ -944,12 +944,6 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 	case Auto_Cast:
 		push_generic_token(p, v.op.kind, 1);
 		visit_expr(p, v.expr);
-	case Ternary_Expr:
-		visit_expr(p, v.cond);
-		push_generic_token(p, v.op1.kind, 1);
-		visit_expr(p, v.x);
-		push_generic_token(p, v.op2.kind, 1);
-		visit_expr(p, v.y);
 	case Ternary_If_Expr:
 		visit_expr(p, v.x);
 		push_generic_token(p, v.op1.kind, 1);
@@ -962,6 +956,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		visit_expr(p, v.cond);
 		push_generic_token(p, v.op2.kind, 1);
 		visit_expr(p, v.y);
+	case Or_Else_Expr:
+		visit_expr(p, v.x);
+		push_generic_token(p, v.token.kind, 1);
+		visit_expr(p, v.y);
+	case Or_Return_Expr:
+		visit_expr(p, v.expr);
+		push_generic_token(p, v.token.kind, 1);
 	case Selector_Call_Expr:
 		visit_expr(p, v.call.expr);
 		push_generic_token(p, .Open_Paren, 1);

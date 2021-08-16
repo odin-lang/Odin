@@ -26,7 +26,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 	context.allocator = allocator;
 
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a); err != nil { return "", err; }
+	clear_if_uninitialized(a) or_return;
 	/*
 		Radix defaults to 10.
 	*/
@@ -39,14 +39,9 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 
 	/*
 		Calculate the size of the buffer we need, and 
-	*/
-	size: int;
-	/*
 		Exit if calculating the size returned an error.
 	*/
-	if size, err = radix_size(a, radix, zero_terminate); err != nil {
-		return "", err;
-	}
+	size := radix_size(a, radix, zero_terminate) or_return;
 
 	/*
 		Allocate the buffer we need.
@@ -70,7 +65,7 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocato
 	context.allocator = allocator;
 
 	a := a; radix := radix;
-	if err = clear_if_uninitialized(a); err != nil { return "", err; }
+	clear_if_uninitialized(a) or_return;
 	/*
 		Radix defaults to 10.
 	*/
@@ -104,7 +99,7 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocato
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	assert_if_nil(a);
 	a := a; radix := radix; size := size;
-	if err = clear_if_uninitialized(a); err != nil { return 0, err; }
+	clear_if_uninitialized(a) or_return;
 	/*
 		Radix defaults to 10.
 	*/
@@ -117,9 +112,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		We weren't given a size. Let's compute it.
 	*/
 	if size == -1 {
-		if size, err = radix_size(a, radix, zero_terminate); err != nil {
-			return 0, err;
-		}
+		size = radix_size(a, radix, zero_terminate) or_return;
 	}
 
 	/*
@@ -256,12 +249,14 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8, allocator := context.alloc
 	/*
 		Set the integer to the default of zero.
 	*/
-	if err = internal_zero(res); err != nil { return err; }
+	internal_zero(res) or_return;
 
 	/*
 		We'll interpret an empty string as zero.
 	*/
-	if len(input) == 0 { return nil; }
+	if len(input) == 0 {
+		return nil;
+	}
 
 	/*
 		If the leading digit is a minus set the sign to negative.
@@ -301,8 +296,8 @@ int_atoi :: proc(res: ^Int, input: string, radix: i8, allocator := context.alloc
 			break;
 		}
 
-		if err = internal_mul(res, res, DIGIT(radix)); err != nil { return err; }
-		if err = internal_add(res, res, DIGIT(y));     err != nil { return err; }
+		internal_mul(res, res, DIGIT(radix)) or_return;
+		internal_add(res, res, DIGIT(y))     or_return;
 
 		input = input[1:];
 	}
@@ -333,7 +328,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	assert_if_nil(a);
 
 	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument; }
-	if err = clear_if_uninitialized(a); err != nil { return {}, err; }
+	clear_if_uninitialized(a) or_return;
 
 	if internal_is_zero(a) {
 		if zero_terminate {
@@ -352,22 +347,22 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 			digit     = a.digit,
 		};
 
-		if size, err = internal_log(t, DIGIT(radix));   err != nil { return {}, err; }
+		size = internal_log(t, DIGIT(radix)) or_return;
 	} else {
 		la, k := &Int{}, &Int{};
 		defer internal_destroy(la, k);
 
 		/* la = floor(log_2(a)) + 1 */
 		bit_count := internal_count_bits(a);
-		if err = internal_set(la, bit_count);           err != nil { return {}, err; }
+		internal_set(la, bit_count) or_return;
 
 		/* k = floor(2^29/log_2(radix)) + 1 */
 		lb := _log_bases;
-		if err = internal_set(k, lb[radix]);            err != nil { return {}, err; }
+		internal_set(k, lb[radix]) or_return;
 
 		/* n = floor((la *  k) / 2^29) + 1 */
-		if err = internal_mul(k, la, k);                err != nil { return 0, err; }
-		if err = internal_shr(k, k, _RADIX_SIZE_SCALE); err != nil { return {}, err; }
+		internal_mul(k, la, k) or_return;
+		internal_shr(k, k, _RADIX_SIZE_SCALE) or_return;
 
 		/* The "+1" here is the "+1" in "floor((la *  k) / 2^29) + 1" */
 		/* n = n + 1 + EOS + sign */
@@ -440,8 +435,8 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 
 	temp, denominator := &Int{}, &Int{};
 
-	if err = internal_copy(temp, a);           err != nil { return 0, err; }
-	if err = internal_set(denominator, radix); err != nil { return 0, err; }
+	internal_copy(temp, a)           or_return;
+	internal_set(denominator, radix) or_return;
 
 	available := len(buffer);
 	if zero_terminate {

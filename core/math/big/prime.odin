@@ -19,12 +19,13 @@ int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res:
 	assert_if_nil(a);
 	context.allocator = allocator;
 
-	if err = internal_clear_if_uninitialized(a); err != nil { return {}, err; }
+	internal_clear_if_uninitialized(a) or_return;
 
-	rem: DIGIT;
 	for prime in _private_prime_table {
-		if rem, err = #force_inline int_mod_digit(a, prime); err != nil { return false, err; }
-		if rem == 0 { return true, nil; }
+		rem := #force_inline int_mod_digit(a, prime) or_return;
+		if rem == 0 {
+			return true, nil;
+		}
 	}
 	/*
 		Default to not divisible.
