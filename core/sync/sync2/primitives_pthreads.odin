@@ -139,7 +139,7 @@ _recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
 }
 
 _recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
-	tid := runtime.current_thread_id();
+	tid := _current_thread_id();
 	assert(tid == m.impl.owner);
 	m.impl.recursion -= 1;
 	recursion := m.impl.recursion;
@@ -154,7 +154,7 @@ _recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
 }
 
 _recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
-	tid := runtime.current_thread_id();
+	tid := _current_thread_id();
 	if m.impl.owner == tid {
 		return mutex_try_lock(&m.impl.mutex);
 	}
