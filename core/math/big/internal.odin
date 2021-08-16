@@ -852,7 +852,7 @@ internal_div :: proc { internal_int_div, };
 	Asssumes quotient, numerator and denominator to have been initialized and not to be nil.
 */
 internal_int_mod :: proc(remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
-	(#force_inline internal_int_divmod(nil, remainder, numerator, denominator, allocator)) or_return;
+	#force_inline internal_int_divmod(nil, remainder, numerator, denominator, allocator) or_return;
 
 	if remainder.used == 0 || denominator.sign == remainder.sign { return nil; }
 
@@ -864,7 +864,7 @@ internal_mod :: proc{ internal_int_mod, };
 	remainder = (number + addend) % modulus.
 */
 internal_int_addmod :: proc(remainder, number, addend, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	(#force_inline internal_add(remainder, number, addend, allocator)) or_return;
+	#force_inline internal_add(remainder, number, addend, allocator) or_return;
 	return #force_inline internal_mod(remainder, remainder, modulus, allocator);
 }
 internal_addmod :: proc { internal_int_addmod, };
@@ -873,7 +873,7 @@ internal_addmod :: proc { internal_int_addmod, };
 	remainder = (number - decrease) % modulus.
 */
 internal_int_submod :: proc(remainder, number, decrease, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	(#force_inline internal_sub(remainder, number, decrease, allocator)) or_return;
+	#force_inline internal_sub(remainder, number, decrease, allocator) or_return;
 	return #force_inline internal_mod(remainder, remainder, modulus, allocator);
 }
 internal_submod :: proc { internal_int_submod, };
@@ -882,7 +882,7 @@ internal_submod :: proc { internal_int_submod, };
 	remainder = (number * multiplicand) % modulus.
 */
 internal_int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	(#force_inline internal_mul(remainder, number, multiplicand, allocator)) or_return;
+	#force_inline internal_mul(remainder, number, multiplicand, allocator) or_return;
 	return #force_inline internal_mod(remainder, remainder, modulus, allocator);
 }
 internal_mulmod :: proc { internal_int_mulmod, };
@@ -891,7 +891,7 @@ internal_mulmod :: proc { internal_int_mulmod, };
 	remainder = (number * number) % modulus.
 */
 internal_int_sqrmod :: proc(remainder, number, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	(#force_inline internal_sqr(remainder, number, allocator)) or_return;
+	#force_inline internal_sqr(remainder, number, allocator) or_return;
 	return #force_inline internal_mod(remainder, remainder, modulus, allocator);
 }
 internal_sqrmod :: proc { internal_int_sqrmod, };
@@ -914,7 +914,7 @@ internal_int_factorial :: proc(res: ^Int, n: int, allocator := context.allocator
 		return #force_inline internal_set(res, _factorial_table[n]);
 	}
 
-	(#force_inline internal_set(res, _factorial_table[i - 1])) or_return;
+	#force_inline internal_set(res, _factorial_table[i - 1]) or_return;
 	for {
 		if err = #force_inline internal_mul(res, res, DIGIT(i)); err != nil || i == n {
 			return err;
@@ -1629,7 +1629,7 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 internal_set :: proc { internal_int_set_from_integer, internal_int_copy };
 
 internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int) -> (err: Error) {
-	(#force_inline internal_error_if_immutable(dest)) or_return;
+	#force_inline internal_error_if_immutable(dest) or_return;
 
 	/*
 		If dest == src, do nothing
@@ -2436,7 +2436,7 @@ internal_int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context
 	/*
 		Resize `quotient` to accomodate extra digits.
 	*/
-	(#force_inline internal_grow(quotient, quotient.used + digits)) or_return;
+	#force_inline internal_grow(quotient, quotient.used + digits) or_return;
 
 	/*
 		Increment the used by the shift amount then copy upwards.
@@ -2534,7 +2534,7 @@ internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator :
 		digits += 1;
 	}
 
-	(#force_inline internal_grow(dest, digits)) or_return;
+	#force_inline internal_grow(dest, digits) or_return;
 
 	for i := 0; i < digits; i += 1 {
 		dest.digit[i] = int_random_digit(r) & _MASK;

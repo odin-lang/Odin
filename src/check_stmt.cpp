@@ -1456,21 +1456,6 @@ bool all_operands_valid(Array<Operand> const &operands) {
 	return true;
 }
 
-Ast *strip_or_return_expr(Ast *node) {
-	for (;;) {
-		if (node == nullptr) {
-			return node;
-		}
-		if (node->kind == Ast_OrReturnExpr) {
-			node = node->OrReturnExpr.expr;
-		} else if (node->kind == Ast_ParenExpr) {
-			node = node->ParenExpr.expr;
-		} else {
-			return node;
-		}
-	}
-}
-
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
