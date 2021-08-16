@@ -159,7 +159,12 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx, ctx->scope, name, field);
 			array_add(fields, field);
-			array_add(tags, p->tag.string);
+			String tag = p->tag.string;
+			if (tag.len != 0 && !unquote_string(permanent_allocator(), &tag, 0, tag.text[0] == '`')) {
+				error(p->tag, "Invalid string literal");
+				tag = {};
+			}
+			array_add(tags, tag);
 
 			field_src_index += 1;
 		}
