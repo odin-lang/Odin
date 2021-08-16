@@ -196,7 +196,7 @@ int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT, allocator :
 
 	internal_clear_if_uninitialized(numerator) or_return;
 
-	_ = (#force_inline internal_divmod(quotient, numerator, denominator)) or_return;
+	_ = #force_inline internal_divmod(quotient, numerator, denominator) or_return;
 	return;
 }
 div :: proc { int_div, int_div_digit, };
@@ -311,12 +311,12 @@ int_choose_digit :: proc(res: ^Int, n, k: int, allocator := context.allocator) -
 	n_fac, k_fac, n_minus_k_fac := &Int{}, &Int{}, &Int{};
 	defer internal_destroy(n_fac, k_fac, n_minus_k_fac);
 
-	(#force_inline internal_int_factorial(n_minus_k_fac, n - k)) or_return;
-	(#force_inline internal_int_factorial(k_fac, k))             or_return;
-	(#force_inline internal_mul(k_fac, k_fac, n_minus_k_fac))    or_return;
+	#force_inline internal_int_factorial(n_minus_k_fac, n - k) or_return;
+	#force_inline internal_int_factorial(k_fac, k)             or_return;
+	#force_inline internal_mul(k_fac, k_fac, n_minus_k_fac)    or_return;
 
-	(#force_inline internal_int_factorial(n_fac, n))             or_return;
-	(#force_inline internal_div(res, n_fac, k_fac))              or_return;
+	#force_inline internal_int_factorial(n_fac, n)             or_return;
+	#force_inline internal_div(res, n_fac, k_fac)              or_return;
 
 	return;
 }

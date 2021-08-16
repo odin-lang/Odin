@@ -42,7 +42,7 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest);
-	(#force_inline internal_error_if_immutable(dest)) or_return;
+	#force_inline internal_error_if_immutable(dest) or_return;
 
 	return #force_inline internal_int_set_from_integer(dest, src, minimize);
 }
@@ -64,8 +64,8 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 	assert_if_nil(dest, src);
 	context.allocator = allocator;
 
-	(#force_inline internal_clear_if_uninitialized(src)) or_return;
-	(#force_inline internal_error_if_immutable(dest))    or_return;
+	#force_inline internal_clear_if_uninitialized(src) or_return;
+	#force_inline internal_error_if_immutable(dest)    or_return;
 
 	return #force_inline internal_int_copy(dest, src, minimize);
 }
@@ -92,8 +92,8 @@ int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 	assert_if_nil(dest, src);
 	context.allocator = allocator;
 
-	(#force_inline internal_clear_if_uninitialized(src)) or_return;
-	(#force_inline internal_error_if_immutable(dest))    or_return;
+	#force_inline internal_clear_if_uninitialized(src) or_return;
+	#force_inline internal_error_if_immutable(dest)    or_return;
 
 	return #force_inline internal_int_abs(dest, src);
 }
@@ -113,8 +113,8 @@ int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 	assert_if_nil(dest, src);
 	context.allocator = allocator;
 
-	(#force_inline internal_clear_if_uninitialized(src)) or_return;
-	(#force_inline internal_error_if_immutable(dest))    or_return;
+	#force_inline internal_clear_if_uninitialized(src) or_return;
+	#force_inline internal_error_if_immutable(dest)    or_return;
 
 	return #force_inline internal_int_neg(dest, src);
 }
@@ -134,7 +134,7 @@ int_bitfield_extract :: proc(a: ^Int, offset, count: int, allocator := context.a
 	assert_if_nil(a);
 	context.allocator = allocator;
 
-	(#force_inline internal_clear_if_uninitialized(a)) or_return;
+	#force_inline internal_clear_if_uninitialized(a) or_return;
 	return #force_inline internal_int_bitfield_extract(a, offset, count);
 }
 
@@ -148,7 +148,7 @@ shrink :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a);
 	context.allocator = allocator;
 
-	(#force_inline internal_clear_if_uninitialized(a)) or_return;
+	#force_inline internal_clear_if_uninitialized(a) or_return;
 	return #force_inline internal_shrink(a);
 }
 
@@ -305,7 +305,7 @@ int_get :: proc(a: ^Int, $T: typeid, allocator := context.allocator) -> (res: T,
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a);
-	(#force_inline internal_clear_if_uninitialized(a, allocator)) or_return;
+	#force_inline internal_clear_if_uninitialized(a, allocator) or_return;
 	return #force_inline internal_int_get(a, T);
 }
 get :: proc { int_get, };
@@ -315,7 +315,7 @@ int_get_float :: proc(a: ^Int, allocator := context.allocator) -> (res: f64, err
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a);
-	(#force_inline internal_clear_if_uninitialized(a, allocator)) or_return;
+	#force_inline internal_clear_if_uninitialized(a, allocator) or_return;
 	return #force_inline internal_int_get_float(a);
 }
 
@@ -327,7 +327,7 @@ count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err:
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a);
-	(#force_inline internal_clear_if_uninitialized(a, allocator)) or_return;
+	#force_inline internal_clear_if_uninitialized(a, allocator) or_return;
 	return #force_inline internal_count_bits(a), nil;
 }
 
@@ -340,7 +340,7 @@ int_count_lsb :: proc(a: ^Int, allocator := context.allocator) -> (count: int, e
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a);
-	(#force_inline internal_clear_if_uninitialized(a, allocator)) or_return;
+	#force_inline internal_clear_if_uninitialized(a, allocator) or_return;
 	return #force_inline internal_int_count_lsb(a);
 }
 
@@ -398,7 +398,7 @@ clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocato
 	assert_if_nil(..args);
 
 	for i in &args {
-		(#force_inline internal_clear_if_uninitialized_single(i, allocator)) or_return;
+		#force_inline internal_clear_if_uninitialized_single(i, allocator) or_return;
 	}
 	return err;
 }
@@ -425,7 +425,7 @@ int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err
 
 	integers := integers;
 	for a in &integers {
-		(#force_inline internal_clear(a, true, allocator)) or_return;
+		#force_inline internal_clear(a, true, allocator) or_return;
 	}
 	return nil;
 }
@@ -440,7 +440,7 @@ copy_digits :: proc(dest, src: ^Int, digits: int, allocator := context.allocator
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest, src);
-	(#force_inline internal_clear_if_uninitialized(src)) or_return;
+	#force_inline internal_clear_if_uninitialized(src) or_return;
 
 	digits = min(digits, len(src.digit), len(dest.digit));
 	return #force_inline internal_copy_digits(dest, src, digits);
@@ -454,7 +454,7 @@ copy_digits :: proc(dest, src: ^Int, digits: int, allocator := context.allocator
 */
 clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a);
-	(#force_inline internal_clear_if_uninitialized(a, allocator)) or_return;
+	#force_inline internal_clear_if_uninitialized(a, allocator) or_return;
 
 	for a.used > 0 && a.digit[a.used - 1] == 0 {
 		a.used -= 1;
@@ -472,7 +472,7 @@ clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 */
 int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
 	assert_if_nil(a);
-	(#force_inline internal_clear_if_uninitialized(a, allocator)) or_return;
+	#force_inline internal_clear_if_uninitialized(a, allocator) or_return;
 
 	size_in_bits := internal_count_bits(a);
 

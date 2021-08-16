@@ -22,7 +22,7 @@ int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res:
 	internal_clear_if_uninitialized(a) or_return;
 
 	for prime in _private_prime_table {
-		rem := (#force_inline int_mod_digit(a, prime)) or_return;
+		rem := #force_inline int_mod_digit(a, prime) or_return;
 		if rem == 0 {
 			return true, nil;
 		}

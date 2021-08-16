@@ -1698,6 +1698,22 @@ Ast *unselector_expr(Ast *node) {
 	return node;
 }
 
+Ast *strip_or_return_expr(Ast *node) {
+	for (;;) {
+		if (node == nullptr) {
+			return node;
+		}
+		if (node->kind == Ast_OrReturnExpr) {
+			node = node->OrReturnExpr.expr;
+		} else if (node->kind == Ast_ParenExpr) {
+			node = node->ParenExpr.expr;
+		} else {
+			return node;
+		}
+	}
+}
+
+
 Ast *parse_value(AstFile *f);
 
 Array<Ast *> parse_element_list(AstFile *f) {
@@ -1916,7 +1932,7 @@ bool ast_on_same_line(Ast *x, Ast *y) {
 
 Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 	Ast *expr = parse_unary_expr(f, false);
-	Ast *e = unparen_expr(expr);
+	Ast *e = strip_or_return_expr(expr);
 	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
 		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
 		return ast_bad_expr(f, token, f->curr_token);
@@ -2801,6 +2817,10 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			operand = ast_deref_expr(f, operand, expect_token(f, Token_Pointer));
 			break;
 
+		case Token_or_return:
+			operand = ast_or_return_expr(f, operand, expect_token(f, Token_or_return));
+			break;
+
 		case Token_OpenBrace:
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
 				operand = parse_literal_value(f, operand);
@@ -2895,7 +2915,6 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_if:
 	case Token_when:
 	case Token_or_else:
-	case Token_or_return:
 		return 1;
 	case Token_Ellipsis:
 	case Token_RangeFull:
@@ -2954,8 +2973,6 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			switch (op.kind) {
 			case Token_if:
 			case Token_when:
-			case Token_or_else:
-			case Token_or_return:
 				if (prev.pos.line < op.pos.line) {
 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
 					goto loop_end;
@@ -2989,8 +3006,6 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				Ast *x = expr;
 				Ast *y = parse_expr(f, lhs);
 				expr = ast_or_else_expr(f, x, op, y);
-			} else if (op.kind == Token_or_return) {
-				expr = ast_or_return_expr(f, expr, op);
 			} else {
 				Ast *right = parse_binary_expr(f, false, prec+1);
 				if (right == nullptr) {

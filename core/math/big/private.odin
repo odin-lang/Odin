@@ -1268,17 +1268,17 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 		}
 
 		low = high;
-		(#force_inline internal_copy(bracket_low, bracket_high)) or_return;
+		#force_inline internal_copy(bracket_low, bracket_high) or_return;
 		high <<= 1;
-		(#force_inline internal_sqr(bracket_high, bracket_high)) or_return;
+		#force_inline internal_sqr(bracket_high, bracket_high) or_return;
 	}
 
 	for (high - low) > 1 {
 		mid := (high + low) >> 1;
 
-		(#force_inline internal_pow(t, bi_base, mid - low)) or_return;
+		#force_inline internal_pow(t, bi_base, mid - low) or_return;
 
-		(#force_inline internal_mul(bracket_mid, bracket_low, t)) or_return;
+		#force_inline internal_mul(bracket_mid, bracket_low, t) or_return;
 
 		mc := #force_inline internal_cmp(a, bracket_mid);
 		switch mc {
