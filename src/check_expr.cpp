@@ -6637,6 +6637,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		if (x.mode == Addressing_Invalid) {
 			o->mode = Addressing_Value;
 			o->type = t_invalid;
+			o->expr = node;
 			return Expr_Expr;
 		}
 
@@ -6645,6 +6646,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		if (y.mode == Addressing_Invalid) {
 			o->mode = Addressing_Value;
 			o->type = t_invalid;
+			o->expr = node;
 			return Expr_Expr;
 		}
 
@@ -6664,6 +6666,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 		o->mode = Addressing_Value;
 		o->type = left_type;
+		o->expr = node;
 		return Expr_Expr;
 	case_end;
 
@@ -6674,6 +6677,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		if (x.mode == Addressing_Invalid) {
 			o->mode = Addressing_Value;
 			o->type = t_invalid;
+			o->expr = node;
 			return Expr_Expr;
 		}
 
@@ -6724,6 +6728,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 		}
 
+		o->expr = node;
 		o->type = left_type;
 		if (left_type != nullptr) {
 			o->mode = Addressing_Value;
@@ -8701,6 +8706,16 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, te->y, shorthand);
 	case_end;
 
+	case_ast_node(oe, OrElseExpr, node);
+		str = write_expr_to_string(str, oe->x, shorthand);
+		str = gb_string_appendc(str, " or_else ");
+		str = write_expr_to_string(str, oe->y, shorthand);
+	case_end;
+
+	case_ast_node(oe, OrReturnExpr, node);
+		str = write_expr_to_string(str, oe->expr, shorthand);
+		str = gb_string_appendc(str, " or_return");
+	case_end;
 
 	case_ast_node(pe, ParenExpr, node);
 		str = gb_string_append_rune(str, '(');
