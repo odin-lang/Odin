@@ -36,8 +36,6 @@ import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
 
-import "core:fmt"
-
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
 
@@ -651,7 +649,6 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 				Fast comba?
 			*/
 			err = #force_inline _private_int_sqr_comba(dest, src);
-			//err = #force_inline _private_int_sqr(dest, src);
 		} else {
 			err = #force_inline _private_int_sqr(dest, src);
 		}
@@ -678,9 +675,13 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 							max_used     >= 2 * min_used {
 			// err = s_mp_mul_balance(a,b,c);
 		} else if false && min_used >= MUL_TOOM_CUTOFF {
-			// err = s_mp_mul_toom(a, b, c);
-		} else if false && min_used >= MUL_KARATSUBA_CUTOFF {
-			// err = s_mp_mul_karatsuba(a, b, c);
+			/*
+				Toom path commented out until it no longer fails Factorial 10k or 100k,
+				as reveaved in the long test.
+			*/
+			err = #force_inline _private_int_mul_toom(dest, src, multiplier);
+		} else if min_used >= MUL_KARATSUBA_CUTOFF {
+			err = #force_inline _private_int_mul_karatsuba(dest, src, multiplier);
 		} else if digits < _WARRAY && min_used <= _MAX_COMBA {
 			/*
 				Can we use the fast multiplier?
@@ -1628,16 +1629,13 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 
 internal_set :: proc { internal_int_set_from_integer, internal_int_copy };
 
-internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int) -> (err: Error) {
+internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int, offset := int(0)) -> (err: Error) {
 	#force_inline internal_error_if_immutable(dest) or_return;
 
 	/*
 		If dest == src, do nothing
 	*/
-	if (dest == src) { return nil; }
-
-	#force_inline mem.copy_non_overlapping(&dest.digit[0], &src.digit[0], size_of(DIGIT) * digits);
-	return nil;
+	return #force_inline _private_copy_digits(dest, src, digits, offset);
 }
 
 /*

@@ -446,6 +446,7 @@ TESTS = {
 	test_mul: [
 		[ 1234,   5432],
 		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7 ],
+		[ 1 << 21_105, 1 << 21_501 ],
 	],
 	test_sqr: [
 		[ 5432],
@@ -531,7 +532,7 @@ TESTS = {
 if not args.fast_tests:
 	TESTS[test_factorial].append(
 		# This one on its own takes around 800ms, so we exclude it for FAST_TESTS
-		[ 100_000 ],
+		[ 10_000 ],
 	)
 
 total_passes   = 0

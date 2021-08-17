@@ -206,16 +206,18 @@ demo :: proc() {
 	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f);
 
-	atoi(a, "12980742146337069150589594264770969721", 10);
+	atoi(a, "615037959146039477924633848896619112832171971562900618409305032006863881436080", 10);
 	print("a: ", a, 10, true, true, true);
-	atoi(b, "4611686018427387904", 10);
+	atoi(b, "378271691190525325893712245607881659587045836991909505715443874842659307597325888631898626653926188084180707310543535657996185416604973577488563643125766400", 10);
 	print("b: ", b, 10, true, true, true);
 
-	if err := internal_divmod(c, d, a, b); err != nil {
-		fmt.printf("Error: %v\n", err);
-	}
-	print("c: ", c);
-	print("c: ", d);
+	factorial(c, 10_000);
+
+	// 120CCAA2076ADF69F75A97695E6C1C2A4E6F377DF92226E43B
+	cs, _ := itoa(c, 16);
+	defer delete(cs);
+
+	print("c: ", c, 10, true, true, true);
 }
 
 main :: proc() {
