@@ -870,6 +870,7 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->global_untyped_mutex);
 	mutex_init(&i->type_info_mutex);
 	mutex_init(&i->deps_mutex);
+	mutex_init(&i->type_and_value_mutex);
 	mutex_init(&i->identifier_uses_mutex);
 	mutex_init(&i->foreign_mutex);
 
@@ -906,6 +907,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->global_untyped_mutex);
 	mutex_destroy(&i->type_info_mutex);
 	mutex_destroy(&i->deps_mutex);
+	mutex_destroy(&i->type_and_value_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
 	mutex_destroy(&i->foreign_mutex);
 }
@@ -1165,25 +1167,23 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 		return;
 	}
 
+	mutex_lock(&i->type_and_value_mutex);
 	Ast *prev_expr = nullptr;
-	for (;;) {
-		if (prev_expr != expr) {
-			expr->tav.mode = mode;
-			expr->tav.type = type;
-			if (mode == Addressing_Constant || mode == Addressing_Invalid) {
-				expr->tav.value = value;
-			} else if (mode == Addressing_Value && is_type_typeid(type)) {
-				expr->tav.value = value;
-			} else if (mode == Addressing_Value && is_type_proc(type)) {
-				expr->tav.value = value;
-			}
-
-			prev_expr = expr;
-		} else {
-			break;
+	while (prev_expr != expr) {
+		prev_expr = expr;
+		expr->tav.mode = mode;
+		expr->tav.type = type;
+		if (mode == Addressing_Constant || mode == Addressing_Invalid) {
+			expr->tav.value = value;
+		} else if (mode == Addressing_Value && is_type_typeid(type)) {
+			expr->tav.value = value;
+		} else if (mode == Addressing_Value && is_type_proc(type)) {
+			expr->tav.value = value;
 		}
+
 		expr = unparen_expr(expr);
 	}
+	mutex_unlock(&i->type_and_value_mutex);
 }
 
 void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {

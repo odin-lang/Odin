@@ -306,6 +306,8 @@ struct CheckerInfo {
 	// too much of a problem in practice
 	BlockingMutex deps_mutex;
 
+	BlockingMutex type_and_value_mutex;
+
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
 	RecursiveMutex gen_procs_mutex;
