@@ -2009,6 +2009,7 @@ int main(int arg_count, char const **arg_ptr) {
 	arena_init(&permanent_arena, heap_allocator());
 	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
 	arena_init(&global_ast_arena, heap_allocator());
+	mutex_init(&fullpath_mutex);
 
 	init_string_buffer_memory();
 	init_string_interner();

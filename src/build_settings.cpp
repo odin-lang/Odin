@@ -470,7 +470,6 @@ bool allow_check_foreign_filepath(void) {
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
-
 String internal_odin_root_dir(void);
 String odin_root_dir(void) {
 	if (global_module_path_set) {
@@ -684,12 +683,13 @@ String internal_odin_root_dir(void) {
 }
 #endif
 
+gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
 String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
-	mutex_lock(&string_buffer_mutex);
-	defer (mutex_unlock(&string_buffer_mutex));
+	mutex_lock(&fullpath_mutex);
+	defer (mutex_unlock(&fullpath_mutex));
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -716,9 +716,9 @@ String path_to_fullpath(gbAllocator a, String s) {
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
 	char *p;
-	mutex_lock(&string_buffer_mutex);
+	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
-	mutex_unlock(&string_buffer_mutex);
+	mutex_unlock(&fullpath_mutex);
 	if(p == nullptr) return String{};
 	return make_string_c(p);
 }
