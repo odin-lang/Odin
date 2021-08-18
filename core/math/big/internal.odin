@@ -676,7 +676,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			*/
 							max_used     >= 2 * min_used {
 			// err = s_mp_mul_balance(a,b,c);
-		} else if false && min_used >= MUL_TOOM_CUTOFF {
+		} else if min_used >= MUL_TOOM_CUTOFF {
 			/*
 				Toom path commented out until it no longer fails Factorial 10k or 100k,
 				as reveaved in the long test.
