@@ -11,10 +11,10 @@ struct WorkerTask {
 
 
 struct ThreadPool {
-	gbMutex     mutex;
-	gbSemaphore sem_available;
-	gbAtomic32  processing_work_count;
-	bool        is_running;
+	BlockingMutex mutex;
+	gbSemaphore   sem_available;
+	gbAtomic32    processing_work_count;
+	bool          is_running;
 
 	gbAllocator allocator;
 
@@ -39,7 +39,7 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 	mpmc_init(&pool->tasks, a, 1024);
 	pool->thread_count = gb_max(thread_count, 0);
 	pool->threads = gb_alloc_array(a, gbThread, pool->thread_count);
-	gb_mutex_init(&pool->mutex);
+	mutex_init(&pool->mutex);
 	gb_semaphore_init(&pool->sem_available);
 	pool->is_running = true;
 
@@ -91,7 +91,7 @@ void thread_pool_destroy(ThreadPool *pool) {
 	thread_pool_join(pool);
 
 	gb_semaphore_destroy(&pool->sem_available);
-	gb_mutex_destroy(&pool->mutex);
+	mutex_destroy(&pool->mutex);
 	gb_free(pool->allocator, pool->threads);
 	pool->thread_count = 0;
 	mpmc_destroy(&pool->tasks);
@@ -99,7 +99,7 @@ void thread_pool_destroy(ThreadPool *pool) {
 
 
 void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
-	gb_mutex_lock(&pool->mutex);
+	mutex_lock(&pool->mutex);
 
 	WorkerTask task = {};
 	task.do_work = proc;
@@ -107,7 +107,7 @@ void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 
 	mpmc_enqueue(&pool->tasks, task);
 	gb_semaphore_post(&pool->sem_available, 1);
-	gb_mutex_unlock(&pool->mutex);
+	mutex_unlock(&pool->mutex);
 }
 
 bool thread_pool_try_and_pop_task(ThreadPool *pool, WorkerTask *task) {
@@ -139,9 +139,9 @@ void thread_pool_wait_to_process(ThreadPool *pool) {
 
 		// Safety-kick
 		while (pool->tasks.count.load(std::memory_order_relaxed) > 0 && gb_atomic32_load(&pool->processing_work_count) == 0) {
-			gb_mutex_lock(&pool->mutex);
+			mutex_lock(&pool->mutex);
 			gb_semaphore_post(&pool->sem_available, cast(i32)pool->tasks.count.load(std::memory_order_relaxed));
-			gb_mutex_unlock(&pool->mutex);
+			mutex_unlock(&pool->mutex);
 		}
 
 		gb_yield();
