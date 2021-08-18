@@ -464,7 +464,6 @@ gb_global bool global_module_path_set = false;
 typedef struct Arena {
 	u8 *                   ptr;
 	u8 *                   end;
-	u8 *                   prev;
 	Array<gbVirtualMemory> blocks;
 	BlockingMutex          mutex;
 	std::atomic<isize>     block_size;
@@ -499,7 +498,6 @@ void arena_internal_grow(Arena *arena, isize min_size) {
 void *arena_alloc(Arena *arena, isize size, isize alignment) {
 	mutex_lock(&arena->mutex);
 
-
 	if (size > (arena->end - arena->ptr)) {
 		arena_internal_grow(arena, size);
 		GB_ASSERT(size <= (arena->end - arena->ptr));
@@ -508,7 +506,6 @@ void *arena_alloc(Arena *arena, isize size, isize alignment) {
 
 	isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
 	void *ptr = arena->ptr;
-	arena->prev = arena->ptr;
 	arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
 	GB_ASSERT(arena->ptr <= arena->end);
 	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
