@@ -941,8 +941,6 @@ void destroy_checker_context(CheckerContext *ctx) {
 
 void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
 	if (file != nullptr) {
-		TokenPos zero_pos = {};
-		global_error_collector.prev = zero_pos;
 		ctx->file  = file;
 		ctx->decl  = file->pkg->decl_info;
 		ctx->scope = file->scope;
@@ -2055,6 +2053,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 
 		Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
+
 
 		AstPackage *pkg = c->info.init_package;
 		Scope *s = pkg->scope;
