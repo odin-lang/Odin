@@ -8,9 +8,7 @@ import "core:time"
 import "core:reflect"
 import "core:runtime"
 import "intrinsics"
-import "core:encoding/json"
 
-_ :: json;
 
 /*
 	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
