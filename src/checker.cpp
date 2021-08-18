@@ -227,6 +227,7 @@ Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capaci
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
+	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
@@ -307,6 +308,7 @@ void destroy_scope(Scope *scope) {
 
 	string_map_destroy(&scope->elements);
 	ptr_set_destroy(&scope->imported);
+	mutex_destroy(&scope->mutex);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -356,43 +358,46 @@ Entity *scope_lookup_current(Scope *s, String const &name) {
 }
 
 void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
-	bool gone_thru_proc = false;
-	bool gone_thru_package = false;
-	StringHashKey key = string_hash_string(name);
-	for (Scope *s = scope; s != nullptr; s = s->parent) {
-		Entity **found = string_map_get(&s->elements, key);
-		if (found) {
-			Entity *e = *found;
-			if (gone_thru_proc) {
-				// IMPORTANT TODO(bill): Is this correct?!
-				if (e->kind == Entity_Label) {
-					continue;
-				}
-				if (e->kind == Entity_Variable) {
-					if (e->scope->flags&ScopeFlag_File) {
-						// Global variables are file to access
-					} else if (e->flags&EntityFlag_Static) {
-						// Allow static/thread_local variables to be referenced
-					} else {
+	if (scope != nullptr) {
+		bool gone_thru_proc = false;
+		bool gone_thru_package = false;
+		StringHashKey key = string_hash_string(name);
+		for (Scope *s = scope; s != nullptr; s = s->parent) {
+			Entity **found = nullptr;
+			mutex_lock(&s->mutex);
+			found = string_map_get(&s->elements, key);
+			mutex_unlock(&s->mutex);
+			if (found) {
+				Entity *e = *found;
+				if (gone_thru_proc) {
+					// IMPORTANT TODO(bill): Is this correct?!
+					if (e->kind == Entity_Label) {
 						continue;
 					}
+					if (e->kind == Entity_Variable) {
+						if (e->scope->flags&ScopeFlag_File) {
+							// Global variables are file to access
+						} else if (e->flags&EntityFlag_Static) {
+							// Allow static/thread_local variables to be referenced
+						} else {
+							continue;
+						}
+					}
 				}
+
+				if (entity_) *entity_ = e;
+				if (scope_) *scope_ = s;
+				return;
 			}
 
-			if (entity_) *entity_ = e;
-			if (scope_) *scope_ = s;
-			return;
-		}
-
-		if (s->flags&ScopeFlag_Proc) {
-			gone_thru_proc = true;
-		}
-		if (s->flags&ScopeFlag_Pkg) {
-			gone_thru_package = true;
+			if (s->flags&ScopeFlag_Proc) {
+				gone_thru_proc = true;
+			}
+			if (s->flags&ScopeFlag_Pkg) {
+				gone_thru_package = true;
+			}
 		}
 	}
-
-
 	if (entity_) *entity_ = nullptr;
 	if (scope_) *scope_ = nullptr;
 }
@@ -410,6 +415,10 @@ Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
 		return nullptr;
 	}
 	StringHashKey key = string_hash_string(name);
+
+	mutex_lock(&s->mutex);
+	defer (mutex_unlock(&s->mutex));
+
 	Entity **found = string_map_get(&s->elements, key);
 
 	if (found) {

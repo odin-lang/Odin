@@ -334,6 +334,8 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	if (found_scope == nullptr) {
 		return;
 	}
+	mutex_lock(&found_scope->mutex);
+	defer (mutex_unlock(&found_scope->mutex));
 
 	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
 	// original entity was still used check checked, but the checking was only
