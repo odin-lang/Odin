@@ -12,10 +12,13 @@ jobs:
         run: make release
       - name: Odin version
         run: ./odin version
+        timeout-minutes: 1
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
+        timeout-minutes: 10
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
+        timeout-minutes: 10
   build_macOS:
     runs-on: macos-latest
     steps:
@@ -30,10 +33,13 @@ jobs:
         run: make release
       - name: Odin version
         run: ./odin version
+        timeout-minutes: 1
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
+        timeout-minutes: 10
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
+        timeout-minutes: 10
   build_windows:
     runs-on: windows-latest
     steps:
@@ -45,15 +51,18 @@ jobs:
           ./build.bat 1
       - name: Odin version
         run: ./odin version
+        timeout-minutes: 1
       - name: Odin check
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo/demo.odin -vet
+        timeout-minutes: 10
       - name: Odin run
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin run examples/demo/demo.odin
+        timeout-minutes: 10
 
 
