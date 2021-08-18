@@ -4868,7 +4868,7 @@ void parser_add_package(Parser *p, AstPackage *pkg) {
 	}
 }
 
-ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_file);
+ParseFileError process_imported_file(Parser *p, ImportedFile imported_file);
 
 WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
@@ -5543,47 +5543,47 @@ bool parse_file(Parser *p, AstFile *f) {
 }
 
 
-ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_file) {
+ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 	AstPackage *pkg = imported_file.pkg;
-	FileInfo const *fi = &imported_file.fi;
-	TokenPos pos = imported_file.pos;
+	FileInfo    fi  = imported_file.fi;
+	TokenPos    pos = imported_file.pos;
 
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
 	file->pkg = pkg;
 	file->id = cast(i32)(imported_file.index+1);
 	TokenPos err_pos = {0};
-	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
+	ParseFileError err = init_ast_file(file, fi.fullpath, &err_pos);
 	err_pos.file_id = file->id;
 	file->last_error = err;
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
-			if (fi->fullpath == p->init_fullpath) {
+			if (fi.fullpath == p->init_fullpath) {
 				syntax_error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
 				gb_exit(1);
 			}
 		} else {
 			switch (err) {
 			case ParseFile_WrongExtension:
-				syntax_error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi.name));
 				break;
 			case ParseFile_InvalidFile:
-				syntax_error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi.name));
 				break;
 			case ParseFile_Permission:
-				syntax_error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi.name));
 				break;
 			case ParseFile_NotFound:
-				syntax_error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
+				syntax_error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi.name), LIT(fi.fullpath));
 				break;
 			case ParseFile_InvalidToken:
-				syntax_error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi->name));
+				syntax_error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi.name));
 				break;
 			case ParseFile_EmptyFile:
-				syntax_error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi.name));
 				break;
 			case ParseFile_FileTooLarge:
-				syntax_error(pos, "Failed to parse file: %.*s; file is too large, exceeds maximum file size of 2 GiB", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; file is too large, exceeds maximum file size of 2 GiB", LIT(fi.name));
 				break;
 			}
 

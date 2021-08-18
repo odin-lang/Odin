@@ -191,6 +191,7 @@ struct Scope {
 	std::atomic<Scope *> next;
 	std::atomic<Scope *> head_child;
 
+	BlockingMutex mutex;
 	StringMap<Entity *> elements;
 	PtrSet<Scope *> imported;
 
