@@ -48,21 +48,25 @@
 		ReleaseSRWLockExclusive(&m->srwlock);
 	}
 #else
-	typedef gbMutex BlockingMutex;
+	struct BlockingMutex {
+		pthread_mutex_t pthread_mutex;
+		pthread_mutexattr_t pthread_mutexattr;
+	};
 	void mutex_init(BlockingMutex *m) {
-		gb_mutex_init(m);
+		pthread_mutexattr_init(&m->pthread_mutexattr);
+		pthread_mutex_init(&m->pthread_mutex, &m->pthread_mutexattr);
 	}
 	void mutex_destroy(BlockingMutex *m) {
-		gb_mutex_destroy(m);
+		pthread_mutex_destroy(&m->pthread_mutex);
 	}
 	void mutex_lock(BlockingMutex *m) {
-		gb_mutex_lock(m);
+		pthread_mutex_lock(&m->pthread_mutex);
 	}
 	bool mutex_try_lock(BlockingMutex *m) {
-		return !!gb_mutex_try_lock(m);
+		return pthread_mutex_trylock(&m->pthread_mutex) == 0;
 	}
 	void mutex_unlock(BlockingMutex *m) {
-		gb_mutex_unlock(m);
+		pthread_mutex_unlock(&m->pthread_mutex);
 	}
 #endif
 
