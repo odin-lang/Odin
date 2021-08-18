@@ -561,6 +561,13 @@ if __name__ == '__main__':
 	print("\n---- math/big tests ----")
 	print()
 
+	max_name = 0
+	for test_proc in TESTS:
+		max_name = max(max_name, len(test_proc.__name__))
+
+	fmt_string = "{name:>{max_name}}: {count_pass:7,} passes and {count_fail:7,} failures in {timing:9.3f} ms."
+	fmt_string = fmt_string.replace("{max_name}", str(max_name))
+
 	for test_proc in TESTS:
 		count_pass = 0
 		count_fail = 0
@@ -583,7 +590,7 @@ if __name__ == '__main__':
 				count_fail     += 1
 				total_failures += 1
 
-		print("{name}: {count_pass:,} passes and {count_fail:,} failures in {timing:.3f} ms.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail, timing=TIMINGS[test_proc] * 1_000))
+		print(fmt_string.format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail, timing=TIMINGS[test_proc] * 1_000))
 
 	for BITS, ITERATIONS in BITS_AND_ITERATIONS:
 		print()		
@@ -665,12 +672,12 @@ if __name__ == '__main__':
 				else:
 					count_fail     += 1; total_failures += 1
 
-			print("{name}: {count_pass:,} passes and {count_fail:,} failures in {timing:.3f} ms.".format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail, timing=TIMINGS[test_proc] * 1_000))
+			print(fmt_string.format(name=test_proc.__name__, count_pass=count_pass, count_fail=count_fail, timing=TIMINGS[test_proc] * 1_000))
 
 	print()		
 	print("---- THE END ----")
 	print()
-	print("total: {count_pass:,} passes and {count_fail:,} failures in {timing:.3f} ms.".format(count_pass=total_passes, count_fail=total_failures, timing=TOTAL_TIME * 1_000))
+	print(fmt_string.format(name="total", count_pass=total_passes, count_fail=total_failures, timing=TOTAL_TIME * 1_000))
 
 	if total_failures:
 		exit(1)
