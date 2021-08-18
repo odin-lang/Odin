@@ -630,6 +630,8 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 	*/
 	if multiplier.used == 0 || src.used == 0 { return internal_zero(dest); }
 
+	neg := src.sign != multiplier.sign;
+
 	if src == multiplier {
 		/*
 			Do we need to square?
@@ -694,7 +696,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			err = #force_inline _private_int_mul(dest, src, multiplier, digits);
 		}
 	}
-	neg := src.sign != multiplier.sign;
+
 	dest.sign = .Negative if dest.used > 0 && neg else .Zero_or_Positive;
 	return err;
 }
