@@ -2053,18 +2053,15 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			}
 		}
 
+
 		Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
 
 		AstPackage *pkg = c->info.init_package;
 		Scope *s = pkg->scope;
+
 		for_array(i, s->elements.entries) {
 			Entity *e = s->elements.entries[i].value;
 			if (e->kind != Entity_Procedure) {
-				continue;
-			}
-
-			// if (e->file == nullptr || !e->file->is_test) {
-			if (e->file == nullptr) {
 				continue;
 			}
 
@@ -3224,6 +3221,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 			Entity *e = alloc_entity_variable(c->scope, name->Ident.token, nullptr);
 			e->identifier = name;
+			e->file = c->file;
 
 			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
@@ -4671,10 +4669,6 @@ void check_unchecked_bodies(Checker *c) {
 }
 
 void check_test_procedures(Checker *c) {
-	if (build_context.test_names.entries.count == 0) {
-		return;
-	}
-
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 
