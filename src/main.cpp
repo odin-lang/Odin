@@ -156,8 +156,8 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 
 i32 linker_stage(lbGenerator *gen) {
-  i32 result = 0;
-  Timings *timings = &global_timings;
+	i32 result = 0;
+	Timings *timings = &global_timings;
 
 	String output_base = gen->output_base;
 
@@ -2009,7 +2009,6 @@ int main(int arg_count, char const **arg_ptr) {
 	arena_init(&permanent_arena, heap_allocator());
 	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
 	arena_init(&global_ast_arena, heap_allocator());
-	permanent_arena.use_mutex = true;
 
 	init_string_buffer_memory();
 	init_string_interner();

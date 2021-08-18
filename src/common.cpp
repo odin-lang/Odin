@@ -462,15 +462,13 @@ gb_global bool global_module_path_set = false;
 #define ALIGN_UP_PTR(p, a)   (cast(void *)ALIGN_UP(cast(uintptr)(p), (a)))
 
 typedef struct Arena {
-	u8 *        ptr;
-	u8 *        end;
-	u8 *        prev;
-	Array<u8 *> blocks;
-	gbAllocator backing;
-	isize       block_size;
-	gbMutex     mutex;
-	isize total_used;
-	bool   use_mutex;
+	u8 *                   ptr;
+	u8 *                   end;
+	u8 *                   prev;
+	Array<gbVirtualMemory> blocks;
+	BlockingMutex          mutex;
+	std::atomic<isize>     block_size;
+	std::atomic<isize>     total_used;
 } Arena;
 
 #define ARENA_MIN_ALIGNMENT 16
@@ -479,44 +477,34 @@ typedef struct Arena {
 
 gb_global Arena permanent_arena = {};
 
-void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
-	arena->backing = backing;
+void arena_init(Arena *arena, gbAllocator block_allocator, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
+	mutex_init(&arena->mutex);
 	arena->block_size = block_size;
-	arena->use_mutex = true;
-	array_init(&arena->blocks, backing, 0, 2);
-	gb_mutex_init(&arena->mutex);
+	array_init(&arena->blocks, block_allocator, 0, 2);
 }
 
-void arena_grow(Arena *arena, isize min_size) {
-	if (arena->use_mutex) {
-		gb_mutex_lock(&arena->mutex);
-	}
-
-	isize size = gb_max(arena->block_size, min_size);
+void arena_internal_grow(Arena *arena, isize min_size) {
+	isize size = gb_max(arena->block_size.load(), min_size);
 	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
-	void *new_ptr = gb_alloc(arena->backing, size);
-	arena->ptr = cast(u8 *)new_ptr;
-	// zero_size(arena->ptr, size); // NOTE(bill): This should already be zeroed
-	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
-	arena->end = arena->ptr + size;
-	array_add(&arena->blocks, arena->ptr);
 
-	if (arena->use_mutex) {
-		gb_mutex_unlock(&arena->mutex);
-	}
+	gbVirtualMemory vmem = gb_vm_alloc(nullptr, size);
+	GB_ASSERT(vmem.data != nullptr);
+	GB_ASSERT(vmem.size >= size);
+	arena->ptr = cast(u8 *)vmem.data;
+	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
+	arena->end = arena->ptr + vmem.size;
+	array_add(&arena->blocks, vmem);
 }
 
 void *arena_alloc(Arena *arena, isize size, isize alignment) {
-	if (arena->use_mutex) {
-		gb_mutex_lock(&arena->mutex);
-	}
+	mutex_lock(&arena->mutex);
 
-	arena->total_used += size;
 
 	if (size > (arena->end - arena->ptr)) {
-		arena_grow(arena, size);
+		arena_internal_grow(arena, size);
 		GB_ASSERT(size <= (arena->end - arena->ptr));
 	}
+	arena->total_used += size;
 
 	isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
 	void *ptr = arena->ptr;
@@ -524,29 +512,22 @@ void *arena_alloc(Arena *arena, isize size, isize alignment) {
 	arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
 	GB_ASSERT(arena->ptr <= arena->end);
 	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
-	// zero_size(ptr, size);
 
-	if (arena->use_mutex) {
-		gb_mutex_unlock(&arena->mutex);
-	}
+	mutex_unlock(&arena->mutex);
 	return ptr;
 }
 
 void arena_free_all(Arena *arena) {
-	if (arena->use_mutex) {
-		gb_mutex_lock(&arena->mutex);
-	}
+	mutex_lock(&arena->mutex);
 
 	for_array(i, arena->blocks) {
-		gb_free(arena->backing, arena->blocks[i]);
+		gb_vm_free(arena->blocks[i]);
 	}
 	array_clear(&arena->blocks);
 	arena->ptr = nullptr;
 	arena->end = nullptr;
 
-	if (arena->use_mutex) {
-		gb_mutex_unlock(&arena->mutex);
-	}
+	mutex_unlock(&arena->mutex);
 }
 
 
