@@ -50,11 +50,9 @@
 #else
 	struct BlockingMutex {
 		pthread_mutex_t pthread_mutex;
-		pthread_mutexattr_t pthread_mutexattr;
 	};
 	void mutex_init(BlockingMutex *m) {
-		pthread_mutexattr_init(&m->pthread_mutexattr);
-		pthread_mutex_init(&m->pthread_mutex, &m->pthread_mutexattr);
+		pthread_mutex_init(&m->pthread_mutex, nullptr);
 	}
 	void mutex_destroy(BlockingMutex *m) {
 		pthread_mutex_destroy(&m->pthread_mutex);
