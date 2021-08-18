@@ -161,6 +161,7 @@ _private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) 
 	internal_clamp(b1);
 	internal_clamp(b2);
 
+
 	/*
 		\\ S1 = (a2+a1+a0) * (b2+b1+b0);
 	*/
