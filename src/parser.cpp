@@ -4812,12 +4812,12 @@ void destroy_ast_file(AstFile *f) {
 bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	string_set_init(&p->imported_files, heap_allocator());
-	string_map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->package_imports, heap_allocator());
 	mutex_init(&p->import_mutex);
 	mutex_init(&p->file_add_mutex);
 	mutex_init(&p->file_decl_mutex);
+	mutex_init(&p->packages_mutex);
 	mpmc_init(&p->file_error_queue, heap_allocator(), 1024);
 	return true;
 }
@@ -4841,31 +4841,19 @@ void destroy_parser(Parser *p) {
 	array_free(&p->packages);
 	array_free(&p->package_imports);
 	string_set_destroy(&p->imported_files);
-	string_map_destroy(&p->package_map);
 	mutex_destroy(&p->import_mutex);
 	mutex_destroy(&p->file_add_mutex);
 	mutex_destroy(&p->file_decl_mutex);
+	mutex_destroy(&p->packages_mutex);
 	mpmc_destroy(&p->file_error_queue);
 }
 
 
 void parser_add_package(Parser *p, AstPackage *pkg) {
+	mutex_lock(&p->packages_mutex);
 	pkg->id = p->packages.count+1;
 	array_add(&p->packages, pkg);
-	if (pkg->name.len > 0) {
-		StringHashKey key = string_hash_string(pkg->name);
-		auto found = string_map_get(&p->package_map, key);
-		if (found) {
-			GB_ASSERT(pkg->files.count > 0);
-			AstFile *f = pkg->files[0];
-			syntax_error(f->package_token, "Non-unique package name '%.*s'", LIT(pkg->name));
-			GB_ASSERT((*found)->files.count > 0);
-			TokenPos pos = (*found)->files[0]->package_token.pos;
-			error_line("\tpreviously declared at %s\n", token_pos_to_string(pos));
-		} else {
-			string_map_set(&p->package_map, key, pkg);
-		}
-	}
+	mutex_unlock(&p->packages_mutex);
 }
 
 ParseFileError process_imported_file(Parser *p, ImportedFile imported_file);
@@ -5605,7 +5593,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 		mutex_lock(&p->file_add_mutex);
 		defer (mutex_unlock(&p->file_add_mutex));
 
-		array_add(&file->pkg->files, file);
+		array_add(&pkg->files, file);
 
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;

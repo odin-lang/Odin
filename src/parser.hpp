@@ -186,7 +186,6 @@ struct AstPackage {
 struct Parser {
 	String                    init_fullpath;
 	StringSet                 imported_files; // fullpath
-	StringMap<AstPackage *>   package_map; // Key(package name)
 	Array<AstPackage *>       packages;
 	Array<ImportedPackage>    package_imports;
 	isize                     file_to_process_count;
@@ -195,6 +194,7 @@ struct Parser {
 	BlockingMutex             import_mutex;
 	BlockingMutex             file_add_mutex;
 	BlockingMutex             file_decl_mutex;
+	BlockingMutex             packages_mutex;
 	MPMCQueue<ParseFileError> file_error_queue;
 };
 
