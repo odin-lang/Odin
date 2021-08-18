@@ -2083,10 +2083,17 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 		bool is_static = false;
 		if (vd->names.count > 0) {
-			Entity *e = entity_of_node(vd->names[0]);
-			if (e->flags & EntityFlag_Static) {
-				// NOTE(bill): If one of the entities is static, they all are
-				is_static = true;
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (!is_blank_ident(name)) {
+					Entity *e = entity_of_node(name);
+					GB_ASSERT(e != nullptr);
+					if (e->flags & EntityFlag_Static) {
+						// NOTE(bill): If one of the entities is static, they all are
+						is_static = true;
+						break;
+					}
+				}
 			}
 		}
 
