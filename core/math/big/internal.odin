@@ -630,6 +630,8 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 	*/
 	if multiplier.used == 0 || src.used == 0 { return internal_zero(dest); }
 
+	neg := src.sign != multiplier.sign;
+
 	if src == multiplier {
 		/*
 			Do we need to square?
@@ -674,7 +676,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			*/
 							max_used     >= 2 * min_used {
 			// err = s_mp_mul_balance(a,b,c);
-		} else if false && min_used >= MUL_TOOM_CUTOFF {
+		} else if min_used >= MUL_TOOM_CUTOFF {
 			/*
 				Toom path commented out until it no longer fails Factorial 10k or 100k,
 				as reveaved in the long test.
@@ -694,7 +696,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			err = #force_inline _private_int_mul(dest, src, multiplier, digits);
 		}
 	}
-	neg := src.sign != multiplier.sign;
+
 	dest.sign = .Negative if dest.used > 0 && neg else .Zero_or_Positive;
 	return err;
 }
