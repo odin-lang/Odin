@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser(
 	epilog          = "By default we run regression and random tests with preset parameters.",
     formatter_class = argparse.ArgumentDefaultsHelpFormatter,
 )
+
 #
 # Normally, we report the number of passes and fails. With this option set, we exit at first fail.
 #
@@ -22,10 +23,10 @@ parser.add_argument(
 	help    = "Exit when a test fails",
 	action  = "store_true",
 )
+
 #
 # We skip randomized tests altogether if this is set.
 #
-
 no_random = parser.add_mutually_exclusive_group()
 
 no_random.add_argument(
@@ -33,13 +34,13 @@ no_random.add_argument(
 	help    = "No random tests",
 	action  = "store_true",
 )
+
 #
 # Normally we run a given number of cycles on each test.
 # Timed tests budget 1 second per 20_000 bits instead.
 #
 # For timed tests we budget a second per `n` bits and iterate until we hit that time.
 #
-
 timed_or_fast = no_random.add_mutually_exclusive_group()
 
 timed_or_fast.add_argument(
@@ -55,6 +56,7 @@ parser.add_argument(
 	default = 20_000,
 	help    = "Timed tests. Every `BITS` worth of input is given a second of running time.",
 )
+
 #
 # For normal tests (non-timed), `-fast-tests` cuts down on the number of iterations.
 #
@@ -136,7 +138,6 @@ gc.disable()
 #
 # Set up exported procedures
 #
-
 try:
 	l = cdll.LoadLibrary(LIB_PATH)
 except:
@@ -159,29 +160,28 @@ print("initialize_constants: ", initialize_constants())
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
-add        = load(l.test_add,    [c_char_p, c_char_p],   Res)
-sub        = load(l.test_sub,    [c_char_p, c_char_p],   Res)
-mul        = load(l.test_mul,    [c_char_p, c_char_p],   Res)
-sqr        = load(l.test_sqr,    [c_char_p          ],   Res)
-div        = load(l.test_div,    [c_char_p, c_char_p],   Res)
+add        =     load(l.test_add,        [c_char_p, c_char_p],   Res)
+sub        =     load(l.test_sub,        [c_char_p, c_char_p],   Res)
+mul        =     load(l.test_mul,        [c_char_p, c_char_p],   Res)
+sqr        =     load(l.test_sqr,        [c_char_p          ],   Res)
+div        =     load(l.test_div,        [c_char_p, c_char_p],   Res)
 
 # Powers and such
-int_log    = load(l.test_log,    [c_char_p, c_longlong], Res)
-int_pow    = load(l.test_pow,    [c_char_p, c_longlong], Res)
-int_sqrt   = load(l.test_sqrt,   [c_char_p            ], Res)
-int_root_n = load(l.test_root_n, [c_char_p, c_longlong], Res)
+int_log    =     load(l.test_log,        [c_char_p, c_longlong], Res)
+int_pow    =     load(l.test_pow,        [c_char_p, c_longlong], Res)
+int_sqrt   =     load(l.test_sqrt,       [c_char_p            ], Res)
+int_root_n =     load(l.test_root_n,     [c_char_p, c_longlong], Res)
 
 # Logical operations
-
-int_shl_digit  = load(l.test_shl_digit, [c_char_p, c_longlong], Res)
-int_shr_digit  = load(l.test_shr_digit, [c_char_p, c_longlong], Res)
-int_shl        = load(l.test_shl, [c_char_p, c_longlong], Res)
-int_shr        = load(l.test_shr, [c_char_p, c_longlong], Res)
+int_shl_digit  = load(l.test_shl_digit,  [c_char_p, c_longlong], Res)
+int_shr_digit  = load(l.test_shr_digit,  [c_char_p, c_longlong], Res)
+int_shl        = load(l.test_shl,        [c_char_p, c_longlong], Res)
+int_shr        = load(l.test_shr,        [c_char_p, c_longlong], Res)
 int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
 
-int_factorial  = load(l.test_factorial, [c_uint64], Res)
-int_gcd        = load(l.test_gcd, [c_char_p, c_char_p], Res)
-int_lcm        = load(l.test_lcm, [c_char_p, c_char_p], Res)
+int_factorial  = load(l.test_factorial,  [c_uint64], Res)
+int_gcd        = load(l.test_gcd,        [c_char_p, c_char_p], Res)
+int_lcm        = load(l.test_lcm,        [c_char_p, c_char_p], Res)
 
 def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = "", radix=16):
 	passed = True
