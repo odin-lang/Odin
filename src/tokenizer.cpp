@@ -262,13 +262,13 @@ bool token_is_newline(Token const &tok) {
 
 struct ErrorCollector {
 	TokenPos prev;
-	i64     count;
-	i64     warning_count;
-	bool    in_block;
-	BlockingMutex mutex;
-	BlockingMutex error_out_mutex;
-	BlockingMutex string_mutex;
-	RecursiveMutex block_mutex;
+	std::atomic<i64>  count;
+	std::atomic<i64>  warning_count;
+	std::atomic<bool> in_block;
+	BlockingMutex     mutex;
+	BlockingMutex     error_out_mutex;
+	BlockingMutex     string_mutex;
+	RecursiveMutex    block_mutex;
 
 	Array<u8> error_buffer;
 	Array<String> errors;
@@ -280,11 +280,7 @@ gb_global ErrorCollector global_error_collector;
 
 
 bool any_errors(void) {
-	bool any_errors = false;
-	mutex_lock(&global_error_collector.block_mutex);
-	any_errors = global_error_collector.error_buffer.count > 0;
-	mutex_unlock(&global_error_collector.block_mutex);
-	return any_errors;
+	return global_error_collector.count.load() != 0;
 }
 
 void init_global_error_collector(void) {
@@ -365,7 +361,7 @@ AstFile *get_ast_file_from_id(i32 index) {
 
 void begin_error_block(void) {
 	mutex_lock(&global_error_collector.block_mutex);
-	global_error_collector.in_block = true;
+	global_error_collector.in_block.store(true);
 }
 
 void end_error_block(void) {
@@ -379,7 +375,7 @@ void end_error_block(void) {
 		global_error_collector.error_buffer.count = 0;
 	}
 
-	global_error_collector.in_block = false;
+	global_error_collector.in_block.store(false);
 	mutex_unlock(&global_error_collector.block_mutex);
 }
 
@@ -498,8 +494,9 @@ bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 }
 
 void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	global_error_collector.count.fetch_add(1);
+
 	mutex_lock(&global_error_collector.mutex);
-	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (pos.line == 0) {
 		error_out("Error: %s\n", gb_bprintf_va(fmt, va));
@@ -521,8 +518,8 @@ void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) 
 		error_va(pos, end, fmt, va);
 		return;
 	}
+	global_error_collector.warning_count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
-	global_error_collector.warning_count++;
 	if (!global_ignore_warnings()) {
 		// NOTE(bill): Duplicate error, skip it
 		if (pos.line == 0) {

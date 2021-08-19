@@ -1136,7 +1136,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 		if (unhandled.count > 0) {
 			begin_error_block();
-			defer (begin_error_block());
+			defer (end_error_block());
 
 			if (unhandled.count == 1) {
 				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
