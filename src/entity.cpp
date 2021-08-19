@@ -120,7 +120,7 @@ struct Entity {
 	Token       token;
 	Scope *     scope;
 	Type *      type;
-	Ast *       identifier; // Can be nullptr
+	std::atomic<Ast *> identifier; // Can be nullptr
 	DeclInfo *  decl_info;
 	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
 	AstFile *   file;

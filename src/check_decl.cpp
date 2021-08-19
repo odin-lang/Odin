@@ -350,12 +350,12 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	original_entity->type = new_entity->type;
 	original_entity->aliased_of = new_entity;
 
-	if (original_entity->identifier == nullptr) {
-		original_entity->identifier = new_entity->identifier;
-	}
-	if (original_entity->identifier != nullptr &&
-	    original_entity->identifier->kind == Ast_Ident) {
-		original_entity->identifier->Ident.entity = new_entity;
+	Ast *empty_ident = nullptr;
+	original_entity->identifier.compare_exchange_strong(empty_ident, new_entity->identifier);
+
+	if (original_entity->identifier.load() != nullptr &&
+	    original_entity->identifier.load()->kind == Ast_Ident) {
+		original_entity->identifier.load()->Ident.entity = new_entity;
 	}
 
 	// IMPORTANT NOTE(bill, 2021-04-10): copy only the variants
