@@ -52,12 +52,12 @@ gb_global gbAllocator mc_allocator = heap_allocator();
 struct Find_Result {
     int windows_sdk_version;   // Zero if no Windows SDK found.
 
-    wchar_t *windows_sdk_root;
-    wchar_t *windows_sdk_um_library_path;
-    wchar_t *windows_sdk_ucrt_library_path;
+    wchar_t const *windows_sdk_root;
+    wchar_t const *windows_sdk_um_library_path;
+    wchar_t const *windows_sdk_ucrt_library_path;
 
-    wchar_t *vs_exe_path;
-    wchar_t *vs_library_path;
+    wchar_t const *vs_exe_path;
+    wchar_t const *vs_library_path;
 };
 
 struct Find_Result_Utf8 {
@@ -179,10 +179,10 @@ struct DECLSPEC_UUID("42843719-DB4C-46C2-8E7C-64F1816EFD5B") DECLSPEC_NOVTABLE I
 
 struct Version_Data {
     i32 best_version[4];  // For Windows 8 versions, only two of these numbers are used.
-    wchar_t *best_name;
+    wchar_t const *best_name;
 };
 
-bool os_file_exists(wchar_t *name) {
+bool os_file_exists(wchar_t const *name) {
     // @Robustness: What flags do we really want to check here?
 
     auto attrib = GetFileAttributesW(name);
@@ -192,7 +192,7 @@ bool os_file_exists(wchar_t *name) {
     return true;
 }
 
-wchar_t *concat(wchar_t *a, wchar_t *b, wchar_t *c = nullptr, wchar_t *d = nullptr) {
+wchar_t *concat(wchar_t const *a, wchar_t const *b, wchar_t const *c = nullptr, wchar_t const *d = nullptr) {
     // Concatenate up to 4 wide strings together. Allocated with malloc.
     // If you don't like that, use a programming language that actually
     // helps you with using custom allocators. Or just edit the code.
@@ -214,8 +214,8 @@ wchar_t *concat(wchar_t *a, wchar_t *b, wchar_t *c = nullptr, wchar_t *d = nullp
     return result;
 }
 
-typedef void (*Visit_Proc_W)(wchar_t *short_name, wchar_t *full_name, Version_Data *data);
-bool visit_files_w(wchar_t *dir_name, Version_Data *data, Visit_Proc_W proc) {
+typedef void (*Visit_Proc_W)(wchar_t const *short_name, wchar_t const *full_name, Version_Data *data);
+bool visit_files_w(wchar_t const *dir_name, Version_Data *data, Visit_Proc_W proc) {
 
     // Visit everything in one folder (non-recursively). If it's a directory
     // that doesn't start with ".", call the visit proc on it. The visit proc
@@ -246,7 +246,7 @@ bool visit_files_w(wchar_t *dir_name, Version_Data *data, Visit_Proc_W proc) {
 }
 
 
-wchar_t *find_windows_kit_root(HKEY key, wchar_t *version) {
+wchar_t *find_windows_kit_root(HKEY key, wchar_t const *version) {
     // Given a key to an already opened registry entry,
     // get the value stored under the 'version' subkey.
     // If that's not the right terminology, hey, I never do registry stuff.
@@ -272,7 +272,7 @@ wchar_t *find_windows_kit_root(HKEY key, wchar_t *version) {
     return value;
 }
 
-void win10_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
+void win10_best(wchar_t const *short_name, wchar_t const *full_name, Version_Data *data) {
     // Find the Windows 10 subdirectory with the highest version number.
 
     int i0, i1, i2, i3;
@@ -292,7 +292,7 @@ void win10_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
 
     // we have to copy_string and free here because visit_files free's the full_name string
     // after we execute this function, so Win*_Data would contain an invalid pointer.
-    if (data->best_name) free(data->best_name);
+    if (data->best_name) free((void *)data->best_name);
     data->best_name = _wcsdup(full_name);
 
     if (data->best_name) {
@@ -303,7 +303,7 @@ void win10_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
     }
 }
 
-void win8_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
+void win8_best(wchar_t const *short_name, wchar_t const *full_name, Version_Data *data) {
     // Find the Windows 8 subdirectory with the highest version number.
 
     int i0, i1;
@@ -317,7 +317,7 @@ void win8_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
 
     // we have to copy_string and free here because visit_files free's the full_name string
     // after we execute this function, so Win*_Data would contain an invalid pointer.
-    if (data->best_name) free(data->best_name);
+    if (data->best_name) free((void *)data->best_name);
     data->best_name = _wcsdup(full_name);
 
     if (data->best_name) {
@@ -502,11 +502,11 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
         defer (RegCloseKey(vs7_key));
 
         // Hardcoded search for 4 prior Visual Studio versions. Is there something better to do here?
-        wchar_t *versions[] = { L"14.0", L"13.0",  L"12.0", L"11.0", L"10.0", L"9.0", };
+        wchar_t const *versions[] = { L"14.0", L"13.0",  L"12.0", L"11.0", L"10.0", L"9.0", };
         const int NUM_VERSIONS = sizeof(versions) / sizeof(versions[0]);
 
         for (int i = 0; i < NUM_VERSIONS; i++) {
-            wchar_t *v = versions[i];
+            wchar_t const *v = versions[i];
 
             DWORD dw_type;
             DWORD cb_data;
@@ -589,7 +589,7 @@ Find_Result find_visual_studio_and_windows_sdk() {
     return result;
 }
 
-String mc_wstring_to_string(wchar_t *str) {
+String mc_wstring_to_string(wchar_t const *str) {
     return string16_to_string(mc_allocator, make_string16_c(str));
 }
 
