@@ -294,7 +294,7 @@ struct CheckerInfo {
 	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
 	// these variables will be of contention
 
-	gbSemaphore collect_semaphore;
+	Semaphore collect_semaphore;
 
 	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
 	                                   // as it needs to be iterated across afterwards
@@ -390,7 +390,7 @@ struct Checker {
 	MPMCQueue<Entity *> procs_with_deferred_to_check;
 
 	ProcBodyQueue procs_to_check_queue;
-	gbSemaphore procs_to_check_semaphore;
+	Semaphore procs_to_check_semaphore;
 
 	// TODO(bill): Technically MPSC queue
 	MPMCQueue<UntypedExprInfo> global_untyped_queue;
