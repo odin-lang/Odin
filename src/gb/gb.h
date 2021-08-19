@@ -2039,7 +2039,7 @@ typedef enum gbFileStandardType {
 	gbFileStandard_Count,
 } gbFileStandardType;
 
-GB_DEF gbFile *const gb_file_get_standard(gbFileStandardType std);
+GB_DEF gbFile *gb_file_get_standard(gbFileStandardType std);
 
 GB_DEF gbFileError gb_file_create        (gbFile *file, char const *filename);
 GB_DEF gbFileError gb_file_open          (gbFile *file, char const *filename);
@@ -3678,12 +3678,12 @@ gb_inline isize       gb_pointer_diff     (void const *begin, void const *end) {
 gb_inline void gb_zero_size(void *ptr, isize size) { gb_memset(ptr, 0, size); }
 
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 #pragma intrinsic(__movsb)
 #endif
 
 gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 	if (dest == NULL) {
 		return NULL;
 	}
@@ -4654,7 +4654,14 @@ gb_inline void gb_yield_thread(void) {
 
 gb_inline void gb_mfence(void) {
 #if defined(GB_SYSTEM_WINDOWS)
-	_ReadWriteBarrier();
+	#if defined(__clang__)
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+		_ReadWriteBarrier();
+	#pragma clang diagnostic pop
+	#else
+		_ReadWriteBarrier();
+	#endif
 #elif defined(GB_SYSTEM_OSX)
 	#if defined(GB_CPU_X86)
 	__sync_synchronize();
@@ -4670,7 +4677,14 @@ gb_inline void gb_mfence(void) {
 
 gb_inline void gb_sfence(void) {
 #if defined(GB_SYSTEM_WINDOWS)
-	_WriteBarrier();
+	#if defined(__clang__)
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+		_WriteBarrier();
+	#pragma clang diagnostic pop
+	#else
+		_WriteBarrier();
+	#endif
 #elif defined(GB_SYSTEM_OSX)
 	#if defined(GB_CPU_X86)
 	__asm__ volatile ("" : : : "memory");
@@ -4687,7 +4701,14 @@ gb_inline void gb_sfence(void) {
 
 gb_inline void gb_lfence(void) {
 #if defined(GB_SYSTEM_WINDOWS)
-	_ReadBarrier();
+	#if defined(__clang__)
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+		_ReadBarrier();
+	#pragma clang diagnostic pop
+	#else
+		_ReadBarrier();
+	#endif
 #elif defined(GB_SYSTEM_OSX)
 	__asm__ volatile ("" : : : "memory");
 #elif defined(GB_CPU_X86)
@@ -8026,13 +8047,13 @@ gb_inline b32 gb_file_has_changed(gbFile *f) {
 }
 
 // TODO(bill): Is this a bad idea?
-gb_global b32    gb__std_file_set = false;
-gb_global gbFile gb__std_files[gbFileStandard_Count] = {{0}};
+gb_global b32    gb__std_file_set;
+gb_global gbFile gb__std_files[gbFileStandard_Count];
 
 
 #if defined(GB_SYSTEM_WINDOWS)
 
-gb_inline gbFile *const gb_file_get_standard(gbFileStandardType std) {
+gb_inline gbFile *gb_file_get_standard(gbFileStandardType std) {
 	if (!gb__std_file_set) {
 	#define GB__SET_STD_FILE(type, v) gb__std_files[type].fd.p = v; gb__std_files[type].ops = gbDefaultFileOperations
 		GB__SET_STD_FILE(gbFileStandard_Input,  GetStdHandle(STD_INPUT_HANDLE));
@@ -8082,7 +8103,7 @@ b32 gb_file_exists(char const *name) {
 
 #else // POSIX
 
-gb_inline gbFile *const gb_file_get_standard(gbFileStandardType std) {
+gb_inline gbFile *gb_file_get_standard(gbFileStandardType std) {
 	if (!gb__std_file_set) {
 	#define GB__SET_STD_FILE(type, v) gb__std_files[type].fd.i = v; gb__std_files[type].ops = gbDefaultFileOperations
 		GB__SET_STD_FILE(gbFileStandard_Input,  0);
