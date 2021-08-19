@@ -1565,7 +1565,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						if (is_type_proc(op.type)) {
 							Entity *proc_entity = entity_from_expr(op.expr);
 							valid = proc_entity != nullptr;
-							poly_const = exact_value_procedure(proc_entity->identifier ? proc_entity->identifier : op.expr);
+							poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
 						}
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {

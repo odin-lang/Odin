@@ -1204,8 +1204,9 @@ void lb_generate_code(lbGenerator *gen) {
 
 			LLVMBool is_optimized = build_context.optimization_level > 0;
 			AstFile *init_file = m->info->init_package->files[0];
-			if (m->info->entry_point && m->info->entry_point->identifier && m->info->entry_point->identifier->file) {
-				init_file = m->info->entry_point->identifier->file;
+			Ast *ident = m->info->entry_point->identifier.load();
+			if (m->info->entry_point && ident && ident->file) {
+				init_file = ident->file;
 			}
 
 			LLVMBool split_debug_inlining = false;

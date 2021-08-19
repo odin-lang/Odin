@@ -211,11 +211,12 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		scope = p->module->debug_compile_unit;
 		type = lb_debug_type_internal_proc(m, bt);
 
+		Ast *ident = entity->identifier.load();
 		if (entity->file != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->file);
 			scope = file;
-		} else if (entity->identifier != nullptr && entity->identifier->file != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->identifier->file);
+		} else if (ident != nullptr && ident->file != nullptr) {
+			file = lb_get_llvm_metadata(m, ident->file);
 			scope = file;
 		} else if (entity->scope != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->scope->file);

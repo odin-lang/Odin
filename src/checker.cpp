@@ -1297,9 +1297,9 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 		if (identifier->kind != Ast_Ident) {
 			return;
 		}
-		if (entity->identifier == nullptr) {
-			entity->identifier = identifier;
-		}
+		Ast *empty_ident = nullptr;
+		entity->identifier.compare_exchange_strong(empty_ident, identifier);
+
 		identifier->Ident.entity = entity;
 
 		if (c->info->allow_identifier_uses) {
