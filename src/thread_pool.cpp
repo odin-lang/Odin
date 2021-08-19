@@ -20,7 +20,7 @@ struct ThreadPool {
 
 	MPMCQueue<WorkerTask> tasks;
 
-	gbThread *threads;
+	Thread *threads;
 	isize thread_count;
 
 	char worker_prefix[10];
@@ -32,13 +32,13 @@ void thread_pool_destroy(ThreadPool *pool);
 void thread_pool_start(ThreadPool *pool);
 void thread_pool_join(ThreadPool *pool);
 void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
-GB_THREAD_PROC(worker_thread_internal);
+THREAD_PROC(worker_thread_internal);
 
 void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_prefix) {
 	pool->allocator = a;
 	mpmc_init(&pool->tasks, a, 1024);
 	pool->thread_count = gb_max(thread_count, 0);
-	pool->threads = gb_alloc_array(a, gbThread, pool->thread_count);
+	pool->threads = gb_alloc_array(a, Thread, pool->thread_count);
 	mutex_init(&pool->mutex);
 	semaphore_init(&pool->sem_available);
 	pool->is_running = true;
@@ -52,15 +52,15 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 	}
 
 	for (isize i = 0; i < pool->thread_count; i++) {
-		gbThread *t = &pool->threads[i];
-		gb_thread_init(t);
+		Thread *t = &pool->threads[i];
+		thread_init(t);
 		t->user_index = i;
 		#if 0
 		// TODO(bill): Fix this on Linux as it causes a seg-fault
 		if (pool->worker_prefix_len > 0) {
 			char worker_name[16] = {};
 			gb_snprintf(worker_name, gb_size_of(worker_name), "%.*s%u", pool->worker_prefix_len, pool->worker_prefix, cast(u16)i);
-			gb_thread_set_name(t, worker_name);
+			thread_set_name(t, worker_name);
 		}
 		#endif
 	}
@@ -68,8 +68,8 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 
 void thread_pool_start(ThreadPool *pool) {
 	for (isize i = 0; i < pool->thread_count; i++) {
-		gbThread *t = &pool->threads[i];
-		gb_thread_start(t, worker_thread_internal, pool);
+		Thread *t = &pool->threads[i];
+		thread_start(t, worker_thread_internal, pool);
 	}
 }
 
@@ -78,11 +78,11 @@ void thread_pool_join(ThreadPool *pool) {
 
 	semaphore_post(&pool->sem_available, cast(i32)pool->thread_count);
 
-	gb_yield();
+	yield();
 
 	for (isize i = 0; i < pool->thread_count; i++) {
-		gbThread *t = &pool->threads[i];
-		gb_thread_join(t);
+		Thread *t = &pool->threads[i];
+		thread_join(t);
 	}
 }
 
@@ -144,14 +144,14 @@ void thread_pool_wait_to_process(ThreadPool *pool) {
 			mutex_unlock(&pool->mutex);
 		}
 
-		gb_yield();
+		yield();
 	}
 
 	thread_pool_join(pool);
 }
 
 
-GB_THREAD_PROC(worker_thread_internal) {
+THREAD_PROC(worker_thread_internal) {
 	ThreadPool *pool = cast(ThreadPool *)thread->user_data;
 	while (pool->is_running) {
 		semaphore_wait(&pool->sem_available);

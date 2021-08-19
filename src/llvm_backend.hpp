@@ -136,8 +136,6 @@ struct lbModule {
 struct lbGenerator {
 	CheckerInfo *info;
 
-	gbMutex mutex;
-
 	Array<String> output_object_paths;
 	Array<String> output_temp_paths;
 	String   output_base;
@@ -148,8 +146,8 @@ struct lbGenerator {
 
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
 
-	gbAtomic32 global_array_index;
-	gbAtomic32 global_generated_index;
+	std::atomic<u32> global_array_index;
+	std::atomic<u32> global_generated_index;
 };
 
 

@@ -127,8 +127,6 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->modules_through_ctx, permanent_allocator(), gen->info->packages.entries.count*2);
 	map_init(&gen->anonymous_proc_lits, heap_allocator(), 1024);
 
-	gb_mutex_init(&gen->mutex);
-
 	if (USE_SEPARATE_MODULES) {
 		for_array(i, gen->info->packages.entries) {
 			AstPackage *pkg = gen->info->packages.entries[i].value;
@@ -2163,7 +2161,7 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 		isize max_len = 7+8+1;
 		char *name = gb_alloc_array(permanent_allocator(), char, max_len);
 
-		u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_array_index, 1);
+		u32 id = m->gen->global_array_index.fetch_add(1);
 		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
 		len -= 1;
 
@@ -2205,7 +2203,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	{
 		isize max_len = 7+8+1;
 		name = gb_alloc_array(permanent_allocator(), char, max_len);
-		u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_array_index, 1);
+		u32 id = m->gen->global_array_index.fetch_add(1);
 		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
 		len -= 1;
 	}
@@ -2317,7 +2315,7 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 	isize max_len = 7+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(permanent_allocator(), u8, max_len);
 
-	u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_generated_index, 1);
+	u32 id = m->gen->global_generated_index.fetch_add(1);
 
 	isize len = gb_snprintf(cast(char *)str, max_len, "ggv$%x", id);
 	String name = make_string(str, len-1);
