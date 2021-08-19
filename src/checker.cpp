@@ -4129,7 +4129,7 @@ struct ThreadProcCheckerSection {
 };
 
 
-void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
+void check_with_workers(Checker *c, ThreadProc *proc, isize total_count) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	if (!build_context.threaded_checker) {
@@ -4143,7 +4143,7 @@ void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
 		section_all.checker = c;
 		section_all.offset = 0;
 		section_all.count = total_count;
-		gbThread dummy_main_thread = {};
+		Thread dummy_main_thread = {};
 		dummy_main_thread.user_data = &section_all;
 		proc(&dummy_main_thread);
 		return;
@@ -4162,27 +4162,27 @@ void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
 	}
 	GB_ASSERT(remaining_count <= 0);
 
-	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
+	Thread *threads = gb_alloc_array(permanent_allocator(), Thread, worker_count);
 	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_init(threads+i);
+		thread_init(threads+i);
 	}
 
 	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_start(threads+i, proc, thread_data+i);
+		thread_start(threads+i, proc, thread_data+i);
 	}
-	gbThread dummy_main_thread = {};
+	Thread dummy_main_thread = {};
 	dummy_main_thread.user_data = thread_data+worker_count;
 	proc(&dummy_main_thread);
 
 	semaphore_wait(&c->info.collect_semaphore);
 
 	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_destroy(threads+i);
+		thread_destroy(threads+i);
 	}
 }
 
 
-GB_THREAD_PROC(thread_proc_collect_entities) {
+THREAD_PROC(thread_proc_collect_entities) {
 	auto *data = cast(ThreadProcCheckerSection *)thread->user_data;
 	Checker *c = data->checker;
 	CheckerContext collect_entity_ctx = make_checker_context(c);
@@ -4231,7 +4231,7 @@ void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedE
 	}
 }
 
-GB_THREAD_PROC(thread_proc_check_export_entities) {
+THREAD_PROC(thread_proc_check_export_entities) {
 	auto data = cast(ThreadProcCheckerSection *)thread->user_data;
 	Checker *c = data->checker;
 
@@ -4720,7 +4720,7 @@ struct ThreadProcBodyData {
 	ThreadProcBodyData *all_data;
 };
 
-GB_THREAD_PROC(thread_proc_body) {
+THREAD_PROC(thread_proc_body) {
 	ThreadProcBodyData *data = cast(ThreadProcBodyData *)thread->user_data;
 	Checker *c = data->checker;
 	GB_ASSERT(c != nullptr);
@@ -4797,22 +4797,22 @@ void check_procedure_bodies(Checker *c) {
 
 	semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
 
-	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
+	Thread *threads = gb_alloc_array(permanent_allocator(), Thread, worker_count);
 	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_init(threads+i);
+		thread_init(threads+i);
 	}
 
 	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_start(threads+i, thread_proc_body, thread_data+i);
+		thread_start(threads+i, thread_proc_body, thread_data+i);
 	}
-	gbThread dummy_main_thread = {};
+	Thread dummy_main_thread = {};
 	dummy_main_thread.user_data = thread_data+worker_count;
 	thread_proc_body(&dummy_main_thread);
 
 	semaphore_wait(&c->procs_to_check_semaphore);
 
 	for (isize i = 0; i < worker_count; i++) {
-		gb_thread_destroy(threads+i);
+		thread_destroy(threads+i);
 	}
 
 	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);

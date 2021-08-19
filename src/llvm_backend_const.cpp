@@ -400,7 +400,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			} else {
 				isize max_len = 7+8+1;
 				char *str = gb_alloc_array(permanent_allocator(), char, max_len);
-				u32 id = cast(u32)gb_atomic32_fetch_add(&m->gen->global_array_index, 1);
+				u32 id = m->gen->global_array_index.fetch_add(1);
 				isize len = gb_snprintf(str, max_len, "csba$%x", id);
 
 				String name = make_string(cast(u8 *)str, len-1);
