@@ -709,7 +709,7 @@ struct Ast {
 };
 
 
-#define ast_node(n_, Kind_, node_) GB_JOIN2(Ast, Kind_) *n_ = &(node_)->Kind_; GB_ASSERT_MSG((node_)->kind == GB_JOIN2(Ast_, Kind_), \
+#define ast_node(n_, Kind_, node_) GB_JOIN2(Ast, Kind_) *n_ = &(node_)->Kind_; gb_unused(n_); GB_ASSERT_MSG((node_)->kind == GB_JOIN2(Ast_, Kind_), \
 	"expected '%.*s' got '%.*s'", \
 	LIT(ast_strings[GB_JOIN2(Ast_, Kind_)]), LIT(ast_strings[(node_)->kind]))
 #define case_ast_node(n_, Kind_, node_) case GB_JOIN2(Ast_, Kind_): { ast_node(n_, Kind_, node_);

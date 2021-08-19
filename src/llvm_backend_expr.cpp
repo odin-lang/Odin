@@ -430,8 +430,6 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 
 
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
-	lbModule *m = p->module;
-
 	if (is_type_array_like(lhs.type) || is_type_array_like(rhs.type)) {
 		return lb_emit_arith_array(p, op, lhs, rhs, type);
 	} else if (is_type_complex(type)) {
@@ -779,7 +777,6 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_not_in:
 		{
 			lbValue left = lb_build_expr(p, be->left);
-			Type *type = default_type(tv.type);
 			lbValue right = lb_build_expr(p, be->right);
 			Type *rt = base_type(right.type);
 			if (is_type_pointer(rt)) {
@@ -989,7 +986,7 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
 		LLVMValueRef b = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(lb_type(m, value.type)), "");
 		lbValue res = {};
-		res.value = LLVMBuildIntCast2(p->builder, value.value, lb_type(m, t), false, "");
+		res.value = LLVMBuildIntCast2(p->builder, b, lb_type(m, t), false, "");
 		res.type = t;
 		return res;
 	}
@@ -1228,14 +1225,12 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	// subtype polymorphism casting
 	if (check_is_assignable_to_using_subtype(src_type, t)) {
 		Type *st = type_deref(src_type);
-		Type *pst = st;
 		st = type_deref(st);
 
 		bool st_is_ptr = is_type_pointer(src_type);
 		st = base_type(st);
 
 		Type *dt = t;
-		bool dt_is_ptr = type_deref(dt) != dt;
 
 		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
 		String field_name = lookup_subtype_polymorphic_field(t, src_type);
@@ -1966,7 +1961,6 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		lbValue key = lb_build_expr(p, ie->index);
 		key = lb_emit_conv(p, key, t->Map.key);
 
-		Type *result_type = type_of_expr(expr);
 		lbAddr addr = lb_addr_map(map_val, key, t, alloc_type_pointer(t->Map.value));
 		lbValue ptr = lb_addr_get_ptr(p, addr);
 
@@ -3403,9 +3397,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		}
 		case Type_Slice: {
 			if (cl->elems.count > 0) {
-				Type *elem_type = bt->Slice.elem;
-				Type *elem_ptr_type = alloc_type_pointer(elem_type);
-				Type *elem_ptr_ptr_type = alloc_type_pointer(elem_ptr_type);
 				lbValue slice = lb_const_value(p->module, type, exact_value_compound(expr));
 
 				lbValue data = lb_slice_elem(p, slice);

@@ -179,8 +179,9 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		TypeTuple *params = &pt->Proc.params->Tuple;
 		for (isize i = 0; i < pt->Proc.param_count; i++) {
 			Entity *e = params->variables[i];
-			Type *original_type = e->type;
-			if (e->kind != Entity_Variable) continue;
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
 
 			if (i+1 == params->variables.count && pt->Proc.c_vararg) {
 				continue;
@@ -658,7 +659,6 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 
 	{
 		LLVMTypeRef ftp = lb_type(p->module, value.type);
-		LLVMTypeRef ft = LLVMGetElementType(ftp);
 		LLVMValueRef fn = value.value;
 		if (!lb_is_type_kind(LLVMTypeOf(value.value), LLVMFunctionTypeKind)) {
 			fn = LLVMBuildPointerCast(p->builder, fn, ftp, "");
@@ -1690,8 +1690,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_atomic_cxchgweak_failacq:
 	case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
 	case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed: {
-		Type *type = expr->tav.type;
-
 		lbValue address = lb_build_expr(p, ce->args[0]);
 		Type *elem = type_deref(address.type);
 		lbValue old_value = lb_build_expr(p, ce->args[1]);
@@ -1765,7 +1763,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_fixed_point_mul_sat:
 	case BuiltinProc_fixed_point_div_sat:
 		{
-			bool do_bswap = is_type_different_to_arch_endianness(tv.type);
 			Type *platform_type = integer_endian_type_to_platform_type(tv.type);
 
 			lbValue x     = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), platform_type);
@@ -2062,7 +2059,6 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			Type *at = a.type;
 			if (at->kind == Type_Tuple) {
 				for_array(i, at->Tuple.variables) {
-					Entity *e = at->Tuple.variables[i];
 					lbValue v = lb_emit_struct_ev(p, a, cast(i32)i);
 					args[arg_index++] = v;
 				}

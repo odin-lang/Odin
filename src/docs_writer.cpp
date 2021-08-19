@@ -301,7 +301,6 @@ bool odin_doc_append_comment_group_string(Array<u8> *buf, CommentGroup *g) {
 		String original_comment = comment;
 
 		bool slash_slash = comment[1] == '/';
-		bool slash_star = comment[1] == '*';
 		if (comment[1] == '/') {
 			comment.text += 2;
 			comment.len  -= 2;
@@ -895,6 +894,7 @@ void odin_doc_update_entities(OdinDocWriter *w) {
 		for_array(i, entities) {
 			Entity *e = entities[i];
 			OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
+			gb_unused(type_index);
 		}
 	}
 
@@ -974,7 +974,6 @@ OdinDocArray<OdinDocEntityIndex> odin_doc_add_pkg_entities(OdinDocWriter *w, Ast
 	auto entity_indices = array_make<OdinDocEntityIndex>(heap_allocator(), 0, w->entity_cache.entries.count);
 	defer (array_free(&entity_indices));
 
-	EntityKind curr_entity_kind = Entity_Invalid;
 	for_array(i, entities) {
 		Entity *e = entities[i];
 		if (e->pkg != pkg) {

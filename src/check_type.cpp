@@ -59,9 +59,6 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 			}
 		}
 	} else if (t->kind == Type_Array && t->Array.count <= 4) {
-		Entity *e = nullptr;
-		String name = {};
-		i32 idx = 0;
 		switch (t->Array.count) {
 		case 4:
 			populate_using_array_index(ctx, node, field, t, str_lit("w"), 3);
@@ -121,8 +118,6 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 		ast_node(p, Field, param);
 		Ast *type_expr = p->type;
 		Type *type = nullptr;
-		bool detemine_type_from_operand = false;
-
 
 		if (type_expr != nullptr) {
 			type = check_type_expr(ctx, type_expr, nullptr);
@@ -591,6 +586,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
 		} else {
 			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
+			gb_unused(where_clause_ok);
 		}
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 	}
@@ -625,6 +621,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 			error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
 		} else {
 			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
+			gb_unused(where_clause_ok);
 		}
 	}
 
@@ -1093,6 +1090,10 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 							return false;
 					} else {
 						bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+						if (!ok) {
+							// TODO(bill, 2021-08-19): is this logic correct?
+							return false;
+						}
 					}
 				}
 			}
@@ -1133,6 +1134,10 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 					}
 				} else {
 					bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+					if (!ok) {
+						// TODO(bill, 2021-08-19): is this logic correct?
+						return false;
+					}
 				}
 			}
 
@@ -1297,8 +1302,6 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 		return nullptr;
 	}
 
-	bool allow_polymorphic_types = ctx->allow_polymorphic_types;
-
 	bool success = true;
 	ast_node(field_list, FieldList, _params);
 	Slice<Ast *> params = field_list->list;
@@ -1307,8 +1310,6 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 		if (success_) *success_ = success;
 		return nullptr;
 	}
-
-
 
 	isize variable_count = 0;
 	for_array(i, params) {
@@ -2080,7 +2081,6 @@ void init_map_entry_type(Type *type) {
 		value: Value,
 	}
 	*/
-	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
 	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
 	auto fields = array_make<Entity *>(permanent_allocator(), 0, 4);
@@ -2114,7 +2114,6 @@ void init_map_internal_types(Type *type) {
 		entries: [dynamic]EntryType;
 	}
 	*/
-	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
 	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
 	Type *hashes_type  = alloc_type_slice(t_int);
@@ -2386,6 +2385,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(i, Ident, e);
 		Operand o = {};
 		Entity *entity = check_ident(ctx, &o, e, named_type, nullptr, false);
+		gb_unused(entity);
 
 		gbString err_str = nullptr;
 		defer (gb_string_free(err_str));

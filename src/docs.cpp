@@ -107,7 +107,6 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 		String original_comment = comment;
 
 		bool slash_slash = comment[1] == '/';
-		bool slash_star = comment[1] == '*';
 		if (comment[1] == '/') {
 			comment.text += 2;
 			comment.len  -= 2;

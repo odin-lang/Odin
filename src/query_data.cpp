@@ -946,7 +946,7 @@ void generate_and_print_query_data_go_to_definitions(Checker *c) {
 
 	isize data_min_size = 0;
 
-	u32 header_offset = cast(u32)data_min_size;
+	u32 header_offset = cast(u32)data_min_size; gb_unused(header_offset);
 	data_min_size += gb_size_of(GoToDefHeader);
 	data_min_size = align_formula_isize(data_min_size, 8);
 

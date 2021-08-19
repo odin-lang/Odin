@@ -1207,7 +1207,6 @@ lbValue lb_map_entries(lbProcedure *p, lbValue value) {
 	Type *t = base_type(value.type);
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
-	Type *gst = t->Map.generated_struct_type;
 	i32 index = 1;
 	lbValue entries = lb_emit_struct_ev(p, value, index);
 	return entries;
@@ -1217,7 +1216,6 @@ lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value) {
 	Type *t = base_type(type_deref(value.type));
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
-	Type *gst = t->Map.generated_struct_type;
 	i32 index = 1;
 	lbValue entries = lb_emit_struct_ep(p, value, index);
 	return entries;

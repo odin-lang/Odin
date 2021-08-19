@@ -45,10 +45,8 @@ LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
 }
 
 LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
-	Type *original_type = type;
-
-	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
+	gb_unused(size);
 
 	GB_ASSERT(type != t_invalid);
 
@@ -56,7 +54,6 @@ LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
 
 	GB_ASSERT(type->kind == Type_Proc);
-	LLVMTypeRef return_type = LLVMVoidTypeInContext(ctx);
 	unsigned parameter_count = 1;
 	for (i32 i = 0; i < type->Proc.param_count; i++) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
@@ -73,8 +70,6 @@ LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 		parameters[param_index++] = lb_debug_type(m, type->Proc.results);
 	}
 
-	LLVMMetadataRef parent_scope = nullptr;
-	LLVMMetadataRef scope = nullptr;
 	LLVMMetadataRef file = nullptr;
 
 	for (i32 i = 0; i < type->Proc.param_count; i++) {
@@ -129,10 +124,8 @@ LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 si
 }
 
 LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
-	Type *original_type = type;
-
-	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
+	gb_unused(size);
 
 	GB_ASSERT(type != t_invalid);
 
