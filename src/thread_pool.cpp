@@ -11,10 +11,10 @@ struct WorkerTask {
 
 
 struct ThreadPool {
-	BlockingMutex    mutex;
-	Semaphore        sem_available;
-	std::atomic<i32> processing_work_count;
-	bool             is_running;
+	BlockingMutex     mutex;
+	Semaphore         sem_available;
+	std::atomic<i32>  processing_work_count;
+	std::atomic<bool> is_running;
 
 	gbAllocator allocator;
 
@@ -74,7 +74,7 @@ void thread_pool_start(ThreadPool *pool) {
 }
 
 void thread_pool_join(ThreadPool *pool) {
-	pool->is_running = false;
+	pool->is_running.store(false);
 
 	semaphore_post(&pool->sem_available, cast(i32)pool->thread_count);
 
@@ -153,7 +153,7 @@ void thread_pool_wait_to_process(ThreadPool *pool) {
 
 THREAD_PROC(worker_thread_internal) {
 	ThreadPool *pool = cast(ThreadPool *)thread->user_data;
-	while (pool->is_running) {
+	while (pool->is_running.load()) {
 		semaphore_wait(&pool->sem_available);
 
 		WorkerTask task = {};
