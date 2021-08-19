@@ -2,7 +2,7 @@ package math_big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-2 license.
+	Made available under Odin's BSD-3 license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -1540,6 +1540,8 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 }
 
 
+
+
 /*
 	hac 14.61, pp608
 */
@@ -1708,9 +1710,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		2. [modified] `b` must be odd.
 	*/
-	if internal_is_even(b) {
-		return .Invalid_Argument;
-	}
+	if internal_is_even(b) { return .Invalid_Argument; }
 
 	/*
 		Init all our temps.
@@ -1730,9 +1730,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		If one of `x`, `y` is zero return an error!
 	*/
-	if internal_is_zero(x) || internal_is_zero(y) {
-		return .Invalid_Argument;
-	}
+	if internal_is_zero(x) || internal_is_zero(y) { return .Invalid_Argument; }
 
 	/*
 		3. `u` = `x`, `v` = `y`, `A` = 1, `B` = 0, `C` = 0, `D` = 1
@@ -1812,9 +1810,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 		/*
 			If not zero goto step 4.
 		*/
-		if internal_is_zero(u) {
-			break;
-		}
+		if internal_is_zero(u) { break; }
 	}
 
 	/*
