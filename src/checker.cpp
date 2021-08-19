@@ -883,7 +883,7 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->identifier_uses_mutex);
 	mutex_init(&i->foreign_mutex);
 
-	gb_semaphore_init(&i->collect_semaphore);
+	semaphore_init(&i->collect_semaphore);
 
 
 #undef TIME_SECTION
@@ -976,7 +976,7 @@ void init_checker(Checker *c) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
-	gb_semaphore_init(&c->procs_to_check_semaphore);
+	semaphore_init(&c->procs_to_check_semaphore);
 
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
 
@@ -991,7 +991,7 @@ void destroy_checker(Checker *c) {
 	destroy_checker_context(&c->builtin_ctx);
 
 	mpmc_destroy(&c->procs_to_check_queue);
-	gb_semaphore_destroy(&c->procs_to_check_semaphore);
+	semaphore_destroy(&c->procs_to_check_semaphore);
 
 	mpmc_destroy(&c->global_untyped_queue);
 }
@@ -4136,7 +4136,7 @@ void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
 		worker_count = 0;
 	}
 
-	gb_semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
+	semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
 
 	if (worker_count == 0) {
 		ThreadProcCheckerSection section_all = {};
@@ -4174,7 +4174,7 @@ void check_with_workers(Checker *c, gbThreadProc *proc, isize total_count) {
 	dummy_main_thread.user_data = thread_data+worker_count;
 	proc(&dummy_main_thread);
 
-	gb_semaphore_wait(&c->info.collect_semaphore);
+	semaphore_wait(&c->info.collect_semaphore);
 
 	for (isize i = 0; i < worker_count; i++) {
 		gb_thread_destroy(threads+i);
@@ -4208,7 +4208,7 @@ GB_THREAD_PROC(thread_proc_collect_entities) {
 
 	map_destroy(&untyped);
 
-	gb_semaphore_release(&c->info.collect_semaphore);
+	semaphore_release(&c->info.collect_semaphore);
 	return 0;
 }
 
@@ -4249,7 +4249,7 @@ GB_THREAD_PROC(thread_proc_check_export_entities) {
 
 	map_destroy(&untyped);
 
-	gb_semaphore_release(&c->info.collect_semaphore);
+	semaphore_release(&c->info.collect_semaphore);
 	return 0;
 }
 
@@ -4735,7 +4735,7 @@ GB_THREAD_PROC(thread_proc_body) {
 
 	map_destroy(&untyped);
 
-	gb_semaphore_release(&c->procs_to_check_semaphore);
+	semaphore_release(&c->procs_to_check_semaphore);
 
 	return 0;
 }
@@ -4795,7 +4795,7 @@ void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(total_queued == original_queue_count);
 
 
-	gb_semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
+	semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
 
 	gbThread *threads = gb_alloc_array(permanent_allocator(), gbThread, worker_count);
 	for (isize i = 0; i < worker_count; i++) {
@@ -4809,7 +4809,7 @@ void check_procedure_bodies(Checker *c) {
 	dummy_main_thread.user_data = thread_data+worker_count;
 	thread_proc_body(&dummy_main_thread);
 
-	gb_semaphore_wait(&c->procs_to_check_semaphore);
+	semaphore_wait(&c->procs_to_check_semaphore);
 
 	for (isize i = 0; i < worker_count; i++) {
 		gb_thread_destroy(threads+i);

@@ -47,6 +47,47 @@
 	void mutex_unlock(BlockingMutex *m) {
 		ReleaseSRWLockExclusive(&m->srwlock);
 	}
+
+	struct RecursiveMutex {
+		CRITICAL_SECTION win32_critical_section;
+	};
+	void mutex_init(RecursiveMutex *m) {
+		InitializeCriticalSection(&m->win32_critical_section);
+	}
+	void mutex_destroy(RecursiveMutex *m) {
+		DeleteCriticalSection(&m->win32_critical_section);
+	}
+	void mutex_lock(RecursiveMutex *m) {
+		EnterCriticalSection(&m->win32_critical_section);
+	}
+	bool mutex_try_lock(RecursiveMutex *m) {
+		return TryEnterCriticalSection(&m->win32_critical_section) != 0;
+	}
+	void mutex_unlock(RecursiveMutex *m) {
+		LeaveCriticalSection(&m->win32_critical_section);
+	}
+
+	struct Semaphore {
+		void *win32_handle;
+	};
+
+	gb_inline void semaphore_init(Semaphore *s) {
+		s->win32_handle = CreateSemaphoreA(NULL, 0, I32_MAX, NULL);
+	}
+	gb_inline void semaphore_destroy(Semaphore *s) {
+		CloseHandle(s->win32_handle);
+	}
+	gb_inline void semaphore_post(Semaphore *s, i32 count) {
+		ReleaseSemaphore(s->win32_handle, count, NULL);
+	}
+	gb_inline void semaphore_wait(Semaphore *s) {
+		WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE);
+	}
+
+	gb_inline void semaphore_release(Semaphore *s) {
+		semaphore_post(s, 1);
+	}
+
 #else
 	struct BlockingMutex {
 		pthread_mutex_t pthread_mutex;
@@ -66,26 +107,55 @@
 	void mutex_unlock(BlockingMutex *m) {
 		pthread_mutex_unlock(&m->pthread_mutex);
 	}
-#endif
 
-struct RecursiveMutex {
-	gbMutex mutex;
-};
-void mutex_init(RecursiveMutex *m) {
-	gb_mutex_init(&m->mutex);
-}
-void mutex_destroy(RecursiveMutex *m) {
-	gb_mutex_destroy(&m->mutex);
-}
-void mutex_lock(RecursiveMutex *m) {
-	gb_mutex_lock(&m->mutex);
-}
-bool mutex_try_lock(RecursiveMutex *m) {
-	return !!gb_mutex_try_lock(&m->mutex);
-}
-void mutex_unlock(RecursiveMutex *m) {
-	gb_mutex_unlock(&m->mutex);
-}
+	struct RecursiveMutex {
+		pthread_mutex_t pthread_mutex;
+		pthread_mutexattr_t pthread_mutexattr;
+	};
+	void mutex_init(RecursiveMutex *m) {
+		pthread_mutexattr_init(&m->pthread_mutexattr);
+		pthread_mutexattr_settype(&m->pthread_mutexattr, PTHREAD_MUTEX_RECURSIVE);
+		pthread_mutex_init(&m->pthread_mutex, &m->pthread_mutexattr);
+	}
+	void mutex_destroy(RecursiveMutex *m) {
+		pthread_mutex_destroy(&m->pthread_mutex);
+	}
+	void mutex_lock(RecursiveMutex *m) {
+		pthread_mutex_lock(&m->pthread_mutex);
+	}
+	bool mutex_try_lock(RecursiveMutex *m) {
+		return pthread_mutex_trylock(&m->pthread_mutex) == 0;
+	}
+	void mutex_unlock(RecursiveMutex *m) {
+		pthread_mutex_unlock(&m->pthread_mutex);
+	}
+
+	#if defined(GB_SYSTEM_OSX)
+		struct Semaphore {
+			semaphore_t osx_handle;
+		};
+
+		gb_inline void semaphore_init   (Semaphore *s)            { semaphore_create(mach_task_self(), &s->osx_handle, SYNC_POLICY_FIFO, 0); }
+		gb_inline void semaphore_destroy(Semaphore *s)            { semaphore_destroy(mach_task_self(), s->osx_handle); }
+		gb_inline void semaphore_post   (Semaphore *s, i32 count) { while (count --> 0) semaphore_signal(s->osx_handle); }
+		gb_inline void semaphore_wait   (Semaphore *s)            { semaphore_wait(s->osx_handle); }
+	#elif defined(GB_SYSTEM_UNIX)
+		struct Semaphore {
+			sem_t unix_handle;
+		};
+
+		gb_inline void semaphore_init   (Semaphore *s)            { sem_init(&s->unix_handle, 0, 0); }
+		gb_inline void semaphore_destroy(Semaphore *s)            { sem_destroy(&s->unix_handle); }
+		gb_inline void semaphore_post   (Semaphore *s, i32 count) { while (count --> 0) sem_post(&s->unix_handle); }
+		gb_inline void semaphore_wait   (Semaphore *s)            { int i; do { i = sem_wait(&s->unix_handle); } while (i == -1 && errno == EINTR); }
+	#else
+	#error
+	#endif
+
+	gb_inline void semaphore_release(Semaphore *s) {
+		semaphore_post(s, 1);
+	}
+#endif
 
 
 
@@ -585,7 +655,7 @@ struct Temp_Allocator {
 	isize curr_offset;
 	gbAllocator backup_allocator;
 	Array<void *> leaked_allocations;
-	gbMutex mutex;
+	BlockingMutex mutex;
 };
 
 gb_global Temp_Allocator temporary_allocator_data = {};
@@ -596,7 +666,7 @@ void temp_allocator_init(Temp_Allocator *s, isize size) {
 	s->len = size;
 	s->curr_offset = 0;
 	s->leaked_allocations.allocator = s->backup_allocator;
-	gb_mutex_init(&s->mutex);
+	mutex_init(&s->mutex);
 }
 
 void *temp_allocator_alloc(Temp_Allocator *s, isize size, isize alignment) {
@@ -639,8 +709,8 @@ GB_ALLOCATOR_PROC(temp_allocator_proc) {
 	Temp_Allocator *s = cast(Temp_Allocator *)allocator_data;
 	GB_ASSERT_NOT_NULL(s);
 
-	gb_mutex_lock(&s->mutex);
-	defer (gb_mutex_unlock(&s->mutex));
+	mutex_lock(&s->mutex);
+	defer (mutex_unlock(&s->mutex));
 
 	switch (type) {
 	case gbAllocation_Alloc:
