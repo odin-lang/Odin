@@ -155,7 +155,6 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 
 void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
 	lbModule *m = p->module;
-	LLVMContextRef ctx = m->ctx;
 	CheckerInfo *info = m->info;
 
 	{
@@ -176,15 +175,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 
 	// Useful types
-	Type *t_i64_slice_ptr    = alloc_type_pointer(alloc_type_slice(t_i64));
-	Type *t_string_slice_ptr = alloc_type_pointer(alloc_type_slice(t_string));
 	Entity *type_info_flags_entity = find_core_entity(info->checker, str_lit("Type_Info_Flags"));
 	Type *t_type_info_flags = type_info_flags_entity->type;
-
-
-	i32 type_info_member_types_index = 0;
-	i32 type_info_member_names_index = 0;
-	i32 type_info_member_offsets_index = 0;
 
 	for_array(type_info_type_index, info->type_info_types) {
 		Type *t = info->type_info_types[type_info_type_index];
@@ -566,9 +558,6 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					LLVMValueRef *value_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, fields.count);
 
 					GB_ASSERT(is_type_integer(t->Enum.base_type));
-
-					LLVMTypeRef align_type = lb_alignment_prefix_type_hack(m, type_align_of(t));
-					LLVMTypeRef array_type = LLVMArrayType(lb_type(m, t_u8), 8);
 
 					for_array(i, fields) {
 						name_values[i] = lb_const_string(m, fields[i]->token.string).value;

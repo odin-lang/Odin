@@ -2432,7 +2432,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		bool no_nil = false;
 		bool maybe = false;
 
-		CommentGroup *docs = f->lead_comment;
 		Token start_token = f->curr_token;
 
 		if (allow_token(f, Token_OpenParen)) {
@@ -3634,7 +3633,6 @@ bool parse_expect_field_separator(AstFile *f, Ast *param) {
 }
 
 Ast *parse_struct_field_list(AstFile *f, isize *name_count_) {
-	CommentGroup *docs = f->lead_comment;
 	Token start_token = f->curr_token;
 
 	auto decls = array_make<Ast *>(heap_allocator());
@@ -4750,7 +4748,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 	isize init_token_cap = gb_max(token_cap, 16);
 	array_init(&f->tokens, heap_allocator(), 0, gb_max(init_token_cap, 16));
-	isize cap0 = f->tokens.capacity;
 
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};

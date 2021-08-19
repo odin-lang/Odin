@@ -75,7 +75,6 @@ void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
 	GB_ASSERT(addr.kind == lbAddr_Context);
 	GB_ASSERT(addr.ctx.sel.index.count == 0);
 
-	lbModule *m = p->module;
 	auto args = array_make<lbValue>(permanent_allocator(), 1);
 	args[0] = addr.addr;
 	lb_emit_runtime_call(p, "__init_context", args);
@@ -118,7 +117,6 @@ lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
 
 
 lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
-	Type *original_type = type;
 	type = base_type(type);
 	GB_ASSERT(is_type_comparable(type));
 
@@ -276,12 +274,10 @@ lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue
 }
 
 lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
-	Type *original_type = type;
 	type = core_type(type);
 	GB_ASSERT(is_type_valid_for_keys(type));
 
 	Type *pt = alloc_type_pointer(type);
-	LLVMTypeRef ptr_type = lb_type(m, pt);
 
 	auto key = hash_type(type);
 	lbProcedure **found = map_get(&m->hasher_procs, key);
@@ -358,7 +354,6 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 			lb_start_block(p, case_block);
 
 			Type *v = type->Union.variants[i];
-			Type *vp = alloc_type_pointer(v);
 			lbValue case_tag = lb_const_union_tag(p->module, type, v);
 
 			lbValue variant_hasher = lb_get_hasher_proc_for_type(m, v);
@@ -490,6 +485,7 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 
 	Type *key_type = map_type->Map.key;
 	Type *val_type = map_type->Map.value;
+	gb_unused(val_type);
 
 	// NOTE(bill): Removes unnecessary allocation if split gep
 	lbValue gep0 = lb_emit_struct_ep(p, h.addr, 0);
@@ -564,10 +560,8 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 }
 
 lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type) {
-	Type *hash_type = t_u64;
 	lbAddr v = lb_add_local_generated(p, t_map_hash, true);
 	lbValue vp = lb_addr_get_ptr(p, v);
-	Type *t = base_type(key.type);
 	key = lb_emit_conv(p, key, key_type);
 
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
@@ -622,9 +616,6 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
-	Type *params  = alloc_type_tuple();
-	Type *results = alloc_type_tuple();
-
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
@@ -653,9 +644,6 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
 	lb_populate_function_pass_manager(main_module, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-
-	Type *params  = alloc_type_tuple();
-	Type *results = alloc_type_tuple();
 
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
@@ -694,9 +682,6 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 				}
 				GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
 			}
-
-			LLVMValueKind value_kind = LLVMGetValueKind(init.value);
-			// gb_printf_err("%s %d\n", LLVMPrintValueToString(init.value));
 
 			if (is_type_any(e->type) || is_type_union(e->type)) {
 				var->init = init;
@@ -1135,7 +1120,6 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMInitializeNativeTarget();
 
 	char const *target_triple = alloc_cstring(permanent_allocator(), build_context.metrics.target_triplet);
-	char const *target_data_layout = alloc_cstring(permanent_allocator(), build_context.metrics.target_data_layout);
 	for_array(i, gen->modules.entries) {
 		LLVMSetTarget(gen->modules.entries[i].value->mod, target_triple);
 	}
@@ -1500,9 +1484,8 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Global Procedures and Types");
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
-		String    name  = e->token.string;
-		DeclInfo *decl  = e->decl_info;
-		Scope *   scope = e->scope;
+		String  name  = e->token.string;
+		Scope * scope = e->scope;
 
 		if ((scope->flags & ScopeFlag_File) == 0) {
 			continue;

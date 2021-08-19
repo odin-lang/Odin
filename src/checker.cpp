@@ -2112,9 +2112,6 @@ void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, 
 	if (tuple == nullptr) {
 		return;
 	}
-	Entity *e = n->entity;
-	bool print_deps = false;
-
 	GB_ASSERT(tuple->kind == Type_Tuple);
 	TypeTuple *t = &tuple->Tuple;
 	for_array(i, t->variables) {
@@ -2138,7 +2135,6 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
-		DeclInfo *d = e->decl_info;
 		if (is_entity_a_dependency(e)) {
 			EntityGraphNode *n = gb_alloc_item(allocator, EntityGraphNode);
 			n->entity = e;
@@ -4345,8 +4341,6 @@ void check_import_entities(Checker *c) {
 			reset_checker_context(&ctx, f, &untyped);
 			ctx.collect_delayed_decls = true;
 
-			MPMCQueue<Ast *> *q = nullptr;
-
 			// Check import declarations first to simplify things
 			for (Ast *id = nullptr; mpmc_dequeue(&f->delayed_decls_queues[AstDelayQueue_Import], &id); /**/) {
 				check_add_import_decl(&ctx, id);
@@ -4730,7 +4724,6 @@ GB_THREAD_PROC(thread_proc_body) {
 	ThreadProcBodyData *data = cast(ThreadProcBodyData *)thread->user_data;
 	Checker *c = data->checker;
 	GB_ASSERT(c != nullptr);
-	ThreadProcBodyData *all_data = data->all_data;
 	ProcBodyQueue *this_queue = data->queue;
 
 	UntypedExprInfoMap untyped = {};
@@ -4897,9 +4890,6 @@ void check_deferred_procedures(Checker *c) {
 			GB_ASSERT(src_params->kind == Type_Tuple);
 			GB_ASSERT(dst_params->kind == Type_Tuple);
 
-			auto const &sv = src_params->Tuple.variables;
-			auto const &dv = dst_params->Tuple.variables;
-
 			if (are_types_identical(src_params, dst_params)) {
 				// Okay!
 			} else {
@@ -4928,9 +4918,6 @@ void check_deferred_procedures(Checker *c) {
 			GB_ASSERT(src_results->kind == Type_Tuple);
 			GB_ASSERT(dst_params->kind == Type_Tuple);
 
-			auto const &sv = src_results->Tuple.variables;
-			auto const &dv = dst_params->Tuple.variables;
-
 			if (are_types_identical(src_results, dst_params)) {
 				// Okay!
 			} else {
@@ -4955,6 +4942,7 @@ void check_deferred_procedures(Checker *c) {
 			Type *tsrc = alloc_type_tuple();
 			auto &sv = tsrc->Tuple.variables;
 			auto const &dv = dst_params->Tuple.variables;
+			gb_unused(dv);
 
 			isize len = 0;
 			if (src_params != nullptr) {

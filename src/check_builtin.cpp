@@ -270,6 +270,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			BlockingMutex *ignore_mutex = nullptr;
 			String path = {};
 			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+			gb_unused(ok);
 
 			char *c_str = alloc_cstring(a, path);
 			defer (gb_free(a, c_str));
@@ -369,6 +370,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 
 			bool is_defined = check_identifier_exists(c->scope, arg);
+			gb_unused(is_defined);
 			operand->type = t_untyped_bool;
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_bool(false);

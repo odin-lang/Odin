@@ -384,7 +384,6 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	Operand operand = {};
 
-	Entity *other_entity = nullptr;
 	if (init != nullptr) {
 		Entity *entity = nullptr;
 		if (init->kind == Ast_Ident) {
@@ -1287,9 +1286,9 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	check_open_scope(ctx, body);
 	{
 		for_array(i, using_entities) {
-			Entity *e = using_entities[i].e;
 			Entity *uvar = using_entities[i].uvar;
 			Entity *prev = scope_insert(ctx->scope, uvar);
+			gb_unused(prev);
 			// NOTE(bill): Don't err here
 		}
 

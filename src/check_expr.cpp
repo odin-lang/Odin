@@ -913,7 +913,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
 				GB_ASSERT(e != nullptr);
 				if (e->kind == Entity_TypeName) {
-					Type *elem = poly->Array.elem;
 					Type *index = source->EnumeratedArray.index;
 					Type *it = base_type(index);
 					if (it->kind != Type_Enum) {
@@ -2399,7 +2398,6 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 
 bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
-	bool can_convert = false;
 
 	Type *bt = base_type(type);
 	if (is_const_expr && is_type_constant_type(bt)) {
@@ -3181,10 +3179,8 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			if (valid_count > 1) {
 				gb_sort_array(valids, valid_count, valid_index_and_score_cmp);
 				i64 best_score = valids[0].score;
-				Type *best_type = t->Union.variants[valids[0].index];
 				for (isize i = 1; i < valid_count; i++) {
 					auto v = valids[i];
-					Type *vt = t->Union.variants[v.index];
 					if (best_score > v.score) {
 						valid_count = i;
 						break;
@@ -3557,7 +3553,6 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 
 	ExactValue value = operand->value;
 	if (value.kind == ExactValue_Compound) {
-		i32 depth = 0;
 		while (sel.index.count > 0) {
 			i32 index = sel.index[0];
 			sel = sub_selection(sel, 1);
@@ -3712,7 +3707,6 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
-		Entity *original_e = e;
 		if (e != nullptr && e->kind == Entity_ImportName && selector->kind == Ast_Ident) {
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
 			// It pretty much needs to be in this order and this way
@@ -4163,7 +4157,6 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (lhs.count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
-			    	bool do_normal = true;
 				Ast *expr = unparen_expr(o.expr);
 
 				Operand val0 = o;
@@ -4269,7 +4262,6 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk || o.mode == Addressing_OptionalOkPtr)) {
-				bool do_normal = true;
 				Ast *expr = unparen_expr(o.expr);
 
 				Operand val0 = o;
@@ -5348,6 +5340,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			proc_type = e->type;
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
+			gb_unused(err);
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
 			if (entity_to_use != nullptr) {
@@ -5381,6 +5374,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
+		gb_unused(err);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
 		if (entity_to_use != nullptr) {
@@ -6270,12 +6264,8 @@ bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, AstImplicitSe
 		o->type = e->type;
 		return true;
 	}
-	bool show_error = true;
 	if (is_type_union(th)) {
 		Type *union_type = base_type(th);
-		isize enum_count = 0;
-		Type *et = nullptr;
-
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
 		for_array(i, union_type->Union.variants) {
@@ -6311,7 +6301,6 @@ ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o, Ast *node, 
 		return Expr_Expr;
 	}
 	o->type = th;
-	Type *enum_type = th;
 
 	bool ok = attempt_implicit_selector_expr(c, o, ise, th);
 	if (!ok) {
@@ -7533,7 +7522,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				is_constant = false;
 			} else {
 				for_array(index, cl->elems) {
-					Entity *field = nullptr;
 					Ast *elem = cl->elems[index];
 					if (elem->kind == Ast_FieldValue) {
 						error(elem, "'field = value' in a bit_set a literal is not allowed");
@@ -7585,7 +7573,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 				u64 bits = 0;
 				for_array(index, cl->elems) {
-					Entity *field = nullptr;
 					Ast *elem = cl->elems[index];
 					GB_ASSERT(elem->kind != Ast_FieldValue);
 					TypeAndValue tav = elem->tav;
@@ -7677,7 +7664,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
-		bool src_is_ptr = is_type_pointer(o->type);
 		Type *src = type_deref(o->type);
 		Type *bsrc = base_type(src);
 
@@ -7725,8 +7711,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		} else {
 			Type *t = check_type(c, ta->type);
 			Type *dst = t;
-			Type *bdst = base_type(dst);
-
 
 			if (is_type_union(src)) {
 				bool ok = false;

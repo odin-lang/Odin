@@ -547,7 +547,6 @@ void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_type, lbValu
 
 	Type *t = enum_type;
 	GB_ASSERT(is_type_enum(t));
-	Type *enum_ptr = alloc_type_pointer(t);
 	t = base_type(t);
 	Type *core_elem = core_type(t);
 	GB_ASSERT(t->kind == Type_Enum);
@@ -863,8 +862,6 @@ void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 
 	lbValue val = {};
 	lbValue key = {};
-	lbBlock *loop = nullptr;
-	lbBlock *done = nullptr;
 	Ast *expr = unparen_expr(rs->expr);
 
 	TypeAndValue tav = type_and_value_of_expr(expr);
@@ -1460,7 +1457,6 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 			Type *t = init.type;
 			GB_ASSERT(t->kind == Type_Tuple);
 			for_array(i, t->Tuple.variables) {
-				Entity *e = t->Tuple.variables[i];
 				lbValue v = lb_emit_struct_ev(p, init, cast(i32)i);
 				array_add(&inits, v);
 			}
@@ -1553,7 +1549,6 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 				Type *t = res.type;
 				if (t->kind == Type_Tuple) {
 					for_array(i, t->Tuple.variables) {
-						Entity *e = t->Tuple.variables[i];
 						lbValue v = lb_emit_struct_ev(p, res, cast(i32)i);
 						array_add(&results, v);
 					}
@@ -1765,7 +1760,6 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 
 void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
 	Type *lhs_type = lb_addr_type(lhs);
-	Type *rhs_type = value.type;
 	Type *array_type = base_type(lhs_type);
 	GB_ASSERT(is_type_array_like(array_type));
 	i64 count = get_array_type_count(array_type);

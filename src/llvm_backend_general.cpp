@@ -811,7 +811,6 @@ LLVMTypeRef llvm_addr_type(lbValue addr_val) {
 }
 
 lbValue lb_emit_load(lbProcedure *p, lbValue value) {
-	lbModule *m = p->module;
 	GB_ASSERT(value.value != nullptr);
 	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
@@ -981,7 +980,6 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 				Entity *field = t->Struct.fields[i];
 				Type *base_type = field->type;
 				GB_ASSERT(base_type->kind == Type_Pointer);
-				Type *elem = base_type->Pointer.elem;
 
 				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
 				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
@@ -1010,7 +1008,6 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			}
 		}
 
-		Type *elem_type = base_type(array_type->Array.elem);
 		lbAddr res = lb_add_local_generated(p, addr.swizzle.type, false);
 		lbValue ptr = lb_addr_get_ptr(p, res);
 		GB_ASSERT(is_type_pointer(ptr.type));
@@ -1044,8 +1041,8 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		GB_ASSERT(array_type->kind == Type_Array);
 
 		unsigned res_align = cast(unsigned)type_align_of(addr.swizzle_large.type);
+		gb_unused(res_align);
 
-		Type *elem_type = base_type(array_type->Array.elem);
 		lbAddr res = lb_add_local_generated(p, addr.swizzle_large.type, false);
 		lbValue ptr = lb_addr_get_ptr(p, res);
 		GB_ASSERT(is_type_pointer(ptr.type));
@@ -1291,10 +1288,9 @@ String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
 
 
 LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
-	Type *original_type = type;
-
 	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
+	gb_unused(size);
 
 	GB_ASSERT(type != t_invalid);
 
@@ -1681,6 +1677,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			// LLVM takes the first element's alignment as the entire alignment (like C)
 			i64 align = type_align_of(type);
 			i64 size = type_size_of(type);
+			gb_unused(size);
 
 			if (is_type_union_maybe_pointer_original_alignment(type)) {
 				LLVMTypeRef fields[1] = {lb_type(m, type->Union.variants[0])};
@@ -1890,6 +1887,7 @@ lbFunctionType *lb_get_function_type(lbModule *m, lbProcedure *p, Type *pt) {
 	ft_found = map_get(&m->function_type_map, hash_type(pt));
 	if (!ft_found) {
 		LLVMTypeRef llvm_proc_type = lb_type(p->module, pt);
+		gb_unused(llvm_proc_type);
 		ft_found = map_get(&m->function_type_map, hash_type(pt));
 	}
 	GB_ASSERT(ft_found != nullptr);
@@ -1905,6 +1903,7 @@ void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 	lbFunctionType **ft_found = map_get(&m->function_type_map, hash);
 	if (ft_found == nullptr) {
 		LLVMTypeRef llvm_proc_type = lb_type(p->module, p->type);
+		gb_unused(llvm_proc_type);
 		ft_found = map_get(&m->function_type_map, hash);
 	}
 	GB_ASSERT(ft_found != nullptr);

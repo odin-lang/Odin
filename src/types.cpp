@@ -1286,7 +1286,6 @@ i64 get_array_type_count(Type *t) {
 
 Type *core_array_type(Type *t) {
 	for (;;) {
-		Type *prev = t;
 		t = base_array_type(t);
 		if (t->kind != Type_Array && t->kind != Type_EnumeratedArray && t->kind != Type_SimdVector) {
 			break;
@@ -1664,7 +1663,6 @@ Scope *polymorphic_record_parent_scope(Type *t) {
 }
 
 bool is_type_polymorphic_record_specialized(Type *t) {
-	Type *original_type = t;
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		return t->Struct.is_poly_specialized;
@@ -3030,10 +3028,6 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_SimdVector: {
-		// align of
-		i64 count = t->SimdVector.count;
-		Type *elem = t->SimdVector.elem;
-		i64 size = count * type_size_of_internal(elem, path);
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 	}

@@ -539,14 +539,12 @@ String quote_to_ascii(gbAllocator a, String str, u8 quote='"') {
 				r = 0XFFFD;
 			}
 			if (r < 0x10000) {
-				u8 b = cast(u8)r;
 				array_add(&buf, cast(u8)'\\');
 				array_add(&buf, cast(u8)'u');
 				for (isize i = 12; i >= 0; i -= 4) {
 					array_add(&buf, cast(u8)lower_hex[(r>>i)&0xf]);
 				}
 			} else {
-				u8 b = cast(u8)r;
 				array_add(&buf, cast(u8)'\\');
 				array_add(&buf, cast(u8)'U');
 				for (isize i = 28; i >= 0; i -= 4) {
