@@ -18,9 +18,9 @@ struct Thread {
 	isize          user_index;
 	isize volatile return_value;
 
-	Semaphore     *semaphore;
-	isize          stack_size;
-	b32 volatile   is_running;
+	Semaphore * semaphore;
+	isize       stack_size;
+	std::atomic<bool> is_running;
 };
 
 
@@ -239,7 +239,7 @@ void thread_init(Thread *t) {
 }
 
 void thread_destroy(Thread *t) {
-	if (t->is_running) thread_join(t);
+	thread_join(t);
 	semaphore_destroy(t->semaphore);
 	gb_free(heap_allocator(), t->semaphore);
 }
@@ -254,14 +254,14 @@ void gb__thread_run(Thread *t) {
 	DWORD __stdcall internal_thread_proc(void *arg) {
 		Thread *t = cast(Thread *)arg;
 		gb__thread_run(t);
-		t->is_running = false;
+		t->is_running.store(false);
 		return 0;
 	}
 #else
 	void *          internal_thread_proc(void *arg) {
 		Thread *t = cast(Thread *)arg;
 		gb__thread_run(t);
-		t->is_running = false;
+		t->is_running.store(false);
 		return NULL;
 	}
 #endif
@@ -269,12 +269,12 @@ void gb__thread_run(Thread *t) {
 void thread_start(Thread *t, ThreadProc *proc, void *user_data) { thread_start_with_stack(t, proc, user_data, 0); }
 
 void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize stack_size) {
-	GB_ASSERT(!t->is_running);
+	GB_ASSERT(!t->is_running.load());
 	GB_ASSERT(proc != NULL);
 	t->proc = proc;
 	t->user_data = user_data;
 	t->stack_size = stack_size;
-	t->is_running = true;
+	t->is_running.store(true);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = CreateThread(NULL, stack_size, internal_thread_proc, t, 0, NULL);
@@ -296,7 +296,7 @@ void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize
 }
 
 void thread_join(Thread *t) {
-	if (!t->is_running) return;
+	if (!t->is_running.load()) return;
 
 #if defined(GB_SYSTEM_WINDOWS)
 	WaitForSingleObject(t->win32_handle, INFINITE);
@@ -306,10 +306,10 @@ void thread_join(Thread *t) {
 	pthread_join(t->posix_handle, NULL);
 	t->posix_handle = 0;
 #endif
-	t->is_running = false;
+	t->is_running.store(false);
 }
 
-bool thread_is_running(Thread const *t) { return t->is_running != 0; }
+bool thread_is_running(Thread const *t) { return t->is_running.load(); }
 
 void thread_set_name(Thread *t, char const *name) {
 #if defined(GB_COMPILER_MSVC)

@@ -4177,6 +4177,10 @@ void check_with_workers(Checker *c, ThreadProc *proc, isize total_count) {
 	semaphore_wait(&c->info.collect_semaphore);
 
 	for (isize i = 0; i < worker_count; i++) {
+		thread_join(threads+i);
+	}
+
+	for (isize i = 0; i < worker_count; i++) {
 		thread_destroy(threads+i);
 	}
 }
@@ -4810,6 +4814,10 @@ void check_procedure_bodies(Checker *c) {
 	thread_proc_body(&dummy_main_thread);
 
 	semaphore_wait(&c->procs_to_check_semaphore);
+
+	for (isize i = 0; i < worker_count; i++) {
+		thread_join(threads+i);
+	}
 
 	for (isize i = 0; i < worker_count; i++) {
 		thread_destroy(threads+i);

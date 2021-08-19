@@ -250,7 +250,7 @@ bool entity_has_deferred_procedure(Entity *e) {
 }
 
 
-gb_global std::atomic<u64> global_entity_id = 0;
+gb_global std::atomic<u64> global_entity_id;
 
 Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
 	gbAllocator a = permanent_allocator();
