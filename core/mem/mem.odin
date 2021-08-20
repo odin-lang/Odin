@@ -245,7 +245,7 @@ context_from_allocator :: proc(a: Allocator) -> type_of(context) {
 	return context;
 }
 
-reinterpret :: proc($T: typeid, ptr: rawptr) -> (value: T) {
+reinterpret_copy :: proc($T: typeid, ptr: rawptr) -> (value: T) {
 	copy(&value, ptr, size_of(T));
 	return;
 }
