@@ -192,47 +192,48 @@ struct TypeProc {
 	bool     optional_ok;
 };
 
-#define TYPE_KINDS                                        \
-	TYPE_KIND(Basic, BasicType)                           \
-	TYPE_KIND(Named, struct {                             \
+#define TYPE_KINDS                                                \
+	TYPE_KIND(Basic, BasicType)                               \
+	TYPE_KIND(Named, struct {                                 \
 		String  name;                                     \
 		Type *  base;                                     \
 		Entity *type_name; /* Entity_TypeName */          \
-	})                                                    \
-	TYPE_KIND(Generic, struct {                           \
+	})                                                        \
+	TYPE_KIND(Generic, struct {                               \
 		i64     id;                                       \
 		String  name;                                     \
 		Type *  specialized;                              \
 		Scope * scope;                                    \
 		Entity *entity;                                   \
-	})                                                    \
-	TYPE_KIND(Pointer, struct { Type *elem; })            \
-	TYPE_KIND(Array,   struct {                           \
+	})                                                        \
+	TYPE_KIND(Pointer, struct { Type *elem; })                \
+	TYPE_KIND(MultiPointer, struct { Type *elem; })           \
+	TYPE_KIND(Array,   struct {                               \
 		Type *elem;                                       \
 		i64   count;                                      \
 		Type *generic_count;                              \
-	})                                                    \
-	TYPE_KIND(EnumeratedArray, struct {                   \
+	})                                                        \
+	TYPE_KIND(EnumeratedArray, struct {                       \
 		Type *elem;                                       \
 		Type *index;                                      \
 		ExactValue min_value;                             \
 		ExactValue max_value;                             \
 		i64 count;                                        \
 		TokenKind op;                                     \
-	})                                                    \
-	TYPE_KIND(Slice,   struct { Type *elem; })            \
-	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
-	TYPE_KIND(Map, struct {                               \
+	})                                                        \
+	TYPE_KIND(Slice,   struct { Type *elem; })                \
+	TYPE_KIND(DynamicArray, struct { Type *elem; })           \
+	TYPE_KIND(Map, struct {                                   \
 		Type *key;                                        \
 		Type *value;                                      \
 		Type *entry_type;                                 \
 		Type *generated_struct_type;                      \
 		Type *internal_type;                              \
 		Type *lookup_result_type;                         \
-	})                                                    \
-	TYPE_KIND(Struct,  TypeStruct)                        \
-	TYPE_KIND(Union,   TypeUnion)                         \
-	TYPE_KIND(Enum, struct {                              \
+	})                                                        \
+	TYPE_KIND(Struct,  TypeStruct)                            \
+	TYPE_KIND(Union,   TypeUnion)                             \
+	TYPE_KIND(Enum, struct {                                  \
 		Array<Entity *> fields;                           \
 		Ast *node;                                        \
 		Scope *  scope;                                   \
@@ -242,31 +243,31 @@ struct TypeProc {
 		ExactValue max_value;                             \
 		isize min_value_index;                            \
 		isize max_value_index;                            \
-	})                                                    \
-	TYPE_KIND(Tuple, struct {                             \
+	})                                                        \
+	TYPE_KIND(Tuple, struct {                                 \
 		Array<Entity *> variables; /* Entity_Variable */  \
 		Array<i64>      offsets;                          \
 		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
-	})                                                    \
-	TYPE_KIND(Proc, TypeProc)                             \
-	TYPE_KIND(BitSet, struct {                            \
+	})                                                        \
+	TYPE_KIND(Proc, TypeProc)                                 \
+	TYPE_KIND(BitSet, struct {                                \
 		Type *elem;                                       \
 		Type *underlying;                                 \
 		i64   lower;                                      \
 		i64   upper;                                      \
 		Ast * node;                                       \
-	})                                                    \
-	TYPE_KIND(SimdVector, struct {                        \
+	})                                                        \
+	TYPE_KIND(SimdVector, struct {                            \
 		i64   count;                                      \
 		Type *elem;                                       \
-	})                                                    \
-	TYPE_KIND(RelativePointer, struct {                   \
+	})                                                        \
+	TYPE_KIND(RelativePointer, struct {                       \
 		Type *pointer_type;                               \
 		Type *base_integer;                               \
-	})                                                    \
-	TYPE_KIND(RelativeSlice, struct {                     \
+	})                                                        \
+	TYPE_KIND(RelativeSlice, struct {                         \
 		Type *slice_type;                                 \
 		Type *base_integer;                               \
 	})
@@ -325,6 +326,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Any,
 	Typeid_Type_Id,
 	Typeid_Pointer,
+	Typeid_Multi_Pointer,
 	Typeid_Procedure,
 	Typeid_Array,
 	Typeid_Enumerated_Array,
@@ -605,6 +607,7 @@ gb_global Type *t_type_info_typeid               = nullptr;
 gb_global Type *t_type_info_string               = nullptr;
 gb_global Type *t_type_info_boolean              = nullptr;
 gb_global Type *t_type_info_pointer              = nullptr;
+gb_global Type *t_type_info_multi_pointer        = nullptr;
 gb_global Type *t_type_info_procedure            = nullptr;
 gb_global Type *t_type_info_array                = nullptr;
 gb_global Type *t_type_info_enumerated_array     = nullptr;
@@ -631,6 +634,7 @@ gb_global Type *t_type_info_typeid_ptr           = nullptr;
 gb_global Type *t_type_info_string_ptr           = nullptr;
 gb_global Type *t_type_info_boolean_ptr          = nullptr;
 gb_global Type *t_type_info_pointer_ptr          = nullptr;
+gb_global Type *t_type_info_multi_pointer_ptr    = nullptr;
 gb_global Type *t_type_info_procedure_ptr        = nullptr;
 gb_global Type *t_type_info_array_ptr            = nullptr;
 gb_global Type *t_type_info_enumerated_array_ptr = nullptr;
@@ -776,6 +780,12 @@ Type *alloc_type_generic(Scope *scope, i64 id, String name, Type *specialized) {
 Type *alloc_type_pointer(Type *elem) {
 	Type *t = alloc_type(Type_Pointer);
 	t->Pointer.elem = elem;
+	return t;
+}
+
+Type *alloc_type_multi_pointer(Type *elem) {
+	Type *t = alloc_type(Type_MultiPointer);
+	t->MultiPointer.elem = elem;
 	return t;
 }
 
@@ -948,10 +958,10 @@ Type *type_deref(Type *t) {
 		if (bt == nullptr) {
 			return nullptr;
 		}
-		if (bt != nullptr && bt->kind == Type_Pointer) {
+		if (bt->kind == Type_Pointer) {
 			return bt->Pointer.elem;
 		}
-		if (bt != nullptr && bt->kind == Type_RelativePointer) {
+		if (bt->kind == Type_RelativePointer) {
 			return type_deref(bt->RelativePointer.pointer_type);
 		}
 	}
@@ -1084,6 +1094,8 @@ bool is_type_ordered(Type *t) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
 	case Type_Pointer:
 		return true;
+	case Type_MultiPointer:
+		return true;
 	}
 	return false;
 }
@@ -1156,6 +1168,10 @@ bool is_type_pointer(Type *t) {
 		return (t->Basic.flags & BasicFlag_Pointer) != 0;
 	}
 	return t->kind == Type_Pointer;
+}
+bool is_type_multi_pointer(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_MultiPointer;
 }
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
@@ -1259,6 +1275,13 @@ bool is_type_u8_ptr(Type *t) {
 	}
 	return false;
 }
+bool is_type_u8_multi_ptr(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_MultiPointer) {
+		return is_type_u8(t->Slice.elem);
+	}
+	return false;
+}
 bool is_type_rune_array(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Array) {
@@ -1348,7 +1371,8 @@ bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Union && t->Union.maybe) {
 		if (t->Union.variants.count == 1) {
-			return is_type_pointer(t->Union.variants[0]);
+			Type *v = t->Union.variants[0];
+			return is_type_pointer(v) || is_type_multi_pointer(v);
 		}
 	}
 	return false;
@@ -1360,7 +1384,7 @@ bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	if (t->kind == Type_Union && t->Union.maybe) {
 		if (t->Union.variants.count == 1) {
 			Type *v = t->Union.variants[0];
-			if (is_type_pointer(v)) {
+			if (is_type_pointer(v) || is_type_multi_pointer(v)) {
 				return type_align_of(v) == type_align_of(t);
 			}
 		}
@@ -1614,6 +1638,8 @@ bool is_type_indexable(Type *t) {
 	case Type_DynamicArray:
 	case Type_Map:
 		return true;
+	case Type_MultiPointer:
+		return true;
 	case Type_EnumeratedArray:
 		return true;
 	case Type_RelativeSlice:
@@ -1836,6 +1862,7 @@ bool type_has_nil(Type *t) {
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:
+	case Type_MultiPointer:
 	case Type_DynamicArray:
 	case Type_Map:
 		return true;
@@ -1889,6 +1916,8 @@ bool is_type_comparable(Type *t) {
 		}
 		return true;
 	case Type_Pointer:
+		return true;
+	case Type_MultiPointer:
 		return true;
 	case Type_Enum:
 		return is_type_comparable(core_type(t));
@@ -1955,6 +1984,7 @@ bool is_type_simple_compare(Type *t) {
 		return false;
 
 	case Type_Pointer:
+	case Type_MultiPointer:
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
@@ -2154,6 +2184,12 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Pointer:
 		if (y->kind == Type_Pointer) {
 			return are_types_identical(x->Pointer.elem, y->Pointer.elem);
+		}
+		break;
+
+	case Type_MultiPointer:
+		if (y->kind == Type_MultiPointer) {
+			return are_types_identical(x->MultiPointer.elem, y->MultiPointer.elem);
 		}
 		break;
 
@@ -3139,6 +3175,9 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	case Type_Pointer:
 		return build_context.word_size;
 
+	case Type_MultiPointer:
+		return build_context.word_size;
+
 	case Type_Array: {
 		i64 count, align, size, alignment;
 		count = t->Array.count;
@@ -3506,6 +3545,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Pointer:
 		str = gb_string_append_rune(str, '^');
+		str = write_type_to_string(str, type->Pointer.elem);
+		break;
+
+	case Type_MultiPointer:
+		str = gb_string_appendc(str, "[^]");
 		str = write_type_to_string(str, type->Pointer.elem);
 		break;
 

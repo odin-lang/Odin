@@ -337,6 +337,9 @@ Ast *clone_ast(Ast *node) {
 	case Ast_PointerType:
 		n->PointerType.type = clone_ast(n->PointerType.type);
 		break;
+	case Ast_MultiPointerType:
+		n->MultiPointerType.type = clone_ast(n->MultiPointerType.type);
+		break;
 	case Ast_ArrayType:
 		n->ArrayType.count = clone_ast(n->ArrayType.count);
 		n->ArrayType.elem  = clone_ast(n->ArrayType.elem);
@@ -985,7 +988,12 @@ Ast *ast_pointer_type(AstFile *f, Token token, Ast *type) {
 	result->PointerType.type = type;
 	return result;
 }
-
+Ast *ast_multi_pointer_type(AstFile *f, Token token, Ast *type) {
+	Ast *result = alloc_ast_node(f, Ast_MultiPointerType);
+	result->MultiPointerType.token = token;
+	result->MultiPointerType.type = type;
+	return result;
+}
 Ast *ast_array_type(AstFile *f, Token token, Ast *count, Ast *elem) {
 	Ast *result = alloc_ast_node(f, Ast_ArrayType);
 	result->ArrayType.token = token;
@@ -2317,7 +2325,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_OpenBracket: {
 		Token token = expect_token(f, Token_OpenBracket);
 		Ast *count_expr = nullptr;
-		if (f->curr_token.kind == Token_Question) {
+		if (f->curr_token.kind == Token_Pointer) {
+			expect_token(f, Token_Pointer);
+			expect_token(f, Token_CloseBracket);
+			return ast_multi_pointer_type(f, token, parse_type(f));
+		} else if (f->curr_token.kind == Token_Question) {
 			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), nullptr);
 		} else if (allow_token(f, Token_dynamic)) {
 			expect_token(f, Token_CloseBracket);

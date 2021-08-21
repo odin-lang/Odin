@@ -95,6 +95,7 @@ Token ast_token(Ast *node) {
 	case Ast_ProcType:         return node->ProcType.token;
 	case Ast_RelativeType:     return ast_token(node->RelativeType.tag);
 	case Ast_PointerType:      return node->PointerType.token;
+	case Ast_MultiPointerType: return node->MultiPointerType.token;
 	case Ast_ArrayType:        return node->ArrayType.token;
 	case Ast_DynamicArrayType: return node->DynamicArrayType.token;
 	case Ast_StructType:       return node->StructType.token;
@@ -312,6 +313,7 @@ Token ast_end_token(Ast *node) {
 	case Ast_RelativeType:
 		return ast_end_token(node->RelativeType.type);
 	case Ast_PointerType:      return ast_end_token(node->PointerType.type);
+	case Ast_MultiPointerType: return ast_end_token(node->MultiPointerType.type);
 	case Ast_ArrayType:        return ast_end_token(node->ArrayType.elem);
 	case Ast_DynamicArrayType: return ast_end_token(node->DynamicArrayType.elem);
 	case Ast_StructType:
