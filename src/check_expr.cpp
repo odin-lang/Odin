@@ -601,13 +601,13 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		return 5;
 	}
 	// ^T <- [^]T
-	if (is_type_pointer(dst) && is_type_multi_pointer(src)) {
+	if (dst->kind == Type_Pointer && src->kind == Type_MultiPointer) {
 		if (are_types_identical(dst->Pointer.elem, src->MultiPointer.elem)) {
 			return 4;
 		}
 	}
 	// [^]T <- ^T
-	if (is_type_multi_pointer(dst) && is_type_pointer(src)) {
+	if (dst->kind == Type_MultiPointer && src->kind == Type_Pointer) {
 		if (are_types_identical(dst->MultiPointer.elem, src->Pointer.elem)) {
 			return 4;
 		}
@@ -943,6 +943,16 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return true;
 			}
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
+		}
+		return false;
+
+	case Type_MultiPointer:
+		if (source->kind == Type_MultiPointer) {
+			isize level = check_is_assignable_to_using_subtype(source->MultiPointer.elem, poly->MultiPointer.elem);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->MultiPointer.elem, true, modify_type);
 		}
 		return false;
 	case Type_Array:
