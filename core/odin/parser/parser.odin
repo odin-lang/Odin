@@ -375,7 +375,7 @@ expect_token_after :: proc(p: ^Parser, kind: tokenizer.Token_Kind, msg: string) 
 expect_operator :: proc(p: ^Parser) -> tokenizer.Token {
 	prev := p.curr_tok;
 	#partial switch prev.kind {
-	case .If, .When, .Or_Else, .Or_Return:
+	case .If, .When, .Or_Else:
 		// okay
 	case:
 		if !tokenizer.is_operator(prev.kind) {
@@ -1452,7 +1452,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
-	case .Question, .If, .When, .Or_Else, .Or_Return:
+	case .Question, .If, .When, .Or_Else:
 		return 1;
 	case .Ellipsis, .Range_Half, .Range_Full:
 		if !p.allow_range {
@@ -3064,6 +3064,14 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 			operand = deref;
 
+		case .Or_Return:
+			token := expect_token(p, .Or_Return);
+			oe := ast.new(ast.Or_Return_Expr, operand.pos, end_pos(token));
+			oe.expr  = operand;
+			oe.token = token;
+
+			operand = oe;
+
 		case .Open_Brace:
 			if !is_lhs && is_literal_type(operand) && p.expr_level >= 0 {
 				operand = parse_literal_value(p, operand);
@@ -3164,7 +3172,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 			}
 
 			#partial switch op.kind {
-			case .If, .When, .Or_Return, .Or_Else:
+			case .If, .When:
 				if p.prev_tok.pos.line < op.pos.line {
 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
 					break loop;
@@ -3223,12 +3231,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				oe.y     = y;
 
 				expr = oe;
-			case .Or_Return:
-				oe := ast.new(ast.Or_Return_Expr, expr.pos, end_pos(p.prev_tok));
-				oe.expr  = expr;
-				oe.token = op;
 
-				expr = oe;
 			case:
 				right := parse_binary_expr(p, false, prec+1);
 				if right == nil {
