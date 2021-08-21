@@ -1727,6 +1727,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 	if (is_type_integer(a) ||
 	    is_type_boolean(a) ||
 	    is_type_pointer(a) ||
+	    is_type_multi_pointer(a) ||
 	    is_type_proc(a) ||
 	    is_type_enum(a)) {
 		LLVMIntPredicate pred = {};
