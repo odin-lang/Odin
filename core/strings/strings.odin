@@ -76,21 +76,11 @@ clone_from :: proc{
 	clone_from_ptr,
 };
 
-clone_from_nul_terminated_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> string {
+clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> string {
 	s := string_from_ptr((^u8)(ptr), len);
 	s = truncate_to_byte(s, 0);
 	return clone(s, allocator, loc);
 }
-clone_from_nul_terminated_unbounded :: proc(ptr: cstring, allocator := context.allocator, loc := #caller_location) -> string {
-	s := string(ptr);
-	s = truncate_to_byte(s, 0);
-	return clone(s, allocator, loc);
-}
-clone_from_nul_terminated :: proc{
-	clone_from_nul_terminated_bounded,
-	clone_from_nul_terminated_unbounded,
-};
-
 
 // Compares two strings, returning a value representing which one comes first lexiographically.
 // -1 for `a`; 1 for `b`, or 0 if they are equal.
