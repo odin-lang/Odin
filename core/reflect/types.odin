@@ -21,13 +21,11 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	switch x in a.variant {
 	case Type_Info_Named:
-		y, ok := b.variant.(Type_Info_Named);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Named) or_return;
 		return x.base == y.base;
 
 	case Type_Info_Integer:
-		y, ok := b.variant.(Type_Info_Integer);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Integer) or_return;
 		return x.signed == y.signed && x.endianness == y.endianness;
 
 	case Type_Info_Rune:
@@ -63,13 +61,15 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		return ok;
 
 	case Type_Info_Pointer:
-		y, ok := b.variant.(Type_Info_Pointer);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Pointer) or_return;
+		return are_types_identical(x.elem, y.elem);
+
+	case Type_Info_Multi_Pointer:
+		y := b.variant.(Type_Info_Multi_Pointer) or_return;
 		return are_types_identical(x.elem, y.elem);
 
 	case Type_Info_Procedure:
-		y, ok := b.variant.(Type_Info_Procedure);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Procedure) or_return;
 		switch {
 		case x.variadic   != y.variadic,
 		     x.convention != y.convention:
@@ -79,31 +79,26 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		return are_types_identical(x.params, y.params) && are_types_identical(x.results, y.results);
 
 	case Type_Info_Array:
-		y, ok := b.variant.(Type_Info_Array);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Array) or_return;
 		if x.count != y.count { return false; }
 		return are_types_identical(x.elem, y.elem);
 
 	case Type_Info_Enumerated_Array:
-		y, ok := b.variant.(Type_Info_Enumerated_Array);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Enumerated_Array) or_return;
 		if x.count != y.count { return false; }
 		return are_types_identical(x.index, y.index) &&
 		       are_types_identical(x.elem, y.elem);
 
 	case Type_Info_Dynamic_Array:
-		y, ok := b.variant.(Type_Info_Dynamic_Array);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Dynamic_Array) or_return;
 		return are_types_identical(x.elem, y.elem);
 
 	case Type_Info_Slice:
-		y, ok := b.variant.(Type_Info_Slice);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Slice) or_return;
 		return are_types_identical(x.elem, y.elem);
 
 	case Type_Info_Tuple:
-		y, ok := b.variant.(Type_Info_Tuple);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Tuple) or_return;
 		if len(x.types) != len(y.types) { return false; }
 		for _, i in x.types {
 			xt, yt := x.types[i], y.types[i];
@@ -114,8 +109,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		return true;
 
 	case Type_Info_Struct:
-		y, ok := b.variant.(Type_Info_Struct);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Struct) or_return;
 	   	switch {
 		case len(x.types)    != len(y.types),
 		     x.is_packed     != y.is_packed,
@@ -138,8 +132,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		return true;
 
 	case Type_Info_Union:
-		y, ok := b.variant.(Type_Info_Union);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Union) or_return;
 		if len(x.variants) != len(y.variants) { return false; }
 
 		for _, i in x.variants {
@@ -153,28 +146,23 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		return false;
 
 	case Type_Info_Map:
-		y, ok := b.variant.(Type_Info_Map);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Map) or_return;
 		return are_types_identical(x.key, y.key) && are_types_identical(x.value, y.value);
 
 	case Type_Info_Bit_Set:
-		y, ok := b.variant.(Type_Info_Bit_Set);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Bit_Set) or_return;
 		return x.elem == y.elem && x.lower == y.lower && x.upper == y.upper;
 
 	case Type_Info_Simd_Vector:
-		y, ok := b.variant.(Type_Info_Simd_Vector);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Simd_Vector) or_return;
 		return x.count == y.count && x.elem == y.elem;
 
 	case Type_Info_Relative_Pointer:
-		y, ok := b.variant.(Type_Info_Relative_Pointer);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Relative_Pointer) or_return;
 		return x.base_integer == y.base_integer && x.pointer == y.pointer;
 
 	case Type_Info_Relative_Slice:
-		y, ok := b.variant.(Type_Info_Relative_Slice);
-		if !ok { return false; }
+		y := b.variant.(Type_Info_Relative_Slice) or_return;
 		return x.base_integer == y.base_integer && x.slice == y.slice;
 	}
 
@@ -255,6 +243,11 @@ is_boolean :: proc(info: ^Type_Info) -> bool {
 is_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false; }
 	_, ok := type_info_base(info).variant.(Type_Info_Pointer);
+	return ok;
+}
+is_multi_pointer :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false; }
+	_, ok := type_info_base(info).variant.(Type_Info_Multi_Pointer);
 	return ok;
 }
 is_procedure :: proc(info: ^Type_Info) -> bool {
@@ -424,6 +417,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 			write_string(w, "^");
 			write_type(w, info.elem);
 		}
+	case Type_Info_Multi_Pointer:
+		write_string(w, "[^]");
+		write_type(w, info.elem);
 	case Type_Info_Procedure:
 		n += write_string(w, "proc");
 		if info.params == nil {
