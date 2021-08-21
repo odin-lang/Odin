@@ -33,6 +33,100 @@ int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res:
 	return false, nil;
 }
 
+/*
+	Computes xR**-1 == x (mod N) via Montgomery Reduction.
+*/
+internal_int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	/*
+		Can the fast reduction [comba] method be used?
+		Note that unlike in mul, you're safely allowed *less* than the available columns [255 per default],
+		since carries are fixed up in the inner loop.
+	*/
+	digs := (n.used * 2) + 1;
+	if digs < _WARRAY && x.used <= _WARRAY && n.used < _MAX_COMBA {
+		return _private_montgomery_reduce_comba(x, n, rho);
+	}
+
+	/*
+		Grow the input as required
+	*/
+	internal_grow(x, digs)                                           or_return;
+	x.used = digs;
+
+	for ix := 0; ix < n.used; ix += 1 {
+		/*
+			`mu = ai * rho mod b`
+			The value of rho must be precalculated via `int_montgomery_setup()`,
+			such that it equals -1/n0 mod b this allows the following inner loop
+			to reduce the input one digit at a time.
+		*/
+
+		mu := DIGIT((_WORD(x.digit[ix]) * _WORD(rho)) & _WORD(_MASK));
+
+		/*
+			a = a + mu * m * b**i
+			Multiply and add in place.
+		*/
+		u  := DIGIT(0);
+		iy := int(0);
+		for ; iy < n.used; iy += 1 {
+			/*
+				Compute product and sum.
+			*/
+			r := (_WORD(mu) * _WORD(n.digit[iy]) + _WORD(u) + _WORD(x.digit[ix + iy]));
+
+			/*
+				Get carry.
+			*/
+			u = DIGIT(r >> _DIGIT_BITS);
+
+			/*
+				Fix digit.
+			*/
+			x.digit[ix + iy] = DIGIT(r & _WORD(_MASK));
+		}
+
+		/*
+			At this point the ix'th digit of x should be zero.
+			Propagate carries upwards as required.
+		*/
+		for u != 0 {
+			x.digit[ix + iy] += u;
+			u = x.digit[ix + iy] >> _DIGIT_BITS;
+			x.digit[ix + iy] &= _MASK;
+			iy += 1;
+		}
+	}
+
+	/*
+		At this point the n.used'th least significant digits of x are all zero,
+		which means we can shift x to the right by n.used digits and the
+		residue is unchanged.
+
+		x = x/b**n.used.
+	*/
+	internal_clamp(x);
+	internal_shr_digit(x, n.used);
+
+	/*
+		if x >= n then x = x - n
+	*/
+	if internal_cmp_mag(x, n) != -1 {
+		return internal_sub(x, x, n);
+	}
+
+	return nil;
+}
+
+int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(x, n);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(x, n) or_return;
+
+	return #force_inline internal_int_montgomery_reduce(x, n, rho);
+}
 
 /*
 	Shifts with subtractions when the result is greater than b.
@@ -67,6 +161,15 @@ internal_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := cont
 	return nil;
 }
 
+int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	return #force_inline internal_int_montgomery_calc_normalization(a, b);
+}
+
 /*
 	Sets up the Montgomery reduction stuff.
 */
@@ -95,6 +198,13 @@ internal_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
 	*/
 	rho = DIGIT(((_WORD(1) << _WORD(_DIGIT_BITS)) - _WORD(x)) & _WORD(_MASK));
 	return rho, nil;
+}
+
+int_montgomery_setup :: proc(n: ^Int, allocator := context.allocator) -> (rho: DIGIT, err: Error) {
+	assert_if_nil(n);
+	internal_clear_if_uninitialized(n, allocator) or_return;
+
+	return #force_inline internal_int_montgomery_setup(n);
 }
 
 /*
