@@ -1,6 +1,6 @@
 package io
 
-import "intrinsics"
+import "core:intrinsics"
 import "core:runtime"
 import "core:unicode/utf8"
 

@@ -1,6 +1,6 @@
 package linalg
 
-import "builtin"
+import "core:builtin"
 import "core:math"
 
 radians :: proc(degrees: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {

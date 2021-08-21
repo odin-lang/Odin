@@ -1,6 +1,6 @@
 package time
 
-import "intrinsics"
+import "core:intrinsics"
 
 Duration :: distinct i64;
 

@@ -1,6 +1,6 @@
 package runtime
 
-import "intrinsics"
+import "core:intrinsics"
 
 @(link_name="__umodti3")
 umodti3 :: proc "c" (a, b: u128) -> u128 {

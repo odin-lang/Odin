@@ -1,6 +1,6 @@
 package math_bits
 
-import "intrinsics"
+import "core:intrinsics"
 
 U8_MIN  :: 0;
 U16_MIN :: 0;

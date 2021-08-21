@@ -1,6 +1,6 @@
 package thread
 
-import "intrinsics"
+import "core:intrinsics"
 import "core:sync"
 import "core:mem"
 

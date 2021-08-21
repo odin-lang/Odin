@@ -1,7 +1,7 @@
 package os
 
 import win32 "core:sys/windows"
-import "intrinsics"
+import "core:intrinsics"
 
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\';

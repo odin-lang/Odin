@@ -2,7 +2,7 @@ package sync
 
 import "core:mem"
 import "core:time"
-import "intrinsics"
+import "core:intrinsics"
 import "core:math/rand"
 
 _, _ :: time, rand;

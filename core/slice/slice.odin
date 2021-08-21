@@ -1,7 +1,7 @@
 package slice
 
-import "intrinsics"
-import "builtin"
+import "core:intrinsics"
+import "core:builtin"
 import "core:math/bits"
 import "core:mem"
 

@@ -1,6 +1,6 @@
 package container
 
-import "intrinsics"
+import "core:intrinsics"
 _ :: intrinsics;
 
 

@@ -5184,7 +5184,12 @@ bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String bas
 
 	if (is_package_name_reserved(file_str)) {
 		*path = file_str;
-		return true;
+		if (collection_name == "core") {
+			return true;
+		} else {
+			syntax_error(node, "The package '%.*s' must be imported with the core library collection: 'core:%.*s'", LIT(file_str), LIT(file_str));
+			return false;
+		}
 	}
 
 	if (file_mutex) mutex_lock(file_mutex);

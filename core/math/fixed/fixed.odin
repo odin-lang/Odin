@@ -3,7 +3,7 @@ package math_fixed
 import "core:math"
 import "core:strconv"
 
-import "intrinsics"
+import "core:intrinsics"
 _ :: intrinsics;
 
 Fixed :: struct($Backing: typeid, $Fraction_Width: uint)

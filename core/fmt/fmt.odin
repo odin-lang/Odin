@@ -10,7 +10,7 @@ import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
-import "intrinsics"
+import "core:intrinsics"
 
 Info :: struct {
 	minus:     bool,

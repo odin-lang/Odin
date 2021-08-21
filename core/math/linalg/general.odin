@@ -1,7 +1,7 @@
 package linalg
 
 import "core:math"
-import "intrinsics"
+import "core:intrinsics"
 
 // Generic
 

@@ -4,7 +4,7 @@ import "core:bytes"
 import "core:io"
 import "core:mem"
 import "core:unicode/utf8"
-import "intrinsics"
+import "core:intrinsics"
 
 // Extra errors returns by scanning procedures
 Scanner_Extra_Error :: enum i32 {

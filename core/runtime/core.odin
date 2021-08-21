@@ -20,7 +20,7 @@
 //
 package runtime
 
-import "intrinsics"
+import "core:intrinsics"
 
 // NOTE(bill): This must match the compiler's
 Calling_Convention :: enum u8 {
