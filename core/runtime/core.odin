@@ -74,6 +74,9 @@ Type_Info_Type_Id    :: struct {};
 Type_Info_Pointer :: struct {
 	elem: ^Type_Info, // nil -> rawptr
 };
+Type_Info_Multi_Pointer :: struct {
+	elem: ^Type_Info,
+};
 Type_Info_Procedure :: struct {
 	params:     ^Type_Info, // Type_Info_Tuple
 	results:    ^Type_Info, // Type_Info_Tuple
@@ -184,6 +187,7 @@ Type_Info :: struct {
 		Type_Info_Any,
 		Type_Info_Type_Id,
 		Type_Info_Pointer,
+		Type_Info_Multi_Pointer,
 		Type_Info_Procedure,
 		Type_Info_Array,
 		Type_Info_Enumerated_Array,
@@ -214,6 +218,7 @@ Typeid_Kind :: enum u8 {
 	Any,
 	Type_Id,
 	Pointer,
+	Multi_Pointer,
 	Procedure,
 	Array,
 	Enumerated_Array,
@@ -340,7 +345,7 @@ Context :: struct {
 
 
 Raw_String :: struct {
-	data: ^byte,
+	data: [^]byte,
 	len:  int,
 }
 
