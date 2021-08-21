@@ -707,6 +707,42 @@ bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
 	return check_is_assignable_to_with_score(c, operand, type, &score);
 }
 
+AstPackage *get_package_of_type(Type *type) {
+	for (;;) {
+		if (type == nullptr) {
+			return nullptr;
+		}
+		switch (type->kind) {
+		case Type_Basic:
+			return builtin_pkg;
+		case Type_Named:
+			if (type->Named.type_name != nullptr) {
+				return type->Named.type_name->pkg;
+			}
+			return nullptr;
+		case Type_Pointer:
+			type = type->Pointer.elem;
+			continue;
+		case Type_Array:
+			type = type->Array.elem;
+			continue;
+		case Type_Slice:
+			type = type->Slice.elem;
+			continue;
+		case Type_DynamicArray:
+			type = type->DynamicArray.elem;
+			continue;
+		case Type_RelativePointer:
+			type = type->RelativePointer.pointer_type;
+			continue;
+		case Type_RelativeSlice:
+			type = type->RelativeSlice.slice_type;
+			continue;
+		}
+		return nullptr;
+	}
+}
+
 
 // NOTE(bill): 'content_name' is for debugging and error messages
 void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
@@ -819,13 +855,32 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 			break;
 		default:
 			// TODO(bill): is this a good enough error message?
-			error(operand->expr,
-			      "Cannot assign value '%s' of type '%s' to '%s' in %.*s",
-			      expr_str,
-			      op_type_str,
-			      type_str,
-			      LIT(context_name));
+			{
+				gbString op_type_extra = gb_string_make(heap_allocator(), "");
+				gbString type_extra = gb_string_make(heap_allocator(), "");
+				defer (gb_string_free(op_type_extra));
+				defer (gb_string_free(type_extra));
+
+				isize on = gb_string_length(op_type_str);
+				isize tn = gb_string_length(type_str);
+				if (on == tn && gb_strncmp(op_type_str, type_str, on) == 0) {
+					AstPackage *op_pkg = get_package_of_type(operand->type);
+					AstPackage *type_pkg = get_package_of_type(type);
+					if (op_pkg != nullptr) {
+						op_type_extra = gb_string_append_fmt(op_type_extra, " (package %.*s)", LIT(op_pkg->name));
+					}
+					if (type_pkg != nullptr) {
+						type_extra = gb_string_append_fmt(type_extra, " (package %.*s)", LIT(type_pkg->name));
+					}
+				}
+				error(operand->expr,
+				      "Cannot assign value '%s' of type '%s%s' to '%s%s' in %.*s",
+				      expr_str,
+				      op_type_str, op_type_extra,
+				      type_str, type_extra,
+				      LIT(context_name));
 				check_assignment_error_suggestion(c, operand, type);
+			}
 			break;
 		}
 		operand->mode = Addressing_Invalid;
