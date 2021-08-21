@@ -7,7 +7,7 @@ import "core:thread"
 import "core:time"
 import "core:reflect"
 import "core:runtime"
-import "intrinsics"
+import "core:intrinsics"
 
 
 /*
