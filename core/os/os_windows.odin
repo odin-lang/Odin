@@ -160,6 +160,18 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return arg_list;
 }
 
+/*
+	Windows 11 (preview) has the same major and minor version numbers
+	as Windows 10: 10 and 0 respectively.
+
+	To determine if you're on Windows 10 or 11, we need to look at
+	the build number. As far as we can tell right now, the cutoff is build 22_000.
+
+	TODO: Narrow down this range once Win 11 is published and the last Win 10 builds
+          become available.
+*/
+WINDOWS_11_BUILD_CUTOFF :: 22_000;
+
 get_windows_version_w :: proc() -> win32.OSVERSIONINFOEXW {
 	osvi : win32.OSVERSIONINFOEXW;
 	osvi.dwOSVersionInfoSize = size_of(win32.OSVERSIONINFOEXW);
@@ -194,5 +206,10 @@ is_windows_8_1 :: proc() -> bool {
 
 is_windows_10 :: proc() -> bool {
 	osvi := get_windows_version_w();
-	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0);
+	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber <  WINDOWS_11_BUILD_CUTOFF);
+}
+
+is_windows_11 :: proc() -> bool {
+	osvi := get_windows_version_w();
+	return (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= WINDOWS_11_BUILD_CUTOFF);
 }
