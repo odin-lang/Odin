@@ -1548,7 +1548,8 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	which uses the comba method to quickly calculate the columns of the reduction.
 	Based on Algorithm 14.32 on pp.601 of HAC.
 */
-_private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT) -> (err: Error) {
+_private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
 	W: [_WARRAY]_WORD = ---;
 
 	if x.used > _WARRAY { return .Invalid_Argument; }
