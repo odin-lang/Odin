@@ -23,6 +23,13 @@ string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len};
 }
 
+string_from_nul_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
+	s := transmute(string)mem.Raw_String{ptr, len};
+	s = truncate_to_byte(s, 0);
+	return s;
+}
+
+
 ptr_from_string :: proc(str: string) -> ^byte {
 	d := transmute(mem.Raw_String)str;
 	return d.data;
@@ -47,6 +54,43 @@ truncate_to_rune :: proc(str: string, r: rune) -> string {
 	}
 	return str[:n];
 }
+
+clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> string {
+	c := make([]byte, len(s)+1, allocator, loc);
+	copy(c, s);
+	c[len(s)] = 0;
+	return string(c[:len(s)]);
+}
+clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #caller_location) -> string {
+	return clone(string(s), allocator, loc);
+}
+clone_from_ptr :: proc(ptr: ^byte, len: int, allocator := context.allocator, loc := #caller_location) -> string {
+	s := string_from_ptr(ptr, len);
+	return clone(s, allocator, loc);
+}
+
+clone_from :: proc{
+	clone,
+	clone_from_bytes,
+	clone_from_cstring,
+	clone_from_ptr,
+};
+
+clone_from_nul_terminated_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> string {
+	s := string_from_ptr((^u8)(ptr), len);
+	s = truncate_to_byte(s, 0);
+	return clone(s, allocator, loc);
+}
+clone_from_nul_terminated_unbounded :: proc(ptr: cstring, allocator := context.allocator, loc := #caller_location) -> string {
+	s := string(ptr);
+	s = truncate_to_byte(s, 0);
+	return clone(s, allocator, loc);
+}
+clone_from_nul_terminated :: proc{
+	clone_from_nul_terminated_bounded,
+	clone_from_nul_terminated_unbounded,
+};
+
 
 // Compares two strings, returning a value representing which one comes first lexiographically.
 // -1 for `a`; 1 for `b`, or 0 if they are equal.
