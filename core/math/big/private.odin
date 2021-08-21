@@ -1543,6 +1543,125 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 
 
 /*
+	Computes xR**-1 == x (mod N) via Montgomery Reduction.
+	This is an optimized implementation of `internal_montgomery_reduce`
+	which uses the comba method to quickly calculate the columns of the reduction.
+	Based on Algorithm 14.32 on pp.601 of HAC.
+*/
+_private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT) -> (err: Error) {
+	W: [_WARRAY]_WORD = ---;
+
+	if x.used > _WARRAY { return .Invalid_Argument; }
+
+	/*
+		Get old used count.
+	*/
+	old_used := x.used;
+
+	/*
+		Grow `x` as required.
+	*/
+	internal_grow(x, n.used + 1) or_return;
+
+	/*
+		First we have to get the digits of the input into an array of double precision words W[...]
+		Copy the digits of `x` into W[0..`x.used` - 1]
+	*/
+	ix: int;
+	for ix = 0; ix < x.used; ix += 1 {
+		W[ix] = _WORD(x.digit[ix]);
+	}
+
+	/*
+		Zero the high words of W[a->used..m->used*2].
+	*/
+	zero_upper := (n.used * 2) + 1;
+	if ix < zero_upper {
+		for ix = x.used; ix < zero_upper; ix += 1 {
+			W[ix] = {};
+		}
+	}
+
+	/*
+		Now we proceed to zero successive digits from the least significant upwards.
+	*/
+	for ix = 0; ix < n.used; ix += 1 {
+		/*
+			`mu = ai * m' mod b`
+
+			We avoid a double precision multiplication (which isn't required)
+			by casting the value down to a DIGIT.  Note this requires
+			that W[ix-1] have the carry cleared (see after the inner loop)
+		*/
+		mu := ((W[ix] & _WORD(_MASK)) * _WORD(rho)) & _WORD(_MASK);
+
+		/*
+			`a = a + mu * m * b**i`
+		
+			This is computed in place and on the fly.  The multiplication
+		 	by b**i is handled by offseting which columns the results
+		 	are added to.
+		
+			Note the comba method normally doesn't handle carries in the
+			inner loop In this case we fix the carry from the previous
+			column since the Montgomery reduction requires digits of the
+			result (so far) [see above] to work.
+
+			This is	handled by fixing up one carry after the inner loop.
+			The carry fixups are done in order so after these loops the
+			first m->used words of W[] have the carries fixed.
+		*/
+		for iy := 0; iy < n.used; iy += 1 {
+			W[ix + iy] += mu * _WORD(n.digit[iy]);
+		}
+
+		/*
+			Now fix carry for next digit, W[ix+1].
+		*/
+		W[ix + 1] += (W[ix] >> _DIGIT_BITS);
+	}
+
+	/*
+		Now we have to propagate the carries and shift the words downward
+		[all those least significant digits we zeroed].
+	*/
+
+	for ; ix < n.used * 2; ix += 1 {
+		W[ix + 1] += (W[ix] >> _DIGIT_BITS);
+	}
+
+	/* copy out, A = A/b**n
+	 *
+	 * The result is A/b**n but instead of converting from an
+	 * array of mp_word to mp_digit than calling mp_rshd
+	 * we just copy them in the right order
+	 */
+
+	for ix = 0; ix < (n.used + 1); ix += 1 {
+		x.digit[ix] = DIGIT(W[n.used + ix] & _WORD(_MASK));
+	}
+
+	/*
+		Set the max used.
+	*/
+	x.used = n.used + 1;
+
+	/*
+		Zero old_used digits, if the input a was larger than m->used+1 we'll have to clear the digits.
+	*/
+	internal_zero_unused(x, old_used);
+	internal_clamp(x);
+
+	/*
+		if A >= m then A = A - m
+	*/
+	if internal_cmp_mag(x, n) != -1 {
+		return internal_sub(x, x, n);
+	}
+	return nil;
+}
+
+/*
 	hac 14.61, pp608
 */
 _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
