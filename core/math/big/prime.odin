@@ -40,39 +40,32 @@ int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res:
 	The method is slightly modified to shift B unconditionally upto just under
 	the leading bit of b.  This saves alot of multiple precision shifting.
 */
-/*
-internal_int_montgomery_calc_normalization :: proc(a, b: ^Int) -> (err: Error) {
+internal_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	/*
+		How many bits of last digit does b use.
+	*/
+	bits := internal_count_bits(b) % _DIGIT_BITS;
 
-	int    x, bits;
-	mp_err err;
-
-	/* how many bits of last digit does b use */
-	bits = mp_count_bits(b) % MP_DIGIT_BIT;
-
-	if (b->used > 1) {
-		if ((err = mp_2expt(a, ((b->used - 1) * MP_DIGIT_BIT) + bits - 1)) != MP_OKAY) {
-			return err;
-		}
+	if b.used > 1 {
+		power := ((b.used - 1) * _DIGIT_BITS) + bits - 1;
+		internal_int_power_of_two(a, power)                          or_return;
 	} else {
-		mp_set(a, 1uL);
+		internal_one(a);
 		bits = 1;
 	}
 
-	/* now compute C = A * B mod b */
-	for (x = bits - 1; x < (int)MP_DIGIT_BIT; x++) {
-		if ((err = mp_mul_2(a, a)) != MP_OKAY) {
-			return err;
-		}
-		if (mp_cmp_mag(a, b) != MP_LT) {
-			if ((err = s_mp_sub(a, b, a)) != MP_OKAY) {
-				return err;
-			}
+	/*
+		Now compute C = A * B mod b.
+	*/
+	for x := bits - 1; x < _DIGIT_BITS; x += 1 {
+		internal_int_shl1(a, a)                                      or_return;
+		if internal_cmp_mag(a, b) != -1 {
+			internal_sub(a, a, b)                                    or_return;
 		}
 	}
-
 	return nil;
 }
-*/
 
 /*
 	Sets up the Montgomery reduction stuff.
