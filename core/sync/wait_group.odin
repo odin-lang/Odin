@@ -1,6 +1,6 @@
 package sync
 
-import "intrinsics"
+import "core:intrinsics"
 
 Wait_Group :: struct {
 	counter: int,

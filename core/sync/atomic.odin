@@ -1,6 +1,6 @@
 package sync
 
-import "intrinsics"
+import "core:intrinsics"
 
 Ordering :: enum {
 	Relaxed, // Monotonic

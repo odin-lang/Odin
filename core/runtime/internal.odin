@@ -1,6 +1,6 @@
 package runtime
 
-import "intrinsics"
+import "core:intrinsics"
 
 bswap_16 :: proc "none" (x: u16) -> u16 {
 	return x>>8 | x<<8;

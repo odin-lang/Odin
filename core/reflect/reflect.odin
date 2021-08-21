@@ -2,7 +2,7 @@ package reflect
 
 import "core:runtime"
 import "core:mem"
-import "intrinsics"
+import "core:intrinsics"
 _ :: intrinsics;
 
 Type_Info :: runtime.Type_Info;

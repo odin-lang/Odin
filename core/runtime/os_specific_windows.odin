@@ -2,7 +2,7 @@
 //+build windows
 package runtime
 
-import "intrinsics"
+import "core:intrinsics"
 
 foreign import kernel32 "system:Kernel32.lib"
 

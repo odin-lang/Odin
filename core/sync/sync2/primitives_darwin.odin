@@ -4,7 +4,7 @@ package sync2
 
 import "core:time"
 import "core:c"
-import "intrinsics"
+import "core:intrinsics"
 
 foreign import pthread "System.framework"
 

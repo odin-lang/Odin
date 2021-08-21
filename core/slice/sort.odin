@@ -1,6 +1,6 @@
 package slice
 
-import "intrinsics"
+import "core:intrinsics"
 _ :: intrinsics;
 
 ORD :: intrinsics.type_is_ordered;

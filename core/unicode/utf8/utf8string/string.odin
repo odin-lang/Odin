@@ -2,7 +2,7 @@ package utf8string
 
 import "core:unicode/utf8"
 import "core:runtime"
-import "builtin"
+import "core:builtin"
 
 String :: struct {
 	contents:   string,

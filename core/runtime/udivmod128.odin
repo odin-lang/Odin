@@ -1,6 +1,6 @@
 package runtime
 
-import "intrinsics"
+import "core:intrinsics"
 
 udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	_ctz :: intrinsics.count_trailing_zeros;

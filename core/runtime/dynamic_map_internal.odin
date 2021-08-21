@@ -1,6 +1,6 @@
 package runtime
 
-import "intrinsics"
+import "core:intrinsics"
 _ :: intrinsics;
 
 INITIAL_MAP_CAP :: 16;

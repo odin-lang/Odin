@@ -1,6 +1,6 @@
 package sync
 
-import "intrinsics"
+import "core:intrinsics"
 import win32 "core:sys/windows"
 import "core:time"
 

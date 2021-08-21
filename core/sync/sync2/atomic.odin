@@ -1,6 +1,6 @@
 package sync2
 
-import "intrinsics"
+import "core:intrinsics"
 
 cpu_relax :: intrinsics.cpu_relax;
 

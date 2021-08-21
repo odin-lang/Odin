@@ -1,6 +1,6 @@
 package slice
 
-import "intrinsics"
+import "core:intrinsics"
 import "core:runtime"
 import "core:mem"
 

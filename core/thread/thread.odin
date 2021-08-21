@@ -2,7 +2,7 @@ package thread
 
 import "core:runtime"
 import "core:mem"
-import "intrinsics"
+import "core:intrinsics"
 
 _ :: intrinsics;
 

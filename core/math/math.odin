@@ -1,6 +1,6 @@
 package math
 
-import "intrinsics"
+import "core:intrinsics"
 _ :: intrinsics;
 
 Float_Class :: enum {
