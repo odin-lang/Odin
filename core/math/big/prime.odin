@@ -33,6 +33,80 @@ int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res:
 	return false, nil;
 }
 
+
+/*
+	Shifts with subtractions when the result is greater than b.
+
+	The method is slightly modified to shift B unconditionally upto just under
+	the leading bit of b.  This saves alot of multiple precision shifting.
+*/
+/*
+internal_int_montgomery_calc_normalization :: proc(a, b: ^Int) -> (err: Error) {
+
+	int    x, bits;
+	mp_err err;
+
+	/* how many bits of last digit does b use */
+	bits = mp_count_bits(b) % MP_DIGIT_BIT;
+
+	if (b->used > 1) {
+		if ((err = mp_2expt(a, ((b->used - 1) * MP_DIGIT_BIT) + bits - 1)) != MP_OKAY) {
+			return err;
+		}
+	} else {
+		mp_set(a, 1uL);
+		bits = 1;
+	}
+
+	/* now compute C = A * B mod b */
+	for (x = bits - 1; x < (int)MP_DIGIT_BIT; x++) {
+		if ((err = mp_mul_2(a, a)) != MP_OKAY) {
+			return err;
+		}
+		if (mp_cmp_mag(a, b) != MP_LT) {
+			if ((err = s_mp_sub(a, b, a)) != MP_OKAY) {
+				return err;
+			}
+		}
+	}
+
+	return nil;
+}
+*/
+
+/*
+	Sets up the Montgomery reduction stuff.
+*/
+internal_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
+	/*
+		Fast inversion mod 2**k
+		Based on the fact that:
+
+		XA = 1 (mod 2**n) => (X(2-XA)) A = 1 (mod 2**2n)
+		                  =>  2*X*A - X*X*A*A = 1
+		                  =>  2*(1) - (1)     = 1
+	*/
+	b := n.digit[0];
+	if b & 1 == 0 { return 0, .Invalid_Argument; }
+
+	x := (((b + 2) & 4) << 1) + b; /* here x*a==1 mod 2**4 */
+	x *= 2 - (b * x);              /* here x*a==1 mod 2**8 */
+	x *= 2 - (b * x);              /* here x*a==1 mod 2**16 */
+	when _WORD_TYPE_BITS == 64 {
+		x *= 2 - (b * x);              /* here x*a==1 mod 2**32 */
+		x *= 2 - (b * x);              /* here x*a==1 mod 2**64 */
+	}
+
+	/*
+		rho = -1/m mod b
+	*/
+	rho = DIGIT(((_WORD(1) << _WORD(_DIGIT_BITS)) - _WORD(x)) & _WORD(_MASK));
+	return rho, nil;
+}
+
+/*
+	Returns the number of Rabin-Miller trials needed for a given bit size.
+*/
 number_of_rabin_miller_trials :: proc(bit_size: int) -> (number_of_trials: int) {
 	switch {
 	case bit_size <=    80:
