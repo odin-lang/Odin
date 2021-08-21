@@ -8486,6 +8486,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_PolyType:
 	case Ast_ProcType:
 	case Ast_PointerType:
+	case Ast_MultiPointerType:
 	case Ast_ArrayType:
 	case Ast_DynamicArrayType:
 	case Ast_StructType:
@@ -8928,6 +8929,11 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_append_rune(str, '^');
+		str = write_expr_to_string(str, pt->type, shorthand);
+	case_end;
+
+	case_ast_node(pt, MultiPointerType, node);
+		str = gb_string_appendc(str, "[^]");
 		str = write_expr_to_string(str, pt->type, shorthand);
 	case_end;
 
