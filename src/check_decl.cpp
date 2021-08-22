@@ -517,6 +517,12 @@ bool signature_parameter_similar_enough(Type *x, Type *y) {
 	if (sig_compare(is_type_pointer, x, y)) {
 		return true;
 	}
+	if (sig_compare(is_type_multi_pointer, x, y)) {
+		return true;
+	}
+	if (sig_compare(is_type_proc, x, y)) {
+		return true;
+	}
 
 	if (sig_compare(is_type_integer, x, y)) {
 		GB_ASSERT(core_type(x)->kind == Type_Basic);
@@ -536,15 +542,21 @@ bool signature_parameter_similar_enough(Type *x, Type *y) {
 	if (sig_compare(is_type_cstring, is_type_u8_ptr, x, y)) {
 		return true;
 	}
+	if (sig_compare(is_type_cstring, is_type_u8_multi_ptr, x, y)) {
+		return true;
+	}
 
 	if (sig_compare(is_type_uintptr, is_type_rawptr, x, y)) {
 		return true;
 	}
 
-	if (sig_compare(is_type_proc, is_type_proc, x, y)) {
+	if (sig_compare(is_type_proc, is_type_pointer, x, y)) {
 		return true;
 	}
-	if (sig_compare(is_type_proc, is_type_pointer, x, y)) {
+	if (sig_compare(is_type_pointer, is_type_multi_pointer, x, y)) {
+		return true;
+	}
+	if (sig_compare(is_type_proc, is_type_multi_pointer, x, y)) {
 		return true;
 	}
 
