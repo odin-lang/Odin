@@ -94,11 +94,6 @@ eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stderr,
 eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
 
 
-@(deprecated="prefer eprint")   print_err   :: proc(args: ..any)              -> int { return eprint(..args); }
-@(deprecated="prefer eprintf")  printf_err  :: proc(fmt: string, args: ..any) -> int { return eprintf(fmt, ..args); }
-@(deprecated="prefer eprintln") println_err :: proc(args: ..any)              -> int { return eprintln(..args); }
-
-
 // aprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
 aprint :: proc(args: ..any, sep := " ") -> string {
