@@ -44,9 +44,6 @@ As Odin lacks a means to interact with `long double` in it's foreign interface, 
 ### `<complex.h>`
 The special values `_Complex_I`, `_Imaginary_I` and the appropriate definition of `I` cannot be realized with the same type in Odin as it would be in C. The literal `1i` is tempting to use for these definitions but the semantics differ from C and would be confusing to use.
 
-### `<inttypes.h>`
-The `{int,uint}_fast{8,16,32,64}_t` integer types are not defined as there's no reliable way to query these types. Not only are they dependent 
-
 ### `<math.h>`
 The classification functions, e.g: `fpclassify` are required by C to be implemented as macros, meaning no implementation would expose functions in their library we could bind. Instead, we provide native Odin implementations with functionally equivalent semantics and behavior as the C ones. Unfortunately, since classification returns unspecified constant values this may be an ABI break where the value of those constants enter and exit native C code.
 
@@ -64,7 +61,8 @@ C has some strange promotion and type-coercion behavior for `<tgmath.h>` which i
 In addition to limitations, there are some minor caveats you should be aware when using this projection.
 
 * `errno()` is a function which returns `^int` rather than a macro.
-* `MB_CUR_MAX` is a function which return `size_t` rather than a macro.
+* `MB_CUR_MAX()` is a function which return `size_t` rather than a macro.
+* Currently only works on Windows (MSVCRT) and Linux (GLIBC or MUSL)
 
 ## License
 Every file within this directory is made available under Odin's BSD-2 license
