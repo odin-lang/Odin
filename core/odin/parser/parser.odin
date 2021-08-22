@@ -848,12 +848,24 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		if !is_range && parse_control_statement_semicolon_separator(p) {
 			init = cond;
 			cond = nil;
-			if p.curr_tok.kind != .Semicolon {
-				cond = parse_simple_stmt(p, nil);
-			}
-			expect_semicolon(p, cond);
-			if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
-				post = parse_simple_stmt(p, nil);
+
+
+			if f.curr_tok.kind == .Open_Brace || f.curr_tok.kind == .Do {
+				error(p, f.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", token.tokens[f.curr_tok.kind]);
+			} else {
+				if p.curr_tok.kind != .Semicolon {
+					cond = parse_simple_stmt(p, nil);
+				}
+
+				if p.curr_tok.text != ";" {
+					error(p, p.curr_tok.pos, "Expected ';', got %s", tokenizer.token_to_string(p.curr_tok));
+				} else {
+					expect_semicolon(p, nil);
+				}
+
+				if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
+					post = parse_simple_stmt(p, nil);
+				}
 			}
 		}
 	}
