@@ -1274,6 +1274,25 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
+	if (is_type_multi_pointer(src) && is_type_pointer(dst)) {
+		lbValue res = {};
+		res.type = t;
+		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(m, t), "");
+		return res;
+	}
+	if (is_type_pointer(src) && is_type_multi_pointer(dst)) {
+		lbValue res = {};
+		res.type = t;
+		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(m, t), "");
+		return res;
+	}
+	if (is_type_multi_pointer(src) && is_type_multi_pointer(dst)) {
+		lbValue res = {};
+		res.type = t;
+		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(m, t), "");
+		return res;
+	}
+
 
 
 
@@ -1708,6 +1727,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 	if (is_type_integer(a) ||
 	    is_type_boolean(a) ||
 	    is_type_pointer(a) ||
+	    is_type_multi_pointer(a) ||
 	    is_type_proc(a) ||
 	    is_type_enum(a)) {
 		LLVMIntPredicate pred = {};
@@ -2838,6 +2858,21 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return lb_addr(v);
 		}
 
+		case Type_MultiPointer: {
+			lbValue multi_ptr = {};
+			multi_ptr = lb_build_expr(p, ie->expr);
+			if (deref) {
+				multi_ptr = lb_emit_load(p, multi_ptr);
+			}
+			lbValue index = lb_build_expr(p, ie->index);
+			lbValue v = {};
+
+			LLVMValueRef indices[1] = {index.value};
+			v.value = LLVMBuildGEP(p->builder, multi_ptr.value, indices, 1, "");
+			v.type = t;
+			return lb_addr(v);
+		}
+
 		case Type_RelativeSlice: {
 			lbAddr slice_addr = {};
 			if (deref) {
@@ -2952,6 +2987,27 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return slice;
 		}
 
+		case Type_MultiPointer: {
+			lbAddr res = lb_add_local_generated(p, type_of_expr(expr), false);
+			if (se->high == nullptr) {
+				lbValue offset = base;
+				LLVMValueRef indices[1] = {low.value};
+				offset.value = LLVMBuildGEP(p->builder, offset.value, indices, 1, "");
+				lb_addr_store(p, res, offset);
+			} else {
+				lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+
+				LLVMValueRef indices[1] = {low.value};
+				LLVMValueRef ptr = LLVMBuildGEP(p->builder, base.value, indices, 1, "");
+				LLVMValueRef len = LLVMBuildSub(p->builder, high.value, low.value, "");
+				// TODO(bill): bounds_check for negative length
+				LLVMValueRef gep0 = lb_emit_struct_ep(p, res.addr, 0).value;
+				LLVMValueRef gep1 = lb_emit_struct_ep(p, res.addr, 1).value;
+				LLVMBuildStore(p->builder, ptr, gep0);
+				LLVMBuildStore(p->builder, len, gep1);
+			}
+			return res;
+		}
 
 		case Type_Array: {
 			Type *slice_type = alloc_type_slice(type->Array.elem);

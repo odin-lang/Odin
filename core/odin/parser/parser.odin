@@ -848,12 +848,24 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		if !is_range && parse_control_statement_semicolon_separator(p) {
 			init = cond;
 			cond = nil;
-			if p.curr_tok.kind != .Semicolon {
-				cond = parse_simple_stmt(p, nil);
-			}
-			expect_semicolon(p, cond);
-			if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
-				post = parse_simple_stmt(p, nil);
+
+
+			if f.curr_tok.kind == .Open_Brace || f.curr_tok.kind == .Do {
+				error(p, f.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", token.tokens[f.curr_tok.kind]);
+			} else {
+				if p.curr_tok.kind != .Semicolon {
+					cond = parse_simple_stmt(p, nil);
+				}
+
+				if p.curr_tok.text != ";" {
+					error(p, p.curr_tok.pos, "Expected ';', got %s", tokenizer.token_to_string(p.curr_tok));
+				} else {
+					expect_semicolon(p, nil);
+				}
+
+				if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
+					post = parse_simple_stmt(p, nil);
+				}
 			}
 		}
 	}
@@ -2428,18 +2440,26 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		tok := expect_token(p, .Pointer);
 		elem := parse_type(p);
 		ptr := ast.new(ast.Pointer_Type, tok.pos, elem.end);
+		ptr.pointer = tok.pos;
 		ptr.elem = elem;
 		return ptr;
+
 
 	case .Open_Bracket:
 		open := expect_token(p, .Open_Bracket);
 		count: ^ast.Expr;
-		if p.curr_tok.kind == .Question {
-			tok := expect_token(p, .Question);
-			q := ast.new(ast.Unary_Expr, tok.pos, end_pos(tok));
-			q.op = tok;
-			count = q;
-		} else if p.curr_tok.kind == .Dynamic {
+		switch p.curr_tok.kind {
+		case .Pointer:
+			tok := expect_token(p, .Pointer);
+			close := expect_token(p, .Close_Bracket);
+			elem := parse_type(p);
+			t := ast.new(ast.Multi_Pointer_Type, open.pos, elem.end_pos);
+			t.open = open.pos;
+			t.pointer = tok.pos;
+			t.close = close.pos;
+			t.elem = elem;
+			return t;
+		case .Dynamic:
 			tok := expect_token(p, .Dynamic);
 			close := expect_token(p, .Close_Bracket);
 			elem := parse_type(p);
@@ -2448,12 +2468,18 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			da.dynamic_pos = tok.pos;
 			da.close = close.pos;
 			da.elem = elem;
-
 			return da;
-		} else if p.curr_tok.kind != .Close_Bracket {
+		case .Question:
+			tok := expect_token(p, .Question);
+			q := ast.new(ast.Unary_Expr, tok.pos, end_pos(tok));
+			q.op = tok;
+			count = q;
+		case:
 			p.expr_level += 1;
 			count = parse_expr(p, false);
 			p.expr_level -= 1;
+		case .Close_Bracket:
+			// handle below
 		}
 		close := expect_token(p, .Close_Bracket);
 		elem := parse_type(p);

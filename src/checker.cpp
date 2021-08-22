@@ -1545,6 +1545,10 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->Pointer.elem);
 		break;
 
+	case Type_MultiPointer:
+		add_type_info_type_internal(c, bt->MultiPointer.elem);
+		break;
+
 	case Type_Array:
 		add_type_info_type_internal(c, bt->Array.elem);
 		add_type_info_type_internal(c, alloc_type_pointer(bt->Array.elem));
@@ -1752,6 +1756,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_Pointer:
 		add_min_dep_type_info(c, bt->Pointer.elem);
+		break;
+
+	case Type_MultiPointer:
+		add_min_dep_type_info(c, bt->MultiPointer.elem);
 		break;
 
 	case Type_Array:
@@ -1993,6 +2001,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			str_lit("bounds_check_error"),
 			str_lit("slice_expr_error_hi"),
 			str_lit("slice_expr_error_lo_hi"),
+			str_lit("multi_pointer_slice_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
 			force_add_dependency_entity(c, c->info.runtime_package->scope, bounds_check_entities[i]);
@@ -2400,6 +2409,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_any              = find_core_type(c, str_lit("Type_Info_Any"));
 	t_type_info_typeid           = find_core_type(c, str_lit("Type_Info_Type_Id"));
 	t_type_info_pointer          = find_core_type(c, str_lit("Type_Info_Pointer"));
+	t_type_info_multi_pointer    = find_core_type(c, str_lit("Type_Info_Multi_Pointer"));
 	t_type_info_procedure        = find_core_type(c, str_lit("Type_Info_Procedure"));
 	t_type_info_array            = find_core_type(c, str_lit("Type_Info_Array"));
 	t_type_info_enumerated_array = find_core_type(c, str_lit("Type_Info_Enumerated_Array"));
@@ -2426,6 +2436,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_any_ptr              = alloc_type_pointer(t_type_info_any);
 	t_type_info_typeid_ptr           = alloc_type_pointer(t_type_info_typeid);
 	t_type_info_pointer_ptr          = alloc_type_pointer(t_type_info_pointer);
+	t_type_info_multi_pointer_ptr    = alloc_type_pointer(t_type_info_multi_pointer);
 	t_type_info_procedure_ptr        = alloc_type_pointer(t_type_info_procedure);
 	t_type_info_array_ptr            = alloc_type_pointer(t_type_info_array);
 	t_type_info_enumerated_array_ptr = alloc_type_pointer(t_type_info_enumerated_array);

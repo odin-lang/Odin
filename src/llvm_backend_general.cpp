@@ -420,6 +420,31 @@ void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue le
 	lb_emit_runtime_call(p, "bounds_check_error", args);
 }
 
+void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
+	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
+		return;
+	}
+
+	low = lb_emit_conv(p, low, t_int);
+	high = lb_emit_conv(p, high, t_int);
+
+	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
+	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 5);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = low;
+	args[4] = high;
+
+	lb_emit_runtime_call(p, "multi_pointer_slice_expr_error", args);
+}
+
 void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
 	if (build_context.no_bounds_check) {
 		return;
@@ -810,6 +835,13 @@ LLVMTypeRef llvm_addr_type(lbValue addr_val) {
 
 lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
+	if (is_type_multi_pointer(value.type)) {
+		Type *vt = base_type(value.type);
+		GB_ASSERT(vt->kind == Type_MultiPointer);
+		Type *t = vt->MultiPointer.elem;
+		LLVMValueRef v = LLVMBuildLoad2(p->builder, llvm_addr_type(value), value.value, "");
+		return lbValue{v, t};
+	}
 	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, llvm_addr_type(value), value.value, "");
@@ -1566,6 +1598,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Pointer:
+		return LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
+
+	case Type_MultiPointer:
 		return LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
 
 	case Type_Array: {
