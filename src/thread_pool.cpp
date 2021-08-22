@@ -16,7 +16,11 @@ struct WorkerTask {
 };
 
 struct ThreadPool {
-	volatile i32 outstanding_task_count;
+#if defined(GB_SYSTEM_WINDOWS)
+	volatile LONG outstanding_task_count;
+#else
+	volatile isize outstanding_task_count;
+#endif
 	WorkerTask *next_task;
 	BlockingMutex task_list_mutex;
 };
