@@ -71,7 +71,7 @@ del *.ilk > NUL 2> NUL
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 
 if %errorlevel% neq 0 goto end_of_build
-if %release_mode% EQU 0 odin check examples/all
+if %release_mode% EQU 0 odin run examples/demo
 
 del *.obj > NUL 2> NUL
 
