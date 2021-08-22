@@ -4133,16 +4133,26 @@ Ast *parse_for_stmt(AstFile *f) {
 		if (!is_range && parse_control_statement_semicolon_separator(f)) {
 			init = cond;
 			cond = nullptr;
-			if (f->curr_token.kind != Token_Semicolon) {
-				cond = parse_simple_stmt(f, StmtAllowFlag_None);
-			}
-			expect_semicolon(f, cond);
-			if (f->curr_token.kind != Token_OpenBrace &&
-			    f->curr_token.kind != Token_do) {
-				post = parse_simple_stmt(f, StmtAllowFlag_None);
+
+			if (f->curr_token.kind == Token_OpenBrace || f->curr_token.kind == Token_do) {
+				syntax_error(f->curr_token, "Expected ';', followed by a condition expression and post statement, got %.*s", LIT(token_strings[f->curr_token.kind]));
+			} else {
+				if (f->curr_token.kind != Token_Semicolon) {
+					cond = parse_simple_stmt(f, StmtAllowFlag_None);
+				}
+
+				if (f->curr_token.string != ";") {
+					syntax_error(f->curr_token, "Expected ';', got %.*s", LIT(token_to_string(f->curr_token)));
+				} else {
+					expect_semicolon(f, nullptr);
+				}
+
+				if (f->curr_token.kind != Token_OpenBrace &&
+				    f->curr_token.kind != Token_do) {
+					post = parse_simple_stmt(f, StmtAllowFlag_None);
+				}
 			}
 		}
-
 	}
 
 
