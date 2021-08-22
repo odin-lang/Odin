@@ -18,6 +18,7 @@ Type_Info_Boolean          :: runtime.Type_Info_Boolean;
 Type_Info_Any              :: runtime.Type_Info_Any;
 Type_Info_Type_Id          :: runtime.Type_Info_Type_Id;
 Type_Info_Pointer          :: runtime.Type_Info_Pointer;
+Type_Info_Multi_Pointer    :: runtime.Type_Info_Multi_Pointer;
 Type_Info_Procedure        :: runtime.Type_Info_Procedure;
 Type_Info_Array            :: runtime.Type_Info_Array;
 Type_Info_Enumerated_Array :: runtime.Type_Info_Enumerated_Array;
@@ -50,6 +51,7 @@ Type_Kind :: enum {
 	Any,
 	Type_Id,
 	Pointer,
+	Multi_Pointer,
 	Procedure,
 	Array,
 	Enumerated_Array,
@@ -82,6 +84,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Any:              return .Any;
 		case Type_Info_Type_Id:          return .Type_Id;
 		case Type_Info_Pointer:          return .Pointer;
+		case Type_Info_Multi_Pointer:    return .Multi_Pointer;
 		case Type_Info_Procedure:        return .Procedure;
 		case Type_Info_Array:            return .Array;
 		case Type_Info_Enumerated_Array: return .Enumerated_Array;
@@ -172,6 +175,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 		case 256: return f64;
 		}
 	case Type_Info_Pointer:          return v.elem.id;
+	case Type_Info_Multi_Pointer:    return v.elem.id;
 	case Type_Info_Array:            return v.elem.id;
 	case Type_Info_Enumerated_Array: return v.elem.id;
 	case Type_Info_Slice:            return v.elem.id;
@@ -292,6 +296,13 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 		return index({val.data, a.base.id}, i, loc);
 
 	case Type_Info_Pointer:
+		ptr := (^rawptr)(val.data)^;
+		if ptr == nil {
+			return nil;
+		}
+		return index({ptr, a.elem.id}, i, loc);
+
+	case Type_Info_Multi_Pointer:
 		ptr := (^rawptr)(val.data)^;
 		if ptr == nil {
 			return nil;

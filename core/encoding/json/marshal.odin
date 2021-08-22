@@ -139,6 +139,9 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case runtime.Type_Info_Pointer:
 		return .Unsupported_Type;
 
+	case runtime.Type_Info_Multi_Pointer:
+		return .Unsupported_Type;
+
 	case runtime.Type_Info_Procedure:
 		return .Unsupported_Type;
 

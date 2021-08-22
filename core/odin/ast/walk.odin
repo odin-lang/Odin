@@ -349,6 +349,8 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.results);
 	case Pointer_Type:
 		walk(v, n.elem);
+	case Multi_Pointer_Type:
+		walk(v, n.elem);
 	case Array_Type:
 		if n.tag != nil {
 			walk(v, n.tag);

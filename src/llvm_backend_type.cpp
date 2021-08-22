@@ -40,6 +40,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
 	} break;
 	case Type_Pointer:         kind = Typeid_Pointer;          break;
+	case Type_MultiPointer:    kind = Typeid_Multi_Pointer;    break;
 	case Type_Array:           kind = Typeid_Array;            break;
 	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
 	case Type_Slice:           kind = Typeid_Slice;            break;
@@ -385,6 +386,20 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_Pointer: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_pointer_ptr);
 			lbValue gep = lb_get_type_info_ptr(m, t->Pointer.elem);
+
+			LLVMValueRef vals[1] = {
+				gep.value,
+			};
+
+			lbValue res = {};
+			res.type = type_deref(tag.type);
+			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			lb_emit_store(p, tag, res);
+			break;
+		}
+		case Type_MultiPointer: {
+			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_multi_pointer_ptr);
+			lbValue gep = lb_get_type_info_ptr(m, t->MultiPointer.elem);
 
 			LLVMValueRef vals[1] = {
 				gep.value,
