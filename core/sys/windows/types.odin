@@ -63,7 +63,7 @@ LONG64  :: i64;
 PDWORD_PTR :: ^DWORD_PTR;
 ATOM :: distinct WORD;
 
-wstring :: ^WCHAR;
+wstring :: [^]WCHAR;
 
 PBYTE :: ^BYTE;
 LPBYTE :: ^BYTE;

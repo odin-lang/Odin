@@ -303,9 +303,9 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	if cap(array)-len(array) > 0 {
 		a := (^Raw_Dynamic_Array)(array);
 		when size_of(E) != 0 {
-			data := (^E)(a.data);
+			data := ([^]E)(a.data);
 			assert(condition=data != nil, loc=loc);
-			intrinsics.ptr_offset(data, a.len)^ = arg;
+			data[a.len] = arg;
 		}
 		a.len += 1;
 	}
@@ -331,9 +331,9 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	if arg_len > 0 {
 		a := (^Raw_Dynamic_Array)(array);
 		when size_of(E) != 0 {
-			data := (^E)(a.data);
+			data := ([^]E)(a.data);
 			assert(condition=data != nil, loc=loc);
-			intrinsics.mem_copy(intrinsics.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+			intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len);
 		}
 		a.len += arg_len;
 	}
