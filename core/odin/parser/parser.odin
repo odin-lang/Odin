@@ -850,8 +850,8 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			cond = nil;
 
 
-			if f.curr_tok.kind == .Open_Brace || f.curr_tok.kind == .Do {
-				error(p, f.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", token.tokens[f.curr_tok.kind]);
+			if p.curr_tok.kind == .Open_Brace || p.curr_tok.kind == .Do {
+				error(p, p.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", tokenizer.tokens[p.curr_tok.kind]);
 			} else {
 				if p.curr_tok.kind != .Semicolon {
 					cond = parse_simple_stmt(p, nil);
@@ -2448,12 +2448,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Open_Bracket:
 		open := expect_token(p, .Open_Bracket);
 		count: ^ast.Expr;
-		switch p.curr_tok.kind {
+		#partial switch p.curr_tok.kind {
 		case .Pointer:
 			tok := expect_token(p, .Pointer);
 			close := expect_token(p, .Close_Bracket);
 			elem := parse_type(p);
-			t := ast.new(ast.Multi_Pointer_Type, open.pos, elem.end_pos);
+			t := ast.new(ast.Multi_Pointer_Type, open.pos, elem.end);
 			t.open = open.pos;
 			t.pointer = tok.pos;
 			t.close = close.pos;
