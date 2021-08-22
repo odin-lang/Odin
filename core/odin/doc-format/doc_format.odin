@@ -166,6 +166,7 @@ Type_Kind :: enum u32le {
 	SOA_Struct_Dynamic = 19,
 	Relative_Pointer   = 20,
 	Relative_Slice     = 21,
+	Multi_Pointer      = 22,
 }
 
 Type_Elems_Cap :: 4;
@@ -222,6 +223,7 @@ Type :: struct {
 	// .Simd_Vector        - 1 type:    0=element
 	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
 	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
+	// .Multi_Pointer      - 1 type:    0=element
 	types: Array(Type_Index),
 
 	// Used by:
