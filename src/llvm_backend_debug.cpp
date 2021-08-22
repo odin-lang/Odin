@@ -291,6 +291,8 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 	case Type_Pointer:
 		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->Pointer.elem), word_bits, word_bits, 0, nullptr, 0);
+	case Type_MultiPointer:
+		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->MultiPointer.elem), word_bits, word_bits, 0, nullptr, 0);
 
 	case Type_Array: {
 		LLVMMetadataRef subscripts[1] = {};
