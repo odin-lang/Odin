@@ -3,12 +3,6 @@
 #define WORKER_TASK_PROC(name) isize name(void *data)
 typedef WORKER_TASK_PROC(WorkerTaskProc);
 
-#if defined(GB_SYSTEM_WINDOWS)
-#define THREAD_POOL_SYNC_FETCH_AND_ADD InterlockedAdd
-#else
-#define THREAD_POOL_SYNC_FETCH_AND_ADD __sync_fetch_and_add
-#endif
-
 struct WorkerTask {
 	WorkerTask *next_task;
 	WorkerTaskProc *do_work;
@@ -16,11 +10,7 @@ struct WorkerTask {
 };
 
 struct ThreadPool {
-#if defined(GB_SYSTEM_WINDOWS)
-	volatile LONG outstanding_task_count;
-#else
-	volatile isize outstanding_task_count;
-#endif
+	std::atomic<isize> outstanding_task_count;
 	WorkerTask *next_task;
 	BlockingMutex task_list_mutex;
 };
@@ -40,8 +30,8 @@ void thread_pool_thread_entry(ThreadPool *pool) {
 			pool->next_task = task->next_task;
 			mutex_unlock(&pool->task_list_mutex);
 			task->do_work(task->data);
-			THREAD_POOL_SYNC_FETCH_AND_ADD(&pool->outstanding_task_count, -1);
-			free(task);
+			pool->outstanding_task_count.fetch_sub(1);
+			gb_free(heap_allocator(), task);
 		} else {
 			mutex_unlock(&pool->task_list_mutex);
 			yield();
@@ -74,7 +64,7 @@ void thread_pool_thread_entry(ThreadPool *pool) {
 void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_prefix) {
 	memset(pool, 0, sizeof(ThreadPool));
 	mutex_init(&pool->task_list_mutex);
-	pool->outstanding_task_count = 1;
+	pool->outstanding_task_count.store(1);
 
 	for (int i = 0; i < thread_count; i++) {
 		thread_pool_start_thread(pool);
@@ -86,20 +76,20 @@ void thread_pool_destroy(ThreadPool *pool) {
 }
 
 void thread_pool_wait(ThreadPool *pool) {
-	THREAD_POOL_SYNC_FETCH_AND_ADD(&pool->outstanding_task_count, -1);
+	pool->outstanding_task_count.fetch_sub(1);
 
-	while (pool->outstanding_task_count) {
+	while (pool->outstanding_task_count.load() != 0) {
 		yield();
 	}
 }
 
 void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
-	WorkerTask *task = (WorkerTask *) calloc(1, sizeof(WorkerTask));
+	WorkerTask *task = gb_alloc_item(heap_allocator(), WorkerTask);
 	task->do_work = proc;
 	task->data = data;
 	mutex_lock(&pool->task_list_mutex);
 	task->next_task = pool->next_task;
 	pool->next_task = task;
-	THREAD_POOL_SYNC_FETCH_AND_ADD(&pool->outstanding_task_count, 1);
+	pool->outstanding_task_count.fetch_add(1);
 	mutex_unlock(&pool->task_list_mutex);
 }
