@@ -251,6 +251,8 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.results = auto_cast clone(r.results);
 	case Pointer_Type:
 		r.elem = clone(r.elem);
+	case Multi_Pointer_Type:
+		r.elem = clone(r.elem);
 	case Array_Type:
 		r.len  = clone(r.len);
 		r.elem = clone(r.elem);
