@@ -65,22 +65,19 @@ unset_env :: proc(key: string) -> Errno {
 // environ returns a copy of strings representing the environment, in the form "key=value"
 // NOTE: the slice of strings and the strings with be allocated using the supplied allocator
 environ :: proc(allocator := context.allocator) -> []string {
-	envs := win32.GetEnvironmentStringsW();
+	envs := cast([^]win32.WCHAR)(win32.GetEnvironmentStringsW());
 	if envs == nil {
 		return nil;
 	}
 	defer win32.FreeEnvironmentStringsW(envs);
 
 	r := make([dynamic]string, 0, 50, allocator);
-	for from, i, p := 0, 0, envs; true; i += 1 {
-		c := (^u16)(uintptr(p) + uintptr(i*2))^;
-		if c == 0 {
+	for from, i := 0, 0; true; i += 1 {
+		if c := envs[i]; c == 0 {
 			if i <= from {
 				break;
 			}
-			w := mem.slice_ptr(mem.ptr_offset(p, from), i-from);
-
-			append(&r, win32.utf16_to_utf8(w, allocator));
+			append(&r, win32.utf16_to_utf8(envs[from:i], allocator));
 			from = i + 1;
 		}
 	}
