@@ -604,6 +604,10 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *tag; \
 		Ast *type; \
 	}) \
+	AST_KIND(MultiPointerType, "multi pointer type", struct { \
+		Token token; \
+		Ast *type; \
+	}) \
 	AST_KIND(ArrayType, "array type", struct { \
 		Token token; \
 		Ast *count; \
