@@ -5685,8 +5685,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 	}
 
-	thread_pool_start(&parser_thread_pool);
-	thread_pool_wait_to_process(&parser_thread_pool);
+	thread_pool_wait(&parser_thread_pool);
 
 	for (ParseFileError err = ParseFile_None; mpmc_dequeue(&p->file_error_queue, &err); /**/) {
 		if (err != ParseFile_None) {

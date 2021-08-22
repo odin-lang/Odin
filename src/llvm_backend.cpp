@@ -1693,8 +1693,7 @@ void lb_generate_code(lbGenerator *gen) {
 			thread_pool_add_task(&lb_thread_pool, lb_llvm_emit_worker_proc, wd);
 		}
 
-		thread_pool_start(&lb_thread_pool);
-		thread_pool_wait_to_process(&lb_thread_pool);
+		thread_pool_wait(&lb_thread_pool);
 	} else {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
