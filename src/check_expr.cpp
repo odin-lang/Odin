@@ -592,10 +592,25 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 #if 1
 
 
-	// TODO(bill): Should I allow this implicit conversion at all?!
 	// rawptr <- ^T
 	if (are_types_identical(type, t_rawptr) && is_type_pointer(src)) {
-	    return 5;
+		return 5;
+	}
+	// rawptr <- [^]T
+	if (are_types_identical(type, t_rawptr) && is_type_multi_pointer(src)) {
+		return 5;
+	}
+	// ^T <- [^]T
+	if (dst->kind == Type_Pointer && src->kind == Type_MultiPointer) {
+		if (are_types_identical(dst->Pointer.elem, src->MultiPointer.elem)) {
+			return 4;
+		}
+	}
+	// [^]T <- ^T
+	if (dst->kind == Type_MultiPointer && src->kind == Type_Pointer) {
+		if (are_types_identical(dst->MultiPointer.elem, src->Pointer.elem)) {
+			return 4;
+		}
 	}
 #endif
 
@@ -928,6 +943,16 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return true;
 			}
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
+		}
+		return false;
+
+	case Type_MultiPointer:
+		if (source->kind == Type_MultiPointer) {
+			isize level = check_is_assignable_to_using_subtype(source->MultiPointer.elem, poly->MultiPointer.elem);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->MultiPointer.elem, true, modify_type);
 		}
 		return false;
 	case Type_Array:
@@ -2392,6 +2417,15 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
 		return true;
 	}
+	if (is_type_multi_pointer(src) && is_type_multi_pointer(dst)) {
+		return true;
+	}
+	if (is_type_multi_pointer(src) && is_type_pointer(dst)) {
+		return true;
+	}
+	if (is_type_pointer(src) && is_type_multi_pointer(dst)) {
+		return true;
+	}
 
 	// uintptr <-> pointer
 	if (is_type_uintptr(src) && is_type_pointer(dst)) {
@@ -2400,16 +2434,18 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {
 		return true;
 	}
+	if (is_type_uintptr(src) && is_type_multi_pointer(dst)) {
+		return true;
+	}
+	if (is_type_multi_pointer(src) && is_type_uintptr(dst)) {
+		return true;
+	}
 
 	// []byte/[]u8 <-> string (not cstring)
 	if (is_type_u8_slice(src) && (is_type_string(dst) && !is_type_cstring(dst))) {
 		return true;
 	}
-	if ((is_type_string(src) && !is_type_cstring(src)) && is_type_u8_slice(dst)) {
-		// if (is_type_typed(src)) {
-			// return true;
-		// }
-	}
+
 	// cstring -> string
 	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
 		if (operand->mode != Addressing_Constant) {
@@ -2421,6 +2457,10 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (are_types_identical(src, t_cstring) && is_type_u8_ptr(dst)) {
 		return !is_constant;
 	}
+	// cstring -> [^]u8
+	if (are_types_identical(src, t_cstring) && is_type_u8_multi_ptr(dst)) {
+		return !is_constant;
+	}
 	// cstring -> rawptr
 	if (are_types_identical(src, t_cstring) && is_type_rawptr(dst)) {
 		return !is_constant;
@@ -2428,6 +2468,10 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 
 	// ^u8 -> cstring
 	if (is_type_u8_ptr(src) && are_types_identical(dst, t_cstring)) {
+		return !is_constant;
+	}
+	// [^]u8 -> cstring
+	if (is_type_u8_multi_ptr(src) && are_types_identical(dst, t_cstring)) {
 		return !is_constant;
 	}
 	// rawptr -> cstring
@@ -3328,7 +3372,7 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 	operand->type = target_type;
 }
 
-bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
+bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
 	Operand operand = {Addressing_Invalid};
 	check_expr_with_type_hint(c, &operand, index_value, type_hint);
 	if (operand.mode == Addressing_Invalid) {
@@ -3367,7 +3411,7 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 	if (operand.mode == Addressing_Constant &&
 	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
-		if (i.sign && !is_type_enum(index_type)) {
+		if (i.sign && !is_type_enum(index_type) && !is_type_multi_pointer(main_type)) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
 			gb_string_free(expr_str);
@@ -6102,6 +6146,13 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 		}
 		break;
 
+	case Type_MultiPointer:
+		o->type = t->MultiPointer.elem;
+		if (o->mode != Addressing_Constant) {
+			o->mode = Addressing_Variable;
+		}
+		return true;
+
 	case Type_Array:
 		*max_count = t->Array.count;
 		if (indirection) {
@@ -8133,13 +8184,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 
 		i64 index = 0;
-		bool ok = check_index_value(c, false, ie->index, max_count, &index, index_type_hint);
+		bool ok = check_index_value(c, t, false, ie->index, max_count, &index, index_type_hint);
 		if (is_const) {
 			if (index < 0) {
-				if (max_count < 0) {
-
-				}
-
 				gbString str = expr_to_string(o->expr);
 				error(o->expr, "Cannot index a constant '%s'", str);
 				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
@@ -8206,6 +8253,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			o->type = alloc_type_slice(t->Array.elem);
 			break;
 
+		case Type_MultiPointer:
+			valid = true;
+			o->type = type_deref(o->type);
+			break;
+
 		case Type_Slice:
 			valid = true;
 			o->type = type_deref(o->type);
@@ -8262,7 +8314,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					capacity = max_count;
 				}
 				i64 j = 0;
-				if (check_index_value(c, true, nodes[i], capacity, &j)) {
+				if (check_index_value(c, t, true, nodes[i], capacity, &j)) {
 					index = j;
 				}
 
@@ -8289,6 +8341,16 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				error(se->expr, "Cannot slice constant value '%s'", s);
 				gb_string_free(s);
 			}
+		}
+
+		if (t->kind == Type_MultiPointer && se->high != nullptr) {
+			/*
+				x[:]   -> [^]T
+				x[i:]  -> [^]T
+				x[:n]  -> []T
+				x[i:n] -> []T
+			*/
+			o->type = alloc_type_slice(t->MultiPointer.elem);
 		}
 
 		o->mode = Addressing_Value;
@@ -8424,6 +8486,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_PolyType:
 	case Ast_ProcType:
 	case Ast_PointerType:
+	case Ast_MultiPointerType:
 	case Ast_ArrayType:
 	case Ast_DynamicArrayType:
 	case Ast_StructType:
@@ -8866,6 +8929,11 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_append_rune(str, '^');
+		str = write_expr_to_string(str, pt->type, shorthand);
+	case_end;
+
+	case_ast_node(pt, MultiPointerType, node);
+		str = gb_string_appendc(str, "[^]");
 		str = write_expr_to_string(str, pt->type, shorthand);
 	case_end;
 

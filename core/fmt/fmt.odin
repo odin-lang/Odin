@@ -1574,6 +1574,48 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fmt_pointer(fi, ptr, verb);
 		}
 
+	case runtime.Type_Info_Multi_Pointer:
+		ptr := (^rawptr)(v.data)^;
+		if verb != 'p' && info.elem != nil {
+			a := any{ptr, info.elem.id};
+
+			elem := runtime.type_info_base(info.elem);
+			if elem != nil {
+				#partial switch e in elem.variant {
+				case runtime.Type_Info_Array,
+				     runtime.Type_Info_Slice,
+				     runtime.Type_Info_Dynamic_Array,
+				     runtime.Type_Info_Map:
+					if ptr == nil {
+						io.write_string(fi.writer, "<nil>");
+						return;
+					}
+					if fi.record_level < 1 {
+					  	fi.record_level += 1;
+						defer fi.record_level -= 1;
+						io.write_byte(fi.writer, '&');
+						fmt_value(fi, a, verb);
+						return;
+					}
+
+				case runtime.Type_Info_Struct,
+				     runtime.Type_Info_Union:
+					if ptr == nil {
+						io.write_string(fi.writer, "<nil>");
+						return;
+					}
+					if fi.record_level < 1 {
+						fi.record_level += 1;
+						defer fi.record_level -= 1;
+						io.write_byte(fi.writer, '&');
+						fmt_value(fi, a, verb);
+						return;
+					}
+				}
+			}
+		}
+		fmt_pointer(fi, ptr, verb);
+
 	case runtime.Type_Info_Array:
 		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
 			s := strings.string_from_ptr((^byte)(v.data), info.count);

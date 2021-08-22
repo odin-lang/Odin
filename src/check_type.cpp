@@ -2525,6 +2525,12 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		return true;
 	case_end;
 
+	case_ast_node(pt, MultiPointerType, e);
+		*type = alloc_type_multi_pointer(check_type(ctx, pt->type));
+		set_base_type(named_type, *type);
+		return true;
+	case_end;
+
 	case_ast_node(rt, RelativeType, e);
 		GB_ASSERT(rt->tag->kind == Ast_CallExpr);
 		ast_node(ce, CallExpr, rt->tag);

@@ -656,6 +656,14 @@ Pointer_Type :: struct {
 	elem:    ^Expr,
 }
 
+Multi_Pointer_Type :: struct {
+	using node: Expr,
+	open:    tokenizer.Pos,
+	pointer: tokenizer.Pos,
+	close:   tokenizer.Pos,
+	elem:    ^Expr,
+}
+
 Array_Type :: struct {
 	using node: Expr,
 	open:  tokenizer.Pos,
