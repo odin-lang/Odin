@@ -1834,6 +1834,7 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 
 	case Type_Enum:
 	case Type_Pointer:
+	case Type_MultiPointer:
 	case Type_Proc:
 	case Type_BitSet:
 		if (op_kind == Token_CmpEq) {
