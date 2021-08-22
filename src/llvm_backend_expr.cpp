@@ -2870,7 +2870,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			LLVMValueRef indices[1] = {index.value};
 			v.value = LLVMBuildGEP(p->builder, multi_ptr.value, indices, 1, "");
-			v.type = t;
+			v.type = alloc_type_pointer(t->MultiPointer.elem);
 			return lb_addr(v);
 		}
 
