@@ -212,7 +212,7 @@ isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0
 	return 0;
 }
 
-bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_entity, Type *type,
+bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                             Array<Operand> *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
 	//                                                                           //
@@ -220,7 +220,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	//                                                                           //
 	///////////////////////////////////////////////////////////////////////////////
 
-	CheckerInfo *info = c->info;
+	CheckerInfo *info = old_c->info;
 
 	if (base_entity == nullptr) {
 		return false;
@@ -290,23 +290,20 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	});
 
 
-	CheckerContext nctx = *c;
+	CheckerContext nctx = *old_c;
 
-	Scope *scope = create_scope(c->info, base_entity->scope);
+	nctx.procs_to_check_queue = old_c->procs_to_check_queue;
+
+	Scope *scope = create_scope(info, base_entity->scope);
 	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
 	if (nctx.polymorphic_scope == nullptr) {
 		nctx.polymorphic_scope = scope;
 	}
-	if (param_operands == nullptr) {
-		// c->no_polymorphic_errors = false;
-	}
 
 
 	auto *pt = &src->Proc;
-
-
 
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
@@ -332,12 +329,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 	}
 
-#if 0
-	bool generate_type_again = nctx.no_polymorphic_errors;
-	if (generate_type_again) {
-#else
 	{
-#endif
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
 		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
 		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
@@ -395,6 +387,14 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
 	d->proc_lit = proc_lit;
+	d->proc_checked = false;
+
+	if (token.string == "raw_slice_data") {
+		Type *elem = final_proc_type->Proc.params->Tuple.variables[0]->type->Slice.elem;
+		if (elem->kind == Type_Basic && elem->Basic.kind == Basic_f64) {
+			gb_printf_err("%.*s %s\n", LIT(token.string), type_to_string(final_proc_type));
+		}
+	}
 
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->identifier = ident;
@@ -404,6 +404,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	entity->scope = scope->parent;
 	entity->file = base_entity->file;
 	entity->pkg = base_entity->pkg;
+	entity->flags &= ~EntityFlag_ProcBodyChecked;
 
 	AstFile *file = nullptr;
 	{
@@ -431,8 +432,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		array_add(&array, entity);
 		map_set(&info->gen_procs, hash_pointer(base_entity->identifier), array);
 	}
-
-	GB_ASSERT(entity != nullptr);
 
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;

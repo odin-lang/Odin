@@ -4591,6 +4591,7 @@ void check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 	reset_checker_context(&ctx, pi->file, untyped);
 	ctx.decl = pi->decl;
 	ctx.procs_to_check_queue = procs_to_check_queue;
+	GB_ASSERT(procs_to_check_queue != nullptr);
 
 	TypeProc *pt = &pi->type->Proc;
 	String name = pi->token.string;
@@ -4635,6 +4636,8 @@ void check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 
 GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
+bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped);
+
 void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Sanity checker
 	// This is a partial hack to make sure all procedure bodies have been checked
@@ -4656,24 +4659,33 @@ void check_unchecked_bodies(Checker *c) {
 		if ((e->flags & EntityFlag_ProcBodyChecked) == 0) {
 			GB_ASSERT(e->decl_info != nullptr);
 
-			ProcInfo pi = {};
-			pi.file  = e->file;
-			pi.token = e->token;
-			pi.decl  = e->decl_info;
-			pi.type  = e->type;
+			ProcInfo *pi = gb_alloc_item(permanent_allocator(), ProcInfo);
+			pi->file  = e->file;
+			pi->token = e->token;
+			pi->decl  = e->decl_info;
+			pi->type  = e->type;
 
 			Ast *pl = e->decl_info->proc_lit;
 			GB_ASSERT(pl != nullptr);
-			pi.body  = pl->ProcLit.body;
-			pi.tags  = pl->ProcLit.tags;
-			if (pi.body == nullptr) {
+			pi->body  = pl->ProcLit.body;
+			pi->tags  = pl->ProcLit.tags;
+			if (pi->body == nullptr) {
 				continue;
 			}
 
-			map_clear(&untyped);
-			check_proc_info(c, &pi, &untyped, nullptr);
+			mpmc_enqueue(&c->procs_to_check_queue, pi);
 		}
 	}
+
+	auto *q = &c->procs_to_check_queue;
+	ProcInfo *pi = nullptr;
+	while (mpmc_dequeue(q, &pi)) {
+		Entity *e = pi->decl->entity;
+		consume_proc_info_queue(c, pi, q, &untyped);
+		add_dependency_to_set(c, e);
+		GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
+	}
+
 }
 
 void check_test_procedures(Checker *c) {
@@ -4838,6 +4850,7 @@ void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(global_remaining == 0);
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
 
 	global_procedure_body_in_worker_queue = false;
 }

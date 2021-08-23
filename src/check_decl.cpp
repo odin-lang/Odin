@@ -1249,7 +1249,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (!(e->flags & EntityFlag_Using)) {
 					continue;
 				}
-				bool is_value     = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
+				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
 				if (t->kind == Type_Struct) {
@@ -1305,6 +1305,20 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		}
 
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
+
+		for_array(i, bs->stmts) {
+			Ast *stmt = bs->stmts[i];
+			if (stmt->kind == Ast_ValueDecl) {
+				ast_node(vd, ValueDecl, stmt);
+				for_array(j, vd->names) {
+					Ast *name = vd->names[j];
+					if (!is_blank_ident(name)) {
+						GB_ASSERT(name->kind == Ast_Ident);
+						GB_ASSERT(name->Ident.entity != nullptr);
+					}
+				}
+			}
+		}
 
 		if (type->Proc.result_count > 0) {
 			if (!check_is_terminating(body, str_lit(""))) {

@@ -458,6 +458,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	e->file = expr->file;
 	e->decl_info = pl->decl;
 	e->code_gen_module = m;
+	e->flags |= EntityFlag_ProcBodyChecked;
 	lbProcedure *p = lb_create_procedure(m, e);
 
 	lbValue value = {};
