@@ -1582,9 +1582,3 @@ load_4_6 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_MultiDrawElementsIndirectCount, "glMultiDrawElementsIndirectCount");
 	set_proc_address(&impl_PolygonOffsetClamp,             "glPolygonOffsetClamp");
 }
-
-init :: proc(set_proc_address: Set_Proc_Address_Type) {
-	// Placeholder for loading maximum supported version
-}
-
-
