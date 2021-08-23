@@ -263,6 +263,9 @@ bool check_is_terminating(Ast *node, String const &label) {
 			if (tv.value.value_bool) {
 				return check_is_terminating(ws->body, label);
 			} else {
+				if (ws->else_stmt == nullptr) {
+					return false;
+				}
 				return check_is_terminating(ws->else_stmt, label);
 			}
 		}
