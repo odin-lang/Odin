@@ -3785,74 +3785,14 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 }
 
 #elif defined(GB_SYSTEM_LINUX)
-// IMPORTANT TODO(bill): This gbAffinity stuff for linux needs be improved a lot!
-// NOTE(zangent): I have to read /proc/cpuinfo to get the number of threads per core.
 #include <stdio.h>
 
 void gb_affinity_init(gbAffinity *a) {
-	b32   accurate = true;
-	isize threads = 0;
-
-	a->thread_count     = 1;
 	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
 	a->threads_per_core = 1;
-
-
-	if(a->core_count <= 0) {
-		a->core_count = 1;
-		accurate = false;
-	}
-
-	// Parsing /proc/cpuinfo to get the number of threads per core.
-	// NOTE(zangent): This calls the CPU's threads "cores", although the wording
-	// is kind of weird. This should be right, though.
-
-	FILE* cpu_info = fopen("/proc/cpuinfo", "r");
-
-	if (cpu_info != NULL) {
-		for (;;) {
-			// The 'temporary char'. Everything goes into this char,
-			// so that we can check against EOF at the end of this loop.
-			int c;
-
-#define AF__CHECK(letter) ((c = getc(cpu_info)) == letter)
-			if (AF__CHECK('c') && AF__CHECK('p') && AF__CHECK('u') && AF__CHECK(' ') &&
-			    AF__CHECK('c') && AF__CHECK('o') && AF__CHECK('r') && AF__CHECK('e') && AF__CHECK('s')) {
-				// We're on a CPU info line.
-				while (!AF__CHECK(EOF)) {
-					if (c == '\n') {
-						break;
-					} else if (c < '0' || '9' > c) {
-						continue;
-					}
-					threads = threads * 10 + (c - '0');
-				}
-				break;
-			} else {
-				while (!AF__CHECK('\n')) {
-					if (c==EOF) {
-						break;
-					}
-				}
-			}
-			if (c == EOF) {
-				break;
-			}
-#undef AF__CHECK
-		}
-
-		fclose(cpu_info);
-	}
-
-	if (threads == 0) {
-		threads  = 1;
-		accurate = false;
-	}
-
-	a->threads_per_core = threads;
-	a->thread_count = a->threads_per_core * a->core_count;
-	a->is_accurate = accurate;
-
+	a->is_accurate      = a->core_count > 0;
+	a->core_count       = a->is_accurate ? a->core_count : 1;
+	a->thread_count     = a->core_count;
 }
 
 void gb_affinity_destroy(gbAffinity *a) {
