@@ -886,13 +886,28 @@ load_3_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 
 
 // VERSION_4_0
+DrawArraysIndirectCommand :: struct {
+	count:         u32,
+	instanceCount: u32,
+	first:         u32,
+	baseInstance:  u32,
+}
+
+DrawElementsIndirectCommand :: struct {
+	count:         u32,
+	instanceCount: u32,
+	firstIndex:    u32,
+	baseVertex:    u32,
+	baseInstance:  u32,
+}
+
 impl_MinSampleShading:               proc "c" (value: f32);
 impl_BlendEquationi:                 proc "c" (buf: u32, mode: u32);
 impl_BlendEquationSeparatei:         proc "c" (buf: u32, modeRGB: u32, modeAlpha: u32);
 impl_BlendFunci:                     proc "c" (buf: u32, src: u32, dst: u32);
 impl_BlendFuncSeparatei:             proc "c" (buf: u32, srcRGB: u32, dstRGB: u32, srcAlpha: u32, dstAlpha: u32);
-impl_DrawArraysIndirect:             proc "c" (mode: u32, indirect: rawptr);
-impl_DrawElementsIndirect:           proc "c" (mode: u32, type: u32, indirect: rawptr);
+impl_DrawArraysIndirect:             proc "c" (mode: u32, indirect: ^DrawArraysIndirectCommand);
+impl_DrawElementsIndirect:           proc "c" (mode: u32, type: u32, indirect: ^DrawElementsIndirectCommand);
 impl_Uniform1d:                      proc "c" (location: i32, x: f64);
 impl_Uniform2d:                      proc "c" (location: i32, x: f64, y: f64);
 impl_Uniform3d:                      proc "c" (location: i32, x: f64, y: f64, z: f64);
@@ -1195,25 +1210,16 @@ load_4_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
 }
 
 // VERSION_4_3
-DrawArraysIndirectCommand :: struct {
-	count:         u32,
-	instanceCount: u32,
-	first:         u32,
-	baseInstance:  u32,
-}
-
-DrawElementsIndirectCommand :: struct {
-	count:         u32,
-	instanceCount: u32,
-	firstIndex:    u32,
-	baseVertex:    u32,
-	baseInstance:  u32,
+DispatchIndirectCommand :: struct {
+	num_groups_x: u32,
+	num_groups_y: u32,
+	num_groups_z: u32,
 }
 
 impl_ClearBufferData:                 proc "c" (target: u32, internalformat: u32, format: u32, type: u32, data: rawptr);
 impl_ClearBufferSubData:              proc "c" (target: u32, internalformat: u32, offset: int, size: int, format: u32, type: u32, data: rawptr);
 impl_DispatchCompute:                 proc "c" (num_groups_x: u32, num_groups_y: u32, num_groups_z: u32);
-impl_DispatchComputeIndirect:         proc "c" (indirect: int);
+impl_DispatchComputeIndirect:         proc "c" (indirect: ^DispatchIndirectCommand);
 impl_CopyImageSubData:                proc "c" (srcName: u32, srcTarget: u32, srcLevel: i32, srcX: i32, srcY: i32, srcZ: i32, dstName: u32, dstTarget: u32, dstLevel: i32, dstX: i32, dstY: i32, dstZ: i32, srcWidth: i32, srcHeight: i32, srcDepth: i32);
 impl_FramebufferParameteri:           proc "c" (target: u32, pname: u32, param: i32);
 impl_GetFramebufferParameteriv:       proc "c" (target: u32, pname: u32, params: [^]i32);
