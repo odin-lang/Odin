@@ -180,8 +180,8 @@ new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, 
 
 @builtin
 new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_second {
-	data := alloc_bytes(size_of(T), alignment, allocator, loc) or_return;
-	t = (^T)(raw_data(data));
+	t_data := mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return;
+	t = (^T)(raw_data(t_data));
 	if t != nil {
 		t^ = data;
 	}
