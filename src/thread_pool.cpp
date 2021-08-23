@@ -13,6 +13,7 @@ struct ThreadPool {
 	std::atomic<isize> outstanding_task_count;
 	WorkerTask *volatile next_task;
 	BlockingMutex task_list_mutex;
+	isize thread_count;
 };
 
 void thread_pool_thread_entry(ThreadPool *pool) {
@@ -62,10 +63,7 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 	memset(pool, 0, sizeof(ThreadPool));
 	mutex_init(&pool->task_list_mutex);
 	pool->outstanding_task_count.store(1);
-
-	for (int i = 0; i < thread_count; i++) {
-		thread_pool_start_thread(pool);
-	}
+	pool->thread_count = thread_count;
 }
 
 void thread_pool_destroy(ThreadPool *pool) {
@@ -73,6 +71,10 @@ void thread_pool_destroy(ThreadPool *pool) {
 }
 
 void thread_pool_wait(ThreadPool *pool) {
+	for (int i = 0; i < pool->thread_count; i++) {
+		thread_pool_start_thread(pool);
+	}
+
 	pool->outstanding_task_count.fetch_sub(1);
 	thread_pool_thread_entry(pool);
 }
