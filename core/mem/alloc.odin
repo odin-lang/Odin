@@ -207,57 +207,69 @@ delete :: proc{
 };
 
 
-new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
+new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) {
 	return new_aligned(T, align_of(T), allocator, loc);
 }
-new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc(size_of(T), alignment, allocator, loc));
-	if ptr != nil { ptr^ = T{}; }
-	return ptr;
+new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
+	data := alloc_bytes(size_of(T), alignment, allocator, loc) or_return;
+	t = (^T)(raw_data(data));
+	return;
 }
 new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
-	if ptr != nil { ptr^ = data; }
-	return ptr;
+	data := alloc_bytes(size_of(T), alignment, allocator, loc) or_return;
+	t = (^T)(raw_data(data));
+	if t != nil {
+		t^ = data;
+	}
+	return;
 }
 
+DEFAULT_RESERVE_CAPACITY :: 16;
 
-make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (slice: T, err: Allocator_Error) {
+	runtime.make_slice_error_loc(loc, len);
+	data := alloc_bytes(size_of(E)*len, alignment, allocator, loc) or_return;
+	if data == nil && size_of(E) != 0 {
+		return;
+	}
+	slice = transmute(T)Raw_Slice{raw_data(data), len};
+	return;
+}
+make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
 	return make_aligned(T, len, align_of(E), allocator, loc);
 }
-make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
-	runtime.make_slice_error_loc(loc, len);
-	data := alloc(size_of(E)*len, alignment, allocator, loc);
-	if data == nil && size_of(E) != 0 {
-		return nil;
-	}
-	zero(data, size_of(E)*len);
-	s := Raw_Slice{data, len};
-	return transmute(T)s;
+make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
+	return make_dynamic_array_len_cap(T, 0, DEFAULT_RESERVE_CAPACITY, allocator, loc);
 }
-make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> T {
-	return make_dynamic_array_len_cap(T, 0, 16, allocator, loc);
-}
-make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) {
 	return make_dynamic_array_len_cap(T, len, len, allocator, loc);
 }
-make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
-	data := alloc(size_of(E)*cap, align_of(E), allocator, loc);
-	s := Raw_Dynamic_Array{data, len, cap, allocator};
+	data := alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return;
+	s := Raw_Dynamic_Array{raw_data(data), len, cap, allocator};
 	if data == nil && size_of(E) != 0 {
 		s.len, s.cap = 0, 0;
 	}
-	zero(data, size_of(E)*len);
-	return transmute(T)s;
+	array = transmute(T)s;
+	return;
 }
-make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
+make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_map_expr_error_loc(loc, cap);
 	context.allocator = allocator;
 
 	m: T;
 	reserve_map(&m, cap);
 	return m;
+}
+make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) {
+	runtime.make_slice_error_loc(loc, len);
+	data := alloc_bytes(size_of(E)*len, align_of(E), allocator, loc) or_return;
+	if data == nil && size_of(E) != 0 {
+		return;
+	}
+	mp = cast(T)raw_data(data);
+	return;
 }
 
 make :: proc{
@@ -266,6 +278,7 @@ make :: proc{
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
 	make_map,
+	make_multi_pointer,
 };
 
 

@@ -114,12 +114,13 @@ Scratch_Allocator :: struct {
 	leaked_allocations: [dynamic][]byte,
 }
 
-scratch_allocator_init :: proc(s: ^Scratch_Allocator, size: int, backup_allocator := context.allocator) {
-	s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator);
+scratch_allocator_init :: proc(s: ^Scratch_Allocator, size: int, backup_allocator := context.allocator) -> Allocator_Error {
+	s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator) or_return;
 	s.curr_offset = 0;
 	s.prev_allocation = nil;
 	s.backup_allocator = backup_allocator;
 	s.leaked_allocations.allocator = backup_allocator;
+	return nil;
 }
 
 scratch_allocator_destroy :: proc(s: ^Scratch_Allocator) {
@@ -188,7 +189,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return ptr, err;
 		}
 		if s.leaked_allocations == nil {
-			s.leaked_allocations = make([dynamic][]byte, a);
+			s.leaked_allocations, err = make([dynamic][]byte, a);
 		}
 		append(&s.leaked_allocations, ptr);
 
