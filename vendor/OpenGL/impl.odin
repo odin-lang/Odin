@@ -59,7 +59,7 @@ Type conversion overview:
 	void*                            -> rawptr
 */
 
-sync_t :: rawptr;
+sync_t :: distinct rawptr;
 debug_proc_t :: #type proc "c" (source: u32, type: u32, id: u32, severity: u32, length: i32, message: cstring, userParam: rawptr);
 
 
