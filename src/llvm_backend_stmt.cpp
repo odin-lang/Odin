@@ -2081,7 +2081,8 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				Ast *name = vd->names[i];
 				if (!is_blank_ident(name)) {
 					Entity *e = entity_of_node(name);
-					GB_ASSERT(e != nullptr);
+					TokenPos pos = ast_token(name).pos;
+					GB_ASSERT_MSG(e != nullptr, "%s", token_pos_to_string(pos));
 					if (e->flags & EntityFlag_Static) {
 						// NOTE(bill): If one of the entities is static, they all are
 						is_static = true;
