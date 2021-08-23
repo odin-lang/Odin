@@ -49,7 +49,7 @@ GetError :: SDL.GetError;
 
 @(default_calling_convention="c", link_prefix="IMG_")
 foreign lib {
-	Init :: proc(flags: InitFlags) -> c.int ---
+	Init :: proc(flags: InitFlags) -> InitFlags ---
 	Quit :: proc() ---
 
 	/* Load an image from an SDL data source.
