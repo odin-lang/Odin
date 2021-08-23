@@ -1343,6 +1343,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			tag_var->flags |= EntityFlag_Used;
 			if (!is_reference) {
 				tag_var->flags |= EntityFlag_Value;
+				tag_var->flags |= EntityFlag_SwitchValue;
 			}
 			add_entity(ctx, ctx->scope, lhs, tag_var);
 			add_entity_use(ctx, lhs, tag_var);
@@ -1921,6 +1922,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		auto lhs = slice_make<Ast *>(temporary_allocator(), rhs.count);
 		slice_copy(&lhs, rs->vals);
 
+		isize addressable_index = cast(isize)is_map;
+
 		for_array(i, rhs) {
 			if (lhs[i] == nullptr) {
 				continue;
@@ -1940,11 +1943,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				if (found == nullptr) {
 					entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 					entity->flags |= EntityFlag_Value;
-					if (use_by_reference_for_value) {
-						if (i == 0 && !is_map) {
+					if (i == addressable_index) {
+						if (use_by_reference_for_value) {
 							entity->flags &= ~EntityFlag_Value;
-						} else if (i == 1 && is_map) {
-							entity->flags &= ~EntityFlag_Value;
+						} else {
+							entity->flags |= EntityFlag_ForValue;
 						}
 					}
 					if (is_soa) {
