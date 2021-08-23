@@ -2189,6 +2189,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				}
 				entity->parent_proc_decl = ctx->curr_proc_decl;
 				entities[entity_count++] = entity;
+				if (name->kind == Ast_Ident) {
+					name->Ident.entity = entity;
+				}
 			}
 
 			if (new_name_count == 0) {
