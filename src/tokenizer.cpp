@@ -117,8 +117,6 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_or_else,     "or_else"),     \
 	TOKEN_KIND(Token_or_return,   "or_return"),   \
 	TOKEN_KIND(Token_asm,         "asm"),         \
-	TOKEN_KIND(Token_inline,      "inline"),      \
-	TOKEN_KIND(Token_no_inline,   "no_inline"),   \
 TOKEN_KIND(Token__KeywordEnd, ""), \
 	TOKEN_KIND(Token_Count, "")
 

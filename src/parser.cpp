@@ -1946,13 +1946,7 @@ Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 		return ast_bad_expr(f, token, f->curr_token);
 	}
 	ProcInlining pi = ProcInlining_none;
-	if (token.kind == Token_inline) {
-		syntax_warning(token, "'inline' is deprecated in favour of '#force_inline'");
-		pi = ProcInlining_inline;
-	} else if (token.kind == Token_no_inline) {
-		syntax_warning(token, "'no_inline' is deprecated in favour of '#force_no_inline'");
-		pi = ProcInlining_no_inline;
-	} else if (token.kind == Token_Ident) {
+	if (token.kind == Token_Ident) {
 		if (token.string == "force_inline") {
 			pi = ProcInlining_inline;
 		} else if (token.string == "force_no_inline") {
@@ -2176,13 +2170,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 		return operand;
 	}
-
-	case Token_inline:
-	case Token_no_inline:
-	{
-		Token token = advance_token(f);
-		return parse_force_inlining_operand(f, token);
-	} break;
 
 	// Parse Procedure Type or Literal or Group
 	case Token_proc: {
@@ -4464,9 +4451,6 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 
 
 Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
-	if (unroll_token.kind == Token_inline) {
-		syntax_warning(unroll_token, "'inline for' is deprecated in favour of `#unroll for'");
-	}
 	Token for_token = expect_token(f, Token_for);
 	Ast *val0 = nullptr;
 	Ast *val1 = nullptr;
@@ -4523,13 +4507,6 @@ Ast *parse_stmt(AstFile *f) {
 	Token token = f->curr_token;
 	switch (token.kind) {
 	// Operands
-	case Token_inline:
-		if (peek_token_kind(f, Token_for)) {
-			Token unroll_token = expect_token(f, Token_inline);
-			return parse_unrolled_for_loop(f, unroll_token);
-		}
-		/* fallthrough */
-	case Token_no_inline:
 	case Token_context: // Also allows for `context =`
 	case Token_proc:
 	case Token_Ident:
