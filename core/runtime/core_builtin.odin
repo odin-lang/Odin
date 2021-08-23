@@ -170,18 +170,22 @@ delete :: proc{
 // return is a pointer to a newly allocated value of that type using the specified allocator, default is context.allocator
 @builtin
 new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) #optional_second {
-	ptr, err := mem_alloc(size_of(T), align_of(T), allocator, loc);
-	return (^T)(ptr), err;
+	return new_aligned(T, align_of(T), allocator, loc);
+}
+new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
+	data := mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return;
+	t = (^T)(raw_data(data));
+	return;
 }
 
 @builtin
-new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) #optional_second {
-	ptr, err := mem_alloc(size_of(T), align_of(T), allocator, loc);
-	res := (^T)(ptr);
-	if ptr != nil && err != .Out_Of_Memory {
-		res^ = data;
+new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_second {
+	data := alloc_bytes(size_of(T), alignment, allocator, loc) or_return;
+	t = (^T)(raw_data(data));
+	if t != nil {
+		t^ = data;
 	}
-	return res, err;
+	return;
 }
 
 DEFAULT_RESERVE_CAPACITY :: 16;
@@ -196,33 +200,30 @@ make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocat
 	return transmute(T)s, err;
 }
 
-@builtin
+@(builtin)
 make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	return make_aligned(T, len, align_of(E), allocator, loc);
 }
-
-@builtin
+@(builtin)
 make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	return make_dynamic_array_len_cap(T, 0, DEFAULT_RESERVE_CAPACITY, allocator, loc);
 }
-
-@builtin
+@(builtin)
 make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
 	return make_dynamic_array_len_cap(T, len, len, allocator, loc);
 }
-
-@builtin
-make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_second {
+@(builtin)
+make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_second {
 	make_dynamic_array_error_loc(loc, len, cap);
-	data, err := mem_alloc(size_of(E)*cap, align_of(E), allocator, loc);
-	s := Raw_Dynamic_Array{data, len, cap, allocator};
+	data := mem_alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return;
+	s := Raw_Dynamic_Array{raw_data(data), len, cap, allocator};
 	if data == nil && size_of(E) != 0 {
 		s.len, s.cap = 0, 0;
 	}
-	return transmute(T)s, err;
+	array = transmute(T)s;
+	return;
 }
-
-@builtin
+@(builtin)
 make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
 	make_map_expr_error_loc(loc, cap);
 	context.allocator = allocator;
@@ -231,6 +232,17 @@ make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = DEFAULT_RESERVE_CAPAC
 	reserve_map(&m, cap);
 	return m;
 }
+@(builtin)
+make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) #optional_second {
+	make_slice_error_loc(loc, len);
+	data := mem_alloc_bytes(size_of(E)*len, align_of(E), allocator, loc) or_return;
+	if data == nil && size_of(E) != 0 {
+		return;
+	}
+	mp = cast(T)raw_data(data);
+	return;
+}
+
 
 // The make built-in procedure allocates and initializes a value of type slice, dynamic array, or map (only)
 // Similar to new, the first argument is a type, not a value. Unlike new, make's return type is the same as the
@@ -243,6 +255,7 @@ make :: proc{
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
 	make_map,
+	make_multi_pointer,
 };
 
 
