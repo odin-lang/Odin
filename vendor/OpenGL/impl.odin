@@ -1195,6 +1195,21 @@ load_4_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
 }
 
 // VERSION_4_3
+DrawArraysIndirectCommand :: struct {
+	count:         u32,
+	instanceCount: u32,
+	first:         u32,
+	baseInstance:  u32,
+}
+
+DrawElementsIndirectCommand :: struct {
+	count:         u32,
+	instanceCount: u32,
+	firstIndex:    u32,
+	baseVertex:    u32,
+	baseInstance:  u32,
+}
+
 impl_ClearBufferData:                 proc "c" (target: u32, internalformat: u32, format: u32, type: u32, data: rawptr);
 impl_ClearBufferSubData:              proc "c" (target: u32, internalformat: u32, offset: int, size: int, format: u32, type: u32, data: rawptr);
 impl_DispatchCompute:                 proc "c" (num_groups_x: u32, num_groups_y: u32, num_groups_z: u32);
@@ -1207,14 +1222,14 @@ impl_InvalidateTexSubImage:           proc "c" (texture: u32, level: i32, xoffse
 impl_InvalidateTexImage:              proc "c" (texture: u32, level: i32);
 impl_InvalidateBufferSubData:         proc "c" (buffer: u32, offset: int, length: int);
 impl_InvalidateBufferData:            proc "c" (buffer: u32);
-impl_InvalidateFramebuffer:           proc "c" (target: u32, numAttachments: i32, attachments: ^u32);
-impl_InvalidateSubFramebuffer:        proc "c" (target: u32, numAttachments: i32, attachments: ^u32, x: i32, y: i32, width: i32, height: i32);
-impl_MultiDrawArraysIndirect:         proc "c" (mode: u32, indirect: rawptr, drawcount: i32, stride: i32);
-impl_MultiDrawElementsIndirect:       proc "c" (mode: u32, type: u32, indirect: rawptr, drawcount: i32, stride: i32);
+impl_InvalidateFramebuffer:           proc "c" (target: u32, numAttachments: i32, attachments: [^]u32);
+impl_InvalidateSubFramebuffer:        proc "c" (target: u32, numAttachments: i32, attachments: [^]u32, x: i32, y: i32, width: i32, height: i32);
+impl_MultiDrawArraysIndirect:         proc "c" (mode: u32, indirect: [^]DrawArraysIndirectCommand, drawcount: i32, stride: i32);
+impl_MultiDrawElementsIndirect:       proc "c" (mode: u32, type: u32, indirect: [^]DrawElementsIndirectCommand, drawcount: i32, stride: i32);
 impl_GetProgramInterfaceiv:           proc "c" (program: u32, programInterface: u32, pname: u32, params: [^]i32);
 impl_GetProgramResourceIndex:         proc "c" (program: u32, programInterface: u32, name: cstring) -> u32;
 impl_GetProgramResourceName:          proc "c" (program: u32, programInterface: u32, index: u32, bufSize: i32, length: ^i32, name: [^]u8);
-impl_GetProgramResourceiv:            proc "c" (program: u32, programInterface: u32, index: u32, propCount: i32, props: ^u32, bufSize: i32, length: ^i32, params: [^]i32);
+impl_GetProgramResourceiv:            proc "c" (program: u32, programInterface: u32, index: u32, propCount: i32, props: [^]u32, bufSize: i32, length: ^i32, params: [^]i32);
 impl_GetProgramResourceLocation:      proc "c" (program: u32, programInterface: u32, name: cstring) -> i32;
 impl_GetProgramResourceLocationIndex: proc "c" (program: u32, programInterface: u32, name: cstring) -> i32;
 impl_ShaderStorageBlockBinding:       proc "c" (program: u32, storageBlockIndex: u32, storageBlockBinding: u32);
@@ -1337,10 +1352,10 @@ impl_NamedFramebufferParameteri:               proc "c" (framebuffer: u32, pname
 impl_NamedFramebufferTexture:                  proc "c" (framebuffer: u32, attachment: u32, texture: u32, level: i32);
 impl_NamedFramebufferTextureLayer:             proc "c" (framebuffer: u32, attachment: u32, texture: u32, level: i32, layer: i32);
 impl_NamedFramebufferDrawBuffer:               proc "c" (framebuffer: u32, buf: u32);
-impl_NamedFramebufferDrawBuffers:              proc "c" (framebuffer: u32, n: i32, bufs: ^u32);
+impl_NamedFramebufferDrawBuffers:              proc "c" (framebuffer: u32, n: i32, bufs: [^]u32);
 impl_NamedFramebufferReadBuffer:               proc "c" (framebuffer: u32, src: u32);
-impl_InvalidateNamedFramebufferData:           proc "c" (framebuffer: u32, numAttachments: i32, attachments: ^u32);
-impl_InvalidateNamedFramebufferSubData:        proc "c" (framebuffer: u32, numAttachments: i32, attachments: ^u32, x: i32, y: i32, width: i32, height: i32);
+impl_InvalidateNamedFramebufferData:           proc "c" (framebuffer: u32, numAttachments: i32, attachments: [^]u32);
+impl_InvalidateNamedFramebufferSubData:        proc "c" (framebuffer: u32, numAttachments: i32, attachments: [^]u32, x: i32, y: i32, width: i32, height: i32);
 impl_ClearNamedFramebufferiv:                  proc "c" (framebuffer: u32, buffer: u32, drawbuffer: i32, value: ^i32);
 impl_ClearNamedFramebufferuiv:                 proc "c" (framebuffer: u32, buffer: u32, drawbuffer: i32, value: ^u32);
 impl_ClearNamedFramebufferfv:                  proc "c" (framebuffer: u32, buffer: u32, drawbuffer: i32, value: ^f32);
@@ -1431,16 +1446,8 @@ impl_GetnSeparableFilter:                      proc "c" (target: u32, format: u3
 impl_GetnHistogram:                            proc "c" (target: u32, reset: u8, format: u32, type: u32, bufSize: i32, values: rawptr);
 impl_GetnMinmax:                               proc "c" (target: u32, reset: u8, format: u32, type: u32, bufSize: i32, values: rawptr);
 impl_TextureBarrier:                           proc "c" ();
-impl_glGetUnsignedBytevEXT:                    proc "c" (pname: u32, data: ^byte);
-impl_TexPageCommitmentARB:                     proc "c"(target: u32,
-														level: i32,
-														xoffset: i32,
-														yoffset: i32,
-														zoffset: i32,
-														width: i32,
-														height: i32,
-														depth: i32,
-														commit: bool);
+impl_GetUnsignedBytevEXT:                    proc "c" (pname: u32, data: ^byte);
+impl_TexPageCommitmentARB:                     proc "c" (target: u32, level: i32, xoffset: i32, yoffset: i32, zoffset: i32, width: i32, height: i32, depth: i32, commit: bool);
 
 load_4_5 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ClipControl,                              "glClipControl");
@@ -1565,15 +1572,14 @@ load_4_5 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_GetnHistogram,                            "glGetnHistogram");
 	set_proc_address(&impl_GetnMinmax,                               "glGetnMinmax");
 	set_proc_address(&impl_TextureBarrier,                           "glTextureBarrier");
-	set_proc_address(&impl_glGetUnsignedBytevEXT,                    "glGetUnsignedBytevEXT");
-	set_proc_address(&impl_TexPageCommitmentARB,                    "glTexPageCommitmentARB");
+	set_proc_address(&impl_GetUnsignedBytevEXT,                      "glGetUnsignedBytevEXT");
+	set_proc_address(&impl_TexPageCommitmentARB,                     "glTexPageCommitmentARB");
 }
 
-
 // VERSION_4_6
-impl_SpecializeShader:               proc "c" (shader: u32, pEntryPoint: ^u8, numSpecializationConstants: u32, pConstantIndex: ^u32, pConstantValue: ^u32);
-impl_MultiDrawArraysIndirectCount:   proc "c" (mode: i32, indirect: rawptr, drawcount: int, maxdrawcount, stride: i32);
-impl_MultiDrawElementsIndirectCount: proc "c" (mode: i32, type: i32, indirect: rawptr, drawcount: int, maxdrawcount, stride: i32);
+impl_SpecializeShader:               proc "c" (shader: u32, pEntryPoint: cstring, numSpecializationConstants: u32, pConstantIndex: ^u32, pConstantValue: ^u32);
+impl_MultiDrawArraysIndirectCount:   proc "c" (mode: i32, indirect: [^]DrawArraysIndirectCommand, drawcount: int, maxdrawcount, stride: i32);
+impl_MultiDrawElementsIndirectCount: proc "c" (mode: i32, type: i32, indirect: [^]DrawElementsIndirectCommand, drawcount: int, maxdrawcount, stride: i32);
 impl_PolygonOffsetClamp:             proc "c" (factor, units, clamp: f32);
 
 load_4_6 :: proc(set_proc_address: Set_Proc_Address_Type) {
