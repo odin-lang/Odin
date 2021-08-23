@@ -122,7 +122,7 @@ init_sdl :: proc() -> (ok: bool) {
 		return false;
 	}
 
-	ctx.renderer = sdl2.CreateRenderer(ctx.window, -1, {.ACCELERATED});
+	ctx.renderer = sdl2.CreateRenderer(ctx.window, -1, {.ACCELERATED, .PRESENTVSYNC});
 	if ctx.surface == nil {
 		log.errorf("sdl2.CreateRenderer failed.");
 		return false;
@@ -213,8 +213,6 @@ init_resources :: proc() -> (ok: bool) {
 	};
 
 	destroy_surface(logo_surface);
-
-
 	append(&ctx.textures, odin_logo);
 
 	return true;
@@ -232,7 +230,6 @@ draw :: proc() {
 		h = i32(f32(tex.h) * tex.scale),
 	};
     sdl2.RenderCopy(ctx.renderer, tex.tex, nil, &r);
-
   	sdl2.RenderPresent(ctx.renderer);
 }
 
