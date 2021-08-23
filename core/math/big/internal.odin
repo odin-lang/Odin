@@ -1866,7 +1866,7 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if raw.cap == 0 {
-		a.digit = mem.make_dynamic_array_len_cap([dynamic]DIGIT, needed, needed, allocator);
+		a.digit = make([dynamic]DIGIT, needed, allocator);
 	} else if raw.cap != needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
