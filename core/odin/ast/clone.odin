@@ -5,7 +5,7 @@ import "core:fmt"
 import "core:odin/tokenizer"
 
 new :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
-	n := mem.new(T);
+	n, _ := mem.new(T);
 	n.pos = pos;
 	n.end = end;
 	n.derived = n^;
