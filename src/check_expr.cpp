@@ -1886,7 +1886,17 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 						error(op, "Cannot take the pointer address of '%s' which is a swizzle intermediate array value", str);
 						break;
 					default:
-						error(op, "Cannot take the pointer address of '%s'", str);
+						{
+							begin_error_block();
+							defer (end_error_block());
+							error(op, "Cannot take the pointer address of '%s'", str);
+							if (e != nullptr && (e->flags & EntityFlag_ForValue) != 0) {
+								error_line("\tSuggestion: Did you want to pass the iterable value to the for statement by pointer to get addressable semantics?\n");
+							}
+							if (e != nullptr && (e->flags & EntityFlag_SwitchValue) != 0) {
+								error_line("\tSuggestion: Did you want to pass the value to the switch statement by pointer to get addressable semantics?\n");
+							}
+						}
 						break;
 					}
 				}

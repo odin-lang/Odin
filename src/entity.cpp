@@ -69,6 +69,9 @@ enum EntityFlag : u64 {
 
 	EntityFlag_Lazy          = 1ull<<27, // Lazily type checked
 
+	EntityFlag_ForValue      = 1ull<<28,
+	EntityFlag_SwitchValue   = 1ull<<29,
+
 	EntityFlag_Test          = 1ull<<30,
 
 	EntityFlag_Overridden    = 1ull<<63,
