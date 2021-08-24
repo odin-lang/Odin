@@ -389,13 +389,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	d->proc_lit = proc_lit;
 	d->proc_checked = false;
 
-	if (token.string == "raw_slice_data") {
-		Type *elem = final_proc_type->Proc.params->Tuple.variables[0]->type->Slice.elem;
-		if (elem->kind == Type_Basic && elem->Basic.kind == Basic_f64) {
-			gb_printf_err("%.*s %s\n", LIT(token.string), type_to_string(final_proc_type));
-		}
-	}
-
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->identifier = ident;
 
