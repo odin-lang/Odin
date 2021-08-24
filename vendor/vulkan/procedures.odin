@@ -459,16 +459,6 @@ when ODIN_OS == "windows" {
 	ProcCmdTraceRaysIndirectKHR                                         :: #type proc "stdcall" (commandBuffer: CommandBuffer, pRaygenShaderBindingTable: ^StridedDeviceAddressRegionKHR, pMissShaderBindingTable: ^StridedDeviceAddressRegionKHR, pHitShaderBindingTable: ^StridedDeviceAddressRegionKHR, pCallableShaderBindingTable: ^StridedDeviceAddressRegionKHR, indirectDeviceAddress: DeviceAddress);
 	ProcGetRayTracingShaderGroupStackSizeKHR                            :: #type proc "stdcall" (device: Device, pipeline: Pipeline, group: u32, groupShader: ShaderGroupShaderKHR) -> DeviceSize;
 	ProcCmdSetRayTracingPipelineStackSizeKHR                            :: #type proc "stdcall" (commandBuffer: CommandBuffer, pipelineStackSize: u32);
-	ProcGetPhysicalDeviceProcAddr                                       :: #type proc "stdcall" (instance: Instance, pName: cstring) -> ProcVoidFunction;
-	ProcNegotiateLoaderLayerInterfaceVersion                            :: #type proc "stdcall" (pVersionStruct: ^NegotiateLayerInterface ) -> Result;
-	ProcSetInstanceLoaderData                                           :: #type proc "stdcall" (instance: Instance, object: rawptr) -> Result;
-	ProcSetDeviceLoaderData                                             :: #type proc "stdcall" (device: Device, object: rawptr) -> Result;
-	ProcLayerCreateDevice                                               :: #type proc "stdcall" (instance: Instance, physicalDevice: PhysicalDevice, pCreateInfo: ^DeviceCreateInfo , pAllocator: ^AllocationCallbacks , pDevice: ^Device , layerGIPA: ProcGetInstanceProcAddr, nextGDPA: ^ProcGetDeviceProcAddr ) -> Result;
-	ProcLayerDestroyDevice                                              :: #type proc "stdcall" (physicalDevice: Device, pAllocator: ^AllocationCallbacks , destroyFunction: ProcDestroyDevice);
-	ProcicdNegotiateLoaderICDInterfaceVersion                           :: #type proc "stdcall" (pVersion: ^u32) -> Result;
-	ProcicdGetInstanceProcAddr                                          :: #type proc "stdcall" (instance: Instance, pName: cstring) -> ProcVoidFunction;
-	ProcicdGetPhysicalDeviceProcAddr                                    :: #type proc "stdcall" (instance: Instance, pName: cstring) -> ProcVoidFunction;
-	ProcicdEnumerateAdapterPhysicalDevices                              :: #type proc "stdcall" (instance: Instance, adapterLUID: LUID, pPhysicalDeviceCount: ^u32, pPhysicalDevices: ^PhysicalDevice) -> Result;
 	ProcCreateWin32SurfaceKHR                                           :: #type proc "stdcall" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result;
 	ProcGetPhysicalDeviceWin32PresentationSupportKHR                    :: #type proc "stdcall" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32) -> b32;
 	ProcGetMemoryWin32HandleKHR                                         :: #type proc "stdcall" (device: Device, pGetWin32HandleInfo: ^MemoryGetWin32HandleInfoKHR, pHandle: ^HANDLE) -> Result;
@@ -937,16 +927,6 @@ when ODIN_OS == "windows" {
 	ProcCmdTraceRaysIndirectKHR                                         :: #type proc "c" (commandBuffer: CommandBuffer, pRaygenShaderBindingTable: ^StridedDeviceAddressRegionKHR, pMissShaderBindingTable: ^StridedDeviceAddressRegionKHR, pHitShaderBindingTable: ^StridedDeviceAddressRegionKHR, pCallableShaderBindingTable: ^StridedDeviceAddressRegionKHR, indirectDeviceAddress: DeviceAddress);
 	ProcGetRayTracingShaderGroupStackSizeKHR                            :: #type proc "c" (device: Device, pipeline: Pipeline, group: u32, groupShader: ShaderGroupShaderKHR) -> DeviceSize;
 	ProcCmdSetRayTracingPipelineStackSizeKHR                            :: #type proc "c" (commandBuffer: CommandBuffer, pipelineStackSize: u32);
-	ProcGetPhysicalDeviceProcAddr                                       :: #type proc "c" (instance: Instance, pName: cstring) -> ProcVoidFunction;
-	ProcNegotiateLoaderLayerInterfaceVersion                            :: #type proc "c" (pVersionStruct: ^NegotiateLayerInterface ) -> Result;
-	ProcSetInstanceLoaderData                                           :: #type proc "c" (instance: Instance, object: rawptr) -> Result;
-	ProcSetDeviceLoaderData                                             :: #type proc "c" (device: Device, object: rawptr) -> Result;
-	ProcLayerCreateDevice                                               :: #type proc "c" (instance: Instance, physicalDevice: PhysicalDevice, pCreateInfo: ^DeviceCreateInfo , pAllocator: ^AllocationCallbacks , pDevice: ^Device , layerGIPA: ProcGetInstanceProcAddr, nextGDPA: ^ProcGetDeviceProcAddr ) -> Result;
-	ProcLayerDestroyDevice                                              :: #type proc "c" (physicalDevice: Device, pAllocator: ^AllocationCallbacks , destroyFunction: ProcDestroyDevice);
-	ProcicdNegotiateLoaderICDInterfaceVersion                           :: #type proc "c" (pVersion: ^u32) -> Result;
-	ProcicdGetInstanceProcAddr                                          :: #type proc "c" (instance: Instance, pName: cstring) -> ProcVoidFunction;
-	ProcicdGetPhysicalDeviceProcAddr                                    :: #type proc "c" (instance: Instance, pName: cstring) -> ProcVoidFunction;
-	ProcicdEnumerateAdapterPhysicalDevices                              :: #type proc "c" (instance: Instance, adapterLUID: LUID, pPhysicalDeviceCount: ^u32, pPhysicalDevices: ^PhysicalDevice) -> Result;
 	ProcCreateWin32SurfaceKHR                                           :: #type proc "c" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result;
 	ProcGetPhysicalDeviceWin32PresentationSupportKHR                    :: #type proc "c" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32) -> b32;
 	ProcGetMemoryWin32HandleKHR                                         :: #type proc "c" (device: Device, pGetWin32HandleInfo: ^MemoryGetWin32HandleInfoKHR, pHandle: ^HANDLE) -> Result;
@@ -1043,12 +1023,6 @@ AcquireDrmDisplayEXT:                                            ProcAcquireDrmD
 GetDrmDisplayEXT:                                                ProcGetDrmDisplayEXT;
 AcquireWinrtDisplayNV:                                           ProcAcquireWinrtDisplayNV;
 GetWinrtDisplayNV:                                               ProcGetWinrtDisplayNV;
-GetPhysicalDeviceProcAddr:                                       ProcGetPhysicalDeviceProcAddr;
-SetInstanceLoaderData:                                           ProcSetInstanceLoaderData;
-LayerCreateDevice:                                               ProcLayerCreateDevice;
-icdGetInstanceProcAddr:                                          ProcicdGetInstanceProcAddr;
-icdGetPhysicalDeviceProcAddr:                                    ProcicdGetPhysicalDeviceProcAddr;
-icdEnumerateAdapterPhysicalDevices:                              ProcicdEnumerateAdapterPhysicalDevices;
 CreateWin32SurfaceKHR:                                           ProcCreateWin32SurfaceKHR;
 GetPhysicalDeviceWin32PresentationSupportKHR:                    ProcGetPhysicalDeviceWin32PresentationSupportKHR;
 GetPhysicalDeviceSurfacePresentModes2EXT:                        ProcGetPhysicalDeviceSurfacePresentModes2EXT;
@@ -1419,8 +1393,6 @@ GetRayTracingCaptureReplayShaderGroupHandlesKHR: ProcGetRayTracingCaptureReplayS
 CmdTraceRaysIndirectKHR:                         ProcCmdTraceRaysIndirectKHR;
 GetRayTracingShaderGroupStackSizeKHR:            ProcGetRayTracingShaderGroupStackSizeKHR;
 CmdSetRayTracingPipelineStackSizeKHR:            ProcCmdSetRayTracingPipelineStackSizeKHR;
-SetDeviceLoaderData:                             ProcSetDeviceLoaderData;
-LayerDestroyDevice:                              ProcLayerDestroyDevice;
 GetMemoryWin32HandleKHR:                         ProcGetMemoryWin32HandleKHR;
 GetMemoryWin32HandlePropertiesKHR:               ProcGetMemoryWin32HandlePropertiesKHR;
 ImportSemaphoreWin32HandleKHR:                   ProcImportSemaphoreWin32HandleKHR;
@@ -1433,14 +1405,12 @@ ReleaseFullScreenExclusiveModeEXT:               ProcReleaseFullScreenExclusiveM
 GetDeviceGroupSurfacePresentModes2EXT:           ProcGetDeviceGroupSurfacePresentModes2EXT;
 
 // Loader Procedures
-CreateInstance:                        ProcCreateInstance;
-EnumerateInstanceExtensionProperties:  ProcEnumerateInstanceExtensionProperties;
-EnumerateInstanceLayerProperties:      ProcEnumerateInstanceLayerProperties;
-EnumerateInstanceVersion:              ProcEnumerateInstanceVersion;
-DebugUtilsMessengerCallbackEXT:        ProcDebugUtilsMessengerCallbackEXT;
-DeviceMemoryReportCallbackEXT:         ProcDeviceMemoryReportCallbackEXT;
-NegotiateLoaderLayerInterfaceVersion:  ProcNegotiateLoaderLayerInterfaceVersion;
-icdNegotiateLoaderICDInterfaceVersion: ProcicdNegotiateLoaderICDInterfaceVersion;
+CreateInstance:                       ProcCreateInstance;
+EnumerateInstanceExtensionProperties: ProcEnumerateInstanceExtensionProperties;
+EnumerateInstanceLayerProperties:     ProcEnumerateInstanceLayerProperties;
+EnumerateInstanceVersion:             ProcEnumerateInstanceVersion;
+DebugUtilsMessengerCallbackEXT:       ProcDebugUtilsMessengerCallbackEXT;
+DeviceMemoryReportCallbackEXT:        ProcDeviceMemoryReportCallbackEXT;
 
 load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {
 	// Instance Procedures
@@ -1520,12 +1490,6 @@ load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetDrmDisplayEXT,                                                "vkGetDrmDisplayEXT");
 	set_proc_address(&AcquireWinrtDisplayNV,                                           "vkAcquireWinrtDisplayNV");
 	set_proc_address(&GetWinrtDisplayNV,                                               "vkGetWinrtDisplayNV");
-	set_proc_address(&GetPhysicalDeviceProcAddr,                                       "vkGetPhysicalDeviceProcAddr");
-	set_proc_address(&SetInstanceLoaderData,                                           "vkSetInstanceLoaderData");
-	set_proc_address(&LayerCreateDevice,                                               "vkLayerCreateDevice");
-	set_proc_address(&icdGetInstanceProcAddr,                                          "vkicdGetInstanceProcAddr");
-	set_proc_address(&icdGetPhysicalDeviceProcAddr,                                    "vkicdGetPhysicalDeviceProcAddr");
-	set_proc_address(&icdEnumerateAdapterPhysicalDevices,                              "vkicdEnumerateAdapterPhysicalDevices");
 	set_proc_address(&CreateWin32SurfaceKHR,                                           "vkCreateWin32SurfaceKHR");
 	set_proc_address(&GetPhysicalDeviceWin32PresentationSupportKHR,                    "vkGetPhysicalDeviceWin32PresentationSupportKHR");
 	set_proc_address(&GetPhysicalDeviceSurfacePresentModes2EXT,                        "vkGetPhysicalDeviceSurfacePresentModes2EXT");
@@ -1896,8 +1860,6 @@ load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdTraceRaysIndirectKHR,                         "vkCmdTraceRaysIndirectKHR");
 	set_proc_address(&GetRayTracingShaderGroupStackSizeKHR,            "vkGetRayTracingShaderGroupStackSizeKHR");
 	set_proc_address(&CmdSetRayTracingPipelineStackSizeKHR,            "vkCmdSetRayTracingPipelineStackSizeKHR");
-	set_proc_address(&SetDeviceLoaderData,                             "vkSetDeviceLoaderData");
-	set_proc_address(&LayerDestroyDevice,                              "vkLayerDestroyDevice");
 	set_proc_address(&GetMemoryWin32HandleKHR,                         "vkGetMemoryWin32HandleKHR");
 	set_proc_address(&GetMemoryWin32HandlePropertiesKHR,               "vkGetMemoryWin32HandlePropertiesKHR");
 	set_proc_address(&ImportSemaphoreWin32HandleKHR,                   "vkImportSemaphoreWin32HandleKHR");
@@ -1910,14 +1872,12 @@ load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetDeviceGroupSurfacePresentModes2EXT,           "vkGetDeviceGroupSurfacePresentModes2EXT");
 
 	// Loader Procedures
-	set_proc_address(&CreateInstance,                        "vkCreateInstance");
-	set_proc_address(&EnumerateInstanceExtensionProperties,  "vkEnumerateInstanceExtensionProperties");
-	set_proc_address(&EnumerateInstanceLayerProperties,      "vkEnumerateInstanceLayerProperties");
-	set_proc_address(&EnumerateInstanceVersion,              "vkEnumerateInstanceVersion");
-	set_proc_address(&DebugUtilsMessengerCallbackEXT,        "vkDebugUtilsMessengerCallbackEXT");
-	set_proc_address(&DeviceMemoryReportCallbackEXT,         "vkDeviceMemoryReportCallbackEXT");
-	set_proc_address(&NegotiateLoaderLayerInterfaceVersion,  "vkNegotiateLoaderLayerInterfaceVersion");
-	set_proc_address(&icdNegotiateLoaderICDInterfaceVersion, "vkicdNegotiateLoaderICDInterfaceVersion");
+	set_proc_address(&CreateInstance,                       "vkCreateInstance");
+	set_proc_address(&EnumerateInstanceExtensionProperties, "vkEnumerateInstanceExtensionProperties");
+	set_proc_address(&EnumerateInstanceLayerProperties,     "vkEnumerateInstanceLayerProperties");
+	set_proc_address(&EnumerateInstanceVersion,             "vkEnumerateInstanceVersion");
+	set_proc_address(&DebugUtilsMessengerCallbackEXT,       "vkDebugUtilsMessengerCallbackEXT");
+	set_proc_address(&DeviceMemoryReportCallbackEXT,        "vkDeviceMemoryReportCallbackEXT");
 
 }
 

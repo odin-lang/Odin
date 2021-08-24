@@ -2859,28 +2859,6 @@ ShaderGroupShaderKHR :: enum c.int {
 	INTERSECTION = 3,
 }
 
-NegotiateLayerStructType :: enum c.int {
-}
-
-LayerFunction_ :: enum c.int {
-	LAYER_LINK_INFO                     = 0,
-	LOADER_DATA_CALLBACK                = 1,
-	LOADER_LAYER_CREATE_DEVICE_CALLBACK = 2,
-	LOADER_FEATURES                     = 3,
-}
-
-LoaderFeastureFlags :: distinct bit_set[LoaderFeastureFlag; Flags];
-LoaderFeastureFlag :: enum Flags {
-	LOADER_FEATURE_PHYSICAL_DEVICE_SORTING = 0,
-}
-
-ChainType :: enum c.int {
-	UNKNOWN                                 = 0,
-	ENUMERATE_INSTANCE_EXTENSION_PROPERTIES = 1,
-	ENUMERATE_INSTANCE_LAYER_PROPERTIES     = 2,
-	ENUMERATE_INSTANCE_VERSION              = 3,
-}
-
 FullScreenExclusiveEXT :: enum c.int {
 	DEFAULT                = 0,
 	ALLOWED                = 1,
@@ -2888,87 +2866,85 @@ FullScreenExclusiveEXT :: enum c.int {
 	APPLICATION_CONTROLLED = 3,
 }
 
-PipelineDynamicStateCreateFlags                      :: distinct bit_set[PipelineDynamicStateCreateFlag; Flags];
-PipelineDynamicStateCreateFlag                       :: enum u32 {};
-PipelineViewportStateCreateFlags                     :: distinct bit_set[PipelineViewportStateCreateFlag; Flags];
-PipelineViewportStateCreateFlag                      :: enum u32 {};
+PipelineLayoutCreateFlags                            :: distinct bit_set[PipelineLayoutCreateFlag; Flags];
+PipelineLayoutCreateFlag                             :: enum u32 {};
+MemoryMapFlags                                       :: distinct bit_set[MemoryMapFlag; Flags];
+MemoryMapFlag                                        :: enum u32 {};
+PipelineTessellationStateCreateFlags                 :: distinct bit_set[PipelineTessellationStateCreateFlag; Flags];
+PipelineTessellationStateCreateFlag                  :: enum u32 {};
+DebugUtilsMessengerCreateFlagsEXT                    :: distinct bit_set[DebugUtilsMessengerCreateFlagEXT; Flags];
+DebugUtilsMessengerCreateFlagEXT                     :: enum u32 {};
+Win32SurfaceCreateFlagsKHR                           :: distinct bit_set[Win32SurfaceCreateFlagKHR; Flags];
+Win32SurfaceCreateFlagKHR                            :: enum u32 {};
+PipelineDepthStencilStateCreateFlags                 :: distinct bit_set[PipelineDepthStencilStateCreateFlag; Flags];
+PipelineDepthStencilStateCreateFlag                  :: enum u32 {};
+PipelineColorBlendStateCreateFlags                   :: distinct bit_set[PipelineColorBlendStateCreateFlag; Flags];
+PipelineColorBlendStateCreateFlag                    :: enum u32 {};
 PipelineDiscardRectangleStateCreateFlagsEXT          :: distinct bit_set[PipelineDiscardRectangleStateCreateFlagEXT; Flags];
 PipelineDiscardRectangleStateCreateFlagEXT           :: enum u32 {};
 DescriptorUpdateTemplateCreateFlags                  :: distinct bit_set[DescriptorUpdateTemplateCreateFlag; Flags];
 DescriptorUpdateTemplateCreateFlag                   :: enum u32 {};
-AccelerationStructureMotionInstanceFlagsNV           :: distinct bit_set[AccelerationStructureMotionInstanceFlagNV; Flags];
-AccelerationStructureMotionInstanceFlagNV            :: enum u32 {};
+QueryPoolCreateFlags                                 :: distinct bit_set[QueryPoolCreateFlag; Flags];
+QueryPoolCreateFlag                                  :: enum u32 {};
 PipelineRasterizationConservativeStateCreateFlagsEXT :: distinct bit_set[PipelineRasterizationConservativeStateCreateFlagEXT; Flags];
 PipelineRasterizationConservativeStateCreateFlagEXT  :: enum u32 {};
-PipelineRasterizationDepthClipStateCreateFlagsEXT    :: distinct bit_set[PipelineRasterizationDepthClipStateCreateFlagEXT; Flags];
-PipelineRasterizationDepthClipStateCreateFlagEXT     :: enum u32 {};
-ValidationCacheCreateFlagsEXT                        :: distinct bit_set[ValidationCacheCreateFlagEXT; Flags];
-ValidationCacheCreateFlagEXT                         :: enum u32 {};
-AccelerationStructureMotionInfoFlagsNV               :: distinct bit_set[AccelerationStructureMotionInfoFlagNV; Flags];
-AccelerationStructureMotionInfoFlagNV                :: enum u32 {};
-MacOSSurfaceCreateFlagsMVK                           :: distinct bit_set[MacOSSurfaceCreateFlagMVK; Flags];
-MacOSSurfaceCreateFlagMVK                            :: enum u32 {};
-MetalSurfaceCreateFlagsEXT                           :: distinct bit_set[MetalSurfaceCreateFlagEXT; Flags];
-MetalSurfaceCreateFlagEXT                            :: enum u32 {};
-PipelineInputAssemblyStateCreateFlags                :: distinct bit_set[PipelineInputAssemblyStateCreateFlag; Flags];
-PipelineInputAssemblyStateCreateFlag                 :: enum u32 {};
-PipelineTessellationStateCreateFlags                 :: distinct bit_set[PipelineTessellationStateCreateFlag; Flags];
-PipelineTessellationStateCreateFlag                  :: enum u32 {};
-PipelineCoverageModulationStateCreateFlagsNV         :: distinct bit_set[PipelineCoverageModulationStateCreateFlagNV; Flags];
-PipelineCoverageModulationStateCreateFlagNV          :: enum u32 {};
-CommandPoolTrimFlags                                 :: distinct bit_set[CommandPoolTrimFlag; Flags];
-CommandPoolTrimFlag                                  :: enum u32 {};
-DisplayModeCreateFlagsKHR                            :: distinct bit_set[DisplayModeCreateFlagKHR; Flags];
-DisplayModeCreateFlagKHR                             :: enum u32 {};
+PipelineCoverageToColorStateCreateFlagsNV            :: distinct bit_set[PipelineCoverageToColorStateCreateFlagNV; Flags];
+PipelineCoverageToColorStateCreateFlagNV             :: enum u32 {};
+BufferViewCreateFlags                                :: distinct bit_set[BufferViewCreateFlag; Flags];
+BufferViewCreateFlag                                 :: enum u32 {};
 PipelineRasterizationStateStreamCreateFlagsEXT       :: distinct bit_set[PipelineRasterizationStateStreamCreateFlagEXT; Flags];
 PipelineRasterizationStateStreamCreateFlagEXT        :: enum u32 {};
 DisplaySurfaceCreateFlagsKHR                         :: distinct bit_set[DisplaySurfaceCreateFlagKHR; Flags];
 DisplaySurfaceCreateFlagKHR                          :: enum u32 {};
-QueryPoolCreateFlags                                 :: distinct bit_set[QueryPoolCreateFlag; Flags];
-QueryPoolCreateFlag                                  :: enum u32 {};
-PipelineColorBlendStateCreateFlags                   :: distinct bit_set[PipelineColorBlendStateCreateFlag; Flags];
-PipelineColorBlendStateCreateFlag                    :: enum u32 {};
-LoaderFeatureFlags                                   :: distinct bit_set[LoaderFeatureFlag; Flags];
-LoaderFeatureFlag                                    :: enum u32 {};
-PipelineCoverageReductionStateCreateFlagsNV          :: distinct bit_set[PipelineCoverageReductionStateCreateFlagNV; Flags];
-PipelineCoverageReductionStateCreateFlagNV           :: enum u32 {};
 DeviceCreateFlags                                    :: distinct bit_set[DeviceCreateFlag; Flags];
 DeviceCreateFlag                                     :: enum u32 {};
-HeadlessSurfaceCreateFlagsEXT                        :: distinct bit_set[HeadlessSurfaceCreateFlagEXT; Flags];
-HeadlessSurfaceCreateFlagEXT                         :: enum u32 {};
+PipelineCoverageModulationStateCreateFlagsNV         :: distinct bit_set[PipelineCoverageModulationStateCreateFlagNV; Flags];
+PipelineCoverageModulationStateCreateFlagNV          :: enum u32 {};
 PipelineMultisampleStateCreateFlags                  :: distinct bit_set[PipelineMultisampleStateCreateFlag; Flags];
 PipelineMultisampleStateCreateFlag                   :: enum u32 {};
-InstanceCreateFlags                                  :: distinct bit_set[InstanceCreateFlag; Flags];
-InstanceCreateFlag                                   :: enum u32 {};
-Win32SurfaceCreateFlagsKHR                           :: distinct bit_set[Win32SurfaceCreateFlagKHR; Flags];
-Win32SurfaceCreateFlagKHR                            :: enum u32 {};
-IOSSurfaceCreateFlagsMVK                             :: distinct bit_set[IOSSurfaceCreateFlagMVK; Flags];
-IOSSurfaceCreateFlagMVK                              :: enum u32 {};
-PipelineLayoutCreateFlags                            :: distinct bit_set[PipelineLayoutCreateFlag; Flags];
-PipelineLayoutCreateFlag                             :: enum u32 {};
-PipelineCoverageToColorStateCreateFlagsNV            :: distinct bit_set[PipelineCoverageToColorStateCreateFlagNV; Flags];
-PipelineCoverageToColorStateCreateFlagNV             :: enum u32 {};
-SemaphoreCreateFlags                                 :: distinct bit_set[SemaphoreCreateFlag; Flags];
-SemaphoreCreateFlag                                  :: enum u32 {};
-PipelineViewportSwizzleStateCreateFlagsNV            :: distinct bit_set[PipelineViewportSwizzleStateCreateFlagNV; Flags];
-PipelineViewportSwizzleStateCreateFlagNV             :: enum u32 {};
-PipelineDepthStencilStateCreateFlags                 :: distinct bit_set[PipelineDepthStencilStateCreateFlag; Flags];
-PipelineDepthStencilStateCreateFlag                  :: enum u32 {};
-MemoryMapFlags                                       :: distinct bit_set[MemoryMapFlag; Flags];
-MemoryMapFlag                                        :: enum u32 {};
-PipelineRasterizationStateCreateFlags                :: distinct bit_set[PipelineRasterizationStateCreateFlag; Flags];
-PipelineRasterizationStateCreateFlag                 :: enum u32 {};
-DeviceMemoryReportFlagsEXT                           :: distinct bit_set[DeviceMemoryReportFlagEXT; Flags];
-DeviceMemoryReportFlagEXT                            :: enum u32 {};
+AccelerationStructureMotionInfoFlagsNV               :: distinct bit_set[AccelerationStructureMotionInfoFlagNV; Flags];
+AccelerationStructureMotionInfoFlagNV                :: enum u32 {};
+DisplayModeCreateFlagsKHR                            :: distinct bit_set[DisplayModeCreateFlagKHR; Flags];
+DisplayModeCreateFlagKHR                             :: enum u32 {};
+AccelerationStructureMotionInstanceFlagsNV           :: distinct bit_set[AccelerationStructureMotionInstanceFlagNV; Flags];
+AccelerationStructureMotionInstanceFlagNV            :: enum u32 {};
+CommandPoolTrimFlags                                 :: distinct bit_set[CommandPoolTrimFlag; Flags];
+CommandPoolTrimFlag                                  :: enum u32 {};
+PipelineDynamicStateCreateFlags                      :: distinct bit_set[PipelineDynamicStateCreateFlag; Flags];
+PipelineDynamicStateCreateFlag                       :: enum u32 {};
+ValidationCacheCreateFlagsEXT                        :: distinct bit_set[ValidationCacheCreateFlagEXT; Flags];
+ValidationCacheCreateFlagEXT                         :: enum u32 {};
 DebugUtilsMessengerCallbackDataFlagsEXT              :: distinct bit_set[DebugUtilsMessengerCallbackDataFlagEXT; Flags];
 DebugUtilsMessengerCallbackDataFlagEXT               :: enum u32 {};
-DebugUtilsMessengerCreateFlagsEXT                    :: distinct bit_set[DebugUtilsMessengerCreateFlagEXT; Flags];
-DebugUtilsMessengerCreateFlagEXT                     :: enum u32 {};
+MacOSSurfaceCreateFlagsMVK                           :: distinct bit_set[MacOSSurfaceCreateFlagMVK; Flags];
+MacOSSurfaceCreateFlagMVK                            :: enum u32 {};
+SemaphoreCreateFlags                                 :: distinct bit_set[SemaphoreCreateFlag; Flags];
+SemaphoreCreateFlag                                  :: enum u32 {};
+DeviceMemoryReportFlagsEXT                           :: distinct bit_set[DeviceMemoryReportFlagEXT; Flags];
+DeviceMemoryReportFlagEXT                            :: enum u32 {};
+PipelineViewportSwizzleStateCreateFlagsNV            :: distinct bit_set[PipelineViewportSwizzleStateCreateFlagNV; Flags];
+PipelineViewportSwizzleStateCreateFlagNV             :: enum u32 {};
+MetalSurfaceCreateFlagsEXT                           :: distinct bit_set[MetalSurfaceCreateFlagEXT; Flags];
+MetalSurfaceCreateFlagEXT                            :: enum u32 {};
+PipelineInputAssemblyStateCreateFlags                :: distinct bit_set[PipelineInputAssemblyStateCreateFlag; Flags];
+PipelineInputAssemblyStateCreateFlag                 :: enum u32 {};
+InstanceCreateFlags                                  :: distinct bit_set[InstanceCreateFlag; Flags];
+InstanceCreateFlag                                   :: enum u32 {};
+IOSSurfaceCreateFlagsMVK                             :: distinct bit_set[IOSSurfaceCreateFlagMVK; Flags];
+IOSSurfaceCreateFlagMVK                              :: enum u32 {};
 DescriptorPoolResetFlags                             :: distinct bit_set[DescriptorPoolResetFlag; Flags];
 DescriptorPoolResetFlag                              :: enum u32 {};
-BufferViewCreateFlags                                :: distinct bit_set[BufferViewCreateFlag; Flags];
-BufferViewCreateFlag                                 :: enum u32 {};
+PipelineRasterizationStateCreateFlags                :: distinct bit_set[PipelineRasterizationStateCreateFlag; Flags];
+PipelineRasterizationStateCreateFlag                 :: enum u32 {};
 PipelineVertexInputStateCreateFlags                  :: distinct bit_set[PipelineVertexInputStateCreateFlag; Flags];
 PipelineVertexInputStateCreateFlag                   :: enum u32 {};
+PipelineRasterizationDepthClipStateCreateFlagsEXT    :: distinct bit_set[PipelineRasterizationDepthClipStateCreateFlagEXT; Flags];
+PipelineRasterizationDepthClipStateCreateFlagEXT     :: enum u32 {};
+PipelineCoverageReductionStateCreateFlagsNV          :: distinct bit_set[PipelineCoverageReductionStateCreateFlagNV; Flags];
+PipelineCoverageReductionStateCreateFlagNV           :: enum u32 {};
+PipelineViewportStateCreateFlags                     :: distinct bit_set[PipelineViewportStateCreateFlag; Flags];
+PipelineViewportStateCreateFlag                      :: enum u32 {};
+HeadlessSurfaceCreateFlagsEXT                        :: distinct bit_set[HeadlessSurfaceCreateFlagEXT; Flags];
+HeadlessSurfaceCreateFlagEXT                         :: enum u32 {};
 
 
