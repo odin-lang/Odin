@@ -5055,46 +5055,6 @@ PhysicalDeviceRayQueryFeaturesKHR :: struct {
 	rayQuery: b32,
 }
 
-NegotiateLayerInterface :: struct {
-	sType:                        NegotiateLayerStructType,
-	loaderLayerInterfaceVersion:  u32,
-	pfnGetInstanceProcAddr:       ProcGetInstanceProcAddr,
-	pfnGetDeviceProcAddr:         ProcGetDeviceProcAddr,
-	pfnGetPhysicalDeviceProcAddr: ProcGetPhysicalDeviceProcAddr,
-}
-
-LayerInstanceLink_ :: struct {
-	pfnNextGetInstanceProcAddr:       ProcGetInstanceProcAddr,
-	pfnNextGetPhysicalDeviceProcAddr: ProcGetPhysicalDeviceProcAddr,
-}
-
-LayerDeviceInfo_ :: struct {
-	pfnNextGetInstanceProcAddr: ProcGetInstanceProcAddr,
-}
-
-LayerDeviceLink_ :: struct {
-	pfnNextGetInstanceProcAddr: ProcGetInstanceProcAddr,
-	pfnNextGetDeviceProcAddr:   ProcGetDeviceProcAddr,
-}
-
-ChainHeader :: struct {
-	type:    ChainType,
-	version: u32,
-	size:    u32,
-}
-
-EnumerateInstanceExtensionPropertiesChain :: struct {
-	header: ChainHeader,
-}
-
-EnumerateInstanceLayerPropertiesChain :: struct {
-	header: ChainHeader,
-}
-
-EnumerateInstanceVersionChain :: struct {
-	header: ChainHeader,
-}
-
 Win32SurfaceCreateInfoKHR :: struct {
 	sType:     StructureType,
 	pNext:     rawptr,

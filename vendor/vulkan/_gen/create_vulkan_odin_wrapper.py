@@ -9,8 +9,8 @@ import math
 file_and_urls = [
     ("vk_platform.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_platform.h',  True),
     ("vulkan_core.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h',  False),
-    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_layer.h',     False),
-    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_icd.h',       False),
+    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_layer.h',     True),
+    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_icd.h',       True),
     ("vulkan_win32.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_win32.h', False),
     ("vulkan_metal.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_metal.h', False),
     ("vulkan_macos.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_macos.h', False),
