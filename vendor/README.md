@@ -45,3 +45,11 @@ SDL2 TTF relies on 3rd party libraries `zlib`, available under the ZLIB license,
 ## Vulkan
 
 The Vulkan 3D graphics API are automatically generated from headers provided by Khronos, and are made available under the [Apache License, Version 2.0](https://github.com/KhronosGroup/Vulkan-Headers/blob/master/LICENSE.txt).
+
+## GLFW
+
+Bindings for the multi-platform library for OpenGL, OpenGL ES, Vulkan, window and input API [GLFW](https://github.com/glfw/glfw).
+
+`GLFW.dll` and `GLFW.lib` are available under GLFW's [zlib/libpng](https://www.glfw.org/license.html) license.
+
+See also LICENSE.txt in the `glfw` directory itself.
