@@ -131,7 +131,7 @@ foreign lib {
 	GameControllerSetSensorEnabled      :: proc(gamecontroller: ^GameController, type: SensorType, enabled: bool) -> c.int ---
 	GameControllerIsSensorEnabled       :: proc(gamecontroller: ^GameController, type: SensorType) -> bool ---
 	GameControllerGetSensorDataRate     :: proc(gamecontroller: ^GameController, type: SensorType) -> f32 ---
-	GameControllerGetSensorData         :: proc(gamecontroller: ^GameController, type: SensorType, data: ^f32, num_values: c.int) -> c.int ---
+	GameControllerGetSensorData         :: proc(gamecontroller: ^GameController, type: SensorType, data: [^]f32, num_values: c.int) -> c.int ---
 	GameControllerRumble                :: proc(gamecontroller: ^GameController, low_frequency_rumble, high_frequency_rumble: u16, duration_ms: u32) -> c.int ---
 	GameControllerRumbleTriggers        :: proc(gamecontroller: ^GameController, left_rumble, right_rumble: u16, duration_ms: u32) -> c.int ---
 	GameControllerHasLED                :: proc(gamecontroller: ^GameController) -> bool ---
