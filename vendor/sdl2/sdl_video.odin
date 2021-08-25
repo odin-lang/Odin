@@ -304,3 +304,10 @@ foreign lib {
 	GL_SwapWindow            :: proc(window: ^Window) ---
 	GL_DeleteContext         :: proc(ctx: GLContext) ---
 }
+
+
+
+// Used by vendor:OpenGL
+gl_set_proc_address :: proc(p: rawptr, name: cstring) {
+	(^rawptr)(p)^ = GL_GetProcAddress(name);
+}
