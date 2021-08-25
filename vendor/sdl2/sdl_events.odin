@@ -482,7 +482,7 @@ GetEventState :: #force_inline proc "c" (type: EventType) -> u8 { return EventSt
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	PumpEvents       :: proc() ---
-	PeepEvents       :: proc(event: ^Event, numevents: c.int, action: eventaction, minType, maxType: EventType) -> c.int ---
+	PeepEvents       :: proc(events: [^]Event, numevents: c.int, action: eventaction, minType, maxType: EventType) -> c.int ---
 	HasEvent         :: proc(type: EventType) -> bool ---
 	HasEvents        :: proc(minType, maxType: EventType) -> bool ---
 	FlushEvent       :: proc(type: EventType) ---
