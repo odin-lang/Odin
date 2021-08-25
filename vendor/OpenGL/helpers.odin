@@ -128,6 +128,7 @@ compile_shader_from_source :: proc(shader_data: string, shader_type: Shader_Type
 	CompileShader(shader_id);
 
 	check_error(shader_id, shader_type, COMPILE_STATUS, GetShaderiv, GetShaderInfoLog) or_return;
+	ok = true;
 	return;
 }
 
