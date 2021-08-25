@@ -223,3 +223,9 @@ SetCursorEnterCallback :: glfw.SetCursorEnterCallback;
 SetJoystickCallback    :: glfw.SetJoystickCallback;
 
 SetErrorCallback :: glfw.SetErrorCallback;
+
+
+// Used by vendor:OpenGL
+gl_set_proc_address :: proc(p: rawptr, name: cstring) {
+	(^rawptr)(p)^ = GetProcAddress(name);
+}
