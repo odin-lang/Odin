@@ -53,3 +53,11 @@ Bindings for the multi-platform library for OpenGL, OpenGL ES, Vulkan, window an
 `GLFW.dll` and `GLFW.lib` are available under GLFW's [zlib/libpng](https://www.glfw.org/license.html) license.
 
 See also LICENSE.txt in the `glfw` directory itself.
+
+## PortMidi
+
+[PortMidi](https://sourceforge.net/projects/portmedia/) Portable Real-Time MIDI Library.
+
+`portmidi_s.lib` is available under PortMidi's [MIT](https://sourceforge.net/projects/portmedia/) license.
+
+See also LICENSE.txt in the `portmidi` directory itself.
