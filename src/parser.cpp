@@ -2986,30 +2986,31 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				Token token_c = expect_token(f, Token_Colon);
 				Ast *y = parse_expr(f, lhs);
 				expr = ast_ternary_if_expr(f, x, cond, y);
-			} else if (op.kind == Token_if) {
+			} else if (op.kind == Token_if || op.kind == Token_when) {
 				Ast *x = expr;
-				// Token_if
 				Ast *cond = parse_expr(f, lhs);
 				Token tok_else = expect_token(f, Token_else);
 				Ast *y = parse_expr(f, lhs);
-				expr = ast_ternary_if_expr(f, x, cond, y);
-			} else if (op.kind == Token_when) {
-				Ast *x = expr;
-				// Token_when
-				Ast *cond = parse_expr(f, lhs);
-				Token tok_else = expect_token(f, Token_else);
-				Ast *y = parse_expr(f, lhs);
-				expr = ast_ternary_when_expr(f, x, cond, y);
-			} else if (op.kind == Token_or_else) {
-				Ast *x = expr;
-				Ast *y = parse_expr(f, lhs);
-				expr = ast_or_else_expr(f, x, op, y);
+				
+				switch (op.kind) {
+				case Token_if:
+					expr = ast_ternary_if_expr(f, x, cond, y);
+					break;
+				case Token_when:
+					expr = ast_ternary_when_expr(f, x, cond, y);
+					break;
+				}
 			} else {
 				Ast *right = parse_binary_expr(f, false, prec+1);
 				if (right == nullptr) {
-					syntax_error(op, "Expected expression on the right-hand side of the binary operator");
+					syntax_error(op, "Expected expression on the right-hand side of the binary operator '%.*s'", LIT(op.string));
 				}
-				expr = ast_binary_expr(f, op, expr, right);
+				if (op.kind == Token_or_else) {
+					// NOTE(bill): easier to handle its logic different with its own AST kind
+					expr = ast_or_else_expr(f, expr, op, right);	
+				} else {
+					expr = ast_binary_expr(f, op, expr, right);
+				}
 			}
 
 			lhs = false;
