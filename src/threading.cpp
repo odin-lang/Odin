@@ -231,6 +231,46 @@ void yield_process(void);
 		
 	}
 #endif
+	
+	
+struct Barrier {
+	BlockingMutex mutex;
+	Condition cond;
+	isize index;
+	isize generation_id;
+	isize thread_count;	
+};
+
+void barrier_init(Barrier *b, isize thread_count) {
+	mutex_init(&b->mutex);
+	condition_init(&b->cond);
+	b->index = 0;
+	b->generation_id = 0;
+	b->thread_count = 0;
+}
+
+void barrier_destroy(Barrier *b) {
+	condition_destroy(&b->cond);
+	mutex_destroy(&b->mutex);
+}
+
+// Returns true if it is the leader
+bool barrier_wait(Barrier *b) {
+	mutex_lock(&b->mutex);
+	defer (mutex_unlock(&b->mutex));
+	isize local_gen = b->generation_id;
+	b->index += 1;
+	if (b->index < b->thread_count) {
+		while (local_gen == b->generation_id && b->index < b->thread_count) {
+			condition_wait(&b->cond, &b->mutex);
+		}
+		return false;
+	}
+	b->index = 0;
+	b->generation_id += 1;
+	condition_broadcast(&b->cond);
+	return true;
+}
 
 
 

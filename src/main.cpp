@@ -7,6 +7,20 @@
 #include "exact_value.cpp"
 #include "build_settings.cpp"
 
+gb_global ThreadPool global_thread_pool;
+void init_global_thread_pool(void) {
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
+}
+bool global_thread_pool_add_task(WorkerTaskProc *proc, void *data) {
+	return thread_pool_add_task(&global_thread_pool, proc, data);
+}
+void global_thread_pool_wait(void) {
+	thread_pool_wait(&global_thread_pool);
+}
+
+
 void debugf(char const *fmt, ...) {
 	if (build_context.show_debug_messages) {
 		gb_printf_err("[DEBUG] ");
@@ -2160,6 +2174,9 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	return 1;
 	// }
 
+	init_global_thread_pool();
+	defer (thread_pool_destroy(&global_thread_pool));
+	
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 

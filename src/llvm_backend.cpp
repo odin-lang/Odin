@@ -1104,9 +1104,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMBool do_threading = (LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
 
-	thread_pool_init(&lb_thread_pool, heap_allocator(), worker_count, "LLVMBackend");
-	defer (thread_pool_destroy(&lb_thread_pool));
-
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
 
@@ -1691,10 +1688,10 @@ void lb_generate_code(lbGenerator *gen) {
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;
 			wd->m = m;
-			thread_pool_add_task(&lb_thread_pool, lb_llvm_emit_worker_proc, wd);
+			global_thread_pool_add_task(lb_llvm_emit_worker_proc, wd);
 		}
 
-		thread_pool_wait(&lb_thread_pool);
+		thread_pool_wait(&global_thread_pool);
 	} else {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;

@@ -191,15 +191,13 @@ struct Parser {
 	isize                     file_to_process_count;
 	isize                     total_token_count;
 	isize                     total_line_count;
+	BlockingMutex             wait_mutex;
 	BlockingMutex             import_mutex;
 	BlockingMutex             file_add_mutex;
 	BlockingMutex             file_decl_mutex;
 	BlockingMutex             packages_mutex;
 	MPMCQueue<ParseFileError> file_error_queue;
 };
-
-
-gb_global ThreadPool parser_thread_pool = {};
 
 struct ParserWorkerData {
 	Parser *parser;
