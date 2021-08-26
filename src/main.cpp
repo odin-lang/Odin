@@ -2018,6 +2018,7 @@ int main(int arg_count, char const **arg_ptr) {
 	
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
+	mutex_init(&hash_exact_value_mutex);
 
 	init_string_buffer_memory();
 	init_string_interner();

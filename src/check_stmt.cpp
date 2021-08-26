@@ -704,6 +704,7 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 	if (operand.value.kind == ExactValue_Invalid) {
 		return;
 	}
+	
 	HashKey key = hash_exact_value(operand.value);
 	TypeAndToken *found = map_get(seen, key);
 	if (found != nullptr) {
