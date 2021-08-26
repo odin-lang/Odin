@@ -225,8 +225,8 @@ void yield_process(void);
 	}
 	void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms) {
 		struct timespec abstime = {};
-		timespec.tv_sec = timeout_in_ms/1000;
-		timespec.tv_nsec = cast(long)(timeout_in_ms%1000)*1e6;
+		abstime.tv_sec = timeout_in_ms/1000;
+		abstime.tv_nsec = cast(long)(timeout_in_ms%1000)*1e6;
 		pthread_cond_timedwait(&c->pthread_cond, &m->pthread_mutex, &abstime);
 		
 	}
