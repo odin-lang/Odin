@@ -861,7 +861,12 @@ internal_int_mod :: proc(remainder, numerator, denominator: ^Int, allocator := c
 
 	return #force_inline internal_add(remainder, remainder, numerator, allocator);
 }
-internal_mod :: proc{ internal_int_mod, };
+
+internal_int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
+	return internal_int_divmod_digit(nil, numerator, denominator, allocator);
+}
+
+internal_mod :: proc{ internal_int_mod, internal_int_mod_digit};
 
 /*
 	remainder = (number + addend) % modulus.
@@ -1170,6 +1175,67 @@ internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison:
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, };
 internal_cmp_mag :: internal_compare_magnitude;
 
+/*
+	Check if remainders are possible squares - fast exclude non-squares.
+
+	Returns `true` if `a` is a square, `false` if not.
+	Assumes `a` not to be `nil` and to have been initialized.
+*/
+internal_int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (square: bool, err: Error) {
+	context.allocator = allocator;
+
+	/*
+		Default to Non-square :)
+	*/
+	square = false;
+
+	if internal_is_negative(a)                                       { return; }
+	if internal_is_zero(a)                                           { return; }
+
+	/*
+		First check mod 128 (suppose that _DIGIT_BITS is at least 7).
+	*/
+	if _private_int_rem_128[127 & a.digit[0]] == 1                   { return; }
+
+	/*
+		Next check mod 105 (3*5*7).
+	*/
+	c: DIGIT;
+	c, err = internal_mod(a, 105);
+	if _private_int_rem_128[c] == 1                                  { return; }
+
+	t := &Int{};
+	defer destroy(t);
+
+	set(t, 11 * 13 * 17 * 19 * 23 * 29 * 31) or_return;
+	internal_mod(t, a, t) or_return;
+
+	r: u64;
+	r, err = internal_int_get(t, u64);
+
+	/*
+		Check for other prime modules, note it's not an ERROR but we must
+		free "t" so the easiest way is to goto LBL_ERR.  We know that err
+		is already equal to MP_OKAY from the mp_mod call
+	*/
+	if (1 << (r % 11) &      0x5C4) != 0                             { return; }
+	if (1 << (r % 13) &      0x9E4) != 0                             { return; }
+	if (1 << (r % 17) &     0x5CE8) != 0                             { return; }
+	if (1 << (r % 19) &    0x4F50C) != 0                             { return; }
+	if (1 << (r % 23) &   0x7ACCA0) != 0                             { return; }
+	if (1 << (r % 29) &  0xC2EDD0C) != 0                             { return; }
+	if (1 << (r % 31) & 0x6DE2B848) != 0                             { return; }
+
+	/*
+		Final check - is sqr(sqrt(arg)) == arg?
+	*/
+	sqrt(t, a) or_return;
+	sqr(t, t)  or_return;
+
+	square = internal_cmp_mag(t, a) == 0;
+
+	return;
+}
 
 /*
 	=========================    Logs, powers and roots    ============================
