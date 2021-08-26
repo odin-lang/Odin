@@ -1,3 +1,7 @@
+#if defined(GB_SYSTEM_UNIX)
+#include <signal.h>
+#endif
+
 struct BlockingMutex;
 struct RecursiveMutex;
 struct Semaphore;
