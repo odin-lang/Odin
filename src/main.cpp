@@ -171,7 +171,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
-		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s.esx\" %.*s %.*s",
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
 		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
