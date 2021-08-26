@@ -609,7 +609,6 @@ String path_to_fullpath(gbAllocator a, String s);
 String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
-	gbTempArenaMemory tmp;
 	u8 *text;
 
 	if (global_module_path_set) {
@@ -651,9 +650,6 @@ String internal_odin_root_dir(void) {
 
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
-
-	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 

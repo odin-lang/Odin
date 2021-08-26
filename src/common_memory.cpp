@@ -6,11 +6,6 @@ gb_inline void zero_size(void *ptr, isize len) {
 #define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
 
 
-i32 next_pow2(i32 n);
-i64 next_pow2(i64 n);
-isize next_pow2_isize(isize n);
-void debugf(char const *fmt, ...);
-
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
@@ -64,7 +59,6 @@ struct MemoryBlock {
 struct Arena {
 	MemoryBlock * curr_block;
 	isize minimum_block_size;
-	isize temporary_memory_count;
 };
 
 enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
@@ -213,7 +207,7 @@ void platform_virtual_memory_init(void) {
 	
 }
 
-MemoryBlock *virtual_memory_alloc(isize size, MemoryBlockFlags flags) {
+MemoryBlock *virtual_memory_alloc(isize size) {
 	return nullptr;
 }
 
