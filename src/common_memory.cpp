@@ -133,11 +133,24 @@ struct PlatformMemoryBlock {
 	PlatformMemoryBlock *prev, *next;
 };
 
+
+gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
+
 PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size);
 void platform_virtual_memory_free(PlatformMemoryBlock *block);
 void platform_virtual_memory_protect(void *memory, isize size);
 
 #if defined(GB_SYSTEM_WINDOWS)
+	void platform_virtual_memory_init(void) {
+		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
+		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
+		
+		SYSTEM_INFO sys_info = {};
+		GetSystemInfo(&sys_info);
+		DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sys_info.dwPageSize);
+		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
+	}
+
 	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 		GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
@@ -152,6 +165,14 @@ void platform_virtual_memory_protect(void *memory, isize size);
 		GB_ASSERT(is_protected);
 	}
 #else
+	void platform_virtual_memory_init(void) {
+		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
+		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
+		
+		DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sysconf(_SC_PAGE_SIZE));
+		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
+	}
+	
 	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 		GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
@@ -166,18 +187,6 @@ void platform_virtual_memory_protect(void *memory, isize size);
 		GB_ASSERT(err != 0);
 	}
 #endif
-
-gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
-
-void platform_virtual_memory_init(void) {
-	global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
-	global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
-	
-	SYSTEM_INFO sys_info = {};
-	GetSystemInfo(&sys_info);
-	DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sys_info.dwPageSize);
-	GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
-}
 
 MemoryBlock *virtual_memory_alloc(isize size) {
 	isize const page_size = DEFAULT_PAGE_SIZE; 
