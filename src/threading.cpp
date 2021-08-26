@@ -355,8 +355,8 @@ void gb__thread_run(Thread *t) {
 #if defined(GB_SYSTEM_WINDOWS)
 	DWORD __stdcall internal_thread_proc(void *arg) {
 		Thread *t = cast(Thread *)arg;
+		t->is_running.store(true);
 		gb__thread_run(t);
-		t->is_running.store(false);
 		return 0;
 	}
 #else
@@ -369,8 +369,8 @@ void gb__thread_run(Thread *t) {
 	#endif
 		
 		Thread *t = cast(Thread *)arg;
+		t->is_running.store(true);
 		gb__thread_run(t);
-		t->is_running.store(false);
 		return NULL;
 	}
 #endif
@@ -383,7 +383,6 @@ void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize
 	t->proc = proc;
 	t->user_data = user_data;
 	t->stack_size = stack_size;
-	t->is_running.store(true);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = CreateThread(NULL, stack_size, internal_thread_proc, t, 0, NULL);
@@ -405,7 +404,9 @@ void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize
 }
 
 void thread_join(Thread *t) {
-	if (!t->is_running.load()) return;
+	if (!t->is_running.load()) {
+		return;
+	}
 
 #if defined(GB_SYSTEM_WINDOWS)
 	WaitForSingleObject(t->win32_handle, INFINITE);
