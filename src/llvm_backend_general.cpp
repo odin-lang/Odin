@@ -1744,6 +1744,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		if (type->Tuple.variables.count == 1) {
 			return lb_type(m, type->Tuple.variables[0]->type);
 		} else {
+			m->internal_type_level += 1;
+			defer (m->internal_type_level -= 1);
+			
 			unsigned field_count = cast(unsigned)(type->Tuple.variables.count);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
