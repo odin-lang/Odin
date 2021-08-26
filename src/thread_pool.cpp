@@ -104,6 +104,14 @@ void thread_pool_do_task(WorkerTask *task) {
 }
 
 void thread_pool_wait(ThreadPool *pool) {
+	if (pool->threads.count == 0) {
+		while (!thread_pool_queue_empty(pool)) {
+			thread_pool_do_task(thread_pool_queue_pop(pool));
+			--pool->ready;
+		}
+		GB_ASSERT(pool->ready == 0);
+		return;
+	}
 	for (;;) {
 		mutex_lock(&pool->mutex);
 
