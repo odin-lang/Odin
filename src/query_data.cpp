@@ -252,10 +252,7 @@ void print_query_data_as_json(QueryValue *value, bool format = true, isize inden
 		char const hex_table[] = "0123456789ABCDEF";
 		isize buf_len = name.len + extra + 2 + 1;
 
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-		defer (gb_temp_arena_memory_end(tmp));
-
-		u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
+		u8 *buf = gb_alloc_array(temporary_allocator(), u8, buf_len);
 
 		isize j = 0;
 
