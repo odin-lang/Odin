@@ -184,7 +184,7 @@ void platform_virtual_memory_protect(void *memory, isize size);
 	}
 	void platform_virtual_memory_protect(void *memory, isize size) {
 		int err = mprotect(memory, size, PROT_NONE);
-		GB_ASSERT(err != 0);
+		GB_ASSERT(err == 0);
 	}
 #endif
 
