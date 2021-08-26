@@ -4786,6 +4786,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	block_size = ((block_size + page_size-1)/page_size) * page_size;
 	block_size = gb_clamp(block_size, page_size, DEFAULT_MINIMUM_BLOCK_SIZE);
 	f->arena.minimum_block_size = block_size;
+	arena_init_local_mutex(&f->arena);
 
 
 	array_init(&f->comments, heap_allocator(), 0, 0);
@@ -5539,7 +5540,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 	FileInfo    fi  = imported_file.fi;
 	TokenPos    pos = imported_file.pos;
 
-	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
+	AstFile *file = gb_alloc_item(permanent_allocator(), AstFile);
 	file->pkg = pkg;
 	file->id = cast(i32)(imported_file.index+1);
 	TokenPos err_pos = {0};
