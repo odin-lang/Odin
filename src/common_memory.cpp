@@ -1,0 +1,402 @@
+
+gb_inline void zero_size(void *ptr, isize len) {
+	memset(ptr, 0, len);
+}
+
+#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
+
+
+i32 next_pow2(i32 n);
+i64 next_pow2(i64 n);
+isize next_pow2_isize(isize n);
+void debugf(char const *fmt, ...);
+
+template <typename U, typename V>
+gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
+
+template <typename U, typename V>
+gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U const &>(v); }
+
+
+gb_inline i64 align_formula(i64 size, i64 align) {
+	if (align > 0) {
+		i64 result = size + align-1;
+		return result - result%align;
+	}
+	return size;
+}
+gb_inline isize align_formula_isize(isize size, isize align) {
+	if (align > 0) {
+		isize result = size + align-1;
+		return result - result%align;
+	}
+	return size;
+}
+gb_inline void *align_formula_ptr(void *ptr, isize align) {
+	if (align > 0) {
+		uintptr result = (cast(uintptr)ptr) + align-1;
+		return (void *)(result - result%align);
+	}
+	return ptr;
+}
+
+
+gb_global BlockingMutex global_memory_block_mutex;
+gb_global BlockingMutex global_memory_allocator_mutex;
+
+void platform_virtual_memory_init(void);
+
+void virtual_memory_init(void) {
+	mutex_init(&global_memory_block_mutex);
+	mutex_init(&global_memory_allocator_mutex);
+	platform_virtual_memory_init();
+}
+
+
+
+struct MemoryBlock {
+	u8 *         base; 
+	isize        size;
+	isize        used;
+	MemoryBlock *prev;
+};
+
+struct Arena {
+	MemoryBlock * curr_block;
+	isize minimum_block_size;
+	isize temporary_memory_count;
+};
+
+enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
+
+gb_global isize DEFAULT_PAGE_SIZE = 4096;
+
+MemoryBlock *virtual_memory_alloc(isize size);
+void virtual_memory_dealloc(MemoryBlock *block);
+void arena_free_all(Arena *arena);
+
+isize arena_align_forward_offset(Arena *arena, isize alignment) {
+	isize alignment_offset = 0;
+	isize ptr = cast(isize)(arena->curr_block->base + arena->curr_block->used);
+	isize mask = alignment-1;
+	if (ptr & mask) {
+		alignment_offset = alignment - (ptr & mask);
+	}
+	return alignment_offset;
+}
+
+
+void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
+	GB_ASSERT(gb_is_power_of_two(alignment));
+	
+	isize size = 0;
+		
+	// TODO(bill): make it so that this can be done lock free (if possible)
+	mutex_lock(&global_memory_allocator_mutex);
+	
+	if (arena->curr_block != nullptr) {
+		size = min_size + arena_align_forward_offset(arena, alignment);
+	}
+
+	if (arena->curr_block == nullptr || (arena->curr_block->used + size) > arena->curr_block->size) {
+		size = align_formula_isize(min_size, alignment);
+		arena->minimum_block_size = gb_max(DEFAULT_MINIMUM_BLOCK_SIZE, arena->minimum_block_size);
+		
+		isize block_size = gb_max(size, arena->minimum_block_size);
+		
+		MemoryBlock *new_block = virtual_memory_alloc(block_size);
+		new_block->prev = arena->curr_block;
+		arena->curr_block = new_block;
+	}
+	
+	MemoryBlock *curr_block = arena->curr_block;
+	GB_ASSERT((curr_block->used + size) <= curr_block->size);
+	
+	u8 *ptr = curr_block->base + curr_block->used;
+	ptr += arena_align_forward_offset(arena, alignment);
+	
+	curr_block->used += size;
+	GB_ASSERT(curr_block->used <= curr_block->size);
+	
+	mutex_unlock(&global_memory_allocator_mutex);
+	
+	// NOTE(bill): memory will be zeroed by default due to virtual memory 
+	return ptr;	
+}
+
+void arena_free_all(Arena *arena) {
+	while (arena->curr_block != nullptr) {
+		MemoryBlock *free_block = arena->curr_block;
+		arena->curr_block = free_block->prev;
+		virtual_memory_dealloc(free_block);
+	}
+}
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+struct WindowsMemoryBlock {
+	MemoryBlock block; // IMPORTANT NOTE: must be at the start
+	WindowsMemoryBlock *prev, *next;
+};
+
+gb_global WindowsMemoryBlock global_windows_memory_block_sentinel;
+
+void platform_virtual_memory_init(void) {
+	global_windows_memory_block_sentinel.prev = &global_windows_memory_block_sentinel;	
+	global_windows_memory_block_sentinel.next = &global_windows_memory_block_sentinel;
+	
+	SYSTEM_INFO sys_info = {};
+	GetSystemInfo(&sys_info);
+	DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sys_info.dwPageSize);
+	GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
+}
+
+MemoryBlock *virtual_memory_alloc(isize size) {
+	isize const page_size = DEFAULT_PAGE_SIZE; 
+	
+	isize total_size     = size + gb_size_of(WindowsMemoryBlock);
+	isize base_offset    = gb_size_of(WindowsMemoryBlock);
+	isize protect_offset = 0;
+	
+	bool do_protection = false;
+	{ // overflow protection
+		isize rounded_size = align_formula_isize(size, page_size);
+		total_size     = rounded_size + 2*page_size;
+		base_offset    = page_size + rounded_size - size;
+		protect_offset = page_size + rounded_size;
+		do_protection  = true;
+	}
+	
+	WindowsMemoryBlock *wmblock = (WindowsMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	GB_ASSERT_MSG(wmblock != nullptr, "Out of Virtual Memory, oh no...");
+	
+	wmblock->block.base = cast(u8 *)wmblock + base_offset;
+	// Should be zeroed
+	GB_ASSERT(wmblock->block.used == 0);
+	GB_ASSERT(wmblock->block.prev == nullptr);
+	
+	if (do_protection) {
+		DWORD old_protect = 0;
+		BOOL is_protected = VirtualProtect(cast(u8 *)wmblock + protect_offset, page_size, PAGE_NOACCESS, &old_protect);
+		GB_ASSERT(is_protected);
+	}
+	
+	wmblock->block.size = size;
+
+	WindowsMemoryBlock *sentinel = &global_windows_memory_block_sentinel;
+	mutex_lock(&global_memory_block_mutex);
+	wmblock->next = sentinel;
+	wmblock->prev = sentinel->prev;
+	wmblock->prev->next = wmblock;
+	wmblock->next->prev = wmblock;
+	mutex_unlock(&global_memory_block_mutex);
+	
+	return &wmblock->block;
+}
+
+void virtual_memory_dealloc(MemoryBlock *block_to_free) {
+	WindowsMemoryBlock *block = cast(WindowsMemoryBlock *)block_to_free;
+	if (block != nullptr) {
+		mutex_lock(&global_memory_block_mutex);
+		block->prev->next = block->next;
+		block->next->prev = block->prev;
+		mutex_unlock(&global_memory_block_mutex);
+		
+		GB_ASSERT(VirtualFree(block, 0, MEM_RELEASE));
+	}
+}
+#else
+
+#error Implement 'virtual_memory_alloc' and 'virtual_memory_dealloc' on this platform
+
+void platform_virtual_memory_init(void) {
+	
+}
+
+MemoryBlock *virtual_memory_alloc(isize size, MemoryBlockFlags flags) {
+	return nullptr;
+}
+
+void virtual_memory_dealloc(MemoryBlock *block) {
+	
+}
+#endif
+
+
+
+GB_ALLOCATOR_PROC(arena_allocator_proc);
+
+gbAllocator arena_allocator(Arena *arena) {
+	gbAllocator a;
+	a.proc = arena_allocator_proc;
+	a.data = arena;
+	return a;
+}
+
+
+GB_ALLOCATOR_PROC(arena_allocator_proc) {
+	void *ptr = nullptr;
+	Arena *arena = cast(Arena *)allocator_data;
+	GB_ASSERT_NOT_NULL(arena);
+
+	switch (type) {
+	case gbAllocation_Alloc:
+		ptr = arena_alloc(arena, size, alignment);
+		break;
+	case gbAllocation_Free:
+		break;
+	case gbAllocation_Resize:
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = arena_alloc(arena, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
+		break;
+	case gbAllocation_FreeAll:
+		arena_free_all(arena);
+		break;
+	}
+
+	return ptr;
+}
+
+
+gb_global Arena permanent_arena = {};
+gbAllocator permanent_allocator() {
+	return arena_allocator(&permanent_arena);
+}
+
+gb_global Arena temporary_arena = {};
+gbAllocator temporary_allocator() {
+	return arena_allocator(&temporary_arena);
+}
+
+
+
+
+
+
+GB_ALLOCATOR_PROC(heap_allocator_proc);
+
+gbAllocator heap_allocator(void) {
+	gbAllocator a;
+	a.proc = heap_allocator_proc;
+	a.data = nullptr;
+	return a;
+}
+
+
+GB_ALLOCATOR_PROC(heap_allocator_proc) {
+	void *ptr = nullptr;
+	gb_unused(allocator_data);
+	gb_unused(old_size);
+
+
+
+// TODO(bill): Throughly test!
+	switch (type) {
+#if defined(GB_COMPILER_MSVC)
+	case gbAllocation_Alloc: {
+		isize aligned_size = align_formula_isize(size, alignment);
+		// TODO(bill): Make sure this is aligned correctly
+		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
+	} break;
+	case gbAllocation_Free:
+		HeapFree(GetProcessHeap(), 0, old_memory);
+		break;
+	case gbAllocation_Resize: {
+		isize aligned_size = align_formula_isize(size, alignment);
+		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
+	} break;
+#elif defined(GB_SYSTEM_LINUX)
+	// TODO(bill): *nix version that's decent
+	case gbAllocation_Alloc: {
+		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+		gb_zero_size(ptr, size);
+	} break;
+
+	case gbAllocation_Free: {
+		free(old_memory);
+	} break;
+
+	case gbAllocation_Resize:
+		if (size == 0) {
+			free(old_memory);
+			break;
+		}
+		if (!old_memory) {
+			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+			gb_zero_size(ptr, size);
+			break;
+		}
+		if (size <= old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+		gb_memmove(ptr, old_memory, old_size);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
+		break;
+#else
+	// TODO(bill): *nix version that's decent
+	case gbAllocation_Alloc:
+		posix_memalign(&ptr, alignment, size);
+		gb_zero_size(ptr, size);
+		break;
+
+	case gbAllocation_Free:
+		free(old_memory);
+		break;
+
+	case gbAllocation_Resize:
+		if (size == 0) {
+			free(old_memory);
+			break;
+		}
+		if (!old_memory) {
+			posix_memalign(&ptr, alignment, size);
+			gb_zero_size(ptr, size);
+			break;
+		}
+		if (size <= old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		posix_memalign(&ptr, alignment, size);
+		gb_memmove(ptr, old_memory, old_size);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
+		break;
+#endif
+
+	case gbAllocation_FreeAll:
+		break;
+	}
+
+	return ptr;
+}
+
+
+template <typename T>
+void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
+	GB_ASSERT(new_count >= 0);
+	if (new_count == 0) {
+		gb_free(a, *array);
+		*array = nullptr;
+		return;
+	}
+	if (new_count < old_count) {
+		return;
+	}
+	isize old_size = old_count * gb_size_of(T);
+	isize new_size = new_count * gb_size_of(T);
+	isize alignment = gb_align_of(T);
+	auto new_data = cast(T *)gb_resize_align(a, *array, old_size, new_size, alignment);
+	GB_ASSERT(new_data != nullptr);
+	*array = new_data;
+}
+

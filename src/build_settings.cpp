@@ -500,7 +500,6 @@ String odin_root_dir(void) {
 String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
-	gbTempArenaMemory tmp;
 	wchar_t *text;
 
 	if (global_module_path_set) {
@@ -525,10 +524,7 @@ String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
-	text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+	text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 
 	GetModuleFileNameW(nullptr, text, cast(int)len);
 	path = string16_to_string(heap_allocator(), make_string16(text, len));
@@ -559,7 +555,6 @@ String path_to_fullpath(gbAllocator a, String s);
 String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
-	gbTempArenaMemory tmp;
 	u8 *text;
 
 	if (global_module_path_set) {
@@ -583,10 +578,7 @@ String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
-	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
+	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
 	path = path_to_fullpath(heap_allocator(), make_string(text, len));
@@ -663,7 +655,7 @@ String internal_odin_root_dir(void) {
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
-	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
+	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
 
 	gb_memmove(text, &path_buf[0], len);
 
@@ -691,13 +683,11 @@ String path_to_fullpath(gbAllocator a, String s) {
 	mutex_lock(&fullpath_mutex);
 	defer (mutex_unlock(&fullpath_mutex));
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-	String16 string16 = string_to_string16(string_buffer_allocator, s);
+	String16 string16 = string_to_string16(temporary_allocator(), s);
 
 	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
-		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 		GetFullPathNameW(&string16[0], len, text, nullptr);
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
