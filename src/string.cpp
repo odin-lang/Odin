@@ -1,11 +1,6 @@
-gb_global gbArena       string_buffer_arena = {};
-gb_global gbAllocator   string_buffer_allocator = {};
 gb_global BlockingMutex string_buffer_mutex = {};
 
 void init_string_buffer_memory(void) {
-	// NOTE(bill): This should be enough memory for file systems
-	gb_arena_init_from_allocator(&string_buffer_arena, heap_allocator(), gb_megabytes(1));
-	string_buffer_allocator = gb_arena_allocator(&string_buffer_arena);
 	mutex_init(&string_buffer_mutex);
 }
 

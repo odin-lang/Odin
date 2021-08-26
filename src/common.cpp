@@ -31,179 +31,21 @@
 
 gbAllocator heap_allocator(void);
 
-#include "threading.cpp"
-
-gb_inline void zero_size(void *ptr, isize len) {
-	memset(ptr, 0, len);
-}
-
-#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
-
+#define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
 i32 next_pow2(i32 n);
 i64 next_pow2(i64 n);
 isize next_pow2_isize(isize n);
 void debugf(char const *fmt, ...);
 
-template <typename U, typename V>
-gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
-
-template <typename U, typename V>
-gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U const &>(v); }
-
-
-gb_inline i64 align_formula(i64 size, i64 align) {
-	if (align > 0) {
-		i64 result = size + align-1;
-		return result - result%align;
-	}
-	return size;
-}
-gb_inline isize align_formula_isize(isize size, isize align) {
-	if (align > 0) {
-		isize result = size + align-1;
-		return result - result%align;
-	}
-	return size;
-}
-gb_inline void *align_formula_ptr(void *ptr, isize align) {
-	if (align > 0) {
-		uintptr result = (cast(uintptr)ptr) + align-1;
-		return (void *)(result - result%align);
-	}
-	return ptr;
-}
-
-
-GB_ALLOCATOR_PROC(heap_allocator_proc);
-
-gbAllocator heap_allocator(void) {
-	gbAllocator a;
-	a.proc = heap_allocator_proc;
-	a.data = nullptr;
-	return a;
-}
-
-
-GB_ALLOCATOR_PROC(heap_allocator_proc) {
-	void *ptr = nullptr;
-	gb_unused(allocator_data);
-	gb_unused(old_size);
-
-
-
-// TODO(bill): Throughly test!
-	switch (type) {
-#if defined(GB_COMPILER_MSVC)
-	case gbAllocation_Alloc: {
-		isize aligned_size = align_formula_isize(size, alignment);
-		// TODO(bill): Make sure this is aligned correctly
-		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
-	} break;
-	case gbAllocation_Free:
-		HeapFree(GetProcessHeap(), 0, old_memory);
-		break;
-	case gbAllocation_Resize: {
-		isize aligned_size = align_formula_isize(size, alignment);
-		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
-	} break;
-#elif defined(GB_SYSTEM_LINUX)
-	// TODO(bill): *nix version that's decent
-	case gbAllocation_Alloc: {
-		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-		gb_zero_size(ptr, size);
-	} break;
-
-	case gbAllocation_Free: {
-		free(old_memory);
-	} break;
-
-	case gbAllocation_Resize:
-		if (size == 0) {
-			free(old_memory);
-			break;
-		}
-		if (!old_memory) {
-			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-			gb_zero_size(ptr, size);
-			break;
-		}
-		if (size <= old_size) {
-			ptr = old_memory;
-			break;
-		}
-
-		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
-		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
-		break;
-#else
-	// TODO(bill): *nix version that's decent
-	case gbAllocation_Alloc:
-		posix_memalign(&ptr, alignment, size);
-		gb_zero_size(ptr, size);
-		break;
-
-	case gbAllocation_Free:
-		free(old_memory);
-		break;
-
-	case gbAllocation_Resize:
-		if (size == 0) {
-			free(old_memory);
-			break;
-		}
-		if (!old_memory) {
-			posix_memalign(&ptr, alignment, size);
-			gb_zero_size(ptr, size);
-			break;
-		}
-		if (size <= old_size) {
-			ptr = old_memory;
-			break;
-		}
-
-		posix_memalign(&ptr, alignment, size);
-		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
-		break;
-#endif
-
-	case gbAllocation_FreeAll:
-		break;
-	}
-
-	return ptr;
-}
-
-
-template <typename T>
-void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
-	GB_ASSERT(new_count >= 0);
-	if (new_count == 0) {
-		gb_free(a, *array);
-		*array = nullptr;
-		return;
-	}
-	if (new_count < old_count) {
-		return;
-	}
-	isize old_size = old_count * gb_size_of(T);
-	isize new_size = new_count * gb_size_of(T);
-	isize alignment = gb_align_of(T);
-	auto new_data = cast(T *)gb_resize_align(a, *array, old_size, new_size, alignment);
-	GB_ASSERT(new_data != nullptr);
-	*array = new_data;
-}
-
-
-
+#include "threading.cpp"
 #include "unicode.cpp"
 #include "array.cpp"
-#include "string.cpp"
 #include "queue.cpp"
+#include "common_memory.cpp"
+#include "string.cpp"
 
-#define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
+
 
 #include "range_cache.cpp"
 
@@ -401,222 +243,6 @@ void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
-// Arena from Per Vognsen
-#define ALIGN_DOWN(n, a)     ((n) & ~((a) - 1))
-#define ALIGN_UP(n, a)       ALIGN_DOWN((n) + (a) - 1, (a))
-#define ALIGN_DOWN_PTR(p, a) (cast(void *)ALIGN_DOWN(cast(uintptr)(p), (a)))
-#define ALIGN_UP_PTR(p, a)   (cast(void *)ALIGN_UP(cast(uintptr)(p), (a)))
-
-typedef struct Arena {
-	u8 *                   ptr;
-	u8 *                   end;
-	Array<gbVirtualMemory> blocks;
-	BlockingMutex          mutex;
-	std::atomic<isize>     block_size;
-	std::atomic<isize>     total_used;
-} Arena;
-
-#define ARENA_MIN_ALIGNMENT 16
-#define ARENA_DEFAULT_BLOCK_SIZE (8*1024*1024)
-
-
-gb_global Arena permanent_arena = {};
-
-void arena_init(Arena *arena, gbAllocator block_allocator, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
-	mutex_init(&arena->mutex);
-	arena->block_size = block_size;
-	array_init(&arena->blocks, block_allocator, 0, 2);
-}
-
-void arena_internal_grow(Arena *arena, isize min_size) {
-	isize size = gb_max(arena->block_size.load(), min_size);
-	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
-
-	gbVirtualMemory vmem = gb_vm_alloc(nullptr, size);
-	GB_ASSERT(vmem.data != nullptr);
-	GB_ASSERT(vmem.size >= size);
-	arena->ptr = cast(u8 *)vmem.data;
-	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
-	arena->end = arena->ptr + vmem.size;
-	array_add(&arena->blocks, vmem);
-}
-
-void *arena_alloc(Arena *arena, isize size, isize alignment) {
-	mutex_lock(&arena->mutex);
-
-	if (size > (arena->end - arena->ptr)) {
-		arena_internal_grow(arena, size);
-		GB_ASSERT(size <= (arena->end - arena->ptr));
-	}
-	arena->total_used += size;
-
-	isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
-	void *ptr = arena->ptr;
-	arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
-	GB_ASSERT(arena->ptr <= arena->end);
-	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
-
-	mutex_unlock(&arena->mutex);
-	return ptr;
-}
-
-void arena_free_all(Arena *arena) {
-	mutex_lock(&arena->mutex);
-
-	for_array(i, arena->blocks) {
-		gb_vm_free(arena->blocks[i]);
-	}
-	array_clear(&arena->blocks);
-	arena->ptr = nullptr;
-	arena->end = nullptr;
-
-	mutex_unlock(&arena->mutex);
-}
-
-
-
-GB_ALLOCATOR_PROC(arena_allocator_proc);
-
-gbAllocator arena_allocator(Arena *arena) {
-	gbAllocator a;
-	a.proc = arena_allocator_proc;
-	a.data = arena;
-	return a;
-}
-
-
-GB_ALLOCATOR_PROC(arena_allocator_proc) {
-	void *ptr = nullptr;
-	Arena *arena = cast(Arena *)allocator_data;
-	GB_ASSERT_NOT_NULL(arena);
-
-	switch (type) {
-	case gbAllocation_Alloc:
-		ptr = arena_alloc(arena, size, alignment);
-		break;
-	case gbAllocation_Free:
-		// GB_PANIC("gbAllocation_Free not supported");
-		break;
-	case gbAllocation_Resize:
-		if (size == 0) {
-			ptr = nullptr;
-		} else if (size <= old_size) {
-			ptr = old_memory;
-		} else {
-			ptr = arena_alloc(arena, size, alignment);
-			gb_memmove(ptr, old_memory, old_size);
-		}
-		break;
-	case gbAllocation_FreeAll:
-		arena_free_all(arena);
-		break;
-	}
-
-	return ptr;
-}
-
-
-gbAllocator permanent_allocator() {
-	return arena_allocator(&permanent_arena);
-	// return heap_allocator();
-}
-
-
-
-struct Temp_Allocator {
-	u8 *data;
-	isize len;
-	isize curr_offset;
-	gbAllocator backup_allocator;
-	Array<void *> leaked_allocations;
-	BlockingMutex mutex;
-};
-
-gb_global Temp_Allocator temporary_allocator_data = {};
-
-void temp_allocator_init(Temp_Allocator *s, isize size) {
-	s->backup_allocator = heap_allocator();
-	s->data = cast(u8 *)gb_alloc_align(s->backup_allocator, size, 16);
-	s->len = size;
-	s->curr_offset = 0;
-	s->leaked_allocations.allocator = s->backup_allocator;
-	mutex_init(&s->mutex);
-}
-
-void *temp_allocator_alloc(Temp_Allocator *s, isize size, isize alignment) {
-	size = align_formula_isize(size, alignment);
-	if (s->curr_offset+size <= s->len) {
-		u8 *start = s->data;
-		u8 *ptr = start + s->curr_offset;
-		ptr = cast(u8 *)align_formula_ptr(ptr, alignment);
-		// assume memory is zero
-
-		isize offset = ptr - start;
-		s->curr_offset = offset + size;
-		return ptr;
-	} else if (size <= s->len) {
-		u8 *start = s->data;
-		u8 *ptr = cast(u8 *)align_formula_ptr(start, alignment);
-		// assume memory is zero
-
-		isize offset = ptr - start;
-		s->curr_offset = offset + size;
-		return ptr;
-	}
-
-	void *ptr = gb_alloc_align(s->backup_allocator, size, alignment);
-	array_add(&s->leaked_allocations, ptr);
-	return ptr;
-}
-
-void temp_allocator_free_all(Temp_Allocator *s) {
-	s->curr_offset = 0;
-	for_array(i, s->leaked_allocations) {
-		gb_free(s->backup_allocator, s->leaked_allocations[i]);
-	}
-	array_clear(&s->leaked_allocations);
-	gb_zero_size(s->data, s->len);
-}
-
-GB_ALLOCATOR_PROC(temp_allocator_proc) {
-	void *ptr = nullptr;
-	Temp_Allocator *s = cast(Temp_Allocator *)allocator_data;
-	GB_ASSERT_NOT_NULL(s);
-
-	mutex_lock(&s->mutex);
-	defer (mutex_unlock(&s->mutex));
-
-	switch (type) {
-	case gbAllocation_Alloc:
-		return temp_allocator_alloc(s, size, alignment);
-	case gbAllocation_Free:
-		break;
-	case gbAllocation_Resize:
-		if (size == 0) {
-			ptr = nullptr;
-		} else if (size <= old_size) {
-			ptr = old_memory;
-		} else {
-			ptr = temp_allocator_alloc(s, size, alignment);
-			gb_memmove(ptr, old_memory, old_size);
-		}
-		break;
-	case gbAllocation_FreeAll:
-		temp_allocator_free_all(s);
-		break;
-	}
-
-	return ptr;
-}
-
-
-gbAllocator temporary_allocator() {
-	return permanent_allocator();
-	// return {temp_allocator_proc, &temporary_allocator_data};
-}
-
-
-
 
 #include "string_map.cpp"
 #include "map.cpp"
@@ -633,7 +259,7 @@ struct StringIntern {
 };
 
 Map<StringIntern *> string_intern_map = {}; // Key: u64
-Arena string_intern_arena = {};
+gb_global Arena string_intern_arena = {};
 
 char const *string_intern(char const *text, isize len) {
 	u64 hash = gb_fnv64a(text, len);
@@ -662,7 +288,6 @@ char const *string_intern(String const &string) {
 
 void init_string_interner(void) {
 	map_init(&string_intern_map, heap_allocator());
-	arena_init(&string_intern_arena, heap_allocator());
 }
 
 
