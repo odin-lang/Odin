@@ -44,10 +44,8 @@ void debugf(char const *fmt, ...);
 #include "queue.cpp"
 #include "common_memory.cpp"
 #include "string.cpp"
-
-
-
 #include "range_cache.cpp"
+
 
 u32 fnv32a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;

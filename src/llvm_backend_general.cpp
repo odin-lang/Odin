@@ -1,7 +1,5 @@
 void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token);
 
-gb_global ThreadPool lb_thread_pool = {};
-
 gb_global Entity *lb_global_type_info_data_entity   = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
 gb_global lbAddr lb_global_type_info_member_names   = {};
