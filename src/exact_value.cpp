@@ -3,6 +3,8 @@
 // TODO(bill): Big numbers
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
+gb_global BlockingMutex hash_exact_value_mutex;
+
 struct Ast;
 struct HashKey;
 struct Type;
@@ -62,6 +64,9 @@ struct ExactValue {
 gb_global ExactValue const empty_exact_value = {};
 
 HashKey hash_exact_value(ExactValue v) {
+	mutex_lock(&hash_exact_value_mutex);
+	defer (mutex_unlock(&hash_exact_value_mutex));
+	
 	HashKey empty = {};
 	switch (v.kind) {
 	case ExactValue_Invalid:

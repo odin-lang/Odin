@@ -676,6 +676,8 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 			for (unsigned i = 0; i < param_count; i++) {
 				LLVMTypeRef param_type = param_types[i];
 				LLVMTypeRef arg_type = LLVMTypeOf(args[i]);
+				// LLVMTypeKind param_kind = LLVMGetTypeKind(param_type);
+				// LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
 				GB_ASSERT_MSG(
 					arg_type == param_type,
 					"Parameter types do not match: %s != %s, argument: %s",
