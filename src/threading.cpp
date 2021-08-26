@@ -356,7 +356,12 @@ void gb__thread_run(Thread *t) {
 		return 0;
 	}
 #else
-	void *          internal_thread_proc(void *arg) {
+	void *internal_thread_proc(void *arg) {
+		// NOTE: Don't permit any signal delivery to threads.
+		sigset_t mask = {};
+		sigfillset(&mask);
+		GB_ASSERT_MSG(pthread_sigmask(SIG_BLOCK, &mask, nullptr) == 0, "failed to block signals");
+		
 		Thread *t = cast(Thread *)arg;
 		gb__thread_run(t);
 		t->is_running.store(false);
