@@ -33,8 +33,12 @@ gbAllocator heap_allocator(void);
 
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
-#include "threading.cpp"
+i32 next_pow2(i32 n);
+i64 next_pow2(i64 n);
+isize next_pow2_isize(isize n);
+void debugf(char const *fmt, ...);
 
+#include "threading.cpp"
 #include "unicode.cpp"
 #include "array.cpp"
 #include "queue.cpp"
