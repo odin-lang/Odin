@@ -60,7 +60,6 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	isize const cmd_cap = 4096;
 	char cmd_line[cmd_cap] = {};
 	va_list va;
-	gbTempArenaMemory tmp;
 	String16 cmd;
 	i32 exit_code = 0;
 
@@ -80,10 +79,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		gb_printf_err("%.*s\n\n", cast(int)(cmd_len-1), cmd_line);
 	}
 
-	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
-	cmd = string_to_string16(string_buffer_allocator, make_string(cast(u8 *)cmd_line, cmd_len-1));
+	cmd = string_to_string16(permanent_allocator(), make_string(cast(u8 *)cmd_line, cmd_len-1));
 	if (CreateProcessW(nullptr, cmd.text,
 	                   nullptr, nullptr, true, 0, nullptr, nullptr,
 	                   &start_info, &pi)) {
@@ -2005,10 +2001,8 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(&global_timings));
 
 	TIME_SECTION("initialization");
-
-	arena_init(&permanent_arena, heap_allocator());
-	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
-	arena_init(&global_ast_arena, heap_allocator());
+	
+	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
 
 	init_string_buffer_memory();
@@ -2187,7 +2181,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	temp_allocator_free_all(&temporary_allocator_data);
+	arena_free_all(&temporary_arena);
 
 	TIME_SECTION("type check");
 
@@ -2200,7 +2194,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	temp_allocator_free_all(&temporary_allocator_data);
+	arena_free_all(&temporary_arena);
 
 	if (build_context.generate_docs) {
 		if (global_error_collector.count != 0) {
@@ -2237,7 +2231,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	lb_generate_code(gen);
 
-	temp_allocator_free_all(&temporary_allocator_data);
+	arena_free_all(&temporary_arena);
 
 	switch (build_context.build_mode) {
 	case BuildMode_Executable:

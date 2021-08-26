@@ -73,7 +73,6 @@ void thread_pool_wait(ThreadPool *pool) {
 	for (int i = 0; i < pool->thread_count; i++) {
 		thread_pool_start_thread(pool);
 	}
-
 	thread_pool_thread_entry(pool);
 }
 

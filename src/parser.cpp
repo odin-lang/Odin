@@ -4784,9 +4784,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	isize const page_size = 4*1024;
 	isize block_size = 2*f->tokens.count*gb_size_of(Ast);
 	block_size = ((block_size + page_size-1)/page_size) * page_size;
-	block_size = gb_clamp(block_size, page_size, ARENA_DEFAULT_BLOCK_SIZE);
-
-	arena_init(&f->arena, heap_allocator(), block_size);
+	block_size = gb_clamp(block_size, page_size, DEFAULT_MINIMUM_BLOCK_SIZE);
+	f->arena.minimum_block_size = block_size;
 
 
 	array_init(&f->comments, heap_allocator(), 0, 0);
