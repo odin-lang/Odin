@@ -44,8 +44,10 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 }
 
 void thread_pool_destroy(ThreadPool *pool) {
+	mutex_lock(&pool->mutex);
 	pool->stop = true;
 	condition_broadcast(&pool->task_cond);
+	mutex_unlock(&pool->mutex);
 
 	for_array(i, pool->threads) {
 		Thread *t = &pool->threads[i];
@@ -128,7 +130,9 @@ void thread_pool_wait(ThreadPool *pool) {
 	
 		thread_pool_do_task(task);
 		if (--pool->ready == 0) {
+			mutex_lock(&pool->mutex);
 			condition_broadcast(&pool->task_cond);
+			mutex_unlock(&pool->mutex);
 		}
 	}
 }
@@ -153,7 +157,9 @@ THREAD_PROC(thread_pool_thread_proc) {
 	
 		thread_pool_do_task(task);
 		if (--pool->ready == 0) {
+			mutex_lock(&pool->mutex);
 			condition_broadcast(&pool->task_cond);
+			mutex_unlock(&pool->mutex);
 		}
 	}
 }
