@@ -4146,8 +4146,16 @@ void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
 	}
-
+	
 	semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
+	if (worker_count == 0) {
+		ThreadProcCheckerSection section_all = {};
+		section_all.checker = c;
+		section_all.offset = 0;
+		section_all.count = total_count;
+		proc(&section_all);
+		return;
+	}
 
 	isize file_load_count = (total_count+thread_count-1)/thread_count;
 	isize remaining_count = total_count;
@@ -4753,6 +4761,21 @@ void check_procedure_bodies(Checker *c) {
 	u32 worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
+	}
+	if (worker_count == 0) {
+		auto *this_queue = &c->procs_to_check_queue;
+		
+		UntypedExprInfoMap untyped = {};
+		map_init(&untyped, heap_allocator());
+		
+		for (ProcInfo *pi = nullptr; mpmc_dequeue(this_queue, &pi); /**/) {
+			consume_proc_info_queue(c, pi, this_queue, &untyped);
+		}
+		
+		map_destroy(&untyped);
+
+		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+		return;
 	}
 
 	global_procedure_body_in_worker_queue = true;
