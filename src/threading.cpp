@@ -1,6 +1,7 @@
 struct BlockingMutex;
 struct RecursiveMutex;
 struct Semaphore;
+struct Condition;
 struct Thread;
 
 #define THREAD_PROC(name) isize name(struct Thread *thread)
@@ -40,6 +41,14 @@ void semaphore_destroy(Semaphore *s);
 void semaphore_post   (Semaphore *s, i32 count);
 void semaphore_wait   (Semaphore *s);
 void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
+
+
+void condition_init(Condition *c);
+void condition_destroy(Condition *c);
+void condition_broadcast(Condition *c);
+void condition_signal(Condition *c);
+void condition_wait(Condition *c, BlockingMutex *m);
+void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms);
 
 u32  thread_current_id(void);
 
@@ -108,6 +117,27 @@ void yield_process(void);
 	void semaphore_wait(Semaphore *s) {
 		WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE);
 	}
+	
+	struct Condition {
+		CONDITION_VARIABLE cond;
+	};
+	
+	void condition_init(Condition *c) {
+	}
+	void condition_destroy(Condition *c) {	
+	}
+	void condition_broadcast(Condition *c) {
+		WakeAllConditionVariable(&c->cond);
+	}
+	void condition_signal(Condition *c) {
+		WakeConditionVariable(&c->cond);
+	}
+	void condition_wait(Condition *c, BlockingMutex *m) {
+		SleepConditionVariableSRW(&c->cond, &m->srwlock, INFINITE, 0);
+	}
+	void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms) {
+		SleepConditionVariableSRW(&c->cond, &m->srwlock, timeout_in_ms, 0);
+	}
 
 #else
 	struct BlockingMutex {
@@ -170,8 +200,36 @@ void yield_process(void);
 		void semaphore_post   (Semaphore *s, i32 count) { while (count --> 0) sem_post(&s->unix_handle); }
 		void semaphore_wait   (Semaphore *s)            { int i; do { i = sem_wait(&s->unix_handle); } while (i == -1 && errno == EINTR); }
 	#else
-	#error
+	#error Implement Semaphore for this platform
 	#endif
+		
+		
+	struct Condition {
+		pthread_cond_t pthread_cond;
+	};
+	
+	void condition_init(Condition *c) {
+		pthread_cond_init(&c->pthread_cond, NULL);
+	}
+	void condition_destroy(Condition *c) {	
+		pthread_cond_destroy(&c->pthread_cond);
+	}
+	void condition_broadcast(Condition *c) {
+		pthread_cond_broadcast(&c->pthread_cond);
+	}
+	void condition_signal(Condition *c) {
+		pthread_cond_signal(&c->pthread_cond);
+	}
+	void condition_wait(Condition *c, BlockingMutex *m) {
+		pthread_cond_wait(&c->pthread_cond, &m->pthread_mutex);
+	}
+	void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms) {
+		struct timespec abstime = {};
+		timespec.tv_sec = timeout_in_ms/1000;
+		timespec.tv_nsec = cast(long)(timeout_in_ms%1000)*1e6;
+		pthread_cond_timedwait(&c->pthread_cond, &m->pthread_mutex, &abstime);
+		
+	}
 #endif
 
 
