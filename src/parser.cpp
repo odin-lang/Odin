@@ -4810,6 +4810,7 @@ bool init_parser(Parser *p) {
 	string_set_init(&p->imported_files, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->package_imports, heap_allocator());
+	mutex_init(&p->wait_mutex);
 	mutex_init(&p->import_mutex);
 	mutex_init(&p->file_add_mutex);
 	mutex_init(&p->file_decl_mutex);
@@ -4837,6 +4838,7 @@ void destroy_parser(Parser *p) {
 	array_free(&p->packages);
 	array_free(&p->package_imports);
 	string_set_destroy(&p->imported_files);
+	mutex_destroy(&p->wait_mutex);
 	mutex_destroy(&p->import_mutex);
 	mutex_destroy(&p->file_add_mutex);
 	mutex_destroy(&p->file_decl_mutex);
@@ -4870,7 +4872,7 @@ void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPo
 	auto wd = gb_alloc_item(heap_allocator(), ParserWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
-	thread_pool_add_task(&parser_thread_pool, parser_worker_proc, wd);
+	global_thread_pool_add_task(parser_worker_proc, wd);
 }
 
 WORKER_TASK_PROC(foreign_file_worker_proc) {
@@ -4909,7 +4911,7 @@ void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFi
 	wd->parser = p;
 	wd->imported_file = f;
 	wd->foreign_kind = kind;
-	thread_pool_add_task(&parser_thread_pool, foreign_file_worker_proc, wd);
+	global_thread_pool_add_task(foreign_file_worker_proc, wd);
 }
 
 
@@ -5619,10 +5621,6 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	thread_pool_init(&parser_thread_pool, heap_allocator(), worker_count, "ParserWork");
-
 	String init_fullpath = path_to_full_path(heap_allocator(), init_filename);
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
@@ -5631,38 +5629,45 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			return ParseFile_WrongExtension;
 		}
 	}
+	
 
-	TokenPos init_pos = {};
-	{
-		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
-		try_add_import_path(p, s, s, init_pos, Package_Runtime);
-	}
+	{ // Add these packages serially and then process them parallel
+		mutex_lock(&p->wait_mutex);
+		defer (mutex_unlock(&p->wait_mutex));
+		
+		TokenPos init_pos = {};
+		{
+			String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
+			try_add_import_path(p, s, s, init_pos, Package_Runtime);
+		}
 
-	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
-	p->init_fullpath = init_fullpath;
+		try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
+		p->init_fullpath = init_fullpath;
 
-	if (build_context.command_kind == Command_test) {
-		String s = get_fullpath_core(heap_allocator(), str_lit("testing"));
-		try_add_import_path(p, s, s, init_pos, Package_Normal);
-	}
+		if (build_context.command_kind == Command_test) {
+			String s = get_fullpath_core(heap_allocator(), str_lit("testing"));
+			try_add_import_path(p, s, s, init_pos, Package_Normal);
+		}
+		
 
-	for_array(i, build_context.extra_packages) {
-		String path = build_context.extra_packages[i];
-		String fullpath = path_to_full_path(heap_allocator(), path); // LEAK?
-		if (!path_is_directory(fullpath)) {
-			String const ext = str_lit(".odin");
-			if (!string_ends_with(fullpath, ext)) {
-				error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
-				return ParseFile_WrongExtension;
+		for_array(i, build_context.extra_packages) {
+			String path = build_context.extra_packages[i];
+			String fullpath = path_to_full_path(heap_allocator(), path); // LEAK?
+			if (!path_is_directory(fullpath)) {
+				String const ext = str_lit(".odin");
+				if (!string_ends_with(fullpath, ext)) {
+					error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
+					return ParseFile_WrongExtension;
+				}
+			}
+			AstPackage *pkg = try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
+			if (pkg) {
+				pkg->is_extra = true;
 			}
 		}
-		AstPackage *pkg = try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
-		if (pkg) {
-			pkg->is_extra = true;
-		}
 	}
-
-	thread_pool_wait(&parser_thread_pool);
+	
+	global_thread_pool_wait();
 
 	for (ParseFileError err = ParseFile_None; mpmc_dequeue(&p->file_error_queue, &err); /**/) {
 		if (err != ParseFile_None) {
