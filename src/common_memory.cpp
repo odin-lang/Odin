@@ -127,17 +127,51 @@ void arena_free_all(Arena *arena) {
 }
 
 
-#if defined(GB_SYSTEM_WINDOWS)
-struct WindowsMemoryBlock {
+struct PlatformMemoryBlock {
 	MemoryBlock block; // IMPORTANT NOTE: must be at the start
-	WindowsMemoryBlock *prev, *next;
+	isize total_size;
+	PlatformMemoryBlock *prev, *next;
 };
 
-gb_global WindowsMemoryBlock global_windows_memory_block_sentinel;
+PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size);
+void platform_virtual_memory_free(PlatformMemoryBlock *block);
+void platform_virtual_memory_protect(void *memory, isize size);
+
+#if defined(GB_SYSTEM_WINDOWS)
+	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
+		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+		return pmblock;
+	}
+	void platform_virtual_memory_free(PlatformMemoryBlock *block) {
+		GB_ASSERT(VirtualFree(block, 0, MEM_RELEASE));
+	}
+	void platform_virtual_memory_protect(void *memory, isize size) {
+		DWORD old_protect = 0;
+		BOOL is_protected = VirtualProtect(memory, size, PAGE_NOACCESS, &old_protect);
+		GB_ASSERT(is_protected);
+	}
+#else
+	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
+		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+		return pmblock;
+	}
+	void platform_virtual_memory_free(PlatformMemoryBlock *block) {
+		isize size = block->total_size;
+		munmap(block, size);
+	}
+	void platform_virtual_memory_protect(void *memory, isize size) {
+		int err = mprotect(memory, size, PROT_NONE);
+		GB_ASSERT(err != 0);
+	}
+#endif
+
+gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
 
 void platform_virtual_memory_init(void) {
-	global_windows_memory_block_sentinel.prev = &global_windows_memory_block_sentinel;	
-	global_windows_memory_block_sentinel.next = &global_windows_memory_block_sentinel;
+	global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
+	global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
 	
 	SYSTEM_INFO sys_info = {};
 	GetSystemInfo(&sys_info);
@@ -148,8 +182,8 @@ void platform_virtual_memory_init(void) {
 MemoryBlock *virtual_memory_alloc(isize size) {
 	isize const page_size = DEFAULT_PAGE_SIZE; 
 	
-	isize total_size     = size + gb_size_of(WindowsMemoryBlock);
-	isize base_offset    = gb_size_of(WindowsMemoryBlock);
+	isize total_size     = size + gb_size_of(PlatformMemoryBlock);
+	isize base_offset    = gb_size_of(PlatformMemoryBlock);
 	isize protect_offset = 0;
 	
 	bool do_protection = false;
@@ -161,60 +195,44 @@ MemoryBlock *virtual_memory_alloc(isize size) {
 		do_protection  = true;
 	}
 	
-	WindowsMemoryBlock *wmblock = (WindowsMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	GB_ASSERT_MSG(wmblock != nullptr, "Out of Virtual Memory, oh no...");
+	PlatformMemoryBlock *pmblock = platform_virtual_memory_alloc(total_size);
+	GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
 	
-	wmblock->block.base = cast(u8 *)wmblock + base_offset;
+	pmblock->block.base = cast(u8 *)pmblock + base_offset;
 	// Should be zeroed
-	GB_ASSERT(wmblock->block.used == 0);
-	GB_ASSERT(wmblock->block.prev == nullptr);
+	GB_ASSERT(pmblock->block.used == 0);
+	GB_ASSERT(pmblock->block.prev == nullptr);
 	
 	if (do_protection) {
-		DWORD old_protect = 0;
-		BOOL is_protected = VirtualProtect(cast(u8 *)wmblock + protect_offset, page_size, PAGE_NOACCESS, &old_protect);
-		GB_ASSERT(is_protected);
+		platform_virtual_memory_protect(cast(u8 *)pmblock + protect_offset, page_size);
 	}
 	
-	wmblock->block.size = size;
+	pmblock->block.size = size;
+	pmblock->total_size = total_size;
 
-	WindowsMemoryBlock *sentinel = &global_windows_memory_block_sentinel;
+	PlatformMemoryBlock *sentinel = &global_platform_memory_block_sentinel;
 	mutex_lock(&global_memory_block_mutex);
-	wmblock->next = sentinel;
-	wmblock->prev = sentinel->prev;
-	wmblock->prev->next = wmblock;
-	wmblock->next->prev = wmblock;
+	pmblock->next = sentinel;
+	pmblock->prev = sentinel->prev;
+	pmblock->prev->next = pmblock;
+	pmblock->next->prev = pmblock;
 	mutex_unlock(&global_memory_block_mutex);
 	
-	return &wmblock->block;
+	return &pmblock->block;
 }
 
 void virtual_memory_dealloc(MemoryBlock *block_to_free) {
-	WindowsMemoryBlock *block = cast(WindowsMemoryBlock *)block_to_free;
+	PlatformMemoryBlock *block = cast(PlatformMemoryBlock *)block_to_free;
 	if (block != nullptr) {
 		mutex_lock(&global_memory_block_mutex);
 		block->prev->next = block->next;
 		block->next->prev = block->prev;
 		mutex_unlock(&global_memory_block_mutex);
-		
-		GB_ASSERT(VirtualFree(block, 0, MEM_RELEASE));
+			
+		platform_virtual_memory_free(block);
 	}
 }
-#else
 
-#error Implement 'virtual_memory_alloc' and 'virtual_memory_dealloc' on this platform
-
-void platform_virtual_memory_init(void) {
-	
-}
-
-MemoryBlock *virtual_memory_alloc(isize size) {
-	return nullptr;
-}
-
-void virtual_memory_dealloc(MemoryBlock *block) {
-	
-}
-#endif
 
 
 
