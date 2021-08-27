@@ -578,6 +578,8 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 	}
 
 	add_entity_use(ctx, expr, e);
+	
+	ERROR_BLOCK();
 
 	switch (e->kind) {
 	case Entity_TypeName: {
@@ -2336,6 +2338,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					if (is_blank_ident(name)) {
 						error(token, "'using' cannot be applied variable declared as '_'");
 					} else if (is_type_struct(t) || is_type_raw_union(t)) {
+						ERROR_BLOCK();
+						
 						Scope *scope = scope_of_node(t->Struct.node);
 						for_array(i, scope->elements.entries) {
 							Entity *f = scope->elements.entries[i].value;
