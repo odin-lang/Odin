@@ -656,7 +656,16 @@ AstPackage *get_core_package(CheckerInfo *info, String name) {
 	String path = get_fullpath_core(a, name);
 	defer (gb_free(a, path.text));
 	auto found = string_map_get(&info->packages, path);
-	GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
+	if (found == nullptr) {
+		gb_printf_err("Name: %.*s\n", LIT(name));
+		gb_printf_err("Fullpath: %.*s\n", LIT(path));
+		
+		for_array(i, info->packages.entries) {
+			auto *entry = &info->packages.entries[i];
+			gb_printf_err("%.*s\n", LIT(entry->key.string));
+		}
+		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
+	}
 	return *found;
 }
 
@@ -4578,9 +4587,11 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 	ctx.decl = pi->decl;
 	ctx.procs_to_check_queue = procs_to_check_queue;
 	GB_ASSERT(procs_to_check_queue != nullptr);
-
+	
+	GB_ASSERT(pi->type->kind == Type_Proc);
 	TypeProc *pt = &pi->type->Proc;
 	String name = pi->token.string;
+	
 	if (pt->is_polymorphic && !pt->is_poly_specialized) {
 		Token token = pi->token;
 		if (pi->poly_def_node != nullptr) {
@@ -4658,7 +4669,8 @@ void check_unchecked_bodies(Checker *c) {
 			if (pi->body == nullptr) {
 				continue;
 			}
-
+			
+			debugf("unchecked: %.*s\n", LIT(e->token.string));
 			mpmc_enqueue(&c->procs_to_check_queue, pi);
 		}
 	}
@@ -4762,6 +4774,7 @@ void check_procedure_bodies(Checker *c) {
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
 	}
+	worker_count = 0;
 	if (worker_count == 0) {
 		auto *this_queue = &c->procs_to_check_queue;
 		
