@@ -479,17 +479,34 @@ last_index :: proc(s, substr: string) -> int {
 	return -1;
 }
 
+
 index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1;
 	}
-
-	// TODO(bill): Optimize
-	for r, i in s {
-		for c in chars {
-			if r == c {
-				return i;
+	
+	if len(chars) == 1 {
+		r := rune(chars[0]);
+		if r >= utf8.RUNE_SELF {
+			r = utf8.RUNE_ERROR;
+		}
+		return index_rune(s, r);
+	}
+	
+	if len(s) > 8 {
+		if as, ok := ascii_set_make(chars); ok {
+			for i in 0..<len(s) {
+				if ascii_set_contains(as, s[i]) {
+					return i;
+				}
 			}
+			return -1;
+		}
+	}
+
+	for c, i in chars {
+		if index_rune(chars, c) >= 0 {
+			return i;
 		}
 	}
 	return -1;
@@ -499,14 +516,46 @@ last_index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1;
 	}
-
-	for i := len(s); i > 0;  {
-		r, w := utf8.decode_last_rune_in_string(s[:i]);
-		i -= w;
-		for c in chars {
-			if r == c {
+	
+	if len(s) == 1 {
+		r := rune(s[0]);
+		if r >= utf8.RUNE_SELF {
+			r = utf8.RUNE_ERROR;
+		}
+		return index_rune(chars, r);
+	}
+	
+	if len(s) > 8 {
+		if as, ok := ascii_set_make(chars); ok {
+			for i := len(s)-1; i >= 0; i -= 1 {
+				if ascii_set_contains(as, s[i]) {
+					return i;
+				}
+			}
+			return -1;
+		}
+	}
+	
+	if len(chars) == 1 {
+		r := rune(chars[0]);
+		if r >= utf8.RUNE_SELF {
+			r = utf8.RUNE_ERROR;
+		}
+		for i := len(s); i > 0; /**/ {
+			c, w := utf8.decode_last_rune_in_string(s[:i]);
+			i -= w;
+			if c == r {
 				return i;
 			}
+		}
+		return -1;
+	}
+
+	for i := len(s); i > 0; /**/ {
+		r, w := utf8.decode_last_rune_in_string(s[:i]);
+		i -= w;
+		if index_rune(chars, r) >= 0 {
+			return i;
 		}
 	}
 	return -1;
