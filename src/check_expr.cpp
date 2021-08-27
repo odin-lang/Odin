@@ -3726,11 +3726,8 @@ void check_did_you_mean_print(DidYouMeanAnswers *d) {
 	}
 }
 
-gb_global BlockingMutex did_you_mean_mutex;
-
 void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) {
-	mutex_lock(&did_you_mean_mutex);
-	defer (mutex_unlock(&did_you_mean_mutex));
+	ERROR_BLOCK();
 	
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
 	defer (did_you_mean_destroy(&d));
@@ -3742,8 +3739,7 @@ void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) 
 }
 
 void check_did_you_mean_scope(String const &name, Scope *scope) {
-	mutex_lock(&did_you_mean_mutex);
-	defer (mutex_unlock(&did_you_mean_mutex));
+	ERROR_BLOCK();
 	
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
 	defer (did_you_mean_destroy(&d));
@@ -4977,6 +4973,8 @@ bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, S
 				return false;
 			} else if (!o.value.value_bool) {
 				if (print_err) {
+					ERROR_BLOCK();
+					
 					gbString str = expr_to_string(clause);
 					error(clause, "'where' clause evaluated to false:\n\t%s", str);
 					gb_string_free(str);

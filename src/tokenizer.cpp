@@ -377,6 +377,8 @@ void end_error_block(void) {
 	mutex_unlock(&global_error_collector.block_mutex);
 }
 
+#define ERROR_BLOCK() begin_error_block(); defer (end_error_block())
+
 
 #define ERROR_OUT_PROC(name) void name(char const *fmt, va_list va)
 typedef ERROR_OUT_PROC(ErrorOutProc);
