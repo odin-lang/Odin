@@ -476,7 +476,7 @@ String odin_root_dir(void) {
 		return global_module_path;
 	}
 
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	char const *found = gb_get_env("ODIN_ROOT", a);
 	if (found) {
 		String path = path_to_full_path(a, make_string_c(found));
@@ -679,7 +679,8 @@ String path_to_fullpath(gbAllocator a, String s) {
 	mutex_lock(&fullpath_mutex);
 	defer (mutex_unlock(&fullpath_mutex));
 
-	String16 string16 = string_to_string16(temporary_allocator(), s);
+	String16 string16 = string_to_string16(heap_allocator(), s);
+	defer (gb_free(heap_allocator(), string16.text));
 
 	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {

@@ -57,8 +57,8 @@ struct MemoryBlock {
 };
 
 struct Arena {
-	MemoryBlock * curr_block;
-	isize minimum_block_size;
+	MemoryBlock *curr_block;
+	isize        minimum_block_size;
 	bool use_local_mutex;
 	BlockingMutex local_mutex;
 };
@@ -69,7 +69,13 @@ gb_global isize DEFAULT_PAGE_SIZE = 4096;
 
 MemoryBlock *virtual_memory_alloc(isize size);
 void virtual_memory_dealloc(MemoryBlock *block);
+void *arena_alloc(Arena *arena, isize min_size, isize alignment);
 void arena_free_all(Arena *arena);
+
+void arena_init_local_mutex(Arena *arena) {
+	mutex_init(&arena->local_mutex);
+	arena->use_local_mutex = true;
+}
 
 isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	isize alignment_offset = 0;
@@ -81,16 +87,8 @@ isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	return alignment_offset;
 }
 
-void arena_init_local_mutex(Arena *arena) {
-	mutex_init(&arena->local_mutex);
-	arena->use_local_mutex = true;
-}
-
-
-
 void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
-	
 	
 	BlockingMutex *mutex = &global_memory_allocator_mutex;
 	if (arena->use_local_mutex) {
@@ -289,6 +287,7 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 		}
 		break;
 	case gbAllocation_FreeAll:
+		GB_PANIC("use arena_free_all directly");
 		arena_free_all(arena);
 		break;
 	}

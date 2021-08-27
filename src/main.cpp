@@ -2019,6 +2019,7 @@ int main(int arg_count, char const **arg_ptr) {
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
 	mutex_init(&hash_exact_value_mutex);
+	mutex_init(&did_you_mean_mutex);
 
 	init_string_buffer_memory();
 	init_string_interner();
@@ -2199,8 +2200,6 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	arena_free_all(&temporary_arena);
-
 	TIME_SECTION("type check");
 
 	checker->parser = parser;
@@ -2211,8 +2210,6 @@ int main(int arg_count, char const **arg_ptr) {
 	if (any_errors()) {
 		return 1;
 	}
-
-	arena_free_all(&temporary_arena);
 
 	if (build_context.generate_docs) {
 		if (global_error_collector.count != 0) {
@@ -2249,8 +2246,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	lb_generate_code(gen);
 
-	arena_free_all(&temporary_arena);
-
 	switch (build_context.build_mode) {
 	case BuildMode_Executable:
 	case BuildMode_DynamicLibrary:
@@ -2269,6 +2264,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	remove_temp_files(gen);
+	arena_free_all(&temporary_arena);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)

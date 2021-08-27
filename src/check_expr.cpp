@@ -3726,7 +3726,12 @@ void check_did_you_mean_print(DidYouMeanAnswers *d) {
 	}
 }
 
+gb_global BlockingMutex did_you_mean_mutex;
+
 void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) {
+	mutex_lock(&did_you_mean_mutex);
+	defer (mutex_unlock(&did_you_mean_mutex));
+	
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
 	defer (did_you_mean_destroy(&d));
 
@@ -3737,6 +3742,9 @@ void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) 
 }
 
 void check_did_you_mean_scope(String const &name, Scope *scope) {
+	mutex_lock(&did_you_mean_mutex);
+	defer (mutex_unlock(&did_you_mean_mutex));
+	
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
 	defer (did_you_mean_destroy(&d));
 
