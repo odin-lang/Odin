@@ -97,9 +97,9 @@ foreign lib {
 	GameControllerNameForIndex          :: proc(joystick_index: c.int) -> cstring ---
 	GameControllerTypeForIndex          :: proc(joystick_index: c.int) -> GameControllerType ---
 	GameControllerMappingForDeviceIndex :: proc(joystick_index: c.int) -> cstring ---
-	GameControllerOpen                  :: proc(joystick_index: c.int)   -> ^GameController ---
-	GameControllerFromInstanceID        :: proc(joyid: JoystickID) -> ^GameController ---
-	GameControllerFromPlayerIndex       :: proc(player_index: c.int)     -> ^GameController ---
+	GameControllerOpen                  :: proc(joystick_index: c.int) -> ^GameController ---
+	GameControllerFromInstanceID        :: proc(joyid: JoystickID)     -> ^GameController ---
+	GameControllerFromPlayerIndex       :: proc(player_index: c.int)   -> ^GameController ---
 	GameControllerName                  :: proc(gamecontroller: ^GameController) -> cstring  ---
 	GameControllerGetType               :: proc(gamecontroller: ^GameController) -> GameControllerType ---
 	GameControllerGetPlayerIndex        :: proc(gamecontroller: ^GameController) -> c.int ---
