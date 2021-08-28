@@ -670,7 +670,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 		digits   := src.used + multiplier.used + 1;
 
 		if        false &&  min_used     >= MUL_KARATSUBA_CUTOFF &&
-						    max_used / 2 >= MUL_KARATSUBA_CUTOFF &&
+							max_used / 2 >= MUL_KARATSUBA_CUTOFF &&
 			/*
 				Not much effect was observed below a ratio of 1:2, but again: YMMV.
 			*/
@@ -1111,10 +1111,10 @@ internal_compare :: proc { internal_int_compare, internal_int_compare_digit, };
 internal_cmp :: internal_compare;
 
 /*
-    Compare an `Int` to an unsigned number upto `DIGIT & _MASK`.
-    Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
+	Compare an `Int` to an unsigned number upto `DIGIT & _MASK`.
+	Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
 
-    Expects: `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
+	Expects: `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
 */
 internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparison: int) {
 	a_is_negative := #force_inline internal_is_negative(a);
@@ -1170,7 +1170,7 @@ internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison:
 		}
 	}
 
-   	return 0;
+	return 0;
 }
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, };
 internal_cmp_mag :: internal_compare_magnitude;
@@ -1202,7 +1202,7 @@ internal_int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (squa
 	*/
 	c: DIGIT;
 	c, err = internal_mod(a, 105);
-	if _private_int_rem_128[c] == 1                                  { return; }
+	if _private_int_rem_105[c] == 1                                  { return; }
 
 	t := &Int{};
 	defer destroy(t);
@@ -2366,12 +2366,12 @@ internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, all
 			/*
 				Shift the current word and mix in the carry bits from the previous word.
 			*/
-	        quotient.digit[x] = (quotient.digit[x] >> uint(bits)) | (carry << shift);
+			quotient.digit[x] = (quotient.digit[x] >> uint(bits)) | (carry << shift);
 
-	        /*
-	        	Update carry from forward carry.
-	        */
-	        carry = fwd_carry;
+			/*
+				Update carry from forward carry.
+			*/
+			carry = fwd_carry;
 		}
 
 	}
@@ -2397,17 +2397,17 @@ internal_int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context
 	*/
 	if digits > quotient.used { return internal_zero(quotient); }
 
-   	/*
+	/*
 		Much like `int_shl_digit`, this is implemented using a sliding window,
 		except the window goes the other way around.
 
 		b-2 | b-1 | b0 | b1 | b2 | ... | bb |   ---->
-		            /\                   |      ---->
-		             \-------------------/      ---->
-    */
+					/\                   |      ---->
+					 \-------------------/      ---->
+	*/
 
 	#no_bounds_check for x := 0; x < (quotient.used - digits); x += 1 {
-    	quotient.digit[x] = quotient.digit[x + digits];
+		quotient.digit[x] = quotient.digit[x + digits];
 	}
 	quotient.used -= digits;
 	internal_zero_unused(quotient);
@@ -2511,14 +2511,14 @@ internal_int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context
 	/*
 		Much like `int_shr_digit`, this is implemented using a sliding window,
 		except the window goes the other way around.
-    */
-    #no_bounds_check for x := quotient.used; x > 0; x -= 1 {
-    	quotient.digit[x+digits-1] = quotient.digit[x-1];
-    }
+	*/
+	#no_bounds_check for x := quotient.used; x > 0; x -= 1 {
+		quotient.digit[x+digits-1] = quotient.digit[x-1];
+	}
 
-   	quotient.used += digits;
-    mem.zero_slice(quotient.digit[:digits]);
-    return nil;
+	quotient.used += digits;
+	mem.zero_slice(quotient.digit[:digits]);
+	return nil;
 }
 internal_shl_digit :: proc { internal_int_shl_digit, };
 
