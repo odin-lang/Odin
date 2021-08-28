@@ -2007,7 +2007,7 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0)) -> 
 	Tables used by `internal_*` and `_*`.
 */
 
-_private_int_rem_128 := [128]DIGIT{
+_private_int_rem_128 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
@@ -2017,8 +2017,9 @@ _private_int_rem_128 := [128]DIGIT{
 	1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 };
+#assert(128 * size_of(DIGIT) == size_of(_private_int_rem_128));
 
-_private_int_rem_105 := [105]DIGIT{
+_private_int_rem_105 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1,
 	0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1,
@@ -2027,8 +2028,9 @@ _private_int_rem_105 := [105]DIGIT{
 	1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1,
 	1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1,
 };
+#assert(105 * size_of(DIGIT) == size_of(_private_int_rem_105));
 
-_private_prime_table := []DIGIT{
+_private_prime_table := [?]DIGIT{
 	0x0002, 0x0003, 0x0005, 0x0007, 0x000B, 0x000D, 0x0011, 0x0013,
 	0x0017, 0x001D, 0x001F, 0x0025, 0x0029, 0x002B, 0x002F, 0x0035,
 	0x003B, 0x003D, 0x0043, 0x0047, 0x0049, 0x004F, 0x0053, 0x0059,
@@ -2065,6 +2067,7 @@ _private_prime_table := []DIGIT{
 	0x05F3, 0x05FB, 0x0607, 0x060D, 0x0611, 0x0617, 0x061F, 0x0623,
 	0x062B, 0x062F, 0x063D, 0x0641, 0x0647, 0x0649, 0x064D, 0x0653,
 };
+#assert(256 * size_of(DIGIT) == size_of(_private_prime_table));
 
 when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	_factorial_table := [35]_WORD{
