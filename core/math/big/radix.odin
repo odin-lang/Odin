@@ -235,7 +235,7 @@ int_to_cstring :: int_itoa_cstring;
 /*
 	Read a string [ASCII] in a given radix.
 */
-int_atoi :: proc(res: ^Int, input: string, radix: i8, allocator := context.allocator) -> (err: Error) {
+int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(res);
 	input := input;
 	context.allocator = allocator;

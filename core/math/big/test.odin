@@ -369,3 +369,22 @@ PyRes :: struct {
 	return PyRes{res = r, err = nil};
 }
 
+/*
+	dest = lcm(a, b)
+*/
+@export test_is_square :: proc "c" (a: cstring) -> (res: PyRes) {
+	context = runtime.default_context();
+	err:    Error;
+	square: bool;
+
+	ai := &Int{};
+	defer internal_destroy(ai);
+
+	if err = atoi(ai, string(a), 16); err != nil { return PyRes{res=":is_square:atoi(a):", err=err}; }
+	if square, err = #force_inline internal_int_is_square(ai); err != nil { return PyRes{res=":is_square:is_square(a):", err=err}; }
+
+	if square {
+		return PyRes{"True", nil};
+	}
+	return PyRes{"False", nil};
+}
