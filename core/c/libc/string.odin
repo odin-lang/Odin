@@ -3,7 +3,11 @@ package libc
 
 // 7.24 String handling
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 foreign libc {
 	// 7.24.2 Copying functions

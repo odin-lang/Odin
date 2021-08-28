@@ -2,7 +2,11 @@ package libc
 
 // 7.22 General utilities
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 when ODIN_OS == "windows" {
 	RAND_MAX :: 0x7fff;
@@ -14,7 +18,7 @@ when ODIN_OS == "windows" {
 	}
 
 	MB_CUR_MAX :: #force_inline proc() -> size_t {
-		return ___mb_cur_max_func();
+		return size_t(___mb_cur_max_func());
 	}
 }
 

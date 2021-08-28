@@ -6,7 +6,10 @@ thrd_start_t :: proc "c" (rawptr) -> int;
 tss_dtor_t   :: proc "c" (rawptr);
 
 when ODIN_OS == "windows" {
-	foreign import libc "system:c"
+	foreign import libc {
+		"system:libucrt.lib", 
+		"system:msvcprt.lib"
+	}
 
 	thrd_success        :: 0;                             // _Thrd_success
 	thrd_nomem          :: 1;                             // _Thrd_nomem
@@ -24,6 +27,7 @@ when ODIN_OS == "windows" {
 	thrd_t              :: struct { _: rawptr, _: uint, } // _Thrd_t
 	tss_t               :: distinct int;                  // _Tss_imp_t
 	cnd_t               :: distinct rawptr;               // _Cnd_imp_t
+	mtx_t               :: distinct rawptr;               // _Mtx_imp_t
 
 	// MSVCRT does not expose the C11 symbol names as what they are in C11
 	// because they held off implementing <threads.h> and C11 support for so
@@ -52,9 +56,9 @@ when ODIN_OS == "windows" {
 		@(link_name="_Mtx_unlock")    mtx_unlock    :: proc(mtx: ^mtx_t) -> int ---;
 
 		// 7.26.5 Thread functions
-		@(link_name="_Thrd_create")   thrd_create   :: proc(thr: ^thr_t, func: thrd_start_t, arg: rawptr) -> int ---;
+		@(link_name="_Thrd_create")   thrd_create   :: proc(thr: ^thrd_t, func: thrd_start_t, arg: rawptr) -> int ---;
 		@(link_name="_Thrd_current")  thrd_current  :: proc() -> thrd_t ---;
-		@(link_name="_Thrd_detach")   thrd_detach   :: proc(thr: thr_t) -> int ---;
+		@(link_name="_Thrd_detach")   thrd_detach   :: proc(thr: thrd_t) -> int ---;
 		@(link_name="_Thrd_equal")    thrd_equal    :: proc(lhs, rhs: thrd_t) -> int ---;
 		@(link_name="_Thrd_exit")     thrd_exit     :: proc(res: int) -> ! ---;
 		@(link_name="_Thrd_join")     thrd_join     :: proc(thr: thrd_t, res: ^int) -> int ---;
