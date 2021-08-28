@@ -403,14 +403,21 @@ def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
 		
 	return test("test_shr_signed", res, [a, bits], expected_error, expected_result)
 
-def test_factorial(n = 0, expected_error = Error.Okay):
-	args  = [n]
-	res   = int_factorial(*args)
+def test_factorial(number = 0, expected_error = Error.Okay):
+	print("Factorial:", number)
+	args  = [number]
+	try:
+		res = int_factorial(*args)
+	except OSError as e:
+		print("{} while trying to factorial {}.".format(e, number))
+		if EXIT_ON_FAIL: exit(3)
+		return False
+
 	expected_result = None
 	if expected_error == Error.Okay:
-		expected_result = math.factorial(n)
+		expected_result = math.factorial(number)
 		
-	return test("test_factorial", res, [n], expected_error, expected_result)
+	return test("test_factorial", res, [number], expected_error, expected_result)
 
 def test_gcd(a = 0, b = 0, expected_error = Error.Okay):
 	args  = [arg_to_odin(a), arg_to_odin(b)]
