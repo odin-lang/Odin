@@ -2,7 +2,11 @@ package libc
 
 // 7.30 Wide character classification and mapping utilities
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 when ODIN_OS == "windows" {
 	wctrans_t :: distinct wchar_t;

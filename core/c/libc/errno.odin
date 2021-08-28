@@ -2,7 +2,11 @@ package libc
 
 // 7.5 Errors
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 // C11 standard only requires the definition of:
 //	EDOM,
