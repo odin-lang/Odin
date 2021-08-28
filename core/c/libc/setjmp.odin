@@ -2,18 +2,52 @@ package libc
 
 // 7.13 Nonlocal jumps
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
+
+when ODIN_OS == "windows" {
+	@(default_calling_convention="c")
+	foreign libc {
+		// 7.13.1 Save calling environment
+		//
+		// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
+		// necessarily export a symbol named setjmp but rather _setjmp in the case
+		// of musl, glibc, BSD libc, and msvcrt.
+		//
+		/// NOTE(dweiler): UCRT has two implementations of longjmp. One that performs
+		// stack unwinding and one that doesn't. The choice of which to use depends on a
+		// flag which is set inside the jmp_buf structure given to setjmp. The default
+		// behavior is to unwind the stack. Within Odin, we cannot use the stack
+		// unwinding version as the unwinding information isn't present. To opt-in to
+		// the regular non-unwinding version we need a way to set this flag. Since the
+		// location of the flag within the struct is not defined or part of the ABI and
+		// can change between versions of UCRT, we must rely on setjmp to set it. It
+		// turns out that setjmp receives this flag in the RDX register on Win64, this
+		// just so happens to coincide with the second argument of a function in the
+		// Win64 ABI. By giving our setjmp a second argument with the value of zero,
+		// the RDX register will contain zero and correctly set the flag to disable
+		// stack unwinding.
+		@(link_name="_setjmp")
+		setjmp  :: proc(env: ^jmp_buf, hack: rawptr = nil) -> int ---;
+	}
+} else {
+	@(default_calling_convention="c")
+	foreign libc {
+		// 7.13.1 Save calling environment
+		//
+		// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
+		// necessarily export a symbol named setjmp but rather _setjmp in the case
+		// of musl, glibc, BSD libc, and msvcrt.
+		@(link_name="_setjmp")
+		setjmp  :: proc(env: ^jmp_buf) -> int ---;
+	}
+}
 
 @(default_calling_convention="c")
 foreign libc {
-	// 7.13.1 Save calling environment
-	//
-	// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
-	// necessarily export a symbol named setjmp but rather _setjmp in the case
-	// of musl, glibc, BSD libc, and msvcrt.
-	@(link_name="_setjmp")
-	setjmp  :: proc(env: ^jmp_buf) -> int ---;
-
 	// 7.13.2 Restore calling environment
 	longjmp :: proc(env: ^jmp_buf, val: int) -> ! ---;
 }
