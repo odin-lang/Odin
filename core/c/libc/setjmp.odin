@@ -8,16 +8,35 @@ when ODIN_OS == "windows" {
 	foreign import libc "system:c"
 }
 
+when ODIN_OS == "windows" {
+	@(default_calling_convention="c")
+	foreign libc {
+		// 7.13.1 Save calling environment
+		//
+		// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
+		// necessarily export a symbol named setjmp but rather _setjmp in the case
+		// of musl, glibc, BSD libc, and msvcrt.
+		//
+		// TODO(mv): Some description of the extra argument, and maybe a link describing
+		// it in more detail?
+		@(link_name="_setjmp")
+		setjmp  :: proc(env: ^jmp_buf, hack: rawptr = nil) -> int ---;
+	}
+} else {
+	@(default_calling_convention="c")
+	foreign libc {
+		// 7.13.1 Save calling environment
+		//
+		// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
+		// necessarily export a symbol named setjmp but rather _setjmp in the case
+		// of musl, glibc, BSD libc, and msvcrt.
+		@(link_name="_setjmp")
+		setjmp  :: proc(env: ^jmp_buf) -> int ---;
+	}
+}
+
 @(default_calling_convention="c")
 foreign libc {
-	// 7.13.1 Save calling environment
-	//
-	// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
-	// necessarily export a symbol named setjmp but rather _setjmp in the case
-	// of musl, glibc, BSD libc, and msvcrt.
-	@(link_name="_setjmp")
-	setjmp  :: proc(env: ^jmp_buf) -> int ---;
-
 	// 7.13.2 Restore calling environment
 	longjmp :: proc(env: ^jmp_buf, val: int) -> ! ---;
 }
