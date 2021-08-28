@@ -160,11 +160,11 @@ print("initialize_constants: ", initialize_constants())
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
-add        =     load(l.test_add,        [c_char_p, c_char_p],   Res)
-sub        =     load(l.test_sub,        [c_char_p, c_char_p],   Res)
-mul        =     load(l.test_mul,        [c_char_p, c_char_p],   Res)
-sqr        =     load(l.test_sqr,        [c_char_p          ],   Res)
-div        =     load(l.test_div,        [c_char_p, c_char_p],   Res)
+add        =     load(l.test_add,        [c_char_p, c_char_p  ], Res)
+sub        =     load(l.test_sub,        [c_char_p, c_char_p  ], Res)
+mul        =     load(l.test_mul,        [c_char_p, c_char_p  ], Res)
+sqr        =     load(l.test_sqr,        [c_char_p            ], Res)
+div        =     load(l.test_div,        [c_char_p, c_char_p  ], Res)
 
 # Powers and such
 int_log    =     load(l.test_log,        [c_char_p, c_longlong], Res)
@@ -179,9 +179,11 @@ int_shl        = load(l.test_shl,        [c_char_p, c_longlong], Res)
 int_shr        = load(l.test_shr,        [c_char_p, c_longlong], Res)
 int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
 
-int_factorial  = load(l.test_factorial,  [c_uint64], Res)
-int_gcd        = load(l.test_gcd,        [c_char_p, c_char_p], Res)
-int_lcm        = load(l.test_lcm,        [c_char_p, c_char_p], Res)
+int_factorial  = load(l.test_factorial,  [c_uint64            ], Res)
+int_gcd        = load(l.test_gcd,        [c_char_p, c_char_p  ], Res)
+int_lcm        = load(l.test_lcm,        [c_char_p, c_char_p  ], Res)
+
+is_square      = load(l.test_is_square,  [c_char_p            ], Res)
 
 def test(test_name: "", res: Res, param=[], expected_error = Error.Okay, expected_result = "", radix=16):
 	passed = True
@@ -428,6 +430,15 @@ def test_lcm(a = 0, b = 0, expected_error = Error.Okay):
 		
 	return test("test_lcm", res, [a, b], expected_error, expected_result)
 
+def test_is_square(a = 0, b = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a)]
+	res   = is_square(*args)
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = str(math.isqrt(a) ** 2 == a) if a > 0 else "False"
+		
+	return test("test_is_square", res, [a], expected_error, expected_result)
+
 # TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
 #
 # The last two arguments in tests are the expected error and expected result.
@@ -527,6 +538,10 @@ TESTS = {
 		[   0, 0,  ],
 		[   0, 125,],
 	],
+	test_is_square: [
+		[ 12, ],
+		[ 92232459121502451677697058974826760244863271517919321608054113675118660929276431348516553336313179167211015633639725554914519355444316239500734169769447134357534241879421978647995614218985202290368055757891124109355450669008628757662409138767505519391883751112010824030579849970582074544353971308266211776494228299586414907715854328360867232691292422194412634523666770452490676515117702116926803826546868467146319938818238521874072436856528051486567230096290549225463582766830777324099589751817442141036031904145041055454639783559905920619197290800070679733841430619962318433709503256637256772215111521321630777950145713049902839937043785039344243357384899099910837463164007565230287809026956254332260375327814271845678201, ]
+	],
 }
 
 if not args.fast_tests:
@@ -545,7 +560,7 @@ RANDOM_TESTS = [
 	test_add, test_sub, test_mul, test_sqr, test_div,
 	test_log, test_pow, test_sqrt, test_root_n,
 	test_shl_digit, test_shr_digit, test_shl, test_shr_signed,
-	test_gcd, test_lcm,
+	test_gcd, test_lcm, test_is_square,
 ]
 SKIP_LARGE   = [
 	test_pow, test_root_n, # test_gcd,
@@ -648,11 +663,13 @@ if __name__ == '__main__':
 					a = abs(a)
 					b = randint(0, 10);
 				elif test_proc == test_shl:
-					b = randint(0, min(BITS, 120));
+					b = randint(0, min(BITS, 120))
 				elif test_proc == test_shr_signed:
-					b = randint(0, min(BITS, 120));
+					b = randint(0, min(BITS, 120))
+				elif test_proc == test_is_square:
+					a = randint(0, 1 << BITS)
 				else:
-					b = randint(0, 1 << BITS)					
+					b = randint(0, 1 << BITS)
 
 				res = None
 
