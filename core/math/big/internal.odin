@@ -659,8 +659,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			Can we use the balance method? Check sizes.
 			* The smaller one needs to be larger than the Karatsuba cut-off.
 			* The bigger one needs to be at least about one `_MUL_KARATSUBA_CUTOFF` bigger
-			* to make some sense, but it depends on architecture, OS, position of the
-			* stars... so YMMV.
+			* to make some sense, but it depends on architecture, OS, position of the stars... so YMMV.
 			* Using it to cut the input into slices small enough for _mul_comba
 			* was actually slower on the author's machine, but YMMV.
 		*/
@@ -669,13 +668,11 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 		max_used := max(src.used, multiplier.used);
 		digits   := src.used + multiplier.used + 1;
 
-		if        false &&  min_used     >= MUL_KARATSUBA_CUTOFF &&
-							max_used / 2 >= MUL_KARATSUBA_CUTOFF &&
+		if min_used >= MUL_KARATSUBA_CUTOFF && (max_used / 2) >= MUL_KARATSUBA_CUTOFF && max_used >= (2 * min_used) {
 			/*
 				Not much effect was observed below a ratio of 1:2, but again: YMMV.
 			*/
-							max_used     >= 2 * min_used {
-			// err = s_mp_mul_balance(a,b,c);
+			err = _private_int_mul_balance(dest, src, multiplier);
 		} else if min_used >= MUL_TOOM_CUTOFF {
 			/*
 				Toom path commented out until it no longer fails Factorial 10k or 100k,
@@ -914,7 +911,7 @@ internal_int_factorial :: proc(res: ^Int, n: int, allocator := context.allocator
 	context.allocator = allocator;
 
 	if n >= FACTORIAL_BINARY_SPLIT_CUTOFF {
-		return #force_inline _private_int_factorial_binary_split(res, n);
+		return _private_int_factorial_binary_split(res, n);
 	}
 
 	i := len(_factorial_table);

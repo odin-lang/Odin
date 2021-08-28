@@ -113,7 +113,7 @@ _private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) 
 	context.allocator = allocator;
 
 	S1, S2, T1, a0, a1, a2, b0, b1, b2 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(S1, S2, T1, a0, a1, a2, b0, b1, b2);
+	defer internal_destroy(S1, S2, T1, a0, a1, a2, b0, b1, b2);
 
 	/*
 		Init temps.
@@ -258,7 +258,7 @@ _private_int_mul_karatsuba :: proc(dest, a, b: ^Int, allocator := context.alloca
 	context.allocator = allocator;
 
 	x0, x1, y0, y1, t1, x0y0, x1y1 := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(x0, x1, y0, y1, t1, x0y0, x1y1);
+	defer internal_destroy(x0, x1, y0, y1, t1, x0y0, x1y1);
 
 	/*
 		min # of digits, divided by two.
@@ -424,6 +424,195 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := conte
 	*/
 
 	return internal_clamp(dest);
+}
+
+/*
+	Multiplies |a| * |b| and does not compute the lower digs digits
+	[meant to get the higher part of the product]
+*/
+_private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	/*
+		Can we use the fast multiplier?
+	*/
+	if a.used + b.used + 1 < _WARRAY && min(a.used, b.used) < _MAX_COMBA {
+		return _private_int_mul_high_comba(dest, a, b, digits);
+	}
+
+	internal_grow(dest, a.used + b.used + 1) or_return;
+	dest.used = a.used + b.used + 1;
+
+	pa := a.used;
+	pb := b.used;
+	for ix := 0; ix < pa; ix += 1 {
+		carry := DIGIT(0);
+
+		for iy := digits - ix; iy < pb; iy += 1 {
+			/*
+				Calculate the double precision result.
+			*/
+			r := _WORD(dest.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + _WORD(carry);
+
+			/*
+				Get the lower part.
+			*/
+			dest.digit[ix + iy] = DIGIT(r & _WORD(_MASK));
+
+			/*
+				Carry the carry.
+			*/
+			carry = DIGIT(r >> _WORD(_DIGIT_BITS));
+		}
+		dest.digit[ix + pb] = carry;
+	}
+	return internal_clamp(dest);
+}
+
+/*
+	This is a modified version of `_private_int_mul_comba` that only produces output digits *above* `digits`.
+	See the comments for `_private_int_mul_comba` to see how it works.
+
+	This is used in the Barrett reduction since for one of the multiplications
+	only the higher digits were needed.  This essentially halves the work.
+
+	Based on Algorithm 14.12 on pp.595 of HAC.
+*/
+_private_int_mul_high_comba :: proc(dest, a, b: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	W: [_WARRAY]DIGIT = ---;
+	_W: _WORD = 0;
+
+	/*
+		Number of output digits to produce. Grow the destination as required.
+	*/
+	pa := a.used + b.used;
+	internal_grow(dest, pa) or_return;
+
+	ix: int;
+	for ix = digits; ix < pa; ix += 1 {
+		/*
+			Get offsets into the two bignums.
+		*/
+		ty := min(b.used - 1, ix);
+		tx := ix - ty;
+
+		/*
+			This is the number of times the loop will iterrate, essentially it's
+			while (tx++ < a->used && ty-- >= 0) { ... }
+		*/
+		iy := min(a.used - tx, ty + 1);
+
+		/*
+			Execute loop.
+		*/
+		for iz := 0; iz < iy; iz += 1 {
+			_W += _WORD(a.digit[tx + iz]) * _WORD(b.digit[ty - iz]);
+		}
+
+		/*
+			Store term.
+		*/
+		W[ix] = DIGIT(_W) & DIGIT(_MASK);
+
+		/*
+			Make next carry.
+		*/
+		_W = _W >> _WORD(_DIGIT_BITS);
+	}
+
+	/*
+		Setup dest
+	*/
+	old_used := dest.used;
+	dest.used = pa;
+
+	for ix = digits; ix < pa; ix += 1 {
+		/*
+			Now extract the previous digit [below the carry].
+		*/
+		dest.digit[ix] = W[ix];
+	}
+
+	/*
+		Zero remainder.
+	*/
+	internal_zero_unused(dest, old_used);
+
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	return internal_clamp(dest);
+}
+
+/*
+	Single-digit multiplication with the smaller number as the single-digit.
+*/
+_private_int_mul_balance :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	a, b := a, b;
+
+	a0, tmp, r := &Int{}, &Int{}, &Int{};
+	defer internal_destroy(a0, tmp, r);
+
+	b_size   := min(a.used, b.used);
+	n_blocks := max(a.used, b.used) / b_size;
+
+	internal_grow(a0, b_size + 2) or_return;
+	internal_init_multi(tmp, r)   or_return;
+
+	/*
+		Make sure that `a` is the larger one.
+	*/
+	if a.used < b.used {
+		a, b = b, a;
+	}
+	assert(a.used >= b.used);
+
+	i, j := 0, 0;
+	for ; i < n_blocks; i += 1 {
+		/*
+			Cut a slice off of `a`.
+		*/
+
+		a0.used = b_size;
+		internal_copy_digits(a0, a, a0.used, j);
+		j += a0.used;
+		internal_clamp(a0);
+
+		/*
+			Multiply with `b`.
+		*/
+		internal_mul(tmp, a0, b)                                     or_return;
+
+		/*
+			Shift `tmp` to the correct position.
+		*/
+		internal_shl_digit(tmp, b_size * i)                          or_return;
+
+		/*
+			Add to output. No carry needed.
+		*/
+		internal_add(r, r, tmp)                                      or_return;
+	}
+
+	/*
+		The left-overs; there are always left-overs.
+	*/
+	if j < a.used {
+		a0.used = a.used - j;
+		internal_copy_digits(a0, a, a0.used, j);
+		j += a0.used;
+		internal_clamp(a0);
+
+		internal_mul(tmp, a0, b)                                     or_return;
+		internal_shl_digit(tmp, b_size * i)                          or_return;
+		internal_add(r, r, tmp)                                      or_return;
+	}
+
+	internal_swap(dest, r);
+	return;
 }
 
 /*
@@ -1188,7 +1377,7 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{};
 	c: int;
-	defer destroy(ta, tb, tq, q);
+	defer internal_destroy(ta, tb, tq, q);
 
 	for {
 		internal_one(tq) or_return;
@@ -1241,31 +1430,34 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 	Binary split factorial algo due to: http://www.luschny.de/math/factorial/binarysplitfact.html
 */
 _private_int_factorial_binary_split :: proc(res: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
 
 	inner, outer, start, stop, temp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer internal_destroy(inner, outer, start, stop, temp);
 
-	internal_one(inner, false, allocator) or_return;
-	internal_one(outer, false, allocator) or_return;
+	internal_one(inner, false)                                       or_return;
+	internal_one(outer, false)                                       or_return;
 
 	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
 
 	for i := bits_used; i >= 0; i -= 1 {
 		start := (n >> (uint(i) + 1)) + 1 | 1;
 		stop  := (n >> uint(i)) + 1 | 1;
-		_private_int_recursive_product(temp, start, stop, 0, allocator) or_return;
-		internal_mul(inner, inner, temp, allocator) or_return;
-		internal_mul(outer, outer, inner, allocator) or_return;
+		_private_int_recursive_product(temp, start, stop, 0)         or_return;
+		internal_mul(inner, inner, temp)                             or_return;
+		internal_mul(outer, outer, inner)                            or_return;
 	}
 	shift := n - intrinsics.count_ones(n);
 
-	return internal_shl(res, outer, int(shift), allocator);
+	return internal_shl(res, outer, int(shift));
 }
 
 /*
 	Recursive product used by binary split factorial algorithm.
 */
 _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int(0), allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
 	t1, t2 := &Int{}, &Int{};
 	defer internal_destroy(t1, t2);
 
@@ -1275,28 +1467,28 @@ _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int
 
 	num_factors := (stop - start) >> 1;
 	if num_factors == 2 {
-		internal_set(t1, start, false, allocator) or_return;
+		internal_set(t1, start, false)                               or_return;
 		when true {
-			internal_grow(t2, t1.used + 1, false, allocator) or_return;
-			internal_add(t2, t1, 2, allocator) or_return;
+			internal_grow(t2, t1.used + 1, false)                    or_return;
+			internal_add(t2, t1, 2)                                  or_return;
 		} else {
-			add(t2, t1, 2) or_return;
+			internal_add(t2, t1, 2)                                  or_return;
 		}
-		return internal_mul(res, t1, t2, allocator);
+		return internal_mul(res, t1, t2);
 	}
 
 	if num_factors > 1 {
 		mid := (start + num_factors) | 1;
-		_private_int_recursive_product(t1, start,  mid, level + 1, allocator) or_return;
-		_private_int_recursive_product(t2,   mid, stop, level + 1, allocator) or_return;
-		return internal_mul(res, t1, t2, allocator);
+		_private_int_recursive_product(t1, start,  mid, level + 1)   or_return;
+		_private_int_recursive_product(t2,   mid, stop, level + 1)   or_return;
+		return internal_mul(res, t1, t2);
 	}
 
 	if num_factors == 1 {
-		return #force_inline internal_set(res, start, true, allocator);
+		return #force_inline internal_set(res, start, true);
 	}
 
-	return #force_inline internal_one(res, true, allocator);
+	return #force_inline internal_one(res, true);
 }
 
 /*
