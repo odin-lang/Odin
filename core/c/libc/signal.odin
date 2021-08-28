@@ -2,7 +2,11 @@ package libc
 
 // 7.14 Signal handling
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 sig_atomic_t :: distinct atomic_int;
 
