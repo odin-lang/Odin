@@ -427,6 +427,129 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := conte
 }
 
 /*
+	Multiplies |a| * |b| and does not compute the lower digs digits
+	[meant to get the higher part of the product]
+*/
+_private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	/*
+		Can we use the fast multiplier?
+	*/
+	if a.used + b.used + 1 < _WARRAY && min(a.used, b.used) < _MAX_COMBA {
+		return _private_int_mul_high_comba(dest, a, b, digits);
+	}
+
+	internal_grow(dest, a.used + b.used + 1) or_return;
+	dest.used = a.used + b.used + 1;
+
+	pa := a.used;
+	pb := b.used;
+	for ix := 0; ix < pa; ix += 1 {
+		carry := DIGIT(0);
+
+		for iy := digits - ix; iy < pb; iy += 1 {
+			/*
+				Calculate the double precision result.
+			*/
+			r := _WORD(dest.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + _WORD(carry);
+
+			/*
+				Get the lower part.
+			*/
+			dest.digit[ix + iy] = DIGIT(r & _WORD(_MASK));
+
+			/*
+				Carry the carry.
+			*/
+			carry = DIGIT(r >> _WORD(_DIGIT_BITS));
+		}
+		dest.digit[ix + pb] = carry;
+	}
+	return internal_clamp(dest);
+}
+
+/*
+	This is a modified version of `_private_int_mul_comba` that only produces output digits *above* `digits`.
+	See the comments for `_private_int_mul_comba` to see how it works.
+
+	This is used in the Barrett reduction since for one of the multiplications
+	only the higher digits were needed.  This essentially halves the work.
+
+	Based on Algorithm 14.12 on pp.595 of HAC.
+*/
+_private_int_mul_high_comba :: proc(dest, a, b: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	W: [_WARRAY]DIGIT = ---;
+	_W: _WORD = 0;
+
+	/*
+		Number of output digits to produce. Grow the destination as required.
+	*/
+	pa := a.used + b.used;
+	internal_grow(dest, pa) or_return;
+
+	ix: int;
+	for ix = digits; ix < pa; ix += 1 {
+		/*
+			Get offsets into the two bignums.
+		*/
+		ty := min(b.used - 1, ix);
+		tx := ix - ty;
+
+		/*
+			This is the number of times the loop will iterrate, essentially it's
+			while (tx++ < a->used && ty-- >= 0) { ... }
+		*/
+		iy := min(a.used - tx, ty + 1);
+
+		/*
+			Execute loop.
+		*/
+		for iz := 0; iz < iy; iz += 1 {
+			_W += _WORD(a.digit[tx + iz]) * _WORD(b.digit[ty - iz]);
+		}
+
+		/*
+			Store term.
+		*/
+		W[ix] = DIGIT(_W) & DIGIT(_MASK);
+
+		/*
+			Make next carry.
+		*/
+		_W = _W >> _WORD(_DIGIT_BITS);
+	}
+
+	/*
+		Setup dest
+	*/
+	old_used := dest.used;
+	dest.used = pa;
+
+	for ix = digits; ix < pa; ix += 1 {
+		/*
+			Now extract the previous digit [below the carry].
+		*/
+		dest.digit[ix] = W[ix];
+	}
+
+	/*
+		Zero remainder.
+	*/
+	internal_zero_unused(dest, old_used);
+
+	/*
+		Adjust dest.used based on leading zeroes.
+	*/
+	return internal_clamp(dest);
+}
+
+
+
+
+/*
 	Low level squaring, b = a*a, HAC pp.596-597, Algorithm 14.16
 	Assumes `dest` and `src` to not be `nil`, and `src` to have been initialized.
 */
