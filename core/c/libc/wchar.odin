@@ -2,7 +2,11 @@ package libc
 
 // 7.29 Extended multibyte and wide character utilities
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 @(default_calling_convention="c")
 foreign libc {

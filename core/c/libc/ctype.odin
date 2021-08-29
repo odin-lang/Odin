@@ -1,6 +1,10 @@
 package libc
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 // 7.4 Character handling
 
