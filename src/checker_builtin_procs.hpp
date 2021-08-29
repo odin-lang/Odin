@@ -146,6 +146,9 @@ enum BuiltinProcId {
 	BuiltinProc_fixed_point_div_sat,
 
 	BuiltinProc_expect,
+	
+	// Platform specific intrinsics
+	BuiltinProc_syscall,
 
 	// Constant type tests
 
@@ -379,6 +382,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("expect"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	
+	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
