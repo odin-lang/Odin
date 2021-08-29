@@ -7,6 +7,7 @@ import "core:runtime"
 import "core:strings"
 import "core:c"
 import "core:strconv"
+import "core:intrinsics"
 
 Handle    :: distinct i32;
 File_Time :: distinct u64;
@@ -269,7 +270,6 @@ SYS_GETTID: Syscall : 186;
 
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---;
-	@(link_name="syscall")          syscall             :: proc(number: Syscall, #c_vararg args: ..any) -> i32 ---;
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---;
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---;
@@ -595,7 +595,7 @@ exit :: proc "contextless" (code: int) -> ! {
 }
 
 current_thread_id :: proc "contextless" () -> int {
-	return cast(int)syscall(SYS_GETTID);
+	return cast(int)intrinsics.syscall(SYS_GETTID);
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
