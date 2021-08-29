@@ -4,7 +4,11 @@ package libc
 
 import "core:intrinsics"
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 // To support C's tgmath behavior we use Odin's explicit procedure overloading,
 // but we cannot use the same names as exported by libc so use @(link_name)

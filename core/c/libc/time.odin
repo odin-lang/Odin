@@ -2,7 +2,11 @@ package libc
 
 // 7.27 Date and time
 
-foreign import libc "system:c"
+when ODIN_OS == "windows" {
+	foreign import libc "system:libucrt.lib"
+} else {
+	foreign import libc "system:c"
+}
 
 // We enforce 64-bit time_t and timespec as there is no reason to use 32-bit as
 // we approach the 2038 problem. Windows has defaulted to this since VC8 (2005).

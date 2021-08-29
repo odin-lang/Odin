@@ -556,3 +556,18 @@ int_compare_magnitude :: proc(a, b: ^Int, allocator := context.allocator) -> (re
 
 	return #force_inline internal_cmp_mag(a, b), nil;
 }
+
+/*
+	Check if remainders are possible squares - fast exclude non-squares.
+
+	Returns `true` if `a` is a square, `false` if not.
+	Assumes `a` not to be `nil` and to have been initialized.
+*/
+int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (square: bool, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a) or_return;
+
+	return #force_inline internal_int_is_square(a);
+}
