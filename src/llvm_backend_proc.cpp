@@ -1830,6 +1830,123 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.type = t;
 			return lb_emit_conv(p, res, t);
 		}
+		
+	case BuiltinProc_syscall:
+		{
+			unsigned arg_count = cast(unsigned)ce->args.count;
+			LLVMValueRef *args = gb_alloc_array(permanent_allocator(), LLVMValueRef, arg_count);
+			for_array(i, ce->args) {
+				lbValue arg = lb_build_expr(p, ce->args[i]);
+				arg = lb_emit_conv(p, arg, t_uintptr);
+				args[i] = arg.value;
+			}
+			
+			LLVMTypeRef llvm_uintptr = lb_type(p->module, t_uintptr);
+			LLVMTypeRef *llvm_arg_types = gb_alloc_array(permanent_allocator(), LLVMTypeRef, arg_count);
+			for (unsigned i = 0; i < arg_count; i++) {
+				llvm_arg_types[i] = llvm_uintptr;
+			}
+			
+			LLVMTypeRef func_type = LLVMFunctionType(llvm_uintptr, llvm_arg_types, arg_count, false);
+			
+			LLVMValueRef inline_asm = nullptr;
+			
+			switch (build_context.metrics.arch) {
+			case TargetArch_amd64:
+				{
+					GB_ASSERT(arg_count <= 7);
+					
+					char asm_string[] = "syscall";
+					gbString constraints = gb_string_make(heap_allocator(), "={rax}");
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"rax",
+							"rdi",
+							"rsi",
+							"rdx",
+							"r10",
+							"r8",
+							"r9"
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+					size_t asm_string_size = gb_strlen(asm_string);
+					size_t constraints_size = gb_string_length(constraints);
+					
+					inline_asm = LLVMGetInlineAsm(func_type, asm_string, asm_string_size, constraints, constraints_size, true, false, LLVMInlineAsmDialectATT);
+				}
+				break;
+			case TargetArch_386:
+				{
+					GB_ASSERT(arg_count <= 7);
+					
+					char asm_string_default[] = "int $0x80";
+					char *asm_string = asm_string_default;
+					gbString constraints = gb_string_make(heap_allocator(), "={eax}");
+					
+					for (unsigned i = 0; i < gb_min(arg_count, 6); i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"eax",
+							"ebx",
+							"ecx",
+							"edx",
+							"esi",
+							"edi",
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+					if (arg_count == 7) {
+						char asm_string7[] = "push %[arg6]\npush %%ebp\nmov 4(%%esp), %%ebp\nint $0x80\npop %%ebp\nadd $4, %%esp";
+						asm_string = asm_string7;
+						
+						constraints = gb_string_appendc(constraints, ",rm");
+					}
+					
+					size_t asm_string_size = gb_strlen(asm_string);
+					size_t constraints_size = gb_string_length(constraints);
+					
+					inline_asm = LLVMGetInlineAsm(func_type, asm_string, asm_string_size, constraints, constraints_size, true, false, LLVMInlineAsmDialectATT);
+				}
+				break;
+			case TargetArch_arm64:
+				{
+					GB_ASSERT(arg_count <= 7);
+					
+					char asm_string[] = "svc #0";
+					gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"x8",
+							"x0",
+							"x1",
+							"x2",
+							"x3",
+							"x4",
+							"x5",
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+					size_t asm_string_size = gb_strlen(asm_string);
+					size_t constraints_size = gb_string_length(constraints);
+					
+					inline_asm = LLVMGetInlineAsm(func_type, asm_string, asm_string_size, constraints, constraints_size, true, false, LLVMInlineAsmDialectATT);
+				}
+				break;
+			default:
+				GB_PANIC("Unsupported platform");
+			}
+			
+			lbValue res = {};
+			res.value = LLVMBuildCall2(p->builder, func_type, inline_asm, args, arg_count, "");
+			res.type = t_uintptr;
+			return res;
+		}
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

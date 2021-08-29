@@ -199,7 +199,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
-	String builtin_name = builtin_procs[id].name;
+	String builtin_name = builtin_procs[id].name;;
 
 
 	if (ce->args.count > 0) {
@@ -2066,11 +2066,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer_like(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 			} else if (x.type == t_llvm_bool) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 			}
 
@@ -2089,17 +2089,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 			} else if (x.type == t_llvm_bool) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 			}
 			i64 sz = type_size_of(x.type);
 			if (sz < 2) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Type passed to '%.*s' must be at least 2 bytes, got %s with size of %lld", LIT(builtin_procs[id].name), xts, sz);
+				error(x.expr, "Type passed to '%.*s' must be at least 2 bytes, got %s with size of %lld", LIT(builtin_name), xts, sz);
 				gb_string_free(xts);
 			}
 
@@ -2126,13 +2126,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			convert_to_typed(c, &x, y.type);
 			if (is_type_untyped(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 				return false;
 			}
 			if (!is_type_integer(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected an integer for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Expected an integer for '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 				return false;
 			}
@@ -2141,7 +2141,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				GB_ASSERT(ct->kind == Type_Basic);
 				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -2161,7 +2161,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 			if (!is_type_float(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 				return false;
 			}
@@ -2204,19 +2204,19 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_pointer(dst.type)) {
 				gbString str = type_to_string(dst.type);
-				error(dst.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(dst.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (!is_type_pointer(src.type)) {
 				gbString str = type_to_string(src.type);
-				error(src.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(src.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (!is_type_integer(len.type)) {
 				gbString str = type_to_string(len.type);
-				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
@@ -2225,7 +2225,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				i64 n = exact_value_to_i64(len.value);
 				if (n < 0) {
 					gbString str = expr_to_string(len.expr);
-					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_name), str);
 					gb_string_free(str);
 				}
 			}
@@ -2251,13 +2251,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_pointer(ptr.type)) {
 				gbString str = type_to_string(ptr.type);
-				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (!is_type_integer(len.type)) {
 				gbString str = type_to_string(len.type);
-				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
@@ -2266,7 +2266,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				i64 n = exact_value_to_i64(len.value);
 				if (n < 0) {
 					gbString str = expr_to_string(len.expr);
-					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+					error(len.expr, "Expected a non-negative integer value for the number of bytes for '%.*s', got %s", LIT(builtin_name), str);
 					gb_string_free(str);
 				}
 			}
@@ -2295,19 +2295,19 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_pointer(ptr.type)) {
 				gbString str = type_to_string(ptr.type);
-				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (are_types_identical(core_type(ptr.type), t_rawptr)) {
 				gbString str = type_to_string(ptr.type);
-				error(ptr.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (!is_type_integer(offset.type)) {
 				gbString str = type_to_string(offset.type);
-				error(offset.expr, "Expected an integer value for the offset parameter for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(offset.expr, "Expected an integer value for the offset parameter for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
@@ -2338,26 +2338,26 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_pointer(ptr0.type)) {
 				gbString str = type_to_string(ptr0.type);
-				error(ptr0.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr0.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (are_types_identical(core_type(ptr0.type), t_rawptr)) {
 				gbString str = type_to_string(ptr0.type);
-				error(ptr0.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr0.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 
 			if (!is_type_pointer(ptr1.type)) {
 				gbString str = type_to_string(ptr1.type);
-				error(ptr1.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr1.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
 			if (are_types_identical(core_type(ptr1.type), t_rawptr)) {
 				gbString str = type_to_string(ptr1.type);
-				error(ptr1.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_procs[id].name), str);
+				error(ptr1.expr, "Expected a dereferenceable pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
@@ -2365,7 +2365,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!are_types_identical(ptr0.type, ptr1.type)) {
 				gbString xts = type_to_string(ptr0.type);
 				gbString yts = type_to_string(ptr1.type);
-				error(ptr0.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				error(ptr0.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_name), xts, yts);
 				gb_string_free(yts);
 				gb_string_free(xts);
 				return false;
@@ -2535,7 +2535,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!are_types_identical(x.type, y.type)) {
 				gbString xts = type_to_string(x.type);
 				gbString yts = type_to_string(y.type);
-				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_name), xts, yts);
 				gb_string_free(yts);
 				gb_string_free(xts);
 				return false;
@@ -2543,7 +2543,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer(x.type) || is_type_untyped(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected an integer type for '%.*s', got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Expected an integer type for '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 				return false;
 			}
@@ -2553,17 +2553,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 			if (z.mode != Addressing_Constant || !is_type_integer(z.type)) {
-				error(z.expr, "Expected a constant integer for the scale in '%.*s'", LIT(builtin_procs[id].name));
+				error(z.expr, "Expected a constant integer for the scale in '%.*s'", LIT(builtin_name));
 				return false;
 			}
 			i64 n = exact_value_to_i64(z.value);
 			if (n <= 0) {
-				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_procs[id].name), n);
+				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), n);
 				return false;
 			}
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
-				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_procs[id].name), n, sz);
+				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), n, sz);
 				return false;
 			}
 
@@ -2590,7 +2590,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!are_types_identical(x.type, y.type)) {
 				gbString xts = type_to_string(x.type);
 				gbString yts = type_to_string(y.type);
-				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_procs[id].name), xts, yts);
+				error(x.expr, "Mismatched types for '%.*s', %s vs %s", LIT(builtin_name), xts, yts);
 				gb_string_free(yts);
 				gb_string_free(xts);
 				*operand = x; // minimize error propagation
@@ -2599,14 +2599,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			if (!is_type_integer_like(x.type)) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_procs[id].name), xts);
+				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 				*operand = x;
 				return true;
 			}
 
 			if (y.mode != Addressing_Constant) {
-				error(y.expr, "Second argument to '%.*s' must be constant as it is the expected value", LIT(builtin_procs[id].name));
+				error(y.expr, "Second argument to '%.*s' must be constant as it is the expected value", LIT(builtin_name));
 			}
 
 			if (x.mode == Addressing_Constant) {
@@ -2620,7 +2620,60 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
-
+		
+	case BuiltinProc_syscall:
+		{
+			convert_to_typed(c, operand, t_uintptr);
+			if (!is_type_uintptr(operand->type)) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Argument 0 must be of type 'uintptr', got %s", t);
+				gb_string_free(t);
+			}
+			for (isize i = 1; i < ce->args.count; i++) {
+				Operand x = {};
+				check_expr(c, &x, ce->args[i]);
+				if (x.mode != Addressing_Invalid) {
+					convert_to_typed(c, &x, t_uintptr);	
+				}
+				if (!is_type_uintptr(operand->type)) {
+					gbString t = type_to_string(x.type);
+					error(x.expr, "Argument %td must be of type 'uintptr', got %s", i, t);
+					gb_string_free(t);
+				}
+			}
+			
+			isize max_arg_count = 32;
+			
+			switch (build_context.metrics.os) {
+			case TargetOs_windows:
+			case TargetOs_freestanding:
+				error(call, "'%.*s' is not supported on this platform (%.*s)", LIT(builtin_name), LIT(target_os_names[build_context.metrics.os]));
+				break;
+			case TargetOs_darwin:
+			case TargetOs_linux:
+			case TargetOs_essence:
+			case TargetOs_freebsd:
+				switch (build_context.metrics.arch) {
+				case TargetArch_386:
+				case TargetArch_amd64:
+				case TargetArch_arm64:
+					max_arg_count = 7;
+					break;
+				}
+				break;
+			}
+			
+			if (ce->args.count > max_arg_count) {
+				error(ast_end_token(call), "'%.*s' has a maximum of %td arguments on this platform (%.*s), got %td", LIT(builtin_name), max_arg_count, LIT(target_os_names[build_context.metrics.os]), ce->args.count);
+			}
+			
+			
+			
+			operand->mode = Addressing_Value;
+			operand->type = t_uintptr;
+			return true;
+		}
+		break;
 
 
 	case BuiltinProc_type_base_type:
