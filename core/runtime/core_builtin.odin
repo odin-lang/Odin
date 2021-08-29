@@ -523,6 +523,15 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	return true;
 }
 
+@builtin
+map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
+	key, value := key, value;
+	h := __get_map_header(m);
+	hash := __get_map_hash(&key);
+	
+	data := uintptr(__dynamic_map_set(h, hash, &value, loc));
+	return (^V)(data + h.value_offset);
+}
 
 
 @builtin

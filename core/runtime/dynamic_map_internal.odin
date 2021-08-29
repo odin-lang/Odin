@@ -193,27 +193,28 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
-	new_header: Map_Header = header;
-	nm := Raw_Map{};
-	nm.entries.allocator = m.entries.allocator;
-	nm.hashes = m.hashes;
-	new_header.m = &nm;
-
 	c := context;
 	if m.entries.allocator.procedure != nil {
 		c.allocator = m.entries.allocator;
 	}
 	context = c;
+	
+	nm := Raw_Map{};
+	nm.entries.allocator = m.entries.allocator;
+	nm.hashes = m.hashes;
+	
+	new_header: Map_Header = header;
+	new_header.m = &nm;
 
 	new_count := new_count;
 	new_count = max(new_count, 2*m.entries.len);
 
-	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
 	__slice_resize(&nm.hashes, new_count, m.entries.allocator, loc);
 	for i in 0 ..< new_count {
 		nm.hashes[i] = -1;
 	}
 
+	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
 	for i in 0 ..< m.entries.len {
 		if len(nm.hashes) == 0 {
 			__dynamic_map_grow(new_header, loc);
@@ -253,7 +254,7 @@ __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 	return nil;
 }
 
-__dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) #no_bounds_check {
+__dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
 	index: int;
 	assert(value != nil);
 
@@ -277,7 +278,7 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 
 	e := __dynamic_map_get_entry(h, index);
 	e.hash = hash.hash;
-
+	
 	key := rawptr(uintptr(e) + h.key_offset);
 	mem_copy(key, hash.key_ptr, h.key_size);
 
@@ -286,7 +287,11 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h, loc);
+		index = __dynamic_map_find(h, hash).entry_index;
+		assert(index >= 0);
 	}
+	
+	return __dynamic_map_get_entry(h, index);
 }
 
 
@@ -297,7 +302,7 @@ __dynamic_map_grow :: proc(using h: Map_Header, loc := #caller_location) {
 }
 
 __dynamic_map_full :: #force_inline proc "contextless" (using h: Map_Header) -> bool {
-	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
+	return int(0.75 * f64(len(m.hashes))) <= m.entries.len;
 }
 
 

@@ -58,3 +58,14 @@ raw_dynamic_array_data :: proc(a: $T/[dynamic]$E) -> ^E {
 raw_data :: proc{raw_array_data, raw_string_data, raw_slice_data, raw_dynamic_array_data};
 
 
+Poly_Raw_Map_Entry :: struct($Key, $Value: typeid) {
+	hash:  uintptr,
+	next:  int,
+	key:   Key,
+	value: Value,	
+}
+
+Poly_Raw_Map :: struct($Key, $Value: typeid) {
+	hashes:  []int,
+	entries: [dynamic]Poly_Raw_Map_Entry(Key, Value),
+}
