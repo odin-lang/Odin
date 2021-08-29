@@ -1,16 +1,12 @@
 package sync
 
 import "core:sys/unix"
+import "core:intrinsics"
 
-foreign import libc "system:c"
 
 current_thread_id :: proc "contextless" () -> int {
-	foreign libc {
-		syscall :: proc(number: i32, #c_vararg args: ..any) -> i32 ---
-	}
-
 	SYS_GETTID :: 186;
-	return int(syscall(SYS_GETTID));
+	return int(intrinsics.syscall(SYS_GETTID));
 }
 
 
@@ -32,10 +28,10 @@ semaphore_destroy :: proc(s: ^Semaphore) {
 }
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
-    // NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
-    for in 0..<count {
-	    assert(unix.sem_post(&s.handle) == 0);
-    }
+	// NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
+	for in 0..<count {
+		assert(unix.sem_post(&s.handle) == 0);
+	}
 }
 
 semaphore_wait_for :: proc(s: ^Semaphore) {
