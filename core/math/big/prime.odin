@@ -15,7 +15,7 @@ package math_big
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
 */
-int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
+internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
 	assert_if_nil(a);
 	context.allocator = allocator;
 
@@ -206,6 +206,216 @@ int_montgomery_setup :: proc(n: ^Int, allocator := context.allocator) -> (rho: D
 
 	return #force_inline internal_int_montgomery_setup(n);
 }
+
+/*
+	Reduces `x` mod `m`, assumes 0 < x < m**2, mu is precomputed via reduce_setup.
+	From HAC pp.604 Algorithm 14.42
+
+	Assumes `x`, `m` and `mu` all not to be `nil` and have been initialized.
+*/
+internal_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	q := &Int{};
+	defer internal_destroy(q);
+	um := m.used;
+
+	/*
+		q = x
+	*/
+	copy(q, x)                                                       or_return;
+
+	/*
+		q1 = x / b**(k-1)
+	*/
+	internal_shr_digit(q, um - 1);
+
+	/*
+		According to HAC this optimization is ok.
+	*/
+	if DIGIT(um) > DIGIT(1) << (_DIGIT_BITS - 1) {
+		mul(q, q, mu)                                                or_return;
+	} else {
+		_private_int_mul_high(q, q, mu, um)                          or_return;
+	}
+
+	/*
+		q3 = q2 / b**(k+1)
+	*/
+	internal_shr_digit(q, um + 1);
+
+	/*
+		x = x mod b**(k+1), quick (no division)
+	*/
+	internal_int_mod_bits(x, x, _DIGIT_BITS * (um + 1))              or_return;
+
+	/*
+		q = q * m mod b**(k+1), quick (no division)
+	*/
+	_private_int_mul(q, q, m, um + 1)                                or_return;
+
+	/*
+		x = x - q
+	*/
+	internal_sub(x, x, q)                                            or_return;
+
+	/*
+		If x < 0, add b**(k+1) to it.
+	*/
+	if internal_cmp(x, 0) == -1 {
+		internal_set(q, 1)                                           or_return;
+		internal_shl_digit(q, um + 1)                                or_return;
+		internal_add(x, x, q)                                        or_return;
+	}
+
+	/*
+		Back off if it's too big.
+	*/
+	for internal_cmp(x, m) != -1 {
+		internal_sub(x, x, m)                                        or_return;
+	}
+
+	return nil;
+}
+
+/*
+	Reduces `a` modulo `n`, where `n` is of the form 2**p - d.
+*/
+internal_int_reduce_2k :: proc(a, n: ^Int, d: DIGIT, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	q := &Int{};
+	defer internal_destroy(q);
+
+	internal_zero(q)                                                 or_return;
+
+	p := internal_count_bits(n);
+
+	for {
+		/*
+			q = a/2**p, a = a mod 2**p
+		*/
+		internal_shrmod(q, a, a, p)                                  or_return;
+
+		if d != 1 {
+			/*
+				q = q * d
+			*/
+			internal_mul(q, q, d)                                    or_return;
+		}
+
+		/*
+			a = a + q
+		*/
+		internal_add(a, a, q)                                        or_return;
+		if internal_cmp_mag(a, n) == -1                              { break; }
+		internal_sub(a, a, n)                                        or_return;
+	}
+
+	return nil;
+}
+
+/*
+	Reduces `a` modulo `n` where `n` is of the form 2**p - d
+	This differs from reduce_2k since "d" can be larger than a single digit.
+*/
+internal_int_reduce_2k_l :: proc(a, n, d: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	q := &Int{};
+	defer internal_destroy(q);
+
+	internal_zero(q)                                                 or_return;
+
+	p := internal_count_bits(n);
+
+	for {
+		/*
+			q = a/2**p, a = a mod 2**p
+		*/
+		internal_shrmod(q, a, a, p)                                  or_return;
+
+		/*
+			q = q * d
+		*/
+		internal_mul(q, q, d)                                        or_return;
+
+		/*
+			a = a + q
+		*/
+		internal_add(a, a, q)                                        or_return;
+		if internal_cmp_mag(a, n) == -1                              { break; }
+		internal_sub(a, a, n)                                        or_return;
+	}
+
+	return nil;
+}
+
+/*
+	Determines if `internal_int_reduce_2k` can be used.
+	Asssumes `a` not to be `nil` and to have been initialized.
+*/
+internal_int_reduce_is_2k :: proc(a: ^Int) -> (reducible: bool, err: Error) {
+	assert_if_nil(a);
+
+	if internal_is_zero(a) {
+		return false, nil;
+	} else if a.used == 1 {
+		return true, nil;
+	} else if a.used  > 1 {
+		iy := internal_count_bits(a);
+		iw := 1;
+		iz := DIGIT(1);
+
+		/*
+			Test every bit from the second digit up, must be 1.
+		*/
+		for ix := _DIGIT_BITS; ix < iy; ix += 1 {
+			if a.digit[iw] & iz == 0 {
+				return false, nil;
+			}
+
+			iz <<= 1;
+			if iz > _DIGIT_MAX {
+				iw += 1;
+				iz  = 1;
+			}
+		}
+		return true, nil;
+	} else {
+		return true, nil;
+	}
+}
+
+/*
+	Determines if `internal_int_reduce_2k_l` can be used.
+	Asssumes `a` not to be `nil` and to have been initialized.
+*/
+internal_int_reduce_is_2k_l :: proc(a: ^Int) -> (reducible: bool, err: Error) {
+	assert_if_nil(a);
+
+	if internal_int_is_zero(a) {
+		return false, nil;
+	} else if a.used == 1 {
+		return true, nil;
+	} else if a.used  > 1 {
+		/*
+			If more than half of the digits are -1 we're sold.
+		*/
+		ix := 0;
+		iy := 0;
+
+		for ; ix < a.used; ix += 1 {
+			if a.digit[ix] == _DIGIT_MAX {
+				iy += 1;
+			}
+		}
+		return iy >= (a.used / 2), nil;
+	} else {
+		return false, nil;
+	}
+}
+
 
 /*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
