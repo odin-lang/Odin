@@ -458,7 +458,7 @@ Event :: struct #raw_union {
 
 
 /* Make sure we haven't broken binary compatibility */
-#assert(size_of(Event) == size_of(Event{}.padding));
+#assert(size_of(Event) == size_of(Event{}.padding))
 
 
 

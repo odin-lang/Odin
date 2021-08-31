@@ -11,7 +11,7 @@ when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
 bool :: distinct b32
-#assert(size_of(bool) == size_of(c.int));
+#assert(size_of(bool) == size_of(c.int))
 
 FOURCC :: #force_inline proc "c" (A, B, C, D: u8) -> u32 {
 	return u32(A) << 0 | u32(B) << 8 | u32(C) << 16 | u32(D) << 24
@@ -155,7 +155,7 @@ iconv_utf8_ucs2 :: proc "c" (s: string) -> [^]u16 {
 	return cast([^]u16)iconv_string("UCS-2-INTERNAL", "UTF-8", cstring(raw_data(s)), len(s)+1)
 }
 
-#assert(size_of(rune) == size_of(c.int));
+#assert(size_of(rune) == size_of(c.int))
 
 iconv_utf8_utf32 :: iconv_utf8_ucs4
 iconv_utf8_ucs4 :: proc "c" (s: string) -> [^]rune {
