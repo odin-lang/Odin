@@ -1419,7 +1419,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				io.write_string(fi.writer, info.name)
 				io.write_string(fi.writer, "{}")
 				return
-			};
+			}
 
 			is_soa := b.soa_kind != .None
 

@@ -398,7 +398,7 @@ when size_of(uintptr) == 4 {
 		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
 	}
 } else {
-	#panic("unknown word size");
+	#panic("unknown word size")
 }
 
 WSABUF :: struct {
@@ -863,7 +863,7 @@ SID :: struct #packed {
 	IdentifierAuthority: SID_IDENTIFIER_AUTHORITY,
 	SubAuthority: [15]DWORD, // Array of DWORDs
 }
-#assert(size_of(SID) == SECURITY_MAX_SID_SIZE);
+#assert(size_of(SID) == SECURITY_MAX_SID_SIZE)
 
 SID_IDENTIFIER_AUTHORITY :: struct #packed {
     Value: [6]u8,
@@ -916,7 +916,7 @@ USER_INFO_1 :: struct #packed {
 	flags: USER_INFO_FLAGS,
 	script_path: LPWSTR,
 }
-#assert(size_of(USER_INFO_1) == 50);
+#assert(size_of(USER_INFO_1) == 50)
 
 LOCALGROUP_MEMBERS_INFO_0 :: struct #packed {
 	sid: ^SID,

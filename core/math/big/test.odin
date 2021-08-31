@@ -147,7 +147,7 @@ PyRes :: struct {
 	if err = atoi(aa, string(a), 16); err != nil { return PyRes{res=":log:atoi(a):", err=err}; }
 	if l, err = #force_inline internal_log(aa, base); err != nil { return PyRes{res=":log:log(a, base):", err=err}; }
 
-	#force_inline internal_zero(aa);
+	#force_inline internal_zero(aa)
 	aa.digit[0] = DIGIT(l)  & _MASK
 	aa.digit[1] = DIGIT(l) >> _DIGIT_BITS
 	aa.used = 2

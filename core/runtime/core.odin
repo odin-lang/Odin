@@ -234,7 +234,7 @@ Typeid_Kind :: enum u8 {
 	Relative_Pointer,
 	Relative_Slice,
 }
-#assert(len(Typeid_Kind) < 32);
+#assert(len(Typeid_Kind) < 32)
 
 // Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
 // 	index:    8*size_of(uintptr) - 8,

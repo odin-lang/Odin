@@ -24,7 +24,7 @@ double         :: b.f64
 complex_float  :: b.complex64
 complex_double :: b.complex128
 
-#assert(size_of(b.uintptr) == size_of(b.int));
+#assert(size_of(b.uintptr) == size_of(b.int))
 
 size_t    :: b.uint
 ssize_t   :: b.int

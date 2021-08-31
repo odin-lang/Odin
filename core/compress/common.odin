@@ -141,7 +141,7 @@ Context_Memory_Input :: struct #packed {
 	size_packed:       i64,
 	size_unpacked:     i64,
 }
-#assert(size_of(Context_Memory_Input) == 64);
+#assert(size_of(Context_Memory_Input) == 64)
 
 Context_Stream_Input :: struct #packed {
 	input_data:        []u8,
@@ -432,7 +432,7 @@ peek_bits_no_refill_lsb :: proc{peek_bits_no_refill_lsb_from_memory, peek_bits_n
 @(optimization_mode="speed")
 read_bits_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width: u8) -> u32 {
 	k := #force_inline peek_bits_lsb(z, width)
-	#force_inline consume_bits_lsb(z, width);
+	#force_inline consume_bits_lsb(z, width)
 	return k
 }
 
@@ -448,7 +448,7 @@ read_bits_lsb :: proc{read_bits_lsb_from_memory, read_bits_lsb_from_stream}
 @(optimization_mode="speed")
 read_bits_no_refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width: u8) -> u32 {
 	k := #force_inline peek_bits_no_refill_lsb(z, width)
-	#force_inline consume_bits_lsb(z, width);
+	#force_inline consume_bits_lsb(z, width)
 	return k
 }
 
@@ -465,7 +465,7 @@ read_bits_no_refill_lsb :: proc{read_bits_no_refill_lsb_from_memory, read_bits_n
 @(optimization_mode="speed")
 discard_to_next_byte_lsb_from_memory :: proc(z: ^Context_Memory_Input) {
 	discard := u8(z.num_bits & 7)
-	#force_inline consume_bits_lsb(z, discard);
+	#force_inline consume_bits_lsb(z, discard)
 }
 
 

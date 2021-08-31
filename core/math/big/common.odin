@@ -87,7 +87,7 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100
 */
 MATH_BIG_FORCE_64_BIT :: #config(MATH_BIG_FORCE_64_BIT, false)
 MATH_BIG_FORCE_32_BIT :: #config(MATH_BIG_FORCE_32_BIT, false)
-when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously."); };
+when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously."); }
 
 _LOW_MEMORY           :: #config(BIGINT_SMALL_MEMORY, false)
 when _LOW_MEMORY {
@@ -172,7 +172,7 @@ Primality_Flags :: bit_set[Primality_Flag; u8]
  */
 
 _MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS)
-#assert(_DEFAULT_DIGIT_COUNT >= _MIN_DIGIT_COUNT);
+#assert(_DEFAULT_DIGIT_COUNT >= _MIN_DIGIT_COUNT)
 
 /*
 	Maximum number of digits.
@@ -193,7 +193,7 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	DIGIT        :: distinct u32
 	_WORD        :: distinct u64
 }
-#assert(size_of(_WORD) == 2 * size_of(DIGIT));
+#assert(size_of(_WORD) == 2 * size_of(DIGIT))
 
 _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT)
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD)

@@ -702,7 +702,7 @@ floattidf :: proc(a: i128) -> f64 {
 		case:
 			a = i128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
 				i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
-		};
+		}
 
 		a |= i128((a & 4) != 0)
 		a += 1
@@ -743,7 +743,7 @@ floattidf_unsigned :: proc(a: u128) -> f64 {
 		case:
 			a = u128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
 				u128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
-		};
+		}
 
 		a |= u128((a & 4) != 0)
 		a += 1

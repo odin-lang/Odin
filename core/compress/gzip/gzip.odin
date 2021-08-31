@@ -33,7 +33,7 @@ Header :: struct #packed {
 	xfl: Compression_Flags,
 	os: OS,
 }
-#assert(size_of(Header) == 10);
+#assert(size_of(Header) == 10)
 
 Header_Flag :: enum u8 {
 	// Order is important
