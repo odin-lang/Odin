@@ -832,9 +832,7 @@ internal_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 
 	for x = 0; x < int(winsize - 1); x += 1 {
 		internal_sqr(&M[slot], &M[slot])                             or_return;
-   		print("slot: ", &M[slot]);
 		redux(&M[slot], P, rho)                                      or_return;
-		print("slot redux: ", &M[slot]);
 	}
 
 	/*
