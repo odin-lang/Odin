@@ -1,5 +1,3 @@
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -17,6 +15,7 @@ package math_big
 
 	These aren't exported for the same reasons.
 */
+package math_big
 
 import "core:intrinsics"
 import "core:mem"

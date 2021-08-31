@@ -1,5 +1,3 @@
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -8,6 +6,7 @@ package math_big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
+package math_big
 
 import "core:intrinsics"
 
@@ -57,10 +56,10 @@ when #config(MATH_BIG_EXE, true) {
 	debugged where necessary.
 */
 
-_DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF,  80);
-_DEFAULT_SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, 120);
-_DEFAULT_MUL_TOOM_CUTOFF      :: #config(MUL_TOOM_CUTOFF,      350);
-_DEFAULT_SQR_TOOM_CUTOFF      :: #config(SQR_TOOM_CUTOFF,      400);
+_DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MATH_BIG_MUL_KARATSUBA_CUTOFF,  80);
+_DEFAULT_SQR_KARATSUBA_CUTOFF :: #config(MATH_BIG_SQR_KARATSUBA_CUTOFF, 120);
+_DEFAULT_MUL_TOOM_CUTOFF      :: #config(MATH_BIG_MUL_TOOM_CUTOFF,      350);
+_DEFAULT_SQR_TOOM_CUTOFF      :: #config(MATH_BIG_SQR_TOOM_CUTOFF,      400);
 
 
 MAX_ITERATIONS_ROOT_N := 500;
@@ -85,15 +84,22 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100;
 
 	2) Optimizations thanks to precomputed masks wouldn't work.
 */
-MATH_BIG_FORCE_64_BIT :: #config(MATH_BIG_FORCE_64_BIT, false);
-MATH_BIG_FORCE_32_BIT :: #config(MATH_BIG_FORCE_32_BIT, false);
+MATH_BIG_FORCE_64_BIT   :: #config(MATH_BIG_FORCE_64_BIT, false);
+MATH_BIG_FORCE_32_BIT   :: #config(MATH_BIG_FORCE_32_BIT, false);
 when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously."); };
 
-_LOW_MEMORY           :: #config(BIGINT_SMALL_MEMORY, false);
+/*
+	Trade a smaller memory footprint for more processing overhead?
+*/
+_LOW_MEMORY             :: #config(MATH_BIG_SMALL_MEMORY, false);
 when _LOW_MEMORY {
-	_DEFAULT_DIGIT_COUNT :: 8;
+	_DEFAULT_DIGIT_COUNT ::   8;
+	_TAB_SIZE            ::  32;
+	_MAX_WIN_SIZE        ::   5;
 } else {
-	_DEFAULT_DIGIT_COUNT :: 32;
+	_DEFAULT_DIGIT_COUNT ::  32;
+	_TAB_SIZE            :: 256;
+	_MAX_WIN_SIZE        ::   0;
 }
 
 /*

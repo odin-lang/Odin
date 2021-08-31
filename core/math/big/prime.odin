@@ -1,5 +1,3 @@
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -10,6 +8,7 @@ package math_big
 
 	This file contains prime finding operations.
 */
+package math_big
 
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
@@ -223,7 +222,7 @@ internal_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 	/*
 		q = x
 	*/
-	copy(q, x)                                                       or_return;
+	internal_copy(q, x)                                              or_return;
 
 	/*
 		q1 = x / b**(k-1)
@@ -234,7 +233,7 @@ internal_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 		According to HAC this optimization is ok.
 	*/
 	if DIGIT(um) > DIGIT(1) << (_DIGIT_BITS - 1) {
-		mul(q, q, mu)                                                or_return;
+		internal_mul(q, q, mu)                                       or_return;
 	} else {
 		_private_int_mul_high(q, q, mu, um)                          or_return;
 	}
@@ -435,32 +434,257 @@ internal_int_reduce_2k_setup :: proc(a: ^Int, allocator := context.allocator) ->
 
 /*
 	Determines the setup value.
-	Assumes `a` is not `nil`.
+	Assumes `mu` and `P` are not `nil`.
+
+	d := (1 << a.bits) - a;
 */
-internal_int_reduce_2k_setup_l :: proc(a, d: ^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_reduce_2k_setup_l :: proc(mu, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
 	tmp := &Int{};
 	defer internal_destroy(tmp);
 	internal_zero(tmp)                                               or_return;
 
-	internal_int_power_of_two(tmp, internal_count_bits(a))           or_return;
-	internal_sub(d, tmp, a)                                          or_return;
+	internal_int_power_of_two(tmp, internal_count_bits(P))           or_return;
+	internal_sub(mu, tmp, P)                                         or_return;
 
 	return nil;
 }
 
 /*
 	Pre-calculate the value required for Barrett reduction.
-	For a given modulus "b" it calulates the value required in "a"
+	For a given modulus "P" it calulates the value required in "mu"
+	Assumes `mu` and `P` are not `nil`.
 */
-internal_int_reduce_setup :: proc(a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+internal_int_reduce_setup :: proc(mu, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
-	internal_int_power_of_two(a, b.used * 2 * _DIGIT_BITS)           or_return;
-	return internal_int_div(a, a, b);
+	internal_int_power_of_two(mu, P.used * 2 * _DIGIT_BITS)           or_return;
+	return internal_int_div(mu, mu, P);
 }
 
+/*
+	Computes res == G**X mod P.
+	Assumes `res`, `G`, `X` and `P` to not be `nil` and for `G`, `X` and `P` to have been initialized.
+*/
+internal_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	M := [_TAB_SIZE]Int{};
+	winsize: uint;
+
+	redux: #type proc(x, m, mu: ^Int, allocator := context.allocator) -> (err: Error);
+
+	defer {
+		internal_destroy(&M[1]);
+		for x := 1 << (winsize - 1); x < (1 << winsize); x += 1 {
+			internal_destroy(&M[x]);
+		}
+	}
+
+	/*
+		Find window size.
+	*/
+	x := internal_count_bits(X);
+	switch {
+	case x <= 7:
+		winsize = 2;
+	case x <= 36:
+		winsize = 3;
+	case x <= 140:
+		winsize = 4;
+	case x <= 450:
+		winsize = 5;
+	case x <= 1303:
+		winsize = 6;
+	case x <= 3529:
+		winsize = 7;
+	case:
+		winsize = 8;
+	}
+
+	winsize = min(_MAX_WIN_SIZE, winsize) if _MAX_WIN_SIZE > 0 else winsize;
+
+	/*
+		Init M array.
+		Init first cell.
+	*/
+	internal_zero(&M[1])                                             or_return;
+
+	/*
+		Now init the second half of the array.
+	*/
+	for x = 1 << (winsize - 1); x < (1 << winsize); x += 1 {
+		internal_zero(&M[x])                                         or_return;
+	}
+
+	/*
+		Create `mu`, used for Barrett reduction.
+	*/
+	mu := &Int{};
+	defer internal_destroy(mu);
+	internal_zero(mu)                                                or_return;
+
+	if redmode == 0 {
+		internal_int_reduce_setup(mu, P)                             or_return;
+		redux = internal_int_reduce;
+	} else {
+		internal_int_reduce_2k_setup_l(mu, P)                        or_return;
+		redux = internal_int_reduce_2k_l;
+	}
+
+	/*
+		Create M table.
+
+		The M table contains powers of the base, e.g. M[x] = G**x mod P.
+		The first half of the table is not computed, though, except for M[0] and M[1].
+	*/
+	internal_int_mod(&M[1], G, P)                                    or_return;
+
+	/*
+		Compute the value at M[1<<(winsize-1)] by squaring M[1] (winsize-1) times.
+
+		TODO: This can probably be replaced by computing the power and using `pow` to raise to it
+		instead of repeated squaring.
+	*/
+	slot := 1 << (winsize - 1);
+	internal_copy(&M[slot], &M[1])                                   or_return;
+
+	for x = 0; x < int(winsize - 1); x += 1 {
+		/*
+			Square it.
+		*/
+		internal_sqr(&M[slot], &M[slot])                             or_return;
+
+		/*
+			Reduce modulo P
+		*/
+		redux(&M[slot], P, mu)                                       or_return;
+	}
+
+	/*
+		Create upper table, that is M[x] = M[x-1] * M[1] (mod P)
+		for x = (2**(winsize - 1) + 1) to (2**winsize - 1)
+	*/
+	for x = slot + 1; x < (1 << winsize); x += 1 {
+		internal_mul(&M[x], &M[x - 1], &M[1])                        or_return;
+		redux(&M[x], P, mu)                                          or_return;
+	}
+
+	/*
+		Setup result.
+	*/
+	internal_one(res)                                                or_return;
+
+	/*
+		Set initial mode and bit cnt.
+	*/
+	mode   := 0;
+	bitcnt := 1;
+	buf    := DIGIT(0);
+	digidx := X.used - 1;
+	bitcpy := uint(0);
+	bitbuf := DIGIT(0);
+
+	for {
+		/*
+			Grab next digit as required.
+		*/
+		bitcnt -= 1;
+		if bitcnt == 0 {
+			/*
+				If digidx == -1 we are out of digits.
+			*/
+			if digidx == -1 { break; }
+
+			/*
+				Read next digit and reset the bitcnt.
+			*/
+			buf    = X.digit[digidx];
+			digidx -= 1;
+			bitcnt = _DIGIT_BITS;
+		}
+
+		/*
+			Grab the next msb from the exponent.
+		*/
+		y := buf >> (_DIGIT_BITS - 1) & 1;
+		buf <<= 1;
+
+		/*
+			If the bit is zero and mode == 0 then we ignore it.
+			These represent the leading zero bits before the first 1 bit
+			in the exponent.  Technically this opt is not required but it
+			does lower the # of trivial squaring/reductions used.
+		*/
+		if mode == 0 && y == 0 {
+			continue;
+		}
+
+		/*
+			If the bit is zero and mode == 1 then we square.
+		*/
+		if mode == 1 && y == 0 {
+			internal_sqr(res, res)                                   or_return;
+			redux(res, P, mu)                                        or_return;
+			continue;
+		}
+
+		/*
+			Else we add it to the window.
+		*/
+		bitcpy += 1;
+		bitbuf |= (y << (winsize - bitcpy));
+		mode    = 2;
+
+		if (bitcpy == winsize) {
+			/*
+				Window is filled so square as required and multiply.
+				Square first.
+			*/
+			for x = 0; x < int(winsize); x += 1 {
+				internal_sqr(res, res)                               or_return;
+				redux(res, P, mu)                                    or_return;
+			}
+
+			/*
+				Then multiply.
+			*/
+			internal_mul(res, res, &M[bitbuf])                       or_return;
+			redux(res, P, mu)                                        or_return;
+
+			/*
+				Empty window and reset.
+			*/
+			bitcpy = 0;
+			bitbuf = 0;
+			mode   = 1;
+		}
+	}
+
+	/*
+		If bits remain then square/multiply.
+	*/
+	if mode == 2 && bitcpy > 0 {
+		/*
+			Square then multiply if the bit is set.
+		*/
+		for x = 0; x < int(bitcpy); x += 1 {
+			internal_sqr(res, res)                                   or_return;
+			redux(res, P, mu)                                        or_return;
+
+			bitbuf <<= 1;
+			if ((bitbuf & (1 << winsize)) != 0) {
+				/*
+					Then multiply.
+				*/
+				internal_mul(res, res, &M[1])                        or_return;
+				redux(res, P, mu)                                    or_return;
+			}
+		}
+	}
+	return err;
+}
 
 /*
 	Returns the number of Rabin-Miller trials needed for a given bit size.

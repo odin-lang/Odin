@@ -1,6 +1,4 @@
 //+ignore
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -9,6 +7,8 @@ package math_big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
+package math_big
+
 
 import "core:fmt"
 import "core:mem"
@@ -18,11 +18,14 @@ print_configation :: proc() {
 `
 Configuration:
 	_DIGIT_BITS                           %v
+	_SMALL_MEMORY                         %v
 	_MIN_DIGIT_COUNT                      %v
 	_MAX_DIGIT_COUNT                      %v
 	_DEFAULT_DIGIT_COUNT                  %v
 	_MAX_COMBA                            %v
 	_WARRAY                               %v
+	_TAB_SIZE                             %v
+	_MAX_WIN_SIZE                         %v
 Runtime tunable:
 	MUL_KARATSUBA_CUTOFF                  %v
 	SQR_KARATSUBA_CUTOFF                  %v
@@ -34,11 +37,14 @@ Runtime tunable:
 	FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS %v
 
 `, _DIGIT_BITS,
+_LOW_MEMORY,
 _MIN_DIGIT_COUNT,
 _MAX_DIGIT_COUNT,
 _DEFAULT_DIGIT_COUNT,
 _MAX_COMBA,
 _WARRAY,
+_TAB_SIZE,
+_MAX_WIN_SIZE,
 MUL_KARATSUBA_CUTOFF,
 SQR_KARATSUBA_CUTOFF,
 MUL_TOOM_CUTOFF,
@@ -203,8 +209,18 @@ int_to_byte_little :: proc(v: ^Int) {
 }
 
 demo :: proc() {
-	// a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	// defer destroy(a, b, c, d, e, f);
+	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer destroy(a, b, c, d, e, f, res);
+
+	set(a, 42);
+	set(b, 6);
+	set(c, 5);
+
+	if err := internal_int_exponent_mod(res, a, b, c, 0); err != nil {
+		fmt.printf("Error: %v\n", err);
+	}
+
+	print("res: ", res);
 }
 
 main :: proc() {
