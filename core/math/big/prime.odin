@@ -144,7 +144,7 @@ internal_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := cont
 		power := ((b.used - 1) * _DIGIT_BITS) + bits - 1;
 		internal_int_power_of_two(a, power)                          or_return;
 	} else {
-		internal_one(a);
+		internal_one(a)                                              or_return;
 		bits = 1;
 	}
 
@@ -187,7 +187,8 @@ internal_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
 	x := (((b + 2) & 4) << 1) + b; /* here x*a==1 mod 2**4 */
 	x *= 2 - (b * x);              /* here x*a==1 mod 2**8 */
 	x *= 2 - (b * x);              /* here x*a==1 mod 2**16 */
-	when _WORD_TYPE_BITS == 64 {
+
+	when _DIGIT_TYPE_BITS == 64 {
 		x *= 2 - (b * x);              /* here x*a==1 mod 2**32 */
 		x *= 2 - (b * x);              /* here x*a==1 mod 2**64 */
 	}
@@ -473,6 +474,10 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 	M := [_TAB_SIZE]Int{};
 	winsize: uint;
 
+	/*
+		Use a pointer to the reduction algorithm.
+		This allows us to use one of many reduction algorithms without modding the guts of the code with if statements everywhere.
+	*/
 	redux: #type proc(x, m, mu: ^Int, allocator := context.allocator) -> (err: Error);
 
 	defer {
@@ -684,6 +689,280 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 		}
 	}
 	return err;
+}
+
+/*
+	Computes Y == G**X mod P, HAC pp.616, Algorithm 14.85
+
+	Uses a left-to-right `k`-ary sliding window to compute the modular exponentiation.
+	The value of `k` changes based on the size of the exponent.
+
+	Uses Montgomery or Diminished Radix reduction [whichever appropriate]
+
+	Assumes `res`, `G`, `X` and `P` to not be `nil` and for `G`, `X` and `P` to have been initialized.
+*/
+internal_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	M := [_TAB_SIZE]Int{};
+	winsize: uint;
+
+	/*
+		Use a pointer to the reduction algorithm.
+		This allows us to use one of many reduction algorithms without modding the guts of the code with if statements everywhere.
+	*/
+	redux: #type proc(x, n: ^Int, rho: DIGIT, allocator := context.allocator) -> (err: Error);
+
+	defer {
+		internal_destroy(&M[1]);
+		for x := 1 << (winsize - 1); x < (1 << winsize); x += 1 {
+			internal_destroy(&M[x]);
+		}
+	}
+
+	/*
+		Find window size.
+	*/
+	x := internal_count_bits(X);
+	switch {
+	case x <= 7:
+		winsize = 2;
+	case x <= 36:
+		winsize = 3;
+	case x <= 140:
+		winsize = 4;
+	case x <= 450:
+		winsize = 5;
+	case x <= 1303:
+		winsize = 6;
+	case x <= 3529:
+		winsize = 7;
+	case:
+		winsize = 8;
+	}
+
+	winsize = min(_MAX_WIN_SIZE, winsize) if _MAX_WIN_SIZE > 0 else winsize;
+
+	/*
+		Init M array
+		Init first cell.
+	*/
+	cap := internal_int_allocated_cap(P);
+	internal_grow(&M[1], cap)                                        or_return;
+
+	/*
+		Now init the second half of the array.
+	*/
+	for x = 1 << (winsize - 1); x < (1 << winsize); x += 1 {
+		internal_grow(&M[x], cap)                                    or_return;
+	}
+
+	/*
+		Determine and setup reduction code.
+	*/
+	rho: DIGIT;
+
+	if redmode == 0 {
+		/*
+			Now setup Montgomery.
+		*/
+		rho = internal_int_montgomery_setup(P)                       or_return;
+
+		/*
+			Automatically pick the comba one if available (saves quite a few calls/ifs).
+		*/
+		if ((P.used * 2) + 1) < _WARRAY && P.used < _MAX_COMBA {
+			redux = _private_montgomery_reduce_comba;
+		} else {
+			/*
+				Use slower baseline Montgomery method.
+			*/
+			redux = internal_int_montgomery_reduce;
+		}
+	} else if redmode == 1 {
+		/*
+		if (MP_HAS(MP_DR_SETUP) && MP_HAS(MP_DR_REDUCE)) {
+			/* setup DR reduction for moduli of the form B**k - b */
+			mp_dr_setup(P, &mp);
+			redux = mp_dr_reduce;
+		} else {
+			err = MP_VAL;
+			goto LBL_M;
+		}
+		*/
+		return .Unimplemented;
+	} else {
+		/*
+			Setup DR reduction for moduli of the form 2**k - b.
+		*/
+		rho = internal_int_reduce_2k_setup(P)                        or_return;
+		redux = internal_int_reduce_2k;
+	}
+
+	/*
+		Setup result.
+	*/
+	internal_grow(res, cap)                                          or_return;
+
+	/*
+		Create M table
+		The first half of the table is not computed, though, except for M[0] and M[1]
+	*/
+
+	if redmode == 0 {
+		/*
+			Now we need R mod m.
+		*/
+		internal_int_montgomery_calc_normalization(res, P)           or_return;
+
+		/*
+			Now set M[1] to G * R mod m.
+		*/
+		internal_mulmod(&M[1], G, res, P)                            or_return;
+	} else {
+		internal_one(res)                                            or_return;
+		internal_mod(&M[1], G, P)                                    or_return;
+	}
+
+	/*
+		Compute the value at M[1<<(winsize-1)] by squaring M[1] (winsize-1) times.
+	*/
+	slot := 1 << (winsize - 1);
+	internal_copy(&M[slot], &M[1])                                   or_return;
+
+	for x = 0; x < int(winsize - 1); x += 1 {
+		internal_sqr(&M[slot], &M[slot])                             or_return;
+   		print("slot: ", &M[slot]);
+		redux(&M[slot], P, rho)                                      or_return;
+		print("slot redux: ", &M[slot]);
+	}
+
+	/*
+		Create upper table.
+	*/
+	for x = (1 << (winsize - 1)) + 1; x < (1 << winsize); x += 1 {
+		internal_mul(&M[x], &M[x - 1], &M[1])                        or_return;
+		redux(&M[x], P, rho)                                         or_return;
+	}
+
+	/*
+		Set initial mode and bit cnt.
+	*/
+	mode   := 0;
+	bitcnt := 1;
+	buf    := DIGIT(0);
+	digidx := X.used - 1;
+	bitcpy := 0;
+	bitbuf := DIGIT(0);
+
+	for {
+		/*
+			Grab next digit as required.
+		*/
+		bitcnt -= 1;
+		if bitcnt == 0 {
+			/*
+				If digidx == -1 we are out of digits so break.
+			*/
+			if digidx == -1 { break; }
+
+			/*
+				Read next digit and reset the bitcnt.
+			*/
+			buf    = X.digit[digidx];
+			digidx -= 1;
+			bitcnt = _DIGIT_BITS;
+		}
+
+		/*
+			Grab the next msb from the exponent.
+		*/
+		y := (buf >> (_DIGIT_BITS - 1)) & 1;
+		buf <<= 1;
+
+		/*
+			If the bit is zero and mode == 0 then we ignore it.
+			These represent the leading zero bits before the first 1 bit in the exponent.
+			Technically this opt is not required but it does lower the # of trivial squaring/reductions used.
+		*/
+		if mode == 0 && y == 0 { continue; }
+
+		/*
+			If the bit is zero and mode == 1 then we square.
+		*/
+		if mode == 1 && y == 0 {
+			internal_sqr(res, res)                                   or_return;
+			redux(res, P, rho)                                       or_return;
+			continue;
+		}
+
+		/*
+			Else we add it to the window.
+		*/
+		bitcpy += 1;
+		bitbuf |= (y << (winsize - uint(bitcpy)));
+		mode    = 2;
+
+		if bitcpy == int(winsize) {
+			/*
+				Window is filled so square as required and multiply
+				Square first.
+			*/
+			for x = 0; x < int(winsize); x += 1 {
+				internal_sqr(res, res)                               or_return;
+				redux(res, P, rho)                                   or_return;
+			}
+
+			/*
+				Then multiply.
+			*/
+			internal_mul(res, res, &M[bitbuf])                       or_return;
+			redux(res, P, rho)                                       or_return;
+
+			/*
+				Empty window and reset.
+			*/
+			bitcpy = 0;
+			bitbuf = 0;
+			mode   = 1;
+		}
+	}
+
+	/*
+		If bits remain then square/multiply.
+	*/
+	if mode == 2 && bitcpy > 0 {
+		/*
+			Square then multiply if the bit is set.
+		*/
+		for x = 0; x < bitcpy; x += 1 {
+			internal_sqr(res, res)                                   or_return;
+			redux(res, P, rho)                                       or_return;
+
+			/*
+				Get next bit of the window.
+			*/
+			bitbuf <<= 1;
+			if bitbuf & (1 << winsize) != 0 {
+				/*
+					Then multiply.
+				*/
+				internal_mul(res, res, &M[1])                        or_return;
+				redux(res, P, rho)                                   or_return;
+			}
+		}
+	}
+
+	if redmode == 0 {
+		/*
+			Fixup result if Montgomery reduction is used.
+			Recall that any value in a Montgomery system is actually multiplied by R mod n.
+			So we have to reduce one more time to cancel out the factor of R.
+		*/
+		redux(res, P, rho)                                           or_return;
+	}
+
+	return nil;
 }
 
 /*

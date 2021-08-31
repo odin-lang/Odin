@@ -208,15 +208,17 @@ int_to_byte_little :: proc(v: ^Int) {
 	}
 }
 
+// printf :: fmt.printf;
+
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
 	set(a, 42);
 	set(b, 6);
-	set(c, 5);
+	set(c, 131);
 
-	if err := internal_int_exponent_mod(res, a, b, c, 0); err != nil {
+	if err := internal_int_exponent_mod_fast(res, a, b, c, 0); err != nil {
 		fmt.printf("Error: %v\n", err);
 	}
 
