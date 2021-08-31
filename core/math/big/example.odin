@@ -218,7 +218,7 @@ demo :: proc() {
 	set(b, 6);
 	set(c, 131);
 
-	if err := internal_int_exponent_mod_fast(res, a, b, c, 1); err != nil {
+	if err := _private_int_exponent_mod(res, a, b, c, 1); err != nil {
 		fmt.printf("Error: %v\n", err);
 	}
 
