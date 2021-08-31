@@ -1307,7 +1307,7 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_InsertSemicolon:
-							build_context.insert_semicolon = true;
+							gb_printf_err("-insert-semicolon flag is not required any more\n");
 							break;
 
 						case BuildFlag_StrictStyle:
@@ -1644,7 +1644,7 @@ void print_show_help(String const arg0, String const &command) {
 	} else if (command == "run") {
 		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
 	} else if (command == "check") {
-		print_usage_line(1, "check     parse and type check .odin file");
+		print_usage_line(1, "check     parse and type check .odin file(s)");
 	} else if (command == "test") {
 		print_usage_line(1, "test      build ands runs procedures with the attribute @(test) in the initial package");
 	} else if (command == "query") {
@@ -1656,14 +1656,18 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin doc core/path core/path/filepath");
 	} else if (command == "version") {
 		print_usage_line(1, "version   print version");
-	}
+	} else if (command == "strip-semicolon") {
+		print_usage_line(1, "strip-semicolon");
+		print_usage_line(2, "parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
+	} 
 
 	bool doc = command == "doc";
 	bool build = command == "build";
 	bool run_or_build = command == "run" || command == "build" || command == "test";
 	bool test_only = command == "test";
-	bool check_only = command == "check";
-	bool check = run_or_build || command == "check";
+	bool strip_semicolon = command == "strip-semicolon";
+	bool check_only = command == "check" || strip_semicolon;
+	bool check = run_or_build || check_only;
 
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
@@ -1729,6 +1733,10 @@ void print_show_help(String const arg0, String const &command) {
 	if (run_or_build) {
 		print_usage_line(1, "-keep-temp-files");
 		print_usage_line(2, "Keeps the temporary files generated during compilation");
+		print_usage_line(0, "");
+	} else if (strip_semicolon) {
+		print_usage_line(1, "-keep-temp-files");
+		print_usage_line(2, "Keeps the temporary files generated during stripping the unneeded semicolons from files");
 		print_usage_line(0, "");
 	}
 
@@ -2002,6 +2010,36 @@ bool check_env(void) {
 	return true;
 }
 
+struct StripSemicolonFile {
+	String old_fullpath;
+	String new_fullpath;
+	AstFile *file;
+};
+
+int strip_semicolons(Parser *parser) {
+	#if 0
+	isize file_count = 0;
+	for_array(i, parser->packages) {
+		AstPackage *pkg = parser->packages[i];
+		file_count += pkg->files.count;
+	}
+	gb_printf_err("File count: %td\n", file_count);
+	
+	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
+	
+	for_array(i, parser->packages) {
+		AstPackage *pkg = parser->packages[i];
+		for_array(j, pkg->files) {
+			AstFile *file = pkg->files[j];
+			gb_printf_err("%.*s\n", LIT(file->fullpath));
+		}
+	}
+	
+	#endif
+	return 0;
+}
+
+
 
 int main(int arg_count, char const **arg_ptr) {
 #define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
@@ -2088,6 +2126,14 @@ int main(int arg_count, char const **arg_ptr) {
 			return 1;
 		}
 		build_context.command_kind = Command_check;
+		build_context.no_output_files = true;
+		init_filename = args[2];
+	} else if (command == "strip-semicolon") {
+		if (args.count < 3) {
+			usage(args[0]);
+			return 1;
+		}
+		build_context.command_kind = Command_strip_semicolon;
 		build_context.no_output_files = true;
 		init_filename = args[2];
 	} else if (command == "query") {
@@ -2208,6 +2254,10 @@ int main(int arg_count, char const **arg_ptr) {
 	check_parsed_files(checker);
 	if (any_errors()) {
 		return 1;
+	}
+	
+	if (build_context.command_kind == Command_strip_semicolon) {
+		return strip_semicolons(parser);
 	}
 
 	if (build_context.generate_docs) {

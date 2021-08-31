@@ -1281,9 +1281,6 @@ Token peek_token(AstFile *f) {
 }
 
 bool skip_possible_newline(AstFile *f) {
-	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
-		return false;
-	}
 	if (token_is_newline(f->curr_token)) {
 		advance_token(f);
 		return true;
@@ -1292,9 +1289,6 @@ bool skip_possible_newline(AstFile *f) {
 }
 
 bool skip_possible_newline_for_literal(AstFile *f) {
-	if ((f->tokenizer.flags & TokenizerFlag_InsertSemicolon) == 0) {
-		return false;
-	}
 	Token curr = f->curr_token;
 	if (token_is_newline(curr)) {
 		Token next = peek_token(f);
@@ -1500,62 +1494,11 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 	if (s == nullptr) {
 		return false;
 	}
-
-	if (build_context.insert_semicolon) {
-		return true;
-	}
-
-	switch (s->kind) {
-	case Ast_EmptyStmt:
-	case Ast_BlockStmt:
-		return true;
-
-	case Ast_IfStmt:
-	case Ast_WhenStmt:
-	case Ast_ForStmt:
-	case Ast_RangeStmt:
-	case Ast_SwitchStmt:
-	case Ast_TypeSwitchStmt:
-		return true;
-
-	case Ast_HelperType:
-		return is_semicolon_optional_for_node(f, s->HelperType.type);
-	case Ast_DistinctType:
-		return is_semicolon_optional_for_node(f, s->DistinctType.type);
-
-	case Ast_PointerType:
-		return is_semicolon_optional_for_node(f, s->PointerType.type);
-
-	case Ast_StructType:
-	case Ast_UnionType:
-	case Ast_EnumType:
-		// Require semicolon within a procedure body
-		return f->curr_proc == nullptr;
-	case Ast_ProcLit:
-		return true;
-
-	case Ast_PackageDecl:
-	case Ast_ImportDecl:
-	case Ast_ForeignImportDecl:
-		return true;
-
-	case Ast_ValueDecl:
-		if (s->ValueDecl.is_mutable) {
-			return false;
-		}
-		if (s->ValueDecl.values.count > 0) {
-			return is_semicolon_optional_for_node(f, s->ValueDecl.values[s->ValueDecl.values.count-1]);
-		}
-		break;
-
-	case Ast_ForeignBlockDecl:
-		return is_semicolon_optional_for_node(f, s->ForeignBlockDecl.body);
-	}
-
-	return false;
+	return true;
 }
 
 void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
+	#if 0
 	if (!build_context.insert_semicolon && token.string == "\n") {
 		switch (token.kind) {
 		case Token_CloseBrace:
@@ -1571,6 +1514,14 @@ void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
 		tok.pos.column -= 1;
 		syntax_error(tok, "Expected ';', got newline");
 	}
+	#endif
+}
+
+void assign_removal_flag_to_semicolon(Token *token) {
+	// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
+	if (token->kind == Token_Semicolon && token->string == ";") {
+		token->flags |= TokenFlag_Remove;
+	}
 }
 
 void expect_semicolon(AstFile *f, Ast *s) {
@@ -1578,6 +1529,7 @@ void expect_semicolon(AstFile *f, Ast *s) {
 
 	if (allow_token(f, Token_Semicolon)) {
 		expect_semicolon_newline_error(f, f->prev_token, s);
+		assign_removal_flag_to_semicolon(&f->prev_token);
 		return;
 	}
 	switch (f->curr_token.kind) {
@@ -1592,6 +1544,7 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
 		expect_semicolon_newline_error(f, f->prev_token, s);
+		assign_removal_flag_to_semicolon(&f->prev_token);
 		return;
 	}
 
@@ -1599,40 +1552,19 @@ void expect_semicolon(AstFile *f, Ast *s) {
 		return;
 	}
 
-
-
 	if (s != nullptr) {
-		bool insert_semi = (f->tokenizer.flags & TokenizerFlag_InsertSemicolon) != 0;
-		if (insert_semi) {
-			switch (f->curr_token.kind) {
-			case Token_CloseBrace:
-			case Token_CloseParen:
-			case Token_else:
-			case Token_EOF:
-				return;
+		switch (f->curr_token.kind) {
+		case Token_CloseBrace:
+		case Token_CloseParen:
+		case Token_else:
+		case Token_EOF:
+			return;
 
-			default:
-				if (is_semicolon_optional_for_node(f, s)) {
-					return;
-				}
-				break;
-			}
-		} else if (prev_token.pos.line != f->curr_token.pos.line) {
+		default:
 			if (is_semicolon_optional_for_node(f, s)) {
 				return;
 			}
-		} else {
-			switch (f->curr_token.kind) {
-			case Token_CloseBrace:
-			case Token_CloseParen:
-			case Token_else:
-				return;
-			case Token_EOF:
-				if (is_semicolon_optional_for_node(f, s)) {
-					return;
-				}
-				break;
-			}
+			break;
 		}
 		String node_string = ast_strings[s->kind];
 		String p = token_to_string(f->curr_token);
@@ -4144,7 +4076,7 @@ Ast *parse_for_stmt(AstFile *f) {
 				if (f->curr_token.string != ";") {
 					syntax_error(f->curr_token, "Expected ';', got %.*s", LIT(token_to_string(f->curr_token)));
 				} else {
-					expect_semicolon(f, nullptr);
+					expect_token(f, Token_Semicolon);
 				}
 
 				if (f->curr_token.kind != Token_OpenBrace &&
@@ -4717,12 +4649,10 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	TokenizerFlags tokenizer_flags = TokenizerFlag_InsertSemicolon;
-
 	zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
 
-	TokenizerInitError err = init_tokenizer_from_fullpath(&f->tokenizer, f->fullpath, tokenizer_flags);
+	TokenizerInitError err = init_tokenizer_from_fullpath(&f->tokenizer, f->fullpath);
 	if (err != TokenizerInit_None) {
 		switch (err) {
 		case TokenizerInit_Empty:
