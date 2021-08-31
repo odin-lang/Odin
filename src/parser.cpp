@@ -1497,7 +1497,19 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 	Token *curr_token = &f->tokens[f->curr_token_index];
 	GB_ASSERT(prev_token->kind == Token_Semicolon);
 	if (prev_token->string == ";") {
+		bool ok = false;
 		if (curr_token->pos.line > prev_token->pos.line) {
+			ok = true;
+		} else if (curr_token->pos.line == prev_token->pos.line) {
+			switch (curr_token->kind) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+				ok = true;
+				break;
+			}
+		}
+			
+		if (ok) {
 			if (build_context.strict_style) {
 				syntax_error(*prev_token, "Found unneeded semicolon");
 			}
