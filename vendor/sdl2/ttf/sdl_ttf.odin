@@ -8,18 +8,18 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2_ttf"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2_ttf"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2_ttf"
 
-bool :: SDL.bool;
+bool :: SDL.bool
 
 #assert(size_of(rune) == size_of(u32));
 
-MAJOR_VERSION :: 2;
-MINOR_VERSION :: 0;
-PATCHLEVEL    :: 15;
+MAJOR_VERSION :: 2
+MINOR_VERSION :: 0
+PATCHLEVEL    :: 15
 
-UNICODE_BOM_NATIVE  :: 0xFEFF;
-UNICODE_BOM_SWAPPED :: 0xFFFE;
+UNICODE_BOM_NATIVE  :: 0xFEFF
+UNICODE_BOM_SWAPPED :: 0xFFFE
 
-Font :: struct {};
+Font :: struct {}
 
 StyleFlag :: enum c.int {
 	BOLD          = 0,
@@ -28,13 +28,13 @@ StyleFlag :: enum c.int {
 	STRIKETHROUGH = 3,
 }
 
-Style :: distinct bit_set[StyleFlag; c.int];
+Style :: distinct bit_set[StyleFlag; c.int]
 
-STYLE_NORMAL        :: Style{};
-STYLE_BOLD          :: Style{.BOLD};
-STYLE_ITALIC        :: Style{.ITALIC};
-STYLE_UNDERLINE     :: Style{.UNDERLINE};
-STYLE_STRIKETHROUGH :: Style{.STRIKETHROUGH};
+STYLE_NORMAL        :: Style{}
+STYLE_BOLD          :: Style{.BOLD}
+STYLE_ITALIC        :: Style{.ITALIC}
+STYLE_UNDERLINE     :: Style{.UNDERLINE}
+STYLE_STRIKETHROUGH :: Style{.STRIKETHROUGH}
 
 Hinting :: enum c.int {
 	NORMAL         = 0,
@@ -44,25 +44,25 @@ Hinting :: enum c.int {
 	LIGHT_SUBPIXEL = 4,
 }
 
-HINTING_NORMAL         :: Hinting.NORMAL;
-HINTING_LIGHT          :: Hinting.LIGHT;
-HINTING_MONO           :: Hinting.MONO;
-HINTING_NONE           :: Hinting.NONE;
-HINTING_LIGHT_SUBPIXEL :: Hinting.LIGHT_SUBPIXEL;
+HINTING_NORMAL         :: Hinting.NORMAL
+HINTING_LIGHT          :: Hinting.LIGHT
+HINTING_MONO           :: Hinting.MONO
+HINTING_NONE           :: Hinting.NONE
+HINTING_LIGHT_SUBPIXEL :: Hinting.LIGHT_SUBPIXEL
 
 /* We'll use SDL for reporting errors */
-SetError :: SDL.SetError;
-GetError :: SDL.GetError;
+SetError :: SDL.SetError
+GetError :: SDL.GetError
 
 /* For compatibility with previous versions, here are the old functions */
 RenderText :: #force_inline proc "c" (font: ^Font, text: cstring, fg, bg: SDL.Color) -> ^SDL.Surface {
-	return RenderText_Shaded(font, text, fg, bg);
+	return RenderText_Shaded(font, text, fg, bg)
 }
 RenderUTF8 :: #force_inline proc "c" (font: ^Font, text: cstring, fg, bg: SDL.Color) -> ^SDL.Surface {
-	return RenderUTF8_Shaded(font, text, fg, bg);
+	return RenderUTF8_Shaded(font, text, fg, bg)
 }
 RenderUNICODE :: #force_inline proc "c" (font: ^Font, text: [^]u16, fg, bg: SDL.Color)  -> ^SDL.Surface {
-	return RenderUNICODE_Shaded(font, text, fg, bg);
+	return RenderUNICODE_Shaded(font, text, fg, bg)
 }
 
 @(default_calling_convention="c", link_prefix="TTF_")

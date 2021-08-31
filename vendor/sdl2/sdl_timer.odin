@@ -7,11 +7,11 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-TimerCallback :: proc "c" (interval: u32, param: rawptr) -> u32;
-TimerID :: distinct c.int;
+TimerCallback :: proc "c" (interval: u32, param: rawptr) -> u32
+TimerID :: distinct c.int
 
 TICKS_PASSED :: #force_inline proc "c" (A, B: u32) -> bool {
-	return bool(i32(B) - i32(A) <= 0);
+	return bool(i32(B) - i32(A) <= 0)
 }
 
 @(default_calling_convention="c", link_prefix="SDL_")

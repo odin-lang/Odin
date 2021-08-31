@@ -7,8 +7,8 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-RELEASED :: 0;
-PRESSED  :: 1;
+RELEASED :: 0
+PRESSED  :: 1
 
 EventType :: enum u32 {
 	FIRSTEVENT     = 0,     /**< Unused (do not remove) */
@@ -167,7 +167,7 @@ KeyboardEvent :: struct {
 	keysym: Keysym,   /**< The key that was pressed or released */
 }
 
-TEXTEDITINGEVENT_TEXT_SIZE :: 32;
+TEXTEDITINGEVENT_TEXT_SIZE :: 32
 TextEditingEvent :: struct {
 	type: EventType,                                /**< ::SDL_TEXTEDITING */
     	timestamp: u32,                           /**< In milliseconds, populated using SDL_GetTicks() */
@@ -178,7 +178,7 @@ TextEditingEvent :: struct {
 }
 
 
-TEXTINPUTEVENT_TEXT_SIZE :: 32;
+TEXTINPUTEVENT_TEXT_SIZE :: 32
 TextInputEvent :: struct {
 	type: EventType,                              /**< ::SDL_TEXTINPUT */
 	timestamp: u32,                         /**< In milliseconds, populated using SDL_GetTicks() */
@@ -468,12 +468,12 @@ eventaction :: enum c.int {
 	GETEVENT,
 }
 
-EventFilter :: proc "c" (userdata: rawptr, event: ^Event) -> c.int;
+EventFilter :: proc "c" (userdata: rawptr, event: ^Event) -> c.int
 
-QUERY   :: -1;
-IGNORE  ::  0;
-DISABLE ::  0;
-ENABLE  ::  1;
+QUERY   :: -1
+IGNORE  ::  0
+DISABLE ::  0
+ENABLE  ::  1
 
 
 GetEventState :: #force_inline proc "c" (type: EventType) -> u8 { return EventState(type, QUERY) }

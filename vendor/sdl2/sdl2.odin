@@ -34,11 +34,11 @@ version :: struct {
 	major: u8,        /**< major version */
 	minor: u8,        /**< minor version */
 	patch: u8,        /**< update version */
-};
+}
 
-MAJOR_VERSION   :: 2;
-MINOR_VERSION   :: 0;
-PATCHLEVEL      :: 16;
+MAJOR_VERSION   :: 2
+MINOR_VERSION   :: 0
+PATCHLEVEL      :: 16
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -59,18 +59,18 @@ InitFlag :: enum u32 {
 	NOPARACHUTE    =  0x14,
 }
 
-InitFlags :: bit_set[InitFlag; u32];
+InitFlags :: bit_set[InitFlag; u32]
 
-INIT_TIMER          :: InitFlags{.TIMER};
-INIT_AUDIO          :: InitFlags{.AUDIO};
-INIT_VIDEO          :: InitFlags{.VIDEO};           /**< INIT_VIDEO implies INIT_EVENTS */
-INIT_JOYSTICK       :: InitFlags{.JOYSTICK};        /**< INIT_JOYSTICK implies INIT_EVENTS */
-INIT_HAPTIC         :: InitFlags{.HAPTIC};
-INIT_GAMECONTROLLER :: InitFlags{.GAMECONTROLLER};  /**< INIT_GAMECONTROLLER implies INIT_JOYSTICK */
-INIT_EVENTS         :: InitFlags{.EVENTS};
-INIT_SENSOR         :: InitFlags{.SENSOR};
-INIT_NOPARACHUTE    :: InitFlags{.NOPARACHUTE};     /**< compatibility; this flag is ignored. */
-INIT_EVERYTHING :: InitFlags{.TIMER, .AUDIO, .VIDEO, .EVENTS, .JOYSTICK, .HAPTIC, .GAMECONTROLLER, .SENSOR};
+INIT_TIMER          :: InitFlags{.TIMER}
+INIT_AUDIO          :: InitFlags{.AUDIO}
+INIT_VIDEO          :: InitFlags{.VIDEO}           /**< INIT_VIDEO implies INIT_EVENTS */
+INIT_JOYSTICK       :: InitFlags{.JOYSTICK}        /**< INIT_JOYSTICK implies INIT_EVENTS */
+INIT_HAPTIC         :: InitFlags{.HAPTIC}
+INIT_GAMECONTROLLER :: InitFlags{.GAMECONTROLLER}  /**< INIT_GAMECONTROLLER implies INIT_JOYSTICK */
+INIT_EVENTS         :: InitFlags{.EVENTS}
+INIT_SENSOR         :: InitFlags{.SENSOR}
+INIT_NOPARACHUTE    :: InitFlags{.NOPARACHUTE}     /**< compatibility; this flag is ignored. */
+INIT_EVERYTHING :: InitFlags{.TIMER, .AUDIO, .VIDEO, .EVENTS, .JOYSTICK, .HAPTIC, .GAMECONTROLLER, .SENSOR}
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -85,8 +85,8 @@ foreign lib {
 
 // Atomic
 // NOTE: Prefer the intrinsics built into Odin 'package intrinsics'
-SpinLock :: distinct c.int;
-atomic_t :: struct { value: c.int };
+SpinLock :: distinct c.int
+atomic_t :: struct { value: c.int }
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -107,11 +107,11 @@ foreign lib {
 
 // Bits
 MostSignificantBitIndex32 :: #force_inline proc "c" (x: u32) -> c.int {
-	return c.int(intrinsics.count_leading_zeros(x));
+	return c.int(intrinsics.count_leading_zeros(x))
 }
 
 HasExactlyOneBitSet32 :: #force_inline proc "c" (x: u32) -> bool {
-	return intrinsics.count_ones(x) == 1;
+	return intrinsics.count_ones(x) == 1
 }
 
 // Clipboard
@@ -135,11 +135,11 @@ foreign lib {
 }
 
 GetErrorString :: proc "c" () -> string {
-	return string(GetError());
+	return string(GetError())
 }
 GetErrorMsgString :: proc "c" (buf: []u8) -> string {
-	cstr := GetErrorMsg(raw_data(buf), c.int(len(buf)));
-	return string(cstr);
+	cstr := GetErrorMsg(raw_data(buf), c.int(len(buf)))
+	return string(cstr)
 }
 
 
@@ -234,16 +234,16 @@ foreign lib {
 // quit
 
 QuitRequested :: #force_inline proc "c" () -> bool {
-        PumpEvents();
-        return bool(PeepEvents(nil, 0, .PEEKEVENT, .QUIT, .QUIT) > 0);
+        PumpEvents()
+        return bool(PeepEvents(nil, 0, .PEEKEVENT, .QUIT, .QUIT) > 0)
 }
 
 
 // sensor
 
-Sensor :: struct {};
+Sensor :: struct {}
 
-SensorID :: distinct i32;
+SensorID :: distinct i32
 
 SensorType :: enum c.int {
 	INVALID = -1,    /**< Returned for an invalid sensor */
@@ -252,7 +252,7 @@ SensorType :: enum c.int {
 	GYRO,            /**< Gyroscope */
 }
 
-STANDARD_GRAVITY :: 9.80665;
+STANDARD_GRAVITY :: 9.80665
 
 
 @(default_calling_convention="c", link_prefix="SDL_")
@@ -278,9 +278,9 @@ foreign lib {
 
 // shape
 
-NONSHAPEABLE_WINDOW    :: -1;
-INVALID_SHAPE_ARGUMENT :: -2;
-WINDOW_LACKS_SHAPE     :: -3;
+NONSHAPEABLE_WINDOW    :: -1
+INVALID_SHAPE_ARGUMENT :: -2
+WINDOW_LACKS_SHAPE     :: -3
 
 WindowShapeModeEnum :: enum c.int {
 	/** \brief The default mode, a binarized alpha cutoff of 1. */
@@ -294,7 +294,7 @@ WindowShapeModeEnum :: enum c.int {
 }
 
 SDL_SHAPEMODEALPHA :: #force_inline proc "c" (mode: WindowShapeModeEnum) -> bool {
-	return bool(mode == .Default || mode == .BinarizeAlpha || mode == .ReverseBinarizeAlpha);
+	return bool(mode == .Default || mode == .BinarizeAlpha || mode == .ReverseBinarizeAlpha)
 }
 
 

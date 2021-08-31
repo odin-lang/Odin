@@ -15,7 +15,7 @@ DisplayMode :: struct {
 	driverdata:   rawptr, /**< driver-specific data, initialize to 0 */
 }
 
-Window :: struct {};
+Window :: struct {}
 
 WindowFlag :: enum u32 {
 	FULLSCREEN    = 0,       /**< fullscreen window */
@@ -46,47 +46,47 @@ WindowFlag :: enum u32 {
 
 	INPUT_GRABBED = MOUSE_GRABBED, /**< equivalent to SDL_WINDOW_MOUSE_GRABBED for compatibility */
 }
-WindowFlags :: distinct bit_set[WindowFlag; u32];
+WindowFlags :: distinct bit_set[WindowFlag; u32]
 
 
-WINDOW_FULLSCREEN         :: WindowFlags{.FULLSCREEN};
-WINDOW_OPENGL             :: WindowFlags{.OPENGL};
-WINDOW_SHOWN              :: WindowFlags{.SHOWN};
-WINDOW_HIDDEN             :: WindowFlags{.HIDDEN};
-WINDOW_BORDERLESS         :: WindowFlags{.BORDERLESS};
-WINDOW_RESIZABLE          :: WindowFlags{.RESIZABLE};
-WINDOW_MINIMIZED          :: WindowFlags{.MINIMIZED};
-WINDOW_MAXIMIZED          :: WindowFlags{.MAXIMIZED};
-WINDOW_MOUSE_GRABBED      :: WindowFlags{.MOUSE_GRABBED};
-WINDOW_INPUT_FOCUS        :: WindowFlags{.INPUT_FOCUS};
-WINDOW_MOUSE_FOCUS        :: WindowFlags{.MOUSE_FOCUS};
-WINDOW_FULLSCREEN_DESKTOP :: WindowFlags{.FULLSCREEN, ._INTERNAL_FULLSCREEN_DESKTOP};
-WINDOW_FOREIGN            :: WindowFlags{.FOREIGN};
-WINDOW_ALLOW_HIGHDPI      :: WindowFlags{.ALLOW_HIGHDPI};
-WINDOW_MOUSE_CAPTURE      :: WindowFlags{.MOUSE_CAPTURE};
-WINDOW_ALWAYS_ON_TOP      :: WindowFlags{.ALWAYS_ON_TOP};
-WINDOW_SKIP_TASKBAR       :: WindowFlags{.SKIP_TASKBAR};
-WINDOW_UTILITY            :: WindowFlags{.UTILITY};
-WINDOW_TOOLTIP            :: WindowFlags{.TOOLTIP};
-WINDOW_POPUP_MENU         :: WindowFlags{.POPUP_MENU};
-WINDOW_KEYBOARD_GRABBED   :: WindowFlags{.KEYBOARD_GRABBED};
-WINDOW_VULKAN             :: WindowFlags{.VULKAN};
-WINDOW_METAL              :: WindowFlags{.METAL};
-WINDOW_INPUT_GRABBED      :: WindowFlags{.INPUT_GRABBED};
+WINDOW_FULLSCREEN         :: WindowFlags{.FULLSCREEN}
+WINDOW_OPENGL             :: WindowFlags{.OPENGL}
+WINDOW_SHOWN              :: WindowFlags{.SHOWN}
+WINDOW_HIDDEN             :: WindowFlags{.HIDDEN}
+WINDOW_BORDERLESS         :: WindowFlags{.BORDERLESS}
+WINDOW_RESIZABLE          :: WindowFlags{.RESIZABLE}
+WINDOW_MINIMIZED          :: WindowFlags{.MINIMIZED}
+WINDOW_MAXIMIZED          :: WindowFlags{.MAXIMIZED}
+WINDOW_MOUSE_GRABBED      :: WindowFlags{.MOUSE_GRABBED}
+WINDOW_INPUT_FOCUS        :: WindowFlags{.INPUT_FOCUS}
+WINDOW_MOUSE_FOCUS        :: WindowFlags{.MOUSE_FOCUS}
+WINDOW_FULLSCREEN_DESKTOP :: WindowFlags{.FULLSCREEN, ._INTERNAL_FULLSCREEN_DESKTOP}
+WINDOW_FOREIGN            :: WindowFlags{.FOREIGN}
+WINDOW_ALLOW_HIGHDPI      :: WindowFlags{.ALLOW_HIGHDPI}
+WINDOW_MOUSE_CAPTURE      :: WindowFlags{.MOUSE_CAPTURE}
+WINDOW_ALWAYS_ON_TOP      :: WindowFlags{.ALWAYS_ON_TOP}
+WINDOW_SKIP_TASKBAR       :: WindowFlags{.SKIP_TASKBAR}
+WINDOW_UTILITY            :: WindowFlags{.UTILITY}
+WINDOW_TOOLTIP            :: WindowFlags{.TOOLTIP}
+WINDOW_POPUP_MENU         :: WindowFlags{.POPUP_MENU}
+WINDOW_KEYBOARD_GRABBED   :: WindowFlags{.KEYBOARD_GRABBED}
+WINDOW_VULKAN             :: WindowFlags{.VULKAN}
+WINDOW_METAL              :: WindowFlags{.METAL}
+WINDOW_INPUT_GRABBED      :: WindowFlags{.INPUT_GRABBED}
 
 
-WINDOWPOS_UNDEFINED_MASK :: 0x1FFF0000;
+WINDOWPOS_UNDEFINED_MASK :: 0x1FFF0000
 WINDOWPOS_UNDEFINED_DISPLAY :: #force_inline proc "c" (X: c.int) -> c.int { return WINDOWPOS_UNDEFINED_MASK|X }
-WINDOWPOS_UNDEFINED :: WINDOWPOS_UNDEFINED_MASK|0;
+WINDOWPOS_UNDEFINED :: WINDOWPOS_UNDEFINED_MASK|0
 WINDOWPOS_ISUNDEFINED :: #force_inline proc "c" (X: c.int) -> bool {
-	return u32(X)&0xFFFF0000 == WINDOWPOS_UNDEFINED_MASK;
+	return u32(X)&0xFFFF0000 == WINDOWPOS_UNDEFINED_MASK
 }
 
-WINDOWPOS_CENTERED_MASK :: 0x2FFF0000;
+WINDOWPOS_CENTERED_MASK :: 0x2FFF0000
 WINDOWPOS_CENTERED_DISPLAY :: #force_inline proc "c" (X: c.int) -> c.int { return WINDOWPOS_CENTERED_MASK|X }
-WINDOWPOS_CENTERED :: WINDOWPOS_CENTERED_MASK|0;
+WINDOWPOS_CENTERED :: WINDOWPOS_CENTERED_MASK|0
 WINDOWPOS_ISCENTERED :: #force_inline proc "c" (X: c.int) -> bool {
-	return u32(X)&0xFFFF0000 == WINDOWPOS_CENTERED_MASK;
+	return u32(X)&0xFFFF0000 == WINDOWPOS_CENTERED_MASK
 }
 
 
@@ -136,7 +136,7 @@ FlashOperation :: enum c.int {
 	UNTIL_FOCUSED,            /**< Flash the window until it gets focus */
 }
 
-GLContext :: distinct rawptr;
+GLContext :: distinct rawptr
 
 GLattr :: enum c.int {
 	RED_SIZE,
@@ -205,7 +205,7 @@ HitTestResult :: enum c.int {
 	RESIZE_LEFT,
 }
 
-HitTest :: proc "c" (win: ^Window, area: ^Point, data: rawptr) -> HitTestResult;
+HitTest :: proc "c" (win: ^Window, area: ^Point, data: rawptr) -> HitTestResult
 
 
 @(default_calling_convention="c", link_prefix="SDL_")
@@ -309,5 +309,5 @@ foreign lib {
 
 // Used by vendor:OpenGL
 gl_set_proc_address :: proc(p: rawptr, name: cstring) {
-	(^rawptr)(p)^ = GL_GetProcAddress(name);
+	(^rawptr)(p)^ = GL_GetProcAddress(name)
 }

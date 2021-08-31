@@ -3,229 +3,229 @@ package glfw
 import "core:c"
 import glfw "bindings"
 
-Init      :: glfw.Init;
-Terminate :: glfw.Terminate;
+Init      :: glfw.Init
+Terminate :: glfw.Terminate
 
-InitHint  :: glfw.InitHint;
+InitHint  :: glfw.InitHint
 
 GetVersion :: proc "c" () -> (major, minor, rev: c.int) {
-	glfw.GetVersion(&major, &minor, &rev);
-	return;
+	glfw.GetVersion(&major, &minor, &rev)
+	return
 }
 GetError :: proc "c" () -> (description: string, code: c.int) {
-	desc: cstring;
-	code = glfw.GetError(&desc);
-	description = string(desc);
-	return;
+	desc: cstring
+	code = glfw.GetError(&desc)
+	description = string(desc)
+	return
 }
 
-GetPrimaryMonitor :: glfw.GetPrimaryMonitor;
+GetPrimaryMonitor :: glfw.GetPrimaryMonitor
 GetMonitors :: proc "c" () -> []MonitorHandle {
-	count: c.int;
-	monitors := glfw.GetMonitors(&count);
-	return monitors[:count];
+	count: c.int
+	monitors := glfw.GetMonitors(&count)
+	return monitors[:count]
 }
 GetMonitorPos :: proc "c" (monitor: MonitorHandle) -> (xpos, ypos: c.int) {
-	glfw.GetMonitorPos(monitor, &xpos, &ypos);
-	return;
+	glfw.GetMonitorPos(monitor, &xpos, &ypos)
+	return
 }
 GetMonitorPhysicalSize :: proc "c" (monitor: MonitorHandle) -> (widthMM, heightMM: c.int) {
-	glfw.GetMonitorPhysicalSize(monitor, &widthMM, &heightMM);
-	return;
+	glfw.GetMonitorPhysicalSize(monitor, &widthMM, &heightMM)
+	return
 }
 GetMonitorContentScale :: proc "c" (monitor: MonitorHandle) -> (xscale, yscale: f32) {
-	glfw.GetMonitorContentScale(monitor, &xscale, &yscale);
-	return;
+	glfw.GetMonitorContentScale(monitor, &xscale, &yscale)
+	return
 }
 
-SetMonitorUserPointer :: glfw.SetMonitorUserPointer;
-GetMonitorUserPointer :: glfw.GetMonitorUserPointer;
+SetMonitorUserPointer :: glfw.SetMonitorUserPointer
+GetMonitorUserPointer :: glfw.GetMonitorUserPointer
 
-GetVideoMode :: glfw.GetVideoMode;
-SetGamma     :: glfw.SetGamma;
-GetGammaRamp :: glfw.GetGammaRamp;
-SetGammaRamp :: glfw.SetGammaRamp;
+GetVideoMode :: glfw.GetVideoMode
+SetGamma     :: glfw.SetGamma
+GetGammaRamp :: glfw.GetGammaRamp
+SetGammaRamp :: glfw.SetGammaRamp
 
-CreateWindow  :: glfw.CreateWindow;
-DestroyWindow :: glfw.DestroyWindow;
+CreateWindow  :: glfw.CreateWindow
+DestroyWindow :: glfw.DestroyWindow
 
-WindowHint         :: glfw.WindowHint;
-DefaultWindowHints :: glfw.DefaultWindowHints;
-WindowHintString   :: glfw.WindowHintString;
-WindowShouldClose  :: glfw.WindowShouldClose;
+WindowHint         :: glfw.WindowHint
+DefaultWindowHints :: glfw.DefaultWindowHints
+WindowHintString   :: glfw.WindowHintString
+WindowShouldClose  :: glfw.WindowShouldClose
 
-SwapInterval :: glfw.SwapInterval;
-SwapBuffers  :: glfw.SwapBuffers;
+SwapInterval :: glfw.SwapInterval
+SwapBuffers  :: glfw.SwapBuffers
 
-SetWindowTitle :: glfw.SetWindowTitle;
+SetWindowTitle :: glfw.SetWindowTitle
 SetWindowIcon :: proc "c" (window: WindowHandle, images: []Image) {
-	glfw.SetWindowIcon(window, c.int(len(images)), raw_data(images));
+	glfw.SetWindowIcon(window, c.int(len(images)), raw_data(images))
 }
-SetWindowPos         :: glfw.SetWindowPos;
-SetWindowSizeLimits  :: glfw.SetWindowSizeLimits;
-SetWindowAspectRatio :: glfw.SetWindowAspectRatio;
-SetWindowSize        :: glfw.SetWindowSize;
+SetWindowPos         :: glfw.SetWindowPos
+SetWindowSizeLimits  :: glfw.SetWindowSizeLimits
+SetWindowAspectRatio :: glfw.SetWindowAspectRatio
+SetWindowSize        :: glfw.SetWindowSize
 GetWindowPos :: proc "c" (window: WindowHandle) -> (xpos, ypos: c.int) {
-	glfw.GetWindowPos(window, &xpos, &ypos);
-	return;
+	glfw.GetWindowPos(window, &xpos, &ypos)
+	return
 }
 GetWindowSize :: proc "c" (window: WindowHandle) -> (width, height: c.int) {
-	glfw.GetWindowSize(window, &width, &height);
-	return;
+	glfw.GetWindowSize(window, &width, &height)
+	return
 }
 GetFramebufferSize :: proc "c" (window: WindowHandle) -> (width, height: c.int) {
-	glfw.GetFramebufferSize(window, &width, &height);
-	return;
+	glfw.GetFramebufferSize(window, &width, &height)
+	return
 }
 GetWindowFrameSize :: proc "c" (window: WindowHandle) -> (left, top, right, bottom: c.int) {
-	glfw.GetWindowFrameSize(window, &left, &top, &right, &bottom);
-	return;
+	glfw.GetWindowFrameSize(window, &left, &top, &right, &bottom)
+	return
 }
 
 GetWindowContentScale :: proc "c" (window: WindowHandle) -> (xscale, yscale: f32) {
-	glfw.GetWindowContentScale(window, &xscale, &yscale);
-	return;
+	glfw.GetWindowContentScale(window, &xscale, &yscale)
+	return
 }
-GetWindowOpacity :: glfw.GetWindowOpacity;
-SetWindowOpacity :: glfw.SetWindowOpacity;
+GetWindowOpacity :: glfw.GetWindowOpacity
+SetWindowOpacity :: glfw.SetWindowOpacity
 
 GetVersionString :: proc "c" () -> string {
-	return string(glfw.GetVersionString());
+	return string(glfw.GetVersionString())
 }
 GetMonitorName :: proc "c" (monitor: MonitorHandle) -> string {
-	return string(glfw.GetMonitorName(monitor));
+	return string(glfw.GetMonitorName(monitor))
 }
 GetClipboardString :: proc "c" (window: WindowHandle) -> string {
-	return string(glfw.GetClipboardString(window));
+	return string(glfw.GetClipboardString(window))
 }
 GetVideoModes :: proc "c" (monitor: MonitorHandle) -> []VidMode {
-	count: c.int;
-	modes := glfw.GetVideoModes(monitor, &count);
-	return modes[:count];
+	count: c.int
+	modes := glfw.GetVideoModes(monitor, &count)
+	return modes[:count]
 }
 
-GetKey :: glfw.GetKey;
+GetKey :: glfw.GetKey
 GetKeyName :: proc "c" (key, scancode: c.int) -> string {
-	return string(glfw.GetKeyName(key, scancode));
+	return string(glfw.GetKeyName(key, scancode))
 }
-SetWindowShouldClose :: glfw.SetWindowShouldClose;
-JoystickPresent      :: glfw.JoystickPresent;
+SetWindowShouldClose :: glfw.SetWindowShouldClose
+JoystickPresent      :: glfw.JoystickPresent
 GetJoystickName :: proc "c" (joy: c.int) -> string {
-	return string(glfw.GetJoystickName(joy));
+	return string(glfw.GetJoystickName(joy))
 }
-GetKeyScancode :: glfw.GetKeyScancode;
+GetKeyScancode :: glfw.GetKeyScancode
 
-IconifyWindow  :: glfw.IconifyWindow;
-RestoreWindow  :: glfw.RestoreWindow;
-MaximizeWindow :: glfw.MaximizeWindow;
-ShowWindow     :: glfw.ShowWindow;
-HideWindow     :: glfw.HideWindow;
-FocusWindow    :: glfw.FocusWindow;
+IconifyWindow  :: glfw.IconifyWindow
+RestoreWindow  :: glfw.RestoreWindow
+MaximizeWindow :: glfw.MaximizeWindow
+ShowWindow     :: glfw.ShowWindow
+HideWindow     :: glfw.HideWindow
+FocusWindow    :: glfw.FocusWindow
 
-RequestWindowAttention :: glfw.RequestWindowAttention;
+RequestWindowAttention :: glfw.RequestWindowAttention
 
-GetWindowMonitor     :: glfw.GetWindowMonitor;
-SetWindowMonitor     :: glfw.SetWindowMonitor;
-GetWindowAttrib      :: glfw.GetWindowAttrib;
-SetWindowUserPointer :: glfw.SetWindowUserPointer;
-GetWindowUserPointer :: glfw.GetWindowUserPointer;
+GetWindowMonitor     :: glfw.GetWindowMonitor
+SetWindowMonitor     :: glfw.SetWindowMonitor
+GetWindowAttrib      :: glfw.GetWindowAttrib
+SetWindowUserPointer :: glfw.SetWindowUserPointer
+GetWindowUserPointer :: glfw.GetWindowUserPointer
 
-SetWindowAttrib :: glfw.SetWindowAttrib;
+SetWindowAttrib :: glfw.SetWindowAttrib
 
-PollEvents        :: glfw.PollEvents;
-WaitEvents        :: glfw.WaitEvents;
-WaitEventsTimeout :: glfw.WaitEventsTimeout;
-PostEmptyEvent    :: glfw.PostEmptyEvent;
+PollEvents        :: glfw.PollEvents
+WaitEvents        :: glfw.WaitEvents
+WaitEventsTimeout :: glfw.WaitEventsTimeout
+PostEmptyEvent    :: glfw.PostEmptyEvent
 
-GetInputMode :: glfw.GetInputMode;
-SetInputMode :: glfw.SetInputMode;
+GetInputMode :: glfw.GetInputMode
+SetInputMode :: glfw.SetInputMode
 
-GetMouseButton :: glfw.GetMouseButton;
+GetMouseButton :: glfw.GetMouseButton
 GetCursorPos :: proc "c" (window: WindowHandle) -> (xpos, ypos: f64) {
-	glfw.GetCursorPos(window, &xpos, &ypos);
-	return;
+	glfw.GetCursorPos(window, &xpos, &ypos)
+	return
 }
-SetCursorPos :: glfw.SetCursorPos;
+SetCursorPos :: glfw.SetCursorPos
 
-CreateCursor         :: glfw.CreateCursor;
-DestroyCursor        :: glfw.DestroyCursor;
-SetCursor            :: glfw.SetCursor;
-CreateStandardCursor :: glfw.CreateStandardCursor;
+CreateCursor         :: glfw.CreateCursor
+DestroyCursor        :: glfw.DestroyCursor
+SetCursor            :: glfw.SetCursor
+CreateStandardCursor :: glfw.CreateStandardCursor
 
 GetJoystickAxes :: proc "c" (joy: c.int) -> []f32 {
-	count: c.int;
-	axes := glfw.GetJoystickAxes(joy, &count);
-	return axes[:count];
+	count: c.int
+	axes := glfw.GetJoystickAxes(joy, &count)
+	return axes[:count]
 }
 GetJoystickButtons :: proc "c" (joy: c.int) -> []u8 {
-	count: c.int;
-	buttons := glfw.GetJoystickButtons(joy, &count);
-	return buttons[:count];
+	count: c.int
+	buttons := glfw.GetJoystickButtons(joy, &count)
+	return buttons[:count]
 }
 GetJoystickHats :: proc "c" (jid: c.int) -> []u8 {
-	count: c.int;
-	hats := glfw.GetJoystickHats(jid, &count);
-	return hats[:count];
+	count: c.int
+	hats := glfw.GetJoystickHats(jid, &count)
+	return hats[:count]
 }
 GetJoystickGUID :: proc "c" (jid: c.int) -> string {
-	return string(glfw.GetJoystickGUID(jid));
+	return string(glfw.GetJoystickGUID(jid))
 }
-SetJoystickUserPointer :: glfw.SetJoystickUserPointer;
-GetJoystickUserPointer :: glfw.GetJoystickUserPointer;
-JoystickIsGamepad      :: glfw.JoystickIsGamepad;
-UpdateGamepadMappings  :: glfw.UpdateGamepadMappings;
+SetJoystickUserPointer :: glfw.SetJoystickUserPointer
+GetJoystickUserPointer :: glfw.GetJoystickUserPointer
+JoystickIsGamepad      :: glfw.JoystickIsGamepad
+UpdateGamepadMappings  :: glfw.UpdateGamepadMappings
 GetGamepadName :: proc "c" (jid: c.int) -> string {
-	return string(glfw.GetGamepadName(jid));
+	return string(glfw.GetGamepadName(jid))
 }
-GetGamepadState    :: glfw.GetGamepadState;
+GetGamepadState    :: glfw.GetGamepadState
 
-SetClipboardString :: glfw.SetClipboardString;
+SetClipboardString :: glfw.SetClipboardString
 
-SetTime            :: glfw.SetTime;
-GetTime            :: glfw.GetTime;
-GetTimerValue      :: glfw.GetTimerValue;
-GetTimerFrequency  :: glfw.GetTimerFrequency;
+SetTime            :: glfw.SetTime
+GetTime            :: glfw.GetTime
+GetTimerValue      :: glfw.GetTimerValue
+GetTimerFrequency  :: glfw.GetTimerFrequency
 
-MakeContextCurrent :: glfw.MakeContextCurrent;
-GetCurrentContext  :: glfw.GetCurrentContext;
-GetProcAddress     :: glfw.GetProcAddress;
-ExtensionSupported :: glfw.ExtensionSupported;
+MakeContextCurrent :: glfw.MakeContextCurrent
+GetCurrentContext  :: glfw.GetCurrentContext
+GetProcAddress     :: glfw.GetProcAddress
+ExtensionSupported :: glfw.ExtensionSupported
 
-VulkanSupported :: glfw.VulkanSupported;
+VulkanSupported :: glfw.VulkanSupported
 GetRequiredInstanceExtensions :: proc "c" () -> []cstring {
-	count: u32;
-	exts := glfw.GetRequiredInstanceExtensions(&count);
-	return exts[:count];
+	count: u32
+	exts := glfw.GetRequiredInstanceExtensions(&count)
+	return exts[:count]
 }
-GetInstanceProcAddress               :: glfw.GetInstanceProcAddress;
-GetPhysicalDevicePresentationSupport :: glfw.GetPhysicalDevicePresentationSupport;
-CreateWindowSurface                  :: glfw.CreateWindowSurface;
+GetInstanceProcAddress               :: glfw.GetInstanceProcAddress
+GetPhysicalDevicePresentationSupport :: glfw.GetPhysicalDevicePresentationSupport
+CreateWindowSurface                  :: glfw.CreateWindowSurface
 
-SetWindowIconifyCallback      :: glfw.SetWindowIconifyCallback;
-SetWindowRefreshCallback      :: glfw.SetWindowRefreshCallback;
-SetWindowFocusCallback        :: glfw.SetWindowFocusCallback;
-SetWindowCloseCallback        :: glfw.SetWindowCloseCallback;
-SetWindowSizeCallback         :: glfw.SetWindowSizeCallback;
-SetWindowPosCallback          :: glfw.SetWindowPosCallback;
-SetFramebufferSizeCallback    :: glfw.SetFramebufferSizeCallback;
-SetDropCallback               :: glfw.SetDropCallback;
-SetMonitorCallback            :: glfw.SetMonitorCallback;
-SetWindowMaximizeCallback     :: glfw.SetWindowMaximizeCallback;
-SetWindowContentScaleCallback :: glfw.SetWindowContentScaleCallback;
+SetWindowIconifyCallback      :: glfw.SetWindowIconifyCallback
+SetWindowRefreshCallback      :: glfw.SetWindowRefreshCallback
+SetWindowFocusCallback        :: glfw.SetWindowFocusCallback
+SetWindowCloseCallback        :: glfw.SetWindowCloseCallback
+SetWindowSizeCallback         :: glfw.SetWindowSizeCallback
+SetWindowPosCallback          :: glfw.SetWindowPosCallback
+SetFramebufferSizeCallback    :: glfw.SetFramebufferSizeCallback
+SetDropCallback               :: glfw.SetDropCallback
+SetMonitorCallback            :: glfw.SetMonitorCallback
+SetWindowMaximizeCallback     :: glfw.SetWindowMaximizeCallback
+SetWindowContentScaleCallback :: glfw.SetWindowContentScaleCallback
 
-SetKeyCallback         :: glfw.SetKeyCallback;
-SetMouseButtonCallback :: glfw.SetMouseButtonCallback;
-SetCursorPosCallback   :: glfw.SetCursorPosCallback;
-SetScrollCallback      :: glfw.SetScrollCallback;
-SetCharCallback        :: glfw.SetCharCallback;
-SetCharModsCallback    :: glfw.SetCharModsCallback;
-SetCursorEnterCallback :: glfw.SetCursorEnterCallback;
-SetJoystickCallback    :: glfw.SetJoystickCallback;
+SetKeyCallback         :: glfw.SetKeyCallback
+SetMouseButtonCallback :: glfw.SetMouseButtonCallback
+SetCursorPosCallback   :: glfw.SetCursorPosCallback
+SetScrollCallback      :: glfw.SetScrollCallback
+SetCharCallback        :: glfw.SetCharCallback
+SetCharModsCallback    :: glfw.SetCharModsCallback
+SetCursorEnterCallback :: glfw.SetCursorEnterCallback
+SetJoystickCallback    :: glfw.SetJoystickCallback
 
-SetErrorCallback :: glfw.SetErrorCallback;
+SetErrorCallback :: glfw.SetErrorCallback
 
 
 // Used by vendor:OpenGL
 gl_set_proc_address :: proc(p: rawptr, name: cstring) {
-	(^rawptr)(p)^ = GetProcAddress(name);
+	(^rawptr)(p)^ = GetProcAddress(name)
 }

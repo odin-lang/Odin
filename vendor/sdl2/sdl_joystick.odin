@@ -7,13 +7,13 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-Joystick :: struct {};
+Joystick :: struct {}
 
 JoystickGUID :: struct {
 	data: [16]u8,
 }
 
-JoystickID :: distinct i32;
+JoystickID :: distinct i32
 
 JoystickType :: enum c.int {
 	UNKNOWN,
@@ -38,20 +38,20 @@ JoystickPowerLevel :: enum c.int {
 	MAX,
 }
 
-IPHONE_MAX_GFORCE :: 5.0;
+IPHONE_MAX_GFORCE :: 5.0
 
-JOYSTICK_AXIS_MAX :: +32767;
-JOYSTICK_AXIS_MIN :: -32768;
+JOYSTICK_AXIS_MAX :: +32767
+JOYSTICK_AXIS_MIN :: -32768
 
-HAT_CENTERED  :: 0x00;
-HAT_UP        :: 0x01;
-HAT_RIGHT     :: 0x02;
-HAT_DOWN      :: 0x04;
-HAT_LEFT      :: 0x08;
-HAT_RIGHTUP   :: HAT_RIGHT|HAT_UP;
-HAT_RIGHTDOWN :: HAT_RIGHT|HAT_DOWN;
-HAT_LEFTUP    :: HAT_LEFT|HAT_UP;
-HAT_LEFTDOWN  :: HAT_LEFT|HAT_DOWN;
+HAT_CENTERED  :: 0x00
+HAT_UP        :: 0x01
+HAT_RIGHT     :: 0x02
+HAT_DOWN      :: 0x04
+HAT_LEFT      :: 0x08
+HAT_RIGHTUP   :: HAT_RIGHT|HAT_UP
+HAT_RIGHTDOWN :: HAT_RIGHT|HAT_DOWN
+HAT_LEFTUP    :: HAT_LEFT|HAT_UP
+HAT_LEFTDOWN  :: HAT_LEFT|HAT_DOWN
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
