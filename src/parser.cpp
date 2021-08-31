@@ -1240,6 +1240,7 @@ Token advance_token(AstFile *f) {
 	f->lead_comment = nullptr;
 	f->line_comment = nullptr;
 
+	f->prev_token_index = f->curr_token_index;
 	Token prev = f->prev_token = f->curr_token;
 
 	bool ok = next_token0(f);
@@ -1517,10 +1518,15 @@ void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
 	#endif
 }
 
-void assign_removal_flag_to_semicolon(Token *token) {
+void assign_removal_flag_to_semicolon(AstFile *f) {
 	// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
-	if (token->kind == Token_Semicolon && token->string == ";") {
-		token->flags |= TokenFlag_Remove;
+	Token *prev_token = &f->tokens[f->prev_token_index];
+	Token *curr_token = &f->tokens[f->curr_token_index];
+	GB_ASSERT(prev_token->kind == Token_Semicolon);
+	if (prev_token->string == ";") {
+		if (curr_token->pos.line > prev_token->pos.line) {
+			prev_token->flags |= TokenFlag_Remove;
+		}
 	}
 }
 
@@ -1528,8 +1534,8 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	Token prev_token = {};
 
 	if (allow_token(f, Token_Semicolon)) {
+		assign_removal_flag_to_semicolon(f);
 		expect_semicolon_newline_error(f, f->prev_token, s);
-		assign_removal_flag_to_semicolon(&f->prev_token);
 		return;
 	}
 	switch (f->curr_token.kind) {
@@ -1543,8 +1549,8 @@ void expect_semicolon(AstFile *f, Ast *s) {
 
 	prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
+		assign_removal_flag_to_semicolon(f);
 		expect_semicolon_newline_error(f, f->prev_token, s);
-		assign_removal_flag_to_semicolon(&f->prev_token);
 		return;
 	}
 
@@ -4707,8 +4713,9 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	u64 end = time_stamp_time_now();
 	f->time_to_tokenize = cast(f64)(end-start)/cast(f64)time_stamp__freq();
 
+	f->prev_token_index = 0;
 	f->curr_token_index = 0;
-	f->prev_token = f->tokens[f->curr_token_index];
+	f->prev_token = f->tokens[f->prev_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
 
 	isize const page_size = 4*1024;
