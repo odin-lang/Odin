@@ -35,19 +35,19 @@ encode :: proc(d: []u16, s: []rune) -> int {
 	loop: for r in s {
 		switch r {
 		case 0..<_surr1, _surr3 ..< _surr_self:
-			if m+1 < n { break loop; }
+			if m+1 < n { break loop }
 			d[n] = u16(r)
 			n += 1
 
 		case _surr_self ..= MAX_RUNE:
-			if m+2 < n { break loop; }
+			if m+2 < n { break loop }
 			r1, r2 := encode_surrogate_pair(r)
 			d[n]    = u16(r1)
 			d[n+1]  = u16(r2)
 			n += 2
 
 		case:
-			if m+1 < n { break loop; }
+			if m+1 < n { break loop }
 			d[n] = u16(REPLACEMENT_CHAR)
 			n += 1
 		}
@@ -61,19 +61,19 @@ encode_string :: proc(d: []u16, s: string) -> int {
 	loop: for r in s {
 		switch r {
 		case 0..<_surr1, _surr3 ..< _surr_self:
-			if m+1 < n { break loop; }
+			if m+1 < n { break loop }
 			d[n] = u16(r)
 			n += 1
 
 		case _surr_self ..= MAX_RUNE:
-			if m+2 < n { break loop; }
+			if m+2 < n { break loop }
 			r1, r2 := encode_surrogate_pair(r)
 			d[n]    = u16(r1)
 			d[n+1]  = u16(r2)
 			n += 2
 
 		case:
-			if m+1 < n { break loop; }
+			if m+1 < n { break loop }
 			d[n] = u16(REPLACEMENT_CHAR)
 			n += 1
 		}

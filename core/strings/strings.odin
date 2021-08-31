@@ -207,11 +207,11 @@ cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator :
 	s := s; rune_length := rune_length
 	l := utf8.rune_count_in_string(s)
 
-	if rune_offset >= l { return ""; }
+	if rune_offset >= l { return "" }
 	if rune_offset == 0 && rune_length <= 0 {
 		return clone(s, allocator)
 	}
-	if rune_length == 0 { rune_length = l; }
+	if rune_length == 0 { rune_length = l }
 
 	bytes_needed := min(rune_length * 4, len(s))
 	buf := make([]u8, bytes_needed, allocator)
@@ -226,7 +226,7 @@ cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator :
 			byte_offset += w
 		}
 		if rune_length > 0 {
-			if i == rune_offset + rune_length - 1 { break; }
+			if i == rune_offset + rune_length - 1 { break }
 		}
 		s = s[w:]
 	}

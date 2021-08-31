@@ -80,12 +80,12 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Array:
 		y := b.variant.(Type_Info_Array) or_return
-		if x.count != y.count { return false; }
+		if x.count != y.count { return false }
 		return are_types_identical(x.elem, y.elem)
 
 	case Type_Info_Enumerated_Array:
 		y := b.variant.(Type_Info_Enumerated_Array) or_return
-		if x.count != y.count { return false; }
+		if x.count != y.count { return false }
 		return are_types_identical(x.index, y.index) &&
 		       are_types_identical(x.elem, y.elem)
 
@@ -99,7 +99,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Tuple:
 		y := b.variant.(Type_Info_Tuple) or_return
-		if len(x.types) != len(y.types) { return false; }
+		if len(x.types) != len(y.types) { return false }
 		for _, i in x.types {
 			xt, yt := x.types[i], y.types[i]
 			if !are_types_identical(xt, yt) {
@@ -125,19 +125,19 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 			xt, yt := x.types[i], y.types[i]
 			xl, yl := x.tags[i],  y.tags[i]
 
-			if xn != yn { return false; }
-			if !are_types_identical(xt, yt) { return false; }
-			if xl != yl { return false; }
+			if xn != yn { return false }
+			if !are_types_identical(xt, yt) { return false }
+			if xl != yl { return false }
 		}
 		return true
 
 	case Type_Info_Union:
 		y := b.variant.(Type_Info_Union) or_return
-		if len(x.variants) != len(y.variants) { return false; }
+		if len(x.variants) != len(y.variants) { return false }
 
 		for _, i in x.variants {
 			xv, yv := x.variants[i], y.variants[i]
-			if !are_types_identical(xv, yv) { return false; }
+			if !are_types_identical(xv, yv) { return false }
 		}
 		return true
 
@@ -170,7 +170,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 }
 
 is_signed :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	#partial switch i in type_info_base(info).variant {
 	case Type_Info_Integer: return i.signed
 	case Type_Info_Float:   return true
@@ -178,7 +178,7 @@ is_signed :: proc(info: ^Type_Info) -> bool {
 	return false
 }
 is_unsigned :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	#partial switch i in type_info_base(info).variant {
 	case Type_Info_Integer: return !i.signed
 	case Type_Info_Float:   return false
@@ -187,7 +187,7 @@ is_unsigned :: proc(info: ^Type_Info) -> bool {
 }
 
 is_byte :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	#partial switch i in type_info_base(info).variant {
 	case Type_Info_Integer: return info.size == 1
 	}
@@ -196,127 +196,127 @@ is_byte :: proc(info: ^Type_Info) -> bool {
 
 
 is_integer :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Integer)
 	return ok
 }
 is_rune :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Rune)
 	return ok
 }
 is_float :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Float)
 	return ok
 }
 is_complex :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Complex)
 	return ok
 }
 is_quaternion :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Quaternion)
 	return ok
 }
 is_any :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Any)
 	return ok
 }
 is_string :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_String)
 	return ok
 }
 is_cstring :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	v, ok := type_info_base(info).variant.(Type_Info_String)
 	return ok && v.is_cstring
 }
 is_boolean :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Boolean)
 	return ok
 }
 is_pointer :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Pointer)
 	return ok
 }
 is_multi_pointer :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Multi_Pointer)
 	return ok
 }
 is_procedure :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Procedure)
 	return ok
 }
 is_array :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Array)
 	return ok
 }
 is_enumerated_array :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Enumerated_Array)
 	return ok
 }
 is_dynamic_array :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Dynamic_Array)
 	return ok
 }
 is_dynamic_map :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Map)
 	return ok
 }
 is_slice :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Slice)
 	return ok
 }
 is_tuple :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Tuple)
 	return ok
 }
 is_struct :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	s, ok := type_info_base(info).variant.(Type_Info_Struct)
 	return ok && !s.is_raw_union
 }
 is_raw_union :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	s, ok := type_info_base(info).variant.(Type_Info_Struct)
 	return ok && s.is_raw_union
 }
 is_union :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Union)
 	return ok
 }
 is_enum :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Enum)
 	return ok
 }
 is_simd_vector :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector)
 	return ok
 }
 is_relative_pointer :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Relative_Pointer)
 	return ok
 }
 is_relative_slice :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
+	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Relative_Slice)
 	return ok
 }
@@ -354,8 +354,8 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		return write_string(w, "nil")
 	}
 
-	_n1 :: proc(err: io.Error) -> int { return 1 if err == nil else 0; }
-	_n2 :: proc(n: int, _: io.Error) -> int { return n; }
+	_n1 :: proc(err: io.Error) -> int { return 1 if err == nil else 0 }
+	_n2 :: proc(n: int, _: io.Error) -> int { return n }
 	_n :: proc{_n1, _n2}
 
 	switch info in ti.variant {
@@ -441,9 +441,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		}
 	case Type_Info_Tuple:
 		count := len(info.names)
-		if count != 1 { n += write_string(w, "("); }
+		if count != 1 { n += write_string(w, "(") }
 		for name, i in info.names {
-			if i > 0 { n += write_string(w, ", "); }
+			if i > 0 { n += write_string(w, ", ") }
 
 			t := info.types[i]
 
@@ -453,7 +453,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 			}
 			n += write_type(w, t)
 		}
-		if count != 1 { n += write_string(w, ")"); }
+		if count != 1 { n += write_string(w, ")") }
 
 	case Type_Info_Array:
 		n += _n(io.write_string(w, "["))
@@ -500,8 +500,8 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		}
 
 		n += write_string(w, "struct ")
-		if info.is_packed    { n += write_string(w, "#packed "); }
-		if info.is_raw_union { n += write_string(w, "#raw_union "); }
+		if info.is_packed    { n += write_string(w, "#packed ") }
+		if info.is_raw_union { n += write_string(w, "#raw_union ") }
 		if info.custom_align {
 			n += _n(io.write_string(w, "#align "))
 			n += _n(io.write_i64(w, i64(ti.align), 10))
@@ -509,7 +509,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		}
 		n += _n(io.write_byte(w, '{'))
 		for name, i in info.names {
-			if i > 0 { n += write_string(w, ", "); }
+			if i > 0 { n += write_string(w, ", ") }
 			n += _n(io.write_string(w, name))
 			n += _n(io.write_string(w, ": "))
 			n += write_type(w, info.types[i])
@@ -525,7 +525,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		}
 		n += _n(io.write_byte(w, '{'))
 		for variant, i in info.variants {
-			if i > 0 { n += write_string(w, ", "); }
+			if i > 0 { n += write_string(w, ", ") }
 			n += write_type(w, variant)
 		}
 		n += _n(io.write_byte(w, '}'))
@@ -535,7 +535,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info) -> (n: int) {
 		n += write_type(w, info.base)
 		n += write_string(w, " {")
 		for name, i in info.names {
-			if i > 0 { n += write_string(w, ", "); }
+			if i > 0 { n += write_string(w, ", ") }
 			n += write_string(w, name)
 		}
 		n += _n(io.write_byte(w, '}'))

@@ -402,11 +402,11 @@ parse_f64 :: proc(str: string) -> (value: f64, ok: bool) {
 				}
 				exp = exp * 10 + d
 			}
-			if exp > 308 { exp = 308; }
+			if exp > 308 { exp = 308 }
 
-			for exp >= 50 { scale *= 1e50; exp -= 50; }
-			for exp >=  8 { scale *=  1e8; exp -=  8; }
-			for exp >   0 { scale *=   10; exp -=  1; }
+			for exp >= 50 { scale *= 1e50; exp -= 50 }
+			for exp >=  8 { scale *=  1e8; exp -=  8 }
+			for exp >   0 { scale *=   10; exp -=  1 }
 		}
 	}
 	s = s[i:]

@@ -184,10 +184,10 @@ any_to_bytes :: proc(val: any) -> []byte {
 }
 
 
-kilobytes :: proc(x: int) -> int { return          (x) * 1024; }
-megabytes :: proc(x: int) -> int { return kilobytes(x) * 1024; }
-gigabytes :: proc(x: int) -> int { return megabytes(x) * 1024; }
-terabytes :: proc(x: int) -> int { return gigabytes(x) * 1024; }
+kilobytes :: proc(x: int) -> int { return          (x) * 1024 }
+megabytes :: proc(x: int) -> int { return kilobytes(x) * 1024 }
+gigabytes :: proc(x: int) -> int { return megabytes(x) * 1024 }
+terabytes :: proc(x: int) -> int { return gigabytes(x) * 1024 }
 
 is_power_of_two :: proc(x: uintptr) -> bool {
 	if x <= 0 {

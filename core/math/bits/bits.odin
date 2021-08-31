@@ -64,30 +64,30 @@ rotate_left :: proc(x: uint, k: int) -> uint {
 	return x <<s | x>>(n-s)
 }
 
-from_be_u8   :: proc(i:   u8) ->   u8 { return i; }
-from_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-from_be_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-from_be_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-from_be_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+from_be_u8   :: proc(i:   u8) ->   u8 { return i }
+from_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
+from_be_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
+from_be_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
+from_be_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
 
-from_le_u8   :: proc(i:   u8) ->   u8 { return i; }
-from_le_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-from_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-from_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-from_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+from_le_u8   :: proc(i:   u8) ->   u8 { return i }
+from_le_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
+from_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
+from_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
+from_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
 
-to_be_u8   :: proc(i:   u8) ->   u8 { return i; }
-to_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-to_be_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-to_be_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-to_be_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+to_be_u8   :: proc(i:   u8) ->   u8 { return i }
+to_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
+to_be_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
+to_be_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
+to_be_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "big" { return i } else { return byte_swap(i) } }
 
 
-to_le_u8   :: proc(i:   u8) ->   u8 { return i; }
-to_le_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-to_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-to_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-to_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+to_le_u8   :: proc(i:   u8) ->   u8 { return i }
+to_le_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
+to_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
+to_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
+to_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i } else { return byte_swap(i) } }
 
 
 
@@ -294,16 +294,16 @@ div :: proc{div_u32, div_u64, div_uint}
 
 
 
-is_power_of_two_u8   :: proc(i:   u8) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_i8   :: proc(i:   i8) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_u16  :: proc(i:  u16) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_i16  :: proc(i:  i16) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_u32  :: proc(i:  u32) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_i32  :: proc(i:  i32) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_u64  :: proc(i:  u64) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_i64  :: proc(i:  i64) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_uint :: proc(i: uint) -> bool { return i > 0 && (i & (i-1)) == 0; }
-is_power_of_two_int  :: proc(i:  int) -> bool { return i > 0 && (i & (i-1)) == 0; }
+is_power_of_two_u8   :: proc(i:   u8) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_i8   :: proc(i:   i8) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_u16  :: proc(i:  u16) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_i16  :: proc(i:  i16) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_u32  :: proc(i:  u32) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_i32  :: proc(i:  i32) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_u64  :: proc(i:  u64) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_i64  :: proc(i:  i64) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_uint :: proc(i: uint) -> bool { return i > 0 && (i & (i-1)) == 0 }
+is_power_of_two_int  :: proc(i:  int) -> bool { return i > 0 && (i & (i-1)) == 0 }
 
 is_power_of_two :: proc{
 	is_power_of_two_u8,   is_power_of_two_i8,
@@ -328,12 +328,12 @@ len_u8_table := [256]u8{
 }
 
 
-bitfield_extract_u8   :: proc(value:   u8, offset, bits: uint) ->   u8 { return (value >> offset) &   u8(1<<bits - 1); }
-bitfield_extract_u16  :: proc(value:  u16, offset, bits: uint) ->  u16 { return (value >> offset) &  u16(1<<bits - 1); }
-bitfield_extract_u32  :: proc(value:  u32, offset, bits: uint) ->  u32 { return (value >> offset) &  u32(1<<bits - 1); }
-bitfield_extract_u64  :: proc(value:  u64, offset, bits: uint) ->  u64 { return (value >> offset) &  u64(1<<bits - 1); }
-bitfield_extract_u128 :: proc(value: u128, offset, bits: uint) -> u128 { return (value >> offset) & u128(1<<bits - 1); }
-bitfield_extract_uint :: proc(value: uint, offset, bits: uint) -> uint { return (value >> offset) & uint(1<<bits - 1); }
+bitfield_extract_u8   :: proc(value:   u8, offset, bits: uint) ->   u8 { return (value >> offset) &   u8(1<<bits - 1) }
+bitfield_extract_u16  :: proc(value:  u16, offset, bits: uint) ->  u16 { return (value >> offset) &  u16(1<<bits - 1) }
+bitfield_extract_u32  :: proc(value:  u32, offset, bits: uint) ->  u32 { return (value >> offset) &  u32(1<<bits - 1) }
+bitfield_extract_u64  :: proc(value:  u64, offset, bits: uint) ->  u64 { return (value >> offset) &  u64(1<<bits - 1) }
+bitfield_extract_u128 :: proc(value: u128, offset, bits: uint) -> u128 { return (value >> offset) & u128(1<<bits - 1) }
+bitfield_extract_uint :: proc(value: uint, offset, bits: uint) -> uint { return (value >> offset) & uint(1<<bits - 1) }
 
 bitfield_extract_i8 :: proc(value: i8, offset, bits: uint) -> i8 {
 	v := (u8(value) >> offset) & u8(1<<bits - 1)

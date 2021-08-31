@@ -120,7 +120,7 @@ int_double :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Err
 	/*
 		Grow destination as required.
 	*/
-	if dest != src { grow(dest, src.used + 1) or_return; }
+	if dest != src { grow(dest, src.used + 1) or_return }
 
 	return #force_inline internal_int_shl1(dest, src)
 }
@@ -153,7 +153,7 @@ int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> 
 
 mul :: proc { int_mul, int_mul_digit, }
 
-sqr :: proc(dest, src: ^Int) -> (err: Error) { return mul(dest, src, src); }
+sqr :: proc(dest, src: ^Int) -> (err: Error) { return mul(dest, src, src) }
 
 /*
 	divmod.
@@ -165,7 +165,7 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, allocator 
 	/*
 		Early out if neither of the results is wanted.
 	*/
-	if quotient == nil && remainder == nil { return nil; }
+	if quotient == nil && remainder == nil { return nil }
 	internal_clear_if_uninitialized(numerator, denominator) or_return
 
 	return #force_inline internal_divmod(quotient, remainder, numerator, denominator)
@@ -275,7 +275,7 @@ sqrmod :: proc { int_sqrmod, }
 
 
 int_factorial :: proc(res: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
-	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument; }
+	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument }
 	assert_if_nil(res)
 
 	return #force_inline internal_int_factorial(res, n, allocator)
@@ -302,8 +302,8 @@ int_choose_digit :: proc(res: ^Int, n, k: int, allocator := context.allocator) -
 	assert_if_nil(res)
 	context.allocator = allocator
 
-	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument; }
-	if k > n { return internal_zero(res); }
+	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument }
+	if k > n { return internal_zero(res) }
 
 	/*
 		res = n! / (k! * (n - k)!)
@@ -326,7 +326,7 @@ choose :: proc { int_choose_digit, }
 	Function computing both GCD and (if target isn't `nil`) also LCM.
 */
 int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	if res_gcd == nil && res_lcm == nil { return nil; }
+	if res_gcd == nil && res_lcm == nil { return nil }
 	assert_if_nil(a, b)
 	context.allocator = allocator
 
@@ -359,7 +359,7 @@ int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator := context
 	context.allocator = allocator
 
 	internal_clear_if_uninitialized(remainder, numerator) or_return
-	if bits < 0 { return .Invalid_Argument; }
+	if bits < 0 { return .Invalid_Argument }
 
 	return #force_inline internal_int_mod_bits(remainder, numerator, bits)
 }
@@ -439,7 +439,7 @@ int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.allocator) -> (
 	/*
 		Fast path for n == 2.
 	*/
-	if n == 2 { return sqrt(dest, src); }
+	if n == 2 { return sqrt(dest, src) }
 
 	assert_if_nil(dest, src)
 	/*
@@ -456,7 +456,7 @@ root_n :: proc { int_root_n, }
 */
 
 int_is_initialized :: proc(a: ^Int) -> bool {
-	if a == nil { return false; }
+	if a == nil { return false }
 
 	return #force_inline internal_int_is_initialized(a)
 }

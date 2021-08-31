@@ -260,8 +260,8 @@ vector4_linear_to_srgb :: proc{
 vector4_hsl_to_rgb_f16 :: proc(h, s, l: f16, a: f16 = 1) -> Vector4f16 {
 	hue_to_rgb :: proc(p, q, t: f16) -> f16 {
 		t := t
-		if t < 0 { t += 1; }
-		if t > 1 { t -= 1; }
+		if t < 0 { t += 1 }
+		if t > 1 { t -= 1 }
 		switch {
 		case t < 1.0/6.0: return p + (q - p) * 6.0 * t
 		case t < 1.0/2.0: return q
@@ -287,8 +287,8 @@ vector4_hsl_to_rgb_f16 :: proc(h, s, l: f16, a: f16 = 1) -> Vector4f16 {
 vector4_hsl_to_rgb_f32 :: proc(h, s, l: f32, a: f32 = 1) -> Vector4f32 {
 	hue_to_rgb :: proc(p, q, t: f32) -> f32 {
 		t := t
-		if t < 0 { t += 1; }
-		if t > 1 { t -= 1; }
+		if t < 0 { t += 1 }
+		if t > 1 { t -= 1 }
 		switch {
 		case t < 1.0/6.0: return p + (q - p) * 6.0 * t
 		case t < 1.0/2.0: return q
@@ -314,8 +314,8 @@ vector4_hsl_to_rgb_f32 :: proc(h, s, l: f32, a: f32 = 1) -> Vector4f32 {
 vector4_hsl_to_rgb_f64 :: proc(h, s, l: f64, a: f64 = 1) -> Vector4f64 {
 	hue_to_rgb :: proc(p, q, t: f64) -> f64 {
 		t := t
-		if t < 0 { t += 1; }
-		if t > 1 { t -= 1; }
+		if t < 0 { t += 1 }
+		if t > 1 { t -= 1 }
 		switch {
 		case t < 1.0/6.0: return p + (q - p) * 6.0 * t
 		case t < 1.0/2.0: return q

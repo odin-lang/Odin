@@ -56,7 +56,7 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 	/*
 		If dest == src, do nothing
 	*/
-	if (dest == src) { return nil; }
+	if (dest == src) { return nil }
 
 	/*
 		Check that `src` is usable and `dest` isn't immutable.
@@ -383,7 +383,7 @@ assert_initialized :: proc(a: ^Int, loc := #caller_location) {
 
 zero_unused :: proc(dest: ^Int, old_used := -1) {
 	assert_if_nil(dest)
-	if ! #force_inline is_initialized(dest) { return; }
+	if ! #force_inline is_initialized(dest) { return }
 
 	#force_inline internal_zero_unused(dest, old_used)
 }
@@ -405,13 +405,13 @@ clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocato
 clear_if_uninitialized :: proc {clear_if_uninitialized_single, clear_if_uninitialized_multi, }
 
 error_if_immutable_single :: proc(arg: ^Int) -> (err: Error) {
-	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable; }
+	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable }
 	return nil
 }
 
 error_if_immutable_multi :: proc(args: ..^Int) -> (err: Error) {
 	for i in args {
-		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable; }
+		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable }
 	}
 	return nil
 }
@@ -489,7 +489,7 @@ int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := co
 
 	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
 	l := len(buf)
-	if size_in_bytes > l { return .Buffer_Overflow; }
+	if size_in_bytes > l { return .Buffer_Overflow }
 
 	size_in_bits := internal_count_bits(a)
 	i := 0
@@ -512,7 +512,7 @@ int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := conte
 
 	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
 	l := len(buf)
-	if size_in_bytes > l { return .Buffer_Overflow; }
+	if size_in_bytes > l { return .Buffer_Overflow }
 
 	size_in_bits := internal_count_bits(a)
 	i := l - 1
@@ -534,11 +534,11 @@ int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := conte
 int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a)
 
-	if !signed && a.sign == .Negative { return .Invalid_Argument; }
+	if !signed && a.sign == .Negative { return .Invalid_Argument }
 
 	l := len(buf)
 	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
-	if size_in_bytes > l { return .Buffer_Overflow;  }
+	if size_in_bytes > l { return .Buffer_Overflow  }
 
 	if a.sign == .Negative {
 		t := &Int{}
@@ -570,12 +570,12 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a)
 
-	if !signed && a.sign == .Negative { return .Invalid_Argument; }
-	if a.sign == .Zero_or_Positive    { return int_to_bytes_big(a, buf, signed, allocator); }
+	if !signed && a.sign == .Negative { return .Invalid_Argument }
+	if a.sign == .Zero_or_Positive    { return int_to_bytes_big(a, buf, signed, allocator) }
 
 	l := len(buf)
 	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
-	if size_in_bytes > l { return .Buffer_Overflow;  }
+	if size_in_bytes > l { return .Buffer_Overflow  }
 
 	t := &Int{}
 	defer destroy(t)
@@ -601,7 +601,7 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 	assert_if_nil(a)
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument; }
+	if l == 0 { return .Invalid_Argument }
 
 	sign: Sign
 	size_in_bits := l * 8
@@ -638,7 +638,7 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 	assert_if_nil(a)
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument; }
+	if l == 0 { return .Invalid_Argument }
 
 	sign: Sign
 	size_in_bits := l * 8
@@ -684,7 +684,7 @@ int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := 
 	assert_if_nil(a)
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument; }
+	if l == 0 { return .Invalid_Argument }
 
 	sign: Sign
 	size_in_bits   := l * 8
@@ -722,7 +722,7 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 	assert_if_nil(a)
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument; }
+	if l == 0 { return .Invalid_Argument }
 
 	sign: Sign
 	size_in_bits := l * 8

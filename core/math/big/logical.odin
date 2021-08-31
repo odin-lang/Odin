@@ -77,7 +77,7 @@ int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, allocator :=
 	assert_if_nil(quotient, numerator)
 	context.allocator = allocator
 
-	if err = internal_clear_if_uninitialized(quotient, numerator);  err != nil { return err; }
+	if err = internal_clear_if_uninitialized(quotient, numerator);  err != nil { return err }
 	return #force_inline internal_int_shrmod(quotient, remainder, numerator, bits)
 }
 shrmod :: proc { int_shrmod, }

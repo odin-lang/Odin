@@ -1051,13 +1051,13 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 	decl := parse_stmt(p)
 	switch d in &decl.derived {
 	case ast.Value_Decl:
-		if d.docs == nil { d.docs = docs; }
+		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
 	case ast.Foreign_Block_Decl:
-		if d.docs == nil { d.docs = docs; }
+		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
 	case ast.Foreign_Import_Decl:
-		if d.docs == nil { d.docs = docs; }
+		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
 	case:
 		error(p, decl.pos, "expected a value or foreign declaration after an attribute")
@@ -1693,20 +1693,20 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 		switch kind {
 		case .Invalid, .Unknown: // Ignore
 		case .Using:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'using' in this field list"); }
-			if count > 0 { flags += {.Using}; }
+			if count > 1 { error(p, p.curr_tok.pos, "multiple 'using' in this field list") }
+			if count > 0 { flags += {.Using} }
 		case .No_Alias:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list"); }
-			if count > 0 { flags += {.No_Alias}; }
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list") }
+			if count > 0 { flags += {.No_Alias} }
 		case .C_Vararg:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list"); }
-			if count > 0 { flags += {.C_Vararg}; }
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list") }
+			if count > 0 { flags += {.C_Vararg} }
 		case .Auto_Cast:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list"); }
-			if count > 0 { flags += {.Auto_Cast}; }
+			if count > 1 { error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list") }
+			if count > 0 { flags += {.Auto_Cast} }
 		case .Any_Int:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#any_int' in this field list"); }
-			if count > 0 { flags += {.Any_Int}; }
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '#any_int' in this field list") }
+			if count > 0 { flags += {.Any_Int} }
 		}
 	}
 

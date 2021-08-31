@@ -183,7 +183,7 @@ internal_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
 		                  =>  2*(1) - (1)     = 1
 	*/
 	b := n.digit[0]
-	if b & 1 == 0 { return 0, .Invalid_Argument; }
+	if b & 1 == 0 { return 0, .Invalid_Argument }
 
 	x := (((b + 2) & 4) << 1) + b /* here x*a==1 mod 2**4 */
 	x *= 2 - (b * x)              /* here x*a==1 mod 2**8 */

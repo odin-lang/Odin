@@ -275,11 +275,11 @@ string_cmp :: proc "contextless" (a, b: string) -> int {
 	return memory_compare(x.data, y.data, min(x.len, y.len))
 }
 
-string_ne :: #force_inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b); }
-string_lt :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) < 0; }
-string_gt :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) > 0; }
-string_le :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) <= 0; }
-string_ge :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) >= 0; }
+string_ne :: #force_inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b) }
+string_lt :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) < 0 }
+string_gt :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) > 0 }
+string_le :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) <= 0 }
+string_ge :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) >= 0 }
 
 cstring_len :: proc "contextless" (s: cstring) -> int {
 	p0 := uintptr((^byte)(s))
@@ -300,24 +300,24 @@ cstring_to_string :: proc "contextless" (s: cstring) -> string {
 }
 
 
-complex32_eq :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) == real(b) && imag(a) == imag(b); }
-complex32_ne :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) != real(b) || imag(a) != imag(b); }
+complex32_eq :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) == real(b) && imag(a) == imag(b) }
+complex32_ne :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) != real(b) || imag(a) != imag(b) }
 
-complex64_eq :: #force_inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) == real(b) && imag(a) == imag(b); }
-complex64_ne :: #force_inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) != real(b) || imag(a) != imag(b); }
+complex64_eq :: #force_inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) == real(b) && imag(a) == imag(b) }
+complex64_ne :: #force_inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) != real(b) || imag(a) != imag(b) }
 
-complex128_eq :: #force_inline proc "contextless" (a, b: complex128) -> bool { return real(a) == real(b) && imag(a) == imag(b); }
-complex128_ne :: #force_inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b); }
+complex128_eq :: #force_inline proc "contextless" (a, b: complex128) -> bool { return real(a) == real(b) && imag(a) == imag(b) }
+complex128_ne :: #force_inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b) }
 
 
-quaternion64_eq :: #force_inline proc "contextless"  (a, b: quaternion64)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
-quaternion64_ne :: #force_inline proc "contextless"  (a, b: quaternion64)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
+quaternion64_eq :: #force_inline proc "contextless"  (a, b: quaternion64)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b) }
+quaternion64_ne :: #force_inline proc "contextless"  (a, b: quaternion64)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b) }
 
-quaternion128_eq :: #force_inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
-quaternion128_ne :: #force_inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
+quaternion128_eq :: #force_inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b) }
+quaternion128_ne :: #force_inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b) }
 
-quaternion256_eq :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
-quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
+quaternion256_eq :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b) }
+quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b) }
 
 
 string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) {

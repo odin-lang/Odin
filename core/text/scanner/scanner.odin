@@ -266,9 +266,9 @@ scan_identifier :: proc(s: ^Scanner) -> rune {
 	return ch
 }
 
-@(private) lower      :: proc(ch: rune) -> rune { return ('a' - 'A') | ch; }
-@(private) is_decimal :: proc(ch: rune) -> bool { return '0' <= ch && ch <= '9'; }
-@(private) is_hex     :: proc(ch: rune) -> bool { return '0' <= ch && ch <= '9' || 'a' <= lower(ch) && lower(ch) <= 'f'; }
+@(private) lower      :: proc(ch: rune) -> rune { return ('a' - 'A') | ch }
+@(private) is_decimal :: proc(ch: rune) -> bool { return '0' <= ch && ch <= '9' }
+@(private) is_hex     :: proc(ch: rune) -> bool { return '0' <= ch && ch <= '9' || 'a' <= lower(ch) && lower(ch) <= 'f' }
 
 
 

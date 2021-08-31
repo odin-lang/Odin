@@ -77,8 +77,8 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 			t := time.now()
 			y, m, d := time.date(t)
 			h, min, s := time.clock(t)
-			if .Date in options { fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d);    }
-			if .Time in options { fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s); }
+			if .Date in options { fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d)    }
+			if .Time in options { fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s) }
 			fmt.sbprint(&buf, "] ")
 		}
 	}
