@@ -85,13 +85,13 @@ fprint_typeid :: proc(fd: os.Handle, id: typeid) -> int {
 }
 
 // print* procedures return the number of bytes written
-print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep); }
-println :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stdout, args=args, sep=sep); }
-printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
+print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep) }
+println :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stdout, args=args, sep=sep) }
+printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args) }
 
-eprint   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stderr, args=args, sep=sep); }
-eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stderr, args=args, sep=sep); }
-eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
+eprint   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stderr, args=args, sep=sep) }
+eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stderr, args=args, sep=sep) }
+eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args) }
 
 
 // aprint* procedures return a string that was allocated with the current context
@@ -688,9 +688,9 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	start := 0
 
 	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero { flags |= {.Prefix}; }
-	if fi.plus             { flags |= {.Plus};   }
-	if fi.space            { flags |= {.Space};  }
+	if fi.hash && !fi.zero { flags |= {.Prefix} }
+	if fi.plus             { flags |= {.Plus}   }
+	if fi.space            { flags |= {.Space}  }
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
@@ -754,9 +754,9 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	start := 0
 
 	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero { flags |= {.Prefix}; }
-	if fi.plus             { flags |= {.Plus};   }
-	if fi.space            { flags |= {.Space};  }
+	if fi.hash && !fi.zero { flags |= {.Prefix} }
+	if fi.plus             { flags |= {.Plus}   }
+	if fi.space            { flags |= {.Space}  }
 	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
@@ -1154,19 +1154,19 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 			bits = u128(x)
 		case 16:
 			x := (^u16)(v.data)^
-			if do_byte_swap { x = byte_swap(x); }
+			if do_byte_swap { x = byte_swap(x) }
 			bits = u128(x)
 		case 32:
 			x := (^u32)(v.data)^
-			if do_byte_swap { x = byte_swap(x); }
+			if do_byte_swap { x = byte_swap(x) }
 			bits = u128(x)
 		case 64:
 			x := (^u64)(v.data)^
-			if do_byte_swap { x = byte_swap(x); }
+			if do_byte_swap { x = byte_swap(x) }
 			bits = u128(x)
 		case 128:
 			x := (^u128)(v.data)^
-			if do_byte_swap { x = byte_swap(x); }
+			if do_byte_swap { x = byte_swap(x) }
 			bits = x
 		case: panic("unknown bit_size size")
 		}
@@ -1237,7 +1237,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 		}
 	} else {
 		for i in 0..<count {
-			if i > 0 { io.write_string(fi.writer, ", "); }
+			if i > 0 { io.write_string(fi.writer, ", ") }
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
 			fmt_arg(fi, any{rawptr(data), elem_id}, verb)
@@ -1437,7 +1437,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 			defer {
 				if hash {
-					for in 0..<indent { io.write_byte(fi.writer, '\t'); }
+					for in 0..<indent { io.write_byte(fi.writer, '\t') }
 				}
 				io.write_byte(fi.writer, ']' if is_soa else '}')
 			}
@@ -1452,11 +1452,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				}
 
 				for index in 0..<uintptr(b.soa_len) {
-					if !hash && index > 0 { io.write_string(fi.writer, ", "); }
+					if !hash && index > 0 { io.write_string(fi.writer, ", ") }
 
 					field_count := -1
 
-					if !hash && field_count > 0 { io.write_string(fi.writer, ", "); }
+					if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 
 					io.write_string(fi.writer, base_type_name)
 					io.write_byte(fi.writer, '{')
@@ -1465,7 +1465,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					for name, i in b.names {
 						field_count += 1
 
-						if !hash && field_count > 0 { io.write_string(fi.writer, ", "); }
+						if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 						if hash {
 							fmt_write_indent(fi)
 						}
@@ -1482,7 +1482,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							fmt_arg(fi, any{data, t.id}, 'v')
 						}
 
-						if hash { io.write_string(fi.writer, ",\n"); }
+						if hash { io.write_string(fi.writer, ",\n") }
 					}
 				}
 			} else {
@@ -1490,7 +1490,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				for name, i in b.names {
 					field_count += 1
 
-					if !hash && field_count > 0 { io.write_string(fi.writer, ", "); }
+					if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 					if hash {
 						fmt_write_indent(fi)
 					}
@@ -1505,7 +1505,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						fmt_arg(fi, any{data, t.id}, 'v')
 					}
 
-					if hash { io.write_string(fi.writer, ",\n"); }
+					if hash { io.write_string(fi.writer, ",\n") }
 				}
 			}
 
@@ -1652,7 +1652,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			io.write_byte(fi.writer, '[')
 			defer io.write_byte(fi.writer, ']')
 			for i in 0..<info.count {
-				if i > 0 { io.write_string(fi.writer, ", "); }
+				if i > 0 { io.write_string(fi.writer, ", ") }
 
 				idx, ok := stored_enum_value_to_string(info.index, info.min_value, i)
 				if ok {
@@ -1683,7 +1683,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		io.write_byte(fi.writer, '<')
 		defer io.write_byte(fi.writer, '>')
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(fi.writer, ", "); }
+			if i > 0 { io.write_string(fi.writer, ", ") }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -1721,7 +1721,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			entry_size := ed.elem_size
 
 			for i in 0..<entries.len {
-				if i > 0 { io.write_string(fi.writer, ", "); }
+				if i > 0 { io.write_string(fi.writer, ", ") }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size)
 
@@ -1751,7 +1751,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		// fi.hash = false;
 
 
-		if hash	{ io.write_byte(fi.writer, '\n'); }
+		if hash	{ io.write_byte(fi.writer, '\n') }
 
 		if is_soa {
 			fi.indent += 1
@@ -1780,11 +1780,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 
 			for index in 0..<n {
-				if !hash && index > 0 { io.write_string(fi.writer, ", "); }
+				if !hash && index > 0 { io.write_string(fi.writer, ", ") }
 
 				field_count := -1
 
-				if !hash && field_count > 0 { io.write_string(fi.writer, ", "); }
+				if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 
 				io.write_string(fi.writer, base_type_name)
 				io.write_byte(fi.writer, '{')
@@ -1794,7 +1794,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					name := info.names[i]
 					field_count += 1
 
-					if !hash && field_count > 0 { io.write_string(fi.writer, ", "); }
+					if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 					if hash {
 						fmt_write_indent(fi)
 					}
@@ -1823,7 +1823,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						}
 					}
 
-					if hash { io.write_string(fi.writer, ",\n"); }
+					if hash { io.write_string(fi.writer, ",\n") }
 				}
 			}
 		} else {
@@ -1831,7 +1831,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			for name, i in info.names {
 				field_count += 1
 
-				if !hash && field_count > 0 { io.write_string(fi.writer, ", "); }
+				if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 				if hash {
 					fmt_write_indent(fi)
 				}
@@ -1942,7 +1942,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			defer io.write_byte(fi.writer, ']')
 
 			for i in 0..<len {
-				if i > 0 { io.write_string(fi.writer, ", "); }
+				if i > 0 { io.write_string(fi.writer, ", ") }
 
 				data := uintptr(ptr) + uintptr(i*slice_type.elem_size)
 				fmt_arg(fi, any{rawptr(data), slice_type.elem.id}, verb)

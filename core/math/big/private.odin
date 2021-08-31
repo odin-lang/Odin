@@ -1088,7 +1088,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		Step 3. for i from n down to (t + 1).
 	*/
 	#no_bounds_check for i := n; i >= (t + 1); i -= 1 {
-		if (i > x.used) { continue; }
+		if (i > x.used) { continue }
 
 		/*
 			step 3.1 if xi == yt then set q{i-t-1} to b-1, otherwise set q{i-t-1} to (xi*b + x{i-1})/yt
@@ -1744,7 +1744,7 @@ _private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := co
 	context.allocator = allocator
 	W: [_WARRAY]_WORD = ---
 
-	if x.used > _WARRAY { return .Invalid_Argument; }
+	if x.used > _WARRAY { return .Invalid_Argument }
 
 	/*
 		Get old used count.
@@ -2022,7 +2022,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		2. [modified] `b` must be odd.
 	*/
-	if internal_is_even(b) { return .Invalid_Argument; }
+	if internal_is_even(b) { return .Invalid_Argument }
 
 	/*
 		Init all our temps.
@@ -2042,7 +2042,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		If one of `x`, `y` is zero return an error!
 	*/
-	if internal_is_zero(x) || internal_is_zero(y) { return .Invalid_Argument; }
+	if internal_is_zero(x) || internal_is_zero(y) { return .Invalid_Argument }
 
 	/*
 		3. `u` = `x`, `v` = `y`, `A` = 1, `B` = 0, `C` = 0, `D` = 1
@@ -2122,7 +2122,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 		/*
 			If not zero goto step 4.
 		*/
-		if internal_is_zero(u) { break; }
+		if internal_is_zero(u) { break }
 	}
 
 	/*

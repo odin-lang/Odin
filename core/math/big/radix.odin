@@ -244,7 +244,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		Make sure the radix is ok.
 	*/
 
-	if radix < 2 || radix > 64 { return .Invalid_Argument; }
+	if radix < 2 || radix > 64 { return .Invalid_Argument }
 
 	/*
 		Set the integer to the default of zero.
@@ -327,7 +327,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	a := a
 	assert_if_nil(a)
 
-	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument; }
+	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument }
 	clear_if_uninitialized(a) or_return
 
 	if internal_is_zero(a) {

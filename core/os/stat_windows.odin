@@ -108,7 +108,7 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	buf := buf
 	N := 0
 	for c, i in buf {
-		if c == 0 { break; }
+		if c == 0 { break }
 		N = i+1
 	}
 	buf = buf[:N]

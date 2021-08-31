@@ -202,7 +202,7 @@ shift :: proc(a: ^Decimal, i: int) {
 }
 
 can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
-	if nd < 0 || nd >= a.count { return false ; }
+	if nd < 0 || nd >= a.count { return false  }
 	if a.digits[nd] == '5' && nd+1 == a.count {
 		if a.trunc {
 			return true
@@ -214,7 +214,7 @@ can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 }
 
 round :: proc(a: ^Decimal, nd: int) {
-	if nd < 0 || nd >= a.count { return; }
+	if nd < 0 || nd >= a.count { return }
 	if can_round_up(a, nd) {
 		round_up(a, nd)
 	} else {
@@ -223,7 +223,7 @@ round :: proc(a: ^Decimal, nd: int) {
 }
 
 round_up :: proc(a: ^Decimal, nd: int) {
-	if nd < 0 || nd >= a.count { return; }
+	if nd < 0 || nd >= a.count { return }
 
 	for i := nd-1; i >= 0; i -= 1 {
 		if c := a.digits[i]; c < '9' {
@@ -240,7 +240,7 @@ round_up :: proc(a: ^Decimal, nd: int) {
 }
 
 round_down :: proc(a: ^Decimal, nd: int) {
-	if nd < 0 || nd >= a.count { return; }
+	if nd < 0 || nd >= a.count { return }
 	a.count = nd
 	trim(a)
 }

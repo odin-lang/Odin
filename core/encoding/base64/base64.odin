@@ -53,8 +53,8 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
     for i, d := 0, 0; i < length; i, d = i + 3, d + 4 {
         c0, c1, c2 = int(data[i]), -1, -1
 
-        if i + 1 < length { c1 = int(data[i + 1]); }
-        if i + 2 < length { c2 = int(data[i + 2]); }
+        if i + 1 < length { c1 = int(data[i + 1]) }
+        if i + 2 < length { c2 = int(data[i + 2]) }
 
         block = (c0 << 16) | (max(c1, 0) << 8) | max(c2, 0)
 

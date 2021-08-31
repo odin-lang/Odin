@@ -43,7 +43,7 @@ _random :: proc(r: ^Rand) -> u32 {
 	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31))
 }
 
-uint32 :: proc(r: ^Rand = nil) -> u32 { return _random(r); }
+uint32 :: proc(r: ^Rand = nil) -> u32 { return _random(r) }
 
 uint64 :: proc(r: ^Rand = nil) -> u64 {
 	a := u64(_random(r))
@@ -59,9 +59,9 @@ uint128 :: proc(r: ^Rand = nil) -> u128 {
 	return (a<<96) | (b<<64) | (c<<32) | d
 }
 
-int31  :: proc(r: ^Rand = nil) -> i32  { return i32(uint32(r) << 1 >> 1); }
-int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1); }
-int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1); }
+int31  :: proc(r: ^Rand = nil) -> i32  { return i32(uint32(r) << 1 >> 1) }
+int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1) }
+int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1) }
 
 int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	if n <= 0 {
@@ -119,11 +119,11 @@ int_max :: proc(n: int, r: ^Rand = nil) -> int {
 	}
 }
 
-float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53); }
-float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)); }
+float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53) }
+float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)) }
 
-float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo; }
-float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo; }
+float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo }
+float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo }
 
 
 read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {

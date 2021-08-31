@@ -367,8 +367,8 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	i, j := 0, n-1
 
 	loop: for {
-		for f(a[i], p) < 0 { i += 1; }
-		for f(p, a[j]) < 0 { j -= 1; }
+		for f(a[i], p) < 0 { i += 1 }
+		for f(p, a[j]) < 0 { j -= 1 }
 
 		if i >= j {
 			break loop
@@ -395,8 +395,8 @@ quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	i, j := 0, n-1
 
 	loop: for {
-		for a[i] < p { i += 1; }
-		for p < a[j] { j -= 1; }
+		for a[i] < p { i += 1 }
+		for p < a[j] { j -= 1 }
 
 		if i >= j {
 			break loop

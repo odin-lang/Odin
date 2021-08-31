@@ -163,7 +163,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case runtime.Type_Info_Array:
 		strings.write_byte(b, '[')
 		for i in 0..<info.count {
-			if i > 0 { strings.write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", ") }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			marshal_arg(b, any{rawptr(data), info.elem.id})
@@ -174,7 +174,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		strings.write_byte(b, '[')
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		for i in 0..<array.len {
-			if i > 0 { strings.write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", ") }
 
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
 			marshal_arg(b, any{rawptr(data), info.elem.id})
@@ -185,7 +185,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		strings.write_byte(b, '[')
 		slice := cast(^mem.Raw_Slice)v.data
 		for i in 0..<slice.len {
-			if i > 0 { strings.write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", ") }
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
 			marshal_arg(b, any{rawptr(data), info.elem.id})
@@ -207,7 +207,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			entry_size := ed.elem_size
 
 			for i in 0..<entries.len {
-				if i > 0 { strings.write_string(b, ", "); }
+				if i > 0 { strings.write_string(b, ", ") }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size)
 				key   := rawptr(data + entry_type.offsets[2])
@@ -223,7 +223,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case runtime.Type_Info_Struct:
 		strings.write_byte(b, '{')
 		for name, i in info.names {
-			if i > 0 { strings.write_string(b, ", "); }
+			if i > 0 { strings.write_string(b, ", ") }
 			strings.write_quoted_string(b, name)
 			strings.write_string(b, ": ")
 

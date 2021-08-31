@@ -117,7 +117,7 @@ backing_type_kind :: proc(T: typeid) -> Type_Kind {
 
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
-	if info == nil { return nil; }
+	if info == nil { return nil }
 
 	base := info
 	loop: for {
@@ -131,7 +131,7 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 
 
 type_info_core :: proc(info: ^Type_Info) -> ^Type_Info {
-	if info == nil { return nil; }
+	if info == nil { return nil }
 
 	base := info
 	loop: for {
@@ -159,7 +159,7 @@ typeid_base_without_enum :: typeid_core
 
 typeid_elem :: proc(id: typeid) -> typeid {
 	ti := type_info_of(id)
-	if ti == nil { return nil; }
+	if ti == nil { return nil }
 
 	bits := 8*ti.size
 
@@ -228,7 +228,7 @@ is_nil :: proc(v: any) -> bool {
 }
 
 length :: proc(val: any) -> int {
-	if val == nil { return 0; }
+	if val == nil { return 0 }
 
 	#partial switch a in type_info_of(val.id).variant {
 	case Type_Info_Named:
@@ -263,7 +263,7 @@ length :: proc(val: any) -> int {
 }
 
 capacity :: proc(val: any) -> int {
-	if val == nil { return 0; }
+	if val == nil { return 0 }
 
 	#partial switch a in type_info_of(val.id).variant {
 	case Type_Info_Named:
@@ -289,7 +289,7 @@ capacity :: proc(val: any) -> int {
 
 
 index :: proc(val: any, i: int, loc := #caller_location) -> any {
-	if val == nil { return nil; }
+	if val == nil { return nil }
 
 	#partial switch a in type_info_of(val.id).variant {
 	case Type_Info_Named:
@@ -336,7 +336,7 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 		return any{data, a.elem.id}
 
 	case Type_Info_String:
-		if a.is_cstring { return nil; }
+		if a.is_cstring { return nil }
 
 		raw := (^mem.Raw_String)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
@@ -395,7 +395,7 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 }
 
 struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) -> any {
-	if a == nil { return nil; }
+	if a == nil { return nil }
 
 	ti := runtime.type_info_base(type_info_of(a.id))
 
@@ -538,7 +538,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, o
 
 
 enum_string :: proc(a: any) -> string {
-	if a == nil { return ""; }
+	if a == nil { return "" }
 	ti := runtime.type_info_base(type_info_of(a.id))
 	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
 		v, _ := as_i64(a)
@@ -627,7 +627,7 @@ type_info_union_is_pure_maybe :: proc(info: runtime.Type_Info_Union) -> bool {
 }
 
 union_variant_typeid :: proc(a: any) -> typeid {
-	if a == nil { return nil; }
+	if a == nil { return nil }
 
 	ti := runtime.type_info_base(type_info_of(a.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
@@ -666,7 +666,7 @@ union_variant_typeid :: proc(a: any) -> typeid {
 }
 
 get_union_variant_raw_tag :: proc(a: any) -> i64 {
-	if a == nil { return -1; }
+	if a == nil { return -1 }
 
 	ti := runtime.type_info_base(type_info_of(a.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
@@ -697,7 +697,7 @@ get_union_variant_raw_tag :: proc(a: any) -> i64 {
 
 
 set_union_variant_raw_tag :: proc(a: any, tag: i64) {
-	if a == nil { return; }
+	if a == nil { return }
 
 	ti := runtime.type_info_base(type_info_of(a.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
@@ -727,7 +727,7 @@ set_union_variant_raw_tag :: proc(a: any, tag: i64) {
 }
 
 set_union_variant_typeid :: proc(a: any, id: typeid) {
-	if a == nil { return; }
+	if a == nil { return }
 
 	ti := runtime.type_info_base(type_info_of(a.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
@@ -757,7 +757,7 @@ set_union_variant_typeid :: proc(a: any, id: typeid) {
 }
 
 set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
-	if a == nil { return; }
+	if a == nil { return }
 
 	ti := runtime.type_info_base(type_info_of(a.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
@@ -788,7 +788,7 @@ set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
 
 
 as_bool :: proc(a: any) -> (value: bool, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -824,7 +824,7 @@ as_uint :: proc(a: any) -> (value: uint, valid: bool) {
 }
 
 as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -931,7 +931,7 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 }
 
 as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -1039,7 +1039,7 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 
 
 as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -1144,7 +1144,7 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 
 
 as_string :: proc(a: any) -> (value: string, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -1163,7 +1163,7 @@ as_string :: proc(a: any) -> (value: string, valid: bool) {
 }
 
 relative_pointer_to_absolute :: proc(a: any) -> rawptr {
-	if a == nil { return nil; }
+	if a == nil { return nil }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -1219,7 +1219,7 @@ relative_pointer_to_absolute_raw :: proc(data: rawptr, base_integer_id: typeid) 
 
 
 as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id
@@ -1246,7 +1246,7 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 
 
 as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
-	if a == nil { return; }
+	if a == nil { return }
 	a := a
 	ti := runtime.type_info_core(type_info_of(a.id))
 	a.id = ti.id

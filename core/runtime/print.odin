@@ -214,7 +214,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 			t := info.params.variant.(Type_Info_Tuple)
 			print_byte('(')
 			for t, i in t.types {
-				if i > 0 { print_string(", "); }
+				if i > 0 { print_string(", ") }
 				print_type(t)
 			}
 			print_string(")")
@@ -225,9 +225,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		}
 	case Type_Info_Tuple:
 		count := len(info.names)
-		if count != 1 { print_byte('('); }
+		if count != 1 { print_byte('(') }
 		for name, i in info.names {
-			if i > 0 { print_string(", "); }
+			if i > 0 { print_string(", ") }
 
 			t := info.types[i]
 
@@ -237,7 +237,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 			}
 			print_type(t)
 		}
-		if count != 1 { print_string(")"); }
+		if count != 1 { print_string(")") }
 
 	case Type_Info_Array:
 		print_byte('[')
@@ -285,8 +285,8 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		}
 
 		print_string("struct ")
-		if info.is_packed    { print_string("#packed "); }
-		if info.is_raw_union { print_string("#raw_union "); }
+		if info.is_packed    { print_string("#packed ") }
+		if info.is_raw_union { print_string("#raw_union ") }
 		if info.custom_align {
 			print_string("#align ")
 			print_u64(u64(ti.align))
@@ -294,7 +294,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		}
 		print_byte('{')
 		for name, i in info.names {
-			if i > 0 { print_string(", "); }
+			if i > 0 { print_string(", ") }
 			print_string(name)
 			print_string(": ")
 			print_type(info.types[i])
@@ -312,7 +312,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		}
 		print_byte('{')
 		for variant, i in info.variants {
-			if i > 0 { print_string(", "); }
+			if i > 0 { print_string(", ") }
 			print_type(variant)
 		}
 		print_string("}")
@@ -322,7 +322,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_type(info.base)
 		print_string(" {")
 		for name, i in info.names {
-			if i > 0 { print_string(", "); }
+			if i > 0 { print_string(", ") }
 			print_string(name)
 		}
 		print_string("}")

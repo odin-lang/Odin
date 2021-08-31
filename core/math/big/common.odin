@@ -87,7 +87,7 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100
 */
 MATH_BIG_FORCE_64_BIT :: #config(MATH_BIG_FORCE_64_BIT, false)
 MATH_BIG_FORCE_32_BIT :: #config(MATH_BIG_FORCE_32_BIT, false)
-when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously."); }
+when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously.") }
 
 _LOW_MEMORY           :: #config(BIGINT_SMALL_MEMORY, false)
 when _LOW_MEMORY {
