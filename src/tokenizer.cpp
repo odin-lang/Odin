@@ -120,7 +120,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 TOKEN_KIND(Token__KeywordEnd, ""), \
 	TOKEN_KIND(Token_Count, "")
 
-enum TokenKind {
+enum TokenKind : u8 {
 #define TOKEN_KIND(e, s) e
 	TOKEN_KINDS
 #undef TOKEN_KIND
@@ -235,21 +235,26 @@ TokenPos token_pos_add_column(TokenPos pos) {
 	return pos;
 }
 
+enum TokenFlag : u8 {
+	TokenFlag_Remove = 1<<1,
+};
+
 struct Token {
 	TokenKind kind;
+	u8        flags;
 	String    string;
 	TokenPos  pos;
 };
 
 Token empty_token = {Token_Invalid};
-Token blank_token = {Token_Ident, {cast(u8 *)"_", 1}};
+Token blank_token = {Token_Ident, 0, {cast(u8 *)"_", 1}};
 
 Token make_token_ident(String s) {
-	Token t = {Token_Ident, s};
+	Token t = {Token_Ident, 0, s};
 	return t;
 }
 Token make_token_ident(char const *s) {
-	Token t = {Token_Ident, make_string_c(s)};
+	Token t = {Token_Ident, 0, make_string_c(s)};
 	return t;
 }
 
@@ -701,12 +706,6 @@ enum TokenizerInitError {
 	TokenizerInit_Count,
 };
 
-
-enum TokenizerFlags {
-	TokenizerFlag_None = 0,
-	TokenizerFlag_InsertSemicolon = 1<<0,
-};
-
 struct Tokenizer {
 	i32 curr_file_id;
 	String fullpath;
@@ -721,7 +720,6 @@ struct Tokenizer {
 
 	i32 error_count;
 
-	TokenizerFlags flags;
 	bool insert_semicolon;
 };
 
@@ -789,8 +787,7 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, isize size, TokenizerFlags flags) {
-	t->flags = flags;
+void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, isize size) {
 	t->fullpath = fullpath;
 	t->line_count = 1;
 
@@ -804,7 +801,7 @@ void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, 
 	}
 }
 
-TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, TokenizerFlags flags = TokenizerFlag_None) {
+TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
@@ -813,15 +810,13 @@ TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &full
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 
 	if (fc.size > I32_MAX) {
-		t->flags = flags;
 		t->fullpath = fullpath;
 		t->line_count = 1;
 		err = TokenizerInit_FileTooLarge;
 		gb_file_free_contents(&fc);
 	} else if (fc.data != nullptr) {
-		init_tokenizer_with_data(t, fullpath, fc.data, fc.size, flags);
+		init_tokenizer_with_data(t, fullpath, fc.data, fc.size);
 	} else {
-		t->flags = flags;
 		t->fullpath = fullpath;
 		t->line_count = 1;
 		gbFile f = {};
@@ -1163,9 +1158,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			return;
 
 		case '\\':
-			if (t->flags & TokenizerFlag_InsertSemicolon) {
-				t->insert_semicolon = false;
-			}
+			t->insert_semicolon = false;
 			tokenizer_get_token(t, token);
 			if (token->pos.line == current_pos.line) {
 				tokenizer_err(t, token_pos_add_column(current_pos), "Expected a newline after \\");
@@ -1493,43 +1486,41 @@ void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	token->string.len = t->curr - token->string.text;
 
 semicolon_check:;
-	if (t->flags & TokenizerFlag_InsertSemicolon) {
-		switch (token->kind) {
-		case Token_Invalid:
-		case Token_Comment:
-			// Preserve insert_semicolon info
-			break;
-		case Token_Ident:
-		case Token_context:
-		case Token_typeid:
-		case Token_break:
-		case Token_continue:
-		case Token_fallthrough:
-		case Token_return:
-		case Token_or_return:
-			/*fallthrough*/
-		case Token_Integer:
-		case Token_Float:
-		case Token_Imag:
-		case Token_Rune:
-		case Token_String:
-		case Token_Undef:
-			/*fallthrough*/
-		case Token_Question:
-		case Token_Pointer:
-		case Token_CloseParen:
-		case Token_CloseBracket:
-		case Token_CloseBrace:
-			/*fallthrough*/
-		case Token_Increment:
-		case Token_Decrement:
-			/*fallthrough*/
-			t->insert_semicolon = true;
-			break;
-		default:
-			t->insert_semicolon = false;
-			break;
-		}
+	switch (token->kind) {
+	case Token_Invalid:
+	case Token_Comment:
+		// Preserve insert_semicolon info
+		break;
+	case Token_Ident:
+	case Token_context:
+	case Token_typeid:
+	case Token_break:
+	case Token_continue:
+	case Token_fallthrough:
+	case Token_return:
+	case Token_or_return:
+		/*fallthrough*/
+	case Token_Integer:
+	case Token_Float:
+	case Token_Imag:
+	case Token_Rune:
+	case Token_String:
+	case Token_Undef:
+		/*fallthrough*/
+	case Token_Question:
+	case Token_Pointer:
+	case Token_CloseParen:
+	case Token_CloseBracket:
+	case Token_CloseBrace:
+		/*fallthrough*/
+	case Token_Increment:
+	case Token_Decrement:
+		/*fallthrough*/
+		t->insert_semicolon = true;
+		break;
+	default:
+		t->insert_semicolon = false;
+		break;
 	}
 
 	return;
