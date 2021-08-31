@@ -1364,7 +1364,7 @@ bit_set_type :: proc() {
 	}
 	{
 		x: bit_set['A'..='Z']
-		#assert(size_of(x) == size_of(u32));
+		#assert(size_of(x) == size_of(u32))
 		y: bit_set[0..=8; u16]
 		fmt.println(typeid_of(type_of(x))) // bit_set[A..=Z]
 		fmt.println(typeid_of(type_of(y))) // bit_set[0..=8; u16]
@@ -1601,7 +1601,7 @@ where_clauses :: proc() {
 		T :: i32
 		N :: 5
 		f: Foo(T, N)
-		#assert(size_of(f) == (N+N-2)*size_of(T));
+		#assert(size_of(f) == (N+N-2)*size_of(T))
 	}
 }
 
@@ -1671,7 +1671,7 @@ ranged_fields_for_array_compound_literals :: proc() {
 			5..=9 = 54,
 			10..<16 = i*3 + (i-1)*2,
 		}
-		#assert(len(foo) == 16);
+		#assert(len(foo) == 16)
 		fmt.println(foo) // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
 	}
 	{ // Slice and Dynamic Array support
@@ -1922,7 +1922,7 @@ constant_literal_expressions :: proc() {
 	fmt.println("-------")
 
 	Partial_Baz :: enum{A=5, B, C, D=16}
-	#assert(len(Partial_Baz) < len(#partial [Partial_Baz]int));
+	#assert(len(Partial_Baz) < len(#partial [Partial_Baz]int))
 	PARTIAL_ENUM_ARRAY_CONST :: #partial [Partial_Baz]int{.A ..= .C = 1, .D = 16}
 
 	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.A])
@@ -1952,8 +1952,8 @@ union_maybe :: proc() {
 	i: Maybe(u8)
 	p: Maybe(^u8) // No tag is stored for pointers, nil is the sentinel value
 
-	#assert(size_of(i) == size_of(u8) + size_of(u8));
-	#assert(size_of(p) == size_of(^u8));
+	#assert(size_of(i) == size_of(u8) + size_of(u8))
+	#assert(size_of(p) == size_of(^u8))
 
 	i = 123
 	x := i.?
