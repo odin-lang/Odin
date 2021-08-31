@@ -31,7 +31,7 @@ add :: proc {
 		int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error)
 	*/
 	int_add_digit,
-};
+}
 
 /*
 	err = sub(dest, a, b);
@@ -45,7 +45,7 @@ sub :: proc {
 		int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error)
 	*/
 	int_sub_digit,
-};
+}
 
 /*
 	=== === === === === === === === === === === === === === === === === === === === === === === ===
@@ -59,44 +59,44 @@ is_initialized :: proc {
 		int_is_initialized :: proc(a: ^Int) -> bool
 	*/
 	int_is_initialized,
-};
+}
 
 is_zero :: proc {
 	/*
 		int_is_zero :: proc(a: ^Int) -> bool
 	*/
 	int_is_zero,
-};
+}
 
 is_positive :: proc {
 	/*
 		int_is_positive :: proc(a: ^Int) -> bool
 	*/
 	int_is_positive,
-};
-is_pos :: is_positive;
+}
+is_pos :: is_positive
 
 is_negative :: proc {
 	/*
 		int_is_negative :: proc(a: ^Int) -> bool
 	*/
 	int_is_negative,
-};
-is_neg :: is_negative;
+}
+is_neg :: is_negative
 
 is_even :: proc {
 	/*
 		int_is_even :: proc(a: ^Int) -> bool
 	*/
 	int_is_even,
-};
+}
 
 is_odd :: proc {
 	/*
 		int_is_odd :: proc(a: ^Int) -> bool
 	*/
 	int_is_odd,
-};
+}
 
 is_power_of_two :: proc {
 	/*
@@ -107,7 +107,7 @@ is_power_of_two :: proc {
 		int_is_power_of_two :: proc(a: ^Int) -> (res: bool)
 	*/
 	int_is_power_of_two,
-};
+}
 
 compare :: proc {
 	/*
@@ -122,16 +122,16 @@ compare :: proc {
 		int_compare_digit :: proc(a: ^Int, u: DIGIT) -> Comparison_Flag
 	*/
 	int_compare_digit,
-};
-cmp :: compare;
+}
+cmp :: compare
 
 compare_magnitude :: proc {
 	/*
 		Compare the magnitude of two `Int`s, unsigned.
 	*/
 	int_compare_magnitude,
-};
-cmp_mag :: compare_magnitude;
+}
+cmp_mag :: compare_magnitude
 
 /*
 	=== === === === === === === === === === === === === === === === === === === === === === === ===
@@ -147,6 +147,6 @@ destroy :: proc {
 		int_destroy :: proc(integers: ..^Int)
 	*/
 	int_destroy,
-};
+}
 
 

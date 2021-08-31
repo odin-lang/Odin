@@ -2,10 +2,10 @@ package encoding_hxa
 
 import "core:mem"
 
-LATEST_VERSION :: 3;
-VERSION_API :: "0.3";
+LATEST_VERSION :: 3
+VERSION_API :: "0.3"
 
-MAGIC_NUMBER :: 'H'<<0 | 'x'<<8 | 'A'<<16 | '\x00'<<24;
+MAGIC_NUMBER :: 'H'<<0 | 'x'<<8 | 'A'<<16 | '\x00'<<24
 
 Header :: struct #packed {
 	magic_number:        u32le,
@@ -48,7 +48,7 @@ Meta_Value_Type :: enum u8 {
 	Text   = 3,
 	Binary = 4,
 	Meta   = 5,
-};
+}
 
 Meta :: struct {
 	name: string, // name of the meta data value (maximum length is 255)
@@ -74,7 +74,7 @@ Layer :: struct {
 }
 
 // Layers stacks are arrays of layers where all the layers have the same number of entries (polygons, edges, vertices or pixels)
-Layer_Stack :: distinct []Layer;
+Layer_Stack :: distinct []Layer
 
 Node_Geometry :: struct {
 	vertex_count:      u32le,       // number of vertices
@@ -92,7 +92,7 @@ Node_Image :: struct {
 	image_stack: Layer_Stack,
 }
 
-Node_Index :: distinct u32le;
+Node_Index :: distinct u32le
 
 // A file consists of an array of nodes, All nodes have meta data. Geometry nodes have geometry, image nodes have pixels
 Node :: struct {
@@ -114,15 +114,15 @@ If you use HxA for something not covered by the conventions but need a conventio
 /* Hard conventions */
 /* ---------------- */
 
-CONVENTION_HARD_BASE_VERTEX_LAYER_NAME       :: "vertex";
-CONVENTION_HARD_BASE_VERTEX_LAYER_ID         :: 0;
-CONVENTION_HARD_BASE_VERTEX_LAYER_COMPONENTS :: 3;
-CONVENTION_HARD_BASE_CORNER_LAYER_NAME       :: "reference";
-CONVENTION_HARD_BASE_CORNER_LAYER_ID         :: 0;
-CONVENTION_HARD_BASE_CORNER_LAYER_COMPONENTS :: 1;
-CONVENTION_HARD_BASE_CORNER_LAYER_TYPE       :: Layer_Data_Type.Int32;
-CONVENTION_HARD_EDGE_NEIGHBOUR_LAYER_NAME    :: "neighbour";
-CONVENTION_HARD_EDGE_NEIGHBOUR_LAYER_TYPE    :: Layer_Data_Type.Int32;
+CONVENTION_HARD_BASE_VERTEX_LAYER_NAME       :: "vertex"
+CONVENTION_HARD_BASE_VERTEX_LAYER_ID         :: 0
+CONVENTION_HARD_BASE_VERTEX_LAYER_COMPONENTS :: 3
+CONVENTION_HARD_BASE_CORNER_LAYER_NAME       :: "reference"
+CONVENTION_HARD_BASE_CORNER_LAYER_ID         :: 0
+CONVENTION_HARD_BASE_CORNER_LAYER_COMPONENTS :: 1
+CONVENTION_HARD_BASE_CORNER_LAYER_TYPE       :: Layer_Data_Type.Int32
+CONVENTION_HARD_EDGE_NEIGHBOUR_LAYER_NAME    :: "neighbour"
+CONVENTION_HARD_EDGE_NEIGHBOUR_LAYER_TYPE    :: Layer_Data_Type.Int32
 
 
 
@@ -131,63 +131,63 @@ CONVENTION_HARD_EDGE_NEIGHBOUR_LAYER_TYPE    :: Layer_Data_Type.Int32;
 
 /* geometry layers */
 
-CONVENTION_SOFT_LAYER_SEQUENCE0      :: "sequence";
-CONVENTION_SOFT_LAYER_NAME_UV0       :: "uv";
-CONVENTION_SOFT_LAYER_NORMALS        :: "normal";
-CONVENTION_SOFT_LAYER_BINORMAL       :: "binormal";
-CONVENTION_SOFT_LAYER_TANGENT        :: "tangent";
-CONVENTION_SOFT_LAYER_COLOR          :: "color";
-CONVENTION_SOFT_LAYER_CREASES        :: "creases";
-CONVENTION_SOFT_LAYER_SELECTION      :: "select";
-CONVENTION_SOFT_LAYER_SKIN_WEIGHT    :: "skining_weight";
-CONVENTION_SOFT_LAYER_SKIN_REFERENCE :: "skining_reference";
-CONVENTION_SOFT_LAYER_BLENDSHAPE     :: "blendshape";
-CONVENTION_SOFT_LAYER_ADD_BLENDSHAPE :: "addblendshape";
-CONVENTION_SOFT_LAYER_MATERIAL_ID    :: "material";
+CONVENTION_SOFT_LAYER_SEQUENCE0      :: "sequence"
+CONVENTION_SOFT_LAYER_NAME_UV0       :: "uv"
+CONVENTION_SOFT_LAYER_NORMALS        :: "normal"
+CONVENTION_SOFT_LAYER_BINORMAL       :: "binormal"
+CONVENTION_SOFT_LAYER_TANGENT        :: "tangent"
+CONVENTION_SOFT_LAYER_COLOR          :: "color"
+CONVENTION_SOFT_LAYER_CREASES        :: "creases"
+CONVENTION_SOFT_LAYER_SELECTION      :: "select"
+CONVENTION_SOFT_LAYER_SKIN_WEIGHT    :: "skining_weight"
+CONVENTION_SOFT_LAYER_SKIN_REFERENCE :: "skining_reference"
+CONVENTION_SOFT_LAYER_BLENDSHAPE     :: "blendshape"
+CONVENTION_SOFT_LAYER_ADD_BLENDSHAPE :: "addblendshape"
+CONVENTION_SOFT_LAYER_MATERIAL_ID    :: "material"
 
 /* Image layers */
 
-CONVENTION_SOFT_ALBEDO            :: "albedo";
-CONVENTION_SOFT_LIGHT             :: "light";
-CONVENTION_SOFT_DISPLACEMENT      :: "displacement";
-CONVENTION_SOFT_DISTORTION        :: "distortion";
-CONVENTION_SOFT_AMBIENT_OCCLUSION :: "ambient_occlusion";
+CONVENTION_SOFT_ALBEDO            :: "albedo"
+CONVENTION_SOFT_LIGHT             :: "light"
+CONVENTION_SOFT_DISPLACEMENT      :: "displacement"
+CONVENTION_SOFT_DISTORTION        :: "distortion"
+CONVENTION_SOFT_AMBIENT_OCCLUSION :: "ambient_occlusion"
 
 /* tags layers */
 
-CONVENTION_SOFT_NAME      :: "name";
-CONVENTION_SOFT_TRANSFORM :: "transform";
+CONVENTION_SOFT_NAME      :: "name"
+CONVENTION_SOFT_TRANSFORM :: "transform"
 
 /* destroy procedures */
 
 meta_destroy :: proc(meta: Meta, allocator := context.allocator) {
 	if nested, ok := meta.value.([]Meta); ok {
 		for m in nested {
-			meta_destroy(m);
+			meta_destroy(m)
 		}
-		delete(nested, allocator);
+		delete(nested, allocator)
 	}
 }
 nodes_destroy :: proc(nodes: []Node, allocator := context.allocator) {
 	for node in nodes {
 		for meta in node.meta_data {
-			meta_destroy(meta);
+			meta_destroy(meta)
 		}
-		delete(node.meta_data, allocator);
+		delete(node.meta_data, allocator)
 
 		switch n in node.content {
 		case Node_Geometry:
-			delete(n.corner_stack, allocator);
-			delete(n.edge_stack, allocator);
-			delete(n.face_stack, allocator);
+			delete(n.corner_stack, allocator)
+			delete(n.edge_stack, allocator)
+			delete(n.face_stack, allocator)
 		case Node_Image:
-			delete(n.image_stack, allocator);
+			delete(n.image_stack, allocator)
 		}
 	}
-	delete(nodes, allocator);
+	delete(nodes, allocator)
 }
 
 file_destroy :: proc(file: File) {
-	nodes_destroy(file.nodes, file.allocator);
-	delete(file.backing, file.allocator);
+	nodes_destroy(file.nodes, file.allocator)
+	delete(file.backing, file.allocator)
 }

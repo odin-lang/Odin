@@ -83,14 +83,14 @@ foreign kernel32 {
 		lpThreadId: LPDWORD,
 	) -> HANDLE ---
 	SwitchToThread :: proc() -> BOOL ---
-	ResumeThread :: proc(thread: HANDLE) -> DWORD ---;
-	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---;
-	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---;
-	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---;
-	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---;
+	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
+	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
+	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
+	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
 
-	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCSTR) -> HANDLE ---;
-	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---;
+	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCSTR) -> HANDLE ---
+	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---
 
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
@@ -285,35 +285,35 @@ foreign kernel32 {
 }
 
 
-STANDARD_RIGHTS_REQUIRED     :: DWORD(0x000F0000);
-SECTION_QUERY                :: DWORD(0x0001);
-SECTION_MAP_WRITE            :: DWORD(0x0002);
-SECTION_MAP_READ             :: DWORD(0x0004);
-SECTION_MAP_EXECUTE          :: DWORD(0x0008);
-SECTION_EXTEND_SIZE          :: DWORD(0x0010);
-SECTION_ALL_ACCESS           :: STANDARD_RIGHTS_REQUIRED | SECTION_QUERY | SECTION_MAP_WRITE | SECTION_MAP_READ | SECTION_MAP_EXECUTE | SECTION_EXTEND_SIZE;
-SECTION_MAP_EXECUTE_EXPLICIT :: DWORD(0x0020);
+STANDARD_RIGHTS_REQUIRED     :: DWORD(0x000F0000)
+SECTION_QUERY                :: DWORD(0x0001)
+SECTION_MAP_WRITE            :: DWORD(0x0002)
+SECTION_MAP_READ             :: DWORD(0x0004)
+SECTION_MAP_EXECUTE          :: DWORD(0x0008)
+SECTION_EXTEND_SIZE          :: DWORD(0x0010)
+SECTION_ALL_ACCESS           :: STANDARD_RIGHTS_REQUIRED | SECTION_QUERY | SECTION_MAP_WRITE | SECTION_MAP_READ | SECTION_MAP_EXECUTE | SECTION_EXTEND_SIZE
+SECTION_MAP_EXECUTE_EXPLICIT :: DWORD(0x0020)
 
-FILE_MAP_WRITE           :: SECTION_MAP_WRITE;
-FILE_MAP_READ            :: SECTION_MAP_READ;
-FILE_MAP_ALL_ACCESS      :: SECTION_ALL_ACCESS;
-FILE_MAP_EXECUTE         :: SECTION_MAP_EXECUTE_EXPLICIT;
-FILE_MAP_COPY            :: DWORD(0x00000001);
-FILE_MAP_RESERVE         :: DWORD(0x80000000);
-FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000);
-FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000);
+FILE_MAP_WRITE           :: SECTION_MAP_WRITE
+FILE_MAP_READ            :: SECTION_MAP_READ
+FILE_MAP_ALL_ACCESS      :: SECTION_ALL_ACCESS
+FILE_MAP_EXECUTE         :: SECTION_MAP_EXECUTE_EXPLICIT
+FILE_MAP_COPY            :: DWORD(0x00000001)
+FILE_MAP_RESERVE         :: DWORD(0x80000000)
+FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
+FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
 
-PAGE_NOACCESS          :: 0x01;
-PAGE_READONLY          :: 0x02;
-PAGE_READWRITE         :: 0x04;
-PAGE_WRITECOPY         :: 0x08;
-PAGE_EXECUTE           :: 0x10;
-PAGE_EXECUTE_READ      :: 0x20;
-PAGE_EXECUTE_READWRITE :: 0x40;
-PAGE_EXECUTE_WRITECOPY :: 0x80;
-PAGE_GUARD             :: 0x100;
-PAGE_NOCACHE           :: 0x200;
-PAGE_WRITECOMBINE      :: 0x400;
+PAGE_NOACCESS          :: 0x01
+PAGE_READONLY          :: 0x02
+PAGE_READWRITE         :: 0x04
+PAGE_WRITECOPY         :: 0x08
+PAGE_EXECUTE           :: 0x10
+PAGE_EXECUTE_READ      :: 0x20
+PAGE_EXECUTE_READWRITE :: 0x40
+PAGE_EXECUTE_WRITECOPY :: 0x80
+PAGE_GUARD             :: 0x100
+PAGE_NOCACHE           :: 0x200
+PAGE_WRITECOMBINE      :: 0x400
 
 MEMORY_BASIC_INFORMATION :: struct {
 	BaseAddress: PVOID,
@@ -325,20 +325,20 @@ MEMORY_BASIC_INFORMATION :: struct {
 	Protect: DWORD,
 	Type: DWORD,
 }
-PMEMORY_BASIC_INFORMATION :: ^MEMORY_BASIC_INFORMATION;
-LPMEMORY_BASIC_INFORMATION :: ^MEMORY_BASIC_INFORMATION;
+PMEMORY_BASIC_INFORMATION :: ^MEMORY_BASIC_INFORMATION
+LPMEMORY_BASIC_INFORMATION :: ^MEMORY_BASIC_INFORMATION
 
-MEM_COMMIT      :: 0x1000;
-MEM_RESERVE     :: 0x2000;
-MEM_DECOMMIT    :: 0x4000;
-MEM_RELEASE     :: 0x8000;
-MEM_FREE        :: 0x10000;
-MEM_PRIVATE     :: 0x20000;
-MEM_MAPPED      :: 0x40000;
-MEM_RESET       :: 0x80000;
-MEM_TOP_DOWN    :: 0x100000;
-MEM_LARGE_PAGES :: 0x20000000;
-MEM_4MB_PAGES   :: 0x80000000;
+MEM_COMMIT      :: 0x1000
+MEM_RESERVE     :: 0x2000
+MEM_DECOMMIT    :: 0x4000
+MEM_RELEASE     :: 0x8000
+MEM_FREE        :: 0x10000
+MEM_PRIVATE     :: 0x20000
+MEM_MAPPED      :: 0x40000
+MEM_RESET       :: 0x80000
+MEM_TOP_DOWN    :: 0x100000
+MEM_LARGE_PAGES :: 0x20000000
+MEM_4MB_PAGES   :: 0x80000000
 
 foreign kernel32 {
 	VirtualAlloc :: proc(
@@ -346,63 +346,63 @@ foreign kernel32 {
 		dwSize: SIZE_T,
 		flAllocationType: DWORD,
 		flProtect: DWORD,
-	) -> LPVOID ---;
+	) -> LPVOID ---
 	VirtualProtect :: proc(
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
 		flNewProtect: DWORD,
 		lpflOldProtect: PDWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualFree :: proc(
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
 		dwFreeType: DWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualQuery :: proc(
 		lpAddress: LPCVOID,
 		lpBuffer: PMEMORY_BASIC_INFORMATION,
 		dwLength: SIZE_T,
-	) -> SIZE_T ---;
+	) -> SIZE_T ---
 	VirtualAllocEx :: proc(
 		hProcess: HANDLE,
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
 		flAllocationType: DWORD,
 		flProtect: DWORD,
-	) -> LPVOID ---;
+	) -> LPVOID ---
 	VirtualFreeEx :: proc(
 		hProcess: HANDLE,
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
 		dwFreeType: DWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualProtectEx :: proc(
 		hProcess: HANDLE,
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
 		flNewProtect: DWORD,
 		lpflOldProtect: PDWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualQueryEx :: proc(
 		hProcess: HANDLE,
 		lpAddress: LPCVOID,
 		lpBuffer: PMEMORY_BASIC_INFORMATION,
 		dwLength: SIZE_T,
-	) -> SIZE_T ---;
+	) -> SIZE_T ---
 	ReadProcessMemory :: proc(
 		hProcess: HANDLE,
 		lpBaseAddress: LPCVOID,
 		lpBuffer: LPVOID,
 		nSize: SIZE_T,
 		lpNumberOfBytesRead: ^SIZE_T,
-	) -> BOOL ---;
+	) -> BOOL ---
 	WriteProcessMemory :: proc(
 		hProcess: HANDLE,
 		lpBaseAddress: LPVOID,
 		lpBuffer: LPCVOID,
 		nSize: SIZE_T,
 		lpNumberOfBytesWritten: ^SIZE_T,
-	) -> BOOL ---;
+	) -> BOOL ---
 	CreateFileMappingW :: proc(
 		hFile: HANDLE,
 		lpFileMappingAttributes: LPSECURITY_ATTRIBUTES,
@@ -410,19 +410,19 @@ foreign kernel32 {
 		dwMaximumSizeHigh: DWORD,
 		dwMaximumSizeLow: DWORD,
 		lpName: LPCWSTR,
-	) -> HANDLE ---;
+	) -> HANDLE ---
 	OpenFileMappingW :: proc(
 		dwDesiredAccess: DWORD,
 		bInheritHandle: BOOL,
 		lpName: LPCWSTR,
-	) -> HANDLE ---;
+	) -> HANDLE ---
 	MapViewOfFile :: proc(
 		hFileMappingObject: HANDLE,
 		dwDesiredAccess: DWORD,
 		dwFileOffsetHigh: DWORD,
 		dwFileOffsetLow: DWORD,
 		dwNumberOfBytesToMap: SIZE_T,
-	) -> LPVOID ---;
+	) -> LPVOID ---
 	MapViewOfFileEx :: proc(
 		hFileMappingObject: HANDLE,
 		dwDesiredAccess: DWORD,
@@ -430,35 +430,35 @@ foreign kernel32 {
 		dwFileOffsetLow: DWORD,
 		dwNumberOfBytesToMap: SIZE_T,
 		lpBaseAddress: LPVOID,
-	) -> LPVOID ---;
+	) -> LPVOID ---
 	FlushViewOfFile :: proc(
 		lpBaseAddress: LPCVOID,
 		dwNumberOfBytesToFlush: SIZE_T,
-	) -> BOOL ---;
+	) -> BOOL ---
 	UnmapViewOfFile :: proc(
 		lpBaseAddress: LPCVOID,
-	) -> BOOL ---;
-	GetLargePageMinimum :: proc() -> SIZE_T ---;
+	) -> BOOL ---
+	GetLargePageMinimum :: proc() -> SIZE_T ---
 	GetProcessWorkingSetSizeEx :: proc(
 		hProcess: HANDLE,
 		lpMinimumWorkingSetSize: PSIZE_T,
 		lpMaximumWorkingSetSize: PSIZE_T,
 		Flags: PDWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	SetProcessWorkingSetSizeEx :: proc(
 		hProcess: HANDLE,
 		dwMinimumWorkingSetSize: SIZE_T,
 		dwMaximumWorkingSetSize: SIZE_T,
 		Flags: DWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualLock :: proc(
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualUnlock :: proc(
 		lpAddress: LPVOID,
 		dwSize: SIZE_T,
-	) -> BOOL ---;
+	) -> BOOL ---
 	GetWriteWatch :: proc(
 		dwFlags: DWORD,
 		lpBaseAddress: PVOID,
@@ -466,11 +466,11 @@ foreign kernel32 {
 		lpAddresses: ^PVOID,
 		lpdwCount: ^ULONG_PTR,
 		lpdwGranularity: LPDWORD,
-	) -> UINT ---;
+	) -> UINT ---
 	ResetWriteWatch :: proc(
 		lpBaseAddress: LPVOID,
 		dwRegionSize: SIZE_T,
-	) -> UINT ---;
+	) -> UINT ---
 }
 
 
@@ -478,36 +478,36 @@ MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
 	LowMemoryResourceNotification,
 	HighMemoryResourceNotification,
 }
-LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification;
-HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification;
+LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification
+HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
 
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
 		NotificationType: MEMORY_RESOURCE_NOTIFICATION_TYPE,
-	) -> HANDLE ---;
+	) -> HANDLE ---
 	QueryMemoryResourceNotification :: proc(
 		ResourceNotificationHandle: HANDLE,
 		ResourceState: PBOOL,
-	) -> BOOL ---;
+	) -> BOOL ---
 }
 
-FILE_CACHE_MAX_HARD_ENABLE  :: DWORD(0x00000001);
-FILE_CACHE_MAX_HARD_DISABLE :: DWORD(0x00000002);
-FILE_CACHE_MIN_HARD_ENABLE  :: DWORD(0x00000004);
-FILE_CACHE_MIN_HARD_DISABLE :: DWORD(0x00000008);
+FILE_CACHE_MAX_HARD_ENABLE  :: DWORD(0x00000001)
+FILE_CACHE_MAX_HARD_DISABLE :: DWORD(0x00000002)
+FILE_CACHE_MIN_HARD_ENABLE  :: DWORD(0x00000004)
+FILE_CACHE_MIN_HARD_DISABLE :: DWORD(0x00000008)
 
 foreign kernel32 {
 	GetSystemFileCacheSize :: proc(
 		lpMinimumFileCacheSize: PSIZE_T,
 		lpMaximumFileCacheSize: PSIZE_T,
 		lpFlags: PDWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	SetSystemFileCacheSize :: proc(
 		MinimumFileCacheSize: SIZE_T,
 		MaximumFileCacheSize: SIZE_T,
 		Flags: DWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	CreateFileMappingNumaW :: proc(
 		hFile: HANDLE,
 		lpFileMappingAttributes: LPSECURITY_ATTRIBUTES,
@@ -516,7 +516,7 @@ foreign kernel32 {
 		dwMaximumSizeLow: DWORD,
 		lpName: LPCWSTR,
 		nndPreferred: DWORD,
-	) -> HANDLE ---;
+	) -> HANDLE ---
 }
 
 WIN32_MEMORY_RANGE_ENTRY :: struct {
@@ -524,7 +524,7 @@ WIN32_MEMORY_RANGE_ENTRY :: struct {
 	NumberOfBytes: SIZE_T,
 }
 
-PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY;
+PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY
 
 foreign kernel32 {
 	PrefetchVirtualMemory :: proc(
@@ -532,45 +532,45 @@ foreign kernel32 {
 		NumberOfEntries: ULONG_PTR,
 		VirtualAddresses: PWIN32_MEMORY_RANGE_ENTRY,
 		Flags: ULONG,
-	) -> BOOL ---;
+	) -> BOOL ---
 	CreateFileMappingFromApp :: proc(
 		hFile: HANDLE,
 		SecurityAttributes: PSECURITY_ATTRIBUTES,
 		PageProtection: ULONG,
 		MaximumSize: ULONG64,
 		Name: PCWSTR,
-	) -> HANDLE ---;
+	) -> HANDLE ---
 	MapViewOfFileFromApp :: proc(
 		hFileMappingObject: HANDLE,
 		DesiredAccess: ULONG,
 		FileOffset: ULONG64,
 		NumberOfBytesToMap: SIZE_T,
-	) -> PVOID ---;
+	) -> PVOID ---
 	UnmapViewOfFileEx :: proc(
 		BaseAddress: PVOID,
 		UnmapFlags: ULONG,
-	) -> BOOL ---;
+	) -> BOOL ---
 	AllocateUserPhysicalPages :: proc(
 		hProcess: HANDLE,
 		NumberOfPages: PULONG_PTR,
 		PageArray: PULONG_PTR,
-	) -> BOOL ---;
+	) -> BOOL ---
 	FreeUserPhysicalPages :: proc(
 		hProcess: HANDLE,
 		NumberOfPages: PULONG_PTR,
 		PageArray: PULONG_PTR,
-	) -> BOOL ---;
+	) -> BOOL ---
 	MapUserPhysicalPages :: proc(
 		VirtualAddress: PVOID,
 		NumberOfPages: ULONG_PTR,
 		PageArray: PULONG_PTR,
-	) -> BOOL ---;
+	) -> BOOL ---
 	AllocateUserPhysicalPagesNuma :: proc(
 		hProcess: HANDLE,
 		NumberOfPages: PULONG_PTR,
 		PageArray: PULONG_PTR,
 		nndPreferred: DWORD,
-	) -> BOOL ---;
+	) -> BOOL ---
 	VirtualAllocExNuma :: proc(
 		hProcess: HANDLE,
 		lpAddress: LPVOID,
@@ -578,26 +578,26 @@ foreign kernel32 {
 		flAllocationType: DWORD,
 		flProtect: DWORD,
 		nndPreferred: DWORD,
-	) -> LPVOID ---;
+	) -> LPVOID ---
 }
 
-MEHC_PATROL_SCRUBBER_PRESENT :: ULONG(0x1);
+MEHC_PATROL_SCRUBBER_PRESENT :: ULONG(0x1)
 
 foreign kernel32 {
 	GetMemoryErrorHandlingCapabilities :: proc(
 		Capabilities: PULONG,
-	) -> BOOL ---;
+	) -> BOOL ---
 }
 
-PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ();
+PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ()
 
 foreign kernel32 {
 	RegisterBadMemoryNotification :: proc(
 		Callback: PBAD_MEMORY_CALLBACK_ROUTINE,
-	) -> PVOID ---;
+	) -> PVOID ---
 	UnregisterBadMemoryNotification :: proc(
 		RegistrationHandle: PVOID,
-	) -> BOOL ---;
+	) -> BOOL ---
 }
 
 OFFER_PRIORITY :: enum c_int {
@@ -606,48 +606,48 @@ OFFER_PRIORITY :: enum c_int {
 	VmOfferPriorityBelowNormal,
 	VmOfferPriorityNormal,
 }
-VmOfferPriorityVeryLow     :: OFFER_PRIORITY.VmOfferPriorityVeryLow;
-VmOfferPriorityLow         :: OFFER_PRIORITY.VmOfferPriorityLow;
-VmOfferPriorityBelowNormal :: OFFER_PRIORITY.VmOfferPriorityBelowNormal;
-VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal;
+VmOfferPriorityVeryLow     :: OFFER_PRIORITY.VmOfferPriorityVeryLow
+VmOfferPriorityLow         :: OFFER_PRIORITY.VmOfferPriorityLow
+VmOfferPriorityBelowNormal :: OFFER_PRIORITY.VmOfferPriorityBelowNormal
+VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal
 
 foreign kernel32 {
 	OfferVirtualMemory :: proc(
 		VirtualAddress: PVOID,
 		Size: SIZE_T,
 		Priority: OFFER_PRIORITY,
-	) -> DWORD ---;
+	) -> DWORD ---
 	ReclaimVirtualMemory :: proc(
 		VirtualAddress: PVOID,
 		Size: SIZE_T,
-	) -> DWORD ---;
+	) -> DWORD ---
 	DiscardVirtualMemory :: proc(
 		VirtualAddress: PVOID,
 		Size: SIZE_T,
-	) -> DWORD ---;
+	) -> DWORD ---
 	VirtualAllocFromApp :: proc(
 		BaseAddress: PVOID,
 		Size: SIZE_T,
 		AllocationType: ULONG,
 		Protection: ULONG,
-	) -> PVOID ---;
+	) -> PVOID ---
 	VirtualProtectFromApp :: proc(
 		Address: PVOID,
 		Size: SIZE_T,
 		NewProtection: ULONG,
 		OldProtection: PULONG,
-	) -> BOOL ---;
+	) -> BOOL ---
 	OpenFileMappingFromApp :: proc(
 		DesiredAccess: ULONG,
 		InheritHandle: BOOL,
 		Name: PCWSTR,
-	) -> HANDLE ---;
+	) -> HANDLE ---
 }
 
 WIN32_MEMORY_INFORMATION_CLASS :: enum c_int {
 	MemoryRegionInfo,
 }
-MemoryRegionInfo :: WIN32_MEMORY_INFORMATION_CLASS.MemoryRegionInfo;
+MemoryRegionInfo :: WIN32_MEMORY_INFORMATION_CLASS.MemoryRegionInfo
 
 WIN32_MEMORY_REGION_INFORMATION :: struct {
 	AllocationBase: PVOID,
@@ -664,7 +664,7 @@ WIN32_MEMORY_REGION_INFORMATION_u :: struct #raw_union {
 WIN32_MEMORY_REGION_INFORMATION_u_s :: struct {
 	Bitfield: ULONG,
 }
-WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG;
+WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
 /*bit_field #align align_of(ULONG) {
 	Private        : 1-0,
 	MappedDataFile : 2-1,
@@ -697,7 +697,7 @@ foreign kernel32 {
 }
 
 
-NUMA_NO_PREFERRED_NODE :: 0xffffffff;
+NUMA_NO_PREFERRED_NODE :: 0xffffffff
 
 MapViewOfFile2 :: #force_inline proc(
 	FileMappingHandle: HANDLE,
@@ -717,7 +717,7 @@ MapViewOfFile2 :: #force_inline proc(
 		AllocationType,
 		PageProtection,
 		NUMA_NO_PREFERRED_NODE,
-	);
+	)
 }
 
 foreign kernel32 {
@@ -725,5 +725,5 @@ foreign kernel32 {
 		ProcessHandle: HANDLE,
 		BaseAddress: PVOID,
 		UnmapFlags: ULONG,
-	) -> BOOL ---;
+	) -> BOOL ---
 }

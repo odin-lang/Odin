@@ -17,15 +17,15 @@ Pos :: struct {
 
 pos_compare :: proc(lhs, rhs: Pos) -> int {
 	if lhs.offset != rhs.offset {
-		return -1 if (lhs.offset < rhs.offset) else +1;
+		return -1 if (lhs.offset < rhs.offset) else +1
 	}
 	if lhs.line != rhs.line {
-		return -1 if (lhs.line < rhs.line) else +1;
+		return -1 if (lhs.line < rhs.line) else +1
 	}
 	if lhs.column != rhs.column {
-		return -1 if (lhs.column < rhs.column) else +1;
+		return -1 if (lhs.column < rhs.column) else +1
 	}
-	return strings.compare(lhs.file, rhs.file);
+	return strings.compare(lhs.file, rhs.file)
 }
 
 Token_Kind :: enum u32 {
@@ -156,7 +156,7 @@ Token_Kind :: enum u32 {
 
 	B_Custom_Keyword_Begin = COUNT+1,
 	// ... Custom keywords
-};
+}
 
 tokens := [Token_Kind.COUNT]string {
 	"Invalid",
@@ -281,60 +281,60 @@ tokens := [Token_Kind.COUNT]string {
 	"inline",
 	"no_inline",
 	"",
-};
+}
 
-custom_keyword_tokens: []string;
+custom_keyword_tokens: []string
 
 
 is_newline :: proc(tok: Token) -> bool {
-	return tok.kind == .Semicolon && tok.text == "\n";
+	return tok.kind == .Semicolon && tok.text == "\n"
 }
 
 
 token_to_string :: proc(tok: Token) -> string {
 	if is_newline(tok) {
-		return "newline";
+		return "newline"
 	}
-	return to_string(tok.kind);
+	return to_string(tok.kind)
 }
 
 to_string :: proc(kind: Token_Kind) -> string {
 	if Token_Kind.Invalid <= kind && kind < Token_Kind.COUNT {
-		return tokens[kind];
+		return tokens[kind]
 	}
 	if Token_Kind.B_Custom_Keyword_Begin < kind {
-		n := int(u16(kind)-u16(Token_Kind.B_Custom_Keyword_Begin));
+		n := int(u16(kind)-u16(Token_Kind.B_Custom_Keyword_Begin))
 		if n < len(custom_keyword_tokens) {
-			return custom_keyword_tokens[n];
+			return custom_keyword_tokens[n]
 		}
 	}
 
-	return "Invalid";
+	return "Invalid"
 }
 
 is_literal  :: proc(kind: Token_Kind) -> bool {
-	return Token_Kind.B_Literal_Begin  < kind && kind < Token_Kind.B_Literal_End;
+	return Token_Kind.B_Literal_Begin  < kind && kind < Token_Kind.B_Literal_End
 }
 is_operator :: proc(kind: Token_Kind) -> bool {
 	#partial switch kind {
 	case .B_Operator_Begin .. .B_Operator_End:
-		return true;
+		return true
 	case .In, .Not_In:
-		return true;
+		return true
 	case .If:
-		return true;
+		return true
 	}
-	return false;
+	return false
 }
 is_assignment_operator :: proc(kind: Token_Kind) -> bool {
-	return Token_Kind.B_Assign_Op_Begin < kind && kind < Token_Kind.B_Assign_Op_End || kind == Token_Kind.Eq;
+	return Token_Kind.B_Assign_Op_Begin < kind && kind < Token_Kind.B_Assign_Op_End || kind == Token_Kind.Eq
 }
 is_keyword :: proc(kind: Token_Kind) -> bool {
 	switch {
 	case Token_Kind.B_Keyword_Begin < kind && kind < Token_Kind.B_Keyword_End:
-		return true;
+		return true
 	case Token_Kind.B_Custom_Keyword_Begin < kind:
-		return true;
+		return true
 	}
-	return false;
+	return false
 }

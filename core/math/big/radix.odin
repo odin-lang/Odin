@@ -22,15 +22,15 @@ import "core:mem"
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
-	assert_if_nil(a);
-	context.allocator = allocator;
+	assert_if_nil(a)
+	context.allocator = allocator
 
-	a := a; radix := radix;
-	clear_if_uninitialized(a) or_return;
+	a := a; radix := radix
+	clear_if_uninitialized(a) or_return
 	/*
 		Radix defaults to 10.
 	*/
-	radix = radix if radix > 0 else 10;
+	radix = radix if radix > 0 else 10
 
 	/*
 		TODO: If we want to write a prefix for some of the radixes, we can oversize the buffer.
@@ -41,39 +41,39 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 		Calculate the size of the buffer we need, and 
 		Exit if calculating the size returned an error.
 	*/
-	size := radix_size(a, radix, zero_terminate) or_return;
+	size := radix_size(a, radix, zero_terminate) or_return
 
 	/*
 		Allocate the buffer we need.
 	*/
-	buffer := make([]u8, size);
+	buffer := make([]u8, size)
 
 	/*
 		Write the digits out into the buffer.
 	*/
-	written: int;
-	written, err = int_itoa_raw(a, radix, buffer, size, zero_terminate);
+	written: int
+	written, err = int_itoa_raw(a, radix, buffer, size, zero_terminate)
 
-	return string(buffer[:written]), err;
+	return string(buffer[:written]), err
 }
 
 /*
 	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
 */
 int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
-	assert_if_nil(a);
-	context.allocator = allocator;
+	assert_if_nil(a)
+	context.allocator = allocator
 
-	a := a; radix := radix;
-	clear_if_uninitialized(a) or_return;
+	a := a; radix := radix
+	clear_if_uninitialized(a) or_return
 	/*
 		Radix defaults to 10.
 	*/
-	radix = radix if radix > 0 else 10;
+	radix = radix if radix > 0 else 10
 
-	s: string;
-	s, err = int_itoa_string(a, radix, true);
-	return cstring(raw_data(s)), err;
+	s: string
+	s, err = int_itoa_string(a, radix, true)
+	return cstring(raw_data(s)), err
 }
 
 /*
@@ -97,57 +97,57 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocato
 	and having to perform a buffer overflow check each character.
 */
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
-	assert_if_nil(a);
-	a := a; radix := radix; size := size;
-	clear_if_uninitialized(a) or_return;
+	assert_if_nil(a)
+	a := a; radix := radix; size := size
+	clear_if_uninitialized(a) or_return
 	/*
 		Radix defaults to 10.
 	*/
-	radix = radix if radix > 0 else 10;
+	radix = radix if radix > 0 else 10
 	if radix < 2 || radix > 64 {
-		return 0, .Invalid_Argument;
+		return 0, .Invalid_Argument
 	}
 
 	/*
 		We weren't given a size. Let's compute it.
 	*/
 	if size == -1 {
-		size = radix_size(a, radix, zero_terminate) or_return;
+		size = radix_size(a, radix, zero_terminate) or_return
 	}
 
 	/*
 		Early exit if the buffer we were given is too small.
 	*/
-	available := len(buffer);
+	available := len(buffer)
 	if available < size {
-		return 0, .Buffer_Overflow;
+		return 0, .Buffer_Overflow
 	}
 	/*
 		Fast path for when `Int` == 0 or the entire `Int` fits in a single radix digit.
 	*/
-	z, _ := is_zero(a);
+	z, _ := is_zero(a)
 	if z || (a.used == 1 && a.digit[0] < DIGIT(radix)) {
 		if zero_terminate {
-			available -= 1;
-			buffer[available] = 0;
+			available -= 1
+			buffer[available] = 0
 		}
-		available -= 1;
-		buffer[available] = RADIX_TABLE[a.digit[0]];
+		available -= 1
+		buffer[available] = RADIX_TABLE[a.digit[0]]
 
 		if n, _ := is_neg(a); n {
-			available -= 1;
-			buffer[available] = '-';
+			available -= 1
+			buffer[available] = '-'
 		}
 
 		/*
 			If we overestimated the size, we need to move the buffer left.
 		*/
-		written = len(buffer) - available;
+		written = len(buffer) - available
 		if written < size {
-			diff := size - written;
-			mem.copy(&buffer[0], &buffer[diff], written);
+			diff := size - written
+			mem.copy(&buffer[0], &buffer[diff], written)
 		}
-		return written, nil;
+		return written, nil
 	}
 
 	/*
@@ -155,32 +155,32 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	*/
 	if a.used == 1 || a.used == 2 {
 		if zero_terminate {
-			available -= 1;
-			buffer[available] = 0;
+			available -= 1
+			buffer[available] = 0
 		}
 
-		val := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0]);
+		val := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0])
 		for val > 0 {
-			q := val / _WORD(radix);
-			available -= 1;
-			buffer[available] = RADIX_TABLE[val - (q * _WORD(radix))];
+			q := val / _WORD(radix)
+			available -= 1
+			buffer[available] = RADIX_TABLE[val - (q * _WORD(radix))]
 
-			val = q;
+			val = q
 		}
 		if n, _ := is_neg(a); n {
-			available -= 1;
-			buffer[available] = '-';
+			available -= 1
+			buffer[available] = '-'
 		}
 
 		/*
 			If we overestimated the size, we need to move the buffer left.
 		*/
-		written = len(buffer) - available;
+		written = len(buffer) - available
 		if written < size {
-			diff := size - written;
-			mem.copy(&buffer[0], &buffer[diff], written);
+			diff := size - written
+			mem.copy(&buffer[0], &buffer[diff], written)
 		}
-		return written, nil;
+		return written, nil
 	}
 
 	/*
@@ -188,57 +188,57 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	*/
 	if is_power_of_two(int(radix)) {
 		if zero_terminate {
-			available -= 1;
-			buffer[available] = 0;
+			available -= 1
+			buffer[available] = 0
 		}
 
-		shift, count: int;
+		shift, count: int
 		// mask  := _WORD(radix - 1);
-		shift, err = log(DIGIT(radix), 2);
-		count, err = count_bits(a);
-		digit: _WORD;
+		shift, err = log(DIGIT(radix), 2)
+		count, err = count_bits(a)
+		digit: _WORD
 
 		for offset := 0; offset < count; offset += shift {
-			bits_to_get := int(min(count - offset, shift));
+			bits_to_get := int(min(count - offset, shift))
 
-			digit, err = int_bitfield_extract(a, offset, bits_to_get);
+			digit, err = int_bitfield_extract(a, offset, bits_to_get)
 			if err != nil {
-				return len(buffer) - available, .Invalid_Argument;
+				return len(buffer) - available, .Invalid_Argument
 			}
-			available -= 1;
-			buffer[available] = RADIX_TABLE[digit];
+			available -= 1
+			buffer[available] = RADIX_TABLE[digit]
 		}
 
 		if n, _ := is_neg(a); n {
-			available -= 1;
-			buffer[available] = '-';
+			available -= 1
+			buffer[available] = '-'
 		}
 
 		/*
 			If we overestimated the size, we need to move the buffer left.
 		*/
-		written = len(buffer) - available;
+		written = len(buffer) - available
 		if written < size {
-			diff := size - written;
-			mem.copy(&buffer[0], &buffer[diff], written);
+			diff := size - written
+			mem.copy(&buffer[0], &buffer[diff], written)
 		}
-		return written, nil;
+		return written, nil
 	}
 
-	return _itoa_raw_full(a, radix, buffer, zero_terminate);
+	return _itoa_raw_full(a, radix, buffer, zero_terminate)
 }
 
-itoa :: proc{int_itoa_string, int_itoa_raw};
-int_to_string  :: int_itoa_string;
-int_to_cstring :: int_itoa_cstring;
+itoa :: proc{int_itoa_string, int_itoa_raw}
+int_to_string  :: int_itoa_string
+int_to_cstring :: int_itoa_cstring
 
 /*
 	Read a string [ASCII] in a given radix.
 */
 int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(res);
-	input := input;
-	context.allocator = allocator;
+	assert_if_nil(res)
+	input := input
+	context.allocator = allocator
 
 	/*
 		Make sure the radix is ok.
@@ -249,92 +249,92 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 	/*
 		Set the integer to the default of zero.
 	*/
-	internal_zero(res) or_return;
+	internal_zero(res) or_return
 
 	/*
 		We'll interpret an empty string as zero.
 	*/
 	if len(input) == 0 {
-		return nil;
+		return nil
 	}
 
 	/*
 		If the leading digit is a minus set the sign to negative.
 		Given the above early out, the length should be at least 1.
 	*/
-	sign := Sign.Zero_or_Positive;
+	sign := Sign.Zero_or_Positive
 	if input[0] == '-' {
-		input = input[1:];
-		sign = .Negative;
+		input = input[1:]
+		sign = .Negative
 	}
 
 	/*
 		Process each digit of the string.
 	*/
-	ch: rune;
+	ch: rune
 	for len(input) > 0 {
 		/* if the radix <= 36 the conversion is case insensitive
 		 * this allows numbers like 1AB and 1ab to represent the same value
 		 * [e.g. in hex]
 		*/
 
-		ch = rune(input[0]);
+		ch = rune(input[0])
 		if radix <= 36 && ch >= 'a' && ch <= 'z' {
-			ch -= 32; // 'a' - 'A'
+			ch -= 32 // 'a' - 'A'
 		}
 
-		pos := ch - '+';
+		pos := ch - '+'
 		if RADIX_TABLE_REVERSE_SIZE <= pos {
-			break;
+			break
 		}
-		y := RADIX_TABLE_REVERSE[pos];
+		y := RADIX_TABLE_REVERSE[pos]
 		/* if the char was found in the map
 		 * and is less than the given radix add it
 		 * to the number, otherwise exit the loop.
 		 */
 		if y >= u8(radix) {
-			break;
+			break
 		}
 
-		internal_mul(res, res, DIGIT(radix)) or_return;
-		internal_add(res, res, DIGIT(y))     or_return;
+		internal_mul(res, res, DIGIT(radix)) or_return
+		internal_add(res, res, DIGIT(y))     or_return
 
-		input = input[1:];
+		input = input[1:]
 	}
 	/*
 		If an illegal character was found, fail.
 	*/
 	if len(input) > 0 && ch != 0 && ch != '\r' && ch != '\n' {
-		return .Invalid_Argument;
+		return .Invalid_Argument
 	}
 	/*
 		Set the sign only if res != 0.
 	*/
 	if res.used > 0 {
-		res.sign = sign;
+		res.sign = sign
 	}
 
-	return nil;
+	return nil
 }
 
 
-atoi :: proc { int_atoi, };
+atoi :: proc { int_atoi, }
 
 /*
 	We size for `string` by default.
 */
 radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := context.allocator) -> (size: int, err: Error) {
-	a := a;
-	assert_if_nil(a);
+	a := a
+	assert_if_nil(a)
 
 	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument; }
-	clear_if_uninitialized(a) or_return;
+	clear_if_uninitialized(a) or_return
 
 	if internal_is_zero(a) {
 		if zero_terminate {
-			return 2, nil;
+			return 2, nil
 		}
-		return 1, nil;
+		return 1, nil
 	}
 
 	if internal_is_power_of_two(a) {
@@ -345,37 +345,37 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 			used      = a.used,
 			sign      = .Zero_or_Positive,
 			digit     = a.digit,
-		};
+		}
 
-		size = internal_log(t, DIGIT(radix)) or_return;
+		size = internal_log(t, DIGIT(radix)) or_return
 	} else {
-		la, k := &Int{}, &Int{};
-		defer internal_destroy(la, k);
+		la, k := &Int{}, &Int{}
+		defer internal_destroy(la, k)
 
 		/* la = floor(log_2(a)) + 1 */
-		bit_count := internal_count_bits(a);
-		internal_set(la, bit_count) or_return;
+		bit_count := internal_count_bits(a)
+		internal_set(la, bit_count) or_return
 
 		/* k = floor(2^29/log_2(radix)) + 1 */
-		lb := _log_bases;
-		internal_set(k, lb[radix]) or_return;
+		lb := _log_bases
+		internal_set(k, lb[radix]) or_return
 
 		/* n = floor((la *  k) / 2^29) + 1 */
-		internal_mul(k, la, k) or_return;
-		internal_shr(k, k, _RADIX_SIZE_SCALE) or_return;
+		internal_mul(k, la, k) or_return
+		internal_shr(k, k, _RADIX_SIZE_SCALE) or_return
 
 		/* The "+1" here is the "+1" in "floor((la *  k) / 2^29) + 1" */
 		/* n = n + 1 + EOS + sign */
-		size_, _ := internal_get(k, u128);
-		size = int(size_);
+		size_, _ := internal_get(k, u128)
+		size = int(size_)
 	}
 
 	/*
 		log truncates to zero, so we need to add one more, and one for `-` if negative.
 	*/
-	size += 2 if a.sign == .Negative else 1;
-	size += 1 if zero_terminate else 0;
-	return size, nil;
+	size += 2 if a.sign == .Negative else 1
+	size += 1 if zero_terminate else 0
+	return size, nil
 }
 
 /*
@@ -392,7 +392,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	for 64 bit "int".
  */
 
-_RADIX_SIZE_SCALE :: 29;
+_RADIX_SIZE_SCALE :: 29
 _log_bases :: [65]u32{
 			0,         0, 0x20000001, 0x14309399, 0x10000001,
 	0xdc81a35, 0xc611924,  0xb660c9e,  0xaaaaaab,  0xa1849cd,
@@ -407,12 +407,12 @@ _log_bases :: [65]u32{
 	0x5ab7d68, 0x5a42df0,  0x59d1506,  0x5962ffe,  0x58f7c57,
 	0x588f7bc, 0x582a000,  0x57c7319,  0x5766f1d,  0x5709243,
 	0x56adad9, 0x565474d,  0x55fd61f,  0x55a85e8,  0x5555556,
-};
+}
 
 /*
 	Characters used in radix conversions.
 */
-RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
 RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
    0x3e, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x01, 0x02, 0x03, 0x04, /* +,-./01234 */
    0x05, 0x06, 0x07, 0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, /* 56789:;<=> */
@@ -422,59 +422,59 @@ RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
    0xff, 0xff, 0xff, 0xff, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, /* ]^_`abcdef */
    0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, /* ghijklmnop */
    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, /* qrstuvwxyz */
-};
-RADIX_TABLE_REVERSE_SIZE :: 80;
+}
+RADIX_TABLE_REVERSE_SIZE :: 80
 
 /*
 	Stores a bignum as a ASCII string in a given radix (2..64)
 	The buffer must be appropriately sized. This routine doesn't check.
 */
 _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
-	assert_if_nil(a);
-	context.allocator = allocator;
+	assert_if_nil(a)
+	context.allocator = allocator
 
-	temp, denominator := &Int{}, &Int{};
+	temp, denominator := &Int{}, &Int{}
 
-	internal_copy(temp, a)           or_return;
-	internal_set(denominator, radix) or_return;
+	internal_copy(temp, a)           or_return
+	internal_set(denominator, radix) or_return
 
-	available := len(buffer);
+	available := len(buffer)
 	if zero_terminate {
-		available -= 1;
-		buffer[available] = 0;
+		available -= 1
+		buffer[available] = 0
 	}
 
 	if a.sign == .Negative {
-		temp.sign = .Zero_or_Positive;
+		temp.sign = .Zero_or_Positive
 	}
 
-	remainder: DIGIT;
+	remainder: DIGIT
 	for {
 		if remainder, err = #force_inline internal_divmod(temp, temp, DIGIT(radix)); err != nil {
-			internal_destroy(temp, denominator);
-			return len(buffer) - available, err;
+			internal_destroy(temp, denominator)
+			return len(buffer) - available, err
 		}
-		available -= 1;
-		buffer[available] = RADIX_TABLE[remainder];
+		available -= 1
+		buffer[available] = RADIX_TABLE[remainder]
 		if temp.used == 0 {
-			break;
+			break
 		}
 	}
 
 	if a.sign == .Negative {
-		available -= 1;
-		buffer[available] = '-';
+		available -= 1
+		buffer[available] = '-'
 	}
 
-	internal_destroy(temp, denominator);
+	internal_destroy(temp, denominator)
 
 	/*
 		If we overestimated the size, we need to move the buffer left.
 	*/
-	written = len(buffer) - available;
+	written = len(buffer) - available
 	if written < len(buffer) {
-		diff := len(buffer) - written;
-		mem.copy(&buffer[0], &buffer[diff], written);
+		diff := len(buffer) - written
+		mem.copy(&buffer[0], &buffer[diff], written)
 	}
-	return written, nil;
+	return written, nil
 }

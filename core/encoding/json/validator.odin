@@ -4,119 +4,119 @@ import "core:mem"
 
 // NOTE(bill): is_valid will not check for duplicate keys
 is_valid :: proc(data: []byte, spec := Specification.JSON, parse_integers := false) -> bool {
-	p := make_parser(data, spec, parse_integers, mem.nil_allocator());
+	p := make_parser(data, spec, parse_integers, mem.nil_allocator())
 	if p.spec == Specification.JSON5 {
-		return validate_value(&p);
+		return validate_value(&p)
 	}
-	return validate_object(&p);
+	return validate_object(&p)
 }
 
 validate_object_key :: proc(p: ^Parser) -> bool {
-	tok := p.curr_token;
+	tok := p.curr_token
 	if p.spec == Specification.JSON5 {
 		if tok.kind == .String {
-			expect_token(p, .String);
-			return true;
+			expect_token(p, .String)
+			return true
 		} else if tok.kind == .Ident {
-			expect_token(p, .Ident);
-			return true;
+			expect_token(p, .Ident)
+			return true
 		}
 	}
-	err := expect_token(p, .String);
-	return err == Error.None;
+	err := expect_token(p, .String)
+	return err == Error.None
 }
 validate_object :: proc(p: ^Parser) -> bool {
 	if err := expect_token(p, .Open_Brace); err != Error.None {
-		return false;
+		return false
 	}
 
 	for p.curr_token.kind != .Close_Brace {
 		if !validate_object_key(p) {
-			return false;
+			return false
 		}
 		if colon_err := expect_token(p, .Colon); colon_err != Error.None {
-			return false;
+			return false
 		}
 
 		if !validate_value(p) {
-			return false;
+			return false
 		}
 
 		if p.spec == Specification.JSON5 {
 			// Allow trailing commas
 			if allow_token(p, .Comma) {
-				continue;
+				continue
 			}
 		} else {
 			// Disallow trailing commas
 			if allow_token(p, .Comma) {
-				continue;
+				continue
 			} else {
-				break;
+				break
 			}
 		}
 	}
 
 	if err := expect_token(p, .Close_Brace); err != Error.None {
-		return false;
+		return false
 	}
-	return true;
+	return true
 }
 
 validate_array :: proc(p: ^Parser) -> bool {
 	if err := expect_token(p, .Open_Bracket); err != Error.None {
-		return false;
+		return false
 	}
 
 	for p.curr_token.kind != .Close_Bracket {
 		if !validate_value(p) {
-			return false;
+			return false
 		}
 
 		// Disallow trailing commas for the time being
 		if allow_token(p, .Comma) {
-			continue;
+			continue
 		} else {
-			break;
+			break
 		}
 	}
 
 	if err := expect_token(p, .Close_Bracket); err != Error.None {
-		return false;
+		return false
 	}
 
-	return true;
+	return true
 }
 
 validate_value :: proc(p: ^Parser) -> bool {
-	token := p.curr_token;
+	token := p.curr_token
 
 	#partial switch token.kind {
 	case .Null, .False, .True:
-		advance_token(p);
-		return true;
+		advance_token(p)
+		return true
 	case .Integer, .Float:
-		advance_token(p);
-		return true;
+		advance_token(p)
+		return true
 	case .String:
-		advance_token(p);
-		return is_valid_string_literal(token.text, p.spec);
+		advance_token(p)
+		return is_valid_string_literal(token.text, p.spec)
 
 	case .Open_Brace:
-		return validate_object(p);
+		return validate_object(p)
 
 	case .Open_Bracket:
-		return validate_array(p);
+		return validate_array(p)
 
 	case:
 		if p.spec == Specification.JSON5 {
 			#partial switch token.kind {
 			case .Infinity, .NaN:
-				advance_token(p);
-				return true;
+				advance_token(p)
+				return true
 			}
 		}
 	}
 
-	return false;
+	return false
 }

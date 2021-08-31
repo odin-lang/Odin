@@ -1,3 +1,3 @@
 package dynlib
 
-Library :: distinct rawptr;
+Library :: distinct rawptr

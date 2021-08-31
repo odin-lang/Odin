@@ -33,181 +33,181 @@ Match_Error :: enum {
 // NOTE(bill): This is effectively the shell pattern matching system found
 //
 match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
-	pattern, name := pattern, name;
+	pattern, name := pattern, name
 	pattern_loop: for len(pattern) > 0 {
-		star: bool;
-		chunk: string;
-		star, chunk, pattern = scan_chunk(pattern);
+		star: bool
+		chunk: string
+		star, chunk, pattern = scan_chunk(pattern)
 		if star && chunk == "" {
-			return !strings.contains(name, SEPARATOR_STRING), .None;
+			return !strings.contains(name, SEPARATOR_STRING), .None
 		}
 
-		t: string;
-		ok: bool;
-		t, ok, err = match_chunk(chunk, name);
+		t: string
+		ok: bool
+		t, ok, err = match_chunk(chunk, name)
 
 		if ok && (len(t) == 0 || len(pattern) > 0) {
-			name = t;
-			continue;
+			name = t
+			continue
 		}
 		if err != .None {
-			return;
+			return
 		}
 		if star {
 			for i := 0; i < len(name) && name[i] != SEPARATOR; i += 1 {
-				t, ok, err = match_chunk(chunk, name[i+1:]);
+				t, ok, err = match_chunk(chunk, name[i+1:])
 				if ok {
 					if len(pattern) == 0 && len(t) > 0 {
-						continue;
+						continue
 					}
-					name = t;
-					continue pattern_loop;
+					name = t
+					continue pattern_loop
 				}
 				if err != .None {
-					return;
+					return
 				}
 			}
 		}
 
-		return false, .None;
+		return false, .None
 	}
 
-	return len(name) == 0, .None;
+	return len(name) == 0, .None
 }
 
 
 @(private="file")
 scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
-	pattern := pattern;
+	pattern := pattern
 	for len(pattern) > 0 && pattern[0] == '*' {
-		pattern = pattern[1:];
-		star = true;
+		pattern = pattern[1:]
+		star = true
 	}
 
-	in_range, i := false, 0;
+	in_range, i := false, 0
 
 	scan_loop: for i = 0; i < len(pattern); i += 1 {
 		switch pattern[i] {
 		case '\\':
 			when ODIN_OS != "windows" {
 				if i+1 < len(pattern) {
-					i += 1;
+					i += 1
 				}
 			}
 		case '[':
-			in_range = true;
+			in_range = true
 		case ']':
-			in_range = false;
+			in_range = false
 		case '*':
 			if !in_range {
-				break scan_loop;
+				break scan_loop
 			}
 
 		}
 	}
-	return star, pattern[:i], pattern[i:];
+	return star, pattern[:i], pattern[i:]
 }
 
 @(private="file")
 match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Match_Error) {
-	chunk, s := chunk, s;
+	chunk, s := chunk, s
 	for len(chunk) > 0 {
 		if len(s) == 0 {
-			return;
+			return
 		}
 		switch chunk[0] {
 		case '[':
-			r, w := utf8.decode_rune_in_string(s);
-			s = s[w:];
-			chunk = chunk[1:];
-			is_negated := false;
+			r, w := utf8.decode_rune_in_string(s)
+			s = s[w:]
+			chunk = chunk[1:]
+			is_negated := false
 			if len(chunk) > 0 && chunk[0] == '^' {
-				is_negated = true;
-				chunk = chunk[1:];
+				is_negated = true
+				chunk = chunk[1:]
 			}
-			match := false;
-			range_count := 0;
+			match := false
+			range_count := 0
 			for {
 				if len(chunk) > 0 && chunk[0] == ']' && range_count > 0 {
-					chunk = chunk[1:];
-					break;
+					chunk = chunk[1:]
+					break
 				}
-				lo, hi: rune;
+				lo, hi: rune
 				if lo, chunk, err = get_escape(chunk); err != .None {
-					return;
+					return
 				}
-				hi = lo;
+				hi = lo
 				if chunk[0] == '-' {
 					if hi, chunk, err = get_escape(chunk[1:]); err != .None {
-						return;
+						return
 					}
 				}
 
 				if lo <= r && r <= hi {
-					match = true;
+					match = true
 				}
-				range_count += 1;
+				range_count += 1
 			}
 			if match == is_negated {
-				return;
+				return
 			}
 
 		case '?':
 			if s[0] == SEPARATOR {
-				return;
+				return
 			}
-			_, w := utf8.decode_rune_in_string(s);
-			s = s[w:];
-			chunk = chunk[1:];
+			_, w := utf8.decode_rune_in_string(s)
+			s = s[w:]
+			chunk = chunk[1:]
 
 		case '\\':
 			when ODIN_OS != "windows" {
-				chunk = chunk[1:];
+				chunk = chunk[1:]
 				if len(chunk) == 0 {
-					err = .Syntax_Error;
-					return;
+					err = .Syntax_Error
+					return
 				}
 			}
-			fallthrough;
+			fallthrough
 		case:
 			if chunk[0] != s[0] {
-				return;
+				return
 			}
-			s = s[1:];
-			chunk = chunk[1:];
+			s = s[1:]
+			chunk = chunk[1:]
 
 		}
 	}
-	return s, true, .None;
+	return s, true, .None
 }
 
 @(private="file")
 get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Error) {
 	if len(chunk) == 0 || chunk[0] == '-' || chunk[0] == ']' {
-		err = .Syntax_Error;
-		return;
+		err = .Syntax_Error
+		return
 	}
-	chunk := chunk;
+	chunk := chunk
 	if chunk[0] == '\\' && ODIN_OS != "windows" {
-		chunk = chunk[1:];
+		chunk = chunk[1:]
 		if len(chunk) == 0 {
-			err = .Syntax_Error;
-			return;
+			err = .Syntax_Error
+			return
 		}
 	}
 
-	w: int;
-	r, w = utf8.decode_rune_in_string(chunk);
+	w: int
+	r, w = utf8.decode_rune_in_string(chunk)
 	if r == utf8.RUNE_ERROR && w == 1 {
-		err = .Syntax_Error;
+		err = .Syntax_Error
 	}
 
-	next_chunk = chunk[w:];
+	next_chunk = chunk[w:]
 	if len(next_chunk) == 0 {
-		err = .Syntax_Error;
+		err = .Syntax_Error
 	}
 
-	return;
+	return
 }
 
 
@@ -222,128 +222,128 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Match_Error) {
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
-		m := make([]string, 1, allocator);
-		m[0] = pattern;
-		return m[:], .None;
+		m := make([]string, 1, allocator)
+		m[0] = pattern
+		return m[:], .None
 	}
 
-	temp_buf: [8]byte;
+	temp_buf: [8]byte
 
-	dir, file := split(pattern);
-	volume_len := 0;
+	dir, file := split(pattern)
+	volume_len := 0
 	when ODIN_OS == "windows" {
-		volume_len, dir = clean_glob_path_windows(dir, temp_buf[:]);
+		volume_len, dir = clean_glob_path_windows(dir, temp_buf[:])
 	} else {
-		dir = clean_glob_path(dir);
+		dir = clean_glob_path(dir)
 	}
 
 	if !has_meta(dir[volume_len:]) {
-		m, e := _glob(dir, file, nil);
-		return m[:], e;
+		m, e := _glob(dir, file, nil)
+		return m[:], e
 	}
 
-	m: []string;
-	m, err = glob(dir);
+	m: []string
+	m, err = glob(dir)
 	if err != .None {
-		return;
+		return
 	}
-	dmatches := make([dynamic]string, 0, 0, allocator);
+	dmatches := make([dynamic]string, 0, 0, allocator)
 	for d in m {
-		dmatches, err = _glob(d, file, &dmatches);
+		dmatches, err = _glob(d, file, &dmatches)
 		if err != .None {
-			break;
+			break
 		}
 	}
 	if len(dmatches) > 0 {
-		matches = dmatches[:];
+		matches = dmatches[:]
 	}
-	return;
+	return
 }
 _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]string, e: Match_Error) {
 	if matches != nil {
-		m = matches^;
+		m = matches^
 	} else {
-		m = make([dynamic]string, 0, 0, context.allocator);
+		m = make([dynamic]string, 0, 0, context.allocator)
 	}
 
 
-	d, derr := os.open(dir);
+	d, derr := os.open(dir)
 	if derr != 0 {
-		return;
+		return
 	}
-	defer os.close(d);
+	defer os.close(d)
 
 	{
-		file_info, ferr := os.fstat(d);
-		defer os.file_info_delete(file_info);
+		file_info, ferr := os.fstat(d)
+		defer os.file_info_delete(file_info)
 		if ferr != 0 {
-			return;
+			return
 		}
 		if !file_info.is_dir {
-			return;
+			return
 		}
 	}
 
 
-	fis, _ := os.read_dir(d, -1);
+	fis, _ := os.read_dir(d, -1)
 	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
-		return a.name < b.name;
-	});
+		return a.name < b.name
+	})
 	defer {
 		for fi in fis {
-			os.file_info_delete(fi);
+			os.file_info_delete(fi)
 		}
-		delete(fis);
+		delete(fis)
 	}
 
 	for fi in fis {
-		n := fi.name;
-		matched := match(pattern, n) or_return;
+		n := fi.name
+		matched := match(pattern, n) or_return
 		if matched {
-			append(&m, join(dir, n));
+			append(&m, join(dir, n))
 		}
 	}
-	return;
+	return
 }
 
 @(private)
 has_meta :: proc(path: string) -> bool {
 	when ODIN_OS == "windows" {
-		CHARS :: `*?[`;
+		CHARS :: `*?[`
 	} else {
-		CHARS :: `*?[\`;
+		CHARS :: `*?[\`
 	}
-	return strings.contains_any(path, CHARS);
+	return strings.contains_any(path, CHARS)
 }
 
 @(private)
 clean_glob_path :: proc(path: string) -> string {
 	switch path {
 	case "":
-		return ".";
+		return "."
 	case SEPARATOR_STRING:
-		return path;
+		return path
 	}
-	return path[:len(path)-1];
+	return path[:len(path)-1]
 }
 
 
 @(private)
 clean_glob_path_windows :: proc(path: string, temp_buf: []byte) -> (prefix_len: int, cleaned: string) {
-	vol_len := volume_name_len(path);
+	vol_len := volume_name_len(path)
 	switch {
 	case path == "":
-		return 0, ".";
+		return 0, "."
 	case vol_len+1 == len(path) && is_separator(path[len(path)-1]): // /, \, C:\, C:/
-		return vol_len+1, path;
+		return vol_len+1, path
 	case vol_len == len(path) && len(path) == 2: // C:
-		copy(temp_buf[:], path);
-		temp_buf[2] = '.';
-		return vol_len, string(temp_buf[:3]);
+		copy(temp_buf[:], path)
+		temp_buf[2] = '.'
+		return vol_len, string(temp_buf[:3])
 	}
 
 	if vol_len >= len(path) {
-		vol_len = len(path) -1;
+		vol_len = len(path) -1
 	}
-	return vol_len, path[:len(path)-1];
+	return vol_len, path[:len(path)-1]
 }

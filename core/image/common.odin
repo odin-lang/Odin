@@ -110,7 +110,7 @@ Option :: enum {
 	do_not_expand_indexed,
 	do_not_expand_channels,
 }
-Options :: distinct bit_set[Option];
+Options :: distinct bit_set[Option]
 
 Error :: enum {
 	Invalid_PNG_Signature,
@@ -138,8 +138,8 @@ Error :: enum {
 */
 
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
-	size = ((((channels * width * depth) + 7) >> 3) + extra_row_bytes) * height;
-	return;
+	size = ((((channels * width * depth) + 7) >> 3) + extra_row_bytes) * height
+	return
 }
 
 /*
@@ -154,61 +154,61 @@ Channel :: enum u8 {
 }
 
 return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok: bool) {
-	ok = false;
-	t: bytes.Buffer;
+	ok = false
+	t: bytes.Buffer
 
-	idx := int(channel);
+	idx := int(channel)
 
 	if img.channels == 2 && idx == 4 {
 		// Alpha requested, which in a two channel image is index 2: G.
-		idx = 2;
+		idx = 2
 	}
 
 	if idx > img.channels {
-		return {}, false;
+		return {}, false
 	}
 
 	switch img.depth {
 	case 8:
-		buffer_size := compute_buffer_size(img.width, img.height, 1, 8);
-		t = bytes.Buffer{};
-		resize(&t.buf, buffer_size);
+		buffer_size := compute_buffer_size(img.width, img.height, 1, 8)
+		t = bytes.Buffer{}
+		resize(&t.buf, buffer_size)
 
-		i := bytes.buffer_to_bytes(&img.pixels);
-		o := bytes.buffer_to_bytes(&t);
+		i := bytes.buffer_to_bytes(&img.pixels)
+		o := bytes.buffer_to_bytes(&t)
 
 		for len(i) > 0 {
-			o[0] = i[idx];
-			i = i[img.channels:];
-			o = o[1:];
+			o[0] = i[idx]
+			i = i[img.channels:]
+			o = o[1:]
 		}
 	case 16:
-		buffer_size := compute_buffer_size(img.width, img.height, 2, 8);
-		t = bytes.Buffer{};
-		resize(&t.buf, buffer_size);
+		buffer_size := compute_buffer_size(img.width, img.height, 2, 8)
+		t = bytes.Buffer{}
+		resize(&t.buf, buffer_size)
 
-		i := mem.slice_data_cast([]u16, img.pixels.buf[:]);
-		o := mem.slice_data_cast([]u16, t.buf[:]);
+		i := mem.slice_data_cast([]u16, img.pixels.buf[:])
+		o := mem.slice_data_cast([]u16, t.buf[:])
 
 		for len(i) > 0 {
-			o[0] = i[idx];
-			i = i[img.channels:];
-			o = o[1:];
+			o[0] = i[idx]
+			i = i[img.channels:]
+			o = o[1:]
 		}
 	case 1, 2, 4:
 		// We shouldn't see this case, as the loader already turns these into 8-bit.
-		return {}, false;
+		return {}, false
 	}
 
-	res = new(Image);
-	res.width         = img.width;
-	res.height        = img.height;
-	res.channels      = 1;
-	res.depth         = img.depth;
-	res.pixels        = t;
-	res.background    = img.background;
-	res.metadata_ptr  = img.metadata_ptr;
-	res.metadata_type = img.metadata_type;
+	res = new(Image)
+	res.width         = img.width
+	res.height        = img.height
+	res.channels      = 1
+	res.depth         = img.depth
+	res.pixels        = t
+	res.background    = img.background
+	res.metadata_ptr  = img.metadata_ptr
+	res.metadata_type = img.metadata_type
 
-	return res, true;
+	return res, true
 }

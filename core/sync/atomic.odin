@@ -16,10 +16,10 @@ strongest_failure_ordering_table := [Ordering]Ordering{
 	.Acquire                 = .Acquire,
 	.Acquire_Release         = .Acquire,
 	.Sequentially_Consistent = .Sequentially_Consistent,
-};
+}
 
 strongest_failure_ordering :: #force_inline proc(order: Ordering) -> Ordering {
-	return strongest_failure_ordering_table[order];
+	return strongest_failure_ordering_table[order]
 }
 
 fence :: #force_inline proc($order: Ordering) {
@@ -80,7 +80,7 @@ atomic_compare_exchange :: #force_inline proc(dst: ^$T, old, new: T, $success, $
 		when success == .Acquire { return instrinsics.atomic_cxchg_failacq(dst, old, new); }
 		else { #panic("an unknown ordering combination"); }
 	} else {
-		return T{}, false;
+		return T{}, false
 	}
 
 }
@@ -106,7 +106,7 @@ atomic_compare_exchange_weak :: #force_inline proc(dst: ^$T, old, new: T, $succe
 		when success == .Acquire { return intrinsics.atomic_cxchgweak_failacq(dst, old, new); }
 		else { #panic("an unknown ordering combination"); }
 	} else {
-		return T{}, false;
+		return T{}, false
 	}
 
 }

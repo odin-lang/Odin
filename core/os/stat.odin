@@ -16,19 +16,19 @@ File_Info :: struct {
 
 file_info_slice_delete :: proc(infos: []File_Info, allocator := context.allocator) {
 	for i := len(infos)-1; i >= 0; i -= 1 {
-		file_info_delete(infos[i], allocator);
+		file_info_delete(infos[i], allocator)
 	}
-	delete(infos, allocator);
+	delete(infos, allocator)
 }
 
 file_info_delete :: proc(fi: File_Info, allocator := context.allocator) {
-	delete(fi.fullpath, allocator);
+	delete(fi.fullpath, allocator)
 }
 
-File_Mode :: distinct u32;
+File_Mode :: distinct u32
 
-File_Mode_Dir         :: File_Mode(1<<16);
-File_Mode_Named_Pipe  :: File_Mode(1<<17);
-File_Mode_Device      :: File_Mode(1<<18);
-File_Mode_Char_Device :: File_Mode(1<<19);
-File_Mode_Sym_Link    :: File_Mode(1<<20);
+File_Mode_Dir         :: File_Mode(1<<16)
+File_Mode_Named_Pipe  :: File_Mode(1<<17)
+File_Mode_Device      :: File_Mode(1<<18)
+File_Mode_Char_Device :: File_Mode(1<<19)
+File_Mode_Sym_Link    :: File_Mode(1<<20)

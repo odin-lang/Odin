@@ -8,82 +8,82 @@ import "core:os"
 import "core:slice"
 
 collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
-	NO_POS :: tokenizer.Pos{};
+	NO_POS :: tokenizer.Pos{}
 
-	pkg_path, pkg_path_ok := filepath.abs(path);
+	pkg_path, pkg_path_ok := filepath.abs(path)
 	if !pkg_path_ok {
-		return;
+		return
 	}
 
-	path_pattern := fmt.tprintf("%s/*.odin", pkg_path);
-	matches, err := filepath.glob(path_pattern);
-	defer delete(matches);
+	path_pattern := fmt.tprintf("%s/*.odin", pkg_path)
+	matches, err := filepath.glob(path_pattern)
+	defer delete(matches)
 
 	if err != nil {
-		return;
+		return
 	}
 
-	pkg = ast.new(ast.Package, NO_POS, NO_POS);
-	pkg.fullpath = pkg_path;
+	pkg = ast.new(ast.Package, NO_POS, NO_POS)
+	pkg.fullpath = pkg_path
 
 	for match in matches {
-		src: []byte;
-		fullpath, ok := filepath.abs(match);
+		src: []byte
+		fullpath, ok := filepath.abs(match)
 		if !ok {
-			return;
+			return
 		}
-		src, ok = os.read_entire_file(fullpath);
+		src, ok = os.read_entire_file(fullpath)
 		if !ok {
-			delete(fullpath);
-			return;
+			delete(fullpath)
+			return
 		}
-		file := ast.new(ast.File, NO_POS, NO_POS);
-		file.pkg = pkg;
-		file.src = string(src);
-		file.fullpath = fullpath;
-		pkg.files[fullpath] = file;
+		file := ast.new(ast.File, NO_POS, NO_POS)
+		file.pkg = pkg
+		file.src = string(src)
+		file.fullpath = fullpath
+		pkg.files[fullpath] = file
 	}
 
-	success = true;
-	return;
+	success = true
+	return
 }
 
 parse_package :: proc(pkg: ^ast.Package, p: ^Parser = nil) -> bool {
-	p := p;
+	p := p
 	if p == nil {
-		p = &Parser{};
-		p^ = default_parser();
+		p = &Parser{}
+		p^ = default_parser()
 	}
 
-	ok := true;
+	ok := true
 
-	files := make([]^ast.File, len(pkg.files), context.temp_allocator);
-	i := 0;
+	files := make([]^ast.File, len(pkg.files), context.temp_allocator)
+	i := 0
 	for _, file in pkg.files {
-		files[i] = file;
-		i += 1;
+		files[i] = file
+		i += 1
 	}
-	slice.sort(files);
+	slice.sort(files)
 
 	for file in files {
 		if !parse_file(p, file) {
-			ok = false;
+			ok = false
 		}
 		if pkg.name == "" {
-			pkg.name = file.pkg_decl.name;
+			pkg.name = file.pkg_decl.name
 		} else if pkg.name != file.pkg_decl.name {
-			error(p, file.pkg_decl.pos, "different package name, expected '%s', got '%s'", pkg.name, file.pkg_decl.name);
+			error(p, file.pkg_decl.pos, "different package name, expected '%s', got '%s'", pkg.name, file.pkg_decl.name)
 		}
 	}
 
-	return ok;
+	return ok
 }
 
 parse_package_from_path :: proc(path: string, p: ^Parser = nil) -> (pkg: ^ast.Package, ok: bool) {
-	pkg, ok = collect_package(path);
+	pkg, ok = collect_package(path)
 	if !ok {
-		return;
+		return
 	}
-	ok = parse_package(pkg, p);
-	return;
+	ok = parse_package(pkg, p)
+	return
 }
