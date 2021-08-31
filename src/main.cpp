@@ -733,7 +733,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None, Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer, Command_all);
-	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None, Command__does_build|Command_strip_semicolon);
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String, Command__does_check);
 	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String, Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String, Command__does_build); // Commands_build is not used to allow for a better error message
@@ -2012,12 +2012,43 @@ bool check_env(void) {
 
 struct StripSemicolonFile {
 	String old_fullpath;
+	String old_fullpath_backup;
 	String new_fullpath;
 	AstFile *file;
+	i64 written;
 };
 
+gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *written_) {
+	i64 written = 0;
+	gbFileError err = gbFileError_None;
+	u8 const *file_data = file->tokenizer.start;
+	i32 prev_offset = 0;
+	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
+	for_array(i, file->tokens) {
+		Token *token = &file->tokens[i];
+		if (token->flags & TokenFlag_Remove) {
+			i32 offset = token->pos.offset;
+			i32 to_write = offset-prev_offset;
+			if (!gb_file_write(f, file_data+prev_offset, to_write)) {
+				return gbFileError_Invalid;
+			}
+			written += to_write;
+			prev_offset = token_pos_end(*token).offset;
+		}
+	}
+	if (end_offset > prev_offset) {
+		i32 to_write = end_offset-prev_offset;
+		if (!gb_file_write(f, file_data+prev_offset, end_offset-prev_offset)) {
+			return gbFileError_Invalid;
+		}
+		written += to_write;
+	}
+	
+	if (written_) *written_ = written;
+	return err;
+}
+
 int strip_semicolons(Parser *parser) {
-	#if 0
 	isize file_count = 0;
 	for_array(i, parser->packages) {
 		AstPackage *pkg = parser->packages[i];
@@ -2031,12 +2062,107 @@ int strip_semicolons(Parser *parser) {
 		AstPackage *pkg = parser->packages[i];
 		for_array(j, pkg->files) {
 			AstFile *file = pkg->files[j];
-			gb_printf_err("%.*s\n", LIT(file->fullpath));
+			String old_fullpath = copy_string(permanent_allocator(), file->fullpath);
+				
+			// assumes .odin extension
+			String fullpath_base = substring(old_fullpath, 0, old_fullpath.len-5);
+			
+			String old_fullpath_backup = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~backup.odin-temp"));
+			String new_fullpath = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~temp.odin-temp"));
+			
+			array_add(&generated_files, StripSemicolonFile{old_fullpath, old_fullpath_backup, new_fullpath, file});
 		}
 	}
 	
-	#endif
-	return 0;
+	isize generated_count = 0;
+	bool failed = false;
+	
+	for_array(i, generated_files) {
+		auto *file = &generated_files[i];
+		char const *filename = cast(char const *)file->new_fullpath.text;
+		gbFileError err = gbFileError_None;
+		defer (if (err != gbFileError_None) {
+			failed = true;
+		});
+		
+		gbFile f = {}; 
+		err = gb_file_create(&f, filename);
+		if (err) {
+			break;
+		}
+		defer (err = gb_file_close(&f));
+		generated_count += 1;
+		
+		i64 written = 0;
+		defer (gb_file_truncate(&f, written));
+		
+		err = write_file_with_stripped_tokens(&f, file->file, &written);
+		if (err) {
+			break;
+		}
+		file->written = written;
+	}
+
+	if (failed) {
+		for (isize i = 0; i < generated_count; i++) {
+			auto *file = &generated_files[i];
+			char const *filename = nullptr;
+			filename = cast(char const *)file->new_fullpath.text;
+			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
+		}
+		return 1;
+	}
+	
+	isize overwritten_files = 0;
+	
+	for_array(i, generated_files) {
+		auto *file = &generated_files[i];
+		
+		char const *old_fullpath = cast(char const *)file->old_fullpath.text;
+		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
+		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
+		
+		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
+			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
+			failed = true;
+			break;
+		}
+		
+		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
+			gb_printf_err("failed to move '%s' to '%s' %d\n", old_fullpath, new_fullpath, GetLastError());
+			if (!gb_file_copy(old_fullpath_backup, old_fullpath, false)) {
+				gb_printf_err("failed to restore '%s' from '%s'\n", old_fullpath, old_fullpath_backup);
+			}
+			failed = true;
+			break;
+		}
+		
+		if (!gb_file_remove(old_fullpath_backup)) {
+			gb_printf_err("failed to remove '%s'\n", old_fullpath_backup);
+		}
+		
+		overwritten_files++;
+	}
+	
+	if (!build_context.keep_temp_files) {
+		for_array(i, generated_files) {
+			auto *file = &generated_files[i];
+			char const *filename = nullptr;
+			filename = cast(char const *)file->new_fullpath.text;
+			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
+			
+			filename = cast(char const *)file->old_fullpath_backup.text;
+			if (gb_file_exists(filename) && !gb_file_remove(filename)) {
+				if (i < overwritten_files) {
+					gb_printf_err("unable to delete file %s", filename);
+					failed = true;
+				}
+			}
+		}
+	}
+	
+	
+	return cast(int)failed;
 }
 
 
