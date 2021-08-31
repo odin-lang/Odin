@@ -2132,7 +2132,7 @@ int strip_semicolons(Parser *parser) {
 		
 		debugf("Copy '%s' to '%s'\n", new_fullpath, old_fullpath);
 		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
-			gb_printf_err("failed to move '%s' to '%s' %d\n", old_fullpath, new_fullpath, GetLastError());
+			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, new_fullpath);
 			debugf("Copy '%s' to '%s'\n", old_fullpath_backup, old_fullpath);
 			if (!gb_file_copy(old_fullpath_backup, old_fullpath, false)) {
 				gb_printf_err("failed to restore '%s' from '%s'\n", old_fullpath, old_fullpath_backup);
