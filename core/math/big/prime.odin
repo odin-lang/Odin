@@ -416,6 +416,51 @@ internal_int_reduce_is_2k_l :: proc(a: ^Int) -> (reducible: bool, err: Error) {
 	}
 }
 
+/*
+	Determines the setup value.
+	Assumes `a` is not `nil`.
+*/
+internal_int_reduce_2k_setup :: proc(a: ^Int, allocator := context.allocator) -> (d: DIGIT, err: Error) {
+	context.allocator = allocator;
+
+	tmp := &Int{};
+	defer internal_destroy(tmp);
+	internal_zero(tmp)                                               or_return;
+
+	internal_int_power_of_two(tmp, internal_count_bits(a))           or_return;
+	internal_sub(tmp, tmp, a)                                        or_return;
+
+	return tmp.digit[0], nil;
+}
+
+/*
+	Determines the setup value.
+	Assumes `a` is not `nil`.
+*/
+internal_int_reduce_2k_setup_l :: proc(a, d: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	tmp := &Int{};
+	defer internal_destroy(tmp);
+	internal_zero(tmp)                                               or_return;
+
+	internal_int_power_of_two(tmp, internal_count_bits(a))           or_return;
+	internal_sub(d, tmp, a)                                          or_return;
+
+	return nil;
+}
+
+/*
+	Pre-calculate the value required for Barrett reduction.
+	For a given modulus "b" it calulates the value required in "a"
+*/
+internal_int_reduce_setup :: proc(a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	internal_int_power_of_two(a, b.used * 2 * _DIGIT_BITS)           or_return;
+	return internal_int_div(a, a, b);
+}
+
 
 /*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
