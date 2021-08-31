@@ -5,7 +5,7 @@ import win32 "core:sys/windows"
 import "core:time"
 
 current_thread_id :: proc "contextless" () -> int {
-	return int(win32.GetCurrentThreadId());
+	return int(win32.GetCurrentThreadId())
 }
 
 
@@ -16,21 +16,21 @@ Semaphore :: struct {
 }
 
 semaphore_init :: proc(s: ^Semaphore, initial_count := 0) {
-	s._handle = win32.CreateSemaphoreW(nil, i32(initial_count), 1<<31-1, nil);
+	s._handle = win32.CreateSemaphoreW(nil, i32(initial_count), 1<<31-1, nil)
 }
 
 semaphore_destroy :: proc(s: ^Semaphore) {
-	win32.CloseHandle(s._handle);
+	win32.CloseHandle(s._handle)
 }
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
-	win32.ReleaseSemaphore(s._handle, i32(count), nil);
+	win32.ReleaseSemaphore(s._handle, i32(count), nil)
 }
 
 semaphore_wait_for :: proc(s: ^Semaphore) {
 	// NOTE(tetra, 2019-10-30): wait_for_single_object decrements the count before it returns.
-	result := win32.WaitForSingleObject(s._handle, win32.INFINITE);
-	assert(result != win32.WAIT_FAILED);
+	result := win32.WaitForSingleObject(s._handle, win32.INFINITE)
+	assert(result != win32.WAIT_FAILED)
 }
 
 
@@ -40,23 +40,23 @@ Mutex :: struct {
 
 
 mutex_init :: proc(m: ^Mutex, spin_count := 0) {
-	win32.InitializeCriticalSectionAndSpinCount(&m._critical_section, u32(spin_count));
+	win32.InitializeCriticalSectionAndSpinCount(&m._critical_section, u32(spin_count))
 }
 
 mutex_destroy :: proc(m: ^Mutex) {
-	win32.DeleteCriticalSection(&m._critical_section);
+	win32.DeleteCriticalSection(&m._critical_section)
 }
 
 mutex_lock :: proc(m: ^Mutex) {
-	win32.EnterCriticalSection(&m._critical_section);
+	win32.EnterCriticalSection(&m._critical_section)
 }
 
 mutex_try_lock :: proc(m: ^Mutex) -> bool {
-	return bool(win32.TryEnterCriticalSection(&m._critical_section));
+	return bool(win32.TryEnterCriticalSection(&m._critical_section))
 }
 
 mutex_unlock :: proc(m: ^Mutex) {
-	win32.LeaveCriticalSection(&m._critical_section);
+	win32.LeaveCriticalSection(&m._critical_section)
 }
 
 Blocking_Mutex :: struct {
@@ -65,7 +65,7 @@ Blocking_Mutex :: struct {
 
 
 blocking_mutex_init :: proc(m: ^Blocking_Mutex) {
-	win32.InitializeSRWLock(&m._handle);
+	win32.InitializeSRWLock(&m._handle)
 }
 
 blocking_mutex_destroy :: proc(m: ^Blocking_Mutex) {
@@ -73,15 +73,15 @@ blocking_mutex_destroy :: proc(m: ^Blocking_Mutex) {
 }
 
 blocking_mutex_lock :: proc(m: ^Blocking_Mutex) {
-	win32.AcquireSRWLockExclusive(&m._handle);
+	win32.AcquireSRWLockExclusive(&m._handle)
 }
 
 blocking_mutex_try_lock :: proc(m: ^Blocking_Mutex) -> bool {
-	return bool(win32.TryAcquireSRWLockExclusive(&m._handle));
+	return bool(win32.TryAcquireSRWLockExclusive(&m._handle))
 }
 
 blocking_mutex_unlock :: proc(m: ^Blocking_Mutex) {
-	win32.ReleaseSRWLockExclusive(&m._handle);
+	win32.ReleaseSRWLockExclusive(&m._handle)
 }
 
 
@@ -95,10 +95,10 @@ Condition :: struct {
 
 
 condition_init :: proc(c: ^Condition, mutex: Condition_Mutex_Ptr) -> bool {
-	assert(mutex != nil);
-	win32.InitializeConditionVariable(&c._handle);
-	c.mutex = mutex;
-	return true;
+	assert(mutex != nil)
+	win32.InitializeConditionVariable(&c._handle)
+	c.mutex = mutex
+	return true
 }
 
 condition_destroy :: proc(c: ^Condition) {
@@ -107,38 +107,38 @@ condition_destroy :: proc(c: ^Condition) {
 
 condition_signal :: proc(c: ^Condition) -> bool {
 	if c._handle.ptr == nil {
-		return false;
+		return false
 	}
-	win32.WakeConditionVariable(&c._handle);
-	return true;
+	win32.WakeConditionVariable(&c._handle)
+	return true
 }
 
 condition_broadcast :: proc(c: ^Condition) -> bool {
 	if c._handle.ptr == nil {
-		return false;
+		return false
 	}
-	win32.WakeAllConditionVariable(&c._handle);
-	return true;
+	win32.WakeAllConditionVariable(&c._handle)
+	return true
 }
 
 condition_wait_for :: proc(c: ^Condition) -> bool {
 	switch m in &c.mutex {
 	case ^Mutex:
-		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, win32.INFINITE);
+		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, win32.INFINITE)
 	case ^Blocking_Mutex:
-		return cast(bool)win32.SleepConditionVariableSRW(&c._handle, &m._handle, win32.INFINITE, 0);
+		return cast(bool)win32.SleepConditionVariableSRW(&c._handle, &m._handle, win32.INFINITE, 0)
 	}
-	return false;
+	return false
 }
 condition_wait_for_timeout :: proc(c: ^Condition, duration: time.Duration) -> bool {
-	ms := win32.DWORD((max(time.duration_nanoseconds(duration), 0) + 999999)/1000000);
+	ms := win32.DWORD((max(time.duration_nanoseconds(duration), 0) + 999999)/1000000)
 	switch m in &c.mutex {
 	case ^Mutex:
-		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, ms);
+		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, ms)
 	case ^Blocking_Mutex:
-		return cast(bool)win32.SleepConditionVariableSRW(&c._handle, &m._handle, ms, 0);
+		return cast(bool)win32.SleepConditionVariableSRW(&c._handle, &m._handle, ms, 0)
 	}
-	return false;
+	return false
 }
 
 
@@ -149,32 +149,32 @@ RW_Lock :: struct {
 }
 
 rw_lock_init :: proc(l: ^RW_Lock) {
-	l._handle = win32.SRWLOCK_INIT;
+	l._handle = win32.SRWLOCK_INIT
 }
 rw_lock_destroy :: proc(l: ^RW_Lock) {
 	//
 }
 rw_lock_read :: proc(l: ^RW_Lock) {
-	win32.AcquireSRWLockShared(&l._handle);
+	win32.AcquireSRWLockShared(&l._handle)
 }
 rw_lock_try_read :: proc(l: ^RW_Lock) -> bool {
-	return bool(win32.TryAcquireSRWLockShared(&l._handle));
+	return bool(win32.TryAcquireSRWLockShared(&l._handle))
 }
 rw_lock_write :: proc(l: ^RW_Lock) {
-	win32.AcquireSRWLockExclusive(&l._handle);
+	win32.AcquireSRWLockExclusive(&l._handle)
 }
 rw_lock_try_write :: proc(l: ^RW_Lock) -> bool {
-	return bool(win32.TryAcquireSRWLockExclusive(&l._handle));
+	return bool(win32.TryAcquireSRWLockExclusive(&l._handle))
 }
 rw_lock_read_unlock :: proc(l: ^RW_Lock) {
-	win32.ReleaseSRWLockShared(&l._handle);
+	win32.ReleaseSRWLockShared(&l._handle)
 }
 rw_lock_write_unlock :: proc(l: ^RW_Lock) {
-	win32.ReleaseSRWLockExclusive(&l._handle);
+	win32.ReleaseSRWLockExclusive(&l._handle)
 }
 
 
 thread_yield :: proc() {
-	win32.SwitchToThread();
+	win32.SwitchToThread()
 }
 

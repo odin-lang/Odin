@@ -8,7 +8,7 @@ Proc_Tag :: enum {
 	Optional_Ok,
 	Optional_Second,
 }
-Proc_Tags :: distinct bit_set[Proc_Tag; u32];
+Proc_Tags :: distinct bit_set[Proc_Tag; u32]
 
 Proc_Inlining :: enum u32 {
 	None      = 0,
@@ -28,7 +28,7 @@ Node_State_Flag :: enum {
 	Bounds_Check,
 	No_Bounds_Check,
 }
-Node_State_Flags :: distinct bit_set[Node_State_Flag];
+Node_State_Flags :: distinct bit_set[Node_State_Flag]
 
 Node :: struct {
 	pos:         tokenizer.Pos,
@@ -526,18 +526,18 @@ Foreign_Import_Decl :: struct {
 
 // Other things
 unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
-	val = expr;
+	val = expr
 	if expr == nil {
-		return;
+		return
 	}
 	for {
-		e, ok := val.derived.(Paren_Expr);
+		e, ok := val.derived.(Paren_Expr)
 		if !ok || e.expr == nil {
-			break;
+			break
 		}
-		val = e.expr;
+		val = e.expr
 	}
-	return;
+	return
 }
 
 Field_Flag :: enum {
@@ -554,16 +554,16 @@ Field_Flag :: enum {
 	Typeid_Token,
 }
 
-Field_Flags :: distinct bit_set[Field_Flag];
+Field_Flags :: distinct bit_set[Field_Flag]
 
 Field_Flags_Struct :: Field_Flags{
 	.Using,
 	.Tags,
-};
+}
 Field_Flags_Record_Poly_Params :: Field_Flags{
 	.Typeid_Token,
 	.Default_Parameters,
-};
+}
 Field_Flags_Signature :: Field_Flags{
 	.Ellipsis,
 	.Using,
@@ -571,10 +571,10 @@ Field_Flags_Signature :: Field_Flags{
 	.C_Vararg,
 	.Auto_Cast,
 	.Default_Parameters,
-};
+}
 
-Field_Flags_Signature_Params  :: Field_Flags_Signature | {Field_Flag.Typeid_Token};
-Field_Flags_Signature_Results :: Field_Flags_Signature;
+Field_Flags_Signature_Params  :: Field_Flags_Signature | {Field_Flag.Typeid_Token}
+Field_Flags_Signature_Results :: Field_Flags_Signature
 
 
 Proc_Group :: struct {

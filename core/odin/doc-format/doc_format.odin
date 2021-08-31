@@ -7,24 +7,24 @@ Array :: struct($T: typeid) {
 	length: u32le,
 }
 
-String :: distinct Array(byte);
+String :: distinct Array(byte)
 
-Version_Type_Major :: 0;
-Version_Type_Minor :: 1;
-Version_Type_Patch :: 0;
+Version_Type_Major :: 0
+Version_Type_Minor :: 1
+Version_Type_Patch :: 0
 
 Version_Type :: struct {
 	major, minor, patch: u8,
 	_: u8,
-};
+}
 
 Version_Type_Default :: Version_Type{
 	major=Version_Type_Major,
 	minor=Version_Type_Minor,
 	patch=Version_Type_Patch,
-};
+}
 
-Magic_String :: "odindoc\x00";
+Magic_String :: "odindoc\x00"
 
 Header_Base :: struct {
 	magic: [8]byte,
@@ -45,10 +45,10 @@ Header :: struct {
 	types:    Array(Type),
 }
 
-File_Index   :: distinct u32le;
-Pkg_Index    :: distinct u32le;
-Entity_Index :: distinct u32le;
-Type_Index   :: distinct u32le;
+File_Index   :: distinct u32le
+Pkg_Index    :: distinct u32le
+Entity_Index :: distinct u32le
+Type_Index   :: distinct u32le
 
 
 Position :: struct {
@@ -56,7 +56,7 @@ Position :: struct {
 	line:   u32le,
 	column: u32le,
 	offset: u32le,
-};
+}
 
 File :: struct {
 	pkg:  Pkg_Index,
@@ -69,7 +69,7 @@ Pkg_Flag :: enum u32le {
 	Init    = 2,
 }
 
-Pkg_Flags :: distinct bit_set[Pkg_Flag; u32le];
+Pkg_Flags :: distinct bit_set[Pkg_Flag; u32le]
 
 Pkg :: struct {
 	fullpath: String,
@@ -108,7 +108,7 @@ Entity_Flag :: enum u32le {
 	Var_Static       = 10,
 }
 
-Entity_Flags :: distinct bit_set[Entity_Flag; u32le];
+Entity_Flags :: distinct bit_set[Entity_Flag; u32le]
 
 Entity :: struct {
 	kind:             Entity_Kind,
@@ -169,7 +169,7 @@ Type_Kind :: enum u32le {
 	Multi_Pointer      = 22,
 }
 
-Type_Elems_Cap :: 4;
+Type_Elems_Cap :: 4
 
 Type :: struct {
 	kind:  Type_Kind,
@@ -239,26 +239,26 @@ Type :: struct {
 	where_clauses: Array(String),
 }
 
-Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le];
+Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le]
 Type_Flag_Basic :: enum u32le {
 	Untyped = 1,
 }
 
-Type_Flags_Struct :: distinct bit_set[Type_Flag_Struct; u32le];
+Type_Flags_Struct :: distinct bit_set[Type_Flag_Struct; u32le]
 Type_Flag_Struct :: enum u32le {
 	Polymorphic = 0,
 	Packed      = 1,
 	Raw_Union   = 2,
 }
 
-Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32le];
+Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32le]
 Type_Flag_Union :: enum u32le {
 	Polymorphic = 0,
 	No_Nil      = 1,
 	Maybe       = 2,
 }
 
-Type_Flags_Proc :: distinct bit_set[Type_Flag_Proc; u32le];
+Type_Flags_Proc :: distinct bit_set[Type_Flag_Proc; u32le]
 Type_Flag_Proc :: enum u32le {
 	Polymorphic = 0,
 	Diverging   = 1,
@@ -267,7 +267,7 @@ Type_Flag_Proc :: enum u32le {
 	C_Vararg    = 4,
 }
 
-Type_Flags_Bit_Set :: distinct bit_set[Type_Flag_Bit_Set; u32le];
+Type_Flags_Bit_Set :: distinct bit_set[Type_Flag_Bit_Set; u32le]
 Type_Flag_Bit_Set :: enum u32le {
 	Range            = 1,
 	Op_Lt            = 2,
@@ -276,13 +276,13 @@ Type_Flag_Bit_Set :: enum u32le {
 }
 
 from_array :: proc(base: ^Header_Base, a: $A/Array($T)) -> []T {
-	s: mem.Raw_Slice;
-	s.data = rawptr(uintptr(base) + uintptr(a.offset));
-	s.len = int(a.length);
-	return transmute([]T)s;
+	s: mem.Raw_Slice
+	s.data = rawptr(uintptr(base) + uintptr(a.offset))
+	s.len = int(a.length)
+	return transmute([]T)s
 }
 from_string :: proc(base: ^Header_Base, s: String) -> string {
-	return string(from_array(base, s));
+	return string(from_array(base, s))
 }
 
 
@@ -298,22 +298,22 @@ Reader_Error :: enum {
 
 read_from_bytes :: proc(data: []byte) -> (h: ^Header, err: Reader_Error) {
 	if len(data) < size_of(Header_Base) {
-		err = .Header_Too_Small;
-		return;
+		err = .Header_Too_Small
+		return
 	}
-	header_base := (^Header_Base)(raw_data(data));
+	header_base := (^Header_Base)(raw_data(data))
 	if header_base.magic != Magic_String {
-		err = .Invalid_Magic;
-		return;
+		err = .Invalid_Magic
+		return
 	}
 	if len(data) < int(header_base.total_size) {
-		err = .Data_Too_Small;
-		return;
+		err = .Data_Too_Small
+		return
 	}
 	if header_base.version != Version_Type_Default {
-		err = .Invalid_Version;
-		return;
+		err = .Invalid_Version
+		return
 	}
-	h = (^Header)(header_base);
-	return;
+	h = (^Header)(header_base)
+	return
 }

@@ -48,34 +48,34 @@ Barrier :: struct {
 }
 
 barrier_init :: proc(b: ^Barrier, thread_count: int) {
-	blocking_mutex_init(&b.mutex);
-	condition_init(&b.cond, &b.mutex);
-	b.index = 0;
-	b.generation_id = 0;
-	b.thread_count = thread_count;
+	blocking_mutex_init(&b.mutex)
+	condition_init(&b.cond, &b.mutex)
+	b.index = 0
+	b.generation_id = 0
+	b.thread_count = thread_count
 }
 
 barrier_destroy :: proc(b: ^Barrier) {
-	blocking_mutex_destroy(&b.mutex);
-	condition_destroy(&b.cond);
+	blocking_mutex_destroy(&b.mutex)
+	condition_destroy(&b.cond)
 }
 
 // Block the current thread until all threads have rendezvoused
 // Barrier can be reused after all threads rendezvoused once, and can be used continuously
 barrier_wait :: proc(b: ^Barrier) -> (is_leader: bool) {
-	blocking_mutex_lock(&b.mutex);
-	defer blocking_mutex_unlock(&b.mutex);
-	local_gen := b.generation_id;
-	b.index += 1;
+	blocking_mutex_lock(&b.mutex)
+	defer blocking_mutex_unlock(&b.mutex)
+	local_gen := b.generation_id
+	b.index += 1
 	if b.index < b.thread_count {
 		for local_gen == b.generation_id && b.index < b.thread_count {
-			condition_wait_for(&b.cond);
+			condition_wait_for(&b.cond)
 		}
-		return false;
+		return false
 	}
 
-	b.index = 0;
-	b.generation_id += 1;
-	condition_broadcast(&b.cond);
-	return true;
+	b.index = 0
+	b.generation_id += 1
+	condition_broadcast(&b.cond)
+	return true
 }

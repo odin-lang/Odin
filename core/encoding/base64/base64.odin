@@ -16,9 +16,9 @@ ENC_TABLE := [64]byte {
     'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
     'w', 'x', 'y', 'z', '0', '1', '2', '3',
     '4', '5', '6', '7', '8', '9', '+', '/',
-};
+}
 
-PADDING :: '=';
+PADDING :: '='
 
 DEC_TABLE := [128]int {
     -1, -1, -1, -1, -1, -1, -1, -1,
@@ -37,61 +37,61 @@ DEC_TABLE := [128]int {
     33, 34, 35, 36, 37, 38, 39, 40,
     41, 42, 43, 44, 45, 46, 47, 48,
     49, 50, 51, -1, -1, -1, -1, -1,
-};
+}
 
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string #no_bounds_check {
-    length := len(data);
+    length := len(data)
     if length == 0 {
-        return "";
+        return ""
     }
 
-    out_length := ((4 * length / 3) + 3) &~ 3;
-    out := make([]byte, out_length, allocator);
+    out_length := ((4 * length / 3) + 3) &~ 3
+    out := make([]byte, out_length, allocator)
 
-    c0, c1, c2, block: int;
+    c0, c1, c2, block: int
 
     for i, d := 0, 0; i < length; i, d = i + 3, d + 4 {
-        c0, c1, c2 = int(data[i]), -1, -1;
+        c0, c1, c2 = int(data[i]), -1, -1
 
         if i + 1 < length { c1 = int(data[i + 1]); }
         if i + 2 < length { c2 = int(data[i + 2]); }
 
-        block = (c0 << 16) | (max(c1, 0) << 8) | max(c2, 0);
+        block = (c0 << 16) | (max(c1, 0) << 8) | max(c2, 0)
 
-        out[d]     = ENC_TBL[block >> 18 & 63];
-        out[d + 1] = ENC_TBL[block >> 12 & 63];
-        out[d + 2] = c1 == -1 ? PADDING : ENC_TBL[block >> 6 & 63];
-        out[d + 3] = c2 == -1 ? PADDING : ENC_TBL[block & 63];
+        out[d]     = ENC_TBL[block >> 18 & 63]
+        out[d + 1] = ENC_TBL[block >> 12 & 63]
+        out[d + 2] = c1 == -1 ? PADDING : ENC_TBL[block >> 6 & 63]
+        out[d + 3] = c2 == -1 ? PADDING : ENC_TBL[block & 63]
     }
-    return string(out);
+    return string(out)
 }
 
 decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> []byte #no_bounds_check {
-    length := len(data);
+    length := len(data)
     if length == 0 {
-        return nil;
+        return nil
     }
 
-    pad_count := data[length - 1] == PADDING ? (data[length - 2] == PADDING ? 2 : 1) : 0;
-    out_length := ((length * 6) >> 3) - pad_count;
-    out := make([]byte, out_length, allocator);
+    pad_count := data[length - 1] == PADDING ? (data[length - 2] == PADDING ? 2 : 1) : 0
+    out_length := ((length * 6) >> 3) - pad_count
+    out := make([]byte, out_length, allocator)
 
-    c0, c1, c2, c3: int;
-    b0, b1, b2: int;
+    c0, c1, c2, c3: int
+    b0, b1, b2: int
 
     for i, j := 0, 0; i < length; i, j = i + 4, j + 3 {
-        c0 = DEC_TBL[data[i]];
-        c1 = DEC_TBL[data[i + 1]];
-        c2 = DEC_TBL[data[i + 2]];
-        c3 = DEC_TBL[data[i + 3]];
+        c0 = DEC_TBL[data[i]]
+        c1 = DEC_TBL[data[i + 1]]
+        c2 = DEC_TBL[data[i + 2]]
+        c3 = DEC_TBL[data[i + 3]]
 
-        b0 = (c0 << 2) | (c1 >> 4);
-        b1 = (c1 << 4) | (c2 >> 2);
-        b2 = (c2 << 6) | c3;
+        b0 = (c0 << 2) | (c1 >> 4)
+        b1 = (c1 << 4) | (c2 >> 2)
+        b2 = (c2 << 6) | c3
 
-        out[j]     = byte(b0);
-        out[j + 1] = byte(b1);
-        out[j + 2] = byte(b2);
+        out[j]     = byte(b0)
+        out[j + 1] = byte(b1)
+        out[j + 2] = byte(b2)
     }
-    return out;
+    return out
 }

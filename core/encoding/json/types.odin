@@ -6,13 +6,13 @@ Specification :: enum {
 	// MJSON, // http://bitsquid.blogspot.com/2009/09/json-configuration-data.html
 }
 
-Null    :: distinct rawptr;
-Integer :: i64;
-Float   :: f64;
-Boolean :: bool;
-String  :: string;
-Array   :: distinct [dynamic]Value;
-Object  :: distinct map[string]Value;
+Null    :: distinct rawptr
+Integer :: i64
+Float   :: f64
+Boolean :: bool
+String  :: string
+Array   :: distinct [dynamic]Value
+Object  :: distinct map[string]Value
 
 Value :: union {
 	Null,
@@ -50,17 +50,17 @@ destroy_value :: proc(value: Value) {
 	#partial switch v in value {
 	case Object:
 		for key, elem in v {
-			delete(key);
-			destroy_value(elem);
+			delete(key)
+			destroy_value(elem)
 		}
-		delete(v);
+		delete(v)
 	case Array:
 		for elem in v {
-			destroy_value(elem);
+			destroy_value(elem)
 		}
-		delete(v);
+		delete(v)
 	case String:
-		delete(v);
+		delete(v)
 	}
 }
 

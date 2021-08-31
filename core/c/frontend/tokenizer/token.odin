@@ -80,29 +80,29 @@ Token :: struct {
 	origin:   ^Token,
 }
 
-Is_Keyword_Proc :: #type proc(tok: ^Token) -> bool;
+Is_Keyword_Proc :: #type proc(tok: ^Token) -> bool
 
 copy_token :: proc(tok: ^Token) -> ^Token {
-	t := new_clone(tok^);
-	t.next = nil;
-	return t;
+	t := new_clone(tok^)
+	t.next = nil
+	return t
 }
 
 new_eof :: proc(tok: ^Token) -> ^Token {
-	t := new_clone(tok^);
-	t.kind = .EOF;
-	t.lit = "";
-	return t;
+	t := new_clone(tok^)
+	t.kind = .EOF
+	t.lit = ""
+	return t
 }
 
 default_is_keyword :: proc(tok: ^Token) -> bool {
 	if tok.kind == .Keyword {
-		return true;
+		return true
 	}
 	if len(tok.lit) > 0 {
-		return default_keyword_set[tok.lit];
+		return default_keyword_set[tok.lit]
 	}
-	return false;
+	return false
 }
 
 
@@ -117,7 +117,7 @@ token_name := [Token_Kind]string {
 	.PP_Number = "preprocessor number",
 	.Comment   = "comment",
 	.EOF       = "eof",
-};
+}
 
 default_keyword_set := map[string]bool{
 	"auto"          = true,
@@ -166,4 +166,4 @@ default_keyword_set := map[string]bool{
 	"__restrict__"  = true,
 	"__thread"      = true,
 	"__attribute__" = true,
-};
+}

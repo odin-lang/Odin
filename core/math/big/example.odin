@@ -47,186 +47,186 @@ MAX_ITERATIONS_ROOT_N,
 FACTORIAL_MAX_N,
 FACTORIAL_BINARY_SPLIT_CUTOFF,
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
-);
+)
 
 }
 
 print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline := true, print_extra_info := false) {
-	assert_if_nil(a);
+	assert_if_nil(a)
 
-	as, err := itoa(a, base);
-	defer delete(as);
+	as, err := itoa(a, base)
+	defer delete(as)
 
-	cb := internal_count_bits(a);
+	cb := internal_count_bits(a)
 	if print_name {
-		fmt.printf("%v", name);
+		fmt.printf("%v", name)
 	}
 	if err != nil {
-		fmt.printf("%v (error: %v | %v)", name, err, a);
+		fmt.printf("%v (error: %v | %v)", name, err, a)
 	}
-	fmt.printf("%v", as);
+	fmt.printf("%v", as)
 	if print_extra_info {
-		fmt.printf(" (base: %v, bits: %v (digits: %v), flags: %v)", base, cb, a.used, a.flags);
+		fmt.printf(" (base: %v, bits: %v (digits: %v), flags: %v)", base, cb, a.used, a.flags)
 	}
 	if newline {
-		fmt.println();
+		fmt.println()
 	}
 }
 
 int_to_byte :: proc(v: ^Int) {
-	err: Error;
-	size: int;
-	print("v: ", v);
-	fmt.println();
+	err: Error
+	size: int
+	print("v: ", v)
+	fmt.println()
 
-	t := &Int{};
-	defer destroy(t);
+	t := &Int{}
+	defer destroy(t)
 
 	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b1 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_big(v, b1);
-	int_from_bytes_big(t, b1);
-	fmt.printf("big: %v | err: %v\n", b1, err);
+	b1 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_big(v, b1)
+	int_from_bytes_big(t, b1)
+	fmt.printf("big: %v | err: %v\n", b1, err)
 
-	int_from_bytes_big(t, b1);
+	int_from_bytes_big(t, b1)
 	if internal_cmp_mag(t, v) != 0 {
-		print("\tError parsing t: ", t);
+		print("\tError parsing t: ", t)
 	}
 
 	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b2 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_big_python(v, b2);
-	fmt.printf("big python: %v | err: %v\n", b2, err);
+	b2 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_big_python(v, b2)
+	fmt.printf("big python: %v | err: %v\n", b2, err)
 
 	if err == nil {
-		int_from_bytes_big_python(t, b2);
+		int_from_bytes_big_python(t, b2)
 		if internal_cmp_mag(t, v) != 0 {
-			print("\tError parsing t: ", t);
+			print("\tError parsing t: ", t)
 		}
 	}
 
 	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b3 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_big(v, b3, true);
-	fmt.printf("big signed: %v | err: %v\n", b3, err);
+	b3 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_big(v, b3, true)
+	fmt.printf("big signed: %v | err: %v\n", b3, err)
 
-	int_from_bytes_big(t, b3, true);
+	int_from_bytes_big(t, b3, true)
 	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t);
+		print("\tError parsing t: ", t)
 	}
 
 	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b4 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_big_python(v, b4, true);
-	fmt.printf("big signed python: %v | err: %v\n", b4, err);
+	b4 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_big_python(v, b4, true)
+	fmt.printf("big signed python: %v | err: %v\n", b4, err)
 
-	int_from_bytes_big_python(t, b4, true);
+	int_from_bytes_big_python(t, b4, true)
 	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t);
+		print("\tError parsing t: ", t)
 	}
 }
 
 int_to_byte_little :: proc(v: ^Int) {
-	err: Error;
-	size: int;
-	print("v: ", v);
-	fmt.println();
+	err: Error
+	size: int
+	print("v: ", v)
+	fmt.println()
 
-	t := &Int{};
-	defer destroy(t);
+	t := &Int{}
+	defer destroy(t)
 
 	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b1 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_little(v, b1);
-	fmt.printf("little: %v | err: %v\n", b1, err);
+	b1 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_little(v, b1)
+	fmt.printf("little: %v | err: %v\n", b1, err)
 
-	int_from_bytes_little(t, b1);
+	int_from_bytes_little(t, b1)
 	if internal_cmp_mag(t, v) != 0 {
-		print("\tError parsing t: ", t);
+		print("\tError parsing t: ", t)
 	}
 
 	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b2 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_little_python(v, b2);
-	fmt.printf("little python: %v | err: %v\n", b2, err);
+	b2 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_little_python(v, b2)
+	fmt.printf("little python: %v | err: %v\n", b2, err)
 
 	if err == nil {
-		int_from_bytes_little_python(t, b2);
+		int_from_bytes_little_python(t, b2)
 		if internal_cmp_mag(t, v) != 0 {
-			print("\tError parsing t: ", t);
+			print("\tError parsing t: ", t)
 		}
 	}
 
 	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b3 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_little(v, b3, true);
-	fmt.printf("little signed: %v | err: %v\n", b3, err);
+	b3 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_little(v, b3, true)
+	fmt.printf("little signed: %v | err: %v\n", b3, err)
 
-	int_from_bytes_little(t, b3, true);
+	int_from_bytes_little(t, b3, true)
 	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t);
+		print("\tError parsing t: ", t)
 	}
 
 	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err);
-		return;
+		fmt.printf("int_to_bytes_size returned: %v\n", err)
+		return
 	}
-	b4 := make([]u8, size, context.temp_allocator);
-	err = int_to_bytes_little_python(v, b4, true);
-	fmt.printf("little signed python: %v | err: %v\n", b4, err);
+	b4 := make([]u8, size, context.temp_allocator)
+	err = int_to_bytes_little_python(v, b4, true)
+	fmt.printf("little signed python: %v | err: %v\n", b4, err)
 
-	int_from_bytes_little_python(t, b4, true);
+	int_from_bytes_little_python(t, b4, true)
 	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t);
+		print("\tError parsing t: ", t)
 	}
 }
 
 demo :: proc() {
-	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(a, b, c, d, e, f);
+	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
+	defer destroy(a, b, c, d, e, f)
 }
 
 main :: proc() {
-	ta := mem.Tracking_Allocator{};
-	mem.tracking_allocator_init(&ta, context.allocator);
-	context.allocator = mem.tracking_allocator(&ta);
+	ta := mem.Tracking_Allocator{}
+	mem.tracking_allocator_init(&ta, context.allocator)
+	context.allocator = mem.tracking_allocator(&ta)
 
-	demo();
+	demo()
 
-	print_configation();
+	print_configation()
 
-	print_timings();
+	print_timings()
 
 	if len(ta.allocation_map) > 0 {
 		for _, v in ta.allocation_map {
-			fmt.printf("Leaked %v bytes @ %v\n", v.size, v.location);
+			fmt.printf("Leaked %v bytes @ %v\n", v.size, v.location)
 		}
 	}
 	if len(ta.bad_free_array) > 0 {
-		fmt.println("Bad frees:");
+		fmt.println("Bad frees:")
 		for v in ta.bad_free_array {
-			fmt.println(v);
+			fmt.println(v)
 		}
 	}
 }

@@ -22,37 +22,37 @@ package math_big
 	2's complement `and`, returns `dest = a & b;`
 */
 int_and :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(dest, a, b);
-	context.allocator = allocator;
+	assert_if_nil(dest, a, b)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return;
-	return #force_inline internal_int_and(dest, a, b);
+	internal_clear_if_uninitialized(a, b) or_return
+	return #force_inline internal_int_and(dest, a, b)
 }
-and :: proc { int_and, };
+and :: proc { int_and, }
 
 /*
 	2's complement `or`, returns `dest = a | b;`
 */
 int_or :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(dest, a, b);
-	context.allocator = allocator;
+	assert_if_nil(dest, a, b)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return;
-	return #force_inline internal_int_or(dest, a, b);
+	internal_clear_if_uninitialized(a, b) or_return
+	return #force_inline internal_int_or(dest, a, b)
 }
-or :: proc { int_or, };
+or :: proc { int_or, }
 
 /*
 	2's complement `xor`, returns `dest = a ^ b;`
 */
 int_xor :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(dest, a, b);
-	context.allocator = allocator;
+	assert_if_nil(dest, a, b)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return;
-	return #force_inline internal_int_xor(dest, a, b);
+	internal_clear_if_uninitialized(a, b) or_return
+	return #force_inline internal_int_xor(dest, a, b)
 }
-xor :: proc { int_xor, };
+xor :: proc { int_xor, }
 
 /*
 	dest = ~src
@@ -61,31 +61,31 @@ int_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err:
 	/*
 		Check that `src` and `dest` are usable.
 	*/
-	assert_if_nil(dest, src);
-	context.allocator = allocator;
+	assert_if_nil(dest, src)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return;
-	return #force_inline internal_int_complement(dest, src);
+	internal_clear_if_uninitialized(dest, src) or_return
+	return #force_inline internal_int_complement(dest, src)
 }
-complement :: proc { int_complement, };
+complement :: proc { int_complement, }
 
 /*
 	quotient, remainder := numerator >> bits;
 	`remainder` is allowed to be passed a `nil`, in which case `mod` won't be computed.
 */
 int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(quotient, numerator);
-	context.allocator = allocator;
+	assert_if_nil(quotient, numerator)
+	context.allocator = allocator
 
 	if err = internal_clear_if_uninitialized(quotient, numerator);  err != nil { return err; }
-	return #force_inline internal_int_shrmod(quotient, remainder, numerator, bits);
+	return #force_inline internal_int_shrmod(quotient, remainder, numerator, bits)
 }
-shrmod :: proc { int_shrmod, };
+shrmod :: proc { int_shrmod, }
 
 int_shr :: proc(dest, source: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
-	return #force_inline shrmod(dest, nil, source, bits, allocator);
+	return #force_inline shrmod(dest, nil, source, bits, allocator)
 }
-shr :: proc { int_shr, };
+shr :: proc { int_shr, }
 
 /*
 	Shift right by `digits` * _DIGIT_BITS bits.
@@ -94,38 +94,38 @@ int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocato
 	/*
 		Check that `quotient` is usable.
 	*/
-	assert_if_nil(quotient);
-	context.allocator = allocator;
+	assert_if_nil(quotient)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(quotient) or_return;
-	return #force_inline internal_int_shr_digit(quotient, digits);
+	internal_clear_if_uninitialized(quotient) or_return
+	return #force_inline internal_int_shr_digit(quotient, digits)
 }
-shr_digit :: proc { int_shr_digit, };
+shr_digit :: proc { int_shr_digit, }
 
 /*
 	Shift right by a certain bit count with sign extension.
 */
 int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(dest, src);
-	context.allocator = allocator;
+	assert_if_nil(dest, src)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return;
-	return #force_inline internal_int_shr_signed(dest, src, bits);
+	internal_clear_if_uninitialized(dest, src) or_return
+	return #force_inline internal_int_shr_signed(dest, src, bits)
 }
 
-shr_signed :: proc { int_shr_signed, };
+shr_signed :: proc { int_shr_signed, }
 
 /*
 	Shift left by a certain bit count.
 */
 int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(dest, src);
-	context.allocator = allocator;
+	assert_if_nil(dest, src)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return;
-	return #force_inline internal_int_shl(dest, src, bits);
+	internal_clear_if_uninitialized(dest, src) or_return
+	return #force_inline internal_int_shl(dest, src, bits)
 }
-shl :: proc { int_shl, };
+shl :: proc { int_shl, }
 
 
 /*
@@ -135,10 +135,10 @@ int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocato
 	/*
 		Check that `quotient` is usable.
 	*/
-	assert_if_nil(quotient);
-	context.allocator = allocator;
+	assert_if_nil(quotient)
+	context.allocator = allocator
 
-	internal_clear_if_uninitialized(quotient) or_return;
-	return #force_inline internal_int_shl_digit(quotient, digits);
+	internal_clear_if_uninitialized(quotient) or_return
+	return #force_inline internal_int_shl_digit(quotient, digits)
 }
 shl_digit :: proc { int_shl_digit, };
