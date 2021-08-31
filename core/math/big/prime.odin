@@ -10,6 +10,8 @@
 */
 package math_big
 
+import "core:mem"
+
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
@@ -781,16 +783,10 @@ internal_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 		}
 	} else if redmode == 1 {
 		/*
-		if (MP_HAS(MP_DR_SETUP) && MP_HAS(MP_DR_REDUCE)) {
-			/* setup DR reduction for moduli of the form B**k - b */
-			mp_dr_setup(P, &mp);
-			redux = mp_dr_reduce;
-		} else {
-			err = MP_VAL;
-			goto LBL_M;
-		}
+			Setup DR reduction for moduli of the form B**k - b.
 		*/
-		return .Unimplemented;
+		rho = internal_int_dr_setup(P);
+		redux = internal_int_dr_reduce;
 	} else {
 		/*
 			Setup DR reduction for moduli of the form 2**k - b.
@@ -960,6 +956,106 @@ internal_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 		redux(res, P, rho)                                           or_return;
 	}
 
+	return nil;
+}
+
+/*
+	Determines the setup value.
+	Assumes `a` to not be `nil` and to have been initialized.
+*/
+internal_int_dr_setup :: proc(a: ^Int) -> (d: DIGIT) {
+	/*
+		The casts are required if _DIGIT_BITS is one less than
+		the number of bits in a DIGIT [e.g. _DIGIT_BITS==31].
+	*/
+	return DIGIT((1 << _DIGIT_BITS) - a.digit[0]);
+}
+
+/*
+	Determines if a number is a valid DR modulus.
+	Assumes `a` to not be `nil` and to have been initialized.
+*/
+internal_dr_is_modulus :: proc(a: ^Int) -> (res: bool) {
+	/*
+		Must be at least two digits.
+	*/
+	if a.used < 2 { return false; }
+
+	/*
+		Must be of the form b**k - a [a <= b] so all but the first digit must be equal to -1 (mod b).
+	*/
+	for ix := 1; ix < a.used; ix += 1 {
+		if a.digit[ix] != _MASK {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+	Reduce "x" in place modulo "n" using the Diminished Radix algorithm.
+	Based on algorithm from the paper
+
+		"Generating Efficient Primes for Discrete Log Cryptosystems"
+					Chae Hoon Lim, Pil Joong Lee,
+			POSTECH Information Research Laboratories
+
+	The modulus must be of a special format [see manual].
+	Has been modified to use algorithm 7.10 from the LTM book instead
+
+	Input x must be in the range 0 <= x <= (n-1)**2
+	Assumes `x` and `n` to not be `nil` and to have been initialized.
+*/
+internal_int_dr_reduce :: proc(x, n: ^Int, k: DIGIT, allocator := context.allocator) -> (err: Error) {
+	/*
+		m = digits in modulus.
+	*/
+	m := n.used;
+
+	/*
+		Ensure that "x" has at least 2m digits.
+	*/
+	internal_grow(x, m + m)                                          or_return;
+
+	/*
+		Top of loop, this is where the code resumes if another reduction pass is required.
+	*/
+	for {
+		i: int;
+		mu := DIGIT(0);
+
+		/*
+			Compute (x mod B**m) + k * [x/B**m] inline and inplace.
+		*/
+		for i = 0; i < m; i += 1 {
+			r         := _WORD(x.digit[i + m]) * _WORD(k) + _WORD(x.digit[i] + mu);
+			x.digit[i] = DIGIT(r & _WORD(_MASK));
+			mu         = DIGIT(r >> _WORD(_DIGIT_BITS));
+		}
+
+		/*
+			Set final carry.
+		*/
+		x.digit[i] = mu;
+
+		/*
+			Zero words above m.
+		*/
+		mem.zero_slice(x.digit[m + 1:][:x.used - m]);
+
+		/*
+			Clamp, sub and return.
+		*/
+		internal_clamp(x)                                            or_return;
+
+		/*
+			If x >= n then subtract and reduce again.
+			Each successive "recursion" makes the input smaller and smaller.
+		*/
+		if internal_cmp_mag(x, n) == -1 { break; }
+
+		internal_sub(x, x, n)                                        or_return;
+	}
 	return nil;
 }
 
