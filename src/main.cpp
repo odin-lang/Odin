@@ -2054,7 +2054,7 @@ int strip_semicolons(Parser *parser) {
 		AstPackage *pkg = parser->packages[i];
 		file_count += pkg->files.count;
 	}
-	gb_printf_err("File count: %td\n", file_count);
+	gb_printf_err("File count to be stripped of unneeded tokens: %td\n", file_count);
 	
 	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
 	
@@ -2096,6 +2096,7 @@ int strip_semicolons(Parser *parser) {
 		i64 written = 0;
 		defer (gb_file_truncate(&f, written));
 		
+		debugf("Write file with stripped tokens: %s\n", filename);
 		err = write_file_with_stripped_tokens(&f, file->file, &written);
 		if (err) {
 			break;
@@ -2122,14 +2123,17 @@ int strip_semicolons(Parser *parser) {
 		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
 		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
 		
+		debugf("Copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
 			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 			failed = true;
 			break;
 		}
 		
+		debugf("Copy '%s' to '%s'\n", new_fullpath, old_fullpath);
 		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
 			gb_printf_err("failed to move '%s' to '%s' %d\n", old_fullpath, new_fullpath, GetLastError());
+			debugf("Copy '%s' to '%s'\n", old_fullpath_backup, old_fullpath);
 			if (!gb_file_copy(old_fullpath_backup, old_fullpath, false)) {
 				gb_printf_err("failed to restore '%s' from '%s'\n", old_fullpath, old_fullpath_backup);
 			}
@@ -2137,6 +2141,7 @@ int strip_semicolons(Parser *parser) {
 			break;
 		}
 		
+		debugf("Remove '%s'\n", old_fullpath_backup);
 		if (!gb_file_remove(old_fullpath_backup)) {
 			gb_printf_err("failed to remove '%s'\n", old_fullpath_backup);
 		}
@@ -2149,9 +2154,12 @@ int strip_semicolons(Parser *parser) {
 			auto *file = &generated_files[i];
 			char const *filename = nullptr;
 			filename = cast(char const *)file->new_fullpath.text;
+			
+			debugf("Remove '%s'\n", filename);
 			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
 			
 			filename = cast(char const *)file->old_fullpath_backup.text;
+			debugf("Remove '%s'\n", filename);
 			if (gb_file_exists(filename) && !gb_file_remove(filename)) {
 				if (i < overwritten_files) {
 					gb_printf_err("unable to delete file %s", filename);
@@ -2160,6 +2168,8 @@ int strip_semicolons(Parser *parser) {
 			}
 		}
 	}
+	
+	gb_printf_err("Files stripped of unneeded token: %td\n", file_count);
 	
 	
 	return cast(int)failed;
