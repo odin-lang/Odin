@@ -816,9 +816,9 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 	x0.used = B
 	x1.used = src.used - B
 
-	#force_inline internal_copy_digits(x0, src, x0.used);
-	#force_inline mem.copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used);
-	#force_inline internal_clamp(x0);
+	#force_inline internal_copy_digits(x0, src, x0.used)
+	#force_inline mem.copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used)
+	#force_inline internal_clamp(x0)
 
 	/*
 		Now calc the products x0*x0 and x1*x1.
@@ -882,9 +882,9 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	a1.used = B
 	a2.used = src.used - 2 * B
 
-	#force_inline mem.copy_non_overlapping(&a0.digit[0], &src.digit[    0], size_of(DIGIT) * a0.used);
-	#force_inline mem.copy_non_overlapping(&a1.digit[0], &src.digit[    B], size_of(DIGIT) * a1.used);
-	#force_inline mem.copy_non_overlapping(&a2.digit[0], &src.digit[2 * B], size_of(DIGIT) * a2.used);
+	#force_inline mem.copy_non_overlapping(&a0.digit[0], &src.digit[    0], size_of(DIGIT) * a0.used)
+	#force_inline mem.copy_non_overlapping(&a1.digit[0], &src.digit[    B], size_of(DIGIT) * a1.used)
+	#force_inline mem.copy_non_overlapping(&a2.digit[0], &src.digit[2 * B], size_of(DIGIT) * a2.used)
 
 	internal_clamp(a0)
 	internal_clamp(a1)
@@ -1700,17 +1700,17 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 		}
 
 		low = high
-		#force_inline internal_copy(bracket_low, bracket_high) or_return;
+		#force_inline internal_copy(bracket_low, bracket_high) or_return
 		high <<= 1
-		#force_inline internal_sqr(bracket_high, bracket_high) or_return;
+		#force_inline internal_sqr(bracket_high, bracket_high) or_return
 	}
 
 	for (high - low) > 1 {
 		mid := (high + low) >> 1
 
-		#force_inline internal_pow(t, bi_base, mid - low) or_return;
+		#force_inline internal_pow(t, bi_base, mid - low) or_return
 
-		#force_inline internal_mul(bracket_mid, bracket_low, t) or_return;
+		#force_inline internal_mul(bracket_mid, bracket_low, t) or_return
 
 		mc := #force_inline internal_cmp(a, bracket_mid)
 		switch mc {
@@ -2209,7 +2209,7 @@ _private_int_rem_128 := [?]DIGIT{
 	1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 }
-#assert(128 * size_of(DIGIT) == size_of(_private_int_rem_128));
+#assert(128 * size_of(DIGIT) == size_of(_private_int_rem_128))
 
 _private_int_rem_105 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1,
@@ -2220,7 +2220,7 @@ _private_int_rem_105 := [?]DIGIT{
 	1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1,
 	1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1,
 }
-#assert(105 * size_of(DIGIT) == size_of(_private_int_rem_105));
+#assert(105 * size_of(DIGIT) == size_of(_private_int_rem_105))
 
 _private_prime_table := [?]DIGIT{
 	0x0002, 0x0003, 0x0005, 0x0007, 0x000B, 0x000D, 0x0011, 0x0013,
@@ -2259,7 +2259,7 @@ _private_prime_table := [?]DIGIT{
 	0x05F3, 0x05FB, 0x0607, 0x060D, 0x0611, 0x0617, 0x061F, 0x0623,
 	0x062B, 0x062F, 0x063D, 0x0641, 0x0647, 0x0649, 0x064D, 0x0653,
 }
-#assert(256 * size_of(DIGIT) == size_of(_private_prime_table));
+#assert(256 * size_of(DIGIT) == size_of(_private_prime_table))
 
 when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	_factorial_table := [35]_WORD{
@@ -2323,7 +2323,7 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 /* f(19): */                               121_645_100_408_832_000,
 /* f(20): */                             2_432_902_008_176_640_000,
 	}
-};
+}
 
 /*
 	=========================  End of private tables  ========================

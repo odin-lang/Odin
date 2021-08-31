@@ -75,7 +75,7 @@ atomic_compare_exchange :: #force_inline proc(dst: ^$T, old, new: T, $success, $
 		when success == .Sequentially_Consistent { return intrinsics.atomic_cxchg(dst, old, new); }
 		else { #panic("an unknown ordering combination"); }
 	} else when failure == .Acquire_Release {
-		#panic("there is not such thing as an acquire/release failure ordering");
+		#panic("there is not such thing as an acquire/release failure ordering")
 	} else when failure == .Release {
 		when success == .Acquire { return instrinsics.atomic_cxchg_failacq(dst, old, new); }
 		else { #panic("an unknown ordering combination"); }
@@ -101,7 +101,7 @@ atomic_compare_exchange_weak :: #force_inline proc(dst: ^$T, old, new: T, $succe
 		when success == .Sequentially_Consistent { return intrinsics.atomic_cxchgweak(dst, old, new); }
 		else { #panic("an unknown ordering combination"); }
 	} else when failure == .Acquire_Release {
-		#panic("there is not such thing as an acquire/release failure ordering");
+		#panic("there is not such thing as an acquire/release failure ordering")
 	} else when failure == .Release {
 		when success == .Acquire { return intrinsics.atomic_cxchgweak_failacq(dst, old, new); }
 		else { #panic("an unknown ordering combination"); }

@@ -221,7 +221,7 @@ mul_uint :: proc(x, y: uint) -> (hi, lo: uint) {
 	when size_of(uint) == size_of(u32) {
 		a, b := mul_u32(u32(x), u32(y))
 	} else {
-		#assert(size_of(uint) == size_of(u64));
+		#assert(size_of(uint) == size_of(u64))
 		a, b := mul_u64(u64(x), u64(y))
 	}
 	return uint(a), uint(b)
@@ -285,7 +285,7 @@ div_uint :: proc(hi, lo, y: uint) -> (quo, rem: uint) {
 	when size_of(uint) == size_of(u32) {
 		a, b := div_u32(u32(hi), u32(lo), u32(y))
 	} else {
-		#assert(size_of(uint) == size_of(u64));
+		#assert(size_of(uint) == size_of(u64))
 		a, b := div_u64(u64(hi), u64(lo), u64(y))
 	}
 	return uint(a), uint(b)

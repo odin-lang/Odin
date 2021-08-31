@@ -580,7 +580,7 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 	} else when size_of(S) == 16 {
 		return int(intrinsics.count_ones(transmute(u128)s))
 	} else {
-		#panic("Unhandled card bit_set size");
+		#panic("Unhandled card bit_set size")
 	}
 }
 

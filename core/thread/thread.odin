@@ -23,7 +23,7 @@ Thread :: struct {
 	creation_allocator: mem.Allocator,
 }
 
-#assert(size_of(Thread{}.user_index) == size_of(uintptr));
+#assert(size_of(Thread{}.user_index) == size_of(uintptr))
 
 Thread_Priority :: enum {
 	Normal,

@@ -510,7 +510,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 		*/
 		reserve(&z.output.buf, expected_output_size)
 		resize (&z.output.buf, expected_output_size)
-	};
+	}
 
 	if len(z.output.buf) != expected_output_size {
 		return .Resize_Failed

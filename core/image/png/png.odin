@@ -109,7 +109,7 @@ IHDR :: struct #packed {
 	interlace_method: Interlace_Method,
 }
 IHDR_SIZE :: size_of(IHDR)
-#assert (IHDR_SIZE == 13);
+#assert (IHDR_SIZE == 13)
 
 Color_Value :: enum u8 {
 	Paletted = 0, // 1 << 0 = 1
@@ -162,7 +162,7 @@ tIME :: struct #packed {
 	minute: u8,
 	second: u8,
 }
-#assert(size_of(tIME) == 7);
+#assert(size_of(tIME) == 7)
 
 CIE_1931_Raw :: struct #packed {
 	x: u32be,
@@ -180,7 +180,7 @@ cHRM_Raw :: struct #packed {
 	g: CIE_1931_Raw,
 	b: CIE_1931_Raw,
 }
-#assert(size_of(cHRM_Raw) == 32);
+#assert(size_of(cHRM_Raw) == 32)
 
 cHRM :: struct #packed {
 	w: CIE_1931,
@@ -188,19 +188,19 @@ cHRM :: struct #packed {
 	g: CIE_1931,
 	b: CIE_1931,
 }
-#assert(size_of(cHRM) == 32);
+#assert(size_of(cHRM) == 32)
 
 gAMA :: struct {
 	gamma_100k: u32be, // Gamma * 100k
 }
-#assert(size_of(gAMA) == 4);
+#assert(size_of(gAMA) == 4)
 
 pHYs :: struct #packed {
 	ppu_x: u32be,
 	ppu_y: u32be,
 	unit:  pHYs_Unit,
 }
-#assert(size_of(pHYs) == 9);
+#assert(size_of(pHYs) == 9)
 
 pHYs_Unit :: enum u8 {
 	Unknown = 0,
