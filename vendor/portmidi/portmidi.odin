@@ -5,7 +5,7 @@ import "core:strings"
 
 when ODIN_OS == "windows" do foreign import lib "portmidi.lib"
 
-#assert(size_of(b32) == size_of(c.int));
+#assert(size_of(b32) == size_of(c.int))
 
 DEFAULT_SYSEX_BUFFER_SIZE :: 1024
 

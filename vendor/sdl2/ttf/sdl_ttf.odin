@@ -10,7 +10,7 @@ when ODIN_OS == "freebsd" do foreign import lib "system:SDL2_ttf"
 
 bool :: SDL.bool
 
-#assert(size_of(rune) == size_of(u32));
+#assert(size_of(rune) == size_of(u32))
 
 MAJOR_VERSION :: 2
 MINOR_VERSION :: 0
