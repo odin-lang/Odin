@@ -1559,31 +1559,14 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	}
 
 	if (s != nullptr) {
-		switch (f->curr_token.kind) {
-		case Token_CloseBrace:
-		case Token_CloseParen:
-		case Token_else:
-		case Token_EOF:
-			return;
-
-		default:
-			if (is_semicolon_optional_for_node(f, s)) {
-				return;
-			}
-			break;
-		}
-		String node_string = ast_strings[s->kind];
-		String p = token_to_string(f->curr_token);
-		syntax_error(prev_token, "Expected ';' after %.*s, got %.*s",
-		             LIT(node_string), LIT(p));
-	} else {
-		switch (f->curr_token.kind) {
-		case Token_EOF:
-			return;
-		}
-		String p = token_to_string(f->curr_token);
-		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
+		return;
+	} 
+	switch (f->curr_token.kind) {
+	case Token_EOF:
+		return;
 	}
+	String p = token_to_string(f->curr_token);
+	syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
 	fix_advance_to_next_stmt(f);
 }
 
@@ -4590,7 +4573,7 @@ Ast *parse_stmt(AstFile *f) {
 
 	case Token_Semicolon:
 		s = ast_empty_stmt(f, token);
-		advance_token(f);
+		expect_semicolon(f, nullptr);
 		return s;
 	}
 
