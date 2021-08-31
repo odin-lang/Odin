@@ -1308,11 +1308,11 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_InsertSemicolon:
 							gb_printf_err("-insert-semicolon flag is not required any more\n");
+							bad_flags = true;
 							break;
 
 						case BuildFlag_StrictStyle:
-							gb_printf_err("-strict-style flag is not required any more\n");
-							bad_flags = true;
+							build_context.strict_style = true;
 							break;
 
 
@@ -1870,8 +1870,8 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-insert-semicolon");
-		print_usage_line(2, "Inserts semicolons on newlines during tokenization using a basic rule");
+		print_usage_line(1, "-strict-style");
+		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");

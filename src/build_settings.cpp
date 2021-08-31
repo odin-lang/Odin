@@ -205,6 +205,8 @@ struct BuildContext {
 	bool   keep_object_files;
 	bool   disallow_do;
 
+	bool   strict_style;
+
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;

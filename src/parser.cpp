@@ -1491,33 +1491,6 @@ Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	return expect_token(f, kind);
 }
 
-bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
-	if (s == nullptr) {
-		return false;
-	}
-	return true;
-}
-
-void expect_semicolon_newline_error(AstFile *f, Token const &token, Ast *s) {
-	#if 0
-	if (!build_context.insert_semicolon && token.string == "\n") {
-		switch (token.kind) {
-		case Token_CloseBrace:
-		case Token_CloseParen:
-		case Token_else:
-			return;
-		}
-		if (is_semicolon_optional_for_node(f, s)) {
-			return;
-		}
-
-		Token tok = token;
-		tok.pos.column -= 1;
-		syntax_error(tok, "Expected ';', got newline");
-	}
-	#endif
-}
-
 void assign_removal_flag_to_semicolon(AstFile *f) {
 	// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
 	Token *prev_token = &f->tokens[f->prev_token_index];
@@ -1525,6 +1498,9 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 	GB_ASSERT(prev_token->kind == Token_Semicolon);
 	if (prev_token->string == ";") {
 		if (curr_token->pos.line > prev_token->pos.line) {
+			if (build_context.strict_style) {
+				syntax_error(*prev_token, "Found unneeded semicolon");
+			}
 			prev_token->flags |= TokenFlag_Remove;
 		}
 	}
@@ -1535,7 +1511,6 @@ void expect_semicolon(AstFile *f, Ast *s) {
 
 	if (allow_token(f, Token_Semicolon)) {
 		assign_removal_flag_to_semicolon(f);
-		expect_semicolon_newline_error(f, f->prev_token, s);
 		return;
 	}
 	switch (f->curr_token.kind) {
@@ -1550,7 +1525,6 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
 		assign_removal_flag_to_semicolon(f);
-		expect_semicolon_newline_error(f, f->prev_token, s);
 		return;
 	}
 
@@ -4545,14 +4519,20 @@ Ast *parse_stmt(AstFile *f) {
 			return s;
 		} else if (tag == "assert") {
 			Ast *t = ast_basic_directive(f, hash_token, name);
-			return ast_expr_stmt(f, parse_call_expr(f, t));
+			Ast *stmt = ast_expr_stmt(f, parse_call_expr(f, t));
+			expect_semicolon(f, stmt);
+			return stmt;
 		} else if (tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, name);
-			return ast_expr_stmt(f, parse_call_expr(f, t));
+			Ast *stmt =  ast_expr_stmt(f, parse_call_expr(f, t));
+			expect_semicolon(f, stmt);
+			return stmt;
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
 			Ast *expr = parse_force_inlining_operand(f, name);
-			return ast_expr_stmt(f, expr);
+			Ast *stmt =  ast_expr_stmt(f, expr);
+			expect_semicolon(f, stmt);
+			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
 		} else if (tag == "include") {
