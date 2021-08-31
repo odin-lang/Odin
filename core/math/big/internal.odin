@@ -992,12 +992,20 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 */
 
 /*
+	This procedure returns the allocated capacity of an Int.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_allocated_cap :: #force_inline proc(a: ^Int) -> (cap: int) {
+	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
+	return raw.cap;
+}
+
+/*
 	This procedure will return `true` if the `Int` is initialized, `false` if not.
 	Assumes `a` not to be `nil`.
 */
 internal_int_is_initialized :: #force_inline proc(a: ^Int) -> (initialized: bool) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-	return raw.cap >= _MIN_DIGIT_COUNT;
+	return internal_int_allocated_cap(a) >= _MIN_DIGIT_COUNT;
 }
 internal_is_initialized :: proc { internal_int_is_initialized, };
 
@@ -1650,8 +1658,7 @@ internal_int_destroy :: proc(integers: ..^Int) {
 	integers := integers;
 
 	for a in &integers {
-		raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-		if raw.cap > 0 {
+		if internal_int_allocated_cap(a) > 0 {
 			mem.zero_slice(a.digit[:]);
 			free(&a.digit[0]);
 		}
@@ -1913,23 +1920,23 @@ internal_int_shrink :: proc(a: ^Int) -> (err: Error) {
 internal_shrink :: proc { internal_int_shrink, };
 
 internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := context.allocator) -> (err: Error) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-
 	/*
 		We need at least _MIN_DIGIT_COUNT or a.used digits, whichever is bigger.
 		The caller is asking for `digits`. Let's be accomodating.
 	*/
+	cap := internal_int_allocated_cap(a);
+
 	needed := max(_MIN_DIGIT_COUNT, a.used, digits);
 	if !allow_shrink {
-		needed = max(needed, raw.cap);
+		needed = max(needed, cap);
 	}
 
 	/*
 		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
 	*/
-	if raw.cap == 0 {
+	if cap == 0 {
 		a.digit = make([dynamic]DIGIT, needed, allocator);
-	} else if raw.cap != needed {
+	} else if cap != needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 		*/

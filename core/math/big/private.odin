@@ -1730,9 +1730,6 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	return;
 }
 
-
-
-
 /*
 	Computes xR**-1 == x (mod N) via Montgomery Reduction.
 	This is an optimized implementation of `internal_montgomery_reduce`
@@ -1753,7 +1750,7 @@ _private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := co
 	/*
 		Grow `x` as required.
 	*/
-	internal_grow(x, n.used + 1) or_return;
+	internal_grow(x, n.used + 1)                                     or_return;
 
 	/*
 		First we have to get the digits of the input into an array of double precision words W[...]
