@@ -29,15 +29,15 @@ FRect :: struct {
 }
 
 PointInRect :: proc(p, r: ^Rect) -> bool {
-	return bool((p.x >= r.x) && (p.x < (r.x + r.w)) && (p.y >= r.y) && (p.y < (r.y + r.h)));
+	return bool((p.x >= r.x) && (p.x < (r.x + r.w)) && (p.y >= r.y) && (p.y < (r.y + r.h)))
 }
 
 RectEmpty :: proc(r: ^Rect) -> bool {
-	return bool(r == nil|| r.w <= 0 || r.h <= 0);
+	return bool(r == nil|| r.w <= 0 || r.h <= 0)
 }
 
 RectEquals :: proc(a, b: ^Rect) -> bool {
-	return a != nil && b != nil && a^ == b^;
+	return a != nil && b != nil && a^ == b^
 }
 
 @(default_calling_convention="c", link_prefix="SDL_")

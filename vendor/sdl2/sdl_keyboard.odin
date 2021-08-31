@@ -34,12 +34,12 @@ foreign lib {
 }
 
 GetKeyboardStateAsSlice :: proc "c" () -> []u8 {
-	numkeys: c.int;
-	keys := GetKeyboardState(&numkeys);
+	numkeys: c.int
+	keys := GetKeyboardState(&numkeys)
 	if keys != nil {
-		return keys[:numkeys];
+		return keys[:numkeys]
 	}
-	return nil;
+	return nil
 }
 
 GetModState :: #force_inline proc "c" () -> Keymod { return transmute(Keymod)u16(SDL_GetModState()) }

@@ -26,10 +26,10 @@ foreign lib {
 
 // Windows & WinRT
 
-WindowsMessageHook :: proc "c" (userdata: rawptr, hWnd: rawptr, message: c.uint, wParam: u64, lParam: i64);
+WindowsMessageHook :: proc "c" (userdata: rawptr, hWnd: rawptr, message: c.uint, wParam: u64, lParam: i64)
 
-IDirect3DDevice9 :: struct {};
-ID3D11Device     :: struct {};
+IDirect3DDevice9 :: struct {}
+ID3D11Device     :: struct {}
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -91,8 +91,8 @@ foreign lib {
 
 
 // iOS
-iOSSetAnimationCallback :: iPhoneSetAnimationCallback;
-iOSSetEventPump         :: iPhoneSetEventPump;
+iOSSetAnimationCallback :: iPhoneSetAnimationCallback
+iOSSetEventPump         :: iPhoneSetEventPump
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -104,8 +104,8 @@ foreign lib {
 
 // Android
 
-ANDROID_EXTERNAL_STORAGE_READ  :: 0x01;
-ANDROID_EXTERNAL_STORAGE_WRITE :: 0x02;
+ANDROID_EXTERNAL_STORAGE_READ  :: 0x01
+ANDROID_EXTERNAL_STORAGE_WRITE :: 0x02
 
 
 @(default_calling_convention="c", link_prefix="SDL_")

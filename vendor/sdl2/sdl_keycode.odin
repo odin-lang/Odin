@@ -1,9 +1,9 @@
 package sdl2
 
 
-SCANCODE_MASK :: 1<<30;
+SCANCODE_MASK :: 1<<30
 SCANCODE_TO_KEYCODE :: #force_inline proc "c" (X: Scancode) -> KeyCode {
-	return KeyCode(i32(X) | SCANCODE_MASK);
+	return KeyCode(i32(X) | SCANCODE_MASK)
 }
 
 KeyCode :: enum i32 {
@@ -309,22 +309,22 @@ KeymodFlag :: enum u16 {
 	RESERVED = 0xf,
 }
 
-Keymod :: distinct bit_set[KeymodFlag; u16];
+Keymod :: distinct bit_set[KeymodFlag; u16]
 
-KMOD_NONE     :: Keymod{};
-KMOD_LSHIFT   :: Keymod{.LSHIFT};
-KMOD_RSHIFT   :: Keymod{.RSHIFT};
-KMOD_LCTRL    :: Keymod{.LCTRL};
-KMOD_RCTRL    :: Keymod{.RCTRL};
-KMOD_LALT     :: Keymod{.LALT};
-KMOD_RALT     :: Keymod{.RALT};
-KMOD_LGUI     :: Keymod{.LGUI};
-KMOD_RGUI     :: Keymod{.RGUI};
-KMOD_NUM      :: Keymod{.NUM};
-KMOD_CAPS     :: Keymod{.CAPS};
-KMOD_MODE     :: Keymod{.MODE};
-KMOD_RESERVED :: Keymod{.RESERVED};
-KMOD_CTRL     :: Keymod{.LCTRL, .RCTRL};
-KMOD_SHIFT    :: Keymod{.LSHIFT, .RSHIFT};
-KMOD_ALT      :: Keymod{.LALT, .RALT};
+KMOD_NONE     :: Keymod{}
+KMOD_LSHIFT   :: Keymod{.LSHIFT}
+KMOD_RSHIFT   :: Keymod{.RSHIFT}
+KMOD_LCTRL    :: Keymod{.LCTRL}
+KMOD_RCTRL    :: Keymod{.RCTRL}
+KMOD_LALT     :: Keymod{.LALT}
+KMOD_RALT     :: Keymod{.RALT}
+KMOD_LGUI     :: Keymod{.LGUI}
+KMOD_RGUI     :: Keymod{.RGUI}
+KMOD_NUM      :: Keymod{.NUM}
+KMOD_CAPS     :: Keymod{.CAPS}
+KMOD_MODE     :: Keymod{.MODE}
+KMOD_RESERVED :: Keymod{.RESERVED}
+KMOD_CTRL     :: Keymod{.LCTRL, .RCTRL}
+KMOD_SHIFT    :: Keymod{.LSHIFT, .RSHIFT}
+KMOD_ALT      :: Keymod{.LALT, .RALT}
 KMOD_GUI      :: Keymod{.LGUI, .RGUI};

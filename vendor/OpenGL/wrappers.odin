@@ -744,7 +744,7 @@ when !ODIN_DEBUG {
 	import "core:fmt"
 
 	debug_helper :: #force_inline proc"c"(from_loc: runtime.Source_Code_Location, num_ret: int, args: ..any, loc := #caller_location) {
-		context = runtime.default_context();
+		context = runtime.default_context()
 
 		Error_Enum :: enum {
 			NO_ERROR = NO_ERROR,
@@ -756,50 +756,50 @@ when !ODIN_DEBUG {
 			STACK_UNDERFLOW = STACK_UNDERFLOW,
 			STACK_OVERFLOW = STACK_OVERFLOW,
 			// TODO: What if the return enum is invalid?
-		};
+		}
 
 		// There can be multiple errors, so we're required to continuously call glGetError until there are no more errors
 		for i := 0; /**/; i += 1 {
-			err := cast(Error_Enum)impl_GetError();
-			if err == .NO_ERROR do break;
+			err := cast(Error_Enum)impl_GetError()
+			if err == .NO_ERROR do break
 
-			fmt.printf("%d: glGetError() returned GL_%v\n", i, err);
+			fmt.printf("%d: glGetError() returned GL_%v\n", i, err)
 
 			// add function call
-			fmt.printf("   call: gl%s(", loc.procedure);
+			fmt.printf("   call: gl%s(", loc.procedure)
 			{
 				// add input arguments
 				for arg, i in args[num_ret:] {
-				if i > 0 do fmt.printf(", ");
+				if i > 0 do fmt.printf(", ")
 
 				if v, ok := arg.(u32); ok { // TODO: Assumes all u32 are GLenum (they're not, GLbitfield and GLuint are also mapped to u32), fix later by better typing
 					if err == .INVALID_ENUM {
-						fmt.printf("INVALID_ENUM=%d", v);
+						fmt.printf("INVALID_ENUM=%d", v)
 					} else {
-						fmt.printf("GL_%v=%d", GL_Enum(v), v);
+						fmt.printf("GL_%v=%d", GL_Enum(v), v)
 					}
 				} else {
-					fmt.printf("%v", arg);
+					fmt.printf("%v", arg)
 				}
 				}
 
 				// add return arguments
 				if num_ret == 1 {
-					fmt.printf(") -> %v \n", args[0]);
+					fmt.printf(") -> %v \n", args[0])
 				} else if num_ret > 1 {
-					fmt.printf(") -> (");
+					fmt.printf(") -> (")
 					for arg, i in args[1:num_ret] {
-						if i > 0 do fmt.printf(", ");
-						fmt.printf("%v", arg);
+						if i > 0 do fmt.printf(", ")
+						fmt.printf("%v", arg)
 					}
-					fmt.printf(")\n");
+					fmt.printf(")\n")
 				} else {
-					fmt.printf(")\n");
+					fmt.printf(")\n")
 				}
 			}
 
 			// add location
-		    fmt.printf("   in:   %s(%d:%d)\n", from_loc.file_path, from_loc.line, from_loc.column);
+		    fmt.printf("   in:   %s(%d:%d)\n", from_loc.file_path, from_loc.line, from_loc.column)
 		}
 	}
 

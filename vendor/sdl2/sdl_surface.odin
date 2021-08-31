@@ -7,17 +7,17 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-SWSURFACE       :: 0;           /**< Just here for compatibility */
-PREALLOC        :: 0x00000001;  /**< Surface uses preallocated memory */
-RLEACCEL        :: 0x00000002;  /**< Surface is RLE encoded */
-DONTFREE        :: 0x00000004;  /**< Surface is referenced internally */
-SIMD_ALIGNED    :: 0x00000008;  /**< Surface uses aligned memory */
+SWSURFACE       :: 0           /**< Just here for compatibility */
+PREALLOC        :: 0x00000001  /**< Surface uses preallocated memory */
+RLEACCEL        :: 0x00000002  /**< Surface is RLE encoded */
+DONTFREE        :: 0x00000004  /**< Surface is referenced internally */
+SIMD_ALIGNED    :: 0x00000008  /**< Surface uses aligned memory */
 
 MUSTLOCK :: #force_inline proc "c" (surface: ^Surface) -> bool {
-	return bool(surface.flags & RLEACCEL != 0);
+	return bool(surface.flags & RLEACCEL != 0)
 }
 
-BlitMap :: struct {};
+BlitMap :: struct {}
 
 Surface :: struct {
 	flags:  u32,                 /**< Read-only */
@@ -45,7 +45,7 @@ Surface :: struct {
 	refcount: c.int,             /**< Read-mostly */
 }
 
-blit :: proc "c" (src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int;
+blit :: proc "c" (src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int
 
 
 YUV_CONVERSION_MODE :: enum c.int {
@@ -57,15 +57,15 @@ YUV_CONVERSION_MODE :: enum c.int {
 
 
 LoadBMP :: #force_inline proc "c" (file: cstring) -> ^Surface {
-	return LoadBMP_RW(RWFromFile(file, "rb"), true);
+	return LoadBMP_RW(RWFromFile(file, "rb"), true)
 }
 
 SaveBMP :: #force_inline proc "c" (surface: ^Surface, file: cstring) -> c.int {
-	return SaveBMP_RW(surface, RWFromFile(file, "wb"), true);
+	return SaveBMP_RW(surface, RWFromFile(file, "wb"), true)
 }
 
-BlitSurface :: UpperBlit;
-BlitScaled  :: UpperBlitScaled;
+BlitSurface :: UpperBlit
+BlitScaled  :: UpperBlitScaled
 
 
 @(default_calling_convention="c", link_prefix="SDL_")

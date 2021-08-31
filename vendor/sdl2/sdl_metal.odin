@@ -7,7 +7,7 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-MetalView :: distinct rawptr;
+MetalView :: distinct rawptr
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
