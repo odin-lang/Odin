@@ -205,6 +205,88 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 }
 
 /*
+	Miller-Rabin test of "a" to the base of "b" as described in HAC pp. 139 Algorithm 4.24.
+
+	Sets result to 0 if definitely composite or 1 if probably prime.
+	Randomly the chance of error is no more than 1/4 and often very much lower.
+
+	Assumes `a` and `b` not to be `nil` and to have been initialized.
+*/
+internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocator) -> (probably_prime: bool, err: Error) {
+	context.allocator = allocator;
+
+	n1, y, r := &Int{}, &Int{}, &Int{};
+	defer internal_destroy(n1, y, r);
+
+	/*
+		Ensure `b` > 1.
+	*/
+	if internal_gt(b, 1) { return false, nil; }
+
+	/*
+		Get n1 = a - 1.
+	*/
+	internal_copy(n1, a) or_return;
+	internal_sub(n1, n1, 1) or_return;
+
+	/*
+		Set 2**s * r = n1
+	*/
+	internal_copy(r, n1) or_return;
+
+	/*
+		Count the number of least significant bits which are zero.
+	*/
+	s := internal_count_lsb(r) or_return;
+
+	/*
+		Now divide n - 1 by 2**s.
+	*/
+	internal_shr(r, r, s) or_return;
+
+	/*
+		Compute y = b**r mod a.
+	*/
+	internal_int_exponent_mod(y, b, r, a) or_return;
+
+	/*
+		If y != 1 and y != n1 do.
+	*/
+	if !internal_eq(y, 1) && !internal_eq(y, n1) {
+		j := 1;
+
+		/*
+			While `j` <= `s` - 1 and `y` != `n1`.
+		*/
+		for j <= (s - 1) && !internal_eq(y, n1) {
+			internal_sqrmod(y, y, a) or_return;
+
+			/*
+				If `y` == 1 then composite.
+			*/
+			if internal_eq(y, 1) {
+				return false, nil;
+			}
+
+			j += 1;
+		}
+
+		/*
+			If `y` != `n1` then composite.
+		*/
+		if !internal_eq(y, n1) {
+			return false, nil;
+		}
+	}
+
+	/*
+		Probably prime now.
+	*/
+	return true, nil;
+}
+
+
+/*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
 */
 number_of_rabin_miller_trials :: proc(bit_size: int) -> (number_of_trials: int) {
