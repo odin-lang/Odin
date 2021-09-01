@@ -1,6 +1,4 @@
 //+ignore
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -31,6 +29,7 @@ package math_big
 
 	TODO: Handle +/- Infinity and NaN.
 */
+package math_big
 
 import "core:mem"
 import "core:intrinsics"
@@ -137,7 +136,7 @@ internal_int_add_signed :: proc(dest, a, b: ^Int, allocator := context.allocator
 		Subtract the one with the greater magnitude from the other.
 		The result gets the sign of the one with the greater magnitude.
 	*/
-	if #force_inline internal_cmp_mag(a, b) == -1 {
+	if #force_inline internal_lt_abs(a, b) {
 		x, y = y, x;
 	}
 
@@ -359,7 +358,7 @@ internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := conte
 		Subtract a positive from a positive, OR negative from a negative.
 		First, take the difference between their magnitudes, then...
 	*/
-	if #force_inline internal_cmp_mag(number, decrease) == -1 {
+	if #force_inline internal_lt_abs(number, decrease) {
 		/*
 			The second has a larger magnitude.
 			The result has the *opposite* sign from the first number.
@@ -719,7 +718,7 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	/*
 		If numerator < denominator then quotient = 0, remainder = numerator.
 	*/
-	if #force_inline internal_cmp_mag(numerator, denominator) == -1 {
+	if #force_inline internal_lt_abs(numerator, denominator) {
 		if remainder != nil {
 			internal_copy(remainder, numerator) or_return;
 		}
@@ -732,7 +731,6 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
 		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.");
 		err = _private_int_div_recursive(quotient, remainder, numerator, denominator);
-		// err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
 	} else {
 		when true {
 			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
@@ -993,12 +991,20 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 */
 
 /*
+	This procedure returns the allocated capacity of an Int.
+	Assumes `a` not to be `nil`.
+*/
+internal_int_allocated_cap :: #force_inline proc(a: ^Int) -> (cap: int) {
+	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
+	return raw.cap;
+}
+
+/*
 	This procedure will return `true` if the `Int` is initialized, `false` if not.
 	Assumes `a` not to be `nil`.
 */
 internal_int_is_initialized :: #force_inline proc(a: ^Int) -> (initialized: bool) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-	return raw.cap >= _MIN_DIGIT_COUNT;
+	return internal_int_allocated_cap(a) >= _MIN_DIGIT_COUNT;
 }
 internal_is_initialized :: proc { internal_int_is_initialized, };
 
@@ -1091,6 +1097,7 @@ internal_is_power_of_two :: proc { internal_int_is_power_of_two, };
 	Expects `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
 */
 internal_int_compare :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
+	assert_if_nil(a, b);
 	a_is_negative := #force_inline internal_is_negative(a);
 
 	/*
@@ -1114,6 +1121,7 @@ internal_cmp :: internal_compare;
 	Expects: `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
 */
 internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparison: int) {
+	assert_if_nil(a);
 	a_is_negative := #force_inline internal_is_negative(a);
 
 	switch {
@@ -1145,6 +1153,7 @@ internal_cmp_digit :: internal_compare_digit;
 	Compare the magnitude of two `Int`s, unsigned.
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
+	assert_if_nil(a, b);
 	/*
 		Compare based on used digits.
 	*/
@@ -1171,6 +1180,177 @@ internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison:
 }
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, };
 internal_cmp_mag :: internal_compare_magnitude;
+
+
+/*
+	bool := a < b
+*/
+internal_int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
+	return internal_cmp(a, b) == -1;
+}
+
+/*
+	bool := a < b
+*/
+internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool) {
+	return internal_cmp_digit(a, b) == -1;
+}
+
+/*
+	bool := |a| < |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
+	return internal_cmp_mag(a, b) == -1;
+}
+
+internal_less_than :: proc {
+	internal_int_less_than,
+	internal_int_less_than_digit,
+};
+internal_lt :: internal_less_than;
+
+internal_less_than_abs :: proc {
+	internal_int_less_than_abs,
+};
+internal_lt_abs :: internal_less_than_abs;
+
+
+/*
+	bool := a <= b
+*/
+internal_int_less_than_or_equal :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool) {
+	return internal_cmp(a, b) <= 0;
+}
+
+/*
+	bool := a <= b
+*/
+internal_int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than_or_equal: bool) {
+	return internal_cmp_digit(a, b) <= 0;
+}
+
+/*
+	bool := |a| <= |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool) {
+	return internal_cmp_mag(a, b) <= 0;
+}
+
+internal_less_than_or_equal :: proc {
+	internal_int_less_than_or_equal,
+	internal_int_less_than_or_equal_digit,
+};
+internal_lte :: internal_less_than_or_equal;
+
+internal_less_than_or_equal_abs :: proc {
+	internal_int_less_than_or_equal_abs,
+};
+internal_lte_abs :: internal_less_than_or_equal_abs;
+
+
+/*
+	bool := a == b
+*/
+internal_int_equals :: #force_inline proc(a, b: ^Int) -> (equals: bool) {
+	return internal_cmp(a, b) == 0;
+}
+
+/*
+	bool := a == b
+*/
+internal_int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (equals: bool) {
+	return internal_cmp_digit(a, b) == 0;
+}
+
+/*
+	bool := |a| == |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_equals_abs :: #force_inline proc(a, b: ^Int) -> (equals: bool) {
+	return internal_cmp_mag(a, b) == 0;
+}
+
+internal_equals :: proc {
+	internal_int_equals,
+	internal_int_equals_digit,
+};
+internal_eq :: internal_equals;
+
+internal_equals_abs :: proc {
+	internal_int_equals_abs,
+};
+internal_eq_abs :: internal_equals_abs;
+
+
+/*
+	bool := a >= b
+*/
+internal_int_greater_than_or_equal :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool) {
+	return internal_cmp(a, b) >= 0;
+}
+
+/*
+	bool := a >= b
+*/
+internal_int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than_or_equal: bool) {
+	return internal_cmp_digit(a, b) >= 0;
+}
+
+/*
+	bool := |a| >= |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool) {
+	return internal_cmp_mag(a, b) >= 0;
+}
+
+internal_greater_than_or_equal :: proc {
+	internal_int_greater_than_or_equal,
+	internal_int_greater_than_or_equal_digit,
+};
+internal_gte :: internal_greater_than_or_equal;
+
+internal_greater_than_or_equal_abs :: proc {
+	internal_int_greater_than_or_equal_abs,
+};
+internal_gte_abs :: internal_greater_than_or_equal_abs;
+
+
+/*
+	bool := a > b
+*/
+internal_int_greater_than :: #force_inline proc(a, b: ^Int) -> (greater_than: bool) {
+	return internal_cmp(a, b) == 1;
+}
+
+/*
+	bool := a > b
+*/
+internal_int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than: bool) {
+	return internal_cmp_digit(a, b) == 1;
+}
+
+/*
+	bool := |a| > |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_greater_than_abs :: #force_inline proc(a, b: ^Int) -> (greater_than: bool) {
+	return internal_cmp_mag(a, b) == 1;
+}
+
+internal_greater_than :: proc {
+	internal_int_greater_than,
+	internal_int_greater_than_digit,
+};
+internal_gt :: internal_greater_than;
+
+internal_greater_than_abs :: proc {
+	internal_int_greater_than_abs,
+};
+internal_gt_abs :: internal_greater_than_abs;
+
 
 /*
 	Check if remainders are possible squares - fast exclude non-squares.
@@ -1229,7 +1409,7 @@ internal_int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (squa
 	sqrt(t, a) or_return;
 	sqr(t, t)  or_return;
 
-	square = internal_cmp_mag(t, a) == 0;
+	square = internal_eq_abs(t, a);
 
 	return;
 }
@@ -1461,7 +1641,7 @@ internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 		internal_add(t2, t1, x)  or_return;
 		internal_shr(y, t2, 1)   or_return;
 
-		if c := internal_cmp(y, x); c == 0 || c == 1 {
+		if internal_gte(y, x) {
 			internal_swap(dest, x);
 			return nil;
 		}
@@ -1576,8 +1756,8 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 			 Number of rounds is at most log_2(root). If it is more it
 			 got stuck, so break out of the loop and do the rest manually.
 		*/
-		if ilog2 -= 1;    ilog2 == 0 { break; }
-		if internal_cmp(t1, t2) == 0 { break; }
+		if ilog2 -= 1; ilog2 == 0 { break; }
+		if internal_eq(t1, t2)    { break; }
 
 		iterations += 1;
 		if iterations == MAX_ITERATIONS_ROOT_N {
@@ -1615,7 +1795,7 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	for {
 		internal_pow(t2, t1, n) or_return;
 	
-		if internal_cmp(t2, a) != 1 { break; }
+		if internal_lt(t2, a) { break; }
 		
 		internal_sub(t1, t1, DIGIT(1)) or_return;
 
@@ -1651,8 +1831,7 @@ internal_int_destroy :: proc(integers: ..^Int) {
 	integers := integers;
 
 	for a in &integers {
-		raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-		if raw.cap > 0 {
+		if internal_int_allocated_cap(a) > 0 {
 			mem.zero_slice(a.digit[:]);
 			free(&a.digit[0]);
 		}
@@ -1821,12 +2000,12 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		For all n in N and n > 0, n = 0 mod 1.
 	*/
-	if internal_is_positive(a) && internal_cmp(b, 1) == 0 { return internal_zero(dest);	}
+	if internal_is_positive(a) && internal_eq(b, 1) { return internal_zero(dest);	}
 
 	/*
 		`b` cannot be negative and has to be > 1
 	*/
-	if internal_is_negative(b) && internal_cmp(b, 1) != 1 { return .Invalid_Argument; }
+	if internal_is_negative(b) || internal_gt(b, 1) { return .Invalid_Argument; }
 
 	/*
 		If the modulus is odd we can use a faster routine instead.
@@ -1914,23 +2093,23 @@ internal_int_shrink :: proc(a: ^Int) -> (err: Error) {
 internal_shrink :: proc { internal_int_shrink, };
 
 internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator := context.allocator) -> (err: Error) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit;
-
 	/*
 		We need at least _MIN_DIGIT_COUNT or a.used digits, whichever is bigger.
 		The caller is asking for `digits`. Let's be accomodating.
 	*/
+	cap := internal_int_allocated_cap(a);
+
 	needed := max(_MIN_DIGIT_COUNT, a.used, digits);
 	if !allow_shrink {
-		needed = max(needed, raw.cap);
+		needed = max(needed, cap);
 	}
 
 	/*
 		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
 	*/
-	if raw.cap == 0 {
+	if cap == 0 {
 		a.digit = make([dynamic]DIGIT, needed, allocator);
-	} else if raw.cap != needed {
+	} else if cap != needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 		*/
