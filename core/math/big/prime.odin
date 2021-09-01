@@ -110,6 +110,101 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.alloc
 }
 
 /*
+	Kronecker symbol (a|p)
+	Straightforward implementation of algorithm 1.4.10 in
+	Henri Cohen: "A Course in Computational Algebraic Number Theory"
+
+	@book{cohen2013course,
+		title={A course in computational algebraic number theory},
+		author={Cohen, Henri},
+		volume={138},
+		year={2013},
+		publisher={Springer Science \& Business Media}
+	}
+
+	Assumes `a` and `p` to not be `nil` and to have been initialized.
+*/
+internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (kronecker: int, err: Error) {
+	context.allocator = allocator;
+
+	a1, p1, r := &Int{}, &Int{}, &Int{};
+	defer internal_destroy(a1, p1, r);
+
+	table := []int{0, 1, 0, -1, 0, -1, 0, 1};
+
+	if internal_int_is_zero(p) {
+		if a.used == 1 && a.digit[0] == 1 {
+			return 1, nil;
+		} else {
+			return 0, nil;
+		}
+	}
+
+	if internal_is_even(a) && internal_is_even(p) {
+		return 0, nil;
+	}
+
+	internal_copy(a1, a) or_return;
+	internal_copy(p1, p) or_return;
+
+	v := internal_count_lsb(p1) or_return;
+	internal_shr(p1, p1, v) or_return;
+
+	k := 1 if v & 1 == 0 else table[a.digit[0] & 7];
+
+	if internal_is_negative(p1) {
+		p1.sign = .Zero_or_Positive;
+		if internal_is_negative(a1) {
+			k = -k;
+		}
+	}
+
+	internal_zero(r) or_return;
+
+	for {
+		if internal_is_zero(a1) {
+			if internal_cmp(p1, 1) == 0 {
+				return k, nil;
+			} else {
+				return 0, nil;
+			}
+		}
+
+		v = internal_count_lsb(a1) or_return;
+		internal_shr(a1, a1, v) or_return;
+
+		if v & 1 == 1 {
+			k = k * table[p1.digit[0] & 7];
+		}
+
+		if internal_is_negative(a1) {
+			/*
+				Compute k = (-1)^((a1)*(p1-1)/4) * k.
+				a1.digit[0] + 1 cannot overflow because the MSB
+				of the DIGIT type is not set by definition.
+			 */
+			if a1.digit[0] + 1 & p1.digit[0] & 2 != 0 {
+				k = -k;
+			}
+		} else {
+			/*
+				Compute k = (-1)^((a1-1)*(p1-1)/4) * k.
+			*/
+			if a1.digit[0] & p1.digit[0] & 2 != 0 {
+				k = -k;
+			}
+		}
+
+		internal_copy(r, a1) or_return;
+		r.sign = .Zero_or_Positive;
+
+		internal_mod(a1, p1, r) or_return;
+		internal_copy(p1, r)    or_return;
+	}
+	return;
+}
+
+/*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
 */
 number_of_rabin_miller_trials :: proc(bit_size: int) -> (number_of_trials: int) {
