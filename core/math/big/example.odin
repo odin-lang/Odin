@@ -213,16 +213,6 @@ int_to_byte_little :: proc(v: ^Int) {
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
-
-	set(a, 42);
-	set(b, 6);
-	set(c, 131);
-
-	if err := internal_int_exponent_mod(res, a, b, c); err != nil {
-		fmt.printf("Error: %v\n", err);
-	}
-
-	print("res: ", res);
 }
 
 main :: proc() {
