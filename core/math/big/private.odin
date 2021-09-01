@@ -1437,7 +1437,7 @@ _private_int_factorial_binary_split :: proc(res: ^Int, n: int, allocator := cont
 	internal_one(inner, false)                                       or_return;
 	internal_one(outer, false)                                       or_return;
 
-	bits_used := int(_DIGIT_TYPE_BITS - intrinsics.count_leading_zeros(n));
+	bits_used := ilog2(n);
 
 	for i := bits_used; i >= 0; i -= 1 {
 		start := (n >> (uint(i) + 1)) + 1 | 1;

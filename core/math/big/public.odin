@@ -10,6 +10,8 @@
 */
 package math_big
 
+import "core:intrinsics"
+
 /*
 	===========================
 		User-level routines    
@@ -382,6 +384,10 @@ digit_log :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 	return #force_inline internal_digit_log(a, base);
 }
 log :: proc { int_log, digit_log, };
+
+ilog2 :: proc(value: $T) -> (log2: T) {
+	return (size_of(T) * 8) - intrinsics.count_leading_zeros(value);
+}
 
 /*
 	Calculate `dest = base^power` using a square-multiply algorithm.
