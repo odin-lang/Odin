@@ -413,7 +413,6 @@ def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
 	return test("test_shr_signed", res, [a, bits], expected_error, expected_result)
 
 def test_factorial(number = 0, expected_error = Error.Okay):
-	print("Factorial:", number)
 	args  = [number]
 	try:
 		res = int_factorial(*args)

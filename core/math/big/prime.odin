@@ -163,7 +163,7 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 
 	for {
 		if internal_is_zero(a1) {
-			if internal_cmp(p1, 1) == 0 {
+			if internal_eq(p1, 1) {
 				return k, nil;
 			} else {
 				return 0, nil;
