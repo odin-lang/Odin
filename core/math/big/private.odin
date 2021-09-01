@@ -1071,11 +1071,11 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 
 	internal_shl_digit(y, n - t) or_return;
 
-	c := internal_cmp(x, y);
-	for c != -1 {
+	gte := internal_gte(x, y);
+	for gte {
 		q.digit[n - t] += 1;
 		internal_sub(x, x, y) or_return;
-		c = internal_cmp(x, y);
+		gte = internal_gte(x, y);
 	}
 
 	/*
@@ -1134,7 +1134,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			t2.digit[2] = x.digit[i];
 			t2.used = 3;
 
-			if t1_t2 := internal_cmp_mag(t1, t2); t1_t2 != 1 {
+			if internal_lte(t1, t2) {
 				break;
 			}
 			iter += 1; if iter > 100 {
@@ -1227,15 +1227,13 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	/*
 		While A1 < 0 do Q1 = Q1 - 1, A1 = A1 + (beta^k * B)
 	*/
-	if internal_cmp(A1, 0) == -1 {
+	if internal_lt(A1, 0) {
 		internal_shl(t, b, k * _DIGIT_BITS) or_return;
 
 		for {
 			internal_decr(Q1) or_return;
 			internal_add(A1, A1, t) or_return;
-			if internal_cmp(A1, 0) != -1 {
-				break;
-			}
+			if internal_gte(A1, 0) { break; }
 		}
 	}
 
@@ -1256,7 +1254,7 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	/*
 		While A2 < 0 do Q0 = Q0 - 1, A2 = A2 + B.
 	*/
-	for internal_cmp(A2, 0) == -1 {
+	for internal_is_negative(A2) { // internal_lt(A2, 0) {
 		internal_decr(Q0) or_return;
 		internal_add(A2, A2, b) or_return;
 	}
@@ -1391,7 +1389,7 @@ _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int
 		shl(tq, tq, n)       or_return;
 
 		for n >= 0 {
-			if c, _ = cmp_mag(ta, tb); c == 0 || c == 1 {
+			if internal_gte(ta, tb) {
 				// ta -= tb
 				sub(ta, ta, tb) or_return;
 				//  q += tq
@@ -1596,7 +1594,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		/*
 			Make sure `v` is the largest.
 		*/
-		if internal_cmp_mag(u, v) == 1 {
+		if internal_gt(u, v) {
 			/*
 				Swap `u` and `v` to make sure `v` is >= `u`.
 			*/
@@ -1634,7 +1632,7 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		Computes least common multiple as `|a*b|/gcd(a,b)`
 		Divide the smallest by the GCD.
 	*/
-	if internal_cmp_mag(a, b) == -1 {
+	if internal_lt_abs(a, b) {
 		/*
 			Store quotient in `t2` such that `t2 * b` is the LCM.
 		*/
@@ -1694,9 +1692,7 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 		/*
 			Iterate until `a` is bracketed between low + high.
 		*/
-		if #force_inline internal_cmp(bracket_high, a) != -1 {
-			break;
-		}
+		if #force_inline internal_gte(bracket_high, a) { break; }
 
 		low = high;
 		#force_inline internal_copy(bracket_low, bracket_high) or_return;
@@ -1844,7 +1840,7 @@ _private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := co
 	/*
 		if A >= m then A = A - m
 	*/
-	if internal_cmp_mag(x, n) != -1 {
+	if internal_gte_abs(x, n) {
 		return internal_sub(x, x, n);
 	}
 	return nil;
@@ -1932,7 +1928,7 @@ _private_int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := cont
 	/*
 		if x >= n then x = x - n
 	*/
-	if internal_cmp_mag(x, n) != -1 {
+	if internal_gte_abs(x, n) {
 		return internal_sub(x, x, n);
 	}
 
@@ -1969,7 +1965,7 @@ _private_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := cont
 	*/
 	for x := bits - 1; x < _DIGIT_BITS; x += 1 {
 		internal_int_shl1(a, a)                                      or_return;
-		if internal_cmp_mag(a, b) != -1 {
+		if internal_gte_abs(a, b) {
 			internal_sub(a, a, b)                                    or_return;
 		}
 	}
@@ -2064,7 +2060,7 @@ _private_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 	/*
 		If x < 0, add b**(k+1) to it.
 	*/
-	if internal_cmp(x, 0) == -1 {
+	if internal_is_negative(x) {
 		internal_set(q, 1)                                           or_return;
 		internal_shl_digit(q, um + 1)                                or_return;
 		internal_add(x, x, q)                                        or_return;
@@ -2073,7 +2069,7 @@ _private_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 	/*
 		Back off if it's too big.
 	*/
-	for internal_cmp(x, m) != -1 {
+	for internal_gte(x, m) {
 		internal_sub(x, x, m)                                        or_return;
 	}
 
@@ -2110,7 +2106,7 @@ _private_int_reduce_2k :: proc(a, n: ^Int, d: DIGIT, allocator := context.alloca
 			a = a + q
 		*/
 		internal_add(a, a, q)                                        or_return;
-		if internal_cmp_mag(a, n) == -1                              { break; }
+		if internal_lt_abs(a, n)                                     { break; }
 		internal_sub(a, a, n)                                        or_return;
 	}
 
@@ -2146,7 +2142,7 @@ _private_int_reduce_2k_l :: proc(a, n, d: ^Int, allocator := context.allocator) 
 			a = a + q
 		*/
 		internal_add(a, a, q)                                        or_return;
-		if internal_cmp_mag(a, n) == -1                              { break; }
+		if internal_lt_abs(a, n)                                     { break; }
 		internal_sub(a, a, n)                                        or_return;
 	}
 
@@ -2359,7 +2355,7 @@ _private_int_dr_reduce :: proc(x, n: ^Int, k: DIGIT, allocator := context.alloca
 			If x >= n then subtract and reduce again.
 			Each successive "recursion" makes the input smaller and smaller.
 		*/
-		if internal_cmp_mag(x, n) == -1 { break; }
+		if internal_lt_abs(x, n) { break; }
 
 		internal_sub(x, x, n)                                        or_return;
 	}
@@ -2985,21 +2981,21 @@ _private_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.allocator
 	/*
 		If `v` != `1` then there is no inverse.
 	*/
-	if internal_cmp(v, 1) != 0 {
+	if !internal_eq(v, 1) {
 		return .Invalid_Argument;
 	}
 
 	/*
 		If its too low.
 	*/
-	if internal_cmp(C, 0) == -1 {
+	if internal_is_negative(C) {
 		internal_add(C, C, b) or_return;
 	}
 
 	/*
 		Too big.
 	*/
-	if internal_cmp(C, 0) != -1 {
+	if internal_gte(C, 0) {
 		internal_sub(C, C, b) or_return;
 	}
 
@@ -3152,7 +3148,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		Too big.
 	*/
-	for internal_cmp_mag(D, b) != -1 {
+	for internal_gte_abs(D, b) {
 		internal_sub(D, D, b) or_return;
 	}
 

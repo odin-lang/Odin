@@ -136,7 +136,7 @@ internal_int_add_signed :: proc(dest, a, b: ^Int, allocator := context.allocator
 		Subtract the one with the greater magnitude from the other.
 		The result gets the sign of the one with the greater magnitude.
 	*/
-	if #force_inline internal_cmp_mag(a, b) == -1 {
+	if #force_inline internal_lt_abs(a, b) {
 		x, y = y, x;
 	}
 
@@ -358,7 +358,7 @@ internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := conte
 		Subtract a positive from a positive, OR negative from a negative.
 		First, take the difference between their magnitudes, then...
 	*/
-	if #force_inline internal_cmp_mag(number, decrease) == -1 {
+	if #force_inline internal_lt_abs(number, decrease) {
 		/*
 			The second has a larger magnitude.
 			The result has the *opposite* sign from the first number.
@@ -718,7 +718,7 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	/*
 		If numerator < denominator then quotient = 0, remainder = numerator.
 	*/
-	if #force_inline internal_cmp_mag(numerator, denominator) == -1 {
+	if #force_inline internal_lt_abs(numerator, denominator) {
 		if remainder != nil {
 			internal_copy(remainder, numerator) or_return;
 		}
@@ -731,7 +731,6 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
 		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.");
 		err = _private_int_div_recursive(quotient, remainder, numerator, denominator);
-		// err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
 	} else {
 		when true {
 			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator);
@@ -1243,12 +1242,12 @@ internal_less_than_or_equal :: proc {
 	internal_int_less_than_or_equal,
 	internal_int_less_than_or_equal_digit,
 }
-internal_lteq :: internal_less_than_or_equal;
+internal_lte :: internal_less_than_or_equal;
 
 internal_less_than_or_equal_abs :: proc {
 	internal_int_less_than_or_equal_abs,
 }
-internal_lteq_abs :: internal_less_than_or_equal_abs;
+internal_lte_abs :: internal_less_than_or_equal_abs;
 
 
 /*
@@ -1311,12 +1310,12 @@ internal_greater_than_or_equal :: proc {
 	internal_int_greater_than_or_equal,
 	internal_int_greater_than_or_equal_digit,
 }
-internal_gteq :: internal_greater_than_or_equal;
+internal_gte :: internal_greater_than_or_equal;
 
 internal_greater_than_or_equal_abs :: proc {
 	internal_int_greater_than_or_equal_abs,
 }
-internal_gteq_abs :: internal_greater_than_or_equal_abs;
+internal_gte_abs :: internal_greater_than_or_equal_abs;
 
 
 /*
@@ -1410,7 +1409,7 @@ internal_int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (squa
 	sqrt(t, a) or_return;
 	sqr(t, t)  or_return;
 
-	square = internal_cmp_mag(t, a) == 0;
+	square = internal_eq_abs(t, a);
 
 	return;
 }
@@ -1642,7 +1641,7 @@ internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 		internal_add(t2, t1, x)  or_return;
 		internal_shr(y, t2, 1)   or_return;
 
-		if c := internal_cmp(y, x); c == 0 || c == 1 {
+		if internal_gte(y, x) {
 			internal_swap(dest, x);
 			return nil;
 		}
@@ -1757,8 +1756,8 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 			 Number of rounds is at most log_2(root). If it is more it
 			 got stuck, so break out of the loop and do the rest manually.
 		*/
-		if ilog2 -= 1;    ilog2 == 0 { break; }
-		if internal_cmp(t1, t2) == 0 { break; }
+		if ilog2 -= 1; ilog2 == 0 { break; }
+		if internal_eq(t1, t2)    { break; }
 
 		iterations += 1;
 		if iterations == MAX_ITERATIONS_ROOT_N {
@@ -1796,7 +1795,7 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	for {
 		internal_pow(t2, t1, n) or_return;
 	
-		if internal_cmp(t2, a) != 1 { break; }
+		if internal_lt(t2, a) { break; }
 		
 		internal_sub(t1, t1, DIGIT(1)) or_return;
 
@@ -2001,12 +2000,12 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 	/*
 		For all n in N and n > 0, n = 0 mod 1.
 	*/
-	if internal_is_positive(a) && internal_cmp(b, 1) == 0 { return internal_zero(dest);	}
+	if internal_is_positive(a) && internal_eq(b, 1) { return internal_zero(dest);	}
 
 	/*
 		`b` cannot be negative and has to be > 1
 	*/
-	if internal_is_negative(b) && internal_cmp(b, 1) != 1 { return .Invalid_Argument; }
+	if internal_is_negative(b) || internal_gt(b, 1) { return .Invalid_Argument; }
 
 	/*
 		If the modulus is odd we can use a faster routine instead.
