@@ -1,3 +1,12 @@
+#
+#	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+#	Made available under Odin's BSD-3 license.
+#
+#	A BigInt implementation in Odin.
+#	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
+#	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
+#
+
 from ctypes import *
 from random import *
 import math
@@ -404,7 +413,6 @@ def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
 	return test("test_shr_signed", res, [a, bits], expected_error, expected_result)
 
 def test_factorial(number = 0, expected_error = Error.Okay):
-	print("Factorial:", number)
 	args  = [number]
 	try:
 		res = int_factorial(*args)

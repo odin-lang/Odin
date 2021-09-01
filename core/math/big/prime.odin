@@ -1,5 +1,3 @@
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -10,12 +8,13 @@ package math_big
 
 	This file contains prime finding operations.
 */
+package math_big
 
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
 */
-int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
+internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
 	assert_if_nil(a);
 	context.allocator = allocator;
 
@@ -34,177 +33,175 @@ int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res:
 }
 
 /*
-	Computes xR**-1 == x (mod N) via Montgomery Reduction.
+	This is a shell function that calls either the normal or Montgomery exptmod functions.
+	Originally the call to the Montgomery code was embedded in the normal function but that
+	wasted alot of stack space for nothing (since 99% of the time the Montgomery code would be called).
+
+	Computes res == G**X mod P.
+	Assumes `res`, `G`, `X` and `P` to not be `nil` and for `G`, `X` and `P` to have been initialized.
 */
-internal_int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator;
-	/*
-		Can the fast reduction [comba] method be used?
-		Note that unlike in mul, you're safely allowed *less* than the available columns [255 per default],
-		since carries are fixed up in the inner loop.
-	*/
-	digs := (n.used * 2) + 1;
-	if digs < _WARRAY && x.used <= _WARRAY && n.used < _MAX_COMBA {
-		return _private_montgomery_reduce_comba(x, n, rho);
-	}
-
-	/*
-		Grow the input as required
-	*/
-	internal_grow(x, digs)                                           or_return;
-	x.used = digs;
-
-	for ix := 0; ix < n.used; ix += 1 {
-		/*
-			`mu = ai * rho mod b`
-			The value of rho must be precalculated via `int_montgomery_setup()`,
-			such that it equals -1/n0 mod b this allows the following inner loop
-			to reduce the input one digit at a time.
-		*/
-
-		mu := DIGIT((_WORD(x.digit[ix]) * _WORD(rho)) & _WORD(_MASK));
-
-		/*
-			a = a + mu * m * b**i
-			Multiply and add in place.
-		*/
-		u  := DIGIT(0);
-		iy := int(0);
-		for ; iy < n.used; iy += 1 {
-			/*
-				Compute product and sum.
-			*/
-			r := (_WORD(mu) * _WORD(n.digit[iy]) + _WORD(u) + _WORD(x.digit[ix + iy]));
-
-			/*
-				Get carry.
-			*/
-			u = DIGIT(r >> _DIGIT_BITS);
-
-			/*
-				Fix digit.
-			*/
-			x.digit[ix + iy] = DIGIT(r & _WORD(_MASK));
-		}
-
-		/*
-			At this point the ix'th digit of x should be zero.
-			Propagate carries upwards as required.
-		*/
-		for u != 0 {
-			x.digit[ix + iy] += u;
-			u = x.digit[ix + iy] >> _DIGIT_BITS;
-			x.digit[ix + iy] &= _MASK;
-			iy += 1;
-		}
-	}
-
-	/*
-		At this point the n.used'th least significant digits of x are all zero,
-		which means we can shift x to the right by n.used digits and the
-		residue is unchanged.
-
-		x = x/b**n.used.
-	*/
-	internal_clamp(x);
-	internal_shr_digit(x, n.used);
-
-	/*
-		if x >= n then x = x - n
-	*/
-	if internal_cmp_mag(x, n) != -1 {
-		return internal_sub(x, x, n);
-	}
-
-	return nil;
-}
-
-int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(x, n);
+internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
-	internal_clear_if_uninitialized(x, n) or_return;
+	dr: int;
 
-	return #force_inline internal_int_montgomery_reduce(x, n, rho);
+	/*
+		Modulus P must be positive.
+	*/
+	if internal_is_negative(P) { return .Invalid_Argument; }
+
+	/*
+		If exponent X is negative we have to recurse.
+	*/
+	if internal_is_negative(X) {
+		tmpG, tmpX := &Int{}, &Int{};
+		defer internal_destroy(tmpG, tmpX);
+
+		internal_init_multi(tmpG, tmpX) or_return;
+
+		/*
+			First compute 1/G mod P.
+		*/
+		internal_invmod(tmpG, G, P) or_return;
+
+		/*
+			now get |X|.
+		*/
+		internal_abs(tmpX, X) or_return;
+
+		/*
+			And now compute (1/G)**|X| instead of G**X [X < 0].
+		*/
+		return internal_int_exponent_mod(res, tmpG, tmpX, P);
+	}
+
+	/*
+		Modified diminished radix reduction.
+	*/
+	can_reduce_2k_l := _private_int_reduce_is_2k_l(P) or_return;
+	if can_reduce_2k_l {
+		return _private_int_exponent_mod(res, G, X, P, 1);
+	}
+
+	/*
+		Is it a DR modulus? default to no.
+	*/
+	dr = 1 if _private_dr_is_modulus(P) else 0;
+
+	/*
+		If not, is it a unrestricted DR modulus?
+	*/
+	if dr == 0 {
+		reduce_is_2k := _private_int_reduce_is_2k(P) or_return;
+		dr = 2 if reduce_is_2k else 0;
+	}
+
+	/*
+		If the modulus is odd or dr != 0 use the montgomery method.
+	*/
+	if internal_int_is_odd(P) || dr != 0 {
+		return _private_int_exponent_mod(res, G, X, P, dr);
+	}
+
+	/*
+		Otherwise use the generic Barrett reduction technique.
+	*/
+	return _private_int_exponent_mod(res, G, X, P, 0);
 }
 
 /*
-	Shifts with subtractions when the result is greater than b.
+	Kronecker symbol (a|p)
+	Straightforward implementation of algorithm 1.4.10 in
+	Henri Cohen: "A Course in Computational Algebraic Number Theory"
 
-	The method is slightly modified to shift B unconditionally upto just under
-	the leading bit of b.  This saves alot of multiple precision shifting.
-*/
-internal_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator;
-	/*
-		How many bits of last digit does b use.
-	*/
-	bits := internal_count_bits(b) % _DIGIT_BITS;
-
-	if b.used > 1 {
-		power := ((b.used - 1) * _DIGIT_BITS) + bits - 1;
-		internal_int_power_of_two(a, power)                          or_return;
-	} else {
-		internal_one(a);
-		bits = 1;
+	@book{cohen2013course,
+		title={A course in computational algebraic number theory},
+		author={Cohen, Henri},
+		volume={138},
+		year={2013},
+		publisher={Springer Science \& Business Media}
 	}
 
-	/*
-		Now compute C = A * B mod b.
-	*/
-	for x := bits - 1; x < _DIGIT_BITS; x += 1 {
-		internal_int_shl1(a, a)                                      or_return;
-		if internal_cmp_mag(a, b) != -1 {
-			internal_sub(a, a, b)                                    or_return;
+	Assumes `a` and `p` to not be `nil` and to have been initialized.
+*/
+internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (kronecker: int, err: Error) {
+	context.allocator = allocator;
+
+	a1, p1, r := &Int{}, &Int{}, &Int{};
+	defer internal_destroy(a1, p1, r);
+
+	table := []int{0, 1, 0, -1, 0, -1, 0, 1};
+
+	if internal_int_is_zero(p) {
+		if a.used == 1 && a.digit[0] == 1 {
+			return 1, nil;
+		} else {
+			return 0, nil;
 		}
 	}
-	return nil;
-}
 
-int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(a, b);
-	context.allocator = allocator;
-
-	internal_clear_if_uninitialized(a, b) or_return;
-
-	return #force_inline internal_int_montgomery_calc_normalization(a, b);
-}
-
-/*
-	Sets up the Montgomery reduction stuff.
-*/
-internal_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
-	/*
-		Fast inversion mod 2**k
-		Based on the fact that:
-
-		XA = 1 (mod 2**n) => (X(2-XA)) A = 1 (mod 2**2n)
-		                  =>  2*X*A - X*X*A*A = 1
-		                  =>  2*(1) - (1)     = 1
-	*/
-	b := n.digit[0];
-	if b & 1 == 0 { return 0, .Invalid_Argument; }
-
-	x := (((b + 2) & 4) << 1) + b; /* here x*a==1 mod 2**4 */
-	x *= 2 - (b * x);              /* here x*a==1 mod 2**8 */
-	x *= 2 - (b * x);              /* here x*a==1 mod 2**16 */
-	when _WORD_TYPE_BITS == 64 {
-		x *= 2 - (b * x);              /* here x*a==1 mod 2**32 */
-		x *= 2 - (b * x);              /* here x*a==1 mod 2**64 */
+	if internal_is_even(a) && internal_is_even(p) {
+		return 0, nil;
 	}
 
-	/*
-		rho = -1/m mod b
-	*/
-	rho = DIGIT(((_WORD(1) << _WORD(_DIGIT_BITS)) - _WORD(x)) & _WORD(_MASK));
-	return rho, nil;
-}
+	internal_copy(a1, a) or_return;
+	internal_copy(p1, p) or_return;
 
-int_montgomery_setup :: proc(n: ^Int, allocator := context.allocator) -> (rho: DIGIT, err: Error) {
-	assert_if_nil(n);
-	internal_clear_if_uninitialized(n, allocator) or_return;
+	v := internal_count_lsb(p1) or_return;
+	internal_shr(p1, p1, v) or_return;
 
-	return #force_inline internal_int_montgomery_setup(n);
+	k := 1 if v & 1 == 0 else table[a.digit[0] & 7];
+
+	if internal_is_negative(p1) {
+		p1.sign = .Zero_or_Positive;
+		if internal_is_negative(a1) {
+			k = -k;
+		}
+	}
+
+	internal_zero(r) or_return;
+
+	for {
+		if internal_is_zero(a1) {
+			if internal_eq(p1, 1) {
+				return k, nil;
+			} else {
+				return 0, nil;
+			}
+		}
+
+		v = internal_count_lsb(a1) or_return;
+		internal_shr(a1, a1, v) or_return;
+
+		if v & 1 == 1 {
+			k = k * table[p1.digit[0] & 7];
+		}
+
+		if internal_is_negative(a1) {
+			/*
+				Compute k = (-1)^((a1)*(p1-1)/4) * k.
+				a1.digit[0] + 1 cannot overflow because the MSB
+				of the DIGIT type is not set by definition.
+			 */
+			if a1.digit[0] + 1 & p1.digit[0] & 2 != 0 {
+				k = -k;
+			}
+		} else {
+			/*
+				Compute k = (-1)^((a1-1)*(p1-1)/4) * k.
+			*/
+			if a1.digit[0] & p1.digit[0] & 2 != 0 {
+				k = -k;
+			}
+		}
+
+		internal_copy(r, a1) or_return;
+		r.sign = .Zero_or_Positive;
+
+		internal_mod(a1, p1, r) or_return;
+		internal_copy(p1, r)    or_return;
+	}
+	return;
 }
 
 /*
