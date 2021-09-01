@@ -561,6 +561,298 @@ int_compare_magnitude :: proc(a, b: ^Int, allocator := context.allocator) -> (re
 
 	return #force_inline internal_cmp_mag(a, b), nil;
 }
+int_cmp_mag :: int_compare_magnitude;
+
+
+/*
+	bool := a < b
+*/
+int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c == -1, err;
+}
+
+/*
+	bool := a < b
+*/
+int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (less_than: bool, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c == -1, err;
+}
+
+/*
+	bool := |a| < |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+int_less_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp_mag(a, b);
+
+	return c == -1, err;
+}
+
+less_than :: proc {
+	int_less_than,
+	int_less_than_digit,
+}
+lt :: less_than;
+
+less_than_abs :: proc {
+	int_less_than_abs,
+}
+lt_abs :: less_than_abs;
+
+
+/*
+	bool := a <= b
+*/
+int_less_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c <= 0, err;
+}
+
+/*
+	bool := a <= b
+*/
+int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c <= 0, err;
+}
+
+/*
+	bool := |a| <= |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp_mag(a, b);
+
+	return c <= 0, err;
+}
+
+less_than_or_equal :: proc {
+	int_less_than_or_equal,
+	int_less_than_or_equal_digit,
+}
+lteq :: less_than_or_equal;
+
+less_than_or_equal_abs :: proc {
+	int_less_than_or_equal_abs,
+}
+lteq_abs :: less_than_or_equal_abs;
+
+
+/*
+	bool := a == b
+*/
+int_equals :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (equals: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c == 0, err;
+}
+
+/*
+	bool := a == b
+*/
+int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (equals: bool, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c == 0, err;
+}
+
+/*
+	bool := |a| == |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+int_equals_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (equals: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp_mag(a, b);
+
+	return c == 0, err;
+}
+
+equals :: proc {
+	int_equals,
+	int_equals_digit,
+}
+eq :: equals;
+
+equals_abs :: proc {
+	int_equals_abs,
+}
+eq_abs :: equals_abs;
+
+
+/*
+	bool := a >= b
+*/
+int_greater_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c >= 0, err;
+}
+
+/*
+	bool := a >= b
+*/
+int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c >= 0, err;
+}
+
+/*
+	bool := |a| >= |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp_mag(a, b);
+
+	return c >= 0, err;
+}
+
+greater_than_or_equal :: proc {
+	int_greater_than_or_equal,
+	int_greater_than_or_equal_digit,
+}
+gteq :: greater_than_or_equal;
+
+greater_than_or_equal_abs :: proc {
+	int_greater_than_or_equal_abs,
+}
+gteq_abs :: greater_than_or_equal_abs;
+
+
+/*
+	bool := a > b
+*/
+int_greater_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c > 0, err;
+}
+
+/*
+	bool := a > b
+*/
+int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+	assert_if_nil(a);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a) or_return;
+
+	c: int;
+	c, err = cmp(a, b);
+
+	return c > 0, err;
+}
+
+/*
+	bool := |a| > |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+int_greater_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+	assert_if_nil(a, b);
+	context.allocator = allocator;
+
+	internal_clear_if_uninitialized(a, b) or_return;
+
+	c: int;
+	c, err = cmp_mag(a, b);
+
+	return c > 0, err;
+}
+
+greater_than :: proc {
+	int_greater_than,
+	int_greater_than_digit,
+}
+gt :: greater_than;
+
+greater_than_abs :: proc {
+	int_greater_than_abs,
+}
+gt_abs :: greater_than_abs;
+
 
 /*
 	Check if remainders are possible squares - fast exclude non-squares.
