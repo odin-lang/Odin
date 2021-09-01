@@ -613,12 +613,12 @@ int_less_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocat
 less_than :: proc {
 	int_less_than,
 	int_less_than_digit,
-}
+};
 lt :: less_than;
 
 less_than_abs :: proc {
 	int_less_than_abs,
-}
+};
 lt_abs :: less_than_abs;
 
 
@@ -671,12 +671,12 @@ int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := contex
 less_than_or_equal :: proc {
 	int_less_than_or_equal,
 	int_less_than_or_equal_digit,
-}
+};
 lteq :: less_than_or_equal;
 
 less_than_or_equal_abs :: proc {
 	int_less_than_or_equal_abs,
-}
+};
 lteq_abs :: less_than_or_equal_abs;
 
 
@@ -729,12 +729,12 @@ int_equals_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator)
 equals :: proc {
 	int_equals,
 	int_equals_digit,
-}
+};
 eq :: equals;
 
 equals_abs :: proc {
 	int_equals_abs,
-}
+};
 eq_abs :: equals_abs;
 
 
@@ -787,12 +787,12 @@ int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := con
 greater_than_or_equal :: proc {
 	int_greater_than_or_equal,
 	int_greater_than_or_equal_digit,
-}
+};
 gteq :: greater_than_or_equal;
 
 greater_than_or_equal_abs :: proc {
 	int_greater_than_or_equal_abs,
-}
+};
 gteq_abs :: greater_than_or_equal_abs;
 
 
@@ -845,12 +845,12 @@ int_greater_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allo
 greater_than :: proc {
 	int_greater_than,
 	int_greater_than_digit,
-}
+};
 gt :: greater_than;
 
 greater_than_abs :: proc {
 	int_greater_than_abs,
-}
+};
 gt_abs :: greater_than_abs;
 
 
