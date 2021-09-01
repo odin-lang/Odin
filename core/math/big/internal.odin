@@ -1098,6 +1098,7 @@ internal_is_power_of_two :: proc { internal_int_is_power_of_two, };
 	Expects `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
 */
 internal_int_compare :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
+	assert_if_nil(a, b);
 	a_is_negative := #force_inline internal_is_negative(a);
 
 	/*
@@ -1121,6 +1122,7 @@ internal_cmp :: internal_compare;
 	Expects: `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
 */
 internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparison: int) {
+	assert_if_nil(a);
 	a_is_negative := #force_inline internal_is_negative(a);
 
 	switch {
@@ -1152,6 +1154,7 @@ internal_cmp_digit :: internal_compare_digit;
 	Compare the magnitude of two `Int`s, unsigned.
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
+	assert_if_nil(a, b);
 	/*
 		Compare based on used digits.
 	*/
@@ -1178,6 +1181,177 @@ internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison:
 }
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, };
 internal_cmp_mag :: internal_compare_magnitude;
+
+
+/*
+	bool := a < b
+*/
+internal_int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
+	return internal_cmp(a, b) == -1;
+}
+
+/*
+	bool := a < b
+*/
+internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool) {
+	return internal_cmp_digit(a, b) == -1;
+}
+
+/*
+	bool := |a| < |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
+	return internal_cmp_mag(a, b) == -1;
+}
+
+internal_less_than :: proc {
+	internal_int_less_than,
+	internal_int_less_than_digit,
+}
+internal_lt :: internal_less_than;
+
+internal_less_than_abs :: proc {
+	internal_int_less_than_abs,
+}
+internal_lt_abs :: internal_less_than_abs;
+
+
+/*
+	bool := a <= b
+*/
+internal_int_less_than_or_equal :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool) {
+	return internal_cmp(a, b) <= 0;
+}
+
+/*
+	bool := a <= b
+*/
+internal_int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than_or_equal: bool) {
+	return internal_cmp_digit(a, b) <= 0;
+}
+
+/*
+	bool := |a| <= |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool) {
+	return internal_cmp_mag(a, b) <= 0;
+}
+
+internal_less_than_or_equal :: proc {
+	internal_int_less_than_or_equal,
+	internal_int_less_than_or_equal_digit,
+}
+internal_lteq :: internal_less_than_or_equal;
+
+internal_less_than_or_equal_abs :: proc {
+	internal_int_less_than_or_equal_abs,
+}
+internal_lteq_abs :: internal_less_than_or_equal_abs;
+
+
+/*
+	bool := a == b
+*/
+internal_int_equals :: #force_inline proc(a, b: ^Int) -> (equals: bool) {
+	return internal_cmp(a, b) == 0;
+}
+
+/*
+	bool := a == b
+*/
+internal_int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (equals: bool) {
+	return internal_cmp_digit(a, b) == 0;
+}
+
+/*
+	bool := |a| == |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_equals_abs :: #force_inline proc(a, b: ^Int) -> (equals: bool) {
+	return internal_cmp_mag(a, b) == 0;
+}
+
+internal_equals :: proc {
+	internal_int_equals,
+	internal_int_equals_digit,
+}
+internal_eq :: internal_equals;
+
+internal_equals_abs :: proc {
+	internal_int_equals_abs,
+}
+internal_eq_abs :: internal_equals_abs;
+
+
+/*
+	bool := a >= b
+*/
+internal_int_greater_than_or_equal :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool) {
+	return internal_cmp(a, b) >= 0;
+}
+
+/*
+	bool := a >= b
+*/
+internal_int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than_or_equal: bool) {
+	return internal_cmp_digit(a, b) >= 0;
+}
+
+/*
+	bool := |a| >= |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool) {
+	return internal_cmp_mag(a, b) >= 0;
+}
+
+internal_greater_than_or_equal :: proc {
+	internal_int_greater_than_or_equal,
+	internal_int_greater_than_or_equal_digit,
+}
+internal_gteq :: internal_greater_than_or_equal;
+
+internal_greater_than_or_equal_abs :: proc {
+	internal_int_greater_than_or_equal_abs,
+}
+internal_gteq_abs :: internal_greater_than_or_equal_abs;
+
+
+/*
+	bool := a > b
+*/
+internal_int_greater_than :: #force_inline proc(a, b: ^Int) -> (greater_than: bool) {
+	return internal_cmp(a, b) == 1;
+}
+
+/*
+	bool := a > b
+*/
+internal_int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than: bool) {
+	return internal_cmp_digit(a, b) == 1;
+}
+
+/*
+	bool := |a| > |b|
+    Compares the magnitudes only, ignores the sign.
+*/
+internal_int_greater_than_abs :: #force_inline proc(a, b: ^Int) -> (greater_than: bool) {
+	return internal_cmp_mag(a, b) == 1;
+}
+
+internal_greater_than :: proc {
+	internal_int_greater_than,
+	internal_int_greater_than_digit,
+}
+internal_gt :: internal_greater_than;
+
+internal_greater_than_abs :: proc {
+	internal_int_greater_than_abs,
+}
+internal_gt_abs :: internal_greater_than_abs;
+
 
 /*
 	Check if remainders are possible squares - fast exclude non-squares.
