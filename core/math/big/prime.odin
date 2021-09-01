@@ -43,73 +43,70 @@ internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator)
 internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
-/*
-	int dr;
+	dr: int;
 
-	/* modulus P must be positive */
-	if (mp_isneg(P)) {
-		return MP_VAL;
-	}
-
-	/* if exponent X is negative we have to recurse */
-	if (mp_isneg(X)) {
-		mp_int tmpG, tmpX;
-		mp_err err;
-
-		if (!MP_HAS(MP_INVMOD)) {
-			return MP_VAL;
-		}
-
-		if ((err = mp_init_multi(&tmpG, &tmpX, NULL)) != MP_OKAY) {
-			return err;
-		}
-
-		/* first compute 1/G mod P */
-		if ((err = mp_invmod(G, P, &tmpG)) != MP_OKAY) {
-			goto LBL_ERR;
-		}
-
-		/* now get |X| */
-		if ((err = mp_abs(X, &tmpX)) != MP_OKAY) {
-			goto LBL_ERR;
-		}
-
-		/* and now compute (1/G)**|X| instead of G**X [X < 0] */
-		err = mp_exptmod(&tmpG, &tmpX, P, Y);
-LBL_ERR:
-		mp_clear_multi(&tmpG, &tmpX, NULL);
-		return err;
-	}
-
-	/* modified diminished radix reduction */
-	if (MP_HAS(MP_REDUCE_IS_2K_L) && MP_HAS(MP_REDUCE_2K_L) && MP_HAS(S_MP_EXPTMOD) &&
-		 mp_reduce_is_2k_l(P)) {
-		return s_mp_exptmod(G, X, P, Y, 1);
-	}
-
-	/* is it a DR modulus? default to no */
-	dr = (MP_HAS(MP_DR_IS_MODULUS) && mp_dr_is_modulus(P)) ? 1 : 0;
-
-	/* if not, is it a unrestricted DR modulus? */
-	if (MP_HAS(MP_REDUCE_IS_2K) && (dr == 0)) {
-		dr = (mp_reduce_is_2k(P)) ? 2 : 0;
-	}
-
-	/* if the modulus is odd or dr != 0 use the montgomery method */
-	if (MP_HAS(S_MP_EXPTMOD_FAST) && (mp_isodd(P) || (dr != 0))) {
-		return s_mp_exptmod_fast(G, X, P, Y, dr);
-	}
-
-	/* otherwise use the generic Barrett reduction technique */
-	if (MP_HAS(S_MP_EXPTMOD)) {
-		return s_mp_exptmod(G, X, P, Y, 0);
-	}
-
-	/* no exptmod for evens */
-	return MP_VAL;
-
+	/*
+		Modulus P must be positive.
 	*/
-	return nil;
+	if internal_is_negative(P) { return .Invalid_Argument; }
+
+	/*
+		If exponent X is negative we have to recurse.
+	*/
+	if internal_is_negative(X) {
+		tmpG, tmpX := &Int{}, &Int{};
+		defer internal_destroy(tmpG, tmpX);
+
+		internal_init_multi(tmpG, tmpX) or_return;
+
+		/*
+			First compute 1/G mod P.
+		*/
+		internal_invmod(tmpG, G, P) or_return;
+
+		/*
+			now get |X|.
+		*/
+		internal_abs(tmpX, X) or_return;
+
+		/*
+			And now compute (1/G)**|X| instead of G**X [X < 0].
+		*/
+		return internal_int_exponent_mod(res, tmpG, tmpX, P);
+	}
+
+	/*
+		Modified diminished radix reduction.
+	*/
+	can_reduce_2k_l := _private_int_reduce_is_2k_l(P) or_return;
+	if can_reduce_2k_l {
+		return _private_int_exponent_mod(res, G, X, P, 1);
+	}
+
+	/*
+		Is it a DR modulus? default to no.
+	*/
+	dr = 1 if _private_dr_is_modulus(P) else 0;
+
+	/*
+		If not, is it a unrestricted DR modulus?
+	*/
+	if dr == 0 {
+		reduce_is_2k := _private_int_reduce_is_2k(P) or_return;
+		dr = 2 if reduce_is_2k else 0;
+	}
+
+	/*
+		If the modulus is odd or dr != 0 use the montgomery method.
+	*/
+	if internal_int_is_odd(P) || dr != 0 {
+		return _private_int_exponent_mod(res, G, X, P, dr);
+	}
+
+	/*
+		Otherwise use the generic Barrett reduction technique.
+	*/
+	return _private_int_exponent_mod(res, G, X, P, 0);
 }
 
 /*
