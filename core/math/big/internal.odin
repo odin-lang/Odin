@@ -1207,12 +1207,12 @@ internal_int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool
 internal_less_than :: proc {
 	internal_int_less_than,
 	internal_int_less_than_digit,
-}
+};
 internal_lt :: internal_less_than;
 
 internal_less_than_abs :: proc {
 	internal_int_less_than_abs,
-}
+};
 internal_lt_abs :: internal_less_than_abs;
 
 
@@ -1241,12 +1241,12 @@ internal_int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (less_t
 internal_less_than_or_equal :: proc {
 	internal_int_less_than_or_equal,
 	internal_int_less_than_or_equal_digit,
-}
+};
 internal_lte :: internal_less_than_or_equal;
 
 internal_less_than_or_equal_abs :: proc {
 	internal_int_less_than_or_equal_abs,
-}
+};
 internal_lte_abs :: internal_less_than_or_equal_abs;
 
 
@@ -1275,12 +1275,12 @@ internal_int_equals_abs :: #force_inline proc(a, b: ^Int) -> (equals: bool) {
 internal_equals :: proc {
 	internal_int_equals,
 	internal_int_equals_digit,
-}
+};
 internal_eq :: internal_equals;
 
 internal_equals_abs :: proc {
 	internal_int_equals_abs,
-}
+};
 internal_eq_abs :: internal_equals_abs;
 
 
@@ -1309,12 +1309,12 @@ internal_int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (gre
 internal_greater_than_or_equal :: proc {
 	internal_int_greater_than_or_equal,
 	internal_int_greater_than_or_equal_digit,
-}
+};
 internal_gte :: internal_greater_than_or_equal;
 
 internal_greater_than_or_equal_abs :: proc {
 	internal_int_greater_than_or_equal_abs,
-}
+};
 internal_gte_abs :: internal_greater_than_or_equal_abs;
 
 
@@ -1343,12 +1343,12 @@ internal_int_greater_than_abs :: #force_inline proc(a, b: ^Int) -> (greater_than
 internal_greater_than :: proc {
 	internal_int_greater_than,
 	internal_int_greater_than_digit,
-}
+};
 internal_gt :: internal_greater_than;
 
 internal_greater_than_abs :: proc {
 	internal_int_greater_than_abs,
-}
+};
 internal_gt_abs :: internal_greater_than_abs;
 
 
