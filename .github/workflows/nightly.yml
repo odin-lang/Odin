@@ -28,6 +28,7 @@ jobs:
           cp LLVM-C.dll dist
           cp -r shared dist
           cp -r core dist
+          cp -r vendor dist
           cp -r bin dist
           cp -r examples dist
       - name: Upload artifact
@@ -51,6 +52,7 @@ jobs:
           cp odin dist
           cp -r shared dist
           cp -r core dist
+          cp -r vendor dist
           cp -r examples dist
       - name: Upload artifact
         uses: actions/upload-artifact@v1
@@ -77,6 +79,7 @@ jobs:
           cp odin dist
           cp -r shared dist
           cp -r core dist
+          cp -r vendor dist
           cp -r examples dist
       - name: Upload artifact
         uses: actions/upload-artifact@v1
