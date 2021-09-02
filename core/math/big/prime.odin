@@ -223,7 +223,7 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	/*
 		Ensure `b` > 1.
 	*/
-	if internal_gt(b, 1) { return false, nil; }
+	if internal_lte(b, 1) { return false, nil; }
 
 	/*
 		Get `n1` = `a` - 1.
@@ -291,10 +291,10 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	`a` is the big Int to test for primality.
 
 	`miller_rabin_trials` can be one of the following:
-		< 0:	For `a` up to 3_317_044_064_679_887_385_961_981, set `miller_rabin_trials` to negative to run a predetermined
+		`< 0`:	For `a` up to 3_317_044_064_679_887_385_961_981, set `miller_rabin_trials` to negative to run a predetermined
 				number of trials for a deterministic answer.
-		= 0:	Run Miller-Rabin with bases 2, 3 and one random base < `a`. Non-deterministic.
-		> 0:	Run Miller-Rabin with bases 2, 3 and `miller_rabin_trials` number of random bases. Non-deterministic.
+		`= 0`:	Run Miller-Rabin with bases 2, 3 and one random base < `a`. Non-deterministic.
+		`> 0`:	Run Miller-Rabin with bases 2, 3 and `miller_rabin_trials` number of random bases. Non-deterministic.
 
 	`miller_rabin_only`:
 		`false`	Also use either Frobenius-Underwood or Lucas-Selfridge, depending on the compile-time `MATH_BIG_USE_FROBENIUS_TEST` choice.

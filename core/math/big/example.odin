@@ -93,45 +93,16 @@ demo :: proc() {
 	err: Error;
 	prime: bool;
 
-	foo := [4]f64{1, 2, 4, 5};
-	fmt.println(foo.rrr);
+	trials := 1;
 
-	trials := 15;
-
-	{
-		SCOPED_TIMING(.is_prime);
-		for p in _private_prime_table[2:] {
-
-			set(a, p);
-			prime, err = internal_int_is_prime(a, trials);
-			if !prime || err != nil {
-				fmt.printf("%v wrongly flagged as composite\n", p);
-			}
-
-			set(a, p - 1);
-			prime, err = internal_int_is_prime(a, trials);
-			if prime || err != nil {
-				fmt.printf("%v wrongly flagged as prime\n", p);
-			}
-
-			set(a, p + 1);
-			prime, err = internal_int_is_prime(a, trials);
-			if prime || err != nil {
-				fmt.printf("%v wrongly flagged as prime\n", p);
-			}
-		}
-	}
-	Timings[.is_prime].count = len(_private_prime_table[2:]) * 3;
-
-	internal_set(a, "3317044064679887385961981");
+	set(c, "3317044064679887385961981");
 
 	{
 		SCOPED_TIMING(.is_prime);
-		prime, err = internal_int_is_prime(a, trials);
-		if prime || err != nil {
-			print("Wrongly flagged as prime: ", a);
-		}
+		prime, err = internal_int_is_prime(c, trials);
 	}
+	//print("prime: ", c);
+	fmt.printf("%v %v\n", prime, err);
 }
 
 main :: proc() {
