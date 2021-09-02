@@ -1871,7 +1871,7 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 	return nil;
 }
 
-internal_set :: proc { internal_int_set_from_integer, internal_int_copy };
+internal_set :: proc { internal_int_set_from_integer, internal_int_copy, int_atoi };
 
 internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int, offset := int(0)) -> (err: Error) {
 	#force_inline internal_error_if_immutable(dest) or_return;

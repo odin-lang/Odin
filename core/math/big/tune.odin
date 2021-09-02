@@ -23,6 +23,7 @@ Category :: enum {
 	sqr,
 	bitfield_extract,
 	rm_trials,
+	is_prime,
 };
 
 Event :: struct {
