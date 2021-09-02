@@ -366,13 +366,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 	if !miller_rabin_only {
 		if miller_rabin_trials >= 0 {
 			when MATH_BIG_USE_FROBENIUS_TEST {
-//				err = mp_prime_frobenius_underwood(a, &res);
-//				if ((err != MP_OKAY) && (err != MP_ITER)) {
-//					goto LBL_B;
-//				}
-//				if (!res) {
-//					goto LBL_B;
-//				}
+				if !internal_int_prime_frobenius_underwood(a) or_return { return; }
 			} else {
 //				if ((err = mp_prime_strong_lucas_selfridge(a, &res)) != MP_OKAY) {
 //					goto LBL_B;
@@ -506,6 +500,102 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 	return true, nil;
 }
 
+/*
+ * floor of positive solution of (2^16) - 1 = (a + 4) * (2 * a + 5)
+ * TODO: Both values are smaller than N^(1/4), would have to use a bigint
+ *       for `a` instead, but any `a` bigger than about 120 are already so rare that
+ *       it is possible to ignore them and still get enough pseudoprimes.
+ *       But it is still a restriction of the set of available pseudoprimes
+ *       which makes this implementation less secure if used stand-alone.
+ */
+_FROBENIUS_UNDERWOOD_A :: 32764;
+
+internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.allocator) -> (result: bool, err: Error) {
+	context.allocator = allocator;
+
+	T1z, T2z, Np1z, sz, tz := &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(T1z, T2z, Np1z, sz, tz);
+
+	internal_init_multi(T1z, T2z, Np1z, sz, tz) or_return;
+
+	a, ap2: int;
+
+	frob: for a = 0; a < _FROBENIUS_UNDERWOOD_A; a += 1 {
+		switch a {
+		case 2, 4, 7, 8, 10, 14, 18, 23, 26, 28:
+			continue frob;
+		}
+
+		internal_set(T1z, i32((a * a) - 4));
+		j := internal_int_kronecker(T1z, N) or_return;
+
+		switch j {
+		case -1: break frob;
+		case  0: return false, nil;
+		}
+	}
+
+	// Tell it a composite and set return value accordingly.
+	if a >= _FROBENIUS_UNDERWOOD_A { return false, .Max_Iterations_Reached; }
+
+	// Composite if N and (a+4)*(2*a+5) are not coprime.
+	internal_set(T1z, u32((a + 4) * ((2 * a) + 5)));
+	internal_int_gcd_lcm(T1z, nil, T1z, N) or_return;
+
+	if !(T1z.used == 1 && T1z.digit[0] == 1) {
+		// Composite.
+		return false, nil;
+	}
+
+	ap2 = a + 2;
+	internal_add(Np1z, N, 1) or_return;
+
+	internal_set(sz, 1) or_return;
+	internal_set(tz, 2) or_return;
+
+	for i := internal_count_bits(Np1z) - 2; i >= 0; i -= 1 {
+		// temp = (sz * (a * sz + 2 * tz)) % N;
+		// tz   = ((tz - sz) * (tz + sz)) % N;
+		// sz   = temp;
+
+		internal_int_shl1(T2z, tz) or_return;
+
+		// a = 0 at about 50% of the cases (non-square and odd input)
+		if a != 0 {
+			internal_mul(T1z, sz, DIGIT(a)) or_return;
+			internal_add(T2z, T2z, T1z) or_return;
+		}
+
+		internal_mul(T1z, T2z, sz) or_return;
+		internal_sub(T2z, tz, sz) or_return;
+		internal_add(sz, sz, tz) or_return;
+		internal_mul(tz, sz, T2z) or_return;
+		internal_mod(tz, tz, N) or_return;
+		internal_mod(sz, T1z, N) or_return;
+
+		if bit, _ := internal_int_bitfield_extract_bool(Np1z, i); bit {
+			// temp = (a+2) * sz + tz
+			// tz   = 2 * tz - sz
+			// sz   = temp
+			if a == 0 {
+				internal_int_shl1(T1z, sz) or_return;
+			} else {
+				internal_mul(T1z, sz, DIGIT(ap2)) or_return;
+			}
+			internal_add(T1z, T1z, tz) or_return;
+			internal_int_shl1(T2z, tz) or_return;
+			internal_sub(tz, T2z, sz);
+			internal_swap(sz, T1z);
+		}
+	}
+
+	internal_set(T1z, u32((2 * a) + 5)) or_return;
+	internal_mod(T1z, T1z, N) or_return;
+
+	result = internal_is_zero(sz) && internal_eq(tz, T1z);
+
+	return;
+}
 
 /*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
@@ -513,7 +603,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 number_of_rabin_miller_trials :: proc(bit_size: int) -> (number_of_trials: int) {
 	switch {
 	case bit_size <=    80:
-		return - 1;		/* Use deterministic algorithm for size <= 80 bits */
+		return -1;		/* Use deterministic algorithm for size <= 80 bits */
 	case bit_size >=    81 && bit_size <     96:
 		return 37;		/* max. error = 2^(-96)  */
 	case bit_size >=    96 && bit_size <    128:

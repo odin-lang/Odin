@@ -1,5 +1,5 @@
 @echo off
-odin run . -vet
+odin run . -vet -define:MATH_BIG_USE_FROBENIUS_TEST=true
 
 set TEST_ARGS=-fast-tests
 :set TEST_ARGS=
