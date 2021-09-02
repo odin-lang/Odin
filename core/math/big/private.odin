@@ -1373,7 +1373,7 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{};
-	c: int;
+
 	defer internal_destroy(ta, tb, tq, q);
 
 	for {

@@ -26,6 +26,7 @@ Configuration:
 	_WARRAY                               %v
 	_TAB_SIZE                             %v
 	_MAX_WIN_SIZE                         %v
+	MATH_BIG_USE_FROBENIUS_TEST           %v
 Runtime tunable:
 	MUL_KARATSUBA_CUTOFF                  %v
 	SQR_KARATSUBA_CUTOFF                  %v
@@ -35,6 +36,7 @@ Runtime tunable:
 	FACTORIAL_MAX_N                       %v
 	FACTORIAL_BINARY_SPLIT_CUTOFF         %v
 	FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS %v
+	USE_MILLER_RABIN_ONLY                 %v
 
 `, _DIGIT_BITS,
 _LOW_MEMORY,
@@ -45,6 +47,8 @@ _MAX_COMBA,
 _WARRAY,
 _TAB_SIZE,
 _MAX_WIN_SIZE,
+MATH_BIG_USE_FROBENIUS_TEST,
+
 MUL_KARATSUBA_CUTOFF,
 SQR_KARATSUBA_CUTOFF,
 MUL_TOOM_CUTOFF,
@@ -53,6 +57,7 @@ MAX_ITERATIONS_ROOT_N,
 FACTORIAL_MAX_N,
 FACTORIAL_BINARY_SPLIT_CUTOFF,
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
+USE_MILLER_RABIN_ONLY,
 );
 
 }
@@ -79,11 +84,24 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-// printf :: fmt.printf;
+printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
+
+	err: Error;
+	prime: bool;
+
+	set(a, "3317044064679887385961981"); // Composite: 1287836182261 × 2575672364521
+	trials := number_of_rabin_miller_trials(internal_count_bits(a));
+	{
+		SCOPED_TIMING(.is_prime);
+		prime, err = internal_int_is_prime(a, trials);
+	}
+	print("Candidate prime: ", a);
+	fmt.printf("%v Miller-Rabin trials needed.\n", trials);
+	fmt.printf("Is prime: %v, Error: %v\n", prime, err);
 }
 
 main :: proc() {
