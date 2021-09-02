@@ -10,6 +10,8 @@
 */
 package math_big
 
+import rnd "core:math/rand";
+
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
 	Returns true if it is, false if not. 
@@ -207,7 +209,7 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 /*
 	Miller-Rabin test of "a" to the base of "b" as described in HAC pp. 139 Algorithm 4.24.
 
-	Sets result to 0 if definitely composite or 1 if probably prime.
+	Sets result to `false` if definitely composite or `true` if probably prime.
 	Randomly the chance of error is no more than 1/4 and often very much lower.
 
 	Assumes `a` and `b` not to be `nil` and to have been initialized.
@@ -224,13 +226,13 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	if internal_gt(b, 1) { return false, nil; }
 
 	/*
-		Get n1 = a - 1.
+		Get `n1` = `a` - 1.
 	*/
 	internal_copy(n1, a) or_return;
 	internal_sub(n1, n1, 1) or_return;
 
 	/*
-		Set 2**s * r = n1
+		Set `2`**`s` * `r` = `n1`
 	*/
 	internal_copy(r, n1) or_return;
 
@@ -240,17 +242,17 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	s := internal_count_lsb(r) or_return;
 
 	/*
-		Now divide n - 1 by 2**s.
+		Now divide `n` - 1 by `2`**`s`.
 	*/
 	internal_shr(r, r, s) or_return;
 
 	/*
-		Compute y = b**r mod a.
+		Compute `y` = `b`**`r` mod `a`.
 	*/
 	internal_int_exponent_mod(y, b, r, a) or_return;
 
 	/*
-		If y != 1 and y != n1 do.
+		If `y` != 1 and `y` != `n1` do.
 	*/
 	if !internal_eq(y, 1) && !internal_eq(y, n1) {
 		j := 1;
@@ -282,6 +284,225 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	/*
 		Probably prime now.
 	*/
+	return true, nil;
+}
+
+/*
+	`a` is the big Int to test for primality.
+
+	`miller_rabin_trials` can be one of the following:
+		< 0:	For `a` up to 3_317_044_064_679_887_385_961_981, set `miller_rabin_trials` to negative to run a predetermined
+				number of trials for a deterministic answer.
+		= 0:	Run Miller-Rabin with bases 2, 3 and one random base < `a`. Non-deterministic.
+		> 0:	Run Miller-Rabin with bases 2, 3 and `miller_rabin_trials` number of random bases. Non-deterministic.
+
+	`miller_rabin_only`:
+		`false`	Also use either Frobenius-Underwood or Lucas-Selfridge, depending on the compile-time `MATH_BIG_USE_FROBENIUS_TEST` choice.
+		`true`	Run Rabin-Miller trials but skip Frobenius-Underwood / Lucas-Selfridge.
+
+	`r` takes a pointer to an instance of `core:math/rand`'s `Rand` and may be `nil` to use the global one.
+
+	Returns `is_prime` (bool), where:
+		`false`	Definitively composite.
+		`true`	Probably prime if `miller_rabin_trials` >= 0, with increasing certainty with more trials.
+				Deterministically prime if `miller_rabin_trials` = 0 for `a` up to 3_317_044_064_679_887_385_961_981.
+
+	Assumes `a` not to be `nil` and to have been initialized.
+*/
+internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_rabin_only := USE_MILLER_RABIN_ONLY, r: ^rnd.Rand = nil, allocator := context.allocator) -> (is_prime: bool, err: Error) {
+	context.allocator = allocator;
+	miller_rabin_trials := miller_rabin_trials;
+
+	// Default to `no`.
+	is_prime = false;
+
+	b, res := &Int{}, &Int{};
+	defer internal_destroy(b, res);
+
+	// Some shortcuts
+	// `N` > 3
+	if a.used == 1 {
+		if a.digit[0] == 0 || a.digit[0] == 1 {
+			return;
+		}
+		if a.digit[0] == 2 {
+			return true, nil;
+		}
+	}
+
+	// `N` must be odd.
+	if internal_is_even(a) {
+		return;
+	}
+
+	// `N` is not a perfect square: floor(sqrt(`N`))^2 != `N` 
+	if internal_int_is_square(a) or_return { return; }
+
+	// Is the input equal to one of the primes in the table?
+	for p in _private_prime_table {
+		if internal_eq(a, p) {
+			return true, nil;
+		}
+	}
+
+	// First perform trial division
+	if internal_int_prime_is_divisible(a) or_return { return; }
+
+	// Run the Miller-Rabin test with base 2 for the BPSW test.
+	internal_set(b, 2) or_return;
+	if !internal_int_prime_miller_rabin(a, b) or_return { return; }
+
+	// Rumours have it that Mathematica does a second M-R test with base 3.
+	// Other rumours have it that their strong L-S test is slightly different.
+	// It does not hurt, though, beside a bit of extra runtime.
+
+	b.digit[0] += 1;
+	if !internal_int_prime_miller_rabin(a, b) or_return { return; }
+
+	// Both, the Frobenius-Underwood test and the the Lucas-Selfridge test are quite
+	// slow so if speed is an issue, set `USE_MILLER_RABIN_ONLY` to use M-R tests with
+	// bases 2, 3 and t random bases.
+
+	if !miller_rabin_only {
+		if miller_rabin_trials >= 0 {
+			when MATH_BIG_USE_FROBENIUS_TEST {
+//				err = mp_prime_frobenius_underwood(a, &res);
+//				if ((err != MP_OKAY) && (err != MP_ITER)) {
+//					goto LBL_B;
+//				}
+//				if (!res) {
+//					goto LBL_B;
+//				}
+			} else {
+//				if ((err = mp_prime_strong_lucas_selfridge(a, &res)) != MP_OKAY) {
+//					goto LBL_B;
+//				}
+//				if (!res) {
+//					goto LBL_B;
+//				}
+			}
+		}
+	}
+
+	// Run at least one Miller-Rabin test with a random base.
+	// Don't replace this with `min`, because we try known deterministic bases
+	//     for certain sized inputs when `miller_rabin_trials` is negative.
+	if miller_rabin_trials == 0 {
+		miller_rabin_trials = 1;
+	}
+
+	// Only recommended if the input range is known to be < 3_317_044_064_679_887_385_961_981
+	// It uses the bases necessary for a deterministic M-R test if the input is	smaller than 3_317_044_064_679_887_385_961_981
+	// The caller has to check the size.
+	// TODO: can be made a bit finer grained but comparing is not free.
+
+	if miller_rabin_trials < 0 {
+		p_max := 0;
+
+		// Sorenson, Jonathan; Webster, Jonathan (2015), "Strong Pseudoprimes to Twelve Prime Bases".
+
+		// 0x437ae92817f9fc85b7e5 = 318_665_857_834_031_151_167_461
+		atoi(b, "437ae92817f9fc85b7e5", 16) or_return;
+		if internal_lt(a, b) {
+			p_max = 12;
+		} else {
+			/* 0x2be6951adc5b22410a5fd = 3_317_044_064_679_887_385_961_981 */
+			atoi(b, "2be6951adc5b22410a5fd", 16) or_return;
+			if internal_lt(a, b) {
+				p_max = 13;
+			} else {
+				return false, .Invalid_Argument;
+			}
+		}
+
+		// We did bases 2 and 3  already, skip them
+		for ix := 2; ix < p_max; ix += 1 {
+			internal_set(b, _private_prime_table[ix]);
+			if !internal_int_prime_miller_rabin(a, b) or_return { return; }
+		}
+	} else if miller_rabin_trials > 0 {
+		// Perform `miller_rabin_trials` M-R tests with random bases between 3 and "a".
+		// See Fips 186.4 p. 126ff
+
+		// The DIGITs have a defined bit-size but the size of a.digit is a simple 'int',
+		// the size of which can depend on the platform.
+		size_a := internal_count_bits(a);
+		mask   := (1 << uint(ilog2(size_a))) - 1;
+
+		/*
+			Assuming the General Rieman hypothesis (never thought to write that in a
+			comment) the upper bound can be lowered to  2*(log a)^2.
+			E. Bach, "Explicit bounds for primality testing and related problems,"
+			Math. Comp. 55 (1990), 355-380.
+
+				size_a = (size_a/10) * 7;
+				len = 2 * (size_a * size_a);
+
+			E.g.: a number of size 2^2048 would be reduced to the upper limit
+
+				floor(2048/10)*7 = 1428
+				2 * 1428^2       = 4078368
+
+			(would have been ~4030331.9962 with floats and natural log instead)
+			That number is smaller than 2^28, the default bit-size of DIGIT on 32-bit platforms.
+		*/
+
+		/*
+			How many tests, you might ask? Dana Jacobsen of Math::Prime::Util fame
+			does exactly 1. In words: one. Look at the end of _GMP_is_prime() in
+			Math-Prime-Util-GMP-0.50/primality.c if you do not believe it.
+
+			The function rand() goes to some length to use a cryptographically
+			good PRNG. That also means that the chance to always get the same base
+			in the loop is non-zero, although very low.
+			-- NOTE(Jeroen): This is not yet true in Odin, but I have some ideas.
+
+			If the BPSW test and/or the addtional Frobenious test have been
+			performed instead of just the Miller-Rabin test with the bases 2 and 3,
+			a single extra test should suffice, so such a very unlikely event will not do much harm.
+
+			To preemptivly answer the dangling question: no, a witness does not	need to be prime.
+		*/
+		for ix := 0; ix < miller_rabin_trials; ix += 1 {
+
+			// rand() guarantees the first digit to be non-zero
+			internal_rand(b, _DIGIT_TYPE_BITS, r) or_return;
+
+			// Reduce digit before casting because DIGIT might be bigger than
+			// an unsigned int and "mask" on the other side is most probably not.
+			l: int;
+
+			fips_rand := (uint)(b.digit[0] & DIGIT(mask));
+			if fips_rand > (uint)(max(int) - _DIGIT_BITS) {
+				l = max(int) / _DIGIT_BITS;
+			} else {
+				l = (int(fips_rand) + _DIGIT_BITS) / _DIGIT_BITS;
+			}
+
+			// Unlikely.
+			if (l < 0) {
+				ix -= 1;
+				continue;
+			}
+			internal_rand(b, l) or_return;
+
+			// That number might got too big and the witness has to be smaller than "a"
+			l = internal_count_bits(b);
+			if l >= size_a {
+				l = (l - size_a) + 1;
+				internal_shr(b, b, l) or_return;
+			}
+
+			// Although the chance for b <= 3 is miniscule, try again.
+			if internal_lte(b, 3) {
+				ix -= 1;
+				continue;
+			}
+			if !internal_int_prime_miller_rabin(a, b) or_return { return; }
+		}
+	}
+
+	// Passed the test.
 	return true, nil;
 }
 
