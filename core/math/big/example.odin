@@ -84,14 +84,14 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-//printf :: fmt.printf;
+// printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
 	err:  Error;
-	frob:  bool;
+	lucas: bool;
 	prime: bool;
 
 	// USE_MILLER_RABIN_ONLY = true;
@@ -103,11 +103,11 @@ demo :: proc() {
 		SCOPED_TIMING(.is_prime);
 		prime, err = internal_int_is_prime(a, trials);
 	}
-	print("Candidate prime: ", a);
+	print("Candidate prime: ", a, 10, true, true, true);
 	fmt.printf("%v Miller-Rabin trials needed.\n", trials);
 
-	frob, err = internal_int_prime_frobenius_underwood(a);
-	fmt.printf("Frobenius-Underwood: %v, Prime: %v, Error: %v\n", frob, prime, err);
+	// lucas, err = internal_int_prime_strong_lucas_selfridge(a);
+	fmt.printf("Lucas-Selfridge: %v, Prime: %v, Error: %v\n", lucas, prime, err);
 }
 
 main :: proc() {
