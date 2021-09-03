@@ -80,7 +80,8 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100;
 
 	Use Frobenius-Underwood for primality testing, or use Lucas-Selfridge (default).
 */
-MATH_BIG_USE_FROBENIUS_TEST :: #config(MATH_BIG_USE_FROBENIUS_TEST, false);
+MATH_BIG_USE_LUCAS_SELFRIDGE_TEST :: #config(MATH_BIG_USE_LUCAS_SELFRIDGE_TEST, false);
+MATH_BIG_USE_FROBENIUS_TEST       :: !MATH_BIG_USE_LUCAS_SELFRIDGE_TEST;
 
 /*
 	Runtime tunable to use Miller-Rabin primality testing only and skip the above.
