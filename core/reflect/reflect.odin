@@ -1296,9 +1296,14 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	if a.data == b.data {
 		return true;
 	}
+	
+	including_indirect_array_recursion := including_indirect_array_recursion;
+	if recursion_level >= DEFAULT_EQUAL_MAX_RECURSION_LEVEL {
+		including_indirect_array_recursion = false;
+	} 
 
 	t := type_info_of(a.id);
-	if .Comparable not_in t.flags {
+	if .Comparable not_in t.flags && !including_indirect_array_recursion {
 		return false;
 	}
 
@@ -1310,14 +1315,36 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0;
 	}
 	
-	including_indirect_array_recursion := including_indirect_array_recursion;
-	if recursion_level >= DEFAULT_EQUAL_MAX_RECURSION_LEVEL {
-		including_indirect_array_recursion = false;
-	} 
-
 	t = runtime.type_info_core(t);
 
-	#partial switch v in t.variant {
+	switch v in t.variant {
+	case Type_Info_Named:
+		unreachable();
+	case Type_Info_Any:
+		return false;
+	case Type_Info_Tuple:
+		unreachable();
+	case Type_Info_Map:
+		return false;
+	case Type_Info_Relative_Slice:
+		return false;
+	case 
+		Type_Info_Boolean,
+		Type_Info_Integer, 
+		Type_Info_Rune,
+		Type_Info_Float,
+		Type_Info_Complex,
+		Type_Info_Quaternion,
+		Type_Info_Type_Id,
+		Type_Info_Pointer,
+		Type_Info_Multi_Pointer,
+		Type_Info_Procedure,
+		Type_Info_Bit_Set,
+		Type_Info_Enum,
+		Type_Info_Simd_Vector,
+		Type_Info_Relative_Pointer:
+		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0;
+		
 	case Type_Info_String:
 		if v.is_cstring {
 			x := string((^cstring)(a.data)^);
@@ -1368,7 +1395,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return false;
 	case Type_Info_Slice:
 		if !including_indirect_array_recursion {
-			break;
+			return false;
 		}
 		array_a := (^mem.Raw_Slice)(a.data);
 		array_b := (^mem.Raw_Slice)(b.data);
@@ -1388,7 +1415,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return true;
 	case Type_Info_Dynamic_Array:
 		if !including_indirect_array_recursion {
-			break;
+			return false;
 		}
 		array_a := (^mem.Raw_Dynamic_Array)(a.data);
 		array_b := (^mem.Raw_Dynamic_Array)(b.data);
@@ -1398,6 +1425,10 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if array_a.data == array_b.data {
 			return true;
 		}
+		if .Simple_Compare in v.elem.flags {
+			return mem.compare_byte_ptrs((^byte)(array_a.data), (^byte)(array_b.data), array_a.len * v.elem.size) == 0;
+		}
+		
 		for i in 0..<array_a.len {
 			x := rawptr(uintptr(array_a.data) + uintptr(v.elem_size*i));
 			y := rawptr(uintptr(array_b.data) + uintptr(v.elem_size*i));
@@ -1407,6 +1438,8 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		}
 		return true;
 	}
-
+	
+	runtime.print_typeid(a.id);
+	runtime.print_string("\n");
 	return true;
 }
