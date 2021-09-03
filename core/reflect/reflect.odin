@@ -1279,10 +1279,12 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 eq :: equal;
 ne :: not_equal;
 
-not_equal :: proc(a, b: any) -> bool {
-	return !equal(a, b);
+DEFAULT_EQUAL_MAX_RECURSION_LEVEL :: 32;
+
+not_equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_level := 0) -> bool {
+	return !equal(a, b, including_indirect_array_recursion, recursion_level);
 }
-equal :: proc(a, b: any) -> bool {
+equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_level := 0) -> bool {
 	if a == nil && b == nil {
 		return true;
 	}
@@ -1307,6 +1309,11 @@ equal :: proc(a, b: any) -> bool {
 	if .Simple_Compare in t.flags {
 		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0;
 	}
+	
+	including_indirect_array_recursion := including_indirect_array_recursion;
+	if recursion_level >= DEFAULT_EQUAL_MAX_RECURSION_LEVEL {
+		including_indirect_array_recursion = false;
+	} 
 
 	t = runtime.type_info_core(t);
 
@@ -1321,23 +1328,25 @@ equal :: proc(a, b: any) -> bool {
 			y := (^string)(b.data)^;
 			return x == y;
 		}
-
+		return true;
 	case Type_Info_Array:
 		for i in 0..<v.count {
 			x := rawptr(uintptr(a.data) + uintptr(v.elem_size*i));
 			y := rawptr(uintptr(b.data) + uintptr(v.elem_size*i));
-			if !equal(any{x, v.elem.id}, any{y, v.elem.id}) {
+			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level) {
 				return false;
 			}
 		}
+		return true;
 	case Type_Info_Enumerated_Array:
 		for i in 0..<v.count {
 			x := rawptr(uintptr(a.data) + uintptr(v.elem_size*i));
 			y := rawptr(uintptr(b.data) + uintptr(v.elem_size*i));
-			if !equal(any{x, v.elem.id}, any{y, v.elem.id}) {
+			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level) {
 				return false;
 			}
 		}
+		return true;
 	case Type_Info_Struct:
 		if v.equal != nil {
 			return v.equal(a.data, b.data);
@@ -1346,11 +1355,57 @@ equal :: proc(a, b: any) -> bool {
 				x := rawptr(uintptr(a.data) + offset);
 				y := rawptr(uintptr(b.data) + offset);
 				id := v.types[i].id;
-				if !equal(any{x, id}, any{y, id}) {
+				if !equal(any{x, id}, any{y, id}, including_indirect_array_recursion, recursion_level) {
 					return false;
 				}
 			}
+			return true;
 		}
+	case Type_Info_Union:
+		if v.equal != nil {
+			return v.equal(a.data, b.data);
+		}
+		return false;
+	case Type_Info_Slice:
+		if !including_indirect_array_recursion {
+			break;
+		}
+		array_a := (^mem.Raw_Slice)(a.data);
+		array_b := (^mem.Raw_Slice)(b.data);
+		if array_a.len != array_b.len {
+			return false;
+		}
+		if array_a.data == array_b.data {
+			return true;
+		}
+		for i in 0..<array_a.len {
+			x := rawptr(uintptr(array_a.data) + uintptr(v.elem_size*i));
+			y := rawptr(uintptr(array_b.data) + uintptr(v.elem_size*i));
+			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level+1) {
+				return false;
+			}	
+		}
+		return true;
+	case Type_Info_Dynamic_Array:
+		if !including_indirect_array_recursion {
+			break;
+		}
+		array_a := (^mem.Raw_Dynamic_Array)(a.data);
+		array_b := (^mem.Raw_Dynamic_Array)(b.data);
+		if array_a.len != array_b.len {
+			return false;
+		}
+		if array_a.data == array_b.data {
+			return true;
+		}
+		for i in 0..<array_a.len {
+			x := rawptr(uintptr(array_a.data) + uintptr(v.elem_size*i));
+			y := rawptr(uintptr(array_b.data) + uintptr(v.elem_size*i));
+			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level+1) {
+				return false;
+			}	
+		}
+		return true;
 	}
 
 	return true;
