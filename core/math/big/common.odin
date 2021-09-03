@@ -75,6 +75,17 @@ FACTORIAL_MAX_N       := 1_000_000;
 FACTORIAL_BINARY_SPLIT_CUTOFF         := 6100;
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100;
 
+/*
+	`internal_int_is_prime` switchables.
+
+	Use Frobenius-Underwood for primality testing, or use Lucas-Selfridge (default).
+*/
+MATH_BIG_USE_FROBENIUS_TEST :: #config(MATH_BIG_USE_FROBENIUS_TEST, false);
+
+/*
+	Runtime tunable to use Miller-Rabin primality testing only and skip the above.
+*/
+USE_MILLER_RABIN_ONLY       := false;
 
 /*
 	We don't allow these to be switched at runtime for two reasons:
