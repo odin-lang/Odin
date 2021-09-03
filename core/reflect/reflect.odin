@@ -1320,10 +1320,15 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	switch v in t.variant {
 	case Type_Info_Named:
 		unreachable();
-	case Type_Info_Any:
-		return false;
 	case Type_Info_Tuple:
 		unreachable();
+	case Type_Info_Any:
+		if !including_indirect_array_recursion {
+			return false;
+		}
+		va := (^any)(a.data);
+		vb := (^any)(b.data);
+		return equal(va, vb, including_indirect_array_recursion, recursion_level+1); 
 	case Type_Info_Map:
 		return false;
 	case Type_Info_Relative_Slice:
