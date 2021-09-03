@@ -545,6 +545,25 @@ internal_int_shl1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 }
 
 /*
+	Multiply bigint `a` with int `d` and put the result in `dest`.
+ 	Like `internal_int_mul_digit` but with an integer as the small input.
+*/
+internal_int_mul_integer :: proc(dest, a: ^Int, b: $T, allocator := context.allocator) -> (err: Error)
+where intrinsics.type_is_integer(T) && T != DIGIT {
+	context.allocator = allocator;
+
+	t := &Int{};
+	defer internal_destroy(t);
+
+	/*
+		DIGIT might be smaller than a long, which excludes the use of `internal_int_mul_digit` here.
+	*/
+	internal_set(t, b) or_return;
+	internal_mul(dest, a, t) or_return;
+	return;
+}
+
+/*
 	Multiply by a DIGIT.
 */
 internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.allocator) -> (err: Error) {
@@ -697,7 +716,7 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 	return err;
 }
 
-internal_mul :: proc { internal_int_mul, internal_int_mul_digit, };
+internal_mul :: proc { internal_int_mul, internal_int_mul_digit, internal_int_mul_integer };
 
 internal_sqr :: proc (dest, src: ^Int, allocator := context.allocator) -> (res: Error) {
 	/*
@@ -938,6 +957,14 @@ internal_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 	if res_gcd == nil && res_lcm == nil { return nil; }
 
 	return #force_inline _private_int_gcd_lcm(res_gcd, res_lcm, a, b, allocator);
+}
+
+internal_int_gcd :: proc(res_gcd, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	return #force_inline _private_int_gcd_lcm(res_gcd, nil, a, b, allocator);
+}
+
+internal_int_lcm :: proc(res_lcm, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
+	return #force_inline _private_int_gcd_lcm(nil, res_lcm, a, b, allocator);
 }
 
 /*

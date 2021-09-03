@@ -368,12 +368,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 			when MATH_BIG_USE_FROBENIUS_TEST {
 				if !internal_int_prime_frobenius_underwood(a) or_return { return; }
 			} else {
-//				if ((err = mp_prime_strong_lucas_selfridge(a, &res)) != MP_OKAY) {
-//					goto LBL_B;
-//				}
-//				if (!res) {
-//					goto LBL_B;
-//				}
+				if !internal_int_prime_strong_lucas_selfridge(a) or_return { return; }
 			}
 		}
 	}
@@ -540,7 +535,7 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 
 	// Composite if N and (a+4)*(2*a+5) are not coprime.
 	internal_set(T1z, u32((a + 4) * ((2 * a) + 5)));
-	internal_int_gcd_lcm(T1z, nil, T1z, N) or_return;
+	internal_int_gcd(T1z, T1z, N) or_return;
 
 	if !(T1z.used == 1 && T1z.digit[0] == 1) {
 		// Composite.
@@ -596,6 +591,241 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 
 	return;
 }
+
+
+/*
+	Strong Lucas-Selfridge test.
+	returns true if it is a strong L-S prime, false if it is composite
+
+	Code ported from Thomas Ray Nicely's implementation of the BPSW test at http://www.trnicely.net/misc/bpsw.html
+
+	Freeware copyright (C) 2016 Thomas R. Nicely <http://www.trnicely.net>.
+	Released into the public domain by the author, who disclaims any legal liability arising from its use.
+
+	The multi-line comments are made by Thomas R. Nicely and are copied verbatim.
+	(If that name sounds familiar, he is the guy who found the fdiv bug in the Pentium CPU.)
+*/
+internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.allocator) -> (lucas_selfridge: bool, err: Error) {
+	// TODO: choose better variable names!
+
+	Dz, gcd, Np1, Uz, Vz, U2mz, V2mz, Qmz, Q2mz, Qkdz, T1z, T2z, T3z, T4z, Q2kdz := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(Dz, gcd, Np1, Uz, Vz, U2mz, V2mz, Qmz, Q2mz, Qkdz, T1z, T2z, T3z, T4z, Q2kdz);
+
+	/*
+		Find the first element D in the sequence {5, -7, 9, -11, 13, ...}
+		such that Jacobi(D,N) = -1 (Selfridge's algorithm). Theory
+		indicates that, if N is not a perfect square, D will "nearly
+		always" be "small." Just in case, an overflow trap for D is	included.
+	*/
+	internal_init_multi(Dz, gcd, Np1, Uz, Vz, U2mz, V2mz, Qmz, Q2mz, Qkdz, T1z, T2z, T3z, T4z, Q2kdz) or_return;
+
+	D    := 5;
+	sign := 1;
+	Ds   : int;
+
+	for {
+		Ds   = sign * D;
+		sign = -sign;
+
+		internal_set(Dz, D) or_return;
+		internal_int_gcd(gcd, a, Dz) or_return;
+
+		/*
+			If 1 < GCD < `N` then `N` is composite with factor "D", and
+			Jacobi(D, N) is technically undefined (but often returned as zero).
+		*/
+		if internal_gt(gcd, 1) && internal_lt(gcd, a)    { return; }
+		if Ds < 0 { Dz.sign = .Negative; }
+
+		j := internal_int_kronecker(Dz, a) or_return;
+		if j == -1 { break; }
+
+		D += 2;
+		if D > max(int) - 2                              { return false, .Invalid_Argument; }
+	}
+
+	Q := (1 - Ds) / 4;   /* Required so D = P*P - 4*Q */
+
+	/*
+		NOTE: The conditions (a) N does not divide Q, and
+		(b) D is square-free or not a perfect square, are included by
+		some authors; e.g., "Prime numbers and computer methods for
+		factorization," Hans Riesel (2nd ed., 1994, Birkhauser, Boston),
+		p. 130. For this particular application of Lucas sequences,
+		these conditions were found to be immaterial.
+	*/
+
+	/*
+		Now calculate N - Jacobi(D,N) = N + 1 (even), and calculate the
+		odd positive integer d and positive integer s for which
+		N + 1 = 2^s*d (similar to the step for N - 1 in Miller's test).
+		The strong Lucas-Selfridge test then returns N as a strong
+		Lucas probable prime (slprp) if any of the following
+		conditions is met: U_d=0, V_d=0, V_2d=0, V_4d=0, V_8d=0,
+		V_16d=0, ..., etc., ending with V_{2^(s-1)*d}=V_{(N+1)/2}=0
+		(all equalities mod N). Thus d is the highest index of U that
+		must be computed (since V_2m is independent of U), compared
+		to U_{N+1} for the standard Lucas-Selfridge test; and no
+		index of V beyond (N+1)/2 is required, just as in the
+		standard Lucas-Selfridge test. However, the quantity Q^d must
+		be computed for use (if necessary) in the latter stages of
+		the test. The result is that the strong Lucas-Selfridge test
+		has a running time only slightly greater (order of 10 %) than
+		that of the standard Lucas-Selfridge test, while producing
+		only (roughly) 30 % as many pseudoprimes (and every strong
+		Lucas pseudoprime is also a standard Lucas pseudoprime). Thus
+		the evidence indicates that the strong Lucas-Selfridge test is
+		more effective than the standard Lucas-Selfridge test, and a
+		Baillie-PSW test based on the strong Lucas-Selfridge test
+		should be more reliable.
+	*/
+	internal_add(Np1, a, 1) or_return;
+	s := internal_count_lsb(Np1) or_return;
+
+	/*
+		This should round towards zero because Thomas R. Nicely used GMP's mpz_tdiv_q_2exp()
+		and mp_div_2d() is equivalent. Additionally: dividing an even number by two does not produce
+		any leftovers.
+	*/
+	internal_int_shr(Dz, Np1, s) or_return;
+
+	/*
+		We must now compute U_d and V_d. Since d is odd, the accumulated
+		values U and V are initialized to U_1 and V_1 (if the target
+		index were even, U and V would be initialized instead to U_0=0
+		and V_0=2). The values of U_2m and V_2m are also initialized to
+		U_1 and V_1; the FOR loop calculates in succession U_2 and V_2,
+		U_4 and V_4, U_8 and V_8, etc. If the corresponding bits
+		(1, 2, 3, ...) of t are on (the zero bit having been accounted
+		for in the initialization of U and V), these values are then
+		combined with the previous totals for U and V, using the
+		composition formulas for addition of indices.
+	*/
+	internal_set(Uz,   1) or_return;
+	internal_set(Vz,   1) or_return; //	P := 1; /* Selfridge's choice */
+	internal_set(U2mz, 1) or_return;
+	internal_set(V2mz, 1) or_return; //	P := 1; /* Selfridge's choice */
+	internal_set(Qmz,  Q) or_return;
+
+	internal_int_shl1(Q2mz, Qmz) or_return;
+
+	/*
+		Initializes calculation of Q^d.
+	*/
+	internal_set(Qkdz, Q) or_return;
+	Nbits := internal_count_bits(Dz);
+
+	for u := 1; u < Nbits; u += 1 { /* zero bit off, already accounted for */
+		/*
+			Formulas for doubling of indices (carried out mod N). Note that
+			the indices denoted as "2m" are actually powers of 2, specifically
+			2^(ul-1) beginning each loop and 2^ul ending each loop.
+			U_2m = U_m*V_m
+			V_2m = V_m*V_m - 2*Q^m
+		*/
+		internal_mul(U2mz, U2mz, V2mz) or_return;
+		internal_mod(U2mz, U2mz, a) or_return;
+		internal_sqr(V2mz, V2mz) or_return;
+		internal_sub(V2mz, V2mz, Q2mz) or_return;
+		internal_mod(V2mz, V2mz, a) or_return;
+
+		/*
+			Must calculate powers of Q for use in V_2m, also for Q^d later.
+		*/
+		internal_sqr(Qmz, Qmz) or_return;
+
+		/* Prevents overflow. Still necessary without a fixed prealloc'd mem.? */
+		internal_mod(Qmz, Qmz, a) or_return;
+		internal_int_shl1(Q2mz, Qmz) or_return;
+
+		if internal_int_bitfield_extract_bool(Dz, u) or_return {
+			/*
+				Formulas for addition of indices (carried out mod N);
+				U_(m+n) = (U_m*V_n + U_n*V_m)/2
+				V_(m+n) = (V_m*V_n + D*U_m*U_n)/2
+				Be careful with division by 2 (mod N)!
+			*/
+			internal_mul(T1z, U2mz, Vz) or_return;
+			internal_mul(T2z, Uz, V2mz) or_return;
+			internal_mul(T3z, V2mz, Vz) or_return;
+			internal_mul(T4z, U2mz, Uz) or_return;
+			internal_mul(T4z, T4z,  Ds) or_return;
+
+			internal_add(Uz,  T1z, T2z) or_return;
+
+			if internal_is_odd(Uz) {
+				internal_add(Uz, Uz, a) or_return;
+			}
+
+			/*
+				This should round towards negative infinity because Thomas R. Nicely used GMP's mpz_fdiv_q_2exp().
+				But `internal_shr1` does not do so, it is truncating instead.
+			*/
+			oddness := internal_is_odd(Uz);
+			internal_int_shr1(Uz, Uz) or_return;
+			if internal_is_negative(Uz) && oddness {
+				internal_sub(Uz, Uz, 1) or_return;
+			}
+			internal_add(Vz, T3z, T4z) or_return;
+			if internal_is_odd(Vz) {
+				internal_add(Vz, Vz, a) or_return;
+			}
+
+			oddness  = internal_is_odd(Vz);
+			internal_int_shr1(Vz, Vz) or_return;
+			if internal_is_negative(Vz) && oddness {
+				internal_sub(Vz, Vz, 1) or_return;
+			}
+			internal_mod(Uz, Uz, a) or_return;
+			internal_mod(Vz, Vz, a) or_return;
+
+			/* Calculating Q^d for later use */
+			internal_mul(Qkdz, Qkdz, Qmz) or_return;
+			internal_mod(Qkdz, Qkdz, a) or_return;
+		}
+	}
+
+	/*
+		If U_d or V_d is congruent to 0 mod N, then N is a prime or a strong Lucas pseudoprime. */
+	if internal_is_zero(Uz) || internal_is_zero(Vz) {
+		return true, nil;
+	}
+
+	/*
+		NOTE: Ribenboim ("The new book of prime number records," 3rd ed.,
+		1995/6) omits the condition V0 on p.142, but includes it on
+		p. 130. The condition is NECESSARY; otherwise the test will
+		return false negatives---e.g., the primes 29 and 2000029 will be
+		returned as composite.
+	*/
+
+	/*
+		Otherwise, we must compute V_2d, V_4d, V_8d, ..., V_{2^(s-1)*d}
+		by repeated use of the formula V_2m = V_m*V_m - 2*Q^m. If any of
+		these are congruent to 0 mod N, then N is a prime or a strong
+		Lucas pseudoprime.
+	*/
+
+	/* Initialize 2*Q^(d*2^r) for V_2m */
+	internal_int_shr1(Q2kdz, Qkdz) or_return;
+
+	for r := 1; r < s; r += 1 {
+		internal_sqr(Vz, Vz) or_return;
+		internal_sub(Vz, Vz, Q2kdz) or_return;
+		internal_mod(Vz, Vz, a) or_return;
+		if internal_is_zero(Vz) {
+			return true, nil;
+		}
+		/* Calculate Q^{d*2^r} for next r (final iteration irrelevant). */
+		if r < (s - 1) {
+			internal_sqr(Qkdz, Qkdz) or_return;
+			internal_mod(Qkdz, Qkdz, a) or_return;
+			internal_int_shl1(Q2kdz, Qkdz) or_return;
+		}
+	}
+	return false, nil;
+}
+
 
 /*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
