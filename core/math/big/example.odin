@@ -84,16 +84,20 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-printf :: fmt.printf;
+//printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
-	err: Error;
+	err:  Error;
+	frob:  bool;
 	prime: bool;
 
-	set(a, "3317044064679887385961981"); // Composite: 1287836182261 × 2575672364521
+	// USE_MILLER_RABIN_ONLY = true;
+
+	// set(a, "3317044064679887385961979"); // Composite: 17 × 1709 × 1366183751 × 83570142193
+	set(a, "359334085968622831041960188598043661065388726959079837"); // 6th Bell prime
 	trials := number_of_rabin_miller_trials(internal_count_bits(a));
 	{
 		SCOPED_TIMING(.is_prime);
@@ -101,7 +105,9 @@ demo :: proc() {
 	}
 	print("Candidate prime: ", a);
 	fmt.printf("%v Miller-Rabin trials needed.\n", trials);
-	fmt.printf("Is prime: %v, Error: %v\n", prime, err);
+
+	frob, err = internal_int_prime_frobenius_underwood(a);
+	fmt.printf("Frobenius-Underwood: %v, Prime: %v, Error: %v\n", frob, prime, err);
 }
 
 main :: proc() {
