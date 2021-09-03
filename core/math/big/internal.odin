@@ -1871,7 +1871,7 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 	return nil;
 }
 
-internal_set :: proc { internal_int_set_from_integer, internal_int_copy };
+internal_set :: proc { internal_int_set_from_integer, internal_int_copy, int_atoi };
 
 internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int, offset := int(0)) -> (err: Error) {
 	#force_inline internal_error_if_immutable(dest) or_return;
@@ -2019,8 +2019,18 @@ internal_invmod :: proc{ internal_int_inverse_modulo, };
 /*
 	Helpers to extract values from the `Int`.
 */
+internal_int_bitfield_extract_bool :: proc(a: ^Int, offset: int) -> (val: bool, err: Error) {
+	limb := offset / _DIGIT_BITS;
+	if limb < 0 || limb >= a.used  { return false, .Invalid_Argument; }
+	i := _WORD(1 << _WORD((offset % _DIGIT_BITS)));
+	return bool(_WORD(a.digit[limb]) & i), nil;
+}
+
 internal_int_bitfield_extract_single :: proc(a: ^Int, offset: int) -> (bit: _WORD, err: Error) {
-	return #force_inline int_bitfield_extract(a, offset, 1);
+	limb := offset / _DIGIT_BITS;
+	if limb < 0 || limb >= a.used  { return 0, .Invalid_Argument; }
+	i := _WORD(1 << _WORD((offset % _DIGIT_BITS)));
+	return 1 if ((_WORD(a.digit[limb]) & i) != 0) else 0, nil;
 }
 
 internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) #no_bounds_check {
