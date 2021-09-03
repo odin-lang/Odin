@@ -185,14 +185,14 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 				a1.digit[0] + 1 cannot overflow because the MSB
 				of the DIGIT type is not set by definition.
 			 */
-			if a1.digit[0] + 1 & p1.digit[0] & 2 != 0 {
+			if ((a1.digit[0] + 1) & p1.digit[0] & 2) != 0 {
 				k = -k;
 			}
 		} else {
 			/*
 				Compute k = (-1)^((a1-1)*(p1-1)/4) * k.
 			*/
-			if a1.digit[0] & p1.digit[0] & 2 != 0 {
+			if (a1.digit[0] & p1.digit[0] & 2) != 0 {
 				k = -k;
 			}
 		}
