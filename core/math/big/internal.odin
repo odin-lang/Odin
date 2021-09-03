@@ -854,7 +854,7 @@ internal_int_mod :: proc(remainder, numerator, denominator: ^Int, allocator := c
 
 	if remainder.used == 0 || denominator.sign == remainder.sign { return nil; }
 
-	return #force_inline internal_add(remainder, remainder, numerator, allocator);
+	return #force_inline internal_add(remainder, remainder, denominator, allocator);
 }
 
 internal_int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
@@ -2747,9 +2747,27 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 	x: int;
 	#no_bounds_check for x = 0; x < a.used && a.digit[x] == 0; x += 1 {}
 
-	q := a.digit[x];
-	x *= _DIGIT_BITS;
-	x += internal_count_lsb(q);
+	when true {
+		q := a.digit[x];
+		x *= _DIGIT_BITS;
+		x += internal_count_lsb(q);
+	} else {
+		lnz := []int{
+   			4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+		};
+
+		q := a.digit[x];
+		x *= _DIGIT_BITS;
+		if q & 1 == 0 {
+			p: DIGIT;
+			for {
+				p = q & 15;
+				x += lnz[p];
+				q >>= 4;
+				if p != 0 { break; }
+			}
+		}		
+	}
 	return x, nil;
 }
 
