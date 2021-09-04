@@ -26,7 +26,7 @@ Configuration:
 	_WARRAY                               %v
 	_TAB_SIZE                             %v
 	_MAX_WIN_SIZE                         %v
-	MATH_BIG_USE_FROBENIUS_TEST           %v
+	MATH_BIG_USE_LUCAS_SELFRIDGE_TEST     %v
 Runtime tunable:
 	MUL_KARATSUBA_CUTOFF                  %v
 	SQR_KARATSUBA_CUTOFF                  %v
@@ -47,7 +47,7 @@ _MAX_COMBA,
 _WARRAY,
 _TAB_SIZE,
 _MAX_WIN_SIZE,
-MATH_BIG_USE_FROBENIUS_TEST,
+MATH_BIG_USE_LUCAS_SELFRIDGE_TEST,
 
 MUL_KARATSUBA_CUTOFF,
 SQR_KARATSUBA_CUTOFF,
@@ -90,24 +90,12 @@ demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
-	err:  Error;
-	lucas: bool;
-	prime: bool;
-
-	// USE_MILLER_RABIN_ONLY = true;
-
-	// set(a, "3317044064679887385961979"); // Composite: 17 × 1709 × 1366183751 × 83570142193
-	set(a, "359334085968622831041960188598043661065388726959079837"); // 6th Bell prime
+	set(a, _private_prime_table[_PRIME_TAB_SIZE - 1]);
+	print("a: ", a);
 	trials := number_of_rabin_miller_trials(internal_count_bits(a));
-	{
-		SCOPED_TIMING(.is_prime);
-		prime, err = internal_int_is_prime(a, trials);
-	}
-	print("Candidate prime: ", a, 10, true, true, true);
-	fmt.printf("%v Miller-Rabin trials needed.\n", trials);
-
-	// lucas, err = internal_int_prime_strong_lucas_selfridge(a);
-	fmt.printf("Lucas-Selfridge: %v, Prime: %v, Error: %v\n", lucas, prime, err);
+	err := internal_int_prime_next_prime(a, trials, false);
+	print("a->next: ", a);
+	fmt.printf("Trials: %v, Error: %v\n", trials, err);
 }
 
 main :: proc() {
