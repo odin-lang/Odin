@@ -112,7 +112,7 @@ internal_int_exponent_mod :: proc(res, G, X, P: ^Int, allocator := context.alloc
 }
 
 /*
-	Kronecker symbol (a|p)
+	Kronecker/Legendre symbol (a|p)
 	Straightforward implementation of algorithm 1.4.10 in
 	Henri Cohen: "A Course in Computational Algebraic Number Theory"
 
@@ -205,6 +205,7 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 	}
 	return;
 }
+internal_int_legendre :: internal_int_kronecker;
 
 /*
 	Miller-Rabin test of "a" to the base of "b" as described in HAC pp. 139 Algorithm 4.24.
@@ -824,6 +825,347 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 		}
 	}
 	return false, nil;
+}
+
+/*
+	Performs one Fermat test.
+
+	If "a" were prime then b**a == b (mod a) since the order of
+	the multiplicative sub-group would be phi(a) = a-1.  That means
+	it would be the same as b**(a mod (a-1)) == b**1 == b (mod a).
+
+	Returns `true` if the congruence holds, or `false` otherwise.
+
+	Assumes `a` and `b` not to be `nil` and to have been initialized.
+*/
+internal_prime_fermat :: proc(a, b: ^Int, allocator := context.allocator) -> (fermat: bool, err: Error) {
+	t := &Int{};
+	defer internal_destroy(t);
+
+	/*
+		Ensure `b` > 1.
+	*/
+	if !internal_gt(b, 1) { return false, .Invalid_Argument; }
+
+	/*
+		Compute `t` = `b`**`a` mod `a`
+	*/
+	internal_int_exponent_mod(t, b, a, a) or_return;
+
+	/*
+		Is it equal to b?
+	*/
+	fermat = internal_eq(t, b);
+	return;
+}
+
+/*
+	Tonelli-Shanks algorithm
+	https://en.wikipedia.org/wiki/Tonelli%E2%80%93Shanks_algorithm
+	https://gmplib.org/list-archives/gmp-discuss/2013-April/005300.html
+*/
+internal_int_sqrtmod_prime :: proc(res, n, prime: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	/*
+		The type is "int" because of the types in the mp_int struct.
+		Don't forget to change them here when you change them there!
+	*/
+	S, M, i: int;
+
+	t1, C, Q, Z, T, R, two := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(t1, C, Q, Z, T, R, two);
+
+	/*
+		First handle the simple cases.
+	*/
+	if internal_is_zero(n)                                           { return internal_zero(res);	}
+
+	/*
+		"prime" must be odd and > 2
+	*/
+	if internal_is_even(prime) || internal_lt(prime, 3)              { return .Invalid_Argument; }
+	legendre := internal_int_kronecker(n, prime)                     or_return;
+
+	/*
+		n \not\cong 0 (mod p) and n \cong r^2 (mod p) for some r \in N^+
+	*/
+	if legendre != 1                                                 { return .Invalid_Argument; }
+
+	internal_init_multi(t1, C, Q, Z, T, R, two)                      or_return;
+
+	/*
+		SPECIAL CASE: if prime mod 4 == 3
+		compute directly: err = n^(prime+1)/4 mod prime
+		Handbook of Applied Cryptography algorithm 3.36
+
+		x%4 == x&3 for x in N and x>0
+	*/
+	if prime.digit[0] & 3 == 3 {
+		internal_add(t1, prime, 1)                                   or_return;
+		internal_shr(t1, t1, 2)                                      or_return;
+		internal_int_exponent_mod(res, n, t1, prime)                 or_return;
+		return;
+	}
+
+	/*
+		NOW: Tonelli-Shanks algorithm
+		Factor out powers of 2 from prime-1, defining Q and S as: prime-1 = Q*2^S
+
+		Q = prime - 1
+	*/
+	internal_copy(Q, prime)                                          or_return;
+	internal_sub(Q, Q, 1)                                            or_return;
+
+	/*
+		S = 0
+	*/
+	S = 0;
+	for internal_is_even(Q) {
+		/*
+			Q = Q / 2
+		*/
+		internal_int_shr1(Q, Q)                                      or_return;
+		/*
+			S = S + 1
+		*/
+		S += 1;
+	}
+
+	/*
+		Find a `Z` such that the Legendre symbol (Z|prime) == -1.
+		Z = 2.
+	*/
+	internal_set(Z, 2)                                               or_return;
+
+	for {
+		legendre = internal_int_kronecker(Z, prime)                  or_return;
+
+		/*
+			If "prime" (p) is an odd prime Jacobi(k|p) = 0 for k \cong 0 (mod p)
+			but there is at least one non-quadratic residue before k>=p if p is an odd prime.
+		*/
+		if legendre == 0                                             { return .Invalid_Argument; }
+		if legendre == -1                                            { break; }
+
+		/*
+			Z = Z + 1
+		*/
+		internal_add(Z, Z, 1)                                        or_return;
+	}
+
+	/*
+		C = Z ^ Q mod prime
+	*/
+	internal_int_exponent_mod(C, Z, Q, prime)                        or_return;
+
+	/*
+		t1 = (Q + 1) / 2
+	*/
+	internal_add(t1, Q, 1)                                           or_return;
+	internal_int_shr1(t1, t1)                                        or_return;
+
+	/*
+		R = n ^ ((Q + 1) / 2) mod prime
+	*/
+	internal_int_exponent_mod(R, n, t1, prime)                       or_return;
+
+	/*
+		T = n ^ Q mod prime
+	*/
+	internal_int_exponent_mod(T, n, Q, prime)                        or_return;
+
+	/*
+		M = S
+	*/
+	M = S;
+	internal_set(two, 2);
+
+	for {
+		internal_copy(t1, T)                                         or_return;
+
+		i = 0;
+		for {
+			if internal_eq(T, 1)                                     { break; }
+
+			/*
+				No exponent in the range 0 < i < M found.
+				(M is at least 1 in the first round because "prime" > 2)
+			*/
+			if M == i                                                { return .Invalid_Argument; }
+			internal_int_exponent_mod(t1, t1, two, prime)            or_return;
+
+			i += 1;
+		}
+
+		if i == 0 {
+			internal_copy(res, R)                                    or_return;
+		}
+
+		/*
+			t1 = 2 ^ (M - i - 1)
+		*/
+		internal_set(t1, M - i - 1)                                  or_return;
+		internal_int_exponent_mod(t1, two, t1, prime)                or_return;
+
+		/*
+			t1 = C ^ (2 ^ (M - i - 1)) mod prime
+		*/
+		internal_int_exponent_mod(t1, C, t1, prime)                  or_return;
+
+		/*
+			C = (t1 * t1) mod prime
+		*/
+		internal_sqrmod(C, t1, prime)                                or_return;
+
+		/*
+			R = (R * t1) mod prime
+		*/
+		internal_mulmod(R, R, t1, prime)                             or_return;
+
+		/*
+			T = (T * C) mod prime
+		*/
+		mulmod(T, T, C, prime)                                       or_return;
+
+		/*
+			M = i
+		*/
+		M = i;
+	}
+
+	return;
+}
+
+/*
+	Finds the next prime after the number `a` using `t` trials of Miller-Rabin,
+	in place: It sets `a` to the prime found.
+	`bbs_style` = true means the prime must be congruent to 3 mod 4
+*/
+internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	res_tab := [_PRIME_TAB_SIZE]DIGIT{};
+
+	/*
+		Force positive.
+	*/
+	a.sign = .Zero_or_Positive;
+
+	/*
+		Simple algo if `a` is less than the largest prime in the table.
+	*/
+	if internal_lt(a, _private_prime_table[_PRIME_TAB_SIZE - 1]) {
+		/*
+			Find which prime it is bigger than `a`
+		*/
+		for p in _private_prime_table {
+			cmp := internal_cmp(a, p);
+
+			if cmp == 0 { continue; }
+			if cmp != 1 {
+				if bbs_style && (p & 3 != 3) {
+					/*
+						Try again until we get a prime congruent to 3 mod 4.
+					*/
+					continue;
+				} else {
+					return internal_set(a, p);
+				}
+			}
+		}
+		/*
+			Fall through to the sieve.
+		*/
+	}
+
+	/*
+		Generate a prime congruent to 3 mod 4 or 1/3 mod 4?
+	*/
+	kstep: DIGIT = 4 if bbs_style else 2;
+
+	/*
+		At this point we will use a combination of a sieve and Miller-Rabin.
+	*/
+	if bbs_style {
+		/*
+			If `a` mod 4 != 3 subtract the correct value to make it so.
+		*/
+		if a.digit[0] & 3 != 3 {
+			internal_sub(a, a, (a.digit[0] & 3) + 1) or_return;
+		}
+	} else {
+		if internal_is_even(a) {
+			/*
+				Force odd.
+			*/
+			internal_sub(a, a, 1) or_return;
+		}
+	}
+
+	/*
+		Generate the restable.
+	*/
+	for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
+		res_tab = internal_mod(a, _private_prime_table[x]) or_return;
+	}
+
+	for {
+		step := DIGIT(0);
+		y: bool;
+
+		/*
+			Skip to the next non-trivially divisible candidate.
+		*/
+		for {
+			/*
+				y == true if any residue was zero [e.g. cannot be prime]
+			*/
+			y = false;
+
+			/*
+				Increase step to next candidate.
+			*/
+			step += kstep;
+
+			/*
+				Compute the new residue without using division.
+			*/
+			for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
+				/*
+					Add the step to each residue.
+				*/
+				res_tab[x] += kstep;
+
+				/*
+					Subtract the modulus [instead of using division].
+				*/
+				if res_tab[x] >= _private_prime_table[x] {
+					res_tab[x] -= _private_prime_table[x];
+				}
+
+				/*
+					Set flag if zero.
+				*/
+				if res_tab[x] == 0 {
+					y = true;
+				}
+			}
+			if !(y && (step < (((1 << _DIGIT_BITS) - kstep)))) { break; }
+		}
+
+		/*
+			Add the step.
+		*/
+		internal_add(a, a, step) or_return;
+
+		/*
+			If we didn't pass the sieve and step == MP_MAX then skip test */
+		if (y && (step >= ((1 << _DIGIT_BITS) - kstep))) { continue; }
+
+		if internal_int_is_prime(a, trials) or_return { break; }
+	}
+	return;
 }
 
 

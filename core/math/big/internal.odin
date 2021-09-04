@@ -880,7 +880,7 @@ internal_int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT, allocator :=
 	return internal_int_divmod_digit(nil, numerator, denominator, allocator);
 }
 
-internal_mod :: proc{ internal_int_mod, internal_int_mod_digit};
+internal_mod :: proc{ internal_int_mod, internal_int_mod_digit, };
 
 /*
 	remainder = (number + addend) % modulus.
