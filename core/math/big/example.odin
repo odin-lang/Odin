@@ -37,6 +37,7 @@ Runtime tunable:
 	FACTORIAL_BINARY_SPLIT_CUTOFF         %v
 	FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS %v
 	USE_MILLER_RABIN_ONLY                 %v
+	MAX_ITERATIONS_RANDOM_PRIME           %v
 
 `, _DIGIT_BITS,
 _LOW_MEMORY,
@@ -58,6 +59,7 @@ FACTORIAL_MAX_N,
 FACTORIAL_BINARY_SPLIT_CUTOFF,
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
 USE_MILLER_RABIN_ONLY,
+MAX_ITERATIONS_RANDOM_PRIME,
 );
 
 }
@@ -84,18 +86,27 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-// printf :: fmt.printf;
+printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
-	set(a, _private_prime_table[_PRIME_TAB_SIZE - 1]);
-	print("a: ", a);
-	trials := number_of_rabin_miller_trials(internal_count_bits(a));
-	err := internal_int_prime_next_prime(a, trials, false);
-	print("a->next: ", a);
-	fmt.printf("Trials: %v, Error: %v\n", trials, err);
+	bits   := 111;
+	trials := -1;
+
+	flags := Primality_Flags{};
+	fmt.printf("Trying to generate a %v bit prime using %v Miller-Rabin trials and options %v.\n", bits, trials, flags);
+
+	err: Error;
+	{
+		SCOPED_TIMING(.random_prime);
+		err = internal_random_prime(a, bits, trials, flags);
+	}
+
+	print("a(10): ", a, 10, true, true, true);
+	fmt.printf("err: %v\n", err);
+	fmt.printf("RANDOM_PRIME_ITERATIONS_USED: %v\n", RANDOM_PRIME_ITERATIONS_USED);
 }
 
 main :: proc() {

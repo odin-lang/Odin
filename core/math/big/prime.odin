@@ -456,7 +456,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		for ix := 0; ix < miller_rabin_trials; ix += 1 {
 
 			// rand() guarantees the first digit to be non-zero
-			internal_rand(b, _DIGIT_TYPE_BITS, r) or_return;
+			internal_random(b, _DIGIT_TYPE_BITS, r) or_return;
 
 			// Reduce digit before casting because DIGIT might be bigger than
 			// an unsigned int and "mask" on the other side is most probably not.
@@ -474,7 +474,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 				ix -= 1;
 				continue;
 			}
-			internal_rand(b, l) or_return;
+			internal_random(b, l) or_return;
 
 			// That number might got too big and the witness has to be smaller than "a"
 			l = internal_count_bits(b);
@@ -1168,6 +1168,117 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 	return;
 }
 
+/*
+	Makes a truly random prime of a given size (bits),
+
+	Flags are as follows:
+	 	Blum_Blum_Shub    - Make prime congruent to 3 mod 4
+		Safe              - Make sure (p-1)/2 is prime as well (implies .Blum_Blum_Shub)
+		Second_MSB_On     - Make the 2nd highest bit one
+
+	This is possibly the mother of all prime generation functions, muahahahahaha!
+*/
+internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := Primality_Flags{}, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+	flags  := flags;
+	trials := trials;
+
+	t := &Int{};
+	defer internal_destroy(t);
+
+	/*
+		Sanity check the input.
+	*/
+	if size_in_bits <= 1 || trials < -1                              { return .Invalid_Argument; }
+
+	/*
+		`.Safe` implies `.Blum_Blum_Shub`.
+	*/
+	if .Safe in flags {
+		if size_in_bits < 3 {
+			/*
+				The smallest safe prime is 5, which takes 3 bits.
+				We early out now, else we'd be locked in an infinite loop trying to generate a 2-bit Safe Prime.
+			*/
+			return .Invalid_Argument;
+		}
+		flags += { .Blum_Blum_Shub, };
+	}
+
+	/*
+		Automatically choose the number of Rabin-Miller trials?
+	*/
+	if trials == -1 {
+		trials = number_of_rabin_miller_trials(size_in_bits);
+	}
+
+	res: bool;
+	RANDOM_PRIME_ITERATIONS_USED = 0;
+
+	for {
+		if MAX_ITERATIONS_RANDOM_PRIME > 0 {
+			RANDOM_PRIME_ITERATIONS_USED += 1;
+			if RANDOM_PRIME_ITERATIONS_USED > MAX_ITERATIONS_RANDOM_PRIME {
+				return .Max_Iterations_Reached;
+			}
+		}
+
+		internal_int_random(a, size_in_bits)                         or_return;
+
+		/*
+			Make sure it's odd.
+		*/
+		if size_in_bits > 2 {
+			a.digit[0] |= 1;
+		} else {
+			/*
+				A 2-bit prime can be either 2 (0b10) or 3 (0b11).
+				So, let's force the top bit to 1 and return early.
+			*/
+			a.digit[0] |= 2;
+			return nil;
+		}
+
+		if .Blum_Blum_Shub in flags {
+			a.digit[0] |= 3;
+		}
+		if .Second_MSB_On in flags {
+			internal_int_bitfield_set_single(a, size_in_bits - 2) or_return;
+		}
+
+		/*
+			Is it prime?
+		*/
+		res = internal_int_is_prime(a, trials)                       or_return;
+
+		if (!res) {
+			continue;
+		}
+
+		if .Safe in flags {
+			/*
+				See if (a-1)/2 is prime.
+			*/
+			internal_sub(a, a, 1)                                    or_return;
+			internal_int_shr1(a, a)                                  or_return;
+
+			/*
+				Is it prime?
+			*/
+			res = internal_int_is_prime(a, trials)                   or_return;
+		}
+		if res { break; }
+	}
+
+	if .Safe in flags {
+		/*
+			Restore a to the original value.
+		*/
+		internal_int_shl1(a, a)                                      or_return;
+		internal_add(a, a, 1)                                        or_return;
+	}
+	return;
+}
 
 /*
 	Returns the number of Rabin-Miller trials needed for a given bit size.

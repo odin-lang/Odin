@@ -24,6 +24,7 @@ Category :: enum {
 	bitfield_extract,
 	rm_trials,
 	is_prime,
+	random_prime,
 };
 
 Event :: struct {
