@@ -89,6 +89,17 @@ MATH_BIG_USE_FROBENIUS_TEST       :: !MATH_BIG_USE_LUCAS_SELFRIDGE_TEST;
 USE_MILLER_RABIN_ONLY       := false;
 
 /*
+	How many times we'll call `internal_int_random` during random prime generation before we bail out.
+	Set to 0 or less to try indefinitely.	
+*/
+MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000;
+
+/*
+	How many iterations we used for the last random prime.
+*/
+@thread_local RANDOM_PRIME_ITERATIONS_USED: int;
+
+/*
 	We don't allow these to be switched at runtime for two reasons:
 
 	1) 32-bit and 64-bit versions of procedures use different types for their storage,
@@ -175,9 +186,9 @@ Error_String :: #partial [Error]string{
 };
 
 Primality_Flag :: enum u8 {
-	Blum_Blum_Shub = 0,	/* BBS style prime */
-	Safe           = 1,	/* Safe prime (p-1)/2 == prime */
-	Second_MSB_On  = 3,  /* force 2nd MSB to 1 */
+ 	Blum_Blum_Shub = 0,  // Make prime congruent to 3 mod 4
+	Safe           = 1,  // Make sure (p-1)/2 is prime as well (implies .Blum_Blum_Shub)
+	Second_MSB_On  = 3,  // Make the 2nd highest bit one
 };
 Primality_Flags :: bit_set[Primality_Flag; u8];
 
