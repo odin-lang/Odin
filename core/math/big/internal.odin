@@ -2045,6 +2045,7 @@ internal_invmod :: proc{ internal_int_inverse_modulo, };
 
 /*
 	Helpers to extract values from the `Int`.
+	Offset is zero indexed.
 */
 internal_int_bitfield_extract_bool :: proc(a: ^Int, offset: int) -> (val: bool, err: Error) {
 	limb := offset / _DIGIT_BITS;
@@ -2113,6 +2114,34 @@ internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WOR
 	res |= (_WORD(a.digit[limb + 2]) & mask) << uint(res_shift);
 
 	return res, nil;
+}
+
+/*
+	Helpers to (un)set a bit in an Int.
+	Offset is zero indexed.
+*/
+internal_int_bitfield_set_single :: proc(a: ^Int, offset: int) -> (err: Error) {
+	limb := offset / _DIGIT_BITS;
+	if limb < 0 || limb >= a.used  { return .Invalid_Argument; }
+	i := DIGIT(1 << uint((offset % _DIGIT_BITS)));
+	a.digit[limb] |= i;
+	return;
+}
+
+internal_int_bitfield_unset_single :: proc(a: ^Int, offset: int) -> (err: Error) {
+	limb := offset / _DIGIT_BITS;
+	if limb < 0 || limb >= a.used  { return .Invalid_Argument; }
+	i := DIGIT(1 << uint((offset % _DIGIT_BITS)));
+	a.digit[limb] &= _MASK - i;
+	return;
+}
+
+internal_int_bitfield_toggle_single :: proc(a: ^Int, offset: int) -> (err: Error) {
+	limb := offset / _DIGIT_BITS;
+	if limb < 0 || limb >= a.used  { return .Invalid_Argument; }
+	i := DIGIT(1 << uint((offset % _DIGIT_BITS)));
+	a.digit[limb] ~= i;
+	return;
 }
 
 /*
@@ -2817,7 +2846,7 @@ internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0; // We shouldn't get here.
 }
 
-internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+internal_int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator;
 
 	bits := bits;
@@ -2842,7 +2871,7 @@ internal_int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator :
 	dest.used = digits;
 	return nil;
 }
-internal_rand :: proc { internal_int_rand, };
+internal_random :: proc { internal_int_random, };
 
 /*
 	Internal helpers.

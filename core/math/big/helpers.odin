@@ -362,15 +362,15 @@ int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0; // We shouldn't get here.
 }
 
-int_rand :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(dest);
-	return #force_inline internal_int_rand(dest, bits, r, allocator);
+	return #force_inline internal_int_random(dest, bits, r, allocator);
 
 }
-rand :: proc { int_rand, };
+random :: proc { int_random, };
 
 /*
 	Internal helpers.
