@@ -86,7 +86,7 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-// printf :: fmt.printf;
+printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
@@ -107,6 +107,18 @@ demo :: proc() {
 	print("a(10): ", a, 10, true, true, true);
 	fmt.printf("err: %v\n", err);
 	fmt.printf("RANDOM_PRIME_ITERATIONS_USED: %v\n", RANDOM_PRIME_ITERATIONS_USED);
+
+	// err = internal_int_write_to_ascii_file(a, "a.txt");
+	// if err != nil {
+	// 	fmt.printf("internal_int_write_to_ascii_file returned %v\n", err);
+	// }
+
+	// err = internal_int_read_from_ascii_file(b, "a.txt");
+	// if err != nil {
+	// 	fmt.printf("internal_int_read_from_ascii_file returned %v\n", err);
+	// }
+
+	// print("b: ", b);
 }
 
 main :: proc() {
