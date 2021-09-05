@@ -1281,6 +1281,89 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 }
 
 /*
+	Extended Euclidean algorithm of (a, b) produces `a * u1` + `b * u2` = `u3`.
+*/
+internal_int_extended_euclidean :: proc(a, b, U1, U2, U3: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator;
+
+	u1, u2, u3, v1, v2, v3, t1, t2, t3, q, tmp := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
+	defer internal_destroy(u1, u2, u3, v1, v2, v3, t1, t2, t3, q, tmp);
+	internal_init_multi(u1, u2, u3, v1, v2, v3, t1, t2, t3, q, tmp)  or_return;
+
+	/*
+		Initialize, (u1, u2, u3) = (1, 0, a).
+	*/
+	internal_set(u1, 1)                                              or_return;
+	internal_set(u3, a)                                              or_return;
+
+	/*
+		Initialize, (v1, v2, v3) = (0, 1, b).
+	*/
+	internal_set(v2, 1)                                              or_return;
+	internal_set(v3, b)                                              or_return;
+
+	/*
+		Loop while v3 != 0
+	*/
+	for !internal_is_zero(v3) {
+		/*
+			q = u3 / v3
+		*/
+		internal_div(q, u3, v3)                                      or_return;
+
+		/*
+			(t1, t2, t3) = (u1, u2, u3) - (v1, v2, v3)q
+		*/
+		internal_mul(tmp, v1, q)                                     or_return;
+		internal_sub( t1, u1, tmp)                                   or_return;
+
+		internal_mul(tmp, v2, q)                                     or_return;
+		internal_sub( t2, u2, tmp)                                   or_return;
+
+		internal_mul(tmp, v3, q)                                     or_return;
+		internal_sub( t3, u3, tmp)                                   or_return;
+
+		/*
+			(u1, u2, u3) = (v1, v2, v3)
+		*/
+		internal_set(u1, v1)                                         or_return;
+		internal_set(u2, v2)                                         or_return;
+		internal_set(u3, v3)                                         or_return;
+
+		/*
+			(v1, v2, v3) = (t1, t2, t3)
+		*/
+		internal_set(v1, t1)                                         or_return;
+		internal_set(v2, t2)                                         or_return;
+		internal_set(v3, t3)                                         or_return;
+	}
+
+	/*
+		Make sure U3 >= 0.
+	*/
+	if internal_is_negative(u3) {
+		internal_neg(u1, u1)                                         or_return;
+		internal_neg(u2, u2)                                         or_return;
+		internal_neg(u3, u3)                                         or_return;
+	}
+
+	/*
+		Copy result out.
+	*/
+	if U1 != nil {
+		internal_swap(u1, U1);
+	}
+	if U2 != nil {
+		internal_swap(u2, U2);
+	}
+	if U3 != nil {
+		internal_swap(u3, U3);
+	}
+	return;
+}
+
+
+/*
 	Returns the number of Rabin-Miller trials needed for a given bit size.
 */
 number_of_rabin_miller_trials :: proc(bit_size: int) -> (number_of_trials: int) {

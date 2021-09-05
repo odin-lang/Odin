@@ -86,13 +86,13 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-printf :: fmt.printf;
+// printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
-	bits   := 111;
+	bits   := 64;
 	trials := -1;
 
 	flags := Primality_Flags{};
