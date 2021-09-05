@@ -166,6 +166,10 @@ Error :: enum int {
 	Division_by_Zero        = 8,
 	Math_Domain_Error       = 9,
 
+	Cannot_Open_File        = 50,
+	Cannot_Read_File        = 51,
+	Cannot_Write_File       = 52,
+
 	Unimplemented           = 127,
 };
 
