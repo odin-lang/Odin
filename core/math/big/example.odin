@@ -86,13 +86,13 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-printf :: fmt.printf;
+// printf :: fmt.printf;
 
 demo :: proc() {
 	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
 	defer destroy(a, b, c, d, e, f, res);
 
-	bits   := 64;
+	bits   := 111;
 	trials := -1;
 
 	flags := Primality_Flags{};
@@ -108,17 +108,23 @@ demo :: proc() {
 	fmt.printf("err: %v\n", err);
 	fmt.printf("RANDOM_PRIME_ITERATIONS_USED: %v\n", RANDOM_PRIME_ITERATIONS_USED);
 
-	// err = internal_int_write_to_ascii_file(a, "a.txt");
-	// if err != nil {
-	// 	fmt.printf("internal_int_write_to_ascii_file returned %v\n", err);
-	// }
+	nails := 0;
 
-	// err = internal_int_read_from_ascii_file(b, "a.txt");
-	// if err != nil {
-	// 	fmt.printf("internal_int_read_from_ascii_file returned %v\n", err);
-	// }
+	count := internal_int_pack_count(a, u8, nails);
+	buf := make([]u8, count);
+	defer delete(buf);
 
-	// print("b: ", b);
+	written: int;
+	order := Order.LSB_First;
+
+	fmt.printf("\na.digit: %v\n", a.digit[:a.used]);
+	written, err = internal_int_pack(a, buf, nails, order);
+	fmt.printf("\nPacked into buf: %v | err: %v | written: %v\n", buf, err, written);
+
+	err = internal_int_unpack(b, buf, nails, order);
+	print("\nUnpacked into b: ", b);
+	fmt.printf("err: %v\n", err);
+	fmt.printf("b.digit: %v\n", b.digit[:b.used]);
 }
 
 main :: proc() {
