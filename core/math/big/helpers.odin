@@ -495,7 +495,7 @@ int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := co
 	if signed {
 		buf[l - 1] = 1 if a.sign == .Negative else 0;
 	}
-	for offset := 0; offset < size_in_bits; offset += 8 {
+	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
 		bits, _ := internal_int_bitfield_extract(a, offset, 8);
 		buf[i] = u8(bits & 255); i += 1;
 	}
@@ -519,7 +519,7 @@ int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := conte
 	if signed {
 		buf[0] = 1 if a.sign == .Negative else 0;
 	}
-	for offset := 0; offset < size_in_bits; offset += 8 {
+	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
 		bits, _ := internal_int_bitfield_extract(a, offset, 8);
 		buf[i] = u8(bits & 255); i -= 1;
 	}
@@ -546,7 +546,7 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 
 		size_in_bits := internal_count_bits(t);
 		i := 0;
-		for offset := 0; offset < size_in_bits; offset += 8 {
+		#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
 			bits, _ := internal_int_bitfield_extract(t, offset, 8);
 			buf[i] = 255 - u8(bits & 255); i += 1;
 		}
@@ -554,7 +554,7 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 	} else {
 		size_in_bits := internal_count_bits(a);
 		i := 0;
-		for offset := 0; offset < size_in_bits; offset += 8 {
+		#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
 			bits, _ := internal_int_bitfield_extract(a, offset, 8);
 			buf[i] = u8(bits & 255); i += 1;
 		}
@@ -583,7 +583,7 @@ int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator :
 
 	size_in_bits := internal_count_bits(t);
 	i := l - 1;
-	for offset := 0; offset < size_in_bits; offset += 8 {
+	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
 		bits, _ := internal_int_bitfield_extract(t, offset, 8);
 		buf[i] = 255 - u8(bits & 255); i -= 1;
 	}
@@ -620,7 +620,7 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 		buf = buf[1:];
 	}
 
-	for v in buf {
+	#no_bounds_check for v in buf {
 		internal_shl(a, a, 8) or_return;
 		a.digit[0] |= DIGIT(v);
 	}
@@ -657,7 +657,7 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 		buf = buf[1:];
 	}
 
-	for v in buf {
+	#no_bounds_check for v in buf {
 		internal_shl(a, a, 8) or_return;
 		if signed && sign == .Negative {
 			a.digit[0] |= DIGIT(255 - v);	

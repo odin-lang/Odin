@@ -186,6 +186,10 @@ Error_String :: #partial [Error]string{
 	.Division_by_Zero        = "Division by zero",
 	.Math_Domain_Error       = "Math domain error",
 
+	.Cannot_Open_File        = "Cannot_Open_File",
+	.Cannot_Read_File        = "Cannot_Read_File",
+	.Cannot_Write_File       = "Cannot_Write_File",
+
 	.Unimplemented           = "Unimplemented",
 };
 
@@ -231,7 +235,8 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT);
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD);
 
-_DIGIT_BITS      :: _DIGIT_TYPE_BITS - 4;
+_DIGIT_NAILS     :: 4;
+_DIGIT_BITS      :: _DIGIT_TYPE_BITS - _DIGIT_NAILS;
 _WORD_BITS       :: 2 * _DIGIT_BITS;
 
 _MASK            :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1);
