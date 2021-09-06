@@ -1376,6 +1376,10 @@ Token expect_operator(AstFile *f) {
 		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
 		             LIT(p));
 	}
+	if (f->curr_token.kind == Token_Ellipsis) {
+		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
+	}
+	
 	advance_token(f);
 	return prev;
 }
