@@ -9,13 +9,13 @@ import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
 is_separator :: proc(c: byte) -> bool {
-	return c == '/';
+	return c == '/'
 }
 
 
 // is_abs checks whether the path is absolute
 is_abs :: proc(path: string) -> bool {
-	return len(path) > 0 && path[0] == '/';
+	return len(path) > 0 && path[0] == '/'
 }
 
 
@@ -25,30 +25,30 @@ is_abs :: proc(path: string) -> bool {
 // If the path is all slashes, it returns "/"
 base :: proc(path: string, new := false, allocator := context.allocator) -> (last_element: string) {
 	defer if new {
-		last_element = strings.clone(last_element, allocator);
+		last_element = strings.clone(last_element, allocator)
 	}
 
 	if path == "" {
-		last_element = ".";
-		return;
+		last_element = "."
+		return
 	}
 
 
-	path := path;
+	path := path
 
 	for len(path) > 0 && is_separator(path[len(path)-1]) {
-		path = path[:len(path)-1];
+		path = path[:len(path)-1]
 	}
 	if i := strings.last_index(path, "/"); i >= 0 {
-		path = path[i+1:];
+		path = path[i+1:]
 	}
 
 	if path == "" {
-		last_element = "/";
+		last_element = "/"
 	} else {
-		last_element = path;
+		last_element = path
 	}
-	return;
+	return
 }
 
 // dir returns all but the last element of path, typically the path's directory.
@@ -57,8 +57,8 @@ base :: proc(path: string, new := false, allocator := context.allocator) -> (las
 // If the path consists entirely of slashes followed by non-slash bytes, it returns a single slash
 // In any other case, the returned path does not end in a slash
 dir :: proc(path: string, allocator := context.allocator) -> string {
-	directory, _ := split(path);
-	return clean(directory, allocator);
+	directory, _ := split(path)
+	return clean(directory, allocator)
 }
 
 
@@ -67,13 +67,13 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 // If there is no slash in path, it returns an empty dir and file set to path
 // The returned values have the property that path = dir+file
 split :: proc(path: string) -> (dir, file: string) {
-	i := strings.last_index(path, "/");
-	return path[:i+1], path[i+1:];
+	i := strings.last_index(path, "/")
+	return path[:i+1], path[i+1:]
 }
 
 // split_elements splits the path elements into slices of the original path string
 split_elements :: proc(path: string, allocator := context.allocator) -> []string {
-	return strings.split(path, "/", allocator);
+	return strings.split(path, "/", allocator)
 }
 
 // clean returns the shortest path name equivalent to path through lexical analysis only
@@ -85,76 +85,76 @@ split_elements :: proc(path: string, allocator := context.allocator) -> []string
 //	4) remove .. that  begin a rooted path ("/.." becomes "/")
 //
 clean :: proc(path: string, allocator := context.allocator) -> string {
-	context.allocator = allocator;
+	context.allocator = allocator
 
 	if path == "" {
-		return strings.clone(".");
+		return strings.clone(".")
 	}
 
 	// NOTE(bill): do not use is_separator because window paths do not follow this convention
-	rooted := path[0] == '/';
-	n := len(path);
+	rooted := path[0] == '/'
+	n := len(path)
 
-	out := &Lazy_Buffer{s = path};
+	out := &Lazy_Buffer{s = path}
 
 	// Check for ../../.. prefixes
-	r, dot_dot := 0, 0;
+	r, dot_dot := 0, 0
 	if rooted {
-		lazy_buffer_append(out, '/');
-		r, dot_dot = 1, 1;
+		lazy_buffer_append(out, '/')
+		r, dot_dot = 1, 1
 	}
 
 	for r < n {
 		switch {
 		case is_separator(path[r]):
-			r += 1;
+			r += 1
 		case path[r] == '.' && (r+1 == n || is_separator(path[r+1])):
-			r += 1;
+			r += 1
 		case path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_separator(path[r+2])):
-			r += 2;
+			r += 2
 			switch {
 			case out.w > dot_dot:
-				out.w -= 1;
+				out.w -= 1
 				for out.w > dot_dot && !is_separator(lazy_buffer_index(out, out.w)) {
-					out.w -= 1;
+					out.w -= 1
 				}
 
 			case !rooted:
 				if out.w > 0 {
-					lazy_buffer_append(out, '/');
+					lazy_buffer_append(out, '/')
 				}
-				lazy_buffer_append(out, '.');
-				lazy_buffer_append(out, '.');
-				dot_dot = out.w;
+				lazy_buffer_append(out, '.')
+				lazy_buffer_append(out, '.')
+				dot_dot = out.w
 			}
 		case:
 			if rooted && out.w != 1 || !rooted && out.w != 0 {
-				lazy_buffer_append(out, '/');
+				lazy_buffer_append(out, '/')
 			}
 			for ; r < n && !is_separator(path[r]); r += 1 {
-				lazy_buffer_append(out, path[r]);
+				lazy_buffer_append(out, path[r])
 			}
 		}
 	}
 
 	if out.w == 0 {
-		delete(out.b);
-		return strings.clone(".");
+		delete(out.b)
+		return strings.clone(".")
 	}
 
-	return lazy_buffer_string(out);
+	return lazy_buffer_string(out)
 }
 
 // join joins numerous path elements into a single path
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
-	context.allocator = allocator;
+	context.allocator = allocator
 	for elem, i in elems {
 		if elem != "" {
-			s := strings.join(elems[i:], "/");
-			return clean(s);
+			s := strings.join(elems[i:], "/")
+			return clean(s)
 		}
 	}
-	return "";
+	return ""
 }
 
 // ext returns the file name extension used by "path"
@@ -163,32 +163,32 @@ join :: proc(elems: ..string, allocator := context.allocator) -> string {
 ext :: proc(path: string, new := false, allocator := context.allocator) -> string {
 	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
 		if path[i] == '.' {
-			res := path[i:];
+			res := path[i:]
 			if new {
-				res = strings.clone(res, allocator);
+				res = strings.clone(res, allocator)
 			}
-			return res;
+			return res
 		}
 	}
-	return "";
+	return ""
 }
 
 // name returns the file without the base and without the extension
 name :: proc(path: string, new := false, allocator := context.allocator) -> (name: string) {
-	_, file := split(path);
-	name = file;
+	_, file := split(path)
+	name = file
 
 	defer if new {
-		name = strings.clone(name, allocator);
+		name = strings.clone(name, allocator)
 	}
 
 	for i := len(file)-1; i >= 0 && !is_separator(file[i]); i -= 1 {
 		if file[i] == '.' {
-			name = file[:i];
-			return;
+			name = file[:i]
+			return
 		}
 	}
-	return file;
+	return file
 
 }
 
@@ -208,27 +208,27 @@ Lazy_Buffer :: struct {
 @(private)
 lazy_buffer_index :: proc(lb: ^Lazy_Buffer, i: int) -> byte {
 	if lb.b != nil {
-		return lb.b[i];
+		return lb.b[i]
 	}
-	return lb.s[i];
+	return lb.s[i]
 }
 @(private)
 lazy_buffer_append :: proc(lb: ^Lazy_Buffer, c: byte) {
 	if lb.b == nil {
 		if lb.w < len(lb.s) && lb.s[lb.w] == c {
-			lb.w += 1;
-			return;
+			lb.w += 1
+			return
 		}
-		lb.b = make([]byte, len(lb.s));
-		copy(lb.b, lb.s[:lb.w]);
+		lb.b = make([]byte, len(lb.s))
+		copy(lb.b, lb.s[:lb.w])
 	}
-	lb.b[lb.w] = c;
-	lb.w += 1;
+	lb.b[lb.w] = c
+	lb.w += 1
 }
 @(private)
 lazy_buffer_string :: proc(lb: ^Lazy_Buffer) -> string {
 	if lb.b == nil {
-		return strings.clone(lb.s[:lb.w]);
+		return strings.clone(lb.s[:lb.w])
 	}
-	return string(lb.b[:lb.w]);
+	return string(lb.b[:lb.w])
 }

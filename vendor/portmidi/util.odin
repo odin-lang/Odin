@@ -10,7 +10,7 @@ import "core:c"
 when ODIN_OS == "windows" do foreign import lib "portmidi_s.lib"
 
 
-Queue :: distinct rawptr;
+Queue :: distinct rawptr
 
 
 /*

@@ -8,11 +8,11 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2_image"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2_image"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2_image"
 
-bool :: SDL.bool;
+bool :: SDL.bool
 
-MAJOR_VERSION :: 2;
-MINOR_VERSION :: 0;
-PATCHLEVEL    :: 5;
+MAJOR_VERSION :: 2
+MINOR_VERSION :: 0
+PATCHLEVEL    :: 5
 
 @(default_calling_convention="c", link_prefix="IMG_")
 foreign lib {
@@ -26,12 +26,12 @@ InitFlag :: enum c.int {
 	WEBP = 3,
 }
 
-InitFlags :: distinct bit_set[InitFlag; c.int];
+InitFlags :: distinct bit_set[InitFlag; c.int]
 
-INIT_JPG  :: InitFlags{.JPG};
-INIT_PNG  :: InitFlags{.PNG};
-INIT_TIF  :: InitFlags{.TIF};
-INIT_WEBP :: InitFlags{.WEBP};
+INIT_JPG  :: InitFlags{.JPG}
+INIT_PNG  :: InitFlags{.PNG}
+INIT_TIF  :: InitFlags{.TIF}
+INIT_WEBP :: InitFlags{.WEBP}
 
 /* Animated image support
    Currently only animated GIFs are supported.
@@ -44,8 +44,8 @@ Animation :: struct {
 }
 
 /* We'll use SDL for reporting errors */
-SetError :: SDL.SetError;
-GetError :: SDL.GetError;
+SetError :: SDL.SetError
+GetError :: SDL.GetError
 
 @(default_calling_convention="c", link_prefix="IMG_")
 foreign lib {

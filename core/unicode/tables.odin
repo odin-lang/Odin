@@ -1,16 +1,16 @@
 package unicode
 
-@(private) pC     :: 1<<0; // a control character.
-@(private) pP     :: 1<<1; // a punctuation character.
-@(private) pN     :: 1<<2; // a numeral.
-@(private) pS     :: 1<<3; // a symbolic character.
-@(private) pZ     :: 1<<4; // a spacing character.
-@(private) pLu    :: 1<<5; // an upper-case letter.
-@(private) pLl    :: 1<<6; // a lower-case letter.
-@(private) pp     :: 1<<7; // a printable character according to Go's definition.
-@(private) pg     :: pp | pZ;   // a graphical character according to the Unicode definition.
-@(private) pLo    :: pLl | pLu; // a letter that is neither upper nor lower case.
-@(private) pLmask :: pLo;
+@(private) pC     :: 1<<0 // a control character.
+@(private) pP     :: 1<<1 // a punctuation character.
+@(private) pN     :: 1<<2 // a numeral.
+@(private) pS     :: 1<<3 // a symbolic character.
+@(private) pZ     :: 1<<4 // a spacing character.
+@(private) pLu    :: 1<<5 // an upper-case letter.
+@(private) pLl    :: 1<<6 // a lower-case letter.
+@(private) pp     :: 1<<7 // a printable character according to Go's definition.
+@(private) pg     :: pp | pZ   // a graphical character according to the Unicode definition.
+@(private) pLo    :: pLl | pLu // a letter that is neither upper nor lower case.
+@(private) pLmask :: pLo
 
 char_properties := [MAX_LATIN1+1]u8{
 	0x00 = pC,       // '\x00'
@@ -269,7 +269,7 @@ char_properties := [MAX_LATIN1+1]u8{
 	0xFD = pLl | pp, // 'ý'
 	0xFE = pLl | pp, // 'þ'
 	0xFF = pLl | pp, // 'ÿ'
-};
+}
 
 
 alpha_ranges := [?]i32{
@@ -425,7 +425,7 @@ alpha_ranges := [?]i32{
 	0xffca,  0xffcf,
 	0xffd2,  0xffd7,
 	0xffda,  0xffdc,
-};
+}
 
 alpha_singlets := [?]i32{
 	0x00aa,
@@ -460,7 +460,7 @@ alpha_singlets := [?]i32{
 	0x2128,
 	0xfb3e,
 	0xfe74,
-};
+}
 
 space_ranges := [?]i32{
 	0x0009,  0x000d, // tab and newline
@@ -475,7 +475,7 @@ space_ranges := [?]i32{
 	0x205f,  0x205f, // medium mathematical space
 	0x3000,  0x3000, // ideographic space
 	0xfeff,  0xfeff,
-};
+}
 
 unicode_spaces := [?]i32{
 	0x0009, // tab
@@ -492,7 +492,7 @@ unicode_spaces := [?]i32{
 	0x205f, // medium mathematical space
 	0x3000, // ideographic space
 	0xfeff, // unknown
-};
+}
 
 to_upper_ranges := [?]i32{
 	0x0061,  0x007a, 468, // a-z A-Z
@@ -530,7 +530,7 @@ to_upper_ranges := [?]i32{
 	0x2170,  0x217f, 484,
 	0x24d0,  0x24e9, 474,
 	0xff41,  0xff5a, 468,
-};
+}
 
 to_upper_singlets := [?]i32{
 	0x00ff, 621,
@@ -873,7 +873,7 @@ to_upper_singlets := [?]i32{
 	0x1fc3, 509,
 	0x1fe5, 507,
 	0x1ff3, 509,
-};
+}
 
 to_lower_ranges := [?]i32{
 	0x0041,  0x005a, 532, // A-Z a-z
@@ -912,7 +912,7 @@ to_lower_ranges := [?]i32{
 	0x2160,  0x216f, 516, // - -
 	0x24b6,  0x24cf, 526, // - -
 	0xff21,  0xff3a, 532, // - -
-};
+}
 
 to_lower_singlets := [?]i32{
 	0x0100, 501,
@@ -1248,7 +1248,7 @@ to_lower_singlets := [?]i32{
 	0x1fcc, 491,
 	0x1fec, 493,
 	0x1ffc, 491,
-};
+}
 
 to_title_singlets := [?]i32{
 	0x01c4, 501,
@@ -1259,4 +1259,4 @@ to_title_singlets := [?]i32{
 	0x01cc, 499,
 	0x01f1, 501,
 	0x01f3, 499,
-};
+}

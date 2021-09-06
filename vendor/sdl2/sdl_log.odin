@@ -7,7 +7,7 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-MAX_LOG_MESSAGE :: 4096;
+MAX_LOG_MESSAGE :: 4096
 
 LogCategory :: enum c.int {
 	APPLICATION,
@@ -54,7 +54,7 @@ LogPriority :: enum c.int {
 	NUM,
 }
 
-LogOutputFunction :: proc "c" (userdata: rawptr, category: LogCategory, priority: LogPriority, message: cstring);
+LogOutputFunction :: proc "c" (userdata: rawptr, category: LogCategory, priority: LogPriority, message: cstring)
 
 
 @(default_calling_convention="c", link_prefix="SDL_")

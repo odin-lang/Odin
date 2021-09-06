@@ -3,35 +3,35 @@ package sdl2
 import "core:c"
 import "core:intrinsics"
 import "core:runtime"
-_, _ :: intrinsics, runtime;
+_, _ :: intrinsics, runtime
 
 when ODIN_OS == "windows" do foreign import lib "SDL2.lib"
 when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-bool :: distinct b32;
-#assert(size_of(bool) == size_of(c.int));
+bool :: distinct b32
+#assert(size_of(bool) == size_of(c.int))
 
 FOURCC :: #force_inline proc "c" (A, B, C, D: u8) -> u32 {
-	return u32(A) << 0 | u32(B) << 8 | u32(C) << 16 | u32(D) << 24;
+	return u32(A) << 0 | u32(B) << 8 | u32(C) << 16 | u32(D) << 24
 }
 
 
 stack_alloc :: proc "c" ($T: typeid, #any_int count: int) -> ^T {
-	return (^T)(intrinsics.alloca(size_of(T)*count));
+	return (^T)(intrinsics.alloca(size_of(T)*count))
 }
 stack_make :: proc "c" ($T: typeid/[]$E, #any_int count: int) -> T {
-	ptr := (^T)(intrinsics.alloca(size_of(T)*count));
-	return transmute(T)runtime.Raw_Slice{ptr, count};
+	ptr := (^T)(intrinsics.alloca(size_of(T)*count))
+	return transmute(T)runtime.Raw_Slice{ptr, count}
 }
 stack_free :: proc "c" (ptr: rawptr) {}
 
 
-malloc_func  :: proc "c" (size: c.size_t) -> rawptr;
-calloc_func  :: proc "c" (nmemb, size: c.size_t) -> rawptr;
-realloc_func :: proc "c" (mem: rawptr, size: c.size_t) -> rawptr;
-free_func    :: proc "c" (mem: rawptr);
+malloc_func  :: proc "c" (size: c.size_t) -> rawptr
+calloc_func  :: proc "c" (nmemb, size: c.size_t) -> rawptr
+realloc_func :: proc "c" (mem: rawptr, size: c.size_t) -> rawptr
+free_func    :: proc "c" (mem: rawptr)
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -81,7 +81,7 @@ foreign lib {
 }
 
 
-M_PI :: 3.14159265358979323846264338327950288;
+M_PI :: 3.14159265358979323846264338327950288
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -130,13 +130,13 @@ foreign lib {
 }
 
 /* The SDL implementation of iconv() returns these error codes */
-ICONV_ERROR  :: ~c.size_t(0); // (size_t)-1
-ICONV_E2BIG  :: ~c.size_t(1); // (size_t)-2
-ICONV_EILSEQ :: ~c.size_t(2); // (size_t)-3
-ICONV_EINVAL :: ~c.size_t(3); // (size_t)-4
+ICONV_ERROR  :: ~c.size_t(0) // (size_t)-1
+ICONV_E2BIG  :: ~c.size_t(1) // (size_t)-2
+ICONV_EILSEQ :: ~c.size_t(2) // (size_t)-3
+ICONV_EINVAL :: ~c.size_t(3) // (size_t)-4
 
 /* SDL_iconv_* are now always real symbols/types, not macros or inlined. */
-iconv_t :: distinct rawptr;
+iconv_t :: distinct rawptr
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -147,17 +147,17 @@ foreign lib {
 }
 
 iconv_utf8_locale :: proc "c" (s: string) -> cstring {
-	return cast(cstring)iconv_string("", "UTF-8", cstring(raw_data(s)), len(s)+1);
+	return cast(cstring)iconv_string("", "UTF-8", cstring(raw_data(s)), len(s)+1)
 }
 
-iconv_utf8_utf16 :: iconv_utf8_ucs2;
+iconv_utf8_utf16 :: iconv_utf8_ucs2
 iconv_utf8_ucs2 :: proc "c" (s: string) -> [^]u16 {
-	return cast([^]u16)iconv_string("UCS-2-INTERNAL", "UTF-8", cstring(raw_data(s)), len(s)+1);
+	return cast([^]u16)iconv_string("UCS-2-INTERNAL", "UTF-8", cstring(raw_data(s)), len(s)+1)
 }
 
-#assert(size_of(rune) == size_of(c.int));
+#assert(size_of(rune) == size_of(c.int))
 
-iconv_utf8_utf32 :: iconv_utf8_ucs4;
+iconv_utf8_utf32 :: iconv_utf8_ucs4
 iconv_utf8_ucs4 :: proc "c" (s: string) -> [^]rune {
-	return cast([^]rune)iconv_string("UCS-4-INTERNAL", "UTF-8", cstring(raw_data(s)), len(s)+1);
+	return cast([^]rune)iconv_string("UCS-4-INTERNAL", "UTF-8", cstring(raw_data(s)), len(s)+1)
 }

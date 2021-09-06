@@ -4,20 +4,20 @@ import "core:intrinsics"
 
 @(optimization_mode="speed")
 crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
-	crc := ~seed;
-	buffer := raw_data(data);
-	length := len(data);
+	crc := ~seed
+	buffer := raw_data(data)
+	length := len(data)
 
 	for length != 0 && uintptr(buffer) & 7 != 0 {
-		crc = crc32_table[0][byte(crc) ~ buffer^] ~ (crc >> 8);
-		buffer = intrinsics.ptr_offset(buffer, 1);
-		length -= 1;
+		crc = crc32_table[0][byte(crc) ~ buffer^] ~ (crc >> 8)
+		buffer = intrinsics.ptr_offset(buffer, 1)
+		length -= 1
 	}
 
 	for length >= 8 {
-		buf := (^[8]byte)(buffer);
-		word := u32((^u32le)(buffer)^);
-		crc ~= word;
+		buf := (^[8]byte)(buffer)
+		word := u32((^u32le)(buffer)^)
+		crc ~= word
 
 		crc = crc32_table[7][crc & 0xff] ~
 		      crc32_table[6][(crc >> 8) & 0xff] ~
@@ -26,21 +26,21 @@ crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
 		      crc32_table[3][buf[4]] ~
 		      crc32_table[2][buf[5]] ~
 		      crc32_table[1][buf[6]] ~
-		      crc32_table[0][buf[7]];
+		      crc32_table[0][buf[7]]
 
-		buffer = intrinsics.ptr_offset(buffer, 8);
-		length -= 8;
+		buffer = intrinsics.ptr_offset(buffer, 8)
+		length -= 8
 	}
 
 
 	for length != 0 {
-		crc = crc32_table[0][byte(crc) ~ buffer^] ~ (crc >> 8);
-		buffer = intrinsics.ptr_offset(buffer, 1);
-		length -= 1;
+		crc = crc32_table[0][byte(crc) ~ buffer^] ~ (crc >> 8)
+		buffer = intrinsics.ptr_offset(buffer, 1)
+		length -= 1
 	}
 
 
-	return ~crc;
+	return ~crc
 }
 
 @(private)
@@ -317,7 +317,7 @@ crc32_table := [8][256]u32{
 		0xff6b144a, 0x33c114d4, 0xbd4e1337, 0x71e413a9, 0x7b211ab0, 0xb78b1a2e, 0x39041dcd, 0xf5ae1d53,
 		0x2c8e0fff, 0xe0240f61, 0x6eab0882, 0xa201081c, 0xa8c40105, 0x646e019b, 0xeae10678, 0x264b06e6,
 	},
-};
+}
 
 
 

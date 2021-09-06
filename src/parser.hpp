@@ -102,6 +102,7 @@ struct AstFile {
 	Tokenizer    tokenizer;
 	Array<Token> tokens;
 	isize        curr_token_index;
+	isize        prev_token_index;
 	Token        curr_token;
 	Token        prev_token; // previous non-comment
 	Token        package_token;

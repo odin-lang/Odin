@@ -7,7 +7,7 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-GameController :: struct {};
+GameController :: struct {}
 
 GameControllerType :: enum c.int {
 	UNKNOWN = 0,
@@ -80,7 +80,7 @@ GameControllerButton :: enum c.int {
 
 
 GameControllerAddMappingsFromFile :: #force_inline proc "c" (file: cstring) -> c.int {
-	return GameControllerAddMappingsFromRW(RWFromFile(file, "rb"), true);
+	return GameControllerAddMappingsFromRW(RWFromFile(file, "rb"), true)
 }
 
 

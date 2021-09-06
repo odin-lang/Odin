@@ -7,10 +7,10 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-Thread :: struct {};
+Thread :: struct {}
 
-threadID :: distinct c.ulong;
-TLSID :: distinct c.uint;
+threadID :: distinct c.ulong
+TLSID :: distinct c.uint
 
 ThreadPriority :: enum c.int {
 	LOW,
@@ -19,7 +19,7 @@ ThreadPriority :: enum c.int {
 	TIME_CRITICAL,
 }
 
-ThreadFunction :: proc "c" (data: rawptr) -> c.int;
+ThreadFunction :: proc "c" (data: rawptr) -> c.int
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

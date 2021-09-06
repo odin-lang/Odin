@@ -7,18 +7,18 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-MUTEX_TIMEDOUT :: 1;
-MUTEX_MAXWAIT  :: ~u32(0);
+MUTEX_TIMEDOUT :: 1
+MUTEX_MAXWAIT  :: ~u32(0)
 
-mutex :: struct {};
+mutex :: struct {}
 
-semaphore :: struct {};
-sem :: semaphore;
+semaphore :: struct {}
+sem :: semaphore
 
-cond :: struct {};
+cond :: struct {}
 
-mutexP :: LockMutex;
-mutexV :: UnlockMutex;
+mutexP :: LockMutex
+mutexV :: UnlockMutex
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

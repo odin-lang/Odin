@@ -7,8 +7,8 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-TouchID  :: distinct i64;
-FingerID :: distinct i64;
+TouchID  :: distinct i64
+FingerID :: distinct i64
 
 TouchDeviceType :: enum c.int {
 	INVALID = -1,
@@ -24,8 +24,8 @@ Finger :: struct {
     pressure: f32,
 }
 
-TOUCH_MOUSEID  :: ~u32(0);
-MOUSE_TOUCH_ID :: TouchID(-1);
+TOUCH_MOUSEID  :: ~u32(0)
+MOUSE_TOUCH_ID :: TouchID(-1)
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

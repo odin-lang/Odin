@@ -733,7 +733,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None, Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer, Command_all);
-	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None, Command__does_build|Command_strip_semicolon);
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String, Command__does_check);
 	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String, Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String, Command__does_build); // Commands_build is not used to allow for a better error message
@@ -1307,12 +1307,12 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_InsertSemicolon:
-							build_context.insert_semicolon = true;
+							gb_printf_err("-insert-semicolon flag is not required any more\n");
+							bad_flags = true;
 							break;
 
 						case BuildFlag_StrictStyle:
-							gb_printf_err("-strict-style flag is not required any more\n");
-							bad_flags = true;
+							build_context.strict_style = true;
 							break;
 
 
@@ -1644,7 +1644,7 @@ void print_show_help(String const arg0, String const &command) {
 	} else if (command == "run") {
 		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
 	} else if (command == "check") {
-		print_usage_line(1, "check     parse and type check .odin file");
+		print_usage_line(1, "check     parse and type check .odin file(s)");
 	} else if (command == "test") {
 		print_usage_line(1, "test      build ands runs procedures with the attribute @(test) in the initial package");
 	} else if (command == "query") {
@@ -1656,14 +1656,18 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin doc core/path core/path/filepath");
 	} else if (command == "version") {
 		print_usage_line(1, "version   print version");
-	}
+	} else if (command == "strip-semicolon") {
+		print_usage_line(1, "strip-semicolon");
+		print_usage_line(2, "parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
+	} 
 
 	bool doc = command == "doc";
 	bool build = command == "build";
 	bool run_or_build = command == "run" || command == "build" || command == "test";
 	bool test_only = command == "test";
-	bool check_only = command == "check";
-	bool check = run_or_build || command == "check";
+	bool strip_semicolon = command == "strip-semicolon";
+	bool check_only = command == "check" || strip_semicolon;
+	bool check = run_or_build || check_only;
 
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
@@ -1729,6 +1733,10 @@ void print_show_help(String const arg0, String const &command) {
 	if (run_or_build) {
 		print_usage_line(1, "-keep-temp-files");
 		print_usage_line(2, "Keeps the temporary files generated during compilation");
+		print_usage_line(0, "");
+	} else if (strip_semicolon) {
+		print_usage_line(1, "-keep-temp-files");
+		print_usage_line(2, "Keeps the temporary files generated during stripping the unneeded semicolons from files");
 		print_usage_line(0, "");
 	}
 
@@ -1862,8 +1870,8 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-insert-semicolon");
-		print_usage_line(2, "Inserts semicolons on newlines during tokenization using a basic rule");
+		print_usage_line(1, "-strict-style");
+		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
@@ -2002,6 +2010,172 @@ bool check_env(void) {
 	return true;
 }
 
+struct StripSemicolonFile {
+	String old_fullpath;
+	String old_fullpath_backup;
+	String new_fullpath;
+	AstFile *file;
+	i64 written;
+};
+
+gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *written_) {
+	i64 written = 0;
+	gbFileError err = gbFileError_None;
+	u8 const *file_data = file->tokenizer.start;
+	i32 prev_offset = 0;
+	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
+	for_array(i, file->tokens) {
+		Token *token = &file->tokens[i];
+		if (token->flags & TokenFlag_Remove) {
+			i32 offset = token->pos.offset;
+			i32 to_write = offset-prev_offset;
+			if (!gb_file_write(f, file_data+prev_offset, to_write)) {
+				return gbFileError_Invalid;
+			}
+			written += to_write;
+			prev_offset = token_pos_end(*token).offset;
+		}
+	}
+	if (end_offset > prev_offset) {
+		i32 to_write = end_offset-prev_offset;
+		if (!gb_file_write(f, file_data+prev_offset, end_offset-prev_offset)) {
+			return gbFileError_Invalid;
+		}
+		written += to_write;
+	}
+	
+	if (written_) *written_ = written;
+	return err;
+}
+
+int strip_semicolons(Parser *parser) {
+	isize file_count = 0;
+	for_array(i, parser->packages) {
+		AstPackage *pkg = parser->packages[i];
+		file_count += pkg->files.count;
+	}
+	gb_printf_err("File count to be stripped of unneeded tokens: %td\n", file_count);
+	
+	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
+	
+	for_array(i, parser->packages) {
+		AstPackage *pkg = parser->packages[i];
+		for_array(j, pkg->files) {
+			AstFile *file = pkg->files[j];
+			String old_fullpath = copy_string(permanent_allocator(), file->fullpath);
+				
+			// assumes .odin extension
+			String fullpath_base = substring(old_fullpath, 0, old_fullpath.len-5);
+			
+			String old_fullpath_backup = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~backup.odin-temp"));
+			String new_fullpath = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~temp.odin-temp"));
+			
+			array_add(&generated_files, StripSemicolonFile{old_fullpath, old_fullpath_backup, new_fullpath, file});
+		}
+	}
+	
+	isize generated_count = 0;
+	bool failed = false;
+	
+	for_array(i, generated_files) {
+		auto *file = &generated_files[i];
+		char const *filename = cast(char const *)file->new_fullpath.text;
+		gbFileError err = gbFileError_None;
+		defer (if (err != gbFileError_None) {
+			failed = true;
+		});
+		
+		gbFile f = {}; 
+		err = gb_file_create(&f, filename);
+		if (err) {
+			break;
+		}
+		defer (err = gb_file_close(&f));
+		generated_count += 1;
+		
+		i64 written = 0;
+		defer (gb_file_truncate(&f, written));
+		
+		debugf("Write file with stripped tokens: %s\n", filename);
+		err = write_file_with_stripped_tokens(&f, file->file, &written);
+		if (err) {
+			break;
+		}
+		file->written = written;
+	}
+
+	if (failed) {
+		for (isize i = 0; i < generated_count; i++) {
+			auto *file = &generated_files[i];
+			char const *filename = nullptr;
+			filename = cast(char const *)file->new_fullpath.text;
+			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
+		}
+		return 1;
+	}
+	
+	isize overwritten_files = 0;
+	
+	for_array(i, generated_files) {
+		auto *file = &generated_files[i];
+		
+		char const *old_fullpath = cast(char const *)file->old_fullpath.text;
+		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
+		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
+		
+		debugf("Copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
+		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
+			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
+			failed = true;
+			break;
+		}
+		
+		debugf("Copy '%s' to '%s'\n", new_fullpath, old_fullpath);
+		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
+			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, new_fullpath);
+			debugf("Copy '%s' to '%s'\n", old_fullpath_backup, old_fullpath);
+			if (!gb_file_copy(old_fullpath_backup, old_fullpath, false)) {
+				gb_printf_err("failed to restore '%s' from '%s'\n", old_fullpath, old_fullpath_backup);
+			}
+			failed = true;
+			break;
+		}
+		
+		debugf("Remove '%s'\n", old_fullpath_backup);
+		if (!gb_file_remove(old_fullpath_backup)) {
+			gb_printf_err("failed to remove '%s'\n", old_fullpath_backup);
+		}
+		
+		overwritten_files++;
+	}
+	
+	if (!build_context.keep_temp_files) {
+		for_array(i, generated_files) {
+			auto *file = &generated_files[i];
+			char const *filename = nullptr;
+			filename = cast(char const *)file->new_fullpath.text;
+			
+			debugf("Remove '%s'\n", filename);
+			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
+			
+			filename = cast(char const *)file->old_fullpath_backup.text;
+			debugf("Remove '%s'\n", filename);
+			if (gb_file_exists(filename) && !gb_file_remove(filename)) {
+				if (i < overwritten_files) {
+					gb_printf_err("unable to delete file %s", filename);
+					failed = true;
+				}
+			}
+		}
+	}
+	
+	gb_printf_err("Files stripped of unneeded token: %td\n", file_count);
+	
+	
+	return cast(int)failed;
+}
+
+
 
 int main(int arg_count, char const **arg_ptr) {
 #define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
@@ -2088,6 +2262,14 @@ int main(int arg_count, char const **arg_ptr) {
 			return 1;
 		}
 		build_context.command_kind = Command_check;
+		build_context.no_output_files = true;
+		init_filename = args[2];
+	} else if (command == "strip-semicolon") {
+		if (args.count < 3) {
+			usage(args[0]);
+			return 1;
+		}
+		build_context.command_kind = Command_strip_semicolon;
 		build_context.no_output_files = true;
 		init_filename = args[2];
 	} else if (command == "query") {
@@ -2208,6 +2390,10 @@ int main(int arg_count, char const **arg_ptr) {
 	check_parsed_files(checker);
 	if (any_errors()) {
 		return 1;
+	}
+	
+	if (build_context.command_kind == Command_strip_semicolon) {
+		return strip_semicolons(parser);
 	}
 
 	if (build_context.generate_docs) {

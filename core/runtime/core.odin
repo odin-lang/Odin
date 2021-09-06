@@ -35,7 +35,7 @@ Calling_Convention :: enum u8 {
 	Naked       = 7,
 }
 
-Type_Info_Enum_Value :: distinct i64;
+Type_Info_Enum_Value :: distinct i64
 
 Platform_Endianness :: enum u8 {
 	Platform = 0,
@@ -44,9 +44,9 @@ Platform_Endianness :: enum u8 {
 }
 
 // Procedure type to test whether two values of the same type are equal
-Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool;
+Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool
 // Procedure type to hash a value, default seed value is 0
-Hasher_Proc :: distinct proc "contextless" (data: rawptr, seed: uintptr = 0) -> uintptr;
+Hasher_Proc :: distinct proc "contextless" (data: rawptr, seed: uintptr = 0) -> uintptr
 
 Type_Info_Struct_Soa_Kind :: enum u8 {
 	None    = 0,
@@ -61,33 +61,33 @@ Type_Info_Named :: struct {
 	base: ^Type_Info,
 	pkg:  string,
 	loc:  Source_Code_Location,
-};
-Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness};
-Type_Info_Rune       :: struct {};
-Type_Info_Float      :: struct {endianness: Platform_Endianness};
-Type_Info_Complex    :: struct {};
-Type_Info_Quaternion :: struct {};
-Type_Info_String     :: struct {is_cstring: bool};
-Type_Info_Boolean    :: struct {};
-Type_Info_Any        :: struct {};
-Type_Info_Type_Id    :: struct {};
+}
+Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness}
+Type_Info_Rune       :: struct {}
+Type_Info_Float      :: struct {endianness: Platform_Endianness}
+Type_Info_Complex    :: struct {}
+Type_Info_Quaternion :: struct {}
+Type_Info_String     :: struct {is_cstring: bool}
+Type_Info_Boolean    :: struct {}
+Type_Info_Any        :: struct {}
+Type_Info_Type_Id    :: struct {}
 Type_Info_Pointer :: struct {
 	elem: ^Type_Info, // nil -> rawptr
-};
+}
 Type_Info_Multi_Pointer :: struct {
 	elem: ^Type_Info,
-};
+}
 Type_Info_Procedure :: struct {
 	params:     ^Type_Info, // Type_Info_Tuple
 	results:    ^Type_Info, // Type_Info_Tuple
 	variadic:   bool,
 	convention: Calling_Convention,
-};
+}
 Type_Info_Array :: struct {
 	elem:      ^Type_Info,
 	elem_size: int,
 	count:     int,
-};
+}
 Type_Info_Enumerated_Array :: struct {
 	elem:      ^Type_Info,
 	index:     ^Type_Info,
@@ -95,13 +95,13 @@ Type_Info_Enumerated_Array :: struct {
 	count:     int,
 	min_value: Type_Info_Enum_Value,
 	max_value: Type_Info_Enum_Value,
-};
-Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int};
-Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int};
+}
+Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
+Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}
 Type_Info_Tuple :: struct { // Only used for procedures parameters and results
 	types:        []^Type_Info,
 	names:        []string,
-};
+}
 
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
@@ -119,7 +119,7 @@ Type_Info_Struct :: struct {
 	soa_kind:      Type_Info_Struct_Soa_Kind,
 	soa_base_type: ^Type_Info,
 	soa_len:       int,
-};
+}
 Type_Info_Union :: struct {
 	variants:     []^Type_Info,
 	tag_offset:   uintptr,
@@ -130,44 +130,44 @@ Type_Info_Union :: struct {
 	custom_align: bool,
 	no_nil:       bool,
 	maybe:        bool,
-};
+}
 Type_Info_Enum :: struct {
 	base:      ^Type_Info,
 	names:     []string,
 	values:    []Type_Info_Enum_Value,
-};
+}
 Type_Info_Map :: struct {
 	key:              ^Type_Info,
 	value:            ^Type_Info,
 	generated_struct: ^Type_Info,
 	key_equal:        Equal_Proc,
 	key_hasher:       Hasher_Proc,
-};
+}
 Type_Info_Bit_Set :: struct {
 	elem:       ^Type_Info,
 	underlying: ^Type_Info, // Possibly nil
 	lower:      i64,
 	upper:      i64,
-};
+}
 Type_Info_Simd_Vector :: struct {
 	elem:       ^Type_Info,
 	elem_size:  int,
 	count:      int,
-};
+}
 Type_Info_Relative_Pointer :: struct {
 	pointer:      ^Type_Info,
 	base_integer: ^Type_Info,
-};
+}
 Type_Info_Relative_Slice :: struct {
 	slice:        ^Type_Info,
 	base_integer: ^Type_Info,
-};
+}
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
 	Simple_Compare = 1,
-};
-Type_Info_Flags :: distinct bit_set[Type_Info_Flag; u32];
+}
+Type_Info_Flags :: distinct bit_set[Type_Info_Flag; u32]
 
 Type_Info :: struct {
 	size:  int,
@@ -234,7 +234,7 @@ Typeid_Kind :: enum u8 {
 	Relative_Pointer,
 	Relative_Slice,
 }
-#assert(len(Typeid_Kind) < 32);
+#assert(len(Typeid_Kind) < 32)
 
 // Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
 // 	index:    8*size_of(uintptr) - 8,
@@ -247,9 +247,9 @@ Typeid_Kind :: enum u8 {
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-type_table: []Type_Info;
+type_table: []Type_Info
 
-args__: []cstring;
+args__: []cstring
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
@@ -260,7 +260,7 @@ Source_Code_Location :: struct {
 	procedure:    string,
 }
 
-Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location) -> !;
+Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location) -> !
 
 // Allocation Stuff
 Allocator_Mode :: enum byte {
@@ -272,7 +272,7 @@ Allocator_Mode :: enum byte {
 	Query_Info,
 }
 
-Allocator_Mode_Set :: distinct bit_set[Allocator_Mode];
+Allocator_Mode_Set :: distinct bit_set[Allocator_Mode]
 
 Allocator_Query_Info :: struct {
 	pointer:   rawptr,
@@ -291,7 +291,7 @@ Allocator_Error :: enum byte {
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
-                             location: Source_Code_Location = #caller_location) -> ([]byte, Allocator_Error);
+                             location: Source_Code_Location = #caller_location) -> ([]byte, Allocator_Error)
 Allocator :: struct {
 	procedure: Allocator_Proc,
 	data:      rawptr,
@@ -319,8 +319,8 @@ Logger_Option :: enum {
 	Thread_Id,
 }
 
-Logger_Options :: bit_set[Logger_Option];
-Logger_Proc :: #type proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location);
+Logger_Options :: bit_set[Logger_Option]
+Logger_Proc :: #type proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location)
 
 Logger :: struct {
 	procedure:    Logger_Proc,
@@ -386,63 +386,63 @@ foreign {
 
 type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
-		return nil;
+		return nil
 	}
 
-	base := info;
+	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named: base = i.base;
-		case: break loop;
+		case Type_Info_Named: base = i.base
+		case: break loop
 		}
 	}
-	return base;
+	return base
 }
 
 
 type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
-		return nil;
+		return nil
 	}
 
-	base := info;
+	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named:  base = i.base;
-		case Type_Info_Enum:   base = i.base;
-		case: break loop;
+		case Type_Info_Named:  base = i.base
+		case Type_Info_Enum:   base = i.base
+		case: break loop
 		}
 	}
-	return base;
+	return base
 }
-type_info_base_without_enum :: type_info_core;
+type_info_base_without_enum :: type_info_core
 
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
-	MASK :: 1<<(8*size_of(typeid) - 8) - 1;
-	data := transmute(uintptr)id;
-	n := int(data & MASK);
+	MASK :: 1<<(8*size_of(typeid) - 8) - 1
+	data := transmute(uintptr)id
+	n := int(data & MASK)
 	if n < 0 || n >= len(type_table) {
-		n = 0;
+		n = 0
 	}
-	return &type_table[n];
+	return &type_table[n]
 }
 
 typeid_base :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_of(id);
-	ti = type_info_base(ti);
-	return ti.id;
+	ti := type_info_of(id)
+	ti = type_info_base(ti)
+	return ti.id
 }
 typeid_core :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_core(type_info_of(id));
-	return ti.id;
+	ti := type_info_core(type_info_of(id))
+	return ti.id
 }
-typeid_base_without_enum :: typeid_core;
+typeid_base_without_enum :: typeid_core
 
 
 
-debug_trap         :: intrinsics.debug_trap;
-trap               :: intrinsics.trap;
-read_cycle_counter :: intrinsics.read_cycle_counter;
+debug_trap         :: intrinsics.debug_trap
+trap               :: intrinsics.trap
+read_cycle_counter :: intrinsics.read_cycle_counter
 
 
 
@@ -451,53 +451,53 @@ default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, opt
 }
 
 default_logger :: proc() -> Logger {
-	return Logger{default_logger_proc, nil, Logger_Level.Debug, nil};
+	return Logger{default_logger_proc, nil, Logger_Level.Debug, nil}
 }
 
 
 default_context :: proc "contextless" () -> Context {
-	c: Context;
-	__init_context(&c);
-	return c;
+	c: Context
+	__init_context(&c)
+	return c
 }
 
 @private
 __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 	if c == nil {
-		return;
+		return
 	}
-	c^ = other^;
-	__init_context(c);
+	c^ = other^
+	__init_context(c)
 }
 
 @private
 __init_context :: proc "contextless" (c: ^Context) {
 	if c == nil {
-		return;
+		return
 	}
 
 	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contexless" calling convention
-	c.allocator.procedure = default_allocator_proc;
-	c.allocator.data = nil;
+	c.allocator.procedure = default_allocator_proc
+	c.allocator.data = nil
 
-	c.temp_allocator.procedure = default_temp_allocator_proc;
-	c.temp_allocator.data = &global_default_temp_allocator_data;
+	c.temp_allocator.procedure = default_temp_allocator_proc
+	c.temp_allocator.data = &global_default_temp_allocator_data
 
-	c.assertion_failure_proc = default_assertion_failure_proc;
+	c.assertion_failure_proc = default_assertion_failure_proc
 
-	c.logger.procedure = default_logger_proc;
-	c.logger.data = nil;
+	c.logger.procedure = default_logger_proc
+	c.logger.data = nil
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
-	print_caller_location(loc);
-	print_string(" ");
-	print_string(prefix);
+	print_caller_location(loc)
+	print_string(" ")
+	print_string(prefix)
 	if len(message) > 0 {
-		print_string(": ");
-		print_string(message);
+		print_string(": ")
+		print_string(message)
 	}
-	print_byte('\n');
+	print_byte('\n')
 	// intrinsics.debug_trap();
-	intrinsics.trap();
+	intrinsics.trap()
 }

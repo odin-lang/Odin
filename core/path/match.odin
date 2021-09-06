@@ -29,175 +29,175 @@ Match_Error :: enum {
 // The only possible error returned is .Syntax_Error
 //
 match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
-	pattern, name := pattern, name;
+	pattern, name := pattern, name
 	pattern_loop: for len(pattern) > 0 {
-		star: bool;
-		chunk: string;
-		star, chunk, pattern = scan_chunk(pattern);
+		star: bool
+		chunk: string
+		star, chunk, pattern = scan_chunk(pattern)
 		if star && chunk == "" {
-			return !strings.contains(name, "/"), .None;
+			return !strings.contains(name, "/"), .None
 		}
 
-		t: string;
-		ok: bool;
-		t, ok, err = match_chunk(chunk, name);
+		t: string
+		ok: bool
+		t, ok, err = match_chunk(chunk, name)
 
 		if ok && (len(t) == 0 || len(pattern) > 0) {
-			name = t;
-			continue;
+			name = t
+			continue
 		}
 		if err != .None {
-			return;
+			return
 		}
 		if star {
 			for i := 0; i < len(name) && name[i] != '/'; i += 1 {
-				t, ok, err = match_chunk(chunk, name[i+1:]);
+				t, ok, err = match_chunk(chunk, name[i+1:])
 				if ok {
 					if len(pattern) == 0 && len(t) > 0 {
-						continue;
+						continue
 					}
-					name = t;
-					continue pattern_loop;
+					name = t
+					continue pattern_loop
 				}
 				if err != .None {
-					return;
+					return
 				}
 			}
 		}
 
-		return false, .None;
+		return false, .None
 	}
 
-	return len(name) == 0, .None;
+	return len(name) == 0, .None
 }
 
 
 @(private="file")
 scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
-	pattern := pattern;
+	pattern := pattern
 	for len(pattern) > 0 && pattern[0] == '*' {
-		pattern = pattern[1:];
-		star = true;
+		pattern = pattern[1:]
+		star = true
 	}
-	in_range := false;
-	i: int;
+	in_range := false
+	i: int
 
 	scan_loop: for i = 0; i < len(pattern); i += 1 {
 		switch pattern[i] {
 		case '\\':
 			if i+1 < len(pattern) {
-				i += 1;
+				i += 1
 			}
 		case '[':
-			in_range = true;
+			in_range = true
 		case ']':
-			in_range = false;
+			in_range = false
 		case '*':
 			if !in_range {
-				break scan_loop;
+				break scan_loop
 			}
 
 		}
 	}
-	return star, pattern[:i], pattern[i:];
+	return star, pattern[:i], pattern[i:]
 }
 
 @(private="file")
 match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Match_Error) {
-	chunk, s := chunk, s;
+	chunk, s := chunk, s
 	for len(chunk) > 0 {
 		if len(s) == 0 {
-			return;
+			return
 		}
 		switch chunk[0] {
 		case '[':
-			r, w := utf8.decode_rune_in_string(s);
-			s = s[w:];
-			chunk = chunk[1:];
-			is_negated := false;
+			r, w := utf8.decode_rune_in_string(s)
+			s = s[w:]
+			chunk = chunk[1:]
+			is_negated := false
 			if len(chunk) > 0 && chunk[0] == '^' {
-				is_negated = true;
-				chunk = chunk[1:];
+				is_negated = true
+				chunk = chunk[1:]
 			}
-			match := false;
-			range_count := 0;
+			match := false
+			range_count := 0
 			for {
 				if len(chunk) > 0 && chunk[0] == ']' && range_count > 0 {
-					chunk = chunk[1:];
-					break;
+					chunk = chunk[1:]
+					break
 				}
-				lo, hi: rune;
+				lo, hi: rune
 				if lo, chunk, err = get_escape(chunk); err != .None {
-					return;
+					return
 				}
-				hi = lo;
+				hi = lo
 				if chunk[0] == '-' {
 					if hi, chunk, err = get_escape(chunk[1:]); err != .None {
-						return;
+						return
 					}
 				}
 
 				if lo <= r && r <= hi {
-					match = true;
+					match = true
 				}
-				range_count += 1;
+				range_count += 1
 			}
 			if match == is_negated {
-				return;
+				return
 			}
 
 		case '?':
 			if s[0] == '/' {
-				return;
+				return
 			}
-			_, w := utf8.decode_rune_in_string(s);
-			s = s[w:];
-			chunk = chunk[1:];
+			_, w := utf8.decode_rune_in_string(s)
+			s = s[w:]
+			chunk = chunk[1:]
 
 		case '\\':
-			chunk = chunk[1:];
+			chunk = chunk[1:]
 			if len(chunk) == 0 {
-				err = .Syntax_Error;
-				return;
+				err = .Syntax_Error
+				return
 			}
-			fallthrough;
+			fallthrough
 		case:
 			if chunk[0] != s[0] {
-				return;
+				return
 			}
-			s = s[1:];
-			chunk = chunk[1:];
+			s = s[1:]
+			chunk = chunk[1:]
 
 		}
 	}
-	return s, true, .None;
+	return s, true, .None
 }
 
 @(private="file")
 get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Error) {
 	if len(chunk) == 0 || chunk[0] == '-' || chunk[0] == ']' {
-		err = .Syntax_Error;
-		return;
+		err = .Syntax_Error
+		return
 	}
-	chunk := chunk;
+	chunk := chunk
 	if chunk[0] == '\\' {
-		chunk = chunk[1:];
+		chunk = chunk[1:]
 		if len(chunk) == 0 {
-			err = .Syntax_Error;
-			return;
+			err = .Syntax_Error
+			return
 		}
 	}
 
-	w: int;
-	r, w = utf8.decode_rune_in_string(chunk);
+	w: int
+	r, w = utf8.decode_rune_in_string(chunk)
 	if r == utf8.RUNE_ERROR && w == 1 {
-		err = .Syntax_Error;
+		err = .Syntax_Error
 	}
 
-	next_chunk = chunk[w:];
+	next_chunk = chunk[w:]
 	if len(next_chunk) == 0 {
-		err = .Syntax_Error;
+		err = .Syntax_Error
 	}
 
-	return;
+	return
 }

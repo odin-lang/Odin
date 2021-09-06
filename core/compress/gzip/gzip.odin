@@ -33,7 +33,7 @@ Header :: struct #packed {
 	xfl: Compression_Flags,
 	os: OS,
 }
-#assert(size_of(Header) == 10);
+#assert(size_of(Header) == 10)
 
 Header_Flag :: enum u8 {
 	// Order is important
@@ -46,7 +46,7 @@ Header_Flag :: enum u8 {
 	reserved_2 = 6,
 	reserved_3 = 7,
 }
-Header_Flags :: distinct bit_set[Header_Flag; u8];
+Header_Flags :: distinct bit_set[Header_Flag; u8]
 
 OS :: enum u8 {
 	FAT          = 0,
@@ -82,7 +82,7 @@ OS_Name :: #partial [OS]string{
 	.QDOS         = "QDOS",
 	.Acorn_RISCOS = "Acorn RISCOS",
 	.Unknown      = "Unknown",
-};
+}
 
 Compression :: enum u8 {
 	DEFLATE = 8,
@@ -93,74 +93,74 @@ Compression_Flags :: enum u8 {
 	Fastest_Compression = 4,
 }
 
-Error     :: compress.Error;
-E_General :: compress.General_Error;
-E_GZIP    :: compress.GZIP_Error;
-E_ZLIB    :: compress.ZLIB_Error;
-E_Deflate :: compress.Deflate_Error;
+Error     :: compress.Error
+E_General :: compress.General_Error
+E_GZIP    :: compress.GZIP_Error
+E_ZLIB    :: compress.ZLIB_Error
+E_Deflate :: compress.Deflate_Error
 
-GZIP_MAX_PAYLOAD_SIZE :: int(max(u32le));
+GZIP_MAX_PAYLOAD_SIZE :: int(max(u32le))
 
-load :: proc{load_from_slice, load_from_file, load_from_context};
+load :: proc{load_from_slice, load_from_file, load_from_context}
 
 load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
-	data, ok := os.read_entire_file(filename, allocator);
-	defer delete(data);
+	data, ok := os.read_entire_file(filename, allocator)
+	defer delete(data)
 
-	err = E_General.File_Not_Found;
+	err = E_General.File_Not_Found
 	if ok {
-		err = load_from_slice(data, buf, len(data), expected_output_size, allocator);
+		err = load_from_slice(data, buf, len(data), expected_output_size, allocator)
 	}
-	return;
+	return
 }
 
 load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
-	buf := buf;
+	buf := buf
 
 	z := &compress.Context_Memory_Input{
 		input_data = slice,
 		output = buf,
-	};
-	return load_from_context(z, buf, known_gzip_size, expected_output_size, allocator);
+	}
+	return load_from_context(z, buf, known_gzip_size, expected_output_size, allocator)
 }
 
 load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
-	buf := buf;
-	expected_output_size := expected_output_size;
+	buf := buf
+	expected_output_size := expected_output_size
 
-	input_data_consumed := 0;
+	input_data_consumed := 0
 
-	z.output = buf;
+	z.output = buf
 
 	if expected_output_size > GZIP_MAX_PAYLOAD_SIZE {
-		return E_GZIP.Payload_Size_Exceeds_Max_Payload;
+		return E_GZIP.Payload_Size_Exceeds_Max_Payload
 	}
 
 	if expected_output_size > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
-		return E_GZIP.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX;
+		return E_GZIP.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX
 	}
 
-	b: []u8;
+	b: []u8
 
-	header, e := compress.read_data(z, Header);
+	header, e := compress.read_data(z, Header)
 	if e != .None {
-		return E_General.File_Too_Short;
+		return E_General.File_Too_Short
 	}
-	input_data_consumed += size_of(Header);
+	input_data_consumed += size_of(Header)
 
 	if header.magic != .GZIP {
-		return E_GZIP.Invalid_GZIP_Signature;
+		return E_GZIP.Invalid_GZIP_Signature
 	}
 	if header.compression_method != .DEFLATE {
-		return E_General.Unknown_Compression_Method;
+		return E_General.Unknown_Compression_Method
 	}
 
 	if header.os >= ._Unknown {
-		header.os = .Unknown;
+		header.os = .Unknown
 	}
 
 	if .reserved_1 in header.flags || .reserved_2 in header.flags || .reserved_3 in header.flags {
-		return E_GZIP.Reserved_Flag_Set;
+		return E_GZIP.Reserved_Flag_Set
 	}
 
 	// printf("signature: %v\n", header.magic);
@@ -171,84 +171,84 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 	// printf("os: %v\n", OS_Name[header.os]);
 
 	if .extra in header.flags {
-		xlen, e_extra := compress.read_data(z, u16le);
-		input_data_consumed += 2;
+		xlen, e_extra := compress.read_data(z, u16le)
+		input_data_consumed += 2
 
 		if e_extra != .None {
-			return E_General.Stream_Too_Short;
+			return E_General.Stream_Too_Short
 		}
 		// printf("Extra data present (%v bytes)\n", xlen);
 		if xlen < 4 {
 			// Minimum length is 2 for ID + 2 for a field length, if set to zero.
-			return E_GZIP.Invalid_Extra_Data;
+			return E_GZIP.Invalid_Extra_Data
 		}
 
-		field_id:     [2]u8;
-		field_length: u16le;
-		field_error: io.Error;
+		field_id:     [2]u8
+		field_length: u16le
+		field_error: io.Error
 
 		for xlen >= 4 {
 			// println("Parsing Extra field(s).");
-			field_id, field_error = compress.read_data(z, [2]u8);
+			field_id, field_error = compress.read_data(z, [2]u8)
 			if field_error != .None {
 				// printf("Parsing Extra returned: %v\n", field_error);
-				return E_General.Stream_Too_Short;
+				return E_General.Stream_Too_Short
 			}
-			xlen -= 2;
-			input_data_consumed += 2;
+			xlen -= 2
+			input_data_consumed += 2
 
-			field_length, field_error = compress.read_data(z, u16le);
+			field_length, field_error = compress.read_data(z, u16le)
 			if field_error != .None {
 				// printf("Parsing Extra returned: %v\n", field_error);
-				return E_General.Stream_Too_Short;
+				return E_General.Stream_Too_Short
 			}
-			xlen -= 2;
-			input_data_consumed += 2;
+			xlen -= 2
+			input_data_consumed += 2
 
 			if xlen <= 0 {
 				// We're not going to try and recover by scanning for a ZLIB header.
 				// Who knows what else is wrong with this file.
-				return E_GZIP.Invalid_Extra_Data;
+				return E_GZIP.Invalid_Extra_Data
 			}
 
 			// printf("    Field \"%v\" of length %v found: ", string(field_id[:]), field_length);
 			if field_length > 0 {
-				b, field_error = compress.read_slice(z, int(field_length));
+				b, field_error = compress.read_slice(z, int(field_length))
 				if field_error != .None {
 					// printf("Parsing Extra returned: %v\n", field_error);
-					return E_General.Stream_Too_Short;
+					return E_General.Stream_Too_Short
 				}
-				xlen -= field_length;
-				input_data_consumed += int(field_length);
+				xlen -= field_length
+				input_data_consumed += int(field_length)
 
 				// printf("%v\n", string(field_data));
 			}
 
 			if xlen != 0 {
-				return E_GZIP.Invalid_Extra_Data;
+				return E_GZIP.Invalid_Extra_Data
 			}
 		}
 	}
 
 	if .name in header.flags {
 		// Should be enough.
-		name: [1024]u8;
-		i := 0;
-		name_error: io.Error;
+		name: [1024]u8
+		i := 0
+		name_error: io.Error
 
 		for i < len(name) {
-			b, name_error = compress.read_slice(z, 1);
+			b, name_error = compress.read_slice(z, 1)
 			if name_error != .None {
-				return E_General.Stream_Too_Short;
+				return E_General.Stream_Too_Short
 			}
-			input_data_consumed += 1;
+			input_data_consumed += 1
 			if b[0] == 0 {
-				break;
+				break
 			}
-			name[i] = b[0];
-			i += 1;
+			name[i] = b[0]
+			i += 1
 			if i >= len(name) {
-				return E_GZIP.Original_Name_Too_Long;
+				return E_GZIP.Original_Name_Too_Long
 			}
 		}
 		// printf("Original filename: %v\n", string(name[:i]));
@@ -256,34 +256,34 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 	if .comment in header.flags {
 		// Should be enough.
-		comment: [1024]u8;
-		i := 0;
-		comment_error: io.Error;
+		comment: [1024]u8
+		i := 0
+		comment_error: io.Error
 
 		for i < len(comment) {
-			b, comment_error = compress.read_slice(z, 1);
+			b, comment_error = compress.read_slice(z, 1)
 			if comment_error != .None {
-				return E_General.Stream_Too_Short;
+				return E_General.Stream_Too_Short
 			}
-			input_data_consumed += 1;
+			input_data_consumed += 1
 			if b[0] == 0 {
-				break;
+				break
 			}
-			comment[i] = b[0];
-			i += 1;
+			comment[i] = b[0]
+			i += 1
 			if i >= len(comment) {
-				return E_GZIP.Comment_Too_Long;
+				return E_GZIP.Comment_Too_Long
 			}
 		}
 		// printf("Comment: %v\n", string(comment[:i]));
 	}
 
 	if .header_crc in header.flags {
-		crc_error: io.Error;
-		_, crc_error = compress.read_slice(z, 2);
-		input_data_consumed += 2;
+		crc_error: io.Error
+		_, crc_error = compress.read_slice(z, 2)
+		input_data_consumed += 2
 		if crc_error != .None {
-			return E_General.Stream_Too_Short;
+			return E_General.Stream_Too_Short
 		}
 		/*
 			We don't actually check the CRC16 (lower 2 bytes of CRC32 of header data until the CRC field).
@@ -294,7 +294,7 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 	/*
 		We should have arrived at the ZLIB payload.
 	*/
-	payload_u32le: u32le;
+	payload_u32le: u32le
 
 	// fmt.printf("known_gzip_size: %v | expected_output_size: %v\n", known_gzip_size, expected_output_size);
 
@@ -314,12 +314,12 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 		*/
 		if known_gzip_size > -1 {
-			offset := i64(known_gzip_size - input_data_consumed - 4);
-			size, _ := compress.input_size(z);
+			offset := i64(known_gzip_size - input_data_consumed - 4)
+			size, _ := compress.input_size(z)
 			if size >= offset + 4 {
-				length_bytes         := z.input_data[offset:][:4];
-				payload_u32le         = (^u32le)(&length_bytes[0])^;
-				expected_output_size = int(payload_u32le);
+				length_bytes         := z.input_data[offset:][:4]
+				payload_u32le         = (^u32le)(&length_bytes[0])^
+				expected_output_size = int(payload_u32le)
 			}
 		} else {
 			/*
@@ -331,37 +331,37 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 	// fmt.printf("GZIP: Expected Payload Size: %v\n", expected_output_size);
 
-	zlib_error := zlib.inflate_raw(z=z, expected_output_size=expected_output_size);
+	zlib_error := zlib.inflate_raw(z=z, expected_output_size=expected_output_size)
 	if zlib_error != nil {
-		return zlib_error;
+		return zlib_error
 	}
 	/*
 		Read CRC32 using the ctx bit reader because zlib may leave bytes in there.
 	*/
-	compress.discard_to_next_byte_lsb(z);
+	compress.discard_to_next_byte_lsb(z)
 
-	footer_error: io.Error;
+	footer_error: io.Error
 
-	payload_crc_b: [4]u8;
+	payload_crc_b: [4]u8
 	for _, i in payload_crc_b {
-		payload_crc_b[i], footer_error = compress.read_u8_prefer_code_buffer_lsb(z);
+		payload_crc_b[i], footer_error = compress.read_u8_prefer_code_buffer_lsb(z)
 	}
-	payload_crc := transmute(u32le)payload_crc_b;
+	payload_crc := transmute(u32le)payload_crc_b
 
-	payload := bytes.buffer_to_bytes(buf);
-	crc32   := u32le(hash.crc32(payload));
+	payload := bytes.buffer_to_bytes(buf)
+	crc32   := u32le(hash.crc32(payload))
 	if crc32 != payload_crc {
-		return E_GZIP.Payload_CRC_Invalid;
+		return E_GZIP.Payload_CRC_Invalid
 	}
 
-	payload_len_b: [4]u8;
+	payload_len_b: [4]u8
 	for _, i in payload_len_b {
-		payload_len_b[i], footer_error = compress.read_u8_prefer_code_buffer_lsb(z);
+		payload_len_b[i], footer_error = compress.read_u8_prefer_code_buffer_lsb(z)
 	}
-	payload_len := transmute(u32le)payload_len_b;
+	payload_len := transmute(u32le)payload_len_b
 
 	if len(payload) != int(payload_len) {
-		return E_GZIP.Payload_Length_Invalid;
+		return E_GZIP.Payload_Length_Invalid
 	}
-	return nil;
+	return nil
 }

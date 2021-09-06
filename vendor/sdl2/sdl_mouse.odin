@@ -7,19 +7,19 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-Cursor :: struct {};
+Cursor :: struct {}
 
 BUTTON :: #force_inline proc "c" (X: c.int) -> c.int { return 1 << u32(X-1) }
-BUTTON_LEFT     :: 1;
-BUTTON_MIDDLE   :: 2;
-BUTTON_RIGHT    :: 3;
-BUTTON_X1       :: 4;
-BUTTON_X2       :: 5;
-BUTTON_LMASK    :: 1<<(BUTTON_LEFT-1);
-BUTTON_MMASK    :: 1<<(BUTTON_MIDDLE-1);
-BUTTON_RMASK    :: 1<<(BUTTON_RIGHT-1);
-BUTTON_X1MASK   :: 1<<(BUTTON_X1-1);
-BUTTON_X2MASK   :: 1<<(BUTTON_X2-1);
+BUTTON_LEFT     :: 1
+BUTTON_MIDDLE   :: 2
+BUTTON_RIGHT    :: 3
+BUTTON_X1       :: 4
+BUTTON_X2       :: 5
+BUTTON_LMASK    :: 1<<(BUTTON_LEFT-1)
+BUTTON_MMASK    :: 1<<(BUTTON_MIDDLE-1)
+BUTTON_RMASK    :: 1<<(BUTTON_RIGHT-1)
+BUTTON_X1MASK   :: 1<<(BUTTON_X1-1)
+BUTTON_X2MASK   :: 1<<(BUTTON_X2-1)
 
 SystemCursor :: enum c.int {
 	ARROW,     /**< Arrow */

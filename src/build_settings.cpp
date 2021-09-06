@@ -120,8 +120,10 @@ enum CommandKind : u32 {
 	Command_doc     = 1<<5,
 	Command_version = 1<<6,
 	Command_test    = 1<<7,
+	
+	Command_strip_semicolon = 1<<8,
 
-	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test,
+	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
 	Command_all = ~(u32)0,
 };
@@ -134,6 +136,7 @@ char const *odin_command_strings[32] = {
 	"doc",
 	"version",
 	"test",
+	"strip-semicolon",
 };
 
 
@@ -201,7 +204,8 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
-	bool   insert_semicolon;
+
+	bool   strict_style;
 
 
 	bool   ignore_warnings;

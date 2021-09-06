@@ -27,13 +27,13 @@ when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
  *
  *  There are macros in SDL 2.0 and later to query these bits.
  */
-AudioFormat :: distinct u16;
+AudioFormat :: distinct u16
 
 
-AUDIO_MASK_BITSIZE       :: 0xFF;
-AUDIO_MASK_DATATYPE      :: 1<<8;
-AUDIO_MASK_ENDIAN        :: 1<<12;
-AUDIO_MASK_SIGNED        :: 1<<15;
+AUDIO_MASK_BITSIZE       :: 0xFF
+AUDIO_MASK_DATATYPE      :: 1<<8
+AUDIO_MASK_ENDIAN        :: 1<<12
+AUDIO_MASK_SIGNED        :: 1<<15
 AUDIO_BITSIZE        :: #force_inline proc "c" (x: AudioFormat) -> u8   { return u8(x & AUDIO_MASK_BITSIZE)                       }
 AUDIO_ISFLOAT        :: #force_inline proc "c" (x: AudioFormat) -> bool { return (x & AUDIO_MASK_DATATYPE) == AUDIO_MASK_DATATYPE }
 AUDIO_ISBIGENDIAN    :: #force_inline proc "c" (x: AudioFormat) -> bool { return (x & AUDIO_MASK_ENDIAN) == AUDIO_MASK_ENDIAN     }
@@ -42,43 +42,43 @@ AUDIO_ISINT          :: #force_inline proc "c" (x: AudioFormat) -> bool { return
 AUDIO_ISLITTLEENDIAN :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISBIGENDIAN(x)                            }
 AUDIO_ISUNSIGNED     :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISSIGNED(x)                               }
 
-AUDIO_U8        :: 0x0008;  /**< Unsigned 8-bit samples */
-AUDIO_S8        :: 0x8008;  /**< Signed 8-bit samples */
-AUDIO_U16LSB    :: 0x0010;  /**< Unsigned 16-bit samples */
-AUDIO_S16LSB    :: 0x8010;  /**< Signed 16-bit samples */
-AUDIO_U16MSB    :: 0x1010;  /**< As above, but big-endian byte order */
-AUDIO_S16MSB    :: 0x9010;  /**< As above, but big-endian byte order */
-AUDIO_U16       :: AUDIO_U16LSB;
-AUDIO_S16       :: AUDIO_S16LSB;
+AUDIO_U8        :: 0x0008  /**< Unsigned 8-bit samples */
+AUDIO_S8        :: 0x8008  /**< Signed 8-bit samples */
+AUDIO_U16LSB    :: 0x0010  /**< Unsigned 16-bit samples */
+AUDIO_S16LSB    :: 0x8010  /**< Signed 16-bit samples */
+AUDIO_U16MSB    :: 0x1010  /**< As above, but big-endian byte order */
+AUDIO_S16MSB    :: 0x9010  /**< As above, but big-endian byte order */
+AUDIO_U16       :: AUDIO_U16LSB
+AUDIO_S16       :: AUDIO_S16LSB
 
-AUDIO_S32LSB    :: 0x8020;  /**< 32-bit integer samples */
-AUDIO_S32MSB    :: 0x9020;  /**< As above, but big-endian byte order */
-AUDIO_S32       :: AUDIO_S32LSB;
+AUDIO_S32LSB    :: 0x8020  /**< 32-bit integer samples */
+AUDIO_S32MSB    :: 0x9020  /**< As above, but big-endian byte order */
+AUDIO_S32       :: AUDIO_S32LSB
 
-AUDIO_F32LSB    :: 0x8120;  /**< 32-bit floating point samples */
-AUDIO_F32MSB    :: 0x9120;  /**< As above, but big-endian byte order */
-AUDIO_F32       :: AUDIO_F32LSB;
+AUDIO_F32LSB    :: 0x8120  /**< 32-bit floating point samples */
+AUDIO_F32MSB    :: 0x9120  /**< As above, but big-endian byte order */
+AUDIO_F32       :: AUDIO_F32LSB
 
 when ODIN_ENDIAN == "little"  {
-	AUDIO_U16SYS :: AUDIO_U16LSB;
-	AUDIO_S16SYS :: AUDIO_S16LSB;
-	AUDIO_S32SYS :: AUDIO_S32LSB;
-	AUDIO_F32SYS :: AUDIO_F32LSB;
+	AUDIO_U16SYS :: AUDIO_U16LSB
+	AUDIO_S16SYS :: AUDIO_S16LSB
+	AUDIO_S32SYS :: AUDIO_S32LSB
+	AUDIO_F32SYS :: AUDIO_F32LSB
 } else {
-	AUDIO_U16SYS :: AUDIO_U16MSB;
-	AUDIO_S16SYS :: AUDIO_S16MSB;
-	AUDIO_S32SYS :: AUDIO_S32MSB;
-	AUDIO_F32SYS :: AUDIO_F32MSB;
+	AUDIO_U16SYS :: AUDIO_U16MSB
+	AUDIO_S16SYS :: AUDIO_S16MSB
+	AUDIO_S32SYS :: AUDIO_S32MSB
+	AUDIO_F32SYS :: AUDIO_F32MSB
 }
 
 
-AUDIO_ALLOW_FREQUENCY_CHANGE    :: 0x00000001;
-AUDIO_ALLOW_FORMAT_CHANGE       :: 0x00000002;
-AUDIO_ALLOW_CHANNELS_CHANGE     :: 0x00000004;
-AUDIO_ALLOW_SAMPLES_CHANGE      :: 0x00000008;
-AUDIO_ALLOW_ANY_CHANGE          :: AUDIO_ALLOW_FREQUENCY_CHANGE|AUDIO_ALLOW_FORMAT_CHANGE|AUDIO_ALLOW_CHANNELS_CHANGE|AUDIO_ALLOW_SAMPLES_CHANGE;
+AUDIO_ALLOW_FREQUENCY_CHANGE    :: 0x00000001
+AUDIO_ALLOW_FORMAT_CHANGE       :: 0x00000002
+AUDIO_ALLOW_CHANNELS_CHANGE     :: 0x00000004
+AUDIO_ALLOW_SAMPLES_CHANGE      :: 0x00000008
+AUDIO_ALLOW_ANY_CHANGE          :: AUDIO_ALLOW_FREQUENCY_CHANGE|AUDIO_ALLOW_FORMAT_CHANGE|AUDIO_ALLOW_CHANNELS_CHANGE|AUDIO_ALLOW_SAMPLES_CHANGE
 
-AudioCallback :: proc "c" (userdata: rawptr, stream: [^]u8, len: c.int);
+AudioCallback :: proc "c" (userdata: rawptr, stream: [^]u8, len: c.int)
 
 /**
  *  The calculated values in this structure are calculated by SDL_OpenAudio().
@@ -105,9 +105,9 @@ AudioSpec :: struct {
 }
 
 
-AudioFilter :: proc "c" (cvt: ^AudioCVT, format: AudioFormat);
+AudioFilter :: proc "c" (cvt: ^AudioCVT, format: AudioFormat)
 
-AUDIOCVT_MAX_FILTERS :: 9;
+AUDIOCVT_MAX_FILTERS :: 9
 
 AudioCVT :: struct #packed {
 	needed:       c.int,       /**< Set to 1 if conversion possible */
@@ -125,7 +125,7 @@ AudioCVT :: struct #packed {
 
 
 
-AudioDeviceID :: distinct u32;
+AudioDeviceID :: distinct u32
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -166,7 +166,7 @@ foreign lib {
 
 
 /* this is opaque to the outside world. */
-AudioStream :: struct {};
+AudioStream :: struct {}
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -180,7 +180,7 @@ foreign lib {
  *  Compatibility convenience function.
  */
 LoadWAV :: #force_inline proc "c" (file: cstring, spec: ^AudioSpec, audio_buf: ^[^]u8, audio_len: ^u32) -> ^AudioSpec {
-	return LoadWAV_RW(RWFromFile(file, "rb"), true, spec, audio_buf, audio_len);
+	return LoadWAV_RW(RWFromFile(file, "rb"), true, spec, audio_buf, audio_len)
 }
 
 @(default_calling_convention="c", link_prefix="SDL_")
@@ -221,7 +221,7 @@ foreign lib {
 }
 
 
-MIX_MAXVOLUME :: 128;
+MIX_MAXVOLUME :: 128
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

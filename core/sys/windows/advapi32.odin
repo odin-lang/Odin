@@ -63,5 +63,5 @@ foreign advapi32 {
 		lpCurrentDirectory: wstring,
 		lpStartupInfo: LPSTARTUPINFO,
 		lpProcessInformation: LPPROCESS_INFORMATION,
-	) -> BOOL ---;
+	) -> BOOL ---
 }
