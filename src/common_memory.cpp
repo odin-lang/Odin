@@ -350,11 +350,16 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		gb_zero_size(ptr, size);
 	} break;
 
-	case gbAllocation_Free: {
-		free(old_memory);
-	} break;
+	case gbAllocation_Free:
+		if (!old_memory) {
+			free(old_memory);
+		}
+		break;
 
 	case gbAllocation_Resize:
+		if (!old_memory) {
+			break;
+		}
 		if (size == 0) {
 			free(old_memory);
 			break;
@@ -381,10 +386,15 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		break;
 
 	case gbAllocation_Free:
-		free(old_memory);
+		if (!old_memory) {
+			free(old_memory);
+		}
 		break;
 
 	case gbAllocation_Resize:
+		if (!old_memory) {
+			break;
+		}
 		if (size == 0) {
 			free(old_memory);
 			break;
