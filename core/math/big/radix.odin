@@ -431,6 +431,117 @@ internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(
 	return nil if ok else .Cannot_Write_File;
 }
 
+/*
+	Calculate the size needed for `internal_int_pack`.
+
+	See https://gmplib.org/manual/Integer-Import-and-Export.html
+*/
+internal_int_pack_count :: proc(a: ^Int, $T: typeid, nails := 0) -> (size_needed: int) {
+	assert(nails >= 0 && nails < (size_of(T) * 8));
+
+	bits := internal_count_bits(a);
+	size := size_of(T);
+
+	size_needed  =  bits / ((size * 8) - nails);
+	size_needed += 1 if (bits % ((size * 8) - nails)) != 0 else 0;
+
+	return size_needed;
+}
+
+/*
+	Based on gmp's mpz_export.
+	See https://gmplib.org/manual/Integer-Import-and-Export.html
+
+	`buf` is a pre-allocated slice of type `T` "words", which must be an unsigned integer of some description.
+		Use `internal_int_pack_count(a, T, nails)` to calculate the necessary size.
+		The library internally uses `DIGIT` as the type, which is u64 or u32 depending on the platform.
+		You are of course welcome to export to []u8, []u32be, and so forth.
+		After this you can use `mem.slice_data_cast` to interpret the buffer as bytes if you so choose.
+
+	`nails` are the number of top bits the output "word" reserves.
+		To mimic the internals of this library, this would be 4.
+
+	To use the minimum amount of output bytes, set `nails` to 0 and pass a `[]u8`.
+	IMPORTANT: `pack` serializes the magnitude of an Int, that is, the output is unsigned.
+
+	Assumes `a` not to be `nil` and to have been initialized.
+*/
+internal_int_pack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_First) -> (written: int, err: Error)
+                     where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) && size_of(T) <= 16 {
+
+	assert(nails >= 0 && nails < (size_of(T) * 8));
+
+	type_size  := size_of(T);
+	type_bits  := (type_size * 8) - nails;
+
+	word_count := internal_int_pack_count(a, T, nails);
+	bit_count  := internal_count_bits(a);
+
+	if len(buf) < word_count {
+		return 0, .Buffer_Overflow;
+	}
+
+	bit_offset  := 0;
+	word_offset := 0;
+
+	#no_bounds_check for i := 0; i < word_count; i += 1 {
+		bit_offset = i * type_bits;
+		if order == .MSB_First {
+			word_offset = word_count - i - 1;
+		} else {
+			word_offset = i;
+		}
+
+		bits_to_get := min(type_bits, bit_count - bit_offset);
+		W := internal_int_bitfield_extract(a, bit_offset, bits_to_get) or_return;
+		buf[word_offset] = T(W);
+	}
+
+	return word_count, nil;
+}
+
+
+
+internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_First, allocator := context.allocator) -> (err: Error)
+                     where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) && size_of(T) <= 16 {
+	assert(nails >= 0 && nails < (size_of(T) * 8));
+	context.allocator = allocator;
+
+	type_size  := size_of(T);
+	type_bits  := (type_size * 8) - nails;
+	type_mask  := T(1 << uint(type_bits)) - 1;
+
+	if len(buf) == 0 {
+		return .Invalid_Argument;
+	}
+
+	bit_count   := type_bits * len(buf);
+	digit_count := (bit_count / _DIGIT_BITS) + min(1, bit_count % _DIGIT_BITS);
+
+	/*
+		Pre-size output Int.
+	*/
+	internal_grow(a, digit_count) or_return;
+
+	t := &Int{};
+	defer internal_destroy(t);
+
+	if order == .LSB_First {
+		for W, i in buf {
+			internal_set(t, W & type_mask)                           or_return;
+			internal_shl(t, t, type_bits * i)                        or_return;
+			internal_add(a, a, t)                                    or_return;
+		}
+	} else {
+		for W in buf {
+			internal_set(t, W & type_mask)                           or_return;
+			internal_shl(a, a, type_bits)                            or_return;
+			internal_add(a, a, t)                                    or_return;
+		}		
+	}
+
+	return internal_clamp(a);
+}
 
 /*
 	Overestimate the size needed for the bigint to string conversion by a very small amount.
