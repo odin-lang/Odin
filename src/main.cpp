@@ -2026,7 +2026,7 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
 	for_array(i, file->tokens) {
 		Token *token = &file->tokens[i];
-		if (token->flags & TokenFlag_Remove) {
+		if (token->flags & (TokenFlag_Remove|TokenFlag_Replace)) {
 			i32 offset = token->pos.offset;
 			i32 to_write = offset-prev_offset;
 			if (!gb_file_write(f, file_data+prev_offset, to_write)) {
@@ -2034,6 +2034,16 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 			}
 			written += to_write;
 			prev_offset = token_pos_end(*token).offset;
+		} 
+		if (token->flags & TokenFlag_Replace) {
+			if (token->kind == Token_Ellipsis) {
+				if (!gb_file_write(f, "..=", 3)) {
+					return gbFileError_Invalid;
+				}
+				written += 3;
+			} else {
+				return gbFileError_Invalid;
+			}
 		}
 	}
 	if (end_offset > prev_offset) {
@@ -2054,7 +2064,6 @@ int strip_semicolons(Parser *parser) {
 		AstPackage *pkg = parser->packages[i];
 		file_count += pkg->files.count;
 	}
-	gb_printf_err("File count to be stripped of unneeded tokens: %td\n", file_count);
 	
 	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
 	
@@ -2062,6 +2071,20 @@ int strip_semicolons(Parser *parser) {
 		AstPackage *pkg = parser->packages[i];
 		for_array(j, pkg->files) {
 			AstFile *file = pkg->files[j];
+			
+			bool nothing_to_change = true;
+			for_array(i, file->tokens) {
+				Token *token = &file->tokens[i];
+				if (token->flags) {
+					nothing_to_change = false;
+					break;
+				}
+			}
+			
+			if (nothing_to_change) {
+				continue;
+			}
+			
 			String old_fullpath = copy_string(permanent_allocator(), file->fullpath);
 				
 			// assumes .odin extension
@@ -2073,6 +2096,9 @@ int strip_semicolons(Parser *parser) {
 			array_add(&generated_files, StripSemicolonFile{old_fullpath, old_fullpath_backup, new_fullpath, file});
 		}
 	}
+	
+	gb_printf_err("File count to be stripped of unneeded tokens: %td\n", generated_files.count);
+	
 	
 	isize generated_count = 0;
 	bool failed = false;
@@ -2169,7 +2195,7 @@ int strip_semicolons(Parser *parser) {
 		}
 	}
 	
-	gb_printf_err("Files stripped of unneeded token: %td\n", file_count);
+	gb_printf_err("Files stripped of unneeded token: %td\n", generated_files.count);
 	
 	
 	return cast(int)failed;

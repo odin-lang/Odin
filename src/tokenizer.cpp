@@ -236,7 +236,8 @@ TokenPos token_pos_add_column(TokenPos pos) {
 }
 
 enum TokenFlag : u8 {
-	TokenFlag_Remove = 1<<1,
+	TokenFlag_Remove  = 1<<1,
+	TokenFlag_Replace = 1<<2,
 };
 
 struct Token {

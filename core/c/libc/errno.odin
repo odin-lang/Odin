@@ -17,12 +17,12 @@ when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
 	@(default_calling_convention="c")
 	foreign libc {
 		@(link_name="__libc_errno_location")
-		_get_errno :: proc() -> ^int ---;
+		_get_errno :: proc() -> ^int ---
 	}
 
-	EDOM   :: 33;
-	EILSEQ :: 84;
-	ERANGE :: 34;
+	EDOM   :: 33
+	EILSEQ :: 84
+	ERANGE :: 34
 }
 
 when ODIN_OS == "windows" {
@@ -30,12 +30,12 @@ when ODIN_OS == "windows" {
 	@(default_calling_convention="c")
 	foreign libc {
 		@(link_name="_errno")
-		_get_errno :: proc() -> ^int ---;
+		_get_errno :: proc() -> ^int ---
 	}
 
-	EDOM   :: 33;
-	EILSEQ :: 42;
-	ERANGE :: 34;
+	EDOM   :: 33
+	EILSEQ :: 42
+	ERANGE :: 34
 }
 
 // Odin has no way to make an identifier "errno" behave as a function call to
@@ -43,5 +43,5 @@ when ODIN_OS == "windows" {
 // error value to errno. To work around this, just expose it as a function like
 // it actually is.
 errno :: #force_inline proc() -> ^int {
-	return _get_errno();
+	return _get_errno()
 }
