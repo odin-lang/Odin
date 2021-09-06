@@ -19,7 +19,7 @@ trap       :: proc() -> ! ---
 
 // Instructions
 
-alloca             :: proc(size, align: int) -> ^u8 ---
+alloca             :: proc(size, align: int) -> [^]u8 ---
 cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
 

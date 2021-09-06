@@ -2055,7 +2055,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(al.expr, "Alignment parameter to '%.*s' must be constant", LIT(builtin_name));
 			}
 
-			operand->type = t_u8_ptr;
+			operand->type = alloc_type_multi_pointer(t_u8);
 			operand->mode = Addressing_Value;
 			break;
 		}
