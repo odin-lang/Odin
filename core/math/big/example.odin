@@ -60,93 +60,93 @@ FACTORIAL_BINARY_SPLIT_CUTOFF,
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
 USE_MILLER_RABIN_ONLY,
 MAX_ITERATIONS_RANDOM_PRIME,
-);
+)
 
 }
 
 print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline := true, print_extra_info := false) {
-	assert_if_nil(a);
+	assert_if_nil(a)
 
-	as, err := itoa(a, base);
-	defer delete(as);
+	as, err := itoa(a, base)
+	defer delete(as)
 
-	cb := internal_count_bits(a);
+	cb := internal_count_bits(a)
 	if print_name {
-		fmt.printf("%v", name);
+		fmt.printf("%v", name)
 	}
 	if err != nil {
-		fmt.printf("%v (error: %v | %v)", name, err, a);
+		fmt.printf("%v (error: %v | %v)", name, err, a)
 	}
-	fmt.printf("%v", as);
+	fmt.printf("%v", as)
 	if print_extra_info {
-		fmt.printf(" (base: %v, bits: %v (digits: %v), flags: %v)", base, cb, a.used, a.flags);
+		fmt.printf(" (base: %v, bits: %v (digits: %v), flags: %v)", base, cb, a.used, a.flags)
 	}
 	if newline {
-		fmt.println();
+		fmt.println()
 	}
 }
 
 // printf :: fmt.printf;
 
 demo :: proc() {
-	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{};
-	defer destroy(a, b, c, d, e, f, res);
+	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
+	defer destroy(a, b, c, d, e, f, res)
 
-	bits   := 111;
-	trials := -1;
+	bits   := 111
+	trials := -1
 
-	flags := Primality_Flags{};
-	fmt.printf("Trying to generate a %v bit prime using %v Miller-Rabin trials and options %v.\n", bits, trials, flags);
+	flags := Primality_Flags{}
+	fmt.printf("Trying to generate a %v bit prime using %v Miller-Rabin trials and options %v.\n", bits, trials, flags)
 
-	err: Error;
+	err: Error
 	{
-		SCOPED_TIMING(.random_prime);
-		err = internal_random_prime(a, bits, trials, flags);
+		SCOPED_TIMING(.random_prime)
+		err = internal_random_prime(a, bits, trials, flags)
 	}
 
-	print("a(10): ", a, 10, true, true, true);
-	fmt.printf("err: %v\n", err);
-	fmt.printf("RANDOM_PRIME_ITERATIONS_USED: %v\n", RANDOM_PRIME_ITERATIONS_USED);
+	print("a(10): ", a, 10, true, true, true)
+	fmt.printf("err: %v\n", err)
+	fmt.printf("RANDOM_PRIME_ITERATIONS_USED: %v\n", RANDOM_PRIME_ITERATIONS_USED)
 
-	nails := 0;
+	nails := 0
 
-	count := internal_int_pack_count(a, u8, nails);
-	buf := make([]u8, count);
-	defer delete(buf);
+	count := internal_int_pack_count(a, u8, nails)
+	buf := make([]u8, count)
+	defer delete(buf)
 
-	written: int;
-	order := Order.LSB_First;
+	written: int
+	order := Order.LSB_First
 
-	fmt.printf("\na.digit: %v\n", a.digit[:a.used]);
-	written, err = internal_int_pack(a, buf, nails, order);
-	fmt.printf("\nPacked into buf: %v | err: %v | written: %v\n", buf, err, written);
+	fmt.printf("\na.digit: %v\n", a.digit[:a.used])
+	written, err = internal_int_pack(a, buf, nails, order)
+	fmt.printf("\nPacked into buf: %v | err: %v | written: %v\n", buf, err, written)
 
-	err = internal_int_unpack(b, buf, nails, order);
-	print("\nUnpacked into b: ", b);
-	fmt.printf("err: %v\n", err);
-	fmt.printf("b.digit: %v\n", b.digit[:b.used]);
+	err = internal_int_unpack(b, buf, nails, order)
+	print("\nUnpacked into b: ", b)
+	fmt.printf("err: %v\n", err)
+	fmt.printf("b.digit: %v\n", b.digit[:b.used])
 }
 
 main :: proc() {
-	ta := mem.Tracking_Allocator{};
-	mem.tracking_allocator_init(&ta, context.allocator);
-	context.allocator = mem.tracking_allocator(&ta);
+	ta := mem.Tracking_Allocator{}
+	mem.tracking_allocator_init(&ta, context.allocator)
+	context.allocator = mem.tracking_allocator(&ta)
 
-	demo();
+	demo()
 
-	print_configation();
+	print_configation()
 
-	print_timings();
+	print_timings()
 
 	if len(ta.allocation_map) > 0 {
 		for _, v in ta.allocation_map {
-			fmt.printf("Leaked %v bytes @ %v\n", v.size, v.location);
+			fmt.printf("Leaked %v bytes @ %v\n", v.size, v.location)
 		}
 	}
 	if len(ta.bad_free_array) > 0 {
-		fmt.println("Bad frees:");
+		fmt.println("Bad frees:")
 		for v in ta.bad_free_array {
-			fmt.println(v);
+			fmt.println(v)
 		}
 	}
 }

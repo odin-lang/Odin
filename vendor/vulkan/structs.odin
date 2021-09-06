@@ -8,31 +8,31 @@ import "core:c"
 when ODIN_OS == "windows" {
 	import win32 "core:sys/windows"
 
-	HINSTANCE           :: win32.HINSTANCE;
-	HWND                :: win32.HWND;
-	HMONITOR            :: win32.HMONITOR;
-	HANDLE              :: win32.HANDLE;
-	LPCWSTR             :: win32.LPCWSTR;
-	SECURITY_ATTRIBUTES :: win32.SECURITY_ATTRIBUTES;
-	DWORD               :: win32.DWORD;
-	LONG                :: win32.LONG;
-	LUID                :: win32.LUID;
+	HINSTANCE           :: win32.HINSTANCE
+	HWND                :: win32.HWND
+	HMONITOR            :: win32.HMONITOR
+	HANDLE              :: win32.HANDLE
+	LPCWSTR             :: win32.LPCWSTR
+	SECURITY_ATTRIBUTES :: win32.SECURITY_ATTRIBUTES
+	DWORD               :: win32.DWORD
+	LONG                :: win32.LONG
+	LUID                :: win32.LUID
 } else {
-	HINSTANCE           :: distinct rawptr;
-	HWND                :: distinct rawptr;
-	HMONITOR            :: distinct rawptr;
-	HANDLE              :: distinct rawptr;
-	LPCWSTR             :: ^u16;
-	SECURITY_ATTRIBUTES :: struct {};
-	DWORD               :: u32;
-	LONG                :: c.long;
+	HINSTANCE           :: distinct rawptr
+	HWND                :: distinct rawptr
+	HMONITOR            :: distinct rawptr
+	HANDLE              :: distinct rawptr
+	LPCWSTR             :: ^u16
+	SECURITY_ATTRIBUTES :: struct {}
+	DWORD               :: u32
+	LONG                :: c.long
 	LUID :: struct {
 		LowPart:  DWORD,
 		HighPart: LONG,
 	}
 }
 
-CAMetalLayer :: struct {};
+CAMetalLayer :: struct {}
 
 /********************************/
 
@@ -5229,178 +5229,178 @@ IOSSurfaceCreateInfoMVK :: struct {
 }
 
 // Aliases
-PhysicalDeviceVariablePointerFeatures                :: PhysicalDeviceVariablePointersFeatures;
-PhysicalDeviceShaderDrawParameterFeatures            :: PhysicalDeviceShaderDrawParametersFeatures;
-RenderPassMultiviewCreateInfoKHR                     :: RenderPassMultiviewCreateInfo;
-PhysicalDeviceMultiviewFeaturesKHR                   :: PhysicalDeviceMultiviewFeatures;
-PhysicalDeviceMultiviewPropertiesKHR                 :: PhysicalDeviceMultiviewProperties;
-PhysicalDeviceFeatures2KHR                           :: PhysicalDeviceFeatures2;
-PhysicalDeviceProperties2KHR                         :: PhysicalDeviceProperties2;
-FormatProperties2KHR                                 :: FormatProperties2;
-ImageFormatProperties2KHR                            :: ImageFormatProperties2;
-PhysicalDeviceImageFormatInfo2KHR                    :: PhysicalDeviceImageFormatInfo2;
-QueueFamilyProperties2KHR                            :: QueueFamilyProperties2;
-PhysicalDeviceMemoryProperties2KHR                   :: PhysicalDeviceMemoryProperties2;
-SparseImageFormatProperties2KHR                      :: SparseImageFormatProperties2;
-PhysicalDeviceSparseImageFormatInfo2KHR              :: PhysicalDeviceSparseImageFormatInfo2;
-PeerMemoryFeatureFlagsKHR                            :: PeerMemoryFeatureFlags;
-PeerMemoryFeatureFlagKHR                             :: PeerMemoryFeatureFlag;
-MemoryAllocateFlagsKHR                               :: MemoryAllocateFlags;
-MemoryAllocateFlagKHR                                :: MemoryAllocateFlag;
-MemoryAllocateFlagsInfoKHR                           :: MemoryAllocateFlagsInfo;
-DeviceGroupRenderPassBeginInfoKHR                    :: DeviceGroupRenderPassBeginInfo;
-DeviceGroupCommandBufferBeginInfoKHR                 :: DeviceGroupCommandBufferBeginInfo;
-DeviceGroupSubmitInfoKHR                             :: DeviceGroupSubmitInfo;
-DeviceGroupBindSparseInfoKHR                         :: DeviceGroupBindSparseInfo;
-BindBufferMemoryDeviceGroupInfoKHR                   :: BindBufferMemoryDeviceGroupInfo;
-BindImageMemoryDeviceGroupInfoKHR                    :: BindImageMemoryDeviceGroupInfo;
-CommandPoolTrimFlagsKHR                              :: CommandPoolTrimFlags;
-PhysicalDeviceGroupPropertiesKHR                     :: PhysicalDeviceGroupProperties;
-DeviceGroupDeviceCreateInfoKHR                       :: DeviceGroupDeviceCreateInfo;
-ExternalMemoryHandleTypeFlagsKHR                     :: ExternalMemoryHandleTypeFlags;
-ExternalMemoryHandleTypeFlagKHR                      :: ExternalMemoryHandleTypeFlag;
-ExternalMemoryFeatureFlagsKHR                        :: ExternalMemoryFeatureFlags;
-ExternalMemoryFeatureFlagKHR                         :: ExternalMemoryFeatureFlag;
-ExternalMemoryPropertiesKHR                          :: ExternalMemoryProperties;
-PhysicalDeviceExternalImageFormatInfoKHR             :: PhysicalDeviceExternalImageFormatInfo;
-ExternalImageFormatPropertiesKHR                     :: ExternalImageFormatProperties;
-PhysicalDeviceExternalBufferInfoKHR                  :: PhysicalDeviceExternalBufferInfo;
-ExternalBufferPropertiesKHR                          :: ExternalBufferProperties;
-PhysicalDeviceIDPropertiesKHR                        :: PhysicalDeviceIDProperties;
-ExternalMemoryImageCreateInfoKHR                     :: ExternalMemoryImageCreateInfo;
-ExternalMemoryBufferCreateInfoKHR                    :: ExternalMemoryBufferCreateInfo;
-ExportMemoryAllocateInfoKHR                          :: ExportMemoryAllocateInfo;
-ExternalSemaphoreHandleTypeFlagsKHR                  :: ExternalSemaphoreHandleTypeFlags;
-ExternalSemaphoreHandleTypeFlagKHR                   :: ExternalSemaphoreHandleTypeFlag;
-ExternalSemaphoreFeatureFlagsKHR                     :: ExternalSemaphoreFeatureFlags;
-ExternalSemaphoreFeatureFlagKHR                      :: ExternalSemaphoreFeatureFlag;
-PhysicalDeviceExternalSemaphoreInfoKHR               :: PhysicalDeviceExternalSemaphoreInfo;
-ExternalSemaphorePropertiesKHR                       :: ExternalSemaphoreProperties;
-SemaphoreImportFlagsKHR                              :: SemaphoreImportFlags;
-SemaphoreImportFlagKHR                               :: SemaphoreImportFlag;
-ExportSemaphoreCreateInfoKHR                         :: ExportSemaphoreCreateInfo;
-PhysicalDeviceShaderFloat16Int8FeaturesKHR           :: PhysicalDeviceShaderFloat16Int8Features;
-PhysicalDeviceFloat16Int8FeaturesKHR                 :: PhysicalDeviceShaderFloat16Int8Features;
-PhysicalDevice16BitStorageFeaturesKHR                :: PhysicalDevice16BitStorageFeatures;
-DescriptorUpdateTemplateKHR                          :: DescriptorUpdateTemplate;
-DescriptorUpdateTemplateTypeKHR                      :: DescriptorUpdateTemplateType;
-DescriptorUpdateTemplateCreateFlagsKHR               :: DescriptorUpdateTemplateCreateFlags;
-DescriptorUpdateTemplateEntryKHR                     :: DescriptorUpdateTemplateEntry;
-DescriptorUpdateTemplateCreateInfoKHR                :: DescriptorUpdateTemplateCreateInfo;
-PhysicalDeviceImagelessFramebufferFeaturesKHR        :: PhysicalDeviceImagelessFramebufferFeatures;
-FramebufferAttachmentsCreateInfoKHR                  :: FramebufferAttachmentsCreateInfo;
-FramebufferAttachmentImageInfoKHR                    :: FramebufferAttachmentImageInfo;
-RenderPassAttachmentBeginInfoKHR                     :: RenderPassAttachmentBeginInfo;
-RenderPassCreateInfo2KHR                             :: RenderPassCreateInfo2;
-AttachmentDescription2KHR                            :: AttachmentDescription2;
-AttachmentReference2KHR                              :: AttachmentReference2;
-SubpassDescription2KHR                               :: SubpassDescription2;
-SubpassDependency2KHR                                :: SubpassDependency2;
-SubpassBeginInfoKHR                                  :: SubpassBeginInfo;
-SubpassEndInfoKHR                                    :: SubpassEndInfo;
-ExternalFenceHandleTypeFlagsKHR                      :: ExternalFenceHandleTypeFlags;
-ExternalFenceHandleTypeFlagKHR                       :: ExternalFenceHandleTypeFlag;
-ExternalFenceFeatureFlagsKHR                         :: ExternalFenceFeatureFlags;
-ExternalFenceFeatureFlagKHR                          :: ExternalFenceFeatureFlag;
-PhysicalDeviceExternalFenceInfoKHR                   :: PhysicalDeviceExternalFenceInfo;
-ExternalFencePropertiesKHR                           :: ExternalFenceProperties;
-FenceImportFlagsKHR                                  :: FenceImportFlags;
-FenceImportFlagKHR                                   :: FenceImportFlag;
-ExportFenceCreateInfoKHR                             :: ExportFenceCreateInfo;
-PointClippingBehaviorKHR                             :: PointClippingBehavior;
-TessellationDomainOriginKHR                          :: TessellationDomainOrigin;
-PhysicalDevicePointClippingPropertiesKHR             :: PhysicalDevicePointClippingProperties;
-RenderPassInputAttachmentAspectCreateInfoKHR         :: RenderPassInputAttachmentAspectCreateInfo;
-InputAttachmentAspectReferenceKHR                    :: InputAttachmentAspectReference;
-ImageViewUsageCreateInfoKHR                          :: ImageViewUsageCreateInfo;
-PipelineTessellationDomainOriginStateCreateInfoKHR   :: PipelineTessellationDomainOriginStateCreateInfo;
-PhysicalDeviceVariablePointerFeaturesKHR             :: PhysicalDeviceVariablePointersFeatures;
-PhysicalDeviceVariablePointersFeaturesKHR            :: PhysicalDeviceVariablePointersFeatures;
-MemoryDedicatedRequirementsKHR                       :: MemoryDedicatedRequirements;
-MemoryDedicatedAllocateInfoKHR                       :: MemoryDedicatedAllocateInfo;
-BufferMemoryRequirementsInfo2KHR                     :: BufferMemoryRequirementsInfo2;
-ImageMemoryRequirementsInfo2KHR                      :: ImageMemoryRequirementsInfo2;
-ImageSparseMemoryRequirementsInfo2KHR                :: ImageSparseMemoryRequirementsInfo2;
-MemoryRequirements2KHR                               :: MemoryRequirements2;
-SparseImageMemoryRequirements2KHR                    :: SparseImageMemoryRequirements2;
-ImageFormatListCreateInfoKHR                         :: ImageFormatListCreateInfo;
-SamplerYcbcrConversionKHR                            :: SamplerYcbcrConversion;
-SamplerYcbcrModelConversionKHR                       :: SamplerYcbcrModelConversion;
-SamplerYcbcrRangeKHR                                 :: SamplerYcbcrRange;
-ChromaLocationKHR                                    :: ChromaLocation;
-SamplerYcbcrConversionCreateInfoKHR                  :: SamplerYcbcrConversionCreateInfo;
-SamplerYcbcrConversionInfoKHR                        :: SamplerYcbcrConversionInfo;
-BindImagePlaneMemoryInfoKHR                          :: BindImagePlaneMemoryInfo;
-ImagePlaneMemoryRequirementsInfoKHR                  :: ImagePlaneMemoryRequirementsInfo;
-PhysicalDeviceSamplerYcbcrConversionFeaturesKHR      :: PhysicalDeviceSamplerYcbcrConversionFeatures;
-SamplerYcbcrConversionImageFormatPropertiesKHR       :: SamplerYcbcrConversionImageFormatProperties;
-BindBufferMemoryInfoKHR                              :: BindBufferMemoryInfo;
-BindImageMemoryInfoKHR                               :: BindImageMemoryInfo;
-PhysicalDeviceMaintenance3PropertiesKHR              :: PhysicalDeviceMaintenance3Properties;
-DescriptorSetLayoutSupportKHR                        :: DescriptorSetLayoutSupport;
-PhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR :: PhysicalDeviceShaderSubgroupExtendedTypesFeatures;
-PhysicalDevice8BitStorageFeaturesKHR                 :: PhysicalDevice8BitStorageFeatures;
-PhysicalDeviceShaderAtomicInt64FeaturesKHR           :: PhysicalDeviceShaderAtomicInt64Features;
-DriverIdKHR                                          :: DriverId;
-ConformanceVersionKHR                                :: ConformanceVersion;
-PhysicalDeviceDriverPropertiesKHR                    :: PhysicalDeviceDriverProperties;
-ShaderFloatControlsIndependenceKHR                   :: ShaderFloatControlsIndependence;
-PhysicalDeviceFloatControlsPropertiesKHR             :: PhysicalDeviceFloatControlsProperties;
-ResolveModeFlagKHR                                   :: ResolveModeFlag;
-ResolveModeFlagsKHR                                  :: ResolveModeFlags;
-SubpassDescriptionDepthStencilResolveKHR             :: SubpassDescriptionDepthStencilResolve;
-PhysicalDeviceDepthStencilResolvePropertiesKHR       :: PhysicalDeviceDepthStencilResolveProperties;
-SemaphoreTypeKHR                                     :: SemaphoreType;
-SemaphoreWaitFlagKHR                                 :: SemaphoreWaitFlag;
-SemaphoreWaitFlagsKHR                                :: SemaphoreWaitFlags;
-PhysicalDeviceTimelineSemaphoreFeaturesKHR           :: PhysicalDeviceTimelineSemaphoreFeatures;
-PhysicalDeviceTimelineSemaphorePropertiesKHR         :: PhysicalDeviceTimelineSemaphoreProperties;
-SemaphoreTypeCreateInfoKHR                           :: SemaphoreTypeCreateInfo;
-TimelineSemaphoreSubmitInfoKHR                       :: TimelineSemaphoreSubmitInfo;
-SemaphoreWaitInfoKHR                                 :: SemaphoreWaitInfo;
-SemaphoreSignalInfoKHR                               :: SemaphoreSignalInfo;
-PhysicalDeviceVulkanMemoryModelFeaturesKHR           :: PhysicalDeviceVulkanMemoryModelFeatures;
-PhysicalDeviceSeparateDepthStencilLayoutsFeaturesKHR :: PhysicalDeviceSeparateDepthStencilLayoutsFeatures;
-AttachmentReferenceStencilLayoutKHR                  :: AttachmentReferenceStencilLayout;
-AttachmentDescriptionStencilLayoutKHR                :: AttachmentDescriptionStencilLayout;
-PhysicalDeviceUniformBufferStandardLayoutFeaturesKHR :: PhysicalDeviceUniformBufferStandardLayoutFeatures;
-PhysicalDeviceBufferDeviceAddressFeaturesKHR         :: PhysicalDeviceBufferDeviceAddressFeatures;
-BufferDeviceAddressInfoKHR                           :: BufferDeviceAddressInfo;
-BufferOpaqueCaptureAddressCreateInfoKHR              :: BufferOpaqueCaptureAddressCreateInfo;
-MemoryOpaqueCaptureAddressAllocateInfoKHR            :: MemoryOpaqueCaptureAddressAllocateInfo;
-DeviceMemoryOpaqueCaptureAddressInfoKHR              :: DeviceMemoryOpaqueCaptureAddressInfo;
-PipelineStageFlags2KHR                               :: Flags64;
-PipelineStageFlag2KHR                                :: Flags64;
-AccessFlags2KHR                                      :: Flags64;
-AccessFlag2KHR                                       :: Flags64;
-SamplerReductionModeEXT                              :: SamplerReductionMode;
-SamplerReductionModeCreateInfoEXT                    :: SamplerReductionModeCreateInfo;
-PhysicalDeviceSamplerFilterMinmaxPropertiesEXT       :: PhysicalDeviceSamplerFilterMinmaxProperties;
-DescriptorBindingFlagEXT                             :: DescriptorBindingFlag;
-DescriptorBindingFlagsEXT                            :: DescriptorBindingFlags;
-DescriptorSetLayoutBindingFlagsCreateInfoEXT         :: DescriptorSetLayoutBindingFlagsCreateInfo;
-PhysicalDeviceDescriptorIndexingFeaturesEXT          :: PhysicalDeviceDescriptorIndexingFeatures;
-PhysicalDeviceDescriptorIndexingPropertiesEXT        :: PhysicalDeviceDescriptorIndexingProperties;
-DescriptorSetVariableDescriptorCountAllocateInfoEXT  :: DescriptorSetVariableDescriptorCountAllocateInfo;
-DescriptorSetVariableDescriptorCountLayoutSupportEXT :: DescriptorSetVariableDescriptorCountLayoutSupport;
-RayTracingShaderGroupTypeNV                          :: RayTracingShaderGroupTypeKHR;
-GeometryTypeNV                                       :: GeometryTypeKHR;
-AccelerationStructureTypeNV                          :: AccelerationStructureTypeKHR;
-CopyAccelerationStructureModeNV                      :: CopyAccelerationStructureModeKHR;
-GeometryFlagsNV                                      :: GeometryFlagsKHR;
-GeometryFlagNV                                       :: GeometryFlagKHR;
-GeometryInstanceFlagsNV                              :: GeometryInstanceFlagsKHR;
-GeometryInstanceFlagNV                               :: GeometryInstanceFlagKHR;
-BuildAccelerationStructureFlagsNV                    :: BuildAccelerationStructureFlagsKHR;
-BuildAccelerationStructureFlagNV                     :: BuildAccelerationStructureFlagKHR;
-TransformMatrixNV                                    :: TransformMatrixKHR;
-AabbPositionsNV                                      :: AabbPositionsKHR;
-AccelerationStructureInstanceNV                      :: AccelerationStructureInstanceKHR;
-QueryPoolCreateInfoINTEL                             :: QueryPoolPerformanceQueryCreateInfoINTEL;
-PhysicalDeviceScalarBlockLayoutFeaturesEXT           :: PhysicalDeviceScalarBlockLayoutFeatures;
-PhysicalDeviceBufferAddressFeaturesEXT               :: PhysicalDeviceBufferDeviceAddressFeaturesEXT;
-BufferDeviceAddressInfoEXT                           :: BufferDeviceAddressInfo;
-ImageStencilUsageCreateInfoEXT                       :: ImageStencilUsageCreateInfo;
-PhysicalDeviceHostQueryResetFeaturesEXT              :: PhysicalDeviceHostQueryResetFeatures;
+PhysicalDeviceVariablePointerFeatures                :: PhysicalDeviceVariablePointersFeatures
+PhysicalDeviceShaderDrawParameterFeatures            :: PhysicalDeviceShaderDrawParametersFeatures
+RenderPassMultiviewCreateInfoKHR                     :: RenderPassMultiviewCreateInfo
+PhysicalDeviceMultiviewFeaturesKHR                   :: PhysicalDeviceMultiviewFeatures
+PhysicalDeviceMultiviewPropertiesKHR                 :: PhysicalDeviceMultiviewProperties
+PhysicalDeviceFeatures2KHR                           :: PhysicalDeviceFeatures2
+PhysicalDeviceProperties2KHR                         :: PhysicalDeviceProperties2
+FormatProperties2KHR                                 :: FormatProperties2
+ImageFormatProperties2KHR                            :: ImageFormatProperties2
+PhysicalDeviceImageFormatInfo2KHR                    :: PhysicalDeviceImageFormatInfo2
+QueueFamilyProperties2KHR                            :: QueueFamilyProperties2
+PhysicalDeviceMemoryProperties2KHR                   :: PhysicalDeviceMemoryProperties2
+SparseImageFormatProperties2KHR                      :: SparseImageFormatProperties2
+PhysicalDeviceSparseImageFormatInfo2KHR              :: PhysicalDeviceSparseImageFormatInfo2
+PeerMemoryFeatureFlagsKHR                            :: PeerMemoryFeatureFlags
+PeerMemoryFeatureFlagKHR                             :: PeerMemoryFeatureFlag
+MemoryAllocateFlagsKHR                               :: MemoryAllocateFlags
+MemoryAllocateFlagKHR                                :: MemoryAllocateFlag
+MemoryAllocateFlagsInfoKHR                           :: MemoryAllocateFlagsInfo
+DeviceGroupRenderPassBeginInfoKHR                    :: DeviceGroupRenderPassBeginInfo
+DeviceGroupCommandBufferBeginInfoKHR                 :: DeviceGroupCommandBufferBeginInfo
+DeviceGroupSubmitInfoKHR                             :: DeviceGroupSubmitInfo
+DeviceGroupBindSparseInfoKHR                         :: DeviceGroupBindSparseInfo
+BindBufferMemoryDeviceGroupInfoKHR                   :: BindBufferMemoryDeviceGroupInfo
+BindImageMemoryDeviceGroupInfoKHR                    :: BindImageMemoryDeviceGroupInfo
+CommandPoolTrimFlagsKHR                              :: CommandPoolTrimFlags
+PhysicalDeviceGroupPropertiesKHR                     :: PhysicalDeviceGroupProperties
+DeviceGroupDeviceCreateInfoKHR                       :: DeviceGroupDeviceCreateInfo
+ExternalMemoryHandleTypeFlagsKHR                     :: ExternalMemoryHandleTypeFlags
+ExternalMemoryHandleTypeFlagKHR                      :: ExternalMemoryHandleTypeFlag
+ExternalMemoryFeatureFlagsKHR                        :: ExternalMemoryFeatureFlags
+ExternalMemoryFeatureFlagKHR                         :: ExternalMemoryFeatureFlag
+ExternalMemoryPropertiesKHR                          :: ExternalMemoryProperties
+PhysicalDeviceExternalImageFormatInfoKHR             :: PhysicalDeviceExternalImageFormatInfo
+ExternalImageFormatPropertiesKHR                     :: ExternalImageFormatProperties
+PhysicalDeviceExternalBufferInfoKHR                  :: PhysicalDeviceExternalBufferInfo
+ExternalBufferPropertiesKHR                          :: ExternalBufferProperties
+PhysicalDeviceIDPropertiesKHR                        :: PhysicalDeviceIDProperties
+ExternalMemoryImageCreateInfoKHR                     :: ExternalMemoryImageCreateInfo
+ExternalMemoryBufferCreateInfoKHR                    :: ExternalMemoryBufferCreateInfo
+ExportMemoryAllocateInfoKHR                          :: ExportMemoryAllocateInfo
+ExternalSemaphoreHandleTypeFlagsKHR                  :: ExternalSemaphoreHandleTypeFlags
+ExternalSemaphoreHandleTypeFlagKHR                   :: ExternalSemaphoreHandleTypeFlag
+ExternalSemaphoreFeatureFlagsKHR                     :: ExternalSemaphoreFeatureFlags
+ExternalSemaphoreFeatureFlagKHR                      :: ExternalSemaphoreFeatureFlag
+PhysicalDeviceExternalSemaphoreInfoKHR               :: PhysicalDeviceExternalSemaphoreInfo
+ExternalSemaphorePropertiesKHR                       :: ExternalSemaphoreProperties
+SemaphoreImportFlagsKHR                              :: SemaphoreImportFlags
+SemaphoreImportFlagKHR                               :: SemaphoreImportFlag
+ExportSemaphoreCreateInfoKHR                         :: ExportSemaphoreCreateInfo
+PhysicalDeviceShaderFloat16Int8FeaturesKHR           :: PhysicalDeviceShaderFloat16Int8Features
+PhysicalDeviceFloat16Int8FeaturesKHR                 :: PhysicalDeviceShaderFloat16Int8Features
+PhysicalDevice16BitStorageFeaturesKHR                :: PhysicalDevice16BitStorageFeatures
+DescriptorUpdateTemplateKHR                          :: DescriptorUpdateTemplate
+DescriptorUpdateTemplateTypeKHR                      :: DescriptorUpdateTemplateType
+DescriptorUpdateTemplateCreateFlagsKHR               :: DescriptorUpdateTemplateCreateFlags
+DescriptorUpdateTemplateEntryKHR                     :: DescriptorUpdateTemplateEntry
+DescriptorUpdateTemplateCreateInfoKHR                :: DescriptorUpdateTemplateCreateInfo
+PhysicalDeviceImagelessFramebufferFeaturesKHR        :: PhysicalDeviceImagelessFramebufferFeatures
+FramebufferAttachmentsCreateInfoKHR                  :: FramebufferAttachmentsCreateInfo
+FramebufferAttachmentImageInfoKHR                    :: FramebufferAttachmentImageInfo
+RenderPassAttachmentBeginInfoKHR                     :: RenderPassAttachmentBeginInfo
+RenderPassCreateInfo2KHR                             :: RenderPassCreateInfo2
+AttachmentDescription2KHR                            :: AttachmentDescription2
+AttachmentReference2KHR                              :: AttachmentReference2
+SubpassDescription2KHR                               :: SubpassDescription2
+SubpassDependency2KHR                                :: SubpassDependency2
+SubpassBeginInfoKHR                                  :: SubpassBeginInfo
+SubpassEndInfoKHR                                    :: SubpassEndInfo
+ExternalFenceHandleTypeFlagsKHR                      :: ExternalFenceHandleTypeFlags
+ExternalFenceHandleTypeFlagKHR                       :: ExternalFenceHandleTypeFlag
+ExternalFenceFeatureFlagsKHR                         :: ExternalFenceFeatureFlags
+ExternalFenceFeatureFlagKHR                          :: ExternalFenceFeatureFlag
+PhysicalDeviceExternalFenceInfoKHR                   :: PhysicalDeviceExternalFenceInfo
+ExternalFencePropertiesKHR                           :: ExternalFenceProperties
+FenceImportFlagsKHR                                  :: FenceImportFlags
+FenceImportFlagKHR                                   :: FenceImportFlag
+ExportFenceCreateInfoKHR                             :: ExportFenceCreateInfo
+PointClippingBehaviorKHR                             :: PointClippingBehavior
+TessellationDomainOriginKHR                          :: TessellationDomainOrigin
+PhysicalDevicePointClippingPropertiesKHR             :: PhysicalDevicePointClippingProperties
+RenderPassInputAttachmentAspectCreateInfoKHR         :: RenderPassInputAttachmentAspectCreateInfo
+InputAttachmentAspectReferenceKHR                    :: InputAttachmentAspectReference
+ImageViewUsageCreateInfoKHR                          :: ImageViewUsageCreateInfo
+PipelineTessellationDomainOriginStateCreateInfoKHR   :: PipelineTessellationDomainOriginStateCreateInfo
+PhysicalDeviceVariablePointerFeaturesKHR             :: PhysicalDeviceVariablePointersFeatures
+PhysicalDeviceVariablePointersFeaturesKHR            :: PhysicalDeviceVariablePointersFeatures
+MemoryDedicatedRequirementsKHR                       :: MemoryDedicatedRequirements
+MemoryDedicatedAllocateInfoKHR                       :: MemoryDedicatedAllocateInfo
+BufferMemoryRequirementsInfo2KHR                     :: BufferMemoryRequirementsInfo2
+ImageMemoryRequirementsInfo2KHR                      :: ImageMemoryRequirementsInfo2
+ImageSparseMemoryRequirementsInfo2KHR                :: ImageSparseMemoryRequirementsInfo2
+MemoryRequirements2KHR                               :: MemoryRequirements2
+SparseImageMemoryRequirements2KHR                    :: SparseImageMemoryRequirements2
+ImageFormatListCreateInfoKHR                         :: ImageFormatListCreateInfo
+SamplerYcbcrConversionKHR                            :: SamplerYcbcrConversion
+SamplerYcbcrModelConversionKHR                       :: SamplerYcbcrModelConversion
+SamplerYcbcrRangeKHR                                 :: SamplerYcbcrRange
+ChromaLocationKHR                                    :: ChromaLocation
+SamplerYcbcrConversionCreateInfoKHR                  :: SamplerYcbcrConversionCreateInfo
+SamplerYcbcrConversionInfoKHR                        :: SamplerYcbcrConversionInfo
+BindImagePlaneMemoryInfoKHR                          :: BindImagePlaneMemoryInfo
+ImagePlaneMemoryRequirementsInfoKHR                  :: ImagePlaneMemoryRequirementsInfo
+PhysicalDeviceSamplerYcbcrConversionFeaturesKHR      :: PhysicalDeviceSamplerYcbcrConversionFeatures
+SamplerYcbcrConversionImageFormatPropertiesKHR       :: SamplerYcbcrConversionImageFormatProperties
+BindBufferMemoryInfoKHR                              :: BindBufferMemoryInfo
+BindImageMemoryInfoKHR                               :: BindImageMemoryInfo
+PhysicalDeviceMaintenance3PropertiesKHR              :: PhysicalDeviceMaintenance3Properties
+DescriptorSetLayoutSupportKHR                        :: DescriptorSetLayoutSupport
+PhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR :: PhysicalDeviceShaderSubgroupExtendedTypesFeatures
+PhysicalDevice8BitStorageFeaturesKHR                 :: PhysicalDevice8BitStorageFeatures
+PhysicalDeviceShaderAtomicInt64FeaturesKHR           :: PhysicalDeviceShaderAtomicInt64Features
+DriverIdKHR                                          :: DriverId
+ConformanceVersionKHR                                :: ConformanceVersion
+PhysicalDeviceDriverPropertiesKHR                    :: PhysicalDeviceDriverProperties
+ShaderFloatControlsIndependenceKHR                   :: ShaderFloatControlsIndependence
+PhysicalDeviceFloatControlsPropertiesKHR             :: PhysicalDeviceFloatControlsProperties
+ResolveModeFlagKHR                                   :: ResolveModeFlag
+ResolveModeFlagsKHR                                  :: ResolveModeFlags
+SubpassDescriptionDepthStencilResolveKHR             :: SubpassDescriptionDepthStencilResolve
+PhysicalDeviceDepthStencilResolvePropertiesKHR       :: PhysicalDeviceDepthStencilResolveProperties
+SemaphoreTypeKHR                                     :: SemaphoreType
+SemaphoreWaitFlagKHR                                 :: SemaphoreWaitFlag
+SemaphoreWaitFlagsKHR                                :: SemaphoreWaitFlags
+PhysicalDeviceTimelineSemaphoreFeaturesKHR           :: PhysicalDeviceTimelineSemaphoreFeatures
+PhysicalDeviceTimelineSemaphorePropertiesKHR         :: PhysicalDeviceTimelineSemaphoreProperties
+SemaphoreTypeCreateInfoKHR                           :: SemaphoreTypeCreateInfo
+TimelineSemaphoreSubmitInfoKHR                       :: TimelineSemaphoreSubmitInfo
+SemaphoreWaitInfoKHR                                 :: SemaphoreWaitInfo
+SemaphoreSignalInfoKHR                               :: SemaphoreSignalInfo
+PhysicalDeviceVulkanMemoryModelFeaturesKHR           :: PhysicalDeviceVulkanMemoryModelFeatures
+PhysicalDeviceSeparateDepthStencilLayoutsFeaturesKHR :: PhysicalDeviceSeparateDepthStencilLayoutsFeatures
+AttachmentReferenceStencilLayoutKHR                  :: AttachmentReferenceStencilLayout
+AttachmentDescriptionStencilLayoutKHR                :: AttachmentDescriptionStencilLayout
+PhysicalDeviceUniformBufferStandardLayoutFeaturesKHR :: PhysicalDeviceUniformBufferStandardLayoutFeatures
+PhysicalDeviceBufferDeviceAddressFeaturesKHR         :: PhysicalDeviceBufferDeviceAddressFeatures
+BufferDeviceAddressInfoKHR                           :: BufferDeviceAddressInfo
+BufferOpaqueCaptureAddressCreateInfoKHR              :: BufferOpaqueCaptureAddressCreateInfo
+MemoryOpaqueCaptureAddressAllocateInfoKHR            :: MemoryOpaqueCaptureAddressAllocateInfo
+DeviceMemoryOpaqueCaptureAddressInfoKHR              :: DeviceMemoryOpaqueCaptureAddressInfo
+PipelineStageFlags2KHR                               :: Flags64
+PipelineStageFlag2KHR                                :: Flags64
+AccessFlags2KHR                                      :: Flags64
+AccessFlag2KHR                                       :: Flags64
+SamplerReductionModeEXT                              :: SamplerReductionMode
+SamplerReductionModeCreateInfoEXT                    :: SamplerReductionModeCreateInfo
+PhysicalDeviceSamplerFilterMinmaxPropertiesEXT       :: PhysicalDeviceSamplerFilterMinmaxProperties
+DescriptorBindingFlagEXT                             :: DescriptorBindingFlag
+DescriptorBindingFlagsEXT                            :: DescriptorBindingFlags
+DescriptorSetLayoutBindingFlagsCreateInfoEXT         :: DescriptorSetLayoutBindingFlagsCreateInfo
+PhysicalDeviceDescriptorIndexingFeaturesEXT          :: PhysicalDeviceDescriptorIndexingFeatures
+PhysicalDeviceDescriptorIndexingPropertiesEXT        :: PhysicalDeviceDescriptorIndexingProperties
+DescriptorSetVariableDescriptorCountAllocateInfoEXT  :: DescriptorSetVariableDescriptorCountAllocateInfo
+DescriptorSetVariableDescriptorCountLayoutSupportEXT :: DescriptorSetVariableDescriptorCountLayoutSupport
+RayTracingShaderGroupTypeNV                          :: RayTracingShaderGroupTypeKHR
+GeometryTypeNV                                       :: GeometryTypeKHR
+AccelerationStructureTypeNV                          :: AccelerationStructureTypeKHR
+CopyAccelerationStructureModeNV                      :: CopyAccelerationStructureModeKHR
+GeometryFlagsNV                                      :: GeometryFlagsKHR
+GeometryFlagNV                                       :: GeometryFlagKHR
+GeometryInstanceFlagsNV                              :: GeometryInstanceFlagsKHR
+GeometryInstanceFlagNV                               :: GeometryInstanceFlagKHR
+BuildAccelerationStructureFlagsNV                    :: BuildAccelerationStructureFlagsKHR
+BuildAccelerationStructureFlagNV                     :: BuildAccelerationStructureFlagKHR
+TransformMatrixNV                                    :: TransformMatrixKHR
+AabbPositionsNV                                      :: AabbPositionsKHR
+AccelerationStructureInstanceNV                      :: AccelerationStructureInstanceKHR
+QueryPoolCreateInfoINTEL                             :: QueryPoolPerformanceQueryCreateInfoINTEL
+PhysicalDeviceScalarBlockLayoutFeaturesEXT           :: PhysicalDeviceScalarBlockLayoutFeatures
+PhysicalDeviceBufferAddressFeaturesEXT               :: PhysicalDeviceBufferDeviceAddressFeaturesEXT
+BufferDeviceAddressInfoEXT                           :: BufferDeviceAddressInfo
+ImageStencilUsageCreateInfoEXT                       :: ImageStencilUsageCreateInfo
+PhysicalDeviceHostQueryResetFeaturesEXT              :: PhysicalDeviceHostQueryResetFeatures
 
 

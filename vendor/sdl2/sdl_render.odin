@@ -14,12 +14,12 @@ RendererFlag :: enum u32 {
 	TARGETTEXTURE = 3, /**< The renderer supports rendering to texture */
 }
 
-RendererFlags :: distinct bit_set[RendererFlag; u32];
+RendererFlags :: distinct bit_set[RendererFlag; u32]
 
-RENDERER_SOFTWARE      :: RendererFlags{.SOFTWARE};
-RENDERER_ACCELERATED   :: RendererFlags{.ACCELERATED};
-RENDERER_PRESENTVSYNC  :: RendererFlags{.PRESENTVSYNC};
-RENDERER_TARGETTEXTURE :: RendererFlags{.TARGETTEXTURE};
+RENDERER_SOFTWARE      :: RendererFlags{.SOFTWARE}
+RENDERER_ACCELERATED   :: RendererFlags{.ACCELERATED}
+RENDERER_PRESENTVSYNC  :: RendererFlags{.PRESENTVSYNC}
+RENDERER_TARGETTEXTURE :: RendererFlags{.TARGETTEXTURE}
 
 RendererInfo :: struct {
 	name:                cstring,       /**< The name of the renderer */
@@ -48,9 +48,9 @@ TextureAccess :: enum c.int {
 	TARGET,    /**< Texture can be used as a render target */
 }
 
-SDL_TEXTUREMODULATE_NONE  :: 0x00000000; /**< No modulation */
-SDL_TEXTUREMODULATE_COLOR :: 0x00000001; /**< srcC = srcC * color */
-SDL_TEXTUREMODULATE_ALPHA :: 0x00000002; /**< srcA = srcA * alpha */
+SDL_TEXTUREMODULATE_NONE  :: 0x00000000 /**< No modulation */
+SDL_TEXTUREMODULATE_COLOR :: 0x00000001 /**< srcC = srcC * color */
+SDL_TEXTUREMODULATE_ALPHA :: 0x00000002 /**< srcA = srcA * alpha */
 
 /**
  * Flip constants for SDL_RenderCopyEx
@@ -61,9 +61,9 @@ RendererFlip :: enum c.int {
 	VERTICAL   = 0x00000002,    /**< flip vertically */
 }
 
-Renderer :: struct {};
+Renderer :: struct {}
 
-Texture :: struct {};
+Texture :: struct {}
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

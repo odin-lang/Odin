@@ -8,21 +8,21 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2_net"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2_net"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2_net"
 
-bool :: SDL.bool;
+bool :: SDL.bool
 
-MAJOR_VERSION :: 2;
-MINOR_VERSION :: 0;
-PATCHLEVEL    :: 1;
+MAJOR_VERSION :: 2
+MINOR_VERSION :: 0
+PATCHLEVEL    :: 1
 
 IPaddress :: struct {
 	host: u32,            /* 32-bit IPv4 host address */
 	port: u16,            /* 16-bit protocol port */
 }
 
-INADDR_ANY       :: 0x00000000;
-INADDR_NONE      :: 0xFFFFFFFF;
-INADDR_LOOPBACK  :: 0x7f000001;
-INADDR_BROADCAST :: 0xFFFFFFFF;
+INADDR_ANY       :: 0x00000000
+INADDR_NONE      :: 0xFFFFFFFF
+INADDR_LOOPBACK  :: 0x7f000001
+INADDR_BROADCAST :: 0xFFFFFFFF
 
 
 @(default_calling_convention="c", link_prefix="SDLNet_")
@@ -42,7 +42,7 @@ foreign lib {
 /* TCP network API                                                     */
 /***********************************************************************/
 
-TCPsocket :: distinct rawptr;
+TCPsocket :: distinct rawptr
 
 @(default_calling_convention="c", link_prefix="SDLNet_")
 foreign lib {
@@ -56,11 +56,11 @@ foreign lib {
 
 
 /* The maximum channels on a a UDP socket */
-MAX_UDPCHANNELS  :: 32;
+MAX_UDPCHANNELS  :: 32
 /* The maximum addresses bound to a single UDP socket channel */
-MAX_UDPADDRESSES :: 4;
+MAX_UDPADDRESSES :: 4
 
-UDPsocket :: distinct rawptr;
+UDPsocket :: distinct rawptr
 UDPpacket :: struct {
 	channel: c.int,     /* The src/dst channel of the packet */
 	data:    [^]u8,     /* The packet data */
@@ -99,16 +99,16 @@ foreign lib {
 
 AllocPacketSlice :: proc "c" (howmany: c.int, size: c.int) -> []^UDPpacket {
 	if packets := AllocPacketV(howmany, size); packets != nil {
-		return packets[:howmany];
+		return packets[:howmany]
 	}
-	return nil;
+	return nil
 }
 FreePacketSlice :: proc "c" (packets: []^UDPpacket) {
-	FreePacketV(raw_data(packets));
+	FreePacketV(raw_data(packets))
 }
 
 UDP_SendSlice :: proc "c" (sock: UDPsocket, packets: []^UDPpacket) -> c.int {
-	return UDP_SendV(sock, raw_data(packets), c.int(len(packets)));
+	return UDP_SendV(sock, raw_data(packets), c.int(len(packets)))
 }
 
 
@@ -116,27 +116,27 @@ UDP_SendSlice :: proc "c" (sock: UDPsocket, packets: []^UDPpacket) -> c.int {
 /* Hooks for checking sockets for available data                       */
 /***********************************************************************/
 
-SocketSet :: distinct rawptr;
+SocketSet :: distinct rawptr
 
 /* Any network socket can be safely cast to this socket type */
-GenericSocket :: ^struct { ready: c.int };
+GenericSocket :: ^struct { ready: c.int }
 
 TCP_AddSocket :: #force_inline proc "c" (set: SocketSet, sock: TCPsocket) -> c.int {
-	return AddSocket(set, (GenericSocket)(sock));
+	return AddSocket(set, (GenericSocket)(sock))
 }
 UDP_AddSocket :: #force_inline proc "c" (set: SocketSet, sock: UDPsocket) -> c.int {
-	return AddSocket(set, (GenericSocket)(sock));
+	return AddSocket(set, (GenericSocket)(sock))
 }
 TCP_DelSocket :: #force_inline proc "c" (set: SocketSet, sock: TCPsocket) -> c.int {
-	return DelSocket(set, (GenericSocket)(sock));
+	return DelSocket(set, (GenericSocket)(sock))
 }
 UDP_DelSocket :: #force_inline proc "c" (set: SocketSet, sock: UDPsocket) -> c.int {
-	return DelSocket(set, (GenericSocket)(sock));
+	return DelSocket(set, (GenericSocket)(sock))
 }
 
 SocketReady :: #force_inline proc "c" (sock: rawptr) -> bool {
-	s := (GenericSocket)(sock);
-	return bool(s != nil && s.ready != 0);
+	s := (GenericSocket)(sock)
+	return bool(s != nil && s.ready != 0)
 }
 
 
@@ -167,25 +167,25 @@ foreign lib {
 
 /* Write a 16/32-bit value to network packet buffer */
 Write16 :: #force_inline proc "c" (value: u16, areap: rawptr) {
-	area := (^[2]u8)(areap);
-	area[0] = u8((value >>  8) & 0xFF);
-	area[1] = u8( value        & 0xFF);
+	area := (^[2]u8)(areap)
+	area[0] = u8((value >>  8) & 0xFF)
+	area[1] = u8( value        & 0xFF)
 }
 Write32 :: #force_inline proc "c" (value: u32, areap: rawptr) {
-	area := (^[4]u8)(areap);
-	area[0] = u8((value >> 24) & 0xFF);
-	area[1] = u8((value >> 16) & 0xFF);
-	area[2] = u8((value >>  8) & 0xFF);
-	area[3] = u8( value        & 0xFF);
+	area := (^[4]u8)(areap)
+	area[0] = u8((value >> 24) & 0xFF)
+	area[1] = u8((value >> 16) & 0xFF)
+	area[2] = u8((value >>  8) & 0xFF)
+	area[3] = u8( value        & 0xFF)
 }
 
 /* Read a 16/32-bit value from network packet buffer */
 Read16 :: #force_inline proc "c" (areap: rawptr) -> u16 {
-	area := (^[2]u8)(areap);
-	return u16(area[0])<<8 | u16(area[1]);
+	area := (^[2]u8)(areap)
+	return u16(area[0])<<8 | u16(area[1])
 }
 
 Read32 :: #force_inline proc "c" (areap: rawptr) -> u32 {
-	area := (^[4]u8)(areap);
-	return u32(area[0])<<24 | u32(area[1])<<16 | u32(area[2])<<8 | u32(area[3]);
+	area := (^[4]u8)(areap)
+	return u32(area[0])<<24 | u32(area[1])<<16 | u32(area[2])<<8 | u32(area[3])
 }

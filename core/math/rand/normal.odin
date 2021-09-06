@@ -18,7 +18,7 @@ import "core:math"
 // sample = norm_float64() * std_dev + mean
 //
 norm_float64 :: proc(r: ^Rand = nil) -> f64 {
-	rn :: 3.442619855899;
+	rn :: 3.442619855899
 
 	@(static)
 	kn := [128]u32{
@@ -48,7 +48,7 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		0x7e3b737a, 0x7e268c2f, 0x7e0e3ff5, 0x7df1aa5d, 0x7dcf8c72,
 		0x7da61a1e, 0x7d72a0fb, 0x7d30e097, 0x7cd9b4ab, 0x7c600f1a,
 		0x7ba90bdc, 0x7a722176, 0x77d664e5,
-	};
+	}
 
 	@(static)
 	wn := [128]f32{
@@ -84,7 +84,7 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		1.1781276e-09, 1.1962995e-09, 1.2158287e-09, 1.2369856e-09,
 		1.2601323e-09, 1.2857697e-09, 1.3146202e-09, 1.347784e-09,
 		1.3870636e-09, 1.4357403e-09, 1.5008659e-09, 1.6030948e-09,
-	};
+	}
 
 	@(static)
 	fn := [128]f32{
@@ -114,39 +114,39 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		0.044660863, 0.040742867, 0.03688439,  0.033087887, 0.029356318,
 		0.025693292, 0.022103304, 0.018592102, 0.015167298, 0.011839478,
 		0.008624485, 0.005548995, 0.0026696292,
-	};
+	}
 
-	r := r;
+	r := r
 	if r == nil {
 		// NOTE(bill, 2020-09-07): Do this so that people can
 		// enforce the global random state if necessary with `nil`
-		r = &global_rand;
+		r = &global_rand
 	}
 
 	for {
-		j := i32(uint32(r));
-		i := j & 0x7f;
-		x := f64(j) * f64(wn[i]);
+		j := i32(uint32(r))
+		i := j & 0x7f
+		x := f64(j) * f64(wn[i])
 		if u32(abs(j)) < kn[i] {
 			// 99% of the time this will be hit
-			return x;
+			return x
 		}
 
 		if i == 0 {
 			for {
-				x = -math.ln(float64(r)) * (1.0/ rn);
-				y := -math.ln(float64(r));
+				x = -math.ln(float64(r)) * (1.0/ rn)
+				y := -math.ln(float64(r))
 				if y+y >= x*x {
-					break;
+					break
 				}
 			}
-			return j > 0 ? rn + x : -rn - x;
+			return j > 0 ? rn + x : -rn - x
 		}
 		if fn[i]+f32(float64(r))*(fn[i-1]-fn[i]) < f32(math.exp(-0.5*x*x)) {
-			return x;
+			return x
 		}
 	}
 
-	return 0; // NOTE(bill): Will never be hit but this is here for sanity's sake
+	return 0 // NOTE(bill): Will never be hit but this is here for sanity's sake
 }
 

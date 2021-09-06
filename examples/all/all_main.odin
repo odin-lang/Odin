@@ -57,4 +57,16 @@ import unicode        "core:unicode"
 import utf8           "core:unicode/utf8"
 import utf16          "core:unicode/utf16"
 
+
+import glfw   "vendor:glfw"
+import gl     "vendor:OpenGL"
+import PM     "vendor:portmidi"
+import SDL    "vendor:sdl2"
+import IMG    "vendor:sdl2/image"
+import SDLNet "vendor:sdl2/net"
+import MIX    "vendor:sdl2/mixer"
+import TTF    "vendor:sdl2/ttf"
+import vk     "vendor:vulkan"
+
+
 main :: proc(){}

@@ -4,10 +4,10 @@ package c_frontend_tokenizer
 in_range :: proc(range: []rune, c: rune) -> bool #no_bounds_check {
 	for i := 0; range[i] != -1; i += 2 {
 		if range[i] <= c && c <= range[i+1] {
-			return true;
+			return true
 		}
 	}
-	return false;
+	return false
 }
 
 
@@ -15,11 +15,11 @@ in_range :: proc(range: []rune, c: rune) -> bool #no_bounds_check {
 //
 // is_ident0 returns true if a given character is acceptable as the first character of an identifier.
 is_ident0 :: proc(c: rune) -> bool {
-	return in_range(_range_ident0, c);
+	return in_range(_range_ident0, c)
 }
 // is_ident0 returns true if a given character is acceptable as a non-first character of an identifier.
 is_ident1 :: proc(c: rune) -> bool {
-	return is_ident0(c) || in_range(_range_ident1, c);
+	return is_ident0(c) || in_range(_range_ident1, c)
 }
 
 // Returns the number of columns needed to display a given character in a fixed-width font.
@@ -27,18 +27,18 @@ is_ident1 :: proc(c: rune) -> bool {
 char_width :: proc(c: rune) -> int {
 	switch {
 	case in_range(_range_width0, c):
-		return 0;
+		return 0
 	case in_range(_range_width2, c):
-		return 2;
+		return 2
 	}
-	return 1;
+	return 1
 }
 
 display_width :: proc(str: string) -> (w: int) {
 	for c in str {
-		w += char_width(c);
+		w += char_width(c)
 	}
-	return;
+	return
 }
 
 
@@ -59,12 +59,12 @@ _range_ident0 := []rune{
 	0x90000, 0x9FFFD, 0xA0000, 0xAFFFD, 0xB0000, 0xBFFFD, 0xC0000, 0xCFFFD,
 	0xD0000, 0xDFFFD, 0xE0000, 0xEFFFD,
 	-1,
-};
+}
 
 _range_ident1 := []rune{
 	'0', '9', '$', '$', 0x0300, 0x036F, 0x1DC0, 0x1DFF, 0x20D0, 0x20FF, 0xFE20, 0xFE2F,
 	-1,
-};
+}
 
 
 _range_width0 := []rune{
@@ -105,7 +105,7 @@ _range_width0 := []rune{
 	0x1D167, 0x1D169, 0x1D173, 0x1D182, 0x1D185, 0x1D18B, 0x1D1AA, 0x1D1AD,
 	0x1D242, 0x1D244, 0xE0001, 0xE0001, 0xE0020, 0xE007F, 0xE0100, 0xE01EF,
 	-1,
-};
+}
 
 _range_width2 := []rune{
 	0x1100, 0x115F, 0x2329, 0x2329, 0x232A, 0x232A, 0x2E80, 0x303E,
@@ -113,4 +113,4 @@ _range_width2 := []rune{
 	0xFE30, 0xFE6F, 0xFF00, 0xFF60, 0xFFE0, 0xFFE6, 0x1F000, 0x1F644,
 	0x20000, 0x2FFFD, 0x30000, 0x3FFFD,
 	-1,
-};
+}

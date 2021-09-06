@@ -5,9 +5,9 @@ import "core:strings"
 
 when ODIN_OS == "windows" do foreign import lib "portmidi.lib"
 
-#assert(size_of(b32) == size_of(c.int));
+#assert(size_of(b32) == size_of(c.int))
 
-DEFAULT_SYSEX_BUFFER_SIZE :: 1024;
+DEFAULT_SYSEX_BUFFER_SIZE :: 1024
 
 Error :: enum c.int {
 	NoError = 0,
@@ -33,7 +33,7 @@ Error :: enum c.int {
 
 /**  A single Stream is a descriptor for an open MIDI device.
 */
-Stream :: distinct rawptr;
+Stream :: distinct rawptr
 
 @(default_calling_convention="c", link_prefix="Pm_")
 foreign lib {
@@ -75,7 +75,7 @@ GetErrorText :: proc (errnum: Error) -> string {
 	foreign lib {
 		Pm_GetErrorText :: proc(errnum: Error) -> cstring ---
 	}
-	return string(Pm_GetErrorText(errnum));
+	return string(Pm_GetErrorText(errnum))
 }
 
 /**  Translate portmidi host error into human readable message.
@@ -87,18 +87,18 @@ GetHostErrorText :: proc (buf: []byte) -> string {
 	foreign lib {
 		Pm_GetHostErrorText :: proc(msg: [^]u8, len: c.uint) ---
 	}
-	Pm_GetHostErrorText(raw_data(buf), u32(len(buf)));
-	str := string(buf[:]);
-	return strings.truncate_to_byte(str, 0);
+	Pm_GetHostErrorText(raw_data(buf), u32(len(buf)))
+	str := string(buf[:])
+	return strings.truncate_to_byte(str, 0)
 }
 
 
-HDRLENGTH :: 50;
-HOST_ERROR_MSG_LEN :: 256; /* any host error msg will occupy less 
+HDRLENGTH :: 50
+HOST_ERROR_MSG_LEN :: 256 /* any host error msg will occupy less 
                               than this number of characters */
 
-DeviceID :: distinct c.int;
-NoDevice :: DeviceID(-1);
+DeviceID :: distinct c.int
+NoDevice :: DeviceID(-1)
 DeviceInfo :: struct {
 	structVersion: c.int,   /**< this internal structure version */ 
 	interf:        cstring, /**< underlying MIDI API, e.g. MMSystem or DirectX */
@@ -122,11 +122,11 @@ foreign lib {
     Timestamp is used to represent a millisecond clock with arbitrary
     start time. The type is used for all MIDI timestampes and clocks.
 */
-Timestamp :: distinct i32;
-TimeProc :: proc "c" (time_info: rawptr) -> Timestamp;
+Timestamp :: distinct i32
+TimeProc :: proc "c" (time_info: rawptr) -> Timestamp
 
 Before :: #force_inline proc "c" (t1, t2: Timestamp) -> b32 {
-	return b32((t1-t2) < 0);
+	return b32((t1-t2) < 0)
 }
 
 @(default_calling_convention="c", link_prefix="Pm_")
@@ -245,50 +245,50 @@ foreign lib {
  	
 /* Filter bit-mask definitions */
 /** filter active sensing messages (0xFE): */
-FILT_ACTIVE :: 1 << 0x0E;
+FILT_ACTIVE :: 1 << 0x0E
 /** filter system exclusive messages (0xF0): */
-FILT_SYSEX :: 1 << 0x00;
+FILT_SYSEX :: 1 << 0x00
 /** filter MIDI clock message (0xF8) */
-FILT_CLOCK :: 1 << 0x08;
+FILT_CLOCK :: 1 << 0x08
 /** filter play messages (start 0xFA, stop 0xFC, continue 0xFB) */
-FILT_PLAY :: (1 << 0x0A) | (1 << 0x0C) | (1 << 0x0B);
+FILT_PLAY :: (1 << 0x0A) | (1 << 0x0C) | (1 << 0x0B)
 /** filter tick messages (0xF9) */
-FILT_TICK :: 1 << 0x09;
+FILT_TICK :: 1 << 0x09
 /** filter undefined FD messages */
-FILT_FD :: 1 << 0x0D;
+FILT_FD :: 1 << 0x0D
 /** filter undefined real-time messages */
-FILT_UNDEFINED :: FILT_FD;
+FILT_UNDEFINED :: FILT_FD
 /** filter reset messages (0xFF) */
-FILT_RESET :: 1 << 0x0F;
+FILT_RESET :: 1 << 0x0F
 /** filter all real-time messages */
-FILT_REALTIME :: FILT_ACTIVE | FILT_SYSEX | FILT_CLOCK | FILT_PLAY | FILT_UNDEFINED | FILT_RESET | FILT_TICK;
+FILT_REALTIME :: FILT_ACTIVE | FILT_SYSEX | FILT_CLOCK | FILT_PLAY | FILT_UNDEFINED | FILT_RESET | FILT_TICK
 /** filter note-on and note-off (0x90-0x9F and 0x80-0x8F */
-FILT_NOTE :: (1 << 0x19) | (1 << 0x18);
+FILT_NOTE :: (1 << 0x19) | (1 << 0x18)
 /** filter channel aftertouch (most midi controllers use this) (0xD0-0xDF)*/
-FILT_CHANNEL_AFTERTOUCH :: 1 << 0x1D;
+FILT_CHANNEL_AFTERTOUCH :: 1 << 0x1D
 /** per-note aftertouch (0xA0-0xAF) */
-FILT_POLY_AFTERTOUCH :: 1 << 0x1A;
+FILT_POLY_AFTERTOUCH :: 1 << 0x1A
 /** filter both channel and poly aftertouch */
-FILT_AFTERTOUCH :: FILT_CHANNEL_AFTERTOUCH | FILT_POLY_AFTERTOUCH;
+FILT_AFTERTOUCH :: FILT_CHANNEL_AFTERTOUCH | FILT_POLY_AFTERTOUCH
 /** Program changes (0xC0-0xCF) */
-FILT_PROGRAM :: 1 << 0x1C;
+FILT_PROGRAM :: 1 << 0x1C
 /** Control Changes (CC's) (0xB0-0xBF)*/
-FILT_CONTROL :: 1 << 0x1B;
+FILT_CONTROL :: 1 << 0x1B
 /** Pitch Bender (0xE0-0xEF*/
-FILT_PITCHBEND :: 1 << 0x1E;
+FILT_PITCHBEND :: 1 << 0x1E
 /** MIDI Time Code (0xF1)*/
-FILT_MTC :: 1 << 0x01;
+FILT_MTC :: 1 << 0x01
 /** Song Position (0xF2) */
-FILT_SONG_POSITION :: 1 << 0x02;
+FILT_SONG_POSITION :: 1 << 0x02
 /** Song Select (0xF3)*/
-FILT_SONG_SELECT :: 1 << 0x03;
+FILT_SONG_SELECT :: 1 << 0x03
 /** Tuning request (0xF6)*/
-FILT_TUNE :: 1 << 0x06;
+FILT_TUNE :: 1 << 0x06
 /** All System Common messages (mtc, song position, song select, tune request) */
-FILT_SYSTEMCOMMON :: FILT_MTC | FILT_SONG_POSITION | FILT_SONG_SELECT | FILT_TUNE;
+FILT_SYSTEMCOMMON :: FILT_MTC | FILT_SONG_POSITION | FILT_SONG_SELECT | FILT_TUNE
 
 Channel :: #force_inline proc "c" (channel: c.int) -> c.int {
-	return 1<<c.uint(channel);
+	return 1<<c.uint(channel)
 }
 
 @(default_calling_convention="c", link_prefix="Pm_")
@@ -361,19 +361,19 @@ foreign lib {
     MessageData2() extract fields from a 32-bit midi message.
 */
 MessageMake :: #force_inline proc "c" (status: c.int, data1, data2: c.int) -> Message {
-	return Message(((data2 << 16) & 0xFF0000) | ((data1 << 8) & 0xFF00) | (status & 0xFF));
+	return Message(((data2 << 16) & 0xFF0000) | ((data1 << 8) & 0xFF00) | (status & 0xFF))
 }
 MessageStatus :: #force_inline proc "c" (msg: Message) -> c.int {
-	return c.int(msg & 0xFF);
+	return c.int(msg & 0xFF)
 }
 MessageData1  :: #force_inline proc "c" (msg: Message) -> c.int {
-	return c.int((msg >> 8) & 0xFF);
+	return c.int((msg >> 8) & 0xFF)
 }
 MessageData2  :: #force_inline proc "c" (msg: Message) -> c.int {
-	return c.int((msg >> 16) & 0xFF);
+	return c.int((msg >> 16) & 0xFF)
 }
 
-Message :: distinct i32;
+Message :: distinct i32
 /**
    All midi data comes in the form of Event structures. A sysex
    message is encoded as a sequence of Event structures, with each

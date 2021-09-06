@@ -9,14 +9,14 @@ when ODIN_OS == "darwin"  do foreign import lib "system:SDL2_mixer"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2_mixer"
 
 
-MAJOR_VERSION :: 2;
-MINOR_VERSION :: 0;
-PATCHLEVEL    :: 4;
+MAJOR_VERSION :: 2
+MINOR_VERSION :: 0
+PATCHLEVEL    :: 4
 
-CHANNELS :: 8;
+CHANNELS :: 8
 
 
-bool :: SDL.bool;
+bool :: SDL.bool
 
 
 InitFlag :: enum c.int {
@@ -28,19 +28,19 @@ InitFlag :: enum c.int {
 	OPUS   = 6,
 }
 
-InitFlags :: distinct bit_set[InitFlag; c.int];
+InitFlags :: distinct bit_set[InitFlag; c.int]
 
-INIT_FLAC :: InitFlags{.FLAC};
-INIT_MOD  :: InitFlags{.MOD};
-INIT_MP3  :: InitFlags{.MP3};
-INIT_OGG  :: InitFlags{.OGG};
-INIT_MID  :: InitFlags{.MID};
-INIT_OPUS :: InitFlags{.OPUS};
+INIT_FLAC :: InitFlags{.FLAC}
+INIT_MOD  :: InitFlags{.MOD}
+INIT_MP3  :: InitFlags{.MP3}
+INIT_OGG  :: InitFlags{.OGG}
+INIT_MID  :: InitFlags{.MID}
+INIT_OPUS :: InitFlags{.OPUS}
 
-DEFAULT_FREQUENCY :: 44100;
-DEFAULT_FORMAT :: SDL.AUDIO_S16SYS;
-DEFAULT_CHANNELS :: 2;
-MAX_VOLUME :: SDL.MIX_MAXVOLUME;
+DEFAULT_FREQUENCY :: 44100
+DEFAULT_FORMAT :: SDL.AUDIO_S16SYS
+DEFAULT_CHANNELS :: 2
+MAX_VOLUME :: SDL.MIX_MAXVOLUME
 
 Chunk :: struct {
 	allocated: c.int,
@@ -55,9 +55,9 @@ Fading :: enum c.int {
 	FADING_IN,
 }
 
-NO_FADING  :: Fading.NO_FADING;
-FADING_OUT :: Fading.FADING_OUT;
-FADING_IN  :: Fading.FADING_IN;
+NO_FADING  :: Fading.NO_FADING
+FADING_OUT :: Fading.FADING_OUT
+FADING_IN  :: Fading.FADING_IN
 
 MusicType :: enum c.int {
 	NONE,
@@ -73,33 +73,33 @@ MusicType :: enum c.int {
 	OPUS,
 }
 
-MUS_NONE           :: MusicType.NONE;
-MUS_CMD            :: MusicType.CMD;
-MUS_WAV            :: MusicType.WAV;
-MUS_MOD            :: MusicType.MOD;
-MUS_MID            :: MusicType.MID;
-MUS_OGG            :: MusicType.OGG;
-MUS_MP3            :: MusicType.MP3;
-MUS_MP3_MAD_UNUSED :: MusicType.MP3_MAD_UNUSED;
-MUS_FLAC           :: MusicType.FLAC;
-MUS_MODPLUG_UNUSED :: MusicType.MODPLUG_UNUSED;
-MUS_OPUS           :: MusicType.OPUS;
+MUS_NONE           :: MusicType.NONE
+MUS_CMD            :: MusicType.CMD
+MUS_WAV            :: MusicType.WAV
+MUS_MOD            :: MusicType.MOD
+MUS_MID            :: MusicType.MID
+MUS_OGG            :: MusicType.OGG
+MUS_MP3            :: MusicType.MP3
+MUS_MP3_MAD_UNUSED :: MusicType.MP3_MAD_UNUSED
+MUS_FLAC           :: MusicType.FLAC
+MUS_MODPLUG_UNUSED :: MusicType.MODPLUG_UNUSED
+MUS_OPUS           :: MusicType.OPUS
 
-Music :: struct {};
+Music :: struct {}
 
 
 
 /* We'll use SDL for reporting errors */
-SetError   :: SDL.SetError;
-GetError   :: SDL.GetError;
-ClearError :: SDL.ClearError;
+SetError   :: SDL.SetError
+GetError   :: SDL.GetError
+ClearError :: SDL.ClearError
 
 Mix_LoadWAV :: #force_inline proc "c" (file: cstring) -> ^Chunk {
-	return LoadWAV_RW(SDL.RWFromFile(file, "rb"), true);
+	return LoadWAV_RW(SDL.RWFromFile(file, "rb"), true)
 }
 
 
-MixFunc :: proc "c" (udata: rawptr, stream: [^]u8, len: c.int);
+MixFunc :: proc "c" (udata: rawptr, stream: [^]u8, len: c.int)
 
 @(default_calling_convention="c", link_prefix="Mix_")
 foreign lib {
@@ -141,18 +141,18 @@ foreign lib {
 	ChannelFinished      :: proc(channel_finished: proc "c" (channel: c.int)) ---
 }
 
-CHANNEL_POST :: -2;
+CHANNEL_POST :: -2
 
-EffectFunc_t :: proc "c" (chan: c.int, stream: rawptr, len: c.int, udata: rawptr);
-EffectDone_t :: proc "c" (chan: c.int, udata: rawptr);
+EffectFunc_t :: proc "c" (chan: c.int, stream: rawptr, len: c.int, udata: rawptr)
+EffectDone_t :: proc "c" (chan: c.int, udata: rawptr)
 
-EFFECTSMAXSPEED :: "MIX_EFFECTSMAXSPEED";
+EFFECTSMAXSPEED :: "MIX_EFFECTSMAXSPEED"
 
 PlayChannel :: #force_inline proc "c" (channel: c.int, chunk: ^Chunk, loops: c.int) -> c.int {
-	return PlayChannelTimed(channel, chunk, loops, -1);
+	return PlayChannelTimed(channel, chunk, loops, -1)
 }
 FadeInChannel :: #force_inline proc "c" (channel: c.int, chunk: ^Chunk, loops: c.int, ms: c.int) -> c.int {
-	return FadeInChannelTimed(channel, chunk, loops, ms, -1);
+	return FadeInChannelTimed(channel, chunk, loops, ms, -1)
 }
 
 

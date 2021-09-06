@@ -7,11 +7,11 @@ when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-VkInstance   :: distinct u64;
-VkSurfaceKHR :: distinct u64;
+VkInstance   :: distinct u64
+VkSurfaceKHR :: distinct u64
 
-vulkanInstance :: VkInstance;
-vulkanSurface  :: VkSurfaceKHR;
+vulkanInstance :: VkInstance
+vulkanSurface  :: VkSurfaceKHR
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

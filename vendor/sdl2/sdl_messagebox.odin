@@ -17,22 +17,22 @@ MessageBoxFlag :: enum u32 {
 }
 
 
-MessageBoxFlags :: distinct bit_set[MessageBoxFlag; u32];
+MessageBoxFlags :: distinct bit_set[MessageBoxFlag; u32]
 
-MESSAGEBOX_ERROR                 :: MessageBoxFlags{.ERROR};
-MESSAGEBOX_WARNING               :: MessageBoxFlags{.WARNING};
-MESSAGEBOX_INFORMATION           :: MessageBoxFlags{.INFORMATION};
-MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT :: MessageBoxFlags{.BUTTONS_LEFT_TO_RIGHT};
-MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT :: MessageBoxFlags{.BUTTONS_RIGHT_TO_LEFT};
+MESSAGEBOX_ERROR                 :: MessageBoxFlags{.ERROR}
+MESSAGEBOX_WARNING               :: MessageBoxFlags{.WARNING}
+MESSAGEBOX_INFORMATION           :: MessageBoxFlags{.INFORMATION}
+MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT :: MessageBoxFlags{.BUTTONS_LEFT_TO_RIGHT}
+MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT :: MessageBoxFlags{.BUTTONS_RIGHT_TO_LEFT}
 
 MessageBoxButtonFlag :: enum u32 {
 	RETURNKEY_DEFAULT = 0,  /**< Marks the default button when return is hit */
 	ESCAPEKEY_DEFAULT = 1,  /**< Marks the default button when escape is hit */
 }
-MessageBoxButtonFlags :: distinct bit_set[MessageBoxButtonFlag; u32];
+MessageBoxButtonFlags :: distinct bit_set[MessageBoxButtonFlag; u32]
 
-MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT :: MessageBoxButtonFlags{.RETURNKEY_DEFAULT};
-MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT :: MessageBoxButtonFlags{.ESCAPEKEY_DEFAULT};
+MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT :: MessageBoxButtonFlags{.RETURNKEY_DEFAULT}
+MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT :: MessageBoxButtonFlags{.ESCAPEKEY_DEFAULT}
 
 MessageBoxButtonData :: struct {
 	flags:    MessageBoxButtonFlags, /**< ::SDL_MessageBoxButtonFlags */

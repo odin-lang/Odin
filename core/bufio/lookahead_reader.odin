@@ -14,14 +14,14 @@ Loadahead_Reader :: struct {
 }
 
 lookahead_reader_init :: proc(lr: ^Loadahead_Reader, r: io.Reader, buf: []byte) -> ^Loadahead_Reader {
-	lr.r = r;
-	lr.buf = buf;
-	lr.n = 0;
-	return lr;
+	lr.r = r
+	lr.buf = buf
+	lr.n = 0
+	return lr
 }
 
 lookahead_reader_buffer :: proc(lr: ^Loadahead_Reader) -> []byte {
-	return lr.buf[:lr.n];
+	return lr.buf[:lr.n]
 }
 
 
@@ -31,35 +31,35 @@ lookahead_reader_buffer :: proc(lr: ^Loadahead_Reader) -> []byte {
 lookahead_reader_peek :: proc(lr: ^Loadahead_Reader, n: int) -> ([]byte, io.Error) {
 	switch {
 	case n < 0:
-		return nil, .Negative_Read;
+		return nil, .Negative_Read
 	case n > len(lr.buf):
-		return nil, .Buffer_Full;
+		return nil, .Buffer_Full
 	}
 
-	n := n;
-	err: io.Error;
-	read_count: int;
+	n := n
+	err: io.Error
+	read_count: int
 
 	if lr.n < n {
-		read_count, err = io.read_at_least(lr.r, lr.buf[lr.n:], n-lr.n);
+		read_count, err = io.read_at_least(lr.r, lr.buf[lr.n:], n-lr.n)
 		if err == .Unexpected_EOF {
-			err = .EOF;
+			err = .EOF
 		}
 	}
 
-	lr.n += read_count;
+	lr.n += read_count
 
 	if n > lr.n {
-		n = lr.n;
+		n = lr.n
 	}
-	return lr.buf[:n], err;
+	return lr.buf[:n], err
 }
 
 // lookahead_reader_peek_all returns a slice of the Lookahead_Reader populating the full buffer
 // If the Lookahead_Reader cannot hold enough bytes, it will read from the underlying reader to populate the rest.
 // NOTE: The returned buffer is not a copy of the underlying buffer
 lookahead_reader_peek_all :: proc(lr: ^Loadahead_Reader) -> ([]byte, io.Error) {
-	return lookahead_reader_peek(lr, len(lr.buf));
+	return lookahead_reader_peek(lr, len(lr.buf))
 }
 
 
@@ -67,17 +67,17 @@ lookahead_reader_peek_all :: proc(lr: ^Loadahead_Reader) -> ([]byte, io.Error) {
 lookahead_reader_consume :: proc(lr: ^Loadahead_Reader, n: int) -> io.Error {
 	switch {
 	case n == 0:
-		return nil;
+		return nil
 	case n < 0:
-		return .Negative_Read;
+		return .Negative_Read
 	case lr.n < n:
-		return .Short_Buffer;
+		return .Short_Buffer
 	}
-	copy(lr.buf, lr.buf[n:lr.n]);
-	lr.n -= n;
-	return nil;
+	copy(lr.buf, lr.buf[n:lr.n])
+	lr.n -= n
+	return nil
 }
 
 lookahead_reader_consume_all :: proc(lr: ^Loadahead_Reader) -> io.Error {
-	return lookahead_reader_consume(lr, lr.n);
+	return lookahead_reader_consume(lr, lr.n)
 }

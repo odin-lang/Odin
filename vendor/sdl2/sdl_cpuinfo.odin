@@ -12,7 +12,7 @@ when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
  * The 64-bit PowerPC processors have a 128 byte cache line.
  * We'll use the larger value to be generally safe.
  */
-CACHELINE_SIZE :: 128;
+CACHELINE_SIZE :: 128
 
 
 @(default_calling_convention="c", link_prefix="SDL_")

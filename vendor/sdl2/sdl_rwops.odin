@@ -8,13 +8,13 @@ when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
 /* RWops Types */
-RWOPS_UNKNOWN   :: 0; /**< Unknown stream type */
-RWOPS_WINFILE   :: 1; /**< Win32 file */
-RWOPS_STDFILE   :: 2; /**< Stdio file */
-RWOPS_JNIFILE   :: 3; /**< Android asset */
-RWOPS_MEMORY    :: 4; /**< Memory stream */
-RWOPS_MEMORY_RO :: 5; /**< Read-Only memory stream */
-RWOPS_VITAFILE  :: 6; /**< Vita file */
+RWOPS_UNKNOWN   :: 0 /**< Unknown stream type */
+RWOPS_WINFILE   :: 1 /**< Win32 file */
+RWOPS_STDFILE   :: 2 /**< Stdio file */
+RWOPS_JNIFILE   :: 3 /**< Android asset */
+RWOPS_MEMORY    :: 4 /**< Memory stream */
+RWOPS_MEMORY_RO :: 5 /**< Read-Only memory stream */
+RWOPS_VITAFILE  :: 6 /**< Vita file */
 
 
 /**
@@ -66,9 +66,9 @@ RWops :: struct {
 }
 
 
-SEEK_SET :: 0; /**< Seek from the beginning of data */
-SEEK_CUR :: 1; /**< Seek relative to current read point */
-SEEK_END :: 2; /**< Seek relative to the end of data */
+SEEK_SET :: 0 /**< Seek from the beginning of data */
+SEEK_CUR :: 1 /**< Seek relative to current read point */
+SEEK_END :: 2 /**< Seek relative to the end of data */
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {

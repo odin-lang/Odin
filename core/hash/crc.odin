@@ -3,11 +3,11 @@ package hash
 
 @(optimization_mode="speed")
 crc64 :: proc(data: []byte, seed := u32(0)) -> u64 #no_bounds_check {
-	result := ~u64(seed);
+	result := ~u64(seed)
 	 #no_bounds_check for b in data {
-		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
+		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff]
 	}
-	return ~result;
+	return ~result
 }
 
 @private _crc64_table := [256]u64{
@@ -75,4 +75,4 @@ crc64 :: proc(data: []byte, seed := u32(0)) -> u64 #no_bounds_check {
 	0xcf8b0890283e370c, 0x8d7be97b81d4019f, 0x4a6acb477bea5a2a, 0x089a2aacd2006cb9,
 	0x14dea25f3af9026d, 0x562e43b4931334fe, 0x913f6188692d6f4b, 0xd3cf8063c0c759d8,
 	0x5dedc41a34bbeeb2, 0x1f1d25f19d51d821, 0xd80c07cd676f8394, 0x9afce626ce85b507,
-};
+}

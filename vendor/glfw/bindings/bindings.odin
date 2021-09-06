@@ -6,7 +6,7 @@ import vk "vendor:vulkan"
 when ODIN_OS == "linux"   do foreign import glfw "system:glfw" // TODO: Add the billion-or-so static libs to link to in linux
 when ODIN_OS == "windows" do foreign import glfw { "lib/glfw3.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
 
-#assert(size_of(c.int) == size_of(b32));
+#assert(size_of(c.int) == size_of(b32))
 
 /*** Functions ***/
 @(default_calling_convention="c", link_prefix="glfw")

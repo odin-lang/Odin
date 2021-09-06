@@ -8,14 +8,14 @@ foreign kernel32 {
 }
 
 windows_trap_array_bounds :: proc "contextless" () -> ! {
-	EXCEPTION_ARRAY_BOUNDS_EXCEEDED :: 0xC000008C;
+	EXCEPTION_ARRAY_BOUNDS_EXCEEDED :: 0xC000008C
 
 
-	RaiseException(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, 0, 0, nil);
+	RaiseException(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, 0, 0, nil)
 }
 
 windows_trap_type_assertion :: proc "contextless" () -> ! {
-	windows_trap_array_bounds();
+	windows_trap_array_bounds()
 }
 
 // @private
@@ -32,10 +32,10 @@ memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		RtlCopyMemory :: proc "c" (dst, src: rawptr, len: int) ---
 	}
 	if dst == nil || src == nil || len == 0 {
-		return dst;
+		return dst
 	}
-	RtlCopyMemory(dst, src, len);
-	return dst;
+	RtlCopyMemory(dst, src, len)
+	return dst
 }
 
 // @(link_name="memmove")
@@ -44,27 +44,27 @@ memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		RtlMoveMemory :: proc "c" (dst, src: rawptr, len: int) ---
 	}
 	if dst == nil || src == nil || len == 0 {
-		return dst;
+		return dst
 	}
-	RtlMoveMemory(dst, src, len);
-	return dst;
+	RtlMoveMemory(dst, src, len)
+	return dst
 }
 
 // @(link_name="memset")
 memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 	if ptr == nil || len == 0 {
-		return ptr;
+		return ptr
 	}
 
-	b := byte(val);
+	b := byte(val)
 
-	p_start := uintptr(ptr);
-	p_end := p_start + uintptr(max(len, 0));
+	p_start := uintptr(ptr)
+	p_end := p_start + uintptr(max(len, 0))
 	for p := p_start; p < p_end; p += 1 {
-		(^byte)(p)^ = b;
+		(^byte)(p)^ = b
 	}
 
-	return ptr;
+	return ptr
 }
 
 // @(link_name="memcmp")

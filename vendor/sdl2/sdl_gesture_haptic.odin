@@ -9,7 +9,7 @@ when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
 // Gesture
 
-GestureID :: distinct i64;
+GestureID :: distinct i64
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -21,7 +21,7 @@ foreign lib {
 
 // Haptic
 
-Haptic :: struct {};
+Haptic :: struct {}
 
 
 HapticType :: enum u16 {
@@ -42,22 +42,22 @@ HapticType :: enum u16 {
 	STATUS        = 1<<14,
 	PAUSE         = 1<<15,
 }
-HAPTIC_CONSTANT      :: HapticType.CONSTANT;
-HAPTIC_SINE          :: HapticType.SINE;
-HAPTIC_LEFTRIGHT     :: HapticType.LEFTRIGHT;
-HAPTIC_TRIANGLE      :: HapticType.TRIANGLE;
-HAPTIC_SAWTOOTHUP    :: HapticType.SAWTOOTHUP;
-HAPTIC_SAWTOOTHDOWN  :: HapticType.SAWTOOTHDOWN;
-HAPTIC_RAMP          :: HapticType.RAMP;
-HAPTIC_SPRING        :: HapticType.SPRING;
-HAPTIC_DAMPER        :: HapticType.DAMPER;
-HAPTIC_INERTIA       :: HapticType.INERTIA;
-HAPTIC_FRICTION      :: HapticType.FRICTION;
-HAPTIC_CUSTOM        :: HapticType.CUSTOM;
-HAPTIC_GAIN          :: HapticType.GAIN;
-HAPTIC_AUTOCENTER    :: HapticType.AUTOCENTER;
-HAPTIC_STATUS        :: HapticType.STATUS;
-HAPTIC_PAUSE         :: HapticType.PAUSE;
+HAPTIC_CONSTANT      :: HapticType.CONSTANT
+HAPTIC_SINE          :: HapticType.SINE
+HAPTIC_LEFTRIGHT     :: HapticType.LEFTRIGHT
+HAPTIC_TRIANGLE      :: HapticType.TRIANGLE
+HAPTIC_SAWTOOTHUP    :: HapticType.SAWTOOTHUP
+HAPTIC_SAWTOOTHDOWN  :: HapticType.SAWTOOTHDOWN
+HAPTIC_RAMP          :: HapticType.RAMP
+HAPTIC_SPRING        :: HapticType.SPRING
+HAPTIC_DAMPER        :: HapticType.DAMPER
+HAPTIC_INERTIA       :: HapticType.INERTIA
+HAPTIC_FRICTION      :: HapticType.FRICTION
+HAPTIC_CUSTOM        :: HapticType.CUSTOM
+HAPTIC_GAIN          :: HapticType.GAIN
+HAPTIC_AUTOCENTER    :: HapticType.AUTOCENTER
+HAPTIC_STATUS        :: HapticType.STATUS
+HAPTIC_PAUSE         :: HapticType.PAUSE
 
 HapticDirectionType :: enum u8 {
 	POLAR         = 0,
@@ -66,12 +66,12 @@ HapticDirectionType :: enum u8 {
 	STEERING_AXIS = 3,
 }
 
-HAPTIC_POLAR         :: HapticDirectionType.POLAR;
-HAPTIC_CARTESIAN     :: HapticDirectionType.CARTESIAN;
-HAPTIC_SPHERICAL     :: HapticDirectionType.SPHERICAL;
-HAPTIC_STEERING_AXIS :: HapticDirectionType.STEERING_AXIS;
+HAPTIC_POLAR         :: HapticDirectionType.POLAR
+HAPTIC_CARTESIAN     :: HapticDirectionType.CARTESIAN
+HAPTIC_SPHERICAL     :: HapticDirectionType.SPHERICAL
+HAPTIC_STEERING_AXIS :: HapticDirectionType.STEERING_AXIS
 
-HAPTIC_INFINITY :: 4294967295;
+HAPTIC_INFINITY :: 4294967295
 
 HapticDirection :: struct {
 	type: HapticDirectionType, /**< The type of encoding. */
