@@ -174,6 +174,7 @@ Error :: enum int {
 }
 
 Error_String :: #partial [Error]string{
+	.Okay                    = "Okay",
 	.Out_Of_Memory           = "Out of memory",
 	.Invalid_Pointer         = "Invalid pointer",
 	.Invalid_Argument        = "Invalid argument",

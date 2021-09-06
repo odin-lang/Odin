@@ -8,7 +8,7 @@ import "core:time"
 import "core:reflect"
 import "core:runtime"
 import "core:intrinsics"
-
+import "core:math/big"
 
 /*
 	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
@@ -2127,6 +2127,81 @@ or_return_operator :: proc() {
 	foo_2()
 }
 
+arbitrary_precision_maths :: proc() {
+	fmt.println("\n# core:math/big")
+
+	print_bigint :: proc(name: string, a: ^big.Int, base := i8(10), print_name := true, newline := true, print_extra_info := true) {
+		big.assert_if_nil(a)
+
+		as, err := big.itoa(a, base)
+		defer delete(as)
+
+		cb := big.internal_count_bits(a)
+		if print_name {
+			fmt.printf(name)
+		}
+		if err != nil {
+			fmt.printf(" (Error: %v) ", err)
+		}
+		fmt.printf(as)
+		if print_extra_info {
+		 	fmt.printf(" (base: %v, bits: %v, digits: %v)", base, cb, a.used)
+		}
+		if newline {
+			fmt.println()
+		}
+	}
+
+	a, b, c, d, e, f, res := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, c, d, e, f, res)
+
+	// How many bits should the random prime be?
+	bits   := 64
+	// Number of Rabin-Miller trials, -1 for automatic.
+	trials := -1
+
+	// Default prime generation flags
+	flags := big.Primality_Flags{}
+
+	err := big.internal_random_prime(a, bits, trials, flags)
+	if err != nil {
+		fmt.printf("Error %v while generating random prime.\n", err)
+	} else {
+		print_bigint("Random Prime A: ", a, 10)
+		fmt.printf("Random number iterations until prime found: %v\n", big.RANDOM_PRIME_ITERATIONS_USED)
+	}
+
+	// If we want to pack this Int into a buffer of u32, how many do we need?
+	count := big.internal_int_pack_count(a, u32)
+	buf := make([]u32, count)
+	defer delete(buf)
+
+	written: int
+	written, err = big.internal_int_pack(a, buf)
+	fmt.printf("\nPacked into u32 buf: %v | err: %v | written: %v\n", buf, err, written)
+
+	// If we want to pack this Int into a buffer of bytes of which only the bottom 6 bits are used, how many do we need?
+	nails := 2
+
+	count = big.internal_int_pack_count(a, u8, nails)
+	byte_buf := make([]u8, count)
+	defer delete(buf)
+
+	written, err = big.internal_int_pack(a, byte_buf, nails)
+	fmt.printf("\nPacked into buf of 6-bit bytes: %v | err: %v | written: %v\n", byte_buf, err, written)
+
+
+
+	// Pick another random big Int, not necesssarily prime.
+	err = big.random(b, 2048)
+	print_bigint("\n2048 bit random number: ", b)
+
+	// Calculate GCD + LCM in one fell swoop
+	big.gcd_lcm(c, d, a, b)
+
+	print_bigint("\nGCD of random prime A and random number B: ", c)
+	print_bigint("\nLCM of random prime A and random number B (in base 36): ", d, 36)
+}
 
 main :: proc() {
 	when true {
@@ -2162,5 +2237,6 @@ main :: proc() {
 		relative_data_types()
 		or_else_operator()
 		or_return_operator()
+		arbitrary_precision_maths()
 	}
 }
