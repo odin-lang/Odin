@@ -2,6 +2,9 @@
 //+ignore
 package intrinsics
 
+// Package-Related
+is_package_imported :: proc(package_name: string) -> bool ---
+
 // Types
 simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
 soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
@@ -16,7 +19,7 @@ trap       :: proc() -> ! ---
 
 // Instructions
 
-alloca             :: proc(size, align: int) -> ^u8 ---
+alloca             :: proc(size, align: int) -> [^]u8 ---
 cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
 
@@ -45,6 +48,9 @@ fixed_point_div_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is
 
 // Compiler Hints
 expect :: proc(val, expected_val: T) -> T ---
+
+// Linux and Darwin Only
+syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
 
 
 // Atomics

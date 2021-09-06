@@ -1,5 +1,3 @@
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -14,23 +12,22 @@ package math_big
 		- Use Barrett reduction for non-powers-of-two.
 		- Also look at extracting and splatting several digits at once.
 */
+package math_big
 
 import "core:intrinsics"
 import "core:mem"
+import "core:os"
 
 /*
-	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
+	This version of `itoa` allocates on behalf of the caller. The caller must free the string.
+	The radix defaults to 10.
 */
-int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
+int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	assert_if_nil(a)
 	context.allocator = allocator
 
 	a := a; radix := radix
 	clear_if_uninitialized(a) or_return
-	/*
-		Radix defaults to 10.
-	*/
-	radix = radix if radix > 0 else 10
 
 	/*
 		TODO: If we want to write a prefix for some of the radixes, we can oversize the buffer.
@@ -58,18 +55,15 @@ int_itoa_string :: proc(a: ^Int, radix := i8(-1), zero_terminate := false, alloc
 }
 
 /*
-	This version of `itoa` allocates one behalf of the caller. The caller must free the string.
+	This version of `itoa` allocates on behalf of the caller. The caller must free the string.
+	The radix defaults to 10.
 */
-int_itoa_cstring :: proc(a: ^Int, radix := i8(-1), allocator := context.allocator) -> (res: cstring, err: Error) {
+int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocator) -> (res: cstring, err: Error) {
 	assert_if_nil(a)
 	context.allocator = allocator
 
 	a := a; radix := radix
 	clear_if_uninitialized(a) or_return
-	/*
-		Radix defaults to 10.
-	*/
-	radix = radix if radix > 0 else 10
 
 	s: string
 	s, err = int_itoa_string(a, radix, true)
@@ -379,6 +373,177 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 }
 
 /*
+	We might add functions to read and write byte-encoded Ints from/to files, using `int_to_bytes_*` functions.
+
+	LibTomMath allows exporting/importing to/from a file in ASCII, but it doesn't support a much more compact representation in binary, even though it has several pack functions int_to_bytes_* (which I expanded upon and wrote Python interoperable versions of as well), and (un)pack, which is GMP compatible.
+	Someone could implement their own read/write binary int procedures, of course.
+
+	Could be worthwhile to add a canonical binary file representation with an optional small header that says it's an Odin big.Int, big.Rat or Big.Float, byte count for each component that follows, flag for big/little endian and a flag that says a checksum exists at the end of the file.
+	For big.Rat and big.Float the header couldn't be optional, because we'd have no way to distinguish where the components end.
+*/
+
+/*
+	Read an Int from an ASCII file.
+*/
+internal_int_read_from_ascii_file :: proc(a: ^Int, filename: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	/*
+		We can either read the entire file at once, or read a bunch at a time and keep multiplying by the radix.
+		For now, we'll read the entire file. Eventually we'll replace this with a copy that duplicates the logic
+		of `atoi` so we don't need to read the entire file.
+	*/
+
+	res, ok := os.read_entire_file(filename, allocator)
+	defer delete(res, allocator)
+
+	if !ok {
+		return .Cannot_Read_File
+	}
+
+	as := string(res)
+	return atoi(a, as, radix)
+}
+
+/*
+	Write an Int to an ASCII file.
+*/
+internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	/*
+		For now we'll convert the Int using itoa and writing the result in one go.
+		If we want to preserve memory we could duplicate the itoa logic and write backwards.
+	*/
+
+	as := itoa(a, radix) or_return
+	defer delete(as)
+
+	l := len(as)
+	assert(l > 0)
+
+	data := transmute([]u8)mem.Raw_Slice{
+		data = raw_data(as),
+		len  = l,
+	}
+
+	ok := os.write_entire_file(name=filename, data=data, truncate=true)
+	return nil if ok else .Cannot_Write_File
+}
+
+/*
+	Calculate the size needed for `internal_int_pack`.
+
+	See https://gmplib.org/manual/Integer-Import-and-Export.html
+*/
+internal_int_pack_count :: proc(a: ^Int, $T: typeid, nails := 0) -> (size_needed: int) {
+	assert(nails >= 0 && nails < (size_of(T) * 8))
+
+	bits := internal_count_bits(a)
+	size := size_of(T)
+
+	size_needed  =  bits / ((size * 8) - nails)
+	size_needed += 1 if (bits % ((size * 8) - nails)) != 0 else 0
+
+	return size_needed
+}
+
+/*
+	Based on gmp's mpz_export.
+	See https://gmplib.org/manual/Integer-Import-and-Export.html
+
+	`buf` is a pre-allocated slice of type `T` "words", which must be an unsigned integer of some description.
+		Use `internal_int_pack_count(a, T, nails)` to calculate the necessary size.
+		The library internally uses `DIGIT` as the type, which is u64 or u32 depending on the platform.
+		You are of course welcome to export to []u8, []u32be, and so forth.
+		After this you can use `mem.slice_data_cast` to interpret the buffer as bytes if you so choose.
+
+	`nails` are the number of top bits the output "word" reserves.
+		To mimic the internals of this library, this would be 4.
+
+	To use the minimum amount of output bytes, set `nails` to 0 and pass a `[]u8`.
+	IMPORTANT: `pack` serializes the magnitude of an Int, that is, the output is unsigned.
+
+	Assumes `a` not to be `nil` and to have been initialized.
+*/
+internal_int_pack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_First) -> (written: int, err: Error)
+                     where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) && size_of(T) <= 16 {
+
+	assert(nails >= 0 && nails < (size_of(T) * 8))
+
+	type_size  := size_of(T)
+	type_bits  := (type_size * 8) - nails
+
+	word_count := internal_int_pack_count(a, T, nails)
+	bit_count  := internal_count_bits(a)
+
+	if len(buf) < word_count {
+		return 0, .Buffer_Overflow
+	}
+
+	bit_offset  := 0
+	word_offset := 0
+
+	#no_bounds_check for i := 0; i < word_count; i += 1 {
+		bit_offset = i * type_bits
+		if order == .MSB_First {
+			word_offset = word_count - i - 1
+		} else {
+			word_offset = i
+		}
+
+		bits_to_get := min(type_bits, bit_count - bit_offset)
+		W := internal_int_bitfield_extract(a, bit_offset, bits_to_get) or_return
+		buf[word_offset] = T(W)
+	}
+
+	return word_count, nil
+}
+
+
+
+internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_First, allocator := context.allocator) -> (err: Error)
+                     where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) && size_of(T) <= 16 {
+	assert(nails >= 0 && nails < (size_of(T) * 8))
+	context.allocator = allocator
+
+	type_size  := size_of(T)
+	type_bits  := (type_size * 8) - nails
+	type_mask  := T(1 << uint(type_bits)) - 1
+
+	if len(buf) == 0 {
+		return .Invalid_Argument
+	}
+
+	bit_count   := type_bits * len(buf)
+	digit_count := (bit_count / _DIGIT_BITS) + min(1, bit_count % _DIGIT_BITS)
+
+	/*
+		Pre-size output Int.
+	*/
+	internal_grow(a, digit_count) or_return
+
+	t := &Int{}
+	defer internal_destroy(t)
+
+	if order == .LSB_First {
+		for W, i in buf {
+			internal_set(t, W & type_mask)                           or_return
+			internal_shl(t, t, type_bits * i)                        or_return
+			internal_add(a, a, t)                                    or_return
+		}
+	} else {
+		for W in buf {
+			internal_set(t, W & type_mask)                           or_return
+			internal_shl(a, a, type_bits)                            or_return
+			internal_add(a, a, t)                                    or_return
+		}		
+	}
+
+	return internal_clamp(a)
+}
+
+/*
 	Overestimate the size needed for the bigint to string conversion by a very small amount.
 	The error is about 10^-8; it will overestimate the result by at most 11 elements for
 	a number of the size 2^(2^31)-1 which is currently the largest possible in this library.
@@ -414,14 +579,14 @@ _log_bases :: [65]u32{
 */
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
 RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
-   0x3e, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x01, 0x02, 0x03, 0x04, /* +,-./01234 */
-   0x05, 0x06, 0x07, 0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, /* 56789:;<=> */
-   0xff, 0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, /* ?@ABCDEFGH */
-   0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, /* IJKLMNOPQR */
-   0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0xff, 0xff, /* STUVWXYZ[\ */
-   0xff, 0xff, 0xff, 0xff, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, /* ]^_`abcdef */
-   0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, /* ghijklmnop */
-   0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, /* qrstuvwxyz */
+	0x3e, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x01, 0x02, 0x03, 0x04, /* +,-./01234 */
+	0x05, 0x06, 0x07, 0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, /* 56789:;<=> */
+	0xff, 0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, /* ?@ABCDEFGH */
+	0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, /* IJKLMNOPQR */
+	0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0xff, 0xff, /* STUVWXYZ[\ */
+	0xff, 0xff, 0xff, 0xff, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, /* ]^_`abcdef */
+	0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, /* ghijklmnop */
+	0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, /* qrstuvwxyz */
 }
 RADIX_TABLE_REVERSE_SIZE :: 80
 
