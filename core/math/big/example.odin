@@ -1,6 +1,4 @@
 //+ignore
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -9,6 +7,8 @@ package math_big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
+package math_big
+
 
 import "core:fmt"
 import "core:mem"
@@ -18,11 +18,15 @@ print_configation :: proc() {
 `
 Configuration:
 	_DIGIT_BITS                           %v
+	_SMALL_MEMORY                         %v
 	_MIN_DIGIT_COUNT                      %v
 	_MAX_DIGIT_COUNT                      %v
 	_DEFAULT_DIGIT_COUNT                  %v
 	_MAX_COMBA                            %v
 	_WARRAY                               %v
+	_TAB_SIZE                             %v
+	_MAX_WIN_SIZE                         %v
+	MATH_BIG_USE_LUCAS_SELFRIDGE_TEST     %v
 Runtime tunable:
 	MUL_KARATSUBA_CUTOFF                  %v
 	SQR_KARATSUBA_CUTOFF                  %v
@@ -32,13 +36,20 @@ Runtime tunable:
 	FACTORIAL_MAX_N                       %v
 	FACTORIAL_BINARY_SPLIT_CUTOFF         %v
 	FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS %v
+	USE_MILLER_RABIN_ONLY                 %v
+	MAX_ITERATIONS_RANDOM_PRIME           %v
 
 `, _DIGIT_BITS,
+_LOW_MEMORY,
 _MIN_DIGIT_COUNT,
 _MAX_DIGIT_COUNT,
 _DEFAULT_DIGIT_COUNT,
 _MAX_COMBA,
 _WARRAY,
+_TAB_SIZE,
+_MAX_WIN_SIZE,
+MATH_BIG_USE_LUCAS_SELFRIDGE_TEST,
+
 MUL_KARATSUBA_CUTOFF,
 SQR_KARATSUBA_CUTOFF,
 MUL_TOOM_CUTOFF,
@@ -47,6 +58,8 @@ MAX_ITERATIONS_ROOT_N,
 FACTORIAL_MAX_N,
 FACTORIAL_BINARY_SPLIT_CUTOFF,
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,
+USE_MILLER_RABIN_ONLY,
+MAX_ITERATIONS_RANDOM_PRIME,
 )
 
 }
@@ -73,138 +86,45 @@ print :: proc(name: string, a: ^Int, base := i8(10), print_name := true, newline
 	}
 }
 
-int_to_byte :: proc(v: ^Int) {
-	err: Error
-	size: int
-	print("v: ", v)
-	fmt.println()
-
-	t := &Int{}
-	defer destroy(t)
-
-	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b1 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_big(v, b1)
-	int_from_bytes_big(t, b1)
-	fmt.printf("big: %v | err: %v\n", b1, err)
-
-	int_from_bytes_big(t, b1)
-	if internal_cmp_mag(t, v) != 0 {
-		print("\tError parsing t: ", t)
-	}
-
-	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b2 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_big_python(v, b2)
-	fmt.printf("big python: %v | err: %v\n", b2, err)
-
-	if err == nil {
-		int_from_bytes_big_python(t, b2)
-		if internal_cmp_mag(t, v) != 0 {
-			print("\tError parsing t: ", t)
-		}
-	}
-
-	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b3 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_big(v, b3, true)
-	fmt.printf("big signed: %v | err: %v\n", b3, err)
-
-	int_from_bytes_big(t, b3, true)
-	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t)
-	}
-
-	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b4 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_big_python(v, b4, true)
-	fmt.printf("big signed python: %v | err: %v\n", b4, err)
-
-	int_from_bytes_big_python(t, b4, true)
-	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t)
-	}
-}
-
-int_to_byte_little :: proc(v: ^Int) {
-	err: Error
-	size: int
-	print("v: ", v)
-	fmt.println()
-
-	t := &Int{}
-	defer destroy(t)
-
-	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b1 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_little(v, b1)
-	fmt.printf("little: %v | err: %v\n", b1, err)
-
-	int_from_bytes_little(t, b1)
-	if internal_cmp_mag(t, v) != 0 {
-		print("\tError parsing t: ", t)
-	}
-
-	if size, err = int_to_bytes_size(v); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b2 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_little_python(v, b2)
-	fmt.printf("little python: %v | err: %v\n", b2, err)
-
-	if err == nil {
-		int_from_bytes_little_python(t, b2)
-		if internal_cmp_mag(t, v) != 0 {
-			print("\tError parsing t: ", t)
-		}
-	}
-
-	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b3 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_little(v, b3, true)
-	fmt.printf("little signed: %v | err: %v\n", b3, err)
-
-	int_from_bytes_little(t, b3, true)
-	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t)
-	}
-
-	if size, err = int_to_bytes_size(v, true); err != nil {
-		fmt.printf("int_to_bytes_size returned: %v\n", err)
-		return
-	}
-	b4 := make([]u8, size, context.temp_allocator)
-	err = int_to_bytes_little_python(v, b4, true)
-	fmt.printf("little signed python: %v | err: %v\n", b4, err)
-
-	int_from_bytes_little_python(t, b4, true)
-	if internal_cmp(t, v) != 0 {
-		print("\tError parsing t: ", t)
-	}
-}
+// printf :: fmt.printf;
 
 demo :: proc() {
-	a, b, c, d, e, f := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
-	defer destroy(a, b, c, d, e, f)
+	a, b, c, d, e, f, res := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
+	defer destroy(a, b, c, d, e, f, res)
+
+	bits   := 111
+	trials := -1
+
+	flags := Primality_Flags{}
+	fmt.printf("Trying to generate a %v bit prime using %v Miller-Rabin trials and options %v.\n", bits, trials, flags)
+
+	err: Error
+	{
+		SCOPED_TIMING(.random_prime)
+		err = internal_random_prime(a, bits, trials, flags)
+	}
+
+	print("a(10): ", a, 10, true, true, true)
+	fmt.printf("err: %v\n", err)
+	fmt.printf("RANDOM_PRIME_ITERATIONS_USED: %v\n", RANDOM_PRIME_ITERATIONS_USED)
+
+	nails := 0
+
+	count := internal_int_pack_count(a, u8, nails)
+	buf := make([]u8, count)
+	defer delete(buf)
+
+	written: int
+	order := Order.LSB_First
+
+	fmt.printf("\na.digit: %v\n", a.digit[:a.used])
+	written, err = internal_int_pack(a, buf, nails, order)
+	fmt.printf("\nPacked into buf: %v | err: %v | written: %v\n", buf, err, written)
+
+	err = internal_int_unpack(b, buf, nails, order)
+	print("\nUnpacked into b: ", b)
+	fmt.printf("err: %v\n", err)
+	fmt.printf("b.digit: %v\n", b.digit[:b.used])
 }
 
 main :: proc() {

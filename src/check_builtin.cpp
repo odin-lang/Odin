@@ -1871,6 +1871,29 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->type = alloc_type_simd_vector(count, elem);
 		break;
 	}
+	
+	case BuiltinProc_is_package_imported: {
+		bool value = false;
+
+		if (!is_type_string(operand->type) && (operand->mode != Addressing_Constant)) {
+			error(ce->args[0], "Expected a constant string for '%.*s'", LIT(builtin_name));
+		} else if (operand->value.kind == ExactValue_String) {
+			String pkg_name = operand->value.value_string;
+			// TODO(bill): probably should have this be a `StringMap` eventually
+			for_array(i, c->info->packages.entries) {
+				AstPackage *pkg = c->info->packages.entries[i].value;
+				if (pkg->name == pkg_name) {
+					value = true;
+					break;
+				}
+			}
+		}
+		
+		operand->mode = Addressing_Constant;
+		operand->type = t_untyped_bool;
+		operand->value = exact_value_bool(value);
+		break;
+	}
 
 	case BuiltinProc_soa_struct: {
 		Operand x = {};
@@ -2032,7 +2055,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(al.expr, "Alignment parameter to '%.*s' must be constant", LIT(builtin_name));
 			}
 
-			operand->type = t_u8_ptr;
+			operand->type = alloc_type_multi_pointer(t_u8);
 			operand->mode = Addressing_Value;
 			break;
 		}

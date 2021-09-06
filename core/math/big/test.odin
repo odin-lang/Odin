@@ -1,6 +1,4 @@
 //+ignore
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -11,6 +9,7 @@ package math_big
 
 	This file exports procedures for use with the test.py test suite.
 */
+package math_big
 
 /*
 	TODO: Write tests for `internal_*` and test reusing parameters with the public implementations.

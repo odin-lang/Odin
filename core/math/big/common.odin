@@ -1,5 +1,3 @@
-package math_big
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -8,6 +6,7 @@ package math_big
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
+package math_big
 
 import "core:intrinsics"
 
@@ -57,10 +56,10 @@ when #config(MATH_BIG_EXE, true) {
 	debugged where necessary.
 */
 
-_DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MUL_KARATSUBA_CUTOFF,  80)
-_DEFAULT_SQR_KARATSUBA_CUTOFF :: #config(SQR_KARATSUBA_CUTOFF, 120)
-_DEFAULT_MUL_TOOM_CUTOFF      :: #config(MUL_TOOM_CUTOFF,      350)
-_DEFAULT_SQR_TOOM_CUTOFF      :: #config(SQR_TOOM_CUTOFF,      400)
+_DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MATH_BIG_MUL_KARATSUBA_CUTOFF,  80)
+_DEFAULT_SQR_KARATSUBA_CUTOFF :: #config(MATH_BIG_SQR_KARATSUBA_CUTOFF, 120)
+_DEFAULT_MUL_TOOM_CUTOFF      :: #config(MATH_BIG_MUL_TOOM_CUTOFF,      350)
+_DEFAULT_SQR_TOOM_CUTOFF      :: #config(MATH_BIG_SQR_TOOM_CUTOFF,      400)
 
 
 MAX_ITERATIONS_ROOT_N := 500
@@ -76,6 +75,29 @@ FACTORIAL_MAX_N       := 1_000_000
 FACTORIAL_BINARY_SPLIT_CUTOFF         := 6100
 FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100
 
+/*
+	`internal_int_is_prime` switchables.
+
+	Use Frobenius-Underwood for primality testing, or use Lucas-Selfridge (default).
+*/
+MATH_BIG_USE_LUCAS_SELFRIDGE_TEST :: #config(MATH_BIG_USE_LUCAS_SELFRIDGE_TEST, false)
+MATH_BIG_USE_FROBENIUS_TEST       :: !MATH_BIG_USE_LUCAS_SELFRIDGE_TEST
+
+/*
+	Runtime tunable to use Miller-Rabin primality testing only and skip the above.
+*/
+USE_MILLER_RABIN_ONLY       := false
+
+/*
+	How many times we'll call `internal_int_random` during random prime generation before we bail out.
+	Set to 0 or less to try indefinitely.	
+*/
+MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000
+
+/*
+	How many iterations we used for the last random prime.
+*/
+@thread_local RANDOM_PRIME_ITERATIONS_USED: int
 
 /*
 	We don't allow these to be switched at runtime for two reasons:
@@ -85,15 +107,22 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100
 
 	2) Optimizations thanks to precomputed masks wouldn't work.
 */
-MATH_BIG_FORCE_64_BIT :: #config(MATH_BIG_FORCE_64_BIT, false)
-MATH_BIG_FORCE_32_BIT :: #config(MATH_BIG_FORCE_32_BIT, false)
+MATH_BIG_FORCE_64_BIT   :: #config(MATH_BIG_FORCE_64_BIT, false)
+MATH_BIG_FORCE_32_BIT   :: #config(MATH_BIG_FORCE_32_BIT, false)
 when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously.") }
 
-_LOW_MEMORY           :: #config(BIGINT_SMALL_MEMORY, false)
+/*
+	Trade a smaller memory footprint for more processing overhead?
+*/
+_LOW_MEMORY             :: #config(MATH_BIG_SMALL_MEMORY, false)
 when _LOW_MEMORY {
-	_DEFAULT_DIGIT_COUNT :: 8
+	_DEFAULT_DIGIT_COUNT ::   8
+	_TAB_SIZE            ::  32
+	_MAX_WIN_SIZE        ::   5
 } else {
-	_DEFAULT_DIGIT_COUNT :: 32
+	_DEFAULT_DIGIT_COUNT ::  32
+	_TAB_SIZE            :: 256
+	_MAX_WIN_SIZE        ::   0
 }
 
 /*
@@ -137,6 +166,10 @@ Error :: enum int {
 	Division_by_Zero        = 8,
 	Math_Domain_Error       = 9,
 
+	Cannot_Open_File        = 50,
+	Cannot_Read_File        = 51,
+	Cannot_Write_File       = 52,
+
 	Unimplemented           = 127,
 }
 
@@ -153,13 +186,17 @@ Error_String :: #partial [Error]string{
 	.Division_by_Zero        = "Division by zero",
 	.Math_Domain_Error       = "Math domain error",
 
+	.Cannot_Open_File        = "Cannot_Open_File",
+	.Cannot_Read_File        = "Cannot_Read_File",
+	.Cannot_Write_File       = "Cannot_Write_File",
+
 	.Unimplemented           = "Unimplemented",
 }
 
 Primality_Flag :: enum u8 {
-	Blum_Blum_Shub = 0,	/* BBS style prime */
-	Safe           = 1,	/* Safe prime (p-1)/2 == prime */
-	Second_MSB_On  = 3,  /* force 2nd MSB to 1 */
+ 	Blum_Blum_Shub = 0,  // Make prime congruent to 3 mod 4
+	Safe           = 1,  // Make sure (p-1)/2 is prime as well (implies .Blum_Blum_Shub)
+	Second_MSB_On  = 3,  // Make the 2nd highest bit one
 }
 Primality_Flags :: bit_set[Primality_Flag; u8]
 
@@ -198,7 +235,8 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT)
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD)
 
-_DIGIT_BITS      :: _DIGIT_TYPE_BITS - 4
+_DIGIT_NAILS     :: 4
+_DIGIT_BITS      :: _DIGIT_TYPE_BITS - _DIGIT_NAILS
 _WORD_BITS       :: 2 * _DIGIT_BITS
 
 _MASK            :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1)
