@@ -2185,7 +2185,7 @@ arbitrary_precision_maths :: proc() {
 
 	count = big.internal_int_pack_count(a, u8, nails)
 	byte_buf := make([]u8, count)
-	defer delete(buf)
+	defer delete(byte_buf)
 
 	written, err = big.internal_int_pack(a, byte_buf, nails)
 	fmt.printf("\nPacked into buf of 6-bit bytes: %v | err: %v | written: %v\n", byte_buf, err, written)
