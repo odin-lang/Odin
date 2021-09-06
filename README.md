@@ -1,7 +1,7 @@
 <p align="center">
-    <img src="misc/logo-slim.png" alt="Odin logo" height="120">
+    <img src="misc/logo-slim.png" alt="Odin logo" style="width:65%">
     <br/>
-    A fast, concise, readable, pragmatic and open sourced programming language.
+   The Data-Oriented Language for Sane Software Development.
     <br/>
     <br/>
     <a href="https://github.com/odin-lang/odin/releases/latest">
