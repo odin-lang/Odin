@@ -351,20 +351,19 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Free:
-		if (!old_memory) {
+		if (old_memory != nullptr) {
 			free(old_memory);
 		}
 		break;
 
 	case gbAllocation_Resize:
-		if (!old_memory) {
-			break;
-		}
 		if (size == 0) {
-			free(old_memory);
+			if (old_memory != nullptr) {
+				free(old_memory);
+			}
 			break;
 		}
-		if (!old_memory) {
+		if (old_memory == nullptr) {
 			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
 			gb_zero_size(ptr, size);
 			break;
@@ -386,20 +385,17 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		break;
 
 	case gbAllocation_Free:
-		if (!old_memory) {
+		if (old_memory != nullptr) {
 			free(old_memory);
 		}
 		break;
 
 	case gbAllocation_Resize:
-		if (!old_memory) {
-			break;
-		}
 		if (size == 0) {
 			free(old_memory);
 			break;
 		}
-		if (!old_memory) {
+		if (old_memory == nullptr) {
 			posix_memalign(&ptr, alignment, size);
 			gb_zero_size(ptr, size);
 			break;
