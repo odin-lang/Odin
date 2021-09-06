@@ -49,6 +49,9 @@ fixed_point_div_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is
 // Compiler Hints
 expect :: proc(val, expected_val: T) -> T ---
 
+// Linux and Darwin Only
+syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
+
 
 // Atomics
 atomic_fence        :: proc() ---
