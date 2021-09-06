@@ -6,6 +6,7 @@ package all
 import bufio          "core:bufio"
 import bytes          "core:bytes"
 import c              "core:c"
+import libc           "core:c/libc"
 import c_tokenizer    "core:c/frontend/tokenizer"
 import c_preprocessor "core:c/frontend/preprocessor"
 import compress       "core:compress"
