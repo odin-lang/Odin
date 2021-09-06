@@ -103,9 +103,9 @@ the_basics :: proc() {
 
 		// Note: `:=` is two tokens, `:` and `=`. The following are equivalent,
 		/*
-			i: int = 123;
-			i:     = 123;
-			i := 123;
+			i: int = 123
+			i:     = 123
+			i := 123
 		*/
 
 		// Constant declarations
@@ -137,7 +137,7 @@ control_flow :: proc() {
 		// NOTE: Unlike other languages like C, there are no parentheses `( )` surrounding the three components.
 		// Braces `{ }` or a `do` are always required
 		for i := 0; i < 10; i += 1 { }
-		// for i := 0; i < 10; i += 1 do fmt.print();
+		// for i := 0; i < 10; i += 1 do fmt.print()
 
 		// The initial and post statements are optional
 		i := 0
@@ -478,8 +478,8 @@ explicit_procedure_overloading :: proc() {
 	add(1, 2, 3)  // three parameters
 
 	// Ambiguous answers
-	// add(1.0, 2);
-	// add(1, 2.0);
+	// add(1.0, 2)
+	// add(1, 2.0)
 }
 
 struct_type :: proc() {
@@ -701,9 +701,9 @@ union_type :: proc() {
 
 			}
 			new_entity :: proc(T: type) -> ^Entity {
-				t := new(T);
-				t.derived = t;
-				return t;
+				t := new(T)
+				t.derived = t
+				return t
 			}
 		*/
 	}
@@ -1040,7 +1040,7 @@ parametric_polymorphism :: proc() {
 		fmt.println(r)
 		r = 123
 		fmt.println(r)
-		r = Error.Foo0 // r = .Foo0; is allow too, see implicit selector expressions below
+		r = Error.Foo0 // r = .Foo0 is allow too, see implicit selector expressions below
 		fmt.println(r)
 	}
 
@@ -1466,7 +1466,7 @@ quaternions :: proc() {
 		q128: quaternion128 // 4xf32
 		q256: quaternion256 // 4xf64
 		q128 = quaternion(1, 0, 0, 0)
-		q256 = 1 // quaternion(1, 0, 0, 0);
+		q256 = 1 // quaternion(1, 0, 0, 0)
 	}
 	{ // Built-in procedures
 		q := 1 + 2i + 3j + 4k
@@ -1560,9 +1560,9 @@ where_clauses :: proc() {
 		fmt.println(cross_3d(x, y))
 
 		// Failure case
-		// i := [2]bool{true, false};
-		// j := [2]bool{false, true};
-		// fmt.println(cross_2d(i, j));
+		// i := [2]bool{true, false}
+		// j := [2]bool{false, true}
+		// fmt.println(cross_2d(i, j))
 
 	}
 
@@ -1704,7 +1704,7 @@ deprecated_attribute :: proc() {
 	}
 
 	// NOTE: Uncomment to see the warning messages
-	// foo_v1(1);
+	// foo_v1(1)
 }
 
 range_statements_with_multiple_return_values :: proc() {
@@ -1826,7 +1826,7 @@ soa_struct_layout :: proc() {
 	}
 	{
 		// SOA Slices
-		// Vector3 :: struct {x, y, z: f32};
+		// Vector3 :: struct {x, y, z: f32}
 		Vector3 :: struct {x: i8, y: i16, z: f32}
 
 		N :: 3
