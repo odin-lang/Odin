@@ -41,7 +41,7 @@ main :: proc() {
 		case '-': accumulator -= 1
 		case '*': accumulator *= 2
 		case '/': accumulator /= 2
-		case '😃': accumulator *= accumulator;
+		case '😃': accumulator *= accumulator
 		case: // Ignore everything else
 		}
 	}
