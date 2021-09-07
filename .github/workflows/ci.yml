@@ -76,3 +76,10 @@ jobs:
           cd tests\core
           call build.bat
         timeout-minutes: 10
+      - name: core:math/big tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core\math\big
+          call build.bat
+        timeout-minutes: 10
