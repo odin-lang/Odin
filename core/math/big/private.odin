@@ -1642,8 +1642,8 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 		/*
 			Store quotient in `t2` such that `t2 * a` is the LCM.
 		*/
-		internal_div(res_lcm, a, temp_gcd_res) or_return
-		err = internal_mul(res_lcm, res_lcm, b)
+		internal_div(res_lcm, b, temp_gcd_res) or_return
+		err = internal_mul(res_lcm, res_lcm, a)
 	}
 
 	if res_gcd != nil {
