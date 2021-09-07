@@ -19,6 +19,11 @@ jobs:
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
         timeout-minutes: 10
+      - name: core:image and core:compress tests
+        run: |
+          cd tests/core
+          make
+        timeout-minutes: 10
   build_macOS:
     runs-on: macos-latest
     steps:

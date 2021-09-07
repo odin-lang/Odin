@@ -7,7 +7,7 @@ package test_core_compress
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for ZLIB, GZIP and PNG.
+	A test suite for ZLIB, GZIP.
 */
 
 import "core:testing"
