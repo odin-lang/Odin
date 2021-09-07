@@ -75,6 +75,6 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd core\image\tests
-          python3 download_assets.py
+          cd tests\core
+          call build.bat
         timeout-minutes: 10
