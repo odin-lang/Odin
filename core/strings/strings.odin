@@ -479,7 +479,7 @@ last_index :: proc(s, substr: string) -> int {
 	return -1
 }
 
-
+// index_any returns the index of the first char of `chars` found in `s`. -1 if not found.
 index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1
@@ -504,8 +504,8 @@ index_any :: proc(s, chars: string) -> int {
 		}
 	}
 
-	for c, i in chars {
-		if index_rune(chars, c) >= 0 {
+	for c in chars {
+		if i := index_rune(s, c); i >= 0 {
 			return i
 		}
 	}
