@@ -69,7 +69,12 @@ jobs:
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd core\math\big\tests
-          python3 --version
           call build.bat
         timeout-minutes: 10
-
+      - name: core:image tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd core\image\tests
+          python3 download_assets.py
+        timeout-minutes: 10
