@@ -38,7 +38,7 @@ PNG_IMAGES         = [
 	"xd3n2c08.png", "xd9n2c08.png", "xdtn0g01.png", "xhdn0g08.png", "xlfn0g04.png", "xs1n0g01.png",
 	"xs2n0g01.png", "xs4n0g01.png", "xs7n0g01.png", "z00n2c08.png", "z03n2c08.png", "z06n2c08.png",
 	"z09n2c08.png",
-	"PngSuite.png", "logo-slim.png",
+	"PngSuite.png", "logo-slim.png", "emblem-1024.png"
 ]
 
 def try_download_file(url, out_file):
@@ -65,7 +65,6 @@ def try_download_and_unpack_zip(suite):
 		with zipfile.ZipFile(out_file) as z:
 			for file in z.filelist:
 				filename = file.filename
-				assert(filename in PNG_IMAGES)
 				extract_path = DOWNLOAD_BASE_PATH.format(suite)
 
 				print("\t\tExtracting: {}".format(filename))
