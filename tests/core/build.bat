@@ -1,4 +1,6 @@
 @echo off
+set COMMON=-show-timings -no-bounds-check -vet -strict-style
+set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
-odin test image    -vet -strict-style
-odin test compress -vet -strict-style
+%PATH_TO_ODIN% test image    %COMMON%
+%PATH_TO_ODIN% test compress %COMMON%
