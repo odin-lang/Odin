@@ -19,7 +19,7 @@ jobs:
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
         timeout-minutes: 10
-      - name: core:image and core:compress tests
+      - name: Core library tests
         run: |
           cd tests/core
           make
@@ -69,7 +69,7 @@ jobs:
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin run examples/demo/demo.odin
         timeout-minutes: 10
-      - name: Tests for core:{image,compress,math}
+      - name: Core library tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
