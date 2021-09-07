@@ -235,6 +235,26 @@ def arg_to_odin(a):
 		s = '-' + hex(a)[3:]
 	return s.encode('utf-8')
 
+
+def integer_sqrt(src):
+		# The Python version on Github's CI doesn't offer math.isqrt.
+		# We implement our own
+		count = src.bit_length()
+		a, b = count >> 1, count & 1
+
+		x = 1 << (a + b)
+
+		while True:
+			# y = (x + n // x) // 2
+			t1 = src // x
+			t2 = t1  + x
+			y = t2 >> 1
+
+			if y >= x:
+				return x
+
+			x, y = y, x
+
 def test_add(a = 0, b = 0, expected_error = Error.Okay):
 	args = [arg_to_odin(a), arg_to_odin(b)]
 	res  = add(*args)
@@ -338,7 +358,7 @@ def test_sqrt(number = 0, expected_error = Error.Okay):
 		if number < 0:
 			expected_result = 0
 		else:
-			expected_result = int(math.isqrt(number))
+			expected_result = integer_sqrt(number)
 	return test("test_sqrt", res, [number], expected_error, expected_result)
 
 def root_n(number, root):
@@ -450,7 +470,7 @@ def test_is_square(a = 0, b = 0, expected_error = Error.Okay):
 	res   = is_square(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
-		expected_result = str(math.isqrt(a) ** 2 == a) if a > 0 else "False"
+		expected_result = str(integer_sqrt(a) ** 2 == a) if a > 0 else "False"
 		
 	return test("test_is_square", res, [a], expected_error, expected_result)
 
