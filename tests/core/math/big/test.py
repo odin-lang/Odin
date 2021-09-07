@@ -101,11 +101,11 @@ if args.no_random:
 # Where is the DLL? If missing, build using: `odin build . -build-mode:shared`
 #
 if platform.system() == "Windows":
-	LIB_PATH = os.getcwd() + os.sep + "test_library.dll"
+	LIB_PATH = os.getcwd() + os.sep + "math_big_test_library.dll"
 elif platform.system() == "Linux":
-	LIB_PATH = os.getcwd() + os.sep + "test_library.so"
+	LIB_PATH = os.getcwd() + os.sep + "math_big_test_library.so"
 elif platform.system() == "Darwin":
-	LIB_PATH = os.getcwd() + os.sep + "test_library.dylib"
+	LIB_PATH = os.getcwd() + os.sep + "math_big_test_library.dylib"
 else:
 	print("Platform is unsupported.")
 	exit(1)
