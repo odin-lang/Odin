@@ -1,7 +1,7 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
 
-all: download_test_assets image_test compress_test
+all: download_test_assets image_test compress_test strings_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -13,3 +13,7 @@ image_test:
 compress_test:
 	$(ODIN) test compress/test_core_compress.odin
 	rm test_core_compress
+
+strings_test:
+	$(ODIN) test strings/test_core_strings.odin
+	rm test_core_strings
