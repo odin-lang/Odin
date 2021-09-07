@@ -7,7 +7,7 @@ package test_core_image
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for ZLIB, GZIP and PNG.
+	A test suite for PNG.
 */
 
 import "core:testing"
