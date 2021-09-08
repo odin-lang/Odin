@@ -371,7 +371,7 @@ ConfigFlag :: enum c.int {
 	WINDOW_TRANSPARENT =  4,   // Set to allow transparent framebuffer
 	WINDOW_HIGHDPI     = 13,   // Set to support HighDPI
 	MSAA_4X_HINT       =  5,   // Set to try enabling MSAA 4X
-	INTERLACED_HINT    =  1,   // Set to try enabling interlaced video format (for V3D)
+	INTERLACED_HINT    = 16,   // Set to try enabling interlaced video format (for V3D)
 }
 ConfigFlags :: distinct bit_set[ConfigFlag; c.int]
 
