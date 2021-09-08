@@ -3273,6 +3273,12 @@ ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "fast")        return ProcCC_FastCall;
 	if (s == "none")        return ProcCC_None;
 	if (s == "naked")       return ProcCC_Naked;
+	if (s == "system") {
+		if (build_context.metrics.os == TargetOs_windows) {
+			return ProcCC_StdCall;
+		}
+		return ProcCC_CDecl;
+	}
 	return ProcCC_Invalid;
 }
 
