@@ -2996,12 +2996,15 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				offset.value = LLVMBuildGEP(p->builder, offset.value, indices, 1, "");
 				lb_addr_store(p, res, offset);
 			} else {
+				low = lb_emit_conv(p, low, t_int);
+				high = lb_emit_conv(p, high, t_int);
+				
 				lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 
 				LLVMValueRef indices[1] = {low.value};
 				LLVMValueRef ptr = LLVMBuildGEP(p->builder, base.value, indices, 1, "");
 				LLVMValueRef len = LLVMBuildSub(p->builder, high.value, low.value, "");
-				// TODO(bill): bounds_check for negative length
+				
 				LLVMValueRef gep0 = lb_emit_struct_ep(p, res.addr, 0).value;
 				LLVMValueRef gep1 = lb_emit_struct_ep(p, res.addr, 1).value;
 				LLVMBuildStore(p->builder, ptr, gep0);
