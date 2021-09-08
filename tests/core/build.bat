@@ -5,14 +5,14 @@ python3 download_assets.py
 echo ---
 echo Running core:image tests
 echo ---
-%PATH_TO_ODIN% test image    %COMMON%
+%PATH_TO_ODIN% run image    %COMMON%
 
 echo ---
 echo Running core:compress tests
 echo ---
-%PATH_TO_ODIN% test compress %COMMON%
+%PATH_TO_ODIN% run compress %COMMON%
 
 echo ---
 echo Running core:strings tests
 echo ---
-%PATH_TO_ODIN% test strings %COMMON%
+%PATH_TO_ODIN% run strings %COMMON%
