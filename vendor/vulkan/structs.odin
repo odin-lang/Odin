@@ -32,7 +32,7 @@ when ODIN_OS == "windows" {
 	}
 }
 
-CAMetalLayer :: struct {};
+CAMetalLayer :: struct {}
 
 /********************************/
 
