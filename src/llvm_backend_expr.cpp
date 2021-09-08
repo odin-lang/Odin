@@ -51,14 +51,61 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	incoming_blocks[done->preds.count] = p->curr_block->block;
 
 	lb_emit_jump(p, done);
-	lb_start_block(p, done);
+	lb_start_block(p, done);	
+	
+	LLVMTypeRef dst_type = lb_type(m, type);
+	LLVMValueRef phi = nullptr;
+	
+	GB_ASSERT(incoming_values.count == incoming_blocks.count);
+	GB_ASSERT(incoming_values.count > 0);
 
+	LLVMTypeRef phi_type = nullptr;
+	for_array(i, incoming_values) {
+		LLVMValueRef incoming_value = incoming_values[i];
+		if (!LLVMIsConstant(incoming_value)) {
+			phi_type = LLVMTypeOf(incoming_value);
+			break;
+		}
+	}
+	
+	if (phi_type == nullptr) {
+		phi = LLVMBuildPhi(p->builder, dst_type, "");
+		LLVMAddIncoming(phi, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
+		goto phi_end;
+	}
+	
+	for_array(i, incoming_values) {
+		LLVMValueRef incoming_value = incoming_values[i];
+		LLVMTypeRef incoming_type = LLVMTypeOf(incoming_value);
+		
+		if (phi_type != incoming_type) {
+			GB_ASSERT_MSG(LLVMIsConstant(incoming_value), "%s vs %s", LLVMPrintTypeToString(phi_type), LLVMPrintTypeToString(incoming_type));
+			bool ok = !!LLVMConstIntGetZExtValue(incoming_value);
+			incoming_values[i] = LLVMConstInt(phi_type, ok, false);
+		}
+		
+	}
+	
+	phi = LLVMBuildPhi(p->builder, phi_type, "");
+	LLVMAddIncoming(phi, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
+	
+	LLVMTypeRef i1 = LLVMInt1TypeInContext(m->ctx);
+	if ((phi_type == i1) ^ (dst_type == i1)) {
+		if (phi_type == i1) {
+			phi = LLVMBuildZExt(p->builder, phi, dst_type, "");
+		} else {
+			phi = LLVMBuildTruncOrBitCast(p->builder, phi, dst_type, "");
+		}
+	} else if (lb_sizeof(phi_type) < lb_sizeof(dst_type)) {
+		phi = LLVMBuildZExt(p->builder, phi, dst_type, "");
+	} else {
+		phi = LLVMBuildTruncOrBitCast(p->builder, phi, dst_type, "");	
+	}		
+	
+phi_end:;
 	lbValue res = {};
 	res.type = type;
-	res.value = LLVMBuildPhi(p->builder, lb_type(m, type), "");
-	GB_ASSERT(incoming_values.count == incoming_blocks.count);
-	LLVMAddIncoming(res.value, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
-
+	res.value = phi;
 	return res;
 }
 
