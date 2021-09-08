@@ -78,11 +78,11 @@ compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_
 	return 0
 }
 
-check_zero :: proc "contextless" (data: []byte) -> bool {
+check_zero :: proc(data: []byte) -> bool {
 	return check_zero_ptr(raw_data(data), len(data))
 }
 
-check_zero_ptr :: proc "contextless" (ptr: rawptr, len: int) -> bool {
+check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
 	switch {
 	case len <= 0:
 		return true
@@ -196,11 +196,11 @@ is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
 	return (x & (x-1)) == 0
 }
 
-align_forward :: proc "contextless" (ptr: rawptr, align: uintptr) -> rawptr {
+align_forward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
 	return rawptr(align_forward_uintptr(uintptr(ptr), align))
 }
 
-align_forward_uintptr :: proc "contextless" (ptr, align: uintptr) -> uintptr {
+align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align))
 
 	p := ptr
@@ -211,30 +211,29 @@ align_forward_uintptr :: proc "contextless" (ptr, align: uintptr) -> uintptr {
 	return p
 }
 
-align_forward_int :: proc "contextless" (ptr, align: int) -> int {
+align_forward_int :: proc(ptr, align: int) -> int {
 	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)))
 }
-align_forward_uint :: proc "contextless" (ptr, align: uint) -> uint {
+align_forward_uint :: proc(ptr, align: uint) -> uint {
 	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)))
 }
 
-align_backward :: proc "contextless" (ptr: rawptr, align: uintptr) -> rawptr {
+align_backward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
 	return rawptr(align_backward_uintptr(uintptr(ptr), align))
 }
 
-align_backward_uintptr :: proc "contextless" (ptr, align: uintptr) -> uintptr {
-	assert(is_power_of_two(align))
+align_backward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	return align_forward_uintptr(ptr - align + 1, align)
 }
 
-align_backward_int :: proc "contextless" (ptr, align: int) -> int {
+align_backward_int :: proc(ptr, align: int) -> int {
 	return int(align_backward_uintptr(uintptr(ptr), uintptr(align)))
 }
-align_backward_uint :: proc "contextless" (ptr, align: uint) -> uint {
+align_backward_uint :: proc(ptr, align: uint) -> uint {
 	return uint(align_backward_uintptr(uintptr(ptr), uintptr(align)))
 }
 
-context_from_allocator :: proc "contextless" (a: Allocator) -> type_of(context) {
+context_from_allocator :: proc(a: Allocator) -> type_of(context) {
 	context.allocator = a
 	return context
 }
@@ -292,7 +291,7 @@ calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, he
 
 
 
-clone_slice :: proc "contextless" (slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (new_slice: T) {
+clone_slice :: proc(slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (new_slice: T) {
 	new_slice, _ = make(T, len(slice), allocator, loc)
 	runtime.copy(new_slice, slice)
 	return new_slice
