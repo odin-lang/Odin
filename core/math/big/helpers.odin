@@ -788,7 +788,7 @@ destroy_constants :: proc() {
 }
 
 
-assert_if_nil :: proc{assert_if_nil_int, assert_if_nil_rat}
+assert_if_nil :: proc{assert_if_nil_int}
 
 assert_if_nil_int :: #force_inline proc(integers: ..^Int, loc := #caller_location) {
 	for i in integers {
@@ -796,8 +796,3 @@ assert_if_nil_int :: #force_inline proc(integers: ..^Int, loc := #caller_locatio
 	}
 }
 
-assert_if_nil_rat :: #force_inline proc(rationals: ..^Rat, loc := #caller_location) {
-	for r in rationals {
-		assert(r != nil, "(nil)", loc)
-	}
-}
