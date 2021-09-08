@@ -168,7 +168,10 @@ buffer_from_slice :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
 		data      = raw_data(backing),
 		len       = 0,
 		cap       = len(backing),
-		allocator = nil_allocator(),
+		allocator = Allocator{
+			procedure = nil_allocator_proc,
+			data = nil,
+		},
 	}
 }
 

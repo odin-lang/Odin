@@ -4,8 +4,8 @@ import "core:sys/unix"
 import "core:intrinsics"
 
 current_thread_id :: proc "contextless" () -> int {
-	SYS_GETTID :: 186;
-	return int(intrinsics.syscall(SYS_GETTID));
+	SYS_GETTID :: 186
+	return int(intrinsics.syscall(SYS_GETTID))
 }
 
 
@@ -18,21 +18,21 @@ Semaphore :: struct #align 16 {
 }
 
 semaphore_init :: proc(s: ^Semaphore, initial_count := 0) {
-	assert(unix.sem_init(&s.handle, 0, u32(initial_count)) == 0);
+	assert(unix.sem_init(&s.handle, 0, u32(initial_count)) == 0)
 }
 
 semaphore_destroy :: proc(s: ^Semaphore) {
-	assert(unix.sem_destroy(&s.handle) == 0);
-	s.handle = {};
+	assert(unix.sem_destroy(&s.handle) == 0)
+	s.handle = {}
 }
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
     // NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
     for in 0..<count {
-	    assert(unix.sem_post(&s.handle) == 0);
+	    assert(unix.sem_post(&s.handle) == 0)
     }
 }
 
 semaphore_wait_for :: proc(s: ^Semaphore) {
-	assert(unix.sem_wait(&s.handle) == 0);
+	assert(unix.sem_wait(&s.handle) == 0)
 }
