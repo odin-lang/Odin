@@ -3,27 +3,27 @@ package mem
 import "core:runtime"
 import "core:intrinsics"
 
-set :: proc(data: rawptr, value: byte, len: int) -> rawptr {
+set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len)
 }
-zero :: proc(data: rawptr, len: int) -> rawptr {
+zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len)
 }
-zero_item :: proc(item: $P/^$T) {
+zero_item :: proc "contextless" (item: $P/^$T) {
 	set(item, 0, size_of(T))
 }
-zero_slice :: proc(data: $T/[]$E) {
+zero_slice :: proc "contextless" (data: $T/[]$E) {
 	zero(raw_data(data), size_of(E)*len(data))
 }
 
 
-copy :: proc(dst, src: rawptr, len: int) -> rawptr {
+copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	return runtime.mem_copy(dst, src, len)
 }
-copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
+copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	return runtime.mem_copy_non_overlapping(dst, src, len)
 }
-compare :: proc(a, b: []byte) -> int {
+compare :: proc "contextless" (a, b: []byte) -> int {
 	res := compare_byte_ptrs(raw_data(a), raw_data(b), min(len(a), len(b)))
 	if res == 0 && len(a) != len(b) {
 		return len(a) <= len(b) ? -1 : +1
@@ -33,7 +33,7 @@ compare :: proc(a, b: []byte) -> int {
 	return res
 }
 
-compare_byte_ptrs :: proc(a, b: ^byte, n: int) -> int #no_bounds_check {
+compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
 	switch {
 	case a == b:
 		return 0
@@ -78,11 +78,11 @@ compare_byte_ptrs :: proc(a, b: ^byte, n: int) -> int #no_bounds_check {
 	return 0
 }
 
-check_zero :: proc(data: []byte) -> bool {
+check_zero :: proc "contextless" (data: []byte) -> bool {
 	return check_zero_ptr(raw_data(data), len(data))
 }
 
-check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
+check_zero_ptr :: proc "contextless" (ptr: rawptr, len: int) -> bool {
 	switch {
 	case len <= 0:
 		return true
@@ -116,25 +116,25 @@ check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
 	return true
 }
 
-simple_equal :: proc(a, b: $T) -> bool where intrinsics.type_is_simple_compare(T) {
+simple_equal :: proc "contextless" (a, b: $T) -> bool where intrinsics.type_is_simple_compare(T) {
 	a, b := a, b
 	return compare_byte_ptrs((^byte)(&a), (^byte)(&b), size_of(T)) == 0
 }
 
-compare_ptrs :: proc(a, b: rawptr, n: int) -> int {
+compare_ptrs :: proc "contextless" (a, b: rawptr, n: int) -> int {
 	return compare_byte_ptrs((^byte)(a), (^byte)(b), n)
 }
 
-ptr_offset :: proc(ptr: $P/^$T, n: int) -> P {
+ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
 	new := int(uintptr(ptr)) + size_of(T)*n
 	return P(uintptr(new))
 }
 
-ptr_sub :: proc(a, b: $P/^$T) -> int {
+ptr_sub :: proc "contextless" (a, b: $P/^$T) -> int {
 	return (int(uintptr(a)) - int(uintptr(b)))/size_of(T)
 }
 
-slice_ptr :: proc(ptr: ^$T, len: int) -> []T {
+slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	return ([^]T)(ptr)[:len]
 }
 
@@ -142,13 +142,13 @@ byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byt
 	return ([^]u8)(data)[:max(len, 0)]
 }
 
-slice_to_bytes :: proc(slice: $E/[]$T) -> []byte {
+slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
 	s := transmute(Raw_Slice)slice
 	s.len *= size_of(T)
 	return transmute([]byte)s
 }
 
-slice_data_cast :: proc($T: typeid/[]$A, slice: $S/[]$B) -> T {
+slice_data_cast :: proc "contextless" ($T: typeid/[]$A, slice: $S/[]$B) -> T {
 	when size_of(A) == 0 || size_of(B) == 0 {
 		return nil
 	} else {
@@ -158,12 +158,12 @@ slice_data_cast :: proc($T: typeid/[]$A, slice: $S/[]$B) -> T {
 	}
 }
 
-slice_to_components :: proc(slice: $E/[]$T) -> (data: ^T, len: int) {
+slice_to_components :: proc "contextless" (slice: $E/[]$T) -> (data: ^T, len: int) {
 	s := transmute(Raw_Slice)slice
 	return s.data, s.len
 }
 
-buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
+buffer_from_slice :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
 	return transmute([dynamic]E)Raw_Dynamic_Array{
 		data      = raw_data(backing),
 		len       = 0,
@@ -172,35 +172,35 @@ buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
 	}
 }
 
-ptr_to_bytes :: proc(ptr: ^$T, len := 1) -> []byte {
+ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
 	assert(len >= 0)
 	return transmute([]byte)Raw_Slice{ptr, len*size_of(T)}
 }
 
-any_to_bytes :: proc(val: any) -> []byte {
+any_to_bytes :: proc "contextless" (val: any) -> []byte {
 	ti := type_info_of(val.id)
 	size := ti != nil ? ti.size : 0
 	return transmute([]byte)Raw_Slice{val.data, size}
 }
 
 
-kilobytes :: proc(x: int) -> int { return          (x) * 1024 }
-megabytes :: proc(x: int) -> int { return kilobytes(x) * 1024 }
-gigabytes :: proc(x: int) -> int { return megabytes(x) * 1024 }
-terabytes :: proc(x: int) -> int { return gigabytes(x) * 1024 }
+kilobytes :: proc "contextless" (x: int) -> int { return          (x) * 1024 }
+megabytes :: proc "contextless" (x: int) -> int { return kilobytes(x) * 1024 }
+gigabytes :: proc "contextless" (x: int) -> int { return megabytes(x) * 1024 }
+terabytes :: proc "contextless" (x: int) -> int { return gigabytes(x) * 1024 }
 
-is_power_of_two :: proc(x: uintptr) -> bool {
+is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
 	if x <= 0 {
 		return false
 	}
 	return (x & (x-1)) == 0
 }
 
-align_forward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
+align_forward :: proc "contextless" (ptr: rawptr, align: uintptr) -> rawptr {
 	return rawptr(align_forward_uintptr(uintptr(ptr), align))
 }
 
-align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
+align_forward_uintptr :: proc "contextless" (ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align))
 
 	p := ptr
@@ -211,35 +211,35 @@ align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	return p
 }
 
-align_forward_int :: proc(ptr, align: int) -> int {
+align_forward_int :: proc "contextless" (ptr, align: int) -> int {
 	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)))
 }
-align_forward_uint :: proc(ptr, align: uint) -> uint {
+align_forward_uint :: proc "contextless" (ptr, align: uint) -> uint {
 	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)))
 }
 
-align_backward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
+align_backward :: proc "contextless" (ptr: rawptr, align: uintptr) -> rawptr {
 	return rawptr(align_backward_uintptr(uintptr(ptr), align))
 }
 
-align_backward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
+align_backward_uintptr :: proc "contextless" (ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align))
 	return align_forward_uintptr(ptr - align + 1, align)
 }
 
-align_backward_int :: proc(ptr, align: int) -> int {
+align_backward_int :: proc "contextless" (ptr, align: int) -> int {
 	return int(align_backward_uintptr(uintptr(ptr), uintptr(align)))
 }
-align_backward_uint :: proc(ptr, align: uint) -> uint {
+align_backward_uint :: proc "contextless" (ptr, align: uint) -> uint {
 	return uint(align_backward_uintptr(uintptr(ptr), uintptr(align)))
 }
 
-context_from_allocator :: proc(a: Allocator) -> type_of(context) {
+context_from_allocator :: proc "contextless" (a: Allocator) -> type_of(context) {
 	context.allocator = a
 	return context
 }
 
-reinterpret_copy :: proc($T: typeid, ptr: rawptr) -> (value: T) {
+reinterpret_copy :: proc "contextless" ($T: typeid, ptr: rawptr) -> (value: T) {
 	copy(&value, ptr, size_of(T))
 	return
 }
@@ -247,24 +247,27 @@ reinterpret_copy :: proc($T: typeid, ptr: rawptr) -> (value: T) {
 
 Fixed_Byte_Buffer :: distinct [dynamic]byte
 
-make_fixed_byte_buffer :: proc(backing: []byte) -> Fixed_Byte_Buffer {
+make_fixed_byte_buffer :: proc "contextless" (backing: []byte) -> Fixed_Byte_Buffer {
 	s := transmute(Raw_Slice)backing
 	d: Raw_Dynamic_Array
 	d.data = s.data
 	d.len = 0
 	d.cap = s.len
-	d.allocator = nil_allocator()
+	d.allocator = Allocator{
+		procedure = nil_allocator_proc,
+		data = nil,
+	}
 	return transmute(Fixed_Byte_Buffer)d
 }
 
 
 
-align_formula :: proc(size, align: int) -> int {
+align_formula :: proc "contextless" (size, align: int) -> int {
 	result := size + align-1
 	return result - result%align
 }
 
-calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int) -> int {
+calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, header_size: int) -> int {
 	p, a := ptr, align
 	modulo := p & (a-1)
 
@@ -289,7 +292,7 @@ calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int)
 
 
 
-clone_slice :: proc(slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (new_slice: T) {
+clone_slice :: proc "contextless" (slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (new_slice: T) {
 	new_slice, _ = make(T, len(slice), allocator, loc)
 	runtime.copy(new_slice, slice)
 	return new_slice
