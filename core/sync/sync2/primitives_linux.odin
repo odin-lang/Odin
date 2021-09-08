@@ -10,6 +10,6 @@ _current_thread_id :: proc "contextless" () -> int {
 		syscall :: proc(number: i32, #c_vararg args: ..any) -> i32 ---
 	}
 
-	SYS_GETTID :: 186;
-	return int(syscall(SYS_GETTID));
+	SYS_GETTID :: 186
+	return int(syscall(SYS_GETTID))
 }

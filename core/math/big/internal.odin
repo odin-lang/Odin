@@ -1042,7 +1042,7 @@ internal_is_initialized :: proc { internal_int_is_initialized, }
 internal_int_is_zero :: #force_inline proc(a: ^Int) -> (zero: bool) {
 	return a.used == 0
 }
-internal_is_zero :: proc { internal_int_is_zero, }
+internal_is_zero :: proc { internal_int_is_zero, internal_rat_is_zero }
 
 /*
 	This procedure will return `true` if the `Int` is positive, `false` if not.

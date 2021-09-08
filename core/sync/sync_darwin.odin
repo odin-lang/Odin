@@ -7,13 +7,13 @@ import "core:c"
 foreign import pthread "System.framework"
 
 current_thread_id :: proc "contextless" () -> int {
-	tid: u64;
+	tid: u64
 	// NOTE(Oskar): available from OSX 10.6 and iOS 3.2.
 	// For older versions there is `syscall(SYS_thread_selfid)`, but not really
 	// the same thing apparently.
-	foreign pthread { pthread_threadid_np :: proc "c" (rawptr, ^u64) -> c.int ---; }
-	pthread_threadid_np(nil, &tid);
-	return int(tid);
+	foreign pthread { pthread_threadid_np :: proc "c" (rawptr, ^u64) -> c.int --- }
+	pthread_threadid_np(nil, &tid)
+	return int(tid)
 }
 
 
@@ -28,27 +28,27 @@ Semaphore :: struct #align 16 {
 // See core/sys/unix/pthread_linux.odin/pthread_t.
 
 semaphore_init :: proc(s: ^Semaphore, initial_count := 0) {
-	ct := darwin.mach_task_self();
-	res := darwin.semaphore_create(ct, &s.handle, 0, c.int(initial_count));
-	assert(res == 0);
+	ct := darwin.mach_task_self()
+	res := darwin.semaphore_create(ct, &s.handle, 0, c.int(initial_count))
+	assert(res == 0)
 }
 
 semaphore_destroy :: proc(s: ^Semaphore) {
-	ct := darwin.mach_task_self();
-	res := darwin.semaphore_destroy(ct, s.handle);
-	assert(res == 0);
-	s.handle = {};
+	ct := darwin.mach_task_self()
+	res := darwin.semaphore_destroy(ct, s.handle)
+	assert(res == 0)
+	s.handle = {}
 }
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
 	// NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
 	for in 0..<count {
-		res := darwin.semaphore_signal(s.handle);
-		assert(res == 0);
+		res := darwin.semaphore_signal(s.handle)
+		assert(res == 0)
 	}
 }
 
 semaphore_wait_for :: proc(s: ^Semaphore) {
-	res := darwin.semaphore_wait(s.handle);
-	assert(res == 0);
+	res := darwin.semaphore_wait(s.handle)
+	assert(res == 0)
 }
