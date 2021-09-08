@@ -71,7 +71,10 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	if (phi_type == nullptr) {
 		phi = LLVMBuildPhi(p->builder, dst_type, "");
 		LLVMAddIncoming(phi, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
-		goto phi_end;
+		lbValue res = {};
+		res.type = type;
+		res.value = phi;
+		return res;
 	}
 	
 	for_array(i, incoming_values) {
@@ -102,7 +105,6 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 		phi = LLVMBuildTruncOrBitCast(p->builder, phi, dst_type, "");	
 	}		
 	
-phi_end:;
 	lbValue res = {};
 	res.type = type;
 	res.value = phi;
