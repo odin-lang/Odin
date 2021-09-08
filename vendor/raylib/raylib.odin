@@ -9,6 +9,8 @@ when #config(RAYLIB_USE_LINALG, false) {
 #assert(size_of(rune) == size_of(c.int))
 
 when ODIN_OS == "windows" do foreign import lib "raylib.lib"
+when ODIN_OS == "linux"   do foreign import lib "linux/libraylib.a"
+when ODIN_OS == "darwin"  do foreign import lib "macos/libraylib.a"
 
 VERSION :: "3.7"
 
