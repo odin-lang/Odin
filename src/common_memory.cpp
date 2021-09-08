@@ -379,7 +379,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
 		gb_memmove(ptr, old_memory, old_size);
 		free(old_memory);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0););
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
 		break;
 #else
 	// TODO(bill): *nix version that's decent
