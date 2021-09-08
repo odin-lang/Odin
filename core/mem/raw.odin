@@ -55,7 +55,7 @@ raw_dynamic_array_data :: proc "contextless" (a: $T/[dynamic]$E) -> ^E {
 	return cast(^E)(transmute(Raw_Dynamic_Array)a).data
 }
 
-raw_data :: proc "contextless" {raw_array_data, raw_string_data, raw_slice_data, raw_dynamic_array_data}
+raw_data :: proc{raw_array_data, raw_string_data, raw_slice_data, raw_dynamic_array_data}
 
 
 Poly_Raw_Map_Entry :: struct($Key, $Value: typeid) {
