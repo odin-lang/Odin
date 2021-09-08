@@ -2,6 +2,10 @@ package raylib
 
 import c "core:c/libc"
 
+when #config(RAYLIB_USE_LINALG, false) {
+	import "core:math/linalg"	
+}
+
 #assert(size_of(rune) == size_of(c.int))
 
 when ODIN_OS == "windows" do foreign import lib "raylib.lib"
@@ -41,22 +45,37 @@ MAGENTA    :: Color{ 255, 0, 255, 255 }     // Magenta
 RAYWHITE   :: Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
 
 
-// Vector2 type
-Vector2 :: distinct [2]f32
-// Vector3 type
-Vector3 :: distinct [3]f32
-// Vector4 type
-Vector4 :: distinct [4]f32
+when #config(RAYLIB_USE_LINALG, false) {
+	// Vector2 type
+	Vector2 :: linalg.Vector2f32
+	// Vector3 type
+	Vector3 :: linalg.Vector3f32
+	// Vector4 type
+	Vector4 :: linalg.Vector4f32
 
-// Quaternion type
-Quaternion :: distinct quaternion128
+	// Quaternion type
+	Quaternion :: linalg.Quaternionf32
 
-// Matrix type (OpenGL style 4x4 - right handed, column major)
-Matrix :: struct {
-	m0, m4, m8, m12:  f32,
-	m1, m5, m9, m13:  f32,
-	m2, m6, m10, m14: f32,
-	m3, m7, m11, m15: f32,
+	// Matrix type (OpenGL style 4x4 - right handed, column major)
+	Matrix :: linalg.Matrix4x4f32
+} else {
+	// Vector2 type
+	Vector2 :: distinct [2]f32
+	// Vector3 type
+	Vector3 :: distinct [3]f32
+	// Vector4 type
+	Vector4 :: distinct [4]f32
+
+	// Quaternion type
+	Quaternion :: distinct quaternion128
+
+	// Matrix type (OpenGL style 4x4 - right handed, column major)
+	Matrix :: struct {
+		m0, m4, m8, m12:  f32,
+		m1, m5, m9, m13:  f32,
+		m2, m6, m10, m14: f32,
+		m3, m7, m11, m15: f32,
+	}
 }
 
 // Color type, RGBA (32bit)
@@ -270,12 +289,10 @@ Wave :: struct {
 	data:        rawptr,          // Buffer data pointer
 }
 
-rAudioBuffer :: struct {}
-
 // Audio stream type
 // NOTE: Useful to create custom audio streams not bound to a specific file
 AudioStream :: struct {
-	buffer: ^rAudioBuffer,        // Pointer to internal data used by the audio system
+	buffer: rawptr,               // Pointer to internal data used by the audio system
 
 	sampleRate: c.uint,           // Frequency (samples per second)
 	sampleSize: c.uint,           // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
@@ -285,15 +302,15 @@ AudioStream :: struct {
 // Sound source type
 Sound :: struct {
 	using stream: AudioStream,    // Audio stream
-	sampleCount: c.uint,          // Total number of samples
+	sampleCount:  c.uint,         // Total number of samples
 }
 
 // Music stream type (audio file streaming from memory)
 // NOTE: Anything longer than ~10 seconds should be streamed
 Music :: struct {
 	using stream: AudioStream,    // Audio stream
-	sampleCount: c.uint,          // Total number of samples
-	looping: bool,                // Music looping enable
+	sampleCount:  c.uint,         // Total number of samples
+	looping:      bool,           // Music looping enable
 
 	ctxType: c.int,               // Type of music context (audio filetype)
 	ctxData: rawptr,              // Audio context data, depends on type
