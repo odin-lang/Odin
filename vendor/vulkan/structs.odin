@@ -32,7 +32,7 @@ when ODIN_OS == "windows" {
 	}
 }
 
-CAMetalLayer :: struct {}
+CAMetalLayer :: struct {};
 
 /********************************/
 
@@ -2651,6 +2651,47 @@ PipelineExecutableInternalRepresentationKHR :: struct {
 	pData:       rawptr,
 }
 
+PhysicalDeviceShaderIntegerDotProductFeaturesKHR :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	shaderIntegerDotProduct: b32,
+}
+
+PhysicalDeviceShaderIntegerDotProductPropertiesKHR :: struct {
+	sType:                                                                         StructureType,
+	pNext:                                                                         rawptr,
+	integerDotProduct8BitUnsignedAccelerated:                                      b32,
+	integerDotProduct8BitSignedAccelerated:                                        b32,
+	integerDotProduct8BitMixedSignednessAccelerated:                               b32,
+	integerDotProduct4x8BitPackedUnsignedAccelerated:                              b32,
+	integerDotProduct4x8BitPackedSignedAccelerated:                                b32,
+	integerDotProduct4x8BitPackedMixedSignednessAccelerated:                       b32,
+	integerDotProduct16BitUnsignedAccelerated:                                     b32,
+	integerDotProduct16BitSignedAccelerated:                                       b32,
+	integerDotProduct16BitMixedSignednessAccelerated:                              b32,
+	integerDotProduct32BitUnsignedAccelerated:                                     b32,
+	integerDotProduct32BitSignedAccelerated:                                       b32,
+	integerDotProduct32BitMixedSignednessAccelerated:                              b32,
+	integerDotProduct64BitUnsignedAccelerated:                                     b32,
+	integerDotProduct64BitSignedAccelerated:                                       b32,
+	integerDotProduct64BitMixedSignednessAccelerated:                              b32,
+	integerDotProductAccumulatingSaturating8BitUnsignedAccelerated:                b32,
+	integerDotProductAccumulatingSaturating8BitSignedAccelerated:                  b32,
+	integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated:         b32,
+	integerDotProductAccumulatingSaturating4x8BitPackedUnsignedAccelerated:        b32,
+	integerDotProductAccumulatingSaturating4x8BitPackedSignedAccelerated:          b32,
+	integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated: b32,
+	integerDotProductAccumulatingSaturating16BitUnsignedAccelerated:               b32,
+	integerDotProductAccumulatingSaturating16BitSignedAccelerated:                 b32,
+	integerDotProductAccumulatingSaturating16BitMixedSignednessAccelerated:        b32,
+	integerDotProductAccumulatingSaturating32BitUnsignedAccelerated:               b32,
+	integerDotProductAccumulatingSaturating32BitSignedAccelerated:                 b32,
+	integerDotProductAccumulatingSaturating32BitMixedSignednessAccelerated:        b32,
+	integerDotProductAccumulatingSaturating64BitUnsignedAccelerated:               b32,
+	integerDotProductAccumulatingSaturating64BitSignedAccelerated:                 b32,
+	integerDotProductAccumulatingSaturating64BitMixedSignednessAccelerated:        b32,
+}
+
 PipelineLibraryCreateInfoKHR :: struct {
 	sType:        StructureType,
 	pNext:        rawptr,
@@ -4733,6 +4774,13 @@ PhysicalDeviceDrmPropertiesEXT :: struct {
 	renderMinor:  i64,
 }
 
+PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	primitiveTopologyListRestart:      b32,
+	primitiveTopologyPatchListRestart: b32,
+}
+
 SubpassShadingPipelineCreateInfoHUAWEI :: struct {
 	sType:      StructureType,
 	pNext:      rawptr,
@@ -4826,6 +4874,12 @@ MultiDrawIndexedInfoEXT :: struct {
 	firstIndex:   u32,
 	indexCount:   u32,
 	vertexOffset: i32,
+}
+
+PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	pageableDeviceLocalMemory: b32,
 }
 
 DeviceOrHostAddressKHR :: struct #raw_union {

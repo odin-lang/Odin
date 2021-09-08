@@ -163,12 +163,12 @@ def parse_handles_def(f):
 
     max_len = max(len(h) for h in handles)
     for h in handles:
-        f.write("{} :: distinct Handle;\n".format(h.ljust(max_len)))
+        f.write("{} :: distinct Handle\n".format(h.ljust(max_len)))
 
     handles_non_dispatchable = [h for h in re.findall(r"VK_DEFINE_NON_DISPATCHABLE_HANDLE\(Vk(\w+)\)", src, re.S)]
     max_len = max(len(h) for h in handles_non_dispatchable)
     for h in handles_non_dispatchable:
-        f.write("{} :: distinct NonDispatchableHandle;\n".format(h.ljust(max_len)))
+        f.write("{} :: distinct NonDispatchableHandle\n".format(h.ljust(max_len)))
 
 
 flags_defs = set()
@@ -222,7 +222,7 @@ def fix_enum_value(value, prefix, suffix, is_flag_bit):
     return token
 
 def parse_constants(f):
-    f.write("// General Constants\n");
+    f.write("// General Constants\n")
     all_data = re.findall(r"#define VK_(\w+)\s*(.*?)U?\n", src, re.S)
     allowed_names = (
         "HEADER_VERSION",
@@ -232,13 +232,13 @@ def parse_constants(f):
     allowed_data = [nv for nv in all_data if nv[0] in allowed_names]
     max_len = max(len(name) for name, value in allowed_data)
     for name, value in allowed_data:
-        f.write("{}{} :: {};\n".format(name, "".rjust(max_len-len(name)), value))
+        f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
 
-    f.write("\n// Vendor Constants\n");
+    f.write("\n// Vendor Constants\n")
     data = re.findall(r"#define VK_((?:"+'|'.join(ext_suffixes)+r")\w+)\s*(.*?)\n", src, re.S)
     max_len = max(len(name) for name, value in data)
     for name, value in data:
-        f.write("{}{} :: {};\n".format(name, "".rjust(max_len-len(name)), value))
+        f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
     f.write("\n")
 
 
@@ -258,7 +258,7 @@ def parse_enums(f):
             flags_name = enum_name.replace("FlagBits", "Flags")
             enum_name = enum_name.replace("FlagBits", "Flag")
             generated_flags.add(flags_name)
-            f.write("{} :: distinct bit_set[{}; Flags];\n".format(flags_name, enum_name))
+            f.write("{} :: distinct bit_set[{}; Flags]\n".format(flags_name, enum_name))
 
 
         if is_flag_bit:
@@ -344,9 +344,9 @@ def parse_enums(f):
                         used_flags.append('.'+flags[i])
                     else:
                         used_flags.append('{}({})'.format(enum_name, i))
-            s = "{enum_name}s_{n} :: {enum_name}s{{".format(enum_name=enum_name, n=n);
+            s = "{enum_name}s_{n} :: {enum_name}s{{".format(enum_name=enum_name, n=n)
             s += ', '.join(used_flags)
-            s += "};\n"
+            s += "}\n"
             f.write(s)
 
         if len(groups) > 0:
@@ -358,8 +358,8 @@ def parse_enums(f):
     max_len = max(len(flag) for flag in unused_flags)
     for flag in unused_flags:
         flag_name = flag.replace("Flags", "Flag")
-        f.write("{} :: distinct bit_set[{}; Flags];\n".format(flag.ljust(max_len), flag_name))
-        f.write("{} :: enum u32 {{}};\n".format(flag_name.ljust(max_len)))
+        f.write("{} :: distinct bit_set[{}; Flags]\n".format(flag.ljust(max_len), flag_name))
+        f.write("{} :: enum u32 {{}}\n".format(flag_name.ljust(max_len)))
 
 
 
@@ -410,7 +410,7 @@ def parse_structs(f):
     max_len = max([len(n) for n, _ in aliases] + [0])
     for n, t in aliases:
         k = max_len
-        f.write("{} :: {};\n".format(n.ljust(k), t))
+        f.write("{} :: {}\n".format(n.ljust(k), t))
 
 
 
@@ -437,13 +437,8 @@ def parse_procedures(f):
     max_len = max(len(n) for n, t in ff)
 
     f.write("// Procedure Types\n\n");
-    f.write("when ODIN_OS == \"windows\" {\n");
     for n, t in ff:
-        f.write("\t{} :: #type {};\n".format(n.ljust(max_len), t.replace('"c"', '"stdcall"')))
-    f.write("} else {\n");
-    for n, t in ff:
-        f.write("\t{} :: #type {};\n".format(n.ljust(max_len), t))
-    f.write("}\n\n");
+        f.write("{} :: #type {}\n".format(n.ljust(max_len), t.replace('"c"', '"system"')))
 
 def group_functions(f):
     data = re.findall(r"typedef (\w+\*?) \(\w+ \*(\w+)\)\((.+?)\);", src, re.S)
@@ -471,7 +466,7 @@ def group_functions(f):
         max_len = max(len(name) for name, _ in group_lines)
         for name, vk_name in group_lines:
             type_str = procedure_map[vk_name]
-            f.write('{}: {};\n'.format(remove_prefix(name, "Proc"), name.rjust(max_len)))
+            f.write('{}: {}\n'.format(remove_prefix(name, "Proc"), name.rjust(max_len)))
         f.write("\n")
 
     f.write("load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {\n")
@@ -480,7 +475,7 @@ def group_functions(f):
         max_len = max(len(name) for name, _ in group_lines)
         for name, vk_name in group_lines:
             k = max_len - len(name)
-            f.write('\tset_proc_address(&{}, {}"vk{}");\n'.format(
+            f.write('\tset_proc_address(&{}, {}"vk{}")\n'.format(
                 remove_prefix(name, 'Proc'),
                 "".ljust(k),
                 remove_prefix(vk_name, 'Proc'),
@@ -503,54 +498,54 @@ import "core:c"
 with open("../core.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write("""
-API_VERSION_1_0 :: (1<<22) | (0<<12) | (0);
+API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
-    return (major<<22) | (minor<<12) | (patch);
+    return (major<<22) | (minor<<12) | (patch)
 }
 
 // Base types
-Flags         :: distinct u32;
-Flags64       :: distinct u64;
-DeviceSize    :: distinct u64;
-DeviceAddress :: distinct u64;
-SampleMask    :: distinct u32;
+Flags         :: distinct u32
+Flags64       :: distinct u64
+DeviceSize    :: distinct u64
+DeviceAddress :: distinct u64
+SampleMask    :: distinct u32
 
-Handle                :: distinct rawptr;
-NonDispatchableHandle :: distinct u64;
+Handle                :: distinct rawptr
+NonDispatchableHandle :: distinct u64
 
-SetProcAddressType :: #type proc(p: rawptr, name: cstring);
+SetProcAddressType :: #type proc(p: rawptr, name: cstring)
 
 
-cstring_array :: ^cstring; // Helper Type
+cstring_array :: ^cstring // Helper Type
 
-RemoteAddressNV :: distinct rawptr; // Declared inline before MemoryGetRemoteAddressInfoNV
+RemoteAddressNV :: distinct rawptr // Declared inline before MemoryGetRemoteAddressInfoNV
 
 // Base constants
-LOD_CLAMP_NONE                :: 1000.0;
-REMAINING_MIP_LEVELS          :: ~u32(0);
-REMAINING_ARRAY_LAYERS        :: ~u32(0);
-WHOLE_SIZE                    :: ~u64(0);
-ATTACHMENT_UNUSED             :: ~u32(0);
-TRUE                          :: 1;
-FALSE                         :: 0;
-QUEUE_FAMILY_IGNORED          :: ~u32(0);
-SUBPASS_EXTERNAL              :: ~u32(0);
-MAX_PHYSICAL_DEVICE_NAME_SIZE :: 256;
-UUID_SIZE                     :: 16;
-MAX_MEMORY_TYPES              :: 32;
-MAX_MEMORY_HEAPS              :: 16;
-MAX_EXTENSION_NAME_SIZE       :: 256;
-MAX_DESCRIPTION_SIZE          :: 256;
-MAX_DEVICE_GROUP_SIZE_KHX     :: 32;
-MAX_DEVICE_GROUP_SIZE         :: 32;
-LUID_SIZE_KHX                 :: 8;
-LUID_SIZE_KHR                 :: 8;
-LUID_SIZE                     :: 8;
-MAX_DRIVER_NAME_SIZE_KHR      :: 256;
-MAX_DRIVER_INFO_SIZE_KHR      :: 256;
-MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(0)-1;
-MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16;
+LOD_CLAMP_NONE                :: 1000.0
+REMAINING_MIP_LEVELS          :: ~u32(0)
+REMAINING_ARRAY_LAYERS        :: ~u32(0)
+WHOLE_SIZE                    :: ~u64(0)
+ATTACHMENT_UNUSED             :: ~u32(0)
+TRUE                          :: 1
+FALSE                         :: 0
+QUEUE_FAMILY_IGNORED          :: ~u32(0)
+SUBPASS_EXTERNAL              :: ~u32(0)
+MAX_PHYSICAL_DEVICE_NAME_SIZE :: 256
+UUID_SIZE                     :: 16
+MAX_MEMORY_TYPES              :: 32
+MAX_MEMORY_HEAPS              :: 16
+MAX_EXTENSION_NAME_SIZE       :: 256
+MAX_DESCRIPTION_SIZE          :: 256
+MAX_DEVICE_GROUP_SIZE_KHX     :: 32
+MAX_DEVICE_GROUP_SIZE         :: 32
+LUID_SIZE_KHX                 :: 8
+LUID_SIZE_KHR                 :: 8
+LUID_SIZE                     :: 8
+MAX_DRIVER_NAME_SIZE_KHR      :: 256
+MAX_DRIVER_INFO_SIZE_KHR      :: 256
+MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(0)-1
+MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
 
 """[1::])
     parse_constants(f)
@@ -568,24 +563,24 @@ MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16;
 when ODIN_OS == "windows" {
 \timport win32 "core:sys/windows"
 
-\tHINSTANCE           :: win32.HINSTANCE;
-\tHWND                :: win32.HWND;
-\tHMONITOR            :: win32.HMONITOR;
-\tHANDLE              :: win32.HANDLE;
-\tLPCWSTR             :: win32.LPCWSTR;
-\tSECURITY_ATTRIBUTES :: win32.SECURITY_ATTRIBUTES;
-\tDWORD               :: win32.DWORD;
-\tLONG                :: win32.LONG;
-\tLUID                :: win32.LUID;
+\tHINSTANCE           :: win32.HINSTANCE
+\tHWND                :: win32.HWND
+\tHMONITOR            :: win32.HMONITOR
+\tHANDLE              :: win32.HANDLE
+\tLPCWSTR             :: win32.LPCWSTR
+\tSECURITY_ATTRIBUTES :: win32.SECURITY_ATTRIBUTES
+\tDWORD               :: win32.DWORD
+\tLONG                :: win32.LONG
+\tLUID                :: win32.LUID
 } else {
-\tHINSTANCE           :: distinct rawptr;
-\tHWND                :: distinct rawptr;
-\tHMONITOR            :: distinct rawptr;
-\tHANDLE              :: distinct rawptr;
-\tLPCWSTR             :: ^u16;
-\tSECURITY_ATTRIBUTES :: struct {};
-\tDWORD               :: u32;
-\tLONG                :: c.long;
+\tHINSTANCE           :: distinct rawptr
+\tHWND                :: distinct rawptr
+\tHMONITOR            :: distinct rawptr
+\tHANDLE              :: distinct rawptr
+\tLPCWSTR             :: ^u16
+\tSECURITY_ATTRIBUTES :: struct {}
+\tDWORD               :: u32
+\tLONG                :: c.long
 \tLUID :: struct {
 \t\tLowPart:  DWORD,
 \t\tHighPart: LONG,
