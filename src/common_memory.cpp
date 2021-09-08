@@ -363,6 +363,9 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 			}
 			break;
 		}
+		
+		alignment = gb_max(alignment, gb_align_of(max_align_t));
+		
 		if (old_memory == nullptr) {
 			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
 			gb_zero_size(ptr, size);
@@ -375,12 +378,17 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
 		gb_memmove(ptr, old_memory, old_size);
-		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
+		free(old_memory);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0););
 		break;
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		int err = posix_memalign(&ptr, alignment, size);
+		int err = 0;
+		alignment = gb_max(alignment, gb_align_of(max_align_t));
+		
+		err = posix_memalign(&ptr, alignment, size);
+		GB_ASSERT_MSG(err == 0, "posix_memalign err: %d", err);
 		gb_zero_size(ptr, size);
 	} break;
 
@@ -396,6 +404,9 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 			free(old_memory);
 			break;
 		}
+		
+		alignment = gb_max(alignment, gb_align_of(max_align_t));
+		
 		if (old_memory == nullptr) {
 			err = posix_memalign(&ptr, alignment, size);
 			GB_ASSERT_MSG(err == 0, "posix_memalign err: %d", err);
@@ -413,8 +424,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		GB_ASSERT(ptr != nullptr);
 		gb_memmove(ptr, old_memory, old_size);
 		free(old_memory);
-		isize n = gb_max(size-old_size, 0);
-		gb_zero_size(cast(u8 *)ptr + old_size, n);
+		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
 	} break;
 #endif
 
