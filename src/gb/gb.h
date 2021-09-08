@@ -3123,18 +3123,22 @@ gb_inline void *gb_memset(void *dest, u8 c, isize n) {
 		return NULL;
 	}
 
-	if (n == 0)
+	if (n <= 0) {
 		return dest;
+	}
 	s[0] = s[n-1] = c;
-	if (n < 3)
+	if (n < 3) {
 		return dest;
+	}
 	s[1] = s[n-2] = c;
 	s[2] = s[n-3] = c;
-	if (n < 7)
+	if (n < 7) {
 		return dest;
+	}
 	s[3] = s[n-4] = c;
-	if (n < 9)
+	if (n < 9) {
 		return dest;
+	}
 
 	k = -cast(intptr)s & 3;
 	s += k;
