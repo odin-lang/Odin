@@ -28,7 +28,7 @@ FRect :: struct {
 	w, h: f32,
 }
 
-PointInRect :: proc(p, r: ^Rect) -> bool {
+PointInRect :: proc(p: ^Point, r: ^Rect) -> bool {
 	return bool((p.x >= r.x) && (p.x < (r.x + r.w)) && (p.y >= r.y) && (p.y < (r.y + r.h)))
 }
 
