@@ -3,8 +3,6 @@ package libc
 // 7.16 Variable arguments
 
 import "core:intrinsics"
-import "core:runtime"
-import "core:mem"
 
 @(private="file")
 @(default_calling_convention="none")
