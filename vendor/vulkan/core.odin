@@ -54,7 +54,7 @@ MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(0)-1
 MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
 
 // General Constants
-HEADER_VERSION       :: 189
+HEADER_VERSION       :: 191
 MAX_DRIVER_NAME_SIZE :: 256
 MAX_DRIVER_INFO_SIZE :: 256
 
@@ -245,6 +245,9 @@ KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME             :: "VK_KHR_deferred_host
 KHR_pipeline_executable_properties                      :: 1
 KHR_PIPELINE_EXECUTABLE_PROPERTIES_SPEC_VERSION         :: 1
 KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME       :: "VK_KHR_pipeline_executable_properties"
+KHR_shader_integer_dot_product                          :: 1
+KHR_SHADER_INTEGER_DOT_PRODUCT_SPEC_VERSION             :: 1
+KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME           :: "VK_KHR_shader_integer_dot_product"
 KHR_pipeline_library                                    :: 1
 KHR_PIPELINE_LIBRARY_SPEC_VERSION                       :: 1
 KHR_PIPELINE_LIBRARY_EXTENSION_NAME                     :: "VK_KHR_pipeline_library"
@@ -668,6 +671,9 @@ EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME           :: "VK_EXT_vertex_input_
 EXT_physical_device_drm                                 :: 1
 EXT_PHYSICAL_DEVICE_DRM_SPEC_VERSION                    :: 1
 EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME                  :: "VK_EXT_physical_device_drm"
+EXT_primitive_topology_list_restart                     :: 1
+EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_SPEC_VERSION        :: 1
+EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME      :: "VK_EXT_primitive_topology_list_restart"
 NV_external_memory_rdma                                 :: 1
 NV_EXTERNAL_MEMORY_RDMA_SPEC_VERSION                    :: 1
 NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME                  :: "VK_NV_external_memory_rdma"
@@ -686,6 +692,9 @@ EXT_MULTI_DRAW_EXTENSION_NAME                           :: "VK_EXT_multi_draw"
 EXT_load_store_op_none                                  :: 1
 EXT_LOAD_STORE_OP_NONE_SPEC_VERSION                     :: 1
 EXT_LOAD_STORE_OP_NONE_EXTENSION_NAME                   :: "VK_EXT_load_store_op_none"
+EXT_pageable_device_local_memory                        :: 1
+EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_SPEC_VERSION           :: 1
+EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME         :: "VK_EXT_pageable_device_local_memory"
 KHR_acceleration_structure                              :: 1
 KHR_ACCELERATION_STRUCTURE_SPEC_VERSION                 :: 12
 KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME               :: "VK_KHR_acceleration_structure"
