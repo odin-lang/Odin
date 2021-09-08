@@ -22,14 +22,27 @@ import "core:mem"
 import "core:os"
 import "core:io"
 
+TEST_count := 0
+TEST_fail  := 0
+
 when ODIN_TEST {
-	expect  :: testing.expect
+    expect  :: testing.expect
+    log     :: testing.log
 } else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string) {
-		if !condition {
-			fmt.println(message)
-		}
-	}
+    expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
+        fmt.printf("[%v] ", loc)
+        TEST_count += 1
+        if !condition {
+            TEST_fail += 1
+            fmt.println(message)
+            return
+        }
+        fmt.println(" PASS")
+    }
+    log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
+        fmt.printf("[%v] ", loc)
+        fmt.printf("log: %v\n", v)
+    }
 }
 
 main :: proc() {
@@ -37,6 +50,8 @@ main :: proc() {
 	t := testing.T{w=w}
 	zlib_test(&t)
 	gzip_test(&t)
+
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 }
 
 @test
