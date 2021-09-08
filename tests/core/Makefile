@@ -8,12 +8,9 @@ download_test_assets:
 
 image_test:
 	$(ODIN) test image/test_core_image.odin
-	rm test_core_image
 
 compress_test:
 	$(ODIN) test compress/test_core_compress.odin
-	rm test_core_compress
 
 strings_test:
 	$(ODIN) test strings/test_core_strings.odin
-	rm test_core_strings
