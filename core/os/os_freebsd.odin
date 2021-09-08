@@ -401,8 +401,8 @@ get_current_directory :: proc() -> string {
 	// The largest value I could find was 4096, so might as well use the page size.
 	page_size := get_page_size();
 	buf := make([dynamic]u8, page_size);
-	for {
-		cwd := _unix_getcwd(cstring(#no_bounds_check &buf[0]), c.size_t(len(buf)));
+	#no_bounds_check for {
+		cwd := _unix_getcwd(cstring(&buf[0]), c.size_t(len(buf)));
 		if cwd != nil {
 			return string(cwd);
 		}
