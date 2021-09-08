@@ -12,6 +12,12 @@ Bindings for the OpenGL graphics API and helpers in idiomatic Odin to, for examp
 
 This package is available under the MIT license. See `LICENSE` and `LICENSE_glad` for more details.
 
+## raylib
+
+Bindings for the raylib, a simple and easy-to-use library to enjoy videogames programming, in idiomatic Odin.
+
+This package is available under the Zlib license. See `LICENSE` for more details.
+
 ## SDL2
 
 Bindings for the cross platform multimedia API [SDL2](https://github.com/libsdl-org/SDL) and its sub-projects.
