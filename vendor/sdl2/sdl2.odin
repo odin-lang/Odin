@@ -206,7 +206,7 @@ foreign lib {
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	SDL_OpenURL :: proc(url: rawptr) -> c.int ---
+	OpenURL :: proc(url: cstring) -> c.int ---
 }
 
 // platform
