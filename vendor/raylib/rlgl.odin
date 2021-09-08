@@ -2,7 +2,13 @@ package raylib
 
 import "core:c"
 
-when ODIN_OS == "windows" do foreign import lib "raylib.lib"
+when ODIN_OS == "windows" do foreign import lib {
+	"raylib.lib",
+	"system:Winmm.lib",
+	"system:Gdi32.lib",
+	"system:User32.lib",
+	"system:Shell32.lib",
+}
 when ODIN_OS == "linux"   do foreign import lib "linux/libraylib.a"
 when ODIN_OS == "darwin"  do foreign import lib "macos/libraylib.a"
 
