@@ -60,6 +60,7 @@ import utf16          "core:unicode/utf16"
 
 import glfw   "vendor:glfw"
 import gl     "vendor:OpenGL"
+import rl     "vendor:raylib"
 import PM     "vendor:portmidi"
 import SDL    "vendor:sdl2"
 import IMG    "vendor:sdl2/image"

@@ -3,6 +3,8 @@ package win32
 
 foreign import "system:user32.lib"
 
+import "core:intrinsics"
+
 
 Menu_Bar_Info :: struct {
 	size: u32,
@@ -94,7 +96,9 @@ MB_SERVICE_NOTIFICATION :: 0x00200000
 @(default_calling_convention = "std")
 foreign user32 {
 	@(link_name="GetDesktopWindow") get_desktop_window  :: proc() -> Hwnd ---
-	@(link_name="ShowCursor")       show_cursor         :: proc(show: Bool) -> i32 ---
+	when !intrinsics.is_package_imported("raylib") { // NOTE(bill): this is a bit of hack but it's to get around the namespace collisions
+		@(link_name="ShowCursor")show_cursor :: proc(show: Bool) -> i32 ---
+	}
 	@(link_name="GetCursorPos")     get_cursor_pos      :: proc(p: ^Point) -> Bool ---
 	@(link_name="SetCursorPos")     set_cursor_pos      :: proc(x, y: i32) -> Bool ---
 	@(link_name="ScreenToClient")   screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool ---
