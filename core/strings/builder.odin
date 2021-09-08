@@ -128,29 +128,17 @@ builder_space :: proc(b: Builder) -> int {
 }
 
 write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
-	if builder_space(b^) > 0 {
-		append(&b.buf, x)
-		n += 1
-	}
-	return
+	n0 := len(b.buf)
+	append(&b.buf, x)
+	n1 := len(b.buf)
+	return n1-n0
 }
 
 write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
-	x := x
-	for len(x) != 0 {
-		space := builder_space(b^)
-		if space == 0 {
-			break // No need to append
-		}
-		i := min(space, len(x))
-		n += i
-		append(&b.buf, ..x[:i])
-		if len(x) <= i {
-			break // No more data to append
-		}
-		x = x[i:]
-	}
-	return
+	n0 := len(b.buf)
+	append(&b.buf, ..x)
+	n1 := len(b.buf)
+	return n1-n0
 }
 
 write_rune_builder :: proc(b: ^Builder, r: rune) -> (int, io.Error) {
