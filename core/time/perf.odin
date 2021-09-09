@@ -1,5 +1,7 @@
 package time
 
+import "core:mem"
+
 Tick :: struct {
 	_nsec: i64, // relative amount
 }
@@ -36,4 +38,59 @@ SCOPED_TICK_DURATION :: proc(d: ^Duration) -> Tick {
 
 _tick_duration_end :: proc(d: ^Duration, t: Tick) {
 	d^ = tick_since(t)
+}
+
+/*
+	Benchmark helpers
+*/
+
+Benchmark_Error :: enum {
+	Okay = 0,
+	Allocation_Error,
+}
+
+Benchmark_Options :: struct {
+	setup:     #type proc(options: ^Benchmark_Options, allocator: mem.Allocator) -> (err: Benchmark_Error),
+	bench:     #type proc(options: ^Benchmark_Options, allocator: mem.Allocator) -> (err: Benchmark_Error),
+	teardown:  #type proc(options: ^Benchmark_Options, allocator: mem.Allocator) -> (err: Benchmark_Error),
+
+	rounds:    int,
+	bytes:     int,
+	input:     []u8,
+
+	count:     int,
+	processed: int,
+	output:    []u8,
+
+	/*
+		Performance
+	*/
+	duration:             Duration,
+	rounds_per_second:    f64,
+	megabytes_per_second: f64,
+}
+
+benchmark :: proc(options: ^Benchmark_Options, allocator := context.allocator) -> (err: Benchmark_Error) {
+	assert(options != nil)
+	assert(options.bench != nil)
+
+	if options.setup != nil {
+		options->setup(allocator) or_return
+	}
+
+	diff: Duration
+	{
+		SCOPED_TICK_DURATION(&diff)
+		options->bench(allocator) or_return
+	}
+	options.duration = diff
+
+	times_per_second            := f64(Second) / f64(diff)
+	options.rounds_per_second    = times_per_second * f64(options.count)
+	options.megabytes_per_second = f64(options.processed) / f64(1024 * 1024) * times_per_second
+
+	if options.teardown != nil {
+		options->teardown(allocator) or_return
+	}
+	return
 }
