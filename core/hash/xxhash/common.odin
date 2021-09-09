@@ -11,6 +11,10 @@ package xxhash
 
 import "core:intrinsics"
 import "core:runtime"
+import "core:time"
+import "core:fmt"
+import "core:testing"
+
 mem_copy :: runtime.mem_copy
 
 /*
@@ -76,3 +80,84 @@ XXH64_read64 :: #force_inline proc(buf: []u8, alignment: Alignment) -> (res: u64
 		return u64(b)
 	}
 }
+
+
+/*
+	Benchmarks
+*/
+
+setup_xxhash :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
+	assert(options != nil)
+
+	options.input = make([]u8, options.bytes, allocator)
+	return nil if len(options.input) == options.bytes else .Allocation_Error
+}
+
+teardown_xxhash :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
+	assert(options != nil)
+
+	delete(options.input)
+	return nil
+}
+
+benchmark_xxhash32 :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
+	buf := options.input
+
+	for _ in 0..=options.rounds {
+		_ = XXH32(buf)
+	}
+	options.count     = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
+benchmark_xxhash64 :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
+	buf := options.input
+
+	for _ in 0..=options.rounds {
+		_ = XXH64(buf)
+	}
+	options.count     = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
+benchmark_print :: proc(name: string, options: ^time.Benchmark_Options) {
+	fmt.printf("\t[%v] %v rounds, %v bytes procesed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s\n",
+		name,
+		options.rounds,
+		options.processed,
+		time.duration_nanoseconds(options.duration),
+		options.rounds_per_second,
+		options.megabytes_per_second,
+	)
+}
+
+@test
+benchmark_runner :: proc(t: ^testing.T) {
+	fmt.println("Starting benchmarks:")
+
+	options := &time.Benchmark_Options{
+		rounds   = 1_000,
+		bytes    = 100,
+		setup    = setup_xxhash,
+		bench    = benchmark_xxhash32,
+		teardown = teardown_xxhash,
+	}
+	err := time.benchmark(options, context.allocator)
+	benchmark_print("xxhash32 100 bytes", options)
+
+	options.bytes = 1_000_000
+	err = time.benchmark(options, context.allocator)
+	benchmark_print("xxhash32 1_000_000 bytes", options)
+
+	options.bytes  = 100
+	options.bench = benchmark_xxhash64
+	err = time.benchmark(options, context.allocator)
+	benchmark_print("xxhash64 100 bytes", options)
+
+	options.bytes = 1_000_000
+	err = time.benchmark(options, context.allocator)
+	benchmark_print("xxhash64 1_000_000 bytes", options)
+}
+
