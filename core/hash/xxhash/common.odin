@@ -11,10 +11,6 @@ package xxhash
 
 import "core:intrinsics"
 import "core:runtime"
-import "core:time"
-import "core:fmt"
-import "core:testing"
-
 mem_copy :: runtime.mem_copy
 
 /*
