@@ -79,7 +79,7 @@ benchmark_xxhash64 :: proc(options: ^time.Benchmark_Options, allocator := contex
 }
 
 benchmark_print :: proc(name: string, options: ^time.Benchmark_Options) {
-    fmt.printf("\t[%v] %v rounds, %v bytes procesed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s\n",
+    fmt.printf("\t[%v] %v rounds, %v bytes processed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s\n",
         name,
         options.rounds,
         options.processed,
