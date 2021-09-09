@@ -206,7 +206,7 @@ struct BuildContext {
 	bool   disallow_do;
 
 	bool   strict_style;
-
+	bool   strict_style_init_only;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
