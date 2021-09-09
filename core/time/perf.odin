@@ -60,7 +60,8 @@ Benchmark_Options :: struct {
 
 	count:     int,
 	processed: int,
-	output:    []u8,
+	output:    []u8, // Unused for hash benchmarks
+	hash:      u128,
 
 	/*
 		Performance
