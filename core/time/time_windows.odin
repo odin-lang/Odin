@@ -24,8 +24,7 @@ _tick_now :: proc() -> Tick {
 		return q * num + r * num / den
 	}
 
-	// @thread_local qpc_frequency: win32.LARGE_INTEGER
-	qpc_frequency: win32.LARGE_INTEGER
+	@thread_local qpc_frequency: win32.LARGE_INTEGER
 
 	if qpc_frequency == 0 {
 		win32.QueryPerformanceFrequency(&qpc_frequency)
