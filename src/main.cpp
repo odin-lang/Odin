@@ -635,6 +635,7 @@ enum BuildFlagKind {
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_InsertSemicolon,
 	BuildFlag_StrictStyle,
+	BuildFlag_StrictStyleInitOnly,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -762,6 +763,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_InsertSemicolon,       str_lit("insert-semicolon"),         BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,           str_lit("strict-style"),             BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,   str_lit("strict-style-init-only"),   BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
@@ -1312,7 +1314,16 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_StrictStyle:
+							if (build_context.strict_style_init_only) {
+								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
+							}
 							build_context.strict_style = true;
+							break;
+						case BuildFlag_StrictStyleInitOnly:
+							if (build_context.strict_style) {
+								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
+							}
+							build_context.strict_style_init_only = true;
 							break;
 
 
@@ -1872,6 +1883,10 @@ void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-strict-style");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
+		print_usage_line(0, "");
+		
+		print_usage_line(1, "-strict-style-init-only");
+		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons, only on the initial project");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
