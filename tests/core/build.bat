@@ -16,3 +16,8 @@ echo ---
 echo Running core:strings tests
 echo ---
 %PATH_TO_ODIN% run strings %COMMON%
+
+echo ---
+echo Running core:hash tests
+echo ---
+%PATH_TO_ODIN% run hash %COMMON% -o:size
