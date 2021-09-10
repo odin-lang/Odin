@@ -1,3 +1,4 @@
+//+private
 package runtime
 
 @(link_name="memset")

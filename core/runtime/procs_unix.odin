@@ -1,18 +1,17 @@
 //+build linux, darwin, freebsd
+//+private
 package runtime
 
+import "core:intrinsics"
+
 @(link_name="memset")
-memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
-	if ptr == nil || len == 0 {
-		return ptr
+memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr #no_bounds_check {
+	if ptr != nil && len != 0 {
+		b := byte(val)
+		p := ([^]byte)(ptr)[:len]
+		for v in &p {
+			v = b
+		}
 	}
-	b := byte(val)
-
-	p_start := uintptr(ptr)
-	p_end := p_start + uintptr(max(len, 0))
-	for p := p_start; p < p_end; p += 1 {
-		(^byte)(p)^ = b
-	}
-
 	return ptr
 }

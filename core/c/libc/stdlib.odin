@@ -58,12 +58,12 @@ foreign libc {
 	atoi          :: proc(nptr: cstring) -> int ---
 	atol          :: proc(nptr: cstring) -> long ---
 	atoll         :: proc(nptr: cstring) -> longlong ---
-	strtod        :: proc(nptr: cstring, endptr: ^^char) -> double ---
-	strtof        :: proc(nptr: cstring, endptr: ^^char) -> float ---
-	strtol        :: proc(nptr: cstring, endptr: ^^char, base: int) -> long ---
-	strtoll       :: proc(nptr: cstring, endptr: ^^char, base: int) -> longlong ---
-	strtoul       :: proc(nptr: cstring, endptr: ^^char, base: int) -> ulong ---
-	strtoull      :: proc(nptr: cstring, endptr: ^^char, base: int) -> ulonglong ---
+	strtod        :: proc(nptr: cstring, endptr: ^[^]char) -> double ---
+	strtof        :: proc(nptr: cstring, endptr: ^[^]char) -> float ---
+	strtol        :: proc(nptr: cstring, endptr: ^[^]char, base: int) -> long ---
+	strtoll       :: proc(nptr: cstring, endptr: ^[^]char, base: int) -> longlong ---
+	strtoul       :: proc(nptr: cstring, endptr: ^[^]char, base: int) -> ulong ---
+	strtoull      :: proc(nptr: cstring, endptr: ^[^]char, base: int) -> ulonglong ---
 
 	// 7.22.2 Pseudo-random sequence generation functions
 	rand          :: proc() -> int ---
@@ -82,7 +82,7 @@ foreign libc {
 	at_quick_exit :: proc(func: proc "c" ()) -> int ---
 	exit          :: proc(status: int) -> ! ---
 	_Exit         :: proc(status: int) -> ! ---
-	getenv        :: proc(name: cstring) -> ^char ---
+	getenv        :: proc(name: cstring) -> [^]char ---
 	quick_exit    :: proc(status: int) -> ! ---
 	system        :: proc(cmd: cstring) -> int ---
 
@@ -101,9 +101,9 @@ foreign libc {
 	// 7.22.7 Multibyte/wide character conversion functions
 	mblen         :: proc(s: cstring, n: size_t) -> int ---
 	mbtowc        :: proc(pwc: ^wchar_t, s: cstring, n: size_t) -> int ---
-	wctomb        :: proc(s: ^char, wc: wchar_t) -> int ---
+	wctomb        :: proc(s: [^]char, wc: wchar_t) -> int ---
 
 	// 7.22.8 Multibyte/wide string conversion functions
 	mbstowcs      :: proc(pwcs: ^wchar_t, s: cstring, n: size_t) -> size_t ---
-	wcstombs      :: proc(s: ^char, pwcs: ^wchar_t, n: size_t) -> size_t ---
+	wcstombs      :: proc(s: [^]char, pwcs: ^wchar_t, n: size_t) -> size_t ---
 }

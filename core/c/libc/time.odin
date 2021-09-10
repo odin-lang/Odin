@@ -20,11 +20,11 @@ when ODIN_OS == "windows" {
 		@(link_name="_timespec64_get") timespec_get :: proc(ts: ^timespec, base: int) -> int ---
 
 		// 7.27.3 Time conversion functions
-		                               asctime      :: proc(timeptr: ^tm) -> ^char ---
-		@(link_name="_ctime64")        ctime        :: proc(timer: ^time_t) -> ^char ---
+		                               asctime      :: proc(timeptr: ^tm) -> [^]char ---
+		@(link_name="_ctime64")        ctime        :: proc(timer: ^time_t) -> [^]char ---
 		@(link_name="_gmtime64")       gmtime       :: proc(timer: ^time_t) -> ^tm ---
 		@(link_name="_localtime64")    localtime    :: proc(timer: ^time_t) -> ^tm ---
-		                               strftime     :: proc(s: ^char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
+		                               strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
 	}
 
 	CLOCKS_PER_SEC :: 1000
@@ -54,11 +54,11 @@ when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
 		timespec_get :: proc(ts: ^timespec, base: int) -> int ---
 
 		// 7.27.3 Time conversion functions
-		asctime      :: proc(timeptr: ^tm) -> ^char ---
-		ctime        :: proc(timer: ^time_t) -> ^char ---
+		asctime      :: proc(timeptr: ^tm) -> [^]char ---
+		ctime        :: proc(timer: ^time_t) -> [^]char ---
 		gmtime       :: proc(timer: ^time_t) -> ^tm ---
 		localtime    :: proc(timer: ^time_t) -> ^tm ---
-		strftime     :: proc(s: ^char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
+		strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
 	}
 
 	CLOCKS_PER_SEC :: 1000000
