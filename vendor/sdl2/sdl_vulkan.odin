@@ -19,7 +19,7 @@ foreign lib {
 	Vulkan_LoadLibrary              :: proc(path: cstring) -> c.int ---
 	Vulkan_GetVkGetInstanceProcAddr :: proc() -> rawptr ---
 	Vulkan_UnloadLibrary            :: proc() ---
-	Vulkan_GetInstanceExtensions    :: proc(window: ^Window, pCount: ^c.uint, pNames: ^cstring) -> bool ---
+	Vulkan_GetInstanceExtensions    :: proc(window: ^Window, pCount: ^c.uint, pNames: [^]cstring) -> bool ---
 	Vulkan_CreateSurface            :: proc(window: ^Window, instance: VkInstance, surface: ^VkSurfaceKHR) -> bool ---
 	Vulkan_GetDrawableSize          :: proc(window: ^Window, w, h: ^c.int) ---
 }
