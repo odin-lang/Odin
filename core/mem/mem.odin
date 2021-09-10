@@ -4,7 +4,7 @@ import "core:runtime"
 import "core:intrinsics"
 
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr #no_bounds_check {
-	return runtime.memset(data, i32(value), int(len))
+	return runtime.memset(data, i32(value), uint(len))
 }
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len)
