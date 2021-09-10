@@ -10,6 +10,9 @@ when ODIN_OS == "windows" {
 
 sig_atomic_t :: distinct atomic_int
 
+SIG_ATOMIC_MIN :: min(sig_atomic_t)
+SIG_ATOMIC_MAX :: max(sig_atomic_t)
+
 @(default_calling_convention="c")
 foreign libc {
 	signal :: proc(sig: int, func: proc "c" (int)) -> proc "c" (int) ---
