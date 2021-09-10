@@ -1,5 +1,6 @@
-
 package libc
+
+import "core:runtime"
 
 // 7.24 String handling
 
@@ -37,7 +38,7 @@ foreign libc {
 	strtok   :: proc(s1: [^]char, s2: cstring) -> [^]char ---
 
 	// 7.24.6 Miscellaneous functions
-	memset   :: proc(s: rawptr, c: int, n: size_t) -> rawptr ---
+	memset   : proc(s: rawptr, c: int, n: size_t) -> rawptr : runtime.memset
 	strerror :: proc(errnum: int) -> [^]char ---
 	strlen   :: proc(s: cstring) -> size_t ---
 }
