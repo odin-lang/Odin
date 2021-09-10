@@ -58,8 +58,8 @@ when ODIN_ARCH == "386" || ODIN_ARCH == "amd64" {
 } else {
 	int_fast8_t    :: builtin.i8
 	uint_fast8_t   :: builtin.u8
-	int_fast16_t   :: builtin.i32
-	uint_fast16_t  :: builtin.u32
+	int_fast16_t   :: builtin.i16
+	uint_fast16_t  :: builtin.u16
 	int_fast32_t   :: builtin.i32
 	uint_fast32_t  :: builtin.u32
 	int_fast64_t   :: builtin.i64
