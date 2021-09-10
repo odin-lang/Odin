@@ -1,14 +1,15 @@
 package sdl2
 
 import "core:c"
+import vk "vendor:vulkan"
 
 when ODIN_OS == "windows" do foreign import lib "SDL2.lib"
 when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
 when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
 when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
 
-VkInstance   :: distinct u64
-VkSurfaceKHR :: distinct u64
+VkInstance   :: vk.Instance
+VkSurfaceKHR :: vk.SurfaceKHR
 
 vulkanInstance :: VkInstance
 vulkanSurface  :: VkSurfaceKHR
