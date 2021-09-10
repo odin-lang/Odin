@@ -73,6 +73,14 @@ INT16_MIN      :: c.INT16_MIN
 INT32_MIN      :: c.INT32_MIN
 INT64_MIN      :: c.INT64_MIN
 
+SIZE_MAX       :: c.SIZE_MAX
+
+PTRDIFF_MIN    :: c.PTRDIFF_MIN
+PTRDIFF_MAX    :: c.PTRDIFF_MAX
+
+WCHAR_MIN      :: c.WCHAR_MIN
+WCHAR_MAX      :: c.WCHAR_MAX
+
 NULL           :: rawptr(uintptr(0))
 
 NDEBUG         :: !ODIN_DEBUG
