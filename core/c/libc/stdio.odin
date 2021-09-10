@@ -82,34 +82,34 @@ foreign libc {
 	remove    :: proc(filename: cstring) -> int ---
 	rename    :: proc(old, new: cstring) -> int ---
 	tmpfile   :: proc() -> ^FILE ---
-	tmpnam    :: proc(s: ^char) -> ^char ---
+	tmpnam    :: proc(s: [^]char) -> [^]char ---
 
 	// 7.21.5 File access functions
 	fclose    :: proc(stream: ^FILE) -> int ---
 	fflush    :: proc(stream: ^FILE) -> int ---
 	fopen     :: proc(filename, mode: cstring) -> ^FILE ---
 	freopen   :: proc(filename, mode: cstring, stream: ^FILE) -> ^FILE ---
-	setbuf    :: proc(stream: ^FILE, buf: ^char) ---
-	setvbuf   :: proc(stream: ^FILE, buf: ^char, mode: int, size: size_t) -> int ---
+	setbuf    :: proc(stream: ^FILE, buf: [^]char) ---
+	setvbuf   :: proc(stream: ^FILE, buf: [^]char, mode: int, size: size_t) -> int ---
 
 	// 7.21.6 Formatted input/output functions
 	fprintf   :: proc(stream: ^FILE, format: cstring, #c_vararg args: ..any) -> int ---
 	fscanf    :: proc(stream: ^FILE, format: cstring, #c_vararg args: ..any) -> int ---
 	printf    :: proc(format: cstring, #c_vararg args: ..any) -> int ---
 	scanf     :: proc(format: cstring, #c_vararg args: ..any) -> int ---
-	snprintf  :: proc(s: ^char, format: cstring, #c_vararg args: ..any) -> int ---
+	snprintf  :: proc(s: [^]char, format: cstring, #c_vararg args: ..any) -> int ---
 	sscanf    :: proc(s, format: cstring, #c_vararg args: ..any) -> int ---
 	vfprintf  :: proc(stream: ^FILE, format: cstring, arg: ^va_list) -> int ---
 	vfscanf   :: proc(stream: ^FILE, format: cstring, arg: ^va_list) -> int ---
 	vprintf   :: proc(format: cstring, arg: ^va_list) -> int ---
 	vscanf    :: proc(format: cstring, arg: ^va_list) -> int ---
-	vsnprintf :: proc(s: ^char, n: size_t, format: cstring, arg: ^va_list) -> int ---
-	vsprintf  :: proc(s: ^char, format: cstring, arg: ^va_list) -> int ---
+	vsnprintf :: proc(s: [^]char, n: size_t, format: cstring, arg: ^va_list) -> int ---
+	vsprintf  :: proc(s: [^]char, format: cstring, arg: ^va_list) -> int ---
 	vsscanf   :: proc(s, format: cstring, arg: ^va_list) -> int ---
 
 	// 7.21.7 Character input/output functions
 	fgetc     :: proc(stream: ^FILE) -> int ---
-	fgets     :: proc(s: ^char, n: int, stream: ^FILE) -> ^char ---
+	fgets     :: proc(s: [^]char, n: int, stream: ^FILE) -> [^]char ---
 	fputc     :: proc(s: cstring, stream: ^FILE) -> int ---
 	getc      :: proc(stream: ^FILE) -> int ---
 	getchar   :: proc() -> int ---

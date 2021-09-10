@@ -1,82 +1,80 @@
 package libc
 
-import builtin "core:builtin"
+import "core:c"
 
-char           :: builtin.u8  // assuming -funsigned-char
-short          :: builtin.i16
-int            :: builtin.i32
-long           :: builtin.i32 when (ODIN_OS == "windows" || size_of(builtin.rawptr) == 4) else builtin.i64
-longlong       :: builtin.i64
+char           :: c.char // assuming -funsigned-char
+short          :: c.short
+int            :: c.int
+long           :: c.long
+longlong       :: c.longlong
 
-uchar          :: builtin.u8
-ushort         :: builtin.u16
-uint           :: builtin.u32
-ulong          :: builtin.u32 when (ODIN_OS == "windows" || size_of(builtin.rawptr) == 4) else builtin.u64
-ulonglong      :: builtin.u64
+uchar          :: c.uchar
+ushort         :: c.ushort
+uint           :: c.uint
+ulong          :: c.ulong
+ulonglong      :: c.ulonglong
 
-bool           :: distinct builtin.b8
+bool           :: c.bool
 
-size_t         :: builtin.uint
-wchar_t        :: builtin.u16 when (ODIN_OS == "windows") else builtin.u32
+size_t         :: c.size_t
+ssize_t        :: c.ssize_t
+wchar_t        :: c.wchar_t
 
-float          :: builtin.f32
-double         :: builtin.f64
+float          :: c.float
+double         :: c.double
 
-// 7.20.1 Integer types
-int8_t         :: builtin.i8
-uint8_t        :: builtin.u8
-int16_t        :: builtin.i16
-uint16_t       :: builtin.u16
-int32_t        :: builtin.i32
-uint32_t       :: builtin.u32
-int64_t        :: builtin.i64
-uint64_t       :: builtin.u64
+int8_t         :: c.int8_t
+uint8_t        :: c.uint8_t
+int16_t        :: c.int16_t
+uint16_t       :: c.uint16_t
+int32_t        :: c.int32_t
+uint32_t       :: c.uint32_t
+int64_t        :: c.int64_t
+uint64_t       :: c.uint64_t
 
-// These are all the same in multiple libc's for multiple architectures.
-int_least8_t   :: builtin.i8
-uint_least8_t  :: builtin.u8
-int_least16_t  :: builtin.i16
-uint_least16_t :: builtin.u16
-int_least32_t  :: builtin.i32
-uint_least32_t :: builtin.u32
-int_least64_t  :: builtin.i64
-uint_least64_t :: builtin.u64
+int_least8_t   :: c.int_least8_t
+uint_least8_t  :: c.uint_least8_t
+int_least16_t  :: c.int_least16_t
+uint_least16_t :: c.uint_least16_t
+int_least32_t  :: c.int_least32_t
+uint_least32_t :: c.uint_least32_t
+int_least64_t  :: c.int_least64_t
+uint_least64_t :: c.uint_least64_t
 
-// Same on Windows, Linux, and FreeBSD
-when ODIN_ARCH == "386" || ODIN_ARCH == "amd64" {
-	int_fast8_t    :: builtin.i8
-	uint_fast8_t   :: builtin.u8
-	int_fast16_t   :: builtin.i32
-	uint_fast16_t  :: builtin.u32
-	int_fast32_t   :: builtin.i32
-	uint_fast32_t  :: builtin.u32
-	int_fast64_t   :: builtin.i64
-	uint_fast64_t  :: builtin.u64
-}
+int_fast8_t    :: c.int_fast8_t
+uint_fast8_t   :: c.uint_fast8_t
+int_fast16_t   :: c.int_fast16_t
+uint_fast16_t  :: c.uint_fast16_t
+int_fast32_t   :: c.int_fast32_t
+uint_fast32_t  :: c.uint_fast32_t
+int_fast64_t   :: c.int_fast64_t
+uint_fast64_t  :: c.uint_fast64_t
 
-intptr_t       :: builtin.int
-uintptr_t      :: builtin.uintptr
-ptrdiff_t      :: distinct intptr_t
+intptr_t       :: c.intptr_t
+uintptr_t      :: c.uintptr_t
+ptrdiff_t      :: c.ptrdiff_t
 
-intmax_t       :: builtin.i64
-uintmax_t      :: builtin.u64
+intmax_t       :: c.intmax_t
+uintmax_t      :: c.uintmax_t
 
 // Copy C's rules for type promotion here by forcing the type on the literals.
-INT8_MAX       :: int(0x7f)
-INT16_MAX      :: int(0x7fff)
-INT32_MAX      :: int(0x7fffffff)
-INT64_MAX      :: longlong(0x7fffffffffffffff)
+INT8_MAX       :: c.INT8_MAX
+INT16_MAX      :: c.INT16_MAX
+INT32_MAX      :: c.INT32_MAX
+INT64_MAX      :: c.INT64_MAX
 
-UINT8_MAX      :: int(0xff)
-UINT16_MAX     :: int(0xffff)
-UINT32_MAX     :: uint(0xffffffff)
-UINT64_MAX     :: ulonglong(0xffffffffffffffff)
+UINT8_MAX      :: c.UINT8_MAX
+UINT16_MAX     :: c.UINT16_MAX
+UINT32_MAX     :: c.UINT32_MAX
+UINT64_MAX     :: c.UINT64_MAX
 
-INT8_MIN       :: ~INT8_MAX
-INT16_MIN      :: ~INT16_MAX
-INT32_MIN      :: ~INT32_MAX
-INT64_MIN      :: ~INT64_MAX
+INT8_MIN       :: c.INT8_MIN
+INT16_MIN      :: c.INT16_MIN
+INT32_MIN      :: c.INT32_MIN
+INT64_MIN      :: c.INT64_MIN
 
 NULL           :: rawptr(uintptr(0))
 
 NDEBUG         :: !ODIN_DEBUG
+
+CHAR_BIT :: 8
