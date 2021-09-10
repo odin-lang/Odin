@@ -6,7 +6,6 @@ foreign import pthread "System.framework"
 
 import "core:runtime"
 import "core:strings"
-import "core:strconv"
 import "core:c"
 
 Handle    :: distinct i32
@@ -273,6 +272,8 @@ W_OK :: 2 // Test for write permission
 X_OK :: 1 // Test for execute permission
 F_OK :: 0 // Test for file existance
 
+F_GETPATH :: 50 // return the full path of the fd
+
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^int ---
 
@@ -284,14 +285,15 @@ foreign libc {
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---
 	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
-	@(link_name="lstat")            _unix_lstat         :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
-	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
+	@(link_name="lstat64")          _unix_lstat         :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
+	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
 	@(link_name="readdir_r")        _unix_readdir_r     :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
 	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
@@ -488,12 +490,13 @@ _readlink :: proc(path: string) -> (string, Errno) {
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	buf : [256]byte
-	fd_str := strconv.itoa( buf[:], cast(int)fd )
+	res  := _unix_fcntl(fd, F_GETPATH, &buf[0])
+	if	res != 0 {
+		return "", Errno(get_last_error())
+	}
 
-	procfs_path := strings.concatenate( []string{ "/proc/self/fd/", fd_str } )
-	defer delete(procfs_path)
-
-	return _readlink(procfs_path)
+	path := strings.clone_from_cstring(cstring(&buf[0]), context.temp_allocator)
+	return path, ERROR_NONE
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
