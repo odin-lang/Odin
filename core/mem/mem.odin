@@ -4,14 +4,7 @@ import "core:runtime"
 import "core:intrinsics"
 
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr #no_bounds_check {
-	if data != nil && len != 0 {
-		b := byte(value)
-		p := ([^]byte)(data)[:len]
-		for v in &p {
-			v = b
-		}
-	}
-	return data
+	return runtime.memset(data, i32(value), len)
 }
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len)
