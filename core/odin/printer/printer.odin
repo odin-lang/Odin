@@ -237,7 +237,7 @@ format_value_decl :: proc(p: ^Printer, index: int) {
 	align_next := false
 
 	//check to see if there is a binary operator in the last token(this is guaranteed by the ast visit), otherwise it's not multilined
-	for line, line_index in p.lines[eq_line:] {
+	for line in p.lines[eq_line:] {
 
 		if len(line.format_tokens) == 0 {
 			break
@@ -309,7 +309,7 @@ format_call :: proc(p: ^Printer, line_index: int, format_index: int) {
 	paren_count := 1
 	done        := false
 
-	for line, line_index in p.lines[paren_line:] {
+	for line in p.lines[paren_line:] {
 
 		if len(line.format_tokens) == 0 {
 			continue
@@ -374,7 +374,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 		panic("Should not be possible")
 	}
 
-	for line, line_index in p.lines[keyword_line:] {
+	for line, line_idx in p.lines[keyword_line:] {
 
 		if len(line.format_tokens) == 0 {
 			continue
@@ -388,7 +388,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 				return
 			}
 
-			if line_index == 0 && i <= format_index {
+			if line_idx == 0 && i <= format_index {
 				continue
 			}
 
@@ -403,7 +403,7 @@ format_keyword_to_brace :: proc(p: ^Printer, line_index: int, format_index: int,
 			}
 		}
 
-		if line_index != 0 {
+		if line_idx != 0 {
 			line.format_tokens[0].spaces_before = largest + 1
 		}
 
@@ -908,7 +908,7 @@ align_comments :: proc(p: ^Printer) {
 
 			length := 0
 
-			for format_token, i in l.format_tokens {
+			for format_token in l.format_tokens {
 				if format_token.kind == .Comment {
 					if len(l.format_tokens) == 1 {
 						l.format_tokens[i].spaces_before = info.length + 1

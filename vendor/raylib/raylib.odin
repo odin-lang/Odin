@@ -2,21 +2,24 @@ package raylib
 
 import c "core:c/libc"
 
-when #config(RAYLIB_USE_LINALG, false) {
+USE_LINALG :: #config(RAYLIB_USE_LINALG, true)
+when USE_LINALG {
 	import "core:math/linalg"	
 }
 
 #assert(size_of(rune) == size_of(c.int))
 
-when ODIN_OS == "windows" do foreign import lib {
-	"raylib.lib",
-	"system:Winmm.lib",
-	"system:Gdi32.lib",
-	"system:User32.lib",
-	"system:Shell32.lib",
+when ODIN_OS == "windows" {
+	foreign import lib {
+		"raylib.lib",
+		"system:Winmm.lib",
+		"system:Gdi32.lib",
+		"system:User32.lib",
+		"system:Shell32.lib",
+	}
 }
-when ODIN_OS == "linux"   do foreign import lib "linux/libraylib.a"
-when ODIN_OS == "darwin"  do foreign import lib "macos/libraylib.a"
+when ODIN_OS == "linux"  { foreign import lib "linux/libraylib.a" }
+when ODIN_OS == "darwin" { foreign import lib "macos/libraylib.a" }
 
 VERSION :: "3.7"
 
@@ -53,7 +56,7 @@ MAGENTA    :: Color{ 255, 0, 255, 255 }     // Magenta
 RAYWHITE   :: Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
 
 
-when #config(RAYLIB_USE_LINALG, false) {
+when USE_LINALG {
 	// Vector2 type
 	Vector2 :: linalg.Vector2f32
 	// Vector3 type

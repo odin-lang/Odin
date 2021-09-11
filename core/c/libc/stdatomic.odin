@@ -191,7 +191,7 @@ atomic_exchange_explicit :: #force_inline proc(object: ^$T, desired: T, order: m
 // 	[success = acq_rel, failure = relaxed] => acqrel_failrelaxed
 atomic_compare_exchange_strong :: #force_inline proc(object, expected: ^$T, desired: T) {
 	value, ok := intrinsics.atomic_cxchg(object, expected^, desired)
-	if !ok do expected^ = value
+	if !ok { expected^ = value } 
 	return ok
 }
 
@@ -236,13 +236,13 @@ atomic_compare_exchange_strong_explicit :: #force_inline proc(object, expected: 
 		value, ok := intrinsics.atomic_cxchg_failacq(object, expected^, desired)
 
 	}
-	if !ok do expected^ = value
+	if !ok { expected^ = value }
 	return ok
 }
 
 atomic_compare_exchange_weak :: #force_inline proc(object, expected: ^$T, desired: T) {
 	value, ok := intrinsics.atomic_cxchgweak(object, expected^, desired)
-	if !ok do expected^ = value
+	if !ok { expected^ = value }
 	return ok
 }
 
@@ -287,7 +287,7 @@ atomic_compare_exchange_weak_explicit :: #force_inline proc(object, expected: ^$
 		value, ok := intrinsics.atomic_cxchgweak_failacq(object, expected^, desired)
 
 	}
-	if !ok do expected^ = value
+	if !ok { expected^ = value }
 	return ok
 }
 

@@ -837,7 +837,9 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 }
 
 utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
-	if len(s) == 0 do return ""
+	if len(s) == 0 {
+		return ""
+	}
 	return wstring_to_utf8(cast(Wstring)&s[0], len(s), allocator)
 }
 

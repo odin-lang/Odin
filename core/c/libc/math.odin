@@ -182,18 +182,20 @@ FP_SUBNORMAL     :: 4
 @(private)
 _fpclassify :: #force_inline proc(x: double) -> int {
 	u := transmute(uint64_t)x
-	e := u >> 52 & 0x7ff
-	if e == 0     do return FP_SUBNORMAL if (u << 1)  != 0 else FP_ZERO
-	if e == 0x7ff do return FP_NAN       if (u << 12) != 0 else FP_INFINITE
+	switch e := u >> 52 & 0x7ff; e {
+	case 0:     return FP_SUBNORMAL if (u << 1)  != 0 else FP_ZERO
+	case 0x7ff: return FP_NAN       if (u << 12) != 0 else FP_INFINITE
+	}
 	return FP_NORMAL
 }
 
 @(private)
 _fpclassifyf :: #force_inline proc(x: float) -> int {
 	u := transmute(uint32_t)x
-	e := u >> 23 & 0xff
-	if e == 0     do return FP_SUBNORMAL if (u << 1)  != 0 else FP_ZERO
-	if e == 0xff  do return FP_NAN       if (u << 9)  != 0 else FP_INFINITE
+	switch e := u >> 23 & 0xff; e {
+	case 0:    return FP_SUBNORMAL if (u << 1)  != 0 else FP_ZERO
+	case 0xff: return FP_NAN       if (u << 9)  != 0 else FP_INFINITE
+	}
 	return FP_NORMAL
 }
 

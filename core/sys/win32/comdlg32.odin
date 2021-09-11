@@ -88,7 +88,9 @@ _open_file_dialog :: proc(title: string, dir: string,
 
 	// Filters need to be passed as a pair of strings (title, filter)
 	filter_len := u32(len(filters))
-	if filter_len % 2 != 0 do return "", false
+	if filter_len % 2 != 0 {
+		return "", false
+	}
 
 	filter: string
 	filter = strings.join(filters, "\u0000", context.temp_allocator)

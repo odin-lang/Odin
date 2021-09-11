@@ -499,7 +499,7 @@ visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 		return
 	}
 
-	for attribute, i in attributes {
+	for attribute in attributes {
 		move_line_limit(p, attribute.pos, 1)
 
 		push_generic_token(p, .At, 0)
@@ -1389,7 +1389,6 @@ visit_proc_type :: proc(p: ^Printer, proc_type: ast.Proc_Type, is_proc_lit := fa
 		push_generic_token(p, .Gt, 0)
 
 		use_parens := false
-		use_named  := false
 
 		if len(proc_type.results.list) > 1 {
 			use_parens = true
