@@ -45,12 +45,12 @@ Error :: enum {
 	Error,
 }
 
-XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, false)
+XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, true)
 
 /*
 	llvm.prefetch fails code generation on Linux.
 */
-when !XXH_DISABLE_PREFETCH && ODIN_OS == "windows" {
+when XXH_DISABLE_PREFETCH {
 	import "core:sys/llvm"
 
 	prefetch_address :: #force_inline proc(address: rawptr) {
@@ -60,11 +60,12 @@ when !XXH_DISABLE_PREFETCH && ODIN_OS == "windows" {
 		ptr := rawptr(uintptr(address) + offset)
 		prefetch_address(ptr)
 	}
+	prefetch :: proc { prefetch_address, prefetch_offset, }
 } else {
 	prefetch_address :: #force_inline proc(address: rawptr) {}
 	prefetch_offset  :: #force_inline proc(address: rawptr, auto_cast offset: uintptr) {}
 }
-prefetch :: proc { prefetch_address, prefetch_offset, }
+
 
 @(optimization_mode="speed")
 XXH_rotl32 :: #force_inline proc(x, r: u32) -> (res: u32) {
