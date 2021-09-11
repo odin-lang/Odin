@@ -3,14 +3,15 @@ package mem
 import "core:runtime"
 import "core:intrinsics"
 
-set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr #no_bounds_check {
+set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), uint(len))
 }
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
-	return set(data, 0, len)
+	intrinsics.mem_zero(data, len)
+	return data
 }
 zero_item :: proc "contextless" (item: $P/^$T) {
-	set(item, 0, size_of(T))
+	intrinsics.mem_zero(item, size_of(T))
 }
 zero_slice :: proc "contextless" (data: $T/[]$E) {
 	zero(raw_data(data), size_of(E)*len(data))
@@ -18,10 +19,12 @@ zero_slice :: proc "contextless" (data: $T/[]$E) {
 
 
 copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	return runtime.mem_copy(dst, src, len)
+	intrinsics.mem_copy(dst, src, len)
+	return dst
 }
 copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	return runtime.mem_copy_non_overlapping(dst, src, len)
+	intrinsics.mem_copy_non_overlapping(dst, src, len)
+	return dst
 }
 compare :: proc "contextless" (a, b: []byte) -> int {
 	res := compare_byte_ptrs(raw_data(a), raw_data(b), min(len(a), len(b)))
