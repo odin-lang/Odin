@@ -84,7 +84,7 @@ benchmark_xxh3_128 :: proc(options: ^time.Benchmark_Options, allocator := contex
 
     h: u128
     for _ in 0..=options.rounds {
-        h = xxhash.XXH3_128bits(buf)
+        h = xxhash.XXH3_128(buf)
     }
     options.count     = options.rounds
     options.processed = options.rounds * options.bytes
@@ -161,25 +161,28 @@ test_benchmark_runner :: proc(t: ^testing.T) {
 
 @test
 test_xxhash_vectors :: proc(t: ^testing.T) {
-    fmt.println("Verifying against XXHASH_TEST_VECTOR_ZERO:")
+    fmt.println("Verifying against XXHASH_TEST_VECTOR_SEEDED:")
 
     buf := make([]u8, 256)
     defer delete(buf)
 
-    for v, i in XXHASH_TEST_VECTOR_ZERO[:] {
-        b := buf[:i]
+    for seed, table in XXHASH_TEST_VECTOR_SEEDED {
+        fmt.printf("Seed: %v\n", seed)
 
-        xxh32    := xxhash.XXH32(b)
-        xxh64    := xxhash.XXH64(b)
-        xxh3_128 := xxhash.XXH3_128bits(b)
+        for v, i in table {
+            b := buf[:i]
 
-        xxh32_error    := fmt.tprintf("[   XXH32(%03d] Expected: %08x. Got: %08x.", i,   v.xxh_32, xxh32)
-        xxh64_error    := fmt.tprintf("[   XXH64(%03d] Expected: %16x. Got: %16x.", i,   v.xxh_64, xxh64)
-        xxh3_128_error := fmt.tprintf("[XXH3_128(%03d] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128)
+            xxh32    := xxhash.XXH32(b, u32(seed))
+            xxh64    := xxhash.XXH64(b, seed)
+            xxh3_128 := xxhash.XXH3_128(b, seed)
 
-        expect(t, xxh32     == v.xxh_32,   xxh32_error)
-        expect(t, xxh64     == v.xxh_64,   xxh64_error)
-        expect(t, xxh3_128  == v.xxh3_128, xxh3_128_error)
+            xxh32_error    := fmt.tprintf("[   XXH32(%03d)] Expected: %08x. Got: %08x.", i,   v.xxh_32, xxh32)
+            xxh64_error    := fmt.tprintf("[   XXH64(%03d)] Expected: %16x. Got: %16x.", i,   v.xxh_64, xxh64)
+            xxh3_128_error := fmt.tprintf("[XXH3_128(%03d)] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128)
+
+            expect(t, xxh32     == v.xxh_32,   xxh32_error)
+            expect(t, xxh64     == v.xxh_64,   xxh64_error)
+            expect(t, xxh3_128  == v.xxh3_128, xxh3_128_error)
+        }
     }
-
 }
