@@ -69,6 +69,11 @@ enum BuiltinProcId {
 
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
+	
+	BuiltinProc_prefetch_read_instruction,
+	BuiltinProc_prefetch_read_data,
+	BuiltinProc_prefetch_write_instruction,
+	BuiltinProc_prefetch_write_data,
 
 	BuiltinProc_atomic_fence,
 	BuiltinProc_atomic_fence_acq,
@@ -305,6 +310,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	
+	{STR_LIT("prefetch_read_instruction"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("prefetch_read_data"),         2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("prefetch_write_instruction"), 2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("prefetch_write_data"),        2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("atomic_fence"),        0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_fence_acq"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
