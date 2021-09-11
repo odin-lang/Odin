@@ -21,6 +21,10 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
+#if LLVM_VERSION_MAJOR < 11 
+#error "LLVM Version 11 is the minimum required"
+#endif
+
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 	if (e == nullptr) {
