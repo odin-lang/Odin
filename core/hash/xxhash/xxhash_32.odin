@@ -15,6 +15,7 @@ import "core:intrinsics"
 	32-bit hash functions
 */
 XXH32_hash :: u32
+xxh_u32    :: u32
 XXH32_DEFAULT_SEED :: XXH32_hash(0)
 
 XXH32_state :: struct {
@@ -153,7 +154,7 @@ XXH32_endian_align :: #force_inline proc(input: []u8, seed := XXH32_DEFAULT_SEED
 		v3 := seed + 0
 		v4 := seed - XXH_PRIME32_1
 
-		for len(buf) >= 15 {
+		for len(buf) >= 16 {
 			#no_bounds_check v1 = XXH32_round(v1, XXH32_read32(buf, alignment)); buf = buf[4:]
 			#no_bounds_check v2 = XXH32_round(v2, XXH32_read32(buf, alignment)); buf = buf[4:]
 			#no_bounds_check v3 = XXH32_round(v3, XXH32_read32(buf, alignment)); buf = buf[4:]

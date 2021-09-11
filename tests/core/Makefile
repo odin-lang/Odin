@@ -16,4 +16,4 @@ strings_test:
 	$(ODIN) run strings/test_core_strings.odin
 
 hash_test:
-	$(ODIN) run hash/test_core_hash.odin -o:size -no-bounds-check
+	$(ODIN) run hash -out=test_hash -o:speed -no-bounds-check
