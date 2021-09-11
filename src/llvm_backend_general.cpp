@@ -1968,24 +1968,32 @@ void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
 
 
 LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type) {
+	unsigned kind = 0;
 	String s = make_string_c(name);
 
-	// NOTE(2021-02-25, bill); All this attributes require a type associated with them
-	// and the current LLVM C API does not expose this functionality yet.
-	// It is better to ignore the attributes for the time being
-	if (s == "byval") {
-		// return nullptr;
-	} else if (s == "byref") {
-		return nullptr;
-	} else if (s == "preallocated") {
-		return nullptr;
-	} else if (s == "sret") {
-		// return nullptr;
-	}
+	#if (LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && (LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH >= 1)))
+		kind = LLVMGetEnumAttributeKindForName(name, s.len);
+		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
+		return LLVMCreateTypeAttribute(ctx, kind, type);
+	#else
+		// NOTE(2021-02-25, bill); All this attributes require a type associated with them
+		// and the current LLVM C API does not expose this functionality yet.
+		// It is better to ignore the attributes for the time being
+		if (s == "byval") {
+			// return nullptr;
+		} else if (s == "byref") {
+			return nullptr;
+		} else if (s == "preallocated") {
+			return nullptr;
+		} else if (s == "sret") {
+			// return nullptr;
+		}
+		
 
-	unsigned kind = LLVMGetEnumAttributeKindForName(name, s.len);
-	GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
-	return LLVMCreateEnumAttribute(ctx, kind, 0);
+		kind = LLVMGetEnumAttributeKindForName(name, s.len);
+		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
+		return LLVMCreateEnumAttribute(ctx, kind, 0);
+	#endif	
 }
 
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value) {

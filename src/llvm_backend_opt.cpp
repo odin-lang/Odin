@@ -21,13 +21,19 @@ void lb_add_must_preserve_predicate_pass(lbModule *m, LLVMPassManagerRef fpm, i3
 }
 
 
+#if LLVM_VERSION_MAJOR < 12
+#define LLVM_ADD_CONSTNAT_VALUE_PASS LLVMAddConstantPropagationPass
+#else
+#define LLVM_ADD_CONSTNAT_VALUE_PASS LLVMAddCorrelatedValuePropagationPass
+#endif
+
 void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm) {
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddConstantPropagationPass(fpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 
-	LLVMAddConstantPropagationPass(fpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddCFGSimplificationPass(fpm);
@@ -58,10 +64,10 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	LLVMAddMemCpyOptPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddConstantPropagationPass(fpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 
-	LLVMAddConstantPropagationPass(fpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddCFGSimplificationPass(fpm);
@@ -99,10 +105,10 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 	LLVMAddMemCpyOptPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddConstantPropagationPass(fpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 
-	LLVMAddConstantPropagationPass(fpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(fpm);
 	LLVMAddMergedLoadStoreMotionPass(fpm);
 	LLVMAddPromoteMemoryToRegisterPass(fpm);
 	LLVMAddCFGSimplificationPass(fpm);
@@ -159,7 +165,7 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 
 	LLVMAddInstructionCombiningPass(mpm);
 	LLVMAddJumpThreadingPass(mpm);
-	LLVMAddCorrelatedValuePropagationPass(mpm);
+	LLVM_ADD_CONSTNAT_VALUE_PASS(mpm);
 	LLVMAddDeadStoreEliminationPass(mpm);
 	LLVMAddLICMPass(mpm);
 
@@ -225,7 +231,7 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	LLVMAddInstructionCombiningPass(mpm);
 	if (optimization_level >= 2) {
 		LLVMAddEarlyCSEPass(mpm);
-		LLVMAddCorrelatedValuePropagationPass(mpm);
+		LLVM_ADD_CONSTNAT_VALUE_PASS(mpm);
 		LLVMAddLICMPass(mpm);
 		LLVMAddLoopUnswitchPass(mpm);
 		LLVMAddCFGSimplificationPass(mpm);
