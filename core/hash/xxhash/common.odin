@@ -11,7 +11,7 @@ package xxhash
 
 import "core:intrinsics"
 import "core:runtime"
-import "core:sys/llvm"
+
 mem_copy  :: runtime.mem_copy
 byte_swap :: intrinsics.byte_swap
 
@@ -48,6 +48,8 @@ Error :: enum {
 XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, false)
 
 when !XXH_DISABLE_PREFETCH {
+	import "core:sys/llvm"
+
 	prefetch_address :: #force_inline proc(address: rawptr) {
 		llvm.prefetch(address, .Read, .High, .Data)
 	}
