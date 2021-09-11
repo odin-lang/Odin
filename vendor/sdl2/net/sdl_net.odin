@@ -3,10 +3,10 @@ package sdl2_net
 import "core:c"
 import SDL ".."
 
-when ODIN_OS == "windows" do foreign import lib "SDL2_net.lib"
-when ODIN_OS == "linux"   do foreign import lib "system:SDL2_net"
-when ODIN_OS == "darwin"  do foreign import lib "system:SDL2_net"
-when ODIN_OS == "freebsd" do foreign import lib "system:SDL2_net"
+when ODIN_OS == "windows" { foreign import lib "SDL2_net.lib"    }
+when ODIN_OS == "linux"   { foreign import lib "system:SDL2_net" }
+when ODIN_OS == "darwin"  { foreign import lib "system:SDL2_net" }
+when ODIN_OS == "freebsd" { foreign import lib "system:SDL2_net" }
 
 bool :: SDL.bool
 

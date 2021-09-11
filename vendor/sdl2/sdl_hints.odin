@@ -2,10 +2,10 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == "windows" do foreign import lib "SDL2.lib"
-when ODIN_OS == "linux"   do foreign import lib "system:SDL2"
-when ODIN_OS == "darwin"  do foreign import lib "system:SDL2"
-when ODIN_OS == "freebsd" do foreign import lib "system:SDL2"
+when ODIN_OS == "windows" { foreign import lib "SDL2.lib"    }
+when ODIN_OS == "linux"   { foreign import lib "system:SDL2" }
+when ODIN_OS == "darwin"  { foreign import lib "system:SDL2" }
+when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
 
 HINT_ACCELEROMETER_AS_JOYSTICK                :: "SDL_ACCELEROMETER_AS_JOYSTICK"
 HINT_ALLOW_ALT_TAB_WHILE_GRABBED              :: "SDL_ALLOW_ALT_TAB_WHILE_GRABBED"

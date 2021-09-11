@@ -3,7 +3,7 @@ package portmidi
 import "core:c"
 import "core:strings"
 
-when ODIN_OS == "windows" do foreign import lib "portmidi.lib"
+when ODIN_OS == "windows" { foreign import lib "portmidi.lib" }
 
 #assert(size_of(b32) == size_of(c.int))
 

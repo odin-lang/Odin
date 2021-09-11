@@ -71,13 +71,17 @@ priority_queue_push :: proc(q: ^$Q/Priority_Queue($T), item: T) {
 	i := q.len
 	for i > 0 {
 		p := (i - 1) / 2
-		if q.priority(s[p]) <= q.priority(item) do break
+		if q.priority(s[p]) <= q.priority(item) { 
+			break 
+		}
 		s[i] = s[p]
 		i = p
 	}
 
 	q.len += 1
-	if q.len > 0 do s[i] = item
+	if q.len > 0 { 
+		s[i] = item 
+	} 
 }
 
 
@@ -96,12 +100,16 @@ priority_queue_pop :: proc(q: ^$Q/Priority_Queue($T)) -> T {
 		b := i * 2 + 2
 		c := b < q.len && q.priority(s[b]) < q.priority(s[a]) ? b : a
 
-		if q.priority(s[c]) >= q.priority(root) do break
+		if q.priority(s[c]) >= q.priority(root) {
+			break
+		}
 		s[i] = s[c]
 		i = c
 	}
 
-	if q.len > 0 do s[i] = root
+	if q.len > 0 {
+		s[i] = root
+	}
 	return min
 }
 
