@@ -11,7 +11,9 @@ package xxhash
 
 import "core:intrinsics"
 import "core:runtime"
-mem_copy :: runtime.mem_copy
+import "core:sys/llvm"
+mem_copy  :: runtime.mem_copy
+byte_swap :: intrinsics.byte_swap
 
 /*
 	Version definition
@@ -43,6 +45,22 @@ Error :: enum {
 	Error,
 }
 
+XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, false)
+
+when !XXH_DISABLE_PREFETCH {
+	prefetch_address :: #force_inline proc(address: rawptr) {
+		llvm.prefetch(address, .Read, .High, .Data)
+	}
+	prefetch_offset  :: #force_inline proc(address: rawptr, auto_cast offset: uintptr) {
+		ptr := rawptr(uintptr(address) + offset)
+		prefetch_address(ptr)
+	}
+} else {
+	prefetch_address :: #force_inline proc(address: rawptr) {}
+	prefetch_offset  :: #force_inline proc(address: rawptr, auto_cast offset: uintptr) {}
+}
+prefetch :: proc { prefetch_address, prefetch_offset, }
+
 @(optimization_mode="speed")
 XXH_rotl32 :: #force_inline proc(x, r: u32) -> (res: u32) {
 	return ((x << r) | (x >> (32 - r)))
@@ -54,7 +72,7 @@ XXH_rotl64 :: #force_inline proc(x, r: u64) -> (res: u64) {
 }
 
 @(optimization_mode="speed")
-XXH32_read32 :: #force_inline proc(buf: []u8, alignment: Alignment) -> (res: u32) {
+XXH32_read32 :: #force_inline proc(buf: []u8, alignment := Alignment.Unaligned) -> (res: u32) {
 	if XXH_FORCE_MEMORY_ACCESS == 2 || alignment == .Aligned {
 		#no_bounds_check b := (^u32le)(&buf[0])^
 		return u32(b)
@@ -66,7 +84,7 @@ XXH32_read32 :: #force_inline proc(buf: []u8, alignment: Alignment) -> (res: u32
 }
 
 @(optimization_mode="speed")
-XXH64_read64 :: #force_inline proc(buf: []u8, alignment: Alignment) -> (res: u64) {
+XXH64_read64 :: #force_inline proc(buf: []u8, alignment := Alignment.Unaligned) -> (res: u64) {
 	if XXH_FORCE_MEMORY_ACCESS == 2 || alignment == .Aligned {
 		#no_bounds_check b := (^u64le)(&buf[0])^
 		return u64(b)
