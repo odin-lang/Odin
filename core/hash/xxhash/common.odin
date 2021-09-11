@@ -47,7 +47,10 @@ Error :: enum {
 
 XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, false)
 
-when !XXH_DISABLE_PREFETCH {
+/*
+	llvm.prefetch fails code generation on Linux.
+*/
+when !XXH_DISABLE_PREFETCH && ODIN_OS == "windows" {
 	import "core:sys/llvm"
 
 	prefetch_address :: #force_inline proc(address: rawptr) {
