@@ -888,7 +888,6 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
-
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	lbModule *m = p->module;
 	t = reduce_tuple_to_single_type(t);
@@ -2981,8 +2980,12 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		lbValue low  = lb_const_int(p->module, t_int, 0);
 		lbValue high = {};
 
-		if (se->low  != nullptr) low  = lb_build_expr(p, se->low);
-		if (se->high != nullptr) high = lb_build_expr(p, se->high);
+		if (se->low  != nullptr) {
+			low = lb_correct_endianness(p, lb_build_expr(p, se->low));
+		}
+		if (se->high != nullptr) {
+			high = lb_correct_endianness(p, lb_build_expr(p, se->high));
+		}
 
 		bool no_indices = se->low == nullptr && se->high == nullptr;
 
