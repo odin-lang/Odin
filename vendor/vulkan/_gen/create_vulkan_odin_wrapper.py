@@ -375,6 +375,7 @@ def parse_enums(f):
 
 
     unused_flags = [flag for flag in flags_defs if flag not in generated_flags]
+    unused_flags.sort()
 
     max_len = max(len(flag) for flag in unused_flags)
     for flag in unused_flags:
