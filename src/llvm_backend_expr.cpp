@@ -2872,13 +2872,13 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			auto index_tv = type_and_value_of_expr(ie->index);
 
 			lbValue index = {};
-			if (compare_exact_values(Token_NotEq, t->EnumeratedArray.min_value, exact_value_i64(0))) {
+			if (compare_exact_values(Token_NotEq, *t->EnumeratedArray.min_value, exact_value_i64(0))) {
 				if (index_tv.mode == Addressing_Constant) {
-					ExactValue idx = exact_value_sub(index_tv.value, t->EnumeratedArray.min_value);
+					ExactValue idx = exact_value_sub(index_tv.value, *t->EnumeratedArray.min_value);
 					index = lb_const_value(p->module, index_type, idx);
 				} else {
 					index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-					index = lb_emit_arith(p, Token_Sub, index, lb_const_value(p->module, index_type, t->EnumeratedArray.min_value), index_type);
+					index = lb_emit_arith(p, Token_Sub, index, lb_const_value(p->module, index_type, *t->EnumeratedArray.min_value), index_type);
 				}
 			} else {
 				index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
@@ -3472,7 +3472,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				}
 
 
-				i32 index_offset = cast(i32)exact_value_to_i64(bt->EnumeratedArray.min_value);
+				i32 index_offset = cast(i32)exact_value_to_i64(*bt->EnumeratedArray.min_value);
 
 				for_array(i, temp_data) {
 					i32 index = temp_data[i].elem_index - index_offset;

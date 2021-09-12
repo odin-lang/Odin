@@ -1023,10 +1023,10 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				if (poly->EnumeratedArray.count != source->EnumeratedArray.count) {
 					return false;
 				}
-				if (compare_exact_values(Token_NotEq, poly->EnumeratedArray.min_value, source->EnumeratedArray.min_value)) {
+				if (compare_exact_values(Token_NotEq, *poly->EnumeratedArray.min_value, *source->EnumeratedArray.min_value)) {
 					return false;
 				}
-				if (compare_exact_values(Token_NotEq, poly->EnumeratedArray.max_value, source->EnumeratedArray.max_value)) {
+				if (compare_exact_values(Token_NotEq, *poly->EnumeratedArray.max_value, *source->EnumeratedArray.max_value)) {
 					return false;
 				}
 				return is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
@@ -3425,8 +3425,8 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 			if (is_type_enum(index_type)) {
 				Type *bt = base_type(index_type);
 				GB_ASSERT(bt->kind == Type_Enum);
-				ExactValue lo = bt->Enum.min_value;
-				ExactValue hi = bt->Enum.max_value;
+				ExactValue const &lo = *bt->Enum.min_value;
+				ExactValue const &hi = *bt->Enum.max_value;
 				String lo_str = {};
 				String hi_str = {};
 				if (bt->Enum.fields.count > 0) {
@@ -3556,7 +3556,7 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 						if (is_type_enumerated_array(node->tav.type)) {
 							Type *bt = base_type(node->tav.type);
 							GB_ASSERT(bt->kind == Type_EnumeratedArray);
-							corrected_index = index + exact_value_to_i64(bt->EnumeratedArray.min_value);
+							corrected_index = index + exact_value_to_i64(*bt->EnumeratedArray.min_value);
 						}
 						if (op != Token_RangeHalf) {
 							if (lo <= corrected_index && corrected_index <= hi) {
@@ -3580,7 +3580,7 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 						if (is_type_enumerated_array(node->tav.type)) {
 							Type *bt = base_type(node->tav.type);
 							GB_ASSERT(bt->kind == Type_EnumeratedArray);
-							index_value = exact_value_sub(index_value, bt->EnumeratedArray.min_value);
+							index_value = exact_value_sub(index_value, *bt->EnumeratedArray.min_value);
 						}
 
 						i64 field_index = exact_value_to_i64(index_value);
@@ -3727,6 +3727,18 @@ void check_did_you_mean_print(DidYouMeanAnswers *d) {
 }
 
 void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) {
+	ERROR_BLOCK();
+	
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, fields) {
+		did_you_mean_append(&d, fields[i]->token.string);
+	}
+	check_did_you_mean_print(&d);
+}
+
+void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields) {
 	ERROR_BLOCK();
 	
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
@@ -7305,8 +7317,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			gbString index_type_str = type_to_string(index_type);
 			defer (gb_string_free(index_type_str));
 
-			i64 total_lo = exact_value_to_i64(t->EnumeratedArray.min_value);
-			i64 total_hi = exact_value_to_i64(t->EnumeratedArray.max_value);
+			i64 total_lo = exact_value_to_i64(*t->EnumeratedArray.min_value);
+			i64 total_hi = exact_value_to_i64(*t->EnumeratedArray.max_value);
 
 			String total_lo_string = {};
 			String total_hi_string = {};
@@ -7319,10 +7331,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					if (f->kind != Entity_Constant) {
 						continue;
 					}
-					if (total_lo_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, t->EnumeratedArray.min_value)) {
+					if (total_lo_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, *t->EnumeratedArray.min_value)) {
 						total_lo_string = f->token.string;
 					}
-					if (total_hi_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, t->EnumeratedArray.max_value)) {
+					if (total_hi_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, *t->EnumeratedArray.max_value)) {
 						total_hi_string = f->token.string;
 					}
 					if (total_lo_string.len != 0 && total_hi_string.len != 0) {
@@ -8472,13 +8484,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		Type *params = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
 		if (param_types.count != 0) {
-			array_init(&params->Tuple.variables, heap_allocator(), param_types.count);
+			slice_init(&params->Tuple.variables, heap_allocator(), param_types.count);
 			for_array(i, param_types) {
 				params->Tuple.variables[i] = alloc_entity_param(scope, blank_token, param_types[i], false, true);
 			}
 		}
 		if (return_type != nullptr) {
-			array_init(&results->Tuple.variables, heap_allocator(), 1);
+			slice_init(&results->Tuple.variables, heap_allocator(), 1);
 			results->Tuple.variables[0] = alloc_entity_param(scope, blank_token, return_type, false, true);
 		}
 
