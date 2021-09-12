@@ -186,7 +186,7 @@ test_xxhash_vectors :: proc(t: ^testing.T) {
 		}
 	}
 
-	fmt.println("Verifying against XXHASH_TEST_VECTOR_SEEDED:")
+	fmt.println("Verifying against XXHASH_TEST_VECTOR_SECRET:")
 	for secret, table in XXHASH_TEST_VECTOR_SECRET {
 		fmt.printf("\tSecret:\n\t\t\"%v\"\n", secret)
 
