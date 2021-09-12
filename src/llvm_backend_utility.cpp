@@ -38,6 +38,16 @@ bool lb_is_type_aggregate(Type *t) {
 }
 
 
+lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
+	Type *src = core_type(value.type);
+	GB_ASSERT(is_type_integer(src) || is_type_float(src));
+	if (is_type_different_to_arch_endianness(src)) {
+		Type *platform_src_type = integer_endian_type_to_platform_type(src);
+		value = lb_emit_byte_swap(p, value, platform_src_type);
+	}
+	return value;
+}
+
 void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment) {
 	bool is_inlinable = false;
 
@@ -1125,6 +1135,7 @@ lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, isize index) {
 }
 
 lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
+	index = lb_correct_endianness(p, index);
 	LLVMValueRef indices[1] = {index.value};
 	lbValue res = {};
 	res.type = ptr.type;
