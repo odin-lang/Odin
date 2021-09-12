@@ -181,9 +181,9 @@ InstanceCreateInfo :: struct {
 	flags:                   InstanceCreateFlags,
 	pApplicationInfo:        ^ApplicationInfo,
 	enabledLayerCount:       u32,
-	ppEnabledLayerNames:     cstring_array,
+	ppEnabledLayerNames:     [^]cstring,
 	enabledExtensionCount:   u32,
-	ppEnabledExtensionNames: cstring_array,
+	ppEnabledExtensionNames: [^]cstring,
 }
 
 MemoryHeap :: struct {
@@ -403,7 +403,7 @@ DeviceQueueCreateInfo :: struct {
 	flags:            DeviceQueueCreateFlags,
 	queueFamilyIndex: u32,
 	queueCount:       u32,
-	pQueuePriorities: ^f32,
+	pQueuePriorities: [^]f32,
 }
 
 DeviceCreateInfo :: struct {
@@ -411,12 +411,12 @@ DeviceCreateInfo :: struct {
 	pNext:                   rawptr,
 	flags:                   DeviceCreateFlags,
 	queueCreateInfoCount:    u32,
-	pQueueCreateInfos:       ^DeviceQueueCreateInfo,
+	pQueueCreateInfos:       [^]DeviceQueueCreateInfo,
 	enabledLayerCount:       u32,
-	ppEnabledLayerNames:     cstring_array,
+	ppEnabledLayerNames:     [^]cstring,
 	enabledExtensionCount:   u32,
-	ppEnabledExtensionNames: cstring_array,
-	pEnabledFeatures:        ^PhysicalDeviceFeatures,
+	ppEnabledExtensionNames: [^]cstring,
+	pEnabledFeatures:        [^]PhysicalDeviceFeatures,
 }
 
 ExtensionProperties :: struct {
@@ -435,12 +435,12 @@ SubmitInfo :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	waitSemaphoreCount:   u32,
-	pWaitSemaphores:      ^Semaphore,
-	pWaitDstStageMask:    ^PipelineStageFlags,
+	pWaitSemaphores:      [^]Semaphore,
+	pWaitDstStageMask:    [^]PipelineStageFlags,
 	commandBufferCount:   u32,
-	pCommandBuffers:      ^CommandBuffer,
+	pCommandBuffers:      [^]CommandBuffer,
 	signalSemaphoreCount: u32,
-	pSignalSemaphores:    ^Semaphore,
+	pSignalSemaphores:    [^]Semaphore,
 }
 
 MappedMemoryRange :: struct {
@@ -475,13 +475,13 @@ SparseMemoryBind :: struct {
 SparseBufferMemoryBindInfo :: struct {
 	buffer:    Buffer,
 	bindCount: u32,
-	pBinds:    ^SparseMemoryBind,
+	pBinds:    [^]SparseMemoryBind,
 }
 
 SparseImageOpaqueMemoryBindInfo :: struct {
 	image:     Image,
 	bindCount: u32,
-	pBinds:    ^SparseMemoryBind,
+	pBinds:    [^]SparseMemoryBind,
 }
 
 ImageSubresource :: struct {
@@ -502,22 +502,22 @@ SparseImageMemoryBind :: struct {
 SparseImageMemoryBindInfo :: struct {
 	image:     Image,
 	bindCount: u32,
-	pBinds:    ^SparseImageMemoryBind,
+	pBinds:    [^]SparseImageMemoryBind,
 }
 
 BindSparseInfo :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	waitSemaphoreCount:   u32,
-	pWaitSemaphores:      ^Semaphore,
+	pWaitSemaphores:      [^]Semaphore,
 	bufferBindCount:      u32,
-	pBufferBinds:         ^SparseBufferMemoryBindInfo,
+	pBufferBinds:         [^]SparseBufferMemoryBindInfo,
 	imageOpaqueBindCount: u32,
-	pImageOpaqueBinds:    ^SparseImageOpaqueMemoryBindInfo,
+	pImageOpaqueBinds:    [^]SparseImageOpaqueMemoryBindInfo,
 	imageBindCount:       u32,
-	pImageBinds:          ^SparseImageMemoryBindInfo,
+	pImageBinds:          [^]SparseImageMemoryBindInfo,
 	signalSemaphoreCount: u32,
-	pSignalSemaphores:    ^Semaphore,
+	pSignalSemaphores:    [^]Semaphore,
 }
 
 SparseImageFormatProperties :: struct {
@@ -569,7 +569,7 @@ BufferCreateInfo :: struct {
 	usage:                 BufferUsageFlags,
 	sharingMode:           SharingMode,
 	queueFamilyIndexCount: u32,
-	pQueueFamilyIndices:   ^u32,
+	pQueueFamilyIndices:   [^]u32,
 }
 
 BufferViewCreateInfo :: struct {
@@ -596,7 +596,7 @@ ImageCreateInfo :: struct {
 	usage:                 ImageUsageFlags,
 	sharingMode:           SharingMode,
 	queueFamilyIndexCount: u32,
-	pQueueFamilyIndices:   ^u32,
+	pQueueFamilyIndices:   [^]u32,
 	initialLayout:         ImageLayout,
 }
 
@@ -650,7 +650,7 @@ SpecializationMapEntry :: struct {
 
 SpecializationInfo :: struct {
 	mapEntryCount: u32,
-	pMapEntries:   ^SpecializationMapEntry,
+	pMapEntries:   [^]SpecializationMapEntry,
 	dataSize:      int,
 	pData:         rawptr,
 }
@@ -693,9 +693,9 @@ PipelineVertexInputStateCreateInfo :: struct {
 	pNext:                           rawptr,
 	flags:                           PipelineVertexInputStateCreateFlags,
 	vertexBindingDescriptionCount:   u32,
-	pVertexBindingDescriptions:      ^VertexInputBindingDescription,
+	pVertexBindingDescriptions:      [^]VertexInputBindingDescription,
 	vertexAttributeDescriptionCount: u32,
-	pVertexAttributeDescriptions:    ^VertexInputAttributeDescription,
+	pVertexAttributeDescriptions:    [^]VertexInputAttributeDescription,
 }
 
 PipelineInputAssemblyStateCreateInfo :: struct {
@@ -727,9 +727,9 @@ PipelineViewportStateCreateInfo :: struct {
 	pNext:         rawptr,
 	flags:         PipelineViewportStateCreateFlags,
 	viewportCount: u32,
-	pViewports:    ^Viewport,
+	pViewports:    [^]Viewport,
 	scissorCount:  u32,
-	pScissors:     ^Rect2D,
+	pScissors:     [^]Rect2D,
 }
 
 PipelineRasterizationStateCreateInfo :: struct {
@@ -803,7 +803,7 @@ PipelineColorBlendStateCreateInfo :: struct {
 	logicOpEnable:   b32,
 	logicOp:         LogicOp,
 	attachmentCount: u32,
-	pAttachments:    ^PipelineColorBlendAttachmentState,
+	pAttachments:    [^]PipelineColorBlendAttachmentState,
 	blendConstants:  [4]f32,
 }
 
@@ -812,7 +812,7 @@ PipelineDynamicStateCreateInfo :: struct {
 	pNext:             rawptr,
 	flags:             PipelineDynamicStateCreateFlags,
 	dynamicStateCount: u32,
-	pDynamicStates:    ^DynamicState,
+	pDynamicStates:    [^]DynamicState,
 }
 
 GraphicsPipelineCreateInfo :: struct {
@@ -820,7 +820,7 @@ GraphicsPipelineCreateInfo :: struct {
 	pNext:               rawptr,
 	flags:               PipelineCreateFlags,
 	stageCount:          u32,
-	pStages:             ^PipelineShaderStageCreateInfo,
+	pStages:             [^]PipelineShaderStageCreateInfo,
 	pVertexInputState:   ^PipelineVertexInputStateCreateInfo,
 	pInputAssemblyState: ^PipelineInputAssemblyStateCreateInfo,
 	pTessellationState:  ^PipelineTessellationStateCreateInfo,
@@ -848,9 +848,9 @@ PipelineLayoutCreateInfo :: struct {
 	pNext:                  rawptr,
 	flags:                  PipelineLayoutCreateFlags,
 	setLayoutCount:         u32,
-	pSetLayouts:            ^DescriptorSetLayout,
+	pSetLayouts:            [^]DescriptorSetLayout,
 	pushConstantRangeCount: u32,
-	pPushConstantRanges:    ^PushConstantRange,
+	pPushConstantRanges:    [^]PushConstantRange,
 }
 
 SamplerCreateInfo :: struct {
@@ -909,7 +909,7 @@ DescriptorPoolCreateInfo :: struct {
 	flags:         DescriptorPoolCreateFlags,
 	maxSets:       u32,
 	poolSizeCount: u32,
-	pPoolSizes:    ^DescriptorPoolSize,
+	pPoolSizes:    [^]DescriptorPoolSize,
 }
 
 DescriptorSetAllocateInfo :: struct {
@@ -917,7 +917,7 @@ DescriptorSetAllocateInfo :: struct {
 	pNext:              rawptr,
 	descriptorPool:     DescriptorPool,
 	descriptorSetCount: u32,
-	pSetLayouts:        ^DescriptorSetLayout,
+	pSetLayouts:        [^]DescriptorSetLayout,
 }
 
 DescriptorSetLayoutBinding :: struct {
@@ -925,7 +925,7 @@ DescriptorSetLayoutBinding :: struct {
 	descriptorType:     DescriptorType,
 	descriptorCount:    u32,
 	stageFlags:         ShaderStageFlags,
-	pImmutableSamplers: ^Sampler,
+	pImmutableSamplers: [^]Sampler,
 }
 
 DescriptorSetLayoutCreateInfo :: struct {
@@ -933,7 +933,7 @@ DescriptorSetLayoutCreateInfo :: struct {
 	pNext:        rawptr,
 	flags:        DescriptorSetLayoutCreateFlags,
 	bindingCount: u32,
-	pBindings:    ^DescriptorSetLayoutBinding,
+	pBindings:    [^]DescriptorSetLayoutBinding,
 }
 
 WriteDescriptorSet :: struct {
@@ -972,7 +972,7 @@ FramebufferCreateInfo :: struct {
 	flags:           FramebufferCreateFlags,
 	renderPass:      RenderPass,
 	attachmentCount: u32,
-	pAttachments:    ^ImageView,
+	pAttachments:    [^]ImageView,
 	width:           u32,
 	height:          u32,
 	layers:          u32,
@@ -982,13 +982,13 @@ SubpassDescription :: struct {
 	flags:                   SubpassDescriptionFlags,
 	pipelineBindPoint:       PipelineBindPoint,
 	inputAttachmentCount:    u32,
-	pInputAttachments:       ^AttachmentReference,
+	pInputAttachments:       [^]AttachmentReference,
 	colorAttachmentCount:    u32,
-	pColorAttachments:       ^AttachmentReference,
-	pResolveAttachments:     ^AttachmentReference,
+	pColorAttachments:       [^]AttachmentReference,
+	pResolveAttachments:     [^]AttachmentReference,
 	pDepthStencilAttachment: ^AttachmentReference,
 	preserveAttachmentCount: u32,
-	pPreserveAttachments:    ^u32,
+	pPreserveAttachments:    [^]u32,
 }
 
 SubpassDependency :: struct {
@@ -1006,11 +1006,11 @@ RenderPassCreateInfo :: struct {
 	pNext:           rawptr,
 	flags:           RenderPassCreateFlags,
 	attachmentCount: u32,
-	pAttachments:    ^AttachmentDescription,
+	pAttachments:    [^]AttachmentDescription,
 	subpassCount:    u32,
-	pSubpasses:      ^SubpassDescription,
+	pSubpasses:      [^]SubpassDescription,
 	dependencyCount: u32,
-	pDependencies:   ^SubpassDependency,
+	pDependencies:   [^]SubpassDependency,
 }
 
 CommandPoolCreateInfo :: struct {
@@ -1126,7 +1126,7 @@ RenderPassBeginInfo :: struct {
 	framebuffer:     Framebuffer,
 	renderArea:      Rect2D,
 	clearValueCount: u32,
-	pClearValues:    ^ClearValue,
+	pClearValues:    [^]ClearValue,
 }
 
 PhysicalDeviceSubgroupProperties :: struct {
@@ -1189,7 +1189,7 @@ DeviceGroupRenderPassBeginInfo :: struct {
 	pNext:                 rawptr,
 	deviceMask:            u32,
 	deviceRenderAreaCount: u32,
-	pDeviceRenderAreas:    ^Rect2D,
+	pDeviceRenderAreas:    [^]Rect2D,
 }
 
 DeviceGroupCommandBufferBeginInfo :: struct {
@@ -1202,11 +1202,11 @@ DeviceGroupSubmitInfo :: struct {
 	sType:                         StructureType,
 	pNext:                         rawptr,
 	waitSemaphoreCount:            u32,
-	pWaitSemaphoreDeviceIndices:   ^u32,
+	pWaitSemaphoreDeviceIndices:   [^]u32,
 	commandBufferCount:            u32,
-	pCommandBufferDeviceMasks:     ^u32,
+	pCommandBufferDeviceMasks:     [^]u32,
 	signalSemaphoreCount:          u32,
-	pSignalSemaphoreDeviceIndices: ^u32,
+	pSignalSemaphoreDeviceIndices: [^]u32,
 }
 
 DeviceGroupBindSparseInfo :: struct {
@@ -1220,16 +1220,16 @@ BindBufferMemoryDeviceGroupInfo :: struct {
 	sType:            StructureType,
 	pNext:            rawptr,
 	deviceIndexCount: u32,
-	pDeviceIndices:   ^u32,
+	pDeviceIndices:   [^]u32,
 }
 
 BindImageMemoryDeviceGroupInfo :: struct {
 	sType:                        StructureType,
 	pNext:                        rawptr,
 	deviceIndexCount:             u32,
-	pDeviceIndices:               ^u32,
+	pDeviceIndices:               [^]u32,
 	splitInstanceBindRegionCount: u32,
-	pSplitInstanceBindRegions:    ^Rect2D,
+	pSplitInstanceBindRegions:    [^]Rect2D,
 }
 
 PhysicalDeviceGroupProperties :: struct {
@@ -1244,7 +1244,7 @@ DeviceGroupDeviceCreateInfo :: struct {
 	sType:               StructureType,
 	pNext:               rawptr,
 	physicalDeviceCount: u32,
-	pPhysicalDevices:    ^PhysicalDevice,
+	pPhysicalDevices:    [^]PhysicalDevice,
 }
 
 BufferMemoryRequirementsInfo2 :: struct {
@@ -1355,7 +1355,7 @@ RenderPassInputAttachmentAspectCreateInfo :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	aspectReferenceCount: u32,
-	pAspectReferences:    ^InputAttachmentAspectReference,
+	pAspectReferences:    [^]InputAttachmentAspectReference,
 }
 
 ImageViewUsageCreateInfo :: struct {
@@ -1374,11 +1374,11 @@ RenderPassMultiviewCreateInfo :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	subpassCount:         u32,
-	pViewMasks:           ^u32,
+	pViewMasks:           [^]u32,
 	dependencyCount:      u32,
-	pViewOffsets:         ^i32,
+	pViewOffsets:         [^]i32,
 	correlationMaskCount: u32,
-	pCorrelationMasks:    ^u32,
+	pCorrelationMasks:    [^]u32,
 }
 
 PhysicalDeviceMultiviewFeatures :: struct {
@@ -1486,7 +1486,7 @@ DescriptorUpdateTemplateCreateInfo :: struct {
 	pNext:                      rawptr,
 	flags:                      DescriptorUpdateTemplateCreateFlags,
 	descriptorUpdateEntryCount: u32,
-	pDescriptorUpdateEntries:   ^DescriptorUpdateTemplateEntry,
+	pDescriptorUpdateEntries:   [^]DescriptorUpdateTemplateEntry,
 	templateType:               DescriptorUpdateTemplateType,
 	descriptorSetLayout:        DescriptorSetLayout,
 	pipelineBindPoint:          PipelineBindPoint,
@@ -1770,7 +1770,7 @@ ImageFormatListCreateInfo :: struct {
 	sType:           StructureType,
 	pNext:           rawptr,
 	viewFormatCount: u32,
-	pViewFormats:    ^Format,
+	pViewFormats:    [^]Format,
 }
 
 AttachmentDescription2 :: struct {
@@ -1802,13 +1802,13 @@ SubpassDescription2 :: struct {
 	pipelineBindPoint:       PipelineBindPoint,
 	viewMask:                u32,
 	inputAttachmentCount:    u32,
-	pInputAttachments:       ^AttachmentReference2,
+	pInputAttachments:       [^]AttachmentReference2,
 	colorAttachmentCount:    u32,
-	pColorAttachments:       ^AttachmentReference2,
-	pResolveAttachments:     ^AttachmentReference2,
+	pColorAttachments:       [^]AttachmentReference2,
+	pResolveAttachments:     [^]AttachmentReference2,
 	pDepthStencilAttachment: ^AttachmentReference2,
 	preserveAttachmentCount: u32,
-	pPreserveAttachments:    ^u32,
+	pPreserveAttachments:    [^]u32,
 }
 
 SubpassDependency2 :: struct {
@@ -1829,13 +1829,13 @@ RenderPassCreateInfo2 :: struct {
 	pNext:                   rawptr,
 	flags:                   RenderPassCreateFlags,
 	attachmentCount:         u32,
-	pAttachments:            ^AttachmentDescription2,
+	pAttachments:            [^]AttachmentDescription2,
 	subpassCount:            u32,
-	pSubpasses:              ^SubpassDescription2,
+	pSubpasses:              [^]SubpassDescription2,
 	dependencyCount:         u32,
-	pDependencies:           ^SubpassDependency2,
+	pDependencies:           [^]SubpassDependency2,
 	correlatedViewMaskCount: u32,
-	pCorrelatedViewMasks:    ^u32,
+	pCorrelatedViewMasks:    [^]u32,
 }
 
 SubpassBeginInfo :: struct {
@@ -1906,7 +1906,7 @@ DescriptorSetLayoutBindingFlagsCreateInfo :: struct {
 	sType:         StructureType,
 	pNext:         rawptr,
 	bindingCount:  u32,
-	pBindingFlags: ^DescriptorBindingFlags,
+	pBindingFlags: [^]DescriptorBindingFlags,
 }
 
 PhysicalDeviceDescriptorIndexingFeatures :: struct {
@@ -1966,7 +1966,7 @@ DescriptorSetVariableDescriptorCountAllocateInfo :: struct {
 	sType:              StructureType,
 	pNext:              rawptr,
 	descriptorSetCount: u32,
-	pDescriptorCounts:  ^u32,
+	pDescriptorCounts:  [^]u32,
 }
 
 DescriptorSetVariableDescriptorCountLayoutSupport :: struct {
@@ -2040,21 +2040,21 @@ FramebufferAttachmentImageInfo :: struct {
 	height:          u32,
 	layerCount:      u32,
 	viewFormatCount: u32,
-	pViewFormats:    ^Format,
+	pViewFormats:    [^]Format,
 }
 
 FramebufferAttachmentsCreateInfo :: struct {
 	sType:                    StructureType,
 	pNext:                    rawptr,
 	attachmentImageInfoCount: u32,
-	pAttachmentImageInfos:    ^FramebufferAttachmentImageInfo,
+	pAttachmentImageInfos:    [^]FramebufferAttachmentImageInfo,
 }
 
 RenderPassAttachmentBeginInfo :: struct {
 	sType:           StructureType,
 	pNext:           rawptr,
 	attachmentCount: u32,
-	pAttachments:    ^ImageView,
+	pAttachments:    [^]ImageView,
 }
 
 PhysicalDeviceUniformBufferStandardLayoutFeatures :: struct {
@@ -2117,9 +2117,9 @@ TimelineSemaphoreSubmitInfo :: struct {
 	sType:                     StructureType,
 	pNext:                     rawptr,
 	waitSemaphoreValueCount:   u32,
-	pWaitSemaphoreValues:      ^u64,
+	pWaitSemaphoreValues:      [^]u64,
 	signalSemaphoreValueCount: u32,
-	pSignalSemaphoreValues:    ^u64,
+	pSignalSemaphoreValues:    [^]u64,
 }
 
 SemaphoreWaitInfo :: struct {
@@ -2127,8 +2127,8 @@ SemaphoreWaitInfo :: struct {
 	pNext:          rawptr,
 	flags:          SemaphoreWaitFlags,
 	semaphoreCount: u32,
-	pSemaphores:    ^Semaphore,
-	pValues:        ^u64,
+	pSemaphores:    [^]Semaphore,
+	pValues:        [^]u64,
 }
 
 SemaphoreSignalInfo :: struct {
@@ -2201,7 +2201,7 @@ SwapchainCreateInfoKHR :: struct {
 	imageUsage:            ImageUsageFlags,
 	imageSharingMode:      SharingMode,
 	queueFamilyIndexCount: u32,
-	pQueueFamilyIndices:   ^u32,
+	pQueueFamilyIndices:   [^]u32,
 	preTransform:          SurfaceTransformFlagsKHR,
 	compositeAlpha:        CompositeAlphaFlagsKHR,
 	presentMode:           PresentModeKHR,
@@ -2213,11 +2213,11 @@ PresentInfoKHR :: struct {
 	sType:              StructureType,
 	pNext:              rawptr,
 	waitSemaphoreCount: u32,
-	pWaitSemaphores:    ^Semaphore,
+	pWaitSemaphores:    [^]Semaphore,
 	swapchainCount:     u32,
-	pSwapchains:        ^SwapchainKHR,
-	pImageIndices:      ^u32,
-	pResults:           ^Result,
+	pSwapchains:        [^]SwapchainKHR,
+	pImageIndices:      [^]u32,
+	pResults:           [^]Result,
 }
 
 ImageSwapchainCreateInfoKHR :: struct {
@@ -2254,7 +2254,7 @@ DeviceGroupPresentInfoKHR :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
 	swapchainCount: u32,
-	pDeviceMasks:   ^u32,
+	pDeviceMasks:   [^]u32,
 	mode:           DeviceGroupPresentModeFlagsKHR,
 }
 
@@ -2379,14 +2379,14 @@ RectLayerKHR :: struct {
 
 PresentRegionKHR :: struct {
 	rectangleCount: u32,
-	pRectangles:    ^RectLayerKHR,
+	pRectangles:    [^]RectLayerKHR,
 }
 
 PresentRegionsKHR :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
 	swapchainCount: u32,
-	pRegions:       ^PresentRegionKHR,
+	pRegions:       [^]PresentRegionKHR,
 }
 
 SharedPresentSurfaceCapabilitiesKHR :: struct {
@@ -2447,7 +2447,7 @@ QueryPoolPerformanceCreateInfoKHR :: struct {
 	pNext:             rawptr,
 	queueFamilyIndex:  u32,
 	counterIndexCount: u32,
-	pCounterIndices:   ^u32,
+	pCounterIndices:   [^]u32,
 }
 
 PerformanceCounterResultKHR :: struct #raw_union {
@@ -2696,14 +2696,14 @@ PipelineLibraryCreateInfoKHR :: struct {
 	sType:        StructureType,
 	pNext:        rawptr,
 	libraryCount: u32,
-	pLibraries:   ^Pipeline,
+	pLibraries:   [^]Pipeline,
 }
 
 PresentIdKHR :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
 	swapchainCount: u32,
-	pPresentIds:    ^u64,
+	pPresentIds:    [^]u64,
 }
 
 PhysicalDevicePresentIdFeaturesKHR :: struct {
@@ -2755,11 +2755,11 @@ DependencyInfoKHR :: struct {
 	pNext:                    rawptr,
 	dependencyFlags:          DependencyFlags,
 	memoryBarrierCount:       u32,
-	pMemoryBarriers:          ^MemoryBarrier2KHR,
+	pMemoryBarriers:          [^]MemoryBarrier2KHR,
 	bufferMemoryBarrierCount: u32,
-	pBufferMemoryBarriers:    ^BufferMemoryBarrier2KHR,
+	pBufferMemoryBarriers:    [^]BufferMemoryBarrier2KHR,
 	imageMemoryBarrierCount:  u32,
-	pImageMemoryBarriers:     ^ImageMemoryBarrier2KHR,
+	pImageMemoryBarriers:     [^]ImageMemoryBarrier2KHR,
 }
 
 SemaphoreSubmitInfoKHR :: struct {
@@ -2783,11 +2783,11 @@ SubmitInfo2KHR :: struct {
 	pNext:                    rawptr,
 	flags:                    SubmitFlagsKHR,
 	waitSemaphoreInfoCount:   u32,
-	pWaitSemaphoreInfos:      ^SemaphoreSubmitInfoKHR,
+	pWaitSemaphoreInfos:      [^]SemaphoreSubmitInfoKHR,
 	commandBufferInfoCount:   u32,
-	pCommandBufferInfos:      ^CommandBufferSubmitInfoKHR,
+	pCommandBufferInfos:      [^]CommandBufferSubmitInfoKHR,
 	signalSemaphoreInfoCount: u32,
-	pSignalSemaphoreInfos:    ^SemaphoreSubmitInfoKHR,
+	pSignalSemaphoreInfos:    [^]SemaphoreSubmitInfoKHR,
 }
 
 PhysicalDeviceSynchronization2FeaturesKHR :: struct {
@@ -2844,7 +2844,7 @@ CopyBufferInfo2KHR :: struct {
 	srcBuffer:   Buffer,
 	dstBuffer:   Buffer,
 	regionCount: u32,
-	pRegions:    ^BufferCopy2KHR,
+	pRegions:    [^]BufferCopy2KHR,
 }
 
 ImageCopy2KHR :: struct {
@@ -2865,7 +2865,7 @@ CopyImageInfo2KHR :: struct {
 	dstImage:       Image,
 	dstImageLayout: ImageLayout,
 	regionCount:    u32,
-	pRegions:       ^ImageCopy2KHR,
+	pRegions:       [^]ImageCopy2KHR,
 }
 
 BufferImageCopy2KHR :: struct {
@@ -2886,7 +2886,7 @@ CopyBufferToImageInfo2KHR :: struct {
 	dstImage:       Image,
 	dstImageLayout: ImageLayout,
 	regionCount:    u32,
-	pRegions:       ^BufferImageCopy2KHR,
+	pRegions:       [^]BufferImageCopy2KHR,
 }
 
 CopyImageToBufferInfo2KHR :: struct {
@@ -2896,7 +2896,7 @@ CopyImageToBufferInfo2KHR :: struct {
 	srcImageLayout: ImageLayout,
 	dstBuffer:      Buffer,
 	regionCount:    u32,
-	pRegions:       ^BufferImageCopy2KHR,
+	pRegions:       [^]BufferImageCopy2KHR,
 }
 
 ImageBlit2KHR :: struct {
@@ -2916,7 +2916,7 @@ BlitImageInfo2KHR :: struct {
 	dstImage:       Image,
 	dstImageLayout: ImageLayout,
 	regionCount:    u32,
-	pRegions:       ^ImageBlit2KHR,
+	pRegions:       [^]ImageBlit2KHR,
 	filter:         Filter,
 }
 
@@ -2938,7 +2938,7 @@ ResolveImageInfo2KHR :: struct {
 	dstImage:       Image,
 	dstImageLayout: ImageLayout,
 	regionCount:    u32,
-	pRegions:       ^ImageResolve2KHR,
+	pRegions:       [^]ImageResolve2KHR,
 }
 
 DebugReportCallbackCreateInfoEXT :: struct {
@@ -3054,9 +3054,9 @@ CuLaunchInfoNVX :: struct {
 	blockDimZ:      u32,
 	sharedMemBytes: u32,
 	paramCount:     int,
-	pParams:        ^rawptr,
+	pParams:        [^]rawptr,
 	extraCount:     int,
-	pExtras:        ^rawptr,
+	pExtras:        [^]rawptr,
 }
 
 ImageViewHandleInfoNVX :: struct {
@@ -3127,7 +3127,7 @@ ValidationFlagsEXT :: struct {
 	sType:                        StructureType,
 	pNext:                        rawptr,
 	disabledValidationCheckCount: u32,
-	pDisabledValidationChecks:    ^ValidationCheckEXT,
+	pDisabledValidationChecks:    [^]ValidationCheckEXT,
 }
 
 PhysicalDeviceTextureCompressionASTCHDRFeaturesEXT :: struct {
@@ -3179,7 +3179,7 @@ PipelineViewportWScalingStateCreateInfoNV :: struct {
 	pNext:                  rawptr,
 	viewportWScalingEnable: b32,
 	viewportCount:          u32,
-	pViewportWScalings:     ^ViewportWScalingNV,
+	pViewportWScalings:     [^]ViewportWScalingNV,
 }
 
 SurfaceCapabilities2EXT :: struct {
@@ -3243,7 +3243,7 @@ PresentTimesInfoGOOGLE :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
 	swapchainCount: u32,
-	pTimes:         ^PresentTimeGOOGLE,
+	pTimes:         [^]PresentTimeGOOGLE,
 }
 
 PhysicalDeviceMultiviewPerViewAttributesPropertiesNVX :: struct {
@@ -3264,7 +3264,7 @@ PipelineViewportSwizzleStateCreateInfoNV :: struct {
 	pNext:             rawptr,
 	flags:             PipelineViewportSwizzleStateCreateFlagsNV,
 	viewportCount:     u32,
-	pViewportSwizzles: ^ViewportSwizzleNV,
+	pViewportSwizzles: [^]ViewportSwizzleNV,
 }
 
 PhysicalDeviceDiscardRectanglePropertiesEXT :: struct {
@@ -3279,7 +3279,7 @@ PipelineDiscardRectangleStateCreateInfoEXT :: struct {
 	flags:                 PipelineDiscardRectangleStateCreateFlagsEXT,
 	discardRectangleMode:  DiscardRectangleModeEXT,
 	discardRectangleCount: u32,
-	pDiscardRectangles:    ^Rect2D,
+	pDiscardRectangles:    [^]Rect2D,
 }
 
 PhysicalDeviceConservativeRasterizationPropertiesEXT :: struct {
@@ -3358,11 +3358,11 @@ DebugUtilsMessengerCallbackDataEXT :: struct {
 	messageIdNumber:  i32,
 	pMessage:         cstring,
 	queueLabelCount:  u32,
-	pQueueLabels:     ^DebugUtilsLabelEXT,
+	pQueueLabels:     [^]DebugUtilsLabelEXT,
 	cmdBufLabelCount: u32,
-	pCmdBufLabels:    ^DebugUtilsLabelEXT,
+	pCmdBufLabels:    [^]DebugUtilsLabelEXT,
 	objectCount:      u32,
-	pObjects:         ^DebugUtilsObjectNameInfoEXT,
+	pObjects:         [^]DebugUtilsObjectNameInfoEXT,
 }
 
 DebugUtilsMessengerCreateInfoEXT :: struct {
@@ -3426,7 +3426,7 @@ SampleLocationsInfoEXT :: struct {
 	sampleLocationsPerPixel: SampleCountFlags,
 	sampleLocationGridSize:  Extent2D,
 	sampleLocationsCount:    u32,
-	pSampleLocations:        ^SampleLocationEXT,
+	pSampleLocations:        [^]SampleLocationEXT,
 }
 
 AttachmentSampleLocationsEXT :: struct {
@@ -3443,9 +3443,9 @@ RenderPassSampleLocationsBeginInfoEXT :: struct {
 	sType:                                 StructureType,
 	pNext:                                 rawptr,
 	attachmentInitialSampleLocationsCount: u32,
-	pAttachmentInitialSampleLocations:     ^AttachmentSampleLocationsEXT,
+	pAttachmentInitialSampleLocations:     [^]AttachmentSampleLocationsEXT,
 	postSubpassSampleLocationsCount:       u32,
-	pPostSubpassSampleLocations:           ^SubpassSampleLocationsEXT,
+	pPostSubpassSampleLocations:           [^]SubpassSampleLocationsEXT,
 }
 
 PipelineSampleLocationsStateCreateInfoEXT :: struct {
@@ -3511,7 +3511,7 @@ PipelineCoverageModulationStateCreateInfoNV :: struct {
 	coverageModulationMode:        CoverageModulationModeNV,
 	coverageModulationTableEnable: b32,
 	coverageModulationTableCount:  u32,
-	pCoverageModulationTable:      ^f32,
+	pCoverageModulationTable:      [^]f32,
 }
 
 PhysicalDeviceShaderSMBuiltinsPropertiesNV :: struct {
@@ -3537,7 +3537,7 @@ DrmFormatModifierPropertiesListEXT :: struct {
 	sType:                        StructureType,
 	pNext:                        rawptr,
 	drmFormatModifierCount:       u32,
-	pDrmFormatModifierProperties: ^DrmFormatModifierPropertiesEXT,
+	pDrmFormatModifierProperties: [^]DrmFormatModifierPropertiesEXT,
 }
 
 PhysicalDeviceImageDrmFormatModifierInfoEXT :: struct {
@@ -3546,14 +3546,14 @@ PhysicalDeviceImageDrmFormatModifierInfoEXT :: struct {
 	drmFormatModifier:     u64,
 	sharingMode:           SharingMode,
 	queueFamilyIndexCount: u32,
-	pQueueFamilyIndices:   ^u32,
+	pQueueFamilyIndices:   [^]u32,
 }
 
 ImageDrmFormatModifierListCreateInfoEXT :: struct {
 	sType:                  StructureType,
 	pNext:                  rawptr,
 	drmFormatModifierCount: u32,
-	pDrmFormatModifiers:    ^u64,
+	pDrmFormatModifiers:    [^]u64,
 }
 
 ImageDrmFormatModifierExplicitCreateInfoEXT :: struct {
@@ -3561,7 +3561,7 @@ ImageDrmFormatModifierExplicitCreateInfoEXT :: struct {
 	pNext:                       rawptr,
 	drmFormatModifier:           u64,
 	drmFormatModifierPlaneCount: u32,
-	pPlaneLayouts:               ^SubresourceLayout,
+	pPlaneLayouts:               [^]SubresourceLayout,
 }
 
 ImageDrmFormatModifierPropertiesEXT :: struct {
@@ -3586,7 +3586,7 @@ ShaderModuleValidationCacheCreateInfoEXT :: struct {
 
 ShadingRatePaletteNV :: struct {
 	shadingRatePaletteEntryCount: u32,
-	pShadingRatePaletteEntries:   ^ShadingRatePaletteEntryNV,
+	pShadingRatePaletteEntries:   [^]ShadingRatePaletteEntryNV,
 }
 
 PipelineViewportShadingRateImageStateCreateInfoNV :: struct {
@@ -3594,7 +3594,7 @@ PipelineViewportShadingRateImageStateCreateInfoNV :: struct {
 	pNext:                  rawptr,
 	shadingRateImageEnable: b32,
 	viewportCount:          u32,
-	pShadingRatePalettes:   ^ShadingRatePaletteNV,
+	pShadingRatePalettes:   [^]ShadingRatePaletteNV,
 }
 
 PhysicalDeviceShadingRateImageFeaturesNV :: struct {
@@ -3622,7 +3622,7 @@ CoarseSampleOrderCustomNV :: struct {
 	shadingRate:         ShadingRatePaletteEntryNV,
 	sampleCount:         u32,
 	sampleLocationCount: u32,
-	pSampleLocations:    ^CoarseSampleLocationNV,
+	pSampleLocations:    [^]CoarseSampleLocationNV,
 }
 
 PipelineViewportCoarseSampleOrderStateCreateInfoNV :: struct {
@@ -3630,7 +3630,7 @@ PipelineViewportCoarseSampleOrderStateCreateInfoNV :: struct {
 	pNext:                  rawptr,
 	sampleOrderType:        CoarseSampleOrderTypeNV,
 	customSampleOrderCount: u32,
-	pCustomSampleOrders:    ^CoarseSampleOrderCustomNV,
+	pCustomSampleOrders:    [^]CoarseSampleOrderCustomNV,
 }
 
 RayTracingShaderGroupCreateInfoNV :: struct {
@@ -3648,9 +3648,9 @@ RayTracingPipelineCreateInfoNV :: struct {
 	pNext:              rawptr,
 	flags:              PipelineCreateFlags,
 	stageCount:         u32,
-	pStages:            ^PipelineShaderStageCreateInfo,
+	pStages:            [^]PipelineShaderStageCreateInfo,
 	groupCount:         u32,
-	pGroups:            ^RayTracingShaderGroupCreateInfoNV,
+	pGroups:            [^]RayTracingShaderGroupCreateInfoNV,
 	maxRecursionDepth:  u32,
 	layout:             PipelineLayout,
 	basePipelineHandle: Pipeline,
@@ -3702,7 +3702,7 @@ AccelerationStructureInfoNV :: struct {
 	flags:         BuildAccelerationStructureFlagsNV,
 	instanceCount: u32,
 	geometryCount: u32,
-	pGeometries:   ^GeometryNV,
+	pGeometries:   [^]GeometryNV,
 }
 
 AccelerationStructureCreateInfoNV :: struct {
@@ -3719,14 +3719,14 @@ BindAccelerationStructureMemoryInfoNV :: struct {
 	memory:                DeviceMemory,
 	memoryOffset:          DeviceSize,
 	deviceIndexCount:      u32,
-	pDeviceIndices:        ^u32,
+	pDeviceIndices:        [^]u32,
 }
 
 WriteDescriptorSetAccelerationStructureNV :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	accelerationStructureCount: u32,
-	pAccelerationStructures:    ^AccelerationStructureNV,
+	pAccelerationStructures:    [^]AccelerationStructureNV,
 }
 
 AccelerationStructureMemoryRequirementsInfoNV :: struct {
@@ -3869,7 +3869,7 @@ PipelineVertexInputDivisorStateCreateInfoEXT :: struct {
 	sType:                     StructureType,
 	pNext:                     rawptr,
 	vertexBindingDivisorCount: u32,
-	pVertexBindingDivisors:    ^VertexInputBindingDivisorDescriptionEXT,
+	pVertexBindingDivisors:    [^]VertexInputBindingDivisorDescriptionEXT,
 }
 
 PhysicalDeviceVertexAttributeDivisorFeaturesEXT :: struct {
@@ -3889,7 +3889,7 @@ PipelineCreationFeedbackCreateInfoEXT :: struct {
 	pNext:                              rawptr,
 	pPipelineCreationFeedback:          ^PipelineCreationFeedbackEXT,
 	pipelineStageCreationFeedbackCount: u32,
-	pPipelineStageCreationFeedbacks:    ^PipelineCreationFeedbackEXT,
+	pPipelineStageCreationFeedbacks:    [^]PipelineCreationFeedbackEXT,
 }
 
 PhysicalDeviceComputeShaderDerivativesFeaturesNV :: struct {
@@ -3945,7 +3945,7 @@ PipelineViewportExclusiveScissorStateCreateInfoNV :: struct {
 	sType:                 StructureType,
 	pNext:                 rawptr,
 	exclusiveScissorCount: u32,
-	pExclusiveScissors:    ^Rect2D,
+	pExclusiveScissors:    [^]Rect2D,
 }
 
 PhysicalDeviceExclusiveScissorFeaturesNV :: struct {
@@ -4162,9 +4162,9 @@ ValidationFeaturesEXT :: struct {
 	sType:                          StructureType,
 	pNext:                          rawptr,
 	enabledValidationFeatureCount:  u32,
-	pEnabledValidationFeatures:     ^ValidationFeatureEnableEXT,
+	pEnabledValidationFeatures:     [^]ValidationFeatureEnableEXT,
 	disabledValidationFeatureCount: u32,
-	pDisabledValidationFeatures:    ^ValidationFeatureDisableEXT,
+	pDisabledValidationFeatures:    [^]ValidationFeatureDisableEXT,
 }
 
 CooperativeMatrixPropertiesNV :: struct {
@@ -4357,7 +4357,7 @@ GraphicsShaderGroupCreateInfoNV :: struct {
 	sType:              StructureType,
 	pNext:              rawptr,
 	stageCount:         u32,
-	pStages:            ^PipelineShaderStageCreateInfo,
+	pStages:            [^]PipelineShaderStageCreateInfo,
 	pVertexInputState:  ^PipelineVertexInputStateCreateInfo,
 	pTessellationState: ^PipelineTessellationStateCreateInfo,
 }
@@ -4366,9 +4366,9 @@ GraphicsPipelineShaderGroupsCreateInfoNV :: struct {
 	sType:         StructureType,
 	pNext:         rawptr,
 	groupCount:    u32,
-	pGroups:       ^GraphicsShaderGroupCreateInfoNV,
+	pGroups:       [^]GraphicsShaderGroupCreateInfoNV,
 	pipelineCount: u32,
-	pPipelines:    ^Pipeline,
+	pPipelines:    [^]Pipeline,
 }
 
 BindShaderGroupIndirectCommandNV :: struct {
@@ -4410,8 +4410,8 @@ IndirectCommandsLayoutTokenNV :: struct {
 	pushconstantSize:             u32,
 	indirectStateFlags:           IndirectStateFlagsNV,
 	indexTypeCount:               u32,
-	pIndexTypes:                  ^IndexType,
-	pIndexTypeValues:             ^u32,
+	pIndexTypes:                  [^]IndexType,
+	pIndexTypeValues:             [^]u32,
 }
 
 IndirectCommandsLayoutCreateInfoNV :: struct {
@@ -4420,9 +4420,9 @@ IndirectCommandsLayoutCreateInfoNV :: struct {
 	flags:             IndirectCommandsLayoutUsageFlagsNV,
 	pipelineBindPoint: PipelineBindPoint,
 	tokenCount:        u32,
-	pTokens:           ^IndirectCommandsLayoutTokenNV,
+	pTokens:           [^]IndirectCommandsLayoutTokenNV,
 	streamCount:       u32,
-	pStreamStrides:    ^u32,
+	pStreamStrides:    [^]u32,
 }
 
 GeneratedCommandsInfoNV :: struct {
@@ -4432,7 +4432,7 @@ GeneratedCommandsInfoNV :: struct {
 	pipeline:               Pipeline,
 	indirectCommandsLayout: IndirectCommandsLayoutNV,
 	streamCount:            u32,
-	pStreams:               ^IndirectCommandsStreamNV,
+	pStreams:               [^]IndirectCommandsStreamNV,
 	sequencesCount:         u32,
 	preprocessBuffer:       Buffer,
 	preprocessOffset:       DeviceSize,
@@ -4463,7 +4463,7 @@ CommandBufferInheritanceViewportScissorInfoNV :: struct {
 	pNext:              rawptr,
 	viewportScissor2D:  b32,
 	viewportDepthCount: u32,
-	pViewportDepths:    ^Viewport,
+	pViewportDepths:    [^]Viewport,
 }
 
 PhysicalDeviceTexelBufferAlignmentFeaturesEXT :: struct {
@@ -4729,14 +4729,14 @@ PhysicalDeviceMutableDescriptorTypeFeaturesVALVE :: struct {
 
 MutableDescriptorTypeListVALVE :: struct {
 	descriptorTypeCount: u32,
-	pDescriptorTypes:    ^DescriptorType,
+	pDescriptorTypes:    [^]DescriptorType,
 }
 
 MutableDescriptorTypeCreateInfoVALVE :: struct {
 	sType:                          StructureType,
 	pNext:                          rawptr,
 	mutableDescriptorTypeListCount: u32,
-	pMutableDescriptorTypeLists:    ^MutableDescriptorTypeListVALVE,
+	pMutableDescriptorTypeLists:    [^]MutableDescriptorTypeListVALVE,
 }
 
 PhysicalDeviceVertexInputDynamicStateFeaturesEXT :: struct {
@@ -4837,7 +4837,7 @@ PipelineColorWriteCreateInfoEXT :: struct {
 	sType:              StructureType,
 	pNext:              rawptr,
 	attachmentCount:    u32,
-	pColorWriteEnables: ^b32,
+	pColorWriteEnables: [^]b32,
 }
 
 PhysicalDeviceGlobalPriorityQueryFeaturesEXT :: struct {
@@ -4943,8 +4943,8 @@ AccelerationStructureBuildGeometryInfoKHR :: struct {
 	srcAccelerationStructure: AccelerationStructureKHR,
 	dstAccelerationStructure: AccelerationStructureKHR,
 	geometryCount:            u32,
-	pGeometries:              ^AccelerationStructureGeometryKHR,
-	ppGeometries:             ^^AccelerationStructureGeometryKHR,
+	pGeometries:              [^]AccelerationStructureGeometryKHR,
+	ppGeometries:             ^[^]AccelerationStructureGeometryKHR,
 	scratchData:              DeviceOrHostAddressKHR,
 }
 
@@ -4963,7 +4963,7 @@ WriteDescriptorSetAccelerationStructureKHR :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	accelerationStructureCount: u32,
-	pAccelerationStructures:    ^AccelerationStructureKHR,
+	pAccelerationStructures:    [^]AccelerationStructureKHR,
 }
 
 PhysicalDeviceAccelerationStructureFeaturesKHR :: struct {
@@ -5056,9 +5056,9 @@ RayTracingPipelineCreateInfoKHR :: struct {
 	pNext:                        rawptr,
 	flags:                        PipelineCreateFlags,
 	stageCount:                   u32,
-	pStages:                      ^PipelineShaderStageCreateInfo,
+	pStages:                      [^]PipelineShaderStageCreateInfo,
 	groupCount:                   u32,
-	pGroups:                      ^RayTracingShaderGroupCreateInfoKHR,
+	pGroups:                      [^]RayTracingShaderGroupCreateInfoKHR,
 	maxPipelineRayRecursionDepth: u32,
 	pLibraryInfo:                 ^PipelineLibraryCreateInfoKHR,
 	pLibraryInterface:            ^RayTracingPipelineInterfaceCreateInfoKHR,
@@ -5128,7 +5128,7 @@ ImportMemoryWin32HandleInfoKHR :: struct {
 ExportMemoryWin32HandleInfoKHR :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
-	pAttributes: ^SECURITY_ATTRIBUTES,
+	pAttributes: [^]SECURITY_ATTRIBUTES,
 	dwAccess:    DWORD,
 	name:        LPCWSTR,
 }
@@ -5150,12 +5150,12 @@ Win32KeyedMutexAcquireReleaseInfoKHR :: struct {
 	sType:            StructureType,
 	pNext:            rawptr,
 	acquireCount:     u32,
-	pAcquireSyncs:    ^DeviceMemory,
-	pAcquireKeys:     ^u64,
-	pAcquireTimeouts: ^u32,
+	pAcquireSyncs:    [^]DeviceMemory,
+	pAcquireKeys:     [^]u64,
+	pAcquireTimeouts: [^]u32,
 	releaseCount:     u32,
-	pReleaseSyncs:    ^DeviceMemory,
-	pReleaseKeys:     ^u64,
+	pReleaseSyncs:    [^]DeviceMemory,
+	pReleaseKeys:     [^]u64,
 }
 
 ImportSemaphoreWin32HandleInfoKHR :: struct {
@@ -5171,7 +5171,7 @@ ImportSemaphoreWin32HandleInfoKHR :: struct {
 ExportSemaphoreWin32HandleInfoKHR :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
-	pAttributes: ^SECURITY_ATTRIBUTES,
+	pAttributes: [^]SECURITY_ATTRIBUTES,
 	dwAccess:    DWORD,
 	name:        LPCWSTR,
 }
@@ -5180,9 +5180,9 @@ D3D12FenceSubmitInfoKHR :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	waitSemaphoreValuesCount:   u32,
-	pWaitSemaphoreValues:       ^u64,
+	pWaitSemaphoreValues:       [^]u64,
 	signalSemaphoreValuesCount: u32,
-	pSignalSemaphoreValues:     ^u64,
+	pSignalSemaphoreValues:     [^]u64,
 }
 
 SemaphoreGetWin32HandleInfoKHR :: struct {
@@ -5205,7 +5205,7 @@ ImportFenceWin32HandleInfoKHR :: struct {
 ExportFenceWin32HandleInfoKHR :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
-	pAttributes: ^SECURITY_ATTRIBUTES,
+	pAttributes: [^]SECURITY_ATTRIBUTES,
 	dwAccess:    DWORD,
 	name:        LPCWSTR,
 }
@@ -5227,7 +5227,7 @@ ImportMemoryWin32HandleInfoNV :: struct {
 ExportMemoryWin32HandleInfoNV :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
-	pAttributes: ^SECURITY_ATTRIBUTES,
+	pAttributes: [^]SECURITY_ATTRIBUTES,
 	dwAccess:    DWORD,
 }
 
@@ -5235,12 +5235,12 @@ Win32KeyedMutexAcquireReleaseInfoNV :: struct {
 	sType:                       StructureType,
 	pNext:                       rawptr,
 	acquireCount:                u32,
-	pAcquireSyncs:               ^DeviceMemory,
-	pAcquireKeys:                ^u64,
-	pAcquireTimeoutMilliseconds: ^u32,
+	pAcquireSyncs:               [^]DeviceMemory,
+	pAcquireKeys:                [^]u64,
+	pAcquireTimeoutMilliseconds: [^]u32,
 	releaseCount:                u32,
-	pReleaseSyncs:               ^DeviceMemory,
-	pReleaseKeys:                ^u64,
+	pReleaseSyncs:               [^]DeviceMemory,
+	pReleaseKeys:                [^]u64,
 }
 
 SurfaceFullScreenExclusiveInfoEXT :: struct {
