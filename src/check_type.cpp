@@ -92,10 +92,10 @@ bool does_field_type_allow_using(Type *t) {
 	return false;
 }
 
-void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<String> *tags, Slice<Ast *> const &params,
+void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields, Slice<String> *tags, Slice<Ast *> const &params,
                          isize init_field_capacity, Type *struct_type, String context) {
-	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
-	*tags   = array_make<String>(heap_allocator(), 0, init_field_capacity);
+	auto fields_array = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
+	auto tags_array = array_make<String>(heap_allocator(), 0, init_field_capacity);
 
 	GB_ASSERT(node->kind == Ast_StructType);
 	GB_ASSERT(struct_type->kind == Type_Struct);
@@ -153,20 +153,20 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx, ctx->scope, name, field);
-			array_add(fields, field);
+			array_add(&fields_array, field);
 			String tag = p->tag.string;
 			if (tag.len != 0 && !unquote_string(permanent_allocator(), &tag, 0, tag.text[0] == '`')) {
 				error(p->tag, "Invalid string literal");
 				tag = {};
 			}
-			array_add(tags, tag);
+			array_add(&tags_array, tag);
 
 			field_src_index += 1;
 		}
 
 
 		if (is_using && p->names.count > 0) {
-			Type *first_type = (*fields)[fields->count-1]->type;
+			Type *first_type = fields_array[fields_array.count-1]->type;
 			Type *t = base_type(type_deref(first_type));
 
 			if (!does_field_type_allow_using(t) &&
@@ -182,6 +182,9 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 			populate_using_entity_scope(ctx, node, p, type);
 		}
 	}
+	
+	*fields = slice_from_array(fields_array);
+	*tags = slice_from_array(tags_array);
 }
 
 
@@ -498,7 +501,7 @@ Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_para
 
 		if (entities.count > 0) {
 			Type *tuple = alloc_type_tuple();
-			tuple->Tuple.variables = entities;
+			tuple->Tuple.variables = slice_from_array(entities);
 			polymorphic_params_type = tuple;
 		}
 	}
@@ -816,8 +819,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 
 	enum_type->Enum.fields = fields;
 	enum_type->Enum.names = make_names_field_for_struct(ctx, ctx->scope);
-	enum_type->Enum.min_value = min_value;
-	enum_type->Enum.max_value = max_value;
+	*enum_type->Enum.min_value = min_value;
+	*enum_type->Enum.max_value = max_value;
 
 	enum_type->Enum.min_value_index = min_value_index;
 	enum_type->Enum.max_value_index = max_value_index;
@@ -1705,7 +1708,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 	}
 
 	Type *tuple = alloc_type_tuple();
-	tuple->Tuple.variables = variables;
+	tuple->Tuple.variables = slice_from_array(variables);
 
 	if (success_) *success_ = success;
 	if (specialization_count_) *specialization_count_ = specialization_count;
@@ -1815,7 +1818,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 		}
 	}
 
-	tuple->Tuple.variables = variables;
+	tuple->Tuple.variables = slice_from_array(variables);
 
 	return tuple;
 }
@@ -2059,7 +2062,7 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 Type *make_optional_ok_type(Type *value, bool typed) {
 	gbAllocator a = permanent_allocator();
 	Type *t = alloc_type_tuple();
-	array_init(&t->Tuple.variables, a, 2);
+	slice_init(&t->Tuple.variables, a, 2);
 	t->Tuple.variables[0] = alloc_entity_field(nullptr, blank_token, value,  false, 0);
 	t->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1);
 	return t;
@@ -2083,11 +2086,11 @@ void init_map_entry_type(Type *type) {
 	*/
 	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
-	auto fields = array_make<Entity *>(permanent_allocator(), 0, 4);
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, cast(i32)fields.count, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, cast(i32)fields.count, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, cast(i32)fields.count, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, cast(i32)fields.count, EntityState_Resolved));
+	auto fields = slice_make<Entity *>(permanent_allocator(), 4);
+	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, cast(i32)fields.count, EntityState_Resolved);
+	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, cast(i32)fields.count, EntityState_Resolved);
+	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, cast(i32)fields.count, EntityState_Resolved);
+	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, cast(i32)fields.count, EntityState_Resolved);
 
 
 	entry_type->Struct.fields = fields;
@@ -2120,9 +2123,9 @@ void init_map_internal_types(Type *type) {
 	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
 
 
-	auto fields = array_make<Entity *>(permanent_allocator(), 0, 2);
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved));
+	auto fields = slice_make<Entity *>(permanent_allocator(), 2);
+	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved);
+	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved);
 
 	generated_struct_type->Struct.fields = fields;
 
@@ -2239,8 +2242,8 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		field_count = 0;
 
 		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = slice_make<String>(heap_allocator(), field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
@@ -2254,8 +2257,8 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		field_count = cast(isize)old_array->Array.count;
 
 		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = slice_make<String>(heap_allocator(), field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
@@ -2296,8 +2299,8 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		GB_ASSERT(old_struct->Struct.tags.count == field_count);
 
 		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = slice_make<String>(heap_allocator(), field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;

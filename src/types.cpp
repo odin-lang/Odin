@@ -129,9 +129,9 @@ enum StructSoaKind {
 };
 
 struct TypeStruct {
-	Array<Entity *> fields;
-	Array<String>   tags;
-	Array<i64>      offsets;
+	Slice<Entity *> fields;
+	Slice<String>   tags;
+	Slice<i64>      offsets;
 	Ast *           node;
 	Scope *         scope;
 
@@ -145,12 +145,12 @@ struct TypeStruct {
 	i64           soa_count;
 	StructSoaKind soa_kind;
 
-	bool are_offsets_set;
-	bool are_offsets_being_processed;
-	bool is_packed;
-	bool is_raw_union;
 	bool is_polymorphic;
-	bool is_poly_specialized;
+	bool are_offsets_set             : 1;
+	bool are_offsets_being_processed : 1;
+	bool is_packed                   : 1;
+	bool is_raw_union                : 1;
+	bool is_poly_specialized         : 1;
 };
 
 struct TypeUnion {
@@ -216,8 +216,8 @@ struct TypeProc {
 	TYPE_KIND(EnumeratedArray, struct {                       \
 		Type *elem;                                       \
 		Type *index;                                      \
-		ExactValue min_value;                             \
-		ExactValue max_value;                             \
+		ExactValue *min_value;                            \
+		ExactValue *max_value;                            \
 		i64 count;                                        \
 		TokenKind op;                                     \
 	})                                                        \
@@ -239,14 +239,14 @@ struct TypeProc {
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
-		ExactValue min_value;                             \
-		ExactValue max_value;                             \
+		ExactValue *min_value;                            \
+		ExactValue *max_value;                            \
 		isize min_value_index;                            \
 		isize max_value_index;                            \
 	})                                                        \
 	TYPE_KIND(Tuple, struct {                                 \
-		Array<Entity *> variables; /* Entity_Variable */  \
-		Array<i64>      offsets;                          \
+		Slice<Entity *> variables; /* Entity_Variable */  \
+		Slice<i64>      offsets;                          \
 		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
@@ -803,15 +803,17 @@ Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	return t;
 }
 
-Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue min_value, ExactValue max_value, TokenKind op) {
+Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue const *min_value, ExactValue const *max_value, TokenKind op) {
 	Type *t = alloc_type(Type_EnumeratedArray);
 	t->EnumeratedArray.elem = elem;
 	t->EnumeratedArray.index = index;
-	t->EnumeratedArray.min_value = min_value;
-	t->EnumeratedArray.max_value = max_value;
+	t->EnumeratedArray.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	t->EnumeratedArray.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	gb_memmove(t->EnumeratedArray.min_value, min_value, gb_size_of(ExactValue));
+	gb_memmove(t->EnumeratedArray.max_value, max_value, gb_size_of(ExactValue));
 	t->EnumeratedArray.op = op;
 
-	t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(max_value, min_value));
+	t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(*max_value, *min_value));
 	return t;
 }
 
@@ -841,6 +843,8 @@ Type *alloc_type_union() {
 
 Type *alloc_type_enum() {
 	Type *t = alloc_type(Type_Enum);
+	t->Enum.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	t->Enum.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
 	return t;
 }
 
@@ -3080,9 +3084,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.word_size);
 }
 
-Array<i64> type_set_offsets_of(Array<Entity *> const &fields, bool is_packed, bool is_raw_union) {
+Slice<i64> type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union) {
 	gbAllocator a = permanent_allocator();
-	auto offsets = array_make<i64>(a, fields.count);
+	auto offsets = slice_make<i64>(a, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {
 		for_array(i, fields) {
@@ -3463,7 +3467,7 @@ Type *reduce_tuple_to_single_type(Type *original_type) {
 
 Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, bool is_packed) {
 	Type *t = alloc_type_struct();
-	t->Struct.fields = array_make<Entity *>(heap_allocator(), field_count);
+	t->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count);
 
 	Scope *scope = nullptr;
 	for_array(i, t->Struct.fields) {
@@ -3483,7 +3487,7 @@ Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, b
 	}
 
 	Type *t = alloc_type_tuple();
-	t->Tuple.variables = array_make<Entity *>(heap_allocator(), field_count);
+	t->Tuple.variables = slice_make<Entity *>(heap_allocator(), field_count);
 
 	Scope *scope = nullptr;
 	for_array(i, t->Tuple.variables) {

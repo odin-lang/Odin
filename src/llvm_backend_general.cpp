@@ -1670,7 +1670,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
 				i64 alignment = type_align_of(type);
 				unsigned size_of_union = cast(unsigned)type_size_of(type);
-				fields[0] = lb_alignment_prefix_type_hack(m, alignment);
+				fields[0] = lb_alignment_prefix_type_hack(m, gb_min(alignment, 16));
 				fields[1] = LLVMArrayType(lb_type(m, t_u8), size_of_union);
 				return LLVMStructTypeInContext(ctx, fields, field_count, false);
 			}

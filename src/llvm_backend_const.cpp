@@ -690,8 +690,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 				isize value_index = 0;
 
-				i64 total_lo = exact_value_to_i64(type->EnumeratedArray.min_value);
-				i64 total_hi = exact_value_to_i64(type->EnumeratedArray.max_value);
+				i64 total_lo = exact_value_to_i64(*type->EnumeratedArray.min_value);
+				i64 total_hi = exact_value_to_i64(*type->EnumeratedArray.max_value);
 
 				for (i64 i = total_lo; i <= total_hi; i++) {
 					bool found = false;

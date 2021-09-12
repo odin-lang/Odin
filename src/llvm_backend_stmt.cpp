@@ -332,8 +332,8 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 			val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
 			// NOTE(bill): Override the idx value for the enumeration
 			Type *index_type = expr_type->EnumeratedArray.index;
-			if (compare_exact_values(Token_NotEq, expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
-				idx = lb_emit_arith(p, Token_Add, idx, lb_const_value(m, index_type, expr_type->EnumeratedArray.min_value), index_type);
+			if (compare_exact_values(Token_NotEq, *expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+				idx = lb_emit_arith(p, Token_Add, idx, lb_const_value(m, index_type, *expr_type->EnumeratedArray.min_value), index_type);
 			}
 		}
 		break;
@@ -984,7 +984,7 @@ void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 						lb_addr_store(p, val0_addr, lb_emit_load(p, elem));
 					}
 					if (val1_type) {
-						ExactValue idx = exact_value_add(exact_value_i64(i), t->EnumeratedArray.min_value);
+						ExactValue idx = exact_value_add(exact_value_i64(i), *t->EnumeratedArray.min_value);
 						lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, idx));
 					}
 

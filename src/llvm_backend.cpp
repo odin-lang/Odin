@@ -761,7 +761,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	if (build_context.metrics.os == TargetOs_windows && build_context.build_mode == BuildMode_DynamicLibrary) {
 		is_dll_main = true;
 		name = str_lit("DllMain");
-		array_init(&params->Tuple.variables, permanent_allocator(), 3);
+		slice_init(&params->Tuple.variables, permanent_allocator(), 3);
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("hinstDLL"),   t_rawptr, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
@@ -769,12 +769,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		name = str_lit("mainCRTStartup");
 	} else {
 		has_args = true;
-		array_init(&params->Tuple.variables, permanent_allocator(), 2);
+		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
 	}
 
-	array_init(&results->Tuple.variables, permanent_allocator(), 1);
+	slice_init(&results->Tuple.variables, permanent_allocator(), 1);
 	results->Tuple.variables[0] = alloc_entity_param(nullptr, blank_token, t_i32, false, true);
 
 	Type *proc_type = alloc_type_proc(nullptr,
