@@ -4710,9 +4710,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	block_size = ((block_size + page_size-1)/page_size) * page_size;
 	block_size = gb_clamp(block_size, page_size, DEFAULT_MINIMUM_BLOCK_SIZE);
 	f->arena.minimum_block_size = block_size;
-	#if 0
-	arena_init_local_mutex(&f->arena);
-	#endif
 
 	array_init(&f->comments, heap_allocator(), 0, 0);
 	array_init(&f->imports,  heap_allocator(), 0, 0);

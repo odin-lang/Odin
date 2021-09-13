@@ -2489,7 +2489,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	remove_temp_files(gen);
-	arena_free_all(&temporary_arena);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)

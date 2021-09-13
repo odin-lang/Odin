@@ -50,17 +50,16 @@ void virtual_memory_init(void) {
 
 
 struct MemoryBlock {
+	MemoryBlock *prev;
 	u8 *         base; 
 	isize        size;
 	isize        used;
-	MemoryBlock *prev;
 };
 
 struct Arena {
 	MemoryBlock *curr_block;
 	isize        minimum_block_size;
-	bool use_local_mutex;
-	BlockingMutex local_mutex;
+	bool         ignore_mutex;
 };
 
 enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
@@ -72,10 +71,6 @@ void virtual_memory_dealloc(MemoryBlock *block);
 void *arena_alloc(Arena *arena, isize min_size, isize alignment);
 void arena_free_all(Arena *arena);
 
-void arena_init_local_mutex(Arena *arena) {
-	mutex_init(&arena->local_mutex);
-	arena->use_local_mutex = true;
-}
 
 isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	isize alignment_offset = 0;
@@ -91,11 +86,9 @@ void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
 	
 	BlockingMutex *mutex = &global_memory_allocator_mutex;
-	if (arena->use_local_mutex) {
-		mutex = &arena->local_mutex;
+	if (!arena->ignore_mutex) {
+		mutex_lock(mutex);
 	}
-		
-	mutex_lock(mutex);
 	
 	isize size = 0;
 	if (arena->curr_block != nullptr) {
@@ -122,7 +115,9 @@ void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	curr_block->used += size;
 	GB_ASSERT(curr_block->used <= curr_block->size);
 	
-	mutex_unlock(mutex);
+	if (!arena->ignore_mutex) {
+		mutex_unlock(mutex);
+	}
 	
 	// NOTE(bill): memory will be zeroed by default due to virtual memory 
 	return ptr;	
@@ -296,14 +291,13 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 }
 
 
-gb_global Arena permanent_arena = {};
+gb_global gb_thread_local Arena permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE, true};
 gbAllocator permanent_allocator() {
 	return arena_allocator(&permanent_arena);
 }
 
-gb_global Arena temporary_arena = {};
 gbAllocator temporary_allocator() {
-	return arena_allocator(&temporary_arena);
+	return permanent_allocator();
 }
 
 
