@@ -130,7 +130,7 @@ enum StructSoaKind : u8 {
 
 struct TypeStruct {
 	Slice<Entity *> fields;
-	Slice<String>   tags;
+	String *        tags;    // count == fields.count
 	i64 *           offsets; // count == fields.count
 
 	Ast *           node;
@@ -139,7 +139,6 @@ struct TypeStruct {
 	i64             custom_align;
 	Type *          polymorphic_params; // Type_Tuple
 	Type *          polymorphic_parent;
-
 
 	Type *          soa_elem;
 	i32             soa_count;
@@ -2172,12 +2171,6 @@ bool are_types_identical(Type *x, Type *y) {
 					bool xf_is_using = (xf->flags&EntityFlag_Using) != 0;
 					bool yf_is_using = (yf->flags&EntityFlag_Using) != 0;
 					if (xf_is_using ^ yf_is_using) {
-						return false;
-					}
-					if (x->Struct.tags.count != y->Struct.tags.count) {
-						return false;
-					}
-					if (x->Struct.tags.count > 0 && x->Struct.tags[i] != y->Struct.tags[i]) {
 						return false;
 					}
 				}
