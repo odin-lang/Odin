@@ -2317,7 +2317,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 				} else {
 					field_type = alloc_type_pointer(old_field->type);
 				}
-				Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_src_index);
+				Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 				soa_struct->Struct.fields[i] = new_field;
 				add_entity(ctx, scope, nullptr, new_field);
 				add_entity_use(ctx, nullptr, new_field);
