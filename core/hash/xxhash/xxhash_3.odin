@@ -11,22 +11,24 @@ package xxhash
 
 import "core:intrinsics"
 
-/* *********************************************************************
-*  XXH3
-*  New generation hash designed for speed on small keys and vectorization
-************************************************************************
+/*
+*************************************************************************
+* XXH3
+* New generation hash designed for speed on small keys and vectorization
+*************************************************************************
 * One goal of XXH3 is to make it fast on both 32-bit and 64-bit, while
 * remaining a true 64-bit/128-bit hash function.
+* ==========================================
+* XXH3 default settings
+* ==========================================
 */
 
-/* ==========================================
- * XXH3 default settings
- * ========================================== */
-
-XXH_ACC_ALIGN           :: 8   /* scalar */
-
-XXH3_SECRET_SIZE_MIN    :: 136
+/*
+	Custom secrets have a default length of 192, but can be set to a different size.
+	The minimum secret size is 136 bytes. It must also be a multiple of 64.
+*/
 XXH_SECRET_DEFAULT_SIZE :: max(XXH3_SECRET_SIZE_MIN, #config(XXH_SECRET_DEFAULT_SIZE, 192))
+#assert(XXH_SECRET_DEFAULT_SIZE % 64 == 0)
 
 XXH3_kSecret :: [?]u8{
 	0xb8, 0xfe, 0x6c, 0x39, 0x23, 0xa4, 0x4b, 0xbe, 0x7c, 0x01, 0x81, 0x2c, 0xf7, 0x21, 0xad, 0x1c,
@@ -42,8 +44,42 @@ XXH3_kSecret :: [?]u8{
 	0x2b, 0x16, 0xbe, 0x58, 0x7d, 0x47, 0xa1, 0xfc, 0x8f, 0xf8, 0xb8, 0xd1, 0x7a, 0xd0, 0x31, 0xce,
 	0x45, 0xcb, 0x3a, 0x8f, 0x95, 0x16, 0x04, 0x28, 0xaf, 0xd7, 0xfb, 0xca, 0xbb, 0x4b, 0x40, 0x7e,
 }
-#assert(size_of(XXH3_kSecret) == 192)
+/*
+	Do not change this constant.
+*/
+XXH3_SECRET_SIZE_MIN    :: 136
+#assert(size_of(XXH3_kSecret) == 192 && size_of(XXH3_kSecret) > XXH3_SECRET_SIZE_MIN)
 
+XXH_ACC_ALIGN           :: 8   /* scalar */
+
+/*
+	This is the optimal update size for incremental hashing.
+*/
+XXH3_INTERNAL_BUFFER_SIZE :: 256
+
+/*
+	Streaming state.
+
+	IMPORTANT: This structure has a strict alignment requirement of 64 bytes!! **
+	Do not allocate this with `make()` or `new`, it will not be sufficiently aligned.
+	Use`XXH3_create_state` and `XXH3_destroy_state, or stack allocation.
+*/
+XXH3_state :: struct {
+	acc:               [8]u64,
+	custom_secret:     [XXH_SECRET_DEFAULT_SIZE]u8,
+	buffer:            [XXH3_INTERNAL_BUFFER_SIZE]u8,
+	buffered_size:     u32,
+	reserved32:        u32,
+	stripes_so_far:    uint,
+	total_len:         u64,
+	stripes_per_block: uint,
+	secret_limit:      uint,
+	seed:              u64,
+	reserved64:        u64,
+	external_secret:   ^[]u8,
+}
+#assert(offset_of(XXH3_state, acc)    % 64 == 0 && offset_of(XXH3_state, custom_secret) % 64 == 0 &&
+        offset_of(XXH3_state, buffer) % 64 == 0)
 
 /************************************************************************
 *  XXH3 128-bit variant
@@ -54,7 +90,6 @@ XXH3_kSecret :: [?]u8{
 */
 xxh_u128              :: u128
 XXH3_128_hash         :: u128
-XXH3_128_DEFAULT_SEED :: xxh_u64(0)
 
 XXH128_hash_t :: struct #raw_union {
 	using raw: struct {
@@ -436,7 +471,12 @@ XXH3_128bits_internal :: #force_inline proc(
 
 /* ===   Public XXH128 API   === */
 
-XXH3_128_with_seed :: proc(input: []u8, seed := XXH3_128_DEFAULT_SEED) -> (hash: XXH3_128_hash) {
+XXH3_128_default :: proc(input: []u8) -> (hash: XXH3_128_hash) {
+	k := XXH3_kSecret
+	return XXH3_128bits_internal(input, 0, k[:], XXH3_hashLong_128b_withSeed)
+}
+
+XXH3_128_with_seed :: proc(input: []u8, seed: xxh_u64) -> (hash: XXH3_128_hash) {
 	k := XXH3_kSecret
 	return XXH3_128bits_internal(input, seed, k[:], XXH3_hashLong_128b_withSeed)
 }
@@ -444,18 +484,17 @@ XXH3_128_with_seed :: proc(input: []u8, seed := XXH3_128_DEFAULT_SEED) -> (hash:
 XXH3_128_with_secret :: proc(input: []u8, secret: []u8) -> (hash: XXH3_128_hash) {
 	return XXH3_128bits_internal(input, 0, secret, XXH3_hashLong_128b_withSecret)
 }
-XXH3_128 :: proc { XXH3_128_with_seed, XXH3_128_with_secret }
-
-/*
+XXH3_128 :: proc { XXH3_128_default, XXH3_128_with_seed, XXH3_128_with_secret }
 
 /* ===   XXH3 128-bit streaming   === */
 
 /*
- * All the functions are actually the same as for 64-bit streaming variant.
- * The only difference is the finalization routine.
- */
+	All the functions are actually the same as for 64-bit streaming variant.
+	The only difference is the finalization routine.
+*/
 
-/*! @ingroup xxh3_family */
+/*
+
 XXH_PUBLIC_API XXH_errorcode
 XXH3_128bits_reset(XXH3_state_t* statePtr)
 {
@@ -635,7 +674,8 @@ XXH3_len_4to8_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64
 	assert(secret != nil)
 	seed := seed
 
-	seed ~= u64(byte_swap(u32(seed) << 32))
+	seed ~= (u64(byte_swap(u32(seed))) << 32)
+
 	#no_bounds_check {
 		input1  := XXH32_read32(input)
 		input2  := XXH32_read32(input[length - 4:])
@@ -907,7 +947,6 @@ XXH3_hashLong_internal_loop :: #force_inline proc(acc: []xxh_u64, input: []u8, s
 	/* last partial block */
 	#no_bounds_check {
 		stripes := ((length - 1) - (block_len * blocks)) / XXH_STRIPE_LEN
-
 		XXH3_accumulate(acc, input[blocks * block_len:], secret, stripes, f_acc512)
 
 		/* last stripe */
@@ -935,142 +974,119 @@ XXH3_mergeAccs :: #force_inline proc(acc: []xxh_u64, secret: []u8, start: xxh_u6
 	return XXH3_avalanche(result64)
 }
 
+@(optimization_mode="speed")
+XXH3_hashLong_64b_internal :: #force_inline proc(input: []u8, secret: []u8,
+			f_acc512: XXH3_accumulate_512_f, f_scramble: XXH3_scramble_accumulator_f) -> (hash: xxh_u64) {
 
-/*
-XXH_FORCE_INLINE XXH64_hash_t
-XXH3_hashLong_64b_internal(const void* XXH_RESTRICT input, size_t len,
-						   const void* XXH_RESTRICT secret, size_t secretSize,
-						   XXH3_f_accumulate_512 f_acc512,
-						   XXH3_f_scrambleAcc f_scramble)
-{
-	XXH_ALIGN(XXH_ACC_ALIGN) xxh_u64 acc[XXH_ACC_NB] = XXH3_INIT_ACC;
+	acc: [XXH_ACC_NB]xxh_u64 = XXH3_INIT_ACC
 
-	XXH3_hashLong_internal_loop(acc, (const xxh_u8*)input, len, (const xxh_u8*)secret, secretSize, f_acc512, f_scramble);
+	XXH3_hashLong_internal_loop(acc[:], input, secret, f_acc512, f_scramble)
 
 	/* converge into final hash */
-	XXH_STATIC_ASSERT(sizeof(acc) == 64);
+	#assert(size_of(acc) == 64)
 	/* do not align on 8, so that the secret is different from the accumulator */
-#define XXH_SECRET_MERGEACCS_START 11
-	XXH_ASSERT(secretSize >= sizeof(acc) + XXH_SECRET_MERGEACCS_START);
-	return XXH3_mergeAccs(acc, (const xxh_u8*)secret + XXH_SECRET_MERGEACCS_START, (xxh_u64)len * XXH_PRIME64_1);
+	XXH_SECRET_MERGEACCS_START :: 11
+	assert(len(secret) >= size_of(acc) + XXH_SECRET_MERGEACCS_START)
+	return XXH3_mergeAccs(acc[:], secret[XXH_SECRET_MERGEACCS_START:], xxh_u64(len(input)) * XXH_PRIME64_1)
 }
 
 /*
- * It's important for performance that XXH3_hashLong is not inlined.
- */
-XXH_NO_INLINE XXH64_hash_t
-XXH3_hashLong_64b_withSecret(const void* XXH_RESTRICT input, size_t len,
-							 XXH64_hash_t seed64, const xxh_u8* XXH_RESTRICT secret, size_t secretLen)
-{
-	(void)seed64;
-	return XXH3_hashLong_64b_internal(input, len, secret, secretLen, XXH3_accumulate_512, XXH3_scrambleAcc);
+	It's important for performance that XXH3_hashLong is not inlined.
+*/
+XXH3_hashLong_64b_withSecret :: #force_no_inline proc(input: []u8, seed64: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
+	return XXH3_hashLong_64b_internal(input, secret, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
 /*
- * It's important for performance that XXH3_hashLong is not inlined.
- * Since the function is not inlined, the compiler may not be able to understand that,
- * in some scenarios, its `secret` argument is actually a compile time constant.
- * This variant enforces that the compiler can detect that,
- * and uses this opportunity to streamline the generated code for better performance.
- */
-XXH_NO_INLINE XXH64_hash_t
-XXH3_hashLong_64b_default(const void* XXH_RESTRICT input, size_t len,
-						  XXH64_hash_t seed64, const xxh_u8* XXH_RESTRICT secret, size_t secretLen)
-{
-	(void)seed64; (void)secret; (void)secretLen;
-	return XXH3_hashLong_64b_internal(input, len, XXH3_kSecret, sizeof(XXH3_kSecret), XXH3_accumulate_512, XXH3_scrambleAcc);
+	It's important for performance that XXH3_hashLong is not inlined.
+	Since the function is not inlined, the compiler may not be able to understand that,
+	in some scenarios, its `secret` argument is actually a compile time constant.
+	This variant enforces that the compiler can detect that,
+	and uses this opportunity to streamline the generated code for better performance.
+*/
+XXH3_hashLong_64b_default :: #force_no_inline proc(input: []u8, seed64: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
+	k := XXH3_kSecret	
+	return XXH3_hashLong_64b_internal(input, k[:], XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
 /*
- * XXH3_hashLong_64b_withSeed():
- * Generate a custom key based on alteration of default XXH3_kSecret with the seed,
- * and then use this key for long mode hashing.
- *
- * This operation is decently fast but nonetheless costs a little bit of time.
- * Try to avoid it whenever possible (typically when seed==0).
- *
- * It's important for performance that XXH3_hashLong is not inlined. Not sure
- * why (uop cache maybe?), but the difference is large and easily measurable.
- */
-XXH_FORCE_INLINE XXH64_hash_t
-XXH3_hashLong_64b_withSeed_internal(const void* input, size_t len,
-									XXH64_hash_t seed,
-									XXH3_f_accumulate_512 f_acc512,
-									XXH3_f_scrambleAcc f_scramble,
-									XXH3_f_initCustomSecret f_initSec)
-{
-	if (seed == 0)
-		return XXH3_hashLong_64b_internal(input, len,
-										  XXH3_kSecret, sizeof(XXH3_kSecret),
-										  f_acc512, f_scramble);
-	{   XXH_ALIGN(XXH_SEC_ALIGN) xxh_u8 secret[XXH_SECRET_DEFAULT_SIZE];
-		f_initSec(secret, seed);
-		return XXH3_hashLong_64b_internal(input, len, secret, sizeof(secret),
-										  f_acc512, f_scramble);
+	XXH3_hashLong_64b_withSeed():
+	Generate a custom key based on alteration of default XXH3_kSecret with the seed,
+	and then use this key for long mode hashing.
+
+	This operation is decently fast but nonetheless costs a little bit of time.
+	Try to avoid it whenever possible (typically when seed==0).
+
+	It's important for performance that XXH3_hashLong is not inlined. Not sure
+	why (uop cache maybe?), but the difference is large and easily measurable.
+*/
+XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(input: []u8,
+									seed:        xxh_u64,
+									f_acc512:    XXH3_accumulate_512_f,
+									f_scramble:  XXH3_scramble_accumulator_f,
+									f_init_sec:  XXH3_init_custom_secret_f) -> (hash: xxh_u64) {
+	if seed == 0 {
+		k := XXH3_kSecret
+		return XXH3_hashLong_64b_internal(input, k[:], f_acc512, f_scramble)
+	}
+	{
+		secret: [XXH_SECRET_DEFAULT_SIZE]u8
+		f_init_sec(secret[:], seed)
+		return XXH3_hashLong_64b_internal(input, secret[:], f_acc512, f_scramble)
 	}
 }
 
 /*
- * It's important for performance that XXH3_hashLong is not inlined.
- */
-XXH_NO_INLINE XXH64_hash_t
-XXH3_hashLong_64b_withSeed(const void* input, size_t len,
-						   XXH64_hash_t seed, const xxh_u8* secret, size_t secretLen)
-{
-	(void)secret; (void)secretLen;
-	return XXH3_hashLong_64b_withSeed_internal(input, len, seed,
-				XXH3_accumulate_512, XXH3_scrambleAcc, XXH3_initCustomSecret);
+	It's important for performance that XXH3_hashLong is not inlined.
+*/
+XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
+	return XXH3_hashLong_64b_withSeed_internal(input, seed, XXH3_accumulate_512, XXH3_scramble_accumulator, XXH3_init_custom_secret)
 }
 
 
-typedef XXH64_hash_t (*XXH3_hashLong64_f)(const void* XXH_RESTRICT, size_t,
-										  XXH64_hash_t, const xxh_u8* XXH_RESTRICT, size_t);
+XXH3_hashLong64_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8)  -> (res: xxh_u64)
 
-XXH_FORCE_INLINE XXH64_hash_t
-XXH3_64bits_internal(const void* XXH_RESTRICT input, size_t len,
-					 XXH64_hash_t seed64, const void* XXH_RESTRICT secret, size_t secretLen,
-					 XXH3_hashLong64_f f_hashLong)
-{
-	XXH_ASSERT(secretLen >= XXH3_SECRET_SIZE_MIN);
+XXH3_64bits_internal :: proc(input: []u8, seed: xxh_u64, secret: []u8, f_hashLong: XXH3_hashLong64_f) -> (hash: xxh_u64) {
+
+
+
+
+	assert(len(secret) >= XXH3_SECRET_SIZE_MIN)
 	/*
-	 * If an action is to be taken if `secretLen` condition is not respected,
-	 * it should be done here.
-	 * For now, it's a contract pre-condition.
-	 * Adding a check and a branch here would cost performance at every hash.
-	 * Also, note that function signature doesn't offer room to return an error.
-	 */
-	if (len <= 16)
-		return XXH3_len_0to16_64b((const xxh_u8*)input, len, (const xxh_u8*)secret, seed64);
-	if (len <= 128)
-		return XXH3_len_17to128_64b((const xxh_u8*)input, len, (const xxh_u8*)secret, secretLen, seed64);
-	if (len <= XXH3_MIDSIZE_MAX)
-		return XXH3_len_129to240_64b((const xxh_u8*)input, len, (const xxh_u8*)secret, secretLen, seed64);
-	return f_hashLong(input, len, seed64, (const xxh_u8*)secret, secretLen);
+		If an action is to be taken if len(secret) condition is not respected, it should be done here.
+		For now, it's a contract pre-condition.
+		Adding a check and a branch here would cost performance at every hash.
+		Also, note that function signature doesn't offer room to return an error.
+	*/
+	length := len(input)
+	switch {
+	case length <=  16: return XXH3_len_0to16_64b(input, secret, seed)
+	case length <= 128: return XXH3_len_17to128_64b(input, secret, seed)
+	case length <= XXH3_MIDSIZE_MAX: return XXH3_len_129to240_64b(input, secret, seed)
+	case: return f_hashLong(input, seed, secret)
+	}
+	unreachable()
 }
-
 
 /* ===   Public entry point   === */
 
-/*! @ingroup xxh3_family */
-XXH_PUBLIC_API XXH64_hash_t XXH3_64bits(const void* input, size_t len)
-{
-	return XXH3_64bits_internal(input, len, 0, XXH3_kSecret, sizeof(XXH3_kSecret), XXH3_hashLong_64b_default);
+XXH3_64_default :: proc(input: []u8) -> (hash: xxh_u64) {
+	k := XXH3_kSecret
+	return XXH3_64bits_internal(input, 0, k[:], XXH3_hashLong_64b_default)
 }
 
-/*! @ingroup xxh3_family */
-XXH_PUBLIC_API XXH64_hash_t
-XXH3_64bits_withSecret(const void* input, size_t len, const void* secret, size_t secretSize)
-{
-	return XXH3_64bits_internal(input, len, 0, secret, secretSize, XXH3_hashLong_64b_withSecret);
+XXH3_64_with_seed :: proc(input: []u8, seed: xxh_u64) -> (hash: xxh_u64) {
+	k := XXH3_kSecret
+	return XXH3_64bits_internal(input, seed, k[:], XXH3_hashLong_64b_withSeed)
 }
 
-/*! @ingroup xxh3_family */
-XXH_PUBLIC_API XXH64_hash_t
-XXH3_64bits_withSeed(const void* input, size_t len, XXH64_hash_t seed)
-{
-	return XXH3_64bits_internal(input, len, seed, XXH3_kSecret, sizeof(XXH3_kSecret), XXH3_hashLong_64b_withSeed);
+XXH3_64_with_secret :: proc(input, secret: []u8) -> (hash: xxh_u64) {
+	return XXH3_64bits_internal(input, 0, secret, XXH3_hashLong_64b_withSecret)
 }
 
+XXH3_64 :: proc { XXH3_64_default, XXH3_64_with_seed, XXH3_64_with_secret }
+
+/*
 
 /* ===   XXH3 streaming   === */
 
