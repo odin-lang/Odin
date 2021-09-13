@@ -79,6 +79,19 @@ benchmark_xxh64 :: proc(options: ^time.Benchmark_Options, allocator := context.a
 	return nil
 }
 
+benchmark_xxh3_64 :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
+	buf := options.input
+
+	h: u64
+	for _ in 0..=options.rounds {
+		h = xxhash.XXH3_64(buf)
+	}
+	options.count     = options.rounds
+	options.processed = options.rounds * options.bytes
+	options.hash      = u128(h)
+	return nil
+}
+
 benchmark_xxh3_128 :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
 	buf := options.input
 
@@ -141,6 +154,21 @@ test_benchmark_runner :: proc(t: ^testing.T) {
 	err = time.benchmark(options, context.allocator)
 	expect(t, err == nil, name)
 	expect(t, options.hash == 0x87d2a1b6e1163ef1, name)
+	benchmark_print(name, options)
+
+	name = "XXH3_64 100 zero bytes"
+	options.bytes  = 100
+	options.bench = benchmark_xxh3_64
+	err = time.benchmark(options, context.allocator)
+	expect(t, err == nil, name)
+	expect(t, options.hash == 0x801fedc74ccd608c, name)
+	benchmark_print(name, options)
+
+	name = "XXH3_64 1 MiB zero bytes"
+	options.bytes = 1_048_576
+	err = time.benchmark(options, context.allocator)
+	expect(t, err == nil, name)
+	expect(t, options.hash == 0x918780b90550bf34, name)
 	benchmark_print(name, options)
 
 	name = "XXH3_128 100 zero bytes"
