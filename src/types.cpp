@@ -2972,7 +2972,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 			return 1;
 		}
 		if (t->Union.custom_align > 0) {
-			return gb_clamp(t->Union.custom_align, 1, build_context.max_align);
+			return gb_max(t->Union.custom_align, 1);
 		}
 
 		i64 max = 1;
@@ -2993,7 +2993,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_Struct: {
 		if (t->Struct.custom_align > 0) {
-			return gb_clamp(t->Struct.custom_align, 1, build_context.max_align);
+			return gb_max(t->Struct.custom_align, 1);
 		}
 		if (t->Struct.is_raw_union) {
 			i64 max = 1;

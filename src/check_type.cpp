@@ -215,13 +215,7 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 				error(node, "#align must be a power of 2, got %lld", align);
 				return false;
 			}
-
-			// NOTE(bill): Success!!!
-			i64 custom_align = gb_clamp(align, 1, build_context.max_align);
-			if (custom_align < align) {
-				warning(node, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
-			}
-			*align_ = custom_align;
+			*align_ = align;
 			return true;
 		}
 	}
