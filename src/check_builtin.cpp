@@ -1943,7 +1943,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
-			soa_struct->Struct.soa_count = count;
+			soa_struct->Struct.soa_count = cast(i32)count;
 
 			scope = create_scope(c->info, c->scope);
 			soa_struct->Struct.scope = scope;
@@ -1976,7 +1976,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
-			soa_struct->Struct.soa_count = count;
+			if (count > I32_MAX) {
+				count = I32_MAX;
+				error(call, "Array count too large for an #soa struct, got %lld", cast(long long)count);
+			}
+			soa_struct->Struct.soa_count = cast(i32)count;
 
 			scope = create_scope(c->info, old_struct->Struct.scope->parent);
 			soa_struct->Struct.scope = scope;
