@@ -2253,7 +2253,11 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
-		soa_struct->Struct.soa_count = count;
+		if (count > I32_MAX) {
+			count = I32_MAX;
+			error(array_typ_expr, "Array count too large for an #soa struct, got %lld", cast(long long)count);
+		}
+		soa_struct->Struct.soa_count = cast(i32)count;
 
 		scope = create_scope(ctx->info, ctx->scope, 8);
 		soa_struct->Struct.scope = scope;
@@ -2295,7 +2299,11 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
-		soa_struct->Struct.soa_count = count;
+		if (count > I32_MAX) {
+			count = I32_MAX;
+			error(array_typ_expr, "Array count too large for an #soa struct, got %lld", cast(long long)count);
+		}
+		soa_struct->Struct.soa_count = cast(i32)count;
 
 		scope = create_scope(ctx->info, old_struct->Struct.scope->parent);
 		soa_struct->Struct.scope = scope;

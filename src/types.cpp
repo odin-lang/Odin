@@ -131,7 +131,8 @@ enum StructSoaKind : u8 {
 struct TypeStruct {
 	Slice<Entity *> fields;
 	Slice<String>   tags;
-	Slice<i64>      offsets;
+	i64 *           offsets; // count == fields.count
+
 	Ast *           node;
 	Scope *         scope;
 
@@ -141,7 +142,7 @@ struct TypeStruct {
 
 
 	Type *          soa_elem;
-	i64             soa_count;
+	i32             soa_count;
 	StructSoaKind   soa_kind;
 
 	bool            is_polymorphic;
@@ -154,8 +155,10 @@ struct TypeStruct {
 
 struct TypeUnion {
 	Slice<Type *> variants;
+	
 	Ast *         node;
 	Scope *       scope;
+	
 	i64           variant_block_size;
 	i64           custom_align;
 	Type *        polymorphic_params; // Type_Tuple
@@ -244,7 +247,7 @@ struct TypeProc {
 	})                                                        \
 	TYPE_KIND(Tuple, struct {                                 \
 		Slice<Entity *> variables; /* Entity_Variable */  \
-		Slice<i64>      offsets;                          \
+		i64 *           offsets;                          \
 		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
@@ -3064,9 +3067,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.word_size);
 }
 
-Slice<i64> type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union) {
+i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union) {
 	gbAllocator a = permanent_allocator();
-	auto offsets = slice_make<i64>(a, fields.count);
+	auto offsets = gb_alloc_array(a, i64, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {
 		for_array(i, fields) {
@@ -3100,7 +3103,6 @@ bool type_set_offsets(Type *t) {
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
-			GB_ASSERT(t->Struct.offsets.count == t->Struct.fields.count);
 			t->Struct.are_offsets_being_processed = false;
 			t->Struct.are_offsets_set = true;
 			return true;
@@ -3285,18 +3287,12 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			if (t->Struct.are_offsets_being_processed && t->Struct.offsets.data == nullptr) {
+			if (t->Struct.are_offsets_being_processed && t->Struct.offsets == nullptr) {
 				type_path_print_illegal_cycle(path, path->path.count-1);
 				return FAILURE_SIZE;
 			}
-			if (t->Struct.are_offsets_set && t->Struct.offsets.count != t->Struct.fields.count) {
-				// TODO(bill, 2019-04-28): Determine exactly why the offsets length is different thatn the field length
-				// Are the the same at some point and then the struct length is increased?
-				// Why is this not handled by the type cycle checker?
-				t->Struct.are_offsets_set = false;
-			}
 			type_set_offsets(t);
-			GB_ASSERT_MSG(t->Struct.offsets.count == t->Struct.fields.count, "%s", type_to_string(t));
+			GB_ASSERT(t->Struct.fields.count == 0 || t->Struct.offsets != nullptr);
 			size = t->Struct.offsets[cast(isize)count-1] + type_size_of_internal(t->Struct.fields[cast(isize)count-1]->type, path);
 			return align_formula(size, align);
 		}
