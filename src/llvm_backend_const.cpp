@@ -99,7 +99,7 @@ LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 		return LLVMConstNull(dst);
 	}
 
-	GB_ASSERT(LLVMSizeOf(dst) == LLVMSizeOf(src));
+	GB_ASSERT_MSG(LLVMSizeOf(dst) == LLVMSizeOf(src), "%s vs %s", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src));
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind:
@@ -125,11 +125,43 @@ lbValue lb_const_ptr_cast(lbModule *m, lbValue value, Type *t) {
 	return res;
 }
 
+LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_) {
+	LLVMTypeRef struct_type = lb_type(m, t);
+	GB_ASSERT(LLVMGetTypeKind(struct_type) == LLVMStructTypeKind);
+	
+	unsigned value_count = cast(unsigned)value_count_;
+	unsigned elem_count = LLVMCountStructElementTypes(struct_type);
+	if (elem_count == value_count) {
+		return llvm_const_named_struct(struct_type, values, value_count_);
+	}
+	Type *bt = base_type(t);
+	GB_ASSERT(bt->kind == Type_Struct);
+	
+	GB_ASSERT(value_count_ == bt->Struct.fields.count);
+	
+	unsigned field_offset = 0;
+	if (lb_struct_has_padding_prefix(bt)) {
+		field_offset = 1;
+	}
+
+	unsigned values_with_padding_count = field_offset + cast(unsigned)(bt->Struct.fields.count*2 + 1);
+	LLVMValueRef *values_with_padding = gb_alloc_array(permanent_allocator(), LLVMValueRef, values_with_padding_count);
+	for (unsigned i = 0; i < value_count; i++) {
+		values_with_padding[field_offset + i*2 + 1] = values[i];
+	}
+	for (unsigned i = 0; i < values_with_padding_count; i++) {
+		if (values_with_padding[i] == nullptr) {
+			values_with_padding[i] = LLVMConstNull(LLVMStructGetTypeAtIndex(struct_type, i));
+		}
+	}
+	
+	return llvm_const_named_struct(struct_type, values_with_padding, values_with_padding_count);
+}
 
 LLVMValueRef llvm_const_named_struct(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(t);
-	GB_ASSERT(value_count == elem_count);
+	GB_ASSERT_MSG(value_count == elem_count, "%s %u %u", LLVMPrintTypeToString(t), value_count, elem_count);
 	for (unsigned i = 0; i < elem_count; i++) {
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(t, i);
 		values[i] = llvm_const_cast(values[i], elem_type);
@@ -235,7 +267,7 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 	fields[3]/*procedure*/ = lb_find_or_add_entity_string(p->module, procedure).value;
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(lb_type(m, t_source_code_location), fields, gb_count_of(fields));
+	res.value = llvm_const_named_struct(m, t_source_code_location, fields, gb_count_of(fields));
 	res.type = t_source_code_location;
 	return res;
 }
@@ -422,7 +454,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 					LLVMValueRef values[2] = {ptr, len};
 
-					res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
+					res.value = llvm_const_named_struct(m, original_type, values, 2);
 					return res;
 				}
 			}
@@ -512,7 +544,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				LLVMValueRef values[2] = {ptr, str_len};
 				GB_ASSERT(is_type_string(original_type));
 
-				res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
+				res.value = llvm_const_named_struct(m, original_type, values, 2);
 			}
 
 			return res;
@@ -554,7 +586,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				break;
 			}
 
-			res.value = llvm_const_named_struct(lb_type(m, original_type), values, 2);
+			res.value = llvm_const_named_struct(m, original_type, values, 2);
 			return res;
 		}
 		break;
@@ -585,7 +617,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				break;
 			}
 
-			res.value = llvm_const_named_struct(lb_type(m, original_type), values, 4);
+			res.value = llvm_const_named_struct(m, original_type, values, 4);
 			return res;
 		}
 		break;
@@ -802,11 +834,15 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 
 			isize offset = 0;
-			if (type->Struct.custom_align > 0) {
+			if (lb_struct_has_padding_prefix(type)) {
 				offset = 1;
 			}
+			
+			LLVMTypeRef struct_type = lb_type(m, original_type);
 
-			isize value_count = type->Struct.fields.count + offset;
+			unsigned value_count = cast(unsigned)(offset + type->Struct.fields.count*2 + 1);
+			GB_ASSERT(LLVMCountStructElementTypes(struct_type) == value_count);
+			
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, value_count);
 			bool *visited = gb_alloc_array(temporary_allocator(), bool, value_count);
 
@@ -822,9 +858,11 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 						Selection sel = lookup_field(type, name, false);
 						Entity *f = type->Struct.fields[sel.index[0]];
+							
+						isize index = offset + f->Variable.field_index*2 + 1;
 						if (elem_type_can_be_constant(f->type)) {
-							values[offset+f->Variable.field_index] = lb_const_value(m, f->type, tav.value, allow_local).value;
-							visited[offset+f->Variable.field_index] = true;
+							values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
+							visited[index] = true;
 						}
 					}
 				} else {
@@ -835,23 +873,22 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						if (tav.mode != Addressing_Invalid) {
 							val = tav.value;
 						}
+						
+						isize index = offset + f->Variable.field_index*2 + 1;
 						if (elem_type_can_be_constant(f->type)) {
-							values[offset+f->Variable.field_index]  = lb_const_value(m, f->type, val, allow_local).value;
-							visited[offset+f->Variable.field_index] = true;
+							values[index]  = lb_const_value(m, f->type, val, allow_local).value;
+							visited[index] = true;
 						}
 					}
 				}
 			}
 
-			for (isize i = 0; i < type->Struct.fields.count; i++) {
-				if (!visited[offset+i]) {
-					GB_ASSERT(values[offset+i] == nullptr);
-					values[offset+i] = lb_const_nil(m, get_struct_field_type(type, i)).value;
+			for (isize i = 0; i < value_count; i++) {
+				if (!visited[i]) {
+					GB_ASSERT(values[i] == nullptr);
+					LLVMTypeRef type = LLVMStructGetTypeAtIndex(struct_type, cast(unsigned)i);
+					values[i] = LLVMConstNull(type);
 				}
-			}
-
-			if (type->Struct.custom_align > 0) {
-				values[0] = LLVMConstNull(lb_alignment_prefix_type_hack(m, type->Struct.custom_align));
 			}
 
 			bool is_constant = true;
@@ -866,7 +903,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 
 			if (is_constant) {
-				res.value = llvm_const_named_struct(lb_type(m, original_type), values, cast(unsigned)value_count);
+				res.value = llvm_const_named_struct(struct_type, values, cast(unsigned)value_count);
 				return res;
 			} else {
 				// TODO(bill): THIS IS HACK BUT IT WORKS FOR WHAT I NEED
@@ -880,8 +917,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						new_values[i] = LLVMConstNull(LLVMTypeOf(old_value));
 					}
 				}
-				LLVMValueRef constant_value = llvm_const_named_struct(lb_type(m, original_type), new_values, cast(unsigned)value_count);
-
+				LLVMValueRef constant_value = llvm_const_named_struct(struct_type, new_values, cast(unsigned)value_count);
 
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;

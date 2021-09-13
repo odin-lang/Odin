@@ -357,8 +357,7 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 		lbValue entries = lb_map_entries_ptr(p, expr);
 		lbValue elem = lb_emit_struct_ep(p, entries, 0);
 		elem = lb_emit_load(p, elem);
-
-		lbValue entry = lb_emit_ptr_offset(p, elem, idx);
+		lbValue entry = lb_emit_ptr_offset(p, elem, idx);		
 		idx = lb_emit_load(p, lb_emit_struct_ep(p, entry, 2));
 		val = lb_emit_load(p, lb_emit_struct_ep(p, entry, 3));
 

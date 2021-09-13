@@ -806,8 +806,6 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		lbAddr all_tests_array_addr = lb_add_global_generated(p->module, array_type, {});
 		lbValue all_tests_array = lb_addr_get_ptr(p, all_tests_array_addr);
 
-		LLVMTypeRef lbt_Internal_Test = lb_type(m, t_Internal_Test);
-
 		LLVMValueRef indices[2] = {};
 		indices[0] = LLVMConstInt(lb_type(m, t_i32), 0, false);
 
@@ -834,7 +832,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 			GB_ASSERT(LLVMIsConstant(vals[2]));
 
 			LLVMValueRef dst = LLVMConstInBoundsGEP(all_tests_array.value, indices, gb_count_of(indices));
-			LLVMValueRef src = llvm_const_named_struct(lbt_Internal_Test, vals, gb_count_of(vals));
+			LLVMValueRef src = llvm_const_named_struct(m, t_Internal_Test, vals, gb_count_of(vals));
 
 			LLVMBuildStore(p->builder, src, dst);
 		}

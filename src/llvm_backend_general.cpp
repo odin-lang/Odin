@@ -1109,7 +1109,7 @@ lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 
 	LLVMTypeRef uvt = LLVMGetElementType(LLVMTypeOf(u.value));
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
-	GB_ASSERT_MSG(element_count == 3, "(%s) != (%s)", type_to_string(ut), LLVMPrintTypeToString(uvt));
+	GB_ASSERT_MSG(element_count == 3, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
 	lbValue tag_ptr = {};
 	tag_ptr.value = LLVMBuildStructGEP(p->builder, u.value, 2, "");
@@ -1160,13 +1160,9 @@ LLVMTypeRef lb_alignment_prefix_type_hack(lbModule *m, i64 alignment) {
 		return LLVMArrayType(lb_type(m, t_u32), 0);
 	case 8:
 		return LLVMArrayType(lb_type(m, t_u64), 0);
-	case 16:
+	default: case 16:
 		return LLVMArrayType(LLVMVectorType(lb_type(m, t_u32), 4), 0);
-	default:
-		GB_PANIC("Invalid alignment %d", cast(i32)alignment);
-		break;
 	}
-	return nullptr;
 }
 
 String lb_mangle_name(lbModule *m, Entity *e) {
@@ -1650,11 +1646,17 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			GB_ASSERT(field_count == 2);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
-			LLVMTypeRef entries_fields[4] = {
-				lb_type(m, t_rawptr),
+			LLVMTypeRef padding_type = LLVMArrayType(lb_type(m, t_uintptr), 0);
+			LLVMTypeRef entries_fields[] = {
+				padding_type,
+				lb_type(m, t_rawptr), // data
+				padding_type,
 				lb_type(m, t_int), // len
+				padding_type,
 				lb_type(m, t_int), // cap
+				padding_type,
 				lb_type(m, t_allocator), // allocator
+				padding_type,
 			};
 
 			fields[0] = lb_type(m, internal_type->Struct.fields[0]->type);
@@ -1676,24 +1678,62 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 
 			isize offset = 0;
-			if (type->Struct.custom_align > 0) {
+			if (lb_struct_has_padding_prefix(type)) {
 				offset = 1;
 			}
 
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
 
-			unsigned field_count = cast(unsigned)(type->Struct.fields.count + offset);
+			unsigned field_count = cast(unsigned)(offset + type->Struct.fields.count*2 + 1);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
+			LLVMTypeRef type_u8 = lb_type(m, t_u8);
+			LLVMTypeRef type_u16 = lb_type(m, t_u16);
+			LLVMTypeRef type_u32 = lb_type(m, t_u32);
+			LLVMTypeRef type_u64 = lb_type(m, t_u64);
+			
+			i64 padding_offset = 0;
 			for_array(i, type->Struct.fields) {
 				Entity *field = type->Struct.fields[i];
-				fields[i+offset] = lb_type(m, field->type);
+				i64 padding = type->Struct.offsets[i]-padding_offset;
+
+				LLVMTypeRef padding_type = nullptr;
+				if (padding_offset == 0) {
+					padding_type = lb_alignment_prefix_type_hack(m, type_align_of(type));
+				} else {
+					i64 alignment = type_align_of(field->type);
+					// NOTE(bill): limit to `[N x u64]` to prevent ABI issues
+					alignment = gb_min(alignment, 8); 
+					if (padding % alignment == 0) {
+						isize len = padding/alignment;
+						switch (alignment) {
+						case 1: padding_type = LLVMArrayType(type_u8,  cast(unsigned)len); break;
+						case 2: padding_type = LLVMArrayType(type_u16, cast(unsigned)len); break;
+						case 4: padding_type = LLVMArrayType(type_u32, cast(unsigned)len); break;
+						case 8: padding_type = LLVMArrayType(type_u64, cast(unsigned)len); break;
+						}
+					} else {
+						padding_type = LLVMArrayType(type_u8, cast(unsigned)padding);
+					}
+				}
+				fields[offset + i*2 + 0] = padding_type;
+				fields[offset + i*2 + 1] = lb_type(m, field->type);
+				if (!type->Struct.is_packed) {
+					padding_offset = align_formula(padding_offset, type_align_of(field->type));
+				}
+				padding_offset += type_size_of(field->type);
 			}
+			
+			i64 end_padding = type_size_of(type)-padding_offset;
+			fields[field_count-1] = LLVMArrayType(type_u8, cast(unsigned)end_padding);
 
-
-			if (type->Struct.custom_align > 0) {
+			if (offset != 0) {
+				GB_ASSERT(offset == 1);
 				fields[0] = lb_alignment_prefix_type_hack(m, type->Struct.custom_align);
+			}
+			for (unsigned i = 0; i < field_count; i++) {
+				GB_ASSERT(fields[i] != nullptr);
 			}
 
 			return LLVMStructTypeInContext(ctx, fields, field_count, type->Struct.is_packed);
@@ -2230,7 +2270,7 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 	LLVMValueRef values[2] = {ptr, str_len};
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(lb_type(m, t_string), values, 2);
+	res.value = llvm_const_named_struct(m, t_string, values, 2);
 	res.type = t_string;
 	return res;
 }
@@ -2265,7 +2305,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	LLVMValueRef values[2] = {ptr, len};
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(lb_type(m, t_u8_slice), values, 2);
+	res.value = llvm_const_named_struct(m, t_u8_slice, values, 2);
 	res.type = t_u8_slice;
 	return res;
 }
