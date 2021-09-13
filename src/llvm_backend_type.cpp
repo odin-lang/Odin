@@ -721,7 +721,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					lb_emit_store(p, offset, lb_const_int(m, t_uintptr, foffset));
 					lb_emit_store(p, is_using, lb_const_bool(m, t_bool, (f->flags&EntityFlag_Using) != 0));
 
-					if (t->Struct.tags.count > 0) {
+					if (t->Struct.tags != nullptr) {
 						String tag_string = t->Struct.tags[source_index];
 						if (tag_string.len > 0) {
 							lbValue tag_ptr = lb_emit_ptr_offset(p, memory_tags, index);

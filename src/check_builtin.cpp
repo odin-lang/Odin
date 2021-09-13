@@ -1789,7 +1789,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			elem = alloc_type_struct();
 			elem->Struct.scope = s;
 			elem->Struct.fields = slice_from_array(fields);
-			elem->Struct.tags = slice_make<String>(permanent_allocator(), fields.count);
+			elem->Struct.tags = gb_alloc_array(permanent_allocator(), String, fields.count);
 			elem->Struct.node = dummy_node_struct;
 			type_set_offsets(elem);
 		}
@@ -1939,7 +1939,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *old_array = base_type(elem);
 			soa_struct = alloc_type_struct();
 			soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), cast(isize)old_array->Array.count);
-			soa_struct->Struct.tags = slice_make<String>(heap_allocator(), cast(isize)old_array->Array.count);
+			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, cast(isize)old_array->Array.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
@@ -1972,7 +1972,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *old_struct = base_type(elem);
 			soa_struct = alloc_type_struct();
 			soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
-			soa_struct->Struct.tags = slice_make<String>(heap_allocator(), old_struct->Struct.tags.count);
+			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, old_struct->Struct.fields.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;

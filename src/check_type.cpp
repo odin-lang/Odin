@@ -92,7 +92,7 @@ bool does_field_type_allow_using(Type *t) {
 	return false;
 }
 
-void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields, Slice<String> *tags, Slice<Ast *> const &params,
+void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields, String **tags, Slice<Ast *> const &params,
                          isize init_field_capacity, Type *struct_type, String context) {
 	auto fields_array = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 	auto tags_array = array_make<String>(heap_allocator(), 0, init_field_capacity);
@@ -184,7 +184,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 	}
 	
 	*fields = slice_from_array(fields_array);
-	*tags = slice_from_array(tags_array);
+	*tags = tags_array.data;
 }
 
 
@@ -2234,7 +2234,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 
 		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = slice_make<String>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = gb_alloc_array(heap_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
@@ -2249,7 +2249,7 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 
 		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = slice_make<String>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = gb_alloc_array(heap_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
@@ -2291,11 +2291,10 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 
 		Type *old_struct = base_type(elem);
 		field_count = old_struct->Struct.fields.count;
-		GB_ASSERT(old_struct->Struct.tags.count == field_count);
 
 		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = slice_make<String>(heap_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = gb_alloc_array(heap_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
