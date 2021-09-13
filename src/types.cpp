@@ -121,7 +121,7 @@ struct BasicType {
 	String    name;
 };
 
-enum StructSoaKind {
+enum StructSoaKind : u8 {
 	StructSoa_None    = 0,
 	StructSoa_Fixed   = 1,
 	StructSoa_Slice   = 2,
@@ -135,38 +135,37 @@ struct TypeStruct {
 	Ast *           node;
 	Scope *         scope;
 
-	Type *     polymorphic_params; // Type_Tuple
-	Type *     polymorphic_parent;
+	i64             custom_align;
+	Type *          polymorphic_params; // Type_Tuple
+	Type *          polymorphic_parent;
 
-	i64      custom_align;
-	Entity * names;
 
-	Type *        soa_elem;
-	i64           soa_count;
-	StructSoaKind soa_kind;
+	Type *          soa_elem;
+	i64             soa_count;
+	StructSoaKind   soa_kind;
 
-	bool is_polymorphic;
-	bool are_offsets_set             : 1;
-	bool are_offsets_being_processed : 1;
-	bool is_packed                   : 1;
-	bool is_raw_union                : 1;
-	bool is_poly_specialized         : 1;
+	bool            is_polymorphic;
+	bool            are_offsets_set             : 1;
+	bool            are_offsets_being_processed : 1;
+	bool            is_packed                   : 1;
+	bool            is_raw_union                : 1;
+	bool            is_poly_specialized         : 1;
 };
 
 struct TypeUnion {
-	Array<Type *> variants;
+	Slice<Type *> variants;
 	Ast *         node;
 	Scope *       scope;
 	i64           variant_block_size;
 	i64           custom_align;
-	i64           tag_size;
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
 
-	bool          no_nil;
-	bool          maybe;
+	i16           tag_size;
 	bool          is_polymorphic;
-	bool          is_poly_specialized;
+	bool          is_poly_specialized : 1;
+	bool          no_nil              : 1;
+	bool          maybe               : 1;
 };
 
 struct TypeProc {
@@ -237,7 +236,6 @@ struct TypeProc {
 		Array<Entity *> fields;                           \
 		Ast *node;                                        \
 		Scope *  scope;                                   \
-		Entity * names;                                   \
 		Type *   base_type;                               \
 		ExactValue *min_value;                            \
 		ExactValue *max_value;                            \
@@ -2311,7 +2309,7 @@ i64 union_tag_size(Type *u) {
 		}
 	}
 
-	u->Union.tag_size = gb_min3(max_align, build_context.max_align, 8);
+	u->Union.tag_size = cast(i16)gb_min3(max_align, build_context.max_align, 8);
 	return u->Union.tag_size;
 }
 
@@ -2478,24 +2476,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 	type = base_type(type);
 
 	if (is_type) {
-		switch (type->kind) {
-		case Type_Struct:
-			if (type->Struct.names != nullptr &&
-			    field_name == "names") {
-				sel.entity = type->Struct.names;
-				return sel;
-			}
-			break;
-		case Type_Enum:
-			if (type->Enum.names != nullptr &&
-			    field_name == "names") {
-				sel.entity = type->Enum.names;
-				return sel;
-			}
-			break;
-		}
-
-
 		if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
 			for_array(i, type->Enum.fields) {
@@ -3269,7 +3249,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 			i64 tag_size = union_tag_size(t);
 			size = align_formula(max, tag_size);
 			// NOTE(bill): Calculate the padding between the common fields and the tag
-			t->Union.tag_size = tag_size;
+			t->Union.tag_size = cast(i16)tag_size;
 			t->Union.variant_block_size = size - field_size;
 
 			size += tag_size;
