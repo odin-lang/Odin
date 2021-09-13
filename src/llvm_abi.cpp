@@ -82,7 +82,7 @@ LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
 	GB_ASSERT_MSG(ret != nullptr, "%d", ft->ret.kind);
 
 	unsigned maximum_arg_count = offset+arg_count;
-	LLVMTypeRef *args = gb_alloc_array(heap_allocator(), LLVMTypeRef, maximum_arg_count);
+	LLVMTypeRef *args = gb_alloc_array(permanent_allocator(), LLVMTypeRef, maximum_arg_count);
 	if (offset == 1) {
 		GB_ASSERT(ft->ret.kind == lbArg_Indirect);
 		args[0] = LLVMPointerType(ft->ret.type, 0);
@@ -300,7 +300,7 @@ namespace lbAbi386 {
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
 
 	LB_ABI_INFO(abi_info) {
-		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
+		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
 		ft->ret = compute_return_type(c, return_type, return_is_defined);
@@ -378,7 +378,7 @@ namespace lbAbiAmd64Win64 {
 
 
 	LB_ABI_INFO(abi_info) {
-		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
+		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
 		ft->ret = lbAbi386::compute_return_type(c, return_type, return_is_defined);
@@ -469,7 +469,7 @@ namespace lbAbiAmd64SysV {
 	LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes);
 
 	LB_ABI_INFO(abi_info) {
-		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
+		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
 
@@ -849,7 +849,7 @@ namespace lbAbiArm64 {
 	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
 
 	LB_ABI_INFO(abi_info) {
-		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
+		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->ret = compute_return_type(c, return_type, return_is_defined);
 		ft -> args = compute_arg_types(c, arg_types, arg_count);
@@ -1034,7 +1034,7 @@ LB_ABI_INFO(lb_get_abi_info) {
 	case ProcCC_None:
 	case ProcCC_InlineAsm:
 		{
-			lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
+			lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 			ft->ctx = c;
 			ft->args = array_make<lbArgType>(heap_allocator(), arg_count);
 			for (unsigned i = 0; i < arg_count; i++) {
