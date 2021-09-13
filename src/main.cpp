@@ -2221,6 +2221,11 @@ int strip_semicolons(Parser *parser) {
 int main(int arg_count, char const **arg_ptr) {
 #define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
 
+	#define TYPE_KIND(k, ...) gb_printf("%s %td\n", #k, sizeof(Type##k));
+		TYPE_KINDS
+	#undef TYPE_KIND
+	gb_printf("Type %td\n", sizeof(Type));
+
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;

@@ -188,13 +188,6 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 }
 
 
-Entity *make_names_field_for_struct(CheckerContext *ctx, Scope *scope) {
-	Entity *e = alloc_entity_field(scope, make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	e->flags |= EntityFlag_TypeField;
-	e->flags |= EntityFlag_Value;
-	return e;
-}
-
 bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 	GB_ASSERT(align_ != nullptr);
 	Operand o = {};
@@ -565,8 +558,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		case_end;
 		}
 	}
-	struct_type->Struct.names = make_names_field_for_struct(ctx, ctx->scope);
-
+	
 	scope_reserve(ctx->scope, min_field_count);
 
 	if (st->is_raw_union && min_field_count > 1) {
@@ -658,7 +650,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 		}
 	}
 
-	union_type->Union.variants = variants;
+	union_type->Union.variants = slice_from_array(variants);
 	union_type->Union.no_nil = ut->no_nil;
 	union_type->Union.maybe = ut->maybe;
 	if (union_type->Union.no_nil) {
@@ -818,7 +810,6 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 
 
 	enum_type->Enum.fields = fields;
-	enum_type->Enum.names = make_names_field_for_struct(ctx, ctx->scope);
 	*enum_type->Enum.min_value = min_value;
 	*enum_type->Enum.max_value = max_value;
 
