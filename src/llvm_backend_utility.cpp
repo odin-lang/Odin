@@ -807,6 +807,13 @@ lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	return {};
 }
 
+i32 lb_convert_struct_index(Type *t, i32 index) {
+	if (t->kind == Type_Struct && t->Struct.custom_align != 0) {
+		index += 1;
+	}
+	return index;
+}
+
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	GB_ASSERT(is_type_pointer(s.type));
 	Type *t = base_type(type_deref(s.type));
@@ -883,10 +890,9 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	}
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
-
-	if (t->kind == Type_Struct && t->Struct.custom_align != 0) {
-		index += 1;
-	}
+	
+	index = lb_convert_struct_index(t, index);
+	
 	if (lb_is_const(s)) {
 		lbModule *m = p->module;
 		lbValue res = {};
@@ -1006,10 +1012,8 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	}
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s, %d", type_to_string(s.type), index);
-
-	if (t->kind == Type_Struct && t->Struct.custom_align != 0) {
-		index += 1;
-	}
+	
+	index = lb_convert_struct_index(t, index);
 
 	lbValue res = {};
 	res.value = LLVMBuildExtractValue(p->builder, s.value, cast(unsigned)index, "");

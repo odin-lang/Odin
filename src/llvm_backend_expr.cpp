@@ -3259,7 +3259,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						TypeAndValue tav = type_and_value_of_expr(elem);
 					} else {
 						TypeAndValue tav = type_and_value_of_expr(elem);
-						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_src_index);
+						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_index);
 						index = sel.index[0];
 					}
 

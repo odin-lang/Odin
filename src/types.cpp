@@ -2432,7 +2432,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
-				if (f->Variable.field_src_index == index) {
+				if (f->Variable.field_index == index) {
 					auto sel_array = array_make<i32>(a, 1);
 					sel_array[0] = cast(i32)i;
 					return make_selection(f, sel_array, false);
