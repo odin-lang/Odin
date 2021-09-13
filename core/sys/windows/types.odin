@@ -1238,3 +1238,15 @@ NET_API_STATUS :: enum DWORD {
 	PasswordNotComplexEnough = 2704,
 	PasswordFilterError = 2705,
 }
+
+
+SYSTEMTIME :: struct {
+	year:         WORD,
+	month:        WORD,
+	day_of_week:  WORD,
+	day:          WORD,
+	hour:         WORD,
+	minute:       WORD,
+	second:       WORD,
+	milliseconds: WORD,
+}
