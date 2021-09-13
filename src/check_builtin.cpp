@@ -1989,7 +1989,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				Entity *old_field = old_struct->Struct.fields[i];
 				if (old_field->kind == Entity_Variable) {
 					Type *array_type = alloc_type_array(old_field->type, count);
-					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_index);
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(c, scope, nullptr, new_field);
 				} else {

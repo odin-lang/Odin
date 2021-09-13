@@ -155,8 +155,7 @@ struct Entity {
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
-			i32        field_index;
-			i32        field_src_index;
+			i32  field_index;
 
 			ParameterValue param_value;
 			Ast *          param_expr;
@@ -319,20 +318,18 @@ Entity *alloc_entity_const_param(Scope *scope, Token token, Type *type, ExactVal
 }
 
 
-Entity *alloc_entity_field(Scope *scope, Token token, Type *type, bool is_using, i32 field_src_index, EntityState state = EntityState_Unresolved) {
+Entity *alloc_entity_field(Scope *scope, Token token, Type *type, bool is_using, i32 field_index, EntityState state = EntityState_Unresolved) {
 	Entity *entity = alloc_entity_variable(scope, token, type);
-	entity->Variable.field_src_index = field_src_index;
-	entity->Variable.field_index = field_src_index;
+	entity->Variable.field_index = field_index;
 	if (is_using) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Field;
 	entity->state = state;
 	return entity;
 }
 
-Entity *alloc_entity_array_elem(Scope *scope, Token token, Type *type, i32 field_src_index) {
+Entity *alloc_entity_array_elem(Scope *scope, Token token, Type *type, i32 field_index) {
 	Entity *entity = alloc_entity_variable(scope, token, type);
-	entity->Variable.field_src_index = field_src_index;
-	entity->Variable.field_index = field_src_index;
+	entity->Variable.field_index = field_index;
 	entity->flags |= EntityFlag_Field;
 	entity->flags |= EntityFlag_ArrayElem;
 	entity->state = EntityState_Resolved;
