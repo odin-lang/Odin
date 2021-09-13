@@ -1789,7 +1789,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			defer (m->internal_type_level -= 1);
 
 			LLVMTypeRef ret = nullptr;
-			LLVMTypeRef *params = gb_alloc_array(heap_allocator(), LLVMTypeRef, param_count);
+			LLVMTypeRef *params = gb_alloc_array(permanent_allocator(), LLVMTypeRef, param_count);
 			if (type->Proc.result_count != 0) {
 				Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
 				ret = lb_type(m, single_ret);
@@ -1883,7 +1883,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			LLVMTypeRef base_integer = lb_type_internal(m, type->RelativeSlice.base_integer);
 
 			unsigned field_count = 2;
-			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+			LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
 			fields[0] = base_integer;
 			fields[1] = base_integer;
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);

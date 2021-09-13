@@ -1196,7 +1196,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 
 	CommentGroup *comments = nullptr;
 	if (list.count > 0) {
-		comments = gb_alloc_item(heap_allocator(), CommentGroup);
+		comments = gb_alloc_item(permanent_allocator(), CommentGroup);
 		comments->list = slice_from_array(list);
 		array_add(&f->comments, comments);
 	}
@@ -4727,8 +4727,6 @@ void destroy_ast_file(AstFile *f) {
 	array_free(&f->tokens);
 	array_free(&f->comments);
 	array_free(&f->imports);
-	gb_free(heap_allocator(), f->tokenizer.fullpath.text);
-	destroy_tokenizer(&f->tokenizer);
 }
 
 bool init_parser(Parser *p) {
@@ -4795,7 +4793,7 @@ WORKER_TASK_PROC(parser_worker_proc) {
 void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
 	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
-	auto wd = gb_alloc_item(heap_allocator(), ParserWorkerData);
+	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
 	global_thread_pool_add_task(parser_worker_proc, wd);
@@ -4833,7 +4831,7 @@ WORKER_TASK_PROC(foreign_file_worker_proc) {
 void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFileKind kind, FileInfo fi, TokenPos pos) {
 	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
-	auto wd = gb_alloc_item(heap_allocator(), ForeignFileWorkerData);
+	auto wd = gb_alloc_item(permanent_allocator(), ForeignFileWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
 	wd->foreign_kind = kind;
@@ -4854,7 +4852,7 @@ AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel
 	string_set_add(&p->imported_files, path);
 
 
-	AstPackage *pkg = gb_alloc_item(heap_allocator(), AstPackage);
+	AstPackage *pkg = gb_alloc_item(permanent_allocator(), AstPackage);
 	pkg->kind = kind;
 	pkg->fullpath = path;
 	array_init(&pkg->files, heap_allocator());

@@ -371,7 +371,7 @@ void begin_error_block(void) {
 void end_error_block(void) {
 	if (global_error_collector.error_buffer.count > 0) {
 		isize n = global_error_collector.error_buffer.count;
-		u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
+		u8 *text = gb_alloc_array(permanent_allocator(), u8, n+1);
 		gb_memmove(text, global_error_collector.error_buffer.data, n);
 		text[n] = 0;
 		String s = {text, n};
@@ -404,7 +404,7 @@ ERROR_OUT_PROC(default_error_out_va) {
 	} else {
 		mutex_lock(&global_error_collector.error_out_mutex);
 		{
-			u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
+			u8 *text = gb_alloc_array(permanent_allocator(), u8, n+1);
 			gb_memmove(text, buf, n);
 			text[n] = 0;
 			array_add(&global_error_collector.errors, make_string(text, n));
@@ -836,12 +836,6 @@ TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &full
 	}
 
 	return err;
-}
-
-gb_inline void destroy_tokenizer(Tokenizer *t) {
-	if (t->start != nullptr) {
-		gb_free(heap_allocator(), t->start);
-	}
 }
 
 gb_inline i32 digit_value(Rune r) {

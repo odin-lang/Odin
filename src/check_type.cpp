@@ -2233,8 +2233,8 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		field_count = 0;
 
 		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = gb_alloc_array(heap_allocator(), String, field_count+extra_field_count);
+		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
@@ -2248,8 +2248,8 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		field_count = cast(isize)old_array->Array.count;
 
 		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = gb_alloc_array(heap_allocator(), String, field_count+extra_field_count);
+		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;
@@ -2293,8 +2293,8 @@ Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *el
 		field_count = old_struct->Struct.fields.count;
 
 		soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count+extra_field_count);
-		soa_struct->Struct.tags = gb_alloc_array(heap_allocator(), String, field_count+extra_field_count);
+		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.node = array_typ_expr;
 		soa_struct->Struct.soa_kind = soa_kind;
 		soa_struct->Struct.soa_elem = elem;

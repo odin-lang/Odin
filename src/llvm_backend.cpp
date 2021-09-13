@@ -1687,7 +1687,7 @@ void lb_generate_code(lbGenerator *gen) {
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
-			auto *wd = gb_alloc_item(heap_allocator(), lbLLVMEmitWorker);
+			auto *wd = gb_alloc_item(permanent_allocator(), lbLLVMEmitWorker);
 			wd->target_machine = target_machines[j];
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;

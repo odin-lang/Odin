@@ -4954,7 +4954,7 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 		} else {
 			lhs_count = pt->params->Tuple.variables.count;
 		}
-		lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+		lhs = gb_alloc_array(permanent_allocator(), Entity *, lhs_count);
 		for (isize i = 0; i < lhs_count; i++) {
 			Entity *e = pt->params->Tuple.variables[i];
 			if (!is_type_polymorphic(e->type)) {
