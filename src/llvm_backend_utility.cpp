@@ -807,12 +807,46 @@ lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	return {};
 }
 
-i32 lb_convert_struct_index(Type *t, i32 index) {
-	if (t->kind == Type_Struct && t->Struct.custom_align != 0) {
-		index += 1;
+bool lb_struct_has_padding_prefix(Type *t) {
+	Type *bt = base_type(t);
+	GB_ASSERT(bt->kind == Type_Struct);
+	return bt->Struct.custom_align != 0 && bt->Struct.fields.count == 0;
+}
+
+i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
+	if (t->kind == Type_Struct) {
+		index = index*2 + 1;
+		if (lb_struct_has_padding_prefix(t)) {
+			index += 1;
+		}
+		
+		unsigned count = LLVMCountStructElementTypes(lb_type(m, t));
+		GB_ASSERT(count >= cast(unsigned)index);
 	}
 	return index;
 }
+
+char const *llvm_type_kinds[] = {
+	"LLVMVoidTypeKind",
+	"LLVMHalfTypeKind",
+	"LLVMFloatTypeKind",
+	"LLVMDoubleTypeKind",
+	"LLVMX86_FP80TypeKind",
+	"LLVMFP128TypeKind",
+	"LLVMPPC_FP128TypeKind",
+	"LLVMLabelTypeKind",
+	"LLVMIntegerTypeKind",
+	"LLVMFunctionTypeKind",
+	"LLVMStructTypeKind",
+	"LLVMArrayTypeKind",
+	"LLVMPointerTypeKind",
+	"LLVMVectorTypeKind",
+	"LLVMMetadataTypeKind",
+	"LLVMX86_MMXTypeKind",
+	"LLVMTokenTypeKind",
+	"LLVMScalableVectorTypeKind",
+	"LLVMBFloatTypeKind",
+};
 
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	GB_ASSERT(is_type_pointer(s.type));
@@ -878,6 +912,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 0: result_type = get_struct_field_type(gst, 0); break;
 		case 1: result_type = get_struct_field_type(gst, 1); break;
 		}
+		index = index*2 + 1;
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
 	} else if (is_type_relative_slice(t)) {
@@ -891,7 +926,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 	
-	index = lb_convert_struct_index(t, index);
+	index = lb_convert_struct_index(p->module, t, index);
 	
 	if (lb_is_const(s)) {
 		lbModule *m = p->module;
@@ -902,6 +937,14 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		return res;
 	} else {
 		lbValue res = {};
+		LLVMTypeRef st = LLVMGetElementType(LLVMTypeOf(s.value));
+		// gb_printf_err("%s\n", type_to_string(s.type));
+		// gb_printf_err("%s\n", LLVMPrintTypeToString(LLVMTypeOf(s.value)));
+		// gb_printf_err("%d\n", index);
+		GB_ASSERT_MSG(LLVMGetTypeKind(st) == LLVMStructTypeKind, "%s", llvm_type_kinds[LLVMGetTypeKind(st)]);
+		unsigned count = LLVMCountStructElementTypes(st);
+		GB_ASSERT(count >= cast(unsigned)index);
+		
 		res.value = LLVMBuildStructGEP(p->builder, s.value, cast(unsigned)index, "");
 		res.type = alloc_type_pointer(result_type);
 		return res;
@@ -1013,7 +1056,7 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s, %d", type_to_string(s.type), index);
 	
-	index = lb_convert_struct_index(t, index);
+	index = lb_convert_struct_index(p->module, t, index);
 
 	lbValue res = {};
 	res.value = LLVMBuildExtractValue(p->builder, s.value, cast(unsigned)index, "");
@@ -1232,7 +1275,7 @@ lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value) {
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
 	i32 index = 1;
-	lbValue entries = lb_emit_struct_ep(p, value, index);
+	lbValue entries = lb_emit_struct_ep(p, value, index);	
 	return entries;
 }
 

@@ -1923,9 +1923,9 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			lbValue map_ptr = lb_address_from_load_or_generate_local(p, x);
 
 			unsigned indices[2] = {0, 0};
-			LLVMValueRef hashes_data = LLVMBuildStructGEP(p->builder, map_ptr.value, 0, "");
-			LLVMValueRef hashes_data_ptr_ptr = LLVMBuildStructGEP(p->builder, hashes_data, 0, "");
-			LLVMValueRef hashes_data_ptr = LLVMBuildLoad(p->builder, hashes_data_ptr_ptr, "");
+			lbValue hashes_data = lb_emit_struct_ep(p, map_ptr, 0);
+			lbValue hashes_data_ptr_ptr = lb_emit_struct_ep(p, hashes_data, 0);
+			LLVMValueRef hashes_data_ptr = LLVMBuildLoad(p->builder, hashes_data_ptr_ptr.value, "");
 
 			if (op_kind == Token_CmpEq) {
 				res.value = LLVMBuildIsNull(p->builder, hashes_data_ptr, "");
@@ -2786,7 +2786,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
-		if (is_type_soa_struct(t)) {
+		if (is_type_soa_struct(t)) {			
 			// SOA STRUCTURES!!!!
 			lbValue val = lb_build_addr_ptr(p, ie->expr);
 			if (deref) {
@@ -2821,7 +2821,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				// lbValue len = ir_soa_struct_len(p, base_struct);
 				// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			}
-
 			lbValue val = lb_emit_ptr_offset(p, field, index);
 			return lb_addr(val);
 		}
