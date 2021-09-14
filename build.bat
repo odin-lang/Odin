@@ -68,15 +68,13 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-rem cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
-rem if %errorlevel% neq 0 goto end_of_build
+cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
+if %errorlevel% neq 0 goto end_of_build
 
-rem call build_vendor.bat
-rem if %errorlevel% neq 0 goto end_of_build
+call build_vendor.bat
+if %errorlevel% neq 0 goto end_of_build
 
-rem if %release_mode% EQU 0 odin run examples/demo
-
-odin check vendor/stb/image -no-entry-point -vet -strict-style
+if %release_mode% EQU 0 odin run examples/demo
 
 del *.obj > NUL 2> NUL
 
