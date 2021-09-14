@@ -271,13 +271,13 @@ Token ast_end_token(Ast *node) {
 		if (node->Attribute.close.kind != Token_Invalid) {
 			return node->Attribute.close;
 		}
-    if (node->Attribute.elems.count > 0) {
-      return ast_end_token(node->Attribute.elems[node->Attribute.elems.count-1]);
-    }
-    if (node->Attribute.open.kind != Token_Invalid) {
-      return node->Attribute.open;
-    }
-    return node->Attribute.token;
+		if (node->Attribute.elems.count > 0) {
+			return ast_end_token(node->Attribute.elems[node->Attribute.elems.count-1]);
+		}
+		if (node->Attribute.open.kind != Token_Invalid) {
+			return node->Attribute.open;
+		}
+		return node->Attribute.token;
 	case Ast_Field:
 		if (node->Field.tag.kind != Token_Invalid) {
 			return node->Field.tag;
