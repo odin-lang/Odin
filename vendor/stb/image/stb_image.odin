@@ -7,7 +7,7 @@ import c "core:c/libc"
 when ODIN_OS == "windows" { foreign import stbi "../lib/stb_image.lib" }
 when ODIN_OS == "linux"   { foreign import stbi "../lib/stb_image.a"   }
 
-#assert(size_of(b32) == size_of(c.int));
+#assert(size_of(b32) == size_of(c.int))
 
 //
 // load image by filename, open file, or memory buffer
