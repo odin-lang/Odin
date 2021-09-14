@@ -1,6 +1,6 @@
 package stb_truetype
 
-import c "core:c/libc"
+import c "core:c"
 import stbrp "vendor:stb/rect_pack"
 
 when ODIN_OS == "windows" { foreign import stbtt "../lib/stb_truetype.lib" }
@@ -14,15 +14,8 @@ when ODIN_OS == "linux"   { foreign import stbtt "../lib/stb_truetype.a"   }
 ////
 ////
 
-#assert(size_of(c.int) == size_of(rune));
-#assert(size_of(c.int) == size_of(b32));
-
-
-// private structure
-_buf :: struct {
-	data: [^]u8,
-	cursor, size: c.int,
-}
+#assert(size_of(c.int) == size_of(rune))
+#assert(size_of(c.int) == size_of(b32))
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -106,11 +99,11 @@ pack_context :: struct {
 	user_allocator_context, pack_info:       rawptr,
 	width, height, stride_in_bytes, padding: c.int,
 	h_oversample, v_oversample:              u32,
-	pixels:                                  [^]u8,
+	pixels:                                  [^]byte,
 	nodes:                                   rawptr,
-};
+}
 
-POINT_SIZE :: #force_inline proc(x: $T) -> T { return -x; } // @NOTE: this was a macro
+POINT_SIZE :: #force_inline proc(x: $T) -> T { return -x } // @NOTE: this was a macro
 
 // bindings
 @(default_calling_convention="c", link_prefix="stbtt_")
@@ -224,7 +217,7 @@ foreign stbtt {
 	// the stbtt_fontinfo yourself, and stbtt_InitFont will fill it out. You don't
 	// need to do anything special to free it, because the contents are pure
 	// value data with no additional data structures. Returns 0 on failure.
-	InitFont :: proc(info: ^fontinfo, data: ^u8, offset: c.int) -> b32 ---
+	InitFont :: proc(info: ^fontinfo, data: [^]byte, offset: c.int) -> b32 ---
 	
 	// This function will determine the number of fonts in a font file.  TrueType
 	// collection (.ttc) files may contain multiple fonts, while TrueType font
@@ -458,7 +451,7 @@ foreign stbtt {
 @(default_calling_convention="c", link_prefix="stbtt_")
 foreign stbtt {
 	// frees the SDF bitmap allocated below
-	FreeSDF :: proc(bitmap: [^]u8, userdata: rawptr) ---
+	FreeSDF :: proc(bitmap: [^]byte, userdata: rawptr) ---
 	
 	// These functions compute a discretized SDF field for a single character, suitable for storing
 	// in a single-channel texture, sampling with bilinear filtering, and testing against
@@ -507,8 +500,8 @@ foreign stbtt {
 	// The algorithm has not been optimized at all, so expect it to be slow
 	// if computing lots of characters or very large sizes.
 
-	GetGlyphSDF     :: proc(info: ^fontinfo, scale: f32, glyph, padding: c.int, onedge_value: u8, pixel_dist_scale: f32, width, height, xoff, yoff: ^c.int) -> ^u8 ---
-	GetCodepointSDF :: proc(info: ^fontinfo, scale: f32, codepoint, padding: c.int, onedge_value: u8, pixel_dist_scale: f32, width, height, xoff, yoff: ^c.int) -> ^u8 ---
+	GetGlyphSDF     :: proc(info: ^fontinfo, scale: f32, glyph, padding: c.int, onedge_value: u8, pixel_dist_scale: f32, width, height, xoff, yoff: ^c.int) -> [^]byte ---
+	GetCodepointSDF :: proc(info: ^fontinfo, scale: f32, codepoint, padding: c.int, onedge_value: u8, pixel_dist_scale: f32, width, height, xoff, yoff: ^c.int) -> [^]byte ---
 }
 
 
@@ -607,3 +600,10 @@ MAC_LANG_FRENCH,  MAC_LANG_SPANISH            :: 1,  6
 MAC_LANG_GERMAN,  MAC_LANG_SWEDISH            :: 2,  5
 MAC_LANG_HEBREW,  MAC_LANG_CHINESE_SIMPLIFIED :: 10, 33
 MAC_LANG_ITALIAN, MAC_LANG_CHINESE_TRAD       :: 3,  19
+
+// private structure
+_buf :: struct {
+	data:   [^]byte,
+	cursor: c.int,
+	size:   c.int,
+}
