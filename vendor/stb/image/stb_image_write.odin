@@ -6,7 +6,7 @@ when ODIN_OS == "windows" { foreign import stbiw "../lib/stb_image_write.lib" }
 when ODIN_OS == "linux"   { foreign import stbiw "../lib/stb_image_write.a"   }
 
 
-write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int);
+write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int)
 
 @(default_calling_convention="c", link_prefix="stbi_")
 foreign stbiw {
