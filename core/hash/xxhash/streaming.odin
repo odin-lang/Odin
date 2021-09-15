@@ -22,7 +22,7 @@ XXH3_128_reset :: proc(state: ^XXH3_state) -> (err: Error) {
 	if state == nil {
 		return .Error
 	}
-	XXH3_reset_internal(state, 0, XXH3_kSecret[:])
+	XXH3_reset_internal(state, 0, XXH3_kSecret[:], len(XXH3_kSecret))
 	return .None
 }
 XXH3_64_reset :: XXH3_128_reset
@@ -34,7 +34,7 @@ XXH3_128_reset_with_secret :: proc(state: ^XXH3_state, secret: []u8) -> (err: Er
 	if secret == nil || len(secret) < XXH3_SECRET_SIZE_MIN {
 		return .Error
 	}
-	XXH3_reset_internal(state, 0, secret)
+	XXH3_reset_internal(state, 0, secret, len(secret))
 	return .None
 }
 XXH3_64_reset_with_secret :: XXH3_128_reset_with_secret
@@ -46,15 +46,18 @@ XXH3_128_reset_with_seed :: proc(state: ^XXH3_state, seed: XXH64_hash) -> (err: 
 	if seed != state.seed {
 		XXH3_init_custom_secret(state.custom_secret[:], seed)
 	}
-
-	XXH3_reset_internal(state, seed, nil)
+	XXH3_reset_internal(state, seed, nil, XXH_SECRET_DEFAULT_SIZE)
 	return .None
 }
 XXH3_64_reset_with_seed :: XXH3_128_reset_with_seed
 
 XXH3_128_update :: proc(state: ^XXH3_state, input: []u8) -> (err: Error) {
+	if len(input) < XXH3_MIDSIZE_MAX {
+		return .Error
+	}
 	return XXH3_update(state, input, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
+XXH3_64_update :: XXH3_128_update
 
 XXH3_128_digest :: proc(state: ^XXH3_state) -> (hash: XXH3_128_hash) {
 	secret := state.custom_secret[:] if len(state.external_secret) == 0 else state.external_secret[:]
@@ -137,7 +140,7 @@ XXH3_copy_state :: proc(dest, src: ^XXH3_state) {
 	mem_copy(dest, src, size_of(XXH3_state))
 }
 
-XXH3_reset_internal :: proc(state: ^XXH3_state, seed: XXH64_hash, secret: []u8) {
+XXH3_reset_internal :: proc(state: ^XXH3_state, seed: XXH64_hash, secret: []u8, secret_size: uint) {
 	assert(state != nil)
 
 	init_start  := offset_of(XXH3_state, buffered_size)
@@ -162,10 +165,9 @@ XXH3_reset_internal :: proc(state: ^XXH3_state, seed: XXH64_hash, secret: []u8) 
 	state.seed = seed
 	state.external_secret = secret
 
-	secret_length := uint(len(secret))
-	assert(secret_length > XXH3_SECRET_SIZE_MIN)
+	assert(secret_size >= XXH3_SECRET_SIZE_MIN)
 
-	state.secret_limit = secret_length - XXH_STRIPE_LEN
+	state.secret_limit = secret_size - XXH_STRIPE_LEN
 	state.stripes_per_block = state.secret_limit / XXH_SECRET_CONSUME_RATE
 }
 
@@ -210,6 +212,8 @@ XXH3_update :: #force_inline proc(
 	input  := input
 	length := len(input)
 	secret := state.custom_secret[:] if len(state.external_secret) == 0 else state.external_secret[:]
+
+	assert(len(input) > 0)
 
 	state.total_length += u64(length)
 	assert(state.buffered_size <= XXH3_INTERNAL_BUFFER_SIZE)
@@ -263,10 +267,6 @@ XXH3_update :: #force_inline proc(
 	mem_copy(&state.buffer[0], &input[0], length)
 	state.buffered_size = u32(length)
 	return .None
-}
-
-XXH3_64_update :: proc(state: ^XXH3_state, input: []u8) -> (err: Error) {
-	return XXH3_update(state, input, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
 XXH3_digest_long :: #force_inline proc(acc: []u64, state: ^XXH3_state, secret: []u8) {
