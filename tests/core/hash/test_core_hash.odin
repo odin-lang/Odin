@@ -202,15 +202,39 @@ test_xxhash_vectors :: proc(t: ^testing.T) {
 
 			xxh32    := xxhash.XXH32(b, u32(seed))
 			xxh64    := xxhash.XXH64(b, seed)
+			xxh3_64  := xxhash.XXH3_64(b, seed)
 			xxh3_128 := xxhash.XXH3_128(b, seed)
 
-			xxh32_error    := fmt.tprintf("[   XXH32(%03d)] Expected: %08x. Got: %08x.", i,   v.xxh_32, xxh32)
-			xxh64_error    := fmt.tprintf("[   XXH64(%03d)] Expected: %16x. Got: %16x.", i,   v.xxh_64, xxh64)
-			xxh3_128_error := fmt.tprintf("[XXH3_128(%03d)] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128)
+			xxh32_error     := fmt.tprintf("[   XXH32(%03d) ] Expected: %08x. Got: %08x.", i,   v.xxh_32, xxh32)
+			xxh64_error     := fmt.tprintf("[   XXH64(%03d) ] Expected: %16x. Got: %16x.", i,   v.xxh_64, xxh64)
+
+			xxh3_64_error   := fmt.tprintf("[XXH3_64(%03d)  ] Expected: %16x. Got: %16x.", i, v.xxh3_64, xxh3_64)
+			xxh3_128_error  := fmt.tprintf("[XXH3_128(%03d) ] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128)
 
 			expect(t, xxh32     == v.xxh_32,   xxh32_error)
 			expect(t, xxh64     == v.xxh_64,   xxh64_error)
+			expect(t, xxh3_64   == v.xxh3_64,  xxh3_64_error)
 			expect(t, xxh3_128  == v.xxh3_128, xxh3_128_error)
+
+			if len(b) > xxhash.XXH3_MIDSIZE_MAX {
+				fmt.printf("XXH3 - size: %v\n", len(b))
+
+				xxh3_state, _ := xxhash.XXH3_create_state()
+				xxhash.XXH3_64_reset_with_seed(xxh3_state, seed)
+				xxhash.XXH3_64_update(xxh3_state, b)
+				xxh3_64_streamed := xxhash.XXH3_64_digest(xxh3_state)
+				xxhash.XXH3_destroy_state(xxh3_state)
+				xxh3_64s_error  := fmt.tprintf("[XXH3_64s(%03d) ] Expected: %16x. Got: %16x.", i, v.xxh3_64, xxh3_64_streamed)
+				expect(t, xxh3_64_streamed == v.xxh3_64, xxh3_64s_error)
+
+				xxh3_state2, _ := xxhash.XXH3_create_state()
+				xxhash.XXH3_128_reset_with_seed(xxh3_state2, seed)
+				xxhash.XXH3_128_update(xxh3_state2, b)
+				xxh3_128_streamed := xxhash.XXH3_128_digest(xxh3_state2)
+				xxhash.XXH3_destroy_state(xxh3_state2)
+				xxh3_128s_error  := fmt.tprintf("[XXH3_128s(%03d) ] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128_streamed)
+				expect(t, xxh3_128_streamed == v.xxh3_128, xxh3_128s_error)
+			}
 		}
 	}
 
