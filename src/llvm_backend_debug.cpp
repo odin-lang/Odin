@@ -50,8 +50,8 @@ LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 
 	GB_ASSERT(type != t_invalid);
 
-	unsigned const word_size = cast(unsigned)build_context.word_size;
-	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
+	/* unsigned const word_size = cast(unsigned)build_context.word_size;
+	unsigned const word_bits = cast(unsigned)(8*build_context.word_size); */
 
 	GB_ASSERT(type->kind == Type_Proc);
 	unsigned parameter_count = 1;
@@ -129,7 +129,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 	GB_ASSERT(type != t_invalid);
 
-	unsigned const word_size = cast(unsigned)build_context.word_size;
+	/* unsigned const word_size = cast(unsigned)build_context.word_size; */
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
 
 	switch (type->kind) {
@@ -564,7 +564,7 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 }
 
 void lb_debug_complete_types(lbModule *m) {
-	unsigned const word_size = cast(unsigned)build_context.word_size;
+	/* unsigned const word_size = cast(unsigned)build_context.word_size; */
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
 
 	for_array(debug_incomplete_type_index, m->debug_incomplete_types) {

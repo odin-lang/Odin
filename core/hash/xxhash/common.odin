@@ -41,7 +41,7 @@ Alignment :: enum {
 }
 
 Error :: enum {
-	Okay = 0,
+	None = 0,
 	Error,
 }
 

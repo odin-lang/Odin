@@ -197,12 +197,12 @@ XXH32 :: proc(input: []u8, seed := XXH32_DEFAULT_SEED) -> (digest: XXH32_hash) {
 */
 XXH32_create_state :: proc(allocator := context.allocator) -> (res: ^XXH32_state, err: Error) {
 	state := new(XXH32_state, allocator)
-	return state, nil if state != nil else .Error
+	return state, .None if state != nil else .Error
 }
 
 XXH32_destroy_state :: proc(state: ^XXH32_state, allocator := context.allocator) -> (err: Error) {
 	free(state, allocator)
-	return nil
+	return .None
 }
 
 XXH32_copy_state :: proc(dest, src: ^XXH32_state) {
@@ -221,7 +221,7 @@ XXH32_reset_state :: proc(state_ptr: ^XXH32_state, seed := XXH32_DEFAULT_SEED) -
 		Do not write into reserved, planned to be removed in a future version.
 	*/
 	mem_copy(state_ptr, &state, size_of(state) - size_of(state.reserved))
-	return nil
+	return .None
 }
 
 XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
@@ -236,7 +236,7 @@ XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
 		ptr := uintptr(raw_data(state.mem32[:])) + uintptr(state.memsize)
 		mem_copy(rawptr(ptr), raw_data(input), int(length))
 		state.memsize += XXH32_hash(length)
-		return nil
+		return .None
 	}
 
 	if state.memsize > 0 {/* Some data left from previous update */
@@ -276,7 +276,7 @@ XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
 		mem_copy(raw_data(state.mem32[:]), raw_data(buf[:]), int(length))
 		state.memsize = u32(length)
 	}
-	return nil
+	return .None
 }
 
 XXH32_digest :: proc(state: ^XXH32_state) -> (res: XXH32_hash) {
