@@ -666,12 +666,12 @@ remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: s
 	return remove(s, key, -1, allocator)
 }
 
-@(private) _ascii_space := [256]u8{'\t' = 1, '\n' = 1, '\v' = 1, '\f' = 1, '\r' = 1, ' ' = 1}
+@(private) _ascii_space := [256]bool{'\t' = true, '\n' = true, '\v' = true, '\f' = true, '\r' = true, ' ' = true}
 
 
 is_ascii_space :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
-		return _ascii_space[u8(r)] != 0
+		return _ascii_space[u8(r)]
 	}
 	return false
 }
@@ -1237,19 +1237,19 @@ fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds
 	na := 0
 	field_start := 0
 	i := 0
-	for i < len(s) && _ascii_space[s[i]] != 0 {
+	for i < len(s) && _ascii_space[s[i]] {
 		i += 1
 	}
 	field_start = i
 	for i < len(s) {
-		if _ascii_space[s[i]] == 0 {
+		if !_ascii_space[s[i]] {
 			i += 1
 			continue
 		}
 		a[na] = s[field_start : i]
 		na += 1
 		i += 1
-		for i < len(s) && _ascii_space[s[i]] != 0 {
+		for i < len(s) && _ascii_space[s[i]] {
 			i += 1
 		}
 		field_start = i
