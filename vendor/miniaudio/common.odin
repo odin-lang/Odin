@@ -3,6 +3,7 @@ package miniaudio
 import "core:c"
 
 when ODIN_OS == "windows" { foreign import lib "../lib/miniaudio.lib" }
+when ODIN_OS == "linux"   { foreign import lib "../lib/miniaudio.a" }
 
 handle :: distinct rawptr
 
