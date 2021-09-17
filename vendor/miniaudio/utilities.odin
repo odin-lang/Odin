@@ -196,18 +196,18 @@ foreign lib {
 
 
 audio_buffer_config :: struct {
-	format: format,
-	channels: u32,
-	sizeInFrames: u64,
-	pData: rawptr,  /* If set to NULL, will allocate a block of memory for you. */
+	format:              format,
+	channels:            u32,
+	sizeInFrames:        u64,
+	pData:               rawptr,  /* If set to NULL, will allocate a block of memory for you. */
 	allocationCallbacks: allocation_callbacks,
 }
 
 audio_buffer :: struct {
-	ref: audio_buffer_ref,
+	ref:                 audio_buffer_ref,
 	allocationCallbacks: allocation_callbacks,
-	ownsData: b32,             /* Used to control whether or not miniaudio owns the data buffer. If set to true, pData will be freed in ma_audio_buffer_uninit(). */
-	_pExtraData: [1]u8,        /* For allocating a buffer with the memory located directly after the other memory of the structure. */
+	ownsData:            b32,             /* Used to control whether or not miniaudio owns the data buffer. If set to true, pData will be freed in ma_audio_buffer_uninit(). */
+	_pExtraData:         [1]u8,        /* For allocating a buffer with the memory located directly after the other memory of the structure. */
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
