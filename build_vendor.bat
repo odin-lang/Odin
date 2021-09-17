@@ -2,9 +2,16 @@
 
 setlocal EnableDelayedExpansion
 
+rem build the .lib files already exist
+
 if not exist "vendor\stb\lib\*.lib" (
-	rem build the .lib fiels already exist
 	pushd vendor\stb\src
+		call build.bat
+	popd
+)
+
+if not exist "vendor\miniaudio\lib\*.lib" (
+	pushd vendor\miniaudio\src
 		call build.bat
 	popd
 )
