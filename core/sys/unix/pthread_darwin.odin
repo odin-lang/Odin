@@ -1,3 +1,4 @@
+//+build darwin
 package unix
 
 import "core:c"

@@ -1,3 +1,4 @@
+//+build linux, darwin, freebsd
 package unix
 
 foreign import "system:pthread"
