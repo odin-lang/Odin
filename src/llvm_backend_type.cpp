@@ -728,7 +728,9 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					lbValue tip = lb_get_type_info_ptr(m, f->type);
 					i64 foffset = 0;
 					if (!t->Struct.is_raw_union) {
-						foffset = t->Struct.offsets[f->Variable.field_index];
+						GB_ASSERT(t->Struct.offsets != nullptr);
+						GB_ASSERT(0 <= f->Variable.field_index && f->Variable.field_index < count);
+						foffset = t->Struct.offsets[source_index];
 					}
 					GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
@@ -779,11 +781,13 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_Map: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
+			
+			lbValue gst = lb_get_type_info_ptr(m, t->Map.generated_struct_type);
 
 			LLVMValueRef vals[5] = {
 				lb_get_type_info_ptr(m, t->Map.key).value,
 				lb_get_type_info_ptr(m, t->Map.value).value,
-				lb_get_type_info_ptr(m, t->Map.generated_struct_type).value,
+				gst.value,
 				lb_get_equal_proc_for_type(m, t->Map.key).value,
 				lb_get_hasher_proc_for_type(m, t->Map.key).value
 			};

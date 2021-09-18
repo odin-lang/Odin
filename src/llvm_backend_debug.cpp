@@ -714,6 +714,7 @@ void lb_debug_complete_types(lbModule *m) {
 
 						unsigned field_line = 0;
 						LLVMDIFlags field_flags = LLVMDIFlagZero;
+						GB_ASSERT(bt->Struct.offsets != nullptr);
 						u64 offset_in_bits = 8*cast(u64)bt->Struct.offsets[j];
 
 						elements[element_offset+j] = LLVMDIBuilderCreateMemberType(
