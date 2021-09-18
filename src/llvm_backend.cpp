@@ -322,6 +322,7 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		for_array(i, type->Struct.fields) {
+			GB_ASSERT(type->Struct.offsets != nullptr);
 			i64 offset = type->Struct.offsets[i];
 			Entity *field = type->Struct.fields[i];
 			lbValue field_hasher = lb_get_hasher_proc_for_type(m, field->type);

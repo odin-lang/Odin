@@ -1667,6 +1667,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Struct:
 		{
+			type_set_offsets(type);
+			
 			if (type->Struct.is_raw_union) {
 				unsigned field_count = 2;
 				LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
@@ -1695,8 +1697,10 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			
 			i64 padding_offset = 0;
 			for_array(i, type->Struct.fields) {
+				GB_ASSERT(type->Struct.offsets != nullptr);
+				
 				Entity *field = type->Struct.fields[i];
-				i64 padding = type->Struct.offsets[i]-padding_offset;
+				i64 padding = type->Struct.offsets[i] - padding_offset;
 
 				LLVMTypeRef padding_type = nullptr;
 				if (padding_offset == 0) {

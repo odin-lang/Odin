@@ -3325,11 +3325,13 @@ i64 type_offset_of(Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
 		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Struct.fields.count-1)) {
+			GB_ASSERT(t->Struct.offsets != nullptr);
 			return t->Struct.offsets[index];
 		}
 	} else if (t->kind == Type_Tuple) {
 		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Tuple.variables.count-1)) {
+			GB_ASSERT(t->Tuple.offsets != nullptr);
 			return t->Tuple.offsets[index];
 		}
 	}  else if (t->kind == Type_Basic) {

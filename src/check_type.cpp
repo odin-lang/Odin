@@ -2072,14 +2072,16 @@ void init_map_entry_type(Type *type) {
 	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
 	auto fields = slice_make<Entity *>(permanent_allocator(), 4);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, cast(i32)fields.count, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, cast(i32)fields.count, EntityState_Resolved);
-	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, cast(i32)fields.count, EntityState_Resolved);
-	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, cast(i32)fields.count, EntityState_Resolved);
+	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, 0, EntityState_Resolved);
+	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved);
+	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, 2, EntityState_Resolved);
+	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 3, EntityState_Resolved);
 
 
-	entry_type->Struct.fields = fields;
-
+	entry_type->Struct.fields  = fields;
+	entry_type->Struct.tags    = gb_alloc_array(permanent_allocator(), String, fields.count);
+	
+	type_set_offsets(entry_type);
 	type->Map.entry_type = entry_type;
 }
 
@@ -2113,8 +2115,8 @@ void init_map_internal_types(Type *type) {
 	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved);
 
 	generated_struct_type->Struct.fields = fields;
-
 	type_set_offsets(generated_struct_type);
+	
 	type->Map.generated_struct_type = generated_struct_type;
 	type->Map.internal_type         = generated_struct_type;
 	type->Map.lookup_result_type    = make_optional_ok_type(value);
