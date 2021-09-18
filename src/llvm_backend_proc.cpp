@@ -1831,6 +1831,54 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return lb_emit_conv(p, res, t);
 		}
 		
+	case BuiltinProc_prefetch_read_instruction:
+	case BuiltinProc_prefetch_read_data:
+	case BuiltinProc_prefetch_write_instruction:
+	case BuiltinProc_prefetch_write_data:
+		{
+			lbValue ptr = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_rawptr);
+			unsigned long long locality = cast(unsigned long long)exact_value_to_i64(ce->args[1]->tav.value);
+			unsigned long long rw = 0;
+			unsigned long long cache = 0;
+			switch (id) {
+			case BuiltinProc_prefetch_read_instruction:
+				rw = 0;
+				cache = 0;
+				break;
+			case BuiltinProc_prefetch_read_data:
+				rw = 0;
+				cache = 1;
+				break;
+			case BuiltinProc_prefetch_write_instruction:
+				rw = 1;
+				cache = 0;
+				break;
+			case BuiltinProc_prefetch_write_data:
+				rw = 1;
+				cache = 1;
+				break;
+			}
+			
+			char const *name = "llvm.prefetch";
+			
+			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+			
+			LLVMTypeRef llvm_i32 = lb_type(p->module, t_i32);
+			LLVMValueRef args[4] = {};
+			args[0] = ptr.value;
+			args[1] = LLVMConstInt(llvm_i32, rw, false);
+			args[2] = LLVMConstInt(llvm_i32, locality, false);
+			args[3] = LLVMConstInt(llvm_i32, cache, false);
+			
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.type = nullptr;
+			return res;
+		}
+		
 	case BuiltinProc_syscall:
 		{
 			unsigned arg_count = cast(unsigned)ce->args.count;
