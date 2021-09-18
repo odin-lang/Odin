@@ -2646,7 +2646,41 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = x.type;
 		}
 		break;
-
+		
+	case BuiltinProc_prefetch_read_instruction:
+	case BuiltinProc_prefetch_read_data:
+	case BuiltinProc_prefetch_write_instruction:
+	case BuiltinProc_prefetch_write_data:
+		{
+			operand->mode = Addressing_NoValue;
+			operand->type = nullptr;
+			
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			check_assignment(c, &x, t_rawptr, builtin_name);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode != Addressing_Constant && is_type_integer(y.type)) {
+				error(y.expr, "Second argument to '%.*s' representing the locality must be an integer in the range 0..=3", LIT(builtin_name));
+				return false;
+			}
+			i64 locality = exact_value_to_i64(y.value);
+			if (!(0 <= locality && locality <= 3)) {
+				error(y.expr, "Second argument to '%.*s' representing the locality must be an integer in the range 0..=3", LIT(builtin_name));
+				return false;
+			}
+			
+		}
+		break;
 		
 	case BuiltinProc_syscall:
 		{
