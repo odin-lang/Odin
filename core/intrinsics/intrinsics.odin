@@ -46,6 +46,11 @@ fixed_point_div     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is
 fixed_point_mul_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
 fixed_point_div_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
 
+prefetch_read_instruction  :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
+prefetch_read_data         :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
+prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
+prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
+
 // Compiler Hints
 expect :: proc(val, expected_val: T) -> T ---
 
