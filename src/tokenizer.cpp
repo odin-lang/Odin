@@ -722,6 +722,8 @@ struct Tokenizer {
 	i32 error_count;
 
 	bool insert_semicolon;
+	
+	MemoryMappedFile memory_mapped_file;
 };
 
 
@@ -811,17 +813,17 @@ TokenizerInitError memory_mapped_file_error_map_to_tokenizer[MemoryMappedFile_CO
 	TokenizerInit_Permission,   /*MemoryMappedFile_Permission*/
 };
 
-TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath) {
-	MemoryMappedFile memory_mapped_file = {};
+TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
 	MemoryMappedFileError mmf_err = memory_map_file_32(
 		alloc_cstring(temporary_allocator(), fullpath), 
-		&memory_mapped_file
+		&t->memory_mapped_file,
+		copy_file_contents
 	);
 	
 	TokenizerInitError err = memory_mapped_file_error_map_to_tokenizer[mmf_err];
 	switch (mmf_err) {
 	case MemoryMappedFile_None:
-		init_tokenizer_with_data(t, fullpath, memory_mapped_file.data, cast(isize)memory_mapped_file.size);
+		init_tokenizer_with_data(t, fullpath, t->memory_mapped_file.data, cast(isize)t->memory_mapped_file.size);
 		break;
 	case MemoryMappedFile_FileTooLarge:
 	case MemoryMappedFile_Empty:

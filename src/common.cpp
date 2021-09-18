@@ -868,76 +868,77 @@ enum MemoryMappedFileError {
 	MemoryMappedFile_COUNT,
 };
 
-MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile *memory_mapped_file) {
+MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile *memory_mapped_file, bool copy_file_contents) {
 	MemoryMappedFileError err = MemoryMappedFile_None;
 	
-#if defined(GB_SYSTEM_WINDOWS)
-	isize w_len = 0;
-	wchar_t *w_str = gb__alloc_utf8_to_ucs2(temporary_allocator(), fullpath, &w_len);
-	if (w_str == nullptr) {
-		return MemoryMappedFile_Invalid;
-	}
-	i64 file_size = 0;
-	LARGE_INTEGER li_file_size = {};
-	HANDLE handle = nullptr;
-	HANDLE file_mapping = nullptr;
-	void *file_data = nullptr;
-	
-	handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
-		handle = nullptr;
-		goto window_handle_file_error;
-	}
-	
-	li_file_size = {};
-	if (!GetFileSizeEx(handle, &li_file_size)) {
-		goto window_handle_file_error;
-	}
-	file_size = cast(i64)li_file_size.QuadPart;
-	if (file_size > I32_MAX) {
-		CloseHandle(handle);
-		return MemoryMappedFile_FileTooLarge;
-	}
-	
-	if (file_size == 0) {
-		CloseHandle(handle);
-		err = MemoryMappedFile_Empty;
-		memory_mapped_file->handle = nullptr;
-		memory_mapped_file->data   = nullptr;
-		memory_mapped_file->size   = 0;
-		return err;
-	}
-	
-	file_mapping = CreateFileMappingW(handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
-	CloseHandle(handle);
-	
-	file_data = MapViewOfFileEx(file_mapping, FILE_MAP_READ, 0, 0, 0/*file_size*/, nullptr/*base address*/);
-	memory_mapped_file->handle = cast(void *)file_mapping;
-	memory_mapped_file->data = file_data;
-	memory_mapped_file->size = cast(i32)file_size;
-	return err;
-	
-window_handle_file_error:;
-	{
-		DWORD handle_err = GetLastError();
-		CloseHandle(handle);
-		err = MemoryMappedFile_Invalid;
-		switch (handle_err) {
-		case ERROR_FILE_NOT_FOUND: 
-		case ERROR_PATH_NOT_FOUND: 
-		case ERROR_INVALID_DRIVE:
-			err = MemoryMappedFile_NotExists; 
-			break;
-		case ERROR_ACCESS_DENIED: 
-		case ERROR_INVALID_ACCESS:
-			err = MemoryMappedFile_Permission;
-			break;
+	if (!copy_file_contents) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		isize w_len = 0;
+		wchar_t *w_str = gb__alloc_utf8_to_ucs2(temporary_allocator(), fullpath, &w_len);
+		if (w_str == nullptr) {
+			return MemoryMappedFile_Invalid;
 		}
+		i64 file_size = 0;
+		LARGE_INTEGER li_file_size = {};
+		HANDLE handle = nullptr;
+		HANDLE file_mapping = nullptr;
+		void *file_data = nullptr;
+		
+		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		if (handle == INVALID_HANDLE_VALUE) {
+			handle = nullptr;
+			goto window_handle_file_error;
+		}
+		
+		li_file_size = {};
+		if (!GetFileSizeEx(handle, &li_file_size)) {
+			goto window_handle_file_error;
+		}
+		file_size = cast(i64)li_file_size.QuadPart;
+		if (file_size > I32_MAX) {
+			CloseHandle(handle);
+			return MemoryMappedFile_FileTooLarge;
+		}
+		
+		if (file_size == 0) {
+			CloseHandle(handle);
+			err = MemoryMappedFile_Empty;
+			memory_mapped_file->handle = nullptr;
+			memory_mapped_file->data   = nullptr;
+			memory_mapped_file->size   = 0;
+			return err;
+		}
+		
+		file_mapping = CreateFileMappingW(handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
+		CloseHandle(handle);
+		
+		file_data = MapViewOfFileEx(file_mapping, FILE_MAP_READ, 0, 0, 0/*file_size*/, nullptr/*base address*/);
+		memory_mapped_file->handle = cast(void *)file_mapping;
+		memory_mapped_file->data = file_data;
+		memory_mapped_file->size = cast(i32)file_size;
 		return err;
+	
+	window_handle_file_error:;
+		{
+			DWORD handle_err = GetLastError();
+			CloseHandle(handle);
+			err = MemoryMappedFile_Invalid;
+			switch (handle_err) {
+			case ERROR_FILE_NOT_FOUND: 
+			case ERROR_PATH_NOT_FOUND: 
+			case ERROR_INVALID_DRIVE:
+				err = MemoryMappedFile_NotExists; 
+				break;
+			case ERROR_ACCESS_DENIED: 
+			case ERROR_INVALID_ACCESS:
+				err = MemoryMappedFile_Permission;
+				break;
+			}
+			return err;
+		}
+	#endif
 	}
 	
-#else
-	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {
@@ -963,7 +964,6 @@ window_handle_file_error:;
 		}
 	}
 	return err;
-#endif
 }
 
 
