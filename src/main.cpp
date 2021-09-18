@@ -2220,7 +2220,6 @@ int strip_semicolons(Parser *parser) {
 
 int main(int arg_count, char const **arg_ptr) {
 #define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
-
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
@@ -2490,7 +2489,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	remove_temp_files(gen);
-	arena_free_all(&temporary_arena);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)

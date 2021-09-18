@@ -1923,9 +1923,9 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			lbValue map_ptr = lb_address_from_load_or_generate_local(p, x);
 
 			unsigned indices[2] = {0, 0};
-			LLVMValueRef hashes_data = LLVMBuildStructGEP(p->builder, map_ptr.value, 0, "");
-			LLVMValueRef hashes_data_ptr_ptr = LLVMBuildStructGEP(p->builder, hashes_data, 0, "");
-			LLVMValueRef hashes_data_ptr = LLVMBuildLoad(p->builder, hashes_data_ptr_ptr, "");
+			lbValue hashes_data = lb_emit_struct_ep(p, map_ptr, 0);
+			lbValue hashes_data_ptr_ptr = lb_emit_struct_ep(p, hashes_data, 0);
+			LLVMValueRef hashes_data_ptr = LLVMBuildLoad(p->builder, hashes_data_ptr_ptr.value, "");
 
 			if (op_kind == Token_CmpEq) {
 				res.value = LLVMBuildIsNull(p->builder, hashes_data_ptr, "");
@@ -2786,7 +2786,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
-		if (is_type_soa_struct(t)) {
+		if (is_type_soa_struct(t)) {			
 			// SOA STRUCTURES!!!!
 			lbValue val = lb_build_addr_ptr(p, ie->expr);
 			if (deref) {
@@ -2821,7 +2821,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				// lbValue len = ir_soa_struct_len(p, base_struct);
 				// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			}
-
 			lbValue val = lb_emit_ptr_offset(p, field, index);
 			return lb_addr(val);
 		}
@@ -2872,13 +2871,13 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			auto index_tv = type_and_value_of_expr(ie->index);
 
 			lbValue index = {};
-			if (compare_exact_values(Token_NotEq, t->EnumeratedArray.min_value, exact_value_i64(0))) {
+			if (compare_exact_values(Token_NotEq, *t->EnumeratedArray.min_value, exact_value_i64(0))) {
 				if (index_tv.mode == Addressing_Constant) {
-					ExactValue idx = exact_value_sub(index_tv.value, t->EnumeratedArray.min_value);
+					ExactValue idx = exact_value_sub(index_tv.value, *t->EnumeratedArray.min_value);
 					index = lb_const_value(p->module, index_type, idx);
 				} else {
 					index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-					index = lb_emit_arith(p, Token_Sub, index, lb_const_value(p->module, index_type, t->EnumeratedArray.min_value), index_type);
+					index = lb_emit_arith(p, Token_Sub, index, lb_const_value(p->module, index_type, *t->EnumeratedArray.min_value), index_type);
 				}
 			} else {
 				index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
@@ -3259,7 +3258,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						TypeAndValue tav = type_and_value_of_expr(elem);
 					} else {
 						TypeAndValue tav = type_and_value_of_expr(elem);
-						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_src_index);
+						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_index);
 						index = sel.index[0];
 					}
 
@@ -3472,7 +3471,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				}
 
 
-				i32 index_offset = cast(i32)exact_value_to_i64(bt->EnumeratedArray.min_value);
+				i32 index_offset = cast(i32)exact_value_to_i64(*bt->EnumeratedArray.min_value);
 
 				for_array(i, temp_data) {
 					i32 index = temp_data[i].elem_index - index_offset;

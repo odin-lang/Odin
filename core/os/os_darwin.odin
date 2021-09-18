@@ -215,13 +215,14 @@ OS_Stat :: struct {
 	_reserve2:     i64,  // RESERVED
 }
 
-// NOTE(laleksic, 2021-01-21): Comment and rename these to match OS_Stat above
+DARWIN_MAXPATHLEN :: 1024
 Dirent :: struct {
 	ino:    u64,
 	off:    u64,
 	reclen: u16,
+	namlen: u16,
 	type:   u8,
-	name:   [256]byte,
+	name:   [DARWIN_MAXPATHLEN]byte,
 }
 
 Dir :: distinct rawptr // DIR*
@@ -289,10 +290,10 @@ foreign libc {
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
-	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
+	@(link_name="fdopendir$INODE64") _unix_fdopendir    :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
-	@(link_name="readdir_r")        _unix_readdir_r     :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="readdir_r$INODE64") _unix_readdir_r    :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
 	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---
@@ -450,7 +451,7 @@ _rewinddir :: proc(dirp: Dir) {
 _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
-
+	
 	if rc != 0 {
 		err = Errno(get_last_error())
 		return

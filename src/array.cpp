@@ -151,6 +151,19 @@ void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset, isize count
 
 
 template <typename T>
+gb_inline Slice<T> slice(Slice<T> const &array, isize lo, isize hi) {
+	GB_ASSERT(0 <= lo && lo <= hi && hi <= array.count);
+	Slice<T> out = {};
+	isize len = hi-lo;
+	if (len > 0) {
+		out.data = array.data+lo;
+		out.count = len;
+	}
+	return out;
+}
+
+
+template <typename T>
 void slice_ordered_remove(Slice<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
 

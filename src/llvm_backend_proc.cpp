@@ -1393,7 +1393,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				Type *res_type = nullptr;
 				gbAllocator a = permanent_allocator();
 				res_type = alloc_type_tuple();
-				array_init(&res_type->Tuple.variables, a, 2);
+				slice_init(&res_type->Tuple.variables, a, 2);
 				res_type->Tuple.variables[0] = alloc_entity_field(nullptr, blank_token, type,        false, 0);
 				res_type->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
 
@@ -1738,7 +1738,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		if (tv.type->kind == Type_Tuple) {
 			Type *fix_typed = alloc_type_tuple();
-			array_init(&fix_typed->Tuple.variables, permanent_allocator(), 2);
+			slice_init(&fix_typed->Tuple.variables, permanent_allocator(), 2);
 			fix_typed->Tuple.variables[0] = tv.type->Tuple.variables[0];
 			fix_typed->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
 

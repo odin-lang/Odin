@@ -38,7 +38,7 @@ def no_vk(t):
     t = t.replace('VK_', '')
     return t
 
-def convert_type(t):
+def convert_type(t, prev_name, curr_name):
     table = {
         "Bool32":      'b32',
         "float":       'f32',
@@ -56,14 +56,14 @@ def convert_type(t):
         "void*":       "rawptr",
         "void *":      "rawptr",
         "char*":       'cstring',
-        "const uint32_t* const*": "^^u32",
+        "const uint32_t* const*": "^[^]u32",
         "const void*": 'rawptr',
         "const char*": 'cstring',
-        "const char* const*": 'cstring_array',
+        "const char* const*": '[^]cstring',
         "const ObjectTableEntryNVX* const*": "^^ObjectTableEntryNVX",
-        "const void* const *": "^rawptr",
-        "const AccelerationStructureGeometryKHR* const*": "^^AccelerationStructureGeometryKHR",
-        "const AccelerationStructureBuildRangeInfoKHR* const*": "^^AccelerationStructureBuildRangeInfoKHR",
+        "const void* const *": "[^]rawptr",
+        "const AccelerationStructureGeometryKHR* const*": "^[^]AccelerationStructureGeometryKHR",
+        "const AccelerationStructureBuildRangeInfoKHR* const*": "^[^]AccelerationStructureBuildRangeInfoKHR",
         "struct BaseOutStructure": "BaseOutStructure",
         "struct BaseInStructure":  "BaseInStructure",
         'v': '',
@@ -74,13 +74,32 @@ def convert_type(t):
 
     if t == "":
         return t
+
     elif t.endswith("*"):
+        elem = ""
+        pointer = "^"
         if t.startswith("const"):
             ttype = t[6:len(t)-1]
-            return "^{}".format(convert_type(ttype))
+            elem = convert_type(ttype, prev_name, curr_name)
         else:
             ttype = t[:len(t)-1]
-            return "^{}".format(convert_type(ttype))
+            elem = convert_type(ttype, prev_name, curr_name)
+            
+        if curr_name.endswith("s") or curr_name.endswith("Table"):
+            if prev_name.endswith("Count") or prev_name.endswith("Counts"):
+                pointer = "[^]"
+            elif curr_name.startswith("pp"):
+                if elem.startswith("[^]"):
+                    pass
+                else:
+                    pointer = "[^]"
+            elif curr_name.startswith("p"):
+                pointer = "[^]"
+                
+        if curr_name and elem.endswith("Flags"):
+            pointer = "[^]"
+                    
+        return "{}{}".format(pointer, elem)
     elif t[0].isupper():
         return t
 
@@ -154,8 +173,8 @@ def fix_enum_arg(name, is_flag_bit=False):
         name = name.replace("_BIT", "")
     return name
 
-def do_type(t):
-    return convert_type(no_vk(t)).replace("FlagBits", "Flags")
+def do_type(t, prev_name="", name=""):
+    return convert_type(no_vk(t), prev_name, name).replace("FlagBits", "Flags")
 
 def parse_handles_def(f):
     f.write("// Handles types\n")
@@ -246,6 +265,8 @@ def parse_enums(f):
     f.write("// Enums\n")
 
     data = re.findall(r"typedef enum Vk(\w+) {(.+?)} \w+;", src, re.S)
+    
+    data.sort(key=lambda x: x[0])
 
     generated_flags = set()
 
@@ -354,6 +375,7 @@ def parse_enums(f):
 
 
     unused_flags = [flag for flag in flags_defs if flag not in generated_flags]
+    unused_flags.sort()
 
     max_len = max(len(flag) for flag in unused_flags)
     for flag in unused_flags:
@@ -373,6 +395,7 @@ def parse_structs(f):
             f.write("#raw_union ")
         f.write("{\n")
 
+        prev_name = ""
         ffields = []
         for type_, fname in fields:
             if '[' in fname:
@@ -381,11 +404,12 @@ def parse_structs(f):
             n = fix_arg(fname)
             if "Flag_Bits" in type_:
                 comment = " // only single bit set"
-            t = do_type(type_)
+            t = do_type(type_, prev_name, fname)
             if t == "Structure_Type" and n == "type":
                 n = "s_type"
 
             ffields.append(tuple([n, t, comment]))
+            prev_name = fname
 
         max_len = max(len(n) for n, _, _ in ffields)
 
@@ -423,7 +447,14 @@ def parse_procedures(f):
 
     for rt, name, fields in data:
         proc_name = no_vk(name)
-        pf = [(do_type(t), fix_arg(n)) for t, n in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:,|$)", fields)]
+        
+        pf = []
+        prev_name = ""
+        for type_, fname in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:,|$)", fields):
+            curr_name = fix_arg(fname)
+            pf.append((do_type(type_, prev_name, curr_name), curr_name))
+            prev_name = curr_name
+            
         data_fields = ', '.join(["{}: {}".format(n, t) for t, n in pf if t != ""])
 
         ts = "proc \"c\" ({})".format(data_fields)
@@ -516,8 +547,6 @@ NonDispatchableHandle :: distinct u64
 
 SetProcAddressType :: #type proc(p: rawptr, name: cstring)
 
-
-cstring_array :: ^cstring // Helper Type
 
 RemoteAddressNV :: distinct rawptr // Declared inline before MemoryGetRemoteAddressInfoNV
 

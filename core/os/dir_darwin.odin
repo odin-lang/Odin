@@ -19,8 +19,6 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		return
 	}
 
-	defer delete(dirpath)
-
 	n := n
 	size := n
 	if n <= 0 {

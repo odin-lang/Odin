@@ -4865,22 +4865,25 @@ void check_deferred_procedures(Checker *c) {
 		Entity *dst = src->Procedure.deferred_procedure.entity;
 		GB_ASSERT(dst != nullptr);
 		GB_ASSERT(dst->kind == Entity_Procedure);
+		
+		char const *attribute = "deferred_none";
+		switch (dst_kind) {
+		case DeferredProcedure_none:
+			attribute = "deferred_none";
+			break;
+		case DeferredProcedure_in:
+			attribute = "deferred_in";
+			break;
+		case DeferredProcedure_out:
+			attribute = "deferred_out";
+			break;
+		case DeferredProcedure_in_out:
+			attribute = "deferred_in_out";
+			break;
+		}
 
 		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
-			switch (dst_kind) {
-			case DeferredProcedure_none:
-				error(src->token, "'deferred_none' cannot be used with a polymorphic procedure");
-				break;
-			case DeferredProcedure_in:
-				error(src->token, "'deferred_in' cannot be used with a polymorphic procedure");
-				break;
-			case DeferredProcedure_out:
-				error(src->token, "'deferred_out' cannot be used with a polymorphic procedure");
-				break;
-			case DeferredProcedure_in_out:
-				error(src->token, "'deferred_in_out' cannot be used with a polymorphic procedure");
-				break;
-			}
+			error(src->token, "'%s' cannot be used with a polymorphic procedure", attribute);
 			continue;
 		}
 
@@ -4974,17 +4977,19 @@ void check_deferred_procedures(Checker *c) {
 				GB_ASSERT(src_results->kind == Type_Tuple);
 				len += src_results->Tuple.variables.count;
 			}
-			array_init(&sv, heap_allocator(), 0, len);
+			slice_init(&sv, heap_allocator(), len);
+			isize offset = 0;
 			if (src_params != nullptr) {
 				for_array(i, src_params->Tuple.variables) {
-					array_add(&sv, src_params->Tuple.variables[i]);
+					sv[offset++] = src_params->Tuple.variables[i];
 				}
 			}
 			if (src_results != nullptr) {
 				for_array(i, src_results->Tuple.variables) {
-					array_add(&sv, src_results->Tuple.variables[i]);
+					sv[offset++] = src_results->Tuple.variables[i];
 				}
 			}
+			GB_ASSERT(offset == len);
 
 
 			if (are_types_identical(tsrc, dst_params)) {
