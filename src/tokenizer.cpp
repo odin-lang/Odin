@@ -802,39 +802,33 @@ void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, 
 	}
 }
 
+TokenizerInitError memory_mapped_file_error_map_to_tokenizer[MemoryMappedFile_COUNT] = {
+	TokenizerInit_None,         /*MemoryMappedFile_None*/
+	TokenizerInit_Empty,        /*MemoryMappedFile_Empty*/
+	TokenizerInit_FileTooLarge, /*MemoryMappedFile_FileTooLarge*/
+	TokenizerInit_Invalid,      /*MemoryMappedFile_Invalid*/
+	TokenizerInit_NotExists,    /*MemoryMappedFile_NotExists*/
+	TokenizerInit_Permission,   /*MemoryMappedFile_Permission*/
+};
+
 TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath) {
-	TokenizerInitError err = TokenizerInit_None;
-
-	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
-
-	// TODO(bill): Memory map rather than copy contents
-	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
-
-	if (fc.size > I32_MAX) {
+	MemoryMappedFile memory_mapped_file = {};
+	MemoryMappedFileError mmf_err = memory_map_file_32(
+		alloc_cstring(temporary_allocator(), fullpath), 
+		&memory_mapped_file
+	);
+	
+	TokenizerInitError err = memory_mapped_file_error_map_to_tokenizer[mmf_err];
+	switch (mmf_err) {
+	case MemoryMappedFile_None:
+		init_tokenizer_with_data(t, fullpath, memory_mapped_file.data, cast(isize)memory_mapped_file.size);
+		break;
+	case MemoryMappedFile_FileTooLarge:
+	case MemoryMappedFile_Empty:
 		t->fullpath = fullpath;
 		t->line_count = 1;
-		err = TokenizerInit_FileTooLarge;
-		gb_file_free_contents(&fc);
-	} else if (fc.data != nullptr) {
-		init_tokenizer_with_data(t, fullpath, fc.data, fc.size);
-	} else {
-		t->fullpath = fullpath;
-		t->line_count = 1;
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		case gbFileError_Invalid:    err = TokenizerInit_Invalid;    break;
-		case gbFileError_NotExists:  err = TokenizerInit_NotExists;  break;
-		case gbFileError_Permission: err = TokenizerInit_Permission; break;
-		}
-
-		if (err == TokenizerInit_None && gb_file_size(&f) == 0) {
-			err = TokenizerInit_Empty;
-		}
-	}
-
+		break;
+	}	
 	return err;
 }
 
