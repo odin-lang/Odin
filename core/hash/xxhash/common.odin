@@ -50,9 +50,7 @@ XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, true)
 /*
 	llvm.prefetch fails code generation on Linux.
 */
-when XXH_DISABLE_PREFETCH {
-	import "core:sys/llvm"
-  
+when !XXH_DISABLE_PREFETCH {
 	prefetch_address :: #force_inline proc(address: rawptr) {
 		intrinsics.prefetch_read_data(address, /*high*/3)
 	}
