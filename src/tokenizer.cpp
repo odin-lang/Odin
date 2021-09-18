@@ -371,7 +371,7 @@ void begin_error_block(void) {
 void end_error_block(void) {
 	if (global_error_collector.error_buffer.count > 0) {
 		isize n = global_error_collector.error_buffer.count;
-		u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
+		u8 *text = gb_alloc_array(permanent_allocator(), u8, n+1);
 		gb_memmove(text, global_error_collector.error_buffer.data, n);
 		text[n] = 0;
 		String s = {text, n};
@@ -404,7 +404,7 @@ ERROR_OUT_PROC(default_error_out_va) {
 	} else {
 		mutex_lock(&global_error_collector.error_out_mutex);
 		{
-			u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
+			u8 *text = gb_alloc_array(permanent_allocator(), u8, n+1);
 			gb_memmove(text, buf, n);
 			text[n] = 0;
 			array_add(&global_error_collector.errors, make_string(text, n));
@@ -722,6 +722,8 @@ struct Tokenizer {
 	i32 error_count;
 
 	bool insert_semicolon;
+	
+	MemoryMappedFile memory_mapped_file;
 };
 
 
@@ -802,46 +804,34 @@ void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, 
 	}
 }
 
-TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath) {
-	TokenizerInitError err = TokenizerInit_None;
+TokenizerInitError memory_mapped_file_error_map_to_tokenizer[MemoryMappedFile_COUNT] = {
+	TokenizerInit_None,         /*MemoryMappedFile_None*/
+	TokenizerInit_Empty,        /*MemoryMappedFile_Empty*/
+	TokenizerInit_FileTooLarge, /*MemoryMappedFile_FileTooLarge*/
+	TokenizerInit_Invalid,      /*MemoryMappedFile_Invalid*/
+	TokenizerInit_NotExists,    /*MemoryMappedFile_NotExists*/
+	TokenizerInit_Permission,   /*MemoryMappedFile_Permission*/
+};
 
-	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
-
-	// TODO(bill): Memory map rather than copy contents
-	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
-
-	if (fc.size > I32_MAX) {
+TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
+	MemoryMappedFileError mmf_err = memory_map_file_32(
+		alloc_cstring(temporary_allocator(), fullpath), 
+		&t->memory_mapped_file,
+		copy_file_contents
+	);
+	
+	TokenizerInitError err = memory_mapped_file_error_map_to_tokenizer[mmf_err];
+	switch (mmf_err) {
+	case MemoryMappedFile_None:
+		init_tokenizer_with_data(t, fullpath, t->memory_mapped_file.data, cast(isize)t->memory_mapped_file.size);
+		break;
+	case MemoryMappedFile_FileTooLarge:
+	case MemoryMappedFile_Empty:
 		t->fullpath = fullpath;
 		t->line_count = 1;
-		err = TokenizerInit_FileTooLarge;
-		gb_file_free_contents(&fc);
-	} else if (fc.data != nullptr) {
-		init_tokenizer_with_data(t, fullpath, fc.data, fc.size);
-	} else {
-		t->fullpath = fullpath;
-		t->line_count = 1;
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		case gbFileError_Invalid:    err = TokenizerInit_Invalid;    break;
-		case gbFileError_NotExists:  err = TokenizerInit_NotExists;  break;
-		case gbFileError_Permission: err = TokenizerInit_Permission; break;
-		}
-
-		if (err == TokenizerInit_None && gb_file_size(&f) == 0) {
-			err = TokenizerInit_Empty;
-		}
-	}
-
+		break;
+	}	
 	return err;
-}
-
-gb_inline void destroy_tokenizer(Tokenizer *t) {
-	if (t->start != nullptr) {
-		gb_free(heap_allocator(), t->start);
-	}
 }
 
 gb_inline i32 digit_value(Rune r) {

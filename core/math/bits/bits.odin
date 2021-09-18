@@ -37,6 +37,10 @@ overflowing_sub :: intrinsics.overflow_sub
 overflowing_mul :: intrinsics.overflow_mul
 
 
+log2 :: proc(x: $T) -> T where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
+	return (8*size_of(T)-1) - count_leading_zeros(x)
+}
+
 rotate_left8 :: proc(x: u8,  k: int) -> u8 {
 	n :: 8
 	s := uint(k) & (n-1)

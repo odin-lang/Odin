@@ -157,12 +157,14 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
 	lbModule *m = p->module;
 	CheckerInfo *info = m->info;
-
+	
+	i64 global_type_info_data_entity_count = 0;
 	{
 		// NOTE(bill): Set the type_table slice with the global backing array
 		lbValue global_type_table = lb_find_runtime_value(m, str_lit("type_table"));
 		Type *type = base_type(lb_global_type_info_data_entity->type);
 		GB_ASSERT(is_type_array(type));
+		global_type_info_data_entity_count = type->Array.count;
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef values[2] = {
@@ -179,6 +181,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 	Entity *type_info_flags_entity = find_core_entity(info->checker, str_lit("Type_Info_Flags"));
 	Type *t_type_info_flags = type_info_flags_entity->type;
 
+	
+	auto entries_handled = slice_make<bool>(heap_allocator(), cast(isize)global_type_info_data_entity_count);
+	defer (gb_free(heap_allocator(), entries_handled.data));
+	entries_handled[0] = true;
+	
 	for_array(type_info_type_index, info->type_info_types) {
 		Type *t = info->type_info_types[type_info_type_index];
 		if (t == nullptr || t == t_invalid) {
@@ -189,18 +196,35 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		if (entry_index <= 0) {
 			continue;
 		}
+		
+		if (entries_handled[entry_index]) {
+			continue;
+		}
+		entries_handled[entry_index] = true;
 
+		lbValue global_data_ptr = lb_global_type_info_data_ptr(m);
 		lbValue tag = {};
-		lbValue ti_ptr = lb_emit_array_epi(p, lb_global_type_info_data_ptr(m), cast(i32)entry_index);
+		lbValue ti_ptr = lb_emit_array_epi(p, global_data_ptr, cast(i32)entry_index);
+		
+		i64 size = type_size_of(t);
+		i64 align = type_align_of(t);
+		u32 flags = type_info_flags_of_type(t);
+		lbValue id = lb_typeid(m, t);
+		GB_ASSERT_MSG(align != 0, "%lld %s", align, type_to_string(t));
+		
+		lbValue type_info_flags = lb_const_int(p->module, t_type_info_flags, flags);
+		
+		lbValue size_ptr  = lb_emit_struct_ep(p, ti_ptr, 0);
+		lbValue align_ptr = lb_emit_struct_ep(p, ti_ptr, 1);
+		lbValue flags_ptr = lb_emit_struct_ep(p, ti_ptr, 2);
+		lbValue id_ptr    = lb_emit_struct_ep(p, ti_ptr, 3);
+				
+		lb_emit_store(p, size_ptr,  lb_const_int(m, t_int, size));
+		lb_emit_store(p, align_ptr, lb_const_int(m, t_int, align));
+		lb_emit_store(p, flags_ptr, type_info_flags);
+		lb_emit_store(p, id_ptr,    id);
+		
 		lbValue variant_ptr = lb_emit_struct_ep(p, ti_ptr, 4);
-
-		lbValue type_info_flags = lb_const_int(p->module, t_type_info_flags, type_info_flags_of_type(t));
-
-		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 0), lb_const_int(m, t_int, type_size_of(t)));
-		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 1), lb_const_int(m, t_int, type_align_of(t)));
-		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 2), type_info_flags);
-		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 3), lb_typeid(m, t));
-
 
 		switch (t->kind) {
 		case Type_Named: {
@@ -233,7 +257,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -298,7 +322,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 				break;
 			}
@@ -334,7 +358,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 					lbValue res = {};
 					res.type = type_deref(tag.type);
-					res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+					res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 					lb_emit_store(p, tag, res);
 				}
 				break;
@@ -368,7 +392,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 					lbValue res = {};
 					res.type = type_deref(tag.type);
-					res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+					res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 					lb_emit_store(p, tag, res);
 				}
 				break;
@@ -393,7 +417,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -407,7 +431,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -423,7 +447,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -443,15 +467,15 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 
 			// NOTE(bill): Union assignment
 			lbValue min_value = lb_emit_struct_ep(p, tag, 4);
 			lbValue max_value = lb_emit_struct_ep(p, tag, 5);
 
-			lbValue min_v = lb_const_value(m, t_i64, t->EnumeratedArray.min_value);
-			lbValue max_v = lb_const_value(m, t_i64, t->EnumeratedArray.max_value);
+			lbValue min_v = lb_const_value(m, t_i64, *t->EnumeratedArray.min_value);
+			lbValue max_v = lb_const_value(m, t_i64, *t->EnumeratedArray.max_value);
 
 			lb_emit_store(p, min_value, min_v);
 			lb_emit_store(p, max_value, max_v);
@@ -467,7 +491,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -481,7 +505,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -506,7 +530,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -545,7 +569,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 
 			break;
@@ -596,7 +620,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -650,7 +674,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 
@@ -688,7 +712,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					vals[11] = soa_len.value;
 				}
 			}
-
+			
 			isize count = t->Struct.fields.count;
 			if (count > 0) {
 				lbValue memory_types   = lb_type_info_member_types_offset  (p, count);
@@ -721,7 +745,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					lb_emit_store(p, offset, lb_const_int(m, t_uintptr, foffset));
 					lb_emit_store(p, is_using, lb_const_bool(m, t_bool, (f->flags&EntityFlag_Using) != 0));
 
-					if (t->Struct.tags.count > 0) {
+					if (t->Struct.tags != nullptr) {
 						String tag_string = t->Struct.tags[source_index];
 						if (tag_string.len > 0) {
 							lbValue tag_ptr = lb_emit_ptr_offset(p, memory_tags, index);
@@ -743,11 +767,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					vals[i]  = LLVMConstNull(lb_type(m, get_struct_field_type(tag.type, i)));
 				}
 			}
-
-
+			
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 
 			break;
@@ -767,7 +790,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			lbValue res = {};
 			res.type = type_deref(tag.type);
-			res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 			lb_emit_store(p, tag, res);
 			break;
 		}
@@ -791,7 +814,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -808,7 +831,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -823,7 +846,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -837,7 +860,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
-				res.value = llvm_const_named_struct(lb_type(m, res.type), vals, gb_count_of(vals));
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
 				lb_emit_store(p, tag, res);
 			}
 			break;
@@ -854,6 +877,12 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			if (t != t_llvm_bool) {
 				GB_PANIC("Unhandled Type_Info variant: %s", type_to_string(t));
 			}
+		}
+	}
+	
+	for_array(i, entries_handled) {
+		if (!entries_handled[i]) {
+			GB_PANIC("UNHANDLED ENTRY %td (%td)", i, entries_handled.count);
 		}
 	}
 }

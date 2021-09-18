@@ -64,13 +64,13 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 	Type *right_type = nullptr;
 	if (x->type->kind == Type_Tuple) {
 		auto const &vars = x->type->Tuple.variables;
-		auto lhs = array_slice(vars, 0, vars.count-1);
+		auto lhs = slice(vars, 0, vars.count-1);
 		auto rhs = vars[vars.count-1];
 		if (lhs.count == 1) {
 			left_type = lhs[0]->type;
 		} else if (lhs.count != 0) {
 			left_type = alloc_type_tuple();
-			left_type->Tuple.variables = array_make_from_ptr(lhs.data, lhs.count, lhs.count);
+			left_type->Tuple.variables = lhs;
 		}
 
 		right_type = rhs->type;
@@ -120,13 +120,13 @@ void check_or_return_split_types(CheckerContext *c, Operand *x, String const &na
 	Type *right_type = nullptr;
 	if (x->type->kind == Type_Tuple) {
 		auto const &vars = x->type->Tuple.variables;
-		auto lhs = array_slice(vars, 0, vars.count-1);
+		auto lhs = slice(vars, 0, vars.count-1);
 		auto rhs = vars[vars.count-1];
 		if (lhs.count == 1) {
 			left_type = lhs[0]->type;
 		} else if (lhs.count != 0) {
 			left_type = alloc_type_tuple();
-			left_type->Tuple.variables = array_make_from_ptr(lhs.data, lhs.count, lhs.count);
+			left_type->Tuple.variables = lhs;
 		}
 
 		right_type = rhs->type;
@@ -1156,12 +1156,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		if (is_type_struct(type)) {
 			isize variable_count = type->Struct.fields.count;
-			array_init(&tuple->Tuple.variables, a, variable_count);
+			slice_init(&tuple->Tuple.variables, a, variable_count);
 			// TODO(bill): Should I copy each of the entities or is this good enough?
 			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 		} else if (is_type_array(type)) {
 			isize variable_count = cast(isize)type->Array.count;
-			array_init(&tuple->Tuple.variables, a, variable_count);
+			slice_init(&tuple->Tuple.variables, a, variable_count);
 			for (isize i = 0; i < variable_count; i++) {
 				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
 			}
@@ -1240,14 +1240,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			} else if (is_type_enum(type)) {
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
-				operand->value = type->Enum.min_value;
+				operand->value = *type->Enum.min_value;
 				return true;
 			} else if (is_type_enumerated_array(type)) {
 				Type *bt = base_type(type);
 				GB_ASSERT(bt->kind == Type_EnumeratedArray);
 				operand->mode  = Addressing_Constant;
 				operand->type  = bt->EnumeratedArray.index;
-				operand->value = bt->EnumeratedArray.min_value;
+				operand->value = *bt->EnumeratedArray.min_value;
 				return true;
 			}
 			gbString type_str = type_to_string(original_type);
@@ -1414,14 +1414,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			} else if (is_type_enum(type)) {
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
-				operand->value = type->Enum.max_value;
+				operand->value = *type->Enum.max_value;
 				return true;
 			} else if (is_type_enumerated_array(type)) {
 				Type *bt = base_type(type);
 				GB_ASSERT(bt->kind == Type_EnumeratedArray);
 				operand->mode  = Addressing_Constant;
 				operand->type  = bt->EnumeratedArray.index;
-				operand->value = bt->EnumeratedArray.max_value;
+				operand->value = *bt->EnumeratedArray.max_value;
 				return true;
 			}
 			gbString type_str = type_to_string(original_type);
@@ -1788,8 +1788,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (elem == nullptr) {
 			elem = alloc_type_struct();
 			elem->Struct.scope = s;
-			elem->Struct.fields = fields;
-			elem->Struct.tags = array_make<String>(permanent_allocator(), fields.count);
+			elem->Struct.fields = slice_from_array(fields);
+			elem->Struct.tags = gb_alloc_array(permanent_allocator(), String, fields.count);
 			elem->Struct.node = dummy_node_struct;
 			type_set_offsets(elem);
 		}
@@ -1938,12 +1938,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (is_type_array(elem)) {
 			Type *old_array = base_type(elem);
 			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), cast(isize)old_array->Array.count);
-			soa_struct->Struct.tags = array_make<String>(heap_allocator(), cast(isize)old_array->Array.count);
+			soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), cast(isize)old_array->Array.count);
+			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, cast(isize)old_array->Array.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
-			soa_struct->Struct.soa_count = count;
+			soa_struct->Struct.soa_count = cast(i32)count;
 
 			scope = create_scope(c->info, c->scope);
 			soa_struct->Struct.scope = scope;
@@ -1971,12 +1971,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			Type *old_struct = base_type(elem);
 			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
-			soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
+			soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
+			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, old_struct->Struct.fields.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
-			soa_struct->Struct.soa_count = count;
+			if (count > I32_MAX) {
+				count = I32_MAX;
+				error(call, "Array count too large for an #soa struct, got %lld", cast(long long)count);
+			}
+			soa_struct->Struct.soa_count = cast(i32)count;
 
 			scope = create_scope(c->info, old_struct->Struct.scope->parent);
 			soa_struct->Struct.scope = scope;
@@ -1985,7 +1989,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				Entity *old_field = old_struct->Struct.fields[i];
 				if (old_field->kind == Entity_Variable) {
 					Type *array_type = alloc_type_array(old_field->type, count);
-					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_index);
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(c, scope, nullptr, new_field);
 				} else {

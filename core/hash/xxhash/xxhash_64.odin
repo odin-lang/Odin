@@ -163,12 +163,12 @@ XXH64 :: proc(input: []u8, seed := XXH64_DEFAULT_SEED) -> (digest: XXH64_hash) {
 */
 XXH64_create_state :: proc(allocator := context.allocator) -> (res: ^XXH64_state, err: Error) {
 	state := new(XXH64_state, allocator)
-	return state, nil if state != nil else .Error
+	return state, .None if state != nil else .Error
 }
 
 XXH64_destroy_state :: proc(state: ^XXH64_state, allocator := context.allocator) -> (err: Error) {
 	free(state, allocator)
-	return nil
+	return .None
 }
 
 XXH64_copy_state :: proc(dest, src: ^XXH64_state) {
@@ -187,7 +187,7 @@ XXH64_reset_state :: proc(state_ptr: ^XXH64_state, seed := XXH64_DEFAULT_SEED) -
 		Fo not write into reserved64, might be removed in a future version.
 	*/
 	mem_copy(state_ptr, &state, size_of(state) - size_of(state.reserved64))
-	return nil
+	return .None
 }
 
 @(optimization_mode="speed")
@@ -201,7 +201,7 @@ XXH64_update :: proc(state: ^XXH64_state, input: []u8) -> (err: Error) {
 		ptr := uintptr(raw_data(state.mem64[:])) + uintptr(state.memsize)
 		mem_copy(rawptr(ptr), raw_data(input), int(length))
 		state.memsize += u32(length)
-		return nil
+		return .None
 	}
 
 	if state.memsize > 0 {   /* tmp buffer is full */
@@ -241,7 +241,7 @@ XXH64_update :: proc(state: ^XXH64_state, input: []u8) -> (err: Error) {
 		mem_copy(raw_data(state.mem64[:]), raw_data(buf[:]), int(length))
 		state.memsize = u32(length)
 	}
-	return nil
+	return .None
 }
 
 @(optimization_mode="speed")

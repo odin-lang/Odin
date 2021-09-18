@@ -41,13 +41,18 @@ Alignment :: enum {
 }
 
 Error :: enum {
-	Okay = 0,
+	None = 0,
 	Error,
 }
 
-XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, false)
+XXH_DISABLE_PREFETCH :: #config(XXH_DISABLE_PREFETCH, true)
 
-when !XXH_DISABLE_PREFETCH {
+/*
+	llvm.prefetch fails code generation on Linux.
+*/
+when XXH_DISABLE_PREFETCH {
+	import "core:sys/llvm"
+  
 	prefetch_address :: #force_inline proc(address: rawptr) {
 		intrinsics.prefetch_read_data(address, /*high*/3)
 	}
@@ -55,13 +60,14 @@ when !XXH_DISABLE_PREFETCH {
 		ptr := rawptr(uintptr(address) + offset)
 		prefetch_address(ptr)
 	}
+	prefetch :: proc { prefetch_address, prefetch_offset, }
 } else {
 	prefetch_address :: #force_inline proc(address: rawptr) {
 	}
 	prefetch_offset  :: #force_inline proc(address: rawptr, #any_int offset: uintptr) {
 	}
 }
-prefetch :: proc { prefetch_address, prefetch_offset, }
+
 
 @(optimization_mode="speed")
 XXH_rotl32 :: #force_inline proc(x, r: u32) -> (res: u32) {

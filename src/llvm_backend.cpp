@@ -763,7 +763,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	if (build_context.metrics.os == TargetOs_windows && build_context.build_mode == BuildMode_DynamicLibrary) {
 		is_dll_main = true;
 		name = str_lit("DllMain");
-		array_init(&params->Tuple.variables, permanent_allocator(), 3);
+		slice_init(&params->Tuple.variables, permanent_allocator(), 3);
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("hinstDLL"),   t_rawptr, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
@@ -771,12 +771,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		name = str_lit("mainCRTStartup");
 	} else {
 		has_args = true;
-		array_init(&params->Tuple.variables, permanent_allocator(), 2);
+		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
 	}
 
-	array_init(&results->Tuple.variables, permanent_allocator(), 1);
+	slice_init(&results->Tuple.variables, permanent_allocator(), 1);
 	results->Tuple.variables[0] = alloc_entity_param(nullptr, blank_token, t_i32, false, true);
 
 	Type *proc_type = alloc_type_proc(nullptr,
@@ -808,8 +808,6 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		lbAddr all_tests_array_addr = lb_add_global_generated(p->module, array_type, {});
 		lbValue all_tests_array = lb_addr_get_ptr(p, all_tests_array_addr);
 
-		LLVMTypeRef lbt_Internal_Test = lb_type(m, t_Internal_Test);
-
 		LLVMValueRef indices[2] = {};
 		indices[0] = LLVMConstInt(lb_type(m, t_i32), 0, false);
 
@@ -836,7 +834,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 			GB_ASSERT(LLVMIsConstant(vals[2]));
 
 			LLVMValueRef dst = LLVMConstInBoundsGEP(all_tests_array.value, indices, gb_count_of(indices));
-			LLVMValueRef src = llvm_const_named_struct(lbt_Internal_Test, vals, gb_count_of(vals));
+			LLVMValueRef src = llvm_const_named_struct(m, t_Internal_Test, vals, gb_count_of(vals));
 
 			LLVMBuildStore(p->builder, src, dst);
 		}
@@ -1689,7 +1687,7 @@ void lb_generate_code(lbGenerator *gen) {
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
-			auto *wd = gb_alloc_item(heap_allocator(), lbLLVMEmitWorker);
+			auto *wd = gb_alloc_item(permanent_allocator(), lbLLVMEmitWorker);
 			wd->target_machine = target_machines[j];
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;

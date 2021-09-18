@@ -18,6 +18,42 @@ Bindings for the raylib, a simple and easy-to-use library to enjoy videogames pr
 
 This package is available under the Zlib license. See `LICENSE` for more details.
 
+## STB
+
+Bindings/ports for many of the [STB libraries](https://github.com/nothings/stb), single-file public domain (or MIT licensed) libraries for C/C++.
+
+### vendor:stb/easy_font 
+
+quick-and-dirty easy-to-deploy bitmap font for printing frame rate, etc
+
+Source port of `stb_easy_font.h`
+
+### vendor:stb/image 
+Image _loader_, _writer_, and _resizer_.
+
+image loading/decoding from file/memory: JPG, PNG, TGA, BMP, PSD, GIF, HDR, PIC
+
+image writing to disk: PNG, TGA, BMP
+
+resize images larger/smaller with good quality
+
+Bindings of `stb_image.h`, `stb_image_rewrite.h`, `stb_image_resize.h`
+
+### vendor:stb/rect_pack
+simple 2D rectangle packer with decent quality
+
+Bindings of `stb_rect_pack.h`
+
+### vendor:stb/truetype
+parse, decode, and rasterize characters from truetype fonts
+
+Bindings of `stb_truetype.h`
+
+### vendor:stb/vorbis
+decode ogg vorbis files from file/memory to float/16-bit signed output
+
+Bindings of `stb_vorbis.c`
+
 ## SDL2
 
 Bindings for the cross platform multimedia API [SDL2](https://github.com/libsdl-org/SDL) and its sub-projects.

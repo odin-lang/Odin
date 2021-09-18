@@ -832,7 +832,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		String sx = x.value_string;
 		String sy = y.value_string;
 		isize len = sx.len+sy.len;
-		u8 *data = gb_alloc_array(heap_allocator(), u8, len);
+		u8 *data = gb_alloc_array(permanent_allocator(), u8, len);
 		gb_memmove(data,        sx.text, sx.len);
 		gb_memmove(data+sx.len, sy.text, sy.len);
 		return exact_value_string(make_string(data, len));

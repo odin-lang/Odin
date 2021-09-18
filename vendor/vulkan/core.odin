@@ -23,8 +23,6 @@ NonDispatchableHandle :: distinct u64
 SetProcAddressType :: #type proc(p: rawptr, name: cstring)
 
 
-cstring_array :: ^cstring // Helper Type
-
 RemoteAddressNV :: distinct rawptr // Declared inline before MemoryGetRemoteAddressInfoNV
 
 // Base constants

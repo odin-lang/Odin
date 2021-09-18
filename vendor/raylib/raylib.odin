@@ -18,7 +18,13 @@ when ODIN_OS == "windows" {
 		"system:Shell32.lib",
 	}
 }
-when ODIN_OS == "linux"  { foreign import lib "linux/libraylib.a" }
+when ODIN_OS == "linux"  { 
+	foreign import lib { 
+		"linux/libraylib.a",
+		"system:dl",
+		"system:pthread",
+	}
+}
 when ODIN_OS == "darwin" { foreign import lib "macos/libraylib.a" }
 
 VERSION :: "3.7"
