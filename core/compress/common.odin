@@ -56,11 +56,9 @@ Error :: union {
 		as it may involve an I/O error, a Deflate error, etc.
 	*/
 	image.Error,
-	io.Error,
 }
 
 General_Error :: enum {
-	None = 0,
 	File_Not_Found,
 	Cannot_Open_File,
 	File_Too_Short,
@@ -70,6 +68,7 @@ General_Error :: enum {
 	Checksum_Failed,
 	Incompatible_Options,
 	Unimplemented,
+
 
 	/*
 		Memory errors
@@ -99,28 +98,7 @@ GZIP_Error :: enum {
 		You can tweak this setting using `-define:COMPRESS_OUTPUT_ALLOCATE_MAX=size_in_bytes`
 	*/
 	Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX,
-}
 
-LZ4_Error :: enum {
-	Generic,
-	Max_Block_Size_Invalid,
-	Block_Mode_Invalid,
-	Content_Checksum_Invalid,
-	Compression_Level_Invalid,
-	Header_Version_Wrong,
-	Block_Checksum_Invalid,
-	Reserved_Flag_Set,
-	Allocation_Failed,
-	Source_Size_Too_Large,
-	Output_Buffer_Too_Small,
-	Frame_Header_Incomplete,
-	Frame_Type_Unknown,
-	Frame_Type_Wrong,
-	Frame_Size_Wrong,
-	Source_Input_Wrong,
-	Decompression_Failed,
-	Header_Checksum_Invalid,
-	Frame_Decoding_Already_Started,
 }
 
 ZIP_Error :: enum {
@@ -146,6 +124,7 @@ Deflate_Error :: enum {
 	Len_Nlen_Mismatch,
 	BType_3,
 }
+
 
 // General I/O context for ZLIB, LZW, etc.
 Context_Memory_Input :: struct #packed {
