@@ -368,11 +368,13 @@ load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.
 }
 
 load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	data, ok := os.read_entire_file(filename, allocator)
+	context.allocator = allocator
+
+	data, ok := os.read_entire_file(filename)
 	defer delete(data)
 
 	if ok {
-		return load_from_slice(data, options, allocator)
+		return load_from_slice(data, options)
 	} else {
 		img = new(Image)
 		return img, E_General.File_Not_Found
@@ -380,7 +382,9 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 }
 
 load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	context.allocator = allocator
 	options := options
+
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
@@ -398,7 +402,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		img = new(Image)
 	}
 
-	info := new(Info, context.allocator)
+	info := new(Info)
 	img.metadata_ptr  = info
 	img.metadata_type = typeid_of(Info)
 
