@@ -461,22 +461,22 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 }
 
 ensure_winsock_initialized :: proc() {
-	@static gate := false;
-	@static initted := false;
+	@static gate := false
+	@static initted := false
 
 	for intrinsics.atomic_xchg(&gate, true) {
-		intrinsics.cpu_relax();
+		intrinsics.cpu_relax()
 	}
-	defer intrinsics.atomic_store(&gate, false);
+	defer intrinsics.atomic_store(&gate, false)
 
 	if initted {
-		return;
+		return
 	}
 
-	unused_info: WSADATA;
-	version_requested := WORD(2) << 8 | 2;
-	res := WSAStartup(version_requested, &unused_info);
-	assert(res == 0, "unable to initialized Winsock2");
+	unused_info: WSADATA
+	version_requested := WORD(2) << 8 | 2
+	res := WSAStartup(version_requested, &unused_info)
+	assert(res == 0, "unable to initialized Winsock2")
 
-	initted = true;
+	initted = true
 }
