@@ -83,13 +83,13 @@ Token :: struct {
 Is_Keyword_Proc :: #type proc(tok: ^Token) -> bool
 
 copy_token :: proc(tok: ^Token) -> ^Token {
-	t, _ := new_clone(tok^)
+	t := new_clone(tok^)
 	t.next = nil
 	return t
 }
 
 new_eof :: proc(tok: ^Token) -> ^Token {
-	t, _ := new_clone(tok^)
+	t := new_clone(tok^)
 	t.kind = .EOF
 	t.lit = ""
 	return t

@@ -215,14 +215,13 @@ new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, 
 	t = (^T)(raw_data(data))
 	return
 }
-new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
-	backing := alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return
-	t = (^T)(raw_data(backing))
+new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
+	data := alloc_bytes(size_of(T), alignment, allocator, loc) or_return
+	t = (^T)(raw_data(data))
 	if t != nil {
 		t^ = data
-		return t, nil
 	}
-	return nil, .Out_Of_Memory
+	return
 }
 
 DEFAULT_RESERVE_CAPACITY :: 16
