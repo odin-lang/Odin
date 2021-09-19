@@ -7,12 +7,11 @@ import win "core:sys/windows"
 
 import "core:fmt"
 
-Socket :: distinct win.SOCKET;
+Socket :: distinct win.SOCKET
 
 Socket_Type :: enum {
 	Tcp,
 	Udp,
-	Bluetooth, // TODO
 }
 
 // WARNING(tetra): @Volatile: Socket_Error must contain all of the other error's values.
@@ -54,39 +53,36 @@ Dial_Error :: enum c.int {
 }
 
 dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error) {
-	win.ensure_winsock_initialized();
+	win.ensure_winsock_initialized()
 
-	family: c.int;
+	family: c.int
 	switch type {
 	case .Tcp, .Udp:
 		switch in addr {
-		case Ipv4_Address:  family = win.AF_INET;
-		case Ipv6_Address:  family = win.AF_INET6;
+		case Ipv4_Address:  family = win.AF_INET
+		case Ipv6_Address:  family = win.AF_INET6
 		}
-	case .Bluetooth:
-		family = win.AF_BTH;
 	case:
-		panic("cannot dial this type of socket");
+		panic("cannot dial this type of socket")
 	}
 
-	typ, proto: c.int;
+	typ, proto: c.int
 	switch type {
-	case .Tcp:        typ = win.SOCK_STREAM; proto = win.IPPROTO_TCP;
-	case .Udp:        typ = win.SOCK_DGRAM;  proto = win.IPPROTO_UDP;
-	case .Bluetooth:  typ = win.SOCK_STREAM; proto = win.BTHPROTO_RFCOMM;
+	case .Tcp:        typ = win.SOCK_STREAM; proto = win.IPPROTO_TCP
+	case .Udp:        typ = win.SOCK_DGRAM;  proto = win.IPPROTO_UDP
 	}
-	sock := win.socket(family, typ, proto);
+	sock := win.socket(family, typ, proto)
 	if sock == win.INVALID_SOCKET {
-		return {}, Dial_Error(win.WSAGetLastError());
+		return {}, Dial_Error(win.WSAGetLastError())
 	}
 
-	sockaddr, addrsize := to_socket_address(family, addr, port); // FIXME: Why does this fail?
-	res := win.connect(sock, (^win.SOCKADDR)(&sockaddr), addrsize);
+	sockaddr, addrsize := to_socket_address(family, addr, port) // FIXME: Why does this fail?
+	res := win.connect(sock, (^win.SOCKADDR)(&sockaddr), addrsize)
 	if res < 0 {
-		return {}, Dial_Error(win.WSAGetLastError());
+		return {}, Dial_Error(win.WSAGetLastError())
 	}
 
-	return Socket(sock), .Ok;
+	return Socket(sock), .Ok
 }
 
 // TODO: put this in listen() when we make it:
@@ -96,7 +92,7 @@ dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error
 // set_option(sock, .Reuse_Address);
 
 close :: proc(s: Socket) {
-	win.closesocket(win.SOCKET(s));
+	win.closesocket(win.SOCKET(s))
 }
 
 // TODO: audit these errors; consider if they can be cleaned up further
@@ -114,12 +110,12 @@ Recv_Error :: enum c.int {
 }
 
 recv :: proc(s: Socket, buf: []byte) -> (bytes_read: int, err: Recv_Error) {
-	res := win.recv(win.SOCKET(s), &buf[0], c.int(len(buf)), 0);
+	res := win.recv(win.SOCKET(s), &buf[0], c.int(len(buf)), 0)
 	if res < 0 {
-		err = Recv_Error(win.WSAGetLastError());
+		err = Recv_Error(win.WSAGetLastError())
 	}
-	bytes_read = int(res);
-	return;
+	bytes_read = int(res)
+	return
 }
 
 Send_Error :: enum c.int {
@@ -141,13 +137,13 @@ Send_Error :: enum c.int {
 // sent up to that point.
 send :: proc(s: Socket, buf: []byte) -> (bytes_written: int, err: Send_Error) {
 	for bytes_written < len(buf) {
-		limit := min(1<<31, len(buf) - bytes_written);
-		res := win.send(win.SOCKET(s), &buf[0], c.int(limit), 0);
+		limit := min(1<<31, len(buf) - bytes_written)
+		res := win.send(win.SOCKET(s), &buf[0], c.int(limit), 0)
 		if res < 0 {
-			err = Send_Error(win.WSAGetLastError());
-			return;
+			err = Send_Error(win.WSAGetLastError())
+			return
 		}
-		bytes_written += int(res);
+		bytes_written += int(res)
 	}
-	return;
+	return
 }
