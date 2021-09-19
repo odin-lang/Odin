@@ -2,35 +2,36 @@ package os2
 
 import sync "core:sync/sync2"
 import "core:time"
+import "core:runtime"
 
-args: []string;
+args: []string
 
 exit :: proc "contextless" (code: int) -> ! {
-	//
+	runtime.trap()
 }
 
 get_uid :: proc() -> int {
-	return -1;
+	return -1
 }
 
 get_euid :: proc() -> int {
-	return -1;
+	return -1
 }
 
 get_gid :: proc() -> int {
-	return -1;
+	return -1
 }
 
 get_egid :: proc() -> int {
-	return -1;
+	return -1
 }
 
 get_pid :: proc() -> int {
-	return -1;
+	return -1
 }
 
 get_ppid :: proc() -> int {
-	return -1;
+	return -1
 }
 
 
@@ -49,7 +50,7 @@ Process_Attributes :: struct {
 	sys: ^Process_Attributes_OS_Specific,
 }
 
-Process_Attributes_OS_Specific :: struct{};
+Process_Attributes_OS_Specific :: struct{}
 
 Process_Error :: enum {
 	None,
@@ -65,35 +66,35 @@ Process_State :: struct {
 	sys:         rawptr,
 }
 
-Signal :: #type proc();
+Signal :: #type proc()
 
-Kill:      Signal = nil;
-Interrupt: Signal = nil;
+Kill:      Signal = nil
+Interrupt: Signal = nil
 
 
 find_process :: proc(pid: int) -> (^Process, Process_Error) {
-	return nil, .None;
+	return nil, .None
 }
 
 
 process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (^Process, Process_Error) {
-	return nil, .None;
+	return nil, .None
 }
 
 process_release :: proc(p: ^Process) -> Process_Error {
-	return .None;
+	return .None
 }
 
 process_kill :: proc(p: ^Process) -> Process_Error {
-	return .None;
+	return .None
 }
 
 process_signal :: proc(p: ^Process, sig: Signal) -> Process_Error {
-	return .None;
+	return .None
 }
 
 process_wait :: proc(p: ^Process) -> (Process_State, Process_Error) {
-	return {}, .None;
+	return {}, .None
 }
 
 
