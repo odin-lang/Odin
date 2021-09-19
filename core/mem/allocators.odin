@@ -576,9 +576,9 @@ Dynamic_Pool :: struct {
 	out_band_size: int,
 	alignment:     int,
 
-	unused_blocks:   [dynamic]rawptr,
-	used_blocks:     [dynamic]rawptr,
-	out_band_blocks: [dynamic]rawptr, // allocations that are bigger than the OOB size, get a block all by themselves.
+	unused_blocks:        [dynamic]rawptr,
+	used_blocks:          [dynamic]rawptr,
+	out_band_allocations: [dynamic]rawptr,
 
 	current_block: rawptr,
 	current_pos:   rawptr,
@@ -653,9 +653,9 @@ dynamic_pool_init :: proc(pool: ^Dynamic_Pool,
 	pool.out_band_size   = out_band_size
 	pool.alignment       = alignment
 	pool.block_allocator = block_allocator
-	pool.out_band_blocks.allocator = array_allocator
-	pool.unused_blocks.allocator = array_allocator
-	pool.used_blocks.allocator = array_allocator
+	pool.out_band_allocations.allocator = array_allocator
+	pool.       unused_blocks.allocator = array_allocator
+	pool.         used_blocks.allocator = array_allocator
 }
 
 dynamic_pool_destroy :: proc(using pool: ^Dynamic_Pool) {
@@ -704,23 +704,16 @@ dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]by
 	extra := alignment - (n % alignment)
 	n += extra
 
-	// NOTE(tetra): If we are asked to allocate more than a certain size,
-	// we allocate it into it's own block, all by itself.
 	if n >= out_band_size {
-		if n > block_size do return nil
-
 		assert(block_allocator.procedure != nil)
 		memory, err := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
 			                                block_size, alignment,
 			                                nil, 0)
-		if err != nil {
-			append(&out_band_blocks, (^byte)(memory));
+		if memory != nil {
+			append(&out_band_allocations, raw_data(memory))
 		}
 		return memory, err
 	}
-
-	// .. Otherwise we append it on to the current block (assuming there's space for it),
-	// or make a new block if there is not.
 
 	if bytes_left < n {
 		err := cycle_new_block(pool)
@@ -750,10 +743,10 @@ dynamic_pool_reset :: proc(using pool: ^Dynamic_Pool) {
 	}
 	clear(&used_blocks)
 
-	for a in out_band_blocks {
-		free(a, block_allocator);
+	for a in out_band_allocations {
+		free(a, block_allocator)
 	}
-	clear(&out_band_blocks);
+	clear(&out_band_allocations)
 }
 
 dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
@@ -805,13 +798,6 @@ panic_allocator :: proc() -> Allocator {
 		procedure = panic_allocator_proc,
 		data = nil,
 	}
-}
-
-alloca_allocator :: proc() -> Allocator {
-	return Allocator{
-		procedure = alloca_allocator_proc,
-		data = nil,
-	};
 }
 
 
