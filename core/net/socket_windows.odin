@@ -9,102 +9,179 @@ import "core:fmt"
 
 Socket :: distinct win.SOCKET
 
-Socket_Type :: enum {
+Socket_Protocol :: enum {
 	Tcp,
 	Udp,
 }
 
-// WARNING(tetra): @Volatile: Socket_Error must contain all of the other error's values.
-// NOTE(tetra): Use type_set here if it gets added.
-Socket_Error :: enum c.int {
-	Ok = 0,
 
-// Dial errors
-	Address_Not_Available = win.WSAEADDRNOTAVAIL,
-	Refused = win.WSAECONNREFUSED,
-
-// Recv errors
-	Shutdown = win.WSAESHUTDOWN,
-	Aborted = win.WSAECONNABORTED,
-	Reset = win.WSAECONNRESET,
-	Truncated = win.WSAEMSGSIZE, // Only for UDP sockets
-	Offline = win.WSAENETDOWN,
-	Unreachable = win.WSAEHOSTUNREACH,
-	Interrupted = win.WSAEINTR,
-	Timeout = win.WSAETIMEDOUT,
-
-// Send errors
-	Not_Connected = win.WSAENOTCONN,
-	Out_Of_Resources = win.WSAENOBUFS,
-	// Shutdown (above)
-	// Aborted (above)
-	// Reset (above)
-	// Truncated (above)
-	// Offline (above)
-	// Unreachable (above)
-	// Interrupted (above)
-	// Timeout (above)
+Socket_Error :: union {
+	Dial_Error,
+	Listen_Error,
+	Send_Error,
+	Recv_Error,
 }
+
 
 Dial_Error :: enum c.int {
 	Ok = 0,
-	Address_Not_Available = win.WSAEADDRNOTAVAIL,
+	Offline = win.WSAENETDOWN,
+	Address_In_Use = win.WSAEADDRINUSE,
+	In_Progress = win.WSAEALREADY,
+	Invalid_Address = win.WSAEADDRNOTAVAIL,
+	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	Refused = win.WSAECONNREFUSED,
+	Is_Listening_Socket = win.WSAEINVAL,
+	Already_Connected = win.WSAEISCONN,
+	Network_Unreachable = win.WSAENETUNREACH,
+	Host_Unreachable = win.WSAEHOSTUNREACH,
+	No_Buffer_Space_Available = win.WSAENOBUFS,
+	Not_A_Socket = win.WSAENOTSOCK,
+	Timeout = win.WSAETIMEDOUT,
+	Would_Block = win.WSAEWOULDBLOCK,
 }
 
-dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error) {
+dial :: proc(addr: Address, port: int, protocol: Socket_Protocol) -> (skt: Socket, err: Dial_Error) {
 	win.ensure_winsock_initialized()
 
 	family: c.int
-	switch type {
-	case .Tcp, .Udp:
-		switch in addr {
-		case Ipv4_Address:  family = win.AF_INET
-		case Ipv6_Address:  family = win.AF_INET6
-		}
-	case:
-		panic("cannot dial this type of socket")
+	switch in addr {
+	case Ipv4_Address:  family = win.AF_INET
+	case Ipv6_Address:  family = win.AF_INET6
 	}
 
 	typ, proto: c.int
-	switch type {
-	case .Tcp:        typ = win.SOCK_STREAM; proto = win.IPPROTO_TCP
-	case .Udp:        typ = win.SOCK_DGRAM;  proto = win.IPPROTO_UDP
-	}
-	sock := win.socket(family, typ, proto)
-	if sock == win.INVALID_SOCKET {
-		return {}, Dial_Error(win.WSAGetLastError())
+	switch protocol {
+	case .Tcp:  typ = win.SOCK_STREAM; proto = win.IPPROTO_TCP
+	case .Udp:  typ = win.SOCK_DGRAM;  proto = win.IPPROTO_UDP
 	}
 
-	sockaddr, addrsize := to_socket_address(family, addr, port) // FIXME: Why does this fail?
+	sock := win.socket(family, typ, proto)
+	if sock == win.INVALID_SOCKET {
+		err = Dial_Error(win.WSAGetLastError())
+		return
+	}
+
+	sockaddr, addrsize := to_socket_address(family, addr, port)
 	res := win.connect(sock, (^win.SOCKADDR)(&sockaddr), addrsize)
 	if res < 0 {
-		return {}, Dial_Error(win.WSAGetLastError())
+		err = Dial_Error(win.WSAGetLastError())
+		return
 	}
 
 	return Socket(sock), .Ok
 }
 
-// TODO: put this in listen() when we make it:
+
+
+Listen_Error :: enum c.int {
+	Ok = 0,
+	Offline = win.WSAENETDOWN,
+	Broadcast_Not_Set = win.WSAEACCES,
+	Address_In_Use = win.WSAEADDRINUSE,
+	Nonlocal_Address = win.WSAEADDRNOTAVAIL,
+	No_Buffer_Space_Available = win.WSAENOBUFS,
+	Not_Socket = win.WSAENOTSOCK,
+}
+
 // NOTE(tetra): This is so that if we crash while the socket is open, we can
 // bypass the cooldown period, and allow the next run of the program to
 // use the same address, for the same socket immediately.
 // set_option(sock, .Reuse_Address);
+listen :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Socket, err: Listen_Error) {
+	win.ensure_winsock_initialized()
+
+	family: c.int
+	switch in local_addr {
+	case Ipv4_Address:  family = win.AF_INET
+	case Ipv6_Address:  family = win.AF_INET6
+	}
+
+	typ := win.SOCK_STREAM
+	proto := win.IPPROTO_TCP
+	sock := win.socket(family, typ, proto)
+	if sock == win.INVALID_SOCKET {
+		err = Listen_Error(win.WSAGetLastError())
+		return
+	}
+
+	sockaddr, addrsize := to_socket_address(family, local_addr, port)
+	res := win.bind(sock, cast(^win.SOCKADDR) &sockaddr, addrsize)
+	if res == win.SOCKET_ERROR {
+		err = Listen_Error(win.WSAGetLastError())
+		return
+	}
+
+	res = win.listen(sock, i32(backlog))
+	if res == win.SOCKET_ERROR {
+		err = Listen_Error(win.WSAGetLastError())
+		return
+	}
+
+	return Socket(sock), .Ok
+}
+
+
+Accept_Error :: enum c.int {
+	Ok = 0,
+	Reset = win.WSAECONNRESET,
+	Not_Listening = win.WSAEINVAL,
+	No_Socket_Descriptors_Available = win.WSAEMFILE,
+	Offline = win.WSAENETDOWN,
+	No_Buffer_Space_Available = win.WSAENOBUFS,
+	Not_Socket = win.WSAENOTSOCK,
+	Not_Connnectable_Socket = win.WSAEOPNOTSUPP,
+	Would_Block = win.WSAEWOULDBLOCK,
+}
+
+accept :: proc(sock: Socket) -> (client: Socket, source: Endpoint, err: Accept_Error) {
+	sockaddr: win.SOCKADDR_STORAGE_LH
+	sockaddrlen := c.int(size_of(sockaddr))
+	client_sock := win.accept(win.SOCKET(sock), cast(^win.SOCKADDR) &sockaddr, &sockaddrlen)
+	if int(client_sock) == win.SOCKET_ERROR {
+		err = Accept_Error(win.WSAGetLastError())
+		return
+	}
+	client = Socket(client_sock)
+
+	source_address: Address
+	port: int
+	switch sockaddrlen {
+	case size_of(win.sockaddr_in):
+		p := cast(^win.sockaddr_in) &sockaddr
+		source_address = transmute(Ipv4_Address) p.sin_addr.s_addr
+		port = int(p.sin_port)
+	case size_of(win.sockaddr_in6):
+		p := cast(^win.sockaddr_in6) &sockaddr
+		source_address = transmute(Ipv6_Address) p.sin6_addr.s6_addr
+		port = int(p.sin6_port)
+	case:
+		unreachable()
+	}
+
+	source = { source_address, port }
+	err = .Ok
+	return
+}
+
 
 close :: proc(s: Socket) {
 	win.closesocket(win.SOCKET(s))
 }
+
+
 
 // TODO: audit these errors; consider if they can be cleaned up further
 // same for Send_Error
 Recv_Error :: enum c.int {
 	Ok,
 	Shutdown = win.WSAESHUTDOWN,
+	Not_Connected = win.WSAENOTCONN,
 	Aborted = win.WSAECONNABORTED,
 	Reset = win.WSAECONNRESET,
 	Truncated = win.WSAEMSGSIZE, // Only for UDP sockets
 	Offline = win.WSAENETDOWN,
-	Unreachable = win.WSAEHOSTUNREACH,
+	Host_Unreachable = win.WSAEHOSTUNREACH,
 	Interrupted = win.WSAEINTR,
 	Timeout = win.WSAETIMEDOUT,
 }
@@ -125,9 +202,9 @@ Send_Error :: enum c.int {
 	Shutdown = win.WSAESHUTDOWN,
 	Truncated = win.WSAEMSGSIZE, // Only for UDP sockets
 	Reset = win.WSAECONNRESET,
-	Out_Of_Resources = win.WSAENOBUFS,
+	No_Buffer_Space_Available = win.WSAENOBUFS,
 	Offline = win.WSAENETDOWN,
-	Unreachable = win.WSAEHOSTUNREACH,
+	Host_Unreachable = win.WSAEHOSTUNREACH,
 	Interrupted = win.WSAEINTR,
 	Timeout = win.WSAETIMEDOUT,
 }
