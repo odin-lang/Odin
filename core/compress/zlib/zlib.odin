@@ -495,6 +495,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 
 @(optimization_mode="speed")
 inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.allocator) -> (err: Error) #no_bounds_check {
+	context.allocator = allocator
 	expected_output_size := expected_output_size
 
 	/*
@@ -526,9 +527,9 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 	defer free(z_offset)
 	defer free(codelength_ht)
 
-	z_repeat      = allocate_huffman_table(allocator=context.allocator) or_return
-	z_offset      = allocate_huffman_table(allocator=context.allocator) or_return
-	codelength_ht = allocate_huffman_table(allocator=context.allocator) or_return
+	z_repeat      = allocate_huffman_table() or_return
+	z_offset      = allocate_huffman_table() or_return
+	codelength_ht = allocate_huffman_table() or_return
 
 	final := u32(0)
 	type  := u32(0)
