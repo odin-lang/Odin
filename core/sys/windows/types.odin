@@ -203,9 +203,14 @@ INVALID_SOCKET :: ~SOCKET(0)
 WSAEINTR: c_int : 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
 WSAEACCES: c_int : 10013
 WSAEINVAL: c_int : 10022
+WSAEMFILE: c_int : 10024
 WSAEWOULDBLOCK: c_int : 10035
+WSAEALREADY: c_int : 10037 // Operation already in progress.
+WSAENOTSOCK: c_int : 10038
 WSAEMSGSIZE: c_int : 10040 // Message was truncated because it exceeded max datagram size.
 WSAEPROTOTYPE: c_int : 10041
+WSAEOPNOTSUPP: c_int : 10045
+WSAEAFNOSUPPORT: c_int : 10047
 WSAEADDRINUSE: c_int : 10048
 WSAEADDRNOTAVAIL: c_int : 10049
 WSAENETDOWN: c_int : 10050
@@ -213,11 +218,13 @@ WSAENETUNREACH: c_int : 10051
 WSAECONNABORTED: c_int : 10053
 WSAECONNRESET: c_int : 10054
 WSAENOBUFS: c_int : 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
+WSAEISCONN: c_int : 10056
 WSAENOTCONN: c_int : 10057
 WSAESHUTDOWN: c_int : 10058
 WSAETIMEDOUT: c_int : 10060
 WSAECONNREFUSED: c_int : 10061
 WSAEHOSTUNREACH: c_int : 10065
+
 
 MAX_PROTOCOL_CHAIN: DWORD : 7
 
@@ -266,6 +273,7 @@ E_NOTIMPL :: HRESULT(-0x7fff_bfff) // 0x8000_4001
 
 INVALID_HANDLE :: HANDLE(~uintptr(0))
 INVALID_HANDLE_VALUE :: INVALID_HANDLE
+SOCKET_ERROR   :: -1
 
 FACILITY_NT_BIT: DWORD : 0x1000_0000
 
