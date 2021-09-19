@@ -104,12 +104,14 @@ GZIP_MAX_PAYLOAD_SIZE :: int(max(u32le))
 load :: proc{load_from_slice, load_from_file, load_from_context}
 
 load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
-	data, ok := os.read_entire_file(filename, allocator)
+	context.allocator = allocator
+
+	data, ok := os.read_entire_file(filename)
 	defer delete(data)
 
 	err = E_General.File_Not_Found
 	if ok {
-		err = load_from_slice(data, buf, len(data), expected_output_size, allocator)
+		err = load_from_slice(data, buf, len(data), expected_output_size)
 	}
 	return
 }
@@ -125,6 +127,7 @@ load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, 
 }
 
 load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
 	buf := buf
 	expected_output_size := expected_output_size
 
