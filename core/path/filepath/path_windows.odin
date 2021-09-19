@@ -91,13 +91,15 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {
-			return join_non_empty(elems[i:])
+			return join_non_empty(elems[i:], allocator)
 		}
 	}
 	return ""
 }
 
-join_non_empty :: proc(elems: []string) -> string {
+join_non_empty :: proc(elems: []string, allocator := context.allocator) -> string {
+	context.allocator = allocator
+	
 	if len(elems[0]) == 2 && elems[0][1] == ':' {
 		i := 1
 		for ; i < len(elems); i += 1 {
@@ -110,8 +112,7 @@ join_non_empty :: proc(elems: []string) -> string {
 		return clean(s)
 	}
 
-	s := strings.join(elems, SEPARATOR_STRING, context.temp_allocator)
-	p := clean(s)
+	p := clean(strings.join(elems, SEPARATOR_STRING, context.temp_allocator))
 	if !is_UNC(p) {
 		return p
 	}

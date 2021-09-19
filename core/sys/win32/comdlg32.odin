@@ -84,7 +84,11 @@ _open_file_dialog :: proc(title: string, dir: string,
                           filters: []string, default_filter: u32,
                           flags: u32, default_ext: string,
                           mode: Open_Save_Mode, allocator := context.temp_allocator) -> (path: string, ok: bool = true) {
-	file_buf := make([]u16, MAX_PATH_WIDE, allocator)
+	context.allocator = allocator
+	file_buf := make([]u16, MAX_PATH_WIDE)
+	defer if !ok {
+		delete(file_buf)
+	}
 
 	// Filters need to be passed as a pair of strings (title, filter)
 	filter_len := u32(len(filters))
@@ -118,9 +122,9 @@ _open_file_dialog :: proc(title: string, dir: string,
 	}
 
 	if !ok {
-		delete(file_buf)
-		return "", false
+		return
 	}
+	
 
 	file_name := utf16_to_utf8(file_buf[:], allocator)
 	path = strings.trim_right_null(file_name)

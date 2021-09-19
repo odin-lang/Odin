@@ -5,12 +5,14 @@ import win32 "core:sys/windows"
 
 @(private)
 full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Errno) {
+	context.allocator = allocator
+	
 	name := name
 	if name == "" {
 		name = "."
 	}
 	p := win32.utf8_to_utf16(name, context.temp_allocator)
-	buf := make([dynamic]u16, 100, allocator)
+	buf := make([dynamic]u16, 100)
 	defer delete(buf)
 	for {
 		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
