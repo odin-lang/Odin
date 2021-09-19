@@ -40,11 +40,11 @@ import win "core:sys/windows"
 resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (addr4, addr6: Address, ok: bool) {
 	if addr := parse_addr(hostname); addr != nil {
 		switch a in addr {
-		case Ipv4_Address: addr4 = addr;
-		case Ipv6_Address: addr6 = addr;
+		case Ipv4_Address: addr4 = addr
+		case Ipv6_Address: addr6 = addr
 		}
-		ok = true;
-		return;
+		ok = true
+		return
 	}
 
 	//
@@ -57,29 +57,29 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 	// we just use a stack-arena here instead.
 	// We can do this because the addresses we return are returned by value,
 	// so we don't return data from within this arena.
-	buf: [4096]byte;
-	arena: mem.Arena;
-	mem.init_arena(&arena, buf[:]);
-	allocator := mem.arena_allocator(&arena);
+	buf: [4096]byte
+	arena: mem.Arena
+	mem.init_arena(&arena, buf[:])
+	allocator := mem.arena_allocator(&arena)
 
 	if .Ipv4 in addr_types {
-		recs, rec_ok := get_dns_records(hostname, .Ipv4, allocator);
-		if !rec_ok do return;
+		recs, rec_ok := get_dns_records(hostname, .Ipv4, allocator)
+		if !rec_ok do return
 		if len(recs) > 0 {
-			addr4 = cast(Ipv4_Address) recs[0].(Dns_Record_Ipv4); // address is copied
+			addr4 = cast(Ipv4_Address) recs[0].(Dns_Record_Ipv4) // address is copied
 		}
 	}
 
 	if .Ipv6 in addr_types {
-		recs, rec_ok := get_dns_records(hostname, .Ipv6, allocator);
-		if !rec_ok do return;
+		recs, rec_ok := get_dns_records(hostname, .Ipv6, allocator)
+		if !rec_ok do return
 		if len(recs) > 0 {
-			addr6 = cast(Ipv6_Address) recs[0].(Dns_Record_Ipv6); // address is copied
+			addr6 = cast(Ipv6_Address) recs[0].(Dns_Record_Ipv6) // address is copied
 		}
 	}
 
-	ok = addr4 != nil || addr6 != nil;
-	return;
+	ok = addr4 != nil || addr6 != nil
+	return
 }
 
 
@@ -97,25 +97,25 @@ Dns_Record_Type :: enum u16 {
 
 // An IPv4 address that the domain name maps to.
 // There can be any number of these.
-Dns_Record_Ipv4 :: distinct Ipv4_Address;
+Dns_Record_Ipv4 :: distinct Ipv4_Address
 
 // An IPv6 address that the domain name maps to.
 // There can be any number of these.
-Dns_Record_Ipv6 :: distinct Ipv6_Address;
+Dns_Record_Ipv6 :: distinct Ipv6_Address
 
 // Another domain name that the domain name maps to.
 // Domains can be pointed to another domain instead of directly to an IP address.
 // `get_dns_records` will recursively follow these if you request this type of record.
-Dns_Record_Cname :: distinct string;
+Dns_Record_Cname :: distinct string
 
 // Arbitrary string data that is associated with the domain name.
 // Commonly of the form `key=value` to be parsed, though there is no specific format for them.
 // These can be used for any purpose.
-Dns_Record_Text :: distinct string;
+Dns_Record_Text :: distinct string
 
 // Domain names of other DNS servers that are associated with the domain name.
 // TODO(tetra): Expand on what these records are used for, and when you should use pay attention to these.
-Dns_Record_Ns :: distinct string;
+Dns_Record_Ns :: distinct string
 
 // Domain names for email servers that are associated with the domain name.
 // These records also have values which ranks them in the order they should be preferred. Lower is more-preferred.
@@ -159,95 +159,95 @@ Dns_Record :: union {
 // WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
 // See `destroy_records`.
 get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.allocator) -> (records: []Dns_Record, ok: bool) {
-	context.allocator = allocator;
+	context.allocator = allocator
 
-	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator);
-	rec: ^win.DNS_RECORD;
-	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil);
-	switch res {
+	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator)
+	rec: ^win.DNS_RECORD
+	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil)
+	switch u32(res) {
 	case 0:
 		// okay
 	case win.ERROR_INVALID_NAME:
-		return;
+		return
 	case win.DNS_INFO_NO_RECORDS:
-		ok = true;
-		return;
+		ok = true
+		return
 	case:
-		return;
+		return
 	}
-	defer win.DnsRecordListFree(rec, 1); // 1 means that we're freeing a list... because the proc name isn't enough.
+	defer win.DnsRecordListFree(rec, 1) // 1 means that we're freeing a list... because the proc name isn't enough.
 
-	count := 0;
+	count := 0
 	for r := rec; r != nil; r = r.pNext {
-		if r.wType != u16(type) do continue; // NOTE(tetra): Should never happen, but...
-		count += 1;
+		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
+		count += 1
 	}
 
 
-	recs := make([dynamic]Dns_Record, 0, count);
-	if recs == nil do return; // return no results if OOM.
+	recs := make([dynamic]Dns_Record, 0, count)
+	if recs == nil do return // return no results if OOM.
 
 	for r := rec; r != nil; r = r.pNext {
-		if r.wType != u16(type) do continue; // NOTE(tetra): Should never happen, but...
+		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
 
 		switch Dns_Record_Type(r.wType) {
 		case .Ipv4:
-			addr := Ipv4_Address(transmute([4]u8) r.Data.A);
-			new_rec := Dns_Record_Ipv4(addr); // NOTE(tetra): value copy
-			append(&recs, new_rec);
+			addr := Ipv4_Address(transmute([4]u8) r.Data.A)
+			new_rec := Dns_Record_Ipv4(addr) // NOTE(tetra): value copy
+			append(&recs, new_rec)
 
 		case .Ipv6:
-			addr := Ipv6_Address(transmute([8]u16be) r.Data.AAAA);
-			new_rec := Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
-			append(&recs, new_rec);
+			addr := Ipv6_Address(transmute([8]u16be) r.Data.AAAA)
+			new_rec := Dns_Record_Ipv6(addr) // NOTE(tetra): value copy
+			append(&recs, new_rec)
 
 		case .Cname:
-			host := string(r.Data.CNAME);
-			new_rec := Dns_Record_Cname(strings.clone(host));
-			append(&recs, new_rec);
+			host := string(r.Data.CNAME)
+			new_rec := Dns_Record_Cname(strings.clone(host))
+			append(&recs, new_rec)
 
 		case .Txt:
-			n := r.Data.TXT.dwStringCount;
-			ptr := &r.Data.TXT.pStringArray;
-			c_strs := mem.slice_ptr(ptr, int(n));
+			n := r.Data.TXT.dwStringCount
+			ptr := &r.Data.TXT.pStringArray
+			c_strs := mem.slice_ptr(ptr, int(n))
 			for cstr in c_strs {
-				s := string(cstr);
-				new_rec := Dns_Record_Text(strings.clone(s));
-				append(&recs, new_rec);
+				s := string(cstr)
+				new_rec := Dns_Record_Text(strings.clone(s))
+				append(&recs, new_rec)
 			}
 
 		case .Ns:
-			host := string(r.Data.NS);
-			new_rec := Dns_Record_Ns(strings.clone(host));
-			append(&recs, new_rec);
+			host := string(r.Data.NS)
+			new_rec := Dns_Record_Ns(strings.clone(host))
+			append(&recs, new_rec)
 
 		case .Mx:
 			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
 			// Or maybe not because you're supposed to just use the first one that works
 			// and which order they're in changes every few calls.
-			host := string(r.Data.MX.pNameExchange);
-			preference := int(r.Data.MX.wPreference);
+			host := string(r.Data.MX.pNameExchange)
+			preference := int(r.Data.MX.wPreference)
 			new_rec := Dns_Record_Mx {
 				host       = strings.clone(host),
-				preference = preference };
-			append(&recs, new_rec);
+				preference = preference }
+			append(&recs, new_rec)
 
 		case .Srv:
-			name := strings.clone(string(r.Data.SRV.pNameTarget));
-			priority := int(r.Data.SRV.wPriority);
-			weight := int(r.Data.SRV.wWeight);
-			port := int(r.Data.SRV.wPort);
+			name := strings.clone(string(r.Data.SRV.pNameTarget))
+			priority := int(r.Data.SRV.wPriority)
+			weight := int(r.Data.SRV.wWeight)
+			port := int(r.Data.SRV.wPort)
 
-			parts := strings.split(name, ".", context.temp_allocator);
-			defer delete(parts);
-			assert(len(parts) == 3, "Srv record name should be of the form _servicename._protocol.domain");
-			service_name, protocol, host := parts[0], parts[1], parts[2];
+			parts := strings.split(name, ".", context.temp_allocator)
+			defer delete(parts)
+			assert(len(parts) == 3, "Srv record name should be of the form _servicename._protocol.domain")
+			service_name, protocol, host := parts[0], parts[1], parts[2]
 
 			if service_name[0] == '_' {
-				service_name = service_name[1:];
+				service_name = service_name[1:]
 			}
 			if protocol[0] == '_' {
-				protocol = protocol[1:];
+				protocol = protocol[1:]
 			}
 
 			append(&recs, Dns_Record_Srv {
@@ -257,35 +257,35 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 				priority     = priority,
 				weight       = weight,
 				port         = port,
-			});
+			})
 		}
 	}
 
-	records = recs[:];
-	ok = true;
-	return;
+	records = recs[:]
+	ok = true
+	return
 }
 
 // `records` slice is also destroyed.
 destroy_dns_records :: proc(records: []Dns_Record, allocator := context.allocator) {
-	context.allocator = allocator;
+	context.allocator = allocator
 
 	for rec in records {
 		switch r in rec {
 		case Dns_Record_Ipv4:  // nothing to do
 		case Dns_Record_Ipv6:  // nothing to do
 		case Dns_Record_Cname:
-			delete(string(r));
+			delete(string(r))
 		case Dns_Record_Text:
-			delete(string(r));
+			delete(string(r))
 		case Dns_Record_Ns:
-			delete(string(r));
+			delete(string(r))
 		case Dns_Record_Mx:
-			delete(r.host);
+			delete(r.host)
 		case Dns_Record_Srv:
-			delete(r.service_name); // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
+			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
 		}
 	}
 
-	delete(records);
+	delete(records)
 }
