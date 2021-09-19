@@ -5,64 +5,64 @@ import "core:strings"
 user_cache_dir :: proc(allocator := context.allocator) -> (dir: string, is_defined: bool) {
 	switch ODIN_OS {
 	case "windows":
-		dir = get_env("LocalAppData");
+		dir = get_env("LocalAppData")
 		if dir != "" {
-			dir = strings.clone(dir, allocator);
+			dir = strings.clone(dir, allocator)
 		}
 	case "darwin":
-		dir = get_env("HOME");
+		dir = get_env("HOME")
 		if dir != "" {
-			dir = strings.concatenate({dir, "/Library/Caches"}, allocator);
+			dir = strings.concatenate({dir, "/Library/Caches"}, allocator)
 		}
 	case: // All other UNIX systems
-		dir = get_env("XDG_CACHE_HOME");
+		dir = get_env("XDG_CACHE_HOME")
 		if dir == "" {
-			dir = get_env("HOME");
+			dir = get_env("HOME")
 			if dir == "" {
-				return;
+				return
 			}
-			dir = strings.concatenate({dir, "/.cache"}, allocator);
+			dir = strings.concatenate({dir, "/.cache"}, allocator)
 		}
 	}
-	is_defined = dir != "";
-	return;
+	is_defined = dir != ""
+	return
 }
 
 user_config_dir :: proc(allocator := context.allocator) -> (dir: string, is_defined: bool) {
 	switch ODIN_OS {
 	case "windows":
-		dir = get_env("AppData");
+		dir = get_env("AppData")
 		if dir != "" {
-			dir = strings.clone(dir, allocator);
+			dir = strings.clone(dir, allocator)
 		}
 	case "darwin":
-		dir = get_env("HOME");
+		dir = get_env("HOME")
 		if dir != "" {
-			dir = strings.concatenate({dir, "/Library/Application Support"}, allocator);
+			dir = strings.concatenate({dir, "/Library/Application Support"}, allocator)
 		}
 	case: // All other UNIX systems
-		dir = get_env("XDG_CACHE_HOME");
+		dir = get_env("XDG_CACHE_HOME")
 		if dir == "" {
-			dir = get_env("HOME");
+			dir = get_env("HOME")
 			if dir == "" {
-				return;
+				return
 			}
-			dir = strings.concatenate({dir, "/.config"}, allocator);
+			dir = strings.concatenate({dir, "/.config"}, allocator)
 		}
 	}
-	is_defined = dir != "";
-	return;
+	is_defined = dir != ""
+	return
 }
 
 user_home_dir :: proc() -> (dir: string, is_defined: bool) {
-	env := "HOME";
+	env := "HOME"
 	switch ODIN_OS {
 	case "windows":
-		env = "USERPROFILE";
+		env = "USERPROFILE"
 	}
 	if v := get_env(env); v != "" {
-		return v, true;
+		return v, true
 	}
-	return "", false;
+	return "", false
 }
 

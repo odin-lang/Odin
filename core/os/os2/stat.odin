@@ -15,28 +15,28 @@ File_Info :: struct {
 
 file_info_slice_delete :: proc(infos: []File_Info, allocator := context.allocator) {
 	for i := len(infos)-1; i >= 0; i -= 1 {
-		file_info_delete(infos[i], allocator);
+		file_info_delete(infos[i], allocator)
 	}
-	delete(infos, allocator);
+	delete(infos, allocator)
 }
 
 file_info_delete :: proc(fi: File_Info, allocator := context.allocator) {
-	delete(fi.fullpath, allocator);
+	delete(fi.fullpath, allocator)
 }
 
 fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-	return _fstat(fd, allocator);
+	return _fstat(fd, allocator)
 }
 
 stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-	return _stat(name, allocator);
+	return _stat(name, allocator)
 }
 
 lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-	return _lstat(name, allocator);
+	return _lstat(name, allocator)
 }
 
 
 same_file :: proc(fi1, fi2: File_Info) -> bool {
-	return _same_file(fi1, fi2);
+	return _same_file(fi1, fi2)
 }
