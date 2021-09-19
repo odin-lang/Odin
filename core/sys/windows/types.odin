@@ -304,6 +304,7 @@ SO_SNDTIMEO: c_int : 0x1005
 SO_REUSEADDR: c_int : 0x0004
 IPPROTO_IP: c_int : 0
 IPPROTO_TCP: c_int : 6
+IPPROTO_UDP: c_int : 17
 IPPROTO_IPV6: c_int : 41
 TCP_NODELAY: c_int : 0x0001
 IP_TTL: c_int : 4

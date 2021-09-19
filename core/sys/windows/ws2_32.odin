@@ -46,7 +46,7 @@ foreign ws2_32 {
 	) -> SOCKET ---
 
 	ioctlsocket :: proc(s: SOCKET, cmd: c_long, argp: ^c_ulong) -> c_int ---
-	socket :: proc(family, type, protocol: c_int) -> SOCKET ---;
+	socket :: proc(family, type, protocol: c_int) -> SOCKET ---
 	closesocket :: proc(socket: SOCKET) -> c_int ---
 	recv :: proc(socket: SOCKET, buf: rawptr, len: c_int, flags: c_int) -> c_int ---
 	send :: proc(socket: SOCKET, buf: rawptr, len: c_int, flags: c_int) -> c_int ---
