@@ -36,7 +36,7 @@ Dial_Error :: enum c.int {
 	Network_Unreachable = win.WSAENETUNREACH,
 	Host_Unreachable = win.WSAEHOSTUNREACH,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
-	Not_A_Socket = win.WSAENOTSOCK,
+	Not_Socket = win.WSAENOTSOCK,
 	Timeout = win.WSAETIMEDOUT,
 	Would_Block = win.WSAEWOULDBLOCK,
 }
