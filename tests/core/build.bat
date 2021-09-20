@@ -21,3 +21,8 @@ echo ---
 echo Running core:hash tests
 echo ---
 %PATH_TO_ODIN% run hash %COMMON% -o:size
+
+echo ---
+echo Running core:odin tests
+echo ---
+%PATH_TO_ODIN% run odin %COMMON% -o:size
