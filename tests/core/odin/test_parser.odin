@@ -1,4 +1,4 @@
-package test_core_odin_parse
+package test_core_odin_parser
 
 import "core:testing"
 import "core:fmt"
