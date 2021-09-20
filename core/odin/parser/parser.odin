@@ -116,7 +116,7 @@ end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 	return pos
 }
 
-default_parser :: proc(flags := Flags{}) -> Parser {
+default_parser :: proc(flags := Flags{.Optional_Semicolons}) -> Parser {
 	return Parser {
 		flags = flags,
 		err  = default_error_handler,
