@@ -259,19 +259,15 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (response
 	context.allocator = allocator
 
 	for {
-		skt, send_ok := send_request(r)
-		if !send_ok do return
+		skt := send_request(r) or_return
 		defer net.close(skt)
 
-		read_ok: bool
-		resp, read_ok = recv_response(skt)
-		if !read_ok do return
+		resp = recv_response(skt) or_return
 
 		if resp.status_code != .Moved_Permanently {
 			break
 		} else {
-			location, has_new_location := resp.headers["Location"]
-			if !has_new_location do return
+			location := resp.headers["Location"] or_return
 
 			r2 := r
 			request_init(&r2, .Get, location)
