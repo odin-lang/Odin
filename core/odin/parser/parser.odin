@@ -786,7 +786,7 @@ parse_control_statement_semicolon_separator :: proc(p: ^Parser) -> bool {
 	if tok.kind != .Open_Brace {
 		return allow_token(p, .Semicolon)
 	}
-	if tok.text == ";" {
+	if p.curr_tok.text == ";" {
 		return allow_token(p, .Semicolon)
 	}
 	return false
