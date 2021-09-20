@@ -666,7 +666,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			case '=':
 				advance_rune(t)
 				kind = .Gt_Eq
-			case '<':
+			case '>':
 				advance_rune(t)
 				kind = .Shr
 				if t.ch == '=' {
