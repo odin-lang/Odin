@@ -174,7 +174,7 @@ close :: proc(s: Socket) {
 // TODO: audit these errors; consider if they can be cleaned up further
 // same for Send_Error
 Recv_Error :: enum c.int {
-	Ok,
+	Ok = 0,
 	Shutdown = win.WSAESHUTDOWN,
 	Not_Connected = win.WSAENOTCONN,
 	Aborted = win.WSAECONNABORTED,
@@ -190,13 +190,13 @@ recv :: proc(s: Socket, buf: []byte) -> (bytes_read: int, err: Recv_Error) {
 	res := win.recv(win.SOCKET(s), &buf[0], c.int(len(buf)), 0)
 	if res < 0 {
 		err = Recv_Error(win.WSAGetLastError())
+		return
 	}
-	bytes_read = int(res)
-	return
+	return int(res), .Ok
 }
 
 Send_Error :: enum c.int {
-	Ok,
+	Ok = 0,
 	Aborted = win.WSAECONNABORTED,
 	Not_Connected = win.WSAENOTCONN,
 	Shutdown = win.WSAESHUTDOWN,
