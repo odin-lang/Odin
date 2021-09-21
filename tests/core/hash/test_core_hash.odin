@@ -1,6 +1,7 @@
 package test_core_hash
 
 import "core:hash/xxhash"
+import "core:hash"
 import "core:time"
 import "core:testing"
 import "core:fmt"
@@ -32,6 +33,7 @@ main :: proc() {
 	t := testing.T{}
 	test_benchmark_runner(&t)
 	test_xxhash_vectors(&t)
+	test_crc64_vectors(&t)
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 }
 
@@ -252,5 +254,44 @@ test_xxhash_vectors :: proc(t: ^testing.T) {
 
 			expect(t, xxh3_128  == v.xxh3_128_secret, xxh3_128_error)
 		}
+	}
+}
+
+@test
+test_crc64_vectors :: proc(t: ^testing.T) {
+	fmt.println("Verifying CRC-64:")
+
+	vectors := map[string][4]u64 {
+		"123456789" = {
+			0x6c40df5f0b497347, // ECMA-182,
+			0x995dc9bbdf1939fa, // XZ
+			0x46a5a9388a5beffe, // ISO 3306
+			0xb90956c775a41001, // ISO 3306, input and output inverted
+		},
+		"This is a test of the emergency broadcast system." = {
+			0x344fe1d09c983d13, // ECMA-182
+			0x27db187fc15bbc72, // XZ
+			0x187184d744afc49e, // ISO 3306
+			0xe7fcf1006b503b61, // ISO 3306, input and output inverted
+		},
+	}
+
+	for vector, expected in vectors {
+		fmt.println("\tVector:", vector)
+		b := transmute([]u8)vector
+		ecma := hash.crc64_ecma_182(b)
+		xz   := hash.crc64_xz(b)
+		iso  := hash.crc64_iso_3306(b)
+		iso2 := hash.crc64_iso_3306_inverse(b)
+
+		ecma_error := fmt.tprintf("[ CRC-64 ECMA    ] Expected: %016x. Got: %016x.", expected[0], ecma)
+		xz_error   := fmt.tprintf("[ CRC-64 XZ      ] Expected: %016x. Got: %016x.", expected[1], xz)
+		iso_error  := fmt.tprintf("[ CRC-64 ISO 3306] Expected: %016x. Got: %016x.", expected[2], iso)
+		iso2_error := fmt.tprintf("[~CRC-64 ISO 3306] Expected: %016x. Got: %016x.", expected[3], iso2)
+
+		expect(t, ecma == expected[0], ecma_error)
+		expect(t, xz   == expected[1], xz_error)
+		expect(t, iso  == expected[2], iso_error)
+		expect(t, iso2 == expected[3], iso2_error)
 	}
 }
