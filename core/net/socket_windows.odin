@@ -15,14 +15,6 @@ Socket_Protocol :: enum {
 }
 
 
-Socket_Error :: union {
-	Dial_Error,
-	Listen_Error,
-	Send_Error,
-	Recv_Error,
-}
-
-
 Dial_Error :: enum c.int {
 	Ok = 0,
 	Offline = win.WSAENETDOWN,
@@ -61,6 +53,10 @@ dial :: proc(addr: Address, port: int, protocol: Socket_Protocol) -> (skt: Socke
 		err = Dial_Error(win.WSAGetLastError())
 		return
 	}
+	skt = Socket(sock)
+	defer if err != nil do close(skt)
+
+	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr, addrsize := to_socket_address(family, addr, port)
 	res := win.connect(sock, (^win.SOCKADDR)(&sockaddr), addrsize)
@@ -69,7 +65,7 @@ dial :: proc(addr: Address, port: int, protocol: Socket_Protocol) -> (skt: Socke
 		return
 	}
 
-	return Socket(sock), .Ok
+	return
 }
 
 
@@ -104,6 +100,10 @@ listen :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Socket,
 		err = Listen_Error(win.WSAGetLastError())
 		return
 	}
+	skt = Socket(sock)
+	defer if err != nil do close(skt)
+
+	_ = set_option(skt, .Exclusive_Addr_Use, true)
 
 	sockaddr, addrsize := to_socket_address(family, local_addr, port)
 	res := win.bind(sock, cast(^win.SOCKADDR) &sockaddr, addrsize)
@@ -118,7 +118,7 @@ listen :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Socket,
 		return
 	}
 
-	return Socket(sock), .Ok
+	return
 }
 
 
@@ -223,4 +223,119 @@ send :: proc(s: Socket, buf: []byte) -> (bytes_written: int, err: Send_Error) {
 		bytes_written += int(res)
 	}
 	return
+}
+
+
+
+Shutdown_Manner :: enum c.int {
+	Receive = win.SD_RECEIVE,
+	Send = win.SD_SEND,
+	Both = win.SD_BOTH,
+}
+
+Shutdown_Error :: enum c.int {
+	Ok = 0,
+	Aborted = win.WSAECONNABORTED,
+	Reset = win.WSAECONNRESET,
+	Offline = win.WSAENETDOWN,
+	Not_Connected = win.WSAENOTCONN,
+	Not_Socket = win.WSAENOTSOCK,
+	Invalid_Manner = win.WSAEINVAL,
+}
+
+shutdown :: proc(s: Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
+	res := win.shutdown(win.SOCKET(s), c.int(manner))
+	if res < 0 {
+		return Shutdown_Error(win.WSAGetLastError())
+	}
+	return
+}
+
+
+
+Socket_Option :: enum c.int {
+	// value: win.BOOL
+	Reuse_Address = win.SO_REUSEADDR,
+	Exclusive_Addr_Use = win.SO_EXCLUSIVEADDRUSE,
+	Keep_Alive = win.SO_KEEPALIVE,
+	Conditional_Accept = win.SO_CONDITIONAL_ACCEPT,
+	Dont_Linger = win.SO_DONTLINGER,
+	Out_Of_Bounds_Data_Inline = win.SO_OOBINLINE,
+	Tcp_Nodelay = win.TCP_NODELAY,
+
+	// value: win.LINGER
+	Linger = win.SO_LINGER,
+
+	// value: win.DWORD
+	Receive_Buffer_Size = win.SO_RCVBUF,
+	Send_Buffer_Size = win.SO_SNDBUF,
+	Receive_Timeout = win.SO_RCVTIMEO,
+	Send_Timeout = win.SO_SNDTIMEO,
+}
+
+Socket_Option_Error :: enum c.int {
+	Ok = 0,
+
+	Incorrect_Type,
+	Unknown_Option,
+
+	Offline = win.WSAENETDOWN,
+	Keep_Alive_Timeout = win.WSAENETRESET,
+	Invalid_Option = win.WSAENOPROTOOPT,
+	Not_Connected = win.WSAENOTCONN,
+	Not_Socket = win.WSAENOTSOCK,
+}
+
+set_option :: proc(s: Socket, option: Socket_Option, value: any) -> Socket_Option_Error {
+	level := win.SOL_SOCKET
+	if option == .Tcp_Nodelay do level = win.IPPROTO_TCP
+
+
+	switch option {
+	case
+		.Reuse_Address,
+		.Exclusive_Addr_Use,
+		.Keep_Alive,
+		.Conditional_Accept,
+		.Dont_Linger,
+		.Out_Of_Bounds_Data_Inline,
+		.Tcp_Nodelay:
+			switch in value {
+			case bool:
+				// okay
+			case:
+				return .Incorrect_Type
+			}
+	case
+		.Receive_Buffer_Size,
+		.Send_Buffer_Size,
+		.Receive_Timeout,
+		.Send_Timeout:
+			switch in value {
+			case i8, i16, i32, i64, i128, int, u8, u16, u32, u64, u128, uint:
+				// okay
+			case:
+				return .Incorrect_Type
+			}
+	case .Linger:
+		switch in value {
+		case win.LINGER:
+			// okay
+		case:
+			return .Incorrect_Type
+		}
+	case:
+		return .Unknown_Option
+	}
+
+
+	ptr := value.data
+	len := c.int(type_info_of(value.id).size)
+
+	res := win.setsockopt(win.SOCKET(s), c.int(level), c.int(option), ptr, len)
+	if res < 0 {
+		return Socket_Option_Error(win.WSAGetLastError())
+	}
+
+	return .Ok
 }
