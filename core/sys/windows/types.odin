@@ -209,12 +209,14 @@ WSAEALREADY: c_int : 10037 // Operation already in progress.
 WSAENOTSOCK: c_int : 10038
 WSAEMSGSIZE: c_int : 10040 // Message was truncated because it exceeded max datagram size.
 WSAEPROTOTYPE: c_int : 10041
+WSAENOPROTOOPT: c_int : 10042
 WSAEOPNOTSUPP: c_int : 10045
 WSAEAFNOSUPPORT: c_int : 10047
 WSAEADDRINUSE: c_int : 10048
 WSAEADDRNOTAVAIL: c_int : 10049
 WSAENETDOWN: c_int : 10050
 WSAENETUNREACH: c_int : 10051
+WSAENETRESET : c_int : 10052
 WSAECONNABORTED: c_int : 10053
 WSAECONNRESET: c_int : 10054
 WSAENOBUFS: c_int : 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
@@ -224,7 +226,6 @@ WSAESHUTDOWN: c_int : 10058
 WSAETIMEDOUT: c_int : 10060
 WSAECONNREFUSED: c_int : 10061
 WSAEHOSTUNREACH: c_int : 10065
-
 
 MAX_PROTOCOL_CHAIN: DWORD : 7
 
@@ -307,9 +308,18 @@ SD_SEND: c_int : 1
 SOCK_DGRAM: c_int : 2
 SOCK_STREAM: c_int : 1
 SOL_SOCKET: c_int : 0xffff
-SO_RCVTIMEO: c_int : 0x1006
-SO_SNDTIMEO: c_int : 0x1005
+SO_ACCEPTCONN: c_int : 0x0002
 SO_REUSEADDR: c_int : 0x0004
+SO_KEEPALIVE: c_int : 0x0008
+SO_SNDTIMEO: c_int : 0x1005
+SO_RCVTIMEO: c_int : 0x1006
+SO_EXCLUSIVEADDRUSE: c_int : ~SO_REUSEADDR
+SO_CONDITIONAL_ACCEPT: c_int : 0x3002
+SO_DONTLINGER: c_int : ~SO_LINGER
+SO_OOBINLINE: c_int : 0x0100
+SO_LINGER: c_int : 0x0080
+SO_RCVBUF: c_int : 0x1002
+SO_SNDBUF: c_int : 0x1001
 IPPROTO_IP: c_int : 0
 IPPROTO_TCP: c_int : 6
 IPPROTO_UDP: c_int : 17
@@ -327,6 +337,11 @@ IP_DROP_MEMBERSHIP: c_int : 13
 IPV6_ADD_MEMBERSHIP: c_int : 12
 IPV6_DROP_MEMBERSHIP: c_int : 13
 MSG_PEEK: c_int : 0x2
+
+LINGER :: struct {
+	l_onoff: c.ushort,
+	l_linger: c.ushort,
+}
 
 ip_mreq :: struct {
 	imr_multiaddr: in_addr,
