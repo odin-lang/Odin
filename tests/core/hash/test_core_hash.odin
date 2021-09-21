@@ -284,10 +284,10 @@ test_crc64_vectors :: proc(t: ^testing.T) {
 		iso  := hash.crc64_iso_3306(b)
 		iso2 := hash.crc64_iso_3306_inverse(b)
 
-		ecma_error := fmt.tprintf("[ CRC-64 ECMA    ] Expected: %016x. Got: %016x.", ecma, expected[0])
-		xz_error   := fmt.tprintf("[ CRC-64 XZ      ] Expected: %016x. Got: %016x.", xz,   expected[1])
-		iso_error  := fmt.tprintf("[ CRC-64 ISO 3306] Expected: %016x. Got: %016x.", iso,  expected[2])
-		iso2_error := fmt.tprintf("[~CRC-64 ISO 3306] Expected: %016x. Got: %016x.", iso2, expected[3])
+		ecma_error := fmt.tprintf("[ CRC-64 ECMA    ] Expected: %016x. Got: %016x.", expected[0], ecma)
+		xz_error   := fmt.tprintf("[ CRC-64 XZ      ] Expected: %016x. Got: %016x.", expected[1], xz)
+		iso_error  := fmt.tprintf("[ CRC-64 ISO 3306] Expected: %016x. Got: %016x.", expected[2], iso)
+		iso2_error := fmt.tprintf("[~CRC-64 ISO 3306] Expected: %016x. Got: %016x.", expected[3], iso2)
 
 		expect(t, ecma == expected[0], ecma_error)
 		expect(t, xz   == expected[1], xz_error)
