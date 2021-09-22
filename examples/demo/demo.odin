@@ -1109,7 +1109,7 @@ threading_example :: proc() {
 
 	{ // Basic Threads
 		fmt.println("\n## Basic Threads")
-			worker_proc :: proc(t: ^thread.Thread) {
+		worker_proc :: proc(t: ^thread.Thread) {
 			for iteration in 1..=5 {
 				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration)
 				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration)
