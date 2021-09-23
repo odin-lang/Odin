@@ -311,8 +311,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->value = exact_value_string(result);
 
 		} else if (name == "load_or") {
-			if (ce->args.count != 1) {
-				error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
+			if (ce->args.count != 2) {
+				error(ce->args[0], "'#load_or' expects 2 arguments, got %td", ce->args.count);
 				return false;
 			}
 
@@ -320,13 +320,28 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Operand o = {};
 			check_expr(c, &o, arg);
 			if (o.mode != Addressing_Constant) {
-				error(arg, "'#load' expected a constant string argument");
+				error(arg, "'#load_or' expected a constant string argument");
 				return false;
 			}
 
 			if (!is_type_string(o.type)) {
 				gbString str = type_to_string(o.type);
-				error(arg, "'#load' expected a constant string, got %s", str);
+				error(arg, "'#load_or' expected a constant string, got %s", str);
+				gb_string_free(str);
+				return false;
+			}
+			
+			Ast *default_arg = ce->args[1];
+			Operand default_op = {};
+			check_expr_with_type_hint(c, &default_op, default_arg, t_u8_slice);
+			if (default_op.mode != Addressing_Constant) {
+				error(arg, "'#load_or' expected a constant '[]byte' argument");
+				return false;
+			}
+
+			if (!are_types_identical(base_type(default_op.type), t_u8_slice)) {
+				gbString str = type_to_string(default_op.type);
+				error(arg, "'#load_or' expected a constant '[]byte', got %s", str);
 				gb_string_free(str);
 				return false;
 			}
@@ -350,36 +365,24 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gbFile f = {};
 			gbFileError file_err = gb_file_open(&f, c_str);
 			defer (gb_file_close(&f));
-
-			switch (file_err) {
-			default:
-			case gbFileError_Invalid:
-				error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
-				return false;
-			case gbFileError_NotExists:
-				error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
-				return false;
-			case gbFileError_Permission:
-				error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
-				return false;
-			case gbFileError_None:
-				// Okay
-				break;
-			}
-
-			String result = {};
-			isize file_size = cast(isize)gb_file_size(&f);
-			if (file_size > 0) {
-				u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
-				gb_file_read_at(&f, data, file_size, 0);
-				data[file_size] = '\0';
-				result.text = data;
-				result.len = file_size;
-			}
-
+			
 			operand->type = t_u8_slice;
 			operand->mode = Addressing_Constant;
-			operand->value = exact_value_string(result);
+			if (file_err == gbFileError_None) {
+				String result = {};
+				isize file_size = cast(isize)gb_file_size(&f);
+				if (file_size > 0) {
+					u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
+					gb_file_read_at(&f, data, file_size, 0);
+					data[file_size] = '\0';
+					result.text = data;
+					result.len = file_size;
+				}
+
+				operand->value = exact_value_string(result);
+			} else {
+				operand->value = default_op.value;
+			}
 
 		} else if (name == "assert") {
 			if (ce->args.count != 1) {
