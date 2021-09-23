@@ -398,9 +398,9 @@ get_id_uintptr :: #force_inline proc(ctx: ^Context, ptr: uintptr) -> Id {
 get_id_bytes   :: proc(ctx: ^Context, bytes: []byte) -> Id {
 	/* 32bit fnv-1a hash */
 	HASH_INITIAL :: 2166136261
-	hash :: proc(hash: ^Id, data: rawptr, size: int) {
-		size := size
-		cptr := ([^]u8)(data)
+	hash :: proc(hash: ^Id, data: []byte) {
+		size := len(data)
+		cptr := ([^]u8)(raw_data(data))
 		for ; size > 0; size -= 1 {
 			hash^ = Id(u32(hash^) ~ u32(cptr[0])) * 16777619
 			cptr = cptr[1:]
@@ -409,7 +409,7 @@ get_id_bytes   :: proc(ctx: ^Context, bytes: []byte) -> Id {
 	
 	idx := ctx.id_stack.idx
 	res := ctx.id_stack.items[idx - 1] if idx > 0 else HASH_INITIAL
-	hash(&res, &bytes[0], len(bytes))
+	hash(&res, bytes)
 	ctx.last_id = res
 	return res
 }
