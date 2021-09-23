@@ -41,4 +41,6 @@ foreign libc {
 	strerror :: proc(errnum: int) -> [^]char ---
 	strlen   :: proc(s: cstring) -> size_t ---
 }
-memset : proc "c" (s: rawptr, c: int, n: size_t) -> rawptr : runtime.memset
+memset :: proc "c" (s: rawptr, c: int, n: size_t) -> rawptr {
+	return runtime.memset(s, c, auto_cast n)
+}
