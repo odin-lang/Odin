@@ -310,6 +310,77 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_string(result);
 
+		} else if (name == "load_or") {
+			if (ce->args.count != 1) {
+				error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
+				return false;
+			}
+
+			Ast *arg = ce->args[0];
+			Operand o = {};
+			check_expr(c, &o, arg);
+			if (o.mode != Addressing_Constant) {
+				error(arg, "'#load' expected a constant string argument");
+				return false;
+			}
+
+			if (!is_type_string(o.type)) {
+				gbString str = type_to_string(o.type);
+				error(arg, "'#load' expected a constant string, got %s", str);
+				gb_string_free(str);
+				return false;
+			}
+
+			gbAllocator a = heap_allocator();
+
+			GB_ASSERT(o.value.kind == ExactValue_String);
+			String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
+			String original_string = o.value.value_string;
+
+
+			BlockingMutex *ignore_mutex = nullptr;
+			String path = {};
+			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+			gb_unused(ok);
+
+			char *c_str = alloc_cstring(a, path);
+			defer (gb_free(a, c_str));
+
+
+			gbFile f = {};
+			gbFileError file_err = gb_file_open(&f, c_str);
+			defer (gb_file_close(&f));
+
+			switch (file_err) {
+			default:
+			case gbFileError_Invalid:
+				error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
+				return false;
+			case gbFileError_NotExists:
+				error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
+				return false;
+			case gbFileError_Permission:
+				error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
+				return false;
+			case gbFileError_None:
+				// Okay
+				break;
+			}
+
+			String result = {};
+			isize file_size = cast(isize)gb_file_size(&f);
+			if (file_size > 0) {
+				u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
+				gb_file_read_at(&f, data, file_size, 0);
+				data[file_size] = '\0';
+				result.text = data;
+				result.len = file_size;
+			}
+
+			operand->type = t_u8_slice;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_string(result);
+
 		} else if (name == "assert") {
 			if (ce->args.count != 1) {
 				error(call, "'#assert' expects 1 argument, got %td", ce->args.count);
@@ -413,7 +484,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				}
 			}
 		} else {
-			GB_PANIC("Unhandled #%.*s", LIT(name));
+			error(call, "Unknown directive call: #%.*s", LIT(name));
 		}
 
 		break;
