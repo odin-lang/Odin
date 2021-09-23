@@ -5865,7 +5865,15 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
 		String name = bd->name.string;
-		if (name == "location" || name == "assert" || name == "panic" || name == "defined" || name == "config" || name == "load") {
+		if (
+		    name == "location" || 
+		    name == "assert" || 
+		    name == "panic" || 
+		    name == "defined" || 
+		    name == "config" || 
+		    name == "load" ||
+		    name == "load_or"
+		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = proc;
@@ -6619,10 +6627,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				o->type = t_source_code_location;
 				o->mode = Addressing_Value;
 			} else if (
-			    name == "load" ||
 			    name == "assert" ||
 			    name == "defined" ||
-			    name == "config"
+			    name == "config" ||
+			    name == "load" ||
+			    name == "load_or"
 			) {
 				error(node, "'#%.*s' must be used as a call", LIT(name));
 				o->type = t_invalid;
