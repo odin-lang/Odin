@@ -2018,26 +2018,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
-		} else if (name.string == "file") {
-			return ast_basic_directive(f, token, name);
-		} else if (name.string == "line") { return ast_basic_directive(f, token, name);
-		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name);
-		} else if (name.string == "caller_location") { return ast_basic_directive(f, token, name);
-		} else if (name.string == "location") {
-			Ast *tag = ast_basic_directive(f, token, name);
-			return parse_call_expr(f, tag);
-		} else if (name.string == "load") {
-			Ast *tag = ast_basic_directive(f, token, name);
-			return parse_call_expr(f, tag);
-		} else if (name.string == "assert") {
-			Ast *tag = ast_basic_directive(f, token, name);
-			return parse_call_expr(f, tag);
-		} else if (name.string == "defined") {
-			Ast *tag = ast_basic_directive(f, token, name);
-			return parse_call_expr(f, tag);
-		} else if (name.string == "config") {
-			Ast *tag = ast_basic_directive(f, token, name);
-			return parse_call_expr(f, tag);
 		} else if (name.string == "soa" || name.string == "simd") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
@@ -2072,16 +2052,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			tag = parse_call_expr(f, tag);
 			Ast *type = parse_type(f);
 			return ast_relative_type(f, tag, type);
-		} else if (name.string == "opaque") {
-			syntax_warning(token, "'#opaque' has been removed and will do nothing to the applied type");
-			return parse_type(f);
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
 			return parse_force_inlining_operand(f, name);
-		} else {
-			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
-		return operand;
+		return ast_basic_directive(f, token, name);
 	}
 
 	// Parse Procedure Type or Literal or Group

@@ -5872,7 +5872,11 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 			operand->type = t_invalid;
 			add_type_and_value(c->info, proc, operand->mode, operand->type, operand->value);
 		} else {
-			GB_PANIC("Unhandled #%.*s", LIT(name));
+			error(proc, "Unknown directive: #%.*s", LIT(name));
+			operand->expr = proc;
+			operand->type = t_invalid;
+			operand->mode = Addressing_Invalid;
+			return Expr_Expr;
 		}
 		if (inlining != ProcInlining_none) {
 			error(call, "Inlining operators are not allowed on built-in procedures");
@@ -6609,7 +6613,26 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			o->type = t_source_code_location;
 			o->mode = Addressing_Value;
 		} else {
-			GB_PANIC("Unknown basic directive");
+			if (name == "location") {
+				init_core_source_code_location(c->checker);
+				error(node, "'#%.*s' must be used in a call expression", LIT(name));
+				o->type = t_source_code_location;
+				o->mode = Addressing_Value;
+			} else if (
+			    name == "load" ||
+			    name == "assert" ||
+			    name == "defined" ||
+			    name == "config"
+			) {
+				error(node, "'#%.*s' must be used as a call", LIT(name));
+				o->type = t_invalid;
+				o->mode = Addressing_Invalid;
+			} else {
+				error(node, "Unknown directive: #%.*s", LIT(name));
+				o->type = t_invalid;
+				o->mode = Addressing_Invalid;
+			}
+			
 		}
 	case_end;
 
