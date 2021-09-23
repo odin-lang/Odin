@@ -4516,14 +4516,9 @@ Ast *parse_stmt(AstFile *f) {
 				break;
 			}
 			return s;
-		} else if (tag == "assert") {
+		} else if (tag == "assert" || tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, name);
 			Ast *stmt = ast_expr_stmt(f, parse_call_expr(f, t));
-			expect_semicolon(f, stmt);
-			return stmt;
-		} else if (tag == "panic") {
-			Ast *t = ast_basic_directive(f, hash_token, name);
-			Ast *stmt =  ast_expr_stmt(f, parse_call_expr(f, t));
 			expect_semicolon(f, stmt);
 			return stmt;
 		} else if (name.string == "force_inline" ||
