@@ -6,6 +6,12 @@ Its use is similar to that of `core:` packages, which would be available in any 
 
 Presently, the `vendor:` collection comprises the following packages:
 
+## microui
+
+A tiny, portable, immediate-mode UI library written in Odin. (Ported from [rxi/microui](https://github.com/rxi/microui).)
+
+This package is available under the MIT license. See `LICENSE` for more details.
+
 ## OpenGL
 
 Bindings for the OpenGL graphics API and helpers in idiomatic Odin to, for example, reload shaders when they're changed on disk.
