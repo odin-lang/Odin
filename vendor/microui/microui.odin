@@ -1279,6 +1279,7 @@ end_root_container :: proc(ctx: ^Context) {
 }
 
 begin_window :: proc(ctx: ^Context, title: string, rect: Rect, opt := Options{}) -> bool {
+	assert(title != "", "missing window title")
 	id := get_id(ctx, title)
 	cnt := internal_get_container(ctx, id, opt)
 	if cnt == nil || !cnt.open {
@@ -1415,6 +1416,7 @@ scoped_end_popup :: proc(ctx: ^Context, _: string, ok: bool) {
 }
 
 begin_panel :: proc(ctx: ^Context, name: string, opt := Options{}) {
+	assert(name != "", "missing panel name")
 	push_id(ctx, name)
 	cnt := internal_get_container(ctx, ctx.last_id, opt)
 	cnt.rect = layout_next(ctx)
