@@ -974,8 +974,8 @@ MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile 
 #define USE_DAMERAU_LEVENSHTEIN 1
 
 isize levenstein_distance_case_insensitive(String const &a, String const &b) {
-	isize w = a.len+1;
-	isize h = b.len+1;
+	isize w = b.len+1;
+	isize h = a.len+1;
 	isize *matrix = gb_alloc_array(temporary_allocator(), isize, w*h);
 	for (isize i = 0; i <= a.len; i++) {
 		matrix[i*w + 0] = i;
