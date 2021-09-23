@@ -5,6 +5,7 @@ import _slice "core:slice"
 import "core:intrinsics"
 
 _ :: intrinsics
+_ :: _slice
 ORD :: intrinsics.type_is_ordered
 
 Interface :: struct {
