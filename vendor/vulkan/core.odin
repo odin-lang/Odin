@@ -2,8 +2,6 @@
 // Vulkan wrapper generated from "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h"
 //
 package vulkan
-
-import "core:c"
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
