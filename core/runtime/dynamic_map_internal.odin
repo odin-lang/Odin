@@ -210,7 +210,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 	new_count = max(new_count, 2*m.entries.len)
 
 	__slice_resize(&nm.hashes, new_count, m.entries.allocator, loc)
-	for i in 0 ..< new_count {
+	for _, i in nm.hashes {
 		nm.hashes[i] = -1
 	}
 
@@ -271,8 +271,10 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 		if fr.entry_prev >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_prev)
 			entry.next = index
-		} else {
+		} else if fr.hash_index >= 0 {
 			h.m.hashes[fr.hash_index] = index
+		} else {
+			return nil
 		}
 	}
 
