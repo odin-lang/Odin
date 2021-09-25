@@ -1518,6 +1518,7 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	case Basic_u32le: return t_u32;
 	case Basic_i64le: return t_i64;
 	case Basic_u64le: return t_u64;
+	case Basic_i128le: return t_i128;
 	case Basic_u128le: return t_u128;
 
 	case Basic_i16be: return t_i16;
@@ -1526,6 +1527,7 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	case Basic_u32be: return t_u32;
 	case Basic_i64be: return t_i64;
 	case Basic_u64be: return t_u64;
+	case Basic_i128be: return t_i128;
 	case Basic_u128be: return t_u128;
 
 	case Basic_f16le: return t_f16;

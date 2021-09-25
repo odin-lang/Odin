@@ -763,3 +763,17 @@ floattidf_unsigned :: proc(a: u128) -> f64 {
 	fb[1] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
+
+
+
+@(link_name="__fixunsdfti")
+fixunsdfti :: proc(a: f64) -> u128 {
+	x := u64(a)
+	return u128(x)
+}
+
+@(link_name="__fixunsdfdi")
+fixunsdfdi :: proc(a: f64) -> i128 {
+	x := i64(a)
+	return i128(x)
+}
