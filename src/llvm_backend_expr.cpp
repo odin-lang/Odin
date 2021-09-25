@@ -1045,6 +1045,12 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_u8_ptr(src) && is_type_cstring(dst)) {
 		return lb_emit_transmute(p, value, dst);
 	}
+	if (is_type_cstring(src) && is_type_u8_multi_ptr(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+	if (is_type_u8_multi_ptr(src) && is_type_cstring(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
 	if (is_type_cstring(src) && is_type_rawptr(dst)) {
 		return lb_emit_transmute(p, value, dst);
 	}
