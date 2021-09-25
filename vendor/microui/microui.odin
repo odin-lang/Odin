@@ -163,6 +163,8 @@ Command_Icon :: struct {
 }
 
 
+Layout_Type :: enum { NONE = 0, RELATIVE = 1, ABSOLUTE = 2 }
+
 Layout :: struct {
 	body, next:                  Rect,
 	position, size, max:         Vec2,
@@ -694,8 +696,6 @@ draw_icon :: proc(ctx: ^Context, id: Icon, rect: Rect, color: Color) {
 /*============================================================================
 ** layout
 **============================================================================*/
-
-Layout_Type :: enum { NONE = 0, RELATIVE = 1, ABSOLUTE = 2 }
 
 layout_begin_column :: proc(ctx: ^Context) {
 	push_layout(ctx, layout_next(ctx), Vec2{0, 0})
