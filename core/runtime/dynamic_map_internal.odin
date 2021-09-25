@@ -161,6 +161,28 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	return header
 }
 
+__get_map_header_runtime :: proc "contextless" (m: ^Raw_Map, ti: Type_Info_Map) -> Map_Header {
+	header := Map_Header{m = m}
+	
+	header.equal = ti.key_equal
+	
+	entries := ti.generated_struct.variant.(Type_Info_Struct).types[1]
+	entry := entries.variant.(Type_Info_Dynamic_Array).elem
+	e := entry.variant.(Type_Info_Struct)
+	
+	header.entry_size    = entry.size
+	header.entry_align   = entry.align
+
+	header.key_offset    = e.offsets[2]
+	header.key_size      = e.types[2].size
+
+	header.value_offset  = e.offsets[3]
+	header.value_size    = e.types[3].size
+
+	return header
+}
+
+
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
 	array := (^Raw_Slice)(array_)
 
