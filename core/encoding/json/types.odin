@@ -6,6 +6,8 @@ Specification :: enum {
 	// MJSON, // http://bitsquid.blogspot.com/2009/09/json-configuration-data.html
 }
 
+DEFAULT_SPECIFICATION :: Specification.JSON5
+
 Null    :: distinct rawptr
 Integer :: i64
 Float   :: f64
@@ -41,6 +43,10 @@ Error :: enum {
 	Expected_String_For_Object_Key,
 	Duplicate_Object_Key,
 	Expected_Colon_After_Key,
+	
+	// Allocating Errors
+	Invalid_Allocator,
+	Out_Of_Memory,
 }
 
 

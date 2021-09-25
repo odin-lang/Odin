@@ -10,11 +10,10 @@ Parser :: struct {
 	curr_token:     Token,
 	spec:           Specification,
 	allocator:      mem.Allocator,
-	unmarshal_data: any,
 	parse_integers: bool,
 }
 
-make_parser :: proc(data: []byte, spec := Specification.JSON, parse_integers := false, allocator := context.allocator) -> Parser {
+make_parser :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> Parser {
 	p: Parser
 	p.tok = make_tokenizer(data, spec, parse_integers)
 	p.spec = spec
@@ -24,7 +23,7 @@ make_parser :: proc(data: []byte, spec := Specification.JSON, parse_integers := 
 	return p
 }
 
-parse :: proc(data: []byte, spec := Specification.JSON, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
+parse :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
 	context.allocator = allocator
 	p := make_parser(data, spec, parse_integers, allocator)
 
@@ -94,7 +93,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		advance_token(p)
 		return
 	case .String:
-		value = String(unquote_string(token, p.spec, p.allocator))
+		value = unquote_string(token, p.spec, p.allocator) or_return
 		advance_token(p)
 		return
 
@@ -161,24 +160,41 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	return
 }
 
-clone_string :: proc(s: string, allocator: mem.Allocator) -> string {
-	n := len(s)
-	b := make([]byte, n+1, allocator)
-	copy(b, s)
-	b[n] = 0
-	return string(b[:n])
+@(private)
+bytes_make :: proc(size, alignment: int, allocator: mem.Allocator) -> (bytes: []byte, err: Error) {
+	b, berr := mem.alloc_bytes(size, alignment, allocator)
+	if berr != nil {
+		if berr == .Out_Of_Memory {
+			err = .Out_Of_Memory
+		} else {
+			err = .Invalid_Allocator
+		}
+	}
+	bytes = b
+	return
 }
 
-parse_object_key :: proc(p: ^Parser) -> (key: string, err: Error) {
+clone_string :: proc(s: string, allocator: mem.Allocator) -> (str: string, err: Error) {
+	n := len(s)
+	b := bytes_make(n+1, 1, allocator) or_return
+	copy(b, s)
+	if len(b) > n {
+		b[n] = 0
+		str = string(b[:n])
+	}
+	return
+}
+
+parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator) -> (key: string, err: Error) {
 	tok := p.curr_token
 	if p.spec == Specification.JSON5 {
 		if tok.kind == .String {
 			expect_token(p, .String)
-			key = unquote_string(tok, p.spec, p.allocator)
+			key = unquote_string(tok, p.spec, key_allocator) or_return
 			return
 		} else if tok.kind == .Ident {
 			expect_token(p, .Ident)
-			key = clone_string(tok.text, p.allocator)
+			key = clone_string(tok.text, key_allocator) or_return
 			return
 		}
 	}
@@ -186,7 +202,7 @@ parse_object_key :: proc(p: ^Parser) -> (key: string, err: Error) {
 		err = .Expected_String_For_Object_Key
 		return
 	}
-	key = unquote_string(tok, p.spec, p.allocator)
+	key = unquote_string(tok, p.spec, key_allocator) or_return
 	return
 }
 
@@ -205,7 +221,7 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 	for p.curr_token.kind != .Close_Brace {
 		key: string
-		key, err = parse_object_key(p)
+		key, err = parse_object_key(p, p.allocator)
 		if err != .None {
 			delete(key, p.allocator)
 			return
@@ -248,7 +264,7 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
-unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator) -> string {
+unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator) -> (value: string, err: Error) {
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
 			return -1
@@ -287,16 +303,16 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	}
 
 	if token.kind != .String {
-		return ""
+		return "", nil
 	}
 	s := token.text
 	if len(s) <= 2 {
-		return ""
+		return "", nil
 	}
 	quote := s[0]
 	if s[0] != s[len(s)-1] {
 		// Invalid string
-		return ""
+		return "", nil
 	}
 	s = s[1:len(s)-1]
 
@@ -320,7 +336,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		return clone_string(s, allocator)
 	}
 
-	b := make([]byte, len(s) + 2*utf8.UTF_MAX, allocator)
+	b := bytes_make(len(s) + 2*utf8.UTF_MAX, 1, allocator) or_return
 	w := copy(b, s[0:i])
 	loop: for i < len(s) {
 		c := s[i]
@@ -423,5 +439,5 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		}
 	}
 
-	return string(b[:w])
+	return string(b[:w]), nil
 }
