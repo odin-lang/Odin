@@ -688,35 +688,55 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 
 ExactValue build_param_to_exact_value(String name, String param) {
 	ExactValue value = {};
-	if (str_eq_ignore_case(param, str_lit("t")) ||
-	    str_eq_ignore_case(param, str_lit("true"))) {
-		value = exact_value_bool(true);
-	} else if (str_eq_ignore_case(param, str_lit("f")) ||
-	           str_eq_ignore_case(param, str_lit("false"))) {
-		value = exact_value_bool(false);
-	} else if (param.len > 0) {
-		if (param[0] == '"') {
-			value = exact_value_string(param);
-			if (value.kind == ExactValue_String) {
-				String s = value.value_string;
-				if (s.len > 1 && s[0] == '"' && s[s.len-1] == '"') {
-					value.value_string = substring(s, 1, s.len-1);
-				}
-			}
-		} else if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
-			if (string_contains_char(param, '.')) {
-				value = exact_value_float_from_string(param);
-			} else {
-				value = exact_value_integer_from_string(param);
-			}
-			if (value.kind == ExactValue_Invalid) {
-				gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
-			}
-		}
-	} else {
+
+	/*
+		Bail out on an empty param string
+	*/
+	if (param.len == 0) {
 		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
+		return value;
 	}
 
+	/*
+		Attempt to parse as bool first.
+	*/
+	if (str_eq_ignore_case(param, str_lit("t")) || str_eq_ignore_case(param, str_lit("true"))) {
+		return exact_value_bool(true);
+	}
+	if (str_eq_ignore_case(param, str_lit("f")) || str_eq_ignore_case(param, str_lit("false"))) {
+		return exact_value_bool(false);
+	}
+
+	/*
+		Try to parse as an integer or float
+	*/
+	if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
+		if (string_contains_char(param, '.')) {
+			value = exact_value_float_from_string(param);
+		} else {
+			value = exact_value_integer_from_string(param);
+		}
+		if (value.kind != ExactValue_Invalid) {
+			return value;
+		}
+	}
+
+	/*
+		Treat the param as a string literal,
+		optionally be quoted in '' to avoid being parsed as a bool, integer or float.
+	*/
+	value = exact_value_string(param);
+
+	if (param[0] == '\'' && value.kind == ExactValue_String) {
+		String s = value.value_string;
+		if (s.len > 1 && s[0] == '\'' && s[s.len-1] == '\'') {
+			value.value_string = substring(s, 1, s.len-1);
+		}
+	}
+
+	if (value.kind != ExactValue_String) {
+		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
+	}
 	return value;
 }
 
