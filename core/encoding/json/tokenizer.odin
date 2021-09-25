@@ -53,7 +53,7 @@ Tokenizer :: struct {
 
 
 
-make_tokenizer :: proc(data: []byte, spec := Specification.JSON, parse_integers := false) -> Tokenizer {
+make_tokenizer :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> Tokenizer {
 	t := Tokenizer{pos = {line=1}, data = data, spec = spec, parse_integers = parse_integers}
 	next_rune(&t)
 	if t.r == utf8.RUNE_BOM {
