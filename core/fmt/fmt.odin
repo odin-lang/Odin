@@ -1219,6 +1219,10 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	io.write_byte(fi.writer, '[')
 	defer io.write_byte(fi.writer, ']')
 
+	if count <= 0 {
+		return
+	}
+	
 	if fi.hash {
 		io.write_byte(fi.writer, '\n')
 		defer fmt_write_indent(fi)
