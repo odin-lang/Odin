@@ -1980,6 +1980,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("modti3"),
 		str_lit("divti3"),
 		str_lit("fixdfti"),
+		str_lit("fixunsdfti"),
+		str_lit("fixunsdfdi"),
 		str_lit("floattidf"),
 		str_lit("floattidf_unsigned"),
 		str_lit("truncsfhf2"),
