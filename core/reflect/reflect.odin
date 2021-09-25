@@ -157,6 +157,21 @@ typeid_core :: proc(id: typeid) -> typeid {
 }
 typeid_base_without_enum :: typeid_core
 
+any_base :: proc(v: any) -> any {
+	v := v
+	if v != nil {
+		v.id = typeid_base(v.id)
+	}
+	return v
+}
+any_core :: proc(v: any) -> any {
+	v := v
+	if v != nil {
+		v.id = typeid_core(v.id)
+	}
+	return v
+}
+
 typeid_elem :: proc(id: typeid) -> typeid {
 	ti := type_info_of(id)
 	if ti == nil { return nil }
