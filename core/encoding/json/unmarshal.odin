@@ -1,6 +1,5 @@
 package json
 
-import "core:fmt"
 import "core:mem"
 import "core:math"
 import "core:reflect"
@@ -37,7 +36,6 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 		return .Non_Pointer_Parameter
 	}
 	
-	
 	if !is_valid(data, spec, true) {
 		return .Invalid_Data
 	}
@@ -47,6 +45,8 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 	if v.data == nil {
 		return .Invalid_Parameter
 	}
+	
+	context.allocator = p.allocator
 	return unmarsal_value(&p, data)
 }
 
@@ -64,11 +64,11 @@ unmarshal_string :: proc(data: string, ptr: ^$T, spec := DEFAULT_SPECIFICATION, 
 assign_bool :: proc(val: any, b: bool) -> bool {
 	v := reflect.any_core(val)
 	switch dst in &v {
-	case bool: dst = auto_cast b
-	case b8:   dst = auto_cast b
-	case b16:  dst = auto_cast b
-	case b32:  dst = auto_cast b
-	case b64:  dst = auto_cast b
+	case bool: dst = bool(b)
+	case b8:   dst = b8  (b)
+	case b16:  dst = b16 (b)
+	case b32:  dst = b32 (b)
+	case b64:  dst = b64 (b)
 	case: return false
 	}
 	return true
@@ -77,35 +77,35 @@ assign_bool :: proc(val: any, b: bool) -> bool {
 assign_int :: proc(val: any, i: $T) -> bool {
 	v := reflect.any_core(val)
 	switch dst in &v {
-	case i8:      dst = auto_cast i
-	case i16:     dst = auto_cast i
-	case i16le:   dst = auto_cast i
-	case i16be:   dst = auto_cast i
-	case i32:     dst = auto_cast i
-	case i32le:   dst = auto_cast i
-	case i32be:   dst = auto_cast i
-	case i64:     dst = auto_cast i
-	case i64le:   dst = auto_cast i
-	case i64be:   dst = auto_cast i
-	case i128:    dst = auto_cast i
-	case i128le:  dst = auto_cast i
-	case i128be:  dst = auto_cast i
-	case u8:      dst = auto_cast i
-	case u16:     dst = auto_cast i
-	case u16le:   dst = auto_cast i
-	case u16be:   dst = auto_cast i
-	case u32:     dst = auto_cast i
-	case u32le:   dst = auto_cast i
-	case u32be:   dst = auto_cast i
-	case u64:     dst = auto_cast i
-	case u64le:   dst = auto_cast i
-	case u64be:   dst = auto_cast i
-	case u128:    dst = auto_cast i
-	case u128le:  dst = auto_cast i
-	case u128be:  dst = auto_cast i
-	case int:     dst = auto_cast i
-	case uint:    dst = auto_cast i
-	case uintptr: dst = auto_cast i
+	case i8:      dst = i8     (i)
+	case i16:     dst = i16    (i)
+	case i16le:   dst = i16le  (i)
+	case i16be:   dst = i16be  (i)
+	case i32:     dst = i32    (i)
+	case i32le:   dst = i32le  (i)
+	case i32be:   dst = i32be  (i)
+	case i64:     dst = i64    (i)
+	case i64le:   dst = i64le  (i)
+	case i64be:   dst = i64be  (i)
+	case i128:    dst = i128   (i)
+	case i128le:  dst = i128le (i)
+	case i128be:  dst = i128be (i)
+	case u8:      dst = u8     (i)
+	case u16:     dst = u16    (i)
+	case u16le:   dst = u16le  (i)
+	case u16be:   dst = u16be  (i)
+	case u32:     dst = u32    (i)
+	case u32le:   dst = u32le  (i)
+	case u32be:   dst = u32be  (i)
+	case u64:     dst = u64    (i)
+	case u64le:   dst = u64le  (i)
+	case u64be:   dst = u64be  (i)
+	case u128:    dst = u128   (i)
+	case u128le:  dst = u128le (i)
+	case u128be:  dst = u128be (i)
+	case int:     dst = int    (i)
+	case uint:    dst = uint   (i)
+	case uintptr: dst = uintptr(i)
 	case: return false
 	}
 	return true
@@ -114,15 +114,15 @@ assign_int :: proc(val: any, i: $T) -> bool {
 assign_float :: proc(val: any, i: $T) -> bool {
 	v := reflect.any_core(val)
 	switch dst in &v {
-	case f16:     dst = auto_cast i
-	case f16le:   dst = auto_cast i
-	case f16be:   dst = auto_cast i
-	case f32:     dst = auto_cast i
-	case f32le:   dst = auto_cast i
-	case f32be:   dst = auto_cast i
-	case f64:     dst = auto_cast i
-	case f64le:   dst = auto_cast i
-	case f64be:   dst = auto_cast i
+	case f16:     dst = f16  (i)
+	case f16le:   dst = f16le(i)
+	case f16be:   dst = f16be(i)
+	case f32:     dst = f32  (i)
+	case f32le:   dst = f32le(i)
+	case f32be:   dst = f32be(i)
+	case f64:     dst = f64  (i)
+	case f64le:   dst = f64le(i)
+	case f64be:   dst = f64be(i)
 	case: return false
 	}
 	return true
@@ -133,11 +133,24 @@ assign_float :: proc(val: any, i: $T) -> bool {
 @(private)
 unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
-	
 	token := p.curr_token
+	
+	v := v
+	ti := reflect.type_info_base(type_info_of(v.id))
+	// NOTE: If it's a union with only one variant, then treat it as that variant
+	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && len(u.variants) == 1 && token.kind != .Null {
+		variant := u.variants[0]
+		v.id = variant.id
+		ti = reflect.type_info_base(variant)
+		if !(u.maybe && reflect.is_pointer(variant)) {
+			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+			assign_int(tag, 1)
+		}
+	}
+	
+	
 	#partial switch token.kind {
 	case .Null:
-		ti := type_info_of(v.id)
 		mem.zero(v.data, ti.size)
 		advance_token(p)
 		return
@@ -175,7 +188,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .String:
 		advance_token(p)
 		str := unquote_string(token, p.spec, p.allocator) or_return
-		val := reflect.any_base(v)
+		val := any{v.data, ti.id}
 		switch dst in &val {
 		case string:
 			dst = str
@@ -191,7 +204,6 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		}
 		defer delete(str, p.allocator)
 		
-		ti := type_info_of(val.id)
 		#partial switch variant in ti.variant {
 		case reflect.Type_Info_Enum:
 			for name, i in variant.names {
@@ -280,7 +292,6 @@ unmarsal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_locat
 
 @(private)
 unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
-	original_val := v
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	
 	assert(expect_token(p, .Open_Brace) == nil)
@@ -374,11 +385,7 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		
 		map_backing_value := any{raw_data(elem_backing), t.value.id}
 		
-		pass := 0
-		
 		map_loop: for p.curr_token.kind != .Close_Brace {
-			defer pass += 1
-			
 			key, _ := parse_object_key(p, p.allocator)
 			unmarsal_expect_token(p, .Colon)
 			
