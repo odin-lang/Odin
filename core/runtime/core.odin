@@ -366,6 +366,15 @@ Raw_Map :: struct {
 	entries: Raw_Dynamic_Array,
 }
 
+Raw_Any :: struct {
+	data: rawptr,
+	id:   typeid,
+}
+
+Raw_Cstring :: struct {
+	data: [^]byte,
+}
+
 
 /////////////////////////////
 // Init Startup Procedures //

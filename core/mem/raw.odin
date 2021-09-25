@@ -1,35 +1,13 @@
 package mem
 
-Raw_Any :: struct {
-	data: rawptr,
-	id:   typeid,
-}
+import "core:runtime"
 
-Raw_String :: struct {
-	data: ^byte,
-	len:  int,
-}
-
-Raw_Cstring :: struct {
-	data: ^byte,
-}
-
-Raw_Slice :: struct {
-	data: rawptr,
-	len:  int,
-}
-
-Raw_Dynamic_Array :: struct {
-	data:      rawptr,
-	len:       int,
-	cap:       int,
-	allocator: Allocator,
-}
-
-Raw_Map :: struct {
-	hashes:  []int,
-	entries: Raw_Dynamic_Array,
-}
+Raw_Any           :: runtime.Raw_Any
+Raw_String        :: runtime.Raw_String
+Raw_Cstring       :: runtime.Raw_Cstring
+Raw_Slice         :: runtime.Raw_Slice
+Raw_Dynamic_Array :: runtime.Raw_Dynamic_Array
+Raw_Map           :: runtime.Raw_Map
 
 Raw_Complex64     :: struct {real, imag: f32}
 Raw_Complex128    :: struct {real, imag: f64}
