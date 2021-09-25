@@ -300,6 +300,229 @@ parse_uint :: proc(s: string, base := 0) -> (value: uint, ok: bool) {
 }
 
 
+// Parses an integer value from a string, in the given base, without a prefix.
+//
+// Returns ok=false if no numeric value of the appropriate base could be found,
+// or if the input string contained more than just the number.
+//
+// ```
+// n, ok := strconv.parse_i128_of_base("-1234eeee", 10);
+// assert(n == -1234 && ok);
+// ```
+parse_i128_of_base :: proc(str: string, base: int) -> (value: i128, ok: bool) {
+	assert(base <= 16, "base must be 1-16")
+
+	s := str
+	if s == "" {
+		return
+	}
+
+	neg := false
+	if len(s) > 1 {
+		switch s[0] {
+		case '-':
+			neg = true
+			s = s[1:]
+		case '+':
+			s = s[1:]
+		}
+	}
+
+
+	i := 0
+	for r in s {
+		if r == '_' {
+			i += 1
+			continue
+		}
+		v := i128(_digit_value(r))
+		if v >= i128(base) {
+			break
+		}
+		value *= i128(base)
+		value += v
+		i += 1
+	}
+	s = s[i:]
+
+	if neg {
+		value = -value
+	}
+	ok = len(s) == 0
+	return
+}
+
+// Parses a integer value from a string, in base 10, unless there's a prefix.
+//
+// Returns ok=false if a valid integer could not be found,
+// or if the input string contained more than just the number.
+//
+// ```
+// n, ok := strconv.parse_i128_maybe_prefixed("1234");
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_i128_maybe_prefixed("0xeeee");
+// assert(n == 0xeeee && ok);
+// ```
+parse_i128_maybe_prefixed :: proc(str: string) -> (value: i128, ok: bool) {
+	s := str
+	if s == "" {
+		return
+	}
+
+	neg := false
+	if len(s) > 1 {
+		switch s[0] {
+		case '-':
+			neg = true
+			s = s[1:]
+		case '+':
+			s = s[1:]
+		}
+	}
+
+
+	base: i128 = 10
+	if len(s) > 2 && s[0] == '0' {
+		switch s[1] {
+		case 'b': base =  2;  s = s[2:]
+		case 'o': base =  8;  s = s[2:]
+		case 'd': base = 10;  s = s[2:]
+		case 'z': base = 12;  s = s[2:]
+		case 'x': base = 16;  s = s[2:]
+		}
+	}
+
+
+	i := 0
+	for r in s {
+		if r == '_' {
+			i += 1
+			continue
+		}
+		v := i128(_digit_value(r))
+		if v >= base {
+			break
+		}
+		value *= base
+		value += v
+		i += 1
+	}
+	s = s[i:]
+
+	if neg {
+		value = -value
+	}
+	ok = len(s) == 0
+	return
+}
+
+parse_i128 :: proc{parse_i128_maybe_prefixed, parse_i128_of_base}
+
+// Parses an unsigned integer value from a string, in the given base, and
+// without a prefix.
+//
+// Returns ok=false if no numeric value of the appropriate base could be found,
+// or if the input string contained more than just the number.
+//
+// ```
+// n, ok := strconv.parse_u128_of_base("1234eeee", 10);
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_u128_of_base("5678eeee", 16);
+// assert(n == 0x5678eeee && ok);
+// ```
+parse_u128_of_base :: proc(str: string, base: int) -> (value: u128, ok: bool) {
+	assert(base <= 16, "base must be 1-16")
+	s := str
+	if s == "" {
+		return
+	}
+
+	if len(s) > 1 && s[0] == '+' {
+		s = s[1:]
+	}
+
+	i := 0
+	for r in s {
+		if r == '_' {
+			i += 1
+			continue
+		}
+		v := u128(_digit_value(r))
+		if v >= u128(base) {
+			break
+		}
+		value *= u128(base)
+		value += v
+		i += 1
+	}
+	s = s[i:]
+
+	ok = len(s) == 0
+	return
+}
+
+// Parses an unsigned integer value from a string in base 10, unless there's a prefix.
+//
+// Returns ok=false if a valid integer could not be found, if the value was negative,
+// or if the input string contained more than just the number.
+//
+// ```
+// n, ok := strconv.parse_u128_maybe_prefixed("1234");
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_u128_maybe_prefixed("0xeeee");
+// assert(n == 0xeeee && ok);
+// ```
+parse_u128_maybe_prefixed :: proc(str: string) -> (value: u128, ok: bool) {
+	s := str
+	if s == "" {
+		return
+	}
+
+	if len(s) > 1 && s[0] == '+' {
+		s = s[1:]
+	}
+
+
+	base := u128(10)
+	if len(s) > 2 && s[0] == '0' {
+		switch s[1] {
+		case 'b': base =  2;  s = s[2:]
+		case 'o': base =  8;  s = s[2:]
+		case 'd': base = 10;  s = s[2:]
+		case 'z': base = 12;  s = s[2:]
+		case 'x': base = 16;  s = s[2:]
+		}
+	}
+
+	i := 0
+	for r in s {
+		if r == '_' {
+			i += 1
+			continue
+		}
+		v := u128(_digit_value(r))
+		if v >= base {
+			break
+		}
+		value *= base
+		value += v
+		i += 1
+	}
+	s = s[i:]
+
+	ok = len(s) == 0
+	return
+}
+
+parse_u128 :: proc{parse_u128_maybe_prefixed, parse_u128_of_base}
+
+
+
+
+
 // Parses a 32-bit floating point number from a string.
 //
 // Returns ok=false if a base 10 float could not be found,
