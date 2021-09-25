@@ -275,11 +275,11 @@ default_style := Style{
 	},
 }
 
-@private expand_rect :: proc(rect: Rect, n: i32) -> Rect {
+expand_rect :: proc(rect: Rect, n: i32) -> Rect {
 	return Rect{rect.x - n, rect.y - n, rect.w + n * 2, rect.h + n * 2}
 }
 
-@private intersect_rects :: proc(r1, r2: Rect) -> Rect {
+intersect_rects :: proc(r1, r2: Rect) -> Rect {
 	x1 := max(r1.x, r2.x)
 	y1 := max(r1.y, r2.y)
 	x2 := min(r1.x + r1.w, r2.x + r2.w)
@@ -289,7 +289,7 @@ default_style := Style{
 	return Rect{x1, y1, x2 - x1, y2 - y1}
 }
 
-@private rect_overlaps_vec2 :: proc(r: Rect, p: Vec2) -> bool {
+rect_overlaps_vec2 :: proc(r: Rect, p: Vec2) -> bool {
 	return p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
 }
 
