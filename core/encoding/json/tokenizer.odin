@@ -43,17 +43,18 @@ Token_Kind :: enum {
 
 Tokenizer :: struct {
 	using pos:        Pos,
-	data:             []byte,
+	data:             string,
 	r:                rune, // current rune
 	w:                int,  // current rune width in bytes
 	curr_line_offset: int,
 	spec:             Specification,
 	parse_integers:   bool,
+	insert_comma: bool,
 }
 
 
 
-make_tokenizer :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> Tokenizer {
+make_tokenizer :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> Tokenizer {
 	t := Tokenizer{pos = {line=1}, data = data, spec = spec, parse_integers = parse_integers}
 	next_rune(&t)
 	if t.r == utf8.RUNE_BOM {
@@ -64,11 +65,15 @@ make_tokenizer :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_intege
 
 next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 	if t.offset >= len(t.data) {
-		return utf8.RUNE_EOF
+		t.r = utf8.RUNE_EOF
+	} else {
+		t.offset += t.w
+		t.r, t.w = utf8.decode_rune_in_string(t.data[t.offset:])
+		t.pos.column = t.offset - t.curr_line_offset
+		if t.offset >= len(t.data) {
+			t.r = utf8.RUNE_EOF
+		}
 	}
-	t.offset += t.w
-	t.r, t.w = utf8.decode_rune(t.data[t.offset:])
-	t.pos.column = t.offset - t.curr_line_offset
 	return t.r
 }
 
@@ -120,18 +125,21 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		return false
 	}
 
-	skip_whitespace :: proc(t: ^Tokenizer) -> rune {
+	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) -> rune {
 		loop: for t.offset < len(t.data) {
 			switch t.r {
 			case ' ', '\t', '\v', '\f', '\r':
 				next_rune(t)
 			case '\n':
+				if on_newline {
+					break loop
+				}
 				t.line += 1
 				t.curr_line_offset = t.offset
 				t.pos.column = 1
 				next_rune(t)
 			case:
-				if t.spec == .JSON5 {
+				if t.spec != .JSON {
 					switch t.r {
 					case 0x2028, 0x2029, 0xFEFF:
 						next_rune(t)
@@ -164,7 +172,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 	}
 
-	skip_whitespace(t)
+	skip_whitespace(t, t.insert_comma)
 
 	token.pos = t.pos
 
@@ -179,6 +187,12 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	case utf8.RUNE_EOF, '\x00':
 		token.kind = .EOF
 		err = .EOF
+		
+	case '\n':
+		t.insert_comma = false
+		token.text = ","
+		token.kind = .Comma
+		return
 
 	case 'A'..='Z', 'a'..='z', '_':
 		token.kind = .Ident
@@ -190,7 +204,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		case "false": token.kind = .False
 		case "true":  token.kind = .True
 		case:
-			if t.spec == .JSON5 {
+			if t.spec != .JSON {
 				switch str {
 				case "Infinity": token.kind = .Infinity
 				case "NaN":      token.kind = .NaN
@@ -200,7 +214,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	case '+':
 		err = .Illegal_Character
-		if t.spec != .JSON5 {
+		if t.spec == .JSON {
 			break
 		}
 		fallthrough
@@ -213,7 +227,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			// Illegal use of +/-
 			err = .Illegal_Character
 
-			if t.spec == .JSON5 {
+			if t.spec != .JSON {
 				if t.r == 'I' || t.r == 'N' {
 					skip_alphanum(t)
 				}
@@ -228,7 +242,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	case '0'..='9':
 		token.kind = t.parse_integers ? .Integer : .Float
-		if t.spec == .JSON5 { // Hexadecimal Numbers
+		if t.spec != .JSON { // Hexadecimal Numbers
 			if curr_rune == '0' && (t.r == 'x' || t.r == 'X') {
 				next_rune(t)
 				skip_hex_digits(t)
@@ -258,7 +272,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	case '.':
 		err = .Illegal_Character
-		if t.spec == .JSON5 { // Allow leading decimal point
+		if t.spec != .JSON { // Allow leading decimal point
 			skip_digits(t)
 			if t.r == 'e' || t.r == 'E' {
 				switch r := next_rune(t); r {
@@ -276,7 +290,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	case '\'':
 		err = .Illegal_Character
-		if t.spec != .JSON5 {
+		if t.spec == .JSON {
 			break
 		}
 		fallthrough
@@ -304,16 +318,25 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 
 
-	case ',': token.kind = .Comma
+	case ',': 
+		token.kind = .Comma
+		t.insert_comma = false
 	case ':': token.kind = .Colon
 	case '{': token.kind = .Open_Brace
 	case '}': token.kind = .Close_Brace
 	case '[': token.kind = .Open_Bracket
 	case ']': token.kind = .Close_Bracket
+	
+	case '=': 
+		if t.spec == .MJSON {
+			token.kind = .Colon
+		} else {
+			err = .Illegal_Character
+		}
 
 	case '/':
 		err = .Illegal_Character
-		if t.spec == .JSON5 {
+		if t.spec != .JSON {
 			switch t.r {
 			case '/':
 				// Single-line comments
@@ -339,6 +362,21 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	}
 
 	token.text = string(t.data[token.offset : t.offset])
+	
+	if t.spec == .MJSON {
+		switch token.kind {
+		case .Invalid:
+			// preserve insert_comma info
+		case .EOF:
+			t.insert_comma = false
+		case .Colon, .Comma, .Open_Brace, .Open_Bracket:
+			t.insert_comma = false
+		case .Null, .False, .True, .Infinity, .NaN, 
+		     .Ident, .Integer, .Float, .String, 
+		     .Close_Brace, .Close_Bracket:
+			t.insert_comma = true
+		}
+	}
 
 	return
 }
@@ -356,7 +394,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		if s == "" {
 			return false
 		}
-	} else if spec == .JSON5 {
+	} else if spec != .JSON {
 		if s[0] == '+' { // Allow positive sign
 			s = s[1:]
 			if s == "" {
@@ -374,7 +412,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 			s = s[1:]
 		}
 	case '.':
-		if spec == .JSON5 { // Allow leading decimal point
+		if spec != .JSON { // Allow leading decimal point
 			s = s[1:]
 		} else {
 			return false
@@ -383,7 +421,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		return false
 	}
 
-	if spec == .JSON5 {
+	if spec != .JSON {
 		if len(s) == 1 && s[0] == '.' { // Allow trailing decimal point
 			return true
 		}
@@ -424,7 +462,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 		return false
 	}
 	if s[0] != '"' || s[len(s)-1] != '"' {
-		if spec == .JSON5 {
+		if spec != .JSON {
 			if s[0] != '\'' || s[len(s)-1] != '\'' {
 				return false
 			}

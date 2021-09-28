@@ -14,6 +14,9 @@ Parser :: struct {
 }
 
 make_parser :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> Parser {
+	return make_parser_from_string(string(data), spec, parse_integers, allocator)
+}
+make_parser_from_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> Parser {
 	p: Parser
 	p.tok = make_tokenizer(data, spec, parse_integers)
 	p.spec = spec
@@ -23,11 +26,25 @@ make_parser :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers 
 	return p
 }
 
-parse :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
-	context.allocator = allocator
-	p := make_parser(data, spec, parse_integers, allocator)
 
-	if p.spec == Specification.JSON5 {
+parse :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
+	return parse_string(string(data), spec, parse_integers, allocator)
+}
+
+parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
+	context.allocator = allocator
+	p := make_parser_from_string(data, spec, parse_integers, allocator)
+
+	switch p.spec {
+	case .JSON:
+		return parse_object(&p)
+	case .JSON5:
+		return parse_value(&p)
+	case .MJSON:
+		#partial switch p.curr_token.kind {
+		case .Ident, .String:
+			return parse_object_body(&p, .EOF)
+		}
 		return parse_value(&p)
 	}
 	return parse_object(&p)
@@ -59,12 +76,34 @@ expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 	prev := p.curr_token
 	advance_token(p)
 	if prev.kind == kind {
-		return .None
+		return nil
 	}
 	return .Unexpected_Token
 }
 
 
+parse_colon :: proc(p: ^Parser) -> (err: Error) {
+	colon_err := expect_token(p, .Colon) 
+	if colon_err == nil {
+		return nil
+	}
+	return .Expected_Colon_After_Key
+}
+
+parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
+	switch p.spec {
+	case .JSON5, .MJSON:
+		if allow_token(p, .Comma) {
+			return false
+		}
+		return false
+	case .JSON:
+		if !allow_token(p, .Comma) {
+			return true
+		}
+	}
+	return false
+}
 
 parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	token := p.curr_token
@@ -102,9 +141,15 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 	case .Open_Bracket:
 		return parse_array(p)
+		
+	case .Ident:
+		if p.spec == .MJSON {
+			advance_token(p)
+			return string(token.text), nil
+		}
 
 	case:
-		if p.spec == Specification.JSON5 {
+		if p.spec != .JSON {
 			#partial switch token.kind {
 			case .Infinity:
 				inf: u64 = 0x7ff0000000000000
@@ -136,7 +181,7 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 	array: Array
 	array.allocator = p.allocator
-	defer if err != .None {
+	defer if err != nil {
 		for elem in array {
 			destroy_value(elem)
 		}
@@ -146,11 +191,8 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	for p.curr_token.kind != .Close_Bracket {
 		elem := parse_value(p) or_return
 		append(&array, elem)
-
-		// Disallow trailing commas for the time being
-		if allow_token(p, .Comma) {
-			continue
-		} else {
+		
+		if parse_comma(p) {
 			break
 		}
 	}
@@ -187,31 +229,21 @@ clone_string :: proc(s: string, allocator: mem.Allocator) -> (str: string, err: 
 
 parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator) -> (key: string, err: Error) {
 	tok := p.curr_token
-	if p.spec == Specification.JSON5 {
-		if tok.kind == .String {
-			expect_token(p, .String)
-			key = unquote_string(tok, p.spec, key_allocator) or_return
-			return
-		} else if tok.kind == .Ident {
-			expect_token(p, .Ident)
-			key = clone_string(tok.text, key_allocator) or_return
-			return
+	if p.spec != .JSON {
+		if allow_token(p, .Ident) {
+			return clone_string(tok.text, key_allocator)
 		}
 	}
-	if tok_err := expect_token(p, .String); tok_err != .None {
+	if tok_err := expect_token(p, .String); tok_err != nil {
 		err = .Expected_String_For_Object_Key
 		return
 	}
-	key = unquote_string(tok, p.spec, key_allocator) or_return
-	return
+	return unquote_string(tok, p.spec, key_allocator)
 }
 
-parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
-	expect_token(p, .Open_Brace) or_return
-
-	obj: Object
+parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, err: Error) {
 	obj.allocator = p.allocator
-	defer if err != .None {
+	defer if err != nil {
 		for key, elem in obj {
 			delete(key, p.allocator)
 			destroy_value(elem)
@@ -219,19 +251,9 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		delete(obj)
 	}
 
-	for p.curr_token.kind != .Close_Brace {
-		key: string
-		key, err = parse_object_key(p, p.allocator)
-		if err != .None {
-			delete(key, p.allocator)
-			return
-		}
-
-		if colon_err := expect_token(p, .Colon); colon_err != .None {
-			err = .Expected_Colon_After_Key
-			return
-		}
-
+	for p.curr_token.kind != end_token {
+		key := parse_object_key(p, p.allocator) or_return
+		parse_colon(p) or_return
 		elem := parse_value(p) or_return
 
 		if key in obj {
@@ -241,22 +263,17 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		}
 
 		obj[key] = elem
-
-		if p.spec == Specification.JSON5 {
-			// Allow trailing commas
-			if allow_token(p, .Comma) {
-				continue
-			}
-		} else {
-			// Disallow trailing commas
-			if allow_token(p, .Comma) {
-				continue
-			} else {
-				break
-			}
+		
+		if parse_comma(p) {
+			break
 		}
-	}
+	}	
+	return
+}
 
+parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
+	expect_token(p, .Open_Brace) or_return
+	obj := parse_object_body(p, .Close_Brace) or_return
 	expect_token(p, .Close_Brace) or_return
 	value = obj
 	return
@@ -387,7 +404,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 
 
 			case '0':
-				if spec == Specification.JSON5 {
+				if spec != .JSON {
 					b[w] = '\x00'
 					i += 1
 					w += 1
@@ -395,7 +412,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 					break loop
 				}
 			case 'v':
-				if spec == Specification.JSON5 {
+				if spec != .JSON {
 					b[w] = '\v'
 					i += 1
 					w += 1
@@ -404,7 +421,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 				}
 
 			case 'x':
-				if spec == Specification.JSON5 {
+				if spec != .JSON {
 					i -= 1 // Include the \x in the check for sanity sake
 					r := get_u2_rune(s[i:])
 					if r < 0 {

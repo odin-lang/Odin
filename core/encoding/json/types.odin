@@ -3,7 +3,7 @@ package json
 Specification :: enum {
 	JSON,
 	JSON5, // https://json5.org/
-	// MJSON, // http://bitsquid.blogspot.com/2009/09/json-configuration-data.html
+	MJSON, // https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html
 }
 
 DEFAULT_SPECIFICATION :: Specification.JSON5
