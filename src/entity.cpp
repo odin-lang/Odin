@@ -183,6 +183,7 @@ struct Entity {
 			DeferredProcedure deferred_procedure;
 			bool    is_foreign;
 			bool    is_export;
+			bool    generated_from_polymorphic;
 			ProcedureOptimizationMode optimization_mode;
 		} Procedure;
 		struct {
