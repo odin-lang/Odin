@@ -109,63 +109,61 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	token := p.curr_token
 	#partial switch token.kind {
 	case .Null:
-		value = Null{}
 		advance_token(p)
+		value = Null{}
 		return
 	case .False:
-		value = Boolean(false)
 		advance_token(p)
+		value = Boolean(false)
 		return
 	case .True:
-		value = Boolean(true)
 		advance_token(p)
+		value = Boolean(true)
 		return
 
 	case .Integer:
+		advance_token(p)
 		i, _ := strconv.parse_i64(token.text)
 		value = Integer(i)
-		advance_token(p)
 		return
 	case .Float:
+		advance_token(p)
 		f, _ := strconv.parse_f64(token.text)
 		value = Float(f)
-		advance_token(p)
 		return
-	case .String:
-		value = unquote_string(token, p.spec, p.allocator) or_return
-		advance_token(p)
-		return
-
-	case .Open_Brace:
-		return parse_object(p)
-
-	case .Open_Bracket:
-		return parse_array(p)
 		
 	case .Ident:
 		if p.spec == .MJSON {
 			advance_token(p)
 			return string(token.text), nil
 		}
+		
+	case .String:
+		advance_token(p)
+		return unquote_string(token, p.spec, p.allocator)
+
+	case .Open_Brace:
+		return parse_object(p)
+
+	case .Open_Bracket:
+		return parse_array(p)
 
 	case:
 		if p.spec != .JSON {
-			#partial switch token.kind {
-			case .Infinity:
+			switch {
+			case allow_token(p, .Infinity):
 				inf: u64 = 0x7ff0000000000000
 				if token.text[0] == '-' {
 					inf = 0xfff0000000000000
 				}
 				value = transmute(f64)inf
-				advance_token(p)
 				return
-			case .NaN:
+			case allow_token(p, .NaN):
 				nan: u64 = 0x7ff7ffffffffffff
 				if token.text[0] == '-' {
 					nan = 0xfff7ffffffffffff
 				}
 				value = transmute(f64)nan
-				advance_token(p)
 				return
 			}
 		}
