@@ -102,6 +102,13 @@ validate_value :: proc(p: ^Parser) -> bool {
 
 	case .Open_Bracket:
 		return validate_array(p)
+		
+	case .Ident:
+		if p.spec == .MJSON {
+			advance_token(p)
+			return true
+		}
+		return false
 
 	case:
 		if p.spec != .JSON {
