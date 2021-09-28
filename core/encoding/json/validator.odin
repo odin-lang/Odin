@@ -5,66 +5,64 @@ import "core:mem"
 // NOTE(bill): is_valid will not check for duplicate keys
 is_valid :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> bool {
 	p := make_parser(data, spec, parse_integers, mem.nil_allocator())
-	if p.spec == Specification.JSON5 {
+	
+	switch p.spec {
+	case .JSON:
+		return validate_object(&p)
+	case .JSON5:
+		return validate_value(&p)
+	case .MJSON:
+		#partial switch p.curr_token.kind {
+		case .Ident, .String:
+			return validate_object_body(&p, .EOF)
+		}
 		return validate_value(&p)
 	}
 	return validate_object(&p)
 }
 
 validate_object_key :: proc(p: ^Parser) -> bool {
-	tok := p.curr_token
-	if p.spec == Specification.JSON5 {
-		if tok.kind == .String {
-			expect_token(p, .String)
-			return true
-		} else if tok.kind == .Ident {
-			expect_token(p, .Ident)
+	if p.spec != .JSON {
+		if allow_token(p, .Ident) {
 			return true
 		}
 	}
 	err := expect_token(p, .String)
-	return err == Error.None
+	return err == .None
 }
-validate_object :: proc(p: ^Parser) -> bool {
-	if err := expect_token(p, .Open_Brace); err != Error.None {
-		return false
-	}
 
-	for p.curr_token.kind != .Close_Brace {
+validate_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> bool {
+	for p.curr_token.kind != end_token {
 		if !validate_object_key(p) {
 			return false
 		}
-		if colon_err := expect_token(p, .Colon); colon_err != Error.None {
+		if parse_colon(p) != nil {
 			return false
 		}
+		validate_value(p) or_return
 
-		if !validate_value(p) {
-			return false
-		}
-
-		if p.spec == Specification.JSON5 {
-			// Allow trailing commas
-			if allow_token(p, .Comma) {
-				continue
-			}
-		} else {
-			// Disallow trailing commas
-			if allow_token(p, .Comma) {
-				continue
-			} else {
-				break
-			}
+		if parse_comma(p) {
+			break
 		}
 	}
+	return true
+}
 
-	if err := expect_token(p, .Close_Brace); err != Error.None {
+validate_object :: proc(p: ^Parser) -> bool {
+	if err := expect_token(p, .Open_Brace); err != .None {
+		return false
+	}
+	
+	validate_object_body(p, .Close_Brace) or_return
+
+	if err := expect_token(p, .Close_Brace); err != .None {
 		return false
 	}
 	return true
 }
 
 validate_array :: proc(p: ^Parser) -> bool {
-	if err := expect_token(p, .Open_Bracket); err != Error.None {
+	if err := expect_token(p, .Open_Bracket); err != .None {
 		return false
 	}
 
@@ -73,15 +71,12 @@ validate_array :: proc(p: ^Parser) -> bool {
 			return false
 		}
 
-		// Disallow trailing commas for the time being
-		if allow_token(p, .Comma) {
-			continue
-		} else {
+		if parse_comma(p) {
 			break
 		}
 	}
 
-	if err := expect_token(p, .Close_Bracket); err != Error.None {
+	if err := expect_token(p, .Close_Bracket); err != .None {
 		return false
 	}
 
@@ -109,7 +104,7 @@ validate_value :: proc(p: ^Parser) -> bool {
 		return validate_array(p)
 
 	case:
-		if p.spec == Specification.JSON5 {
+		if p.spec != .JSON {
 			#partial switch token.kind {
 			case .Infinity, .NaN:
 				advance_token(p)

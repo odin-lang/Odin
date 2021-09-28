@@ -1,5 +1,6 @@
 package json
 
+import "core:fmt"
 import "core:mem"
 import "core:math"
 import "core:reflect"
@@ -48,6 +49,14 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 	}
 	
 	context.allocator = p.allocator
+	
+	if p.spec == .MJSON {
+		#partial switch p.curr_token.kind {
+		case .Ident, .String:
+			return unmarsal_object(&p, data, .EOF)
+		}
+	}
+
 	return unmarsal_value(&p, data)
 }
 
@@ -244,13 +253,13 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 
 	case .Open_Brace:
-		return unmarsal_object(p, v)
+		return unmarsal_object(p, v, .Close_Brace)
 
 	case .Open_Bracket:
 		return unmarsal_array(p, v)
 
 	case:
-		if p.spec == Specification.JSON5 {
+		if p.spec != .JSON {
 			#partial switch token.kind {
 			case .Infinity:
 				advance_token(p)
@@ -285,16 +294,18 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 unmarsal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_location) -> Token {
 	prev := p.curr_token
 	err := expect_token(p, kind)
-	assert(err == nil, "unmarsal_expect_token", loc)
+	fmt.assertf(condition = err == nil, fmt="unmarsal_expect_token: %v, got %v", args={kind, prev.kind}, loc=loc)
 	return prev
 }
 
 
 @(private)
-unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
+unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	
-	assert(expect_token(p, .Open_Brace) == nil)
+	if end_token == .Close_Brace {
+		assert(expect_token(p, .Open_Brace) == nil)
+	}
 
 	v := v
 	v = reflect.any_base(v)
@@ -306,7 +317,7 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			return UNSUPPORTED_TYPE
 		}
 	
-		struct_loop: for p.curr_token.kind != .Close_Brace {
+		struct_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
 			defer delete(key, p.allocator)
 			
@@ -347,21 +358,10 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
 				unmarsal_value(p, field) or_return
-								
-				if p.spec == Specification.JSON5 {
-					// Allow trailing commas
-					if allow_token(p, .Comma) {
-						continue struct_loop
-					}
-				} else {
-					// Disallow trailing commas
-					if allow_token(p, .Comma) {
-						continue struct_loop
-					} else {
-						break struct_loop
-					}
+					
+				if parse_comma(p) {
+					break struct_loop
 				}
-				
 				continue struct_loop
 			}
 			
@@ -384,7 +384,7 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		
 		map_backing_value := any{raw_data(elem_backing), t.value.id}
 		
-		map_loop: for p.curr_token.kind != .Close_Brace {
+		map_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
 			unmarsal_expect_token(p, .Colon)
 			
@@ -410,19 +410,9 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 
-		
-			if p.spec == Specification.JSON5 {
-				// Allow trailing commas
-				if allow_token(p, .Comma) {
-					continue map_loop
-				}
-			} else {
-				// Disallow trailing commas
-				if allow_token(p, .Comma) {
-					continue map_loop
-				} else {
-					break map_loop
-				}
+			
+			if parse_comma(p) {
+				break map_loop
 			}
 		}
 		
@@ -430,7 +420,7 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		index_type := reflect.type_info_base(t.index)
 		enum_type := index_type.variant.(reflect.Type_Info_Enum)
 	
-		enumerated_array_loop: for p.curr_token.kind != .Close_Brace {
+		enumerated_array_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
 			unmarsal_expect_token(p, .Colon)
 			defer delete(key, p.allocator)
@@ -450,19 +440,9 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			index_any := any{index_ptr, t.elem.id}
 			
 			unmarsal_value(p, index_any) or_return
-		
-			if p.spec == Specification.JSON5 {
-				// Allow trailing commas
-				if allow_token(p, .Comma) {
-					continue enumerated_array_loop
-				}
-			} else {
-				// Disallow trailing commas
-				if allow_token(p, .Comma) {
-					continue enumerated_array_loop
-				} else {
-					break enumerated_array_loop
-				}
+			
+			if parse_comma(p) {
+				break enumerated_array_loop
 			}
 		}
 
@@ -472,7 +452,9 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		return UNSUPPORTED_TYPE
 	}
 	
-	assert(expect_token(p, .Close_Brace) == nil)
+	if end_token == .Close_Brace {
+		assert(expect_token(p, .Close_Brace) == nil)
+	}
 	return
 }
 
@@ -485,10 +467,8 @@ unmarsal_count_array :: proc(p: ^Parser) -> (length: uintptr) {
 	array_length_loop: for p.curr_token.kind != .Close_Bracket {
 		_, _ = parse_value(p)
 		length += 1
-
-		if allow_token(p, .Comma) {
-			continue
-		} else {
+		
+		if parse_comma(p) {
 			break
 		}
 	}
@@ -509,9 +489,7 @@ unmarsal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			
 			unmarsal_value(p, elem) or_return
 			
-			if allow_token(p, .Comma) {
-				continue
-			} else {
+			if parse_comma(p) {
 				break
 			}	
 		}
