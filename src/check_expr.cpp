@@ -429,6 +429,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
 		poly_proc_data->proc_info  = proc_info;
+		entity->Procedure.generated_from_polymorphic = proc_info->generated_from_polymorphic;
 	}
 
 	// NOTE(bill): Check the newly generated procedure body
@@ -7965,10 +7966,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			Type *type = type_of_expr(ac->expr);
 			check_cast(c, o, type_hint);
 			if (is_type_typed(type) && are_types_identical(type, type_hint)) {
-				if (build_context.vet) {
+				if (build_context.vet_extra) {
 					error(node, "Redundant 'auto_cast' applied to expression");
-				} else {
-					// warning(node, "Redundant 'auto_cast' applied to expression");
 				}
 			}
 
