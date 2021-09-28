@@ -1774,7 +1774,7 @@ void print_show_help(String const arg0, String const &command) {
 	if (check) {
 		print_usage_line(1, "-collection:<name>=<filepath>");
 		print_usage_line(2, "Defines a library collection used for imports");
-		print_usage_line(2, "Example: -collection:shared:dir/to/shared");
+		print_usage_line(2, "Example: -collection:shared=dir/to/shared");
 		print_usage_line(2, "Usage in Code:");
 		print_usage_line(3, "import \"shared:foo\"");
 		print_usage_line(0, "");
