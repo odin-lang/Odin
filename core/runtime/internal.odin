@@ -682,7 +682,7 @@ extendhfsf2 :: proc "c" (value: u16) -> f32 {
 
 
 @(link_name="__floattidf")
-floattidf :: proc(a: i128) -> f64 {
+floattidf :: proc "c" (a: i128) -> f64 {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -692,7 +692,7 @@ floattidf :: proc(a: i128) -> f64 {
 	s := a >> (N-1)
 	a = (a ~ s) - s
 	sd: = N - intrinsics.count_leading_zeros(a)  // number of significant digits
-	e := u32(sd - 1)        // exponent
+	e := i32(sd - 1)        // exponent
 	if sd > DBL_MANT_DIG {
 		switch sd {
 		case DBL_MANT_DIG + 1:
@@ -701,7 +701,7 @@ floattidf :: proc(a: i128) -> f64 {
 			// okay
 		case:
 			a = i128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
-				i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
+			    i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
 		}
 
 		a |= i128((a & 4) != 0)
@@ -713,19 +713,19 @@ floattidf :: proc(a: i128) -> f64 {
 			e += 1
 		}
 	} else {
-		a <<= u128(DBL_MANT_DIG - sd)
+		a <<= u128(DBL_MANT_DIG - sd) & 127
 	}
 	fb: [2]u32
-	fb[0] = (u32(s) & 0x80000000) |           // sign
-	        ((e + 1023) << 20)    |           // exponent
+	fb[1] = (u32(s) & 0x80000000) |          // sign
+	        (u32(e + 1023) << 20) |          // exponent
 	        u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
-	fb[1] = u32(a)                           // mantissa-low
+	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
 
 
 @(link_name="__floattidf_unsigned")
-floattidf_unsigned :: proc(a: u128) -> f64 {
+floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -733,7 +733,7 @@ floattidf_unsigned :: proc(a: u128) -> f64 {
 	a := a
 	N :: size_of(u128) * 8
 	sd: = N - intrinsics.count_leading_zeros(a)  // number of significant digits
-	e := u32(sd - 1)        // exponent
+	e := i32(sd - 1)        // exponent
 	if sd > DBL_MANT_DIG {
 		switch sd {
 		case DBL_MANT_DIG + 1:
@@ -757,23 +757,23 @@ floattidf_unsigned :: proc(a: u128) -> f64 {
 		a <<= u128(DBL_MANT_DIG - sd)
 	}
 	fb: [2]u32
-	fb[0] = (0) |                             // sign
-	        ((e + 1023) << 20) |              // exponent
+	fb[1] = (0) |                            // sign
+	        u32((e + 1023) << 20) |          // exponent
 	        u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
-	fb[1] = u32(a)                           // mantissa-low
+	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
 
 
 
 @(link_name="__fixunsdfti")
-fixunsdfti :: proc(a: f64) -> u128 {
+fixunsdfti :: #force_no_inline proc "c" (a: f64) -> u128 {
 	x := u64(a)
 	return u128(x)
 }
 
 @(link_name="__fixunsdfdi")
-fixunsdfdi :: proc(a: f64) -> i128 {
+fixunsdfdi :: #force_no_inline proc "c" (a: f64) -> i128 {
 	x := i64(a)
 	return i128(x)
 }
