@@ -35,11 +35,12 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 	if !reflect.is_pointer(ti) || ti.id == rawptr {
 		return .Non_Pointer_Parameter
 	}
+	PARSE_INTEGERS :: true
 	
-	if !is_valid(data, spec, true) {
+	if !is_valid(data, spec, PARSE_INTEGERS) {
 		return .Invalid_Data
 	}
-	p := make_parser(data, spec, true, allocator)
+	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
 	
 	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}
 	if v.data == nil {
@@ -169,7 +170,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		if assign_float(v, i) {
 			return
 		}
-		return
+		return UNSUPPORTED_TYPE
 	case .Float:
 		advance_token(p)
 		f, _ := strconv.parse_f64(token.text)
@@ -276,8 +277,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	}
 
 	advance_token(p)
-	return
-
+	return UNSUPPORTED_TYPE
 }
 
 
@@ -344,11 +344,10 @@ unmarsal_object :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 				type := fields[use_field_idx].type
 				name := fields[use_field_idx].name
 				
-
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
 				unmarsal_value(p, field) or_return
-				
+								
 				if p.spec == Specification.JSON5 {
 					// Allow trailing commas
 					if allow_token(p, .Comma) {
