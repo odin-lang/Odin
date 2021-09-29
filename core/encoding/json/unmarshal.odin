@@ -467,7 +467,6 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 		}
 
 		return nil
-	
 	case:
 		return UNSUPPORTED_TYPE
 	}
@@ -560,6 +559,21 @@ unmarsal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		}
 		
 		return assign_array(p, v.data, t.elem, length)
+		
+	case reflect.Type_Info_Complex:
+		// NOTE(bill): Allow lengths which are less than the dst array
+		if int(length) > 2 {
+			return UNSUPPORTED_TYPE
+		}
+	
+		switch ti.id {
+		case complex32:  return assign_array(p, v.data, type_info_of(f16), 2)
+		case complex64:  return assign_array(p, v.data, type_info_of(f32), 2)
+		case complex128: return assign_array(p, v.data, type_info_of(f64), 2)
+		}
+		
+		return UNSUPPORTED_TYPE
+		
 	}
 		
 	return UNSUPPORTED_TYPE
