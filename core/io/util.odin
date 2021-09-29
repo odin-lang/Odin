@@ -2,6 +2,7 @@ package io
 
 import "core:mem"
 import "core:strconv"
+import "core:unicode/utf8"
 
 
 read_ptr :: proc(r: Reader, p: rawptr, byte_size: int) -> (n: int, err: Error) {
@@ -37,6 +38,158 @@ write_uint :: proc(w: Writer, i: uint, base: int = 10) -> (n: int, err: Error) {
 write_int :: proc(w: Writer, i: int, base: int = 10) -> (n: int, err: Error) {
 	return write_i64(w, i64(i), base)
 }
+
+
+
+@(private="file")
+DIGITS_LOWER := "0123456789abcdefx"
+
+@(private="file")
+n_write_byte :: proc(w: Writer, b: byte, bytes_processed: ^int) -> Error {
+	err := write_byte(w, b)
+	if err == nil {
+		bytes_processed^ += 1
+	}
+	return err
+}
+
+n_wrapper :: proc(n: int, err: Error, bytes_processed: ^int) -> Error {
+	bytes_processed^ += n
+	return err
+}
+
+
+write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true) -> (n: int, err: Error) {
+	if write_quote {
+		n_write_byte(w, '\'', &n) or_return
+	}
+	switch r {
+	case '\a': n_wrapper(write_string(w, `\a"`), &n) or_return
+	case '\b': n_wrapper(write_string(w, `\b"`), &n) or_return
+	case '\e': n_wrapper(write_string(w, `\e"`), &n) or_return
+	case '\f': n_wrapper(write_string(w, `\f"`), &n) or_return
+	case '\n': n_wrapper(write_string(w, `\n"`), &n) or_return
+	case '\r': n_wrapper(write_string(w, `\r"`), &n) or_return
+	case '\t': n_wrapper(write_string(w, `\t"`), &n) or_return
+	case '\v': n_wrapper(write_string(w, `\v"`), &n) or_return
+	case:
+		if r < 32 {
+			n_wrapper(write_string(w, `\x`), &n) or_return
+			
+			buf: [2]byte
+			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
+			switch len(s) {
+			case 0: n_wrapper(write_string(w, "00"), &n) or_return
+			case 1: n_write_byte(w, '0', &n)             or_return
+			case 2: n_wrapper(write_string(w, s), &n)    or_return
+			}
+		} else {
+			n_wrapper(write_rune(w, r), &n) or_return
+		}
+
+	}
+	if write_quote {
+		n_write_byte(w, '\'', &n) or_return
+	}
+	return
+}
+
+write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false) -> (n: int, err: Error) {
+	is_printable :: proc(r: rune) -> bool {
+		if r <= 0xff {
+			switch r {
+			case 0x20..=0x7e:
+				return true
+			case 0xa1..=0xff: // ¡ through ÿ except for the soft hyphen
+				return r != 0xad //
+			}
+		}
+
+		// TODO(bill): A proper unicode library will be needed!
+		return false
+	}
+	
+	if html_safe {
+		switch r {
+		case '<', '>', '&':
+			n_write_byte(w, '\\', &n) or_return
+			n_write_byte(w, 'u', &n)  or_return
+			for s := 12; s >= 0; s -= 4 {
+				n_write_byte(w, DIGITS_LOWER[r>>uint(s) & 0xf], &n) or_return
+			}
+			return
+		}
+	}
+
+	if r == rune(quote) || r == '\\' {
+		n_write_byte(w, '\\', &n)    or_return
+		n_write_byte(w, byte(r), &n) or_return
+		return
+	} else if is_printable(r) {
+		n_wrapper(write_encoded_rune(w, r, false), &n) or_return
+		return
+	}
+	switch r {
+	case '\a': n_wrapper(write_string(w, `\a`), &n) or_return
+	case '\b': n_wrapper(write_string(w, `\b`), &n) or_return
+	case '\e': n_wrapper(write_string(w, `\e`), &n) or_return
+	case '\f': n_wrapper(write_string(w, `\f`), &n) or_return
+	case '\n': n_wrapper(write_string(w, `\n`), &n) or_return
+	case '\r': n_wrapper(write_string(w, `\r`), &n) or_return
+	case '\t': n_wrapper(write_string(w, `\t`), &n) or_return
+	case '\v': n_wrapper(write_string(w, `\v`), &n) or_return
+	case:
+		switch c := r; {
+		case c < ' ':
+			n_write_byte(w, '\\', &n)                      or_return
+			n_write_byte(w, 'x', &n)                       or_return
+			n_write_byte(w, DIGITS_LOWER[byte(c)>>4], &n)  or_return
+			n_write_byte(w, DIGITS_LOWER[byte(c)&0xf], &n) or_return
+
+		case c > utf8.MAX_RUNE:
+			c = 0xfffd
+			fallthrough
+		case c < 0x10000:
+			n_write_byte(w, '\\', &n) or_return
+			n_write_byte(w, 'u', &n)  or_return
+			for s := 12; s >= 0; s -= 4 {
+				n_write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
+			}
+		case:
+			n_write_byte(w, '\\', &n) or_return
+			n_write_byte(w, 'U', &n)  or_return
+			for s := 28; s >= 0; s -= 4 {
+				n_write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
+			}
+		}
+	}
+	return
+}
+
+write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"') -> (n: int, err: Error) {
+	n_write_byte(w, quote, &n) or_return
+	for width, s := 0, str; len(s) > 0; s = s[width:] {
+		r := rune(s[0])
+		width = 1
+		if r >= utf8.RUNE_SELF {
+			r, width = utf8.decode_rune_in_string(s)
+		}
+		if width == 1 && r == utf8.RUNE_ERROR {
+			n_write_byte(w, '\\', &n)                   or_return
+			n_write_byte(w, 'x', &n)                    or_return
+			n_write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
+			n_write_byte(w, DIGITS_LOWER[s[0]&0xf], &n) or_return
+			continue
+		}
+
+		n_wrapper(write_escaped_rune(w, r, quote), &n) or_return
+
+	}
+	n_write_byte(w, quote, &n) or_return
+	return
+}
+
+
 
 Tee_Reader :: struct {
 	r: Reader,
