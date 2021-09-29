@@ -402,6 +402,25 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 			}
 		}
 	}
+	
+	if spec != .JSON && len(s) >= 2 {
+		// Allow for hexadecimal strings
+		if s[:2] == "0x" || s[:2] == "0X" {
+			s = s[2:]
+			if len(s) == 0 {
+				return false
+			}
+			hexadecimal_loop: for len(s) > 0 {
+				switch s[0] {
+				case '0'..='9', 'A'..='Z', 'a'..='z':
+					s = s[1:]
+				case:
+					break hexadecimal_loop
+				}
+			}
+			return len(s) == 0
+		}
+	}
 
 	switch s[0] {
 	case '0':
@@ -461,14 +480,16 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 	if s[0] != s[len(s)-1] {
 		return false
 	}
-	if s[0] != '"' || s[len(s)-1] != '"' {
+	switch quote {
+	case '"':
+		// okay
+	case '\'':
 		if spec != .JSON {
-			if s[0] != '\'' || s[len(s)-1] != '\'' {
-				return false
-			}
-		} else {
 			return false
 		}
+		// okay
+	case:
+		return false
 	}
 	s = s[1 : len(s)-1]
 
@@ -484,6 +505,19 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 			switch s[i] {
 			case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
 				i += 1
+				
+			case '\r':
+				if spec != .JSON && i+1 < len(s) && s[i+1] == '\n' {
+					i += 2
+				} else {
+					return false
+				}
+			case '\n':
+				if spec != .JSON {
+					i += 1
+				} else {
+					return false
+				}
 			case 'u':
 				if i >= len(s) {
 					return false

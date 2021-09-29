@@ -1,10 +1,43 @@
 package json
 
+/*
+	JSON 
+		strict JSON
+	JSON5 
+		pure superset of JSON and valid JavaScript
+		https://json5.org/
+		
+		* Object keys may be an ECMAScript 5.1 IdentifierName.
+		* Objects may have a single trailing comma.
+		* Arrays may have a single trailing comma.
+		* Strings may be single quoted.
+		* Strings may span multiple lines by escaping new line characters.
+		* Strings may include character escapes
+		* Numbers may be hexadecimal.
+		* Numbers may have a leading or trailing decimal point.
+		* Numbers may be IEEE 754 positive infinity, negative infinity, and NaN.
+		* Numbers may begin with an explicit plus sign.
+		* Single and multi-line comments are allowed.
+		* Additional white space characters are allowed.
+		
+	MJSON
+		pure superset of JSON5, may not be valid JavaScript
+		https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html
+		
+		* All the same features as JSON5 plus extras.
+		* Assume an object definition at the root level (no need to surround entire file with { } ).
+		* Commas are optional, using comma insertion rules with newlines.
+		* Quotes around object keys are optional if the keys are valid identifiers.
+		* : can be replaced with =
+*/
 Specification :: enum {
 	JSON,
 	JSON5, // https://json5.org/
 	MJSON, // https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html
 }
+
+
+
 
 DEFAULT_SPECIFICATION :: Specification.JSON5
 
