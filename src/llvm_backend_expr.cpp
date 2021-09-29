@@ -1272,6 +1272,18 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
+	if (is_type_multi_pointer(src) && is_type_uintptr(dst)) {
+		lbValue res = {};
+		res.type = t;
+		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
+		return res;
+	}
+	if (is_type_uintptr(src) && is_type_multi_pointer(dst)) {
+		lbValue res = {};
+		res.type = t;
+		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+		return res;
+	}
 
 	#if 1
 	if (is_type_union(dst)) {
