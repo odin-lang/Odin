@@ -1,24 +1,22 @@
 package io
 
-import "core:mem"
 import "core:strconv"
 import "core:unicode/utf8"
 
-
 read_ptr :: proc(r: Reader, p: rawptr, byte_size: int) -> (n: int, err: Error) {
-	return read(r, mem.byte_slice(p, byte_size))
+	return read(r, ([^]byte)(p)[:byte_size])
 }
 
 write_ptr :: proc(w: Writer, p: rawptr, byte_size: int) -> (n: int, err: Error) {
-	return write(w, mem.byte_slice(p, byte_size))
+	return write(w, ([^]byte)(p)[:byte_size])
 }
 
 read_ptr_at :: proc(r: Reader_At, p: rawptr, byte_size: int, offset: i64) -> (n: int, err: Error) {
-	return read_at(r, mem.byte_slice(p, byte_size), offset)
+	return read_at(r, ([^]byte)(p)[:byte_size], offset)
 }
 
 write_ptr_at :: proc(w: Writer_At, p: rawptr, byte_size: int, offset: i64) -> (n: int, err: Error) {
-	return write_at(w, mem.byte_slice(p, byte_size), offset)
+	return write_at(w, ([^]byte)(p)[:byte_size], offset)
 }
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10) -> (n: int, err: Error) {
@@ -38,6 +36,18 @@ write_uint :: proc(w: Writer, i: uint, base: int = 10) -> (n: int, err: Error) {
 write_int :: proc(w: Writer, i: int, base: int = 10) -> (n: int, err: Error) {
 	return write_i64(w, i64(i), base)
 }
+
+write_u128 :: proc(w: Writer, i: u128, base: int = 10) -> (n: int, err: Error) {
+	buf: [32]byte
+	s := strconv.append_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
+	return write_string(w, s)
+}
+write_i128 :: proc(w: Writer, i: i128, base: int = 10) -> (n: int, err: Error) {
+	buf: [32]byte
+	s := strconv.append_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
+	return write_string(w, s)
+}
+
 
 
 
