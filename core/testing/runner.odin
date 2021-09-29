@@ -18,7 +18,7 @@ end_t :: proc(t: ^T) {
 
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	stream := os.stream_from_handle(os.stdout)
-	w, _ := io.to_writer(stream)
+	w := io.to_writer(stream)
 
 	t := &T{}
 	t.w = w
