@@ -109,14 +109,12 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		io.write_byte(w, '"')                  or_return
 
 	case runtime.Type_Info_Float:
-		val: f64
 		switch f in a {
-		case f16: val = f64(f)
-		case f32: val = f64(f)
-		case f64: val = f64(f)
+		case f16: io.write_f16(w, f) or_return
+		case f32: io.write_f32(w, f) or_return
+		case f64: io.write_f64(w, f) or_return
+		case: return .Unsupported_Type
 		}
-		
-		write_f64(w, val, ti.size)
 
 	case runtime.Type_Info_Complex:
 		r, i: f64
@@ -124,13 +122,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		case complex32:  r, i = f64(real(z)), f64(imag(z))
 		case complex64:  r, i = f64(real(z)), f64(imag(z))
 		case complex128: r, i = f64(real(z)), f64(imag(z))
+		case: return .Unsupported_Type
 		}
 	
-		io.write_byte(w, '[')      or_return
-		write_f64(w, r, ti.size/2) or_return
-		io.write_string(w, ", ")   or_return
-		write_f64(w, i, ti.size/2) or_return
-		io.write_byte(w, ']')      or_return
+		io.write_byte(w, '[')    or_return
+		io.write_f64(w, r)       or_return
+		io.write_string(w, ", ") or_return
+		io.write_f64(w, i)       or_return
+		io.write_byte(w, ']')    or_return
 
 	case runtime.Type_Info_Quaternion:
 		return .Unsupported_Type
