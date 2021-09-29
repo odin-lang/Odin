@@ -7,8 +7,6 @@ import bufio          "core:bufio"
 import bytes          "core:bytes"
 import c              "core:c"
 import libc           "core:c/libc"
-import c_tokenizer    "core:c/frontend/tokenizer"
-import c_preprocessor "core:c/frontend/preprocessor"
 import compress       "core:compress"
 import gzip           "core:compress/gzip"
 import zlib           "core:compress/zlib"
@@ -56,18 +54,5 @@ import time           "core:time"
 import unicode        "core:unicode"
 import utf8           "core:unicode/utf8"
 import utf16          "core:unicode/utf16"
-
-
-import glfw   "vendor:glfw"
-import gl     "vendor:OpenGL"
-import rl     "vendor:raylib"
-import PM     "vendor:portmidi"
-import SDL    "vendor:sdl2"
-import IMG    "vendor:sdl2/image"
-import SDLNet "vendor:sdl2/net"
-import MIX    "vendor:sdl2/mixer"
-import TTF    "vendor:sdl2/ttf"
-import vk     "vendor:vulkan"
-
 
 main :: proc(){}
