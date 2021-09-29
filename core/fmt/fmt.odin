@@ -63,24 +63,24 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 
 
 fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
-	w, _ := io.to_writer(os.stream_from_handle(fd))
+	w := io.to_writer(os.stream_from_handle(fd))
 	return wprint(w=w, args=args, sep=sep)
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
-	w, _ := io.to_writer(os.stream_from_handle(fd))
+	w := io.to_writer(os.stream_from_handle(fd))
 	return wprintln(w=w, args=args, sep=sep)
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	w, _ := io.to_writer(os.stream_from_handle(fd))
+	w := io.to_writer(os.stream_from_handle(fd))
 	return wprintf(w, fmt, ..args)
 }
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> int {
-	w, _ := io.to_writer(os.stream_from_handle(fd))
+	w := io.to_writer(os.stream_from_handle(fd))
 	return wprint_type(w, info)
 }
 fprint_typeid :: proc(fd: os.Handle, id: typeid) -> int {
-	w, _ := io.to_writer(os.stream_from_handle(fd))
+	w := io.to_writer(os.stream_from_handle(fd))
 	return wprint_typeid(w, id)
 }
 

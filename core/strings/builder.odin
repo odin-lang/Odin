@@ -80,8 +80,7 @@ to_stream :: proc(b: ^Builder) -> io.Stream {
 	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b}
 }
 to_writer :: proc(b: ^Builder) -> io.Writer {
-	w, _ := io.to_writer(to_stream(b))
-	return w
+	return io.to_writer(to_stream(b))
 }
 
 
