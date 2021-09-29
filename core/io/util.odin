@@ -47,6 +47,54 @@ write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) ->
 	s := strconv.append_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
+write_f16 :: proc(w: Writer, val: f16, n_written: ^int = nil) -> (n: int, err: Error) {
+	buf: [386]byte
+
+	str := strconv.append_float(buf[1:], f64(val), 'f', 2*size_of(val), 8*size_of(val))
+	s := buf[:len(str)+1]
+	if s[1] == '+' || s[1] == '-' {
+		s = s[1:]
+	} else {
+		s[0] = '+'
+	}
+	if s[0] == '+' {
+		s = s[1:]
+	}
+
+	return write_string(w, string(s), n_written)
+}
+write_f32 :: proc(w: Writer, val: f32, n_written: ^int = nil) -> (n: int, err: Error) {
+	buf: [386]byte
+
+	str := strconv.append_float(buf[1:], f64(val), 'f', 2*size_of(val), 8*size_of(val))
+	s := buf[:len(str)+1]
+	if s[1] == '+' || s[1] == '-' {
+		s = s[1:]
+	} else {
+		s[0] = '+'
+	}
+	if s[0] == '+' {
+		s = s[1:]
+	}
+
+	return write_string(w, string(s), n_written)
+}	
+write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: Error) {
+	buf: [386]byte
+
+	str := strconv.append_float(buf[1:], val, 'f', 2*size_of(val), 8*size_of(val))
+	s := buf[:len(str)+1]
+	if s[1] == '+' || s[1] == '-' {
+		s = s[1:]
+	} else {
+		s[0] = '+'
+	}
+	if s[0] == '+' {
+		s = s[1:]
+	}
+
+	return write_string(w, string(s), n_written)
+}	
 
 
 
