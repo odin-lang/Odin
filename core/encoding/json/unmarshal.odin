@@ -120,18 +120,27 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	return true
 }
 @(private)
-assign_float :: proc(val: any, i: $T) -> bool {
+assign_float :: proc(val: any, f: $T) -> bool {
 	v := reflect.any_core(val)
 	switch dst in &v {
-	case f16:     dst = f16  (i)
-	case f16le:   dst = f16le(i)
-	case f16be:   dst = f16be(i)
-	case f32:     dst = f32  (i)
-	case f32le:   dst = f32le(i)
-	case f32be:   dst = f32be(i)
-	case f64:     dst = f64  (i)
-	case f64le:   dst = f64le(i)
-	case f64be:   dst = f64be(i)
+	case f16:     dst = f16  (f)
+	case f16le:   dst = f16le(f)
+	case f16be:   dst = f16be(f)
+	case f32:     dst = f32  (f)
+	case f32le:   dst = f32le(f)
+	case f32be:   dst = f32be(f)
+	case f64:     dst = f64  (f)
+	case f64le:   dst = f64le(f)
+	case f64be:   dst = f64be(f)
+	
+	case complex32:  dst = complex(f16(f), 0)
+	case complex64:  dst = complex(f32(f), 0)
+	case complex128: dst = complex(f64(f), 0)
+	
+	case quaternion64:  dst = quaternion(f16(f), 0, 0, 0)
+	case quaternion128: dst = quaternion(f32(f), 0, 0, 0)
+	case quaternion256: dst = quaternion(f64(f), 0, 0, 0)
+	
 	case: return false
 	}
 	return true
