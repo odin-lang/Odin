@@ -155,7 +155,6 @@ unmarsal_string :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Inf
 		}
 		return true
 	}
-	defer delete(str, p.allocator)
 	
 	#partial switch variant in ti.variant {
 	case reflect.Type_Info_Enum:
@@ -261,6 +260,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		if unmarsal_string(p, any{v.data, ti.id}, str, ti) {
 			return nil
 		}
+		delete(str, p.allocator)
 		return UNSUPPORTED_TYPE
 
 
