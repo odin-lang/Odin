@@ -3,9 +3,7 @@ package odin_printer
 import "core:odin/ast"
 import "core:odin/tokenizer"
 import "core:strings"
-import "core:runtime"
 import "core:fmt"
-import "core:unicode/utf8"
 import "core:mem"
 
 Type_Enum :: enum {Line_Comment, Value_Decl, Switch_Stmt, Struct, Assign, Call, Enum, If, For, Proc_Lit}

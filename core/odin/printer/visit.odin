@@ -3,10 +3,7 @@ package odin_printer
 import "core:odin/ast"
 import "core:odin/tokenizer"
 import "core:strings"
-import "core:runtime"
 import "core:fmt"
-import "core:unicode/utf8"
-import "core:mem"
 import "core:sort"
 
 //right now the attribute order is not linearly parsed(bug?)
