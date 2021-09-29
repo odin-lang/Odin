@@ -17,8 +17,6 @@ Marshal_Error :: union {
 	io.Error,
 }
 
-
-
 marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.make_builder(allocator)
 	defer if err != nil || data == nil {
