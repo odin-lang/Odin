@@ -6,7 +6,7 @@ all:
 	ar rcs ../lib/stb_image_resize.a stb_image_resize.o
 	ar rcs ../lib/stb_truetype.a     stb_truetype.o
 	ar rcs ../lib/stb_rect_pack.a    stb_rect_pack.o
-	ar rcs ../lib/stb_vorbis_pack.a  stb_vorbis_pack.o
+	#ar rcs ../lib/stb_vorbis_pack.a  stb_vorbis_pack.o
 	#gcc -fPIC -shared -Wl,-soname=stb_image.so         -o ../lib/stb_image.so        stb_image.o
 	#gcc -fPIC -shared -Wl,-soname=stb_image_write.so   -o ../lib/stb_image_write.so  stb_image_write.o
 	#gcc -fPIC -shared -Wl,-soname=stb_image_resize.so  -o ../lib/stb_image_resize.so stb_image_resize.o

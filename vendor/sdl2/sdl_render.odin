@@ -93,8 +93,8 @@ foreign lib {
 	LockTextureToSurface         :: proc(texture:  ^Texture, rect: ^Rect, surface: ^^Surface) -> c.int ---
 	UnlockTexture                :: proc(texture:  ^Texture) ---
 	RenderTargetSupported        :: proc(renderer: ^PixelFormatEnum) -> bool ---
-	SetRenderTarget              :: proc(renderer: ^PixelFormatEnum, texture: ^Texture) -> c.int ---
-	GetRenderTarget              :: proc(renderer: ^PixelFormatEnum) -> ^Texture ---
+	SetRenderTarget              :: proc(renderer: ^Renderer, texture: ^Texture) -> c.int ---
+	GetRenderTarget              :: proc(renderer: ^Renderer) -> ^Texture ---
 	RenderSetLogicalSize         :: proc(renderer: ^Renderer, w, h: c.int) -> c.int ---
 	RenderGetLogicalSize         :: proc(renderer: ^Renderer, w, h: ^c.int) ---
 	RenderSetIntegerScale        :: proc(renderer: ^Renderer, enable: bool) -> c.int ---
