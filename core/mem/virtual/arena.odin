@@ -1,6 +1,7 @@
 package mem_virtual
 
 import "core:mem"
+import sync "core:sync/sync2"
 
 Arena :: struct {
 	curr_block:      ^Memory_Block,
@@ -8,6 +9,9 @@ Arena :: struct {
 	total_allocated: int,
 	
 	minimum_block_size: int,
+
+	ignore_mutex: bool,	
+	mutex: sync.Mutex,
 }
 
 DEFAULT_MINIMUM_BLOCK_SIZE :: 8*1024*1024
@@ -25,6 +29,11 @@ arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int) -> (data: []by
 	}
 	
 	assert(mem.is_power_of_two(uintptr(alignment)))
+	
+	mutex := &arena.mutex
+	if !arena.ignore_mutex {
+		sync.mutex_lock(mutex)
+	}
 	
 	size := 0
 	if arena.curr_block != nil {
@@ -52,6 +61,10 @@ arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int) -> (data: []by
 	curr_block.used += size
 	assert(curr_block.used <= curr_block.size)
 	arena.total_used += size
+	
+	if !arena.ignore_mutex {
+		sync.mutex_unlock(mutex)
+	}
 	
 	return ptr[:min_size], nil
 }
