@@ -75,15 +75,13 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	w := io.to_writer(os.stream_from_handle(fd))
 	return wprintf(w, fmt, ..args)
 }
-fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> int {
+fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> (n: int, err: io.Error) {
 	w := io.to_writer(os.stream_from_handle(fd))
-	n, _ := wprint_type(w, info)
-	return n
+	return wprint_type(w, info)
 }
-fprint_typeid :: proc(fd: os.Handle, id: typeid) -> int {
+fprint_typeid :: proc(fd: os.Handle, id: typeid) -> (n: int, err: io.Error) {
 	w := io.to_writer(os.stream_from_handle(fd))
-	n, _ := wprint_typeid(w, id)
-	return n
+	return wprint_typeid(w, id)
 }
 
 // print* procedures return the number of bytes written
