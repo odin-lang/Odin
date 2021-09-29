@@ -3,7 +3,7 @@ package mem_virtual
 import "core:mem"
 import sync "core:sync/sync2"
 
-Arena :: struct {
+Growing_Arena :: struct {
 	curr_block:      ^Memory_Block,
 	total_used:      int,
 	total_allocated: int,
@@ -17,8 +17,8 @@ Arena :: struct {
 DEFAULT_MINIMUM_BLOCK_SIZE :: 8*1024*1024
 DEFAULT_PAGE_SIZE := 4096
 
-arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int) -> (data: []byte, err: mem.Allocator_Error) {
-	align_forward_offset :: proc(arena: ^Arena, alignment: int) -> int #no_bounds_check {
+growing_arena_alloc :: proc(arena: ^Growing_Arena, min_size: int, alignment: int) -> (data: []byte, err: mem.Allocator_Error) {
+	align_forward_offset :: proc(arena: ^Growing_Arena, alignment: int) -> int #no_bounds_check {
 		alignment_offset := 0
 		ptr := uintptr(arena.curr_block.base[arena.curr_block.used:])
 		mask := uintptr(alignment-1)
@@ -69,7 +69,8 @@ arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int) -> (data: []by
 	return ptr[:min_size], nil
 }
 
-arena_free_all :: proc(arena: ^Arena) {
+growing_arena_free_all :: proc(arena: ^Growing_Arena) {
+	mutex := &arena.mutex
 	if !arena.ignore_mutex {
 		sync.mutex_lock(mutex)
 	}
@@ -84,27 +85,27 @@ arena_free_all :: proc(arena: ^Arena) {
 	}
 }
 
-arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
-	return mem.Allocator{arena_allocator_proc, arena}
+growing_arena_allocator :: proc(arena: ^Growing_Arena) -> mem.Allocator {
+	return mem.Allocator{growing_arena_allocator_proc, arena}
 }
 
-arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
+growing_arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
-	arena := (^Arena)(allocator_data)
+	arena := (^Growing_Arena)(allocator_data)
 	
 	switch mode {
 	case .Alloc:
-		return arena_alloc(arena, size, alignment)
+		return growing_arena_alloc(arena, size, alignment)
 	case .Free:
 		err = .Mode_Not_Implemented
 		return
 	case .Free_All:
-		arena_free_all(arena)
+		growing_arena_free_all(arena)
 		return
 	case .Resize:
-		return mem.default_resize_bytes_align(mem.byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena))
+		return mem.default_resize_bytes_align(mem.byte_slice(old_memory, old_size), size, alignment, growing_arena_allocator(arena), location)
 		
 	case .Query_Features, .Query_Info:
 		err = .Mode_Not_Implemented
