@@ -166,7 +166,8 @@ write_quoted_rune :: proc(w: io.Writer, r: rune) -> (n: int) {
 		n += _write_byte(w, DIGITS_LOWER[buf[0]>>4])
 		n += _write_byte(w, DIGITS_LOWER[buf[0]&0xf])
 	} else {
-		n += write_escaped_rune(w, r, quote)
+		i, _ := io.write_escaped_rune(w, r, quote)
+		n += i
 	}
 	n += _write_byte(w, quote)
 	return
@@ -216,11 +217,13 @@ write_quoted_string :: proc{
 	write_quoted_string_writer,
 }
 
+@(deprecated="prefer io.write_quoted_string")
 write_quoted_string_builder :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
 	n, _ = io.write_quoted_string(to_writer(b), str, quote)
 	return
 }
 
+@(deprecated="prefer io.write_quoted_string")
 write_quoted_string_writer :: proc(w: io.Writer, str: string, quote: byte = '"') -> (n: int) {
 	n, _ = io.write_quoted_string(w, str, quote)
 	return	
@@ -231,11 +234,13 @@ write_encoded_rune :: proc{
 	write_encoded_rune_writer,
 }
 
+@(deprecated="prefer io.write_encoded_rune")
 write_encoded_rune_builder :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
 	return
 
 }
+@(deprecated="prefer io.write_encoded_rune")
 write_encoded_rune_writer :: proc(w: io.Writer, r: rune, write_quote := true) -> (n: int) {
 	n, _ = io.write_encoded_rune(w, r, write_quote)
 	return
@@ -247,11 +252,13 @@ write_escaped_rune :: proc{
 	write_escaped_rune_writer,
 }
 
+@(deprecated="prefer io.write_escaped_rune")
 write_escaped_rune_builder :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
 	return
 }
 
+@(deprecated="prefer io.write_escaped_rune")
 write_escaped_rune_writer :: proc(w: io.Writer, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	n, _ = io.write_escaped_rune(w, r, quote, html_safe)
 	return

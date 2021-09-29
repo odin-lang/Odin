@@ -77,11 +77,13 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 }
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> int {
 	w := io.to_writer(os.stream_from_handle(fd))
-	return wprint_type(w, info)
+	n, _ := wprint_type(w, info)
+	return n
 }
 fprint_typeid :: proc(fd: os.Handle, id: typeid) -> int {
 	w := io.to_writer(os.stream_from_handle(fd))
-	return wprint_typeid(w, id)
+	n, _ := wprint_typeid(w, id)
+	return n
 }
 
 // print* procedures return the number of bytes written
@@ -526,15 +528,15 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	return int(size1 - size0)
 }
 
-wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info) -> int {
-	n := reflect.write_type(w, info)
+wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info) -> (int, io.Error) {
+	n, err := reflect.write_type(w, info)
 	io.flush(auto_cast w)
-	return n
+	return n, err
 }
-wprint_typeid :: proc(w: io.Writer, id: typeid) -> int {
-	n := reflect.write_type(w, type_info_of(id))
+wprint_typeid :: proc(w: io.Writer, id: typeid) -> (int, io.Error) {
+	n, err := reflect.write_type(w, type_info_of(id))
 	io.flush(auto_cast w)
-	return n
+	return n, err
 }
 
 
@@ -971,7 +973,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 		}
 
 	case 'q': // quoted string
-		strings.write_quoted_string(fi.writer, s, '"')
+		io.write_quoted_string(fi.writer, s, '"')
 
 	case 'x', 'X':
 		space := fi.space

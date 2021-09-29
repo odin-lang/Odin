@@ -8,6 +8,7 @@ import "core:path/filepath"
 import "core:unicode/utf8"
 import "core:unicode/utf16"
 import "core:os"
+import "core:io"
 
 @(private)
 Tokenizer :: tokenizer.Tokenizer
@@ -518,9 +519,8 @@ join_adjacent_string_literals :: proc(cpp: ^Preprocessor, initial_tok: ^Token) {
 
 
 quote_string :: proc(s: string) -> []byte {
-	b := &strings.Builder{}
-	strings.init_builder(b, 0, len(s)+2)
-	strings.write_quoted_string(b, s, '"')
+	b := strings.make_builder(0, len(s)+2)
+	io.write_quoted_string(strings.to_writer(&b), s, '"')
 	return b.buf[:]
 }
 
