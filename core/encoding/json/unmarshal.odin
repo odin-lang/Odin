@@ -1,6 +1,5 @@
 package json
 
-import "core:fmt"
 import "core:mem"
 import "core:math"
 import "core:reflect"
@@ -306,7 +305,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 unmarsal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_location) -> Token {
 	prev := p.curr_token
 	err := expect_token(p, kind)
-	fmt.assertf(condition = err == nil, fmt="unmarsal_expect_token: %v, got %v", args={kind, prev.kind}, loc=loc)
+	assert(err == nil, "unmarsal_expect_token")
 	return prev
 }
 
