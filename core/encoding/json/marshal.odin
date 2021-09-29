@@ -9,7 +9,6 @@ import "core:io"
 
 Marshal_Data_Error :: enum {
 	Unsupported_Type,
-	Invalid_Data,
 }
 
 Marshal_Error :: union {
@@ -32,11 +31,10 @@ marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: M
 }
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
-	w := strings.to_writer(b)
-	return marshal_to_writer(w, v)
+	return marshal_to_writer(strings.to_writer(b), v)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any) -> Marshal_Error {
+marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 	write_f64 :: proc(w: io.Writer, val: f64, size: int) -> io.Error {
 		buf: [386]byte
 
@@ -53,12 +51,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> Marshal_Error {
 
 		_ = io.write_string(w, string(s)) or_return
 		return nil
-	}
-	
-	
+	}	
 	if v == nil {
 		io.write_string(w, "null") or_return
-		return .None
+		return
 	}
 
 	ti := runtime.type_info_base(type_info_of(v.id))
@@ -195,35 +191,15 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> Marshal_Error {
 		
 	case runtime.Type_Info_Enumerated_Array:
 		index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
-		TREAT_AS_NORMAL_ARRAY_IF_POSSIBLE :: false
-		if TREAT_AS_NORMAL_ARRAY_IF_POSSIBLE && len(index.values) == info.count {
-			io.write_byte(w, '[') or_return
-			for i in 0..<info.count {
-				if i > 0 { io.write_string(w, ", ") or_return }
+		io.write_byte(w, '[') or_return
+		for i in 0..<info.count {
+			if i > 0 { io.write_string(w, ", ") or_return }
 
-				data := uintptr(v.data) + uintptr(i*info.elem_size)
-				marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
-			}
-			io.write_byte(w, ']') or_return
-		} else {
-			io.write_byte(w, '{') or_return
-			count := 0
-			for field in soa_zip(name=index.names, value=index.values)  {
-				if field.name == "" || field.name == "_" {
-					continue
-				}
-				if count > 0 { io.write_string(w, ", ") or_return }
-				count += 1
-				
-				io.write_quoted_string(w, field.name) or_return
-				io.write_string(w, ": ") or_return
-				i := int(field.value-info.min_value)
-				data := uintptr(v.data) + uintptr(i*info.elem_size)
-				marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
-			}
-			io.write_byte(w, '}') or_return
+			data := uintptr(v.data) + uintptr(i*info.elem_size)
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
 		}
-
+		io.write_byte(w, ']') or_return
+		
 	case runtime.Type_Info_Dynamic_Array:
 		io.write_byte(w, '[') or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
@@ -366,5 +342,5 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> Marshal_Error {
 		return .Unsupported_Type
 	}
 
-	return .None
+	return
 }
