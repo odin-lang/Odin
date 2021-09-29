@@ -21,7 +21,7 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-#if LLVM_VERSION_MAJOR < 11 
+#if LLVM_VERSION_MAJOR < 11
 #error "LLVM Version 11 is the minimum required"
 #elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
 #error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
@@ -1207,9 +1207,13 @@ void lb_generate_code(lbGenerator *gen) {
 
 			LLVMBool is_optimized = build_context.optimization_level > 0;
 			AstFile *init_file = m->info->init_package->files[0];
-			Ast *ident = m->info->entry_point->identifier.load();
-			if (m->info->entry_point && ident && ident->file) {
-				init_file = ident->file;
+
+			if (Entity *entry_point = m->info->entry_point) {
+				if (Ast *ident = entry_point->identifier.load()) {
+					if (ident->file) {
+						init_file = ident->file;
+					}
+				}
 			}
 
 			LLVMBool split_debug_inlining = false;
