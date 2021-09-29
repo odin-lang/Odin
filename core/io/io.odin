@@ -216,15 +216,15 @@ size :: proc(s: Stream) -> i64 {
 
 
 read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n: int, err: Error) {
+	defer if n_read != nil {
+		n_read^ += n
+	}
+	
 	if r.stream_vtable == nil {
 		return 0, .Empty
 	}
 	if r.impl_read_at != nil {
-		n, err = r->impl_read_at(p, offset)
-		if n_read != nil {
-			n_read^ += n
-		}
-		return
+		return r->impl_read_at(p, offset)
 	}
 	if r.impl_seek == nil || r.impl_read == nil {
 		return 0, .Empty
@@ -237,9 +237,6 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 	}
 
 	n, err = r->impl_read(p)
-	if n_read != nil {
-		n_read^ += n
-	}
 	_, err1 := r->impl_seek(curr_offset, .Start)
 	if err1 != nil && err == nil {
 		err = err1
@@ -249,15 +246,15 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 }
 
 write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) -> (n: int, err: Error) {
+	defer if n_written != nil {
+		n_written^ += n
+	}
+	
 	if w.stream_vtable == nil {
 		return 0, .Empty
 	}
 	if w.impl_write_at != nil {
-		n, err = w->impl_write_at(p, offset)
-		if n_written != nil {
-			n_written^ += n
-		}
-		return
+		return w->impl_write_at(p, offset)
 	}
 	if w.impl_seek == nil || w.impl_write == nil {
 		return 0, .Empty
@@ -270,9 +267,6 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) ->
 	}
 
 	n, err = w->impl_write(p)
-	if n_written != nil {
-		n_written^ += n
-	}
 	_, err1 := w->impl_seek(curr_offset, .Start)
 	if err1 != nil && err == nil {
 		err = err1
@@ -300,7 +294,11 @@ read_from :: proc(w: Reader_From, r: Reader) -> (n: i64, err: Error) {
 }
 
 
-read_byte :: proc(r: Byte_Reader, n_read: ^int = nil) -> (byte, Error) {
+read_byte :: proc(r: Byte_Reader, n_read: ^int = nil) -> (b: byte, err: Error) {
+	defer if err == nil && n_read != nil {
+		n_read^ += 1
+	}
+	
 	if r.stream_vtable == nil {
 		return 0, .Empty
 	}
@@ -311,12 +309,9 @@ read_byte :: proc(r: Byte_Reader, n_read: ^int = nil) -> (byte, Error) {
 		return 0, .Empty
 	}
 
-	b: [1]byte
-	_, err := r->impl_read(b[:])
-	if err == nil && n_read != nil {
-		n_read^ += 1
-	}
-	return b[0], err
+	buf: [1]byte
+	_, err = r->impl_read(buf[:])
+	return buf[0], err
 }
 
 write_byte :: proc{
@@ -333,7 +328,10 @@ write_byte_to_writer :: proc(w: Writer, c: byte, n_written: ^int = nil) -> Error
 }
 
 @(private)
-_write_byte :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> Error {
+_write_byte :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> (err: Error) {
+	defer if err == nil && n_written != nil {
+		n_written^ += 1
+	}
 	if w.stream_vtable == nil {
 		return .Empty
 	}
@@ -345,23 +343,19 @@ _write_byte :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> Error {
 	}
 
 	b := [1]byte{c}
-	_, err := w->impl_write(b[:])
-	if err == nil && n_written != nil {
-		n_written^ += 1
-	}
+	_, err = w->impl_write(b[:])
 	return err
 }
 
 read_rune :: proc(br: Rune_Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: Error) {
+	defer if err == nil && n_read != nil {
+		n_read^ += size
+	}
 	if br.stream_vtable == nil {
 		return 0, 0, .Empty
 	}
 	if br.impl_read_rune != nil {
-		ch, size, err = br->impl_read_rune()
-		if n_read != nil {
-			n_read^ += size
-		}
-		return
+		return br->impl_read_rune()
 	}
 	if br.impl_read == nil {
 		return 0, 0, .Empty
@@ -377,9 +371,6 @@ read_rune :: proc(br: Rune_Reader, n_read: ^int = nil) -> (ch: rune, size: int, 
 	if err != nil {
 		return
 	}
-	if n_read != nil {
-		n_read^ += 1
-	}
 	if ch < utf8.RUNE_SELF {
 		return
 	}
@@ -390,12 +381,8 @@ read_rune :: proc(br: Rune_Reader, n_read: ^int = nil) -> (ch: rune, size: int, 
 		return
 	}
 	sz := int(x&7)
-	n: int
-	n, err = br->impl_read(b[1:sz])
-	if n_read != nil {
-		n_read^ += n
-	}
-	if err != nil || n+1 < sz {
+	size, err = br->impl_read(b[1:sz])
+	if err != nil || size+1 < sz {
 		ch = utf8.RUNE_ERROR
 		return
 	}
@@ -423,26 +410,23 @@ write_string :: proc(s: Writer, str: string, n_written: ^int = nil) -> (n: int, 
 }
 
 write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err: Error) {
+	defer if err == nil && n_written != nil {
+		n_written^ += size
+	}
+	
 	if s.stream_vtable != nil && s.impl_write_rune != nil {
-		size, err = s->impl_write_rune(r)
-		if n_written != nil {
-			n_written^ += size
-		}
-		return
+		return s->impl_write_rune(r)
 	}
 
 	if r < utf8.RUNE_SELF {
 		err = write_byte(s, byte(r))
 		if err == nil {
 			size = 1
-			if n_written != nil {
-				n_written^ += size
-			}
 		}
 		return
 	}
 	buf, w := utf8.encode_rune(r)
-	return write(s, buf[:w], n_written)
+	return write(s, buf[:w])
 }
 
 
