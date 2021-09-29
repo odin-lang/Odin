@@ -52,18 +52,18 @@ _builder_stream_vtable := &io.Stream_VTable{
 	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		b := (^Builder)(s.stream_data)
 		n = write_bytes(b, p)
-		if len(b.buf) == cap(b.buf) {
+		if n < len(p) {
 			err = .EOF
 		}
 		return
 	},
-	impl_write_byte = proc(s: io.Stream, c: byte) -> io.Error {
+	impl_write_byte = proc(s: io.Stream, c: byte) -> (err: io.Error) {
 		b := (^Builder)(s.stream_data)
-		_ = write_byte(b, c)
-		if len(b.buf) == cap(b.buf) {
-			return .EOF
+		n := write_byte(b, c)
+		if n == 0 {
+			err = .EOF
 		}
-		return nil
+		return
 	},
 	impl_size = proc(s: io.Stream) -> i64 {
 		b := (^Builder)(s.stream_data)
