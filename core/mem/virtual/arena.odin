@@ -70,12 +70,18 @@ arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int) -> (data: []by
 }
 
 arena_free_all :: proc(arena: ^Arena) {
+	if !arena.ignore_mutex {
+		sync.mutex_lock(mutex)
+	}
 	for arena.curr_block != nil {
 		free_block := arena.curr_block
 		arena.curr_block = free_block.prev
 		memory_dealloc(free_block)
 	}
 	arena.total_used = 0
+	if !arena.ignore_mutex {
+		sync.mutex_unlock(mutex)
+	}
 }
 
 arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
