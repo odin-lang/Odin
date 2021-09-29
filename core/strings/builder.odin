@@ -218,30 +218,13 @@ write_quoted_string :: proc{
 }
 
 write_quoted_string_builder :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
-	return write_quoted_string_writer(to_writer(b), str, quote)
+	n, _ = io.write_quoted_string(to_writer(b), str, quote)
+	return
 }
 
 write_quoted_string_writer :: proc(w: io.Writer, str: string, quote: byte = '"') -> (n: int) {
-	n += _write_byte(w, quote)
-	for width, s := 0, str; len(s) > 0; s = s[width:] {
-		r := rune(s[0])
-		width = 1
-		if r >= utf8.RUNE_SELF {
-			r, width = utf8.decode_rune_in_string(s)
-		}
-		if width == 1 && r == utf8.RUNE_ERROR {
-			n += _write_byte(w, '\\')
-			n += _write_byte(w, 'x')
-			n += _write_byte(w, DIGITS_LOWER[s[0]>>4])
-			n += _write_byte(w, DIGITS_LOWER[s[0]&0xf])
-			continue
-		}
-
-		n += write_escaped_rune(w, r, quote)
-
-	}
-	n += _write_byte(w, quote)
-	return
+	n, _ = io.write_quoted_string(w, str, quote)
+	return	
 }
 
 write_encoded_rune :: proc{
@@ -250,41 +233,12 @@ write_encoded_rune :: proc{
 }
 
 write_encoded_rune_builder :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
-	return write_encoded_rune_writer(to_writer(b), r, write_quote)
+	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
+	return
 
 }
 write_encoded_rune_writer :: proc(w: io.Writer, r: rune, write_quote := true) -> (n: int) {
-	if write_quote {
-		n += _write_byte(w, '\'')
-	}
-	switch r {
-	case '\a': n += write_string(w, `\a"`)
-	case '\b': n += write_string(w, `\b"`)
-	case '\e': n += write_string(w, `\e"`)
-	case '\f': n += write_string(w, `\f"`)
-	case '\n': n += write_string(w, `\n"`)
-	case '\r': n += write_string(w, `\r"`)
-	case '\t': n += write_string(w, `\t"`)
-	case '\v': n += write_string(w, `\v"`)
-	case:
-		if r < 32 {
-			n += write_string(w, `\x`)
-			buf: [2]byte
-			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
-			switch len(s) {
-			case 0: n += write_string(w, "00")
-			case 1: n += _write_byte(w, '0')
-			case 2: n += write_string(w, s)
-			}
-		} else {
-			rn, _ := io.write_rune(w, r)
-			n += rn
-		}
-
-	}
-	if write_quote {
-		n += _write_byte(w, '\'')
-	}
+	n, _ = io.write_encoded_rune(w, r, write_quote)
 	return
 }
 
@@ -295,78 +249,12 @@ write_escaped_rune :: proc{
 }
 
 write_escaped_rune_builder :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
-	return write_escaped_rune_writer(to_writer(b), r, quote, html_safe)
+	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
+	return
 }
 
 write_escaped_rune_writer :: proc(w: io.Writer, r: rune, quote: byte, html_safe := false) -> (n: int) {
-	is_printable :: proc(r: rune) -> bool {
-		if r <= 0xff {
-			switch r {
-			case 0x20..=0x7e:
-				return true
-			case 0xa1..=0xff: // ¡ through ÿ except for the soft hyphen
-				return r != 0xad //
-			}
-		}
-
-		// TODO(bill): A proper unicode library will be needed!
-		return false
-	}
-
-	if html_safe {
-		switch r {
-		case '<', '>', '&':
-			n += _write_byte(w, '\\')
-			n += _write_byte(w, 'u')
-			for s := 12; s >= 0; s -= 4 {
-				n += _write_byte(w, DIGITS_LOWER[r>>uint(s) & 0xf])
-			}
-			return
-		}
-	}
-
-	if r == rune(quote) || r == '\\' {
-		n += _write_byte(w, '\\')
-		n += _write_byte(w, byte(r))
-		return
-	} else if is_printable(r) {
-		n += write_encoded_rune(w, r, false)
-		return
-	}
-	switch r {
-	case '\a': n += write_string(w, `\a`)
-	case '\b': n += write_string(w, `\b`)
-	case '\e': n += write_string(w, `\e`)
-	case '\f': n += write_string(w, `\f`)
-	case '\n': n += write_string(w, `\n`)
-	case '\r': n += write_string(w, `\r`)
-	case '\t': n += write_string(w, `\t`)
-	case '\v': n += write_string(w, `\v`)
-	case:
-		switch c := r; {
-		case c < ' ':
-			n += _write_byte(w, '\\')
-			n += _write_byte(w, 'x')
-			n += _write_byte(w, DIGITS_LOWER[byte(c)>>4])
-			n += _write_byte(w, DIGITS_LOWER[byte(c)&0xf])
-
-		case c > utf8.MAX_RUNE:
-			c = 0xfffd
-			fallthrough
-		case c < 0x10000:
-			n += _write_byte(w, '\\')
-			n += _write_byte(w, 'u')
-			for s := 12; s >= 0; s -= 4 {
-				n += _write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf])
-			}
-		case:
-			n += _write_byte(w, '\\')
-			n += _write_byte(w, 'U')
-			for s := 28; s >= 0; s -= 4 {
-				n += _write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf])
-			}
-		}
-	}
+	n, _ = io.write_escaped_rune(w, r, quote, html_safe)
 	return
 }
 
