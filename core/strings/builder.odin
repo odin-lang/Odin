@@ -217,7 +217,6 @@ write_quoted_string :: proc{
 	write_quoted_string_writer,
 }
 
-@(deprecated="prefer io.write_quoted_string")
 write_quoted_string_builder :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
 	n, _ = io.write_quoted_string(to_writer(b), str, quote)
 	return
@@ -234,7 +233,6 @@ write_encoded_rune :: proc{
 	write_encoded_rune_writer,
 }
 
-@(deprecated="prefer io.write_encoded_rune")
 write_encoded_rune_builder :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
 	return
@@ -252,7 +250,6 @@ write_escaped_rune :: proc{
 	write_escaped_rune_writer,
 }
 
-@(deprecated="prefer io.write_escaped_rune")
 write_escaped_rune_builder :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
 	return
