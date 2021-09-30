@@ -43,6 +43,36 @@ Weekday :: enum int {
 	Saturday,
 }
 
+Stopwatch :: struct {
+	running: bool,
+	_start_time: Tick,
+	_stop_time: Duration,
+}
+
+start :: proc(using stopwatch: ^Stopwatch) {
+	if !running {
+		_start_time = tick_now()
+		running = true
+	}
+}
+
+stop :: proc(using stopwatch: ^Stopwatch) {
+	if running {
+		_stop_time += tick_diff(_start_time, tick_now())
+		running = false
+	}
+}
+
+reset :: proc(using stopwatch: ^Stopwatch) {
+	_stop_time = {}
+	running = false
+}
+
+duration :: proc(using stopwatch: Stopwatch) -> Duration {
+	if !running { return _stop_time }
+	return _stop_time + tick_diff(_start_time, tick_now())
+}
+
 diff :: proc(start, end: Time) -> Duration {
 	d := end._nsec - start._nsec
 	return Duration(d)
@@ -51,7 +81,6 @@ diff :: proc(start, end: Time) -> Duration {
 since :: proc(start: Time) -> Duration {
 	return diff(start, now())
 }
-
 
 duration_nanoseconds :: proc(d: Duration) -> i64 {
 	return i64(d)
