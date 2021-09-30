@@ -801,6 +801,45 @@ set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
 	panic("expected a union to reflect.set_union_variant_type_info")
 }
 
+set_union_value :: proc(dst: any, value: any) -> bool {
+	if dst == nil { return false }
+
+	ti := runtime.type_info_base(type_info_of(dst.id))
+	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
+		if value.id == nil {
+			mem.zero(dst.data, ti.size)
+			return true
+		}
+		if ti.id == runtime.typeid_base(value.id) {
+			mem.copy(dst.data, value.data, ti.size)
+			return true
+		}
+		
+		if type_info_union_is_pure_maybe(info) {
+			if variant := info.variants[0]; variant.id == value.id {
+				mem.copy(dst.data, value.data, variant.size)
+				return true
+			}
+			return false
+		}
+
+		for variant, i in info.variants {
+			if variant.id == value.id {
+				tag := i64(i)
+				if !info.no_nil {
+					tag += 1
+				}
+				mem.copy(dst.data, value.data, variant.size)
+				set_union_variant_raw_tag(dst, tag)
+				return true
+			}
+		}
+		return false
+	}
+	panic("expected a union to reflect.set_union_variant_typeid")
+}
+
+
 
 as_bool :: proc(a: any) -> (value: bool, valid: bool) {
 	if a == nil { return }
