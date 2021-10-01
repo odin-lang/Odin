@@ -1176,7 +1176,7 @@ foreign lib {
 	ColorFromNormalized :: proc(normalized: Vector4) -> Color ---                       // Returns Color from normalized values [0..1]
 	ColorToHSV          :: proc(color: Color) -> Vector3 ---                            // Returns HSV values for a Color, hue [0..360], saturation/value [0..1]
 	ColorFromHSV        :: proc(hue, saturation, value: f32) -> Color ---               // Returns a Color from HSV values, hue [0..360], saturation/value [0..1]
-	ColorAlpha          :: proc(color: f32, alpha: f32) -> Color ---                    // Returns color with alpha applied, alpha goes from 0.0f to 1.0f
+	ColorAlpha          :: proc(color: Color, alpha: f32) -> Color ---                    // Returns color with alpha applied, alpha goes from 0.0f to 1.0f
 	ColorAlphaBlend     :: proc(dst, src, tint: Color) -> Color ---                     // Returns src alpha-blended into dst color with tint
 	GetColor            :: proc(hexValue: c.int) -> Color ---                           // Get Color structure from hexadecimal value
 	GetPixelColor       :: proc(srcPtr: rawptr, format: PixelFormat) -> Color ---       // Get Color from a source pixel pointer of certain format
