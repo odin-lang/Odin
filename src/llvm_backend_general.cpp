@@ -56,6 +56,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	gbAllocator a = heap_allocator();
 	map_init(&m->types, a);
+	map_init(&m->struct_field_remapping, a);
 	map_init(&m->llvm_types, a);
 	map_init(&m->values, a);
 	map_init(&m->soa_values, a);
@@ -1109,10 +1110,10 @@ lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 
 	LLVMTypeRef uvt = LLVMGetElementType(LLVMTypeOf(u.value));
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
-	GB_ASSERT_MSG(element_count == 3, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
+	GB_ASSERT_MSG(element_count == 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
 	lbValue tag_ptr = {};
-	tag_ptr.value = LLVMBuildStructGEP(p->builder, u.value, 2, "");
+	tag_ptr.value = LLVMBuildStructGEP(p->builder, u.value, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }
@@ -1646,22 +1647,25 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			GB_ASSERT(field_count == 2);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
-			LLVMTypeRef padding_type = LLVMArrayType(lb_type(m, t_uintptr), 0);
 			LLVMTypeRef entries_fields[] = {
-				padding_type,
 				lb_type(m, t_rawptr), // data
-				padding_type,
 				lb_type(m, t_int), // len
-				padding_type,
 				lb_type(m, t_int), // cap
-				padding_type,
 				lb_type(m, t_allocator), // allocator
-				padding_type,
 			};
 
 			fields[0] = lb_type(m, internal_type->Struct.fields[0]->type);
 			fields[1] = LLVMStructTypeInContext(ctx, entries_fields, gb_count_of(entries_fields), false);
-
+			
+			{ // Add this to simplify things
+				lbStructFieldRemapping entries_field_remapping = {};
+				slice_init(&entries_field_remapping, permanent_allocator(), gb_count_of(entries_fields));
+				for_array(i, entries_field_remapping) {
+					entries_field_remapping[i] = cast(i32)i;
+				}
+				map_set(&m->struct_field_remapping, hash_pointer(fields[1]), entries_field_remapping);
+			}
+			
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
 
@@ -1678,23 +1682,20 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				fields[1] = LLVMArrayType(lb_type(m, t_u8), size_of_union);
 				return LLVMStructTypeInContext(ctx, fields, field_count, false);
 			}
-
-			isize offset = 0;
-			if (lb_struct_has_padding_prefix(type)) {
-				offset = 1;
-			}
+			
+			lbStructFieldRemapping field_remapping = {};
+			slice_init(&field_remapping, permanent_allocator(), type->Struct.fields.count);
 
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
 
-			unsigned field_count = cast(unsigned)(offset + type->Struct.fields.count*2 + 1);
-			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
-
-			LLVMTypeRef type_u8 = lb_type(m, t_u8);
-			LLVMTypeRef type_u16 = lb_type(m, t_u16);
-			LLVMTypeRef type_u32 = lb_type(m, t_u32);
-			LLVMTypeRef type_u64 = lb_type(m, t_u64);
+			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, type->Struct.fields.count*2 + 2);
 			
+			if (lb_struct_has_padding_prefix(type)) {
+				LLVMTypeRef padding_offset = lb_alignment_prefix_type_hack(m, type->Struct.custom_align);
+				array_add(&fields, padding_offset);
+			}
+
 			i64 padding_offset = 0;
 			for_array(i, type->Struct.fields) {
 				GB_ASSERT(type->Struct.offsets != nullptr);
@@ -1702,27 +1703,14 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				Entity *field = type->Struct.fields[i];
 				i64 padding = type->Struct.offsets[i] - padding_offset;
 
-				LLVMTypeRef padding_type = nullptr;
-				if (padding_offset == 0) {
-					padding_type = lb_alignment_prefix_type_hack(m, type_align_of(type));
-				} else {
-					i64 alignment = type_align_of(field->type);
-					// NOTE(bill): limit to `[N x u64]` to prevent ABI issues
-					alignment = gb_min(alignment, 8); 
-					if (padding % alignment == 0) {
-						isize len = padding/alignment;
-						switch (alignment) {
-						case 1: padding_type = LLVMArrayType(type_u8,  cast(unsigned)len); break;
-						case 2: padding_type = LLVMArrayType(type_u16, cast(unsigned)len); break;
-						case 4: padding_type = LLVMArrayType(type_u32, cast(unsigned)len); break;
-						case 8: padding_type = LLVMArrayType(type_u64, cast(unsigned)len); break;
-						}
-					} else {
-						padding_type = LLVMArrayType(type_u8, cast(unsigned)padding);
-					}
+				if (padding != 0) {
+					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, type_align_of(field->type));
+					array_add(&fields, padding_type);					
 				}
-				fields[offset + i*2 + 0] = padding_type;
-				fields[offset + i*2 + 1] = lb_type(m, field->type);
+				
+				field_remapping[i] = cast(i32)fields.count;
+				array_add(&fields, lb_type(m, field->type));
+				
 				if (!type->Struct.is_packed) {
 					padding_offset = align_formula(padding_offset, type_align_of(field->type));
 				}
@@ -1730,17 +1718,18 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			
 			i64 end_padding = type_size_of(type)-padding_offset;
-			fields[field_count-1] = LLVMArrayType(type_u8, cast(unsigned)end_padding);
-
-			if (offset != 0) {
-				GB_ASSERT(offset == 1);
-				fields[0] = lb_alignment_prefix_type_hack(m, type->Struct.custom_align);
+			if (end_padding > 0) {
+				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
 			}
-			for (unsigned i = 0; i < field_count; i++) {
+
+			for_array(i, fields) {
 				GB_ASSERT(fields[i] != nullptr);
 			}
-
-			return LLVMStructTypeInContext(ctx, fields, field_count, type->Struct.is_packed);
+			
+			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, type->Struct.is_packed);
+			map_set(&m->struct_field_remapping, hash_pointer(struct_type), field_remapping);
+			map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);
+			return struct_type;
 		}
 		break;
 
@@ -1755,29 +1744,25 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			gb_unused(size);
 
 			if (is_type_union_maybe_pointer_original_alignment(type)) {
-				LLVMTypeRef fields[1] = {lb_type(m, type->Union.variants[0])};
-				return LLVMStructTypeInContext(ctx, fields, 1, false);
+				LLVMTypeRef fields[] = {lb_type(m, type->Union.variants[0])};
+				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
 
 			unsigned block_size = cast(unsigned)type->Union.variant_block_size;
 
-			LLVMTypeRef fields[3] = {};
-			unsigned field_count = 1;
-			fields[0] = lb_alignment_prefix_type_hack(m, align);
+			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 2);
 			if (is_type_union_maybe_pointer(type)) {
-				field_count += 1;
-				fields[1] = lb_type(m, type->Union.variants[0]);
+				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
+				array_add(&fields, variant);
 			} else {
-				field_count += 2;
-				if (block_size == align) {
-					fields[1] = LLVMIntTypeInContext(m->ctx, 8*block_size);
-				} else {
-					fields[1] = LLVMArrayType(lb_type(m, t_u8), block_size);
-				}
-				fields[2] = lb_type(m, union_tag_type(type));
+				LLVMTypeRef block_type = lb_type_padding_filler(m, block_size, align);
+				LLVMTypeRef tag_type   = lb_type(m, union_tag_type(type));
+				array_add(&fields, block_type);
+				array_add(&fields, tag_type);
+				
 			}
-
-			return LLVMStructTypeInContext(ctx, fields, field_count, false);
+			
+			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, false);
 		}
 		break;
 

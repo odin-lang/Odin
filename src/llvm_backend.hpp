@@ -91,6 +91,8 @@ struct lbIncompleteDebugType {
 	LLVMMetadataRef metadata;
 };
 
+typedef Slice<i32> lbStructFieldRemapping;
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -100,8 +102,9 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // associated
 
-	Map<LLVMTypeRef> types; // Key: Type *
-	Map<Type *> llvm_types; // Key: LLVMTypeRef
+	Map<LLVMTypeRef> types;                             // Key: Type *
+	Map<lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
+	Map<Type *> llvm_types;                             // Key: LLVMTypeRef
 	i32 internal_type_level;
 
 	Map<lbValue>  values;           // Key: Entity *
@@ -447,7 +450,10 @@ lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, A
 void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint);
 lbValue lb_consume_copy_elision_hint(lbProcedure *p);
 
+
 bool lb_struct_has_padding_prefix(Type *t);
+lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);
+LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
@@ -461,51 +467,51 @@ bool lb_struct_has_padding_prefix(Type *t);
 
 
 enum lbCallingConventionKind {
-    lbCallingConvention_C = 0,
-    lbCallingConvention_Fast = 8,
-    lbCallingConvention_Cold = 9,
-    lbCallingConvention_GHC = 10,
-    lbCallingConvention_HiPE = 11,
-    lbCallingConvention_WebKit_JS = 12,
-    lbCallingConvention_AnyReg = 13,
-    lbCallingConvention_PreserveMost = 14,
-    lbCallingConvention_PreserveAll = 15,
-    lbCallingConvention_Swift = 16,
-    lbCallingConvention_CXX_FAST_TLS = 17,
-    lbCallingConvention_FirstTargetCC = 64,
-    lbCallingConvention_X86_StdCall = 64,
-    lbCallingConvention_X86_FastCall = 65,
-    lbCallingConvention_ARM_APCS = 66,
-    lbCallingConvention_ARM_AAPCS = 67,
-    lbCallingConvention_ARM_AAPCS_VFP = 68,
-    lbCallingConvention_MSP430_INTR = 69,
-    lbCallingConvention_X86_ThisCall = 70,
-    lbCallingConvention_PTX_Kernel = 71,
-    lbCallingConvention_PTX_Device = 72,
-    lbCallingConvention_SPIR_FUNC = 75,
-    lbCallingConvention_SPIR_KERNEL = 76,
-    lbCallingConvention_Intel_OCL_BI = 77,
-    lbCallingConvention_X86_64_SysV = 78,
-    lbCallingConvention_Win64 = 79,
-    lbCallingConvention_X86_VectorCall = 80,
-    lbCallingConvention_HHVM = 81,
-    lbCallingConvention_HHVM_C = 82,
-    lbCallingConvention_X86_INTR = 83,
-    lbCallingConvention_AVR_INTR = 84,
-    lbCallingConvention_AVR_SIGNAL = 85,
-    lbCallingConvention_AVR_BUILTIN = 86,
-    lbCallingConvention_AMDGPU_VS = 87,
-    lbCallingConvention_AMDGPU_GS = 88,
-    lbCallingConvention_AMDGPU_PS = 89,
-    lbCallingConvention_AMDGPU_CS = 90,
-    lbCallingConvention_AMDGPU_KERNEL = 91,
-    lbCallingConvention_X86_RegCall = 92,
-    lbCallingConvention_AMDGPU_HS = 93,
-    lbCallingConvention_MSP430_BUILTIN = 94,
-    lbCallingConvention_AMDGPU_LS = 95,
-    lbCallingConvention_AMDGPU_ES = 96,
-    lbCallingConvention_AArch64_VectorCall = 97,
-    lbCallingConvention_MaxID = 1023,
+	lbCallingConvention_C = 0,
+	lbCallingConvention_Fast = 8,
+	lbCallingConvention_Cold = 9,
+	lbCallingConvention_GHC = 10,
+	lbCallingConvention_HiPE = 11,
+	lbCallingConvention_WebKit_JS = 12,
+	lbCallingConvention_AnyReg = 13,
+	lbCallingConvention_PreserveMost = 14,
+	lbCallingConvention_PreserveAll = 15,
+	lbCallingConvention_Swift = 16,
+	lbCallingConvention_CXX_FAST_TLS = 17,
+	lbCallingConvention_FirstTargetCC = 64,
+	lbCallingConvention_X86_StdCall = 64,
+	lbCallingConvention_X86_FastCall = 65,
+	lbCallingConvention_ARM_APCS = 66,
+	lbCallingConvention_ARM_AAPCS = 67,
+	lbCallingConvention_ARM_AAPCS_VFP = 68,
+	lbCallingConvention_MSP430_INTR = 69,
+	lbCallingConvention_X86_ThisCall = 70,
+	lbCallingConvention_PTX_Kernel = 71,
+	lbCallingConvention_PTX_Device = 72,
+	lbCallingConvention_SPIR_FUNC = 75,
+	lbCallingConvention_SPIR_KERNEL = 76,
+	lbCallingConvention_Intel_OCL_BI = 77,
+	lbCallingConvention_X86_64_SysV = 78,
+	lbCallingConvention_Win64 = 79,
+	lbCallingConvention_X86_VectorCall = 80,
+	lbCallingConvention_HHVM = 81,
+	lbCallingConvention_HHVM_C = 82,
+	lbCallingConvention_X86_INTR = 83,
+	lbCallingConvention_AVR_INTR = 84,
+	lbCallingConvention_AVR_SIGNAL = 85,
+	lbCallingConvention_AVR_BUILTIN = 86,
+	lbCallingConvention_AMDGPU_VS = 87,
+	lbCallingConvention_AMDGPU_GS = 88,
+	lbCallingConvention_AMDGPU_PS = 89,
+	lbCallingConvention_AMDGPU_CS = 90,
+	lbCallingConvention_AMDGPU_KERNEL = 91,
+	lbCallingConvention_X86_RegCall = 92,
+	lbCallingConvention_AMDGPU_HS = 93,
+	lbCallingConvention_MSP430_BUILTIN = 94,
+	lbCallingConvention_AMDGPU_LS = 95,
+	lbCallingConvention_AMDGPU_ES = 96,
+	lbCallingConvention_AArch64_VectorCall = 97,
+	lbCallingConvention_MaxID = 1023,
 };
 
 lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
