@@ -1,6 +1,9 @@
 package raylib
 
 import c "core:c/libc"
+import "core:fmt"
+import "core:mem"
+import "core:strings"
 
 USE_LINALG :: #config(RAYLIB_USE_LINALG, true)
 when USE_LINALG {
@@ -1217,7 +1220,6 @@ foreign lib {
 	TextCopy      :: proc(dst: [^]u8, src: cstring) -> c.int ---                                  // Copy one string to another, returns bytes copied
 	TextIsEqual   :: proc(text1, text2: cstring) -> bool ---                                      // Check if two text string are equal
 	TextLength    :: proc(text: cstring) -> c.uint ---                                            // Get text length, checks for '\0' ending
-	TextFormat    :: proc(text: cstring, #c_vararg args: ..any) -> cstring ---                    // Text formatting with variables (sprintf style)
 	TextSubtext   :: proc(text: cstring, position: c.int, length: c.int) -> cstring ---           // Get a piece of a text string
 	TextReplace   :: proc(text: [^]byte, replace, by: cstring) -> cstring ---                     // Replace text string (memory must be freed!)
 	TextInsert    :: proc(text, insert: cstring, position: c.int) -> cstring ---                  // Insert text in a position (memory must be freed!)
@@ -1258,7 +1260,7 @@ foreign lib {
 	DrawSphereWires     :: proc(centerPos: Vector3, radius: f32, rings, slices: c.int, color: Color) ---                       // Draw sphere wires
 	DrawCylinder        :: proc(position: Vector3, radiusTop, radiusBottom: f32, height: f32, slices: c.int, color: Color) --- // Draw a cylinder/cone
 	DrawCylinderWires   :: proc(position: Vector3, radiusTop, radiusBottom: f32, height: f32, slices: c.int, color: Color) --- // Draw a cylinder/cone wires
-	DrawPlane           :: proc(centerPos, size: Vector2, color: Color) ---                                                    // Draw a plane XZ
+	DrawPlane           :: proc(centerPos: Vector3, size: Vector2, color: Color) ---                                                    // Draw a plane XZ
 	DrawRay             :: proc(ray: Ray, color: Color) ---                                                                    // Draw a ray line
 	DrawGrid            :: proc(slices: c.int, spacing: f32) ---                                                               // Draw a grid (centered at (0, 0, 0))
 
@@ -1399,4 +1401,47 @@ foreign lib {
 	SetAudioStreamVolume            :: proc(stream: AudioStream, volume: f32) ---                        // Set volume for audio stream (1.0 is max level)
 	SetAudioStreamPitch             :: proc(stream: AudioStream, pitch: f32) ---                         // Set pitch for audio stream (1.0 is base level)
 	SetAudioStreamBufferSizeDefault :: proc(size: c.int) ---                                             // Default size for new audio streams
+}
+
+
+// Text formatting with variables (sprintf style)
+TextFormat :: proc(text: cstring, args: ..any) -> cstring { 
+	str := fmt.tprintf(string(text), ..args)
+	return strings.clone_to_cstring(str, MemAllocator())
+}
+
+
+MemAllocator :: proc "contextless" () -> mem.Allocator {
+	return mem.Allocator{MemAllocatorProc, nil}
+}
+
+MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
+                         size, alignment: int,
+                         old_memory: rawptr, old_size: int, location := #caller_location) -> (data: []byte, err: mem.Allocator_Error)  {
+	switch mode {
+	case .Alloc:
+		ptr := MemAlloc(c.int(size))
+		if ptr == nil {
+			err = .Out_Of_Memory
+			return
+		}
+		data = mem.byte_slice(ptr, size)
+		return
+	case .Free:
+		MemFree(old_memory)
+		return nil, nil
+	
+	case .Resize:
+		ptr := MemRealloc(old_memory, c.int(size))
+		if ptr == nil {
+			err = .Out_Of_Memory
+			return
+		}
+		data = mem.byte_slice(ptr, size)
+		return
+	
+	case .Free_All, .Query_Features, .Query_Info:
+		return nil, .Mode_Not_Implemented
+	}	
+	return nil, .Mode_Not_Implemented
 }
