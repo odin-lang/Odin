@@ -807,24 +807,55 @@ lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	return {};
 }
 
+
 bool lb_struct_has_padding_prefix(Type *t) {
 	Type *bt = base_type(t);
 	GB_ASSERT(bt->kind == Type_Struct);
 	return bt->Struct.custom_align != 0 && bt->Struct.fields.count == 0;
 }
+lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t) {
+	t = base_type(t);
+	LLVMTypeRef struct_type = lb_type(m, t);
+	auto *field_remapping = map_get(&m->struct_field_remapping, hash_pointer(struct_type));
+	if (field_remapping == nullptr) {
+		field_remapping = map_get(&m->struct_field_remapping, hash_pointer(t));
+	}
+	GB_ASSERT(field_remapping != nullptr);
+	return *field_remapping;
+}
 
 i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
-		index = index*2 + 1;
-		if (lb_struct_has_padding_prefix(t)) {
-			index += 1;
-		}
-		
-		unsigned count = LLVMCountStructElementTypes(lb_type(m, t));
-		GB_ASSERT(count >= cast(unsigned)index);
+		auto field_remapping = lb_get_struct_remapping(m, t);
+		index = field_remapping[index];
 	}
 	return index;
 }
+
+LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align) {
+	// NOTE(bill): limit to `[N x u64]` to prevent ABI issues
+	padding_align = gb_clamp(padding_align, 1, 8);
+	if (padding % padding_align == 0) {
+		LLVMTypeRef elem = nullptr;
+		isize len = padding/padding_align;
+		switch (padding_align) {
+		case 1: elem = lb_type(m, t_u8);  break;
+		case 2: elem = lb_type(m, t_u16); break;
+		case 4: elem = lb_type(m, t_u32); break;
+		case 8: elem = lb_type(m, t_u64); break;
+		}
+		
+		GB_ASSERT_MSG(elem != nullptr, "Invalid lb_type_padding_filler padding and padding_align: %lld", padding_align);
+		if (len != 1) {
+			return LLVMArrayType(elem, cast(unsigned)len);
+		} else {
+			return elem;
+		}
+	} else {
+		return LLVMArrayType(lb_type(m, t_u8), cast(unsigned)padding);
+	}
+}
+
 
 char const *llvm_type_kinds[] = {
 	"LLVMVoidTypeKind",
@@ -912,7 +943,6 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 0: result_type = get_struct_field_type(gst, 0); break;
 		case 1: result_type = get_struct_field_type(gst, 1); break;
 		}
-		index = index*2 + 1;
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
 	} else if (is_type_relative_slice(t)) {
@@ -926,6 +956,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 	
+	i32 original_index = index;
 	index = lb_convert_struct_index(p->module, t, index);
 	
 	if (lb_is_const(s)) {
@@ -943,7 +974,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		// gb_printf_err("%d\n", index);
 		GB_ASSERT_MSG(LLVMGetTypeKind(st) == LLVMStructTypeKind, "%s", llvm_type_kinds[LLVMGetTypeKind(st)]);
 		unsigned count = LLVMCountStructElementTypes(st);
-		GB_ASSERT(count >= cast(unsigned)index);
+		GB_ASSERT_MSG(count >= cast(unsigned)index, "%u %d %d", count, index, original_index);
 		
 		res.value = LLVMBuildStructGEP(p->builder, s.value, cast(unsigned)index, "");
 		res.type = alloc_type_pointer(result_type);

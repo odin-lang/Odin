@@ -139,15 +139,12 @@ LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values,
 	
 	GB_ASSERT(value_count_ == bt->Struct.fields.count);
 	
-	unsigned field_offset = 0;
-	if (lb_struct_has_padding_prefix(bt)) {
-		field_offset = 1;
-	}
-
-	unsigned values_with_padding_count = field_offset + cast(unsigned)(bt->Struct.fields.count*2 + 1);
+	auto field_remapping = lb_get_struct_remapping(m, t);
+	unsigned values_with_padding_count = LLVMCountStructElementTypes(struct_type);
+	
 	LLVMValueRef *values_with_padding = gb_alloc_array(permanent_allocator(), LLVMValueRef, values_with_padding_count);
 	for (unsigned i = 0; i < value_count; i++) {
-		values_with_padding[field_offset + i*2 + 1] = values[i];
+		values_with_padding[field_remapping[i]] = values[i];
 	}
 	for (unsigned i = 0; i < values_with_padding_count; i++) {
 		if (values_with_padding[i] == nullptr) {
@@ -832,16 +829,11 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			if (is_type_raw_union(type)) {
 				return lb_const_nil(m, original_type);
 			}
-
-			isize offset = 0;
-			if (lb_struct_has_padding_prefix(type)) {
-				offset = 1;
-			}
 			
 			LLVMTypeRef struct_type = lb_type(m, original_type);
 
-			unsigned value_count = cast(unsigned)(offset + type->Struct.fields.count*2 + 1);
-			GB_ASSERT(LLVMCountStructElementTypes(struct_type) == value_count);
+			auto field_remapping = lb_get_struct_remapping(m, type);
+			unsigned value_count = LLVMCountStructElementTypes(struct_type);
 			
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, value_count);
 			bool *visited = gb_alloc_array(temporary_allocator(), bool, value_count);
@@ -859,7 +851,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						Selection sel = lookup_field(type, name, false);
 						Entity *f = type->Struct.fields[sel.index[0]];
 							
-						isize index = offset + f->Variable.field_index*2 + 1;
+						i32 index = field_remapping[f->Variable.field_index];
 						if (elem_type_can_be_constant(f->type)) {
 							values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
 							visited[index] = true;
@@ -874,7 +866,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 							val = tav.value;
 						}
 						
-						isize index = offset + f->Variable.field_index*2 + 1;
+						i32 index = field_remapping[f->Variable.field_index];
 						if (elem_type_can_be_constant(f->type)) {
 							values[index]  = lb_const_value(m, f->type, val, allow_local).value;
 							visited[index] = true;
