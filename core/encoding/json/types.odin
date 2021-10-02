@@ -34,6 +34,7 @@ Specification :: enum {
 	JSON,
 	JSON5, // https://json5.org/
 	MJSON, // https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html
+	Bitsquid = MJSON,
 }
 
 
