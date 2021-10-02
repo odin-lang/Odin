@@ -239,7 +239,7 @@ i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMIntegerTypeKind:
 		{
 			unsigned w = LLVMGetIntTypeWidth(type);
-			return gb_clamp((w + 7)/8, 1, build_context.max_align);
+			return gb_clamp((w + 7)/8, 1, build_context.word_size);
 		}
 	case LLVMHalfTypeKind:
 		return 2;
@@ -342,7 +342,7 @@ namespace lbAbi386 {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			i64 sz = lb_sizeof(t);
-			if (kind == LLVMStructTypeKind) {
+			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
@@ -392,7 +392,7 @@ namespace lbAbiAmd64Win64 {
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
-			if (kind == LLVMStructTypeKind) {
+			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
 				i64 sz = lb_sizeof(t);
 				switch (sz) {
 				case 1:
