@@ -1736,7 +1736,10 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, type->Struct.is_packed);
 			map_set(&m->struct_field_remapping, hash_pointer(struct_type), field_remapping);
 			map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);			
-			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size, "%s vs %s", LLVMPrintTypeToString(struct_type), type_to_string(type));
+			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size, 
+			              "(%lld) %s vs (%lld) %s", 
+			              cast(long long)lb_sizeof(struct_type), LLVMPrintTypeToString(struct_type), 
+			              cast(long long)full_type_size, type_to_string(type));
 			return struct_type;
 		}
 		break;
