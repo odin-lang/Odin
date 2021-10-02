@@ -451,7 +451,6 @@ void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint);
 lbValue lb_consume_copy_elision_hint(lbProcedure *p);
 
 
-bool lb_struct_has_padding_prefix(Type *t);
 lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);
 LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 

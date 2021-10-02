@@ -808,11 +808,6 @@ lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 }
 
 
-bool lb_struct_has_padding_prefix(Type *t) {
-	Type *bt = base_type(t);
-	GB_ASSERT(bt->kind == Type_Struct);
-	return bt->Struct.custom_align != 0 && bt->Struct.fields.count == 0;
-}
 lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t) {
 	t = base_type(t);
 	LLVMTypeRef struct_type = lb_type(m, t);

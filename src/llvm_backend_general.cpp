@@ -1674,13 +1674,21 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			type_set_offsets(type);
 			
 			if (type->Struct.is_raw_union) {
-				unsigned field_count = 2;
-				LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
-				i64 alignment = type_align_of(type);
+				unsigned alignment = cast(unsigned)type_align_of(type);
 				unsigned size_of_union = cast(unsigned)type_size_of(type);
-				fields[0] = lb_alignment_prefix_type_hack(m, gb_min(alignment, 16));
-				fields[1] = LLVMArrayType(lb_type(m, t_u8), size_of_union);
-				return LLVMStructTypeInContext(ctx, fields, field_count, false);
+				GB_ASSERT(size_of_union % alignment == 0);
+				
+				lbStructFieldRemapping field_remapping = {};
+				slice_init(&field_remapping, permanent_allocator(), 1);
+				
+				LLVMTypeRef fields[1] = {};
+				fields[0] = lb_type_padding_filler(m, size_of_union, alignment);
+				field_remapping[0] = 0;
+				
+				LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
+				map_set(&m->struct_field_remapping, hash_pointer(struct_type), field_remapping);
+				map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);
+				return struct_type;
 			}
 			
 			lbStructFieldRemapping field_remapping = {};
@@ -1689,13 +1697,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
 
-			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, type->Struct.fields.count*2 + 2);
+			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, type->Struct.fields.count*2 + 1);
 			
-			if (lb_struct_has_padding_prefix(type)) {
-				LLVMTypeRef padding_offset = lb_alignment_prefix_type_hack(m, type->Struct.custom_align);
-				array_add(&fields, padding_offset);
-			}
-
 			i64 padding_offset = 0;
 			for_array(i, type->Struct.fields) {
 				GB_ASSERT(type->Struct.offsets != nullptr);
