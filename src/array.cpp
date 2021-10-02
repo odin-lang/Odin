@@ -1,7 +1,6 @@
 #define ARRAY_GROW_FORMULA(x) (gb_max(((x)+1)*3 >> 1, 8))
 GB_STATIC_ASSERT(ARRAY_GROW_FORMULA(0) > 0);
 
-#if 1
 template <typename T>
 struct Array {
 	gbAllocator allocator;
@@ -418,98 +417,36 @@ void array_unordered_remove(Array<T> *array, isize index) {
 
 
 
-
-#endif
-
-#if 0
-#define Array(Type_) struct { \
-	gbAllocator const &allocator; \
-	Type_ *     e; \
-	isize       count; \
-	isize       capacity; \
+template <typename T>
+T *begin(Array<T> &array) {
+	return array.data;
+}
+template <typename T>
+T const *begin(Array<T> const &array) {
+	return array.data;
+}
+template <typename T>
+T *end(Array<T> &array) {
+	return array.data + array.count;
+}
+template <typename T>
+T const *end(Array<T> const &array) {
+	return array.data + array.count;
 }
 
-typedef Array(void) ArrayVoid;
-
-#define array_init_reserve(x_, allocator_, init_capacity_) do { \
-	void **e = cast(void **)&((x_)->e); \
-	GB_ASSERT((x_) != nullptr); \
-	(x_)->allocator = (allocator_); \
-	(x_)->count = 0; \
-	(x_)->capacity = (init_capacity_); \
-	*e = gb_alloc((allocator_), gb_size_of(*(x_)->e)*(init_capacity_)); \
-} while (0)
-
-#define array_init_count(x_, allocator_, init_count_) do { \
-	void **e = cast(void **)&((x_)->e); \
-	GB_ASSERT((x_) != nullptr); \
-	(x_)->allocator = (allocator_); \
-	(x_)->count = (init_count_); \
-	(x_)->capacity = (init_count_); \
-	*e = gb_alloc((allocator_), gb_size_of(*(x_)->e)*(init_count_)); \
-} while (0)
-
-#define array_init(x_, allocator_)        do { array_init_reserve(x_, allocator_, ARRAY_GROW_FORMULA(0)); } while (0)
-#define array_free(x_)                    do { gb_free((x_)->allocator, (x_)->e); } while (0)
-#define array_set_capacity(x_, capacity_) do { array__set_capacity((x_), (capacity_), gb_size_of(*(x_)->e)); } while (0)
-
-#define array_grow(x_, min_capacity_) do { \
-	isize new_capacity = ARRAY_GROW_FORMULA((x_)->capacity); \
-	if (new_capacity < (min_capacity_)) { \
-		new_capacity = (min_capacity_); \
-	} \
-	array_set_capacity(x_, new_capacity); \
-} while (0)
-
-#define array_add(x_, item_) do { \
-	if ((x_)->capacity < (x_)->count+1) { \
-		array_grow(x_, 0); \
-	} \
-	(x_)->e[(x_)->count++] = item_; \
-} while (0)
-
-#define array_pop(x_)   do { GB_ASSERT((x_)->count > 0); (x_)->count--; } while (0)
-#define array_clear(x_) do { (x_)->count = 0; } while (0)
-
-#define array_resize(x_, new_count_) do { \
-	if ((x_)->capacity < (new_count_)) { \
-		array_grow((x_), (new_count_)); \
-	} \
-	(x_)->count = (new_count_); \
-} while (0)
-
-#define array_reserve(x_, new_capacity_) do { \
-	if ((x_)->capacity < (new_capacity_)) { \
-		array_set_capacity((x_), (new_capacity_)); \
-	} \
-} while (0)
-
-
-
-
-void array__set_capacity(void *ptr, isize capacity, isize element_size) {
-	ArrayVoid *x = cast(ArrayVoid *)ptr;
-	GB_ASSERT(ptr != nullptr);
-
-	GB_ASSERT(element_size > 0);
-
-	if (capacity == x->capacity) {
-		return;
-	}
-
-	if (capacity < x->count) {
-		if (x->capacity < capacity) {
-			isize new_capacity = ARRAY_GROW_FORMULA(x->capacity);
-			if (new_capacity < capacity) {
-				new_capacity = capacity;
-			}
-			array__set_capacity(ptr, new_capacity, element_size);
-		}
-		x->count = capacity;
-	}
-
-	x->e = gb_resize(x->allocator, x->e, element_size*x->capacity, element_size*capacity);
-	x->capacity = capacity;
+template <typename T>
+T *begin(Slice<T> &array) {
+	return array.data;
 }
-#endif
-
+template <typename T>
+T const *begin(Slice<T> const &array) {
+	return array.data;
+}
+template <typename T>
+T *end(Slice<T> &array) {
+	return array.data + array.count;
+}
+template <typename T>
+T const *end(Slice<T> const &array) {
+	return array.data + array.count;
+}

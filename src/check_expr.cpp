@@ -2017,8 +2017,8 @@ void add_comparison_procedures_for_fields(CheckerContext *c, Type *t) {
 		}
 		break;
 	case Type_Struct:
-		for_array(i, t->Struct.fields) {
-			add_comparison_procedures_for_fields(c, t->Struct.fields[i]->type);
+		for (Entity *field : t->Struct.fields) {
+			add_comparison_procedures_for_fields(c, field->type);
 		}
 		break;
 	}

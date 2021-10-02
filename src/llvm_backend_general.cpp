@@ -1700,18 +1700,18 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, type->Struct.fields.count*2 + 1);
 			
 			i64 padding_offset = 0;
-			for_array(i, type->Struct.fields) {
-				GB_ASSERT(type->Struct.offsets != nullptr);
-				
-				Entity *field = type->Struct.fields[i];
-				i64 padding = type->Struct.offsets[i] - padding_offset;
+			// auto field_indices = struct_fields_index_by_increasing_offset(type, temporary_allocator());
+			// for (i32 field_index : field_indices) {
+			for (isize field_index = 0; field_index < type->Struct.fields.count; field_index++) {
+				Entity *field = type->Struct.fields[field_index];
+				i64 padding = type->Struct.offsets[field_index] - padding_offset;
 
 				if (padding != 0) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, type_align_of(field->type));
 					array_add(&fields, padding_type);					
 				}
 				
-				field_remapping[i] = cast(i32)fields.count;
+				field_remapping[field_index] = cast(i32)fields.count;
 				array_add(&fields, lb_type(m, field->type));
 				
 				if (!type->Struct.is_packed) {
@@ -1720,7 +1720,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				padding_offset += type_size_of(field->type);
 			}
 			
-			i64 end_padding = type_size_of(type)-padding_offset;
+			i64 full_type_size = type_size_of(type);
+			i64 end_padding = full_type_size-padding_offset;
 			if (end_padding > 0) {
 				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
 			}
@@ -1731,7 +1732,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			
 			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, type->Struct.is_packed);
 			map_set(&m->struct_field_remapping, hash_pointer(struct_type), field_remapping);
-			map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);
+			map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);			
+			GB_ASSERT(lb_sizeof(struct_type) == full_type_size);
 			return struct_type;
 		}
 		break;

@@ -171,7 +171,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			LLVMConstInBoundsGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
 		};
-		LLVMValueRef slice = llvm_const_named_struct(llvm_addr_type(global_type_table), values, gb_count_of(values));
+		LLVMValueRef slice = llvm_const_named_struct_internal(llvm_addr_type(global_type_table), values, gb_count_of(values));
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}

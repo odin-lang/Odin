@@ -39,8 +39,7 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 	}
 
 	if (t->kind == Type_Struct) {
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
+		for (Entity *f : t->Struct.fields) {
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
 			Entity *e = scope_lookup_current(ctx->scope, name);
