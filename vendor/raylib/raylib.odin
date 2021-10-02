@@ -121,7 +121,7 @@ Image :: struct {
 	width:   c.int,               // Image base width
 	height:  c.int,               // Image base height
 	mipmaps: c.int,               // Mipmap levels, 1 by default
-	format:  c.int,               // Data format (PixelFormat type)
+	format:  PixelFormat,         // Data format (PixelFormat type)
 }
 
 // Texture type
@@ -131,7 +131,7 @@ Texture :: struct {
 	width:   c.int,               // Texture base width
 	height:  c.int,               // Texture base height
 	mipmaps: c.int,               // Mipmap levels, 1 by default
-	format:  c.int,               // Data format (PixelFormat type)
+	format:  PixelFormat,         // Data format (PixelFormat type)
 }
 
 // Texture2D type, same as Texture
