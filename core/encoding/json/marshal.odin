@@ -35,23 +35,6 @@ marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 }
 
 marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
-	write_f64 :: proc(w: io.Writer, val: f64, size: int) -> io.Error {
-		buf: [386]byte
-
-		str := strconv.append_float(buf[1:], val, 'f', 2*size, 8*size)
-		s := buf[:len(str)+1]
-		if s[1] == '+' || s[1] == '-' {
-			s = s[1:]
-		} else {
-			s[0] = '+'
-		}
-		if s[0] == '+' {
-			s = s[1:]
-		}
-
-		_ = io.write_string(w, string(s)) or_return
-		return nil
-	}	
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
