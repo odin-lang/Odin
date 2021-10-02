@@ -2759,23 +2759,30 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 	return sel;
 }
 
-GB_COMPARE_PROC(struct_field_cmp_by_offset) {
-	i64 x = *(i64 const *)(a);
-	i64 y = *(i64 const *)(b);
-	if (x < y) {
-		return -1;
-	} else if (x > y) {
-		return +1;
-	}
-	return 0;
-}
-
-
-Slice<i32> struct_fields_index_by_increasing_offset(Type *type, gbAllocator allocator) {
+bool are_struct_fields_reordered(Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Struct);
 	type_set_offsets(type);
 	GB_ASSERT(type->Struct.offsets != nullptr);
+	
+	i64 prev_offset = 0;
+	for_array(i, type->Struct.fields) {
+		i64 offset = type->Struct.offsets[i];
+		if (prev_offset > offset) {
+			return true;
+		}
+		prev_offset = offset;
+	}
+
+	return false;
+}
+
+Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allocator, Type *type) {
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_Struct);
+	type_set_offsets(type);
+	GB_ASSERT(type->Struct.offsets != nullptr);
+	
 	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);
 	
 	i64 prev_offset = 0;
@@ -2790,14 +2797,13 @@ Slice<i32> struct_fields_index_by_increasing_offset(Type *type, gbAllocator allo
 	}
 	if (!is_ordered) {
 		isize n = indices.count;
-		for (isize i = 0; i < n-1; i++) {
-			for (isize j = 0; j < n-i-1; j++) {
-				isize a = j;
-				isize b = j+1;
-				if (type->Struct.offsets[a] > type->Struct.offsets[b]) {
-					gb_swap(i32, indices[a], indices[b]);
-				}
-			}
+		for (isize i = 1; i < n; i++) {
+			isize j = i;
+			
+			while (j > 0 && type->Struct.offsets[indices[j-1]] > type->Struct.offsets[indices[j]]) {
+				gb_swap(i32, indices[j-1], indices[j]);
+				j -= 1;
+			}				
 		}
 	}
 	
