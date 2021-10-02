@@ -78,7 +78,7 @@ Get live support and talk with other odiners on the Odin Discord.
 
 ### References
 
-#### [Language Specification](https://odin-lang.org/ref/spec)
+#### [Language Specification](https://odin-lang.org/docs/spec/)
 
 The official Odin Language specification.
 
