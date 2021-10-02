@@ -139,7 +139,7 @@ lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
 		};
 		lbValue res = {};
 		res.type = t_string;
-		res.value = llvm_const_named_struct(lb_type(p->module, t_string), values, gb_count_of(values));
+		res.value = llvm_const_named_struct(p->module, t_string, values, gb_count_of(values));
 		return res;
 	} else {
 		lbAddr res = lb_add_local_generated(p, t_string, false);

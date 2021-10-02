@@ -436,7 +436,7 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
 
 LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_);
-LLVMValueRef llvm_const_named_struct(LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
+LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
 void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
 
 lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);

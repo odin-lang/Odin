@@ -679,6 +679,7 @@ bool are_types_identical(Type *x, Type *y);
 bool is_type_pointer(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
+bool type_set_offsets(Type *t);
 
 void init_type_mutex(void) {
 	mutex_init(&g_type_mutex);
@@ -2757,6 +2758,53 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 
 	return sel;
 }
+
+GB_COMPARE_PROC(struct_field_cmp_by_offset) {
+	i64 x = *(i64 const *)(a);
+	i64 y = *(i64 const *)(b);
+	if (x < y) {
+		return -1;
+	} else if (x > y) {
+		return +1;
+	}
+	return 0;
+}
+
+
+Slice<i32> struct_fields_index_by_increasing_offset(Type *type, gbAllocator allocator) {
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_Struct);
+	type_set_offsets(type);
+	GB_ASSERT(type->Struct.offsets != nullptr);
+	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);
+	
+	i64 prev_offset = 0;
+	bool is_ordered = true;
+	for_array(i, indices) {
+		indices.data[i] = cast(i32)i;
+		i64 offset = type->Struct.offsets[i];
+		if (is_ordered && prev_offset > offset) {
+			is_ordered = false;
+		}
+		prev_offset = offset;
+	}
+	if (!is_ordered) {
+		isize n = indices.count;
+		for (isize i = 0; i < n-1; i++) {
+			for (isize j = 0; j < n-i-1; j++) {
+				isize a = j;
+				isize b = j+1;
+				if (type->Struct.offsets[a] > type->Struct.offsets[b]) {
+					gb_swap(i32, indices[a], indices[b]);
+				}
+			}
+		}
+	}
+	
+	return indices;
+}
+
+
 
 
 // IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?

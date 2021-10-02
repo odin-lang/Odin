@@ -132,7 +132,7 @@ LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values,
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(struct_type);
 	if (elem_count == value_count) {
-		return llvm_const_named_struct(struct_type, values, value_count_);
+		return llvm_const_named_struct_internal(struct_type, values, value_count_);
 	}
 	Type *bt = base_type(t);
 	GB_ASSERT(bt->kind == Type_Struct);
@@ -152,10 +152,10 @@ LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values,
 		}
 	}
 	
-	return llvm_const_named_struct(struct_type, values_with_padding, values_with_padding_count);
+	return llvm_const_named_struct_internal(struct_type, values_with_padding, values_with_padding_count);
 }
 
-LLVMValueRef llvm_const_named_struct(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
+LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(t);
 	GB_ASSERT_MSG(value_count == elem_count, "%s %u %u", LLVMPrintTypeToString(t), value_count, elem_count);
@@ -895,7 +895,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 
 			if (is_constant) {
-				res.value = llvm_const_named_struct(struct_type, values, cast(unsigned)value_count);
+				res.value = llvm_const_named_struct_internal(struct_type, values, cast(unsigned)value_count);
 				return res;
 			} else {
 				// TODO(bill): THIS IS HACK BUT IT WORKS FOR WHAT I NEED
@@ -909,7 +909,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						new_values[i] = LLVMConstNull(LLVMTypeOf(old_value));
 					}
 				}
-				LLVMValueRef constant_value = llvm_const_named_struct(struct_type, new_values, cast(unsigned)value_count);
+				LLVMValueRef constant_value = llvm_const_named_struct_internal(struct_type, new_values, cast(unsigned)value_count);
 
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;
