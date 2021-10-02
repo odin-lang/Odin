@@ -293,7 +293,8 @@ rect_overlaps_vec2 :: proc(r: Rect, p: Vec2) -> bool {
 	return p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
 }
 
-@private default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
+@private 
+default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
 	draw_rect(ctx, rect, ctx.style.colors[colorid])
 	if colorid == .SCROLL_BASE || colorid == .SCROLL_THUMB || colorid == .TITLE_BG {
 		return
@@ -453,7 +454,12 @@ check_clip :: proc(ctx: ^Context, r: Rect) -> Clip {
 	return .PART
 }
 
-@private push_layout :: proc(ctx: ^Context, body: Rect, scroll: Vec2) {
+get_layout :: proc(ctx: ^Context) -> ^Layout {
+	return &ctx.layout_stack.items[ctx.layout_stack.idx - 1]
+}
+
+@private 
+push_layout :: proc(ctx: ^Context, body: Rect, scroll: Vec2) {
 	layout: Layout
 	layout.body = Rect{body.x - scroll.x, body.y - scroll.y, body.w, body.h}
 	layout.max = Vec2{-0x1000000, -0x1000000}
@@ -461,11 +467,8 @@ check_clip :: proc(ctx: ^Context, r: Rect) -> Clip {
 	layout_row(ctx, {0})
 }
 
-@private get_layout :: proc(ctx: ^Context) -> ^Layout {
-	return &ctx.layout_stack.items[ctx.layout_stack.idx - 1]
-}
-
-@private pop_container :: proc(ctx: ^Context) {
+@private 
+pop_container :: proc(ctx: ^Context) {
 	cnt := get_current_container(ctx)
 	layout := get_layout(ctx)
 	cnt.content_size.x = layout.max.x - layout.body.x
@@ -710,6 +713,12 @@ layout_end_column :: proc(ctx: ^Context) {
 	a.next_row = max(a.next_row, b.next_row + b.body.y - a.body.y)
 	a.max.x = max(a.max.x, b.max.x)
 	a.max.y = max(a.max.y, b.max.y)
+}
+
+@(deferred_in=layout_end_column)
+layout_column :: proc(ctx: ^Context) -> bool {
+	layout_begin_column(ctx)
+	return true
 }
 
 layout_row :: proc(ctx: ^Context, widths: []i32, height: i32 = 0) {
@@ -1011,8 +1020,7 @@ parse_real :: #force_inline proc(s: string) -> (Real, bool) {
 	f, ok := strconv.parse_f64(s)
 	return Real(f), ok
 }
-
-@private 
+ 
 number_textbox :: proc(ctx: ^Context, value: ^Real, r: Rect, id: Id, fmt_string: string) -> bool {
 	if ctx.mouse_pressed_bits == {.LEFT} && .SHIFT in ctx.key_down_bits && ctx.hover_id == id {
 		ctx.number_edit_id = id
@@ -1181,7 +1189,8 @@ treenode :: proc(ctx: ^Context, label: string, opt := Options{}) -> Result_Set {
 }
 
 
-@private scrollbar :: proc(ctx: ^Context, cnt: ^Container, _b: ^Rect, cs: Vec2, id_string: string, i: int) {
+@private 
+scrollbar :: proc(ctx: ^Context, cnt: ^Container, _b: ^Rect, cs: Vec2, id_string: string, i: int) {
 	b := (^struct{ pos, size: [2]i32 })(_b)
 	#assert(size_of(b^) == size_of(_b^))
 
