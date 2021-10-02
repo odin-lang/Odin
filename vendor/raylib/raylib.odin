@@ -10,6 +10,9 @@ when USE_LINALG {
 	import "core:math/linalg"	
 }
 
+MAX_TEXTFORMAT_BUFFERS :: #config(RAYLIB_MAX_TEXTFORMAT_BUFFERS, 4)
+MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
+
 #assert(size_of(rune) == size_of(c.int))
 
 when ODIN_OS == "windows" {
@@ -1404,8 +1407,25 @@ foreign lib {
 }
 
 
+
 // Text formatting with variables (sprintf style)
 TextFormat :: proc(text: cstring, args: ..any) -> cstring { 
+	@static buffers: [MAX_TEXTFORMAT_BUFFERS][MAX_TEXT_BUFFER_LENGTH]byte
+	@static index: u32
+	
+	buffer := buffers[index][:]
+	mem.zero_slice(buffer)
+	
+	index = (index+1)%MAX_TEXTFORMAT_BUFFERS
+	
+	str := fmt.bprintf(buffer[:len(buffer)-1], string(text), ..args)
+	buffer[len(str)] = 0
+	
+	return cstring(raw_data(buffer))
+}
+
+// Text formatting with variables (sprintf style) and allocates (must be freed with 'MemFree')
+TextFormatAlloc :: proc(text: cstring, args: ..any) -> cstring { 
 	str := fmt.tprintf(string(text), ..args)
 	return strings.clone_to_cstring(str, MemAllocator())
 }
