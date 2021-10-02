@@ -116,14 +116,14 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 		write_byte(w, '\'', &n) or_return
 	}
 	switch r {
-	case '\a': write_string(w, `\a"`, &n) or_return
-	case '\b': write_string(w, `\b"`, &n) or_return
-	case '\e': write_string(w, `\e"`, &n) or_return
-	case '\f': write_string(w, `\f"`, &n) or_return
-	case '\n': write_string(w, `\n"`, &n) or_return
-	case '\r': write_string(w, `\r"`, &n) or_return
-	case '\t': write_string(w, `\t"`, &n) or_return
-	case '\v': write_string(w, `\v"`, &n) or_return
+	case '\a': write_string(w, `\a`, &n) or_return
+	case '\b': write_string(w, `\b`, &n) or_return
+	case '\e': write_string(w, `\e`, &n) or_return
+	case '\f': write_string(w, `\f`, &n) or_return
+	case '\n': write_string(w, `\n`, &n) or_return
+	case '\r': write_string(w, `\r`, &n) or_return
+	case '\t': write_string(w, `\t`, &n) or_return
+	case '\v': write_string(w, `\v`, &n) or_return
 	case:
 		if r < 32 {
 			write_string(w, `\x`, &n) or_return
@@ -132,8 +132,8 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
 			case 0: write_string(w, "00", &n) or_return
-			case 1: write_byte(w, '0', &n)             or_return
-			case 2: write_string(w, s, &n)    or_return
+			case 1: write_byte(w, '0',    &n) or_return
+			case 2: write_string(w, s,    &n) or_return
 			}
 		} else {
 			write_rune(w, r, &n) or_return
