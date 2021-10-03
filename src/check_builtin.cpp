@@ -753,7 +753,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			field_name = field_arg->tav.value.value_string;
 		}
 		if (field_name.len == 0) {
-			error(field_arg, "Expected a constant (non-empty) string for field argument: %d", field_arg->tav.value.kind);
+			error(field_arg, "Expected a constant (non-empty) string for field argument");
 			return false;
 		}
 
