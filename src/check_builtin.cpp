@@ -669,39 +669,49 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		GB_ASSERT(type != nullptr);
-
-		if (field_arg == nullptr ||
-		    field_arg->kind != Ast_Ident) {
-			error(field_arg, "Expected an identifier for field argument");
+		
+		String field_name = {};
+		
+		if (field_arg == nullptr) {
+			error(call, "Expected an identifier or constant string for field argument");
 			return false;
 		}
+
+		if (field_arg->kind == Ast_Ident) {
+			field_name = field_arg->Ident.token.string;
+		} else if (field_arg->tav.mode == Addressing_Constant && field_arg->tav.value.kind == ExactValue_String) {
+			field_name = field_arg->tav.value.value_string;
+		}
+		if (field_name.len == 0) {
+			error(field_arg, "Expected an identifier or constant (non-empty) string for field argument");
+			return false;
+		}
+
+		
 		if (is_type_array(type)) {
 			gbString t = type_to_string(type);
 			error(field_arg, "Invalid a struct type for 'offset_of', got '%s'", t);
 			gb_string_free(t);
 			return false;
 		}
-
-
-		ast_node(arg, Ident, field_arg);
-		String field_name = arg->token.string;
+		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
 			gbString type_str = type_to_string(type);
 			error(ce->args[0],
-			      "'%s' has no field named '%.*s'", type_str, LIT(arg->token.string));
+			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
 
 			Type *bt = base_type(type);
 			if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(arg->token.string, bt->Struct.fields);
+				check_did_you_mean_type(field_name, bt->Struct.fields);
 			}
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string(type);
 			error(ce->args[0],
-			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(arg->token.string), type_str);
+			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
