@@ -862,6 +862,7 @@ void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->packages, a);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->testing_procedures, a, 0, 0);
+	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
 
@@ -1266,7 +1267,7 @@ void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope *scope) {
 		AstPackage *pkg = c->file->pkg;
 		if (pkg->kind == Package_Init && e->kind == Entity_Procedure && e->token.string == "main") {
 			// Do nothing
-		} else if (e->flags & EntityFlag_Test) {
+		} else if (e->flags & (EntityFlag_Test|EntityFlag_Init)) {
 			// Do nothing
 		} else {
 			e->flags |= EntityFlag_Lazy;
@@ -1340,7 +1341,7 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 		return false;
 	}
 
-	if (e->flags & EntityFlag_Test) {
+	if (e->flags & (EntityFlag_Test|EntityFlag_Init)) {
 		return false;
 	} else if (e->kind == Entity_Variable && e->Variable.is_export) {
 		return false;
@@ -1373,6 +1374,8 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 				if (name == "test") {
 					return false;
 				} else if (name == "export") {
+					return false;
+				} else if (name == "init") {
 					return false;
 				}
 			}
@@ -2054,6 +2057,29 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			if (e->Procedure.is_export) {
 				add_dependency_to_set(c, e);
 			}
+			if (e->flags & EntityFlag_Init) {
+				Type *t = base_type(e->type);
+				GB_ASSERT(t->kind == Type_Proc);
+				
+				bool is_init = true;
+				
+				if (t->Proc.param_count != 0 || t->Proc.result_count != 0) {
+					gbString str = type_to_string(t);
+					error(e->token, "@(init) procedures must have a signature type with no parameters nor results, got %s", str);
+					gb_string_free(str);
+					is_init = false;
+				}
+				
+				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+					error(e->token, "@(init) procedures must be declared at the file scope");
+					is_init = false;
+				}
+				
+				if (is_init) {
+					add_dependency_to_set(c, e);
+					array_add(&c->info.init_procedures, e);
+				}					
+			}
 			break;
 		}
 	}
@@ -2611,6 +2637,12 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			return false;
 		}
 		return true;
+	} else if (name == "init") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+		}
+		ac->init = true;
+		return true;
 	} else if (name == "deferred") {
 		if (value != nullptr) {
 			Operand o = {};
@@ -3154,6 +3186,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 	EntityVisiblityKind entity_visibility_kind = c->foreign_context.visibility_kind;
 	bool is_test = false;
+	bool is_init = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -3211,6 +3244,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				j -= 1;
 			} else if (name == "test") {
 				is_test = true;
+			} else if (name == "init") {
+				is_init = true;
 			}
 		}
 	}
@@ -3336,6 +3371,9 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 				if (is_test) {
 					e->flags |= EntityFlag_Test;
+				}
+				if (is_init) {
+					e->flags |= EntityFlag_Init;
 				}
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
@@ -4342,6 +4380,7 @@ void check_import_entities(Checker *c) {
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
 		ImportGraphNode *node = package_order[pkg_index];
 		AstPackage *pkg = node->pkg;
+		pkg->order = 1+pkg_index;
 
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
@@ -5060,6 +5099,48 @@ void check_merge_queues_into_arrays(Checker *c) {
 	check_add_definitions_from_queues(c);
 }
 
+GB_COMPARE_PROC(init_procedures_cmp) {
+	int cmp = 0;
+	Entity *x = *(Entity **)a;
+	Entity *y = *(Entity **)b;
+	if (x == y) {
+		cmp = 0;
+		return cmp;
+	}
+	
+	if (x->pkg != y->pkg) {
+		isize order_x = x->pkg ? x->pkg->order : 0;
+		isize order_y = y->pkg ? y->pkg->order : 0;
+		cmp = isize_cmp(order_x, order_y);
+		if (cmp) {
+			return cmp;
+		}
+	}
+	if (x->file != y->file) {
+		String fullpath_x = x->file ? x->file->fullpath : (String{});
+		String fullpath_y = y->file ? y->file->fullpath : (String{});
+		String file_x = filename_from_path(fullpath_x);
+		String file_y = filename_from_path(fullpath_y);
+		
+		cmp = string_compare(file_x, file_y);
+		if (cmp) {
+			return cmp;
+		}
+	}
+
+	
+	cmp = u64_cmp(x->order_in_src, y->order_in_src);
+	if (cmp) {
+		return cmp;
+	}
+	return i32_cmp(x->token.pos.offset, y->token.pos.offset);
+}
+
+
+void check_sort_init_procedures(Checker *c) {
+	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
+}
+
 
 void check_parsed_files(Checker *c) {
 #define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
@@ -5227,6 +5308,9 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("sanity checks");
 	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
 	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
+	
+	TIME_SECTION("sort init procedures");
+	check_sort_init_procedures(c);
 
 	TIME_SECTION("type check finish");
 

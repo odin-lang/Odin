@@ -174,6 +174,7 @@ struct AstPackage {
 	Array<AstFile *>      files;
 	Array<AstForeignFile> foreign_files;
 	bool                  is_single_file;
+	isize                 order;
 
 	MPMCQueue<AstPackageExportedEntity> exported_entity_queue;
 

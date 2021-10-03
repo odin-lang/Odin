@@ -722,6 +722,9 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	if (ac.test) {
 		e->flags |= EntityFlag_Test;
 	}
+	if (ac.init) {
+		e->flags |= EntityFlag_Init;
+	}
 	if (ac.set_cold) {
 		e->flags |= EntityFlag_Cold;
 	}

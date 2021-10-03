@@ -47,6 +47,39 @@ void debugf(char const *fmt, ...);
 #include "range_cache.cpp"
 
 
+int isize_cmp(isize x, isize y) {
+	if (x < y) {
+		return -1;
+	} else if (x > y) {
+		return +1;
+	}
+	return 0;
+}
+int u64_cmp(u64 x, u64 y) {
+	if (x < y) {
+		return -1;
+	} else if (x > y) {
+		return +1;
+	}
+	return 0;
+}
+int i64_cmp(i64 x, i64 y) {
+	if (x < y) {
+		return -1;
+	} else if (x > y) {
+		return +1;
+	}
+	return 0;
+}
+int i32_cmp(i32 x, i32 y) {
+	if (x < y) {
+		return -1;
+	} else if (x > y) {
+		return +1;
+	}
+	return 0;
+}
+
 u32 fnv32a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
 	u32 h = 0x811c9dc5;
