@@ -749,8 +749,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 
-		if (field_arg->tav.mode == Addressing_Constant && field_arg->tav.value.kind == ExactValue_String) {
-			field_name = field_arg->tav.value.value_string;
+		Operand x = {};
+		check_expr(c, &x, field_arg);
+		if (x.mode == Addressing_Constant && x.value.kind == ExactValue_String) {
+			field_name = x.value.value_string;
 		}
 		if (field_name.len == 0) {
 			error(field_arg, "Expected a constant (non-empty) string for field argument");
