@@ -78,7 +78,7 @@ global_platform_memory_block_sentinel: Platform_Memory_Block
 @(private)
 global_platform_memory_block_sentinel_set: bool
 
-@(private)
+@(init)
 platform_memory_init :: proc() {
 	if !global_platform_memory_block_sentinel_set {
 		_platform_memory_init()
@@ -89,17 +89,14 @@ platform_memory_init :: proc() {
 }
 
 platform_memory_alloc :: proc(block_size: int) -> (^Platform_Memory_Block, mem.Allocator_Error) {
-	platform_memory_init()
 	return _platform_memory_alloc(block_size)
 }
 
 
 platform_memory_free :: proc(block: ^Platform_Memory_Block) {
-	platform_memory_init()
 	_platform_memory_free(block)
 }
 
 platform_memory_protect :: proc(memory: rawptr, size: int) {
-	platform_memory_init()
 	_platform_memory_protect(memory, size)
 }
