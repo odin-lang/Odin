@@ -9,9 +9,11 @@ enum BuiltinProcId {
 	BuiltinProc_size_of,
 	BuiltinProc_align_of,
 	BuiltinProc_offset_of,
+	BuiltinProc_offset_of_by_string,
 	BuiltinProc_type_of,
 	BuiltinProc_type_info_of,
 	BuiltinProc_typeid_of,
+	
 
 	BuiltinProc_swizzle,
 
@@ -247,7 +249,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("align_of"),         1, false, Expr_Expr, BuiltinProcPkg_builtin},
-	{STR_LIT("offset_of"),        1, true, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("offset_of"),        1, true,  Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("offset_of_by_string"),2, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("type_of"),          1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("type_info_of"),     1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("typeid_of"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},

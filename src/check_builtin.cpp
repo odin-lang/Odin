@@ -171,6 +171,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
+	case BuiltinProc_offset_of_by_string:
 	case BuiltinProc_type_info_of:
 	case BuiltinProc_typeid_of:
 	case BuiltinProc_len:
@@ -634,7 +635,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Ast *arg0 = unparen_expr(ce->args[0]);
 			if (arg0->kind != Ast_SelectorExpr) {
 				gbString x = expr_to_string(arg0);
-				error(ce->args[0], "Invalid expression for 'offset_of', '%s' is not a selector expression", x);
+				error(ce->args[0], "Invalid expression for '%.*s', '%s' is not a selector expression", LIT(builtin_name), x);
 				gb_string_free(x);
 				return false;
 			}
@@ -650,7 +651,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			Type *bt = base_type(type);
 			if (bt == nullptr || bt == t_invalid) {
-				error(ce->args[0], "Expected a type for 'offset_of'");
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
 				return false;
 			}
 
@@ -659,13 +660,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			type = check_type(c, ce->args[0]);
 			Type *bt = base_type(type);
 			if (bt == nullptr || bt == t_invalid) {
-				error(ce->args[0], "Expected a type for 'offset_of'");
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
 				return false;
 			}
 
 			field_arg = unparen_expr(ce->args[1]);
 		} else {
-			error(ce->args[0], "Expected either 1 or 2 arguments to 'offset_of', in the format of 'offset_of(Type, field)', 'offset_of(value.field)'");
+			error(ce->args[0], "Expected either 1 or 2 arguments to '%.*s', in the format of '%.*s(Type, field)', '%.*s(value.field)'", LIT(builtin_name), LIT(builtin_name), LIT(builtin_name));
 			return false;
 		}
 		GB_ASSERT(type != nullptr);
@@ -673,24 +674,93 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		String field_name = {};
 		
 		if (field_arg == nullptr) {
-			error(call, "Expected an identifier or constant string for field argument");
+			error(call, "Expected an identifier for field argument");
 			return false;
 		}
 
 		if (field_arg->kind == Ast_Ident) {
 			field_name = field_arg->Ident.token.string;
-		} else if (field_arg->tav.mode == Addressing_Constant && field_arg->tav.value.kind == ExactValue_String) {
-			field_name = field_arg->tav.value.value_string;
 		}
 		if (field_name.len == 0) {
-			error(field_arg, "Expected an identifier or constant (non-empty) string for field argument");
+			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
 
 		
 		if (is_type_array(type)) {
 			gbString t = type_to_string(type);
-			error(field_arg, "Invalid a struct type for 'offset_of', got '%s'", t);
+			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+		
+		Selection sel = lookup_field(type, field_name, false);
+		if (sel.entity == nullptr) {
+			gbString type_str = type_to_string(type);
+			error(ce->args[0],
+			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+			gb_string_free(type_str);
+
+			Type *bt = base_type(type);
+			if (bt->kind == Type_Struct) {
+				check_did_you_mean_type(field_name, bt->Struct.fields);
+			}
+			return false;
+		}
+		if (sel.indirect) {
+			gbString type_str = type_to_string(type);
+			error(ce->args[0],
+			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+		operand->mode = Addressing_Constant;
+		operand->value = exact_value_i64(type_offset_of_from_selection(type, sel));
+		operand->type  = t_uintptr;
+		break;
+	}
+	
+	case BuiltinProc_offset_of_by_string: {
+		// offset_of_by_string :: proc(Type, string) -> uintptr
+
+		Type *type = nullptr;
+		Ast *field_arg = nullptr;
+
+		if (ce->args.count == 2) {
+			type = check_type(c, ce->args[0]);
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			field_arg = unparen_expr(ce->args[1]);
+		} else {
+			error(ce->args[0], "Expected either 2 arguments to '%.*s', in the format of '%.*s(Type, field)'", LIT(builtin_name), LIT(builtin_name));
+			return false;
+		}
+		GB_ASSERT(type != nullptr);
+		
+		String field_name = {};
+		
+		if (field_arg == nullptr) {
+			error(call, "Expected a constant (not-empty) string for field argument");
+			return false;
+		}
+
+		if (field_arg->tav.mode == Addressing_Constant && field_arg->tav.value.kind == ExactValue_String) {
+			field_name = field_arg->tav.value.value_string;
+		}
+		if (field_name.len == 0) {
+			error(field_arg, "Expected a constant (non-empty) string for field argument: %d", field_arg->tav.value.kind);
+			return false;
+		}
+
+		
+		if (is_type_array(type)) {
+			gbString t = type_to_string(type);
+			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
