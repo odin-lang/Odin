@@ -99,14 +99,6 @@ struct DeferredProcedure {
 
 
 struct AttributeContext {
-	bool    is_export;
-	bool    is_static;
-	bool    require_results;
-	bool    require_declaration;
-	bool    has_disabled_proc;
-	bool    disabled_proc;
-	bool    test;
-	bool    set_cold;
 	String  link_name;
 	String  link_prefix;
 	String  link_section;
@@ -115,6 +107,15 @@ struct AttributeContext {
 	String  deprecated_message;
 	String  warning_message;
 	DeferredProcedure deferred_procedure;
+	bool    is_export           : 1;
+	bool    is_static           : 1;
+	bool    require_results     : 1;
+	bool    require_declaration : 1;
+	bool    has_disabled_proc   : 1;
+	bool    disabled_proc       : 1;
+	bool    test                : 1;
+	bool    init                : 1;
+	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 };
 
@@ -284,6 +285,7 @@ struct CheckerInfo {
 
 
 	Array<Entity *> testing_procedures;
+	Array<Entity *> init_procedures;
 
 	Array<Entity *> definitions;
 	Array<Entity *> entities;

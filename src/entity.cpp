@@ -73,6 +73,7 @@ enum EntityFlag : u64 {
 	EntityFlag_SwitchValue   = 1ull<<29,
 
 	EntityFlag_Test          = 1ull<<30,
+	EntityFlag_Init          = 1ull<<31,
 
 	EntityFlag_Overridden    = 1ull<<63,
 

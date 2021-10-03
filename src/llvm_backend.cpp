@@ -653,7 +653,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	lb_populate_function_pass_manager(main_module, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
-	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
+	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
@@ -731,6 +731,13 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 			var->is_initialized = true;
 		}
 	}
+	
+	CheckerInfo *info = main_module->gen->info;
+	
+	for (Entity *e : info->init_procedures) {
+		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
+		lb_emit_call(p, value, {}, ProcInlining_none, false);
+	}
 
 
 	lb_end_procedure_body(p);
@@ -799,8 +806,9 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
 		lb_fill_slice(p, args, argv, argc);
 	}
-
-	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
+	
+	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
+	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none, false);
 
 	if (build_context.command_kind == Command_test) {
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
