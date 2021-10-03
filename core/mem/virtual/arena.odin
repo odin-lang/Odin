@@ -148,13 +148,10 @@ growing_arena_temp_end :: proc(temp: Growing_Arena_Temp, loc := #caller_location
 	}
 	
 	if block := arena.curr_block; block != nil {
-		
 		assert(block.used >= temp.used, "out of order use of growing_arena_temp_end", loc)
 		amount_to_zero := min(block.used-temp.used, block.size-block.used)
-		
+		mem.zero_slice(block.base[temp.used:][:amount_to_zero])
 		block.used = temp.used
-		
-		mem.zero_slice(block.base[block.used:][:amount_to_zero])
 	}
 	
 	assert(arena.temp_count > 0, "double-use of growing_arena_temp_end", loc)
@@ -162,5 +159,5 @@ growing_arena_temp_end :: proc(temp: Growing_Arena_Temp, loc := #caller_location
 }
 
 growing_arena_check_temp :: proc(arena: ^Growing_Arena, loc := #caller_location) {
-	assert(condition = arena.temp_count == 0, loc = loc)
+	assert(arena.temp_count == 0, "Growing_Arena_Temp not been ended", loc)
 }
