@@ -135,6 +135,7 @@ duration_round :: proc(d, m: Duration) -> Duration {
 	}
 	return MAX_DURATION
 }
+
 duration_truncate :: proc(d, m: Duration) -> Duration {
 	return d if m <= 0 else d - d%m
 }
@@ -148,17 +149,33 @@ year :: proc(t: Time) -> (year: int) {
 	year, _, _, _ = _date(t, true)
 	return
 }
+
 month :: proc(t: Time) -> (month: Month) {
 	_, month, _, _ = _date(t, true)
 	return
 }
+
 day :: proc(t: Time) -> (day: int) {
 	_, _, day, _ = _date(t, true)
 	return
 }
 
-clock :: proc(t: Time) -> (hour, min, sec: int) {
-	sec = int(_time_abs(t) % SECONDS_PER_DAY)
+clock :: proc { clock_from_time, clock_from_duration, clock_from_stopwatch }
+
+clock_from_time :: proc(t: Time) -> (hour, min, sec: int) {
+	return clock_from_seconds(_time_abs(t))
+}
+
+clock_from_duration :: proc(d: Duration) -> (hour, min, sec: int) {
+	return clock_from_seconds(u64(d/1e9))
+}
+
+clock_from_stopwatch :: proc(s: Stopwatch) -> (hour, min, sec: int) {
+	return clock_from_duration(duration(s))
+}
+
+clock_from_seconds :: proc(nsec: u64) -> (hour, min, sec: int) {
+	sec = int(nsec % SECONDS_PER_DAY)
 	hour = sec / SECONDS_PER_HOUR
 	sec -= hour * SECONDS_PER_HOUR
 	min = sec / SECONDS_PER_MINUTE
@@ -166,11 +183,9 @@ clock :: proc(t: Time) -> (hour, min, sec: int) {
 	return
 }
 
-
 read_cycle_counter :: proc() -> u64 {
 	return u64(intrinsics.read_cycle_counter())
 }
-
 
 unix :: proc(sec: i64, nsec: i64) -> Time {
 	sec, nsec := sec, nsec
