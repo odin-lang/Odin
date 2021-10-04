@@ -68,6 +68,7 @@ growing_arena_free_all :: proc(arena: ^Growing_Arena) {
 		growing_arena_free_last_memory_block(arena)
 	}
 	arena.total_used = 0
+	arena.total_allocated = 0
 }
 
 growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
@@ -160,3 +161,6 @@ growing_arena_temp_end :: proc(temp: Growing_Arena_Temp, loc := #caller_location
 growing_arena_check_temp :: proc(arena: ^Growing_Arena, loc := #caller_location) {
 	assert(arena.temp_count == 0, "Growing_Arena_Temp not been ended", loc)
 }
+
+
+
