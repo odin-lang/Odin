@@ -2,8 +2,6 @@
 //+private
 package mem_virtual
 
-import "core:mem"
-
 foreign import Kernel32 "system:Kernel32.lib"
 
 LPSYSTEM_INFO :: ^SYSTEM_INFO
@@ -60,28 +58,38 @@ foreign Kernel32 {
 }
 
 
+_reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
+	result := VirtualAlloc(nil, size, MEM_RELEASE, PAGE_READWRITE)
+	if result == nil {
+		err = .Out_Of_Memory
+		return
+	}
+	data = ([^]byte)(result)[:size]
+	return
+}
+
+_commit :: proc(data: rawptr, size: uint) {
+	VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE)
+}
+_decommit :: proc(data: rawptr, size: uint) {
+	VirtualFree(data, size, MEM_DECOMMIT)
+}
+_release :: proc(data: rawptr, size: uint) {
+	VirtualFree(data, 0, MEM_RELEASE)
+}
+_protect :: proc(data: rawptr, size: uint) -> bool {
+	old_protect: u32
+	ok := VirtualProtect(data, size, PAGE_NOACCESS, &old_protect)
+	return bool(ok)
+}
+
+
+
 _platform_memory_init :: proc() {
 	sys_info: SYSTEM_INFO
 	GetSystemInfo(&sys_info)
-	DEFAULT_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, int(sys_info.dwPageSize))
-	assert(mem.is_power_of_two(uintptr(DEFAULT_PAGE_SIZE)))
-}
-
-_platform_memory_alloc :: proc(total_size: int) -> (pmblock: ^Platform_Memory_Block, err: mem.Allocator_Error) {
-	pmblock = (^Platform_Memory_Block)(VirtualAlloc(nil, uint(total_size), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE))
-	if pmblock == nil {
-		err = .Out_Of_Memory
-	}
-	return 
-}
-
-
-_platform_memory_free :: proc(block: ^Platform_Memory_Block) {
-	VirtualFree(block, 0, MEM_RELEASE)
-}
-
-_platform_memory_protect :: proc(memory: rawptr, size: int) -> bool {
-	old_protect: u32
-	ok := VirtualProtect(memory, uint(size), PAGE_NOACCESS, &old_protect)
-	return bool(ok)
+	DEFAULT_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, uint(sys_info.dwPageSize))
+	
+	// is power of two
+	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
