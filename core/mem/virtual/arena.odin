@@ -12,9 +12,8 @@ Growing_Arena :: struct {
 }
 
 DEFAULT_MINIMUM_BLOCK_SIZE :: 1024*1024 // 1 KiB should be enough
-DEFAULT_PAGE_SIZE := 4096
 
-growing_arena_alloc :: proc(arena: ^Growing_Arena, min_size: int, alignment: int) -> (data: []byte, err: mem.Allocator_Error) {
+growing_arena_alloc :: proc(arena: ^Growing_Arena, min_size: int, alignment: int) -> (data: []byte, err: Allocator_Error) {
 	align_forward_offset :: proc(arena: ^Growing_Arena, alignment: int) -> int #no_bounds_check {
 		alignment_offset := 0
 		ptr := uintptr(arena.curr_block.base[arena.curr_block.used:])
@@ -71,7 +70,7 @@ growing_arena_free_all :: proc(arena: ^Growing_Arena) {
 	arena.total_used = 0
 }
 
-growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: mem.Allocator_Error) {
+growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Growing_Arena
 	bootstrap.minimum_block_size = minimum_block_size
 	
@@ -84,7 +83,7 @@ growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintp
 	return
 }
 
-growing_arena_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: mem.Allocator_Error) { 
+growing_arena_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) { 
 	return growing_arena_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 growing_arena_bootstrap_new :: proc{
@@ -99,7 +98,7 @@ growing_arena_allocator :: proc(arena: ^Growing_Arena) -> mem.Allocator {
 growing_arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
-                             location := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
+                             location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Growing_Arena)(allocator_data)
 	
 	switch mode {
