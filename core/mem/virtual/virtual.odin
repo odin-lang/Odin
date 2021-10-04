@@ -16,11 +16,10 @@ commit :: proc(data: rawptr, size: uint) {
 }
 
 reserve_and_commit :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
-	data = _reserve(size) or_return
+	data = reserve(size) or_return
 	commit(raw_data(data), size)
 	return
 }
-
 
 decommit :: proc(data: rawptr, size: uint) {
 	_decommit(data, size)
@@ -30,9 +29,18 @@ release :: proc(data: rawptr, size: uint) {
 	_release(data, size)
 }
 
-protect :: proc(data: rawptr, size: uint) -> bool {
-	return _protect(data, size)
+Protect_Flag :: enum u32 {
+	Read,
+	Write,
+	Execute,
 }
+Protect_Flags :: distinct bit_set[Protect_Flag; u32]
+Protect_No_Access :: Protect_Flags{}
+
+protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
+	return _protect(data, size, flags)
+}
+
 
 
 
@@ -73,7 +81,7 @@ memory_alloc :: proc(size: int) -> (block: ^Memory_Block, err: Allocator_Error) 
 	assert(pmblock.block.prev == nil)
 	
 	if (do_protection) {
-		protect(rawptr(uintptr(pmblock) + protect_offset), page_size)
+		protect(rawptr(uintptr(pmblock) + protect_offset), page_size, Protect_No_Access)
 	}
 	
 	pmblock.block.size = size

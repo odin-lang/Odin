@@ -86,8 +86,13 @@ _decommit :: proc(data: rawptr, size: uint) {
 _release :: proc(data: rawptr, size: uint) {
 	munmap(data, size)
 }
-_protect :: proc(data: rawptr, size: uint) -> bool {
-	err := mprotect(data, size, PROT_NONE) 
+_protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
+	pflags: c.int
+	pflags = PROT_NONE
+	if .Read    in flags { pflags |= PROT_READ  }
+	if .Write   in flags { pflags |= PROT_WRITE }
+	if .Execute in flags { pflags |= PROT_EXEC  }
+	err := mprotect(data, size, pflags)
 	return err != 0
 }
 

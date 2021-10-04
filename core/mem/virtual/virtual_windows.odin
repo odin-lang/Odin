@@ -77,9 +77,25 @@ _decommit :: proc(data: rawptr, size: uint) {
 _release :: proc(data: rawptr, size: uint) {
 	VirtualFree(data, 0, MEM_RELEASE)
 }
-_protect :: proc(data: rawptr, size: uint) -> bool {
+_protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
+	pflags: u32
+	pflags = PAGE_NOACCESS
+	switch flags {
+	case {}:                        pflags = PAGE_NOACCESS
+	case {.Read}:                   pflags = PAGE_READONLY
+	case {.Read, .Write}:           pflags = PAGE_READWRITE
+	case {.Write}:                  pflags = PAGE_WRITECOPY
+	case {.Execute}:                pflags = PAGE_EXECUTE
+	case {.Execute, .Read}:         pflags = PAGE_EXECUTE_READ
+	case {.Execute, .Read, .Write}: pflags = PAGE_EXECUTE_READWRITE
+	case {.Execute, .Write}:        pflags = PAGE_EXECUTE_WRITECOPY
+	case: 
+		return false
+	}
+	
+	
 	old_protect: u32
-	ok := VirtualProtect(data, size, PAGE_NOACCESS, &old_protect)
+	ok := VirtualProtect(data, size, pflags, &old_protect)
 	return bool(ok)
 }
 
