@@ -415,20 +415,28 @@ Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
 		return nullptr;
 	}
 	StringHashKey key = string_hash_string(name);
+	Entity **found = nullptr;
+	Entity *result = nullptr;
 
 	mutex_lock(&s->mutex);
 	defer (mutex_unlock(&s->mutex));
-
-	Entity **found = string_map_get(&s->elements, key);
+	
+	found = string_map_get(&s->elements, key);
 
 	if (found) {
-		return *found;
+		if (entity != *found) {
+			result = *found;
+		}
+		goto end;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
-		Entity **found = string_map_get(&s->parent->elements, key);
+		found = string_map_get(&s->parent->elements, key);
 		if (found) {
 			if ((*found)->flags & EntityFlag_Result) {
-				return *found;
+				if (entity != *found) {
+					result = *found;
+				}
+				goto end;
 			}
 		}
 	}
@@ -437,7 +445,8 @@ Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
 	if (entity->scope == nullptr) {
 		entity->scope = s;
 	}
-	return nullptr;
+end:;
+	return result;
 }
 
 Entity *scope_insert(Scope *s, Entity *entity) {
