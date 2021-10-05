@@ -179,7 +179,6 @@ buffer_from_slice :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
 }
 
 ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
-	assert(len >= 0)
 	return transmute([]byte)Raw_Slice{ptr, len*size_of(T)}
 }
 
