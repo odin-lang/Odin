@@ -24,7 +24,7 @@ static_arena_init :: proc(arena: ^Static_Arena, reserved: uint, commit_size: uin
 	committed = min(committed, reserved)
 	
 	ptr := raw_data(data)
-	commit(ptr, uint(committed))
+	commit(ptr, uint(committed)) or_return
 	
 	arena.block = memory_block_alloc(commit_size, reserved, {}) or_return
 	arena.total_used = 0

@@ -10,13 +10,13 @@ reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
 	return _reserve(size)
 }
 
-commit :: proc(data: rawptr, size: uint) {
-	_commit(data, size)
+commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
+	return _commit(data, size)
 }
 
 reserve_and_commit :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
 	data = reserve(size) or_return
-	commit(raw_data(data), size)
+	commit(raw_data(data), size) or_return
 	return
 }
 
@@ -82,7 +82,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	pmblock := platform_memory_alloc(0, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
-	commit(pmblock.block.base, committed)
+	commit(pmblock.block.base, committed) or_return
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
 	assert(pmblock.block.prev == nil)	
