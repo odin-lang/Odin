@@ -11,7 +11,7 @@ Growing_Arena :: struct {
 	temp_count: int,
 }
 
-DEFAULT_MINIMUM_BLOCK_SIZE :: 1024*1024 // 1 KiB should be enough
+DEFAULT_MINIMUM_BLOCK_SIZE :: 1<<20 // 1 MiB should be enough
 
 growing_arena_alloc :: proc(arena: ^Growing_Arena, min_size: int, alignment: int) -> (data: []byte, err: Allocator_Error) {
 	align_forward_offset :: proc "contextless" (arena: ^Growing_Arena, alignment: int) -> uint #no_bounds_check {

@@ -4,13 +4,17 @@ import "core:mem"
 
 Static_Arena :: struct {
 	block: ^Memory_Block,
-	minimum_reserve_size: uint,
+	total_used:     uint,
+	total_reserved: uint,
 	
+	minimum_block_size: uint,
 	temp_count: int,
 }
 
-STATIC_ARENA_DEFAULT_COMMIT_SIZE  :: 1<<20
-STATIC_ARENA_DEFAULT_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<26
+STATIC_ARENA_DEFAULT_COMMIT_SIZE  :: 1<<20 // 1 MiB should be enough to start with
+
+// 1 GiB on 64-bit systems, 128 MiB on 32-bit systems by default
+STATIC_ARENA_DEFAULT_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<27
 
 static_arena_init :: proc(arena: ^Static_Arena, reserved: uint, commit_size: uint = STATIC_ARENA_DEFAULT_COMMIT_SIZE) -> (err: Allocator_Error) {
 	reserved := reserved
@@ -23,6 +27,8 @@ static_arena_init :: proc(arena: ^Static_Arena, reserved: uint, commit_size: uin
 	commit(ptr, uint(committed))
 	
 	arena.block = memory_block_alloc(commit_size, reserved, {}) or_return
+	arena.total_used = 0
+	arena.total_reserved = arena.block.reserved
 	return
 } 
 
@@ -39,15 +45,14 @@ static_arena_alloc :: proc(arena: ^Static_Arena, size: int, alignment: int) -> (
 	}
 	
 	if arena.block == nil {
-		reserve_size := max(arena.minimum_reserve_size, STATIC_ARENA_DEFAULT_RESERVE_SIZE)
+		reserve_size := max(arena.minimum_block_size, STATIC_ARENA_DEFAULT_RESERVE_SIZE)
 		static_arena_init(arena, reserve_size, STATIC_ARENA_DEFAULT_COMMIT_SIZE) or_return
 	}
 	
 	MINIMUM_ALIGN :: 2*align_of(uintptr)
 	
-	align := max(MINIMUM_ALIGN, alignment)
-	
-	return alloc_from_memory_block(arena.block, size, align)
+	defer arena.total_used = arena.block.used
+	return alloc_from_memory_block(arena.block, size, max(MINIMUM_ALIGN, alignment))
 }
 
 static_arena_reset_to :: proc(arena: ^Static_Arena, pos: uint) -> bool {
