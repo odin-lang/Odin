@@ -65,6 +65,10 @@ growing_arena_free_all :: proc(arena: ^Growing_Arena) {
 	arena.total_reserved = 0
 }
 
+growing_arena_destroy :: proc(arena: ^Growing_Arena) {
+	growing_arena_free_all(arena)
+}
+
 growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Growing_Arena
 	bootstrap.minimum_block_size = minimum_block_size
