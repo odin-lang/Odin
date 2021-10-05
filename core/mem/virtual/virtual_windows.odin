@@ -50,11 +50,15 @@ PAGE_WRITECOPY         :: 0x08
 PAGE_TARGETS_INVALID   :: 0x40000000
 PAGE_TARGETS_NO_UPDATE :: 0x40000000
 
+ERROR_INVALID_ADDRESS :: 487
+
+@(default_calling_convention="stdcall")
 foreign Kernel32 {
 	GetSystemInfo  :: proc(lpSystemInfo: LPSYSTEM_INFO) ---
 	VirtualAlloc   :: proc(lpAddress: rawptr, dwSize: uint, flAllocationType: u32, flProtect: u32) -> rawptr ---
 	VirtualFree    :: proc(lpAddress: rawptr, dwSize: uint, dwFreeType: u32) -> b32 ---
 	VirtualProtect :: proc(lpAddress: rawptr, dwSize: uint, flNewProtect: u32, lpflOldProtect: ^u32) -> b32 ---
+	GetLastError   :: proc() -> u32 ---
 }
 
 
@@ -68,8 +72,18 @@ _reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
 	return
 }
 
-_commit :: proc(data: rawptr, size: uint) {
-	VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE)
+_commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
+	result := VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE)
+	if result == nil {
+		switch err := GetLastError(); err {
+		case ERROR_INVALID_ADDRESS:
+			return .Out_Of_Memory
+		}
+
+		// TODO(bill): Handle errors correctly
+		return .Invalid_Argument
+	}
+	return nil
 }
 _decommit :: proc(data: rawptr, size: uint) {
 	VirtualFree(data, size, MEM_DECOMMIT)

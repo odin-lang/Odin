@@ -67,7 +67,7 @@ madvise :: proc "contextless" (addr: rawptr, length: uint, advice: c.int) -> c.i
 
 
 _reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
-	MAP_FAILED := rawptr(uintptr(~0))
+	MAP_FAILED := rawptr(~uintptr(0))
 	result := mmap(nil, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
 	if result == MAP_FAILED {
 		return nil, .Out_Of_Memory
@@ -75,8 +75,13 @@ _reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
 	return ([^]byte)(result)[:size], nil
 }
 
-_commit :: proc(data: rawptr, size: uint) {
-	mprotect(data, size, PROT_READ|PROT_WRITE)
+_commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
+	result := mprotect(data, size, PROT_READ|PROT_WRITE)
+	if result != 0 {
+		// TODO(bill): Handle error value correctly
+		return .Out_Of_Memory
+	}
+	return nil
 }
 _decommit :: proc(data: rawptr, size: uint) {
 	mprotect(data, size, PROT_NONE)
