@@ -16,16 +16,7 @@ STATIC_ARENA_DEFAULT_COMMIT_SIZE  :: 1<<20 // 1 MiB should be enough to start wi
 // 1 GiB on 64-bit systems, 128 MiB on 32-bit systems by default
 STATIC_ARENA_DEFAULT_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<27
 
-static_arena_init :: proc(arena: ^Static_Arena, reserved: uint, commit_size: uint = STATIC_ARENA_DEFAULT_COMMIT_SIZE) -> (err: Allocator_Error) {
-	reserved := reserved
-	reserved = max(reserved, STATIC_ARENA_DEFAULT_COMMIT_SIZE)
-	data := reserve(uint(reserved)) or_return
-	committed := max(commit_size, STATIC_ARENA_DEFAULT_COMMIT_SIZE)
-	committed = min(committed, reserved)
-	
-	ptr := raw_data(data)
-	commit(ptr, uint(committed)) or_return
-	
+static_arena_init :: proc(arena: ^Static_Arena, reserved: uint, commit_size: uint = STATIC_ARENA_DEFAULT_COMMIT_SIZE) -> (err: Allocator_Error) {	
 	arena.block = memory_block_alloc(commit_size, reserved, {}) or_return
 	arena.total_used = 0
 	arena.total_reserved = arena.block.reserved
