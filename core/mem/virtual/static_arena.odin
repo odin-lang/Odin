@@ -74,6 +74,29 @@ static_arena_free_all :: proc(arena: ^Static_Arena) {
 	static_arena_reset_to(arena, 0)
 }
 
+
+static_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
+	bootstrap: Static_Arena
+	bootstrap.minimum_block_size = reserved
+	
+	data := static_arena_alloc(&bootstrap, size_of(T), align_of(T)) or_return
+	
+	ptr = (^T)(raw_data(data))
+	
+	(^Static_Arena)(uintptr(ptr) + offset_to_arena)^ = bootstrap
+	
+	return
+}
+
+static_arena_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, reserved: uint) -> (ptr: ^T, err: Allocator_Error) { 
+	return static_arena_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), reserved)
+}
+static_arena_bootstrap_new :: proc{
+	static_arena_bootstrap_new_by_offset, 
+	static_arena_bootstrap_new_by_name,
+}
+
+
 static_arena_allocator :: proc(arena: ^Static_Arena) -> mem.Allocator {
 	return mem.Allocator{static_arena_allocator_proc, arena}
 }
@@ -129,7 +152,7 @@ static_arena_temp_end :: proc(temp: Static_Arena_Temp, loc := #caller_location) 
 	
 	static_arena_reset_to(arena, temp.used)
 	
-	assert(arena.temp_count > 0, "double-use of growing_arena_temp_end", loc)
+	assert(arena.temp_count > 0, "double-use of static_arena_temp_end", loc)
 	arena.temp_count -= 1
 }
 
