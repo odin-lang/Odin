@@ -67,13 +67,12 @@ madvise :: proc "contextless" (addr: rawptr, length: uint, advice: c.int) -> c.i
 
 
 _reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
+	MAP_FAILED := rawptr(uintptr(~0))
 	result := mmap(nil, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
-	if result == nil {
-		err = .Out_Of_Memory
-		return
+	if result == MAP_FAILED {
+		return nil, .Out_Of_Memory
 	}
-	data = ([^]byte)(result)[:size]
-	return
+	return ([^]byte)(result)[:size], nil
 }
 
 _commit :: proc(data: rawptr, size: uint) {
