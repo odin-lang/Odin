@@ -1,7 +1,6 @@
 package mem_virtual
 
 import "core:mem"
-import sync "core:sync/sync2"
 
 DEFAULT_PAGE_SIZE := uint(4096)
 
@@ -46,106 +45,104 @@ protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 
 Memory_Block :: struct {
 	prev: ^Memory_Block,
-	base: [^]byte,
-	size: int,
-	used: int,
+	base:      [^]byte,
+	used:      uint,
+	committed: uint,
+	reserved:  uint,
 }
+Memory_Block_Flag :: enum u32 {
+	Overflow_Protection,
+}
+Memory_Block_Flags :: distinct bit_set[Memory_Block_Flag; u32]
 
 
-memory_alloc :: proc(size: int) -> (block: ^Memory_Block, err: Allocator_Error) {
+memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
 	align_formula :: proc "contextless" (size, align: uint) -> uint {
 		result := size + align-1
 		return result - result%align
 	}
 	
 	page_size := DEFAULT_PAGE_SIZE
+	committed := committed
+	committed = clamp(committed, 0, reserved)
 	
-	total_size     := uint(size + size_of(Platform_Memory_Block))
+	total_size     := uint(reserved + size_of(Platform_Memory_Block))
 	base_offset    := uintptr(size_of(Platform_Memory_Block))
 	protect_offset := uintptr(0)
 	
 	do_protection := false
-	{ // overflow protection
-		rounded_size := align_formula(uint(size), page_size)
+	if .Overflow_Protection in flags { // overflow protection
+		rounded_size := align_formula(uint(reserved), page_size)
 		total_size     = uint(rounded_size + 2*page_size)
-		base_offset    = uintptr(page_size + rounded_size - uint(size))
+		base_offset    = uintptr(page_size + rounded_size - uint(reserved))
 		protect_offset = uintptr(page_size + rounded_size)
 		do_protection  = true
 	}
 	
-	pmblock := platform_memory_alloc(total_size) or_return
+	pmblock := platform_memory_alloc(0, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
+	commit(pmblock.block.base, committed)
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
-	assert(pmblock.block.prev == nil)
-	
+	assert(pmblock.block.prev == nil)	
 	if (do_protection) {
 		protect(rawptr(uintptr(pmblock) + protect_offset), page_size, Protect_No_Access)
 	}
 	
-	pmblock.block.size = size
-	pmblock.total_size = total_size
+	pmblock.block.committed = committed
+	pmblock.block.reserved  = reserved
 
 	sentinel := &global_platform_memory_block_sentinel
-	sync.mutex_lock(&global_memory_block_mutex)
+	platform_mutex_lock()
 	pmblock.next = sentinel
 	pmblock.prev = sentinel.prev
 	pmblock.prev.next = pmblock
 	pmblock.next.prev = pmblock
-	sync.mutex_unlock(&global_memory_block_mutex)
+	platform_mutex_unlock()
 	
 	return &pmblock.block, nil
 }
 
+alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) -> (data: []byte, err: Allocator_Error) {
+	calc_alignment_offset :: proc(block: ^Memory_Block, alignment: uintptr) -> uint {
+		alignment_offset := uint(0)
+		ptr := uintptr(block.base[block.used:])
+		mask := alignment-1
+		if ptr & mask != 0 {
+			alignment_offset = uint(alignment - (ptr & mask))
+		}
+		return alignment_offset
+		
+	}
+	
+	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
+	
+	size := uint(min_size) + alignment_offset
+	
+	if block.used + size > block.reserved {
+		err = .Out_Of_Memory
+		return
+	}
+	
+	ptr := block.base[block.used:]
+	ptr = ptr[alignment_offset:]
+	
+	block.used += size
+	assert(block.used <= block.reserved)
+	
+	return ptr[:min_size], nil	
+}
 
-memory_dealloc :: proc(block_to_free: ^Memory_Block) {
-	block := (^Platform_Memory_Block)(block_to_free)
-	if block != nil {
-		sync.mutex_lock(&global_memory_block_mutex)
+
+memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
+	if block := (^Platform_Memory_Block)(block_to_free); block != nil {
+		platform_mutex_lock()
 		block.prev.next = block.next
 		block.next.prev = block.prev
-		sync.mutex_unlock(&global_memory_block_mutex)
+		platform_mutex_unlock()
 		
 		platform_memory_free(block)
 	}
 }
 
-Platform_Memory_Block :: struct {
-	block:      Memory_Block,
-	total_size: uint,
-	prev, next: ^Platform_Memory_Block,
-} 
-
-platform_memory_alloc :: proc(total_size: uint) -> (block: ^Platform_Memory_Block, err: Allocator_Error) {
-	total_size := total_size
-	total_size = max(total_size, size_of(Platform_Memory_Block))
-	data := reserve_and_commit(total_size) or_return
-	block = (^Platform_Memory_Block)(raw_data(data))
-	block.total_size = total_size
-	return
-}
-
-
-platform_memory_free :: proc(block: ^Platform_Memory_Block) {
-	if block != nil {
-		release(block, block.total_size)
-	}
-}
-
-@(private)
-global_memory_block_mutex: sync.Mutex
-@(private)
-global_platform_memory_block_sentinel: Platform_Memory_Block
-@(private)
-global_platform_memory_block_sentinel_set: bool
-
-@(private, init)
-platform_memory_init :: proc() {
-	if !global_platform_memory_block_sentinel_set {
-		_platform_memory_init()
-		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel
-		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel
-		global_platform_memory_block_sentinel_set = true
-	}
-}

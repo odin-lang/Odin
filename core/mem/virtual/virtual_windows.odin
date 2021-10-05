@@ -59,7 +59,7 @@ foreign Kernel32 {
 
 
 _reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
-	result := VirtualAlloc(nil, size, MEM_RELEASE, PAGE_READWRITE)
+	result := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
 		err = .Out_Of_Memory
 		return
