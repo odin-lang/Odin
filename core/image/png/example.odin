@@ -12,7 +12,6 @@ package png
 	An example of how to use `load`.
 */
 
-import "core:compress"
 import "core:image"
 // import "core:image/png"
 import "core:bytes"
@@ -42,7 +41,7 @@ demo :: proc() {
 	file: string
 
 	options := image.Options{.return_metadata}
-	err:       compress.Error
+	err:       image.Error
 	img:      ^image.Image
 
 	file = "../../../misc/logo-slim.png"

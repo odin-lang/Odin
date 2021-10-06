@@ -11,6 +11,8 @@ package image
 
 import "core:bytes"
 import "core:mem"
+import "core:compress"
+import "core:runtime"
 
 Image :: struct {
 	width:         int,
@@ -112,19 +114,34 @@ Option :: enum {
 }
 Options :: distinct bit_set[Option]
 
-Error :: enum {
+Error :: union {
+	General_Image_Error,
+	PNG_Error,
+
+	compress.Error,
+	compress.General_Error,
+	compress.Deflate_Error,
+	compress.ZLIB_Error,
+	runtime.Allocator_Error,
+}
+
+General_Image_Error :: enum {
+	None = 0,
+	Invalid_Image_Dimensions,
+	Image_Does_Not_Adhere_to_Spec,
+}
+
+PNG_Error :: enum {
 	Invalid_PNG_Signature,
 	IHDR_Not_First_Chunk,
 	IHDR_Corrupt,
 	IDAT_Missing,
 	IDAT_Must_Be_Contiguous,
 	IDAT_Corrupt,
-	PNG_Does_Not_Adhere_to_Spec,
 	PLTE_Encountered_Unexpectedly,
 	PLTE_Invalid_Length,
 	TRNS_Encountered_Unexpectedly,
 	BKGD_Invalid_Length,
-	Invalid_Image_Dimensions,
 	Unknown_Color_Type,
 	Invalid_Color_Bit_Depth_Combo,
 	Unknown_Filter_Method,

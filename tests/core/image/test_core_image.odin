@@ -64,7 +64,7 @@ PNG_Test :: struct {
 	file:   string,
 	tests:  []struct {
 		options:        image.Options,
-		expected_error: compress.Error,
+		expected_error: image.Error,
 		dims:           PNG_Dims,
 		hash:           u32,
 	},
@@ -1198,37 +1198,37 @@ Corrupt_PNG_Tests   := []PNG_Test{
 	{
 		"xs1n0g01", // signature byte 1 MSBit reset to zero
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs2n0g01", // signature byte 2 is a 'Q'
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs4n0g01", // signature byte 4 lowercase
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs7n0g01", // 7th byte a space instead of control-Z
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xcrn0g04", // added cr bytes
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xlfn0g04", // added lf bytes
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
@@ -1240,37 +1240,37 @@ Corrupt_PNG_Tests   := []PNG_Test{
 	{
 		"xc1n0g08", // color type 1
 		{
-			{Default, I_Error.Unknown_Color_Type, {}, 0x_0000_0000},
+			{Default, .Unknown_Color_Type, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xc9n2c08", // color type 9
 		{
-			{Default, I_Error.Unknown_Color_Type, {}, 0x_0000_0000},
+			{Default, .Unknown_Color_Type, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xd0n2c08", // bit-depth 0
 		{
-			{Default, I_Error.Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
+			{Default, .Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xd3n2c08", // bit-depth 3
 		{
-			{Default, I_Error.Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
+			{Default, .Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xd9n2c08", // bit-depth 99
 		{
-			{Default, I_Error.Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
+			{Default, .Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xdtn0g01", // missing IDAT chunk
 		{
-			{Default, I_Error.IDAT_Missing, {}, 0x_0000_0000},
+			{Default, .IDAT_Missing, {}, 0x_0000_0000},
 		},
 	},
 	{
