@@ -1,13 +1,12 @@
-package png
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-2 license.
+	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
+package png
 
 import "core:compress"
 import "core:compress/zlib"
@@ -20,6 +19,28 @@ import "core:bytes"
 import "core:io"
 import "core:mem"
 import "core:intrinsics"
+
+/*
+	67_108_864 pixels max by default.
+	Maximum allowed dimensions are capped at 65535 * 65535.
+*/
+MAX_DIMENSIONS    :: min(#config(PNG_MAX_DIMENSIONS, 8192 * 8192), 65535 * 65535)
+
+/*
+	Limit chunk sizes.
+		By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
+*/
+_MAX_IDAT_DEFAULT :: ( 8192 /* Width */ *  8192 /* Height */ * 2 /* 16-bit */) +  8192 /* Filter bytes */
+_MAX_IDAT         :: (65535 /* Width */ * 65535 /* Height */ * 2 /* 16-bit */) + 65535 /* Filter bytes */
+
+MAX_IDAT_SIZE     :: min(#config(PNG_MAX_IDAT_SIZE, _MAX_IDAT_DEFAULT), _MAX_IDAT)
+
+/*
+	For chunks other than IDAT with a variable size like `zTXT` and `eXIf`,
+	limit their size to 16 MiB each by default. Max of 256 MiB each.
+*/
+MAX_CHUNK_SIZE    :: min(#config(PNG_MAX_CHUNK_SIZE, 16_777_216), 268_435_456)
+
 
 Error     :: image.Error
 Image     :: image.Image
@@ -248,6 +269,20 @@ read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 	}
 	chunk.header = ch
 
+	/*
+		Sanity check chunk size
+	*/
+	#partial switch ch.type {
+	case .IDAT:
+		if ch.length > MAX_IDAT_SIZE {
+			return {}, image.PNG_Error.IDAT_Size_Too_Large
+		}
+	case:
+		if ch.length > MAX_CHUNK_SIZE {
+			return {}, image.PNG_Error.Invalid_Chunk_Length
+		}
+	}
+
 	chunk.data, e = compress.read_slice(ctx, int(ch.length))
 	if e != .None {
 		return {}, compress.General_Error.Stream_Too_Short
@@ -308,7 +343,7 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 	header := (^IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
-	if width == 0 || height == 0 {
+	if width == 0 || height == 0 || u128(width) * u128(height) > MAX_DIMENSIONS {
 		return {}, .Invalid_Image_Dimensions
 	}
 
@@ -438,8 +473,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	idat: []u8
 	idat_b: bytes.Buffer
-	idat_length := u32be(0)
 	defer bytes.buffer_destroy(&idat_b)
+
+	idat_length := u64(0)
 
 	c:		Chunk
 	ch:     Chunk_Header
@@ -521,6 +557,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				interlace_method   = interlace_method,
 			}
 			info.header = h
+
 		case .PLTE:
 			seen_plte = true
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
@@ -543,6 +580,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			if .return_metadata in options {
 				append_chunk(&info.chunks, c) or_return
 			}
+
 		case .IDAT:
 			// If we only want image metadata and don't want the pixel data, we can early out.
 			if .return_metadata not_in options && .do_not_decompress_image in options {
@@ -563,7 +601,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				c = read_chunk(ctx) or_return
 
 				bytes.buffer_write(&idat_b, c.data)
-				idat_length += c.header.length
+				idat_length += u64(c.header.length)
+
+				if idat_length > MAX_IDAT_SIZE {
+					return {}, image.PNG_Error.IDAT_Size_Too_Large
+				}
 
 				ch, e = compress.peek_data(ctx, Chunk_Header)
 				if e != .None {
@@ -571,14 +613,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 				next = ch.type
 			}
+
 			idat = bytes.buffer_to_bytes(&idat_b)
 			if int(idat_length) != len(idat) {
 				return {}, .IDAT_Corrupt
 			}
 			seen_idat = true
+
 		case .IEND:
 			c = read_chunk(ctx) or_return
 			seen_iend = true
+
 		case .bKGD:
 
 			// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
@@ -614,6 +659,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					col := mem.slice_data_cast([]u16be, c.data[:])
 					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
 			}
+
 		case .tRNS:
 			c = read_chunk(ctx) or_return
 
@@ -645,6 +691,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 			}
 			trns = c
+
 		case .iDOT, .CbGI:
 			/*
 				iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
@@ -652,6 +699,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				across one of these files, use a utility to defry it.
 			*/
 			return img, .Image_Does_Not_Adhere_to_Spec
+
 		case:
 			// Unhandled type
 			c = read_chunk(ctx) or_return

@@ -1,5 +1,3 @@
-package test_core_image
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -9,6 +7,7 @@ package test_core_image
 
 	A test suite for PNG.
 */
+package test_core_image
 
 import "core:testing"
 
