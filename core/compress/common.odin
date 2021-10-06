@@ -11,6 +11,7 @@ package compress
 import "core:io"
 import "core:image"
 import "core:bytes"
+import "core:mem"
 
 /*
 	These settings bound how much compression algorithms will allocate for their output buffer.
@@ -47,6 +48,7 @@ when size_of(uintptr) == 8 {
 
 Error :: union {
 	General_Error,
+	mem.Allocator_Error,
 	Deflate_Error,
 	ZLIB_Error,
 	GZIP_Error,

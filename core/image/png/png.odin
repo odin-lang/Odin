@@ -100,13 +100,13 @@ Chunk_Type :: enum u32be {
 }
 
 IHDR :: struct #packed {
-	width: u32be,
-	height: u32be,
-	bit_depth: u8,
-	color_type: Color_Type,
+	width:              u32be,
+	height:             u32be,
+	bit_depth:          u8,
+	color_type:         Color_Type,
 	compression_method: u8,
-	filter_method: u8,
-	interlace_method: Interlace_Method,
+	filter_method:      u8,
+	interlace_method:   Interlace_Method,
 }
 IHDR_SIZE :: size_of(IHDR)
 #assert (IHDR_SIZE == 13)
@@ -135,22 +135,22 @@ PLTE_Entry    :: [3]u8
 
 PLTE :: struct #packed {
 	entries: [256]PLTE_Entry,
-	used: u16,
+	used:    u16,
 }
 
 hIST :: struct #packed {
 	entries: [256]u16,
-	used: u16,
+	used:    u16,
 }
 
 sPLT :: struct #packed {
-	name: string,
-	depth: u8,
+	name:    string,
+	depth:   u8,
 	entries: union {
 		[][4]u8,
 		[][4]u16,
 	},
-	used: u16,
+	used:    u16,
 }
 
 // Other chunks
@@ -223,14 +223,14 @@ Exif :: struct {
 }
 
 iCCP :: struct {
-	name: string,
+	name:    string,
 	profile: []u8,
 }
 
 sRGB_Rendering_Intent :: enum u8 {
-	Perceptual = 0,
+	Perceptual            = 0,
 	Relative_colorimetric = 1,
-	Saturation = 2,
+	Saturation            = 2,
 	Absolute_colorimetric = 3,
 }
 
@@ -272,6 +272,35 @@ read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 		return {}, E_General.Checksum_Failed
 	}
 	return chunk, nil
+}
+
+copy_chunk :: proc(src: Chunk, allocator := context.allocator) -> (dest: Chunk, err: Error) {
+	if int(src.header.length) != len(src.data) {
+		return {}, .Invalid_Chunk_Length
+	}
+
+	dest.header = src.header
+	dest.crc    = src.crc
+	dest.data   = make([]u8, dest.header.length, allocator) or_return
+
+	copy(dest.data[:], src.data[:])
+	return
+}
+
+append_chunk :: proc(list: ^[dynamic]Chunk, src: Chunk, allocator := context.allocator) -> (err: Error) {
+	if int(src.header.length) != len(src.data) {
+		return .Invalid_Chunk_Length
+	}
+
+	c := copy_chunk(src, allocator) or_return
+	length := len(list)
+	append(list, c)
+	if len(list) != length + 1 {
+		// Resize during append failed.
+		return .Out_Of_Memory
+	}
+
+	return
 }
 
 read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
@@ -422,8 +451,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	header:	IHDR
 
-	info.chunks.allocator = context.temp_allocator
-
 	// State to ensure correct chunk ordering.
 	seen_ihdr := false; first := true
 	seen_plte := false
@@ -518,7 +545,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 
 			if .return_metadata in options {
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 		case .IDAT:
 			// If we only want image metadata and don't want the pixel data, we can early out.
@@ -563,7 +590,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			c = read_chunk(ctx) or_return
 			seen_bkgd = true
 			if .return_metadata in options {
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 
 			ct := transmute(u8)info.header.color_type
@@ -599,7 +626,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 
 			if .return_metadata in options {
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 
 			/*
@@ -626,16 +653,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			/*
 				iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
 				We're not going to add support for it. If you have the misfortunte of coming
-				across one of these files, use a utility to defry it.s
+				across one of these files, use a utility to defry it.
 			*/
 			return img, E_PNG.PNG_Does_Not_Adhere_to_Spec
 		case:
 			// Unhandled type
 			c = read_chunk(ctx) or_return
-
 			if .return_metadata in options {
-				// NOTE: Chunk cata is currently allocated on the temp allocator.
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 
 			first = false
