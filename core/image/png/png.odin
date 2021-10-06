@@ -821,7 +821,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
-		resize(&t.buf, dest_raw_size)
+		if !resize(&t.buf, dest_raw_size) {
+			return {}, mem.Allocator_Error.Out_Of_Memory
+		}
 
 		i := 0; j := 0
 
@@ -900,7 +902,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 16)
 		t := bytes.Buffer{}
-		resize(&t.buf, dest_raw_size)
+		if !resize(&t.buf, dest_raw_size) {
+			return {}, mem.Allocator_Error.Out_Of_Memory
+		}
 
 		p16 := mem.slice_data_cast([]u16, temp.buf[:])
 		o16 := mem.slice_data_cast([]u16, t.buf[:])
@@ -1097,7 +1101,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
-		resize(&t.buf, dest_raw_size)
+		if !resize(&t.buf, dest_raw_size) {
+			return {}, mem.Allocator_Error.Out_Of_Memory
+		}
 
 		p := mem.slice_data_cast([]u8, temp.buf[:])
 		o := mem.slice_data_cast([]u8, t.buf[:])
@@ -1604,7 +1610,9 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 	bytes_per_channel := depth == 16 ? 2 : 1
 
 	num_bytes := compute_buffer_size(width, height, channels, depth == 16 ? 16 : 8)
-	resize(&img.pixels.buf, num_bytes)
+	if !resize(&img.pixels.buf, num_bytes) {
+		return mem.Allocator_Error.Out_Of_Memory
+	}
 
 	filter_ok: bool
 
@@ -1644,7 +1652,9 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 			if x > 0 && y > 0 {
 				temp: bytes.Buffer
 				temp_len := compute_buffer_size(x, y, channels, depth == 16 ? 16 : 8)
-				resize(&temp.buf, temp_len)
+				if !resize(&temp.buf, temp_len) {
+					return mem.Allocator_Error.Out_Of_Memory
+				}
 
 				params := Filter_Params{
 					src      = input,
