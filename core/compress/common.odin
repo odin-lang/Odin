@@ -9,9 +9,8 @@ package compress
 */
 
 import "core:io"
-import "core:image"
 import "core:bytes"
-import "core:mem"
+import "core:runtime"
 
 /*
 	These settings bound how much compression algorithms will allocate for their output buffer.
@@ -48,16 +47,12 @@ when size_of(uintptr) == 8 {
 
 Error :: union {
 	General_Error,
-	mem.Allocator_Error,
 	Deflate_Error,
 	ZLIB_Error,
 	GZIP_Error,
 	ZIP_Error,
-	/*
-		This is here because png.load will return a this type of error union,
-		as it may involve an I/O error, a Deflate error, etc.
-	*/
-	image.Error,
+
+	runtime.Allocator_Error,
 }
 
 General_Error :: enum {
@@ -70,7 +65,6 @@ General_Error :: enum {
 	Checksum_Failed,
 	Incompatible_Options,
 	Unimplemented,
-
 
 	/*
 		Memory errors

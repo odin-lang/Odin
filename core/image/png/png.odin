@@ -21,11 +21,7 @@ import "core:io"
 import "core:mem"
 import "core:intrinsics"
 
-Error     :: compress.Error
-E_General :: compress.General_Error
-E_PNG     :: image.Error
-E_Deflate :: compress.Deflate_Error
-
+Error     :: image.Error
 Image     :: image.Image
 Options   :: image.Options
 
@@ -248,13 +244,13 @@ ADAM7_Y_SPACING := []int{ 8,8,8,4,4,2,2 }
 read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 	ch, e := compress.read_data(ctx, Chunk_Header)
 	if e != .None {
-		return {}, E_General.Stream_Too_Short
+		return {}, compress.General_Error.Stream_Too_Short
 	}
 	chunk.header = ch
 
 	chunk.data, e = compress.read_slice(ctx, int(ch.length))
 	if e != .None {
-		return {}, E_General.Stream_Too_Short
+		return {}, compress.General_Error.Stream_Too_Short
 	}
 
 	// Compute CRC over chunk type + data
@@ -264,12 +260,12 @@ read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 
 	crc, e3 := compress.read_data(ctx, u32be)
 	if e3 != .None {
-		return {}, E_General.Stream_Too_Short
+		return {}, compress.General_Error.Stream_Too_Short
 	}
 	chunk.crc = crc
 
 	if chunk.crc != u32be(computed_crc) {
-		return {}, E_General.Checksum_Failed
+		return {}, compress.General_Error.Checksum_Failed
 	}
 	return chunk, nil
 }
@@ -297,7 +293,7 @@ append_chunk :: proc(list: ^[dynamic]Chunk, src: Chunk, allocator := context.all
 	append(list, c)
 	if len(list) != length + 1 {
 		// Resize during append failed.
-		return .Out_Of_Memory
+		return mem.Allocator_Error.Out_Of_Memory
 	}
 
 	return
@@ -313,19 +309,19 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 	// Validate IHDR
 	using header
 	if width == 0 || height == 0 {
-		return {}, E_PNG.Invalid_Image_Dimensions
+		return {}, .Invalid_Image_Dimensions
 	}
 
 	if compression_method != 0 {
-		return {}, E_General.Unknown_Compression_Method
+		return {}, compress.General_Error.Unknown_Compression_Method
 	}
 
 	if filter_method != 0 {
-		return {}, E_PNG.Unknown_Filter_Method
+		return {}, .Unknown_Filter_Method
 	}
 
 	if interlace_method != .None && interlace_method != .Adam7 {
-		return {}, E_PNG.Unknown_Interlace_Method
+		return {}, .Unknown_Interlace_Method
 
 	}
 
@@ -343,7 +339,7 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 			}
 		}
 		if !allowed {
-			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo
+			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 	case 2, 4, 6:
 		/*
@@ -351,7 +347,7 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 			Allowed bit depths: 8 and 16
 		*/
 		if bit_depth != 8 && bit_depth != 16 {
-			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo
+			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 	case 3:
 		/*
@@ -366,11 +362,11 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 			}
 		}
 		if !allowed {
-			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo
+			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 
 	case:
-		return {}, E_PNG.Unknown_Color_Type
+		return {}, .Unknown_Color_Type
 	}
 
 	return header, nil
@@ -406,7 +402,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 		return load_from_slice(data, options)
 	} else {
 		img = new(Image)
-		return img, E_General.File_Not_Found
+		return img, compress.General_Error.File_Not_Found
 	}
 }
 
@@ -420,7 +416,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	if .alpha_drop_if_present in options && .alpha_add_if_missing in options {
-		return {}, E_General.Incompatible_Options
+		return {}, compress.General_Error.Incompatible_Options
 	}
 
 	if .do_not_expand_channels in options {
@@ -437,7 +433,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	signature, io_error := compress.read_data(ctx, Signature)
 	if io_error != .None || signature != .PNG {
-		return img, E_PNG.Invalid_PNG_Signature
+		return img, .Invalid_PNG_Signature
 	}
 
 	idat: []u8
@@ -472,14 +468,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 		ch, e = compress.peek_data(ctx, Chunk_Header)
 		if e != .None {
-			return img, E_General.Stream_Too_Short
+			return img, compress.General_Error.Stream_Too_Short
 		}
 		// name := chunk_type_to_name(&ch.type); // Only used for debug prints during development.
 
 		#partial switch ch.type {
 		case .IHDR:
 			if seen_ihdr || !first {
-				return {}, E_PNG.IHDR_Not_First_Chunk
+				return {}, .IHDR_Not_First_Chunk
 			}
 			seen_ihdr = true
 
@@ -508,7 +504,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 
 			if img.channels == 0 || img.depth == 0 {
-				return {}, E_PNG.IHDR_Corrupt
+				return {}, .IHDR_Corrupt
 			}
 
 			img.width  = int(header.width)
@@ -530,18 +526,18 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
 			ct := transmute(u8)info.header.color_type
 			if seen_idat || ct == 0 || ct == 4 {
-				return img, E_PNG.PLTE_Encountered_Unexpectedly
+				return img, .PLTE_Encountered_Unexpectedly
 			}
 
 			c = read_chunk(ctx) or_return
 
 			if c.header.length % 3 != 0 || c.header.length > 768 {
-				return img, E_PNG.PLTE_Invalid_Length
+				return img, .PLTE_Invalid_Length
 			}
 			plte_ok: bool
 			_plte, plte_ok = plte(c)
 			if !plte_ok {
-				return img, E_PNG.PLTE_Invalid_Length
+				return img, .PLTE_Invalid_Length
 			}
 
 			if .return_metadata in options {
@@ -555,11 +551,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			// There must be at least 1 IDAT, contiguous if more.
 			if seen_idat {
-				return img, E_PNG.IDAT_Must_Be_Contiguous
+				return img, .IDAT_Must_Be_Contiguous
 			}
 
 			if idat_length > 0 {
-				return img, E_PNG.IDAT_Must_Be_Contiguous
+				return img, .IDAT_Must_Be_Contiguous
 			}
 
 			next := ch.type
@@ -571,13 +567,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 				ch, e = compress.peek_data(ctx, Chunk_Header)
 				if e != .None {
-					return img, E_General.Stream_Too_Short
+					return img, compress.General_Error.Stream_Too_Short
 				}
 				next = ch.type
 			}
 			idat = bytes.buffer_to_bytes(&idat_b)
 			if int(idat_length) != len(idat) {
-				return {}, E_PNG.IDAT_Corrupt
+				return {}, .IDAT_Corrupt
 			}
 			seen_idat = true
 		case .IEND:
@@ -597,7 +593,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			switch ct {
 				case 3: // Indexed color
 					if c.header.length != 1 {
-						return {}, E_PNG.BKGD_Invalid_Length
+						return {}, .BKGD_Invalid_Length
 					}
 					col := _plte.entries[c.data[0]]
 					img.background = [3]u16{
@@ -607,13 +603,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					}
 				case 0, 4: // Grayscale, with and without Alpha
 					if c.header.length != 2 {
-						return {}, E_PNG.BKGD_Invalid_Length
+						return {}, .BKGD_Invalid_Length
 					}
 					col := u16(mem.slice_data_cast([]u16be, c.data[:])[0])
 					img.background = [3]u16{col, col, col}
 				case 2, 6: // Color, with and without Alpha
 					if c.header.length != 6 {
-						return {}, E_PNG.BKGD_Invalid_Length
+						return {}, .BKGD_Invalid_Length
 					}
 					col := mem.slice_data_cast([]u16be, c.data[:])
 					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
@@ -622,7 +618,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			c = read_chunk(ctx) or_return
 
 			if .Alpha in info.header.color_type {
-				return img, E_PNG.TRNS_Encountered_Unexpectedly
+				return img, .TRNS_Encountered_Unexpectedly
 			}
 
 			if .return_metadata in options {
@@ -655,7 +651,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				We're not going to add support for it. If you have the misfortunte of coming
 				across one of these files, use a utility to defry it.
 			*/
-			return img, E_PNG.PNG_Does_Not_Adhere_to_Spec
+			return img, .Image_Does_Not_Adhere_to_Spec
 		case:
 			// Unhandled type
 			c = read_chunk(ctx) or_return
@@ -673,7 +669,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	if !seen_idat {
-		return img, E_PNG.IDAT_Missing
+		return img, .IDAT_Missing
 	}
 
 	/*
@@ -710,7 +706,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	buf_len := len(buf.buf)
 	if expected_size != buf_len {
-		return {}, E_PNG.IDAT_Corrupt
+		return {}, .IDAT_Corrupt
 	}
 
 	/*
@@ -1549,7 +1545,7 @@ defilter_16 :: proc(params: ^Filter_Params) -> (ok: bool) {
 	return
 }
 
-defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, options: Options) -> (err: compress.Error) {
+defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, options: Options) -> (err: Error) {
 	input    := bytes.buffer_to_bytes(filter_bytes)
 	width    := int(header.width)
 	height   := int(header.height)
@@ -1585,7 +1581,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 		}
 		if !filter_ok {
 			// Caller will destroy buffer for us.
-			return E_PNG.Unknown_Filter_Method
+			return .Unknown_Filter_Method
 		}
 	} else {
 		/*
@@ -1623,7 +1619,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 
 				if !filter_ok {
 					// Caller will destroy buffer for us.
-					return E_PNG.Unknown_Filter_Method
+					return .Unknown_Filter_Method
 				}
 
 				t := temp.buf[:]
