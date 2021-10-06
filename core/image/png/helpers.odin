@@ -34,16 +34,13 @@ destroy :: proc(img: ^Image) {
 
 	bytes.buffer_destroy(&img.pixels)
 
-	assert(img.metadata_ptr != nil && img.metadata_type == Info)
-	v := (^Info)(img.metadata_ptr)
-
-	for chunk in &v.chunks {
-		delete(chunk.data)
+	if v, ok := img.metadata.(^image.PNG_Info); ok {
+		for chunk in &v.chunks {
+			delete(chunk.data)
+		}
+		delete(v.chunks)
+		free(v)
 	}
-	delete(v.chunks)
-
-	// Clean up Info.
-	free(img.metadata_ptr)
 	free(img)
 }
 
@@ -51,7 +48,7 @@ destroy :: proc(img: ^Image) {
 	Chunk helpers
 */
 
-gamma :: proc(c: Chunk) -> (res: f32, ok: bool) {
+gamma :: proc(c: image.PNG_Chunk) -> (res: f32, ok: bool) {
 	if c.header.type != .gAMA || len(c.data) != size_of(gAMA) {
 		return {}, false
 	}
@@ -61,7 +58,7 @@ gamma :: proc(c: Chunk) -> (res: f32, ok: bool) {
 
 INCHES_PER_METER :: 1000.0 / 25.4
 
-phys :: proc(c: Chunk) -> (res: pHYs, ok: bool) {
+phys :: proc(c: image.PNG_Chunk) -> (res: pHYs, ok: bool) {
 	if c.header.type != .pHYs || len(c.data) != size_of(pHYs) {
 		return {}, false
 	}
@@ -73,7 +70,7 @@ phys_to_dpi :: proc(p: pHYs) -> (x_dpi, y_dpi: f32) {
 	return f32(p.ppu_x) / INCHES_PER_METER, f32(p.ppu_y) / INCHES_PER_METER
 }
 
-time :: proc(c: Chunk) -> (res: tIME, ok: bool) {
+time :: proc(c: image.PNG_Chunk) -> (res: tIME, ok: bool) {
 	if c.header.type != .tIME || len(c.data) != size_of(tIME) {
 		return {}, false
 	}
@@ -81,7 +78,7 @@ time :: proc(c: Chunk) -> (res: tIME, ok: bool) {
 	return (^tIME)(raw_data(c.data))^, true
 }
 
-core_time :: proc(c: Chunk) -> (t: coretime.Time, ok: bool) {
+core_time :: proc(c: image.PNG_Chunk) -> (t: coretime.Time, ok: bool) {
 	if png_time, png_ok := time(c); png_ok {
 		using png_time
 		return coretime.datetime_to_time(
@@ -93,7 +90,7 @@ core_time :: proc(c: Chunk) -> (t: coretime.Time, ok: bool) {
 	}
 }
 
-text :: proc(c: Chunk) -> (res: Text, ok: bool) {
+text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 	assert(len(c.data) == int(c.header.length))
 	#partial switch c.header.type {
 	case .tEXt:
@@ -196,7 +193,7 @@ text_destroy :: proc(text: Text) {
 	delete(text.text)
 }
 
-iccp :: proc(c: Chunk) -> (res: iCCP, ok: bool) {
+iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 	ok = true
 
 	fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
@@ -232,7 +229,7 @@ iccp_destroy :: proc(i: iCCP) {
 
 }
 
-srgb :: proc(c: Chunk) -> (res: sRGB, ok: bool) {
+srgb :: proc(c: image.PNG_Chunk) -> (res: sRGB, ok: bool) {
 	if c.header.type != .sRGB || len(c.data) != size_of(sRGB_Rendering_Intent) {
 		return {}, false
 	}
@@ -244,7 +241,7 @@ srgb :: proc(c: Chunk) -> (res: sRGB, ok: bool) {
 	return res, true
 }
 
-plte :: proc(c: Chunk) -> (res: PLTE, ok: bool) {
+plte :: proc(c: image.PNG_Chunk) -> (res: PLTE, ok: bool) {
 	if c.header.type != .PLTE {
 		return {}, false
 	}
@@ -258,7 +255,7 @@ plte :: proc(c: Chunk) -> (res: PLTE, ok: bool) {
 	return
 }
 
-splt :: proc(c: Chunk) -> (res: sPLT, ok: bool) {
+splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 	if c.header.type != .sPLT {
 		return {}, false
 	}
@@ -309,7 +306,7 @@ splt_destroy :: proc(s: sPLT) {
 	delete(s.name)
 }
 
-sbit :: proc(c: Chunk) -> (res: [4]u8, ok: bool) {
+sbit :: proc(c: image.PNG_Chunk) -> (res: [4]u8, ok: bool) {
 	/*
 		Returns [4]u8 with the significant bits in each channel.
 		A channel will contain zero if not applicable to the PNG color type.
@@ -327,7 +324,7 @@ sbit :: proc(c: Chunk) -> (res: [4]u8, ok: bool) {
 
 }
 
-hist :: proc(c: Chunk) -> (res: hIST, ok: bool) {
+hist :: proc(c: image.PNG_Chunk) -> (res: hIST, ok: bool) {
 	if c.header.type != .hIST {
 		return {}, false
 	}
@@ -349,7 +346,7 @@ hist :: proc(c: Chunk) -> (res: hIST, ok: bool) {
 	return
 }
 
-chrm :: proc(c: Chunk) -> (res: cHRM, ok: bool) {
+chrm :: proc(c: image.PNG_Chunk) -> (res: cHRM, ok: bool) {
 	ok = true
 	if c.header.length != size_of(cHRM_Raw) {
 		return {}, false
@@ -367,7 +364,7 @@ chrm :: proc(c: Chunk) -> (res: cHRM, ok: bool) {
 	return
 }
 
-exif :: proc(c: Chunk) -> (res: Exif, ok: bool) {
+exif :: proc(c: image.PNG_Chunk) -> (res: Exif, ok: bool) {
 
 	ok = true
 

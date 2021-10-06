@@ -1504,10 +1504,8 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 				passed &= test.hash == hash
 				if .return_metadata in test.options {
-					v: ^png.Info
 
-					if img.metadata_ptr != nil && img.metadata_type == png.Info {
-						v = (^png.Info)(img.metadata_ptr)
+					if v, ok := img.metadata.(^image.PNG_Info); ok {
 						for c in v.chunks {
 							#partial switch(c.header.type) {
 							case .gAMA:
