@@ -41,7 +41,7 @@ main :: proc() {
 demo :: proc() {
 	file: string
 
-	options := image.Options{} // {.return_metadata};
+	options := image.Options{.return_metadata}
 	err:       compress.Error
 	img:      ^image.Image
 
@@ -53,23 +53,26 @@ demo :: proc() {
 	if err != nil {
 		fmt.printf("Trying to read PNG file %v returned %v\n", file, err)
 	} else {
-		v: ^Info
-
 		fmt.printf("Image: %vx%vx%v, %v-bit.\n", img.width, img.height, img.channels, img.depth)
-		if img.metadata_ptr != nil && img.metadata_type == Info {
-			v = (^Info)(img.metadata_ptr)
 
-			// Handle ancillary chunks as you wish.
-			// We provide helper functions for a few types.
-			for c in v.chunks {
-				#partial switch c.header.type {
-				case .tIME:
-					t, _ := core_time(c)
+		assert(img.metadata_ptr != nil && img.metadata_type == Info)
+
+		v := (^Info)(img.metadata_ptr)
+
+		// Handle ancillary chunks as you wish.
+		// We provide helper functions for a few types.
+		for c in v.chunks {
+			#partial switch c.header.type {
+			case .tIME:
+				if t, t_ok := core_time(c); t_ok {
 					fmt.printf("[tIME]: %v\n", t)
-				case .gAMA:
-					fmt.printf("[gAMA]: %v\n", gamma(c))
-				case .pHYs:
-					phys := phys(c)
+				}
+			case .gAMA:
+				if gama, gama_ok := gamma(c); gama_ok {
+					fmt.printf("[gAMA]: %v\n", gama)
+				}
+			case .pHYs:
+				if phys, phys_ok := phys(c); phys_ok {
 					if phys.unit == .Meter {
 						xm    := f32(img.width)  / f32(phys.ppu_x)
 						ym    := f32(img.height) / f32(phys.ppu_y)
@@ -80,72 +83,70 @@ demo :: proc() {
 					} else {
 						fmt.printf("[pHYs] x: %v, y: %v pixels per unknown unit.\n", phys.ppu_x, phys.ppu_y)
 					}
-				case .iTXt, .zTXt, .tEXt:
-					res, ok_text := text(c)
-					if ok_text {
-						if c.header.type == .iTXt {
-							fmt.printf("[iTXt] %v (%v:%v): %v\n", res.keyword, res.language, res.keyword_localized, res.text)
-						} else {
-							fmt.printf("[tEXt/zTXt] %v: %v\n", res.keyword, res.text)
-						}
-					}
-					defer text_destroy(res)
-				case .bKGD:
-					fmt.printf("[bKGD] %v\n", img.background)
-				case .eXIf:
-					res, ok_exif := exif(c)
-					if ok_exif {
-						/*
-							Other than checking the signature and byte order, we don't handle Exif data.
-							If you wish to interpret it, pass it to an Exif parser.
-						*/
-						fmt.printf("[eXIf] %v\n", res)
-					}
-				case .PLTE:
-					plte, plte_ok := plte(c)
-					if plte_ok {
-						fmt.printf("[PLTE] %v\n", plte)
-					} else {
-						fmt.printf("[PLTE] Error\n")
-					}
-				case .hIST:
-					res, ok_hist := hist(c)
-					if ok_hist {
-						fmt.printf("[hIST] %v\n", res)
-					}
-				case .cHRM:
-					res, ok_chrm := chrm(c)
-					if ok_chrm {
-						fmt.printf("[cHRM] %v\n", res)
-					}
-				case .sPLT:
-					res, ok_splt := splt(c)
-					if ok_splt {
-						fmt.printf("[sPLT] %v\n", res)
-					}
-					splt_destroy(res)
-				case .sBIT:
-					if res, ok_sbit := sbit(c); ok_sbit {
-						fmt.printf("[sBIT] %v\n", res)
-					}
-				case .iCCP:
-					res, ok_iccp := iccp(c)
-					if ok_iccp {
-						fmt.printf("[iCCP] %v\n", res)
-					}
-					iccp_destroy(res)
-				case .sRGB:
-					if res, ok_srgb := srgb(c); ok_srgb {
-						fmt.printf("[sRGB] Rendering intent: %v\n", res)
-					}
-				case:
-					type := c.header.type
-					name := chunk_type_to_name(&type)
-					fmt.printf("[%v]: %v\n", name, c.data)
 				}
+			case .iTXt, .zTXt, .tEXt:
+				res, ok_text := text(c)
+				if ok_text {
+					if c.header.type == .iTXt {
+						fmt.printf("[iTXt] %v (%v:%v): %v\n", res.keyword, res.language, res.keyword_localized, res.text)
+					} else {
+						fmt.printf("[tEXt/zTXt] %v: %v\n", res.keyword, res.text)
+					}
+				}
+				defer text_destroy(res)
+			case .bKGD:
+				fmt.printf("[bKGD] %v\n", img.background)
+			case .eXIf:
+				if res, ok_exif := exif(c); ok_exif {
+					/*
+						Other than checking the signature and byte order, we don't handle Exif data.
+						If you wish to interpret it, pass it to an Exif parser.
+					*/
+					fmt.printf("[eXIf] %v\n", res)
+				}
+			case .PLTE:
+				if plte, plte_ok := plte(c); plte_ok {
+					fmt.printf("[PLTE] %v\n", plte)
+				} else {
+					fmt.printf("[PLTE] Error\n")
+				}
+			case .hIST:
+				if res, ok_hist := hist(c); ok_hist {
+					fmt.printf("[hIST] %v\n", res)
+				}
+			case .cHRM:
+				if res, ok_chrm := chrm(c); ok_chrm {
+					fmt.printf("[cHRM] %v\n", res)
+				}
+			case .sPLT:
+				res, ok_splt := splt(c)
+				if ok_splt {
+					fmt.printf("[sPLT] %v\n", res)
+				}
+				splt_destroy(res)
+			case .sBIT:
+				if res, ok_sbit := sbit(c); ok_sbit {
+					fmt.printf("[sBIT] %v\n", res)
+				}
+			case .iCCP:
+				res, ok_iccp := iccp(c)
+				if ok_iccp {
+					fmt.printf("[iCCP] %v\n", res)
+				}
+				iccp_destroy(res)
+			case .sRGB:
+				if res, ok_srgb := srgb(c); ok_srgb {
+					fmt.printf("[sRGB] Rendering intent: %v\n", res)
+				}
+			case:
+				type := c.header.type
+				name := chunk_type_to_name(&type)
+				fmt.printf("[%v]: %v\n", name, c.data)
 			}
 		}
 	}
+
+	fmt.printf("Done parsing metadata.\n")
 
 	if err == nil && .do_not_decompress_image not_in options && .info not_in options {
 		if ok := write_image_as_ppm("out.ppm", img); ok {

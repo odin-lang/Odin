@@ -1514,10 +1514,10 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 							case .gAMA:
 								switch(file.file) {
 								case "pp0n2c16", "pp0n6a08":
-									gamma := png.gamma(c)
+									gamma, gamma_ok := png.gamma(c)
 									expected_gamma := f32(1.0)
 									error  = fmt.tprintf("%v test %v gAMA is %v, expected %v.", file.file, count, gamma, expected_gamma)
-									expect(t, gamma == expected_gamma, error)
+									expect(t, gamma == expected_gamma && gamma_ok, error)
 								}
 							case .PLTE:
 								switch(file.file) {
@@ -1557,25 +1557,25 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									expect(t, expected_chrm == chrm && chrm_ok, error)
 								}
 							case .pHYs:
-								phys     := png.phys(c)
+								phys, phys_ok := png.phys(c)
 								phys_err := "%v test %v cHRM is %v, expected %v."
 								switch (file.file) {
 								case "cdfn2c08":
 									expected_phys := png.pHYs{ppu_x =    1, ppu_y =    4, unit = .Unknown}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								case "cdhn2c08":
 									expected_phys := png.pHYs{ppu_x =    4, ppu_y =    1, unit = .Unknown}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								case "cdsn2c08":
 									expected_phys := png.pHYs{ppu_x =    1, ppu_y =    1, unit = .Unknown}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								case "cdun2c08":
 									expected_phys := png.pHYs{ppu_x = 1000, ppu_y = 1000, unit = .Meter}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								}
 							case .hIST:
 								hist, hist_ok := png.hist(c)
@@ -1589,7 +1589,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									expect(t, hist.used == 256 && hist_ok, error)
 								}
 							case .tIME:
-								png_time := png.time(c)
+								png_time, png_time_ok := png.time(c)
 								time_err := "%v test %v tIME was %v, expected %v."
 								expected_time: png.tIME
 
@@ -1610,7 +1610,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 								}
 								error  = fmt.tprintf(time_err, file.file, count, png_time, expected_time)
-								expect(t, png_time == expected_time, error)
+								expect(t, png_time  == expected_time && png_time_ok,  error)
 
 								error  = fmt.tprintf(time_core_err, file.file, count, core_time, expected_core)
 								expect(t, core_time == expected_core && core_time_ok, error)

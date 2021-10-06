@@ -131,6 +131,7 @@ Error :: enum {
 	Unknown_Interlace_Method,
 	Requested_Channel_Not_Present,
 	Post_Processing_Error,
+	Invalid_Chunk_Length,
 }
 
 /*
