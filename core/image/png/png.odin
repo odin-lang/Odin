@@ -51,95 +51,6 @@ Signature :: enum u64be {
 	PNG = 0x89 << 56 | 'P' << 48 | 'N' << 40 | 'G' << 32 | '\r' << 24 | '\n' << 16 | 0x1a << 8 | '\n',
 }
 
-Info :: struct {
-	header: IHDR,
-	chunks: [dynamic]Chunk,
-}
-
-Chunk_Header :: struct #packed {
-	length: u32be,
-	type:   Chunk_Type,
-}
-
-Chunk :: struct #packed {
-	header: Chunk_Header,
-	data:   []byte,
-	crc:    u32be,
-}
-
-Chunk_Type :: enum u32be {
-	// IHDR must come first in a file
-	IHDR = 'I' << 24 | 'H' << 16 | 'D' << 8 | 'R',
-	// PLTE must precede the first IDAT chunk
-	PLTE = 'P' << 24 | 'L' << 16 | 'T' << 8 | 'E',
-	bKGD = 'b' << 24 | 'K' << 16 | 'G' << 8 | 'D',
-	tRNS = 't' << 24 | 'R' << 16 | 'N' << 8 | 'S',
-	IDAT = 'I' << 24 | 'D' << 16 | 'A' << 8 | 'T',
-
-	iTXt = 'i' << 24 | 'T' << 16 | 'X' << 8 | 't',
-	tEXt = 't' << 24 | 'E' << 16 | 'X' << 8 | 't',
-	zTXt = 'z' << 24 | 'T' << 16 | 'X' << 8 | 't',
-
-	iCCP = 'i' << 24 | 'C' << 16 | 'C' << 8 | 'P',
-	pHYs = 'p' << 24 | 'H' << 16 | 'Y' << 8 | 's',
-	gAMA = 'g' << 24 | 'A' << 16 | 'M' << 8 | 'A',
-	tIME = 't' << 24 | 'I' << 16 | 'M' << 8 | 'E',
-
-	sPLT = 's' << 24 | 'P' << 16 | 'L' << 8 | 'T',
-	sRGB = 's' << 24 | 'R' << 16 | 'G' << 8 | 'B',
-	hIST = 'h' << 24 | 'I' << 16 | 'S' << 8 | 'T',
-	cHRM = 'c' << 24 | 'H' << 16 | 'R' << 8 | 'M',
-	sBIT = 's' << 24 | 'B' << 16 | 'I' << 8 | 'T',
-
-	/*
-		eXIf tags are not part of the core spec, but have been ratified
-		in v1.5.0 of the PNG Ext register.
-
-		We will provide unprocessed chunks to the caller if `.return_metadata` is set.
-		Applications are free to implement an Exif decoder.
-	*/
-	eXIf = 'e' << 24 | 'X' << 16 | 'I' << 8 | 'f',
-
-	// PNG files must end with IEND
-	IEND = 'I' << 24 | 'E' << 16 | 'N' << 8 | 'D',
-
-	/*
-		XCode sometimes produces "PNG" files that don't adhere to the PNG spec.
-		We recognize them only in order to avoid doing further work on them.
-
-		Some tools like PNG Defry may be able to repair them, but we're not
-		going to reward Apple for producing proprietary broken files purporting
-		to be PNGs by supporting them.
-
-	*/
-	iDOT = 'i' << 24 | 'D' << 16 | 'O' << 8 | 'T',
-	CbGI = 'C' << 24 | 'b' << 16 | 'H' << 8 | 'I',
-}
-
-IHDR :: struct #packed {
-	width:              u32be,
-	height:             u32be,
-	bit_depth:          u8,
-	color_type:         Color_Type,
-	compression_method: u8,
-	filter_method:      u8,
-	interlace_method:   Interlace_Method,
-}
-IHDR_SIZE :: size_of(IHDR)
-#assert (IHDR_SIZE == 13)
-
-Color_Value :: enum u8 {
-	Paletted = 0, // 1 << 0 = 1
-	Color    = 1, // 1 << 1 = 2
-	Alpha    = 2, // 1 << 2 = 4
-}
-Color_Type :: distinct bit_set[Color_Value; u8]
-
-Interlace_Method :: enum u8 {
-	None  = 0,
-	Adam7 = 1,
-}
-
 Row_Filter :: enum u8 {
 	None    = 0,
 	Sub     = 1,
@@ -262,8 +173,8 @@ ADAM7_Y_SPACING := []int{ 8,8,8,4,4,2,2 }
 
 // Implementation starts here
 
-read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
-	ch, e := compress.read_data(ctx, Chunk_Header)
+read_chunk :: proc(ctx: ^$C) -> (chunk: image.PNG_Chunk, err: Error) {
+	ch, e := compress.read_data(ctx, image.PNG_Chunk_Header)
 	if e != .None {
 		return {}, compress.General_Error.Stream_Too_Short
 	}
@@ -305,7 +216,7 @@ read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 	return chunk, nil
 }
 
-copy_chunk :: proc(src: Chunk, allocator := context.allocator) -> (dest: Chunk, err: Error) {
+copy_chunk :: proc(src: image.PNG_Chunk, allocator := context.allocator) -> (dest: image.PNG_Chunk, err: Error) {
 	if int(src.header.length) != len(src.data) {
 		return {}, .Invalid_Chunk_Length
 	}
@@ -318,7 +229,7 @@ copy_chunk :: proc(src: Chunk, allocator := context.allocator) -> (dest: Chunk, 
 	return
 }
 
-append_chunk :: proc(list: ^[dynamic]Chunk, src: Chunk, allocator := context.allocator) -> (err: Error) {
+append_chunk :: proc(list: ^[dynamic]image.PNG_Chunk, src: image.PNG_Chunk, allocator := context.allocator) -> (err: Error) {
 	if int(src.header.length) != len(src.data) {
 		return .Invalid_Chunk_Length
 	}
@@ -334,13 +245,13 @@ append_chunk :: proc(list: ^[dynamic]Chunk, src: Chunk, allocator := context.all
 	return
 }
 
-read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
+read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 	c, e := read_chunk(ctx)
 	if e != nil {
 		return {}, e
 	}
 
-	header := (^IHDR)(raw_data(c.data))^
+	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
 	if width == 0 || height == 0 || u128(width) * u128(height) > MAX_DIMENSIONS {
@@ -407,7 +318,7 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 	return header, nil
 }
 
-chunk_type_to_name :: proc(type: ^Chunk_Type) -> string {
+chunk_type_to_name :: proc(type: ^image.PNG_Chunk_Type) -> string {
 	t := transmute(^u8)type
 	return strings.string_from_ptr(t, 4)
 }
@@ -462,9 +373,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		img = new(Image)
 	}
 
-	info := new(Info)
-	img.metadata_ptr  = info
-	img.metadata_type = typeid_of(Info)
+	info := new(image.PNG_Info)
+	img.metadata = info
 
 	signature, io_error := compress.read_data(ctx, Signature)
 	if io_error != .None || signature != .PNG {
@@ -477,11 +387,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	idat_length := u64(0)
 
-	c:		Chunk
-	ch:     Chunk_Header
+	c:		image.PNG_Chunk
+	ch:     image.PNG_Chunk_Header
 	e:      io.Error
 
-	header:	IHDR
+	header:	image.PNG_IHDR
 
 	// State to ensure correct chunk ordering.
 	seen_ihdr := false; first := true
@@ -492,7 +402,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	seen_iend := false
 
 	_plte := PLTE{}
-	trns := Chunk{}
+	trns := image.PNG_Chunk{}
 
 	final_image_channels := 0
 
@@ -502,7 +412,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// Peek at next chunk's length and type.
 		// TODO: Some streams may not provide seek/read_at
 
-		ch, e = compress.peek_data(ctx, Chunk_Header)
+		ch, e = compress.peek_data(ctx, image.PNG_Chunk_Header)
 		if e != .None {
 			return img, compress.General_Error.Stream_Too_Short
 		}
@@ -547,7 +457,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			img.height = int(header.height)
 
 			using header
-			h := IHDR{
+			h := image.PNG_IHDR{
 				width              = width,
 				height             = height,
 				bit_depth          = bit_depth,
@@ -607,7 +517,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					return {}, image.PNG_Error.IDAT_Size_Too_Large
 				}
 
-				ch, e = compress.peek_data(ctx, Chunk_Header)
+				ch, e = compress.peek_data(ctx, image.PNG_Chunk_Header)
 				if e != .None {
 					return img, compress.General_Error.Stream_Too_Short
 				}
@@ -1599,7 +1509,7 @@ defilter_16 :: proc(params: ^Filter_Params) -> (ok: bool) {
 	return
 }
 
-defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, options: Options) -> (err: Error) {
+defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IHDR, options: Options) -> (err: Error) {
 	input    := bytes.buffer_to_bytes(filter_bytes)
 	width    := int(header.width)
 	height   := int(header.height)
