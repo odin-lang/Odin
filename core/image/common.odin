@@ -319,8 +319,7 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 	res.depth         = img.depth
 	res.pixels        = t
 	res.background    = img.background
-	// res.metadata_ptr  = img.metadata_ptr
-	// res.metadata_type = img.metadata_type
+	res.metadata      = img.metadata
 
 	return res, true
 }
