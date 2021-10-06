@@ -1,5 +1,3 @@
-package png
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-2 license.
@@ -10,6 +8,7 @@ package png
 
 	These are a few useful utility functions to work with PNG images.
 */
+package png
 
 import "core:image"
 import "core:compress/zlib"
@@ -34,15 +33,14 @@ destroy :: proc(img: ^Image) {
 	}
 
 	bytes.buffer_destroy(&img.pixels)
-	// Clean up Info.
-	free(img.metadata_ptr)
 
-	/*
-		We don't need to do anything for the individual chunks.
-		They're allocated on the temp allocator, as is info.chunks
-
-		See read_chunk.
-	*/
+	if v, ok := img.metadata.(^image.PNG_Info); ok {
+		for chunk in &v.chunks {
+			delete(chunk.data)
+		}
+		delete(v.chunks)
+		free(v)
+	}
 	free(img)
 }
 
@@ -50,46 +48,50 @@ destroy :: proc(img: ^Image) {
 	Chunk helpers
 */
 
-gamma :: proc(c: Chunk) -> f32 {
-	assert(c.header.type == .gAMA)
-	res := (^gAMA)(raw_data(c.data))^
-	when true {
-		// Returns the wrong result on old backend
-		// Fixed for -llvm-api
-		return f32(res.gamma_100k) / 100_000.0
-	} else {
-		return f32(u32(res.gamma_100k)) / 100_000.0
+gamma :: proc(c: image.PNG_Chunk) -> (res: f32, ok: bool) {
+	if c.header.type != .gAMA || len(c.data) != size_of(gAMA) {
+		return {}, false
 	}
+	gama := (^gAMA)(raw_data(c.data))^
+	return f32(gama.gamma_100k) / 100_000.0, true
 }
 
 INCHES_PER_METER :: 1000.0 / 25.4
 
-phys :: proc(c: Chunk) -> pHYs {
-	assert(c.header.type == .pHYs)
-	res := (^pHYs)(raw_data(c.data))^
-	return res
+phys :: proc(c: image.PNG_Chunk) -> (res: pHYs, ok: bool) {
+	if c.header.type != .pHYs || len(c.data) != size_of(pHYs) {
+		return {}, false
+	}
+
+	return (^pHYs)(raw_data(c.data))^, true 
 }
 
 phys_to_dpi :: proc(p: pHYs) -> (x_dpi, y_dpi: f32) {
 	return f32(p.ppu_x) / INCHES_PER_METER, f32(p.ppu_y) / INCHES_PER_METER
 }
 
-time :: proc(c: Chunk) -> tIME {
-	assert(c.header.type == .tIME)
-	res := (^tIME)(raw_data(c.data))^
-	return res
+time :: proc(c: image.PNG_Chunk) -> (res: tIME, ok: bool) {
+	if c.header.type != .tIME || len(c.data) != size_of(tIME) {
+		return {}, false
+	}
+
+	return (^tIME)(raw_data(c.data))^, true
 }
 
-core_time :: proc(c: Chunk) -> (t: coretime.Time, ok: bool) {
-	png_time := time(c)
-	using png_time
-	return coretime.datetime_to_time(
-		int(year), int(month), int(day),
-		int(hour), int(minute), int(second),
-	)
+core_time :: proc(c: image.PNG_Chunk) -> (t: coretime.Time, ok: bool) {
+	if png_time, png_ok := time(c); png_ok {
+		using png_time
+		return coretime.datetime_to_time(
+			int(year), int(month), int(day),
+			int(hour), int(minute), int(second),
+		)
+	} else {
+		return {}, false
+	}
 }
 
-text :: proc(c: Chunk) -> (res: Text, ok: bool) {
+text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
+	assert(len(c.data) == int(c.header.length))
 	#partial switch c.header.type {
 	case .tEXt:
 		ok = true
@@ -191,7 +193,7 @@ text_destroy :: proc(text: Text) {
 	delete(text.text)
 }
 
-iccp :: proc(c: Chunk) -> (res: iCCP, ok: bool) {
+iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 	ok = true
 
 	fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
@@ -227,10 +229,8 @@ iccp_destroy :: proc(i: iCCP) {
 
 }
 
-srgb :: proc(c: Chunk) -> (res: sRGB, ok: bool) {
-	ok = true
-
-	if c.header.type != .sRGB || len(c.data) != 1 {
+srgb :: proc(c: image.PNG_Chunk) -> (res: sRGB, ok: bool) {
+	if c.header.type != .sRGB || len(c.data) != size_of(sRGB_Rendering_Intent) {
 		return {}, false
 	}
 
@@ -238,10 +238,10 @@ srgb :: proc(c: Chunk) -> (res: sRGB, ok: bool) {
 	if res.intent > max(sRGB_Rendering_Intent) {
 		ok = false; return
 	}
-	return
+	return res, true
 }
 
-plte :: proc(c: Chunk) -> (res: PLTE, ok: bool) {
+plte :: proc(c: image.PNG_Chunk) -> (res: PLTE, ok: bool) {
 	if c.header.type != .PLTE {
 		return {}, false
 	}
@@ -255,7 +255,7 @@ plte :: proc(c: Chunk) -> (res: PLTE, ok: bool) {
 	return
 }
 
-splt :: proc(c: Chunk) -> (res: sPLT, ok: bool) {
+splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 	if c.header.type != .sPLT {
 		return {}, false
 	}
@@ -306,7 +306,7 @@ splt_destroy :: proc(s: sPLT) {
 	delete(s.name)
 }
 
-sbit :: proc(c: Chunk) -> (res: [4]u8, ok: bool) {
+sbit :: proc(c: image.PNG_Chunk) -> (res: [4]u8, ok: bool) {
 	/*
 		Returns [4]u8 with the significant bits in each channel.
 		A channel will contain zero if not applicable to the PNG color type.
@@ -324,7 +324,7 @@ sbit :: proc(c: Chunk) -> (res: [4]u8, ok: bool) {
 
 }
 
-hist :: proc(c: Chunk) -> (res: hIST, ok: bool) {
+hist :: proc(c: image.PNG_Chunk) -> (res: hIST, ok: bool) {
 	if c.header.type != .hIST {
 		return {}, false
 	}
@@ -346,7 +346,7 @@ hist :: proc(c: Chunk) -> (res: hIST, ok: bool) {
 	return
 }
 
-chrm :: proc(c: Chunk) -> (res: cHRM, ok: bool) {
+chrm :: proc(c: image.PNG_Chunk) -> (res: cHRM, ok: bool) {
 	ok = true
 	if c.header.length != size_of(cHRM_Raw) {
 		return {}, false
@@ -364,7 +364,7 @@ chrm :: proc(c: Chunk) -> (res: cHRM, ok: bool) {
 	return
 }
 
-exif :: proc(c: Chunk) -> (res: Exif, ok: bool) {
+exif :: proc(c: image.PNG_Chunk) -> (res: Exif, ok: bool) {
 
 	ok = true
 
