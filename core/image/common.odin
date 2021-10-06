@@ -1,13 +1,12 @@
-package image
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-2 license.
+	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 		Ginger Bill:     Cosmetic changes.
 */
+package image
 
 import "core:bytes"
 import "core:mem"
@@ -128,6 +127,7 @@ Error :: union {
 General_Image_Error :: enum {
 	None = 0,
 	Invalid_Image_Dimensions,
+	Image_Dimensions_Too_Large,
 	Image_Does_Not_Adhere_to_Spec,
 }
 
@@ -138,6 +138,7 @@ PNG_Error :: enum {
 	IDAT_Missing,
 	IDAT_Must_Be_Contiguous,
 	IDAT_Corrupt,
+	IDAT_Size_Too_Large,
 	PLTE_Encountered_Unexpectedly,
 	PLTE_Invalid_Length,
 	TRNS_Encountered_Unexpectedly,
