@@ -301,17 +301,17 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 	return
 }
 
+
+
 @builtin
-append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> Allocator_Error {
+append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	if array == nil {
-		return .None
+		return
 	}
 
 	if cap(array) < len(array)+1 {
 		cap := 2 * cap(array) + max(8, 1)
-		if ok := reserve(array, cap, loc); !ok {
-			return .Out_Of_Memory
-		}
+		_ = reserve(array, cap, loc)
 	}
 	if cap(array)-len(array) > 0 {
 		a := (^Raw_Dynamic_Array)(array)
@@ -322,25 +322,23 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 		}
 		a.len += 1
 	}
-	return .None
 }
 
 @builtin
-append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> Allocator_Error {
+append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)  {
 	if array == nil {
-		return .None
+		return
 	}
 
 	arg_len := len(args)
 	if arg_len <= 0 {
-		return .Invalid_Argument
+		return
 	}
+
 
 	if cap(array) < len(array)+arg_len {
 		cap := 2 * cap(array) + max(8, arg_len)
-		if ok := reserve(array, cap, loc); !ok {
-			return .Out_Of_Memory
-		}
+		_ = reserve(array, cap, loc)
 	}
 	arg_len = min(cap(array)-len(array), arg_len)
 	if arg_len > 0 {
@@ -352,22 +350,21 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		}
 		a.len += arg_len
 	}
-	return .None
 }
 
 // The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
 @builtin
-append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) -> Allocator_Error {
+append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) {
 	args := transmute([]E)arg
-	return append_elems(array=array, args=args, loc=loc)
+	append_elems(array=array, args=args, loc=loc)
 }
 
 
 // The append_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
 @builtin
-append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) -> Allocator_Error {
+append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
 	for arg in args {
-		append(array = array, args = transmute([]E)(arg), loc = loc) or_return
+		append(array = array, args = transmute([]E)(arg), loc = loc)
 	}
 }
 
