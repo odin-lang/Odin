@@ -495,11 +495,6 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	Type *val_type = map_type->Map.value;
 	gb_unused(val_type);
 
-	// NOTE(bill): Removes unnecessary allocation if split gep
-	lbValue gep0 = lb_emit_struct_ep(p, h.addr, 0);
-	lbValue m = lb_emit_conv(p, map_val_ptr, type_deref(gep0.type));
-	lb_emit_store(p, gep0, m);
-
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
 
@@ -508,14 +503,28 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 
 	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
-
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 1), lb_get_equal_proc_for_type(p->module, key_type));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 2), lb_const_int(p->module, t_int, entry_size));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 3), lb_const_int(p->module, t_int, entry_align));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 4), lb_const_int(p->module, t_uintptr, key_offset));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 5), lb_const_int(p->module, t_int, key_size));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 6), lb_const_int(p->module, t_uintptr, value_offset));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 7), lb_const_int(p->module, t_int, value_size));
+	
+	
+	Type *map_header_base = base_type(t_map_header);
+	GB_ASSERT(map_header_base->Struct.fields.count == 8);
+	Type *m_type = map_header_base->Struct.fields[0]->type;
+	LLVMValueRef const_values[8] = {};
+	const_values[0] = LLVMConstNull(lb_type(p->module, m_type));
+	const_values[1] = lb_get_equal_proc_for_type(p->module, key_type)    .value;
+	const_values[2] = lb_const_int(p->module, t_int,        entry_size)  .value;
+	const_values[3] = lb_const_int(p->module, t_int,        entry_align) .value;
+	const_values[4] = lb_const_int(p->module, t_uintptr,    key_offset)  .value;
+	const_values[5] = lb_const_int(p->module, t_int,        key_size)    .value;
+	const_values[6] = lb_const_int(p->module, t_uintptr,    value_offset).value;
+	const_values[7] = lb_const_int(p->module, t_int,        value_size)  .value;
+	
+	LLVMValueRef const_value = llvm_const_named_struct(p->module, t_map_header, const_values, gb_count_of(const_values));
+	LLVMBuildStore(p->builder, const_value, h.addr.value);
+	
+	// NOTE(bill): Removes unnecessary allocation if split gep
+	lbValue gep0 = lb_emit_struct_ep(p, h.addr, 0);
+	lbValue m = lb_emit_conv(p, map_val_ptr, type_deref(gep0.type));
+	lb_emit_store(p, gep0, m);
 
 	return lb_addr_load(p, h);
 }
