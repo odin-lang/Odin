@@ -106,6 +106,8 @@ foreign kernel32 {
 	                                                                      bytes_returned: ^u32, overlapped: ^Overlapped,
 	                                                                      completion: rawptr) -> Bool ---
 
+	@(link_name="GetOverlappedResult") get_overlapped_result :: proc(file: Handle, overlapped: ^Overlapped, number_of_bytes_transferred: ^u32, wait: Bool) -> Bool ---
+
 	@(link_name="WideCharToMultiByte") wide_char_to_multi_byte :: proc(code_page: u32, flags: u32,
 	                                                                   wchar_str: Wstring, wchar: i32,
 	                                                                   multi_str: cstring, multi: i32,

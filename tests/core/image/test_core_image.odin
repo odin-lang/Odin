@@ -1,5 +1,3 @@
-package test_core_image
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -9,6 +7,7 @@ package test_core_image
 
 	A test suite for PNG.
 */
+package test_core_image
 
 import "core:testing"
 
@@ -64,7 +63,7 @@ PNG_Test :: struct {
 	file:   string,
 	tests:  []struct {
 		options:        image.Options,
-		expected_error: compress.Error,
+		expected_error: image.Error,
 		dims:           PNG_Dims,
 		hash:           u32,
 	},
@@ -1198,37 +1197,37 @@ Corrupt_PNG_Tests   := []PNG_Test{
 	{
 		"xs1n0g01", // signature byte 1 MSBit reset to zero
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs2n0g01", // signature byte 2 is a 'Q'
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs4n0g01", // signature byte 4 lowercase
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs7n0g01", // 7th byte a space instead of control-Z
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xcrn0g04", // added cr bytes
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xlfn0g04", // added lf bytes
 		{
-			{Default, I_Error.Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
@@ -1240,37 +1239,37 @@ Corrupt_PNG_Tests   := []PNG_Test{
 	{
 		"xc1n0g08", // color type 1
 		{
-			{Default, I_Error.Unknown_Color_Type, {}, 0x_0000_0000},
+			{Default, .Unknown_Color_Type, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xc9n2c08", // color type 9
 		{
-			{Default, I_Error.Unknown_Color_Type, {}, 0x_0000_0000},
+			{Default, .Unknown_Color_Type, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xd0n2c08", // bit-depth 0
 		{
-			{Default, I_Error.Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
+			{Default, .Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xd3n2c08", // bit-depth 3
 		{
-			{Default, I_Error.Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
+			{Default, .Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xd9n2c08", // bit-depth 99
 		{
-			{Default, I_Error.Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
+			{Default, .Invalid_Color_Bit_Depth_Combo, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xdtn0g01", // missing IDAT chunk
 		{
-			{Default, I_Error.IDAT_Missing, {}, 0x_0000_0000},
+			{Default, .IDAT_Missing, {}, 0x_0000_0000},
 		},
 	},
 	{
@@ -1505,19 +1504,17 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 				passed &= test.hash == hash
 				if .return_metadata in test.options {
-					v: ^png.Info
 
-					if img.metadata_ptr != nil && img.metadata_type == png.Info {
-						v = (^png.Info)(img.metadata_ptr)
+					if v, ok := img.metadata.(^image.PNG_Info); ok {
 						for c in v.chunks {
 							#partial switch(c.header.type) {
 							case .gAMA:
 								switch(file.file) {
 								case "pp0n2c16", "pp0n6a08":
-									gamma := png.gamma(c)
+									gamma, gamma_ok := png.gamma(c)
 									expected_gamma := f32(1.0)
 									error  = fmt.tprintf("%v test %v gAMA is %v, expected %v.", file.file, count, gamma, expected_gamma)
-									expect(t, gamma == expected_gamma, error)
+									expect(t, gamma == expected_gamma && gamma_ok, error)
 								}
 							case .PLTE:
 								switch(file.file) {
@@ -1557,25 +1554,25 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									expect(t, expected_chrm == chrm && chrm_ok, error)
 								}
 							case .pHYs:
-								phys     := png.phys(c)
+								phys, phys_ok := png.phys(c)
 								phys_err := "%v test %v cHRM is %v, expected %v."
 								switch (file.file) {
 								case "cdfn2c08":
 									expected_phys := png.pHYs{ppu_x =    1, ppu_y =    4, unit = .Unknown}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								case "cdhn2c08":
 									expected_phys := png.pHYs{ppu_x =    4, ppu_y =    1, unit = .Unknown}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								case "cdsn2c08":
 									expected_phys := png.pHYs{ppu_x =    1, ppu_y =    1, unit = .Unknown}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								case "cdun2c08":
 									expected_phys := png.pHYs{ppu_x = 1000, ppu_y = 1000, unit = .Meter}
 									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys, error)
+									expect(t, expected_phys == phys && phys_ok, error)
 								}
 							case .hIST:
 								hist, hist_ok := png.hist(c)
@@ -1589,7 +1586,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									expect(t, hist.used == 256 && hist_ok, error)
 								}
 							case .tIME:
-								png_time := png.time(c)
+								png_time, png_time_ok := png.time(c)
 								time_err := "%v test %v tIME was %v, expected %v."
 								expected_time: png.tIME
 
@@ -1610,7 +1607,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 								}
 								error  = fmt.tprintf(time_err, file.file, count, png_time, expected_time)
-								expect(t, png_time == expected_time, error)
+								expect(t, png_time  == expected_time && png_time_ok,  error)
 
 								error  = fmt.tprintf(time_core_err, file.file, count, core_time, expected_core)
 								expect(t, core_time == expected_core && core_time_ok, error)

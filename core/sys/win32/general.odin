@@ -99,6 +99,57 @@ Rect :: struct {
 	bottom: i32,
 }
 
+Dev_Mode_A :: struct {
+    device_name:    [32]u8,
+    spec_version:   u16,
+    driver_version: u16,
+    size:           u16,
+    driver_extra:   u16,
+    fields:         u32,
+	using _: struct #raw_union {
+		// Printer only fields.
+		using _: struct {
+			orientation:    i16,
+			paper_size:     i16,
+			paper_length:   i16,
+			paper_width:    i16,
+			scale:          i16,
+			copies:         i16,
+			default_source: i16,
+			print_quality:  i16,
+		},
+		// Display only fields.
+		using _: struct {
+			position:             Point,
+			display_orientation:  u32,
+			display_fixed_output: u32,
+		},
+	},
+    color:        i16,
+    duplex:       i16,
+    y_resolution: i16,
+    tt_option:    i16,
+    collate:      i16,
+    form_name:    [32]u8,
+    log_pixels:   u16,
+    bits_per_pel: u32,
+    pels_width:   u32,
+    pels_height:  u32,
+	using _: struct #raw_union {
+		display_flags: u32,
+		nup:           u32,
+	},
+    display_frequency: u32,
+    icm_method:        u32,
+    icm_intent:        u32,
+    media_type:        u32,
+    dither_type:       u32,
+    reserved_1:        u32,
+    reserved_2:        u32,
+    panning_width:     u32,
+    panning_height:    u32,
+}
+
 Filetime :: struct {
 	lo, hi: u32,
 }
@@ -364,6 +415,9 @@ MAPVK_VK_TO_CHAR   :: 2
 MAPVK_VSC_TO_VK_EX :: 3
 
 //WinUser.h
+ENUM_CURRENT_SETTINGS  :: u32(4294967295) // (DWORD)-1
+ENUM_REGISTRY_SETTINGS :: u32(4294967294) // (DWORD)-2
+
 VK_LBUTTON        :: 0x01
 VK_RBUTTON        :: 0x02
 VK_CANCEL         :: 0x03
@@ -877,7 +931,20 @@ FILE_GENERIC_EXECUTE :: 0x20000000
 FILE_GENERIC_WRITE   :: 0x40000000
 FILE_GENERIC_READ    :: 0x80000000
 
-FILE_APPEND_DATA :: 0x0004
+FILE_READ_DATA            :: 0x0001
+FILE_LIST_DIRECTORY       :: 0x0001
+FILE_WRITE_DATA           :: 0x0002
+FILE_ADD_FILE             :: 0x0002
+FILE_APPEND_DATA          :: 0x0004
+FILE_ADD_SUBDIRECTORY     :: 0x0004
+FILE_CREATE_PIPE_INSTANCE :: 0x0004
+FILE_READ_EA              :: 0x0008
+FILE_WRITE_EA             :: 0x0010
+FILE_EXECUTE              :: 0x0020
+FILE_TRAVERSE             :: 0x0020
+FILE_DELETE_CHILD         :: 0x0040
+FILE_READ_ATTRIBUTES      :: 0x0080
+FILE_WRITE_ATTRIBUTES     :: 0x0100
 
 STD_INPUT_HANDLE  :: -10
 STD_OUTPUT_HANDLE :: -11

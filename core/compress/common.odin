@@ -1,5 +1,3 @@
-package compress
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -7,10 +5,11 @@ package compress
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 */
+package compress
 
 import "core:io"
-import "core:image"
 import "core:bytes"
+import "core:runtime"
 
 /*
 	These settings bound how much compression algorithms will allocate for their output buffer.
@@ -51,11 +50,8 @@ Error :: union {
 	ZLIB_Error,
 	GZIP_Error,
 	ZIP_Error,
-	/*
-		This is here because png.load will return a this type of error union,
-		as it may involve an I/O error, a Deflate error, etc.
-	*/
-	image.Error,
+
+	runtime.Allocator_Error,
 }
 
 General_Error :: enum {
@@ -68,7 +64,6 @@ General_Error :: enum {
 	Checksum_Failed,
 	Incompatible_Options,
 	Unimplemented,
-
 
 	/*
 		Memory errors
