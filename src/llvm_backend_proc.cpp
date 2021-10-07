@@ -239,8 +239,11 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		}
 
 		if (p->body != nullptr) {
+			// String debug_name = entity->token.string.text;
+			String debug_name = p->name;
+			
 			p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
-				cast(char const *)entity->token.string.text, entity->token.string.len,
+				cast(char const *)debug_name.text, debug_name.len,
 				cast(char const *)p->name.text, p->name.len,
 				file, line, type,
 				is_local_to_unit, is_definition,
