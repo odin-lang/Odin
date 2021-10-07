@@ -201,6 +201,8 @@ foreign user32 {
 	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a :: proc(code, map_type: u32, hkl: HKL) -> u32 ---
 
 	@(link_name="EnumDisplayMonitors") enum_display_monitors :: proc(hdc: Hdc,  rect: ^Rect, enum_proc: Monitor_Enum_Proc, lparam: Lparam) -> bool ---
+
+	@(link_name="EnumDisplaySettingsA") enum_display_settings_a :: proc(device_name: cstring, mode_number: u32, mode: ^Dev_Mode_A) -> Bool ---
 }
 
 @(default_calling_convention = "std")

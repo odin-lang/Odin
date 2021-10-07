@@ -1,13 +1,12 @@
-package png
-
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-2 license.
+	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
+package png
 
 import "core:compress"
 import "core:compress/zlib"
@@ -21,106 +20,35 @@ import "core:io"
 import "core:mem"
 import "core:intrinsics"
 
-Error     :: compress.Error
-E_General :: compress.General_Error
-E_PNG     :: image.Error
-E_Deflate :: compress.Deflate_Error
+/*
+	67_108_864 pixels max by default.
+	Maximum allowed dimensions are capped at 65535 * 65535.
+*/
+MAX_DIMENSIONS    :: min(#config(PNG_MAX_DIMENSIONS, 8192 * 8192), 65535 * 65535)
 
+/*
+	Limit chunk sizes.
+		By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
+*/
+_MAX_IDAT_DEFAULT :: ( 8192 /* Width */ *  8192 /* Height */ * 2 /* 16-bit */) +  8192 /* Filter bytes */
+_MAX_IDAT         :: (65535 /* Width */ * 65535 /* Height */ * 2 /* 16-bit */) + 65535 /* Filter bytes */
+
+MAX_IDAT_SIZE     :: min(#config(PNG_MAX_IDAT_SIZE, _MAX_IDAT_DEFAULT), _MAX_IDAT)
+
+/*
+	For chunks other than IDAT with a variable size like `zTXT` and `eXIf`,
+	limit their size to 16 MiB each by default. Max of 256 MiB each.
+*/
+MAX_CHUNK_SIZE    :: min(#config(PNG_MAX_CHUNK_SIZE, 16_777_216), 268_435_456)
+
+
+Error     :: image.Error
 Image     :: image.Image
 Options   :: image.Options
 
 Signature :: enum u64be {
 	// 0x89504e470d0a1a0a
 	PNG = 0x89 << 56 | 'P' << 48 | 'N' << 40 | 'G' << 32 | '\r' << 24 | '\n' << 16 | 0x1a << 8 | '\n',
-}
-
-Info :: struct {
-	header: IHDR,
-	chunks: [dynamic]Chunk,
-}
-
-Chunk_Header :: struct #packed {
-	length: u32be,
-	type:   Chunk_Type,
-}
-
-Chunk :: struct #packed {
-	header: Chunk_Header,
-	data:   []byte,
-	crc:    u32be,
-}
-
-Chunk_Type :: enum u32be {
-	// IHDR must come first in a file
-	IHDR = 'I' << 24 | 'H' << 16 | 'D' << 8 | 'R',
-	// PLTE must precede the first IDAT chunk
-	PLTE = 'P' << 24 | 'L' << 16 | 'T' << 8 | 'E',
-	bKGD = 'b' << 24 | 'K' << 16 | 'G' << 8 | 'D',
-	tRNS = 't' << 24 | 'R' << 16 | 'N' << 8 | 'S',
-	IDAT = 'I' << 24 | 'D' << 16 | 'A' << 8 | 'T',
-
-	iTXt = 'i' << 24 | 'T' << 16 | 'X' << 8 | 't',
-	tEXt = 't' << 24 | 'E' << 16 | 'X' << 8 | 't',
-	zTXt = 'z' << 24 | 'T' << 16 | 'X' << 8 | 't',
-
-	iCCP = 'i' << 24 | 'C' << 16 | 'C' << 8 | 'P',
-	pHYs = 'p' << 24 | 'H' << 16 | 'Y' << 8 | 's',
-	gAMA = 'g' << 24 | 'A' << 16 | 'M' << 8 | 'A',
-	tIME = 't' << 24 | 'I' << 16 | 'M' << 8 | 'E',
-
-	sPLT = 's' << 24 | 'P' << 16 | 'L' << 8 | 'T',
-	sRGB = 's' << 24 | 'R' << 16 | 'G' << 8 | 'B',
-	hIST = 'h' << 24 | 'I' << 16 | 'S' << 8 | 'T',
-	cHRM = 'c' << 24 | 'H' << 16 | 'R' << 8 | 'M',
-	sBIT = 's' << 24 | 'B' << 16 | 'I' << 8 | 'T',
-
-	/*
-		eXIf tags are not part of the core spec, but have been ratified
-		in v1.5.0 of the PNG Ext register.
-
-		We will provide unprocessed chunks to the caller if `.return_metadata` is set.
-		Applications are free to implement an Exif decoder.
-	*/
-	eXIf = 'e' << 24 | 'X' << 16 | 'I' << 8 | 'f',
-
-	// PNG files must end with IEND
-	IEND = 'I' << 24 | 'E' << 16 | 'N' << 8 | 'D',
-
-	/*
-		XCode sometimes produces "PNG" files that don't adhere to the PNG spec.
-		We recognize them only in order to avoid doing further work on them.
-
-		Some tools like PNG Defry may be able to repair them, but we're not
-		going to reward Apple for producing proprietary broken files purporting
-		to be PNGs by supporting them.
-
-	*/
-	iDOT = 'i' << 24 | 'D' << 16 | 'O' << 8 | 'T',
-	CbGI = 'C' << 24 | 'b' << 16 | 'H' << 8 | 'I',
-}
-
-IHDR :: struct #packed {
-	width: u32be,
-	height: u32be,
-	bit_depth: u8,
-	color_type: Color_Type,
-	compression_method: u8,
-	filter_method: u8,
-	interlace_method: Interlace_Method,
-}
-IHDR_SIZE :: size_of(IHDR)
-#assert (IHDR_SIZE == 13)
-
-Color_Value :: enum u8 {
-	Paletted = 0, // 1 << 0 = 1
-	Color    = 1, // 1 << 1 = 2
-	Alpha    = 2, // 1 << 2 = 4
-}
-Color_Type :: distinct bit_set[Color_Value; u8]
-
-Interlace_Method :: enum u8 {
-	None  = 0,
-	Adam7 = 1,
 }
 
 Row_Filter :: enum u8 {
@@ -135,22 +63,22 @@ PLTE_Entry    :: [3]u8
 
 PLTE :: struct #packed {
 	entries: [256]PLTE_Entry,
-	used: u16,
+	used:    u16,
 }
 
 hIST :: struct #packed {
 	entries: [256]u16,
-	used: u16,
+	used:    u16,
 }
 
 sPLT :: struct #packed {
-	name: string,
-	depth: u8,
+	name:    string,
+	depth:   u8,
 	entries: union {
 		[][4]u8,
 		[][4]u16,
 	},
-	used: u16,
+	used:    u16,
 }
 
 // Other chunks
@@ -223,14 +151,14 @@ Exif :: struct {
 }
 
 iCCP :: struct {
-	name: string,
+	name:    string,
 	profile: []u8,
 }
 
 sRGB_Rendering_Intent :: enum u8 {
-	Perceptual = 0,
+	Perceptual            = 0,
 	Relative_colorimetric = 1,
-	Saturation = 2,
+	Saturation            = 2,
 	Absolute_colorimetric = 3,
 }
 
@@ -245,16 +173,30 @@ ADAM7_Y_SPACING := []int{ 8,8,8,4,4,2,2 }
 
 // Implementation starts here
 
-read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
-	ch, e := compress.read_data(ctx, Chunk_Header)
+read_chunk :: proc(ctx: ^$C) -> (chunk: image.PNG_Chunk, err: Error) {
+	ch, e := compress.read_data(ctx, image.PNG_Chunk_Header)
 	if e != .None {
-		return {}, E_General.Stream_Too_Short
+		return {}, compress.General_Error.Stream_Too_Short
 	}
 	chunk.header = ch
 
+	/*
+		Sanity check chunk size
+	*/
+	#partial switch ch.type {
+	case .IDAT:
+		if ch.length > MAX_IDAT_SIZE {
+			return {}, image.PNG_Error.IDAT_Size_Too_Large
+		}
+	case:
+		if ch.length > MAX_CHUNK_SIZE {
+			return {}, image.PNG_Error.Invalid_Chunk_Length
+		}
+	}
+
 	chunk.data, e = compress.read_slice(ctx, int(ch.length))
 	if e != .None {
-		return {}, E_General.Stream_Too_Short
+		return {}, compress.General_Error.Stream_Too_Short
 	}
 
 	// Compute CRC over chunk type + data
@@ -264,39 +206,68 @@ read_chunk :: proc(ctx: ^$C) -> (chunk: Chunk, err: Error) {
 
 	crc, e3 := compress.read_data(ctx, u32be)
 	if e3 != .None {
-		return {}, E_General.Stream_Too_Short
+		return {}, compress.General_Error.Stream_Too_Short
 	}
 	chunk.crc = crc
 
 	if chunk.crc != u32be(computed_crc) {
-		return {}, E_General.Checksum_Failed
+		return {}, compress.General_Error.Checksum_Failed
 	}
 	return chunk, nil
 }
 
-read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
+copy_chunk :: proc(src: image.PNG_Chunk, allocator := context.allocator) -> (dest: image.PNG_Chunk, err: Error) {
+	if int(src.header.length) != len(src.data) {
+		return {}, .Invalid_Chunk_Length
+	}
+
+	dest.header = src.header
+	dest.crc    = src.crc
+	dest.data   = make([]u8, dest.header.length, allocator) or_return
+
+	copy(dest.data[:], src.data[:])
+	return
+}
+
+append_chunk :: proc(list: ^[dynamic]image.PNG_Chunk, src: image.PNG_Chunk, allocator := context.allocator) -> (err: Error) {
+	if int(src.header.length) != len(src.data) {
+		return .Invalid_Chunk_Length
+	}
+
+	c := copy_chunk(src, allocator) or_return
+	length := len(list)
+	append(list, c)
+	if len(list) != length + 1 {
+		// Resize during append failed.
+		return mem.Allocator_Error.Out_Of_Memory
+	}
+
+	return
+}
+
+read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 	c, e := read_chunk(ctx)
 	if e != nil {
 		return {}, e
 	}
 
-	header := (^IHDR)(raw_data(c.data))^
+	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
-	if width == 0 || height == 0 {
-		return {}, E_PNG.Invalid_Image_Dimensions
+	if width == 0 || height == 0 || u128(width) * u128(height) > MAX_DIMENSIONS {
+		return {}, .Invalid_Image_Dimensions
 	}
 
 	if compression_method != 0 {
-		return {}, E_General.Unknown_Compression_Method
+		return {}, compress.General_Error.Unknown_Compression_Method
 	}
 
 	if filter_method != 0 {
-		return {}, E_PNG.Unknown_Filter_Method
+		return {}, .Unknown_Filter_Method
 	}
 
 	if interlace_method != .None && interlace_method != .Adam7 {
-		return {}, E_PNG.Unknown_Interlace_Method
+		return {}, .Unknown_Interlace_Method
 
 	}
 
@@ -314,7 +285,7 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 			}
 		}
 		if !allowed {
-			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo
+			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 	case 2, 4, 6:
 		/*
@@ -322,7 +293,7 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 			Allowed bit depths: 8 and 16
 		*/
 		if bit_depth != 8 && bit_depth != 16 {
-			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo
+			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 	case 3:
 		/*
@@ -337,17 +308,17 @@ read_header :: proc(ctx: ^$C) -> (IHDR, Error) {
 			}
 		}
 		if !allowed {
-			return {}, E_PNG.Invalid_Color_Bit_Depth_Combo
+			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 
 	case:
-		return {}, E_PNG.Unknown_Color_Type
+		return {}, .Unknown_Color_Type
 	}
 
 	return header, nil
 }
 
-chunk_type_to_name :: proc(type: ^Chunk_Type) -> string {
+chunk_type_to_name :: proc(type: ^image.PNG_Chunk_Type) -> string {
 	t := transmute(^u8)type
 	return strings.string_from_ptr(t, 4)
 }
@@ -377,7 +348,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 		return load_from_slice(data, options)
 	} else {
 		img = new(Image)
-		return img, E_General.File_Not_Found
+		return img, compress.General_Error.File_Not_Found
 	}
 }
 
@@ -391,7 +362,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	if .alpha_drop_if_present in options && .alpha_add_if_missing in options {
-		return {}, E_General.Incompatible_Options
+		return {}, compress.General_Error.Incompatible_Options
 	}
 
 	if .do_not_expand_channels in options {
@@ -402,27 +373,25 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		img = new(Image)
 	}
 
-	info := new(Info)
-	img.metadata_ptr  = info
-	img.metadata_type = typeid_of(Info)
+	info := new(image.PNG_Info)
+	img.metadata = info
 
 	signature, io_error := compress.read_data(ctx, Signature)
 	if io_error != .None || signature != .PNG {
-		return img, E_PNG.Invalid_PNG_Signature
+		return img, .Invalid_PNG_Signature
 	}
 
 	idat: []u8
 	idat_b: bytes.Buffer
-	idat_length := u32be(0)
 	defer bytes.buffer_destroy(&idat_b)
 
-	c:		Chunk
-	ch:     Chunk_Header
+	idat_length := u64(0)
+
+	c:		image.PNG_Chunk
+	ch:     image.PNG_Chunk_Header
 	e:      io.Error
 
-	header:	IHDR
-
-	info.chunks.allocator = context.temp_allocator
+	header:	image.PNG_IHDR
 
 	// State to ensure correct chunk ordering.
 	seen_ihdr := false; first := true
@@ -433,7 +402,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	seen_iend := false
 
 	_plte := PLTE{}
-	trns := Chunk{}
+	trns := image.PNG_Chunk{}
 
 	final_image_channels := 0
 
@@ -443,16 +412,16 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// Peek at next chunk's length and type.
 		// TODO: Some streams may not provide seek/read_at
 
-		ch, e = compress.peek_data(ctx, Chunk_Header)
+		ch, e = compress.peek_data(ctx, image.PNG_Chunk_Header)
 		if e != .None {
-			return img, E_General.Stream_Too_Short
+			return img, compress.General_Error.Stream_Too_Short
 		}
 		// name := chunk_type_to_name(&ch.type); // Only used for debug prints during development.
 
 		#partial switch ch.type {
 		case .IHDR:
 			if seen_ihdr || !first {
-				return {}, E_PNG.IHDR_Not_First_Chunk
+				return {}, .IHDR_Not_First_Chunk
 			}
 			seen_ihdr = true
 
@@ -481,14 +450,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 
 			if img.channels == 0 || img.depth == 0 {
-				return {}, E_PNG.IHDR_Corrupt
+				return {}, .IHDR_Corrupt
 			}
 
 			img.width  = int(header.width)
 			img.height = int(header.height)
 
 			using header
-			h := IHDR{
+			h := image.PNG_IHDR{
 				width              = width,
 				height             = height,
 				bit_depth          = bit_depth,
@@ -498,28 +467,30 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				interlace_method   = interlace_method,
 			}
 			info.header = h
+
 		case .PLTE:
 			seen_plte = true
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
 			ct := transmute(u8)info.header.color_type
 			if seen_idat || ct == 0 || ct == 4 {
-				return img, E_PNG.PLTE_Encountered_Unexpectedly
+				return img, .PLTE_Encountered_Unexpectedly
 			}
 
 			c = read_chunk(ctx) or_return
 
 			if c.header.length % 3 != 0 || c.header.length > 768 {
-				return img, E_PNG.PLTE_Invalid_Length
+				return img, .PLTE_Invalid_Length
 			}
 			plte_ok: bool
 			_plte, plte_ok = plte(c)
 			if !plte_ok {
-				return img, E_PNG.PLTE_Invalid_Length
+				return img, .PLTE_Invalid_Length
 			}
 
 			if .return_metadata in options {
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
+
 		case .IDAT:
 			// If we only want image metadata and don't want the pixel data, we can early out.
 			if .return_metadata not_in options && .do_not_decompress_image in options {
@@ -528,11 +499,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			// There must be at least 1 IDAT, contiguous if more.
 			if seen_idat {
-				return img, E_PNG.IDAT_Must_Be_Contiguous
+				return img, .IDAT_Must_Be_Contiguous
 			}
 
 			if idat_length > 0 {
-				return img, E_PNG.IDAT_Must_Be_Contiguous
+				return img, .IDAT_Must_Be_Contiguous
 			}
 
 			next := ch.type
@@ -540,22 +511,29 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				c = read_chunk(ctx) or_return
 
 				bytes.buffer_write(&idat_b, c.data)
-				idat_length += c.header.length
+				idat_length += u64(c.header.length)
 
-				ch, e = compress.peek_data(ctx, Chunk_Header)
+				if idat_length > MAX_IDAT_SIZE {
+					return {}, image.PNG_Error.IDAT_Size_Too_Large
+				}
+
+				ch, e = compress.peek_data(ctx, image.PNG_Chunk_Header)
 				if e != .None {
-					return img, E_General.Stream_Too_Short
+					return img, compress.General_Error.Stream_Too_Short
 				}
 				next = ch.type
 			}
+
 			idat = bytes.buffer_to_bytes(&idat_b)
 			if int(idat_length) != len(idat) {
-				return {}, E_PNG.IDAT_Corrupt
+				return {}, .IDAT_Corrupt
 			}
 			seen_idat = true
+
 		case .IEND:
 			c = read_chunk(ctx) or_return
 			seen_iend = true
+
 		case .bKGD:
 
 			// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
@@ -563,14 +541,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			c = read_chunk(ctx) or_return
 			seen_bkgd = true
 			if .return_metadata in options {
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 
 			ct := transmute(u8)info.header.color_type
 			switch ct {
 				case 3: // Indexed color
 					if c.header.length != 1 {
-						return {}, E_PNG.BKGD_Invalid_Length
+						return {}, .BKGD_Invalid_Length
 					}
 					col := _plte.entries[c.data[0]]
 					img.background = [3]u16{
@@ -580,26 +558,27 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					}
 				case 0, 4: // Grayscale, with and without Alpha
 					if c.header.length != 2 {
-						return {}, E_PNG.BKGD_Invalid_Length
+						return {}, .BKGD_Invalid_Length
 					}
 					col := u16(mem.slice_data_cast([]u16be, c.data[:])[0])
 					img.background = [3]u16{col, col, col}
 				case 2, 6: // Color, with and without Alpha
 					if c.header.length != 6 {
-						return {}, E_PNG.BKGD_Invalid_Length
+						return {}, .BKGD_Invalid_Length
 					}
 					col := mem.slice_data_cast([]u16be, c.data[:])
 					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
 			}
+
 		case .tRNS:
 			c = read_chunk(ctx) or_return
 
 			if .Alpha in info.header.color_type {
-				return img, E_PNG.TRNS_Encountered_Unexpectedly
+				return img, .TRNS_Encountered_Unexpectedly
 			}
 
 			if .return_metadata in options {
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 
 			/*
@@ -622,20 +601,20 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 			}
 			trns = c
+
 		case .iDOT, .CbGI:
 			/*
 				iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
 				We're not going to add support for it. If you have the misfortunte of coming
-				across one of these files, use a utility to defry it.s
+				across one of these files, use a utility to defry it.
 			*/
-			return img, E_PNG.PNG_Does_Not_Adhere_to_Spec
+			return img, .Image_Does_Not_Adhere_to_Spec
+
 		case:
 			// Unhandled type
 			c = read_chunk(ctx) or_return
-
 			if .return_metadata in options {
-				// NOTE: Chunk cata is currently allocated on the temp allocator.
-				append(&info.chunks, c)
+				append_chunk(&info.chunks, c) or_return
 			}
 
 			first = false
@@ -648,7 +627,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	if !seen_idat {
-		return img, E_PNG.IDAT_Missing
+		return img, .IDAT_Missing
 	}
 
 	/*
@@ -685,7 +664,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	buf_len := len(buf.buf)
 	if expected_size != buf_len {
-		return {}, E_PNG.IDAT_Corrupt
+		return {}, .IDAT_Corrupt
 	}
 
 	/*
@@ -752,7 +731,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
-		resize(&t.buf, dest_raw_size)
+		if !resize(&t.buf, dest_raw_size) {
+			return {}, mem.Allocator_Error.Out_Of_Memory
+		}
 
 		i := 0; j := 0
 
@@ -831,7 +812,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 16)
 		t := bytes.Buffer{}
-		resize(&t.buf, dest_raw_size)
+		if !resize(&t.buf, dest_raw_size) {
+			return {}, mem.Allocator_Error.Out_Of_Memory
+		}
 
 		p16 := mem.slice_data_cast([]u16, temp.buf[:])
 		o16 := mem.slice_data_cast([]u16, t.buf[:])
@@ -1028,7 +1011,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
-		resize(&t.buf, dest_raw_size)
+		if !resize(&t.buf, dest_raw_size) {
+			return {}, mem.Allocator_Error.Out_Of_Memory
+		}
 
 		p := mem.slice_data_cast([]u8, temp.buf[:])
 		o := mem.slice_data_cast([]u8, t.buf[:])
@@ -1524,7 +1509,7 @@ defilter_16 :: proc(params: ^Filter_Params) -> (ok: bool) {
 	return
 }
 
-defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, options: Options) -> (err: compress.Error) {
+defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IHDR, options: Options) -> (err: Error) {
 	input    := bytes.buffer_to_bytes(filter_bytes)
 	width    := int(header.width)
 	height   := int(header.height)
@@ -1535,7 +1520,9 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 	bytes_per_channel := depth == 16 ? 2 : 1
 
 	num_bytes := compute_buffer_size(width, height, channels, depth == 16 ? 16 : 8)
-	resize(&img.pixels.buf, num_bytes)
+	if !resize(&img.pixels.buf, num_bytes) {
+		return mem.Allocator_Error.Out_Of_Memory
+	}
 
 	filter_ok: bool
 
@@ -1560,7 +1547,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 		}
 		if !filter_ok {
 			// Caller will destroy buffer for us.
-			return E_PNG.Unknown_Filter_Method
+			return .Unknown_Filter_Method
 		}
 	} else {
 		/*
@@ -1575,7 +1562,9 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 			if x > 0 && y > 0 {
 				temp: bytes.Buffer
 				temp_len := compute_buffer_size(x, y, channels, depth == 16 ? 16 : 8)
-				resize(&temp.buf, temp_len)
+				if !resize(&temp.buf, temp_len) {
+					return mem.Allocator_Error.Out_Of_Memory
+				}
 
 				params := Filter_Params{
 					src      = input,
@@ -1598,7 +1587,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^IHDR, option
 
 				if !filter_ok {
 					// Caller will destroy buffer for us.
-					return E_PNG.Unknown_Filter_Method
+					return .Unknown_Filter_Method
 				}
 
 				t := temp.buf[:]
