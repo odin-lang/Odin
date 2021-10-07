@@ -2058,7 +2058,6 @@ void init_map_entry_type(Type *type) {
 
 	// NOTE(bill): The preload types may have not been set yet
 	GB_ASSERT(t_map_hash != nullptr);
-	Type *entry_type = alloc_type_struct();
 
 	/*
 	struct {
@@ -2076,7 +2075,7 @@ void init_map_entry_type(Type *type) {
 	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, 2, EntityState_Resolved);
 	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 3, EntityState_Resolved);
 
-
+	Type *entry_type = alloc_type_struct();
 	entry_type->Struct.fields  = fields;
 	entry_type->Struct.tags    = gb_alloc_array(permanent_allocator(), String, fields.count);
 	

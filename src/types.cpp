@@ -3018,8 +3018,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Map:
-		init_map_internal_types(t);
-		return type_align_of_internal(t->Map.internal_type, path);
+		return build_context.word_size;
 	case Type_Enum:
 		return type_align_of_internal(t->Enum.base_type, path);
 
@@ -3248,11 +3247,16 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_DynamicArray:
 		// data + len + cap + allocator(procedure+data)
-		return 3*build_context.word_size + 2*build_context.word_size;
+		return (3 + 2)*build_context.word_size;
 
 	case Type_Map:
-		init_map_internal_types(t);
-		return type_size_of_internal(t->Map.internal_type, path);
+		/*
+			struct {
+				hashes:  []int,               // 2 words
+				entries: [dynamic]Entry_Type, // 5 words
+			}
+		*/
+		return (2 + (3 + 2))*build_context.word_size;
 
 	case Type_Tuple: {
 		i64 count, align, size;

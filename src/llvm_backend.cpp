@@ -495,9 +495,13 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	Type *val_type = map_type->Map.value;
 	gb_unused(val_type);
 
+	GB_ASSERT(map_type->Map.entry_type->kind == Type_Struct);
+	map_type->Map.entry_type->cached_size = -1;
+	map_type->Map.entry_type->Struct.are_offsets_set = false;
+	
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
-
+	
 	i64 key_offset = type_offset_of(map_type->Map.entry_type, 2);
 	i64 key_size   = type_size_of  (map_type->Map.key);
 
@@ -507,9 +511,9 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	
 	Type *map_header_base = base_type(t_map_header);
 	GB_ASSERT(map_header_base->Struct.fields.count == 8);
-	Type *m_type = map_header_base->Struct.fields[0]->type;
+	Type *raw_map_ptr_type = map_header_base->Struct.fields[0]->type;
 	LLVMValueRef const_values[8] = {};
-	const_values[0] = LLVMConstNull(lb_type(p->module, m_type));
+	const_values[0] = LLVMConstNull(lb_type(p->module, raw_map_ptr_type));
 	const_values[1] = lb_get_equal_proc_for_type(p->module, key_type)    .value;
 	const_values[2] = lb_const_int(p->module, t_int,        entry_size)  .value;
 	const_values[3] = lb_const_int(p->module, t_int,        entry_align) .value;
