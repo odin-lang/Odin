@@ -137,6 +137,10 @@ print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
 	os_write(a[i:])
 }
 
+print_uint    :: proc "contextless" (x: uint)    { print_u64(u64(x)) }
+print_uintptr :: proc "contextless" (x: uintptr) { print_u64(u64(x)) }
+print_int     :: proc "contextless" (x: int)     { print_i64(i64(x)) }
+
 print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
 	print_string(file_path)
 	print_byte('(')
