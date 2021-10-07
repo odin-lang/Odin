@@ -483,14 +483,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			res.value = llvm_const_array(et, elems, cast(unsigned)count);
 			return res;
 		}
-		GB_PANIC("This should not have happened!\n");
-
-		LLVMValueRef data = LLVMConstStringInContext(ctx,
-			cast(char const *)value.value_string.text,
-			cast(unsigned)value.value_string.len,
-			false /*DontNullTerminate*/);
-		res.value = data;
-		return res;
+		// NOTE(bill, 2021-10-07): Allow for array programming value constants
+		Type *core_elem = core_array_type(type);
+		return lb_const_value(m, core_elem, value, allow_local);		
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
 		GB_ASSERT(type->Array.count == value.value_string.len);
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
