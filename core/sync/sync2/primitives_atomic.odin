@@ -2,7 +2,7 @@ package sync2
 
 import "core:time"
 
-Atomic_Mutex_State :: enum i32 {
+Atomic_Mutex_State :: enum Futex {
 	Unlocked = 0,
 	Locked   = 1,
 	Waiting  = 2,
@@ -42,8 +42,8 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 			if atomic_exchange_acquire(&m.state, .Waiting) == .Unlocked {
 				return
 			}
-
-			// TODO(bill): Use a Futex here for Linux to improve performance and error handling
+			
+			futex_wait((^Futex)(&m.state), u32(new_state))
 			cpu_relax()
 		}
 	}
@@ -62,7 +62,7 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
 	@(cold)
 	unlock_slow :: proc(m: ^Atomic_Mutex) {
-		// TODO(bill): Use a Futex here for Linux to improve performance and error handling
+		futex_wake_single((^Futex)(&m.state))
 	}
 
 
@@ -289,20 +289,20 @@ atomic_recursive_mutex_guard :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
 @(private="file")
 Queue_Item :: struct {
 	next: ^Queue_Item,
-	futex: i32,
+	futex: Futex,
 }
 
 @(private="file")
 queue_item_wait :: proc(item: ^Queue_Item) {
 	for atomic_load_acquire(&item.futex) == 0 {
-		// TODO(bill): Use a Futex here for Linux to improve performance and error handling
+		futex_wait(&item.futex, 0)
 		cpu_relax()
 	}
 }
 @(private="file")
 queue_item_signal :: proc(item: ^Queue_Item) {
 	atomic_store_release(&item.futex, 1)
-	// TODO(bill): Use a Futex here for Linux to improve performance and error handling
+	futex_wake_single(&item.futex)
 }
 
 
@@ -329,11 +329,6 @@ atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 	atomic_mutex_unlock(m)
 	queue_item_wait(waiter)
 	atomic_mutex_lock(m)
-}
-
-atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, timeout: time.Duration) -> bool {
-	// TODO(bill): _cond_wait_with_timeout for unix
-	return false
 }
 
 atomic_cond_signal :: proc(c: ^Atomic_Cond) {

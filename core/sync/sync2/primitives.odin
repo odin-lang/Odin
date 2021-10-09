@@ -153,10 +153,6 @@ cond_wait :: proc(c: ^Cond, m: ^Mutex) {
 	_cond_wait(c, m)
 }
 
-cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, timeout: time.Duration) -> bool {
-	return _cond_wait_with_timeout(c, m, timeout)
-}
-
 cond_signal :: proc(c: ^Cond) {
 	_cond_signal(c)
 }
@@ -166,20 +162,67 @@ cond_broadcast :: proc(c: ^Cond) {
 }
 
 
-
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
 // Posting to the semaphore increases the count by one, or the provided amount.
 //
 // A Sema must not be copied after first use
 Sema :: struct {
-	impl: _Sema,
+	count: Futex,
 }
 
-
 sema_wait :: proc(s: ^Sema) {
-	_sema_wait(s)
+	for {
+		original_count := atomic_load(&s.count)
+		for original_count == 0 {
+			futex_wait(&s.count, u32(original_count))
+			original_count = s.count
+		}
+		if original_count == atomic_compare_exchange_strong(&s.count, original_count-1, original_count) {
+			return
+		}
+	}
 }
 
 sema_post :: proc(s: ^Sema, count := 1) {
-	_sema_post(s, count)
+	atomic_add(&s.count, Futex(count))
+	if count == 1 {
+		futex_wake_single(&s.count)
+	} else {
+		futex_wake_all(&s.count)
+	}
+}
+
+
+// Futex is a fast userspace mutual exclusion lock, using a 32-bit memory address as a hint
+// 
+// An Futex must not be copied after first use
+Futex :: distinct u32
+
+Futex_Error :: enum {
+	None,
+	Timed_Out,
+}
+
+futex_wait :: proc(f: ^Futex, expected: u32) {
+	if u32(atomic_load(f)) != expected {
+		return
+	}
+	
+	assert(_futex_wait(f, expected) != nil, "futex_wait failure")
+}
+
+futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> Futex_Error {
+	if u32(atomic_load(f)) != expected {
+		return nil
+	}
+	
+	return _futex_wait_with_timeout(f, expected, duration)
+}
+
+futex_wake_single :: proc(f: ^Futex) {
+	_futex_wake_single(f)
+}
+
+futex_wake_all :: proc(f: ^Futex) {
+	_futex_wake_all(f)
 }
