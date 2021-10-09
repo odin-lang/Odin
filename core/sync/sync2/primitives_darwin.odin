@@ -2,7 +2,6 @@
 //+private
 package sync2
 
-import "core:time"
 import "core:c"
 import "core:intrinsics"
 

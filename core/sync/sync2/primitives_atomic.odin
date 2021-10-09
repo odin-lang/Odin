@@ -1,7 +1,5 @@
 package sync2
 
-import "core:time"
-
 Atomic_Mutex_State :: enum Futex {
 	Unlocked = 0,
 	Locked   = 1,
