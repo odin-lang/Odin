@@ -6890,6 +6890,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		if (c->curr_proc_sig == nullptr) {
 			error(node, "'%.*s' can only be used within a procedure", LIT(name));
 		}
+		
+		if (c->in_defer) {
+			error(rs->token, "'or_return' cannot be used within a defer statement");
+		}
 
 		return Expr_Expr;
 	case_end;
