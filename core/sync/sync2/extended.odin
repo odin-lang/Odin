@@ -251,17 +251,18 @@ Once :: struct {
 }
 
 once_do :: proc(o: ^Once, fn: proc()) {
-	if atomic_load_acquire(&o.done) == false {
-		_once_do_slow(o, fn)
+	@(cold)
+	do_slow :: proc(o: ^Once, fn: proc()) {
+		mutex_lock(&o.m)
+		defer mutex_unlock(&o.m)
+		if !o.done {
+			fn()
+			atomic_store_release(&o.done, true)
+		}
 	}
-}
 
-@(cold)
-_once_do_slow :: proc(o: ^Once, fn: proc()) {
-	mutex_lock(&o.m)
-	defer mutex_unlock(&o.m)
-	if !o.done {
-		fn()
-		atomic_store_release(&o.done, true)
+	
+	if atomic_load_acquire(&o.done) == false {
+		do_slow(o, fn)
 	}
 }
