@@ -2,8 +2,6 @@
 //+private
 package sync2
 
-import "core:time"
-import "core:runtime"
 import "core:sys/unix"
 
 _Mutex_State :: enum i32 {

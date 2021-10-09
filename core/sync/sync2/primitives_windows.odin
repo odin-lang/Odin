@@ -2,7 +2,6 @@
 //+private
 package sync2
 
-import "core:time"
 import win32 "core:sys/windows"
 
 _current_thread_id :: proc "contextless" () -> int {
@@ -52,8 +51,6 @@ _rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
 _rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 	return bool(win32.TryAcquireSRWLockShared(&rw.impl.srwlock))
 }
-
-
 
 
 _Cond :: struct {

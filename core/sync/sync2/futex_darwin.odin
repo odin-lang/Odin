@@ -29,7 +29,6 @@ _futex_wait :: proc(f: ^Futex, expected: u32) -> Futex_Error {
 
 _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> Futex_Error {
 	timeout_ns := u64(duration)
-	timeout_overflowed := false
 	
 	s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
 	if s >= 0 {
