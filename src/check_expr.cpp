@@ -6892,7 +6892,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 		
 		if (c->in_defer) {
-			error(rs->token, "'or_return' cannot be used within a defer statement");
+			error(node, "'or_return' cannot be used within a defer statement");
 		}
 
 		return Expr_Expr;
