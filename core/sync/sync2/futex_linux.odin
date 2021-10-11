@@ -39,22 +39,22 @@ internal_futex :: proc(f: ^Futex, op: c.int, val: u32, timeout: rawptr) -> int {
 }
 
 
-_futex_wait :: proc(f: ^Futex, expected: u32) -> Futex_Error {
+_futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
 	err := internal_futex(f, FUTEX_WAIT_PRIVATE | FUTEX_WAIT, expected, nil)
 	switch err {
 	case ESUCCESS, EINTR, EAGAIN, EINVAL:
 		// okay
 	case ETIMEDOUT:
-		return .Timed_Out
+		return false
 	case EFAULT: 
 		fallthrough
 	case:
 		panic("futex_wait failure")
 	}
-	return nil
+	return true
 }
 
-_futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> Futex_Error {
+_futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	timespec_t :: struct {
 		tv_sec:  c.long,
 		tv_nsec: c.long,
@@ -74,13 +74,13 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Durati
 	case ESUCCESS, EINTR, EAGAIN, EINVAL:
 		// okay
 	case ETIMEDOUT:
-		return .Timed_Out
+		return false
 	case EFAULT: 
 		fallthrough
 	case:
 		panic("futex_wait_with_timeout failure")
 	}
-	return nil
+	return true
 }
 
 

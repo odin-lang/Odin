@@ -23,26 +23,26 @@ EINTR     :: -4
 EFAULT    :: -14
 ETIMEDOUT :: -60
 
-_futex_wait :: proc(f: ^Futex, expected: u32) -> Futex_Error {
+_futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
 	return _futex_wait_with_timeout(f, expected, 0)
 }
 
-_futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> Futex_Error {
+_futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	timeout_ns := u64(duration)
 	
 	s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
 	if s >= 0 {
-		return nil
+		return true
 	}
 	switch s {
 	case EINTR, EFAULT:
-		return nil
+		return true
 	case ETIMEDOUT:
-		return .Timed_Out
+		return false
 	case:
 		panic("futex_wait failure")
 	}
-	return nil
+	return true
 
 }
 

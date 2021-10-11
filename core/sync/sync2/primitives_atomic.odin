@@ -307,7 +307,7 @@ queue_item_wait_with_timeout :: proc(item: ^Queue_Item, duration: time.Duration)
 		if remaining < 0 {
 			return false
 		}
-		if futex_wait_with_timeout(&item.futex, 0, remaining) == .Timed_Out {
+		if !futex_wait_with_timeout(&item.futex, 0, remaining) {
 			return false
 		}
 		cpu_relax()
