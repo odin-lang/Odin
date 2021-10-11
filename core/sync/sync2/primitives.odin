@@ -174,56 +174,21 @@ cond_broadcast :: proc(c: ^Cond) {
 //
 // A Sema must not be copied after first use
 Sema :: struct {
-	count: Futex,
-}
-
-sema_wait :: proc(s: ^Sema) {
-	for {
-		original_count := atomic_load(&s.count)
-		for original_count == 0 {
-			futex_wait(&s.count, u32(original_count))
-			original_count = s.count
-		}
-		if original_count == atomic_compare_exchange_strong(&s.count, original_count-1, original_count) {
-			return
-		}
-	}
-}
-
-sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
-	if duration <= 0 {
-		return false
-	}
-	
-	start := time.tick_now()
-	for {
-		original_count := atomic_load(&s.count)
-		remaining := duration - time.tick_since(start)
-		if remaining < 0 {
-			return false
-		}
-		
-		for original_count == 0 {
-			ok := futex_wait_with_timeout(&s.count, u32(original_count), remaining)
-			if !ok {
-				return false
-			}
-			original_count = s.count
-		}
-		if original_count == atomic_compare_exchange_strong(&s.count, original_count-1, original_count) {
-			return true
-		}
-	}
+	impl: _Sema,
 }
 
 sema_post :: proc(s: ^Sema, count := 1) {
-	atomic_add(&s.count, Futex(count))
-	if count == 1 {
-		futex_signal(&s.count)
-	} else {
-		futex_broadcast(&s.count)
-	}
+	_sema_post(s, count)
 }
+
+sema_wait :: proc(s: ^Sema) {
+	_sema_wait(s)
+}
+
+sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
+	return _sema_wait_with_timeout(s, duration)
+}
+
 
 
 // Futex is a fast userspace mutual exclusion lock, using a 32-bit memory address as a hint
