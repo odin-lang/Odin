@@ -5,7 +5,8 @@ package testing
 import win32 "core:sys/windows"
 import "core:runtime"
 import "core:intrinsics"
-
+import "core:time"
+import "core:fmt"
 
 Sema :: struct {
 	count: i32,
@@ -57,6 +58,9 @@ Thread :: struct {
 	init_context: Maybe(runtime.Context),
 
 	creation_allocator: runtime.Allocator,
+	
+	internal_fail_timeout: time.Duration,
+	internal_fail_timeout_loc: runtime.Source_Code_Location,
 }
 
 Thread_Os_Specific :: struct {
@@ -121,7 +125,21 @@ thread_terminate :: proc "contextless" (thread: ^Thread, exit_code: int) {
 }
 
 
-
+_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
+	thread := thread_create(proc(thread: ^Thread) {
+		t := thread.t
+		time.sleep(thread.internal_fail_timeout)
+		if !intrinsics.atomic_load(&t._is_done) {
+			fail_now(t, "TIMEOUT", thread.internal_fail_timeout_loc)
+		}
+		// NOTE(bill): Complete hack and probably not a good idea
+		thread_join_and_destroy(thread)
+	})
+	thread.internal_fail_timeout = duration
+	thread.internal_fail_timeout_loc = loc
+	thread.t = t
+	thread_start(thread)
+}
 
 global_threaded_runner_semaphore: Sema
 global_exception_handler: rawptr
@@ -152,8 +170,13 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 			errorf(t=global_current_t, format="%s %s", args={prefix, message}, loc=loc)
 			intrinsics.trap()
 		}
+		
+		t := thread.t
 
-		thread.it.p(thread.t)
+		t._fail_timeout_set = false
+		intrinsics.atomic_store(&t._is_done, false)
+		thread.it.p(t)
+		intrinsics.atomic_store(&t._is_done, true)
 
 		thread.success = true
 		sema_post(&global_threaded_runner_semaphore)
@@ -169,7 +192,6 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 	thread.t = t
 	thread.it = it
 	thread.success = false
-
 	thread_start(thread)
 
 	sema_wait(&global_threaded_runner_semaphore)
