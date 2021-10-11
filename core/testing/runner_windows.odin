@@ -6,6 +6,9 @@ import win32 "core:sys/windows"
 import "core:runtime"
 import "core:intrinsics"
 import "core:time"
+import "core:fmt"
+
+_ :: fmt
 
 Sema :: struct {
 	count: i32,
@@ -18,16 +21,36 @@ sema_wait :: proc "contextless" (s: ^Sema) {
 	for {
 		original_count := s.count
 		for original_count == 0 {
-			win32.WaitOnAddress(
-				&s.count,
-				&original_count,
-				size_of(original_count),
-				win32.INFINITE,
-			)
+			win32.WaitOnAddress(&s.count, &original_count, size_of(original_count), win32.INFINITE)
 			original_count = s.count
 		}
 		if original_count == intrinsics.atomic_cxchg(&s.count, original_count-1, original_count) {
 			return
+		}
+	}
+}
+sema_wait_with_timeout :: proc "contextless" (s: ^Sema, duration: time.Duration) -> bool {	
+	if duration <= 0 {
+		return false
+	}
+	for {
+	
+		original_count := intrinsics.atomic_load(&s.count)
+		for start := time.tick_now(); original_count == 0; /**/ {
+			if intrinsics.atomic_load(&s.count) != original_count {
+				remaining := duration - time.tick_since(start)
+				if remaining < 0 {
+					return false
+				}
+				ms := u32(remaining/time.Millisecond)
+				if !win32.WaitOnAddress(&s.count, &original_count, size_of(original_count), ms) {
+					return false
+				}
+			}
+			original_count = s.count
+		}
+		if original_count == intrinsics.atomic_cxchg(&s.count, original_count-1, original_count) {
+			return true
 		}
 	}
 }
@@ -40,6 +63,7 @@ sema_post :: proc "contextless" (s: ^Sema, count := 1) {
 		win32.WakeByAddressAll(&s.count)
 	}
 }
+
 
 
 Thread_Proc :: #type proc(^Thread)
@@ -127,18 +151,20 @@ thread_terminate :: proc "contextless" (thread: ^Thread, exit_code: int) {
 _fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
 	thread := thread_create(proc(thread: ^Thread) {
 		t := thread.t
-		time.sleep(thread.internal_fail_timeout)
-		if !intrinsics.atomic_load(&t._is_done) {
+		timeout := thread.internal_fail_timeout
+		if !sema_wait_with_timeout(&global_fail_timeout_semaphore, timeout) {
 			fail_now(t, "TIMEOUT", thread.internal_fail_timeout_loc)
 		}
-		// NOTE(bill): Complete hack and probably not a good idea
-		thread_join_and_destroy(thread)
 	})
 	thread.internal_fail_timeout = duration
 	thread.internal_fail_timeout_loc = loc
 	thread.t = t
+	global_fail_timeout_thread = thread
 	thread_start(thread)
 }
+
+global_fail_timeout_thread: ^Thread
+global_fail_timeout_semaphore: Sema
 
 global_threaded_runner_semaphore: Sema
 global_exception_handler: rawptr
@@ -164,7 +190,7 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 			return win32.EXCEPTION_CONTINUE_SEARCH
 		}
 		global_exception_handler = win32.AddVectoredExceptionHandler(0, exception_handler_proc)
-
+		
 		context.assertion_failure_proc = proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
 			errorf(t=global_current_t, format="%s %s", args={prefix, message}, loc=loc)
 			intrinsics.trap()
@@ -172,11 +198,14 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 		
 		t := thread.t
 
-		t._fail_timeout_set = false
-		intrinsics.atomic_store(&t._is_done, false)
+		global_fail_timeout_thread = nil
+		sema_reset(&global_fail_timeout_semaphore)
+		
 		thread.it.p(t)
-		intrinsics.atomic_store(&t._is_done, true)
-
+		
+		sema_post(&global_fail_timeout_semaphore)
+		thread_join_and_destroy(global_fail_timeout_thread)
+		
 		thread.success = true
 		sema_post(&global_threaded_runner_semaphore)
 	})
