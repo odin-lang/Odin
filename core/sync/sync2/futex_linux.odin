@@ -55,21 +55,19 @@ _futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
 }
 
 _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
+	if duration <= 0 {
+		return false
+	}
+	
 	timespec_t :: struct {
 		tv_sec:  c.long,
 		tv_nsec: c.long,
 	}
 	
-	timeout: timespec_t
-	timeout_ptr: ^timespec_t = nil
-	
-	if duration > 0 {
-		timeout.tv_sec  = (c.long)(duration/1e9)
-		timeout.tv_nsec = (c.long)(duration%1e9)
-		timeout_ptr = &timeout
-	}
-
-	err := internal_futex(f, FUTEX_WAIT_PRIVATE | FUTEX_WAIT, expected, &timeout)
+	err := internal_futex(f, FUTEX_WAIT_PRIVATE | FUTEX_WAIT, expected, &timespec_t{
+		tv_sec  = (c.long)(duration/1e9),
+		tv_nsec = (c.long)(duration%1e9),
+	})
 	switch err {
 	case ESUCCESS, EINTR, EAGAIN, EINVAL:
 		// okay
