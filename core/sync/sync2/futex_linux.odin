@@ -33,7 +33,7 @@ get_errno :: proc(r: int) -> int {
 	return 0
 }
 
-internal_futex :: proc(f: ^Futex, op: uintptr, val: u32, timeout: rawptr) -> int {
+internal_futex :: proc(f: ^Futex, op: c.int, val: u32, timeout: rawptr) -> int {
 	code := int(intrinsics.syscall(202, uintptr(f), uintptr(op), uintptr(val), uintptr(timeout), 0, 0))
 	return get_errno(code)
 }
@@ -55,13 +55,19 @@ _futex_wait :: proc(f: ^Futex, expected: u32) -> Futex_Error {
 }
 
 _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> Futex_Error {
-	timeout: struct {
+	timespec_t :: struct {
 		tv_sec:  c.long,
 		tv_nsec: c.long,
 	}
 	
-	timeout.tv_sec  = (c.long)(duration/1e9)
-	timeout.tv_nsec = (c.long)(duration%1e9)
+	timeout: timespec_t
+	timeout_ptr: ^timespec_t = nil
+	
+	if duration > 0 {
+		timeout.tv_sec  = (c.long)(duration/1e9)
+		timeout.tv_nsec = (c.long)(duration%1e9)
+		timeout_ptr = &timeout
+	}
 
 	err := internal_futex(f, FUTEX_WAIT_PRIVATE | FUTEX_WAIT, expected, &timeout)
 	switch err {
