@@ -29,7 +29,7 @@ when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 		}
 		atomic_exchange_release(&m.impl.owner, 0)
 		
-		futex_wake_single(&m.impl.owner)
+		futex_signal(&m.impl.owner)
 		// outside the lock
 
 	}

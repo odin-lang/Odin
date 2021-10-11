@@ -84,7 +84,7 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Durati
 }
 
 
-_futex_wake_single :: proc(f: ^Futex) {
+_futex_signal :: proc(f: ^Futex) {
 	err := internal_futex(f, FUTEX_WAKE_PRIVATE | FUTEX_WAKE, 1, nil)
 	switch err {
 	case ESUCCESS, EINVAL, EFAULT:
@@ -93,7 +93,7 @@ _futex_wake_single :: proc(f: ^Futex) {
 		panic("futex_wake_single failure")
 	}
 }
-_futex_wake_all :: proc(f: ^Futex)  {
+_futex_broadcast :: proc(f: ^Futex)  {
 	err := internal_futex(f, FUTEX_WAKE_PRIVATE | FUTEX_WAKE, u32(max(i32)), nil)
 	switch err {
 	case ESUCCESS, EINVAL, EFAULT:
