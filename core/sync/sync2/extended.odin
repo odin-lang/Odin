@@ -1,5 +1,7 @@
 package sync2
 
+import "core:time"
+
 // A Wait_Group waits for a collection of threads to finish
 //
 // A Wait_Group must not be copied after first use
@@ -43,6 +45,24 @@ wait_group_wait :: proc(wg: ^Wait_Group) {
 			panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
+}
+
+wait_group_wait_with_timeout :: proc(wg: ^Wait_Group, duration: time.Duration) -> bool {
+	if duration <= 0 {
+		return false
+	}
+	mutex_lock(&wg.mutex)
+	defer mutex_unlock(&wg.mutex)
+
+	if wg.counter != 0 {
+		if !cond_wait_with_timeout(&wg.cond, &wg.mutex, duration) {
+			return false
+		}
+		if wg.counter != 0 {
+			panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+		}
+	}
+	return true
 }
 
 

@@ -55,62 +55,18 @@ when #config(ODIN_SYNC_SEMA_USE_FUTEX, true) {
 	}
 } else {
 	_Sema :: struct {
-		mutex: Mutex,
-		cond:  Cond,
-		count: i32,
+		wg: Wait_Group,
 	}
 
 	_sema_post :: proc(s: ^Sema, count := 1) {
-		mutex_lock(&s.impl.mutex)
-		defer mutex_unlock(&s.impl.mutex)
-		
-		s.impl.count += i32(count)
-		if count == 1 {
-			cond_signal(&s.impl.cond)
-		} else {
-			cond_broadcast(&s.impl.cond)
-		}
+		wait_group_add(&s.impl.wg, count)
 	}
 
 	_sema_wait :: proc(s: ^Sema) {
-		mutex_lock(&s.impl.mutex)
-		defer mutex_unlock(&s.impl.mutex)
-		
-		for s.impl.count == 0 {
-			cond_wait(&s.impl.cond, &s.impl.mutex)
-		}
-		
-		s.impl.count -= 1
-		if s.impl.count > 0 {
-			cond_signal(&s.impl.cond)
-		}
+		wait_group_wait(&s.impl.wg)
 	}
 
 	_sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
-		if duration <= 0 {
-			return false
-		}
-		
-		mutex_lock(&s.impl.mutex)
-		defer mutex_unlock(&s.impl.mutex)
-		
-		start := time.tick_now()
-		for s.impl.count == 0 {
-			remaining := duration - time.tick_since(start)
-			if remaining < 0 {
-				return false
-			}
-			
-			if !cond_wait_with_timeout(&s.impl.cond, &s.impl.mutex, remaining) {
-				return false
-			}
-		}
-		
-		s.impl.count -= 1
-		if s.impl.count > 0 {
-			cond_signal(&s.impl.cond)
-		}
-		
-		return true
+		return wait_group_wait_with_timeout(&s.impl.wg, duration)
 	}
 }
