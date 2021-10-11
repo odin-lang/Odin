@@ -6,9 +6,6 @@ import win32 "core:sys/windows"
 import "core:runtime"
 import "core:intrinsics"
 import "core:time"
-import "core:fmt"
-
-_ :: fmt
 
 Sema :: struct {
 	count: i32,

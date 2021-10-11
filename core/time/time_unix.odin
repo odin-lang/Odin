@@ -4,9 +4,9 @@ package time
 IS_SUPPORTED :: true // NOTE: Times on Darwin are UTC.
 
 when ODIN_OS == "darwin" {
-  foreign import libc "System.framework"
+	foreign import libc "System.framework"
 } else  {
-  foreign import libc "system:c"
+	foreign import libc "system:c"
 }
 
 
@@ -40,7 +40,7 @@ CLOCK_SYSTEM   :: CLOCK_REALTIME
 CLOCK_CALENDAR :: CLOCK_MONOTONIC
 
 
-clock_gettime :: proc(clock_id: u64) -> TimeSpec {
+clock_gettime :: proc "contextless" (clock_id: u64) -> TimeSpec {
 	ts : TimeSpec // NOTE(tetra): Do we need to initialize this?
 	_unix_clock_gettime(clock_id, &ts)
 	return ts
@@ -85,7 +85,7 @@ nanosleep :: proc(nanoseconds: i64) -> int {
 }
 
 
-_tick_now :: proc() -> Tick {
+_tick_now :: proc "contextless" () -> Tick {
 	t := clock_gettime(CLOCK_MONOTONIC_RAW)
 	_nsec := t.tv_sec*1e9 + t.tv_nsec
 	return Tick{_nsec = _nsec}
