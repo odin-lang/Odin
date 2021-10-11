@@ -2,6 +2,7 @@
 //+private
 package sync2
 
+import "core:time"
 import "core:sys/unix"
 
 _Mutex_State :: enum i32 {
@@ -36,6 +37,15 @@ _cond_wait :: proc(c: ^Cond, m: ^Mutex) {
 	err := unix.pthread_cond_wait(&c.impl.pthread_cond, &m.impl.pthread_mutex)
 	assert(err == 0)
 }
+
+
+_cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
+	tv_sec  := i64(duration/1e9)
+	tv_nsec := i64(duration%1e9)
+	err := unix.pthread_cond_timedwait(&c.impl.pthread_cond, &m.impl.pthread_mutex, &{tv_sec, tv_nsec})
+	return err == 0
+}
+
 
 _cond_signal :: proc(c: ^Cond) {
 	err := unix.pthread_cond_signal(&c.impl.pthread_cond)

@@ -153,6 +153,10 @@ cond_wait :: proc(c: ^Cond, m: ^Mutex) {
 	_cond_wait(c, m)
 }
 
+cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
+	return _cond_wait_with_timeout(c, m, duration)
+}
+
 cond_signal :: proc(c: ^Cond) {
 	_cond_signal(c)
 }
@@ -215,6 +219,9 @@ futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duratio
 	if u32(atomic_load(f)) != expected {
 		return nil
 	}
+	if duration == 0 {
+		return .Timed_Out	
+	}	
 	
 	return _futex_wait_with_timeout(f, expected, duration)
 }

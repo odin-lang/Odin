@@ -2,6 +2,7 @@
 //+private
 package sync2
 
+import "core:time"
 import win32 "core:sys/windows"
 
 _current_thread_id :: proc "contextless" () -> int {
@@ -60,6 +61,13 @@ _Cond :: struct {
 _cond_wait :: proc(c: ^Cond, m: ^Mutex) {
 	_ = win32.SleepConditionVariableSRW(&c.impl.cond, &m.impl.srwlock, win32.INFINITE, 0)
 }
+
+_cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
+	duration := u32(duration / time.Millisecond)
+	ok := win32.SleepConditionVariableSRW(&c.impl.cond, &m.impl.srwlock, duration, 0)
+	return bool(ok)
+}
+
 
 _cond_signal :: proc(c: ^Cond) {
 	win32.WakeConditionVariable(&c.impl.cond)

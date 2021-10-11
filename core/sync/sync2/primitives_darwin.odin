@@ -3,6 +3,7 @@
 package sync2
 
 import "core:c"
+import "core:time"
 import "core:intrinsics"
 
 foreign import pthread "System.framework"
@@ -41,6 +42,12 @@ _Cond :: struct {
 
 _cond_wait :: proc(c: ^Cond, m: ^Mutex) {
 	atomic_cond_wait(&c.impl.cond, &m.impl.mutex)
+}
+
+_cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
+	// TODO(bill): _cond_wait_with_timeout for Darwin
+	atomic_cond_wait(&c.impl.cond, &m.impl.mutex)
+	return true
 }
 
 _cond_signal :: proc(c: ^Cond) {
