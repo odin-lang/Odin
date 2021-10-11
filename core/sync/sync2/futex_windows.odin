@@ -20,13 +20,13 @@ foreign Synchronization {
 
 
 
-_futex_wait :: proc(f: ^Futex, expect: u32) -> Futex_Error {
+_futex_wait :: proc(f: ^Futex, expect: u32) -> bool {
 	expect := expect
 	ok := RtlWaitOnAddress(f, &expect, size_of(expect), nil)
-	return nil if ok else .Timed_Out
+	return bool(ok)
 }
 
-_futex_wait_with_timeout :: proc(f: ^Futex, expect: u32, duration: time.Duration) -> Futex_Error {
+_futex_wait_with_timeout :: proc(f: ^Futex, expect: u32, duration: time.Duration) -> bool {
 	expect := expect
 	
 	timeout: i64
@@ -38,7 +38,7 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expect: u32, duration: time.Duration
 	}
 	\
 	ok := RtlWaitOnAddress(f, &expect, size_of(expect), timeout_ptr)
-	return nil if ok else .Timed_Out
+	return bool(ok)
 }
 
 _futex_wake_single :: proc(f: ^Futex) {

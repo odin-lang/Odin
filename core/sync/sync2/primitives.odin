@@ -202,25 +202,21 @@ sema_post :: proc(s: ^Sema, count := 1) {
 // An Futex must not be copied after first use
 Futex :: distinct u32
 
-Futex_Error :: enum {
-	None,
-	Timed_Out,
-}
-
 futex_wait :: proc(f: ^Futex, expected: u32) {
 	if u32(atomic_load(f)) != expected {
 		return
 	}
 	
-	assert(_futex_wait(f, expected) != nil, "futex_wait failure")
+	assert(_futex_wait(f, expected), "futex_wait failure")
 }
 
-futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> Futex_Error {
+// returns true if the wait happened within the duration, false if it exceeded the time duration
+futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	if u32(atomic_load(f)) != expected {
-		return nil
+		return true
 	}
 	if duration == 0 {
-		return .Timed_Out	
+		return false
 	}	
 	
 	return _futex_wait_with_timeout(f, expected, duration)
