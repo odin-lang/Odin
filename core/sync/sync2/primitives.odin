@@ -190,6 +190,32 @@ sema_wait :: proc(s: ^Sema) {
 	}
 }
 
+sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
+	if duration <= 0 {
+		return false
+	}
+	
+	start := time.tick_now()
+	for {
+		original_count := atomic_load(&s.count)
+		remaining := duration - time.tick_since(start)
+		if remaining < 0 {
+			return false
+		}
+		
+		for original_count == 0 {
+			ok := futex_wait_with_timeout(&s.count, u32(original_count), remaining)
+			if !ok {
+				return false
+			}
+			original_count = s.count
+		}
+		if original_count == atomic_compare_exchange_strong(&s.count, original_count-1, original_count) {
+			return true
+		}
+	}
+}
+
 sema_post :: proc(s: ^Sema, count := 1) {
 	atomic_add(&s.count, Futex(count))
 	if count == 1 {
