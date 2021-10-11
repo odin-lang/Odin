@@ -149,6 +149,8 @@ thread_terminate :: proc "contextless" (thread: ^Thread, exit_code: int) {
 
 
 _fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
+	assert(global_fail_timeout_thread == nil, "set_fail_timeout previously called", loc)
+	
 	thread := thread_create(proc(thread: ^Thread) {
 		t := thread.t
 		timeout := thread.internal_fail_timeout

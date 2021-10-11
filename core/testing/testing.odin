@@ -99,6 +99,5 @@ expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> boo
 
 
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
-	assert(global_fail_timeout_thread == nil, "set_fail_timeout previously called", loc)
 	_fail_timeout(t, duration, loc)
 }
