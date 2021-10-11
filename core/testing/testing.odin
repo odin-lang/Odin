@@ -2,6 +2,7 @@ package testing
 
 import "core:fmt"
 import "core:io"
+import "core:time"
 
 // IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T)
@@ -27,6 +28,8 @@ T :: struct {
 	cleanups: [dynamic]Internal_Cleanup,
 
 	_fail_now: proc() -> !,
+	_is_done: bool,
+	_fail_timeout_set: bool,
 }
 
 
@@ -43,13 +46,18 @@ errorf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 	t.error_count += 1
 }
 
-fail :: proc(t: ^T) {
-	error(t, "FAIL")
+fail :: proc(t: ^T, loc := #caller_location) {
+	error(t=t, args={"FAIL"}, loc=loc)
 	t.error_count += 1
 }
 
-fail_now :: proc(t: ^T) {
-	fail(t)
+fail_now :: proc(t: ^T, msg := "", loc := #caller_location) {
+	if msg != "" {
+		error(t=t, args={"FAIL:", msg}, loc=loc)
+	} else {
+		error(t=t, args={"FAIL"}, loc=loc)
+	}
+	t.error_count += 1
 	if t._fail_now != nil {
 		t._fail_now()
 	}
@@ -80,4 +88,11 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 		error(t=t, args={msg}, loc=loc)
 	}
 	return ok
+}
+
+
+set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
+	assert(t._fail_timeout_set == false, "set_fail_timeout previously called", loc)
+	t._fail_timeout_set = true
+	_fail_timeout(t, duration, loc)
 }
