@@ -22,13 +22,9 @@ _futex_wait :: proc(f: ^Futex, expect: u32) -> bool {
 
 _futex_wait_with_timeout :: proc(f: ^Futex, expect: u32, duration: time.Duration) -> bool {
 	expect := expect
-	if duration <= 0 {
-		return bool(WaitOnAddress(f, &expect, size_of(expect), ~u32(0)))
-	}
-	
-	timeout := ~u32(0)
+	timeout := u32(0)
 	if duration > 0 {
-		timeout = u32(timeout/1e6)
+		timeout = u32(duration/1e6)
 	}
 	return bool(WaitOnAddress(f, &expect, size_of(expect), timeout))
 }
