@@ -443,7 +443,7 @@ read_at_least :: proc(r: Reader, buf: []byte, min: int) -> (n: int, err: Error) 
 	for n < min && err == nil {
 		nn: int
 		nn, err = read(r, buf[n:])
-		n += n
+		n += nn
 	}
 
 	if n >= min {
