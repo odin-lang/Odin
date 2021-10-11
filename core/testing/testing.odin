@@ -3,6 +3,7 @@ package testing
 import "core:fmt"
 import "core:io"
 import "core:time"
+import "core:intrinsics"
 
 // IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T)
@@ -28,8 +29,6 @@ T :: struct {
 	cleanups: [dynamic]Internal_Cleanup,
 
 	_fail_now: proc() -> !,
-	_is_done: bool,
-	_fail_timeout_set: bool,
 }
 
 
@@ -89,10 +88,17 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 	}
 	return ok
 }
+expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
+	ok := value == expected
+	if !ok {
+		errorf(t=t, format="expected %v, got %v", args={expected, value}, loc=loc)
+	}
+	return ok
+}
+
 
 
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
-	assert(t._fail_timeout_set == false, "set_fail_timeout previously called", loc)
-	t._fail_timeout_set = true
+	assert(global_fail_timeout_thread == nil, "set_fail_timeout previously called", loc)
 	_fail_timeout(t, duration, loc)
 }
