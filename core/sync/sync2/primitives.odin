@@ -219,9 +219,9 @@ sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
 sema_post :: proc(s: ^Sema, count := 1) {
 	atomic_add(&s.count, Futex(count))
 	if count == 1 {
-		futex_wake_single(&s.count)
+		futex_signal(&s.count)
 	} else {
-		futex_wake_all(&s.count)
+		futex_broadcast(&s.count)
 	}
 }
 
@@ -251,10 +251,10 @@ futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duratio
 	return _futex_wait_with_timeout(f, expected, duration)
 }
 
-futex_wake_single :: proc(f: ^Futex) {
-	_futex_wake_single(f)
+futex_signal :: proc(f: ^Futex) {
+	_futex_signal(f)
 }
 
-futex_wake_all :: proc(f: ^Futex) {
-	_futex_wake_all(f)
+futex_broadcast :: proc(f: ^Futex) {
+	_futex_broadcast(f)
 }

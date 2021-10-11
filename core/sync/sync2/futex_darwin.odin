@@ -46,7 +46,7 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Durati
 
 }
 
-_futex_wake_single :: proc(f: ^Futex) {
+_futex_signal :: proc(f: ^Futex) {
 	loop: for {
 		s := __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0)
 		if s >= 0 {
@@ -63,7 +63,7 @@ _futex_wake_single :: proc(f: ^Futex) {
 	}
 }
 
-_futex_wake_all :: proc(f: ^Futex) {
+_futex_broadcast :: proc(f: ^Futex) {
 	loop: for {
 		s := __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0)
 		if s >= 0 {

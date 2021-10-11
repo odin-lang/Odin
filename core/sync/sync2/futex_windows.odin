@@ -29,10 +29,10 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expect: u32, duration: time.Duration
 	return bool(WaitOnAddress(f, &expect, size_of(expect), timeout))
 }
 
-_futex_wake_single :: proc(f: ^Futex) {
+_futex_signal :: proc(f: ^Futex) {
 	WakeByAddressSingle(f)
 }
 
-_futex_wake_all :: proc(f: ^Futex) {
+_futex_broadcast :: proc(f: ^Futex) {
 	WakeByAddressAll(f)
 }

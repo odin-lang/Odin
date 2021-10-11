@@ -62,7 +62,7 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
 	@(cold)
 	unlock_slow :: proc(m: ^Atomic_Mutex) {
-		futex_wake_single((^Futex)(&m.state))
+		futex_signal((^Futex)(&m.state))
 	}
 
 
@@ -317,7 +317,7 @@ queue_item_wait_with_timeout :: proc(item: ^Queue_Item, duration: time.Duration)
 @(private="file")
 queue_item_signal :: proc(item: ^Queue_Item) {
 	atomic_store_release(&item.futex, 1)
-	futex_wake_single(&item.futex)
+	futex_signal(&item.futex)
 }
 
 
