@@ -1,5 +1,7 @@
 package sync2
 
+import "core:time"
+
 Atomic_Mutex_State :: enum Futex {
 	Unlocked = 0,
 	Locked   = 1,
@@ -298,6 +300,21 @@ queue_item_wait :: proc(item: ^Queue_Item) {
 	}
 }
 @(private="file")
+queue_item_wait_with_timeout :: proc(item: ^Queue_Item, duration: time.Duration) -> bool {
+	start := time.tick_now()
+	for atomic_load_acquire(&item.futex) == 0 {
+		remaining := duration - time.tick_since(start)
+		if remaining < 0 {
+			return false
+		}
+		if futex_wait_with_timeout(&item.futex, 0, remaining) == .Timed_Out {
+			return false
+		}
+		cpu_relax()
+	}
+	return true
+}
+@(private="file")
 queue_item_signal :: proc(item: ^Queue_Item) {
 	atomic_store_release(&item.futex, 1)
 	futex_wake_single(&item.futex)
@@ -328,6 +345,23 @@ atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 	queue_item_wait(waiter)
 	atomic_mutex_lock(m)
 }
+
+atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duration: time.Duration) -> (ok: bool) {
+	waiter := &Queue_Item{}
+
+	atomic_mutex_lock(&c.queue_mutex)
+	waiter.next = c.queue_head
+	c.queue_head = waiter
+
+	atomic_store(&c.pending, true)
+	atomic_mutex_unlock(&c.queue_mutex)
+
+	atomic_mutex_unlock(m)
+	ok = queue_item_wait_with_timeout(waiter, duration)
+	atomic_mutex_lock(m)
+	return
+}
+
 
 atomic_cond_signal :: proc(c: ^Atomic_Cond) {
 	if !atomic_load(&c.pending) {

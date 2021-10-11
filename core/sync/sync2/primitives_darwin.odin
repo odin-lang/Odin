@@ -45,9 +45,7 @@ _cond_wait :: proc(c: ^Cond, m: ^Mutex) {
 }
 
 _cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
-	// TODO(bill): _cond_wait_with_timeout for Darwin
-	atomic_cond_wait(&c.impl.cond, &m.impl.mutex)
-	return true
+	return atomic_cond_wait_with_timeout(&c.impl.cond, &m.impl.mutex, duration)
 }
 
 _cond_signal :: proc(c: ^Cond) {
