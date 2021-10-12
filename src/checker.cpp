@@ -853,8 +853,6 @@ void init_universal(void) {
 
 
 void init_checker_info(CheckerInfo *i) {
-#define TIME_SECTION(str) do { debugf("[Subsection] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
 	gbAllocator a = heap_allocator();
 
 	TIME_SECTION("checker info: general");
@@ -903,9 +901,6 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->foreign_mutex);
 
 	semaphore_init(&i->collect_semaphore);
-
-
-#undef TIME_SECTION
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -982,7 +977,6 @@ void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMa
 
 
 void init_checker(Checker *c) {
-#define TIME_SECTION(str) do { debugf("[Subsection] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 	gbAllocator a = heap_allocator();
 
 	TIME_SECTION("init checker info");
@@ -1000,8 +994,6 @@ void init_checker(Checker *c) {
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
 
 	c->builtin_ctx = make_checker_context(c);
-
-#undef TIME_SECTION
 }
 
 void destroy_checker(Checker *c) {
@@ -2183,8 +2175,6 @@ void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, 
 }
 
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
-#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
 	map_init(&M, allocator, info->entities.count);
 	defer (map_destroy(&M));
@@ -2303,8 +2293,6 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 	// gb_printf_err(">>>max      pred: %f succ: %f\n", pred_max, succ_max);
 
 	return G;
-
-#undef TIME_SECTION
 }
 
 
@@ -4313,8 +4301,6 @@ void check_export_entities(Checker *c) {
 }
 
 void check_import_entities(Checker *c) {
-#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
 	defer ({
 		for_array(i, dep_graph) {
@@ -4444,8 +4430,6 @@ void check_import_entities(Checker *c) {
 			add_untyped_expressions(ctx.info, &untyped);
 		}
 	}
-
-#undef TIME_SECTION
 }
 
 
@@ -4538,8 +4522,6 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 
 
 void calculate_global_init_order(Checker *c) {
-#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
@@ -4611,8 +4593,6 @@ void calculate_global_init_order(Checker *c) {
 		}
 		gb_printf("\n");
 	}
-
-#undef TIME_SECTION
 }
 
 
@@ -5152,8 +5132,6 @@ void check_sort_init_procedures(Checker *c) {
 
 
 void check_parsed_files(Checker *c) {
-#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->builtin_ctx, t_invalid);
 
@@ -5322,6 +5300,4 @@ void check_parsed_files(Checker *c) {
 	check_sort_init_procedures(c);
 
 	TIME_SECTION("type check finish");
-
-#undef TIME_SECTION
 }

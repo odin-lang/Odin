@@ -1120,9 +1120,6 @@ void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 
 
 void lb_generate_code(lbGenerator *gen) {
-	#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-	#define TIME_SECTION_WITH_LEN(str, len) do { if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
-
 	TIME_SECTION("LLVM Initializtion");
 
 	isize thread_count = gb_max(build_context.thread_count, 1);
@@ -1745,8 +1742,4 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 	}
-
-
-
-#undef TIME_SECTION
 }
