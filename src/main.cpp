@@ -67,34 +67,35 @@ gb_global Timings global_timings = {0};
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
+	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
+	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
+	isize cmd_len = 0;
+	va_list va;
+	i32 exit_code = 0;
+	
+	va_start(va, fmt);
+	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
+	va_end(va);
+	
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
-	isize cmd_len = 0;
-	isize const cmd_cap = 4096;
-	char cmd_line[cmd_cap] = {};
-	va_list va;
-	String16 cmd;
-	i32 exit_code = 0;
-
-
+	String16 wcmd = {};
+	
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
 	start_info.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
 	start_info.hStdOutput  = GetStdHandle(STD_OUTPUT_HANDLE);
 	start_info.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
 
-	va_start(va, fmt);
-	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
-	va_end(va);
 
 	if (build_context.show_system_calls) {
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
 		gb_printf_err("%.*s\n\n", cast(int)(cmd_len-1), cmd_line);
 	}
 
-	cmd = string_to_string16(permanent_allocator(), make_string(cast(u8 *)cmd_line, cmd_len-1));
-	if (CreateProcessW(nullptr, cmd.text,
+	wcmd = string_to_string16(permanent_allocator(), make_string(cast(u8 *)cmd_line, cmd_len-1));
+	if (CreateProcessW(nullptr, wcmd.text,
 	                   nullptr, nullptr, true, 0, nullptr, nullptr,
 	                   &start_info, &pi)) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
@@ -108,58 +109,19 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		exit_code = -1;
 	}
 
-	if (exit_code) {
-		exit(exit_code);
-	}
-
-	return exit_code;
-
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-
-	char cmd_line[4096] = {0};
-	isize cmd_len;
-	va_list va;
-	String cmd;
-	i32 exit_code = 0;
-
-	va_start(va, fmt);
-	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
-	va_end(va);
-	cmd = make_string(cast(u8 *)&cmd_line, cmd_len-1);
-
 	if (build_context.show_system_calls) {
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
 		gb_printf_err("%s\n\n", cmd_line);
 	}
 	exit_code = system(cmd_line);
-	// pid_t pid = fork();
-	// int status = 0;
-
-	// if(pid == 0) {
-	// 	// in child, pid == 0.
-	// 	int ret = execvp(cmd.text, (char* const*) cmd.text);
-
-	// 	if(ret == -1) {
-	// 		gb_printf_err("Failed to execute command:\n\t%s\n", cmd_line);
-
-	// 		// we're in the child, so returning won't do us any good -- just quit.
-	// 		exit(-1);
-	// 	}
-
-	// 	// unreachable
-	// 	abort();
-	// } else {
-	// 	// wait for child to finish, then we can continue cleanup
-
-	// 	int s = 0;
-	// 	waitpid(pid, &s, 0);
-
-	// 	status = WEXITSTATUS(s);
-	// }
-
-	// exit_code = status
-	return exit_code;
 #endif
+	
+	if (exit_code) {
+		exit(exit_code);
+	}
+	
+	return exit_code;
 }
 
 
@@ -173,10 +135,13 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-		system_exec_command_line_app("wasm-ld",
+		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm-obj\" -o \"%.*s.wasm\" %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+		if (result) {
+			return result;
+		}
 	}
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
@@ -298,23 +263,25 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
-
-				if (result == 0) {
-					result = system_exec_command_line_app("msvc-link",
-						"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
-						"/nologo /incremental:no /opt:ref /subsystem:%s "
-						" %.*s "
-						" %.*s "
-						" %s "
-						"",
-						LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
-						link_settings,
-						subsystem_str,
-						LIT(build_context.link_flags),
-						LIT(build_context.extra_linker_flags),
-						lib_str
-					  );
+				
+				if (result) {
+					return result;
 				}
+
+				result = system_exec_command_line_app("msvc-link",
+					"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					" %.*s "
+					" %.*s "
+					" %s "
+					"",
+					LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
+					lib_str
+				  );
 			} else {
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
@@ -331,8 +298,13 @@ i32 linker_stage(lbGenerator *gen) {
 					lib_str
 				);
 			}
+			
+			if (result) {
+				return result;
+			}
+			
 		} else { // lld
-			  result = system_exec_command_line_app("msvc-lld-link",
+			result = system_exec_command_line_app("msvc-lld-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
@@ -346,6 +318,10 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
+			  
+			  if (result) {
+			  	return result;
+			  }
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
@@ -483,14 +459,22 @@ i32 linker_stage(lbGenerator *gen) {
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
+		
+		if (result) {
+			return result;
+		}
 
 	#if defined(GB_SYSTEM_OSX)
 		if (build_context.ODIN_DEBUG) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 			// to the symbols in the object file
-			system_exec_command_line_app("dsymutil",
+			result = system_exec_command_line_app("dsymutil",
 				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 			);
+			
+			if (result) {
+				return result;
+			}
 		}
 	#endif
 
@@ -2495,11 +2479,11 @@ int main(int arg_count, char const **arg_ptr) {
 	case BuildMode_Executable:
 	case BuildMode_DynamicLibrary:
 		i32 result = linker_stage(gen);
-		if (result != 0) {
+		if (result) {
 			if (build_context.show_timings) {
 				show_timings(checker, &global_timings);
 			}
-			return 1;
+			return result;
 		}
 		break;
 	}
