@@ -883,33 +883,33 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 
 
-struct MemoryMappedFile {
+struct LoadedFile {
 	void *handle;
 	
-	void *data;
-	i32   size;
+	void const *data;
+	i32         size;
 };
-enum MemoryMappedFileError {
-	MemoryMappedFile_None,
+enum LoadedFileError {
+	LoadedFile_None,
 	
-	MemoryMappedFile_Empty,
-	MemoryMappedFile_FileTooLarge,
-	MemoryMappedFile_Invalid,
-	MemoryMappedFile_NotExists,
-	MemoryMappedFile_Permission,
+	LoadedFile_Empty,
+	LoadedFile_FileTooLarge,
+	LoadedFile_Invalid,
+	LoadedFile_NotExists,
+	LoadedFile_Permission,
 	
-	MemoryMappedFile_COUNT,
+	LoadedFile_COUNT,
 };
 
-MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile *memory_mapped_file, bool copy_file_contents) {
-	MemoryMappedFileError err = MemoryMappedFile_None;
+LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
+	LoadedFileError err = LoadedFile_None;
 	
 	if (!copy_file_contents) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		isize w_len = 0;
 		wchar_t *w_str = gb__alloc_utf8_to_ucs2(temporary_allocator(), fullpath, &w_len);
 		if (w_str == nullptr) {
-			return MemoryMappedFile_Invalid;
+			return LoadedFile_Invalid;
 		}
 		i64 file_size = 0;
 		LARGE_INTEGER li_file_size = {};
@@ -930,12 +930,12 @@ MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile 
 		file_size = cast(i64)li_file_size.QuadPart;
 		if (file_size > I32_MAX) {
 			CloseHandle(handle);
-			return MemoryMappedFile_FileTooLarge;
+			return LoadedFile_FileTooLarge;
 		}
 		
 		if (file_size == 0) {
 			CloseHandle(handle);
-			err = MemoryMappedFile_Empty;
+			err = LoadedFile_Empty;
 			memory_mapped_file->handle = nullptr;
 			memory_mapped_file->data   = nullptr;
 			memory_mapped_file->size   = 0;
@@ -955,16 +955,16 @@ MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile 
 		{
 			DWORD handle_err = GetLastError();
 			CloseHandle(handle);
-			err = MemoryMappedFile_Invalid;
+			err = LoadedFile_Invalid;
 			switch (handle_err) {
 			case ERROR_FILE_NOT_FOUND: 
 			case ERROR_PATH_NOT_FOUND: 
 			case ERROR_INVALID_DRIVE:
-				err = MemoryMappedFile_NotExists; 
+				err = LoadedFile_NotExists; 
 				break;
 			case ERROR_ACCESS_DENIED: 
 			case ERROR_INVALID_ACCESS:
-				err = MemoryMappedFile_Permission;
+				err = LoadedFile_Permission;
 				break;
 			}
 			return err;
@@ -975,7 +975,7 @@ MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile 
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {
-		err = MemoryMappedFile_FileTooLarge;
+		err = LoadedFile_FileTooLarge;
 		gb_file_free_contents(&fc);
 	} else if (fc.data != nullptr) {
 		memory_mapped_file->handle = nullptr;
@@ -987,13 +987,13 @@ MemoryMappedFileError memory_map_file_32(char const *fullpath, MemoryMappedFile 
 		defer (gb_file_close(&f));
 
 		switch (file_err) {
-		case gbFileError_Invalid:    err = MemoryMappedFile_Invalid;    break;
-		case gbFileError_NotExists:  err = MemoryMappedFile_NotExists;  break;
-		case gbFileError_Permission: err = MemoryMappedFile_Permission; break;
+		case gbFileError_Invalid:    err = LoadedFile_Invalid;    break;
+		case gbFileError_NotExists:  err = LoadedFile_NotExists;  break;
+		case gbFileError_Permission: err = LoadedFile_Permission; break;
 		}
 
-		if (err == MemoryMappedFile_None && gb_file_size(&f) == 0) {
-			err = MemoryMappedFile_Empty;
+		if (err == LoadedFile_None && gb_file_size(&f) == 0) {
+			err = LoadedFile_Empty;
 		}
 	}
 	return err;

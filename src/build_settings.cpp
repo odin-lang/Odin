@@ -222,6 +222,8 @@ struct BuildContext {
 	bool threaded_checker;
 
 	bool show_debug_messages;
+	
+	bool copy_file_contents;
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
@@ -771,6 +773,8 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
+	
+	bc->copy_file_contents = true;
 
 	TargetMetrics *metrics = nullptr;
 

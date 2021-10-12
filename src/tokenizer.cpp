@@ -723,7 +723,7 @@ struct Tokenizer {
 
 	bool insert_semicolon;
 	
-	MemoryMappedFile memory_mapped_file;
+	LoadedFile loaded_file;
 };
 
 
@@ -790,7 +790,7 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, isize size) {
+void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *data, isize size) {
 	t->fullpath = fullpath;
 	t->line_count = 1;
 
@@ -804,29 +804,29 @@ void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void *data, 
 	}
 }
 
-TokenizerInitError memory_mapped_file_error_map_to_tokenizer[MemoryMappedFile_COUNT] = {
-	TokenizerInit_None,         /*MemoryMappedFile_None*/
-	TokenizerInit_Empty,        /*MemoryMappedFile_Empty*/
-	TokenizerInit_FileTooLarge, /*MemoryMappedFile_FileTooLarge*/
-	TokenizerInit_Invalid,      /*MemoryMappedFile_Invalid*/
-	TokenizerInit_NotExists,    /*MemoryMappedFile_NotExists*/
-	TokenizerInit_Permission,   /*MemoryMappedFile_Permission*/
+TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT] = {
+	TokenizerInit_None,         /*LoadedFile_None*/
+	TokenizerInit_Empty,        /*LoadedFile_Empty*/
+	TokenizerInit_FileTooLarge, /*LoadedFile_FileTooLarge*/
+	TokenizerInit_Invalid,      /*LoadedFile_Invalid*/
+	TokenizerInit_NotExists,    /*LoadedFile_NotExists*/
+	TokenizerInit_Permission,   /*LoadedFile_Permission*/
 };
 
 TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
-	MemoryMappedFileError mmf_err = memory_map_file_32(
+	LoadedFileError file_err = load_file_32(
 		alloc_cstring(temporary_allocator(), fullpath), 
-		&t->memory_mapped_file,
+		&t->loaded_file,
 		copy_file_contents
 	);
 	
-	TokenizerInitError err = memory_mapped_file_error_map_to_tokenizer[mmf_err];
-	switch (mmf_err) {
-	case MemoryMappedFile_None:
-		init_tokenizer_with_data(t, fullpath, t->memory_mapped_file.data, cast(isize)t->memory_mapped_file.size);
+	TokenizerInitError err = loaded_file_error_map_to_tokenizer[file_err];
+	switch (file_err) {
+	case LoadedFile_None:
+		init_tokenizer_with_data(t, fullpath, t->loaded_file.data, cast(isize)t->loaded_file.size);
 		break;
-	case MemoryMappedFile_FileTooLarge:
-	case MemoryMappedFile_Empty:
+	case LoadedFile_FileTooLarge:
+	case LoadedFile_Empty:
 		t->fullpath = fullpath;
 		t->line_count = 1;
 		break;
