@@ -77,31 +77,31 @@ wait_group_wait_with_timeout :: proc(wg: ^Wait_Group, duration: time.Duration) -
  * 	import "core:sync"
  * 	import "core:thread"
  *
- * 	barrier := &sync.Barrier{};
+ * 	barrier := &sync.Barrier{}
  *
  * 	main :: proc() {
- * 		fmt.println("Start");
+ * 		fmt.println("Start")
  *
- * 		THREAD_COUNT :: 4;
- * 		threads: [THREAD_COUNT]^thread.Thread;
+ * 		THREAD_COUNT :: 4
+ * 		threads: [THREAD_COUNT]^thread.Thread
  *
- * 		sync.barrier_init(barrier, THREAD_COUNT);
- * 		defer sync.barrier_destroy(barrier);
+ * 		sync.barrier_init(barrier, THREAD_COUNT)
+ * 		defer sync.barrier_destroy(barrier)
  *
  *
  * 		for _, i in threads {
  * 			threads[i] = thread.create_and_start(proc(t: ^thread.Thread) {
  * 				// Same messages will be printed together but without any interleaving
- * 				fmt.println("Getting ready!");
- * 				sync.barrier_wait(barrier);
- * 				fmt.println("Off their marks they go!");
- * 			});
+ * 				fmt.println("Getting ready!")
+ * 				sync.barrier_wait(barrier)
+ * 				fmt.println("Off their marks they go!")
+ * 			})
  * 		}
  *
  * 		for t in threads {
- * 			thread.destroy(t); // join and free thread
+ * 			thread.destroy(t) // join and free thread
  * 		}
- * 		fmt.println("Finished");
+ * 		fmt.println("Finished")
  * 	}
  *
  */
@@ -186,7 +186,11 @@ ticket_mutex_lock :: #force_inline proc(m: ^Ticket_Mutex) {
 ticket_mutex_unlock :: #force_inline proc(m: ^Ticket_Mutex) {
 	atomic_add_relaxed(&m.serving, 1)
 }
-
+@(deferred_in=ticket_mutex_unlock)
+ticket_mutex_guard :: proc(m: ^Ticket_Mutex) -> bool {
+	ticket_mutex_lock(m)
+	return true
+}
 
 
 Benaphore :: struct {
@@ -209,6 +213,12 @@ benaphore_unlock :: proc(b: ^Benaphore) {
 	if atomic_sub_release(&b.counter, 1) > 0 {
 		sema_post(&b.sema)
 	}
+}
+
+@(deferred_in=benaphore_unlock)
+benaphore_guard :: proc(m: ^Benaphore) -> bool {
+	benaphore_lock(m)
+	return true
 }
 
 Recursive_Benaphore :: struct {
@@ -261,15 +271,24 @@ recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
 	// outside the lock
 }
 
+@(deferred_in=recursive_benaphore_unlock)
+recursive_benaphore_guard :: proc(m: ^Recursive_Benaphore) -> bool {
+	recursive_benaphore_lock(m)
+	return true
+}
 
 
 
 
+// Once is a data value that will perform exactly on action.
+// 
+// A Once must not be copied after first use.
 Once :: struct {
 	m:    Mutex,
 	done: bool,
 }
 
+// once_do calls the procedure fn if and only if once_do is being called for the first for this instance of Once.
 once_do :: proc(o: ^Once, fn: proc()) {
 	@(cold)
 	do_slow :: proc(o: ^Once, fn: proc()) {

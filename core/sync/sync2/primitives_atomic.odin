@@ -409,6 +409,14 @@ Atomic_Sema :: struct {
 	count: int,
 }
 
+atomic_sema_post :: proc(s: ^Atomic_Sema, count := 1) {
+	atomic_mutex_lock(&s.mutex)
+	defer atomic_mutex_unlock(&s.mutex)
+
+	s.count += count
+	atomic_cond_signal(&s.cond)
+}
+
 atomic_sema_wait :: proc(s: ^Atomic_Sema) {
 	atomic_mutex_lock(&s.mutex)
 	defer atomic_mutex_unlock(&s.mutex)
@@ -423,11 +431,29 @@ atomic_sema_wait :: proc(s: ^Atomic_Sema) {
 	}
 }
 
-atomic_sema_post :: proc(s: ^Atomic_Sema, count := 1) {
+atomic_sema_wait_with_timeout :: proc(s: ^Atomic_Sema, duration: time.Duration) -> bool {
+	if duration <= 0 {
+		return false
+	}
 	atomic_mutex_lock(&s.mutex)
 	defer atomic_mutex_unlock(&s.mutex)
+	
+	start := time.tick_now()
 
-	s.count += count
-	atomic_cond_signal(&s.cond)
+	for s.count == 0 {
+		remaining := duration - time.tick_since(start)
+		if remaining < 0 {
+			return false
+		}
+		
+		if !atomic_cond_wait_with_timeout(&s.cond, &s.mutex, remaining) {
+			return false
+		}
+	}
+
+	s.count -= 1
+	if s.count > 0 {
+		atomic_cond_signal(&s.cond)
+	}
+	return true
 }
-
