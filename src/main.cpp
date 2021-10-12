@@ -1627,6 +1627,8 @@ void show_timings(Checker *c, Timings *t) {
 
 void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
+	
+	TIME_SECTION("remove keep temp files");
 
 	for_array(i, gen->output_temp_paths) {
 		String path = gen->output_temp_paths[i];
@@ -2223,7 +2225,6 @@ int strip_semicolons(Parser *parser) {
 
 
 int main(int arg_count, char const **arg_ptr) {
-#define TIME_SECTION(str) do { debugf("[Section] %s\n", str); timings_start_section(&global_timings, str_lit(str)); } while (0)
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
@@ -2232,7 +2233,7 @@ int main(int arg_count, char const **arg_ptr) {
 	timings_init(&global_timings, str_lit("Total Time"), 2048);
 	defer (timings_destroy(&global_timings));
 
-	TIME_SECTION("initialization");
+	MAIN_TIME_SECTION("initialization");
 	
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
@@ -2410,7 +2411,7 @@ int main(int arg_count, char const **arg_ptr) {
 	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
 	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
 
-	TIME_SECTION("parse files");
+	MAIN_TIME_SECTION("parse files");
 
 	if (!init_parser(parser)) {
 		return 1;
@@ -2425,7 +2426,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	TIME_SECTION("type check");
+	MAIN_TIME_SECTION("type check");
 
 	checker->parser = parser;
 	init_checker(checker);
@@ -2468,7 +2469,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-	TIME_SECTION("LLVM API Code Gen");
+	MAIN_TIME_SECTION("LLVM API Code Gen");
 	lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
 	if (!lb_init_generator(gen, checker)) {
 		return 1;
@@ -2488,11 +2489,11 @@ int main(int arg_count, char const **arg_ptr) {
 		break;
 	}
 
+	remove_temp_files(gen);
+	
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
 	}
-
-	remove_temp_files(gen);
 
 	if (run_output) {
 	#if defined(GB_SYSTEM_WINDOWS)
