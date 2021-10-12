@@ -54,7 +54,7 @@ wait :: proc{
 	futex_wait,
 }
 
-wait_for_timeout :: proc{
+wait_with_timeout :: proc{
 	cond_wait_with_timeout,
 	sema_wait_with_timeout,
 	atomic_cond_wait_with_timeout,
