@@ -24,7 +24,7 @@ mutex_unlock :: proc(m: ^Mutex) {
 	_mutex_unlock(m)
 }
 
-// mutex_lock tries to lock m, will return true on success, and false on failure
+// mutex_try_lock tries to lock m, will return true on success, and false on failure
 mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	return _mutex_try_lock(m)
 }

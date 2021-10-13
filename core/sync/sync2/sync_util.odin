@@ -1,6 +1,12 @@
 package sync2
 
 
+// Example:
+//
+// if guard(&m) {
+//         ...
+// }
+//
 guard :: proc{
 	mutex_guard,
 	rw_mutex_guard,
@@ -12,11 +18,18 @@ guard :: proc{
 	atomic_rw_mutex_guard,
 }
 
+// Example:
+//
+// if shared_guard(&m) {
+//         ...
+// }
+//
 shared_guard :: proc{
 	rw_mutex_shared_guard,
 	atomic_rw_mutex_shared_guard,
 }
 
+// lock locks m
 lock :: proc{
 	mutex_lock,
 	rw_mutex_lock,
@@ -28,6 +41,7 @@ lock :: proc{
 	atomic_rw_mutex_lock,
 }
 
+// unlock locks m
 unlock :: proc{
 	mutex_unlock,
 	rw_mutex_unlock,
@@ -39,6 +53,7 @@ unlock :: proc{
 	atomic_rw_mutex_unlock,
 }
 
+// try_lock tries to lock m, will return true on success, and false on failure
 try_lock :: proc{
 	mutex_try_lock,
 	rw_mutex_try_lock,
@@ -49,16 +64,19 @@ try_lock :: proc{
 	atomic_rw_mutex_try_lock,
 }
 
+// shared_lock locks rw for reading (with arbitrary number of readers)
 shared_lock :: proc{
 	rw_mutex_shared_lock,
 	atomic_rw_mutex_shared_lock,
 }
 
+// shared_unlock unlocks rw for reading (with arbitrary number of readers)
 shared_unlock :: proc{
 	rw_mutex_shared_unlock,
 	atomic_rw_mutex_shared_unlock,
 }
 
+// try_shared_lock tries to lock rw for reading (with arbitrary number of readers)
 try_shared_lock :: proc{
 	rw_mutex_try_shared_lock,
 	atomic_rw_mutex_try_shared_lock,
