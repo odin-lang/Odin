@@ -9,6 +9,7 @@ guard :: proc{
 	recursive_benaphore_guard,
 	atomic_mutex_guard,
 	atomic_recursive_mutex_guard,
+	atomic_rw_mutex_guard,
 }
 
 shared_guard :: proc{
@@ -24,6 +25,7 @@ lock :: proc{
 	recursive_benaphore_lock,
 	atomic_mutex_lock,
 	atomic_recursive_mutex_lock,
+	atomic_rw_mutex_lock,
 }
 
 unlock :: proc{
@@ -34,6 +36,7 @@ unlock :: proc{
 	recursive_benaphore_unlock,
 	atomic_mutex_unlock,
 	atomic_recursive_mutex_unlock,
+	atomic_rw_mutex_unlock,
 }
 
 try_lock :: proc{
@@ -43,7 +46,24 @@ try_lock :: proc{
 	recursive_benaphore_try_lock,
 	atomic_mutex_try_lock,
 	atomic_recursive_mutex_try_lock,
+	atomic_rw_mutex_try_lock,
 }
+
+shared_lock :: proc{
+	rw_mutex_shared_lock,
+	atomic_rw_mutex_shared_lock,
+}
+
+shared_unlock :: proc{
+	rw_mutex_shared_unlock,
+	atomic_rw_mutex_shared_unlock,
+}
+
+try_shared_lock :: proc{
+	rw_mutex_try_shared_lock,
+	atomic_rw_mutex_try_shared_lock,
+}
+
 
 
 wait :: proc{
