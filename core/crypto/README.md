@@ -5,6 +5,7 @@ A crypto library for the Odin language
 This library offers various algorithms available in either native Odin or via bindings to the [Botan](https://botan.randombit.net/) crypto library.
 Please see the chart below for the options.  
 **Note:** All crypto hash algorithms, offered by [Botan\'s FFI](https://botan.randombit.net/handbook/api_ref/hash.html), have been added.
+If you wish to use Botan, make sure you have installed it and the dll is available in either the global path or next to your binary.
 
 ## Hashing algorithms
 | Algorithm                                                                                                    | Odin             | Botan                |
