@@ -90,11 +90,11 @@ hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
     return _hash_impl->hash_stream_16(s)
 }
 
-// hash_file_128 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_128 :: proc(path: string, load_at_once: bool) -> ([16]byte, bool) {
+// hash_file_128 will read the file provided by the given handle
+// and compute a hash
+hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
     _create_ripemd_ctx(16)
-    return _hash_impl->hash_file_16(path, load_at_once)
+    return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
 hash_128 :: proc {
@@ -124,11 +124,11 @@ hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
     return _hash_impl->hash_stream_20(s)
 }
 
-// hash_file_160 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_160 :: proc(path: string, load_at_once: bool) -> ([20]byte, bool) {
+// hash_file_160 will read the file provided by the given handle
+// and compute a hash
+hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
     _create_ripemd_ctx(20)
-    return _hash_impl->hash_file_20(path, load_at_once)
+    return _hash_impl->hash_file_20(hd, load_at_once)
 }
 
 hash_160 :: proc {
@@ -158,11 +158,11 @@ hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
     return _hash_impl->hash_stream_32(s)
 }
 
-// hash_file_256 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_256 :: proc(path: string, load_at_once: bool) -> ([32]byte, bool) {
+// hash_file_256 will read the file provided by the given handle
+// and compute a hash
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
     _create_ripemd_ctx(32)
-    return _hash_impl->hash_file_32(path, load_at_once)
+    return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
 hash_256 :: proc {
@@ -192,11 +192,11 @@ hash_stream_320 :: proc(s: io.Stream) -> ([40]byte, bool) {
     return _hash_impl->hash_stream_40(s)
 }
 
-// hash_file_320 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_320 :: proc(path: string, load_at_once: bool) -> ([40]byte, bool) {
+// hash_file_320 will read the file provided by the given handle
+// and compute a hash
+hash_file_320 :: proc(hd: os.Handle, load_at_once := false) -> ([40]byte, bool) {
     _create_ripemd_ctx(40)
-    return _hash_impl->hash_file_40(path, load_at_once)
+    return _hash_impl->hash_file_40(hd, load_at_once)
 }
 
 hash_320 :: proc {
@@ -236,15 +236,12 @@ hash_stream_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([16]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_16(ctx, buf[:]), read_ok
-            }
+hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_16(ctx, buf[:]), ok
         }
     }
     return [16]byte{}, false
@@ -280,15 +277,12 @@ hash_stream_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([20]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_20(ctx, buf[:]), read_ok
-            }
+hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_20(ctx, buf[:]), ok
         }
     }
     return [20]byte{}, false
@@ -324,15 +318,12 @@ hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([32]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_32(ctx, buf[:]), read_ok
-            }
+hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_32(ctx, buf[:]), ok
         }
     }
     return [32]byte{}, false
@@ -368,15 +359,12 @@ hash_stream_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([40]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_40(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_40(ctx, buf[:]), read_ok
-            }
+hash_file_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([40]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_40(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_40(ctx, buf[:]), ok
         }
     }
     return [40]byte{}, false

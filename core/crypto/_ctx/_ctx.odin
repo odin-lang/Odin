@@ -11,6 +11,7 @@ package _ctx
 */
 
 import "core:io"
+import "core:os"
 
 Hash_Size :: enum {
     _16,
@@ -44,15 +45,15 @@ Hash_Context_Vtable :: struct {
     hash_bytes_48     : proc (ctx: ^Hash_Context, input: []byte) -> [48]byte,
     hash_bytes_64     : proc (ctx: ^Hash_Context, input: []byte) -> [64]byte,
     hash_bytes_128    : proc (ctx: ^Hash_Context, input: []byte) -> [128]byte,
-    hash_file_16      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([16]byte,  bool),
-    hash_file_20      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([20]byte,  bool),
-    hash_file_24      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([24]byte,  bool),
-    hash_file_28      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([28]byte,  bool),
-    hash_file_32      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([32]byte,  bool),
-    hash_file_40      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([40]byte,  bool),
-    hash_file_48      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([48]byte,  bool),
-    hash_file_64      : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([64]byte,  bool),
-    hash_file_128     : proc (ctx: ^Hash_Context, path: string, load_at_once: bool)  -> ([128]byte, bool),
+    hash_file_16      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte,  bool),
+    hash_file_20      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([20]byte,  bool),
+    hash_file_24      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([24]byte,  bool),
+    hash_file_28      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([28]byte,  bool),
+    hash_file_32      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte,  bool),
+    hash_file_40      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([40]byte,  bool),
+    hash_file_48      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([48]byte,  bool),
+    hash_file_64      : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([64]byte,  bool),
+    hash_file_128     : proc (ctx: ^Hash_Context, hd: os.Handle, load_at_once := false) -> ([128]byte, bool),
     hash_stream_16    : proc (ctx: ^Hash_Context, s: io.Stream)  -> ([16]byte,  bool),
     hash_stream_20    : proc (ctx: ^Hash_Context, s: io.Stream)  -> ([20]byte,  bool),
     hash_stream_24    : proc (ctx: ^Hash_Context, s: io.Stream)  -> ([24]byte,  bool),
@@ -63,7 +64,7 @@ Hash_Context_Vtable :: struct {
     hash_stream_64    : proc (ctx: ^Hash_Context, s: io.Stream)  -> ([64]byte,  bool),
     hash_stream_128   : proc (ctx: ^Hash_Context, s: io.Stream)  -> ([128]byte, bool),
     hash_bytes_slice  : proc (ctx: ^Hash_Context, input: []byte, out_size: int, allocator := context.allocator) -> []byte,
-    hash_file_slice   : proc (ctx: ^Hash_Context, path: string,  out_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool),
+    hash_file_slice   : proc (ctx: ^Hash_Context, hd: os.Handle, out_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool),
     hash_stream_slice : proc (ctx: ^Hash_Context, s: io.Stream,  out_size: int, allocator := context.allocator) -> ([]byte, bool),
     init              : proc (ctx: ^Hash_Context),
     update            : proc (ctx: ^Hash_Context, data: []byte),

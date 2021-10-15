@@ -18,6 +18,7 @@ import "core:io"
 
 import "../botan"
 import "../_ctx"
+import "../util"
 
 /*
     Context initialization and switching between the Odin implementation and the bindings
@@ -138,11 +139,11 @@ hash_skein256_stream :: proc(s: io.Stream, bit_size: int, allocator := context.a
     return _hash_impl->hash_stream_slice(s, bit_size, allocator)
 }
 
-// hash_skein256_file will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_skein256_file :: proc(path: string, bit_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool) {
+// hash_skein256_file will read the file provided by the given handle
+// and compute a hash
+hash_skein256_file :: proc(hd: os.Handle, bit_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool) {
     _create_skein256_ctx(bit_size)
-    return _hash_impl->hash_file_slice(path, bit_size, load_at_once, allocator)
+    return _hash_impl->hash_file_slice(hd, bit_size, load_at_once, allocator)
 }
 
 hash_skein256 :: proc {
@@ -172,11 +173,11 @@ hash_skein512_stream :: proc(s: io.Stream, bit_size: int, allocator := context.a
     return _hash_impl->hash_stream_slice(s, bit_size, allocator)
 }
 
-// hash_skein512_file will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_skein512_file :: proc(path: string, bit_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool) {
+// hash_skein512_file will read the file provided by the given handle
+// and compute a hash
+hash_skein512_file :: proc(hd: os.Handle, bit_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool) {
     _create_skein512_ctx(bit_size)
-    return _hash_impl->hash_file_slice(path, bit_size, load_at_once, allocator)
+    return _hash_impl->hash_file_slice(hd, bit_size, load_at_once, allocator)
 }
 
 hash_skein512 :: proc {
@@ -206,11 +207,11 @@ hash_skein1024_stream :: proc(s: io.Stream, bit_size: int, allocator := context.
     return _hash_impl->hash_stream_slice(s, bit_size, allocator)
 }
 
-// hash_skein1024_file will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_skein1024_file :: proc(path: string, bit_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool) {
+// hash_skein1024_file will read the file provided by the given handle
+// and compute a hash
+hash_skein1024_file :: proc(hd: os.Handle, bit_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool) {
     _create_skein1024_ctx(bit_size)
-    return _hash_impl->hash_file_slice(path, bit_size, load_at_once, allocator)
+    return _hash_impl->hash_file_slice(hd, bit_size, load_at_once, allocator)
 }
 
 hash_skein1024 :: proc {
@@ -270,15 +271,12 @@ hash_stream_skein256_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.
     }
 }
 
-hash_file_skein256_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, bit_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_skein256_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_skein256_odin(ctx, buf[:], bit_size), read_ok
-            }
+hash_file_skein256_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, bit_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool) {
+    if !load_at_once {
+        return hash_stream_skein256_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_skein256_odin(ctx, buf[:], bit_size, allocator), ok
         }
     }
     return nil, false
@@ -318,15 +316,12 @@ hash_stream_skein512_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.
     }
 }
 
-hash_file_skein512_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, bit_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_skein512_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_skein512_odin(ctx, buf[:], bit_size), read_ok
-            }
+hash_file_skein512_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, bit_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool) {
+    if !load_at_once {
+        return hash_stream_skein512_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_skein512_odin(ctx, buf[:], bit_size, allocator), ok
         }
     }
     return nil, false
@@ -366,15 +361,12 @@ hash_stream_skein1024_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io
     }
 }
 
-hash_file_skein1024_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, bit_size: int, load_at_once: bool, allocator := context.allocator) -> ([]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_skein1024_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_skein1024_odin(ctx, buf[:], bit_size), read_ok
-            }
+hash_file_skein1024_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, bit_size: int, load_at_once := false, allocator := context.allocator) -> ([]byte, bool) {
+    if !load_at_once {
+        return hash_stream_skein512_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_skein512_odin(ctx, buf[:], bit_size, allocator), ok
         }
     }
     return nil, false

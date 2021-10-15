@@ -5,7 +5,6 @@ A crypto library for the Odin language
 This library offers various algorithms available in either native Odin or via bindings to the [Botan](https://botan.randombit.net/) crypto library.
 Please see the chart below for the options.  
 **Note:** All crypto hash algorithms, offered by [Botan\'s FFI](https://botan.randombit.net/handbook/api_ref/hash.html), have been added.
-If you wish to use Botan, make sure you have installed it and the dll is available in either the global path or next to your binary.
 
 ## Hashing algorithms
 | Algorithm                                                                                                    | Odin             | Botan                |
@@ -42,7 +41,7 @@ Included in these groups are four procedures.
 * `hash_string` - Hash a given string and return the computed hash. Just calls `hash_bytes` internally
 * `hash_bytes` - Hash a given byte slice and return the computed hash
 * `hash_stream` - Takes a stream from io.Stream and returns the computed hash from it
-* `hash_file` - Hashes a file. A second boolean parameter controls if the file is streamed (set to false) or read at once (set to true)
+* `hash_file` - Takes a file handle and returns the computed hash from it. A second optional boolean parameter controls if the file is streamed (this is the default) or read at once (set to true)
 
 \*\*\* On some algorithms there is another part to the name, since they might offer control about additional parameters.  
 For instance, `HAVAL` offers different sizes as well as three different round amounts.  
