@@ -82,11 +82,11 @@ hash_stream :: proc(s: io.Stream) -> ([16]byte, bool) {
     return _hash_impl->hash_stream_16(s)
 }
 
-// hash_file will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file :: proc(path: string, load_at_once: bool) -> ([16]byte, bool) {
+// hash_file will read the file provided by the given handle
+// and compute a hash
+hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
     _create_md4_ctx()
-    return _hash_impl->hash_file_16(path, load_at_once)
+    return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
 hash :: proc {
@@ -142,15 +142,12 @@ hash_stream_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -
     }
 }
 
-hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([16]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin(ctx, buf[:]), read_ok
-            }
+hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin(ctx, buf[:]), ok
         }
     }
     return [16]byte{}, false

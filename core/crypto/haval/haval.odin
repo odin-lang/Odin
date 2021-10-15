@@ -109,11 +109,11 @@ hash_stream_128_3 :: proc(s: io.Stream) -> ([16]byte, bool) {
     return _hash_impl->hash_stream_16(s)
 }
 
-// hash_file_128_3 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_128_3 :: proc(path: string, load_at_once: bool) -> ([16]byte, bool) {
+// hash_file_128_3 will read the file provided by the given handle
+// and compute a hash
+hash_file_128_3 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
     _create_haval_ctx(._16, 3)
-    return _hash_impl->hash_file_16(path, load_at_once)
+    return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
 hash_128_3 :: proc {
@@ -143,11 +143,11 @@ hash_stream_128_4 :: proc(s: io.Stream) -> ([16]byte, bool) {
     return _hash_impl->hash_stream_16(s)
 }
 
-// hash_file_128_4 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_128_4 :: proc(path: string, load_at_once: bool) -> ([16]byte, bool) {
+// hash_file_128_4 will read the file provided by the given handle
+// and compute a hash
+hash_file_128_4 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
     _create_haval_ctx(._16, 4)
-    return _hash_impl->hash_file_16(path, load_at_once)
+    return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
 hash_128_4 :: proc {
@@ -177,11 +177,11 @@ hash_stream_128_5 :: proc(s: io.Stream) -> ([16]byte, bool) {
     return _hash_impl->hash_stream_16(s)
 }
 
-// hash_file_128_5 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_128_5 :: proc(path: string, load_at_once: bool) -> ([16]byte, bool) {
+// hash_file_128_5 will read the file provided by the given handle
+// and compute a hash
+hash_file_128_5 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
     _create_haval_ctx(._16, 5)
-    return _hash_impl->hash_file_16(path, load_at_once)
+    return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
 hash_128_5 :: proc {
@@ -211,11 +211,11 @@ hash_stream_160_3 :: proc(s: io.Stream) -> ([20]byte, bool) {
     return _hash_impl->hash_stream_20(s)
 }
 
-// hash_file_160_3 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_160_3 :: proc(path: string, load_at_once: bool) -> ([20]byte, bool) {
+// hash_file_160_3 will read the file provided by the given handle
+// and compute a hash
+hash_file_160_3 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
     _create_haval_ctx(._20, 3)
-    return _hash_impl->hash_file_20(path, load_at_once)
+    return _hash_impl->hash_file_20(hd, load_at_once)
 }
 
 hash_160_3 :: proc {
@@ -245,11 +245,11 @@ hash_stream_160_4 :: proc(s: io.Stream) -> ([20]byte, bool) {
     return _hash_impl->hash_stream_20(s)
 }
 
-// hash_file_160_4 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_160_4 :: proc(path: string, load_at_once: bool) -> ([20]byte, bool) {
+// hash_file_160_4 will read the file provided by the given handle
+// and compute a hash
+hash_file_160_4 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
     _create_haval_ctx(._20, 4)
-    return _hash_impl->hash_file_20(path, load_at_once)
+    return _hash_impl->hash_file_20(hd, load_at_once)
 }
 
 hash_160_4 :: proc {
@@ -279,11 +279,11 @@ hash_stream_160_5 :: proc(s: io.Stream) -> ([20]byte, bool) {
     return _hash_impl->hash_stream_20(s)
 }
 
-// hash_file_160_5 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_160_5 :: proc(path: string, load_at_once: bool) -> ([20]byte, bool) {
+// hash_file_160_5 will read the file provided by the given handle
+// and compute a hash
+hash_file_160_5 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
     _create_haval_ctx(._20, 5)
-    return _hash_impl->hash_file_20(path, load_at_once)
+    return _hash_impl->hash_file_20(hd, load_at_once)
 }
 
 hash_160_5 :: proc {
@@ -313,11 +313,11 @@ hash_stream_192_3 :: proc(s: io.Stream) -> ([24]byte, bool) {
     return _hash_impl->hash_stream_24(s)
 }
 
-// hash_file_192_3 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_192_3 :: proc(path: string, load_at_once: bool) -> ([24]byte, bool) {
+// hash_file_192_3 will read the file provided by the given handle
+// and compute a hash
+hash_file_192_3 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
     _create_haval_ctx(._24, 3)
-    return _hash_impl->hash_file_24(path, load_at_once)
+    return _hash_impl->hash_file_24(hd, load_at_once)
 }
 
 hash_192_3 :: proc {
@@ -347,11 +347,11 @@ hash_stream_192_4 :: proc(s: io.Stream) -> ([24]byte, bool) {
     return _hash_impl->hash_stream_24(s)
 }
 
-// hash_file_192_4 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_192_4 :: proc(path: string, load_at_once: bool) -> ([24]byte, bool) {
+// hash_file_192_4 will read the file provided by the given handle
+// and compute a hash
+hash_file_192_4 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
     _create_haval_ctx(._24, 4)
-    return _hash_impl->hash_file_24(path, load_at_once)
+    return _hash_impl->hash_file_24(hd, load_at_once)
 }
 
 hash_192_4 :: proc {
@@ -381,11 +381,11 @@ hash_stream_192_5 :: proc(s: io.Stream) -> ([24]byte, bool) {
     return _hash_impl->hash_stream_24(s)
 }
 
-// hash_file_192_5 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_192_5 :: proc(path: string, load_at_once: bool) -> ([24]byte, bool) {
+// hash_file_192_5 will read the file provided by the given handle
+// and compute a hash
+hash_file_192_5 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
     _create_haval_ctx(._24, 5)
-    return _hash_impl->hash_file_24(path, load_at_once)
+    return _hash_impl->hash_file_24(hd, load_at_once)
 }
 
 hash_192_5 :: proc {
@@ -415,11 +415,11 @@ hash_stream_224_3 :: proc(s: io.Stream) -> ([28]byte, bool) {
     return _hash_impl->hash_stream_28(s)
 }
 
-// hash_file_224_3 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_224_3 :: proc(path: string, load_at_once: bool) -> ([28]byte, bool) {
+// hash_file_224_3 will read the file provided by the given handle
+// and compute a hash
+hash_file_224_3 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
     _create_haval_ctx(._28, 3)
-    return _hash_impl->hash_file_28(path, load_at_once)
+    return _hash_impl->hash_file_28(hd, load_at_once)
 }
 
 hash_224_3 :: proc {
@@ -449,11 +449,11 @@ hash_stream_224_4 :: proc(s: io.Stream) -> ([28]byte, bool) {
     return _hash_impl->hash_stream_28(s)
 }
 
-// hash_file_224_4 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_224_4 :: proc(path: string, load_at_once: bool) -> ([28]byte, bool) {
+// hash_file_224_4 will read the file provided by the given handle
+// and compute a hash
+hash_file_224_4 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
     _create_haval_ctx(._28, 4)
-    return _hash_impl->hash_file_28(path, load_at_once)
+    return _hash_impl->hash_file_28(hd, load_at_once)
 }
 
 hash_224_4 :: proc {
@@ -483,11 +483,11 @@ hash_stream_224_5 :: proc(s: io.Stream) -> ([28]byte, bool) {
     return _hash_impl->hash_stream_28(s)
 }
 
-// hash_file_224_5 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_224_5 :: proc(path: string, load_at_once: bool) -> ([28]byte, bool) {
+// hash_file_224_5 will read the file provided by the given handle
+// and compute a hash
+hash_file_224_5 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
     _create_haval_ctx(._28, 5)
-    return _hash_impl->hash_file_28(path, load_at_once)
+    return _hash_impl->hash_file_28(hd, load_at_once)
 }
 
 hash_224_5 :: proc {
@@ -517,11 +517,11 @@ hash_stream_256_3 :: proc(s: io.Stream) -> ([32]byte, bool) {
     return _hash_impl->hash_stream_32(s)
 }
 
-// hash_file_256_3 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_256_3 :: proc(path: string, load_at_once: bool) -> ([32]byte, bool) {
+// hash_file_256_3 will read the file provided by the given handle
+// and compute a hash
+hash_file_256_3 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
     _create_haval_ctx(._32, 3)
-    return _hash_impl->hash_file_32(path, load_at_once)
+    return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
 hash_256_3 :: proc {
@@ -551,11 +551,11 @@ hash_stream_256_4 :: proc(s: io.Stream) -> ([32]byte, bool) {
     return _hash_impl->hash_stream_32(s)
 }
 
-// hash_file_256_4 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_256_4 :: proc(path: string, load_at_once: bool) -> ([32]byte, bool) {
+// hash_file_256_4 will read the file provided by the given handle
+// and compute a hash
+hash_file_256_4 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
     _create_haval_ctx(._32, 4)
-    return _hash_impl->hash_file_32(path, load_at_once)
+    return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
 hash_256_4 :: proc {
@@ -585,11 +585,11 @@ hash_stream_256_5 :: proc(s: io.Stream) -> ([32]byte, bool) {
     return _hash_impl->hash_stream_32(s)
 }
 
-// hash_file_256_5 will try to open the file provided by the given
-// path and pass it to hash_stream to compute a hash
-hash_file_256_5 :: proc(path: string, load_at_once: bool) -> ([32]byte, bool) {
+// hash_file_256_5 will read the file provided by the given handle
+// and compute a hash
+hash_file_256_5 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
     _create_haval_ctx(._32, 5)
-    return _hash_impl->hash_file_32(path, load_at_once)
+    return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
 hash_256_5 :: proc {
@@ -647,15 +647,12 @@ hash_stream_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([16]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_16(ctx, buf[:]), read_ok
-            }
+hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_16(ctx, buf[:]), ok
         }
     }
     return [16]byte{}, false
@@ -693,15 +690,12 @@ hash_stream_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([20]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_20(ctx, buf[:]), read_ok
-            }
+hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_20(ctx, buf[:]), ok
         }
     }
     return [20]byte{}, false
@@ -739,15 +733,12 @@ hash_stream_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([24]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_24(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_24(ctx, buf[:]), read_ok
-            }
+hash_file_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_24(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_24(ctx, buf[:]), ok
         }
     }
     return [24]byte{}, false
@@ -785,15 +776,12 @@ hash_stream_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([28]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_28(ctx, buf[:]), read_ok
-            }
+hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_28(ctx, buf[:]), ok
         }
     }
     return [28]byte{}, false
@@ -831,15 +819,12 @@ hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream
     }
 }
 
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, path: string, load_at_once: bool) -> ([32]byte, bool) {
-    if hd, err := os.open(path); err == os.ERROR_NONE {
-        defer os.close(hd)
-        if !load_at_once {
-            return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-        } else {
-            if buf, read_ok := os.read_entire_file(path); read_ok {
-                return hash_bytes_odin_32(ctx, buf[:]), read_ok
-            }
+hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
+    if !load_at_once {
+        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
+    } else {
+        if buf, ok := util.read_entire_file(hd); ok {
+            return hash_bytes_odin_32(ctx, buf[:]), ok
         }
     }
     return [32]byte{}, false
