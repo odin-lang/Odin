@@ -80,21 +80,21 @@ hash_string_224 :: proc(data: string) -> [28]byte {
 // hash_bytes_224 will hash the given input and return the
 // computed hash
 hash_bytes_224 :: proc(data: []byte) -> [28]byte {
-    _create_sha3_ctx(28)
+    _create_keccak_ctx(28)
     return _hash_impl->hash_bytes_28(data)
 }
 
 // hash_stream_224 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_224 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_sha3_ctx(28)
+    _create_keccak_ctx(28)
     return _hash_impl->hash_stream_28(s)
 }
 
 // hash_file_224 will read the file provided by the given handle
 // and compute a hash
 hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_sha3_ctx(28)
+    _create_keccak_ctx(28)
     return _hash_impl->hash_file_28(hd, load_at_once)
 }
 
@@ -114,21 +114,21 @@ hash_string_256 :: proc(data: string) -> [32]byte {
 // hash_bytes_256 will hash the given input and return the
 // computed hash
 hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    _create_sha3_ctx(32)
+    _create_keccak_ctx(32)
     return _hash_impl->hash_bytes_32(data)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_sha3_ctx(32)
+    _create_keccak_ctx(32)
     return _hash_impl->hash_stream_32(s)
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
 hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_sha3_ctx(32)
+    _create_keccak_ctx(32)
     return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
@@ -148,21 +148,21 @@ hash_string_384 :: proc(data: string) -> [48]byte {
 // hash_bytes_384 will hash the given input and return the
 // computed hash
 hash_bytes_384 :: proc(data: []byte) -> [48]byte {
-    _create_sha3_ctx(48)
+    _create_keccak_ctx(48)
     return _hash_impl->hash_bytes_48(data)
 }
 
 // hash_stream_384 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_384 :: proc(s: io.Stream) -> ([48]byte, bool) {
-    _create_sha3_ctx(48)
+    _create_keccak_ctx(48)
     return _hash_impl->hash_stream_48(s)
 }
 
 // hash_file_384 will read the file provided by the given handle
 // and compute a hash
 hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    _create_sha3_ctx(48)
+    _create_keccak_ctx(48)
     return _hash_impl->hash_file_48(hd, load_at_once)
 }
 
@@ -182,21 +182,21 @@ hash_string_512 :: proc(data: string) -> [64]byte {
 // hash_bytes_512 will hash the given input and return the
 // computed hash
 hash_bytes_512 :: proc(data: []byte) -> [64]byte {
-    _create_sha3_ctx(64)
+    _create_keccak_ctx(64)
     return _hash_impl->hash_bytes_64(data)
 }
 
 // hash_stream_512 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_512 :: proc(s: io.Stream) -> ([64]byte, bool) {
-    _create_sha3_ctx(64)
+    _create_keccak_ctx(64)
     return _hash_impl->hash_stream_64(s)
 }
 
 // hash_file_512 will read the file provided by the given handle
 // and compute a hash
 hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    _create_sha3_ctx(64)
+    _create_keccak_ctx(64)
     return _hash_impl->hash_file_64(hd, load_at_once)
 }
 
@@ -388,7 +388,7 @@ hash_file_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
 }
 
 @(private)
-_create_sha3_ctx :: #force_inline proc(mdlen: int) {
+_create_keccak_ctx :: #force_inline proc(mdlen: int) {
     ctx: _sha3.Sha3_Context
     ctx.mdlen               = mdlen
     ctx.is_keccak           = true
@@ -404,10 +404,10 @@ _create_sha3_ctx :: #force_inline proc(mdlen: int) {
 @(private)
 _init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
     #partial switch ctx.hash_size {
-        case ._28: _create_sha3_ctx(28)
-        case ._32: _create_sha3_ctx(32)
-        case ._48: _create_sha3_ctx(48)
-        case ._64: _create_sha3_ctx(64)
+        case ._28: _create_keccak_ctx(28)
+        case ._32: _create_keccak_ctx(32)
+        case ._48: _create_keccak_ctx(48)
+        case ._64: _create_keccak_ctx(64)
     }
     if c, ok := ctx.internal_ctx.(_sha3.Sha3_Context); ok {
         _sha3.init_odin(&c)

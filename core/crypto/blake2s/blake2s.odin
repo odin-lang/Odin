@@ -71,21 +71,21 @@ hash_string :: proc(data: string) -> [32]byte {
 // hash_bytes will hash the given input and return the
 // computed hash
 hash_bytes :: proc(data: []byte) -> [32]byte {
-    _create_blake2_ctx()
+    _create_blake2s_ctx()
     return _hash_impl->hash_bytes_32(data)
 }
 
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
 hash_stream :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_blake2_ctx()
+    _create_blake2s_ctx()
     return _hash_impl->hash_stream_32(s)
 }
 
 // hash_file will read the file provided by the given handle
 // and compute a hash
 hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_blake2_ctx()
+    _create_blake2s_ctx()
     return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
@@ -154,7 +154,7 @@ hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, loa
 }
 
 @(private)
-_create_blake2_ctx :: #force_inline proc() {
+_create_blake2s_ctx :: #force_inline proc() {
     ctx: _blake2.Blake2s_Context
     cfg: _blake2.Blake2_Config
     cfg.size = _blake2.BLAKE2S_SIZE
@@ -165,7 +165,7 @@ _create_blake2_ctx :: #force_inline proc() {
 
 @(private)
 _init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_blake2_ctx()
+    _create_blake2s_ctx()
     if c, ok := ctx.internal_ctx.(_blake2.Blake2s_Context); ok {
         _blake2.init_odin(&c)
     }
