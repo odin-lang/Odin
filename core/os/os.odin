@@ -70,7 +70,7 @@ file_size_from_path :: proc(path: string) -> i64 {
 	return length
 }
 
-read_entire_file :: proc(name: string, allocator := context.allocator) -> (data: []byte, success: bool) {
+read_entire_file_from_filename :: proc(name: string, allocator := context.allocator) -> (data: []byte, success: bool) {
 	context.allocator = allocator
 
 	fd, err := open(name, O_RDONLY, 0)
@@ -79,26 +79,38 @@ read_entire_file :: proc(name: string, allocator := context.allocator) -> (data:
 	}
 	defer close(fd)
 
-	length: i64
-	if length, err = file_size(fd); err != 0 {
-		return nil, false
-	}
+	return read_entire_file_from_handle(fd, allocator)
+}
 
-	if length <= 0 {
-		return nil, true
-	}
+read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator) -> (data: []byte, success: bool) {
+	context.allocator = allocator
 
-	data = make([]byte, int(length))
-	if data == nil {
-		return nil, false
-	}
+    length: i64
+    err: Errno
+    if length, err = file_size(fd); err != 0 {
+        return nil, false
+    }
 
-	bytes_read, read_err := read(fd, data)
-	if read_err != ERROR_NONE {
-		delete(data)
-		return nil, false
-	}
-	return data[:bytes_read], true
+    if length <= 0 {
+        return nil, true
+    }
+
+    data = make([]byte, int(length), allocator)
+    if data == nil {
+        return nil, false
+    }
+
+    bytes_read, read_err := read(fd, data)
+    if read_err != ERROR_NONE {
+        delete(data)
+        return nil, false
+    }
+    return data[:bytes_read], true
+}
+
+read_entire_file :: proc {
+	read_entire_file_from_filename,
+	read_entire_file_from_handle,
 }
 
 write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (success: bool) {
