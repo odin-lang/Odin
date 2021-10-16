@@ -18,7 +18,6 @@ import "core:io"
 
 import "../botan"
 import "../_ctx"
-import "../util"
 
 /*
     Context initialization and switching between the Odin implementation and the bindings
@@ -275,7 +274,7 @@ hash_file_skein256_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Ha
     if !load_at_once {
         return hash_stream_skein256_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_skein256_odin(ctx, buf[:], bit_size, allocator), ok
         }
     }
@@ -320,7 +319,7 @@ hash_file_skein512_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Ha
     if !load_at_once {
         return hash_stream_skein512_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_skein512_odin(ctx, buf[:], bit_size, allocator), ok
         }
     }
@@ -365,7 +364,7 @@ hash_file_skein1024_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.H
     if !load_at_once {
         return hash_stream_skein512_odin(ctx, os.stream_from_handle(hd), bit_size, allocator)
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_skein512_odin(ctx, buf[:], bit_size, allocator), ok
         }
     }

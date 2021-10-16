@@ -11,7 +11,6 @@ package util
 */
 
 import "core:mem"
-import "core:os"
 
 // @note(bp): this can replace the other two
 cast_slice :: #force_inline proc "contextless" ($D: typeid/[]$DE, src: $S/[]$SE) -> D {
@@ -142,29 +141,4 @@ XOR_BUF :: #force_inline proc "contextless" (input, output: []byte) {
     for i := 0; i < len(input); i += 1 {
         output[i] ~= input[i]
     }
-}
-
-// Taken from core:os and changed to just take a file handle
-read_entire_file :: proc(fd: os.Handle, allocator := context.allocator) -> (data: []byte, success: bool) {
-    length: i64
-    err: os.Errno
-    if length, err = os.file_size(fd); err != 0 {
-        return nil, false
-    }
-
-    if length <= 0 {
-        return nil, true
-    }
-
-    data = make([]byte, int(length), allocator)
-    if data == nil {
-        return nil, false
-    }
-
-    bytes_read, read_err := os.read(fd, data)
-    if read_err != os.ERROR_NONE {
-        delete(data)
-        return nil, false
-    }
-    return data[:bytes_read], true
 }

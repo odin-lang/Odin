@@ -15,7 +15,6 @@ import "core:os"
 import "core:io"
 
 import "../_ctx"
-import "../util"
 
 /*
     Context initialization and switching between the Odin implementation and the bindings
@@ -272,7 +271,7 @@ hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_28(ctx, buf[:]), ok
         }
     }
@@ -313,7 +312,7 @@ hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_32(ctx, buf[:]), ok
         }
     }
@@ -354,7 +353,7 @@ hash_file_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_48(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_48(ctx, buf[:]), ok
         }
     }
@@ -395,7 +394,7 @@ hash_file_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_64(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_64(ctx, buf[:]), ok
         }
     }

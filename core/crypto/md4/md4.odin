@@ -146,7 +146,7 @@ hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, loa
     if !load_at_once {
         return hash_stream_odin(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin(ctx, buf[:]), ok
         }
     }
