@@ -77,6 +77,9 @@ main :: proc() {
 ```
 For example uses of all available algorithms, please see the tests within `tests/core/crypto`.
 
+#### Thread safety
+The crypto package is not thread-safe at the moment. This may change in the future.
+
 ### Disclaimer
 The algorithms were ported out of curiosity and due to interest in the field.
 We have not had any of the code verified by a third party or tested/fuzzed by any automatic means.
