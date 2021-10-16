@@ -240,7 +240,7 @@ hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_16(ctx, buf[:]), ok
         }
     }
@@ -281,7 +281,7 @@ hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_20(ctx, buf[:]), ok
         }
     }
@@ -322,7 +322,7 @@ hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_32(ctx, buf[:]), ok
         }
     }
@@ -363,7 +363,7 @@ hash_file_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
     if !load_at_once {
         return hash_stream_odin_40(ctx, os.stream_from_handle(hd))
     } else {
-        if buf, ok := util.read_entire_file(hd); ok {
+        if buf, ok := os.read_entire_file(hd); ok {
             return hash_bytes_odin_40(ctx, buf[:]), ok
         }
     }
