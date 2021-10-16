@@ -74,21 +74,21 @@ hash_string_128 :: proc(data: string) -> [16]byte {
 // hash_bytes_128 will hash the given input and return the
 // computed hash
 hash_bytes_128 :: proc(data: []byte) -> [16]byte {
-    _create_sha3_ctx(16)
+    _create_shake_ctx(16)
     return _hash_impl->hash_bytes_16(data)
 }
 
 // hash_stream_128 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    _create_sha3_ctx(16)
+    _create_shake_ctx(16)
     return _hash_impl->hash_stream_16(s)
 }
 
 // hash_file_128 will read the file provided by the given handle
 // and compute a hash
 hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    _create_sha3_ctx(16)
+    _create_shake_ctx(16)
     return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
@@ -108,21 +108,21 @@ hash_string_256 :: proc(data: string) -> [32]byte {
 // hash_bytes_256 will hash the given input and return the
 // computed hash
 hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    _create_sha3_ctx(32)
+    _create_shake_ctx(32)
     return _hash_impl->hash_bytes_32(data)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_sha3_ctx(32)
+    _create_shake_ctx(32)
     return _hash_impl->hash_stream_32(s)
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
 hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_sha3_ctx(32)
+    _create_shake_ctx(32)
     return _hash_impl->hash_file_32(hd, load_at_once)
 }
 
@@ -236,7 +236,7 @@ hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
 }
 
 @(private)
-_create_sha3_ctx :: #force_inline proc(mdlen: int) {
+_create_shake_ctx :: #force_inline proc(mdlen: int) {
     ctx: _sha3.Sha3_Context
     ctx.mdlen               = mdlen
     _hash_impl.internal_ctx = ctx
@@ -249,8 +249,8 @@ _create_sha3_ctx :: #force_inline proc(mdlen: int) {
 @(private)
 _init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
     #partial switch ctx.hash_size {
-        case ._16: _create_sha3_ctx(16)
-        case ._32: _create_sha3_ctx(32)
+        case ._16: _create_shake_ctx(16)
+        case ._32: _create_shake_ctx(32)
     }
     if c, ok := ctx.internal_ctx.(_sha3.Sha3_Context); ok {
         _sha3.init_odin(&c)

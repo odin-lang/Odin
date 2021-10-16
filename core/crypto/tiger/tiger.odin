@@ -76,21 +76,21 @@ hash_string_128 :: proc(data: string) -> [16]byte {
 // hash_bytes_128 will hash the given input and return the
 // computed hash
 hash_bytes_128 :: proc(data: []byte) -> [16]byte {
-    _create_ripemd_ctx(16)
+    _create_tiger_ctx(16)
     return _hash_impl->hash_bytes_16(data)
 }
 
 // hash_stream_128 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    _create_ripemd_ctx(16)
+    _create_tiger_ctx(16)
     return _hash_impl->hash_stream_16(s)
 }
 
 // hash_file_128 will read the file provided by the given handle
 // and compute a hash
 hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    _create_ripemd_ctx(16)
+    _create_tiger_ctx(16)
     return _hash_impl->hash_file_16(hd, load_at_once)
 }
 
@@ -110,21 +110,21 @@ hash_string_160 :: proc(data: string) -> [20]byte {
 // hash_bytes_160 will hash the given input and return the
 // computed hash
 hash_bytes_160 :: proc(data: []byte) -> [20]byte {
-    _create_ripemd_ctx(20)
+    _create_tiger_ctx(20)
     return _hash_impl->hash_bytes_20(data)
 }
 
 // hash_stream_160 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    _create_ripemd_ctx(20)
+    _create_tiger_ctx(20)
     return _hash_impl->hash_stream_20(s)
 }
 
 // hash_file_160 will read the file provided by the given handle
 // and compute a hash
 hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    _create_ripemd_ctx(20)
+    _create_tiger_ctx(20)
     return _hash_impl->hash_file_20(hd, load_at_once)
 }
 
@@ -144,21 +144,21 @@ hash_string_192 :: proc(data: string) -> [24]byte {
 // hash_bytes_192 will hash the given input and return the
 // computed hash
 hash_bytes_192 :: proc(data: []byte) -> [24]byte {
-    _create_ripemd_ctx(24)
+    _create_tiger_ctx(24)
     return _hash_impl->hash_bytes_24(data)
 }
 
 // hash_stream_192 will read the stream in chunks and compute a
 // hash from its contents
 hash_stream_192 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    _create_ripemd_ctx(24)
+    _create_tiger_ctx(24)
     return _hash_impl->hash_stream_24(s)
 }
 
 // hash_file_192 will read the file provided by the given handle
 // and compute a hash
 hash_file_192 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
-    _create_ripemd_ctx(24)
+    _create_tiger_ctx(24)
     return _hash_impl->hash_file_24(hd, load_at_once)
 }
 
@@ -293,7 +293,7 @@ hash_file_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, 
 }
 
 @(private)
-_create_ripemd_ctx :: #force_inline proc(hash_size: int) {
+_create_tiger_ctx :: #force_inline proc(hash_size: int) {
     ctx: _tiger.Tiger_Context
     ctx.ver = 1
     _hash_impl.internal_ctx = ctx
@@ -307,9 +307,9 @@ _create_ripemd_ctx :: #force_inline proc(hash_size: int) {
 @(private)
 _init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
     #partial switch ctx.hash_size {
-        case ._16: _create_ripemd_ctx(16)
-        case ._20: _create_ripemd_ctx(20)
-        case ._24: _create_ripemd_ctx(24)
+        case ._16: _create_tiger_ctx(16)
+        case ._20: _create_tiger_ctx(20)
+        case ._24: _create_tiger_ctx(24)
     }
     if c, ok := ctx.internal_ctx.(_tiger.Tiger_Context); ok {
         _tiger.init_odin(&c)
