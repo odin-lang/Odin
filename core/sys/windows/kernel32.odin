@@ -209,6 +209,7 @@ foreign kernel32 {
 	FindNextFileW :: proc(findFile: HANDLE, findFileData: LPWIN32_FIND_DATAW) -> BOOL ---
 	FindClose :: proc(findFile: HANDLE) -> BOOL ---
 	GetModuleHandleW :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
+	GetModuleHandleA :: proc(lpModuleName: LPCSTR) -> HMODULE ---
 	GetSystemTimeAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
 	CreateEventW :: proc(
 		lpEventAttributes: LPSECURITY_ATTRIBUTES,
