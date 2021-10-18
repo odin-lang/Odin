@@ -64,7 +64,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	
 	page_size := DEFAULT_PAGE_SIZE
 	committed := committed
-	committed = clamp(committed, 0, reserved)
+	committed = clamp(committed, 0, reserved) + size_of(Platform_Memory_Block)
 	
 	total_size     := uint(reserved + size_of(Platform_Memory_Block))
 	base_offset    := uintptr(size_of(Platform_Memory_Block))
@@ -79,10 +79,9 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 		do_protection  = true
 	}
 	
-	pmblock := platform_memory_alloc(0, total_size) or_return
+	pmblock := platform_memory_alloc(committed, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
-	commit(pmblock.block.base, committed) or_return
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
 	assert(pmblock.block.prev == nil)	
