@@ -1967,6 +1967,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__init_context"),
 		str_lit("__type_info_of"),
 		str_lit("cstring_to_string"),
+		str_lit("_cleanup_runtime"), 
 
 		// Pseudo-CRT required procedures
 		str_lit("memset"),
@@ -1993,7 +1994,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("gnu_h2f_ieee"),
 		str_lit("gnu_f2h_ieee"),
 		str_lit("extendhfsf2"),
-
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
