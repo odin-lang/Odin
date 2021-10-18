@@ -512,6 +512,34 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 		res.value = llvm_const_array(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
+	} else if (is_type_matrix(type) &&
+	    value.kind != ExactValue_Invalid &&
+	    value.kind != ExactValue_Compound) {
+		i64 row = type->Matrix.row_count;
+		i64 column = type->Matrix.column_count;
+		GB_ASSERT(row == column);
+		
+		Type *elem = type->Matrix.elem;
+		
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
+		
+		i64 stride_bytes = matrix_type_stride(type);
+		i64 stride_elems = stride_bytes/type_size_of(elem);
+		
+		i64 total_elem_count = matrix_type_total_elems(type);
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)total_elem_count);		
+		for (i64 i = 0; i < row; i++) {
+			elems[i*stride_elems + i] = single_elem.value;
+		}
+		for (i64 i = 0; i < total_elem_count; i++) {
+			if (elems[i] == nullptr) {
+				elems[i] = LLVMConstNull(lb_type(m, elem));
+			}
+		}
+		
+		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)total_elem_count);
+		return res;
 	}
 
 	switch (value.kind) {

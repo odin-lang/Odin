@@ -1221,6 +1221,41 @@ lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
 	return res;
 }
 
+lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column) {
+	Type *t = s.type;
+	GB_ASSERT(is_type_pointer(t));
+	Type *st = base_type(type_deref(t));
+	GB_ASSERT_MSG(is_type_matrix(st), "%s", type_to_string(st));
+
+	Type *ptr = base_array_type(st);
+	
+	isize index = row*column;
+	GB_ASSERT(0 <= index);
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(p->module, t_int), 0, false),
+		LLVMConstInt(lb_type(p->module, t_int), cast(unsigned)index, false),
+	};
+
+	lbValue res = {};
+	if (lb_is_const(s)) {
+		res.value = LLVMConstGEP(s.value, indices, gb_count_of(indices));
+	} else {
+		res.value = LLVMBuildGEP(p->builder, s.value, indices, gb_count_of(indices), "");
+	}
+	res.type = alloc_type_pointer(ptr);
+	return res;
+}
+
+lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isize column) {
+	Type *st = base_type(s.type);
+	GB_ASSERT_MSG(is_type_matrix(st), "%s", type_to_string(st));
+	
+	lbValue value = lb_address_from_load_or_generate_local(p, s);
+	lbValue ptr = lb_emit_matrix_epi(p, value, row, column);
+	return lb_emit_load(p, ptr);
+}
+
 
 void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len) {
 	Type *t = lb_addr_type(slice);
