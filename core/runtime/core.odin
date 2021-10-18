@@ -384,7 +384,12 @@ Raw_Cstring :: struct {
 // This is probably only useful for freestanding targets
 foreign {
 	@(link_name="__$startup_runtime")
-	_startup_runtime :: proc "contextless" () ---
+	_startup_runtime :: proc() ---
+}
+
+@(link_name="__$cleanup_runtime")
+_cleanup_runtime :: proc() {
+	default_temp_allocator_destroy(&global_default_temp_allocator_data)
 }
 
 

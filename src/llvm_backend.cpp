@@ -879,7 +879,10 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		}
 	}
 
-
+	
+	lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
+	lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
+	
 
 	if (is_dll_main) {
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 1, false));
