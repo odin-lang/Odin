@@ -407,6 +407,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		bool is_align_stack; \
 		InlineAsmDialectKind dialect; \
 	}) \
+	AST_KIND(MatrixIndexExpr, "matrix index expression",       struct { Ast *expr, *row_index, *column_index; Token open, close; }) \
 AST_KIND(_ExprEnd,       "", bool) \
 AST_KIND(_StmtBegin,     "", bool) \
 	AST_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -656,6 +657,12 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *count; \
 		Ast *key; \
 		Ast *value; \
+	}) \
+	AST_KIND(MatrixType, "matrix type", struct { \
+		Token token;       \
+		Ast *row_count;    \
+		Ast *column_count; \
+		Ast *elem;         \
 	}) \
 AST_KIND(_TypeEnd,  "", bool)
 

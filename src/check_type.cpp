@@ -2200,6 +2200,63 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	// error(node, "'map' types are not yet implemented");
 }
 
+void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
+	ast_node(mt, MatrixType, node);
+	
+	Operand row = {};
+	Operand column = {};
+	
+	i64 row_count = check_array_count(ctx, &row, mt->row_count);
+	i64 column_count = check_array_count(ctx, &column, mt->column_count);
+	
+	Type *elem = check_type_expr(ctx, mt->elem, nullptr);
+	
+	Type *generic_row = nullptr;
+	Type *generic_column = nullptr;
+	
+	if (row.mode == Addressing_Type && row.type->kind == Type_Generic) {
+		generic_row = row.type;
+	}
+	
+	if (column.mode == Addressing_Type && column.type->kind == Type_Generic) {
+		generic_column = column.type;
+	}
+	
+	if (row_count < MIN_MATRIX_ELEMENT_COUNT && generic_row == nullptr) {
+		gbString s = expr_to_string(row.expr);
+		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MIN_MATRIX_ELEMENT_COUNT, s);
+		gb_string_free(s);
+	}
+	
+	if (column_count < MIN_MATRIX_ELEMENT_COUNT && generic_column == nullptr) {
+		gbString s = expr_to_string(column.expr);
+		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MIN_MATRIX_ELEMENT_COUNT, s);
+		gb_string_free(s);
+	}
+	
+	if (row_count*column_count > MAX_MATRIX_ELEMENT_COUNT) {
+		i64 element_count = row_count*column_count;
+		error(column.expr, "Matrix types are limited to a maximum of %d elements, got %lld", MAX_MATRIX_ELEMENT_COUNT, cast(long long)element_count);
+	}
+	
+	if (is_type_integer(elem)) {
+		// okay
+	} else if (is_type_float(elem)) {
+		// okay
+	} else if (is_type_complex(elem)) {
+		// okay
+	} else {
+		gbString s = type_to_string(elem);
+		error(column.expr, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
+		gb_string_free(s);
+	}
+	
+	*type = alloc_type_matrix(elem, row_count, column_count, generic_row, generic_column);
+	
+	return;
+}
+
+
 
 Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type, StructSoaKind soa_kind) {
 	Type *bt_elem = base_type(elem);
@@ -2784,6 +2841,17 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 			set_base_type(named_type, *type);
 			return true;
 		}
+	case_end;
+	
+	
+	case_ast_node(mt, MatrixType, e);
+		bool ips = ctx->in_polymorphic_specialization;
+		defer (ctx->in_polymorphic_specialization = ips);
+		ctx->in_polymorphic_specialization = false;
+
+		check_matrix_type(ctx, type, e);
+		set_base_type(named_type, *type);
+		return true;
 	case_end;
 	}
 

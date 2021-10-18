@@ -1953,6 +1953,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		}
 
+	case runtime.Type_Info_Matrix:
+		io.write_string(fi.writer, "[]")
 	}
 }
 
