@@ -1930,6 +1930,24 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			fields[1] = base_integer;
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
+		
+	case Type_Matrix:
+		{
+			i64 size = type_size_of(type);
+			i64 elem_size = type_size_of(type->Matrix.elem);
+			GB_ASSERT(elem_size > 0);
+			i64 elem_count = size/elem_size;
+			GB_ASSERT(elem_count > 0);
+			
+			m->internal_type_level -= 1;
+			
+			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
+			LLVMTypeRef t = LLVMArrayType(elem, cast(unsigned)elem_count);
+			
+			m->internal_type_level += 1;
+			return t;
+		}
+	
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));

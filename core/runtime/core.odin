@@ -162,6 +162,13 @@ Type_Info_Relative_Slice :: struct {
 	slice:        ^Type_Info,
 	base_integer: ^Type_Info,
 }
+Type_Info_Matrix :: struct {
+	elem:         ^Type_Info,
+	elem_size:    int,
+	stride:       int, // bytes 
+	row_count:    int,
+	column_count: int,
+}
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -202,6 +209,7 @@ Type_Info :: struct {
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
 		Type_Info_Relative_Slice,
+		Type_Info_Matrix,
 	},
 }
 
@@ -233,6 +241,7 @@ Typeid_Kind :: enum u8 {
 	Simd_Vector,
 	Relative_Pointer,
 	Relative_Slice,
+	Matrix,
 }
 #assert(len(Typeid_Kind) < 32)
 

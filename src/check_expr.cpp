@@ -6207,6 +6207,17 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 		}
 		o->type = t->EnumeratedArray.elem;
 		return true;
+		
+	case Type_Matrix:
+		*max_count = t->Matrix.column_count;
+		if (indirection) {
+			o->mode = Addressing_Variable;
+		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_Constant) {
+			o->mode = Addressing_Value;
+		}
+		o->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count);
+		return true;
 
 	case Type_Slice:
 		o->type = t->Slice.elem;
@@ -6502,6 +6513,11 @@ void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, 
 	add_type_and_value(c->info, x->expr, x->mode, tuple, x->value);
 	x->type = tuple;
 	GB_ASSERT(is_type_tuple(type_of_expr(x->expr)));
+}
+
+
+void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	error(node, "TODO: matrix index expressions");
 }
 
 
@@ -8202,6 +8218,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				// Okay
 			} else if (is_type_relative_slice(t)) {
 				// Okay
+			} else if (is_type_matrix(t)) {
+				// Okay
 			} else {
 				valid = false;
 			}
@@ -8266,9 +8284,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 		}
+		
+		if (type_hint != nullptr && is_type_matrix(t)) {
+			// TODO(bill): allow matrix columns to be assignable to other types which are the same internally
+			// if a type hint exists
+		}
+		
 	case_end;
-
-
 
 	case_ast_node(se, SliceExpr, node);
 		check_expr(c, o, se->expr);
@@ -8442,7 +8464,12 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 
 	case_end;
-
+	
+	case_ast_node(mie, MatrixIndexExpr, node);
+		check_matrix_index_expr(c, o, node, type_hint);
+		o->expr = node;
+		return Expr_Expr;
+	case_end;
 
 	case_ast_node(ce, CallExpr, node);
 		return check_call_expr(c, o, node, ce->proc, ce->args, ce->inlining, type_hint);
@@ -8952,6 +8979,15 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = gb_string_append_rune(str, ']');
 	case_end;
 
+	case_ast_node(mie, MatrixIndexExpr, node);
+		str = write_expr_to_string(str, mie->expr, shorthand);
+		str = gb_string_append_rune(str, '[');
+		str = write_expr_to_string(str, mie->row_index, shorthand);
+		str = gb_string_appendc(str, "; ");
+		str = write_expr_to_string(str, mie->column_index, shorthand);
+		str = gb_string_append_rune(str, ']');
+	case_end;
+	
 	case_ast_node(e, Ellipsis, node);
 		str = gb_string_appendc(str, "..");
 		str = write_expr_to_string(str, e->expr, shorthand);
@@ -9023,6 +9059,16 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = gb_string_append_rune(str, ']');
 		str = write_expr_to_string(str, mt->value, shorthand);
 	case_end;
+	
+	case_ast_node(mt, MatrixType, node);
+		str = gb_string_append_rune(str, '[');
+		str = write_expr_to_string(str, mt->row_count, shorthand);
+		str = gb_string_appendc(str, "; ");
+		str = write_expr_to_string(str, mt->column_count, shorthand);
+		str = gb_string_append_rune(str, ']');
+		str = write_expr_to_string(str, mt->elem, shorthand);
+	case_end;
+
 
 	case_ast_node(f, Field, node);
 		if (f->flags&FieldFlag_using) {
