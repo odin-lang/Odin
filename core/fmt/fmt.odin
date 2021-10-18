@@ -1954,7 +1954,40 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Matrix:
-		io.write_string(fi.writer, "[]")
+		reflect.write_type(fi.writer, type_info_of(v.id))
+		io.write_byte(fi.writer, '{')
+		defer io.write_byte(fi.writer, '}')
+		
+		fi.indent += 1;  defer fi.indent -= 1
+		
+		if fi.hash	{ 
+			io.write_byte(fi.writer, '\n')
+			// TODO(bill): Should this render it like in written form? e.g. tranposed
+			for col in 0..<info.column_count {
+				fmt_write_indent(fi)
+				for row in 0..<info.row_count {
+					if row > 0 { io.write_string(fi.writer, ", ") }
+					
+					offset := row*info.elem_size + col*info.stride
+					
+					data := uintptr(v.data) + uintptr(offset)
+					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
+				}
+				io.write_string(fi.writer, ";\n")
+			}
+		} else {
+			for col in 0..<info.column_count {
+				if col > 0 { io.write_string(fi.writer, "; ") }
+				for row in 0..<info.row_count {
+					if row > 0 { io.write_string(fi.writer, ", ") }
+					
+					offset := row*info.elem_size + col*info.stride
+					
+					data := uintptr(v.data) + uintptr(offset)
+					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
+				}
+			}
+		}
 	}
 }
 

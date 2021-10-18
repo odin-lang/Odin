@@ -1659,6 +1659,10 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
 		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
 		break;
+		
+	case Type_Matrix:
+		add_type_info_type_internal(c, bt->Matrix.elem);
+		break;
 
 	default:
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
@@ -1869,6 +1873,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 	case Type_RelativeSlice:
 		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
 		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
+		break;
+		
+	case Type_Matrix:
+		add_min_dep_type_info(c, bt->Matrix.elem);
 		break;
 
 	default:

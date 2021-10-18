@@ -1257,6 +1257,22 @@ i64 matrix_type_stride(Type *t) {
 	return stride;
 }
 
+i64 matrix_type_stride_in_elems(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	i64 stride = matrix_type_stride(t);
+	return stride/gb_max(1, type_size_of(t->Matrix.elem));
+}
+
+
+i64 matrix_type_total_elems(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	i64 size = type_size_of(t);
+	i64 elem_size = type_size_of(t->Matrix.elem);
+	return size/gb_max(elem_size, 1);
+}
+
 bool is_type_dynamic_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_DynamicArray;
@@ -3174,17 +3190,17 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	
 	case Type_Matrix: {
 		Type *elem = t->Matrix.elem;
-		i64 row_count = t->Matrix.row_count;
-		// i64 column_count = t->Matrix.column_count;
+		i64 row_count = gb_max(t->Matrix.row_count, 1);
+
 		bool pop = type_path_push(path, elem);
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
+		// elem align is used here rather than size as it make a little more sense
 		i64 elem_align = type_align_of_internal(elem, path);
 		if (pop) type_path_pop(path);
 		
-		i64 align = gb_clamp(elem_align * row_count, elem_align, build_context.max_align);
-				
+		i64 align = gb_min(next_pow2(elem_align * row_count), build_context.max_align);
 		return align;
 	}
 
@@ -3934,6 +3950,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = write_type_to_string(str, type->RelativeSlice.base_integer);
 		str = gb_string_append_fmt(str, ") ");
 		str = write_type_to_string(str, type->RelativeSlice.slice_type);
+		break;
+		
+	case Type_Matrix:
+		str = gb_string_appendc(str, gb_bprintf("[%d", cast(int)type->Matrix.row_count));
+		str = gb_string_appendc(str, "; ");
+		str = gb_string_appendc(str, gb_bprintf("%d]", cast(int)type->Matrix.column_count));
+		str = write_type_to_string(str, type->Matrix.elem);
 		break;
 	}
 
