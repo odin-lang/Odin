@@ -877,7 +877,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				LLVMValueRef vals[5] = {
 					lb_get_type_info_ptr(m, t->Matrix.elem).value,
 					lb_const_int(m, t_int, ez).value,
-					lb_const_int(m, t_int, matrix_type_stride(t)).value,
+					lb_const_int(m, t_int, matrix_type_stride_in_elems(t)).value,
 					lb_const_int(m, t_int, t->Matrix.row_count).value,
 					lb_const_int(m, t_int, t->Matrix.column_count).value,
 				};

@@ -2569,6 +2569,7 @@ bool is_literal_type(Ast *node) {
 	case Ast_DynamicArrayType:
 	case Ast_MapType:
 	case Ast_BitSetType:
+	case Ast_MatrixType:
 	case Ast_CallExpr:
 		return true;
 	}

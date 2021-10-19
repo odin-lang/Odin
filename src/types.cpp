@@ -1276,6 +1276,39 @@ i64 matrix_type_total_elems(Type *t) {
 	return size/gb_max(elem_size, 1);
 }
 
+void matrix_indices_from_index(Type *t, i64 index, i64 *row_index_, i64 *column_index_) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	i64 row_count = t->Matrix.row_count;
+	i64 column_count = t->Matrix.column_count;
+	GB_ASSERT(0 <= index && index < row_count*column_count);
+	
+	i64 row_index = index / column_count;
+	i64 column_index = index % column_count;
+	
+	if (row_index_)    *row_index_    = row_index;
+	if (column_index_) *column_index_ = column_index;
+}
+
+i64 matrix_index_to_offset(Type *t, i64 index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	i64 row_index, column_index;
+	matrix_indices_from_index(t, index, &row_index, &column_index);
+	i64 stride_elems = matrix_type_stride_in_elems(t);
+	return stride_elems*column_index + row_index;
+}
+
+i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	GB_ASSERT(0 <= row_index && row_index < t->Matrix.row_count);
+	GB_ASSERT(0 <= column_index && column_index < t->Matrix.column_count);
+	i64 stride_elems = matrix_type_stride_in_elems(t);
+	return stride_elems*column_index + row_index;
+}
+
 bool is_type_dynamic_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_DynamicArray;

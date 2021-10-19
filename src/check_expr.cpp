@@ -7369,6 +7369,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		case Type_Array:
 		case Type_DynamicArray:
 		case Type_SimdVector:
+		case Type_Matrix:
 		{
 			Type *elem_type = nullptr;
 			String context_name = {};
@@ -7395,6 +7396,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				elem_type = t->SimdVector.elem;
 				context_name = str_lit("simd vector literal");
 				max_type_count = t->SimdVector.count;
+			} else if (t->kind == Type_Matrix) {
+				elem_type = t->Matrix.elem;
+				context_name = str_lit("matrix literal");
+				max_type_count = t->Matrix.row_count*t->Matrix.column_count;
 			} else {
 				GB_PANIC("unreachable");
 			}

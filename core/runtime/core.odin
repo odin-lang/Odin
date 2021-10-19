@@ -165,7 +165,7 @@ Type_Info_Relative_Slice :: struct {
 Type_Info_Matrix :: struct {
 	elem:         ^Type_Info,
 	elem_size:    int,
-	stride:       int, // bytes 
+	elem_stride:  int, 
 	row_count:    int,
 	column_count: int,
 }
