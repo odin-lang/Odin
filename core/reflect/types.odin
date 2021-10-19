@@ -592,9 +592,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		write_type(w, info.slice,        &n) or_return
 		
 	case Type_Info_Matrix:
-		io.write_string(w, "[",                     &n) or_return
+		io.write_string(w, "matrix[",               &n) or_return
 		io.write_i64(w, i64(info.row_count), 10,    &n) or_return
-		io.write_string(w, "; ",                    &n) or_return
+		io.write_string(w, ", ",                    &n) or_return
 		io.write_i64(w, i64(info.column_count), 10, &n) or_return
 		io.write_string(w, "]",                     &n) or_return
 		write_type(w, info.elem,                    &n) or_return
