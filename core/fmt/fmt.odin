@@ -1967,7 +1967,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				for col in 0..<info.column_count {
 					if col > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := row*info.elem_size + col*info.stride
+					offset := (row + col*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -1980,7 +1980,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				for col in 0..<info.column_count {
 					if col > 0 { io.write_string(fi.writer, "; ") }
 					
-					offset := row*info.elem_size + col*info.stride
+					offset := (row + col*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)

@@ -1225,18 +1225,53 @@ lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column) {
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
 	Type *mt = base_type(type_deref(t));
-	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
-
+	
 	Type *ptr = base_array_type(mt);
 	
-	i64 stride_elems = matrix_type_stride_in_elems(mt);
+	if (column == 0) {
+		GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
+		
+		LLVMValueRef indices[2] = {
+			LLVMConstInt(lb_type(p->module, t_int), 0, false),
+			LLVMConstInt(lb_type(p->module, t_int), cast(unsigned)row, false),
+		};
+		
+		lbValue res = {};
+		if (lb_is_const(s)) {
+			res.value = LLVMConstGEP(s.value, indices, gb_count_of(indices));
+		} else {
+			res.value = LLVMBuildGEP(p->builder, s.value, indices, gb_count_of(indices), "");
+		}
+		
+		Type *ptr = base_array_type(mt);
+		res.type = alloc_type_pointer(ptr);
+		return res;
+	} else if (row == 0 && is_type_array_like(mt)) {
+		LLVMValueRef indices[2] = {
+			LLVMConstInt(lb_type(p->module, t_int), 0, false),
+			LLVMConstInt(lb_type(p->module, t_int), cast(unsigned)column, false),
+		};
+		
+		lbValue res = {};
+		if (lb_is_const(s)) {
+			res.value = LLVMConstGEP(s.value, indices, gb_count_of(indices));
+		} else {
+			res.value = LLVMBuildGEP(p->builder, s.value, indices, gb_count_of(indices), "");
+		}
+		
+		Type *ptr = base_array_type(mt);
+		res.type = alloc_type_pointer(ptr);
+		return res;
+	}
 	
-	isize index = row + column*stride_elems;
-	GB_ASSERT(0 <= index);
+	
+	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
+	
+	isize offset = matrix_indices_to_offset(mt, row, column);
 
 	LLVMValueRef indices[2] = {
 		LLVMConstInt(lb_type(p->module, t_int), 0, false),
-		LLVMConstInt(lb_type(p->module, t_int), cast(unsigned)index, false),
+		LLVMConstInt(lb_type(p->module, t_int), cast(unsigned)offset, false),
 	};
 
 	lbValue res = {};
@@ -1446,4 +1481,35 @@ lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 		return lb_emit_load(p, v);
 	}
 	return lb_emit_struct_ev(p, value, cast(i32)n);
+}
+
+
+
+lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t) {
+	lbModule *m = p->module;
+	
+	a = lb_emit_conv(p, a, t);
+	b = lb_emit_conv(p, b, t);
+	c = lb_emit_conv(p, c, t);
+	
+	if (!is_type_different_to_arch_endianness(t) && is_type_float(t)) {
+		char const *name = "llvm.fma";
+		unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+		GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+		
+		LLVMTypeRef types[1] = {};
+		types[0] = lb_type(m, t);
+		
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(m->mod, id, types, gb_count_of(types));
+		LLVMValueRef values[3] = {};
+		values[0] = a.value;
+		values[1] = b.value;
+		values[2] = c.value;
+		LLVMValueRef call = LLVMBuildCall(p->builder, ip, values, gb_count_of(values), "");
+		return {call, t};
+	} else {
+		lbValue x = lb_emit_arith(p, Token_Mul, a, b, t);
+		lbValue y = lb_emit_arith(p, Token_Add, x, c, t);
+		return y;
+	}
 }

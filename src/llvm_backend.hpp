@@ -393,6 +393,8 @@ lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
 void lb_emit_increment(lbProcedure *p, lbValue addr);
 lbValue lb_emit_select(lbProcedure *p, lbValue cond, lbValue x, lbValue y);
 
+lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t);
+
 void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
 lbValue lb_type_info(lbModule *m, Type *type);
