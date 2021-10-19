@@ -333,6 +333,7 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
 lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel);
 
+lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lbValue column);
 lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column);
 lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isize column);
 

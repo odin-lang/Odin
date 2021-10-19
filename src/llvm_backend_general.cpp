@@ -419,6 +419,36 @@ void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue le
 	lb_emit_runtime_call(p, "bounds_check_error", args);
 }
 
+void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
+	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
+		return;
+	}
+
+	row_index = lb_emit_conv(p, row_index, t_int);
+	column_index = lb_emit_conv(p, column_index, t_int);
+	row_count = lb_emit_conv(p, row_count, t_int);
+	column_count = lb_emit_conv(p, column_count, t_int);
+
+	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
+	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 7);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = row_index;
+	args[4] = column_index;
+	args[5] = row_count;
+	args[6] = column_count;
+
+	lb_emit_runtime_call(p, "matrix_bounds_check_error", args);
+}
+
+
 void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high) {
 	if (build_context.no_bounds_check) {
 		return;

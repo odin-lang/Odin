@@ -6367,8 +6367,7 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 		*max_count = t->Matrix.column_count;
 		if (indirection) {
 			o->mode = Addressing_Variable;
-		} else if (o->mode != Addressing_Variable &&
-		           o->mode != Addressing_Constant) {
+		} else if (o->mode != Addressing_Variable) {
 			o->mode = Addressing_Value;
 		}
 		o->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count);
@@ -6672,7 +6671,68 @@ void check_promote_optional_ok(CheckerContext *c, Operand *x, Type **val_type_, 
 
 
 void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
-	error(node, "TODO: matrix index expressions");
+	ast_node(ie, MatrixIndexExpr, node);
+	
+	check_expr(c, o, ie->expr);
+	node->viral_state_flags |= ie->expr->viral_state_flags;
+	if (o->mode == Addressing_Invalid) {
+		o->expr = node;
+		return;
+	}
+	
+	Type *t = base_type(type_deref(o->type));
+	bool is_ptr = is_type_pointer(o->type);
+	bool is_const = o->mode == Addressing_Constant;
+	
+	if (t->kind != Type_Matrix) {
+		gbString str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(o->type);
+		defer (gb_string_free(str));
+		defer (gb_string_free(type_str));
+		if (is_const) {
+			error(o->expr, "Cannot use matrix indexing on constant '%s' of type '%s'", str, type_str);
+		} else {
+			error(o->expr, "Cannot use matrix indexing on '%s' of type '%s'", str, type_str);
+		}
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return;
+	}
+	o->type = t->Matrix.elem;
+	if (is_ptr) {
+		o->mode = Addressing_Variable;
+	} else if (o->mode != Addressing_Variable) {
+		o->mode = Addressing_Value;
+	}
+	
+	if (ie->row_index == nullptr) {
+		gbString str = expr_to_string(o->expr);
+		error(o->expr, "Missing row index for '%s'", str);
+		gb_string_free(str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return;
+	}
+	if (ie->column_index == nullptr) {
+		gbString str = expr_to_string(o->expr);
+		error(o->expr, "Missing column index for '%s'", str);
+		gb_string_free(str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return;
+	}
+	
+	i64 row_count = t->Matrix.row_count;
+	i64 column_count = t->Matrix.column_count;
+	
+	i64 row_index = 0;
+	i64 column_index = 0;
+	bool row_ok = check_index_value(c, t, false, ie->row_index, row_count, &row_index, nullptr);
+	bool column_ok = check_index_value(c, t, false, ie->column_index, column_count, &column_index, nullptr);
+	
+	
+	gb_unused(row_ok);
+	gb_unused(column_ok);
 }
 
 

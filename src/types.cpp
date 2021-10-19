@@ -1726,6 +1726,8 @@ bool is_type_indexable(Type *t) {
 		return true;
 	case Type_RelativeSlice:
 		return true;
+	case Type_Matrix:
+		return true;
 	}
 	return false;
 }
@@ -1743,6 +1745,8 @@ bool is_type_sliceable(Type *t) {
 		return false;
 	case Type_RelativeSlice:
 		return true;
+	case Type_Matrix:
+		return false;
 	}
 	return false;
 }
