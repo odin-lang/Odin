@@ -9138,7 +9138,7 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, mie->expr, shorthand);
 		str = gb_string_append_rune(str, '[');
 		str = write_expr_to_string(str, mie->row_index, shorthand);
-		str = gb_string_appendc(str, "; ");
+		str = gb_string_appendc(str, ", ");
 		str = write_expr_to_string(str, mie->column_index, shorthand);
 		str = gb_string_append_rune(str, ']');
 	case_end;
@@ -9216,9 +9216,9 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 	case_end;
 	
 	case_ast_node(mt, MatrixType, node);
-		str = gb_string_append_rune(str, '[');
+		str = gb_string_appendc(str, "matrix[");
 		str = write_expr_to_string(str, mt->row_count, shorthand);
-		str = gb_string_appendc(str, "; ");
+		str = gb_string_appendc(str, ", ");
 		str = write_expr_to_string(str, mt->column_count, shorthand);
 		str = gb_string_append_rune(str, ']');
 		str = write_expr_to_string(str, mt->elem, shorthand);

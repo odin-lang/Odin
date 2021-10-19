@@ -2241,18 +2241,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			count_expr = parse_expr(f, false);
 			f->expr_level--;
 		}
-		if (allow_token(f, Token_Semicolon)) {
-			Ast *row_count = count_expr;
-			Ast *column_count = nullptr;
-			
-			f->expr_level++;
-			column_count = parse_expr(f, false);
-			f->expr_level--;
-			
-			expect_token(f, Token_CloseBracket);	
-			
-			return ast_matrix_type(f, token, row_count, column_count, parse_type(f));
-		}
 		
 		expect_token(f, Token_CloseBracket);
 		return ast_array_type(f, token, count_expr, parse_type(f));
@@ -2270,6 +2258,23 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		value = parse_type(f);
 
 		return ast_map_type(f, token, key, value);
+	} break;
+	
+	case Token_matrix: {
+		Token token = expect_token(f, Token_matrix);
+		Ast *row_count = nullptr;
+		Ast *column_count = nullptr;
+		Ast *type = nullptr;
+		Token open, close;
+		
+		open  = expect_token_after(f, Token_OpenBracket, "matrix");
+		row_count = parse_expr(f, true);
+		expect_token(f, Token_Comma);
+		column_count = parse_expr(f, true);
+		close = expect_token(f, Token_CloseBracket);
+		type = parse_type(f);
+		
+		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
 
 	case Token_struct: {
@@ -2716,11 +2721,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			case Token_RangeHalf:
 				syntax_error(f->curr_token, "Expected a colon, not a range");
 				/* fallthrough */
-			case Token_Semicolon:  // matrix index
-				if (f->curr_token.kind == Token_Semicolon && f->curr_token.string == "\n") {
-					syntax_error(f->curr_token, "Expected a ';', not a newline");
-				}
-				/* fallthrough */
+			case Token_Comma:  // matrix index
 			case Token_Colon:
 				interval = advance_token(f);
 				is_interval = true;
@@ -2736,7 +2737,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			close = expect_token(f, Token_CloseBracket);
 
 			if (is_interval) {
-				if (interval.kind == Token_Semicolon) {
+				if (interval.kind == Token_Comma) {
 					if (indices[0] == nullptr || indices[1] == nullptr) {
 						syntax_error(open, "Matrix index expressions require both row and column indices");
 					}

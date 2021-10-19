@@ -1954,9 +1954,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Matrix:
-		reflect.write_type(fi.writer, type_info_of(v.id))
-		io.write_byte(fi.writer, '{')
-		defer io.write_byte(fi.writer, '}')
+		io.write_string(fi.writer, "matrix[")
+		defer io.write_byte(fi.writer, ']')
 		
 		fi.indent += 1;  defer fi.indent -= 1
 		

@@ -3956,9 +3956,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 		
 	case Type_Matrix:
-		str = gb_string_appendc(str, gb_bprintf("[%d", cast(int)type->Matrix.row_count));
-		str = gb_string_appendc(str, "; ");
-		str = gb_string_appendc(str, gb_bprintf("%d]", cast(int)type->Matrix.column_count));
+		str = gb_string_appendc(str, gb_bprintf("matrix[%d, %d]", cast(int)type->Matrix.row_count, cast(int)type->Matrix.column_count));
 		str = write_type_to_string(str, type->Matrix.elem);
 		break;
 	}
