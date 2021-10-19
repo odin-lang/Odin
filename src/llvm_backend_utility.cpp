@@ -1249,6 +1249,37 @@ lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column) {
 	return res;
 }
 
+lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lbValue column) {
+	Type *t = s.type;
+	GB_ASSERT(is_type_pointer(t));
+	Type *mt = base_type(type_deref(t));
+	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
+
+	Type *ptr = base_array_type(mt);
+	
+	LLVMValueRef stride_elems = lb_const_int(p->module, t_int, matrix_type_stride_in_elems(mt)).value;
+	
+	row = lb_emit_conv(p, row, t_int);
+	column = lb_emit_conv(p, column, t_int);
+	
+	LLVMValueRef index = LLVMBuildAdd(p->builder, row.value, LLVMBuildMul(p->builder, column.value, stride_elems, ""), "");
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(p->module, t_int), 0, false),
+		index,
+	};
+
+	lbValue res = {};
+	if (lb_is_const(s)) {
+		res.value = LLVMConstGEP(s.value, indices, gb_count_of(indices));
+	} else {
+		res.value = LLVMBuildGEP(p->builder, s.value, indices, gb_count_of(indices), "");
+	}
+	res.type = alloc_type_pointer(ptr);
+	return res;
+}
+
+
 lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isize column) {
 	Type *st = base_type(s.type);
 	GB_ASSERT_MSG(is_type_matrix(st), "%s", type_to_string(st));

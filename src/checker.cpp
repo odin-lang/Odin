@@ -2022,6 +2022,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		String bounds_check_entities[] = {
 			// Bounds checking related procedures
 			str_lit("bounds_check_error"),
+			str_lit("matrix_bounds_check_error"),
 			str_lit("slice_expr_error_hi"),
 			str_lit("slice_expr_error_lo_hi"),
 			str_lit("multi_pointer_slice_expr_error"),

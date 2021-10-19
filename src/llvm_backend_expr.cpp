@@ -1727,7 +1727,7 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 	
 	if (is_type_matrix(dst) && !is_type_matrix(src)) {
-		GB_ASSERT(dst->Matrix.row_count == dst->Matrix.column_count);
+		GB_ASSERT_MSG(dst->Matrix.row_count == dst->Matrix.column_count, "%s <- %s", type_to_string(dst), type_to_string(src));
 		
 		Type *elem = base_array_type(dst);
 		lbValue e = lb_emit_conv(p, value, elem);
@@ -2805,6 +2805,10 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_ast_node(ie, IndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
+	
+	case_ast_node(ie, MatrixIndexExpr, expr);
+		return lb_addr_load(p, lb_build_addr(p, expr));
+	case_end;
 
 	case_ast_node(ia, InlineAsmExpr, expr);
 		Type *t = type_of_expr(expr);
@@ -3304,6 +3308,25 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lbValue v = lb_emit_ptr_offset(p, elem, index);
 			return lb_addr(v);
 		}
+		
+		case Type_Matrix: {
+			lbValue matrix = {};
+			matrix = lb_build_addr_ptr(p, ie->expr);
+			if (deref) {
+				matrix = lb_emit_load(p, matrix);
+			}
+			lbValue index = lb_build_expr(p, ie->index);
+			index = lb_emit_conv(p, index, t_int);
+			lbValue elem = lb_emit_matrix_ep(p, matrix, lb_const_int(p->module, t_int, 0), index);
+			elem = lb_emit_conv(p, elem, alloc_type_pointer(type_of_expr(expr)));
+
+			auto index_tv = type_and_value_of_expr(ie->index);
+			if (index_tv.mode != Addressing_Constant) {
+				lbValue len = lb_const_int(p->module, t_int, t->Matrix.column_count);
+				lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+			}
+			return lb_addr(elem);
+		}
 
 
 		case Type_Basic: { // Basic_string
@@ -3325,6 +3348,35 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return lb_addr(lb_emit_ptr_offset(p, elem, index));
 		}
 		}
+	case_end;
+	
+	case_ast_node(ie, MatrixIndexExpr, expr);
+		Type *t = base_type(type_of_expr(ie->expr));
+
+		bool deref = is_type_pointer(t);
+		t = base_type(type_deref(t));
+		
+		lbValue m = {};
+		m = lb_build_addr_ptr(p, ie->expr);
+		if (deref) {
+			m = lb_emit_load(p, m);
+		}
+		lbValue row_index = lb_build_expr(p, ie->row_index);
+		lbValue column_index = lb_build_expr(p, ie->column_index);
+		row_index = lb_emit_conv(p, row_index, t_int);
+		column_index = lb_emit_conv(p, column_index, t_int);
+		lbValue elem = lb_emit_matrix_ep(p, m, row_index, column_index);
+
+		auto row_index_tv = type_and_value_of_expr(ie->row_index);
+		auto column_index_tv = type_and_value_of_expr(ie->column_index);
+		if (row_index_tv.mode != Addressing_Constant || column_index_tv.mode != Addressing_Constant) {
+			lbValue row_count = lb_const_int(p->module, t_int, t->Matrix.row_count);
+			lbValue column_count = lb_const_int(p->module, t_int, t->Matrix.column_count);
+			lb_emit_matrix_bounds_check(p, ast_token(ie->row_index), row_index, column_index, row_count, column_count);
+		}
+		return lb_addr(elem);
+		
+		
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
