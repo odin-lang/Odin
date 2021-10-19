@@ -1957,7 +1957,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		io.write_string(fi.writer, "matrix[")
 		defer io.write_byte(fi.writer, ']')
 		
-		fi.indent += 1;  defer fi.indent -= 1
+		fi.indent += 1
 		
 		if fi.hash { 
 			io.write_byte(fi.writer, '\n')
@@ -1986,6 +1986,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
 				}
 			}
+		}
+		
+		fi.indent -= 1
+		
+		if fi.hash { 
+			fmt_write_indent(fi)
 		}
 	}
 }
