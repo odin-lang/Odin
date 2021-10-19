@@ -1960,13 +1960,13 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		
 		fi.indent += 1;  defer fi.indent -= 1
 		
-		if fi.hash	{ 
+		if fi.hash { 
 			io.write_byte(fi.writer, '\n')
 			// TODO(bill): Should this render it like in written form? e.g. tranposed
-			for col in 0..<info.column_count {
+			for row in 0..<info.row_count {
 				fmt_write_indent(fi)
-				for row in 0..<info.row_count {
-					if row > 0 { io.write_string(fi.writer, ", ") }
+				for col in 0..<info.column_count {
+					if col > 0 { io.write_string(fi.writer, ", ") }
 					
 					offset := row*info.elem_size + col*info.stride
 					
@@ -1976,10 +1976,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				io.write_string(fi.writer, ";\n")
 			}
 		} else {
-			for col in 0..<info.column_count {
-				if col > 0 { io.write_string(fi.writer, "; ") }
-				for row in 0..<info.row_count {
-					if row > 0 { io.write_string(fi.writer, ", ") }
+			for row in 0..<info.row_count {
+				if row > 0 { io.write_string(fi.writer, ", ") }
+				for col in 0..<info.column_count {
+					if col > 0 { io.write_string(fi.writer, "; ") }
 					
 					offset := row*info.elem_size + col*info.stride
 					

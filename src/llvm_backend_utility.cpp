@@ -1224,12 +1224,14 @@ lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
 lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column) {
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
-	Type *st = base_type(type_deref(t));
-	GB_ASSERT_MSG(is_type_matrix(st), "%s", type_to_string(st));
+	Type *mt = base_type(type_deref(t));
+	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
 
-	Type *ptr = base_array_type(st);
+	Type *ptr = base_array_type(mt);
 	
-	isize index = row*column;
+	i64 stride_elems = matrix_type_stride_in_elems(mt);
+	
+	isize index = row + column*stride_elems;
 	GB_ASSERT(0 <= index);
 
 	LLVMValueRef indices[2] = {

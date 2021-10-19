@@ -1937,7 +1937,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			i64 elem_size = type_size_of(type->Matrix.elem);
 			GB_ASSERT(elem_size > 0);
 			i64 elem_count = size/elem_size;
-			GB_ASSERT(elem_count > 0);
+			GB_ASSERT_MSG(elem_count > 0, "%s", type_to_string(type));
 			
 			m->internal_type_level -= 1;
 			
@@ -2611,8 +2611,10 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 	LLVMValueRef ptr = LLVMBuildAlloca(p->builder, llvm_type, name);
 
-	// unsigned alignment = 16; // TODO(bill): Make this configurable
-	unsigned alignment = cast(unsigned)lb_alignof(llvm_type);
+	unsigned alignment = cast(unsigned)gb_max(type_align_of(type), lb_alignof(llvm_type));
+	if (is_type_matrix(type)) {
+		alignment *= 2; // NOTE(bill): Just in case
+	}
 	LLVMSetAlignment(ptr, alignment);
 
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
