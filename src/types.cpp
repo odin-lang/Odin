@@ -1249,6 +1249,7 @@ bool is_type_matrix(Type *t) {
 }
 
 i64 matrix_type_stride(Type *t) {
+	// TODO(bill): precompute matrix stride
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	i64 align = type_align_of(t);
@@ -1258,6 +1259,7 @@ i64 matrix_type_stride(Type *t) {
 }
 
 i64 matrix_type_stride_in_elems(Type *t) {
+	// TODO(bill): precompute matrix stride
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	i64 stride = matrix_type_stride(t);
@@ -1266,6 +1268,7 @@ i64 matrix_type_stride_in_elems(Type *t) {
 
 
 i64 matrix_type_total_elems(Type *t) {
+	// TODO(bill): precompute matrix total elems
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	i64 size = type_size_of(t);
