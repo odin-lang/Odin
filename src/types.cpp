@@ -1267,19 +1267,20 @@ i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 		elem_size = type_size_of(t->Matrix.elem);
 	}
 	
-	
-	/*
-		[3; 4]f32 -> [4]{x, y, z, _: f32} // extra padding for alignment reasons
-	*/
+
 	i64 stride_in_bytes = 0;
 	
 	i64 row_count = t->Matrix.row_count;
+#if 0	
 	if (row_count == 1) {
 		stride_in_bytes = elem_size;
 	} else {	
 		i64 matrix_alignment = type_align_of(t);
-		stride_in_bytes = align_formula(elem_size*t->Matrix.row_count, matrix_alignment);
+		stride_in_bytes = align_formula(elem_size*row_count, matrix_alignment);
 	}
+#else
+	stride_in_bytes = elem_size*row_count;
+#endif
 	t->Matrix.stride_in_bytes = stride_in_bytes;
 	return stride_in_bytes;
 }
