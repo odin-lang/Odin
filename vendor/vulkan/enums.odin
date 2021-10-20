@@ -3,8 +3,6 @@
 //
 package vulkan
 
-import "core:c"
-
 // Enums
 AccelerationStructureBuildTypeKHR :: enum c.int {
 	HOST           = 0,

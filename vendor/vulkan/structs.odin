@@ -3,8 +3,6 @@
 //
 package vulkan
 
-import "core:c"
-
 when ODIN_OS == "windows" {
 	import win32 "core:sys/windows"
 
@@ -3750,7 +3748,7 @@ PhysicalDeviceRayTracingPropertiesNV :: struct {
 }
 
 TransformMatrixKHR :: struct {
-	matrix: [3][4]f32,
+	mat: [3][4]f32,
 }
 
 AabbPositionsKHR :: struct {

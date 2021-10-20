@@ -405,8 +405,8 @@ def parse_structs(f):
             if "Flag_Bits" in type_:
                 comment = " // only single bit set"
             t = do_type(type_, prev_name, fname)
-            if t == "Structure_Type" and n == "type":
-                n = "s_type"
+            if n == "matrix":
+                n = "mat"
 
             ffields.append(tuple([n, t, comment]))
             prev_name = fname
