@@ -1313,8 +1313,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue m = lb_build_expr(p, ce->args[0]);
 			return lb_emit_matrix_flatten(p, m, tv.type);
 		}
-
-
+		
 	// "Intrinsics"
 
 	case BuiltinProc_alloca:

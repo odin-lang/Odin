@@ -1334,11 +1334,15 @@ i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_index) {
 }
 
 bool is_type_valid_for_matrix_elems(Type *t) {
+	t = base_type(t);
 	if (is_type_integer(t)) {
 		return true;
 	} else if (is_type_float(t)) {
 		return true;
 	} else if (is_type_complex(t)) {
+		return true;
+	} 
+	if (t->kind == Type_Generic) {
 		return true;
 	}
 	return false;
