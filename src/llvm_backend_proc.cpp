@@ -1263,6 +1263,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue m = lb_build_expr(p, ce->args[0]);
 			return lb_emit_matrix_tranpose(p, m, tv.type);
 		}
+		
+	case BuiltinProc_outer_product:
+		{
+			lbValue a = lb_build_expr(p, ce->args[0]);
+			lbValue b = lb_build_expr(p, ce->args[1]);
+			return lb_emit_outer_product(p, a, b, tv.type);
+		}
+
 
 	// "Intrinsics"
 
