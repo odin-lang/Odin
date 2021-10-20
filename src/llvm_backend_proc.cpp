@@ -1280,6 +1280,12 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_ASSERT(is_type_matrix(tv.type));
 			return lb_emit_arith_matrix(p, Token_Mul, a, b, tv.type, true);
 		}
+		
+	case BuiltinProc_matrix_flatten:
+		{
+			lbValue m = lb_build_expr(p, ce->args[0]);
+			return lb_emit_matrix_flatten(p, m, tv.type);
+		}
 
 
 	// "Intrinsics"

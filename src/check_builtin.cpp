@@ -2131,6 +2131,36 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 	
+	case BuiltinProc_matrix_flatten: {
+		Operand x = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x)) {
+			error(call, "'%.*s' expects a matrix or array", LIT(builtin_name));
+			return false;
+		}
+		Type *t = base_type(x.type);
+		if (!is_type_matrix(t) && !is_type_array(t)) {
+			gbString s = type_to_string(x.type);
+			error(call, "'%.*s' expects a matrix or array, got %s", LIT(builtin_name), s);
+			gb_string_free(s);
+			return false;
+		}
+		
+		operand->mode = Addressing_Value;
+		if (is_type_array(t)) {
+			// Do nothing
+			operand->type = x.type;			
+		} else {
+			GB_ASSERT(t->kind == Type_Matrix);
+			operand->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count*t->Matrix.column_count);
+		}
+		operand->type = check_matrix_type_hint(operand->type, type_hint);
+		break;
+	}
+	
 
 	case BuiltinProc_simd_vector: {
 		Operand x = {};
