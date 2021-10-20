@@ -2168,7 +2168,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 	
-
 	case BuiltinProc_simd_vector: {
 		Operand x = {};
 		Operand y = {};
