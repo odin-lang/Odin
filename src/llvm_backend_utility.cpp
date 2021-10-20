@@ -1545,3 +1545,44 @@ LLVMValueRef llvm_splat(lbProcedure *p, LLVMValueRef value, unsigned count) {
 	LLVMValueRef mask = llvm_mask_zero(p->module, count);
 	return LLVMBuildShuffleVector(p->builder, single, LLVMGetUndef(LLVMTypeOf(single)), mask, "");
 }
+
+LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
+	LLVMTypeRef type = LLVMTypeOf(value);
+	GB_ASSERT(LLVMGetTypeKind(type) == LLVMVectorTypeKind);
+	LLVMTypeRef elem = LLVMGetElementType(type);
+	
+	char const *name = nullptr;
+	i32 value_offset = 0;
+	i32 value_count  = 0;
+	
+	switch (LLVMGetTypeKind(elem)) {
+	case LLVMHalfTypeKind:
+	case LLVMFloatTypeKind:
+	case LLVMDoubleTypeKind:
+		name = "llvm.vector.reduce.fadd";
+		value_offset = 0;
+		value_count = 2;
+		break;
+	case LLVMIntegerTypeKind:
+		name = "llvm.vector.reduce.add";
+		value_offset = 1;
+		value_count = 1;
+		break;
+	default:
+		GB_PANIC("invalid vector type %s", LLVMPrintTypeToString(type));
+		break;
+	}
+	
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+	
+	LLVMTypeRef types[1] = {};
+	types[0] = elem;
+	
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+	LLVMValueRef values[2] = {};
+	values[0] = LLVMConstNull(elem);
+	values[1] = value;
+	LLVMValueRef call = LLVMBuildCall(p->builder, ip, values+value_offset, value_count, "");
+	return call;
+}
