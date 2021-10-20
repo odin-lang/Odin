@@ -527,7 +527,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		i64 total_elem_count = matrix_type_total_elems(type);
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)total_elem_count);		
 		for (i64 i = 0; i < row; i++) {
-			elems[matrix_index_to_offset(type, i)] = single_elem.value;
+			elems[matrix_indices_to_offset(type, i, i)] = single_elem.value;
 		}
 		for (i64 i = 0; i < total_elem_count; i++) {
 			if (elems[i] == nullptr) {
