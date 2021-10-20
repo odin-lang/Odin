@@ -3,8 +3,6 @@
 //
 package vulkan
 
-import "core:c"
-
 // Procedure Types
 
 ProcAllocationFunction                                              :: #type proc "system" (pUserData: rawptr, size: int, alignment: int, allocationScope: SystemAllocationScope) -> rawptr
