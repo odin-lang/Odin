@@ -38,6 +38,7 @@ enum BuiltinProcId {
 	BuiltinProc_transpose,
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
+	BuiltinProc_matrix_flatten,
 
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
@@ -282,6 +283,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
