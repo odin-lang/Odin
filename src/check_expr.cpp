@@ -897,6 +897,34 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 	}
 }
 
+bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source_count) {
+	Type *gt = *gt_;
+	
+	GB_ASSERT(gt->kind == Type_Generic);
+	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
+	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_TypeName) {
+		*gt_ = nullptr;
+		*dst_count = source_count;
+
+		e->kind = Entity_Constant;
+		e->Constant.value = exact_value_i64(source_count);
+		e->type = t_untyped_integer;
+		return true;
+	} else if (e->kind == Entity_Constant) {
+		*gt_ = nullptr;
+		if (e->Constant.value.kind != ExactValue_Integer) {
+			return false;
+		}
+		i64 count = big_int_to_i64(&e->Constant.value.value_integer);
+		if (count != source_count) {
+			return false;
+		}
+		*dst_count = source_count;
+		return true;
+	}
+	return false;
+}
 
 bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
@@ -951,28 +979,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 	case Type_Array:
 		if (source->kind == Type_Array) {
 			if (poly->Array.generic_count != nullptr) {
-				Type *gt = poly->Array.generic_count;
-				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
-				GB_ASSERT(e != nullptr);
-				if (e->kind == Entity_TypeName) {
-					poly->Array.generic_count = nullptr;
-					poly->Array.count = source->Array.count;
-
-					e->kind = Entity_Constant;
-					e->Constant.value = exact_value_i64(source->Array.count);
-					e->type = t_untyped_integer;
-				} else if (e->kind == Entity_Constant) {
-					poly->Array.generic_count = nullptr;
-					if (e->Constant.value.kind != ExactValue_Integer) {
-						return false;
-					}
-					i64 count = big_int_to_i64(&e->Constant.value.value_integer);
-					if (count != source->Array.count) {
-						return false;
-					}
-					poly->Array.count = source->Array.count;
-				} else {
+				if (!polymorphic_assign_index(&poly->Array.generic_count, &poly->Array.count, source->Array.count)) {
 					return false;
 				}
 			}
@@ -1169,54 +1176,14 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 	case Type_Matrix:
 		if (source->kind == Type_Matrix) {
 			if (poly->Matrix.generic_row_count != nullptr) {
-				Type *gt = poly->Matrix.generic_row_count;
-				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
-				GB_ASSERT(e != nullptr);
-				if (e->kind == Entity_TypeName) {
-					poly->Matrix.generic_row_count = nullptr;
-					poly->Matrix.row_count = source->Matrix.row_count;
-
-					e->kind = Entity_Constant;
-					e->Constant.value = exact_value_i64(source->Matrix.row_count);
-					e->type = t_untyped_integer;
-				} else if (e->kind == Entity_Constant) {
-					poly->Matrix.generic_row_count = nullptr;
-					if (e->Constant.value.kind != ExactValue_Integer) {
-						return false;
-					}
-					i64 count = big_int_to_i64(&e->Constant.value.value_integer);
-					if (count != source->Matrix.row_count) {
-						return false;
-					}
-					poly->Matrix.row_count = source->Matrix.row_count;
-				} else {
+				poly->Matrix.stride_in_bytes = 0;
+				if (!polymorphic_assign_index(&poly->Matrix.generic_row_count, &poly->Matrix.row_count, source->Matrix.row_count)) {
 					return false;
 				}
 			}
 			if (poly->Matrix.generic_column_count != nullptr) {
-				Type *gt = poly->Matrix.generic_column_count;
-				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
-				GB_ASSERT(e != nullptr);
-				if (e->kind == Entity_TypeName) {
-					poly->Matrix.generic_column_count = nullptr;
-					poly->Matrix.column_count = source->Matrix.column_count;
-
-					e->kind = Entity_Constant;
-					e->Constant.value = exact_value_i64(source->Matrix.column_count);
-					e->type = t_untyped_integer;
-				} else if (e->kind == Entity_Constant) {
-					poly->Matrix.generic_column_count = nullptr;
-					if (e->Constant.value.kind != ExactValue_Integer) {
-						return false;
-					}
-					i64 count = big_int_to_i64(&e->Constant.value.value_integer);
-					if (count != source->Matrix.column_count) {
-						return false;
-					}
-					poly->Matrix.column_count = source->Matrix.column_count;
-				} else {
+				poly->Matrix.stride_in_bytes = 0;
+				if (!polymorphic_assign_index(&poly->Matrix.generic_column_count, &poly->Matrix.column_count, source->Matrix.column_count)) {
 					return false;
 				}
 			}
