@@ -684,11 +684,13 @@ gb_global Type *t_hasher_proc = nullptr;
 
 gb_global RecursiveMutex g_type_mutex;
 
+struct TypePath;
 
-i64      type_size_of               (Type *t);
-i64      type_align_of              (Type *t);
-i64      type_offset_of             (Type *t, i32 index);
-gbString type_to_string             (Type *type);
+i64      type_size_of         (Type *t);
+i64      type_align_of        (Type *t);
+i64      type_offset_of       (Type *t, i32 index);
+gbString type_to_string       (Type *type);
+i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
@@ -1248,21 +1250,36 @@ bool is_type_matrix(Type *t) {
 	return t->kind == Type_Matrix;
 }
 
-i64 matrix_type_stride(Type *t) {
+i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	// TODO(bill): precompute matrix stride
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
+	i64 elem_size;
+	if (tp != nullptr) {
+		elem_size = type_size_of_internal(t->Matrix.elem, tp);
+	} else {
+		elem_size = type_size_of(t->Matrix.elem);
+	}
+	
+	
+	/*
+		[3; 4]f32 -> [4]{x, y, z, _: f32} // extra padding for alignment reasons
+	*/
+	
+	i64 row_count = t->Matrix.row_count;
+	if (row_count == 1) {
+		return elem_size;
+	}
+	
 	i64 align = type_align_of(t);
-	i64 elem_size = type_size_of(t->Matrix.elem);
-	i64 stride = align_formula(elem_size*t->Matrix.row_count, align);
-	return stride;
+	return align_formula(elem_size*t->Matrix.row_count, align);
 }
 
 i64 matrix_type_stride_in_elems(Type *t) {
 	// TODO(bill): precompute matrix stride
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	i64 stride = matrix_type_stride(t);
+	i64 stride = matrix_type_stride_in_bytes(t, nullptr);
 	return stride/gb_max(1, type_size_of(t->Matrix.elem));
 }
 
@@ -3512,23 +3529,14 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 	
 	case Type_Matrix: {
-		Type *elem = t->Matrix.elem;
-		i64 row_count = t->Matrix.row_count;
-		i64 column_count = t->Matrix.column_count;
-		bool pop = type_path_push(path, elem);
+		bool pop = type_path_push(path, t->Matrix.elem);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
-		i64 elem_size = type_size_of_internal(elem, path);
+		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
 		if (pop) type_path_pop(path);
-		i64 align = type_align_of(t);
-		
-		/*
-			[3; 4]f32 -> [4]{x, y, z, _: f32} // extra padding for alignment reasons
-		*/
-		
-		i64 size = align_formula(elem_size * row_count, align) * column_count;
-		return size;
+
+		return stride_in_bytes * t->Matrix.column_count;
 	}
 
 	case Type_RelativePointer:
