@@ -1577,7 +1577,7 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
 	
 	LLVMTypeRef types[1] = {};
-	types[0] = elem;
+	types[0] = type;
 	
 	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 	LLVMValueRef values[2] = {};
@@ -1585,4 +1585,31 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	values[1] = value;
 	LLVMValueRef call = LLVMBuildCall(p->builder, ip, values+value_offset, value_count, "");
 	return call;
+}
+
+LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
+	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
+	
+	LLVMTypeRef elem = LLVMGetElementType(LLVMTypeOf(a));
+	
+	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
+		return LLVMBuildAdd(p->builder, a, b, "");
+	}
+	return LLVMBuildFAdd(p->builder, a, b, "");
+}
+
+LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
+	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
+	
+	LLVMTypeRef elem = LLVMGetElementType(LLVMTypeOf(a));
+	
+	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
+		return LLVMBuildMul(p->builder, a, b, "");
+	}
+	return LLVMBuildFMul(p->builder, a, b, "");
+}
+
+
+LLVMValueRef llvm_vector_dot(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
+	return llvm_vector_reduce_add(p, llvm_vector_mul(p, a, b));
 }
