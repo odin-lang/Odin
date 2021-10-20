@@ -277,6 +277,7 @@ struct TypeProc {
 		i64   column_count;                               \
 		Type *generic_row_count;                          \
 		Type *generic_column_count;                       \
+		i64   stride_in_bytes;                            \
 	})
 
 
@@ -1251,9 +1252,14 @@ bool is_type_matrix(Type *t) {
 }
 
 i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
-	// TODO(bill): precompute matrix stride
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
+	if (t->Matrix.stride_in_bytes != 0) {
+		return t->Matrix.stride_in_bytes;
+	} else if (t->Matrix.row_count == 0) {
+		return 0;
+	}
+	
 	i64 elem_size;
 	if (tp != nullptr) {
 		elem_size = type_size_of_internal(t->Matrix.elem, tp);
@@ -1265,18 +1271,20 @@ i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	/*
 		[3; 4]f32 -> [4]{x, y, z, _: f32} // extra padding for alignment reasons
 	*/
+	i64 stride_in_bytes = 0;
 	
 	i64 row_count = t->Matrix.row_count;
 	if (row_count == 1) {
-		return elem_size;
+		stride_in_bytes = elem_size;
+	} else {	
+		i64 matrix_alignment = type_align_of(t);
+		stride_in_bytes = align_formula(elem_size*t->Matrix.row_count, matrix_alignment);
 	}
-	
-	i64 align = type_align_of(t);
-	return align_formula(elem_size*t->Matrix.row_count, align);
+	t->Matrix.stride_in_bytes = stride_in_bytes;
+	return stride_in_bytes;
 }
 
 i64 matrix_type_stride_in_elems(Type *t) {
-	// TODO(bill): precompute matrix stride
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	i64 stride = matrix_type_stride_in_bytes(t, nullptr);
@@ -1285,7 +1293,6 @@ i64 matrix_type_stride_in_elems(Type *t) {
 
 
 i64 matrix_type_total_elems(Type *t) {
-	// TODO(bill): precompute matrix total elems
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	i64 size = type_size_of(t);
