@@ -1266,7 +1266,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_conj: {
 		// conj :: proc(x: type) -> type
 		Operand *x = operand;
-		if (is_type_complex(x->type)) {
+		Type *t = x->type;
+		Type *elem = core_array_type(t);
+		
+		if (is_type_complex(t)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_complex(x->value);
 				f64 r = v.value_complex->real;
@@ -1276,7 +1279,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			} else {
 				x->mode = Addressing_Value;
 			}
-		} else if (is_type_quaternion(x->type)) {
+		} else if (is_type_quaternion(t)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_quaternion(x->value);
 				f64 r = +v.value_quaternion->real;
@@ -1288,7 +1291,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			} else {
 				x->mode = Addressing_Value;
 			}
-		} else {
+		} else if (is_type_array_like(t) && (is_type_complex(elem) || is_type_quaternion(elem))) {
+			x->mode = Addressing_Value;
+		} else if (is_type_matrix(t) && (is_type_complex(elem) || is_type_quaternion(elem))) {
+			x->mode = Addressing_Value;
+		}else {
 			gbString s = type_to_string(x->type);
 			error(call, "Expected a complex or quaternion, got '%s'", s);
 			gb_string_free(s);
