@@ -1270,6 +1270,16 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue b = lb_build_expr(p, ce->args[1]);
 			return lb_emit_outer_product(p, a, b, tv.type);
 		}
+	case BuiltinProc_hadamard_product:
+		{
+			lbValue a = lb_build_expr(p, ce->args[0]);
+			lbValue b = lb_build_expr(p, ce->args[1]);
+			if (is_type_array(tv.type)) {
+				return lb_emit_arith(p, Token_Mul, a, b, tv.type);
+			}
+			GB_ASSERT(is_type_matrix(tv.type));
+			return lb_emit_arith_matrix(p, Token_Mul, a, b, tv.type, true);
+		}
 
 
 	// "Intrinsics"

@@ -997,8 +997,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 
 				GB_ASSERT(lower <= upper);
 
-				i64 bits = MAX_BITS;
-				if (bs->underlying != nullptr) {
+				i64 bits = MAX_BITS
+;				if (bs->underlying != nullptr) {
 					Type *u = check_type(c, bs->underlying);
 					if (!is_type_integer(u)) {
 						gbString ts = type_to_string(u);
@@ -2239,13 +2239,7 @@ void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 		error(column.expr, "Matrix types are limited to a maximum of %d elements, got %lld", MAX_MATRIX_ELEMENT_COUNT, cast(long long)element_count);
 	}
 	
-	if (is_type_integer(elem)) {
-		// okay
-	} else if (is_type_float(elem)) {
-		// okay
-	} else if (is_type_complex(elem)) {
-		// okay
-	} else {
+	if (!is_type_valid_for_matrix_elems(elem)) {
 		gbString s = type_to_string(elem);
 		error(column.expr, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
 		gb_string_free(s);
