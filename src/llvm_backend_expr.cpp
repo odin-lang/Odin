@@ -619,9 +619,10 @@ lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 	Type *elem = mt->Matrix.elem;
 	LLVMTypeRef elem_type = lb_type(p->module, elem);
 	
-	unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
 	
 	if (lb_matrix_elem_simple(mt)) {
+		unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
+		
 		unsigned row_count = cast(unsigned)mt->Matrix.row_count; gb_unused(row_count);
 		unsigned column_count = cast(unsigned)mt->Matrix.column_count;
 		auto m_columns = slice_make<LLVMValueRef>(permanent_allocator(), column_count);
