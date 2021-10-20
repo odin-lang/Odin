@@ -2056,6 +2056,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		
+		Type *elem = xt->Array.elem;
+		
+		if (!is_type_valid_for_matrix_elems(elem)) {
+			gbString s = type_to_string(elem);
+			error(call, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
+			gb_string_free(s);
+		}
+		
 		if (xt->Array.count == 0 || yt->Array.count == 0) {
 			gbString s1 = type_to_string(x.type);
 			gbString s2 = type_to_string(y.type);
@@ -2072,7 +2080,53 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		
 		operand->mode = Addressing_Value;
-		operand->type = alloc_type_matrix(xt->Array.elem, xt->Array.count, yt->Array.count);	
+		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count);	
+		operand->type = check_matrix_type_hint(operand->type, type_hint);
+		break;
+	}
+	
+	case BuiltinProc_hadamard_product: {
+		Operand x = {};
+		Operand y = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		check_expr(c, &y, ce->args[1]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x) || !is_operand_value(y)) {
+			error(call, "'%.*s' expects a matrix or array types", LIT(builtin_name));
+			return false;
+		}
+		if (!is_type_matrix(x.type) && !is_type_array(y.type)) {
+			gbString s1 = type_to_string(x.type);
+			gbString s2 = type_to_string(y.type);
+			error(call, "'%.*s' expects matrix or array values, got %s and %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		if (!are_types_identical(x.type, y.type)) {
+			gbString s1 = type_to_string(x.type);
+			gbString s2 = type_to_string(y.type);
+			error(call, "'%.*s' values of the same type, got %s and %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		Type *elem = core_array_type(x.type);
+		if (!is_type_valid_for_matrix_elems(elem)) {
+			gbString s = type_to_string(elem);
+			error(call, "'%.*s' expects elements to be types are limited to integers, floats, and complex, got %s", LIT(builtin_name), s);
+			gb_string_free(s);
+		}
+		
+		operand->mode = Addressing_Value;
+		operand->type = x.type;
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}

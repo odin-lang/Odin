@@ -672,13 +672,13 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 
 
 
-lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
+lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 	
 	Type *xt = base_type(lhs.type);
 	Type *yt = base_type(rhs.type);
 	
-	if (op == Token_Mul) {
+	if (op == Token_Mul && !component_wise) {
 		if (xt->kind == Type_Matrix) {
 			if (yt->kind == Type_Matrix) {
 				return lb_emit_matrix_mul(p, lhs, rhs, type);
@@ -703,7 +703,7 @@ lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue 
 		array_lhs.type = array_type; 
 		array_rhs.type = array_type;
 
-		lbValue array = lb_emit_arith_array(p, op, array_lhs, array_rhs, type);
+		lbValue array = lb_emit_arith_array(p, op, array_lhs, array_rhs, array_type);
 		array.type = type;
 		return array;
 	}
