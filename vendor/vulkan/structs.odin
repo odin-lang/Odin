@@ -3,6 +3,8 @@
 //
 package vulkan
 
+import "core:c"
+
 when ODIN_OS == "windows" {
 	import win32 "core:sys/windows"
 
