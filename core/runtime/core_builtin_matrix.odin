@@ -3,6 +3,48 @@ package runtime
 import "core:intrinsics"
 _ :: intrinsics
 
+
+@(builtin)
+determinant :: proc{
+	matrix1x1_determinant,
+	matrix2x2_determinant,
+	matrix3x3_determinant,
+	matrix4x4_determinant,
+}
+
+@(builtin)
+adjugate :: proc{
+	matrix1x1_adjugate,
+	matrix2x2_adjugate,
+	matrix3x3_adjugate,
+	matrix4x4_adjugate,
+}
+
+@(builtin)
+inverse_transpose :: proc{
+	matrix1x1_inverse_transpose,
+	matrix2x2_inverse_transpose,
+	matrix3x3_inverse_transpose,
+	matrix4x4_inverse_transpose,
+}
+
+
+@(builtin)
+inverse :: proc{
+	matrix1x1_inverse,
+	matrix2x2_inverse,
+	matrix3x3_inverse,
+	matrix4x4_inverse,
+}
+
+@(builtin)
+hermitian_adjoint :: proc{
+	matrix1x1_hermitian_adjoint,
+	matrix2x2_hermitian_adjoint,
+	matrix3x3_hermitian_adjoint,
+	matrix4x4_hermitian_adjoint,
+}
+
 @(builtin)
 matrix1x1_determinant :: proc(m: $M/matrix[1, 1]$T) -> (det: T) {
 	return m[0, 0]
@@ -14,9 +56,9 @@ matrix2x2_determinant :: proc(m: $M/matrix[2, 2]$T) -> (det: T) {
 }
 @(builtin)
 matrix3x3_determinant :: proc(m: $M/matrix[3, 3]$T) -> (det: T) {
-	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
-	b := -m[1, 0] * (m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
-	c := +m[2, 0] * (m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
 @(builtin)
@@ -28,21 +70,7 @@ matrix4x4_determinant :: proc(m: $M/matrix[4, 4]$T) -> (det: T) {
 	return
 }
 
-@(builtin)
-matrix_determinant :: proc{
-	matrix1x1_determinant,
-	matrix2x2_determinant,
-	matrix3x3_determinant,
-	matrix4x4_determinant,
-}
 
-@(builtin)
-determinant :: proc{
-	matrix1x1_determinant,
-	matrix2x2_determinant,
-	matrix3x3_determinant,
-	matrix4x4_determinant,
-}
 
 
 @(builtin)
@@ -61,16 +89,16 @@ matrix2x2_adjugate :: proc(x: $M/matrix[2, 2]$T) -> (y: M) {
 }
 
 @(builtin)
-matrix3x3_adjugate :: proc(x: $M/matrix[3, 3]$T) -> (y: M) {
-	y[0, 0] = +(x[1, 1] * x[2, 2] - x[1, 2] * x[2, 1])
-	y[0, 1] = -(x[1, 0] * x[2, 2] - x[1, 2] * x[2, 0])
-	y[0, 2] = +(x[1, 0] * x[2, 1] - x[1, 1] * x[2, 0])
-	y[1, 0] = -(x[0, 1] * x[2, 2] - x[0, 2] * x[2, 1])
-	y[1, 1] = +(x[0, 0] * x[2, 2] - x[0, 2] * x[2, 0])
-	y[1, 2] = -(x[0, 0] * x[2, 1] - x[0, 1] * x[2, 0])
-	y[2, 0] = +(x[0, 1] * x[1, 2] - x[0, 2] * x[1, 1])
-	y[2, 1] = -(x[0, 0] * x[1, 2] - x[0, 2] * x[1, 0])
-	y[2, 2] = +(x[0, 0] * x[1, 1] - x[0, 1] * x[1, 0])
+matrix3x3_adjugate :: proc(m: $M/matrix[3, 3]$T) -> (y: M) {
+	y[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	y[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	y[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	y[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	y[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	y[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	y[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	y[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	y[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return
 }
 
@@ -101,25 +129,6 @@ matrix4x4_adjugate :: proc(x: $M/matrix[4, 4]$T) -> (y: M) {
 }
 
 @(builtin)
-matrix_adjugate :: proc{
-	matrix1x1_adjugate,
-	matrix2x2_adjugate,
-	matrix3x3_adjugate,
-	matrix4x4_adjugate,
-}
-
-
-@(builtin)
-adjugate :: proc{
-	matrix1x1_adjugate,
-	matrix2x2_adjugate,
-	matrix3x3_adjugate,
-	matrix4x4_adjugate,
-}
-
-
-
-@(builtin)
 matrix1x1_inverse_transpose :: proc(x: $M/matrix[1, 1]$T) -> (y: M) {
 	y[0, 0] = 1/x[0, 0]
 	return
@@ -129,16 +138,16 @@ matrix1x1_inverse_transpose :: proc(x: $M/matrix[1, 1]$T) -> (y: M) {
 matrix2x2_inverse_transpose :: proc(x: $M/matrix[2, 2]$T) -> (y: M) {
 	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
 	when intrinsics.type_is_integer(T) {
-		y[0, 0] = x[1, 1] / d
-		y[0, 1] = x[0, 1] / d
-		y[1, 0] = x[1, 0] / d
-		y[1, 1] = x[0, 0] / d
+		y[0, 0] = +x[1, 1] / d
+		y[1, 0] = -x[1, 0] / d
+		y[0, 1] = -x[0, 1] / d
+		y[1, 1] = +x[0, 0] / d
 	} else {
 		id := 1 / d
-		y[0, 0] = x[1, 1] * id
-		y[0, 1] = x[0, 1] * id
-		y[1, 0] = x[1, 0] * id
-		y[1, 1] = x[0, 0] * id
+		y[0, 0] = +x[1, 1] * id
+		y[1, 0] = -x[1, 0] * id
+		y[0, 1] = -x[0, 1] * id
+		y[1, 1] = +x[0, 0] * id
 	}
 	return
 }
@@ -187,23 +196,6 @@ matrix4x4_inverse_transpose :: proc(x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_c
 	}
 	return
 }
-
-@(builtin)
-matrix_inverse_transpose :: proc{
-	matrix1x1_inverse_transpose,
-	matrix2x2_inverse_transpose,
-	matrix3x3_inverse_transpose,
-	matrix4x4_inverse_transpose,
-}
-
-@(builtin)
-inverse_transpose :: proc{
-	matrix1x1_inverse_transpose,
-	matrix2x2_inverse_transpose,
-	matrix3x3_inverse_transpose,
-	matrix4x4_inverse_transpose,
-}
-
 
 @(builtin)
 matrix1x1_inverse :: proc(x: $M/matrix[1, 1]$T) -> (y: M) {
@@ -276,22 +268,6 @@ matrix4x4_inverse :: proc(x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
 
 
 @(builtin)
-matrix_inverse :: proc{
-	matrix1x1_inverse,
-	matrix2x2_inverse,
-	matrix3x3_inverse,
-	matrix4x4_inverse,
-}
-
-@(builtin)
-inverse :: proc{
-	matrix1x1_inverse,
-	matrix2x2_inverse,
-	matrix3x3_inverse,
-	matrix4x4_inverse,
-}
-
-@(builtin)
 matrix1x1_hermitian_adjoint :: proc(m: $M/matrix[1, 1]$T) -> M where intrinsics.type_is_complex(T) {
 	return conj(transpose(m))
 }
@@ -308,10 +284,3 @@ matrix4x4_hermitian_adjoint :: proc(m: $M/matrix[4, 4]$T) -> M where intrinsics.
 	return conj(transpose(m))
 }
 
-@(builtin)
-hermitian_adjoint :: proc{
-	matrix1x1_hermitian_adjoint,
-	matrix2x2_hermitian_adjoint,
-	matrix3x3_hermitian_adjoint,
-	matrix4x4_hermitian_adjoint,
-}
