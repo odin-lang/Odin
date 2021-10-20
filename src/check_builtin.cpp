@@ -25,6 +25,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_simple_compare,
 	is_type_dereferenceable,
 	is_type_valid_for_keys,
+	is_type_valid_for_matrix_elems,
 
 	is_type_named,
 	is_type_pointer,
@@ -40,6 +41,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_proc,
 	is_type_bit_set,
 	is_type_simd_vector,
+	is_type_matrix,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
