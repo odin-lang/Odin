@@ -160,6 +160,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 
 	case runtime.Type_Info_Relative_Slice:
 		return .Unsupported_Type
+		
+	case runtime.Type_Info_Matrix:
+		return .Unsupported_Type
 
 	case runtime.Type_Info_Array:
 		io.write_byte(w, '[') or_return
