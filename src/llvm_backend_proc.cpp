@@ -1257,6 +1257,12 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return lb_soa_zip(p, ce, tv);
 	case BuiltinProc_soa_unzip:
 		return lb_soa_unzip(p, ce, tv);
+		
+	case BuiltinProc_transpose:
+		{
+			lbValue m = lb_build_expr(p, ce->args[0]);
+			return lb_emit_matrix_tranpose(p, m, tv.type);
+		}
 
 	// "Intrinsics"
 

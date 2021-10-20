@@ -2708,6 +2708,25 @@ bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type
 	return false;
 }
 
+Type *check_matrix_type_hint(Type *matrix, Type *type_hint) {
+	Type *xt = base_type(matrix);
+	if (type_hint != nullptr) {
+		Type *th = base_type(type_hint);
+		if (are_types_identical(th, xt)) {
+			return type_hint;
+		} else if (xt->kind == Type_Matrix && th->kind == Type_Array) {
+			if (!are_types_identical(xt->Matrix.elem, th->Array.elem)) {
+				// ignore
+			} else if (xt->Matrix.row_count == 1 && xt->Matrix.column_count == th->Array.count) {
+				return type_hint;
+			} else if (xt->Matrix.column_count == 1 && xt->Matrix.row_count == th->Array.count) {
+				return type_hint;
+			}
+		}
+	}
+	return matrix;
+}
+
 
 void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand *y, Type *type_hint, bool use_lhs_as_type_hint) {
 	if (!check_binary_op(c, x, op)) {
@@ -2791,21 +2810,8 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 	}
 
 matrix_success:
-	if (type_hint != nullptr) {
-		Type *th = base_type(type_hint);
-		if (are_types_identical(th, x->type)) {
-			x->type = type_hint;
-		} else if (x->type->kind == Type_Matrix && th->kind == Type_Array) {
-			Type *xt = x->type;
-			if (!are_types_identical(xt->Matrix.elem, th->Array.elem)) {
-				// ignore
-			} else if (xt->Matrix.row_count == 1 && xt->Matrix.column_count == th->Array.count) {
-				x->type = type_hint;
-			} else if (xt->Matrix.column_count == 1 && xt->Matrix.row_count == th->Array.count) {
-				x->type = type_hint;
-			}
-		}
-	}
+	x->type = check_matrix_type_hint(x->type, type_hint);
+	
 	return;
 	
 	
