@@ -1513,3 +1513,35 @@ lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t
 		return y;
 	}
 }
+
+LLVMValueRef llvm_mask_iota(lbModule *m, unsigned start, unsigned count) {
+	auto iota = slice_make<LLVMValueRef>(temporary_allocator(), count);
+	for (unsigned i = 0; i < count; i++) {
+		iota[i] = lb_const_int(m, t_u32, start+i).value;
+	}
+	return LLVMConstVector(iota.data, count);
+}
+
+LLVMValueRef llvm_mask_zero(lbModule *m, unsigned count) {
+	return LLVMConstNull(LLVMVectorType(lb_type(m, t_u32), count));
+}
+
+LLVMValueRef llvm_splat(lbProcedure *p, LLVMValueRef value, unsigned count) {
+	GB_ASSERT(count > 0);
+	if (LLVMIsConstant(value)) {
+		LLVMValueRef single = LLVMConstVector(&value, 1);
+		if (count == 1) {
+			return single;
+		}
+		LLVMValueRef mask = llvm_mask_zero(p->module, count);
+		return LLVMConstShuffleVector(single, LLVMGetUndef(LLVMTypeOf(single)), mask);
+	}
+	
+	LLVMTypeRef single_type = LLVMVectorType(LLVMTypeOf(value), 1);
+	LLVMValueRef single = LLVMBuildBitCast(p->builder, value, single_type, "");
+	if (count == 1) {
+		return single;
+	}
+	LLVMValueRef mask = llvm_mask_zero(p->module, count);
+	return LLVMBuildShuffleVector(p->builder, single, LLVMGetUndef(LLVMTypeOf(single)), mask, "");
+}
