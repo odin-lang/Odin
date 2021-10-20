@@ -1165,6 +1165,67 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			return key || value;
 		}
 		return false;
+		
+	case Type_Matrix:
+		if (source->kind == Type_Matrix) {
+			if (poly->Matrix.generic_row_count != nullptr) {
+				Type *gt = poly->Matrix.generic_row_count;
+				GB_ASSERT(gt->kind == Type_Generic);
+				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
+				GB_ASSERT(e != nullptr);
+				if (e->kind == Entity_TypeName) {
+					poly->Matrix.generic_row_count = nullptr;
+					poly->Matrix.row_count = source->Matrix.row_count;
+
+					e->kind = Entity_Constant;
+					e->Constant.value = exact_value_i64(source->Matrix.row_count);
+					e->type = t_untyped_integer;
+				} else if (e->kind == Entity_Constant) {
+					poly->Matrix.generic_row_count = nullptr;
+					if (e->Constant.value.kind != ExactValue_Integer) {
+						return false;
+					}
+					i64 count = big_int_to_i64(&e->Constant.value.value_integer);
+					if (count != source->Matrix.row_count) {
+						return false;
+					}
+					poly->Matrix.row_count = source->Matrix.row_count;
+				} else {
+					return false;
+				}
+			}
+			if (poly->Matrix.generic_column_count != nullptr) {
+				Type *gt = poly->Matrix.generic_column_count;
+				GB_ASSERT(gt->kind == Type_Generic);
+				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
+				GB_ASSERT(e != nullptr);
+				if (e->kind == Entity_TypeName) {
+					poly->Matrix.generic_column_count = nullptr;
+					poly->Matrix.column_count = source->Matrix.column_count;
+
+					e->kind = Entity_Constant;
+					e->Constant.value = exact_value_i64(source->Matrix.column_count);
+					e->type = t_untyped_integer;
+				} else if (e->kind == Entity_Constant) {
+					poly->Matrix.generic_column_count = nullptr;
+					if (e->Constant.value.kind != ExactValue_Integer) {
+						return false;
+					}
+					i64 count = big_int_to_i64(&e->Constant.value.value_integer);
+					if (count != source->Matrix.column_count) {
+						return false;
+					}
+					poly->Matrix.column_count = source->Matrix.column_count;
+				} else {
+					return false;
+				}
+			}
+			if (poly->Matrix.row_count == source->Matrix.row_count &&
+			    poly->Matrix.column_count == source->Matrix.column_count) {
+				return is_polymorphic_type_assignable(c, poly->Matrix.elem, source->Matrix.elem, true, modify_type);
+			}
+		} 
+		return false;
 	}
 	return false;
 }
