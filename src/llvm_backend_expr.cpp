@@ -331,7 +331,7 @@ bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbVal
 				z = LLVMBuildFRem(p->builder, x, y, "");
 				break;
 			default:
-				GB_PANIC("Unsupported vector operation");
+				GB_PANIC("Unsupported vector operation %.*s", LIT(token_strings[op]));
 				break;
 			}
 
@@ -918,10 +918,11 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 	
-	Type *xt = base_type(lhs.type);
-	Type *yt = base_type(rhs.type);
 	
 	if (op == Token_Mul && !component_wise) {
+		Type *xt = base_type(lhs.type);
+		Type *yt = base_type(rhs.type);
+		
 		if (xt->kind == Type_Matrix) {
 			if (yt->kind == Type_Matrix) {
 				return lb_emit_matrix_mul(p, lhs, rhs, type);
@@ -934,21 +935,36 @@ lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue 
 		}
 		
 	} else {
-		GB_ASSERT(are_types_identical(xt, yt));
+		if (is_type_matrix(lhs.type)) {
+			rhs = lb_emit_conv(p, rhs, lhs.type);
+		} else {
+			lhs = lb_emit_conv(p, lhs, rhs.type);
+		}
+		
+		Type *xt = base_type(lhs.type);
+		Type *yt = base_type(rhs.type);
+		
+		GB_ASSERT_MSG(are_types_identical(xt, yt), "%s %.*s %s", type_to_string(lhs.type), LIT(token_strings[op]), type_to_string(rhs.type));
 		GB_ASSERT(xt->kind == Type_Matrix);
 		// element-wise arithmetic
 		// pretend it is an array
 		lbValue array_lhs = lhs;
 		lbValue array_rhs = rhs;
 		Type *array_type = alloc_type_array(xt->Matrix.elem, matrix_type_total_elems(xt));
-		GB_ASSERT(type_size_of(array_type) == type_size_of(type));
+		GB_ASSERT(type_size_of(array_type) == type_size_of(xt));
 		
 		array_lhs.type = array_type; 
 		array_rhs.type = array_type;
 
-		lbValue array = lb_emit_arith_array(p, op, array_lhs, array_rhs, array_type);
-		array.type = type;
-		return array;
+		if (token_is_comparison(op)) {
+			lbValue res = lb_emit_comp(p, op, array_lhs, array_rhs);
+			return lb_emit_conv(p, res, type);
+		} else {
+			lbValue array = lb_emit_arith(p, op, array_lhs, array_rhs, array_type);
+			array.type = type;
+			return array;
+		}
+
 	}
 	
 	GB_PANIC("TODO: lb_emit_arith_matrix");

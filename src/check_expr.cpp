@@ -657,6 +657,14 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return distance + 6;
 		}
 	}
+	
+	if (is_type_matrix(dst)) {
+		Type *elem = base_array_type(dst);
+		i64 distance = check_distance_between_types(c, operand, elem);
+		if (distance >= 0) {
+			return distance + 7;
+		}
+	}
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
