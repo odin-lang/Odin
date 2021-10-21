@@ -2460,6 +2460,24 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
 		return true;
 	}
+	
+	if (is_type_matrix(src) && is_type_matrix(dst)) {
+		GB_ASSERT(src->kind == Type_Matrix);
+		GB_ASSERT(dst->kind == Type_Matrix);
+		if (!are_types_identical(src->Matrix.elem, dst->Matrix.elem)) {
+			return false;
+		}
+		
+		if (src->Matrix.row_count != src->Matrix.column_count) {
+			return false;
+		}
+		
+		if (dst->Matrix.row_count != dst->Matrix.column_count) {
+			return false;
+		}
+		
+		return true;
+	}
 
 
 	// Cast between pointers
@@ -8838,6 +8856,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_EnumType:
 	case Ast_MapType:
 	case Ast_BitSetType:
+	case Ast_MatrixType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
