@@ -1154,7 +1154,11 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (show_error) {
-			error(operand.expr, "Cannot determine polymorphic type from parameter");
+			gbString pts = type_to_string(poly_type);
+			gbString ots = type_to_string(operand.type);
+			defer (gb_string_free(pts));
+			defer (gb_string_free(ots));
+			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
 		}
 		return t_invalid;
 	}
@@ -2839,10 +2843,6 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	
 	
 	case_ast_node(mt, MatrixType, e);
-		bool ips = ctx->in_polymorphic_specialization;
-		defer (ctx->in_polymorphic_specialization = ips);
-		ctx->in_polymorphic_specialization = false;
-
 		check_matrix_type(ctx, type, e);
 		set_base_type(named_type, *type);
 		return true;
