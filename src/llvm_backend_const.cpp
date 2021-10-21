@@ -524,7 +524,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
 		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
 				
-		i64 total_elem_count = matrix_type_total_elems(type);
+		i64 total_elem_count = matrix_type_total_internal_elems(type);
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)total_elem_count);		
 		for (i64 i = 0; i < row; i++) {
 			elems[matrix_indices_to_offset(type, i, i)] = single_elem.value;
@@ -990,7 +990,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			}
 			
 			i64 max_count = type->Matrix.row_count*type->Matrix.column_count;
-			i64 total_count = matrix_type_total_elems(type);
+			i64 total_count = matrix_type_total_internal_elems(type);
 			
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)total_count);
 			if (cl->elems[0]->kind == Ast_FieldValue) {

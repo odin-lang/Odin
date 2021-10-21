@@ -508,7 +508,7 @@ LLVMValueRef lb_matrix_to_vector(lbProcedure *p, lbValue matrix) {
 	GB_ASSERT(mt->kind == Type_Matrix);
 	LLVMTypeRef elem_type = lb_type(p->module, mt->Matrix.elem);
 	
-	unsigned total_count = cast(unsigned)matrix_type_total_elems(mt);
+	unsigned total_count = cast(unsigned)matrix_type_total_internal_elems(mt);
 	LLVMTypeRef total_matrix_type = LLVMVectorType(elem_type, total_count);
 	
 	LLVMValueRef ptr = lb_address_from_load_or_generate_local(p, matrix).value;
@@ -948,7 +948,7 @@ lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue 
 		// pretend it is an array
 		lbValue array_lhs = lhs;
 		lbValue array_rhs = rhs;
-		Type *array_type = alloc_type_array(xt->Matrix.elem, matrix_type_total_elems(xt));
+		Type *array_type = alloc_type_array(xt->Matrix.elem, matrix_type_total_internal_elems(xt));
 		GB_ASSERT(type_size_of(array_type) == type_size_of(xt));
 		
 		array_lhs.type = array_type; 
@@ -1941,15 +1941,33 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		GB_ASSERT(dst->kind == Type_Matrix);
 		GB_ASSERT(src->kind == Type_Matrix);
 		lbAddr v = lb_add_local_generated(p, t, true);
-		for (i64 j = 0; j < dst->Matrix.column_count; j++) {
-			for (i64 i = 0; i < dst->Matrix.row_count; i++) {
-				if (i < src->Matrix.row_count && j < src->Matrix.column_count) {
-					lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
+		
+		if (is_matrix_square(dst) && is_matrix_square(dst)) {
+			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+					if (i < src->Matrix.row_count && j < src->Matrix.column_count) {
+						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
+						lbValue s = lb_emit_matrix_ev(p, value, i, j);
+						lb_emit_store(p, d, s);
+					} else if (i == j) {
+						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
+						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), true);
+						lb_emit_store(p, d, s);
+					}
+				}
+			}
+		} else {
+			i64 dst_count = dst->Matrix.row_count*dst->Matrix.column_count;
+			i64 src_count = src->Matrix.row_count*src->Matrix.column_count;
+			GB_ASSERT(dst_count == src_count);
+			
+			for (i64 j = 0; j < src->Matrix.column_count; j++) {
+				for (i64 i = 0; i < src->Matrix.row_count; i++) {
 					lbValue s = lb_emit_matrix_ev(p, value, i, j);
-					lb_emit_store(p, d, s);
-				} else if (i == j) {
-					lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
-					lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), true);
+					i64 index = i + j*src->Matrix.row_count;					
+					i64 dst_i = index%dst->Matrix.row_count;
+					i64 dst_j = index/dst->Matrix.row_count;
+					lbValue d = lb_emit_matrix_epi(p, v.addr, dst_i, dst_j);
 					lb_emit_store(p, d, s);
 				}
 			}
