@@ -3809,6 +3809,43 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_ast_node(ac, AutoCast, expr);
 		return lb_build_addr(p, ac->expr);
 	case_end;
+	
+	case_ast_node(te, TernaryIfExpr, expr);
+		LLVMValueRef incoming_values[2] = {};
+		LLVMBasicBlockRef incoming_blocks[2] = {};
+
+		GB_ASSERT(te->y != nullptr);
+		lbBlock *then  = lb_create_block(p, "if.then");
+		lbBlock *done  = lb_create_block(p, "if.done"); // NOTE(bill): Append later
+		lbBlock *else_ = lb_create_block(p, "if.else");
+
+		lbValue cond = lb_build_cond(p, te->cond, then, else_);
+		lb_start_block(p, then);
+
+		Type *ptr_type = alloc_type_pointer(default_type(type_of_expr(expr)));
+
+		incoming_values[0] = lb_emit_conv(p, lb_build_addr_ptr(p, te->x), ptr_type).value;
+
+		lb_emit_jump(p, done);
+		lb_start_block(p, else_);
+
+		incoming_values[1] = lb_emit_conv(p, lb_build_addr_ptr(p, te->y), ptr_type).value;
+
+		lb_emit_jump(p, done);
+		lb_start_block(p, done);
+
+		lbValue res = {};
+		res.value = LLVMBuildPhi(p->builder, lb_type(p->module, ptr_type), "");
+		res.type = ptr_type;
+
+		GB_ASSERT(p->curr_block->preds.count >= 2);
+		incoming_blocks[0] = p->curr_block->preds[0]->block;
+		incoming_blocks[1] = p->curr_block->preds[1]->block;
+
+		LLVMAddIncoming(res.value, incoming_values, incoming_blocks, 2);
+
+		return lb_addr(res);
+	case_end;
 	}
 
 	TokenPos token_pos = ast_token(expr).pos;
