@@ -2469,7 +2469,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		}
 		
 		if (src->Matrix.row_count != src->Matrix.column_count) {
-			return false;
+			i64 src_count = src->Matrix.row_count*src->Matrix.column_count;
+			i64 dst_count = dst->Matrix.row_count*dst->Matrix.column_count;
+			return src_count == dst_count;
 		}
 		
 		if (dst->Matrix.row_count != dst->Matrix.column_count) {
