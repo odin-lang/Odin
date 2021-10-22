@@ -1111,10 +1111,7 @@ void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type
 void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	if (c->untyped != nullptr) {
 		map_remove(c->untyped, hash_pointer(e));
-		if (map_get(c->untyped, hash_pointer(e)) != nullptr) {
-			map_remove(c->untyped, hash_pointer(e));
-			GB_ASSERT(map_get(c->untyped, hash_pointer(e)) == nullptr);
-		}
+		GB_ASSERT(map_get(c->untyped, hash_pointer(e)) == nullptr);
 	} else {
 		auto *untyped = &c->info->global_untyped;
 		mutex_lock(&c->info->global_untyped_mutex);
@@ -1196,7 +1193,12 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 	while (prev_expr != expr) {
 		prev_expr = expr;
 		expr->tav.mode = mode;
-		expr->tav.type = type;
+		if (type != nullptr && expr->tav.type != nullptr && 
+		    is_type_any(type) && is_type_untyped(expr->tav.type)) {
+			// ignore
+		} else {
+			expr->tav.type = type;
+		}
 
 		if (mode == Addressing_Constant || mode == Addressing_Invalid) {
 			expr->tav.value = value;

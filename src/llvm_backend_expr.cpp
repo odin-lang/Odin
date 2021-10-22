@@ -762,12 +762,6 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_Xor:
 	case Token_AndNot: {
 		Type *type = default_type(tv.type);
-		if (is_type_typed(be->left->tav.type) && is_type_untyped(be->right->tav.type)) {
-			be->right->tav.type = be->left->tav.type;
-		} else if (is_type_untyped(be->left->tav.type) && is_type_typed(be->right->tav.type)) {
-			be->left->tav.type = type_of_expr(be->right);
-		}
-		
 		lbValue left = lb_build_expr(p, be->left);
 		lbValue right = lb_build_expr(p, be->right);
 		return lb_emit_arith(p, be->op.kind, left, right, type);
