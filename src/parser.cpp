@@ -1228,6 +1228,9 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 }
 
 bool ignore_newlines(AstFile *f) {
+	if (f->ignoring_newlines) {
+		return true;
+	}
 	if (f->allow_newline) {
 		return f->expr_level > 0;
 	}
@@ -3585,6 +3588,8 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 	bool seen_ellipsis = false;
 	bool is_signature = (allowed_flags & FieldFlag_Signature) == FieldFlag_Signature;
 
+	f->ignoring_newlines = true;
+
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
@@ -3739,6 +3744,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			}
 		}
 
+		f->ignoring_newlines = false;
 		if (name_count_) *name_count_ = total_name_count;
 		return ast_field_list(f, start_token, params);
 	}
@@ -3760,6 +3766,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		array_add(&params, param);
 	}
 
+	f->ignoring_newlines = false;
 	if (name_count_) *name_count_ = total_name_count;
 	return ast_field_list(f, start_token, params);
 }
