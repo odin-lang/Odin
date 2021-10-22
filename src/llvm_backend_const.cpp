@@ -329,7 +329,7 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 		debug_print_big_int(a);
 		gb_printf_err("%s -> %tu\n", type_to_string(original_type), sz);;
 	}
-	GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu", max_count, sz, written);
+	GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu, type %s", max_count, sz, written, type_to_string(original_type));
 	GB_ASSERT(gb_size_of(rop64) >= sz);
 
 	mp_err err = mp_pack(rop, sz, &written,
