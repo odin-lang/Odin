@@ -2258,9 +2258,9 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): The commented out code below is just for debug purposes only
-		// GB_ASSERT_MSG(!is_type_untyped(tv.type), "%s @ %s\n%s", type_to_string(tv.type), token_pos_to_string(expr_pos), expr_to_string(expr));
 		// if (is_type_untyped(type)) {
-		// 	gb_printf_err("%s %s\n", token_pos_to_string(expr_pos), expr_to_string(expr));
+		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav.type), expr);
+		// 	GB_PANIC("%s\n", type_to_string(tv.type));
 		// }
 
 		// NOTE(bill): Short on constant values
