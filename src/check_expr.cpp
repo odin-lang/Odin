@@ -3017,14 +3017,14 @@ void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final)
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
 				add_type_and_value(c->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
 				if (e->kind == Ast_TernaryIfExpr) {
-					goto propagate;
+					update_untyped_expr_type(c, e->TernaryIfExpr.x, type, final);
+					update_untyped_expr_type(c, e->TernaryIfExpr.y, type, final);
 				}
 			}
 		}
 		return;
 	}
 
-propagate:;
 	switch (e->kind) {
 	case_ast_node(ue, UnaryExpr, e);
 		if (old->value.kind != ExactValue_Invalid) {
