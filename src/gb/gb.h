@@ -6030,8 +6030,11 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 
 	struct stat stat_existing;
 	fstat(existing_fd, &stat_existing);
-
 	size = sendfile(new_fd, existing_fd, 0, stat_existing.st_size);
+	
+	// set new handle to wanted size for safety
+	int i = ftruncate(new_fd, size);
+	GB_ASSERT(i == 0);
 
 	close(new_fd);
 	close(existing_fd);
