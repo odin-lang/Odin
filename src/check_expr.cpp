@@ -829,7 +829,7 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 			operand->mode = Addressing_Invalid;
 		}
 
-
+		convert_to_typed(c, operand, type);
 		return;
 	}
 
@@ -837,6 +837,8 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
 			add_type_info_type(c, operand->type);
 			add_type_and_value(c->info, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
+		} else {
+			convert_to_typed(c, operand, type);
 		}
 	} else {
 		gbString expr_str    = expr_to_string(operand->expr);
@@ -3014,11 +3016,15 @@ void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final)
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
 				add_type_and_value(c->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+				if (e->kind == Ast_TernaryIfExpr) {
+					goto propagate;
+				}
 			}
 		}
 		return;
 	}
 
+propagate:;
 	switch (e->kind) {
 	case_ast_node(ue, UnaryExpr, e);
 		if (old->value.kind != ExactValue_Invalid) {
@@ -6742,13 +6748,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			type = y.type;
 		}
 
-		o->type = type;
+		o->type = x.type;
 		o->mode = Addressing_Value;
+		o->expr = node;
 		if (type_hint != nullptr && is_type_untyped(type)) {
 			if (check_cast_internal(c, &x, type_hint) &&
 			    check_cast_internal(c, &y, type_hint)) {
+				convert_to_typed(c, o, type_hint);
 				update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
-				o->type = type_hint;
 			}
 		}
 	case_end;

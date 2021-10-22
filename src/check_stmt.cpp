@@ -1728,6 +1728,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				Entity *e = pt->results->Tuple.variables[i];
 				Operand *o = &operands[i];
 				check_assignment(ctx, o, e->type, str_lit("return statement"));
+				convert_to_typed(ctx, o, e->type);
+				
 				if (is_type_untyped(o->type)) {
 					update_untyped_expr_type(ctx, o->expr, e->type, true);
 				}
