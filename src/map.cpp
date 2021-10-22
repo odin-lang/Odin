@@ -114,16 +114,17 @@ gb_internal isize map__add_entry(Map<T> *h, HashKey const &key) {
 template <typename T>
 gb_internal MapFindResult map__find(Map<T> *h, HashKey const &key) {
 	MapFindResult fr = {-1, -1, -1};
-	if (h->hashes.count > 0) {
-		fr.hash_index = key.key & (h->hashes.count-1);
-		fr.entry_index = h->hashes.data[fr.hash_index];
-		while (fr.entry_index >= 0) {
-			if (hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = h->entries.data[fr.entry_index].next;
+	if (h->hashes.count == 0) {
+		return fr;
+	}
+	fr.hash_index = key.key & (h->hashes.count-1);
+	fr.entry_index = h->hashes.data[fr.hash_index];
+	while (fr.entry_index >= 0) {
+		if (hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
+			return fr;
 		}
+		fr.entry_prev = fr.entry_index;
+		fr.entry_index = h->entries.data[fr.entry_index].next;
 	}
 	return fr;
 }
@@ -131,16 +132,17 @@ gb_internal MapFindResult map__find(Map<T> *h, HashKey const &key) {
 template <typename T>
 gb_internal MapFindResult map__find_from_entry(Map<T> *h, MapEntry<T> *e) {
 	MapFindResult fr = {-1, -1, -1};
-	if (h->hashes.count > 0) {
-		fr.hash_index  = e->key.key & (h->hashes.count-1);
-		fr.entry_index = h->hashes.data[fr.hash_index];
-		while (fr.entry_index >= 0) {
-			if (&h->entries.data[fr.entry_index] == e) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = h->entries.data[fr.entry_index].next;
+	if (h->hashes.count == 0) {
+		return fr;
+	}
+	fr.hash_index  = e->key.key & (h->hashes.count-1);
+	fr.entry_index = h->hashes.data[fr.hash_index];
+	while (fr.entry_index >= 0) {
+		if (&h->entries.data[fr.entry_index] == e) {
+			return fr;
 		}
+		fr.entry_prev = fr.entry_index;
+		fr.entry_index = h->entries.data[fr.entry_index].next;
 	}
 	return fr;
 }
@@ -246,6 +248,8 @@ void map__erase(Map<T> *h, MapFindResult const &fr) {
 		return;
 	}
 	h->entries.data[fr.entry_index] = h->entries.data[h->entries.count-1];
+	array_pop(&h->entries);
+	
 	last = map__find(h, h->entries.data[fr.entry_index].key);
 	if (last.entry_prev >= 0) {
 		h->entries.data[last.entry_prev].next = fr.entry_index;
