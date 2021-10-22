@@ -837,8 +837,6 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
 			add_type_info_type(c, operand->type);
 			add_type_and_value(c->info, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
-		} else {
-			convert_to_typed(c, operand, type);
 		}
 	} else {
 		gbString expr_str    = expr_to_string(operand->expr);
@@ -3226,9 +3224,9 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 
 			case Basic_UntypedNil:
 				if (is_type_any(target_type)) {
-					target_type = t_untyped_nil;
+					// target_type = t_untyped_nil;
 				} else if (is_type_cstring(target_type)) {
-					target_type = t_untyped_nil;
+					// target_type = t_untyped_nil;
 				} else if (!type_has_nil(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
@@ -3375,6 +3373,14 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			return;
 		}
 		break;
+	}
+	
+	if (is_type_any(target_type) && is_type_untyped(operand->type)) {
+		if (is_type_untyped_nil(operand->type) && is_type_untyped_undef(operand->type)) {
+				
+		} else {
+			target_type = default_type(operand->type);
+		}
 	}
 
 	update_untyped_expr_type(c, operand->expr, target_type, true);
@@ -6743,15 +6749,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
-		Type *type = x.type;
-		if (is_type_untyped_nil(type) || is_type_untyped_undef(type)) {
-			type = y.type;
+		o->type = x.type;
+		if (is_type_untyped_nil(o->type) || is_type_untyped_undef(o->type)) {
+			o->type = y.type;
 		}
 
-		o->type = x.type;
 		o->mode = Addressing_Value;
 		o->expr = node;
-		if (type_hint != nullptr && is_type_untyped(type)) {
+		if (type_hint != nullptr && is_type_untyped(o->type)) {
 			if (check_cast_internal(c, &x, type_hint) &&
 			    check_cast_internal(c, &y, type_hint)) {
 				convert_to_typed(c, o, type_hint);
