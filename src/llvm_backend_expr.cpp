@@ -2806,17 +2806,18 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	TokenPos expr_pos = ast_token(expr).pos;
 	TypeAndValue tv = type_and_value_of_expr(expr);
+	Type *type = type_of_expr(expr);
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): The commented out code below is just for debug purposes only
-		// GB_ASSERT_MSG(!is_type_untyped(tv.type), "%s @ %s\n%s", type_to_string(tv.type), token_pos_to_string(expr_pos), expr_to_string(expr));
-		// if (is_type_untyped(tv.type)) {
-		// 	gb_printf_err("%s %s\n", token_pos_to_string(expr_pos), expr_to_string(expr));
+		// if (is_type_untyped(type)) {
+		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav.type), expr);
+		// 	GB_PANIC("%s\n", type_to_string(tv.type));
 		// }
 
 		// NOTE(bill): Short on constant values
-		return lb_const_value(p->module, tv.type, tv.value);
+		return lb_const_value(p->module, type, tv.value);
 	}
 
 	#if 0
@@ -2847,12 +2848,12 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(u, Undef, expr)
 		lbValue res = {};
-		if (is_type_untyped(tv.type)) {
+		if (is_type_untyped(type)) {
 			res.value = nullptr;
 			res.type  = t_untyped_undef;
 		} else {
-			res.value = LLVMGetUndef(lb_type(m, tv.type));
-			res.type  = tv.type;
+			res.value = LLVMGetUndef(lb_type(m, type));
+			res.type  = type;
 		}
 		return res;
 	case_end;
@@ -2893,7 +2894,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode == Addressing_Constant);
 
-		return lb_const_value(p->module, tv.type, tv.value);
+		return lb_const_value(p->module, type, tv.value);
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, expr);
@@ -2966,7 +2967,6 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ta, TypeAssertion, expr);
 		TokenPos pos = ast_token(expr).pos;
-		Type *type = tv.type;
 		lbValue e = lb_build_expr(p, ta->expr);
 		Type *t = type_deref(e.type);
 		if (is_type_union(t)) {
@@ -2986,16 +2986,16 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		lbValue e = lb_build_expr(p, tc->expr);
 		switch (tc->token.kind) {
 		case Token_cast:
-			return lb_emit_conv(p, e, tv.type);
+			return lb_emit_conv(p, e, type);
 		case Token_transmute:
-			return lb_emit_transmute(p, e, tv.type);
+			return lb_emit_transmute(p, e, type);
 		}
 		GB_PANIC("Invalid AST TypeCast");
 	case_end;
 
 	case_ast_node(ac, AutoCast, expr);
 		lbValue value = lb_build_expr(p, ac->expr);
-		return lb_emit_conv(p, value, tv.type);
+		return lb_emit_conv(p, value, type);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
@@ -3005,7 +3005,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		default:
 			{
 				lbValue v = lb_build_expr(p, ue->expr);
-				return lb_emit_unary_arith(p, ue->op.kind, v, tv.type);
+				return lb_emit_unary_arith(p, ue->op.kind, v, type);
 			}
 		}
 	case_end;

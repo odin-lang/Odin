@@ -13,6 +13,8 @@ create_multi_logger :: proc(logs: ..Logger) -> Logger {
 }
 
 destroy_multi_logger :: proc(log : ^Logger) {
+	data := (^Multi_Logger_Data)(log.data)
+	delete(data.loggers)
 	free(log.data)
 	log^ = nil_logger()
 }

@@ -177,8 +177,70 @@ mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment
 	new_ptr = raw_data(new_data)
 	return
 }
-memory_equal :: proc "contextless" (a, b: rawptr, n: int) -> bool {
-	return memory_compare(a, b, n) == 0
+memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
+	switch {
+	case n == 0: return true
+	case x == y: return true
+	}
+	
+	a, b := ([^]byte)(x), ([^]byte)(y)
+	length := uint(n)
+	
+	when size_of(uint) == 8 {
+		if word_length := length >> 3; word_length != 0 {
+			for i in 0..<word_length {
+				if intrinsics.unaligned_load((^u64)(a)) != intrinsics.unaligned_load((^u64)(b)) {
+					return false
+				}
+				a = a[size_of(u64):]
+				b = b[size_of(u64):]
+			}
+		}
+		
+		if length & 4 != 0 {
+			if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
+				return false
+			}
+			a = a[size_of(u32):]
+			b = b[size_of(u32):]
+		}
+		
+		if length & 2 != 0 {
+			if intrinsics.unaligned_load((^u16)(a)) != intrinsics.unaligned_load((^u16)(b)) {
+				return false
+			}
+			a = a[size_of(u16):]
+			b = b[size_of(u16):]
+		}
+		
+		if length & 1 != 0 && a[0] != b[0] {
+			return false	
+		}
+		return true
+	} else {
+		if word_length := length >> 2; word_length != 0 {
+			for i in 0..<word_length {
+				if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
+					return false
+				}
+				a = a[size_of(u32):]
+				b = b[size_of(u32):]
+			}
+		}
+		
+		length &= 3
+		
+		if length != 0 {
+			for i in 0..<length {
+				if a[i] != b[i] {
+					return false
+				}
+			}
+		}
+
+		return true
+	}
+
 }
 memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
 	switch {
@@ -258,15 +320,13 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 	return 0
 }
 
-string_eq :: proc "contextless" (a, b: string) -> bool {
-	x := transmute(Raw_String)a
-	y := transmute(Raw_String)b
-	switch {
-	case x.len != y.len: return false
-	case x.len == 0:      return true
-	case x.data == y.data:   return true
+string_eq :: proc "contextless" (lhs, rhs: string) -> bool {
+	x := transmute(Raw_String)lhs
+	y := transmute(Raw_String)rhs
+	if x.len != y.len {
+		return false
 	}
-	return string_cmp(a, b) == 0
+	return #force_inline memory_equal(x.data, y.data, x.len)
 }
 
 string_cmp :: proc "contextless" (a, b: string) -> int {
@@ -708,7 +768,7 @@ floattidf :: proc "c" (a: i128) -> f64 {
 		a += 1
 		a >>= 2
 
-		if a & (1 << DBL_MANT_DIG) != 0 {
+		if a & (i128(1) << DBL_MANT_DIG) != 0 {
 			a >>= 1
 			e += 1
 		}
