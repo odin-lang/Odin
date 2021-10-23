@@ -354,8 +354,8 @@ foreign ENet {
 
 	address_set_host_ip            :: proc(address: ^Address, hostName: cstring) -> i32 ---
 	address_set_host               :: proc(address: ^Address, hostName: cstring) -> i32 ---
-	address_get_host_ip            :: proc(address: ^Address, hostName: cstring, nameLength: uint) -> i32 ---
-	address_get_host               :: proc(address: ^Address, hostName: cstring, nameLength: uint) -> i32 ---
+	address_get_host_ip            :: proc(address: ^Address, hostName: [^]u8, nameLength: uint) -> i32 ---
+	address_get_host               :: proc(address: ^Address, hostName: [^]u8, nameLength: uint) -> i32 ---
 
 	packet_create                  :: proc(rawptr, uint, u32) -> ^Packet ---
 	packet_destroy                 :: proc(^Packet) ---
