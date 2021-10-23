@@ -258,15 +258,72 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 	return 0
 }
 
-string_eq :: proc "contextless" (a, b: string) -> bool {
-	x := transmute(Raw_String)a
-	y := transmute(Raw_String)b
+string_eq :: proc "contextless" (lhs, rhs: string) -> bool {
+	x := transmute(Raw_String)lhs
+	y := transmute(Raw_String)rhs
 	switch {
-	case x.len != y.len: return false
-	case x.len == 0:      return true
-	case x.data == y.data:   return true
+	case x.len != y.len:   return false
+	case x.len == 0:       return true
+	case x.data == y.data: return true
 	}
-	return string_cmp(a, b) == 0
+	
+	a, b := x.data, y.data
+	length := uint(x.len)
+	
+	when size_of(uint) == 8 {
+		if word_length := length >> 3; word_length != 0 {
+			for i in 0..<word_length {
+				if intrinsics.unaligned_load((^u64)(a)) != intrinsics.unaligned_load((^u64)(b)) {
+					return false
+				}
+				a = a[size_of(u64):]
+				b = b[size_of(u64):]
+			}
+		}
+		
+		if length & 4 != 0 {
+			if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
+				return false
+			}
+			a = a[size_of(u32):]
+			b = b[size_of(u32):]
+		}
+		
+		if length & 2 != 0 {
+			if intrinsics.unaligned_load((^u16)(a)) != intrinsics.unaligned_load((^u16)(b)) {
+				return false
+			}
+			a = a[size_of(u16):]
+			b = b[size_of(u16):]
+		}
+		
+		if length & 1 != 0 && a[0] != b[0] {
+			return false	
+		}
+		return true
+	} else {
+		if word_length := length >> 2; word_length != 0 {
+			for i in 0..<word_length {
+				if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
+					return false
+				}
+				a = a[size_of(u32):]
+				b = b[size_of(u32):]
+			}
+		}
+		
+		length &= 3
+		
+		if length != 0 {
+			for i in 0..<length {
+				if a[i] != b[i] {
+					return false
+				}
+			}
+		}
+
+		return true
+	}
 }
 
 string_cmp :: proc "contextless" (a, b: string) -> int {
@@ -708,7 +765,7 @@ floattidf :: proc "c" (a: i128) -> f64 {
 		a += 1
 		a >>= 2
 
-		if a & (1 << DBL_MANT_DIG) != 0 {
+		if a & (i128(1) << DBL_MANT_DIG) != 0 {
 			a >>= 1
 			e += 1
 		}
