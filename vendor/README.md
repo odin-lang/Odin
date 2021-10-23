@@ -115,6 +115,6 @@ See also LICENSE.txt in the `portmidi` directory itself.
 
 [ENet](http://enet.bespin.org/) Reliable UDP networking library.
 
-`enet.lib` and `enet64.lib` are available under ENet's [zlib/libpng](http://enet.bespin.org/License.html) license.
+`enet.lib` and `enet64.lib` are available under ENet's [MIT](http://enet.bespin.org/License.html) license.
 
 See also LICENSE in the `ENet` directory itself.
