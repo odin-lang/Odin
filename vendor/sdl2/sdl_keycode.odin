@@ -2,11 +2,11 @@ package sdl2
 
 
 SCANCODE_MASK :: 1<<30
-SCANCODE_TO_KEYCODE :: #force_inline proc "c" (X: Scancode) -> KeyCode {
-	return KeyCode(i32(X) | SCANCODE_MASK)
+SCANCODE_TO_KEYCODE :: #force_inline proc "c" (X: Scancode) -> Keycode {
+	return Keycode(i32(X) | SCANCODE_MASK)
 }
 
-KeyCode :: enum i32 {
+Keycode :: enum i32 {
 	UNKNOWN = 0,
 
 	RETURN = '\r',
