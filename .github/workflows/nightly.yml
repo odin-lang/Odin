@@ -93,7 +93,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.x'
+          python-version: '3.8.x'
 
       - name: Install B2 CLI
         shell: bash
@@ -127,16 +127,23 @@ jobs:
           BUCKET: ${{ secrets.B2_BUCKET }}
           DAYS_TO_KEEP: ${{ secrets.B2_DAYS_TO_KEEP }}
         run: |
+          echo Authorizing B2 account
           b2 authorize-account "$APPID" "$APPKEY"
-
+          
+          echo Uploading artifcates to B2
           chmod +x ./ci/upload_create_nightly.sh
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
 
+          echo Deleting old artifacts in B2
           python3 ci/delete_old_binaries.py "$BUCKET" "$DAYS_TO_KEEP"
 
+          echo Creating nightly.json
           python3 ci/create_nightly_json.py "$BUCKET" > nightly.json
+          
+          echo Uploading nightly.json
           b2 upload-file "$BUCKET" nightly.json nightly.json
 
+          echo Clear B2 account info
           b2 clear-account
