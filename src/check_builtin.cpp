@@ -2567,6 +2567,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_volatile_store:
 		/*fallthrough*/
+	case BuiltinProc_unaligned_store:
+		/*fallthrough*/
 	case BuiltinProc_atomic_store:
 	case BuiltinProc_atomic_store_rel:
 	case BuiltinProc_atomic_store_relaxed:
@@ -2587,6 +2589,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 	case BuiltinProc_volatile_load:
+		/*fallthrough*/
+	case BuiltinProc_unaligned_load:
 		/*fallthrough*/
 	case BuiltinProc_atomic_load:
 	case BuiltinProc_atomic_load_acq:
