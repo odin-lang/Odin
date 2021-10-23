@@ -2526,6 +2526,9 @@ bool is_literal_type(Ast *node) {
 	case Ast_BitSetType:
 	case Ast_CallExpr:
 		return true;
+	case Ast_MultiPointerType:
+		// For better error messages
+		return true;
 	}
 	return false;
 }
