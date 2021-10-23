@@ -9,7 +9,7 @@ when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
 
 Keysym :: struct {
 	scancode: Scancode, /**< SDL physical key code - see ::SDL_Scancode for details */
-	sym:      KeyCode,  /**< SDL virtual key code - see ::SDL_KeyCode for details */
+	sym:      Keycode,  /**< SDL virtual key code - see ::SDL_Keycode for details */
 	mod:      Keymod,   /**< current key modifiers */
 	unused:   u32,
 }
@@ -19,12 +19,12 @@ Keysym :: struct {
 foreign lib {
 	GetKeyboardFocus        :: proc() -> ^Window ---
 	GetKeyboardState        :: proc(numkeys: ^c.int) -> [^]u8 ---
-	GetKeyFromScancode      :: proc(scancode: Scancode) -> KeyCode ---
-	GetScancodeFromKey      :: proc(key: KeyCode) -> Scancode ---
+	GetKeyFromScancode      :: proc(scancode: Scancode) -> Keycode ---
+	GetScancodeFromKey      :: proc(key: Keycode) -> Scancode ---
 	GetScancodeName         :: proc(scancode: Scancode) -> cstring ---
 	GetScancodeFromName     :: proc(name: cstring) -> Scancode ---
-	GetKeyName              :: proc(key: KeyCode) -> cstring ---
-	GetKeyFromName          :: proc(name: cstring) -> KeyCode ---
+	GetKeyName              :: proc(key: Keycode) -> cstring ---
+	GetKeyFromName          :: proc(name: cstring) -> Keycode ---
 	StartTextInput          :: proc() ---
 	IsTextInputActive       :: proc() -> bool ---
 	StopTextInput           :: proc() ---

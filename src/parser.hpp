@@ -28,9 +28,9 @@ enum AddressingMode : u8 {
 };
 
 struct TypeAndValue {
+	Type *         type;
 	AddressingMode mode;
 	bool           is_lhs; // Debug info
-	Type *         type;
 	ExactValue     value;
 };
 

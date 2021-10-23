@@ -837,7 +837,7 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 			operand->mode = Addressing_Invalid;
 		}
 
-
+		convert_to_typed(c, operand, type);
 		return;
 	}
 
@@ -3208,6 +3208,10 @@ void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final)
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
 				add_type_and_value(c->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+				if (e->kind == Ast_TernaryIfExpr) {
+					update_untyped_expr_type(c, e->TernaryIfExpr.x, type, final);
+					update_untyped_expr_type(c, e->TernaryIfExpr.y, type, final);
+				}
 			}
 		}
 		return;
@@ -3414,9 +3418,9 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 
 			case Basic_UntypedNil:
 				if (is_type_any(target_type)) {
-					target_type = t_untyped_nil;
+					// target_type = t_untyped_nil;
 				} else if (is_type_cstring(target_type)) {
-					target_type = t_untyped_nil;
+					// target_type = t_untyped_nil;
 				} else if (!type_has_nil(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
@@ -3586,6 +3590,14 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			return;
 		}
 		break;
+	}
+	
+	if (is_type_any(target_type) && is_type_untyped(operand->type)) {
+		if (is_type_untyped_nil(operand->type) && is_type_untyped_undef(operand->type)) {
+				
+		} else {
+			target_type = default_type(operand->type);
+		}
 	}
 
 	update_untyped_expr_type(c, operand->expr, target_type, true);
@@ -7030,18 +7042,18 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
-		Type *type = x.type;
-		if (is_type_untyped_nil(type) || is_type_untyped_undef(type)) {
-			type = y.type;
+		o->type = x.type;
+		if (is_type_untyped_nil(o->type) || is_type_untyped_undef(o->type)) {
+			o->type = y.type;
 		}
 
-		o->type = type;
 		o->mode = Addressing_Value;
-		if (type_hint != nullptr && is_type_untyped(type)) {
+		o->expr = node;
+		if (type_hint != nullptr && is_type_untyped(o->type)) {
 			if (check_cast_internal(c, &x, type_hint) &&
 			    check_cast_internal(c, &y, type_hint)) {
+				convert_to_typed(c, o, type_hint);
 				update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
-				o->type = type_hint;
 			}
 		}
 	case_end;

@@ -2572,6 +2572,9 @@ bool is_literal_type(Ast *node) {
 	case Ast_MatrixType:
 	case Ast_CallExpr:
 		return true;
+	case Ast_MultiPointerType:
+		// For better error messages
+		return true;
 	}
 	return false;
 }
@@ -5426,8 +5429,7 @@ bool parse_file(Parser *p, AstFile *f) {
 							// Ignore
 						} else if (f->flags & AstFile_IsTest) {
 							// Ignore
-						} else if (build_context.command_kind == Command_doc &&
-						           f->pkg->kind == Package_Init) {
+						} else if (f->pkg->kind == Package_Init && build_context.command_kind == Command_doc) {
 							// Ignore
 						} else {
 							f->flags |= AstFile_IsLazy;
