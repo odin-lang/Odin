@@ -117,4 +117,4 @@ See also LICENSE.txt in the `portmidi` directory itself.
 
 `enet.lib` and `enet64.lib` are available under ENet's [zlib/libpng](http://enet.bespin.org/License.html) license.
 
-See also LICENSE in the `ENet` directory iself.
+See also LICENSE in the `ENet` directory itself.
