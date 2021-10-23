@@ -22,10 +22,10 @@ VERSION_GET_MAJOR :: #force_inline proc(version: u32) -> u8 {
 	return u8((version >> 16) & 0xff)
 }
 VERSION_GET_MINOR :: #force_inline proc(version: u32) -> u8 {
-	return u8((version >> 8) & 0xff);
+	return u8((version >> 8) & 0xff)
 }
 VERSION_GET_PATCH :: #force_inline proc(version: u32) -> u8 {
-	return u8(version & 0xff);
+	return u8(version & 0xff)
 }
 
 // Odin does not have "macros" or compile-time evaluation of functions, so the
