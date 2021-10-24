@@ -165,9 +165,10 @@ Type_Info_Relative_Slice :: struct {
 Type_Info_Matrix :: struct {
 	elem:         ^Type_Info,
 	elem_size:    int,
-	elem_stride:  int, 
+	elem_stride:  int, // elem_stride >= row_count
 	row_count:    int,
 	column_count: int,
+	// Total element count = column_count * elem_stride
 }
 
 Type_Info_Flag :: enum u8 {
