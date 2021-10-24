@@ -511,10 +511,16 @@ LLVMValueRef lb_matrix_to_vector(lbProcedure *p, lbValue matrix) {
 	unsigned total_count = cast(unsigned)matrix_type_total_internal_elems(mt);
 	LLVMTypeRef total_matrix_type = LLVMVectorType(elem_type, total_count);
 	
+#if 1
 	LLVMValueRef ptr = lb_address_from_load_or_generate_local(p, matrix).value;
 	LLVMValueRef matrix_vector_ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(total_matrix_type, 0), "");
 	LLVMValueRef matrix_vector = LLVMBuildLoad(p->builder, matrix_vector_ptr, "");
+	LLVMSetAlignment(matrix_vector, cast(unsigned)type_align_of(mt));
 	return matrix_vector;
+#else
+	LLVMValueRef matrix_vector = LLVMBuildBitCast(p->builder, matrix.value, total_matrix_type, "");
+	return matrix_vector;
+#endif
 }
 
 LLVMValueRef lb_matrix_trimmed_vector_mask(lbProcedure *p, Type *mt) {
@@ -524,7 +530,6 @@ LLVMValueRef lb_matrix_trimmed_vector_mask(lbProcedure *p, Type *mt) {
 	unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
 	unsigned row_count = cast(unsigned)mt->Matrix.row_count;
 	unsigned column_count = cast(unsigned)mt->Matrix.column_count;
-	
 	unsigned mask_elems_index = 0;
 	auto mask_elems = slice_make<LLVMValueRef>(permanent_allocator(), row_count*column_count);
 	for (unsigned j = 0; j < column_count; j++) {
@@ -540,7 +545,17 @@ LLVMValueRef lb_matrix_trimmed_vector_mask(lbProcedure *p, Type *mt) {
 
 LLVMValueRef lb_matrix_to_trimmed_vector(lbProcedure *p, lbValue m) {
 	LLVMValueRef vector = lb_matrix_to_vector(p, m);
-	LLVMValueRef mask = lb_matrix_trimmed_vector_mask(p, m.type);
+	
+	Type *mt = base_type(m.type);
+	GB_ASSERT(mt->kind == Type_Matrix);
+	
+	unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
+	unsigned row_count = cast(unsigned)mt->Matrix.row_count;
+	if (stride == row_count) {
+		return vector;
+	}
+	
+	LLVMValueRef mask = lb_matrix_trimmed_vector_mask(p, mt);
 	LLVMValueRef trimmed_vector = LLVMBuildShuffleVector(p->builder, vector, LLVMGetUndef(LLVMTypeOf(vector)), mask, "");
 	return trimmed_vector;
 }
@@ -791,7 +806,7 @@ lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 		
 		for (unsigned row_index = 0; row_index < column_count; row_index++) {
 			LLVMValueRef value = lb_emit_struct_ev(p, rhs, row_index).value;
-			LLVMValueRef row = llvm_splat(p, value, row_count);
+			LLVMValueRef row = llvm_vector_broadcast(p, value, row_count);
 			v_rows[row_index] = row;
 		}
 		
@@ -866,7 +881,7 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 		
 		for (unsigned column_index = 0; column_index < row_count; column_index++) {
 			LLVMValueRef value = lb_emit_struct_ev(p, lhs, column_index).value;
-			LLVMValueRef row = llvm_splat(p, value, column_count);
+			LLVMValueRef row = llvm_vector_broadcast(p, value, column_count);
 			v_rows[column_index] = row;
 		}
 		

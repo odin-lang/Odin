@@ -2083,8 +2083,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		
 		i64 max_count = xt->Array.count*yt->Array.count;
-		if (max_count > MAX_MATRIX_ELEMENT_COUNT) {
-			error(call, "Product of the array lengths exceed the maximum matrix element count, got %d, expected a maximum of %d", cast(int)max_count, MAX_MATRIX_ELEMENT_COUNT);
+		if (max_count > MATRIX_ELEMENT_COUNT_MAX) {
+			error(call, "Product of the array lengths exceed the maximum matrix element count, got %d, expected a maximum of %d", cast(int)max_count, MATRIX_ELEMENT_COUNT_MAX);
 			return false;
 		}
 		

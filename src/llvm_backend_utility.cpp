@@ -1526,7 +1526,7 @@ LLVMValueRef llvm_mask_zero(lbModule *m, unsigned count) {
 	return LLVMConstNull(LLVMVectorType(lb_type(m, t_u32), count));
 }
 
-LLVMValueRef llvm_splat(lbProcedure *p, LLVMValueRef value, unsigned count) {
+LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef value, unsigned count) {
 	GB_ASSERT(count > 0);
 	if (LLVMIsConstant(value)) {
 		LLVMValueRef single = LLVMConstVector(&value, 1);

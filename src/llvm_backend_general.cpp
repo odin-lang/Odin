@@ -512,8 +512,7 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	}
 }
 
-bool lb_try_update_alignment(lbValue ptr, unsigned alignment)  {
-	LLVMValueRef addr_ptr = ptr.value;
+bool lb_try_update_alignment(LLVMValueRef addr_ptr, unsigned alignment) {
 	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr) || LLVMIsALoadInst(addr_ptr)) {
 		if (LLVMGetAlignment(addr_ptr) < alignment) {
 			if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
@@ -524,6 +523,11 @@ bool lb_try_update_alignment(lbValue ptr, unsigned alignment)  {
 	}
 	return false;
 }
+
+bool lb_try_update_alignment(lbValue ptr, unsigned alignment) {
+	return lb_try_update_alignment(ptr.value, alignment);
+}
+
 
 bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_) {
 	Type *array_type = base_type(type_deref(ptr.type));
