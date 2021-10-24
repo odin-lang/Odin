@@ -360,8 +360,8 @@ enum TypeInfoFlag : u32 {
 
 
 enum : int {
-	MIN_MATRIX_ELEMENT_COUNT = 1,
-	MAX_MATRIX_ELEMENT_COUNT = 16,
+	MATRIX_ELEMENT_COUNT_MIN = 1,
+	MATRIX_ELEMENT_COUNT_MAX = 16,
 };
 
 
@@ -700,6 +700,74 @@ bool is_type_pointer(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
 bool type_set_offsets(Type *t);
+Type *base_type(Type *t);
+
+i64 type_size_of_internal(Type *t, TypePath *path);
+i64 type_align_of_internal(Type *t, TypePath *path);
+
+
+// IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
+
+struct TypePath {
+	Array<Entity *> path; // Entity_TypeName;
+	bool failure;
+};
+
+
+void type_path_init(TypePath *tp) {
+	tp->path.allocator = heap_allocator();
+}
+
+void type_path_free(TypePath *tp) {
+	array_free(&tp->path);
+}
+
+void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
+	GB_ASSERT(tp != nullptr);
+
+	GB_ASSERT(start_index < tp->path.count);
+	Entity *e = tp->path[start_index];
+	GB_ASSERT(e != nullptr);
+	error(e->token, "Illegal type declaration cycle of `%.*s`", LIT(e->token.string));
+	// NOTE(bill): Print cycle, if it's deep enough
+	for (isize j = start_index; j < tp->path.count; j++) {
+		Entity *e = tp->path[j];
+		error(e->token, "\t%.*s refers to", LIT(e->token.string));
+	}
+	// NOTE(bill): This will only print if the path count > 1
+	error(e->token, "\t%.*s", LIT(e->token.string));
+	tp->failure = true;
+	e->type->failure = true;
+	base_type(e->type)->failure = true;
+}
+
+bool type_path_push(TypePath *tp, Type *t) {
+	GB_ASSERT(tp != nullptr);
+	if (t->kind != Type_Named) {
+		return false;
+	}
+	Entity *e = t->Named.type_name;
+
+	for (isize i = 0; i < tp->path.count; i++) {
+		Entity *p = tp->path[i];
+		if (p == e) {
+			type_path_print_illegal_cycle(tp, i);
+		}
+	}
+
+	array_add(&tp->path, e);
+	return true;
+}
+
+void type_path_pop(TypePath *tp) {
+	if (tp != nullptr && tp->path.count > 0) {
+		array_pop(&tp->path);
+	}
+}
+
+
+#define FAILURE_SIZE      0
+#define FAILURE_ALIGNMENT 0
 
 void init_type_mutex(void) {
 	mutex_init(&g_type_mutex);
@@ -1251,6 +1319,42 @@ bool is_type_matrix(Type *t) {
 	return t->kind == Type_Matrix;
 }
 
+i64 matrix_align_of(Type *t, struct TypePath *tp) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	Type *elem = t->Matrix.elem;
+	i64 row_count = gb_max(t->Matrix.row_count, 1);
+
+	bool pop = type_path_push(tp, elem);
+	if (tp->failure) {
+		return FAILURE_ALIGNMENT;
+	}
+
+	i64 elem_align = type_align_of_internal(elem, tp);
+	if (pop) type_path_pop(tp);
+	
+	i64 elem_size = type_size_of(elem);
+	
+
+	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
+	// It would be better for performance to pad each column so that each column
+	// could be maximally aligned but as a compromise, having no padding will be
+	// beneficial to third libraries that assume no padding
+	
+	i64 total_expected_size = row_count*t->Matrix.column_count*elem_size;
+	// i64 min_alignment = prev_pow2(elem_align * row_count);
+	i64 min_alignment = prev_pow2(total_expected_size);
+	while ((total_expected_size % min_alignment) != 0) {
+		min_alignment >>= 1;
+	}
+	GB_ASSERT(min_alignment >= elem_align);
+	
+	i64 align = gb_min(min_alignment, build_context.max_align);
+	return align;
+}
+
+
 i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
@@ -1266,21 +1370,16 @@ i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	} else {
 		elem_size = type_size_of(t->Matrix.elem);
 	}
-	
 
 	i64 stride_in_bytes = 0;
 	
+	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
+	// It would be better for performance to pad each column so that each column
+	// could be maximally aligned but as a compromise, having no padding will be
+	// beneficial to third libraries that assume no padding
 	i64 row_count = t->Matrix.row_count;
-#if 0	
-	if (row_count == 1) {
-		stride_in_bytes = elem_size;
-	} else {	
-		i64 matrix_alignment = type_align_of(t);
-		stride_in_bytes = align_formula(elem_size*row_count, matrix_alignment);
-	}
-#else
 	stride_in_bytes = elem_size*row_count;
-#endif
+	
 	t->Matrix.stride_in_bytes = stride_in_bytes;
 	return stride_in_bytes;
 }
@@ -2969,71 +3068,6 @@ Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allocator, Type 
 
 
 
-
-// IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
-
-struct TypePath {
-	Array<Entity *> path; // Entity_TypeName;
-	bool failure;
-};
-
-
-void type_path_init(TypePath *tp) {
-	tp->path.allocator = heap_allocator();
-}
-
-void type_path_free(TypePath *tp) {
-	array_free(&tp->path);
-}
-
-void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
-	GB_ASSERT(tp != nullptr);
-
-	GB_ASSERT(start_index < tp->path.count);
-	Entity *e = tp->path[start_index];
-	GB_ASSERT(e != nullptr);
-	error(e->token, "Illegal type declaration cycle of `%.*s`", LIT(e->token.string));
-	// NOTE(bill): Print cycle, if it's deep enough
-	for (isize j = start_index; j < tp->path.count; j++) {
-		Entity *e = tp->path[j];
-		error(e->token, "\t%.*s refers to", LIT(e->token.string));
-	}
-	// NOTE(bill): This will only print if the path count > 1
-	error(e->token, "\t%.*s", LIT(e->token.string));
-	tp->failure = true;
-	e->type->failure = true;
-	base_type(e->type)->failure = true;
-}
-
-bool type_path_push(TypePath *tp, Type *t) {
-	GB_ASSERT(tp != nullptr);
-	if (t->kind != Type_Named) {
-		return false;
-	}
-	Entity *e = t->Named.type_name;
-
-	for (isize i = 0; i < tp->path.count; i++) {
-		Entity *p = tp->path[i];
-		if (p == e) {
-			type_path_print_illegal_cycle(tp, i);
-		}
-	}
-
-	array_add(&tp->path, e);
-	return true;
-}
-
-void type_path_pop(TypePath *tp) {
-	if (tp != nullptr && tp->path.count > 0) {
-		array_pop(&tp->path);
-	}
-}
-
-
-#define FAILURE_SIZE      0
-#define FAILURE_ALIGNMENT 0
-
-
 i64 type_size_of_internal (Type *t, TypePath *path);
 i64 type_align_of_internal(Type *t, TypePath *path);
 i64 type_size_of(Type *t);
@@ -3260,21 +3294,8 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 	}
 	
-	case Type_Matrix: {
-		Type *elem = t->Matrix.elem;
-		i64 row_count = gb_max(t->Matrix.row_count, 1);
-
-		bool pop = type_path_push(path, elem);
-		if (path->failure) {
-			return FAILURE_ALIGNMENT;
-		}
-		// elem align is used here rather than size as it make a little more sense
-		i64 elem_align = type_align_of_internal(elem, path);
-		if (pop) type_path_pop(path);
-		
-		i64 align = gb_min(next_pow2(elem_align * row_count), build_context.max_align);
-		return align;
-	}
+	case Type_Matrix: 
+		return matrix_align_of(t, path);
 
 	case Type_RelativePointer:
 		return type_align_of_internal(t->RelativePointer.base_integer, path);
