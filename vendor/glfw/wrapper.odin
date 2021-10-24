@@ -52,7 +52,9 @@ DestroyWindow :: glfw.DestroyWindow
 WindowHint         :: glfw.WindowHint
 DefaultWindowHints :: glfw.DefaultWindowHints
 WindowHintString   :: glfw.WindowHintString
-WindowShouldClose  :: glfw.WindowShouldClose
+WindowShouldClose :: proc "c" (window: WindowHandle) -> bool {
+    return glfw.WindowShouldClose(window) != 0
+}
 
 SwapInterval :: glfw.SwapInterval
 SwapBuffers  :: glfw.SwapBuffers
