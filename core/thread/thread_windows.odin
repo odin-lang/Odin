@@ -24,7 +24,8 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
 		context = t.init_context.? or_else runtime.default_context()
-
+		
+		t.id = sync.current_thread_id()
 		t.procedure(t)
 
 		if t.init_context == nil {
