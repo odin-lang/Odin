@@ -12,6 +12,7 @@ MAX_USER_ARGUMENTS :: 8
 
 Thread :: struct {
 	using specific: Thread_Os_Specific,
+	id:             int,
 	procedure:      Thread_Proc,
 	data:           rawptr,
 	user_index:     int,
