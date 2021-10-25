@@ -260,12 +260,12 @@ matrix4x4_inverse :: proc(x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
 
 
 @(builtin)
-matrix_hermitian_adjoint :: proc(m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1, N <= 4 {
+matrix_hermitian_adjoint :: proc(m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1 {
 	return conj(transpose(m))
 }
 
 @(builtin)
-matrix_trace :: proc(m: $M/matrix[$N, N]$T) -> (trace: T) where N >= 1, N <= 4 {
+matrix_trace :: proc(m: $M/matrix[$N, N]$T) -> (trace: T) {
 	for i in 0..<N {
 		trace += m[i, i]
 	}
