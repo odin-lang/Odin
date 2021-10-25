@@ -2065,7 +2065,7 @@ LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char con
 	unsigned kind = 0;
 	String s = make_string_c(name);
 
-	#if (LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && (LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH >= 1)))
+	#if ODIN_LLVM_MINIMUM_VERSION_12
 		kind = LLVMGetEnumAttributeKindForName(name, s.len);
 		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
 		return LLVMCreateTypeAttribute(ctx, kind, type);

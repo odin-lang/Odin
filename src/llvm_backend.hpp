@@ -30,6 +30,18 @@
 #include <llvm-c/Transforms/Vectorize.h>
 #endif
 
+#if LLVM_VERSION_MAJOR < 11
+#error "LLVM Version 11 is the minimum required"
+#elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
+#error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
+#endif
+
+#if LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
+#define ODIN_LLVM_MINIMUM_VERSION_12 1
+#else
+#define ODIN_LLVM_MINIMUM_VERSION_12 0
+#endif
+
 struct lbProcedure;
 
 struct lbValue {

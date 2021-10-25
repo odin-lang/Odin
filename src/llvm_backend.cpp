@@ -21,12 +21,6 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-#if LLVM_VERSION_MAJOR < 11
-#error "LLVM Version 11 is the minimum required"
-#elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
-#error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
-#endif
-
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 	if (e == nullptr) {
@@ -1214,7 +1208,9 @@ void lb_generate_code(lbGenerator *gen) {
 		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
 		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
-		llvm_cpu = "x86-64-v2";
+		if (ODIN_LLVM_MINIMUM_VERSION_12) {
+			llvm_cpu = "x86-64-v2";
+		}
 	}
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
