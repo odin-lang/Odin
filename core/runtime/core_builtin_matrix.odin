@@ -117,12 +117,12 @@ matrix4x4_adjugate :: proc(x: $M/matrix[4, 4]$T) -> (y: M) {
 	}
 	cofactor :: proc(m: $M/matrix[4, 4]$T, row, column: i32) -> (cofactor: T) {	
 		sign: T = 1 if (row + column) % 2 == 0 else -1
-		return sign * matrix4x4_minor(m, row, column)
+		return sign * minor(m, row, column)
 	}
 	
 	for i in 0..<4 {
 		for j in 0..<4 {
-			y[i, j] = matrix4x4_cofactor(x, i, j)
+			y[i, j] = cofactor(x, i, j)
 		}
 	}
 	return
