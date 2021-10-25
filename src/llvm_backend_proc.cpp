@@ -127,16 +127,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
-	if (false) {
-		lbCallingConventionKind cc_kind = lbCallingConvention_C;
-		// TODO(bill): Clean up this logic
-		if (!is_arch_wasm()) {
-			cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-		}
-		LLVMSetFunctionCallConv(p->value, cc_kind);
-	}
-
-
+	
 	if (pt->Proc.diverging) {
 		lb_add_attribute_to_proc(m, p->value, "noreturn");
 	}

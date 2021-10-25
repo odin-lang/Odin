@@ -837,11 +837,10 @@ lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 		
 		LLVMValueRef vector = nullptr;
 		for (i64 i = 0; i < column_count; i++) {
-			LLVMValueRef product = llvm_vector_mul(p, m_columns[i], v_rows[i]);
 			if (i == 0) {
-				vector = product;
+				vector = llvm_vector_mul(p, m_columns[i], v_rows[i]);
 			} else {
-				vector = llvm_vector_add(p, vector, product);
+				vector = llvm_vector_mul_add(p, m_columns[i], v_rows[i], vector);
 			}
 		}
 		
@@ -914,11 +913,10 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 		
 		LLVMValueRef vector = nullptr;
 		for (i64 i = 0; i < row_count; i++) {
-			LLVMValueRef product = llvm_vector_mul(p, v_rows[i], m_columns[i]);
 			if (i == 0) {
-				vector = product;
+				vector = llvm_vector_mul(p, v_rows[i], m_columns[i]);
 			} else {
-				vector = llvm_vector_add(p, vector, product);
+				vector = llvm_vector_mul_add(p, v_rows[i], m_columns[i], vector);
 			}
 		}
 

@@ -1632,3 +1632,47 @@ LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 LLVMValueRef llvm_vector_dot(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	return llvm_vector_reduce_add(p, llvm_vector_mul(p, a, b));
 }
+
+LLVMValueRef llvm_vector_mul_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b, LLVMValueRef c) {
+	lbModule *m = p->module;
+	
+	LLVMTypeRef t = LLVMTypeOf(a);
+	GB_ASSERT(t == LLVMTypeOf(b));
+	GB_ASSERT(t == LLVMTypeOf(c));
+	GB_ASSERT(LLVMGetTypeKind(t) == LLVMVectorTypeKind);
+	
+	LLVMTypeRef elem = LLVMGetElementType(t);
+	
+	bool is_possible = false;
+	
+	switch (LLVMGetTypeKind(elem)) {
+	case LLVMHalfTypeKind:
+		is_possible = true;
+		break;
+	case LLVMFloatTypeKind:
+	case LLVMDoubleTypeKind:
+		is_possible = true;
+		break;
+	}
+
+	if (is_possible) {
+		char const *name = "llvm.fmuladd";
+		unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+		GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+		
+		LLVMTypeRef types[1] = {};
+		types[0] = t;
+		
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(m->mod, id, types, gb_count_of(types));
+		LLVMValueRef values[3] = {};
+		values[0] = a;
+		values[1] = b;
+		values[2] = c;
+		LLVMValueRef call = LLVMBuildCall(p->builder, ip, values, gb_count_of(values), "");
+		return call;
+	} else {
+		LLVMValueRef x = llvm_vector_mul(p, a, b);
+		LLVMValueRef y = llvm_vector_add(p, x, c);
+		return y;
+	}
+}
