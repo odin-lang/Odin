@@ -50,6 +50,21 @@ matrix_trace :: proc(m: $M/matrix[$N, N]$T) -> (trace: T) {
 	return
 }
 
+@(builtin)
+matrix_minor :: proc(m: $M/matrix[$N, N]$T, row, column: int) -> (minor: T) where N > 1 {
+	K :: N-1
+	cut_down: matrix[K, K]T
+	for col_idx in 0..<K {
+		j := col_idx + int(col_idx >= column)
+		for row_idx in 0..<K {
+			i := row_idx + int(row_idx >= row)
+			cut_down[row_idx, col_idx] = m[i, j]
+		}
+	}
+	return determinant(cut_down)
+}
+
+
 
 @(builtin)
 matrix1x1_determinant :: proc(m: $M/matrix[1, 1]$T) -> (det: T) {
@@ -108,19 +123,6 @@ matrix3x3_adjugate :: proc(m: $M/matrix[3, 3]$T) -> (y: M) {
 	return
 }
 
-@(builtin)
-matrix_minor :: proc(m: $M/matrix[$N, N]$T, row, column: int) -> (minor: T) where N > 1 {
-	K :: N-1
-	cut_down: matrix[K, K]T
-	for col_idx in 0..<K {
-		j := col_idx + int(col_idx >= column)
-		for row_idx in 0..<K {
-			i := row_idx + int(row_idx >= row)
-			cut_down[row_idx, col_idx] = m[i, j]
-		}
-	}
-	return determinant(cut_down)
-}
 
 @(builtin)
 matrix4x4_adjugate :: proc(x: $M/matrix[4, 4]$T) -> (y: M) {
