@@ -2,15 +2,15 @@ package runtime
 
 import "core:intrinsics"
 
-bswap_16 :: proc "none" (x: u16) -> u16 {
+bswap_16 :: proc "contextless" (x: u16) -> u16 {
 	return x>>8 | x<<8
 }
 
-bswap_32 :: proc "none" (x: u32) -> u32 {
+bswap_32 :: proc "contextless" (x: u32) -> u32 {
 	return x>>24 | (x>>8)&0xff00 | (x<<8)&0xff0000 | x<<24
 }
 
-bswap_64 :: proc "none" (x: u64) -> u64 {
+bswap_64 :: proc "contextless" (x: u64) -> u64 {
 	z := x
 	z = (z & 0x00000000ffffffff) << 32 | (z & 0xffffffff00000000) >> 32
 	z = (z & 0x0000ffff0000ffff) << 16 | (z & 0xffff0000ffff0000) >> 16
@@ -18,7 +18,7 @@ bswap_64 :: proc "none" (x: u64) -> u64 {
 	return z
 }
 
-bswap_128 :: proc "none" (x: u128) -> u128 {
+bswap_128 :: proc "contextless" (x: u128) -> u128 {
 	z := transmute([4]u32)x
 	z[0] = bswap_32(z[3])
 	z[1] = bswap_32(z[2])
@@ -27,32 +27,26 @@ bswap_128 :: proc "none" (x: u128) -> u128 {
 	return transmute(u128)z
 }
 
-bswap_f16 :: proc "none" (f: f16) -> f16 {
+bswap_f16 :: proc "contextless" (f: f16) -> f16 {
 	x := transmute(u16)f
 	z := bswap_16(x)
 	return transmute(f16)z
 
 }
 
-bswap_f32 :: proc "none" (f: f32) -> f32 {
+bswap_f32 :: proc "contextless" (f: f32) -> f32 {
 	x := transmute(u32)f
 	z := bswap_32(x)
 	return transmute(f32)z
 
 }
 
-bswap_f64 :: proc "none" (f: f64) -> f64 {
+bswap_f64 :: proc "contextless" (f: f64) -> f64 {
 	x := transmute(u64)f
 	z := bswap_64(x)
 	return transmute(f64)z
 }
 
-
-
-ptr_offset :: #force_inline proc "contextless" (ptr: $P/^$T, n: int) -> P {
-	new := int(uintptr(ptr)) + size_of(T)*n
-	return P(uintptr(new))
-}
 
 is_power_of_two_int :: #force_inline proc(x: int) -> bool {
 	if x <= 0 {
@@ -828,12 +822,14 @@ floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 
 @(link_name="__fixunsdfti")
 fixunsdfti :: #force_no_inline proc "c" (a: f64) -> u128 {
+	// TODO(bill): implement `fixunsdfti` correctly
 	x := u64(a)
 	return u128(x)
 }
 
 @(link_name="__fixunsdfdi")
 fixunsdfdi :: #force_no_inline proc "c" (a: f64) -> i128 {
+	// TODO(bill): implement `fixunsdfdi` correctly
 	x := i64(a)
 	return i128(x)
 }
