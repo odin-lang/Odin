@@ -1492,7 +1492,26 @@ lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t
 	b = lb_emit_conv(p, b, t);
 	c = lb_emit_conv(p, c, t);
 	
-	if (!is_type_different_to_arch_endianness(t) && is_type_float(t)) {
+	bool is_possible = !is_type_different_to_arch_endianness(t) && is_type_float(t);
+	
+	if (is_possible) {
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+			if (type_size_of(t) == 2) {
+				is_possible = false;
+			}
+			break;
+		case TargetArch_arm64:
+			// possible
+			break;
+		case TargetArch_386:
+		case TargetArch_wasm32:
+			is_possible = false;
+			break;
+		}
+	}
+
+	if (is_possible) {
 		char const *name = "llvm.fma";
 		unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 		GB_ASSERT_MSG(id != 0, "Unable to find %s", name);

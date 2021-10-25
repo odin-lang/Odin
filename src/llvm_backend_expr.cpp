@@ -489,13 +489,32 @@ bool lb_is_matrix_simdable(Type *t) {
 		return false;
 	}
 	
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+	case TargetArch_arm64:
+		// possible
+		break;
+	case TargetArch_386:
+	case TargetArch_wasm32:
+		// nope
+		return false;
+	}
+	
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
 		case Basic_f16:
 		case Basic_f16le:
 		case Basic_f16be:
-			// TODO(bill): determine when this is fine
-			return true;
+			switch (build_context.metrics.arch) {
+			case TargetArch_amd64:
+				return false;
+			case TargetArch_arm64:
+				// TODO(bill): determine when this is fine
+				return true;
+			case TargetArch_386:
+			case TargetArch_wasm32:
+				return false;
+			}
 		}
 	}
 	
@@ -690,6 +709,8 @@ lbValue lb_emit_outer_product(lbProcedure *p, lbValue a, lbValue b, Type *type) 
 }
 
 lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs, Type *type) {
+	// TODO(bill): Handle edge case for f16 types on x86(-64) platforms
+	
 	Type *xt = base_type(lhs.type);
 	Type *yt = base_type(rhs.type);
 	
@@ -775,6 +796,8 @@ lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs, Type *type)
 }
 
 lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type *type) {
+	// TODO(bill): Handle edge case for f16 types on x86(-64) platforms
+	
 	Type *mt = base_type(lhs.type);
 	Type *vt = base_type(rhs.type);
 	
@@ -843,6 +866,8 @@ lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 }
 
 lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type *type) {
+	// TODO(bill): Handle edge case for f16 types on x86(-64) platforms
+	
 	Type *mt = base_type(rhs.type);
 	Type *vt = base_type(lhs.type);
 	
