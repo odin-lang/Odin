@@ -37,13 +37,6 @@ inverse :: proc{
 	matrix4x4_inverse,
 }
 
-@(builtin)
-hermitian_adjoint :: proc{
-	matrix1x1_hermitian_adjoint,
-	matrix2x2_hermitian_adjoint,
-	matrix3x3_hermitian_adjoint,
-	matrix4x4_hermitian_adjoint,
-}
 
 @(builtin)
 matrix1x1_determinant :: proc(m: $M/matrix[1, 1]$T) -> (det: T) {
@@ -103,26 +96,25 @@ matrix3x3_adjugate :: proc(m: $M/matrix[3, 3]$T) -> (y: M) {
 }
 
 @(builtin)
-matrix4x4_adjugate :: proc(x: $M/matrix[4, 4]$T) -> (y: M) {
-	minor :: proc(m: $M/matrix[4, 4]$T, row, column: i32) -> (minor: T) {
-		cut_down: matrix[3, 3]T
-		for col_idx in 0..<3 {
-			col := col_idx + int(col_idx >= column)
-			for row_idx in 0..<3 {
-				row := row_idx + int(row_idx >= row)
-				cut_down[row_idx, col_idx] = m[row, col]
-			}
+matrix_minor :: proc(m: $M/matrix[$N, N]$T, row, column: int) -> (minor: T) where N > 1 {
+	K :: N-1
+	cut_down: matrix[K, K]T
+	for col_idx in 0..<K {
+		j := col_idx + int(col_idx >= column)
+		for row_idx in 0..<K {
+			i := row_idx + int(row_idx >= row)
+			cut_down[row_idx, col_idx] = m[i, j]
 		}
-		return determinant(cut_down)
 	}
-	cofactor :: proc(m: $M/matrix[4, 4]$T, row, column: i32) -> (cofactor: T) {	
-		sign: T = 1 if (row + column) % 2 == 0 else -1
-		return sign * minor(m, row, column)
-	}
-	
+	return determinant(cut_down)
+}
+
+@(builtin)
+matrix4x4_adjugate :: proc(x: $M/matrix[4, 4]$T) -> (y: M) {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			y[i, j] = cofactor(x, i, j)
+			sign: T = 1 if (i + j) % 2 == 0 else -1
+			y[i, j] = sign * matrix_minor(x, i, j)
 		}
 	}
 	return
@@ -268,19 +260,14 @@ matrix4x4_inverse :: proc(x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
 
 
 @(builtin)
-matrix1x1_hermitian_adjoint :: proc(m: $M/matrix[1, 1]$T) -> M where intrinsics.type_is_complex(T) {
-	return conj(transpose(m))
-}
-@(builtin)
-matrix2x2_hermitian_adjoint :: proc(m: $M/matrix[2, 2]$T) -> M where intrinsics.type_is_complex(T) {
-	return conj(transpose(m))
-}
-@(builtin)
-matrix3x3_hermitian_adjoint :: proc(m: $M/matrix[3, 3]$T) -> M where intrinsics.type_is_complex(T) {
-	return conj(transpose(m))
-}
-@(builtin)
-matrix4x4_hermitian_adjoint :: proc(m: $M/matrix[4, 4]$T) -> M where intrinsics.type_is_complex(T) {
+matrix_hermitian_adjoint :: proc(m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1, N <= 4 {
 	return conj(transpose(m))
 }
 
+@(builtin)
+matrix_trace :: proc(m: $M/matrix[$N, N]$T) -> (trace: T) where N >= 1, N <= 4 {
+	for i in 0..<N {
+		trace += m[i, i]
+	}
+	return
+}
