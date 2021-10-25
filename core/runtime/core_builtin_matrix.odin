@@ -166,14 +166,14 @@ matrix3x3_inverse_transpose :: proc(x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_c
 	when intrinsics.type_is_integer(T) {
 		for i in 0..<3 {
 			for j in 0..<3 {
-				inverse_transpose[i, j] = a[i, j] / d
+				y[i, j] = a[i, j] / d
 			}
 		}
 	} else {
 		id := 1/d
 		for i in 0..<3 {
 			for j in 0..<3 {
-				inverse_transpose[i, j] = a[i, j] * id
+				y[i, j] = a[i, j] * id
 			}
 		}
 	}
@@ -190,14 +190,14 @@ matrix4x4_inverse_transpose :: proc(x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_c
 	when intrinsics.type_is_integer(T) {
 		for i in 0..<4 {
 			for j in 0..<4 {
-				inverse_transpose[i, j] = a[i, j] / d
+				y[i, j] = a[i, j] / d
 			}
 		}
 	} else {
 		id := 1/d
 		for i in 0..<4 {
 			for j in 0..<4 {
-				inverse_transpose[i, j] = a[i, j] * id
+				y[i, j] = a[i, j] * id
 			}
 		}
 	}
@@ -235,14 +235,14 @@ matrix3x3_inverse :: proc(x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
 	when intrinsics.type_is_integer(T) {
 		for i in 0..<3 {
 			for j in 0..<3 {
-				inverse_transpose[i, j] = a[j, i] / d
+				y[i, j] = a[j, i] / d
 			}
 		}
 	} else {
 		id := 1/d
 		for i in 0..<3 {
 			for j in 0..<3 {
-				inverse_transpose[i, j] = a[j, i] * id
+				y[i, j] = a[j, i] * id
 			}
 		}
 	}
@@ -259,14 +259,14 @@ matrix4x4_inverse :: proc(x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
 	when intrinsics.type_is_integer(T) {
 		for i in 0..<4 {
 			for j in 0..<4 {
-				inverse_transpose[i, j] = a[j, i] / d
+				y[i, j] = a[j, i] / d
 			}
 		}
 	} else {
 		id := 1/d
 		for i in 0..<4 {
 			for j in 0..<4 {
-				inverse_transpose[i, j] = a[j, i] * id
+				y[i, j] = a[j, i] * id
 			}
 		}
 	}
