@@ -472,7 +472,7 @@ LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 
 
 
-enum lbCallingConventionKind {
+enum lbCallingConventionKind : unsigned {
 	lbCallingConvention_C = 0,
 	lbCallingConvention_Fast = 8,
 	lbCallingConvention_Cold = 9,
@@ -517,6 +517,8 @@ enum lbCallingConventionKind {
 	lbCallingConvention_AMDGPU_LS = 95,
 	lbCallingConvention_AMDGPU_ES = 96,
 	lbCallingConvention_AArch64_VectorCall = 97,
+	lbCallingConvention_AArch64_SVE_VectorCall = 98,
+	lbCallingConvention_WASM_EmscriptenInvoke = 99,
 	lbCallingConvention_MaxID = 1023,
 };
 
