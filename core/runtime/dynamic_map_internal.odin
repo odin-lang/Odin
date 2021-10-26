@@ -287,7 +287,7 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h, loc)
-		index = __dynamic_map_find(h, hash).entry_index
+		// index = __dynamic_map_find(h, hash).entry_index
 		// assert(index >= 0)
 	}
 	
