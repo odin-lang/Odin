@@ -419,6 +419,36 @@ void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue le
 	lb_emit_runtime_call(p, "bounds_check_error", args);
 }
 
+void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
+	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
+		return;
+	}
+
+	row_index = lb_emit_conv(p, row_index, t_int);
+	column_index = lb_emit_conv(p, column_index, t_int);
+	row_count = lb_emit_conv(p, row_count, t_int);
+	column_count = lb_emit_conv(p, column_count, t_int);
+
+	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
+	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 7);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = row_index;
+	args[4] = column_index;
+	args[5] = row_count;
+	args[6] = column_count;
+
+	lb_emit_runtime_call(p, "matrix_bounds_check_error", args);
+}
+
+
 void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high) {
 	if (build_context.no_bounds_check) {
 		return;
@@ -482,8 +512,7 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	}
 }
 
-bool lb_try_update_alignment(lbValue ptr, unsigned alignment)  {
-	LLVMValueRef addr_ptr = ptr.value;
+bool lb_try_update_alignment(LLVMValueRef addr_ptr, unsigned alignment) {
 	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr) || LLVMIsALoadInst(addr_ptr)) {
 		if (LLVMGetAlignment(addr_ptr) < alignment) {
 			if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
@@ -494,6 +523,11 @@ bool lb_try_update_alignment(lbValue ptr, unsigned alignment)  {
 	}
 	return false;
 }
+
+bool lb_try_update_alignment(lbValue ptr, unsigned alignment) {
+	return lb_try_update_alignment(ptr.value, alignment);
+}
+
 
 bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_) {
 	Type *array_type = base_type(type_deref(ptr.type));
@@ -1930,6 +1964,24 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			fields[1] = base_integer;
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
+		
+	case Type_Matrix:
+		{
+			i64 size = type_size_of(type);
+			i64 elem_size = type_size_of(type->Matrix.elem);
+			GB_ASSERT(elem_size > 0);
+			i64 elem_count = size/elem_size;
+			GB_ASSERT_MSG(elem_count > 0, "%s", type_to_string(type));
+			
+			m->internal_type_level -= 1;
+			
+			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
+			LLVMTypeRef t = LLVMArrayType(elem, cast(unsigned)elem_count);
+			
+			m->internal_type_level += 1;
+			return t;
+		}
+	
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));
@@ -2013,7 +2065,7 @@ LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char con
 	unsigned kind = 0;
 	String s = make_string_c(name);
 
-	#if (LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && (LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH >= 1)))
+	#if ODIN_LLVM_MINIMUM_VERSION_12
 		kind = LLVMGetEnumAttributeKindForName(name, s.len);
 		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
 		return LLVMCreateTypeAttribute(ctx, kind, type);
@@ -2593,8 +2645,10 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 	LLVMValueRef ptr = LLVMBuildAlloca(p->builder, llvm_type, name);
 
-	// unsigned alignment = 16; // TODO(bill): Make this configurable
-	unsigned alignment = cast(unsigned)lb_alignof(llvm_type);
+	unsigned alignment = cast(unsigned)gb_max(type_align_of(type), lb_alignof(llvm_type));
+	if (is_type_matrix(type)) {
+		alignment *= 2; // NOTE(bill): Just in case
+	}
 	LLVMSetAlignment(ptr, alignment);
 
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);

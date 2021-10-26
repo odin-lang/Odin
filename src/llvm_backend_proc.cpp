@@ -127,16 +127,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
-	if (false) {
-		lbCallingConventionKind cc_kind = lbCallingConvention_C;
-		// TODO(bill): Clean up this logic
-		if (!is_arch_wasm()) {
-			cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-		}
-		LLVMSetFunctionCallConv(p->value, cc_kind);
-	}
-
-
+	
 	if (pt->Proc.diverging) {
 		lb_add_attribute_to_proc(m, p->value, "noreturn");
 	}
@@ -784,6 +775,57 @@ lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> 
 	return lb_emit_call(p, proc, args);
 }
 
+lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
+	lbValue res = {};
+	Type *t = val.type;
+	if (is_type_complex(t)) {
+		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, false));
+		lbValue real = lb_emit_struct_ev(p, val, 0);
+		lbValue imag = lb_emit_struct_ev(p, val, 1);
+		imag = lb_emit_unary_arith(p, Token_Sub, imag, imag.type);
+		lb_emit_store(p, lb_emit_struct_ep(p, res, 0), real);
+		lb_emit_store(p, lb_emit_struct_ep(p, res, 1), imag);
+	} else if (is_type_quaternion(t)) {
+		// @QuaternionLayout
+		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, false));
+		lbValue real = lb_emit_struct_ev(p, val, 3);
+		lbValue imag = lb_emit_struct_ev(p, val, 0);
+		lbValue jmag = lb_emit_struct_ev(p, val, 1);
+		lbValue kmag = lb_emit_struct_ev(p, val, 2);
+		imag = lb_emit_unary_arith(p, Token_Sub, imag, imag.type);
+		jmag = lb_emit_unary_arith(p, Token_Sub, jmag, jmag.type);
+		kmag = lb_emit_unary_arith(p, Token_Sub, kmag, kmag.type);
+		lb_emit_store(p, lb_emit_struct_ep(p, res, 3), real);
+		lb_emit_store(p, lb_emit_struct_ep(p, res, 0), imag);
+		lb_emit_store(p, lb_emit_struct_ep(p, res, 1), jmag);
+		lb_emit_store(p, lb_emit_struct_ep(p, res, 2), kmag);
+	} else if (is_type_array_like(t)) {
+		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, true));
+		Type *elem_type = base_array_type(t);
+		i64 count = get_array_type_count(t);
+		for (i64 i = 0; i < count; i++) {
+			lbValue dst = lb_emit_array_epi(p, res, i);
+			lbValue elem = lb_emit_struct_ev(p, val, cast(i32)i);
+			elem = lb_emit_conjugate(p, elem, elem_type);
+			lb_emit_store(p, dst, elem);
+		}
+	} else if (is_type_matrix(t)) {
+		Type *mt = base_type(t);
+		GB_ASSERT(mt->kind == Type_Matrix);
+		Type *elem_type = mt->Matrix.elem;
+		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, true));
+		for (i64 j = 0; j < mt->Matrix.column_count; j++) {
+			for (i64 i = 0; i < mt->Matrix.row_count; i++) {
+				lbValue dst = lb_emit_matrix_epi(p, res, i, j);
+				lbValue elem = lb_emit_matrix_ev(p, val, i, j);
+				elem = lb_emit_conjugate(p, elem, elem_type);
+				lb_emit_store(p, dst, elem);
+			}
+		}
+	}
+	return lb_emit_load(p, res);
+}
+
 lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, bool use_copy_elision_hint) {
 	lbModule *m = p->module;
 
@@ -1176,31 +1218,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_conj: {
 		lbValue val = lb_build_expr(p, ce->args[0]);
-		lbValue res = {};
-		Type *t = val.type;
-		if (is_type_complex(t)) {
-			res = lb_addr_get_ptr(p, lb_add_local_generated(p, tv.type, false));
-			lbValue real = lb_emit_struct_ev(p, val, 0);
-			lbValue imag = lb_emit_struct_ev(p, val, 1);
-			imag = lb_emit_unary_arith(p, Token_Sub, imag, imag.type);
-			lb_emit_store(p, lb_emit_struct_ep(p, res, 0), real);
-			lb_emit_store(p, lb_emit_struct_ep(p, res, 1), imag);
-		} else if (is_type_quaternion(t)) {
-			// @QuaternionLayout
-			res = lb_addr_get_ptr(p, lb_add_local_generated(p, tv.type, false));
-			lbValue real = lb_emit_struct_ev(p, val, 3);
-			lbValue imag = lb_emit_struct_ev(p, val, 0);
-			lbValue jmag = lb_emit_struct_ev(p, val, 1);
-			lbValue kmag = lb_emit_struct_ev(p, val, 2);
-			imag = lb_emit_unary_arith(p, Token_Sub, imag, imag.type);
-			jmag = lb_emit_unary_arith(p, Token_Sub, jmag, jmag.type);
-			kmag = lb_emit_unary_arith(p, Token_Sub, kmag, kmag.type);
-			lb_emit_store(p, lb_emit_struct_ep(p, res, 3), real);
-			lb_emit_store(p, lb_emit_struct_ep(p, res, 0), imag);
-			lb_emit_store(p, lb_emit_struct_ep(p, res, 1), jmag);
-			lb_emit_store(p, lb_emit_struct_ep(p, res, 2), kmag);
-		}
-		return lb_emit_load(p, res);
+		return lb_emit_conjugate(p, val, tv.type);
 	}
 
 	case BuiltinProc_expand_to_tuple: {
@@ -1316,7 +1334,36 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return lb_soa_zip(p, ce, tv);
 	case BuiltinProc_soa_unzip:
 		return lb_soa_unzip(p, ce, tv);
-
+		
+	case BuiltinProc_transpose:
+		{
+			lbValue m = lb_build_expr(p, ce->args[0]);
+			return lb_emit_matrix_tranpose(p, m, tv.type);
+		}
+		
+	case BuiltinProc_outer_product:
+		{
+			lbValue a = lb_build_expr(p, ce->args[0]);
+			lbValue b = lb_build_expr(p, ce->args[1]);
+			return lb_emit_outer_product(p, a, b, tv.type);
+		}
+	case BuiltinProc_hadamard_product:
+		{
+			lbValue a = lb_build_expr(p, ce->args[0]);
+			lbValue b = lb_build_expr(p, ce->args[1]);
+			if (is_type_array(tv.type)) {
+				return lb_emit_arith(p, Token_Mul, a, b, tv.type);
+			}
+			GB_ASSERT(is_type_matrix(tv.type));
+			return lb_emit_arith_matrix(p, Token_Mul, a, b, tv.type, true);
+		}
+		
+	case BuiltinProc_matrix_flatten:
+		{
+			lbValue m = lb_build_expr(p, ce->args[0]);
+			return lb_emit_matrix_flatten(p, m, tv.type);
+		}
+		
 	// "Intrinsics"
 
 	case BuiltinProc_alloca:

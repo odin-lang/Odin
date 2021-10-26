@@ -21,12 +21,6 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-#if LLVM_VERSION_MAJOR < 11
-#error "LLVM Version 11 is the minimum required"
-#elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
-#error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
-#endif
-
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 	if (e == nullptr) {
@@ -1135,13 +1129,46 @@ void lb_generate_code(lbGenerator *gen) {
 
 	auto *min_dep_set = &info->minimum_dependency_set;
 
-	LLVMInitializeAllTargetInfos();
-	LLVMInitializeAllTargets();
-	LLVMInitializeAllTargetMCs();
-	LLVMInitializeAllAsmPrinters();
-	LLVMInitializeAllAsmParsers();
-	LLVMInitializeAllDisassemblers();
-	LLVMInitializeNativeTarget();
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64: 
+	case TargetArch_386:
+		LLVMInitializeX86TargetInfo();
+		LLVMInitializeX86Target();
+		LLVMInitializeX86TargetMC();
+		LLVMInitializeX86AsmPrinter();
+		LLVMInitializeX86AsmParser();
+		LLVMInitializeX86Disassembler();
+		break;
+	case TargetArch_arm64:
+		LLVMInitializeAArch64TargetInfo();
+		LLVMInitializeAArch64Target();
+		LLVMInitializeAArch64TargetMC();
+		LLVMInitializeAArch64AsmPrinter();
+		LLVMInitializeAArch64AsmParser();
+		LLVMInitializeAArch64Disassembler();
+		break;
+	case TargetArch_wasm32:
+		LLVMInitializeWebAssemblyTargetInfo();
+		LLVMInitializeWebAssemblyTarget();
+		LLVMInitializeWebAssemblyTargetMC();
+		LLVMInitializeWebAssemblyAsmPrinter();
+		LLVMInitializeWebAssemblyAsmParser();
+		LLVMInitializeWebAssemblyDisassembler();
+		break;
+	default:
+		LLVMInitializeAllTargetInfos();
+		LLVMInitializeAllTargets();
+		LLVMInitializeAllTargetMCs();
+		LLVMInitializeAllAsmPrinters();
+		LLVMInitializeAllAsmParsers();
+		LLVMInitializeAllDisassemblers();
+		break;
+	}
+
+	
+	if (build_context.microarch == "native") {
+		LLVMInitializeNativeTarget();
+	}
 
 	char const *target_triple = alloc_cstring(permanent_allocator(), build_context.metrics.target_triplet);
 	for_array(i, gen->modules.entries) {
@@ -1173,6 +1200,16 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 		if (gb_strcmp(llvm_cpu, host_cpu_name) == 0) {
 			llvm_features = LLVMGetHostCPUFeatures();
+		}
+	} else if (build_context.metrics.arch == TargetArch_amd64) {
+		// NOTE(bill): x86-64-v2 is more than enough for everyone
+		//
+		// x86-64: CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
+		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
+		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
+		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
+		if (ODIN_LLVM_MINIMUM_VERSION_12) {
+			llvm_cpu = "x86-64-v2";
 		}
 	}
 
@@ -1640,6 +1677,7 @@ void lb_generate_code(lbGenerator *gen) {
 		code_gen_file_type = LLVMAssemblyFile;
 	}
 
+
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
 		if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
@@ -1683,7 +1721,6 @@ void lb_generate_code(lbGenerator *gen) {
 			return;
 		}
 	}
-
 
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 
