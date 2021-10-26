@@ -46,7 +46,7 @@ foreign glfw {
 	WindowHint         :: proc(hint, value: c.int) ---
 	DefaultWindowHints :: proc() ---
 	WindowHintString   :: proc(hint: c.int, value: cstring) ---
-	WindowShouldClose  :: proc(window: WindowHandle) -> c.int ---
+	WindowShouldClose  :: proc(window: WindowHandle) -> b32 ---
 
 	SwapInterval :: proc(interval: c.int) ---
 	SwapBuffers  :: proc(window: WindowHandle) ---
