@@ -60,7 +60,7 @@ NET_TO_HOST_32 :: #force_inline proc(value: u32) -> u32 {
 	return u32(transmute(u32be)value)
 }
 
-Version :: u32;
+Version :: u32
 
 SocketType :: enum i32 {
 	STREAM   = 1,
@@ -109,7 +109,7 @@ PacketFlag :: enum i32 {
 	FLAG_SENT           = 1 << 8,
 }
 
-PacketFreeCallback :: proc "c" (packet: ^Packet);
+PacketFreeCallback :: proc "c" (packet: ^Packet)
 
 Packet :: struct {
 	referenceCount: uint,
