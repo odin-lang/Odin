@@ -1,5 +1,6 @@
 package slice
 
+import "core:builtin"
 import "core:mem"
 
 ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
@@ -40,6 +41,29 @@ ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
 		mem.copy(t, a, rem)
 		mem.copy(a, b, rem)
 		mem.copy(b, t, rem)
+	}
+}
+
+ptr_swap_overlapping :: proc(x, y: rawptr, len: int) {
+	if len <= 0 {
+		return
+	}
+	if x == y {
+		return
+	}
+	
+	N :: 512
+	buffer: [N]byte = ---
+	
+	a, b := ([^]byte)(x), ([^]byte)(y)
+	
+	for n := len; n > 0; n -= N {
+		m := builtin.min(n, N)
+		mem.copy(&buffer, a, m)
+		mem.copy(a, b, m)
+		mem.copy(b, &buffer, m)
+		
+		a, b = a[N:], b[N:]
 	}
 }
 
