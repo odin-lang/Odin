@@ -99,7 +99,7 @@ LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 		return LLVMConstNull(dst);
 	}
 
-	GB_ASSERT_MSG(LLVMSizeOf(dst) == LLVMSizeOf(src), "%s vs %s", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src));
+	GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "%s vs %s", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src));
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind:
