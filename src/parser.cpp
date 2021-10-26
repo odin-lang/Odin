@@ -159,6 +159,11 @@ Ast *clone_ast(Ast *node) {
 		n->IndexExpr.expr  = clone_ast(n->IndexExpr.expr);
 		n->IndexExpr.index = clone_ast(n->IndexExpr.index);
 		break;
+	case Ast_MatrixIndexExpr:
+		n->MatrixIndexExpr.expr  = clone_ast(n->MatrixIndexExpr.expr);
+		n->MatrixIndexExpr.row_index = clone_ast(n->MatrixIndexExpr.row_index);
+		n->MatrixIndexExpr.column_index = clone_ast(n->MatrixIndexExpr.column_index);
+		break;
 	case Ast_DerefExpr:
 		n->DerefExpr.expr = clone_ast(n->DerefExpr.expr);
 		break;
@@ -371,6 +376,11 @@ Ast *clone_ast(Ast *node) {
 		n->MapType.key   = clone_ast(n->MapType.key);
 		n->MapType.value = clone_ast(n->MapType.value);
 		break;
+	case Ast_MatrixType:
+		n->MatrixType.row_count    = clone_ast(n->MatrixType.row_count);
+		n->MatrixType.column_count = clone_ast(n->MatrixType.column_count);
+		n->MatrixType.elem         = clone_ast(n->MatrixType.elem);
+		break;
 	}
 
 	return n;
@@ -574,6 +584,15 @@ Ast *ast_deref_expr(AstFile *f, Ast *expr, Token op) {
 }
 
 
+Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token close, Token interval, Ast *row, Ast *column) {
+	Ast *result = alloc_ast_node(f, Ast_MatrixIndexExpr);
+	result->MatrixIndexExpr.expr         = expr;
+	result->MatrixIndexExpr.row_index    = row;
+	result->MatrixIndexExpr.column_index = column;
+	result->MatrixIndexExpr.open         = open;
+	result->MatrixIndexExpr.close        = close;
+	return result;
+}
 
 
 Ast *ast_ident(AstFile *f, Token token) {
@@ -1066,6 +1085,14 @@ Ast *ast_map_type(AstFile *f, Token token, Ast *key, Ast *value) {
 	return result;
 }
 
+Ast *ast_matrix_type(AstFile *f, Token token, Ast *row_count, Ast *column_count, Ast *elem) {
+	Ast *result = alloc_ast_node(f, Ast_MatrixType);
+	result->MatrixType.token = token;
+	result->MatrixType.row_count = row_count;
+	result->MatrixType.column_count = column_count;
+	result->MatrixType.elem = elem;
+	return result;
+}
 
 Ast *ast_foreign_block_decl(AstFile *f, Token token, Ast *foreign_library, Ast *body,
                             CommentGroup *docs) {
@@ -2214,6 +2241,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			count_expr = parse_expr(f, false);
 			f->expr_level--;
 		}
+		
 		expect_token(f, Token_CloseBracket);
 		return ast_array_type(f, token, count_expr, parse_type(f));
 	} break;
@@ -2230,6 +2258,23 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		value = parse_type(f);
 
 		return ast_map_type(f, token, key, value);
+	} break;
+	
+	case Token_matrix: {
+		Token token = expect_token(f, Token_matrix);
+		Ast *row_count = nullptr;
+		Ast *column_count = nullptr;
+		Ast *type = nullptr;
+		Token open, close;
+		
+		open  = expect_token_after(f, Token_OpenBracket, "matrix");
+		row_count = parse_expr(f, true);
+		expect_token(f, Token_Comma);
+		column_count = parse_expr(f, true);
+		close = expect_token(f, Token_CloseBracket);
+		type = parse_type(f);
+		
+		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
 
 	case Token_struct: {
@@ -2524,6 +2569,7 @@ bool is_literal_type(Ast *node) {
 	case Ast_DynamicArrayType:
 	case Ast_MapType:
 	case Ast_BitSetType:
+	case Ast_MatrixType:
 	case Ast_CallExpr:
 		return true;
 	case Ast_MultiPointerType:
@@ -2679,6 +2725,7 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			case Token_RangeHalf:
 				syntax_error(f->curr_token, "Expected a colon, not a range");
 				/* fallthrough */
+			case Token_Comma:  // matrix index
 			case Token_Colon:
 				interval = advance_token(f);
 				is_interval = true;
@@ -2694,7 +2741,14 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			close = expect_token(f, Token_CloseBracket);
 
 			if (is_interval) {
-				operand = ast_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
+				if (interval.kind == Token_Comma) {
+					if (indices[0] == nullptr || indices[1] == nullptr) {
+						syntax_error(open, "Matrix index expressions require both row and column indices");
+					}
+					operand = ast_matrix_index_expr(f, operand, open, close, interval, indices[0], indices[1]);
+				} else {
+					operand = ast_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
+				}
 			} else {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}

@@ -128,14 +128,8 @@ compare_ptrs :: proc "contextless" (a, b: rawptr, n: int) -> int {
 	return compare_byte_ptrs((^byte)(a), (^byte)(b), n)
 }
 
-ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
-	new := int(uintptr(ptr)) + size_of(T)*n
-	return P(uintptr(new))
-}
-
-ptr_sub :: proc "contextless" (a, b: $P/^$T) -> int {
-	return (int(uintptr(a)) - int(uintptr(b)))/size_of(T)
-}
+ptr_offset :: intrinsics.ptr_offset
+ptr_sub :: intrinsics.ptr_sub
 
 slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	return ([^]T)(ptr)[:len]

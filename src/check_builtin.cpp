@@ -25,6 +25,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_simple_compare,
 	is_type_dereferenceable,
 	is_type_valid_for_keys,
+	is_type_valid_for_matrix_elems,
 
 	is_type_named,
 	is_type_pointer,
@@ -40,6 +41,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 	is_type_proc,
 	is_type_bit_set,
 	is_type_simd_vector,
+	is_type_matrix,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
@@ -1266,7 +1268,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_conj: {
 		// conj :: proc(x: type) -> type
 		Operand *x = operand;
-		if (is_type_complex(x->type)) {
+		Type *t = x->type;
+		Type *elem = core_array_type(t);
+		
+		if (is_type_complex(t)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_complex(x->value);
 				f64 r = v.value_complex->real;
@@ -1276,7 +1281,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			} else {
 				x->mode = Addressing_Value;
 			}
-		} else if (is_type_quaternion(x->type)) {
+		} else if (is_type_quaternion(t)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_quaternion(x->value);
 				f64 r = +v.value_quaternion->real;
@@ -1288,7 +1293,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			} else {
 				x->mode = Addressing_Value;
 			}
-		} else {
+		} else if (is_type_array_like(t) && (is_type_complex(elem) || is_type_quaternion(elem))) {
+			x->mode = Addressing_Value;
+		} else if (is_type_matrix(t) && (is_type_complex(elem) || is_type_quaternion(elem))) {
+			x->mode = Addressing_Value;
+		}else {
 			gbString s = type_to_string(x->type);
 			error(call, "Expected a complex or quaternion, got '%s'", s);
 			gb_string_free(s);
@@ -1966,13 +1975,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (!is_operand_value(x)) {
-			error(call, "'soa_unzip' expects an #soa slice");
+			error(call, "'%.*s' expects an #soa slice", LIT(builtin_name));
 			return false;
 		}
 		Type *t = base_type(x.type);
 		if (!is_type_soa_struct(t) || t->Struct.soa_kind != StructSoa_Slice) {
 			gbString s = type_to_string(x.type);
-			error(call, "'soa_unzip' expects an #soa slice, got %s", s);
+			error(call, "'%.*s' expects an #soa slice, got %s", LIT(builtin_name), s);
 			gb_string_free(s);
 			return false;
 		}
@@ -1987,7 +1996,180 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_Value;
 		break;
 	}
-
+	
+	case BuiltinProc_transpose: {
+		Operand x = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x)) {
+			error(call, "'%.*s' expects a matrix or array", LIT(builtin_name));
+			return false;
+		}
+		Type *t = base_type(x.type);
+		if (!is_type_matrix(t) && !is_type_array(t)) {
+			gbString s = type_to_string(x.type);
+			error(call, "'%.*s' expects a matrix or array, got %s", LIT(builtin_name), s);
+			gb_string_free(s);
+			return false;
+		}
+		
+		operand->mode = Addressing_Value;
+		if (is_type_array(t)) {
+			// Do nothing
+			operand->type = x.type;			
+		} else {
+			GB_ASSERT(t->kind == Type_Matrix);
+			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count);
+		}
+		operand->type = check_matrix_type_hint(operand->type, type_hint);
+		break;
+	}
+	
+	case BuiltinProc_outer_product: {
+		Operand x = {};
+		Operand y = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		check_expr(c, &y, ce->args[1]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x) || !is_operand_value(y)) {
+			error(call, "'%.*s' expects only arrays", LIT(builtin_name));
+			return false;
+		}
+		
+		if (!is_type_array(x.type) && !is_type_array(y.type)) {
+			gbString s1 = type_to_string(x.type);
+			gbString s2 = type_to_string(y.type);
+			error(call, "'%.*s' expects only arrays, got %s and %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		Type *xt = base_type(x.type);
+		Type *yt = base_type(y.type);
+		GB_ASSERT(xt->kind == Type_Array);
+		GB_ASSERT(yt->kind == Type_Array);
+		if (!are_types_identical(xt->Array.elem, yt->Array.elem)) {
+			gbString s1 = type_to_string(xt->Array.elem);
+			gbString s2 = type_to_string(yt->Array.elem);
+			error(call, "'%.*s' mismatched element types, got %s vs %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		Type *elem = xt->Array.elem;
+		
+		if (!is_type_valid_for_matrix_elems(elem)) {
+			gbString s = type_to_string(elem);
+			error(call, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
+			gb_string_free(s);
+		}
+		
+		if (xt->Array.count == 0 || yt->Array.count == 0) {
+			gbString s1 = type_to_string(x.type);
+			gbString s2 = type_to_string(y.type);
+			error(call, "'%.*s' expects only arrays of non-zero length, got %s and %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		i64 max_count = xt->Array.count*yt->Array.count;
+		if (max_count > MATRIX_ELEMENT_COUNT_MAX) {
+			error(call, "Product of the array lengths exceed the maximum matrix element count, got %d, expected a maximum of %d", cast(int)max_count, MATRIX_ELEMENT_COUNT_MAX);
+			return false;
+		}
+		
+		operand->mode = Addressing_Value;
+		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count);	
+		operand->type = check_matrix_type_hint(operand->type, type_hint);
+		break;
+	}
+	
+	case BuiltinProc_hadamard_product: {
+		Operand x = {};
+		Operand y = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		check_expr(c, &y, ce->args[1]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x) || !is_operand_value(y)) {
+			error(call, "'%.*s' expects a matrix or array types", LIT(builtin_name));
+			return false;
+		}
+		if (!is_type_matrix(x.type) && !is_type_array(y.type)) {
+			gbString s1 = type_to_string(x.type);
+			gbString s2 = type_to_string(y.type);
+			error(call, "'%.*s' expects matrix or array values, got %s and %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		if (!are_types_identical(x.type, y.type)) {
+			gbString s1 = type_to_string(x.type);
+			gbString s2 = type_to_string(y.type);
+			error(call, "'%.*s' values of the same type, got %s and %s", LIT(builtin_name), s1, s2);
+			gb_string_free(s2);
+			gb_string_free(s1);
+			return false;
+		}
+		
+		Type *elem = core_array_type(x.type);
+		if (!is_type_valid_for_matrix_elems(elem)) {
+			gbString s = type_to_string(elem);
+			error(call, "'%.*s' expects elements to be types are limited to integers, floats, and complex, got %s", LIT(builtin_name), s);
+			gb_string_free(s);
+		}
+		
+		operand->mode = Addressing_Value;
+		operand->type = x.type;
+		operand->type = check_matrix_type_hint(operand->type, type_hint);
+		break;
+	}
+	
+	case BuiltinProc_matrix_flatten: {
+		Operand x = {};
+		check_expr(c, &x, ce->args[0]);
+		if (x.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_operand_value(x)) {
+			error(call, "'%.*s' expects a matrix or array", LIT(builtin_name));
+			return false;
+		}
+		Type *t = base_type(x.type);
+		if (!is_type_matrix(t) && !is_type_array(t)) {
+			gbString s = type_to_string(x.type);
+			error(call, "'%.*s' expects a matrix or array, got %s", LIT(builtin_name), s);
+			gb_string_free(s);
+			return false;
+		}
+		
+		operand->mode = Addressing_Value;
+		if (is_type_array(t)) {
+			// Do nothing
+			operand->type = x.type;			
+		} else {
+			GB_ASSERT(t->kind == Type_Matrix);
+			operand->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count*t->Matrix.column_count);
+		}
+		operand->type = check_matrix_type_hint(operand->type, type_hint);
+		break;
+	}
+	
 	case BuiltinProc_simd_vector: {
 		Operand x = {};
 		Operand y = {};
