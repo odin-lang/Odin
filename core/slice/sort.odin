@@ -152,8 +152,8 @@ _max_depth :: proc(n: int) -> int { // 2*ceil(log2(n+1))
 }
 
 @(private)
-_quick_sort :: proc(data: $T/[]$E, a, b, max_depth: int) where ORD(E) {
-	median3 :: proc(data: T, m1, m0, m2: int) {
+_quick_sort :: proc(data: $T/[]$E, a, b, max_depth: int) where ORD(E) #no_bounds_check {
+	median3 :: proc(data: T, m1, m0, m2: int) #no_bounds_check {
 		if data[m1] < data[m0] {
 			swap(data, m1, m0)
 		}
@@ -165,7 +165,7 @@ _quick_sort :: proc(data: $T/[]$E, a, b, max_depth: int) where ORD(E) {
 		}
 	}
 
-	do_pivot :: proc(data: T, lo, hi: int) -> (midlo, midhi: int) {
+	do_pivot :: proc(data: T, lo, hi: int) -> (midlo, midhi: int) #no_bounds_check {
 		m := int(uint(lo+hi)>>1)
 		if hi-lo > 40 {
 			s := (hi-lo)/8
@@ -265,7 +265,7 @@ _quick_sort :: proc(data: $T/[]$E, a, b, max_depth: int) where ORD(E) {
 }
 
 @(private)
-_insertion_sort :: proc(data: $T/[]$E, a, b: int) where ORD(E) {
+_insertion_sort :: proc(data: $T/[]$E, a, b: int) where ORD(E) #no_bounds_check {
 	for i in a+1..<b {
 		for j := i; j > a && data[j] < data[j-1]; j -= 1 {
 			swap(data, j, j-1)
@@ -274,8 +274,8 @@ _insertion_sort :: proc(data: $T/[]$E, a, b: int) where ORD(E) {
 }
 
 @(private)
-_heap_sort :: proc(data: $T/[]$E, a, b: int) where ORD(E) {
-	sift_down :: proc(data: T, lo, hi, first: int) {
+_heap_sort :: proc(data: $T/[]$E, a, b: int) where ORD(E) #no_bounds_check {
+	sift_down :: proc(data: T, lo, hi, first: int) #no_bounds_check {
 		root := lo
 		for {
 			child := 2*root + 1
@@ -312,8 +312,8 @@ _heap_sort :: proc(data: $T/[]$E, a, b: int) where ORD(E) {
 
 
 @(private)
-_quick_sort_less :: proc(data: $T/[]$E, a, b, max_depth: int, less: proc(i, j: E) -> bool) {
-	median3 :: proc(data: T, m1, m0, m2: int, less: proc(i, j: E) -> bool) {
+_quick_sort_less :: proc(data: $T/[]$E, a, b, max_depth: int, less: proc(i, j: E) -> bool) #no_bounds_check {
+	median3 :: proc(data: T, m1, m0, m2: int, less: proc(i, j: E) -> bool) #no_bounds_check {
 		if less(data[m1], data[m0]) {
 			swap(data, m1, m0)
 		}
@@ -325,7 +325,7 @@ _quick_sort_less :: proc(data: $T/[]$E, a, b, max_depth: int, less: proc(i, j: E
 		}
 	}
 
-	do_pivot :: proc(data: T, lo, hi: int, less: proc(i, j: E) -> bool) -> (midlo, midhi: int) {
+	do_pivot :: proc(data: T, lo, hi: int, less: proc(i, j: E) -> bool) -> (midlo, midhi: int) #no_bounds_check {
 		m := int(uint(lo+hi)>>1)
 		if hi-lo > 40 {
 			s := (hi-lo)/8
@@ -424,7 +424,7 @@ _quick_sort_less :: proc(data: $T/[]$E, a, b, max_depth: int, less: proc(i, j: E
 }
 
 @(private)
-_insertion_sort_less :: proc(data: $T/[]$E, a, b: int, less: proc(i, j: E) -> bool) {
+_insertion_sort_less :: proc(data: $T/[]$E, a, b: int, less: proc(i, j: E) -> bool) #no_bounds_check {
 	for i in a+1..<b {
 		for j := i; j > a && less(data[j], data[j-1]); j -= 1 {
 			swap(data, j, j-1)
@@ -433,8 +433,8 @@ _insertion_sort_less :: proc(data: $T/[]$E, a, b: int, less: proc(i, j: E) -> bo
 }
 
 @(private)
-_heap_sort_less :: proc(data: $T/[]$E, a, b: int, less: proc(i, j: E) -> bool) {
-	sift_down :: proc(data: T, lo, hi, first: int, less: proc(i, j: E) -> bool) {
+_heap_sort_less :: proc(data: $T/[]$E, a, b: int, less: proc(i, j: E) -> bool) #no_bounds_check {
+	sift_down :: proc(data: T, lo, hi, first: int, less: proc(i, j: E) -> bool) #no_bounds_check {
 		root := lo
 		for {
 			child := 2*root + 1
@@ -471,8 +471,8 @@ _heap_sort_less :: proc(data: $T/[]$E, a, b: int, less: proc(i, j: E) -> bool) {
 
 
 @(private)
-_quick_sort_cmp :: proc(data: $T/[]$E, a, b, max_depth: int, cmp: proc(i, j: E) -> Ordering) {
-	median3 :: proc(data: T, m1, m0, m2: int, cmp: proc(i, j: E) -> Ordering) {
+_quick_sort_cmp :: proc(data: $T/[]$E, a, b, max_depth: int, cmp: proc(i, j: E) -> Ordering) #no_bounds_check {
+	median3 :: proc(data: T, m1, m0, m2: int, cmp: proc(i, j: E) -> Ordering) #no_bounds_check {
 		if cmp(data[m1], data[m0]) == .Less {
 			swap(data, m1, m0)
 		}
@@ -484,7 +484,7 @@ _quick_sort_cmp :: proc(data: $T/[]$E, a, b, max_depth: int, cmp: proc(i, j: E) 
 		}
 	}
 
-	do_pivot :: proc(data: T, lo, hi: int, cmp: proc(i, j: E) -> Ordering) -> (midlo, midhi: int) {
+	do_pivot :: proc(data: T, lo, hi: int, cmp: proc(i, j: E) -> Ordering) -> (midlo, midhi: int) #no_bounds_check {
 		m := int(uint(lo+hi)>>1)
 		if hi-lo > 40 {
 			s := (hi-lo)/8
@@ -583,7 +583,7 @@ _quick_sort_cmp :: proc(data: $T/[]$E, a, b, max_depth: int, cmp: proc(i, j: E) 
 }
 
 @(private)
-_insertion_sort_cmp :: proc(data: $T/[]$E, a, b: int, cmp: proc(i, j: E) -> Ordering) {
+_insertion_sort_cmp :: proc(data: $T/[]$E, a, b: int, cmp: proc(i, j: E) -> Ordering) #no_bounds_check {
 	for i in a+1..<b {
 		for j := i; j > a && cmp(data[j], data[j-1]) == .Less; j -= 1 {
 			swap(data, j, j-1)
@@ -592,8 +592,8 @@ _insertion_sort_cmp :: proc(data: $T/[]$E, a, b: int, cmp: proc(i, j: E) -> Orde
 }
 
 @(private)
-_heap_sort_cmp :: proc(data: $T/[]$E, a, b: int, cmp: proc(i, j: E) -> Ordering) {
-	sift_down :: proc(data: T, lo, hi, first: int, cmp: proc(i, j: E) -> Ordering) {
+_heap_sort_cmp :: proc(data: $T/[]$E, a, b: int, cmp: proc(i, j: E) -> Ordering) #no_bounds_check {
+	sift_down :: proc(data: T, lo, hi, first: int, cmp: proc(i, j: E) -> Ordering) #no_bounds_check {
 		root := lo
 		for {
 			child := 2*root + 1
