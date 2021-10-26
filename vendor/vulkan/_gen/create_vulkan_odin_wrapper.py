@@ -262,6 +262,7 @@ def parse_constants(f):
 
 
 def parse_enums(f):
+    f.write("import \"core:c\"\n\n")
     f.write("// Enums\n")
 
     data = re.findall(r"typedef enum Vk(\w+) {(.+?)} \w+;", src, re.S)
@@ -405,8 +406,8 @@ def parse_structs(f):
             if "Flag_Bits" in type_:
                 comment = " // only single bit set"
             t = do_type(type_, prev_name, fname)
-            if t == "Structure_Type" and n == "type":
-                n = "s_type"
+            if n == "matrix":
+                n = "mat"
 
             ffields.append(tuple([n, t, comment]))
             prev_name = fname
@@ -467,6 +468,7 @@ def parse_procedures(f):
 
     max_len = max(len(n) for n, t in ff)
 
+    f.write("import \"core:c\"\n\n")
     f.write("// Procedure Types\n\n");
     for n, t in ff:
         f.write("{} :: #type {}\n".format(n.ljust(max_len), t.replace('"c"', '"system"')))
@@ -587,6 +589,8 @@ MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
     with open("../structs.odin", 'w', encoding='utf-8') as f:
         f.write(BASE)
         f.write("""
+import "core:c"
+
 when ODIN_OS == "windows" {
 \timport win32 "core:sys/windows"
 

@@ -42,6 +42,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_Pointer:         kind = Typeid_Pointer;          break;
 	case Type_MultiPointer:    kind = Typeid_Multi_Pointer;    break;
 	case Type_Array:           kind = Typeid_Array;            break;
+	case Type_Matrix:          kind = Typeid_Matrix;           break;
 	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
 	case Type_Slice:           kind = Typeid_Slice;            break;
 	case Type_DynamicArray:    kind = Typeid_Dynamic_Array;    break;
@@ -868,7 +869,25 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				lb_emit_store(p, tag, res);
 			}
 			break;
+		case Type_Matrix: 
+			{
+				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_matrix_ptr);
+				i64 ez = type_size_of(t->Matrix.elem);
 
+				LLVMValueRef vals[5] = {
+					lb_get_type_info_ptr(m, t->Matrix.elem).value,
+					lb_const_int(m, t_int, ez).value,
+					lb_const_int(m, t_int, matrix_type_stride_in_elems(t)).value,
+					lb_const_int(m, t_int, t->Matrix.row_count).value,
+					lb_const_int(m, t_int, t->Matrix.column_count).value,
+				};
+
+				lbValue res = {};
+				res.type = type_deref(tag.type);
+				res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
+				lb_emit_store(p, tag, res);
+			}
+			break;
 		}
 
 

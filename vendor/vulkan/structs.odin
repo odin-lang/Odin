@@ -3750,7 +3750,7 @@ PhysicalDeviceRayTracingPropertiesNV :: struct {
 }
 
 TransformMatrixKHR :: struct {
-	matrix: [3][4]f32,
+	mat: [3][4]f32,
 }
 
 AabbPositionsKHR :: struct {

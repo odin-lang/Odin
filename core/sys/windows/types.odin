@@ -916,7 +916,7 @@ USER_INFO_1 :: struct #packed {
 	flags: USER_INFO_FLAGS,
 	script_path: LPWSTR,
 }
-#assert(size_of(USER_INFO_1) == 50)
+// #assert(size_of(USER_INFO_1) == 50)
 
 LOCALGROUP_MEMBERS_INFO_0 :: struct #packed {
 	sid: ^SID,

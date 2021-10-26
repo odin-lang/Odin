@@ -30,6 +30,18 @@
 #include <llvm-c/Transforms/Vectorize.h>
 #endif
 
+#if LLVM_VERSION_MAJOR < 11
+#error "LLVM Version 11 is the minimum required"
+#elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
+#error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
+#endif
+
+#if LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
+#define ODIN_LLVM_MINIMUM_VERSION_12 1
+#else
+#define ODIN_LLVM_MINIMUM_VERSION_12 0
+#endif
+
 struct lbProcedure;
 
 struct lbValue {
@@ -333,6 +345,11 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
 lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel);
 
+lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lbValue column);
+lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column);
+lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isize column);
+
+
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
 lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type);
 void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block);
@@ -387,6 +404,8 @@ lbValue lb_map_cap(lbProcedure *p, lbValue value);
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
 void lb_emit_increment(lbProcedure *p, lbValue addr);
 lbValue lb_emit_select(lbProcedure *p, lbValue cond, lbValue x, lbValue y);
+
+lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t);
 
 void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
@@ -465,7 +484,7 @@ LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 
 
 
-enum lbCallingConventionKind {
+enum lbCallingConventionKind : unsigned {
 	lbCallingConvention_C = 0,
 	lbCallingConvention_Fast = 8,
 	lbCallingConvention_Cold = 9,
@@ -510,6 +529,8 @@ enum lbCallingConventionKind {
 	lbCallingConvention_AMDGPU_LS = 95,
 	lbCallingConvention_AMDGPU_ES = 96,
 	lbCallingConvention_AArch64_VectorCall = 97,
+	lbCallingConvention_AArch64_SVE_VectorCall = 98,
+	lbCallingConvention_WASM_EmscriptenInvoke = 99,
 	lbCallingConvention_MaxID = 1023,
 };
 
