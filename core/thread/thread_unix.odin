@@ -76,6 +76,9 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 		return nil
 	}
 	thread.creation_allocator = context.allocator
+	
+	sync.mutex_init(&thread.start_mutex)
+	sync.condition_init(&thread.start_gate, &thread.start_mutex)
 
 	// Set thread priority.
 	policy: i32
@@ -96,12 +99,13 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
 		free(thread, thread.creation_allocator)
+		
+		sync.condition_destroy(&thread.start_gate)
+		sync.mutex_destroy(&thread.start_mutex)
 		return nil
 	}
 	thread.procedure = procedure
 
-	sync.mutex_init(&thread.start_mutex)
-	sync.condition_init(&thread.start_gate, &thread.start_mutex)
 
 	return thread
 }
