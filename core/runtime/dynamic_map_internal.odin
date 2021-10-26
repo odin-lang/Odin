@@ -190,8 +190,6 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 		return true
 	}
 
-	assert(allocator.procedure != nil)
-
 	old_size := array.len*size_of(T)
 	new_size := new_count*size_of(T)
 
@@ -256,7 +254,7 @@ __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 
 __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
 	index: int
-	assert(value != nil)
+	// assert(value != nil)
 
 	if len(h.m.hashes) == 0 {
 		__dynamic_map_reserve(h, INITIAL_MAP_CAP, loc)
@@ -289,8 +287,8 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h, loc)
-		index = __dynamic_map_find(h, hash).entry_index
-		assert(index >= 0)
+		// index = __dynamic_map_find(h, hash).entry_index
+		// assert(index >= 0)
 	}
 	
 	return __dynamic_map_get_entry(h, index)
@@ -315,12 +313,6 @@ __dynamic_map_hash_equal :: proc "contextless" (h: Map_Header, a, b: Map_Hash) -
 __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{-1, -1, -1}
 	if n := uintptr(len(m.hashes)); n > 0 {
-		for i in 0..<m.entries.len {
-			entry := __dynamic_map_get_entry(h, i)
-			assert(entry.next < m.entries.len)
-		}
-		
-		
 		fr.hash_index = int(hash.hash % n)
 		fr.entry_index = m.hashes[fr.hash_index]
 		for fr.entry_index >= 0 {
@@ -329,7 +321,7 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 			if __dynamic_map_hash_equal(h, entry_hash, hash) {
 				return fr
 			}
-			assert(entry.next < m.entries.len)
+			// assert(entry.next < m.entries.len)
 			
 			fr.entry_prev = fr.entry_index
 			fr.entry_index = entry.next
@@ -358,7 +350,7 @@ __dynamic_map_delete_key :: proc(using h: Map_Header, hash: Map_Hash) {
 }
 
 __dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_Header {
-	assert(0 <= index && index < m.entries.len)
+	// assert(0 <= index && index < m.entries.len)
 	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size))
 }
 

@@ -11,6 +11,7 @@ import SDLNet "vendor:sdl2/net"
 import MIX    "vendor:sdl2/mixer"
 import TTF    "vendor:sdl2/ttf"
 import vk     "vendor:vulkan"
+import ENet   "vendor:ENet"
 
 _ :: glfw
 _ :: gl
@@ -22,3 +23,4 @@ _ :: SDLNet
 _ :: MIX
 _ :: TTF
 _ :: vk
+_ :: ENet
