@@ -96,6 +96,29 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 }
 
 
+matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
+	if 0 <= row_index && row_index < row_count && 
+	   0 <= column_index && column_index < column_count {
+		return
+	}
+	handle_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
+		print_caller_location(Source_Code_Location{file, line, column, ""})
+		print_string(" Matrix indices [")
+		print_i64(i64(row_index))
+		print_string(", ")
+		print_i64(i64(column_index))
+		print_string(" is out of bounds range [0..<")
+		print_i64(i64(row_count))
+		print_string(", 0..<")
+		print_i64(i64(column_count))
+		print_string("]")
+		print_byte('\n')
+		bounds_trap()
+	}
+	handle_error(file, line, column, row_index, column_index, row_count, column_count)
+}
+
+
 type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid) {
 	if ok {
 		return

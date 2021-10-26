@@ -164,6 +164,12 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	case Type_Info_Relative_Slice:
 		y := b.variant.(Type_Info_Relative_Slice) or_return
 		return x.base_integer == y.base_integer && x.slice == y.slice
+		
+	case Type_Info_Matrix:
+		y := b.variant.(Type_Info_Matrix) or_return
+		if x.row_count != y.row_count { return false }
+		if x.column_count != y.column_count { return false }
+		return are_types_identical(x.elem, y.elem)
 	}
 
 	return false
@@ -584,6 +590,14 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		write_type(w, info.base_integer, &n) or_return
 		io.write_string(w, ") ",         &n) or_return
 		write_type(w, info.slice,        &n) or_return
+		
+	case Type_Info_Matrix:
+		io.write_string(w, "matrix[",               &n) or_return
+		io.write_i64(w, i64(info.row_count), 10,    &n) or_return
+		io.write_string(w, ", ",                    &n) or_return
+		io.write_i64(w, i64(info.column_count), 10, &n) or_return
+		io.write_string(w, "]",                     &n) or_return
+		write_type(w, info.elem,                    &n) or_return
 	}
 
 	return

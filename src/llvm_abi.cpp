@@ -153,7 +153,18 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 	// TODO(bill): Clean up this logic
 	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[calling_convention];
-	}
+	} 
+	// if (build_context.metrics.arch == TargetArch_amd64) {
+	// 	if (build_context.metrics.os == TargetOs_windows) {
+	// 		if (cc_kind == lbCallingConvention_C) {
+	// 			cc_kind = lbCallingConvention_Win64;
+	// 		}
+	// 	} else {
+	// 		if (cc_kind == lbCallingConvention_C) {
+	// 			cc_kind = lbCallingConvention_X86_64_SysV;
+	// 		}
+	// 	}
+	// } 
 	LLVMSetFunctionCallConv(fn, cc_kind);
 	if (calling_convention == ProcCC_Odin) {
 		unsigned context_index = offset+arg_count;

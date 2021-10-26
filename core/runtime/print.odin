@@ -370,5 +370,13 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_type(info.base_integer)
 		print_string(") ")
 		print_type(info.slice)
+		
+	case Type_Info_Matrix:
+		print_string("matrix[")
+		print_u64(u64(info.row_count))
+		print_string(", ")
+		print_u64(u64(info.column_count))
+		print_string("]")
+		print_type(info.elem)
 	}
 }

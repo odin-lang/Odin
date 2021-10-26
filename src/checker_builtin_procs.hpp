@@ -34,6 +34,11 @@ enum BuiltinProcId {
 
 	BuiltinProc_soa_zip,
 	BuiltinProc_soa_unzip,
+	
+	BuiltinProc_transpose,
+	BuiltinProc_outer_product,
+	BuiltinProc_hadamard_product,
+	BuiltinProc_matrix_flatten,
 
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
@@ -194,6 +199,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_simple_compare, // easily compared using memcmp
 	BuiltinProc_type_is_dereferenceable,
 	BuiltinProc_type_is_valid_map_key,
+	BuiltinProc_type_is_valid_matrix_elements,
 
 	BuiltinProc_type_is_named,
 	BuiltinProc_type_is_pointer,
@@ -210,6 +216,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_bit_field_value,
 	BuiltinProc_type_is_bit_set,
 	BuiltinProc_type_is_simd_vector,
+	BuiltinProc_type_is_matrix,
 
 	BuiltinProc_type_is_specialized_polymorphic_record,
 	BuiltinProc_type_is_unspecialized_polymorphic_record,
@@ -277,6 +284,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("soa_zip"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("soa_unzip"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	
+	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
@@ -437,6 +449,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_dereferenceable"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_map_key"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_valid_matrix_elements"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_named"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_pointer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -453,6 +466,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_bit_field_value"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_bit_set"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialized_polymorphic_record"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_unspecialized_polymorphic_record"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

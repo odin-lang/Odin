@@ -1668,6 +1668,10 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
 		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
 		break;
+		
+	case Type_Matrix:
+		add_type_info_type_internal(c, bt->Matrix.elem);
+		break;
 
 	default:
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
@@ -1879,6 +1883,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
 		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
 		break;
+		
+	case Type_Matrix:
+		add_min_dep_type_info(c, bt->Matrix.elem);
+		break;
 
 	default:
 		GB_PANIC("Unhandled type: %*.s", LIT(type_strings[bt->kind]));
@@ -2023,6 +2031,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		String bounds_check_entities[] = {
 			// Bounds checking related procedures
 			str_lit("bounds_check_error"),
+			str_lit("matrix_bounds_check_error"),
 			str_lit("slice_expr_error_hi"),
 			str_lit("slice_expr_error_lo_hi"),
 			str_lit("multi_pointer_slice_expr_error"),
@@ -2467,6 +2476,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
 	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
+	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -2494,6 +2504,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
 	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
+	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 }
 
 void init_mem_allocator(Checker *c) {

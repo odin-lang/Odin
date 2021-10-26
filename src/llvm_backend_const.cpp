@@ -512,6 +512,31 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 		res.value = llvm_const_array(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
+	} else if (is_type_matrix(type) &&
+	    value.kind != ExactValue_Invalid &&
+	    value.kind != ExactValue_Compound) {
+		i64 row = type->Matrix.row_count;
+		i64 column = type->Matrix.column_count;
+		GB_ASSERT(row == column);
+		
+		Type *elem = type->Matrix.elem;
+		
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
+				
+		i64 total_elem_count = matrix_type_total_internal_elems(type);
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)total_elem_count);		
+		for (i64 i = 0; i < row; i++) {
+			elems[matrix_indices_to_offset(type, i, i)] = single_elem.value;
+		}
+		for (i64 i = 0; i < total_elem_count; i++) {
+			if (elems[i] == nullptr) {
+				elems[i] = LLVMConstNull(lb_type(m, elem));
+			}
+		}
+		
+		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)total_elem_count);
+		return res;
 	}
 
 	switch (value.kind) {
@@ -956,6 +981,82 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 			res.value = LLVMConstInt(lb_type(m, original_type), bits, false);
 			return res;
+		} else if (is_type_matrix(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+			Type *elem_type = type->Matrix.elem;
+			isize elem_count = cl->elems.count;
+			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
+				return lb_const_nil(m, original_type);
+			}
+			
+			i64 max_count = type->Matrix.row_count*type->Matrix.column_count;
+			i64 total_count = matrix_type_total_internal_elems(type);
+			
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)total_count);
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				for_array(j, cl->elems) {
+					Ast *elem = cl->elems[j];
+					ast_node(fv, FieldValue, elem);
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						TypeAndValue lo_tav = ie->left->tav;
+						TypeAndValue hi_tav = ie->right->tav;
+						GB_ASSERT(lo_tav.mode == Addressing_Constant);
+						GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+						TokenKind op = ie->op.kind;
+						i64 lo = exact_value_to_i64(lo_tav.value);
+						i64 hi = exact_value_to_i64(hi_tav.value);
+						if (op != Token_RangeHalf) {
+							hi += 1;
+						}
+						TypeAndValue tav = fv->value->tav;
+						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+						for (i64 k = lo; k < hi; k++) {
+							i64 offset = matrix_index_to_offset(type, k);
+							GB_ASSERT(values[offset] == nullptr);
+							values[offset] = val;
+						}
+					} else {
+						TypeAndValue index_tav = fv->field->tav;
+						GB_ASSERT(index_tav.mode == Addressing_Constant);
+						i64 index = exact_value_to_i64(index_tav.value);
+						TypeAndValue tav = fv->value->tav;
+						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+						i64 offset = matrix_index_to_offset(type, index);
+						GB_ASSERT(values[offset] == nullptr);
+						values[offset] = val;
+					}
+				}
+				
+				for (i64 i = 0; i < total_count; i++) {
+					if (values[i] == nullptr) {
+						values[i] = LLVMConstNull(lb_type(m, elem_type));
+					}
+				}
+
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, allow_local);
+				return res;
+			} else {
+				GB_ASSERT_MSG(elem_count == max_count, "%td != %td", elem_count, max_count);
+
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)total_count);
+				
+				for_array(i, cl->elems) {
+					TypeAndValue tav = cl->elems[i]->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					i64 offset = matrix_index_to_offset(type, i);
+					values[offset] = lb_const_value(m, elem_type, tav.value, allow_local).value;
+				}
+				for (isize i = 0; i < total_count; i++) {
+					if (values[i] == nullptr) {
+						values[i] = LLVMConstNull(lb_type(m, elem_type));
+					}
+				}
+
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, allow_local);
+				return res;
+			}
 		} else {
 			return lb_const_nil(m, original_type);
 		}

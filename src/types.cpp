@@ -270,6 +270,14 @@ struct TypeProc {
 	TYPE_KIND(RelativeSlice, struct {                         \
 		Type *slice_type;                                 \
 		Type *base_integer;                               \
+	})                                                        \
+	TYPE_KIND(Matrix, struct {                                \
+		Type *elem;                                       \
+		i64   row_count;                                  \
+		i64   column_count;                               \
+		Type *generic_row_count;                          \
+		Type *generic_column_count;                       \
+		i64   stride_in_bytes;                            \
 	})
 
 
@@ -341,6 +349,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Simd_Vector,
 	Typeid_Relative_Pointer,
 	Typeid_Relative_Slice,
+	Typeid_Matrix,
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -348,6 +357,13 @@ enum TypeInfoFlag : u32 {
 	TypeInfoFlag_Comparable     = 1<<0,
 	TypeInfoFlag_Simple_Compare = 1<<1,
 };
+
+
+enum : int {
+	MATRIX_ELEMENT_COUNT_MIN = 1,
+	MATRIX_ELEMENT_COUNT_MAX = 16,
+};
+
 
 bool is_type_comparable(Type *t);
 bool is_type_simple_compare(Type *t);
@@ -622,6 +638,7 @@ gb_global Type *t_type_info_bit_set              = nullptr;
 gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_relative_pointer     = nullptr;
 gb_global Type *t_type_info_relative_slice       = nullptr;
+gb_global Type *t_type_info_matrix               = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -649,6 +666,7 @@ gb_global Type *t_type_info_bit_set_ptr          = nullptr;
 gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
 gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
+gb_global Type *t_type_info_matrix_ptr           = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -667,11 +685,13 @@ gb_global Type *t_hasher_proc = nullptr;
 
 gb_global RecursiveMutex g_type_mutex;
 
+struct TypePath;
 
-i64      type_size_of               (Type *t);
-i64      type_align_of              (Type *t);
-i64      type_offset_of             (Type *t, i32 index);
-gbString type_to_string             (Type *type);
+i64      type_size_of         (Type *t);
+i64      type_align_of        (Type *t);
+i64      type_offset_of       (Type *t, i32 index);
+gbString type_to_string       (Type *type);
+i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
@@ -680,6 +700,74 @@ bool is_type_pointer(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
 bool type_set_offsets(Type *t);
+Type *base_type(Type *t);
+
+i64 type_size_of_internal(Type *t, TypePath *path);
+i64 type_align_of_internal(Type *t, TypePath *path);
+
+
+// IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
+
+struct TypePath {
+	Array<Entity *> path; // Entity_TypeName;
+	bool failure;
+};
+
+
+void type_path_init(TypePath *tp) {
+	tp->path.allocator = heap_allocator();
+}
+
+void type_path_free(TypePath *tp) {
+	array_free(&tp->path);
+}
+
+void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
+	GB_ASSERT(tp != nullptr);
+
+	GB_ASSERT(start_index < tp->path.count);
+	Entity *e = tp->path[start_index];
+	GB_ASSERT(e != nullptr);
+	error(e->token, "Illegal type declaration cycle of `%.*s`", LIT(e->token.string));
+	// NOTE(bill): Print cycle, if it's deep enough
+	for (isize j = start_index; j < tp->path.count; j++) {
+		Entity *e = tp->path[j];
+		error(e->token, "\t%.*s refers to", LIT(e->token.string));
+	}
+	// NOTE(bill): This will only print if the path count > 1
+	error(e->token, "\t%.*s", LIT(e->token.string));
+	tp->failure = true;
+	e->type->failure = true;
+	base_type(e->type)->failure = true;
+}
+
+bool type_path_push(TypePath *tp, Type *t) {
+	GB_ASSERT(tp != nullptr);
+	if (t->kind != Type_Named) {
+		return false;
+	}
+	Entity *e = t->Named.type_name;
+
+	for (isize i = 0; i < tp->path.count; i++) {
+		Entity *p = tp->path[i];
+		if (p == e) {
+			type_path_print_illegal_cycle(tp, i);
+		}
+	}
+
+	array_add(&tp->path, e);
+	return true;
+}
+
+void type_path_pop(TypePath *tp) {
+	if (tp != nullptr && tp->path.count > 0) {
+		array_pop(&tp->path);
+	}
+}
+
+
+#define FAILURE_SIZE      0
+#define FAILURE_ALIGNMENT 0
 
 void init_type_mutex(void) {
 	mutex_init(&g_type_mutex);
@@ -803,6 +891,24 @@ Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	t->Array.count = count;
 	return t;
 }
+
+Type *alloc_type_matrix(Type *elem, i64 row_count, i64 column_count, Type *generic_row_count = nullptr, Type *generic_column_count = nullptr) {
+	if (generic_row_count != nullptr || generic_column_count != nullptr) {
+		Type *t = alloc_type(Type_Matrix);
+		t->Matrix.elem                 = elem;
+		t->Matrix.row_count            = row_count;
+		t->Matrix.column_count         = column_count;
+		t->Matrix.generic_row_count    = generic_row_count;
+		t->Matrix.generic_column_count = generic_column_count;
+		return t;
+	}
+	Type *t = alloc_type(Type_Matrix);
+	t->Matrix.elem = elem;
+	t->Matrix.row_count = row_count;
+	t->Matrix.column_count = column_count;
+	return t;
+}
+
 
 Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue const *min_value, ExactValue const *max_value, TokenKind op) {
 	Type *t = alloc_type(Type_EnumeratedArray);
@@ -1208,6 +1314,132 @@ bool is_type_enumerated_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_EnumeratedArray;
 }
+bool is_type_matrix(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Matrix;
+}
+
+i64 matrix_align_of(Type *t, struct TypePath *tp) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	Type *elem = t->Matrix.elem;
+	i64 row_count = gb_max(t->Matrix.row_count, 1);
+
+	bool pop = type_path_push(tp, elem);
+	if (tp->failure) {
+		return FAILURE_ALIGNMENT;
+	}
+
+	i64 elem_align = type_align_of_internal(elem, tp);
+	if (pop) type_path_pop(tp);
+	
+	i64 elem_size = type_size_of(elem);
+	
+
+	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
+	// It would be better for performance to pad each column so that each column
+	// could be maximally aligned but as a compromise, having no padding will be
+	// beneficial to third libraries that assume no padding
+	
+	i64 total_expected_size = row_count*t->Matrix.column_count*elem_size;
+	// i64 min_alignment = prev_pow2(elem_align * row_count);
+	i64 min_alignment = prev_pow2(total_expected_size);
+	while ((total_expected_size % min_alignment) != 0) {
+		min_alignment >>= 1;
+	}
+	GB_ASSERT(min_alignment >= elem_align);
+	
+	i64 align = gb_min(min_alignment, build_context.max_align);
+	return align;
+}
+
+
+i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	if (t->Matrix.stride_in_bytes != 0) {
+		return t->Matrix.stride_in_bytes;
+	} else if (t->Matrix.row_count == 0) {
+		return 0;
+	}
+	
+	i64 elem_size;
+	if (tp != nullptr) {
+		elem_size = type_size_of_internal(t->Matrix.elem, tp);
+	} else {
+		elem_size = type_size_of(t->Matrix.elem);
+	}
+
+	i64 stride_in_bytes = 0;
+	
+	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
+	// It would be better for performance to pad each column so that each column
+	// could be maximally aligned but as a compromise, having no padding will be
+	// beneficial to third libraries that assume no padding
+	i64 row_count = t->Matrix.row_count;
+	stride_in_bytes = elem_size*row_count;
+	
+	t->Matrix.stride_in_bytes = stride_in_bytes;
+	return stride_in_bytes;
+}
+
+i64 matrix_type_stride_in_elems(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	i64 stride = matrix_type_stride_in_bytes(t, nullptr);
+	return stride/gb_max(1, type_size_of(t->Matrix.elem));
+}
+
+
+i64 matrix_type_total_internal_elems(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	i64 size = type_size_of(t);
+	i64 elem_size = type_size_of(t->Matrix.elem);
+	return size/gb_max(elem_size, 1);
+}
+
+i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	GB_ASSERT(0 <= row_index && row_index < t->Matrix.row_count);
+	GB_ASSERT(0 <= column_index && column_index < t->Matrix.column_count);
+	i64 stride_elems = matrix_type_stride_in_elems(t);
+	return stride_elems*column_index + row_index;
+}
+i64 matrix_index_to_offset(Type *t, i64 index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	i64 row_index    = index%t->Matrix.row_count;
+	i64 column_index = index/t->Matrix.row_count;
+	return matrix_indices_to_offset(t, row_index, column_index);
+}
+
+
+
+bool is_matrix_square(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	return t->Matrix.row_count == t->Matrix.column_count;
+}
+
+bool is_type_valid_for_matrix_elems(Type *t) {
+	t = base_type(t);
+	if (is_type_integer(t)) {
+		return true;
+	} else if (is_type_float(t)) {
+		return true;
+	} else if (is_type_complex(t)) {
+		return true;
+	} 
+	if (t->kind == Type_Generic) {
+		return true;
+	}
+	return false;
+}
+
 bool is_type_dynamic_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_DynamicArray;
@@ -1241,6 +1473,8 @@ Type *base_array_type(Type *t) {
 		return bt->EnumeratedArray.elem;
 	} else if (is_type_simd_vector(bt)) {
 		return bt->SimdVector.elem;
+	} else if (is_type_matrix(bt)) {
+		return bt->Matrix.elem;
 	}
 	return t;
 }
@@ -1315,11 +1549,16 @@ i64 get_array_type_count(Type *t) {
 Type *core_array_type(Type *t) {
 	for (;;) {
 		t = base_array_type(t);
-		if (t->kind != Type_Array && t->kind != Type_EnumeratedArray && t->kind != Type_SimdVector) {
+		switch (t->kind) {
+		case Type_Array:
+		case Type_EnumeratedArray:
+		case Type_SimdVector:
+		case Type_Matrix:
 			break;
+		default:
+			return t;
 		}
 	}
-	return t;
 }
 
 
@@ -1651,6 +1890,8 @@ bool is_type_indexable(Type *t) {
 		return true;
 	case Type_RelativeSlice:
 		return true;
+	case Type_Matrix:
+		return true;
 	}
 	return false;
 }
@@ -1668,6 +1909,8 @@ bool is_type_sliceable(Type *t) {
 		return false;
 	case Type_RelativeSlice:
 		return true;
+	case Type_Matrix:
+		return false;
 	}
 	return false;
 }
@@ -1934,6 +2177,8 @@ bool is_type_comparable(Type *t) {
 		return is_type_comparable(t->Array.elem);
 	case Type_Proc:
 		return true;
+	case Type_Matrix:
+		return is_type_comparable(t->Matrix.elem);
 
 	case Type_BitSet:
 		return true;
@@ -1995,6 +2240,9 @@ bool is_type_simple_compare(Type *t) {
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
+		
+	case Type_Matrix:
+		return is_type_simple_compare(t->Matrix.elem);
 
 	case Type_Struct:
 		for_array(i, t->Struct.fields) {
@@ -2105,6 +2353,14 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Array:
 		if (y->kind == Type_Array) {
 			return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
+		}
+		break;
+		
+	case Type_Matrix:
+		if (y->kind == Type_Matrix) {
+			return x->Matrix.row_count == y->Matrix.row_count &&
+			       x->Matrix.column_count == y->Matrix.column_count &&
+			       are_types_identical(x->Matrix.elem, y->Matrix.elem);
 		}
 		break;
 
@@ -2812,71 +3068,6 @@ Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allocator, Type 
 
 
 
-
-// IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
-
-struct TypePath {
-	Array<Entity *> path; // Entity_TypeName;
-	bool failure;
-};
-
-
-void type_path_init(TypePath *tp) {
-	tp->path.allocator = heap_allocator();
-}
-
-void type_path_free(TypePath *tp) {
-	array_free(&tp->path);
-}
-
-void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
-	GB_ASSERT(tp != nullptr);
-
-	GB_ASSERT(start_index < tp->path.count);
-	Entity *e = tp->path[start_index];
-	GB_ASSERT(e != nullptr);
-	error(e->token, "Illegal type declaration cycle of `%.*s`", LIT(e->token.string));
-	// NOTE(bill): Print cycle, if it's deep enough
-	for (isize j = start_index; j < tp->path.count; j++) {
-		Entity *e = tp->path[j];
-		error(e->token, "\t%.*s refers to", LIT(e->token.string));
-	}
-	// NOTE(bill): This will only print if the path count > 1
-	error(e->token, "\t%.*s", LIT(e->token.string));
-	tp->failure = true;
-	e->type->failure = true;
-	base_type(e->type)->failure = true;
-}
-
-bool type_path_push(TypePath *tp, Type *t) {
-	GB_ASSERT(tp != nullptr);
-	if (t->kind != Type_Named) {
-		return false;
-	}
-	Entity *e = t->Named.type_name;
-
-	for (isize i = 0; i < tp->path.count; i++) {
-		Entity *p = tp->path[i];
-		if (p == e) {
-			type_path_print_illegal_cycle(tp, i);
-		}
-	}
-
-	array_add(&tp->path, e);
-	return true;
-}
-
-void type_path_pop(TypePath *tp) {
-	if (tp != nullptr && tp->path.count > 0) {
-		array_pop(&tp->path);
-	}
-}
-
-
-#define FAILURE_SIZE      0
-#define FAILURE_ALIGNMENT 0
-
-
 i64 type_size_of_internal (Type *t, TypePath *path);
 i64 type_align_of_internal(Type *t, TypePath *path);
 i64 type_size_of(Type *t);
@@ -2982,7 +3173,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
-		i64 align = type_align_of_internal(t->Array.elem, path);
+		i64 align = type_align_of_internal(elem, path);
 		if (pop) type_path_pop(path);
 		return align;
 	}
@@ -2993,7 +3184,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
-		i64 align = type_align_of_internal(t->EnumeratedArray.elem, path);
+		i64 align = type_align_of_internal(elem, path);
 		if (pop) type_path_pop(path);
 		return align;
 	}
@@ -3102,6 +3293,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 	}
+	
+	case Type_Matrix: 
+		return matrix_align_of(t, path);
 
 	case Type_RelativePointer:
 		return type_align_of_internal(t->RelativePointer.base_integer, path);
@@ -3368,6 +3562,17 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		i64 count = t->SimdVector.count;
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
+	}
+	
+	case Type_Matrix: {
+		bool pop = type_path_push(path, t->Matrix.elem);
+		if (path->failure) {
+			return FAILURE_SIZE;
+		}
+		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
+		if (pop) type_path_pop(path);
+
+		return stride_in_bytes * t->Matrix.column_count;
 	}
 
 	case Type_RelativePointer:
@@ -3829,6 +4034,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = write_type_to_string(str, type->RelativeSlice.base_integer);
 		str = gb_string_append_fmt(str, ") ");
 		str = write_type_to_string(str, type->RelativeSlice.slice_type);
+		break;
+		
+	case Type_Matrix:
+		str = gb_string_appendc(str, gb_bprintf("matrix[%d, %d]", cast(int)type->Matrix.row_count, cast(int)type->Matrix.column_count));
+		str = write_type_to_string(str, type->Matrix.elem);
 		break;
 	}
 
