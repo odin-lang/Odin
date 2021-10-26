@@ -2144,8 +2144,8 @@ int strip_semicolons(Parser *parser) {
 		generated_count += 1;
 		
 		i64 written = 0;
-		defer (gb_file_truncate(&f, written));
-		
+		defer (err = gb_file_truncate(&f, written));
+
 		debugf("Write file with stripped tokens: %s\n", filename);
 		err = write_file_with_stripped_tokens(&f, file->file, &written);
 		if (err) {
@@ -2181,6 +2181,7 @@ int strip_semicolons(Parser *parser) {
 		}
 		
 		debugf("Copy '%s' to '%s'\n", new_fullpath, old_fullpath);
+
 		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
 			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, new_fullpath);
 			debugf("Copy '%s' to '%s'\n", old_fullpath_backup, old_fullpath);
@@ -2190,7 +2191,7 @@ int strip_semicolons(Parser *parser) {
 			failed = true;
 			break;
 		}
-		
+
 		debugf("Remove '%s'\n", old_fullpath_backup);
 		if (!gb_file_remove(old_fullpath_backup)) {
 			gb_printf_err("failed to remove '%s'\n", old_fullpath_backup);
