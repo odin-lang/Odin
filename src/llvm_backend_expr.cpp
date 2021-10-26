@@ -3111,11 +3111,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		}
 
 		LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, t));
-		LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
-			cast(char *)asm_string.text, cast(size_t)asm_string.len,
-			cast(char *)constraints_string.text, cast(size_t)constraints_string.len,
-			ia->has_side_effects, ia->is_align_stack, dialect
-		);
+		LLVMValueRef the_asm = llvm_get_inline_asm(func_type, asm_string, constraints_string, ia->has_side_effects, ia->has_side_effects, dialect);
 		GB_ASSERT(the_asm != nullptr);
 		return {the_asm, t};
 	case_end;
