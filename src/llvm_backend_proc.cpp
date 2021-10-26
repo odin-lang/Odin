@@ -1335,22 +1335,12 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		if (build_context.metrics.arch == TargetArch_386 ||
 		    build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
-			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
-				cast(char *)"pause", 5,
-				cast(char *)"", 0,
-				/*HasSideEffects*/true, /*IsAlignStack*/false,
-				LLVMInlineAsmDialectATT
-			);
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {});
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		} else if (build_context.metrics.arch == TargetArch_arm64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
-			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
-				cast(char *)"yield", 5,
-				cast(char *)"", 0,
-				/*HasSideEffects*/true, /*IsAlignStack*/false,
-				LLVMInlineAsmDialectATT
-			);
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("yield"), {});
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		}
@@ -1961,10 +1951,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");
 					}
-					size_t asm_string_size = gb_strlen(asm_string);
-					size_t constraints_size = gb_string_length(constraints);
 					
-					inline_asm = LLVMGetInlineAsm(func_type, asm_string, asm_string_size, constraints, constraints_size, true, false, LLVMInlineAsmDialectATT);
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
 			case TargetArch_386:
@@ -1995,10 +1983,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 						constraints = gb_string_appendc(constraints, ",rm");
 					}
 					
-					size_t asm_string_size = gb_strlen(asm_string);
-					size_t constraints_size = gb_string_length(constraints);
-					
-					inline_asm = LLVMGetInlineAsm(func_type, asm_string, asm_string_size, constraints, constraints_size, true, false, LLVMInlineAsmDialectATT);
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
 			case TargetArch_arm64:
@@ -2021,10 +2006,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");
 					}
-					size_t asm_string_size = gb_strlen(asm_string);
-					size_t constraints_size = gb_string_length(constraints);
-					
-					inline_asm = LLVMGetInlineAsm(func_type, asm_string, asm_string_size, constraints, constraints_size, true, false, LLVMInlineAsmDialectATT);
+
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
 			default:
