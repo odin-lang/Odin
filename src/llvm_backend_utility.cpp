@@ -1379,3 +1379,16 @@ lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 	}
 	return lb_emit_struct_ev(p, value, cast(i32)n);
 }
+
+LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, String const &clobbers, bool has_side_effects=true, bool is_align_stack=false, LLVMInlineAsmDialect dialect=LLVMInlineAsmDialectATT) {
+	return LLVMGetInlineAsm(func_type,
+		cast(char *)str.text, cast(size_t)str.len,
+		cast(char *)clobbers.text, cast(size_t)clobbers.len,
+		/*HasSideEffects*/true, /*IsAlignStack*/false,
+		dialect
+	#if LLVM_VERSION_MAJOR >= 13 
+		, /*CanThrow*/false
+	#endif
+	);
+}
+
