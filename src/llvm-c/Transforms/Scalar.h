@@ -67,9 +67,6 @@ void LLVMAddIndVarSimplifyPass(LLVMPassManagerRef PM);
 /** See llvm::createInstructionCombiningPass function. */
 void LLVMAddInstructionCombiningPass(LLVMPassManagerRef PM);
 
-/** See llvm::createInstSimplifyLegacyPass function. */
-void LLVMAddInstructionSimplifyPass(LLVMPassManagerRef PM);
-
 /** See llvm::createJumpThreadingPass function. */
 void LLVMAddJumpThreadingPass(LLVMPassManagerRef PM);
 
@@ -127,6 +124,9 @@ void LLVMAddSimplifyLibCallsPass(LLVMPassManagerRef PM);
 
 /** See llvm::createTailCallEliminationPass function. */
 void LLVMAddTailCallEliminationPass(LLVMPassManagerRef PM);
+
+/** See llvm::createConstantPropagationPass function. */
+void LLVMAddConstantPropagationPass(LLVMPassManagerRef PM);
 
 /** See llvm::demotePromoteMemoryToRegisterPass function. */
 void LLVMAddDemoteMemoryToRegisterPass(LLVMPassManagerRef PM);

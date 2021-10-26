@@ -15,7 +15,7 @@
 #ifndef LLVM_C_LINKTIMEOPTIMIZER_H
 #define LLVM_C_LINKTIMEOPTIMIZER_H
 
-#include "ExternC.h"
+#include "llvm-c/ExternC.h"
 
 LLVM_C_EXTERN_C_BEGIN
 
