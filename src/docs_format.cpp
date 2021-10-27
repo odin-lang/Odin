@@ -167,7 +167,7 @@ enum OdinDocEntityFlag : u64 {
 	OdinDocEntityFlag_Param_NoAlias  = 1ull<<7,
 	OdinDocEntityFlag_Param_AnyInt   = 1ull<<8,
 
-	OdinDocEntityFlag_Type_Alias = 1ull<<29,
+	OdinDocEntityFlag_Type_Alias = 1ull<<20,
 
 	OdinDocEntityFlag_Var_Thread_Local = 1ull<<40,
 	OdinDocEntityFlag_Var_Static       = 1ull<<41,
