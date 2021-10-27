@@ -850,6 +850,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (e->flags & EntityFlag_AutoCast)   { flags |= OdinDocEntityFlag_Param_AutoCast; }
 		if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
 		if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
+		if (e->flags & EntityFlag_AnyInt)     { flags |= OdinDocEntityFlag_Param_AnyInt;   }
 	}
 
 	OdinDocString init_string = {};
