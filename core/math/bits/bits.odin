@@ -147,55 +147,53 @@ len :: proc{len_u8, len_u16, len_u32, len_u64, len_uint}
 
 
 add_u32 :: proc(x, y, carry: u32) -> (sum, carry_out: u32) {
-	yc := y + carry
-	sum = x + yc
-	if sum < x || yc < y {
-		carry_out = 1
-	}
+	tmp_carry, tmp_carry2: bool
+	sum, tmp_carry = intrinsics.overflow_add(x, y)
+	sum, tmp_carry2 = intrinsics.overflow_add(sum, carry)
+	carry_out = u32(tmp_carry | tmp_carry2)
 	return
 }
 add_u64 :: proc(x, y, carry: u64) -> (sum, carry_out: u64) {
-	yc := y + carry
-	sum = x + yc
-	if sum < x || yc < y {
-		carry_out = 1
-	}
+	tmp_carry, tmp_carry2: bool
+	sum, tmp_carry = intrinsics.overflow_add(x, y)
+	sum, tmp_carry2 = intrinsics.overflow_add(sum, carry)
+	carry_out = u64(tmp_carry | tmp_carry2)
 	return
 }
 add_uint :: proc(x, y, carry: uint) -> (sum, carry_out: uint) {
-	yc := y + carry
-	sum = x + yc
-	if sum < x || yc < y {
-		carry_out = 1
+	when size_of(uint) == size_of(u64) {
+		a, b := add_u64(u64(x), u64(y), u64(carry))
+	} else {
+		#assert(size_of(uint) == size_of(u32))
+		a, b := add_u32(u32(x), u32(y), u32(carry))
 	}
-	return
+	return uint(a), uint(b)
 }
 add :: proc{add_u32, add_u64, add_uint}
 
 
 sub_u32 :: proc(x, y, borrow: u32) -> (diff, borrow_out: u32) {
-	yb := y + borrow
-	diff = x - yb
-	if diff > x || yb < y {
-		borrow_out = 1
-	}
+	tmp_borrow, tmp_borrow2: bool
+	diff, tmp_borrow = intrinsics.overflow_sub(x, y)
+	diff, tmp_borrow2 = intrinsics.overflow_sub(diff, borrow)
+	borrow_out = u32(tmp_borrow | tmp_borrow2)
 	return
 }
 sub_u64 :: proc(x, y, borrow: u64) -> (diff, borrow_out: u64) {
-	yb := y + borrow
-	diff = x - yb
-	if diff > x || yb < y {
-		borrow_out = 1
-	}
+	tmp_borrow, tmp_borrow2: bool
+	diff, tmp_borrow = intrinsics.overflow_sub(x, y)
+	diff, tmp_borrow2 = intrinsics.overflow_sub(diff, borrow)
+	borrow_out = u64(tmp_borrow | tmp_borrow2)
 	return
 }
 sub_uint :: proc(x, y, borrow: uint) -> (diff, borrow_out: uint) {
-	yb := y + borrow
-	diff = x - yb
-	if diff > x || yb < y {
-		borrow_out = 1
+	when size_of(uint) == size_of(u64) {
+		a, b := sub_u64(u64(x), u64(y), u64(borrow))
+	} else {
+		#assert(size_of(uint) == size_of(u32))
+		a, b := sub_u32(u32(x), u32(y), u32(borrow))
 	}
-	return
+	return uint(a), uint(b)
 }
 sub :: proc{sub_u32, sub_u64, sub_uint}
 
@@ -206,18 +204,8 @@ mul_u32 :: proc(x, y: u32) -> (hi, lo: u32) {
 	return
 }
 mul_u64 :: proc(x, y: u64) -> (hi, lo: u64) {
-	mask :: 1<<32 - 1
-
-	x0, x1 := x & mask, x >> 32
-	y0, y1 := y & mask, y >> 32
-
-	w0 := x0 * y0
-	t := x1*y0 + w0>>32
-
-	w1, w2 := t & mask, t >> 32
-	w1 += x0 * y1
-	hi = x1*y1 + w2 + w1>>32
-	lo = x * y
+	prod_wide := u128(x) * u128(y)
+	hi, lo = u64(prod_wide>>64), u64(prod_wide)
 	return
 }
 
