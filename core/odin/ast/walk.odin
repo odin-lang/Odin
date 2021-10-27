@@ -110,6 +110,10 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 	case Index_Expr:
 		walk(v, n.expr)
 		walk(v, n.index)
+	case Matrix_Index_Expr:
+		walk(v, n.expr)
+		walk(v, n.row_index)
+		walk(v, n.column_index)
 	case Deref_Expr:
 		walk(v, n.expr)
 	case Slice_Expr:
@@ -398,6 +402,10 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 	case Relative_Type:
 		walk(v, n.tag)
 		walk(v, n.type)
+	case Matrix_Type:
+		walk(v, n.row_count)
+		walk(v, n.column_count)
+		walk(v, n.elem)
 
 	case:
 		fmt.panicf("ast.walk: unexpected node type %T", n)

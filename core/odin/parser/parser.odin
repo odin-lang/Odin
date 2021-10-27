@@ -2703,6 +2703,22 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		bst.underlying = underlying
 		bst.close = close.pos
 		return bst
+		
+	case .Matrix:
+		tok := expect_token(p, .Matrix)
+		expect_token(p, .Open_Bracket)
+		row_count := parse_expr(p, false)
+		expect_token(p, .Comma)
+		column_count := parse_expr(p, false)
+		expect_token(p, .Close_Bracket)
+		elem := parse_type(p)
+
+		mt := ast.new(ast.Matrix_Type, tok.pos, elem.end)
+		mt.tok_pos = tok.pos
+		mt.row_count = row_count
+		mt.column_count = column_count
+		mt.elem = elem
+		return mt
 
 	case .Asm:
 		tok := expect_token(p, .Asm)
@@ -2969,7 +2985,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			defer p.allow_range = prev_allow_range
 			p.allow_range = false
 
-			indicies: [2]^ast.Expr
+			indices: [2]^ast.Expr
 			interval: tokenizer.Token
 			is_slice_op := false
 
@@ -2981,18 +2997,18 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 				// NOTE(bill): Do not err yet
 				break
 			case:
-				indicies[0] = parse_expr(p, false)
+				indices[0] = parse_expr(p, false)
 			}
 
 			#partial switch p.curr_tok.kind {
 			case .Ellipsis, .Range_Half, .Range_Full:
 				error(p, p.curr_tok.pos, "expected a colon, not a range")
 				fallthrough
-			case .Colon:
+			case .Colon, .Comma/*matrix index*/:
 				interval = advance_token(p)
 				is_slice_op = true
 				if p.curr_tok.kind != .Close_Bracket && p.curr_tok.kind != .EOF {
-					indicies[1] = parse_expr(p, false)
+					indices[1] = parse_expr(p, false)
 				}
 			}
 
@@ -3000,20 +3016,34 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			p.expr_level -= 1
 
 			if is_slice_op {
-				se := ast.new(ast.Slice_Expr, operand.pos, end_pos(close))
-				se.expr = operand
-				se.open = open.pos
-				se.low = indicies[0]
-				se.interval = interval
-				se.high = indicies[1]
-				se.close = close.pos
+				if interval.kind == .Comma {
+					if indices[0] == nil || indices[1] == nil {
+						error(p, p.curr_tok.pos, "matrix index expressions require both row and column indices")
+					}
+					se := ast.new(ast.Matrix_Index_Expr, operand.pos, end_pos(close))
+					se.expr = operand
+					se.open = open.pos
+					se.row_index = indices[0]
+					se.column_index = indices[1]
+					se.close = close.pos
 
-				operand = se
+					operand = se
+				} else {
+					se := ast.new(ast.Slice_Expr, operand.pos, end_pos(close))
+					se.expr = operand
+					se.open = open.pos
+					se.low = indices[0]
+					se.interval = interval
+					se.high = indices[1]
+					se.close = close.pos
+
+					operand = se
+				}
 			} else {
 				ie := ast.new(ast.Index_Expr, operand.pos, end_pos(close))
 				ie.expr = operand
 				ie.open = open.pos
-				ie.index = indicies[0]
+				ie.index = indices[0]
 				ie.close = close.pos
 
 				operand = ie

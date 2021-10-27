@@ -117,6 +117,10 @@ clone_node :: proc(node: ^Node) -> ^Node {
 	case Index_Expr:
 		r.expr = clone(r.expr)
 		r.index = clone(r.index)
+	case Matrix_Index_Expr:
+		r.expr = clone(r.expr)
+		r.row_index = clone(r.row_index)
+		r.column_index = clone(r.column_index)
 	case Deref_Expr:
 		r.expr = clone(r.expr)
 	case Slice_Expr:
@@ -275,7 +279,10 @@ clone_node :: proc(node: ^Node) -> ^Node {
 	case Map_Type:
 		r.key = clone(r.key)
 		r.value = clone(r.value)
-
+	case Matrix_Type:
+		r.row_count = clone(r.row_count)
+		r.column_count = clone(r.column_count)
+		r.elem = clone(r.elem)
 	case:
 		fmt.panicf("Unhandled node kind: %T", r)
 	}
