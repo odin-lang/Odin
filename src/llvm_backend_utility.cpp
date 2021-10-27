@@ -1567,6 +1567,10 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	LLVMTypeRef type = LLVMTypeOf(value);
 	GB_ASSERT(LLVMGetTypeKind(type) == LLVMVectorTypeKind);
 	LLVMTypeRef elem = LLVMGetElementType(type);
+	unsigned len = LLVMGetVectorSize(type);
+	if (len == 0) {
+		return LLVMConstNull(type);
+	}
 	
 	char const *name = nullptr;
 	i32 value_offset = 0;
@@ -1591,17 +1595,30 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	}
 	
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+	if (id != 0) {
+		LLVMTypeRef types[1] = {};
+		types[0] = type;
+		
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+		LLVMValueRef values[2] = {};
+		values[0] = LLVMConstNull(elem);
+		values[1] = value;
+		LLVMValueRef call = LLVMBuildCall(p->builder, ip, values+value_offset, value_count, "");
+		return call;
+	}
 	
-	LLVMTypeRef types[1] = {};
-	types[0] = type;
+	// Manual reduce
 	
-	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-	LLVMValueRef values[2] = {};
-	values[0] = LLVMConstNull(elem);
-	values[1] = value;
-	LLVMValueRef call = LLVMBuildCall(p->builder, ip, values+value_offset, value_count, "");
-	return call;
+	LLVMValueRef sum = LLVMBuildExtractElement(p->builder, value, lb_const_int(p->module, t_u32, 0).value, "");
+	for (unsigned i = 0; i < len; i++) {
+		LLVMValueRef val = LLVMBuildExtractElement(p->builder, value, lb_const_int(p->module, t_u32, i).value, "");
+		if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
+			sum = LLVMBuildAdd(p->builder, sum, val, "");
+		} else {
+			sum = LLVMBuildFAdd(p->builder, sum, val, "");
+		}
+	}
+	return sum;
 }
 
 LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
