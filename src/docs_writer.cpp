@@ -756,6 +756,14 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 		}
 		break;
+		
+	case Type_Matrix:
+		doc_type.kind = OdinDocType_Matrix;
+		doc_type.elem_count_len = 2;
+		doc_type.elem_counts[0] = type->Matrix.row_count;
+		doc_type.elem_counts[1] = type->Matrix.column_count;
+		doc_type.types = odin_doc_type_as_slice(w, type->Matrix.elem);
+		break;
 	}
 
 	if (dst) {
