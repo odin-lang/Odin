@@ -10,7 +10,7 @@ Array :: struct($T: typeid) {
 String :: distinct Array(byte)
 
 Version_Type_Major :: 0
-Version_Type_Minor :: 1
+Version_Type_Minor :: 2
 Version_Type_Patch :: 0
 
 Version_Type :: struct {
@@ -101,17 +101,19 @@ Entity_Flag :: enum u32le {
 	Param_Ellipsis  = 5, // Variadic parameter
 	Param_CVararg   = 6, // #c_vararg
 	Param_No_Alias  = 7, // #no_alias
+	Param_Any_Int   = 8, // #any_int
 
-	Type_Alias = 8,
+	Type_Alias = 20,
 
-	Var_Thread_Local = 9,
-	Var_Static       = 10,
+	Var_Thread_Local = 40,
+	Var_Static       = 41,
 }
 
-Entity_Flags :: distinct bit_set[Entity_Flag; u32le]
+Entity_Flags :: distinct bit_set[Entity_Flag; u64le]
 
 Entity :: struct {
 	kind:             Entity_Kind,
+	_:                u32le, // reserved
 	flags:            Entity_Flags,
 	pos:              Position,
 	name:             String,
