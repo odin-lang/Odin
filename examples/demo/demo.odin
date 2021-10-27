@@ -2373,7 +2373,9 @@ matrix_type :: proc() {
 	// Unlike normal arrays, matrices try to maximize alignment to allow for the (SIMD) vectorization
 	// properties whilst keeping zero padding (either between columns or at the end of the type).
 	// 
-	// Zero padding is a compromise for use with third-party libraries, instead of optimizing for performance
+	// Zero padding is a compromise for use with third-party libraries, instead of optimizing for performance.
+	// Padding between columns was not taken even if that would have allowed each column to be loaded 
+	// individually into a SIMD register with the correct alignment properties. 
 	// 
 	// Currently, matrices are limited to a maximum of 16 elements (rows*columns), and a minimum of 1 element.
 	// This is because matrices are stored as values (not a reference type), and thus operations on them will
