@@ -193,12 +193,12 @@ Type :: struct {
 	custom_align: String,
 
 	// Used by:
-	// .Array - 1 count: 0=len
+	// .Array            - 1 count: 0=len
 	// .Enumerated_Array - 1 count: 0=len
 	// .SOA_Struct_Fixed - 1 count: 0=len
-	// .Bit_Set - 2 count: 0=lower, 1=upper
-	// .Simd_Vector - 1 count: 0=len
-	// .Matrix - 2count: 0=row_count, 1=column_count
+	// .Bit_Set          - 2 count: 0=lower, 1=upper
+	// .Simd_Vector      - 1 count: 0=len
+	// .Matrix           - 2 count: 0=row_count, 1=column_count
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
