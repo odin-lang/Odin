@@ -2367,7 +2367,8 @@ matrix_type :: proc() {
 	// TECHNICAL INFORMATION: the internal representation of a matrix in Odin is stored
 	// in column-major format
 	// e.g. matrix[2, 3]f32 is internally [3][2]f32 (with different a alignment requirement)
-	// Column-major is used in order to utilize SIMD instructions effectively on modern hardware	
+	// Column-major is used in order to utilize (SIMD) vector instructions effectively on 
+	// modern hardware, if possible.
 	//
 	// Unlike normal arrays, matrices try to maximize alignment to allow for the (SIMD) vectorization
 	// properties whilst keeping zero padding (either between columns or at the end of the type).
