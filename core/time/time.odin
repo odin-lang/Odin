@@ -46,31 +46,31 @@ Weekday :: enum int {
 Stopwatch :: struct {
 	running: bool,
 	_start_time: Tick,
-	_stop_time: Duration,
+	_accumulation: Duration,
 }
 
-start :: proc(using stopwatch: ^Stopwatch) {
+stopwatch_start :: proc(using stopwatch: ^Stopwatch) {
 	if !running {
 		_start_time = tick_now()
 		running = true
 	}
 }
 
-stop :: proc(using stopwatch: ^Stopwatch) {
+stopwatch_stop :: proc(using stopwatch: ^Stopwatch) {
 	if running {
-		_stop_time += tick_diff(_start_time, tick_now())
+		_accumulation += tick_diff(_start_time, tick_now())
 		running = false
 	}
 }
 
-reset :: proc(using stopwatch: ^Stopwatch) {
-	_stop_time = {}
+stopwatch_reset :: proc(using stopwatch: ^Stopwatch) {
+	_accumulation = {}
 	running = false
 }
 
-duration :: proc(using stopwatch: Stopwatch) -> Duration {
-	if !running { return _stop_time }
-	return _stop_time + tick_diff(_start_time, tick_now())
+stopwatch_duration :: proc(using stopwatch: Stopwatch) -> Duration {
+	if !running { return _accumulation }
+	return _accumulation + tick_diff(_start_time, tick_now())
 }
 
 diff :: proc(start, end: Time) -> Duration {
@@ -171,7 +171,7 @@ clock_from_duration :: proc(d: Duration) -> (hour, min, sec: int) {
 }
 
 clock_from_stopwatch :: proc(s: Stopwatch) -> (hour, min, sec: int) {
-	return clock_from_duration(duration(s))
+	return clock_from_duration(stopwatch_duration(s))
 }
 
 clock_from_seconds :: proc(nsec: u64) -> (hour, min, sec: int) {
