@@ -43,6 +43,36 @@ Weekday :: enum int {
 	Saturday,
 }
 
+Stopwatch :: struct {
+	running: bool,
+	_start_time: Tick,
+	_accumulation: Duration,
+}
+
+stopwatch_start :: proc(using stopwatch: ^Stopwatch) {
+	if !running {
+		_start_time = tick_now()
+		running = true
+	}
+}
+
+stopwatch_stop :: proc(using stopwatch: ^Stopwatch) {
+	if running {
+		_accumulation += tick_diff(_start_time, tick_now())
+		running = false
+	}
+}
+
+stopwatch_reset :: proc(using stopwatch: ^Stopwatch) {
+	_accumulation = {}
+	running = false
+}
+
+stopwatch_duration :: proc(using stopwatch: Stopwatch) -> Duration {
+	if !running { return _accumulation }
+	return _accumulation + tick_diff(_start_time, tick_now())
+}
+
 diff :: proc(start, end: Time) -> Duration {
 	d := end._nsec - start._nsec
 	return Duration(d)
@@ -51,7 +81,6 @@ diff :: proc(start, end: Time) -> Duration {
 since :: proc(start: Time) -> Duration {
 	return diff(start, now())
 }
-
 
 duration_nanoseconds :: proc(d: Duration) -> i64 {
 	return i64(d)
@@ -106,6 +135,7 @@ duration_round :: proc(d, m: Duration) -> Duration {
 	}
 	return MAX_DURATION
 }
+
 duration_truncate :: proc(d, m: Duration) -> Duration {
 	return d if m <= 0 else d - d%m
 }
@@ -119,17 +149,33 @@ year :: proc(t: Time) -> (year: int) {
 	year, _, _, _ = _date(t, true)
 	return
 }
+
 month :: proc(t: Time) -> (month: Month) {
 	_, month, _, _ = _date(t, true)
 	return
 }
+
 day :: proc(t: Time) -> (day: int) {
 	_, _, day, _ = _date(t, true)
 	return
 }
 
-clock :: proc(t: Time) -> (hour, min, sec: int) {
-	sec = int(_time_abs(t) % SECONDS_PER_DAY)
+clock :: proc { clock_from_time, clock_from_duration, clock_from_stopwatch }
+
+clock_from_time :: proc(t: Time) -> (hour, min, sec: int) {
+	return clock_from_seconds(_time_abs(t))
+}
+
+clock_from_duration :: proc(d: Duration) -> (hour, min, sec: int) {
+	return clock_from_seconds(u64(d/1e9))
+}
+
+clock_from_stopwatch :: proc(s: Stopwatch) -> (hour, min, sec: int) {
+	return clock_from_duration(stopwatch_duration(s))
+}
+
+clock_from_seconds :: proc(nsec: u64) -> (hour, min, sec: int) {
+	sec = int(nsec % SECONDS_PER_DAY)
 	hour = sec / SECONDS_PER_HOUR
 	sec -= hour * SECONDS_PER_HOUR
 	min = sec / SECONDS_PER_MINUTE
@@ -137,11 +183,9 @@ clock :: proc(t: Time) -> (hour, min, sec: int) {
 	return
 }
 
-
 read_cycle_counter :: proc() -> u64 {
 	return u64(intrinsics.read_cycle_counter())
 }
-
 
 unix :: proc(sec: i64, nsec: i64) -> Time {
 	sec, nsec := sec, nsec
