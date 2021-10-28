@@ -1564,18 +1564,26 @@ LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef value, unsigned 
 }
 
 LLVMValueRef llvm_vector_shuffle_reduction(lbProcedure *p, LLVMValueRef value, LLVMOpcode op_code) {
+	LLVMTypeRef original_vector_type = LLVMTypeOf(value);
+	
+	GB_ASSERT(LLVMGetTypeKind(original_vector_type) == LLVMVectorTypeKind);
+	unsigned len = LLVMGetVectorSize(original_vector_type);
+	
 	LLVMValueRef v_zero32 = lb_const_int(p->module, t_u32, 0).value;
-	unsigned len = LLVMGetVectorSize(LLVMTypeOf(value));
 	if (len == 1) {
 		return LLVMBuildExtractElement(p->builder, value, v_zero32, "");
 	}
 	GB_ASSERT((len & (len-1)) == 0);
 	
 	for (unsigned i = len; i != 1; i >>= 1) {
-		LLVMValueRef lhs_mask = llvm_mask_iota(p->module, 0, i/2);
-		LLVMValueRef rhs_mask = llvm_mask_iota(p->module, i/2, i);
+		unsigned mask_len = i/2;
+		LLVMValueRef lhs_mask = llvm_mask_iota(p->module, 0, mask_len);
+		LLVMValueRef rhs_mask = llvm_mask_iota(p->module, mask_len, mask_len);
+		GB_ASSERT(LLVMTypeOf(lhs_mask) == LLVMTypeOf(rhs_mask));
+
 		LLVMValueRef lhs = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), lhs_mask, "");
 		LLVMValueRef rhs = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), rhs_mask, "");
+		GB_ASSERT(LLVMTypeOf(lhs) == LLVMTypeOf(rhs));
 		
 		value = LLVMBuildBinOp(p->builder, op_code, lhs, rhs, "");
 	}
@@ -1629,7 +1637,7 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	}
 
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	if (id != 0) {
+	if (id != 0 && false) {
 		LLVMTypeRef types[1] = {};
 		types[0] = type;
 		
@@ -1663,6 +1671,7 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	if (len_pow_2 == len) {
 		return llvm_vector_shuffle_reduction(p, value, op_code);
 	} else {
+		GB_ASSERT(len_pow_2 < len);
 		LLVMValueRef lower_mask = llvm_mask_iota(p->module, 0, len_pow_2);
 		LLVMValueRef upper_mask = llvm_mask_iota(p->module, len_pow_2, len-len_pow_2);
 		LLVMValueRef lower = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), lower_mask, "");
@@ -1670,7 +1679,8 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 		upper = llvm_vector_expand_to_power_of_two(p, upper);
 
 		LLVMValueRef lower_reduced = llvm_vector_shuffle_reduction(p, lower, op_code);
-		LLVMValueRef upper_reduced = llvm_vector_shuffle_reduction(p, upper, op_code); 
+		LLVMValueRef upper_reduced = llvm_vector_shuffle_reduction(p, upper, op_code);
+		GB_ASSERT(LLVMTypeOf(lower_reduced) == LLVMTypeOf(upper_reduced));
 
 		return LLVMBuildBinOp(p->builder, op_code, lower_reduced, upper_reduced, "");
 	}
