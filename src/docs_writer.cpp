@@ -756,6 +756,14 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 		}
 		break;
+		
+	case Type_Matrix:
+		doc_type.kind = OdinDocType_Matrix;
+		doc_type.elem_count_len = 2;
+		doc_type.elem_counts[0] = type->Matrix.row_count;
+		doc_type.elem_counts[1] = type->Matrix.column_count;
+		doc_type.types = odin_doc_type_as_slice(w, type->Matrix.elem);
+		break;
 	}
 
 	if (dst) {
@@ -842,6 +850,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (e->flags & EntityFlag_AutoCast)   { flags |= OdinDocEntityFlag_Param_AutoCast; }
 		if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
 		if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
+		if (e->flags & EntityFlag_AnyInt)     { flags |= OdinDocEntityFlag_Param_AnyInt;   }
 	}
 
 	OdinDocString init_string = {};

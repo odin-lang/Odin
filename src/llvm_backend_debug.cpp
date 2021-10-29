@@ -437,6 +437,20 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			gbString name = type_to_string(type, temporary_allocator());
 			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, name, gb_string_length(name), nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
 		}
+		
+	case Type_Matrix: {
+		LLVMMetadataRef subscripts[1] = {};
+		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
+			0ll,
+			matrix_type_total_internal_elems(type)
+		);
+
+		return LLVMDIBuilderCreateArrayType(m->debug_builder,
+			8*cast(uint64_t)type_size_of(type),
+			8*cast(unsigned)type_align_of(type),
+			lb_debug_type(m, type->Matrix.elem),
+			subscripts, gb_count_of(subscripts));
+	}
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));

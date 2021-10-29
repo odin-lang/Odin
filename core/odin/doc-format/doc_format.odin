@@ -10,7 +10,7 @@ Array :: struct($T: typeid) {
 String :: distinct Array(byte)
 
 Version_Type_Major :: 0
-Version_Type_Minor :: 1
+Version_Type_Minor :: 2
 Version_Type_Patch :: 0
 
 Version_Type :: struct {
@@ -101,17 +101,19 @@ Entity_Flag :: enum u32le {
 	Param_Ellipsis  = 5, // Variadic parameter
 	Param_CVararg   = 6, // #c_vararg
 	Param_No_Alias  = 7, // #no_alias
+	Param_Any_Int   = 8, // #any_int
 
-	Type_Alias = 8,
+	Type_Alias = 20,
 
-	Var_Thread_Local = 9,
-	Var_Static       = 10,
+	Var_Thread_Local = 40,
+	Var_Static       = 41,
 }
 
-Entity_Flags :: distinct bit_set[Entity_Flag; u32le]
+Entity_Flags :: distinct bit_set[Entity_Flag; u64le]
 
 Entity :: struct {
 	kind:             Entity_Kind,
+	_:                u32le, // reserved
 	flags:            Entity_Flags,
 	pos:              Position,
 	name:             String,
@@ -167,6 +169,7 @@ Type_Kind :: enum u32le {
 	Relative_Pointer   = 20,
 	Relative_Slice     = 21,
 	Multi_Pointer      = 22,
+	Matrix             = 23,
 }
 
 Type_Elems_Cap :: 4
@@ -192,11 +195,12 @@ Type :: struct {
 	custom_align: String,
 
 	// Used by:
-	// .Array - 1 count: 0=len
+	// .Array            - 1 count: 0=len
 	// .Enumerated_Array - 1 count: 0=len
 	// .SOA_Struct_Fixed - 1 count: 0=len
-	// .Bit_Set - 2 count: 0=lower, 1=upper
-	// .Simd_Vector - 1 count: 0=len
+	// .Bit_Set          - 2 count: 0=lower, 1=upper
+	// .Simd_Vector      - 1 count: 0=len
+	// .Matrix           - 2 count: 0=row_count, 1=column_count
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
@@ -224,6 +228,7 @@ Type :: struct {
 	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
 	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
 	// .Multi_Pointer      - 1 type:    0=element
+	// .Matrix             - 1 type:    0=element
 	types: Array(Type_Index),
 
 	// Used by:

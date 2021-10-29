@@ -150,6 +150,7 @@ Token_Kind :: enum u32 {
 		Asm,         // asm
 		Inline,      // inline
 		No_Inline,   // no_inline
+		Matrix,      // matrix
 	B_Keyword_End,
 
 	COUNT,
@@ -280,6 +281,7 @@ tokens := [Token_Kind.COUNT]string {
 	"asm",
 	"inline",
 	"no_inline",
+	"matrix",
 	"",
 }
 
@@ -299,10 +301,10 @@ token_to_string :: proc(tok: Token) -> string {
 }
 
 to_string :: proc(kind: Token_Kind) -> string {
-	if Token_Kind.Invalid <= kind && kind < Token_Kind.COUNT {
+	if .Invalid <= kind && kind < .COUNT {
 		return tokens[kind]
 	}
-	if Token_Kind.B_Custom_Keyword_Begin < kind {
+	if .B_Custom_Keyword_Begin < kind {
 		n := int(u16(kind)-u16(Token_Kind.B_Custom_Keyword_Begin))
 		if n < len(custom_keyword_tokens) {
 			return custom_keyword_tokens[n]
@@ -313,7 +315,7 @@ to_string :: proc(kind: Token_Kind) -> string {
 }
 
 is_literal  :: proc(kind: Token_Kind) -> bool {
-	return Token_Kind.B_Literal_Begin  < kind && kind < Token_Kind.B_Literal_End
+	return .B_Literal_Begin  < kind && kind < .B_Literal_End
 }
 is_operator :: proc(kind: Token_Kind) -> bool {
 	#partial switch kind {
@@ -327,13 +329,13 @@ is_operator :: proc(kind: Token_Kind) -> bool {
 	return false
 }
 is_assignment_operator :: proc(kind: Token_Kind) -> bool {
-	return Token_Kind.B_Assign_Op_Begin < kind && kind < Token_Kind.B_Assign_Op_End || kind == Token_Kind.Eq
+	return .B_Assign_Op_Begin < kind && kind < .B_Assign_Op_End || kind == .Eq
 }
 is_keyword :: proc(kind: Token_Kind) -> bool {
 	switch {
-	case Token_Kind.B_Keyword_Begin < kind && kind < Token_Kind.B_Keyword_End:
+	case .B_Keyword_Begin < kind && kind < .B_Keyword_End:
 		return true
-	case Token_Kind.B_Custom_Keyword_Begin < kind:
+	case .B_Custom_Keyword_Begin < kind:
 		return true
 	}
 	return false
