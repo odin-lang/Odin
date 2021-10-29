@@ -32,6 +32,9 @@ add :: proc {
 		int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error)
 	*/
 	int_add_digit,
+	rat_add_rat,
+	rat_add_int,
+	int_add_rat,
 }
 
 /*
@@ -46,6 +49,9 @@ sub :: proc {
 		int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error)
 	*/
 	int_sub_digit,
+	rat_sub_rat,
+	rat_sub_int,
+	int_sub_rat,
 }
 
 /*
@@ -67,6 +73,10 @@ is_zero :: proc {
 		int_is_zero :: proc(a: ^Int) -> bool
 	*/
 	int_is_zero,
+	/*
+		rat_is_zero :: proc(a: ^Rat) -> bool
+	*/
+	rat_is_zero,
 }
 
 is_positive :: proc {
@@ -74,6 +84,7 @@ is_positive :: proc {
 		int_is_positive :: proc(a: ^Int) -> bool
 	*/
 	int_is_positive,
+	rat_is_positive,
 }
 is_pos :: is_positive
 
@@ -82,6 +93,7 @@ is_negative :: proc {
 		int_is_negative :: proc(a: ^Int) -> bool
 	*/
 	int_is_negative,
+	rat_is_negative,
 }
 is_neg :: is_negative
 
@@ -90,6 +102,7 @@ is_even :: proc {
 		int_is_even :: proc(a: ^Int) -> bool
 	*/
 	int_is_even,
+	rat_is_even,
 }
 
 is_odd :: proc {
@@ -97,6 +110,7 @@ is_odd :: proc {
 		int_is_odd :: proc(a: ^Int) -> bool
 	*/
 	int_is_odd,
+	rat_is_odd,
 }
 
 is_power_of_two :: proc {
