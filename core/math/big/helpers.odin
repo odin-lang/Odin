@@ -44,7 +44,20 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 	return #force_inline internal_int_set_from_integer(dest, src, minimize)
 }
 
-set :: proc { int_set_from_integer, int_copy, int_atoi, }
+set :: proc { 
+	int_set_from_integer, 
+	int_copy, 
+	int_atoi, 
+
+	rat_set_f64, 
+	rat_set_f32, 
+	rat_set_f16, 
+	rat_set_u64, 
+	rat_set_i64,
+	rat_set_int, 
+	rat_set_digit, 
+	rat_set_rat, 
+}
 
 /*
 	Copy one `Int` to another.
@@ -66,7 +79,10 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 
 	return #force_inline internal_int_copy(dest, src, minimize)
 }
-copy :: proc { int_copy, }
+copy :: proc { 
+	int_copy, 
+	rat_copy,
+}
 
 /*
 	In normal code, you can also write `a, b = b, a`.
@@ -77,7 +93,7 @@ int_swap :: proc(a, b: ^Int) {
 	assert_if_nil(a, b)
 	#force_inline internal_swap(a, b)
 }
-swap :: proc { int_swap, }
+swap :: proc { int_swap, rat_swap }
 
 /*
 	Set `dest` to |`src`|.
@@ -98,7 +114,7 @@ int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 platform_abs :: proc(n: $T) -> T where intrinsics.type_is_integer(T) {
 	return n if n >= 0 else -n
 }
-abs :: proc{ int_abs, platform_abs, }
+abs :: proc{ int_abs, platform_abs, rat_abs }
 
 /*
 	Set `dest` to `-src`.
@@ -115,7 +131,7 @@ int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 
 	return #force_inline internal_int_neg(dest, src)
 }
-neg :: proc { int_neg, }
+neg :: proc { int_neg, rat_neg }
 
 /*
 	Helpers to extract values from the `Int`.
@@ -788,7 +804,10 @@ destroy_constants :: proc() {
 }
 
 
-assert_if_nil :: proc{assert_if_nil_int}
+assert_if_nil :: proc{
+	assert_if_nil_int,
+	assert_if_nil_rat,
+}
 
 assert_if_nil_int :: #force_inline proc(integers: ..^Int, loc := #caller_location) {
 	for i in integers {
@@ -796,3 +815,8 @@ assert_if_nil_int :: #force_inline proc(integers: ..^Int, loc := #caller_locatio
 	}
 }
 
+assert_if_nil_rat :: #force_inline proc(rationals: ..^Rat, loc := #caller_location) {
+	for r in rationals {
+		assert(r != nil, "(nil)", loc)
+	}
+}
