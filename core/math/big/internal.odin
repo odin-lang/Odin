@@ -1042,7 +1042,10 @@ internal_is_initialized :: proc { internal_int_is_initialized, }
 internal_int_is_zero :: #force_inline proc(a: ^Int) -> (zero: bool) {
 	return a.used == 0
 }
-internal_is_zero :: proc { internal_int_is_zero }
+internal_is_zero :: proc { 
+	internal_rat_is_zero,
+	internal_int_is_zero,
+}
 
 /*
 	This procedure will return `true` if the `Int` is positive, `false` if not.
@@ -1865,7 +1868,10 @@ internal_int_destroy :: proc(integers: ..^Int) {
 		a = &Int{}
 	}
 }
-internal_destroy :: proc{ internal_int_destroy, }
+internal_destroy :: proc{ 
+	internal_int_destroy, 
+	internal_rat_destroy, 
+}
 
 /*
 	Helpers to set an `Int` to a specific value.
@@ -1950,13 +1956,14 @@ internal_copy :: proc { internal_int_copy, }
 	This helper swaps completely.
 */
 internal_int_swap :: #force_inline proc(a, b: ^Int) {
-	a := a; b := b
-
 	a.used,  b.used  = b.used,  a.used
 	a.sign,  b.sign  = b.sign,  a.sign
 	a.digit, b.digit = b.digit, a.digit
 }
-internal_swap :: proc { internal_int_swap, }
+internal_swap :: proc { 
+	internal_int_swap, 
+	internal_rat_swap,
+}
 
 /*
 	Set `dest` to |`src`|.

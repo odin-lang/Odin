@@ -224,6 +224,15 @@ Slice_Expr :: struct {
 	close:    tokenizer.Pos,
 }
 
+Matrix_Index_Expr :: struct {
+	using node: Expr,
+	expr:         ^Expr,
+	open:         tokenizer.Pos,
+	row_index:    ^Expr,
+	column_index: ^Expr,
+	close:        tokenizer.Pos,
+}
+
 Call_Expr :: struct {
 	using node: Expr,
 	inlining: Proc_Inlining,
@@ -738,4 +747,12 @@ Relative_Type :: struct {
 	using node: Expr,
 	tag:  ^Expr,
 	type: ^Expr,
+}
+
+Matrix_Type :: struct {
+	using node: Expr,
+	tok_pos:      tokenizer.Pos,
+	row_count:    ^Expr,
+	column_count: ^Expr,
+	elem:         ^Expr,
 }

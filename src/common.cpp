@@ -443,7 +443,17 @@ u64 ceil_log2(u64 x) {
 	return cast(u64)(bit_set_count(x) - 1 - y);
 }
 
-
+u32 prev_pow2(u32 n) {
+	if (n == 0) {
+		return 0;
+	}
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	return n - (n >> 1);
+}
 i32 prev_pow2(i32 n) {
 	if (n <= 0) {
 		return 0;

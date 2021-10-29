@@ -14,7 +14,7 @@ struct OdinDocVersionType {
 };
 
 #define OdinDocVersionType_Major 0
-#define OdinDocVersionType_Minor 1
+#define OdinDocVersionType_Minor 2
 #define OdinDocVersionType_Patch 0
 
 struct OdinDocHeaderBase {
@@ -82,6 +82,7 @@ enum OdinDocTypeKind : u32 {
 	OdinDocType_RelativePointer  = 20,
 	OdinDocType_RelativeSlice    = 21,
 	OdinDocType_MultiPointer     = 22,
+	OdinDocType_Matrix           = 23,
 };
 
 enum OdinDocTypeFlag_Basic : u32 {
@@ -154,21 +155,22 @@ enum OdinDocEntityKind : u32 {
 	OdinDocEntity_LibraryName = 7,
 };
 
-enum OdinDocEntityFlag : u32 {
-	OdinDocEntityFlag_Foreign = 1<<0,
-	OdinDocEntityFlag_Export  = 1<<1,
+enum OdinDocEntityFlag : u64 {
+	OdinDocEntityFlag_Foreign = 1ull<<0,
+	OdinDocEntityFlag_Export  = 1ull<<1,
 
-	OdinDocEntityFlag_Param_Using    = 1<<2,
-	OdinDocEntityFlag_Param_Const    = 1<<3,
-	OdinDocEntityFlag_Param_AutoCast = 1<<4,
-	OdinDocEntityFlag_Param_Ellipsis = 1<<5,
-	OdinDocEntityFlag_Param_CVararg  = 1<<6,
-	OdinDocEntityFlag_Param_NoAlias  = 1<<7,
+	OdinDocEntityFlag_Param_Using    = 1ull<<2,
+	OdinDocEntityFlag_Param_Const    = 1ull<<3,
+	OdinDocEntityFlag_Param_AutoCast = 1ull<<4,
+	OdinDocEntityFlag_Param_Ellipsis = 1ull<<5,
+	OdinDocEntityFlag_Param_CVararg  = 1ull<<6,
+	OdinDocEntityFlag_Param_NoAlias  = 1ull<<7,
+	OdinDocEntityFlag_Param_AnyInt   = 1ull<<8,
 
-	OdinDocEntityFlag_Type_Alias = 1<<8,
+	OdinDocEntityFlag_Type_Alias = 1ull<<20,
 
-	OdinDocEntityFlag_Var_Thread_Local = 1<<9,
-	OdinDocEntityFlag_Var_Static       = 1<<10,
+	OdinDocEntityFlag_Var_Thread_Local = 1ull<<40,
+	OdinDocEntityFlag_Var_Static       = 1ull<<41,
 };
 
 struct OdinDocEntity {
