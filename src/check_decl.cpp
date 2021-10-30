@@ -899,6 +899,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			mutex_unlock(&ctx->info->foreign_mutex);
 		}
 	}
+	
+	if (e->Procedure.link_name.len > 0 ) {
+		e->flags |= EntityFlag_CustomLinkName;
+	}
 }
 
 void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
@@ -989,6 +993,10 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 		} else {
 			string_map_set(fp, key, e);
 		}
+	}
+	
+	if (e->Variable.link_name.len > 0) {
+		e->flags |= EntityFlag_CustomLinkName;
 	}
 
 	if (init_expr == nullptr) {
