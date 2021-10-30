@@ -893,15 +893,12 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		}
-
-	} else if (is_arch_wasm()) {
-		if (bc->metrics.arch == TargetArch_wasm32) {
-			bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined ");
-		} else {
-			bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined -mwasm64 ");
-		}
+	} else if (bc->metrics.arch == TargetArch_wasm32) {
+		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined --features=wasm-feature-atomics ");
+	} else if (bc->metrics.arch == TargetArch_wasm64) {
+		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined -mwasm64 --features=wasm-feature-memory64,wasm-feature-atomics --verbose ");
 	} else {
-		gb_printf_err("Compiler Error: Unsupported architecture\n");;
+		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
 	}
 
