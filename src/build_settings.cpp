@@ -29,6 +29,7 @@ enum TargetArchKind {
 	TargetArch_386,
 	TargetArch_arm64,
 	TargetArch_wasm32,
+	TargetArch_wasm64,
 
 	TargetArch_COUNT,
 };
@@ -59,6 +60,7 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit("386"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
+	str_lit("wasm64"),
 };
 
 String target_endian_names[TargetEndian_COUNT] = {
@@ -69,6 +71,7 @@ String target_endian_names[TargetEndian_COUNT] = {
 
 TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -335,6 +338,16 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 	str_lit(""),
 };
 
+gb_global TargetMetrics target_freestanding_wasm64 = {
+	TargetOs_freestanding,
+	TargetArch_wasm64,
+	8,
+	16,
+	str_lit("wasm64-freestanding-js"),
+	str_lit(""),
+};
+
+
 
 
 struct NamedTargetMetrics {
@@ -353,6 +366,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_386"),    &target_freebsd_386    },
 	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
+	{ str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -458,11 +472,21 @@ bool find_library_collection_path(String name, String *path) {
 }
 
 bool is_arch_wasm(void) {
-	return build_context.metrics.arch == TargetArch_wasm32;
+	switch (build_context.metrics.arch) {
+	case TargetArch_wasm32:
+	case TargetArch_wasm64:
+		return true;
+	}
+	return false;
 }
 
 bool allow_check_foreign_filepath(void) {
-	return build_context.metrics.arch != TargetArch_wasm32;
+	switch (build_context.metrics.arch) {
+	case TargetArch_wasm32:
+	case TargetArch_wasm64:
+		return false;
+	}
+	return true;
 }
 
 
@@ -870,7 +894,7 @@ void init_build_context(TargetMetrics *cross_target) {
 			break;
 		}
 
-	} else if (bc->metrics.arch == TargetArch_wasm32) {
+	} else if (is_arch_wasm()) {
 		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined ");
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");;
