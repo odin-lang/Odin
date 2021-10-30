@@ -1148,6 +1148,7 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMInitializeAArch64Disassembler();
 		break;
 	case TargetArch_wasm32:
+	case TargetArch_wasm64:
 		LLVMInitializeWebAssemblyTargetInfo();
 		LLVMInitializeWebAssemblyTarget();
 		LLVMInitializeWebAssemblyTargetMC();
