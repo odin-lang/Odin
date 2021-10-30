@@ -1,23 +1,12 @@
 package runtime
 
-@(private)
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte {
-	return transmute([]u8)Raw_Slice{data=data, len=max(len, 0)}
-}
-
-
 DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 1<<22)
 
 
-Default_Temp_Allocator :: struct {
-	data:               []byte,
-	curr_offset:        int,
-	prev_allocation:    rawptr,
-	backup_allocator:   Allocator,
-	leaked_allocations: [dynamic][]byte,
-}
-
 when ODIN_OS == "freestanding" {
+	Default_Temp_Allocator :: struct {
+	}
+	
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {
 	}
 	
@@ -30,6 +19,14 @@ when ODIN_OS == "freestanding" {
 		return nil, nil		
 	}
 } else {
+	Default_Temp_Allocator :: struct {
+		data:               []byte,
+		curr_offset:        int,
+		prev_allocation:    rawptr,
+		backup_allocator:   Allocator,
+		leaked_allocations: [dynamic][]byte,
+	}
+	
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {
 		s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator)
 		s.curr_offset = 0

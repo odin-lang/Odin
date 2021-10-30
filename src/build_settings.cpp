@@ -895,7 +895,11 @@ void init_build_context(TargetMetrics *cross_target) {
 		}
 
 	} else if (is_arch_wasm()) {
-		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined ");
+		if (bc->metrics.arch == TargetArch_wasm32) {
+			bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined ");
+		} else {
+			bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined -mwasm64 ");
+		}
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");;
 		gb_exit(1);

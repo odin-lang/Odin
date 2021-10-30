@@ -2,6 +2,11 @@ package runtime
 
 import "core:intrinsics"
 
+@(private)
+byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
+	return ([^]byte)(data)[:max(len, 0)]
+}
+
 bswap_16 :: proc "contextless" (x: u16) -> u16 {
 	return x>>8 | x<<8
 }

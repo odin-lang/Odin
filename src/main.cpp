@@ -135,19 +135,12 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-		
-		if (build_context.metrics.arch == TargetArch_wasm32) {
-			result = system_exec_command_line_app("wasm-ld",
-				"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
-				LIT(build_context.ODIN_ROOT),
-				LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
-		} else {
-			GB_ASSERT(build_context.metrics.arch == TargetArch_wasm64);
-			result = system_exec_command_line_app("wasm-ld",
-				"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
-				LIT(build_context.ODIN_ROOT),
-				LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
-		}
+
+		GB_ASSERT(build_context.metrics.arch == TargetArch_wasm64);
+		result = system_exec_command_line_app("wasm-ld",
+			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
+			LIT(build_context.ODIN_ROOT),
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 		return result;
 	}
 

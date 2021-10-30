@@ -1064,14 +1064,10 @@ struct lbLLVMModulePassWorkerData {
 };
 
 WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
-	GB_ASSERT(MULTITHREAD_OBJECT_GENERATION);
-
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
-
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
-
 	return 0;
 }
 
@@ -1661,6 +1657,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
+		
+		lb_run_remove_unused_function_pass(m->mod);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;
@@ -1738,8 +1736,16 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Object Generation");
+	
+	isize non_empty_module_count = 0;
+	for_array(j, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[j].value;
+		if (!lb_is_module_empty(m)) {
+			non_empty_module_count += 1;
+		}
+	}
 
-	if (do_threading) {
+	if (do_threading && non_empty_module_count > 1) {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			if (lb_is_module_empty(m)) {
