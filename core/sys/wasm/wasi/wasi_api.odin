@@ -1,7 +1,7 @@
 //+build wasm32
 package sys_wasi
 
-foreign import wasi "wasi_unstable"
+foreign import wasi "wasi_snapshot_preview1"
 
 DIRCOOKIE_START :: u64(0)
 size_t :: uint
@@ -173,6 +173,7 @@ errno_t :: enum u16 {
 }
 
 
+rights_t :: distinct bit_set[rights_flag_t; u64]
 rights_flag_t :: enum u64 {
 	/**
 	 * The right to invoke `fd_datasync`.
@@ -332,9 +333,6 @@ rights_flag_t :: enum u64 {
 	SOCK_SHUTDOWN = 28,
 }
 
-rights_t :: distinct bit_set[rights_flag_t; u64]
-
-
 fd_t :: distinct i32
 
 // iovec_t :: struct {
@@ -345,8 +343,8 @@ fd_t :: distinct i32
 // 	buf: [^]u8,
 // 	buf_len: size_t,
 // }
-iovec_t :: distinct []byte
-ciovec_t :: distinct []byte
+iovec_t :: []byte
+ciovec_t :: []byte
 
 
 filedelta_t :: distinct i64
@@ -1133,7 +1131,8 @@ foreign wasi {
 		/**
 		 * The path at which to create the directory.
 		 */
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Adjust the timestamps of a file or directory.
@@ -1148,7 +1147,8 @@ foreign wasi {
 		/**
 		 * The path of the file or directory to operate on.
 		 */
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 		/**
 		 * The desired values of the data access timestamp.
 		 */
@@ -1175,7 +1175,8 @@ foreign wasi {
 		/**
 		 * The source path from which to link.
 		 */
-		old_path: cstring,
+		old_path: [^]byte,
+		old_path_len: size_t,
 		/**
 		 * The working directory at which the resolution of the new path starts.
 		 */
@@ -1183,7 +1184,8 @@ foreign wasi {
 		/**
 		 * The destination path at which to create the hard link.
 		 */
-		new_path: cstring,
+		new_path: [^]byte,
+		new_path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Remove a directory.
@@ -1195,7 +1197,8 @@ foreign wasi {
 		/**
 		 * The path to a directory to remove.
 		 */
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Rename a file or directory.
@@ -1206,7 +1209,8 @@ foreign wasi {
 		/**
 		 * The source path of the file or directory to rename.
 		 */
-		old_path: cstring,
+		old_path: [^]byte,
+		old_path_len: size_t,
 		/**
 		 * The working directory at which the resolution of the new path starts.
 		 */
@@ -1214,7 +1218,8 @@ foreign wasi {
 		/**
 		 * The destination path to which to rename the file or directory.
 		 */
-		new_path: cstring,
+		new_path: [^]byte,
+		new_path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Create a symbolic link.
@@ -1224,12 +1229,14 @@ foreign wasi {
 		/**
 		 * The contents of the symbolic link.
 		 */
-		old_path: cstring,
+		old_path: [^]byte,
+		old_path_len: size_t,
 		fd: fd_t,
 		/**
 		 * The destination path at which to create the symbolic link.
 		 */
-		new_path: cstring,
+		new_path: [^]byte,
+		new_path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Unlink a file.
@@ -1241,7 +1248,8 @@ foreign wasi {
 		/**
 		 * The path to a file to unlink.
 		 */
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Terminate the process normally. An exit code of 0 indicates successful
@@ -1552,9 +1560,9 @@ path_filestat_get :: proc "c" (
 	/**
 	 * The path of the file or directory to inspect.
 	 */
-	path: cstring,
+	path: string,
 ) -> (offset: filestat_t, err: errno_t) {
-	err = wasi_path_filestat_get(fd, flags, path, &offset)
+	err = wasi_path_filestat_get(fd, flags, raw_data(path), len(path), &offset)
 	return
 }
 /**
@@ -1578,7 +1586,7 @@ path_open :: proc "c" (
 	 * The relative path of the file or directory to open, relative to the
 	 * `path_open::fd` directory.
 	 */
-	path: cstring,
+	path: string,
 	/**
 	 * The method by which to open the file.
 	 */
@@ -1596,7 +1604,7 @@ path_open :: proc "c" (
 	fs_rights_inheriting: rights_t,
 	fdflags: fdflags_t,
 ) -> (file: fd_t, err: errno_t) {
-	err = wasi_path_open(fd, dirflags, path, oflags, fs_rights_base, fs_rights_inheriting, fdflags, &file)
+	err = wasi_path_open(fd, dirflags, raw_data(path), len(path), oflags, fs_rights_base, fs_rights_inheriting, fdflags, &file)
 	return
 }
 /**
@@ -1610,14 +1618,13 @@ path_readlink :: proc "c" (
 	/**
 	 * The path of the symbolic link from which to read.
 	 */
-	path: cstring,
+	path: string,
 	/**
 	 * The buffer to which to write the contents of the symbolic link.
 	 */
-	buf: [^]u8,
-	buf_len: size_t,
+	buf: []u8,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_path_readlink(fd, path, buf, buf_len, &n)
+	err = wasi_path_readlink(fd, raw_data(path), len(path), raw_data(buf), len(buf), &n)
 	return
 }
 /**
@@ -1788,14 +1795,16 @@ foreign wasi {
 		/**
 		 * The path of the file or directory to inspect.
 		 */
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 		retptr0: ^filestat_t,
 	) -> errno_t ---
 	@(link_name="path_open")
 	wasi_path_open :: proc(
 		fd: fd_t,
 		dirflags: lookupflags_t,
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 		oflags: oflags_t,
 		fs_rights_base: rights_t,
 		fs_rights_inheriting: rights_t,
@@ -1805,7 +1814,8 @@ foreign wasi {
 	@(link_name="path_readlink")
 	wasi_path_readlink :: proc(
 		fd: fd_t,
-		path: cstring,
+		path: [^]byte,
+		path_len: size_t,
 		buf: [^]u8,
 		buf_len: size_t,
 		retptr0: ^size_t,
