@@ -897,6 +897,11 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 
 	if (is_arch_wasm()) {
 		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
+		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
+		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
+		
+		char const *export_name = alloc_cstring(permanent_allocator(), p->name);
+		LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
 	} else {
 		LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	}
