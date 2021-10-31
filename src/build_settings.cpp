@@ -380,7 +380,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_386"),    &target_freebsd_386    },
 	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
-	{ str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
 	{ str_lit("wasi_wasm32"), &target_wasi_wasm32 },
 };
 
