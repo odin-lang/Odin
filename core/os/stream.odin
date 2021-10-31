@@ -19,7 +19,7 @@ _file_stream_vtable := &io.Stream_VTable{
 		return
 	},
 	impl_read_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		when ODIN_OS == "windows" {
+		when ODIN_OS == "windows" || ODIN_OS == "wasi" {
 			fd := Handle(uintptr(s.stream_data))
 			os_err: Errno
 			n, os_err = read_at(fd, p, offset)
@@ -33,7 +33,7 @@ _file_stream_vtable := &io.Stream_VTable{
 		return
 	},
 	impl_write_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		when ODIN_OS == "windows" {
+		when ODIN_OS == "windows" || ODIN_OS == "wasi" {
 			fd := Handle(uintptr(s.stream_data))
 			os_err: Errno
 			n, os_err = write_at(fd, p, offset)
