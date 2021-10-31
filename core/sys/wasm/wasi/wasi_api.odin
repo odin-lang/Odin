@@ -1,7 +1,7 @@
 //+build wasm32
 package sys_wasi
 
-foreign import wasi "env"
+foreign import wasi "wasi_unstable"
 
 DIRCOOKIE_START :: u64(0)
 size_t :: uint
@@ -970,7 +970,7 @@ prestat_t :: struct {
 	},
 }
 
-@(link_prefix="__wasi_")
+@(default_calling_convention="c")
 foreign wasi {
 	/**
 	 * Read command-line argument data.
@@ -1303,8 +1303,8 @@ foreign wasi {
  * Returns the number of arguments and the size of the argument string
  * data, or an error.
  */
-args_sizes_get :: proc() -> (num_args, size_of_args: size_t, err: errno_t) {
-	err = __wasi_args_sizes_get(&num_args, &size_of_args)
+args_sizes_get :: proc "c" () -> (num_args, size_of_args: size_t, err: errno_t) {
+	err = wasi_args_sizes_get(&num_args, &size_of_args)
 	return
 }
 /**
@@ -1313,8 +1313,8 @@ args_sizes_get :: proc() -> (num_args, size_of_args: size_t, err: errno_t) {
  * Returns the number of environment variable arguments and the size of the
  * environment variable data.
  */
-environ_sizes_get :: proc() -> (num_envs, size_of_envs: size_t, err: errno_t) {
-	err = __wasi_environ_sizes_get(&num_envs, &size_of_envs)
+environ_sizes_get :: proc "c" () -> (num_envs, size_of_envs: size_t, err: errno_t) {
+	err = wasi_environ_sizes_get(&num_envs, &size_of_envs)
 	return
 }
 /**
@@ -1325,13 +1325,13 @@ environ_sizes_get :: proc() -> (num_envs, size_of_envs: size_t, err: errno_t) {
  * @return
  * The resolution of the clock, or an error if one happened.
  */
-clock_res_get :: proc(
+clock_res_get :: proc "c" (
 	/**
 	 * The clock for which to return the resolution.
 	 */
 	id: clockid_t,
 ) -> (ts: timestamp_t, err: errno_t) {
-	err = __wasi_clock_res_get(id, &ts)
+	err = wasi_clock_res_get(id, &ts)
 	return
 }
 /**
@@ -1340,7 +1340,7 @@ clock_res_get :: proc(
  * @return
  * The time value of the clock.
  */
-clock_time_get :: proc(
+clock_time_get :: proc "c" (
 	/**
 	 * The clock for which to return the time.
 	 */
@@ -1350,7 +1350,7 @@ clock_time_get :: proc(
 	 */
 	precision: timestamp_t,
 ) -> (ts: timestamp_t, err: errno_t) {
-	err = __wasi_clock_time_get(id, precision, &ts)
+	err = wasi_clock_time_get(id, precision, &ts)
 	return
 }
 /**
@@ -1359,10 +1359,10 @@ clock_time_get :: proc(
  * @return
  * The buffer where the file descriptor's attributes are stored.
  */
-fd_fdstat_get :: proc(
+fd_fdstat_get :: proc "c" (
 	fd: fd_t,
 ) -> (stat: fdstat_t, err: errno_t) {
-	err = __wasi_fd_fdstat_get(fd, &stat)
+	err = wasi_fd_fdstat_get(fd, &stat)
 	return
 }
 /**
@@ -1370,10 +1370,10 @@ fd_fdstat_get :: proc(
  * @return
  * The buffer where the file's attributes are stored.
  */
-fd_filestat_get :: proc(
+fd_filestat_get :: proc "c" (
 	fd: fd_t,
 ) -> (stat: filestat_t, err: errno_t) {
-	err = __wasi_fd_filestat_get(fd, &stat)
+	err = wasi_fd_filestat_get(fd, &stat)
 	return
 }
 
@@ -1386,22 +1386,22 @@ fd_filestat_get :: proc(
  * @return
  * The number of bytes read.
  */
-fd_pread :: proc(
+fd_pread :: proc "c" (
 	fd: fd_t,
-    /**
-     * List of scatter/gather vectors in which to store data.
-     */
-    iovs: [^]iovec_t,
-    /**
-     * The length of the array pointed to by `iovs`.
-     */
-    iovs_len: size_t,
-    /**
-     * The offset within the file at which to read.
-     */
-    offset: filesize_t,
+	/**
+	 * List of scatter/gather vectors in which to store data.
+	 */
+	iovs: [^]iovec_t,
+	/**
+	 * The length of the array pointed to by `iovs`.
+	 */
+	iovs_len: size_t,
+	/**
+	 * The offset within the file at which to read.
+	 */
+	offset: filesize_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_fd_pread(fd, iovs, iovs_len, offset, &n)
+	err = wasi_fd_pread(fd, iovs, iovs_len, offset, &n)
 	return
 }
 /**
@@ -1409,10 +1409,10 @@ fd_pread :: proc(
  * @return
  * The buffer where the description is stored.
  */
-fd_prestat_get :: proc(
+fd_prestat_get :: proc "c" (
 	fd: fd_t,
 ) -> (desc: prestat_t, err: errno_t) {
-	err = __wasi_fd_prestat_get(fd, &desc)
+	err = wasi_fd_prestat_get(fd, &desc)
 	return
 }
 /**
@@ -1421,22 +1421,22 @@ fd_prestat_get :: proc(
  * @return
  * The number of bytes written.
  */
-fd_pwrite :: proc(
+fd_pwrite :: proc "c" (
 	fd: fd_t,
-    /**
-     * List of scatter/gather vectors from which to retrieve data.
-     */
-    iovs: [^]ciovec_t,
-    /**
-     * The length of the array pointed to by `iovs`.
-     */
-    iovs_len: size_t,
-    /**
-     * The offset within the file at which to write.
-     */
-    offset: filesize_t,
+	/**
+	 * List of scatter/gather vectors from which to retrieve data.
+	 */
+	iovs: [^]ciovec_t,
+	/**
+	 * The length of the array pointed to by `iovs`.
+	 */
+	iovs_len: size_t,
+	/**
+	 * The offset within the file at which to write.
+	 */
+	offset: filesize_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_fd_pwrite(fd, iovs, iovs_len, offset, &n)
+	err = wasi_fd_pwrite(fd, iovs, iovs_len, offset, &n)
 	return
 }
 /**
@@ -1445,18 +1445,18 @@ fd_pwrite :: proc(
  * @return
  * The number of bytes read.
  */
-fd_read :: proc(
+fd_read :: proc "c" (
 	fd: fd_t,
-    /**
-     * List of scatter/gather vectors to which to store data.
-     */
-    iovs: [^]iovec_t,
-    /**
-     * The length of the array pointed to by `iovs`.
-     */
-    iovs_len: size_t,
+	/**
+	 * List of scatter/gather vectors to which to store data.
+	 */
+	iovs: [^]iovec_t,
+	/**
+	 * The length of the array pointed to by `iovs`.
+	 */
+	iovs_len: size_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_fd_read(fd, iovs, iovs_len, &n)
+	err = wasi_fd_read(fd, iovs, iovs_len, &n)
 	return
 }
 /**
@@ -1472,19 +1472,19 @@ fd_read :: proc(
  * @return
  * The number of bytes stored in the read buffer. If less than the size of the read buffer, the end of the directory has been reached.
  */
-fd_readdir :: proc(
+fd_readdir :: proc "c" (
 	fd: fd_t,
-    /**
-     * The buffer where directory entries are stored
-     */
-    buf: [^]u8,
-    buf_len: size_t,
-    /**
-     * The location within the directory to start reading
-     */
-    cookie: dircookie_t,
+	/**
+	 * The buffer where directory entries are stored
+	 */
+	buf: [^]u8,
+	buf_len: size_t,
+	/**
+	 * The location within the directory to start reading
+	 */
+	cookie: dircookie_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_fd_readdir(fd, buf, buf_len, cookie, &n)
+	err = wasi_fd_readdir(fd, buf, buf_len, cookie, &n)
 	return
 }
 /**
@@ -1493,18 +1493,18 @@ fd_readdir :: proc(
  * @return
  * The new offset of the file descriptor, relative to the start of the file.
  */
-fd_seek :: proc(
+fd_seek :: proc "c" (
 	fd: fd_t,
-    /**
-     * The number of bytes to move.
-     */
-    offset: filedelta_t,
-    /**
-     * The base from which the offset is relative.
-     */
-    whence: whence_t,
+	/**
+	 * The number of bytes to move.
+	 */
+	offset: filedelta_t,
+	/**
+	 * The base from which the offset is relative.
+	 */
+	whence: whence_t,
 ) -> (new_offset: filesize_t, err: errno_t) {
-	err = __wasi_fd_seek(fd, offset, whence, &new_offset)
+	err = wasi_fd_seek(fd, offset, whence, &new_offset)
 	return
 }
 /**
@@ -1513,28 +1513,28 @@ fd_seek :: proc(
  * @return
  * The current offset of the file descriptor, relative to the start of the file.
  */
-fd_tell :: proc(
+fd_tell :: proc "c" (
 	fd: fd_t,
 ) -> (offset: filesize_t, err: errno_t) {
-	err = __wasi_fd_tell(fd, &offset)
+	err = wasi_fd_tell(fd, &offset)
 	return
 }
 /**
  * Write to a file descriptor.
  * Note: This is similar to `writev` in POSIX.
  */
-fd_write :: proc(
+fd_write :: proc "c" (
 	fd: fd_t,
-    /**
-     * List of scatter/gather vectors from which to retrieve data.
-     */
-    iovs: [^]ciovec_t,
-    /**
-     * The length of the array pointed to by `iovs`.
-     */
-    iovs_len: size_t,
+	/**
+	 * List of scatter/gather vectors from which to retrieve data.
+	 */
+	iovs: [^]ciovec_t,
+	/**
+	 * The length of the array pointed to by `iovs`.
+	 */
+	iovs_len: size_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_fd_write(fd, iovs, iovs_len, &n)
+	err = wasi_fd_write(fd, iovs, iovs_len, &n)
 	return
 }
 /**
@@ -1543,18 +1543,18 @@ fd_write :: proc(
  * @return
  * The buffer where the file's attributes are stored.
  */
-path_filestat_get :: proc(
+path_filestat_get :: proc "c" (
 	fd: fd_t,
-    /**
-     * Flags determining the method of how the path is resolved.
-     */
-    flags: lookupflags_t,
-    /**
-     * The path of the file or directory to inspect.
-     */
-    path: cstring,
+	/**
+	 * Flags determining the method of how the path is resolved.
+	 */
+	flags: lookupflags_t,
+	/**
+	 * The path of the file or directory to inspect.
+	 */
+	path: cstring,
 ) -> (offset: filestat_t, err: errno_t) {
-	err = __wasi_path_filestat_get(fd, flags, path, &offset)
+	err = wasi_path_filestat_get(fd, flags, path, &offset)
 	return
 }
 /**
@@ -1568,35 +1568,35 @@ path_filestat_get :: proc(
  * @return
  * The file descriptor of the file that has been opened.
  */
-path_open :: proc(
+path_open :: proc "c" (
 	fd: fd_t,
-    /**
-     * Flags determining the method of how the path is resolved.
-     */
-    dirflags: lookupflags_t,
-    /**
-     * The relative path of the file or directory to open, relative to the
-     * `path_open::fd` directory.
-     */
-    path: cstring,
-    /**
-     * The method by which to open the file.
-     */
-    oflags: oflags_t,
-    /**
-     * The initial rights of the newly created file descriptor. The
-     * implementation is allowed to return a file descriptor with fewer rights
-     * than specified, if and only if those rights do not apply to the type of
-     * file being opened.
-     * The *base* rights are rights that will apply to operations using the file
-     * descriptor itself, while the *inheriting* rights are rights that apply to
-     * file descriptors derived from it.
-     */
-    fs_rights_base: rights_t,
-    fs_rights_inheriting: rights_t,
-    fdflags: fdflags_t,
+	/**
+	 * Flags determining the method of how the path is resolved.
+	 */
+	dirflags: lookupflags_t,
+	/**
+	 * The relative path of the file or directory to open, relative to the
+	 * `path_open::fd` directory.
+	 */
+	path: cstring,
+	/**
+	 * The method by which to open the file.
+	 */
+	oflags: oflags_t,
+	/**
+	 * The initial rights of the newly created file descriptor. The
+	 * implementation is allowed to return a file descriptor with fewer rights
+	 * than specified, if and only if those rights do not apply to the type of
+	 * file being opened.
+	 * The *base* rights are rights that will apply to operations using the file
+	 * descriptor itself, while the *inheriting* rights are rights that apply to
+	 * file descriptors derived from it.
+	 */
+	fs_rights_base: rights_t,
+	fs_rights_inheriting: rights_t,
+	fdflags: fdflags_t,
 ) -> (file: fd_t, err: errno_t) {
-	err = __wasi_path_open(fd, dirflags, path, oflags, fs_rights_base, fs_rights_inheriting, fdflags, &file)
+	err = wasi_path_open(fd, dirflags, path, oflags, fs_rights_base, fs_rights_inheriting, fdflags, &file)
 	return
 }
 /**
@@ -1605,19 +1605,19 @@ path_open :: proc(
  * @return
  * The number of bytes placed in the buffer.
  */
-path_readlink :: proc(
+path_readlink :: proc "c" (
 	fd: fd_t,
-    /**
-     * The path of the symbolic link from which to read.
-     */
-    path: cstring,
-    /**
-     * The buffer to which to write the contents of the symbolic link.
-     */
-    buf: [^]u8,
-    buf_len: size_t,
+	/**
+	 * The path of the symbolic link from which to read.
+	 */
+	path: cstring,
+	/**
+	 * The buffer to which to write the contents of the symbolic link.
+	 */
+	buf: [^]u8,
+	buf_len: size_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_path_readlink(fd, path, buf, buf_len, &n)
+	err = wasi_path_readlink(fd, path, buf, buf_len, &n)
 	return
 }
 /**
@@ -1625,21 +1625,21 @@ path_readlink :: proc(
  * @return
  * The number of events stored.
  */
-poll_oneoff :: proc(
-    /**
-     * The events to which to subscribe.
-     */
-    subscription_in: ^subscription_t,
-    /**
-     * The events that have occurred.
-     */
-    event_out: ^event_t,
-    /**
-     * Both the number of subscriptions and events.
-     */
-    nsubscriptions: size_t,
+poll_oneoff :: proc "c" (
+	/**
+	 * The events to which to subscribe.
+	 */
+	subscription_in: ^subscription_t,
+	/**
+	 * The events that have occurred.
+	 */
+	event_out: ^event_t,
+	/**
+	 * Both the number of subscriptions and events.
+	 */
+	nsubscriptions: size_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_poll_oneoff(subscription_in, event_out, nsubscriptions, &n)
+	err = wasi_poll_oneoff(subscription_in, event_out, nsubscriptions, &n)
 	return
 }
 /**
@@ -1649,22 +1649,22 @@ poll_oneoff :: proc(
  * @return
  * Number of bytes stored in ri_data and message flags.
  */
-sock_recv :: proc(
+sock_recv :: proc "c" (
 	fd: fd_t,
-    /**
-     * List of scatter/gather vectors to which to store data.
-     */
-    ri_data: [^]iovec_t,
-    /**
-     * The length of the array pointed to by `ri_data`.
-     */
-    ri_data_len: size_t,
-    /**
-     * Message flags.
-     */
-    ri_flags: riflags_t,
+	/**
+	 * List of scatter/gather vectors to which to store data.
+	 */
+	ri_data: [^]iovec_t,
+	/**
+	 * The length of the array pointed to by `ri_data`.
+	 */
+	ri_data_len: size_t,
+	/**
+	 * Message flags.
+	 */
+	ri_flags: riflags_t,
 ) -> (n: size_t, flags: roflags_t, err: errno_t) {
-	err = __wasi_sock_recv(fd, ri_data, ri_data_len, ri_flags, &n, &flags)
+	err = wasi_sock_recv(fd, ri_data, ri_data_len, ri_flags, &n, &flags)
 	return
 }
 /**
@@ -1674,100 +1674,115 @@ sock_recv :: proc(
  * @return
  * Number of bytes transmitted.
  */
-sock_send :: proc(
+sock_send :: proc "c" (
 	fd: fd_t,
-    /**
-     * List of scatter/gather vectors to which to retrieve data
-     */
-    si_data: [^]ciovec_t,
-    /**
-     * The length of the array pointed to by `si_data`.
-     */
-    si_data_len: size_t,
-    /**
-     * Message flags.
-     */
-    si_flags: siflags_t,
+	/**
+	 * List of scatter/gather vectors to which to retrieve data
+	 */
+	si_data: [^]ciovec_t,
+	/**
+	 * The length of the array pointed to by `si_data`.
+	 */
+	si_data_len: size_t,
+	/**
+	 * Message flags.
+	 */
+	si_flags: siflags_t,
 ) -> (n: size_t, err: errno_t) {
-	err = __wasi_sock_send(fd, si_data, si_data_len, si_flags, &n)
+	err = wasi_sock_send(fd, si_data, si_data_len, si_flags, &n)
 	return
 }
 
-
+@(default_calling_convention="c")
 foreign wasi {
-	__wasi_args_sizes_get :: proc(
+	@(link_name="args_sizes_get")
+	wasi_args_sizes_get :: proc(
 		retptr0: ^size_t,
 		retptr1: ^size_t,
 	) -> errno_t ---
-	__wasi_environ_sizes_get :: proc(
+	@(link_name="environ_sizes_get")
+	wasi_environ_sizes_get :: proc(
 		retptr0: ^size_t,
 		retptr1: ^size_t,
 	) -> errno_t ---
-	__wasi_clock_res_get :: proc(
+	@(link_name="clock_res_get")
+	wasi_clock_res_get :: proc(
 		id: clockid_t,
 		retptr0: ^timestamp_t,
 	) -> errno_t ---
-	__wasi_clock_time_get :: proc(
+	@(link_name="clock_time_get")
+	wasi_clock_time_get :: proc(
 		id: clockid_t,
 		precision: timestamp_t,
 		retptr0: ^timestamp_t,
 	) -> errno_t ---
-	__wasi_fd_fdstat_get :: proc(
+	@(link_name="fd_fdstat_get")
+	wasi_fd_fdstat_get :: proc(
 		fd: fd_t,
 		retptr0: ^fdstat_t,
 	) -> errno_t ---
-	__wasi_fd_filestat_get :: proc(
+	@(link_name="fd_filestat_get")
+	wasi_fd_filestat_get :: proc(
 		fd: fd_t,
 		retptr0: ^filestat_t,
 	) -> errno_t ---
-	__wasi_fd_pread :: proc(
+	@(link_name="fd_pread")
+	wasi_fd_pread :: proc(
 		fd: fd_t,
 		iovs: [^]iovec_t,
 		iovs_len: size_t,
 		offset: filesize_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_fd_prestat_get :: proc(
+	@(link_name="fd_prestat_get")
+	wasi_fd_prestat_get :: proc(
 		fd: fd_t,
 		retptr0: ^prestat_t,
 	) -> errno_t ---
-	__wasi_fd_pwrite :: proc(
+	@(link_name="fd_pwrite")
+	wasi_fd_pwrite :: proc(
 		fd: fd_t,
 		iovs: [^]ciovec_t,
 		iovs_len: size_t,
 		offset: filesize_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_fd_read :: proc(
+	@(link_name="fd_read")
+	wasi_fd_read :: proc(
 		fd: fd_t,
 		iovs: [^]iovec_t,
 		iovs_len: size_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_fd_readdir :: proc(
+	@(link_name="fd_readdir")
+	wasi_fd_readdir :: proc(
 		fd: fd_t,
 		buf: [^]u8,
 		buf_len: size_t,
 		cookie: dircookie_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_fd_seek :: proc(
+	@(link_name="fd_seek")
+	wasi_fd_seek :: proc(
 		fd: fd_t,
 		offset: filedelta_t,
 		whence: whence_t,
 		retptr0: ^filesize_t,
 	) -> errno_t ---
-	__wasi_fd_tell :: proc(
+	@(link_name="fd_tell")
+	wasi_fd_tell :: proc(
 		fd: fd_t,
 		retptr0: ^filesize_t,
 	) -> errno_t ---
-	__wasi_fd_write :: proc(
+	@(link_name="fd_write")
+	wasi_fd_write :: proc(
 		fd: fd_t,
 		iovs: [^]ciovec_t,
 		iovs_len: size_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_path_filestat_get :: proc(
+	@(link_name="path_filestat_get")
+	wasi_path_filestat_get :: proc(
 		fd: fd_t,
 		flags: lookupflags_t,
 		/**
@@ -1776,7 +1791,8 @@ foreign wasi {
 		path: cstring,
 		retptr0: ^filestat_t,
 	) -> errno_t ---
-	__wasi_path_open :: proc(
+	@(link_name="path_open")
+	wasi_path_open :: proc(
 		fd: fd_t,
 		dirflags: lookupflags_t,
 		path: cstring,
@@ -1786,20 +1802,23 @@ foreign wasi {
 		fdflags: fdflags_t,
 		retptr: ^fd_t,
 	) -> errno_t ---
-	__wasi_path_readlink :: proc(
+	@(link_name="path_readlink")
+	wasi_path_readlink :: proc(
 		fd: fd_t,
 		path: cstring,
 		buf: [^]u8,
 		buf_len: size_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_poll_oneoff :: proc(
+	@(link_name="poll_oneoff")
+	wasi_poll_oneoff :: proc(
 		subscription_in: ^subscription_t,
 		event_out: ^event_t,
 		nsubscriptions: size_t,
 		retptr0: ^size_t,
 	) -> errno_t ---
-	__wasi_sock_recv :: proc(
+	@(link_name="sock_recv")
+	wasi_sock_recv :: proc(
 		fd: fd_t,
 		ri_data: [^]iovec_t,
 		ri_data_len: size_t,
@@ -1807,7 +1826,8 @@ foreign wasi {
 		retptr0: ^size_t,
 		retptr1: ^roflags_t,
 	) -> errno_t ---
-	__wasi_sock_send :: proc(
+	@(link_name="sock_send")
+	wasi_sock_send :: proc(
 		fd: fd_t,
 		si_data: [^]ciovec_t,
 		si_data_len: size_t,
