@@ -40,6 +40,9 @@ all: debug demo
 demo:
 	./odin run examples/demo/demo.odin
 
+report:
+	./odin report
+
 debug:
 	$(CC) src/main.cpp src/libtommath.cpp $(DISABLED_WARNINGS) $(CFLAGS) -g $(LDFLAGS) -o odin
 
