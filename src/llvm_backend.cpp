@@ -771,6 +771,8 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	Type *results = alloc_type_tuple();
 
 	Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
+	
+	bool call_cleanup = true;
 
 	bool has_args = false;
 	bool is_dll_main = false;
@@ -782,8 +784,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("hinstDLL"),   t_rawptr, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
+		call_cleanup = false;
 	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
 		name = str_lit("mainCRTStartup");
+	} else if (is_arch_wasm()) {
+		name = str_lit("_start");
+		call_cleanup = false;
 	} else {
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
@@ -874,8 +880,10 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 
 	
-	lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
-	lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
+	if (call_cleanup) {
+		lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
+		lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
+	}
 	
 
 	if (is_dll_main) {
@@ -885,6 +893,19 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 
 	lb_end_procedure_body(p);
+	
+
+	if (is_arch_wasm()) {
+		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
+		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
+		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
+		
+		char const *export_name = alloc_cstring(permanent_allocator(), p->name);
+		LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
+	} else {
+		LLVMSetLinkage(p->value, LLVMExternalLinkage);
+	}
+	
 
 	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
@@ -1064,14 +1085,10 @@ struct lbLLVMModulePassWorkerData {
 };
 
 WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
-	GB_ASSERT(MULTITHREAD_OBJECT_GENERATION);
-
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
-
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
-
 	return 0;
 }
 
@@ -1148,6 +1165,7 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMInitializeAArch64Disassembler();
 		break;
 	case TargetArch_wasm32:
+	case TargetArch_wasm64:
 		LLVMInitializeWebAssemblyTargetInfo();
 		LLVMInitializeWebAssemblyTarget();
 		LLVMInitializeWebAssemblyTargetMC();
@@ -1660,6 +1678,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
+		
+		lb_run_remove_unused_function_pass(m->mod);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;
@@ -1737,8 +1757,16 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Object Generation");
+	
+	isize non_empty_module_count = 0;
+	for_array(j, gen->modules.entries) {
+		lbModule *m = gen->modules.entries[j].value;
+		if (!lb_is_module_empty(m)) {
+			non_empty_module_count += 1;
+		}
+	}
 
-	if (do_threading) {
+	if (do_threading && non_empty_module_count > 1) {
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			if (lb_is_module_empty(m)) {

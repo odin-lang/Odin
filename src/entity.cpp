@@ -74,9 +74,10 @@ enum EntityFlag : u64 {
 
 	EntityFlag_Test          = 1ull<<30,
 	EntityFlag_Init          = 1ull<<31,
+	
+	EntityFlag_CustomLinkName = 1ull<<40,
 
 	EntityFlag_Overridden    = 1ull<<63,
-
 };
 
 enum EntityState : u32 {

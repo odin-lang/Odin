@@ -16,6 +16,8 @@ enum TargetOsKind {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_freebsd,
+	
+	TargetOs_wasi,
 
 	TargetOs_freestanding,
 
@@ -29,6 +31,7 @@ enum TargetArchKind {
 	TargetArch_386,
 	TargetArch_arm64,
 	TargetArch_wasm32,
+	TargetArch_wasm64,
 
 	TargetArch_COUNT,
 };
@@ -49,6 +52,8 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("freebsd"),
+	
+	str_lit("wasi"),
 
 	str_lit("freestanding"),
 };
@@ -59,6 +64,7 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit("386"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
+	str_lit("wasm64"),
 };
 
 String target_endian_names[TargetEndian_COUNT] = {
@@ -69,6 +75,7 @@ String target_endian_names[TargetEndian_COUNT] = {
 
 TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -335,6 +342,26 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 	str_lit(""),
 };
 
+gb_global TargetMetrics target_freestanding_wasm64 = {
+	TargetOs_freestanding,
+	TargetArch_wasm64,
+	8,
+	16,
+	str_lit("wasm64-freestanding-js"),
+	str_lit(""),
+};
+
+gb_global TargetMetrics target_wasi_wasm32 = {
+	TargetOs_wasi,
+	TargetArch_wasm32,
+	4,
+	8,
+	str_lit("wasm32-wasi-js"),
+	str_lit(""),
+};
+
+
+
 
 
 struct NamedTargetMetrics {
@@ -353,6 +380,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_386"),    &target_freebsd_386    },
 	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
+	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+	{ str_lit("wasi_wasm32"), &target_wasi_wasm32 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -458,11 +487,21 @@ bool find_library_collection_path(String name, String *path) {
 }
 
 bool is_arch_wasm(void) {
-	return build_context.metrics.arch == TargetArch_wasm32;
+	switch (build_context.metrics.arch) {
+	case TargetArch_wasm32:
+	case TargetArch_wasm64:
+		return true;
+	}
+	return false;
 }
 
 bool allow_check_foreign_filepath(void) {
-	return build_context.metrics.arch != TargetArch_wasm32;
+	switch (build_context.metrics.arch) {
+	case TargetArch_wasm32:
+	case TargetArch_wasm64:
+		return false;
+	}
+	return true;
 }
 
 
@@ -869,11 +908,24 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		}
-
-	} else if (bc->metrics.arch == TargetArch_wasm32) {
-		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined ");
+	} else if (is_arch_wasm()) {
+		gbString link_flags = gb_string_make(heap_allocator(), " ");
+		// link_flags = gb_string_appendc(link_flags, "--export-all ");
+		// link_flags = gb_string_appendc(link_flags, "--export-table ");
+		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
+		if (bc->metrics.arch == TargetArch_wasm64) {
+			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
+		}
+		if (bc->metrics.os == TargetOs_freestanding) {
+			link_flags = gb_string_appendc(link_flags, "--no-entry ");
+		}
+		
+		bc->link_flags = make_string_c(link_flags);
+		
+		// Disallow on wasm
+		build_context.use_separate_modules = false;
 	} else {
-		gb_printf_err("Compiler Error: Unsupported architecture\n");;
+		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
 	}
 
