@@ -1,5 +1,4 @@
-//+build !freestanding
-//+build !windows
+//+build !freestanding !wasi !windows
 package runtime
 
 import "core:os"
