@@ -94,7 +94,7 @@ SetError   :: SDL.SetError
 GetError   :: SDL.GetError
 ClearError :: SDL.ClearError
 
-Mix_LoadWAV :: #force_inline proc "c" (file: cstring) -> ^Chunk {
+LoadWAV :: #force_inline proc "c" (file: cstring) -> ^Chunk {
 	return LoadWAV_RW(SDL.RWFromFile(file, "rb"), true)
 }
 
