@@ -388,6 +388,12 @@ void lb_run_remove_unused_function_pass(LLVMModuleRef mod) {
 			    name == "memcpy") {
 				continue;
 			}
+			if (is_arch_wasm()) {
+				if (name == "__ashlti3") {
+					LLVMSetLinkage(curr_func, LLVMExternalLinkage);
+					continue;
+				}
+			}
 			
 			LLVMLinkage linkage = LLVMGetLinkage(curr_func);
 						

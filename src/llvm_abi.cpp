@@ -1053,6 +1053,11 @@ namespace lbAbiWasm32 {
 	}
 
 	lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
+		if (!is_return && type == LLVMIntTypeInContext(c, 128)) {
+			LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
+			return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+		}
+		
 		if (!is_return && lb_sizeof(type) > 8) {
 			return lb_arg_type_indirect(type, nullptr);
 		}
