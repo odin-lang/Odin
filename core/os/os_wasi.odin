@@ -46,53 +46,7 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	return int(n), Errno(err)
 }
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
-	flags: wasi.oflags_t
-	fs_rights_base:       wasi.rights_t
-	fs_rights_inheriting: wasi.rights_t
-	fdflags:              wasi.fdflags_t
-	
-	if mode & O_RDONLY == O_RDONLY {
-		fs_rights_base += {.FD_READ}
-	}
-	if mode & O_WRONLY == O_WRONLY {
-		fs_rights_base += {.FD_WRITE}
-	}
-	if mode & O_RDWR == O_RDWR {
-		fs_rights_base += {.FD_READ, .FD_WRITE}
-	}
-	if mode & O_CREATE == O_CREATE {
-		flags += {.CREATE}
-		fs_rights_base += {.FD_WRITE}
-	}
-	if mode & O_EXCL == O_EXCL {
-		flags += {.EXCL}
-	}
-	if mode & O_NOCTTY == O_NOCTTY {
-		
-	}
-	if mode & O_TRUNC == O_TRUNC {
-		flags += {.TRUNC}
-	}
-	if mode & O_NONBLOCK == O_NONBLOCK {
-		fdflags += {.NONBLOCK}
-	}
-	if mode & O_APPEND == O_APPEND {
-		fdflags += {.APPEND}
-	}
-	if mode & O_SYNC == O_SYNC {
-		fdflags += {.DSYNC, .RSYNC, .SYNC}
-	}
-	if mode & O_ASYNC == O_ASYNC {
-		
-	}
-	if mode & O_CLOEXEC == O_CLOEXEC {
-		
-	}
-	fs_rights_inheriting = fs_rights_base
-	
-	
-	fd, err := wasi.path_open(0, {}, path, flags, fs_rights_base, fs_rights_inheriting, fdflags)
-	return Handle(fd), Errno(err)
+	return 0, -1
 }
 close :: proc(fd: Handle) -> Errno {
 	err := wasi.fd_close(wasi.fd_t(fd))
