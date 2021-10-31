@@ -1,7 +1,7 @@
 //+build wasm32
 package sys_wasi
 
-foreign import "env"
+foreign import wasi "env"
 
 DIRCOOKIE_START :: u64(0)
 size_t :: uint
@@ -971,7 +971,7 @@ prestat_t :: struct {
 }
 
 @(link_prefix="__wasi_")
-foreign env {
+foreign wasi {
 	/**
 	 * Read command-line argument data.
 	 * The size of the array should match that returned by `args_sizes_get`
@@ -1093,12 +1093,12 @@ foreign env {
 	 * Return a description of the given preopened file descriptor.
 	 */
 	fd_prestat_dir_name :: proc(
-	    fd: fd_t,
-	    /**
-	     * A buffer into which to write the preopened directory name.
-	     */
-	    path: [^]u8,
-	    path_len: size_t,
+		fd: fd_t,
+		/**
+		 * A buffer into which to write the preopened directory name.
+		 */
+		path: [^]u8,
+		path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Atomically replace a file descriptor by renumbering another file descriptor.
@@ -1111,11 +1111,11 @@ foreign env {
 	 * would disappear if `dup2()` were to be removed entirely.
 	 */
 	fd_renumber :: proc(
-	    fd: fd_t,
-	    /**
-	     * The file descriptor to overwrite.
-	     */
-	    to: fd_t,
+		fd: fd_t,
+		/**
+		 * The file descriptor to overwrite.
+		 */
+		to: fd_t,
 	) -> errno_t ---
 	/**
 	 * Synchronize the data and metadata of a file to disk.
@@ -1129,61 +1129,61 @@ foreign env {
 	 * Note: This is similar to `mkdirat` in POSIX.
 	 */
 	path_create_directory :: proc(
-	    fd: fd_t,
-	    /**
-	     * The path at which to create the directory.
-	     */
-	    path: cstring,
+		fd: fd_t,
+		/**
+		 * The path at which to create the directory.
+		 */
+		path: cstring,
 	) -> errno_t ---
 	/**
 	 * Adjust the timestamps of a file or directory.
 	 * Note: This is similar to `utimensat` in POSIX.
 	 */
 	path_filestat_set_times :: proc(
-	    fd: fd_t,
-	    /**
-	     * Flags determining the method of how the path is resolved.
-	     */
-	    flags: lookupflags_t,
-	    /**
-	     * The path of the file or directory to operate on.
-	     */
-	    path: cstring,
-	    /**
-	     * The desired values of the data access timestamp.
-	     */
-	    atim: timestamp_t,
-	    /**
-	     * The desired values of the data modification timestamp.
-	     */
-	    mtim: timestamp_t,
-	    /**
-	     * A bitmask indicating which timestamps to adjust.
-	     */
-	    fst_flags: fstflags_t,
+		fd: fd_t,
+		/**
+		 * Flags determining the method of how the path is resolved.
+		 */
+		flags: lookupflags_t,
+		/**
+		 * The path of the file or directory to operate on.
+		 */
+		path: cstring,
+		/**
+		 * The desired values of the data access timestamp.
+		 */
+		atim: timestamp_t,
+		/**
+		 * The desired values of the data modification timestamp.
+		 */
+		mtim: timestamp_t,
+		/**
+		 * A bitmask indicating which timestamps to adjust.
+		 */
+		fst_flags: fstflags_t,
 	) -> errno_t ---
 	/**
 	 * Create a hard link.
 	 * Note: This is similar to `linkat` in POSIX.
 	 */
 	path_link :: proc(
-	    old_fd: fd_t,
-	    /**
-	     * Flags determining the method of how the path is resolved.
-	     */
-	    old_flags: lookupflags_t,
-	    /**
-	     * The source path from which to link.
-	     */
-	    old_path: cstring,
-	    /**
-	     * The working directory at which the resolution of the new path starts.
-	     */
-	    new_fd: fd_t,
-	    /**
-	     * The destination path at which to create the hard link.
-	     */
-	    new_path: cstring,
+		old_fd: fd_t,
+		/**
+		 * Flags determining the method of how the path is resolved.
+		 */
+		old_flags: lookupflags_t,
+		/**
+		 * The source path from which to link.
+		 */
+		old_path: cstring,
+		/**
+		 * The working directory at which the resolution of the new path starts.
+		 */
+		new_fd: fd_t,
+		/**
+		 * The destination path at which to create the hard link.
+		 */
+		new_path: cstring,
 	) -> errno_t ---
 	/**
 	 * Remove a directory.
@@ -1191,45 +1191,45 @@ foreign env {
 	 * Note: This is similar to `unlinkat(fd, path, AT_REMOVEDIR)` in POSIX.
 	 */
 	path_remove_directory :: proc(
-	    fd: fd_t,
-	    /**
-	     * The path to a directory to remove.
-	     */
-	    path: cstring,
+		fd: fd_t,
+		/**
+		 * The path to a directory to remove.
+		 */
+		path: cstring,
 	) -> errno_t ---
 	/**
 	 * Rename a file or directory.
 	 * Note: This is similar to `renameat` in POSIX.
 	 */
 	path_rename :: proc(
-	    fd: fd_t,
-	    /**
-	     * The source path of the file or directory to rename.
-	     */
-	    old_path: cstring,
-	    /**
-	     * The working directory at which the resolution of the new path starts.
-	     */
+		fd: fd_t,
+		/**
+		 * The source path of the file or directory to rename.
+		 */
+		old_path: cstring,
+		/**
+		 * The working directory at which the resolution of the new path starts.
+		 */
 		new_fd: fd_t,
-	    /**
-	     * The destination path to which to rename the file or directory.
-	     */
-	    new_path: cstring,
+		/**
+		 * The destination path to which to rename the file or directory.
+		 */
+		new_path: cstring,
 	) -> errno_t ---
 	/**
 	 * Create a symbolic link.
 	 * Note: This is similar to `symlinkat` in POSIX.
 	 */
 	path_symlink :: proc(
-	    /**
-	     * The contents of the symbolic link.
-	     */
-	    old_path: cstring,
+		/**
+		 * The contents of the symbolic link.
+		 */
+		old_path: cstring,
 		fd: fd_t,
-	    /**
-	     * The destination path at which to create the symbolic link.
-	     */
-	    new_path: cstring,
+		/**
+		 * The destination path at which to create the symbolic link.
+		 */
+		new_path: cstring,
 	) -> errno_t ---
 	/**
 	 * Unlink a file.
@@ -1238,10 +1238,10 @@ foreign env {
 	 */
 	path_unlink_file :: proc(
 		fd: fd_t,
-	    /**
-	     * The path to a file to unlink.
-	     */
-	    path: cstring,
+		/**
+		 * The path to a file to unlink.
+		 */
+		path: cstring,
 	) -> errno_t ---
 	/**
 	 * Terminate the process normally. An exit code of 0 indicates successful
@@ -1249,20 +1249,20 @@ foreign env {
 	 * the environment.
 	 */
 	proc_exit :: proc(
-	    /**
-	     * The exit code returned by the process.
-	     */
-	    rval: exitcode_t,
+		/**
+		 * The exit code returned by the process.
+		 */
+		rval: exitcode_t,
 	) -> ! ---
 	/**
 	 * Send a signal to the process of the calling thread.
 	 * Note: This is similar to `raise` in POSIX.
 	 */
 	proc_raise :: proc(
-	    /**
-	     * The signal condition to trigger.
-	     */
-	    sig: signal_t,
+		/**
+		 * The signal condition to trigger.
+		 */
+		sig: signal_t,
 	) -> errno_t ---
 	/**
 	 * Temporarily yield execution of the calling thread.
@@ -1278,11 +1278,11 @@ foreign env {
 	 * number generator, rather than to provide the random data directly.
 	 */
 	random_get :: proc(
-	    /**
-	     * The buffer to fill with random data.
-	     */
-	    buf: [^]u8,
-	    buf_len: size_t,
+		/**
+		 * The buffer to fill with random data.
+		 */
+		buf: [^]u8,
+		buf_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Shut down socket send and receive channels.
@@ -1290,135 +1290,10 @@ foreign env {
 	 */
 	sock_shutdown :: proc(
 		fd: fd_t,
-	    /**
-	     * Which channels on the socket to shut down.
-	     */
-	    how: sdflags_t,
-	) -> errno_t ---
-}
-
-
-foreign env {
-	__wasi_args_sizes_get :: proc(
-		retptr0: ^size_t,
-		retptr1: ^size_t,
-	) -> errno_t ---
-	__wasi_environ_sizes_get :: proc(
-		retptr0: ^size_t,
-		retptr1: ^size_t,
-	) -> errno_t ---
-	__wasi_clock_res_get :: proc(
-		id: clockid_t,
-		retptr0: ^timestamp_t,
-	) -> errno_t ---
-	__wasi_clock_time_get :: proc(
-		id: clockid_t,
-		precision: timestamp_t,
-		retptr0: ^timestamp_t,
-	) -> errno_t ---
-	__wasi_fd_fdstat_get :: proc(
-		fd: fd_t,
-		retptr0: ^fdstat_t,
-	) -> errno_t ---
-	__wasi_fd_filestat_get :: proc(
-		fd: fd_t,
-		retptr0: ^filestat_t,
-	) -> errno_t ---
-	
-	
-	__wasi_fd_pread :: proc(
-		fd: fd_t,
-	    iovs: [^]iovec_t,
-	    iovs_len: size_t,
-	    offset: filesize_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_fd_prestat_get :: proc(
-		fd: fd_t,
-	    retptr0: ^prestat_t,
-	) -> errno_t ---
-	__wasi_fd_pwrite :: proc(
-		fd: fd_t,
-	    iovs: [^]ciovec_t,
-	    iovs_len: size_t,
-	    offset: filesize_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_fd_read :: proc(
-		fd: fd_t,
-	    iovs: [^]iovec_t,
-	    iovs_len: size_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_fd_readdir :: proc(
-		fd: fd_t,
-	    buf: [^]u8,
-	    buf_len: size_t,
-	    cookie: dircookie_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_fd_seek :: proc(
-		fd: fd_t,
-	    offset: filedelta_t,
-	    whence: whence_t,
-	    retptr0: ^filesize_t,
-	) -> errno_t ---
-	__wasi_fd_tell :: proc(
-		fd: fd_t,
-	    retptr0: ^filesize_t,
-	) -> errno_t ---
-	__wasi_fd_write :: proc(
-		fd: fd_t,
-	    iovs: [^]ciovec_t,
-	    iovs_len: size_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_path_filestat_get :: proc(
-		fd: fd_t,
-	    flags: lookupflags_t,
-	    /**
-	     * The path of the file or directory to inspect.
-	     */
-	    path: cstring,
-	    retptr0: ^filestat_t,
-	) -> errno_t ---
-	__wasi_path_open :: proc(
-		fd: fd_t,
-	    dirflags: lookupflags_t,
-	    path: cstring,
-	    oflags: oflags_t,
-	    fs_rights_base: rights_t,
-	    fs_rights_inheriting: rights_t,
-	    fdflags: fdflags_t,
-		retptr: ^fd_t,
-	) -> errno_t ---
-	__wasi_path_readlink :: proc(
-		fd: fd_t,
-	    path: cstring,
-	    buf: [^]u8,
-	    buf_len: size_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_poll_oneoff :: proc(
-	    subscription_in: ^subscription_t,
-	    event_out: ^event_t,
-	    nsubscriptions: size_t,
-	    retptr0: ^size_t,
-	) -> errno_t ---
-	__wasi_sock_recv :: proc(
-		fd: fd_t,
-	    ri_data: [^]iovec_t,
-	    ri_data_len: size_t,
-	    ri_flags: riflags_t,
-	    retptr0: ^size_t,
-	    retptr1: ^roflags_t,
-	) -> errno_t ---
-	__wasi_sock_send :: proc(
-		fd: fd_t,
-	    si_data: [^]ciovec_t,
-	    si_data_len: size_t,
-	    si_flags: siflags_t,
-	    retptr0: ^size_t,
+		/**
+		 * Which channels on the socket to shut down.
+		 */
+		how: sdflags_t,
 	) -> errno_t ---
 }
 
@@ -1816,4 +1691,127 @@ sock_send :: proc(
 ) -> (n: size_t, err: errno_t) {
 	err = __wasi_sock_send(fd, si_data, si_data_len, si_flags, &n)
 	return
+}
+
+
+foreign wasi {
+	__wasi_args_sizes_get :: proc(
+		retptr0: ^size_t,
+		retptr1: ^size_t,
+	) -> errno_t ---
+	__wasi_environ_sizes_get :: proc(
+		retptr0: ^size_t,
+		retptr1: ^size_t,
+	) -> errno_t ---
+	__wasi_clock_res_get :: proc(
+		id: clockid_t,
+		retptr0: ^timestamp_t,
+	) -> errno_t ---
+	__wasi_clock_time_get :: proc(
+		id: clockid_t,
+		precision: timestamp_t,
+		retptr0: ^timestamp_t,
+	) -> errno_t ---
+	__wasi_fd_fdstat_get :: proc(
+		fd: fd_t,
+		retptr0: ^fdstat_t,
+	) -> errno_t ---
+	__wasi_fd_filestat_get :: proc(
+		fd: fd_t,
+		retptr0: ^filestat_t,
+	) -> errno_t ---
+	__wasi_fd_pread :: proc(
+		fd: fd_t,
+		iovs: [^]iovec_t,
+		iovs_len: size_t,
+		offset: filesize_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_fd_prestat_get :: proc(
+		fd: fd_t,
+		retptr0: ^prestat_t,
+	) -> errno_t ---
+	__wasi_fd_pwrite :: proc(
+		fd: fd_t,
+		iovs: [^]ciovec_t,
+		iovs_len: size_t,
+		offset: filesize_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_fd_read :: proc(
+		fd: fd_t,
+		iovs: [^]iovec_t,
+		iovs_len: size_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_fd_readdir :: proc(
+		fd: fd_t,
+		buf: [^]u8,
+		buf_len: size_t,
+		cookie: dircookie_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_fd_seek :: proc(
+		fd: fd_t,
+		offset: filedelta_t,
+		whence: whence_t,
+		retptr0: ^filesize_t,
+	) -> errno_t ---
+	__wasi_fd_tell :: proc(
+		fd: fd_t,
+		retptr0: ^filesize_t,
+	) -> errno_t ---
+	__wasi_fd_write :: proc(
+		fd: fd_t,
+		iovs: [^]ciovec_t,
+		iovs_len: size_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_path_filestat_get :: proc(
+		fd: fd_t,
+		flags: lookupflags_t,
+		/**
+		 * The path of the file or directory to inspect.
+		 */
+		path: cstring,
+		retptr0: ^filestat_t,
+	) -> errno_t ---
+	__wasi_path_open :: proc(
+		fd: fd_t,
+		dirflags: lookupflags_t,
+		path: cstring,
+		oflags: oflags_t,
+		fs_rights_base: rights_t,
+		fs_rights_inheriting: rights_t,
+		fdflags: fdflags_t,
+		retptr: ^fd_t,
+	) -> errno_t ---
+	__wasi_path_readlink :: proc(
+		fd: fd_t,
+		path: cstring,
+		buf: [^]u8,
+		buf_len: size_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_poll_oneoff :: proc(
+		subscription_in: ^subscription_t,
+		event_out: ^event_t,
+		nsubscriptions: size_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
+	__wasi_sock_recv :: proc(
+		fd: fd_t,
+		ri_data: [^]iovec_t,
+		ri_data_len: size_t,
+		ri_flags: riflags_t,
+		retptr0: ^size_t,
+		retptr1: ^roflags_t,
+	) -> errno_t ---
+	__wasi_sock_send :: proc(
+		fd: fd_t,
+		si_data: [^]ciovec_t,
+		si_data_len: size_t,
+		si_flags: siflags_t,
+		retptr0: ^size_t,
+	) -> errno_t ---
 }
