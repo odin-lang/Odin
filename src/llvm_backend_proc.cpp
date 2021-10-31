@@ -1560,7 +1560,18 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			len = lb_emit_conv(p, len, t_int);
 
 			unsigned alignment = 1;
-			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment);
+			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment, false);
+			return {};
+		}
+	case BuiltinProc_mem_zero_volatile:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+			lbValue len = lb_build_expr(p, ce->args[1]);
+			ptr = lb_emit_conv(p, ptr, t_rawptr);
+			len = lb_emit_conv(p, len, t_int);
+
+			unsigned alignment = 1;
+			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment, true);
 			return {};
 		}
 

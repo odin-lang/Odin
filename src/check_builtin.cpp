@@ -2598,6 +2598,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_mem_zero:
+	case BuiltinProc_mem_zero_volatile:
 		{
 			operand->mode = Addressing_NoValue;
 			operand->type = t_invalid;
