@@ -2011,6 +2011,9 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("gnu_h2f_ieee"),
 		str_lit("gnu_f2h_ieee"),
 		str_lit("extendhfsf2"),
+		
+		// WASM Specific
+		str_lit("__ashlti3"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);

@@ -135,13 +135,12 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
+
 		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm-obj\" -o \"%.*s.wasm\" %.*s %.*s",
+			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
-		if (result) {
-			return result;
-		}
+		return result;
 	}
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {

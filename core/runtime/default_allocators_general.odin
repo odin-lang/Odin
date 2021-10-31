@@ -1,5 +1,6 @@
 //+build !windows
 //+build !freestanding
+//+build !wasi
 package runtime
 
 when ODIN_DEFAULT_TO_NIL_ALLOCATOR {

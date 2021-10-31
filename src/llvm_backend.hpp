@@ -585,3 +585,24 @@ enum : LLVMAttributeIndex {
 	LLVMAttributeIndex_FunctionIndex = ~0u,
 	LLVMAttributeIndex_FirstArgIndex = 1,
 };
+
+
+char const *llvm_linkage_strings[] = {
+	"external linkage",
+	"available externally linkage",
+	"link once any linkage",
+	"link once odr linkage",
+	"link once odr auto hide linkage",
+	"weak any linkage",
+	"weak odr linkage",
+	"appending linkage",
+	"internal linkage",
+	"private linkage",
+	"dllimport linkage",
+	"dllexport linkage",
+	"external weak linkage",
+	"ghost linkage",
+	"common linkage",
+	"linker private linkage",
+	"linker private weak linkage"
+};

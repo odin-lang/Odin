@@ -355,3 +355,63 @@ void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
 	// are not removed
 	lb_run_remove_dead_instruction_pass(p);
 }
+
+
+void lb_run_remove_unused_function_pass(LLVMModuleRef mod) {
+	isize removal_count = 0;
+	isize pass_count = 0;
+	isize const max_pass_count = 10;
+	// Custom remove dead function pass
+	for (; pass_count < max_pass_count; pass_count++) {
+		bool was_dead_function = false;	
+		for (LLVMValueRef func = LLVMGetFirstFunction(mod);
+		     func != nullptr;
+		     /**/
+		     ) {
+		     	LLVMValueRef curr_func = func;
+		     	func = LLVMGetNextFunction(func);
+		     	
+			LLVMUseRef first_use = LLVMGetFirstUse(curr_func);
+			if (first_use != nullptr)  {
+				continue;
+			}
+			String name = {};
+			name.text = cast(u8 *)LLVMGetValueName2(curr_func, cast(size_t *)&name.len);
+						
+			if (LLVMIsDeclaration(curr_func)) {
+				// Ignore for the time being
+				continue;
+			}
+			
+			if (name == "memset" ||
+			    name == "memmove" ||
+			    name == "memcpy") {
+				continue;
+			}
+			if (is_arch_wasm()) {
+				if (name == "__ashlti3") {
+					LLVMSetLinkage(curr_func, LLVMExternalLinkage);
+					continue;
+				}
+			}
+			
+			LLVMLinkage linkage = LLVMGetLinkage(curr_func);
+						
+			switch (linkage) {
+			case LLVMExternalLinkage:
+			case LLVMDLLImportLinkage:
+			case LLVMDLLExportLinkage:
+			default:
+				continue;
+			case LLVMInternalLinkage:
+				break;
+			}
+			LLVMDeleteFunction(curr_func);
+			was_dead_function = true;
+			removal_count += 1;
+		}
+		if (!was_dead_function) {
+			break;
+		}
+	}
+}
