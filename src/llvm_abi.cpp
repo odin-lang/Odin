@@ -1039,6 +1039,70 @@ namespace lbAbiArm64 {
 	}
 }
 
+namespace lbAbiWasm32 {
+	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+
+	LB_ABI_INFO(abi_info) {
+		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		ft->ctx = c;
+		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->calling_convention = calling_convention;
+		return ft;
+	}
+
+	lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
+		if (!is_return && lb_sizeof(type) > 8) {
+			return lb_arg_type_indirect(type, nullptr);
+		}
+
+		LLVMAttributeRef attr = nullptr;
+		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
+		if (type == i1) {
+			attr = lb_create_enum_attribute(c, "zeroext");
+		}
+		return lb_arg_type_direct(type, nullptr, nullptr, attr);
+	}
+
+	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+
+		for (unsigned i = 0; i < arg_count; i++) {
+			LLVMTypeRef t = arg_types[i];
+			LLVMTypeKind kind = LLVMGetTypeKind(t);
+			i64 sz = lb_sizeof(t);
+			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+				if (sz == 0) {
+					args[i] = lb_arg_type_ignore(t);
+				} else {
+					args[i] = lb_arg_type_indirect(t, nullptr);
+				}
+			} else {
+				args[i] = non_struct(c, t, false);
+			}
+		}
+		return args;
+	}
+
+	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+		if (!return_is_defined) {
+			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
+			i64 sz = lb_sizeof(return_type);
+			switch (sz) {
+			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+			}
+			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+			return lb_arg_type_indirect(return_type, attr);
+		}
+		return non_struct(c, return_type, true);
+	}
+}
+
 
 LB_ABI_INFO(lb_get_abi_info) {
 	switch (calling_convention) {
@@ -1075,7 +1139,7 @@ LB_ABI_INFO(lb_get_abi_info) {
 	case TargetArch_wasm32:
 		// TODO(bill): implement wasm32's ABI correct 
 		// NOTE(bill): this ABI is only an issue for WASI compatibility
-		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiWasm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	case TargetArch_wasm64:
 		// TODO(bill): implement wasm64's ABI correct 
 		// NOTE(bill): this ABI is only an issue for WASI compatibility
