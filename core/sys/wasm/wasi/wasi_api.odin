@@ -1088,17 +1088,6 @@ foreign wasi {
 		fst_flags: fstflags_t,
 	) -> errno_t ---
 	/**
-	 * Return a description of the given preopened file descriptor.
-	 */
-	fd_prestat_dir_name :: proc(
-		fd: fd_t,
-		/**
-		 * A buffer into which to write the preopened directory name.
-		 */
-		path: [^]u8,
-		path_len: size_t,
-	) -> errno_t ---
-	/**
 	 * Atomically replace a file descriptor by renumbering another file descriptor.
 	 * Due to the strong focus on thread safety, this environment does not provide
 	 * a mechanism to duplicate or renumber a file descriptor to an arbitrary
@@ -1121,135 +1110,6 @@ foreign wasi {
 	 */
 	fd_sync :: proc(
 		f: fd_t,
-	) -> errno_t ---
-	/**
-	 * Create a directory.
-	 * Note: This is similar to `mkdirat` in POSIX.
-	 */
-	path_create_directory :: proc(
-		fd: fd_t,
-		/**
-		 * The path at which to create the directory.
-		 */
-		path: [^]byte,
-		path_len: size_t,
-	) -> errno_t ---
-	/**
-	 * Adjust the timestamps of a file or directory.
-	 * Note: This is similar to `utimensat` in POSIX.
-	 */
-	path_filestat_set_times :: proc(
-		fd: fd_t,
-		/**
-		 * Flags determining the method of how the path is resolved.
-		 */
-		flags: lookupflags_t,
-		/**
-		 * The path of the file or directory to operate on.
-		 */
-		path: [^]byte,
-		path_len: size_t,
-		/**
-		 * The desired values of the data access timestamp.
-		 */
-		atim: timestamp_t,
-		/**
-		 * The desired values of the data modification timestamp.
-		 */
-		mtim: timestamp_t,
-		/**
-		 * A bitmask indicating which timestamps to adjust.
-		 */
-		fst_flags: fstflags_t,
-	) -> errno_t ---
-	/**
-	 * Create a hard link.
-	 * Note: This is similar to `linkat` in POSIX.
-	 */
-	path_link :: proc(
-		old_fd: fd_t,
-		/**
-		 * Flags determining the method of how the path is resolved.
-		 */
-		old_flags: lookupflags_t,
-		/**
-		 * The source path from which to link.
-		 */
-		old_path: [^]byte,
-		old_path_len: size_t,
-		/**
-		 * The working directory at which the resolution of the new path starts.
-		 */
-		new_fd: fd_t,
-		/**
-		 * The destination path at which to create the hard link.
-		 */
-		new_path: [^]byte,
-		new_path_len: size_t,
-	) -> errno_t ---
-	/**
-	 * Remove a directory.
-	 * Return `errno::notempty` if the directory is not empty.
-	 * Note: This is similar to `unlinkat(fd, path, AT_REMOVEDIR)` in POSIX.
-	 */
-	path_remove_directory :: proc(
-		fd: fd_t,
-		/**
-		 * The path to a directory to remove.
-		 */
-		path: [^]byte,
-		path_len: size_t,
-	) -> errno_t ---
-	/**
-	 * Rename a file or directory.
-	 * Note: This is similar to `renameat` in POSIX.
-	 */
-	path_rename :: proc(
-		fd: fd_t,
-		/**
-		 * The source path of the file or directory to rename.
-		 */
-		old_path: [^]byte,
-		old_path_len: size_t,
-		/**
-		 * The working directory at which the resolution of the new path starts.
-		 */
-		new_fd: fd_t,
-		/**
-		 * The destination path to which to rename the file or directory.
-		 */
-		new_path: [^]byte,
-		new_path_len: size_t,
-	) -> errno_t ---
-	/**
-	 * Create a symbolic link.
-	 * Note: This is similar to `symlinkat` in POSIX.
-	 */
-	path_symlink :: proc(
-		/**
-		 * The contents of the symbolic link.
-		 */
-		old_path: [^]byte,
-		old_path_len: size_t,
-		fd: fd_t,
-		/**
-		 * The destination path at which to create the symbolic link.
-		 */
-		new_path: [^]byte,
-		new_path_len: size_t,
-	) -> errno_t ---
-	/**
-	 * Unlink a file.
-	 * Return `errno::isdir` if the path refers to a directory.
-	 * Note: This is similar to `unlinkat(fd, path, 0)` in POSIX.
-	 */
-	path_unlink_file :: proc(
-		fd: fd_t,
-		/**
-		 * The path to a file to unlink.
-		 */
-		path: [^]byte,
-		path_len: size_t,
 	) -> errno_t ---
 	/**
 	 * Terminate the process normally. An exit code of 0 indicates successful
@@ -1277,21 +1137,6 @@ foreign wasi {
 	 * Note: This is similar to `sched_yield` in POSIX.
 	 */
 	sched_yield :: proc() -> errno_t ---
-	/**
-	 * Write high-quality random data into a buffer.
-	 * This function blocks when the implementation is unable to immediately
-	 * provide sufficient high-quality random data.
-	 * This function may execute slowly, so when large mounts of random data are
-	 * required, it's advisable to use this function to seed a pseudo-random
-	 * number generator, rather than to provide the random data directly.
-	 */
-	random_get :: proc(
-		/**
-		 * The buffer to fill with random data.
-		 */
-		buf: [^]u8,
-		buf_len: size_t,
-	) -> errno_t ---
 	/**
 	 * Shut down socket send and receive channels.
 	 * Note: This is similar to `shutdown` in POSIX.
@@ -1399,17 +1244,13 @@ fd_pread :: proc "c" (
 	/**
 	 * List of scatter/gather vectors in which to store data.
 	 */
-	iovs: [^]iovec_t,
-	/**
-	 * The length of the array pointed to by `iovs`.
-	 */
-	iovs_len: size_t,
+	iovs: []iovec_t,
 	/**
 	 * The offset within the file at which to read.
 	 */
 	offset: filesize_t,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_fd_pread(fd, iovs, iovs_len, offset, &n)
+	err = wasi_fd_pread(fd, raw_data(iovs), len(iovs), offset, &n)
 	return
 }
 /**
@@ -1434,17 +1275,13 @@ fd_pwrite :: proc "c" (
 	/**
 	 * List of scatter/gather vectors from which to retrieve data.
 	 */
-	iovs: [^]ciovec_t,
-	/**
-	 * The length of the array pointed to by `iovs`.
-	 */
-	iovs_len: size_t,
+	iovs: []ciovec_t,
 	/**
 	 * The offset within the file at which to write.
 	 */
 	offset: filesize_t,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_fd_pwrite(fd, iovs, iovs_len, offset, &n)
+	err = wasi_fd_pwrite(fd, raw_data(iovs), len(iovs), offset, &n)
 	return
 }
 /**
@@ -1458,13 +1295,9 @@ fd_read :: proc "c" (
 	/**
 	 * List of scatter/gather vectors to which to store data.
 	 */
-	iovs: [^]iovec_t,
-	/**
-	 * The length of the array pointed to by `iovs`.
-	 */
-	iovs_len: size_t,
+	iovs: []iovec_t,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_fd_read(fd, iovs, iovs_len, &n)
+	err = wasi_fd_read(fd, raw_data(iovs), len(iovs), &n)
 	return
 }
 /**
@@ -1485,14 +1318,13 @@ fd_readdir :: proc "c" (
 	/**
 	 * The buffer where directory entries are stored
 	 */
-	buf: [^]u8,
-	buf_len: size_t,
+	buf: []byte,
 	/**
 	 * The location within the directory to start reading
 	 */
 	cookie: dircookie_t,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_fd_readdir(fd, buf, buf_len, cookie, &n)
+	err = wasi_fd_readdir(fd, raw_data(buf), len(buf), cookie, &n)
 	return
 }
 /**
@@ -1536,13 +1368,9 @@ fd_write :: proc "c" (
 	/**
 	 * List of scatter/gather vectors from which to retrieve data.
 	 */
-	iovs: [^]ciovec_t,
-	/**
-	 * The length of the array pointed to by `iovs`.
-	 */
-	iovs_len: size_t,
+	iovs: []ciovec_t,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_fd_write(fd, iovs, iovs_len, &n)
+	err = wasi_fd_write(fd, raw_data(iovs), len(iovs), &n)
 	return
 }
 /**
@@ -1661,17 +1489,13 @@ sock_recv :: proc "c" (
 	/**
 	 * List of scatter/gather vectors to which to store data.
 	 */
-	ri_data: [^]iovec_t,
-	/**
-	 * The length of the array pointed to by `ri_data`.
-	 */
-	ri_data_len: size_t,
+	ri_data: []iovec_t,
 	/**
 	 * Message flags.
 	 */
 	ri_flags: riflags_t,
 ) -> (n: size_t, flags: roflags_t, err: errno_t) {
-	err = wasi_sock_recv(fd, ri_data, ri_data_len, ri_flags, &n, &flags)
+	err = wasi_sock_recv(fd, raw_data(ri_data), len(ri_data), ri_flags, &n, &flags)
 	return
 }
 /**
@@ -1686,19 +1510,181 @@ sock_send :: proc "c" (
 	/**
 	 * List of scatter/gather vectors to which to retrieve data
 	 */
-	si_data: [^]ciovec_t,
-	/**
-	 * The length of the array pointed to by `si_data`.
-	 */
-	si_data_len: size_t,
+	si_data: []ciovec_t,
 	/**
 	 * Message flags.
 	 */
 	si_flags: siflags_t,
 ) -> (n: size_t, err: errno_t) {
-	err = wasi_sock_send(fd, si_data, si_data_len, si_flags, &n)
+	err = wasi_sock_send(fd, raw_data(si_data), len(si_data), si_flags, &n)
 	return
 }
+
+/**
+ * Return a description of the given preopened file descriptor.
+ */
+fd_prestat_dir_name :: proc(
+	fd: fd_t,
+	/**
+	 * A buffer into which to write the preopened directory name.
+	 */
+	path: string,
+) -> errno_t {
+	return wasm_fd_prestat_dir_name(fd, raw_data(path), len(path))
+}
+/**
+ * Create a directory.
+ * Note: This is similar to `mkdirat` in POSIX.
+ */
+path_create_directory :: proc(
+	fd: fd_t,
+	/**
+	 * The path at which to create the directory.
+	 */
+	path: string,
+) -> errno_t {
+	return wasm_path_create_directory(fd, raw_data(path), len(path))
+}
+/**
+ * Adjust the timestamps of a file or directory.
+ * Note: This is similar to `utimensat` in POSIX.
+ */
+path_filestat_set_times :: proc(
+	fd: fd_t,
+	/**
+	 * Flags determining the method of how the path is resolved.
+	 */
+	flags: lookupflags_t,
+	/**
+	 * The path of the file or directory to operate on.
+	 */
+	path: string,
+	/**
+	 * The desired values of the data access timestamp.
+	 */
+	atim: timestamp_t,
+	/**
+	 * The desired values of the data modification timestamp.
+	 */
+	mtim: timestamp_t,
+	/**
+	 * A bitmask indicating which timestamps to adjust.
+	 */
+	fst_flags: fstflags_t,
+) -> errno_t {
+	return wasm_path_filestat_set_times(fd, flags, raw_data(path), len(path), atim, mtim, fst_flags)
+}
+/**
+ * Remove a directory.
+ * Return `errno::notempty` if the directory is not empty.
+ * Note: This is similar to `unlinkat(fd, path, AT_REMOVEDIR)` in POSIX.
+ */
+path_remove_directory :: proc(
+	fd: fd_t,
+	/**
+	 * The path to a directory to remove.
+	 */
+	path: string,
+) -> errno_t {
+	return wasm_path_remove_directory(fd, raw_data(path), len(path))
+}
+/**
+ * Create a hard link.
+ * Note: This is similar to `linkat` in POSIX.
+ */
+path_link :: proc(
+	old_fd: fd_t,
+	/**
+	 * Flags determining the method of how the path is resolved.
+	 */
+	old_flags: lookupflags_t,
+	/**
+	 * The source path from which to link.
+	 */
+	old_path: string,
+	/**
+	 * The working directory at which the resolution of the new path starts.
+	 */
+	new_fd: fd_t,
+	/**
+	 * The destination path at which to create the hard link.
+	 */
+	new_path: string,
+) -> errno_t {
+	return wasm_path_link(old_fd, old_flags, raw_data(old_path), len(old_path), new_fd, raw_data(new_path), len(new_path))
+}
+
+/**
+ * Rename a file or directory.
+ * Note: This is similar to `renameat` in POSIX.
+ */
+path_rename :: proc(
+	fd: fd_t,
+	/**
+	 * The source path of the file or directory to rename.
+	 */
+	old_path: string,
+	/**
+	 * The working directory at which the resolution of the new path starts.
+	 */
+	new_fd: fd_t,
+	/**
+	 * The destination path to which to rename the file or directory.
+	 */
+	new_path: string,
+) -> errno_t {
+	return wasm_path_rename(fd, raw_data(old_path), len(old_path), new_fd, raw_data(new_path), len(new_path))
+}
+/**
+ * Create a symbolic link.
+ * Note: This is similar to `symlinkat` in POSIX.
+ */
+path_symlink :: proc(
+	/**
+	 * The contents of the symbolic link.
+	 */
+	old_path: string,
+	fd: fd_t,
+	/**
+	 * The destination path at which to create the symbolic link.
+	 */
+	new_path: string,
+) -> errno_t {
+	return wasm_path_symlink(raw_data(old_path), len(old_path), fd, raw_data(new_path), len(new_path))
+}
+/**
+ * Unlink a file.
+ * Return `errno::isdir` if the path refers to a directory.
+ * Note: This is similar to `unlinkat(fd, path, 0)` in POSIX.
+ */
+path_unlink_file :: proc(
+	fd: fd_t,
+	/**
+	 * The path to a file to unlink.
+	 */
+	path: string,
+) -> errno_t {
+	return wasm_path_unlink_file(fd, raw_data(path), len(path))
+}
+/**
+ * Write high-quality random data into a buffer.
+ * This function blocks when the implementation is unable to immediately
+ * provide sufficient high-quality random data.
+ * This function may execute slowly, so when large mounts of random data are
+ * required, it's advisable to use this function to seed a pseudo-random
+ * number generator, rather than to provide the random data directly.
+ */
+random_get :: proc(
+	/**
+	 * The buffer to fill with random data.
+	 */
+	buf: []u8,
+) -> errno_t {
+	return wasm_random_get(raw_data(buf), len(buf))
+}
+
+
+
 
 @(default_calling_convention="c")
 foreign wasi {
@@ -1795,7 +1781,7 @@ foreign wasi {
 		/**
 		 * The path of the file or directory to inspect.
 		 */
-		path: [^]byte,
+		path: [^]u8,
 		path_len: size_t,
 		retptr0: ^filestat_t,
 	) -> errno_t ---
@@ -1803,7 +1789,7 @@ foreign wasi {
 	wasi_path_open :: proc(
 		fd: fd_t,
 		dirflags: lookupflags_t,
-		path: [^]byte,
+		path: [^]u8,
 		path_len: size_t,
 		oflags: oflags_t,
 		fs_rights_base: rights_t,
@@ -1814,7 +1800,7 @@ foreign wasi {
 	@(link_name="path_readlink")
 	wasi_path_readlink :: proc(
 		fd: fd_t,
-		path: [^]byte,
+		path: [^]u8,
 		path_len: size_t,
 		buf: [^]u8,
 		buf_len: size_t,
@@ -1843,5 +1829,71 @@ foreign wasi {
 		si_data_len: size_t,
 		si_flags: siflags_t,
 		retptr0: ^size_t,
+	) -> errno_t ---
+	@(link_name="fd_prestat_dir_name")
+	wasm_fd_prestat_dir_name :: proc(
+		fd: fd_t,
+		path: [^]u8,
+		path_len: size_t,
+	) -> errno_t ---
+	@(link_name="path_create_directory")
+	wasm_path_create_directory :: proc(
+		fd: fd_t,
+		path: [^]u8,
+		path_len: size_t,
+	) -> errno_t ---
+	@(link_name="path_filestat_set_times")
+	wasm_path_filestat_set_times :: proc(
+		fd: fd_t,
+		flags: lookupflags_t,
+		path: [^]u8,
+		path_len: size_t,
+		atim: timestamp_t,
+		mtim: timestamp_t,
+		fst_flags: fstflags_t,
+	) -> errno_t ---
+	@(link_name="path_remove_directory")
+	wasm_path_remove_directory :: proc(
+		fd: fd_t,
+		path: [^]u8,
+		path_len: size_t,
+	) -> errno_t ---
+	@(link_name="path_link")
+	wasm_path_link :: proc(
+		old_fd: fd_t,
+		old_flags: lookupflags_t,
+		old_path: [^]u8,
+		old_path_len: size_t,
+		new_fd: fd_t,
+		new_path: [^]u8,
+		new_path_len: size_t,
+	) -> errno_t ---
+	@(link_name="path_rename")
+	wasm_path_rename :: proc(
+		fd: fd_t,
+		old_path: [^]u8,
+		old_path_len: size_t,
+		new_fd: fd_t,
+		new_path: [^]u8,
+		new_path_len: size_t,
+	) -> errno_t ---
+	@(link_name="path_symlink")
+	wasm_path_symlink :: proc(
+		old_path: [^]u8,
+		old_path_len: size_t,
+		fd: fd_t,
+		new_path: [^]u8,
+		new_path_len: size_t,
+	) -> errno_t ---
+	@(link_name="path_unlink_file")
+	wasm_path_unlink_file :: proc(
+		fd: fd_t,
+		path: [^]u8,
+		path_len: size_t,
+	) -> errno_t ---
+	@(link_name="random_get")
+	wasm_random_get :: proc(
+		buf: [^]u8,
+		buf_len: size_t,
 	) -> errno_t ---
 }
