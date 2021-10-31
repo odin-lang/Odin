@@ -787,7 +787,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		call_cleanup = false;
 	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
 		name = str_lit("mainCRTStartup");
-	} else if (build_context.metrics.os == TargetOs_wasi) {
+	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
 		call_cleanup = false;
 	} else {
@@ -894,8 +894,8 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 
 	lb_end_procedure_body(p);
 	
-	
-	if (build_context.metrics.os == TargetOs_wasi) {
+
+	if (is_arch_wasm()) {
 		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
 	} else {
 		LLVMSetLinkage(p->value, LLVMExternalLinkage);
