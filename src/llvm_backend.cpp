@@ -771,6 +771,8 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	Type *results = alloc_type_tuple();
 
 	Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
+	
+	bool call_cleanup = true;
 
 	bool has_args = false;
 	bool is_dll_main = false;
@@ -782,10 +784,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("hinstDLL"),   t_rawptr, false, true);
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
+		call_cleanup = false;
 	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
 		name = str_lit("mainCRTStartup");
 	} else if (build_context.metrics.os == TargetOs_wasi) {
 		name = str_lit("_start");
+		call_cleanup = false;
 	} else {
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
@@ -876,8 +880,10 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 
 	
-	lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
-	lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
+	if (call_cleanup) {
+		lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
+		lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
+	}
 	
 
 	if (is_dll_main) {
@@ -890,7 +896,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	
 	
 	if (build_context.metrics.os == TargetOs_wasi) {
-		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);	
+		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
 	} else {
 		LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	}
