@@ -64,6 +64,8 @@ gb_global Timings global_timings = {0};
 #include "microsoft_craziness.h"
 #endif
 
+#include "bug_report.cpp"
+
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
@@ -96,8 +98,8 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 	wcmd = string_to_string16(permanent_allocator(), make_string(cast(u8 *)cmd_line, cmd_len-1));
 	if (CreateProcessW(nullptr, wcmd.text,
-	                   nullptr, nullptr, true, 0, nullptr, nullptr,
-	                   &start_info, &pi)) {
+					   nullptr, nullptr, true, 0, nullptr, nullptr,
+					   &start_info, &pi)) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
 		GetExitCodeProcess(pi.hProcess, cast(DWORD *)&exit_code);
 
@@ -212,7 +214,7 @@ i32 linker_stage(lbGenerator *gen) {
 				String lib = m->foreign_library_paths[i];
 				GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
 				gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-				            " \"%.*s\"", LIT(lib));
+							" \"%.*s\"", LIT(lib));
 				lib_str = gb_string_appendc(lib_str, lib_str_buf);
 			}
 		}
@@ -221,7 +223,7 @@ i32 linker_stage(lbGenerator *gen) {
 			String lib = gen->default_module.foreign_library_paths[i];
 			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
 			gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-			            " \"%.*s\"", LIT(lib));
+						" \"%.*s\"", LIT(lib));
 			lib_str = gb_string_appendc(lib_str, lib_str_buf);
 		}
 
@@ -320,7 +322,7 @@ i32 linker_stage(lbGenerator *gen) {
 			);
 			  
 			  if (result) {
-			  	return result;
+				return result;
 			  }
 		}
 	#else
@@ -513,10 +515,6 @@ Array<String> setup_args(int argc, char const **argv) {
 #endif
 }
 
-
-
-
-
 void print_usage_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf_err("\t");
@@ -540,6 +538,7 @@ void usage(String argv0) {
 	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "doc       generate documentation .odin file, or directory of .odin files");
 	print_usage_line(1, "version   print version");
+	print_usage_line(1, "report    print information useful to reporting a bug");
 	print_usage_line(0, "");
 	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
 	print_usage_line(1, "-help");
@@ -856,12 +855,12 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlagParam_Boolean: {
 							if (str_eq_ignore_case(param, str_lit("t")) ||
-							    str_eq_ignore_case(param, str_lit("true")) ||
-							    param == "1") {
+								str_eq_ignore_case(param, str_lit("true")) ||
+								param == "1") {
 								value = exact_value_bool(true);
 							} else if (str_eq_ignore_case(param, str_lit("f")) ||
-							           str_eq_ignore_case(param, str_lit("false")) ||
-							           param == "0") {
+									   str_eq_ignore_case(param, str_lit("false")) ||
+									   param == "0") {
 								value = exact_value_bool(false);
 							} else {
 								gb_printf_err("Invalid flag parameter for '%.*s' : '%.*s'\n", LIT(name), LIT(param));
@@ -2373,6 +2372,10 @@ int main(int arg_count, char const **arg_ptr) {
 
 		gb_printf("\n");
 		return 0;
+	} else if (command == "report") {
+		build_context.command_kind = Command_bug_report;
+		print_bug_report_help();
+		return 0;
 	} else {
 		usage(args[0]);
 		return 1;
@@ -2396,7 +2399,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
-		                       get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
+							   get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
 	}
 
 
