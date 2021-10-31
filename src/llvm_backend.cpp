@@ -784,6 +784,8 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
 	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
 		name = str_lit("mainCRTStartup");
+	} else if (build_context.metrics.os == TargetOs_wasi) {
+		name = str_lit("_start");
 	} else {
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
@@ -885,6 +887,14 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 
 	lb_end_procedure_body(p);
+	
+	
+	if (build_context.metrics.os == TargetOs_wasi) {
+		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);	
+	} else {
+		LLVMSetLinkage(p->value, LLVMExternalLinkage);
+	}
+	
 
 	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");

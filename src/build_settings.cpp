@@ -16,6 +16,8 @@ enum TargetOsKind {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_freebsd,
+	
+	TargetOs_wasi,
 
 	TargetOs_freestanding,
 
@@ -50,6 +52,8 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("freebsd"),
+	
+	str_lit("wasi"),
 
 	str_lit("freestanding"),
 };
@@ -347,6 +351,16 @@ gb_global TargetMetrics target_freestanding_wasm64 = {
 	str_lit(""),
 };
 
+gb_global TargetMetrics target_wasi_wasm32 = {
+	TargetOs_wasi,
+	TargetArch_wasm32,
+	4,
+	8,
+	str_lit("wasm32-wasi-js"),
+	str_lit(""),
+};
+
+
 
 
 
@@ -367,6 +381,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+	{ str_lit("wasi_wasm32"), &target_wasi_wasm32 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -893,10 +908,18 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
 		}
-	} else if (bc->metrics.arch == TargetArch_wasm32) {
-		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined --features=wasm-feature-atomics ");
-	} else if (bc->metrics.arch == TargetArch_wasm64) {
-		bc->link_flags = str_lit("--no-entry --export-table --export-all --allow-undefined -mwasm64 --features=wasm-feature-memory64,wasm-feature-atomics --verbose ");
+	} else if (is_arch_wasm()) {
+		gbString link_flags = gb_string_make(heap_allocator(), "--export-all  ");
+		link_flags = gb_string_appendc(link_flags, "--export-table ");
+		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
+		if (bc->metrics.arch == TargetArch_wasm64) {
+			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
+		}
+		if (bc->metrics.os == TargetOs_freestanding) {
+			link_flags = gb_string_appendc(link_flags, "--no-entry ");
+		}
+		
+		bc->link_flags = make_string_c(link_flags);
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
