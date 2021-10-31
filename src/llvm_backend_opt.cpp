@@ -383,6 +383,11 @@ void lb_run_remove_unused_function_pass(LLVMModuleRef mod) {
 				continue;
 			}
 			
+			if (name == "memset" ||
+			    name == "memmove" ||
+			    name == "memcpy") {
+				continue;
+			}
 			
 			LLVMLinkage linkage = LLVMGetLinkage(curr_func);
 						
