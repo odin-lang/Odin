@@ -921,6 +921,9 @@ void init_build_context(TargetMetrics *cross_target) {
 		}
 		
 		bc->link_flags = make_string_c(link_flags);
+		
+		// Disallow on wasm
+		build_context.use_separate_modules = false;
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
