@@ -244,7 +244,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 		} else if (name == "load") {
 			if (ce->args.count != 1) {
-				error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
+				if (ce->args.count == 0) {
+					error(ce->close, "'#load' expects 1 argument, got 0");
+				} else {
+					error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);					
+				}
+
 				return false;
 			}
 
@@ -315,7 +320,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		} else if (name == "load_or") {
 			if (ce->args.count != 2) {
-				error(ce->args[0], "'#load_or' expects 2 arguments, got %td", ce->args.count);
+				if (ce->args.count == 0) {
+					error(ce->close, "'#load_or' expects 2 arguments, got 0");
+				} else {
+					error(ce->args[0], "'#load_or' expects 2 arguments, got %td", ce->args.count);
+				}
 				return false;
 			}
 
@@ -2598,6 +2607,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_mem_zero:
+	case BuiltinProc_mem_zero_volatile:
 		{
 			operand->mode = Addressing_NoValue;
 			operand->type = t_invalid;

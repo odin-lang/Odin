@@ -48,7 +48,7 @@ lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 	return value;
 }
 
-void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment) {
+void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile) {
 	bool is_inlinable = false;
 
 	i64 const_len = 0;
@@ -77,7 +77,7 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 	args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
 	args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
 	args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
-	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, false); // is_volatile parameter
+	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
 
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
@@ -93,7 +93,7 @@ void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alig
 		{
 			// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
 			i32 sz = cast(i32)type_size_of(type);
-			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment);
+			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
 		}
 		break;
 	default:
@@ -1504,6 +1504,7 @@ lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t
 			break;
 		case TargetArch_386:
 		case TargetArch_wasm32:
+		case TargetArch_wasm64:
 			is_possible = false;
 			break;
 		}

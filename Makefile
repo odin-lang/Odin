@@ -23,6 +23,8 @@ ifeq ($(OS), Linux)
     LLVM_CONFIG=llvm-config-11
     ifneq ($(shell which llvm-config-11 2>/dev/null),)
         LLVM_CONFIG=llvm-config-11
+    else ifneq ($(shell which llvm-config-11-64 2>/dev/null),)
+        LLVM_CONFIG=llvm-config-11-64
     else
         ifneq ($(shell llvm-config --version | grep '^11\.'),)
             LLVM_CONFIG=llvm-config
@@ -39,6 +41,9 @@ all: debug demo
 
 demo:
 	./odin run examples/demo/demo.odin
+
+report:
+	./odin report
 
 debug:
 	$(CC) src/main.cpp src/libtommath.cpp $(DISABLED_WARNINGS) $(CFLAGS) -g $(LDFLAGS) -o odin
