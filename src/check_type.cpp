@@ -921,26 +921,51 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 		}
 		i64 lower = big_int_to_i64(&i);
 		i64 upper = big_int_to_i64(&j);
-
+		
+		bool lower_changed = false;
 		i64 bits = MAX_BITS;
 		if (type->BitSet.underlying != nullptr) {
 			bits = 8*type_size_of(type->BitSet.underlying);
+			
+			if (lower > 0) {
+				lower = 0;
+				lower_changed = true;
+			} else if (lower < 0) {
+				error(bs->elem, "bit_set does not allow a negative lower bound (%lld) when an underlying type is set", lower);
+			}
 		}
+
+		i64 bits_required = upper-lower;
+		switch (be->op.kind) {
+		case Token_Ellipsis:
+		case Token_RangeFull:
+			bits_required += 1;
+			break;
+		}
+		bool is_valid = true;
 
 		switch (be->op.kind) {
 		case Token_Ellipsis:
 		case Token_RangeFull:
 			if (upper - lower >= bits) {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower+1));
+				is_valid = false;
 			}
 			break;
 		case Token_RangeHalf:
 			if (upper - lower > bits) {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower));
+				is_valid = false;
 			}
 			upper -= 1;
 			break;
 		}
+		if (!is_valid) {
+			if (lower_changed) {
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internal the lower changed was changed 0 as an underlying type was set)", bits, bits_required);
+			} else {
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+			}
+		}
+		
 		type->BitSet.elem  = t;
 		type->BitSet.lower = lower;
 		type->BitSet.upper = upper;
@@ -996,7 +1021,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 				}
 
 				GB_ASSERT(lower <= upper);
-
+				
+				bool lower_changed = false;
 				i64 bits = MAX_BITS
 ;				if (bs->underlying != nullptr) {
 					Type *u = check_type(c, bs->underlying);
@@ -1008,17 +1034,31 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 					}
 					type->BitSet.underlying = u;
 					bits = 8*type_size_of(u);
+					
+					if (lower > 0) {
+						lower = 0;
+						lower_changed = true;
+					} else if (lower < 0) {
+						gbString s = type_to_string(elem);
+						error(bs->elem, "bit_set does not allow a negative lower bound (%lld) of the element type '%s' when an underlying type is set", lower, s);
+						gb_string_free(s);
+					}
 				}
 
-				if (upper - lower >= MAX_BITS) {
-					error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", MAX_BITS, (upper-lower+1));
+				if (upper - lower >= bits) {
+					i64 bits_required = upper-lower+1;
+					if (lower_changed) {
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internal the lower changed was changed 0 as an underlying type was set)", bits, bits_required);
+					} else {
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+					}
 				}
 
 				type->BitSet.lower = lower;
 				type->BitSet.upper = upper;
 			}
 		}
-	}
+	}	
 }
 
 

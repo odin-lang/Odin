@@ -10,6 +10,15 @@ zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	intrinsics.mem_zero(data, len)
 	return data
 }
+zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+	// This routine tries to avoid the compiler optimizing away the call,
+	// so that it is always executed.  It is intended to provided
+	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
+	// memset_s call.
+	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
+	intrinsics.atomic_fence() // Prevent reordering
+	return data
+}
 zero_item :: proc "contextless" (item: $P/^$T) {
 	intrinsics.mem_zero(item, size_of(T))
 }

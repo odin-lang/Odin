@@ -13,6 +13,9 @@ jobs:
       - name: Odin version
         run: ./odin version
         timeout-minutes: 1
+      - name: Odin report
+        run: ./odin report
+        timeout-minutes: 1
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
         timeout-minutes: 10
@@ -39,6 +42,9 @@ jobs:
       - name: Odin version
         run: ./odin version
         timeout-minutes: 1
+      - name: Odin report
+        run: ./odin report
+        timeout-minutes: 1
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
         timeout-minutes: 10
@@ -56,6 +62,9 @@ jobs:
           ./build.bat 1
       - name: Odin version
         run: ./odin version
+        timeout-minutes: 1
+      - name: Odin report
+        run: ./odin report
         timeout-minutes: 1
       - name: Odin check
         shell: cmd

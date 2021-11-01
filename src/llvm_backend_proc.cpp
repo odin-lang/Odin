@@ -195,13 +195,19 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 			// then it is very likely it is required by LLVM and thus cannot have internal linkage
 			if (entity->pkg != nullptr && entity->pkg->kind == Package_Runtime && p->body != nullptr) {
 				GB_ASSERT(entity->kind == Entity_Procedure);
-				if (entity->Procedure.link_name != "") {
-					LLVMSetLinkage(p->value, LLVMExternalLinkage);
+				String link_name = entity->Procedure.link_name;
+				if (entity->flags & EntityFlag_CustomLinkName && 
+				    link_name != "") {
+					if (string_starts_with(link_name, str_lit("__"))) {
+						LLVMSetLinkage(p->value, LLVMExternalLinkage);
+					} else {
+						LLVMSetLinkage(p->value, LLVMInternalLinkage);
+					}
 				}
 			}
 		}
 	}
-
+	
 	if (p->is_foreign) {
 		if (is_arch_wasm()) {
 			char const *import_name = alloc_cstring(permanent_allocator(), p->name);
@@ -217,6 +223,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-module", module_name);
 		}
 	}
+	
 
 	// NOTE(bill): offset==0 is the return value
 	isize offset = 1;
@@ -1553,7 +1560,18 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			len = lb_emit_conv(p, len, t_int);
 
 			unsigned alignment = 1;
-			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment);
+			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment, false);
+			return {};
+		}
+	case BuiltinProc_mem_zero_volatile:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+			lbValue len = lb_build_expr(p, ce->args[1]);
+			ptr = lb_emit_conv(p, ptr, t_rawptr);
+			len = lb_emit_conv(p, len, t_int);
+
+			unsigned alignment = 1;
+			lb_mem_zero_ptr_internal(p, ptr.value, len.value, alignment, true);
 			return {};
 		}
 
