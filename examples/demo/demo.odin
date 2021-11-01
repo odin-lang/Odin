@@ -2439,7 +2439,16 @@ main :: proc() {
 		deprecated_attribute()
 		range_statements_with_multiple_return_values()
 		threading_example()
-		soa_struct_layout()
+
+		when !ODIN_DEBUG {
+			/*
+				This test causes the following error when compiled with -`debug`:
+					`Kernel32.lib(KERNEL32.dll) : fatal error LNK1103: debugging information corrupt; recompile module`
+				Only compile when not running under debug for now to not hold up CI for other commits.
+			*/
+			soa_struct_layout()
+		}
+
 		constant_literal_expressions()
 		union_maybe()
 		explicit_context_definition()
