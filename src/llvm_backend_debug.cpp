@@ -547,6 +547,7 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		case Type_SimdVector:
 		case Type_RelativePointer:
 		case Type_RelativeSlice:
+		case Type_Matrix:
 			{
 				LLVMMetadataRef debug_bt = lb_debug_type(m, bt);
 				LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, debug_bt, name_text, name_len, file, line, scope, align_in_bits);
