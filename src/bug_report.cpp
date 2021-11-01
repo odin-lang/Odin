@@ -39,6 +39,10 @@ void report_windows_product_type(DWORD ProductType) {
 		gb_printf("Enterprise");
 		break;
 
+	case PRODUCT_CORE:
+		gb_printf("Home Basic");
+		break;
+
 	case PRODUCT_HOME_BASIC_N:
 		gb_printf("Home Basic N");
 		break;
