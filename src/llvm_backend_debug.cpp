@@ -684,6 +684,9 @@ void lb_debug_complete_types(lbModule *m) {
 					}
 					element_count = cast(unsigned)(bt->Struct.fields.count + element_offset);
 					elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
+					
+					isize field_size_bits = 8*type_size_of(bt) - element_offset*word_bits;
+					
 					switch (bt->Struct.soa_kind) {
 					case StructSoa_Slice:
 						elements[0] = LLVMDIBuilderCreateMemberType(
@@ -691,7 +694,7 @@ void lb_debug_complete_types(lbModule *m) {
 							".len", 4,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							8*type_size_of(bt)-word_bits,
+							field_size_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_int)
 						);
 						break;
@@ -701,7 +704,7 @@ void lb_debug_complete_types(lbModule *m) {
 							".len", 4,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							8*type_size_of(bt)-word_bits + 0*word_bits,
+							field_size_bits + 0*word_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_int)
 						);
 						elements[1] = LLVMDIBuilderCreateMemberType(
@@ -709,15 +712,15 @@ void lb_debug_complete_types(lbModule *m) {
 							".cap", 4,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							8*type_size_of(bt)-word_bits + 1*word_bits,
+							field_size_bits + 1*word_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_int)
 						);
 						elements[2] = LLVMDIBuilderCreateMemberType(
 							m->debug_builder, record_scope,
-							".allocator", 12,
+							".allocator", 10,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							8*type_size_of(bt)-word_bits + 2*word_bits,
+							field_size_bits + 2*word_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_allocator)
 						);
 						break;
