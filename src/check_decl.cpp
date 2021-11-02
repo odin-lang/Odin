@@ -594,7 +594,7 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	return true;
 }
 
-void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
+Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 	Ast *ident = nullptr;
 	Entity **foreign_library = nullptr;
 
@@ -608,7 +608,7 @@ void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 		foreign_library = &e->Variable.foreign_library;
 		break;
 	default:
-		return;
+		return nullptr;
 	}
 
 	if (ident == nullptr) {
@@ -631,8 +631,10 @@ void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 			*foreign_library = found;
 			found->flags |= EntityFlag_Used;
 			add_entity_use(ctx, ident, found);
+			return found;
 		}
 	}
+	return nullptr;
 }
 
 String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix) {
@@ -836,10 +838,26 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		if (e->Procedure.link_name.len > 0) {
 			name = e->Procedure.link_name;
 		}
+		Entity *foreign_library = init_entity_foreign_library(ctx, e);
+		
+		if (is_arch_wasm()) {
+			String module_name = str_lit("env");
+			if (foreign_library != nullptr) {
+				GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+				if (foreign_library->LibraryName.paths.count != 1) {
+					error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td", 
+					      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+				}
+				
+				if (foreign_library->LibraryName.paths.count >= 1) {
+					module_name = foreign_library->LibraryName.paths[0];
+				}
+			}
+			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+		}
+		
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
-
-		init_entity_foreign_library(ctx, e);
 
 		mutex_lock(&ctx->info->foreign_mutex);
 
@@ -962,6 +980,9 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(ctx, e);
+		if (is_arch_wasm()) {
+			error(e->token, "A foreign variable declaration are not allowed for the '%.*s' architecture", LIT(target_arch_names[build_context.metrics.arch]));
+		}
 	}
 	if (ac.link_name.len > 0) {
 		e->Variable.link_name = ac.link_name;
