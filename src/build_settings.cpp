@@ -516,6 +516,8 @@ bool allow_check_foreign_filepath(void) {
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
+String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
+
 String internal_odin_root_dir(void);
 String odin_root_dir(void) {
 	if (global_module_path_set) {

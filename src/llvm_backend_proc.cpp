@@ -57,7 +57,6 @@ void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbVal
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
 
-
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
@@ -183,10 +182,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
 		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
 
-		if (is_arch_wasm()) {
-			char const *export_name = alloc_cstring(permanent_allocator(), p->name);
-			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
-		}
+		lb_set_wasm_export_attributes(p->value, p->name);
 	} else if (!p->is_foreign) {
 		if (!USE_SEPARATE_MODULES) {
 			LLVMSetLinkage(p->value, LLVMInternalLinkage);
@@ -209,19 +205,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	}
 	
 	if (p->is_foreign) {
-		if (is_arch_wasm()) {
-			char const *import_name = alloc_cstring(permanent_allocator(), p->name);
-			char const *module_name = "env";
-			if (entity->Procedure.foreign_library != nullptr) {
-				Entity *foreign_library = entity->Procedure.foreign_library;
-				GB_ASSERT(foreign_library->kind == Entity_LibraryName);
-				if (foreign_library->LibraryName.paths.count > 0)  {
-					module_name = alloc_cstring(permanent_allocator(), foreign_library->LibraryName.paths[0]);
-				}
-			}
-			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-name",   import_name);
-			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-module", module_name);
-		}
+		lb_set_wasm_import_attributes(p->value, entity, p->name);
 	}
 	
 
