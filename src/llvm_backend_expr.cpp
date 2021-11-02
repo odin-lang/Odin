@@ -4465,7 +4465,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 								lbCompoundLitElemTempData data = {};
 								data.value = value;
 								
-								data.elem_index = cast(i32)matrix_index_to_offset(bt, k);
+								data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, k);
 								array_add(&temp_data, data);
 							}
 
@@ -4479,7 +4479,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 							data.value = lb_emit_conv(p, value, et);
 							data.expr = fv->value;
 							
-							data.elem_index = cast(i32)matrix_index_to_offset(bt, index);
+							data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, index);
 							array_add(&temp_data, data);
 						}
 
@@ -4489,7 +4489,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						}
 						lbCompoundLitElemTempData data = {};
 						data.expr = elem;
-						data.elem_index = cast(i32)matrix_index_to_offset(bt, i);
+						data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, i);
 						array_add(&temp_data, data);
 					}
 				}
