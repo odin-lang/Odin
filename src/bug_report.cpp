@@ -47,6 +47,14 @@ void report_windows_product_type(DWORD ProductType) {
 		gb_printf("Home Basic N");
 		break;
 
+	case PRODUCT_EDUCATION:
+		gb_printf("Education");
+		break;
+
+	case PRODUCT_EDUCATION_N:
+		gb_printf("Education N");
+		break;
+
 	case PRODUCT_BUSINESS:
 		gb_printf("Business");
 		break;
