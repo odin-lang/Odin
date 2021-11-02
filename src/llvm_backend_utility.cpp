@@ -1770,3 +1770,36 @@ LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, Strin
 	#endif
 	);
 }
+
+
+void lb_set_wasm_import_attributes(LLVMValueRef value, Entity *entity, String import_name) {
+	if (!is_arch_wasm()) {
+		return;
+	}
+	String module_name = str_lit("env");
+	if (entity->Procedure.foreign_library != nullptr) {
+		Entity *foreign_library = entity->Procedure.foreign_library;
+		GB_ASSERT(foreign_library->kind == Entity_LibraryName);
+		GB_ASSERT(foreign_library->LibraryName.paths.count == 1);
+		
+		module_name = foreign_library->LibraryName.paths[0];
+		
+		if (string_starts_with(import_name, module_name)) {
+			import_name = substring(import_name, module_name.len+WASM_MODULE_NAME_SEPARATOR.len, import_name.len);
+		}
+		
+	}
+	LLVMAddTargetDependentFunctionAttr(value, "wasm-import-module", alloc_cstring(permanent_allocator(), module_name));
+	LLVMAddTargetDependentFunctionAttr(value, "wasm-import-name",   alloc_cstring(permanent_allocator(), import_name));
+}
+
+
+void lb_set_wasm_export_attributes(LLVMValueRef value, String export_name) {
+	if (!is_arch_wasm()) {
+		return;
+	}
+	LLVMSetLinkage(value, LLVMDLLExportLinkage);
+	LLVMSetDLLStorageClass(value, LLVMDLLExportStorageClass);
+	LLVMSetVisibility(value, LLVMDefaultVisibility);
+	LLVMAddTargetDependentFunctionAttr(value, "wasm-export-name",   alloc_cstring(permanent_allocator(), export_name));
+}

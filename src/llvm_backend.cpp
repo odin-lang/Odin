@@ -895,15 +895,9 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	lb_end_procedure_body(p);
 	
 
+	LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	if (is_arch_wasm()) {
-		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
-		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
-		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
-		
-		char const *export_name = alloc_cstring(permanent_allocator(), p->name);
-		LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
-	} else {
-		LLVMSetLinkage(p->value, LLVMExternalLinkage);
+		lb_set_wasm_export_attributes(p->value, p->name);
 	}
 	
 
@@ -1489,6 +1483,8 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
+			
+			lb_set_wasm_import_attributes(g.value, e, name);
 		} else {
 			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
 		}
