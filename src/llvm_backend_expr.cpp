@@ -1658,6 +1658,23 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 		return res;
 	}
+	
+	if (is_type_float(src) && is_type_complex(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbAddr gen = lb_add_local_generated(p, dst, false);
+		lbValue gp = lb_addr_get_ptr(p, gen);
+		lbValue real = lb_emit_conv(p, value, ft);
+		lb_emit_store(p, lb_emit_struct_ep(p, gp, 0), real);
+		return lb_addr_load(p, gen);
+	}
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbAddr gen = lb_add_local_generated(p, dst, false);
+		lbValue gp = lb_addr_get_ptr(p, gen);
+		lbValue real = lb_emit_conv(p, value, ft);
+		lb_emit_store(p, lb_emit_struct_ep(p, gp, 0), real);
+		return lb_addr_load(p, gen);
+	}
 
 	if (is_type_complex(src) && is_type_complex(dst)) {
 		Type *ft = base_complex_elem_type(dst);

@@ -2453,6 +2453,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		return true;
+	}
 	if (is_type_complex(src) && is_type_quaternion(dst)) {
 		return true;
 	}
