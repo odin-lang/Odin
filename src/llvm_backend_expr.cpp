@@ -671,7 +671,7 @@ lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type) {
 	for (i64 j = 0; j < column_count; j++) {
 		for (i64 i = 0; i < row_count; i++) {
 			lbValue src = lb_emit_matrix_ev(p, m, i, j);
-			lbValue dst = lb_emit_matrix_epi(p, res.addr, i, j);
+			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
 			lb_emit_store(p, dst, src);
 		}
 	}
