@@ -2692,7 +2692,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				if (!is_partial && t->EnumeratedArray.count > bt->Enum.fields.count) {
 					error(e, "Non-contiguous enumeration used as an index in an enumerated array");
 					long long ea_count   = cast(long long)t->EnumeratedArray.count;
-					long long enum_count = cast(long long)t->Enum.fields.count;
+					long long enum_count = cast(long long)bt->Enum.fields.count;
 					error_line("\tenumerated array length: %lld\n", ea_count);
 					error_line("\tenum field count: %lld\n", enum_count);
 					error_line("\tSuggestion: prepend #partial to the enumerated array to allow for non-named elements\n");
