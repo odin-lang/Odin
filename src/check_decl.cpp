@@ -1345,8 +1345,9 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				for_array(j, vd->names) {
 					Ast *name = vd->names[j];
 					if (!is_blank_ident(name)) {
-						GB_ASSERT(name->kind == Ast_Ident);
-						GB_ASSERT(name->Ident.entity != nullptr);
+						if (name->kind == Ast_Ident) {
+							GB_ASSERT(name->Ident.entity != nullptr);
+						}
 					}
 				}
 			}

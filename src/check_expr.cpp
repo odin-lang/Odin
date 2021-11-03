@@ -2453,6 +2453,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		return true;
+	}
 	if (is_type_complex(src) && is_type_quaternion(dst)) {
 		return true;
 	}
@@ -3660,8 +3663,11 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 				String lo_str = {};
 				String hi_str = {};
 				if (bt->Enum.fields.count > 0) {
-					lo_str = bt->Enum.fields[bt->Enum.min_value_index]->token.string;
-					hi_str = bt->Enum.fields[bt->Enum.max_value_index]->token.string;
+					isize lo_idx = gb_clamp(bt->Enum.min_value_index, 0, bt->Enum.fields.count - 1);
+					isize hi_idx = gb_clamp(bt->Enum.max_value_index, 0, bt->Enum.fields.count - 1);
+
+					lo_str = bt->Enum.fields[lo_idx]->token.string;
+					hi_str = bt->Enum.fields[hi_idx]->token.string;
 				}
 
 				bool out_of_bounds = false;

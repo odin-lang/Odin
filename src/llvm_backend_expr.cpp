@@ -671,7 +671,7 @@ lbValue lb_emit_matrix_flatten(lbProcedure *p, lbValue m, Type *type) {
 	for (i64 j = 0; j < column_count; j++) {
 		for (i64 i = 0; i < row_count; i++) {
 			lbValue src = lb_emit_matrix_ev(p, m, i, j);
-			lbValue dst = lb_emit_matrix_epi(p, res.addr, i, j);
+			lbValue dst = lb_emit_array_epi(p, res.addr, i + j*row_count);
 			lb_emit_store(p, dst, src);
 		}
 	}
@@ -1657,6 +1657,23 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			res.value = LLVMBuildFPTrunc(p->builder, value.value, lb_type(m, t), "");
 		}
 		return res;
+	}
+	
+	if (is_type_float(src) && is_type_complex(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbAddr gen = lb_add_local_generated(p, dst, false);
+		lbValue gp = lb_addr_get_ptr(p, gen);
+		lbValue real = lb_emit_conv(p, value, ft);
+		lb_emit_store(p, lb_emit_struct_ep(p, gp, 0), real);
+		return lb_addr_load(p, gen);
+	}
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbAddr gen = lb_add_local_generated(p, dst, false);
+		lbValue gp = lb_addr_get_ptr(p, gen);
+		lbValue real = lb_emit_conv(p, value, ft);
+		lb_emit_store(p, lb_emit_struct_ep(p, gp, 0), real);
+		return lb_addr_load(p, gen);
 	}
 
 	if (is_type_complex(src) && is_type_complex(dst)) {
@@ -4465,7 +4482,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 								lbCompoundLitElemTempData data = {};
 								data.value = value;
 								
-								data.elem_index = cast(i32)matrix_index_to_offset(bt, k);
+								data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, k);
 								array_add(&temp_data, data);
 							}
 
@@ -4479,7 +4496,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 							data.value = lb_emit_conv(p, value, et);
 							data.expr = fv->value;
 							
-							data.elem_index = cast(i32)matrix_index_to_offset(bt, index);
+							data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, index);
 							array_add(&temp_data, data);
 						}
 
@@ -4489,7 +4506,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						}
 						lbCompoundLitElemTempData data = {};
 						data.expr = elem;
-						data.elem_index = cast(i32)matrix_index_to_offset(bt, i);
+						data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, i);
 						array_add(&temp_data, data);
 					}
 				}

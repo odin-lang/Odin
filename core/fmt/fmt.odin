@@ -1927,27 +1927,28 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fi.indent += 1
 		
 		if fi.hash { 
+			// Printed as it is written
 			io.write_byte(fi.writer, '\n')
-			// TODO(bill): Should this render it like in written form? e.g. tranposed
-			for row in 0..<info.row_count {
+			for col in 0..<info.column_count {
 				fmt_write_indent(fi)
-				for col in 0..<info.column_count {
-					if col > 0 { io.write_string(fi.writer, ", ") }
+				for row in 0..<info.row_count {
+					if row > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := (row + col*info.elem_stride)*info.elem_size
+					offset := (col + row*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
 				}
-				io.write_string(fi.writer, ";\n")
+				io.write_string(fi.writer, ",\n")
 			}
 		} else {
-			for row in 0..<info.row_count {
-				if row > 0 { io.write_string(fi.writer, ", ") }
-				for col in 0..<info.column_count {
-					if col > 0 { io.write_string(fi.writer, "; ") }
+			// Printed in Row-Major layout to match text layout
+			for col in 0..<info.column_count {
+				if col > 0 { io.write_string(fi.writer, "; ") }
+				for row in 0..<info.row_count {
+					if row > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := (row + col*info.elem_stride)*info.elem_size
+					offset := (col + row*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)

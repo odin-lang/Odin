@@ -1013,7 +1013,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						TypeAndValue tav = fv->value->tav;
 						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
 						for (i64 k = lo; k < hi; k++) {
-							i64 offset = matrix_index_to_offset(type, k);
+							i64 offset = matrix_row_major_index_to_offset(type, k);
 							GB_ASSERT(values[offset] == nullptr);
 							values[offset] = val;
 						}
@@ -1023,7 +1023,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						i64 index = exact_value_to_i64(index_tav.value);
 						TypeAndValue tav = fv->value->tav;
 						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
-						i64 offset = matrix_index_to_offset(type, index);
+						i64 offset = matrix_row_major_index_to_offset(type, index);
 						GB_ASSERT(values[offset] == nullptr);
 						values[offset] = val;
 					}
@@ -1045,7 +1045,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				for_array(i, cl->elems) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					i64 offset = matrix_index_to_offset(type, i);
+					i64 offset = matrix_row_major_index_to_offset(type, i);
 					values[offset] = lb_const_value(m, elem_type, tav.value, allow_local).value;
 				}
 				for (isize i = 0; i < total_count; i++) {
