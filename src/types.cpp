@@ -1408,12 +1408,13 @@ i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_index) {
 	i64 stride_elems = matrix_type_stride_in_elems(t);
 	return stride_elems*column_index + row_index;
 }
-i64 matrix_index_to_offset(Type *t, i64 index) {
+
+i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	
-	i64 row_index    = index%t->Matrix.row_count;
-	i64 column_index = index/t->Matrix.row_count;
+	i64 column_index = index%t->Matrix.column_count;
+	i64 row_index    = index/t->Matrix.column_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
 }
 
