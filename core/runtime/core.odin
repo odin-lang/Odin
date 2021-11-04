@@ -506,8 +506,10 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 	c.temp_allocator.procedure = default_temp_allocator_proc
 	c.temp_allocator.data = &global_default_temp_allocator_data
-
-	c.assertion_failure_proc = default_assertion_failure_proc
+	
+	when !ODIN_DISABLE_ASSERT {
+		c.assertion_failure_proc = default_assertion_failure_proc
+	}
 
 	c.logger.procedure = default_logger_proc
 	c.logger.data = nil

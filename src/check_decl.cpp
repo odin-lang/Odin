@@ -730,7 +730,6 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	if (ac.set_cold) {
 		e->flags |= EntityFlag_Cold;
 	}
-
 	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
 
 
@@ -760,6 +759,22 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	bool is_foreign = e->Procedure.is_foreign;
 	bool is_export  = e->Procedure.is_export;
+	
+	if (ac.linkage.len != 0) {
+		     if (ac.linkage == "internal")  { e->flags |= EntityFlag_CustomLinkage_Internal; }
+		else if (ac.linkage == "strong")    { e->flags |= EntityFlag_CustomLinkage_Strong;   }
+		else if (ac.linkage == "weak")      { e->flags |= EntityFlag_CustomLinkage_Weak;     }
+		else if (ac.linkage == "link_once") { e->flags |= EntityFlag_CustomLinkage_LinkOnce; }
+		
+		if (is_foreign && (e->flags & EntityFlag_CustomLinkage_Internal)) {
+			error(e->token, "A foreign procedure may not have an \"internal\" linkage");
+		}
+	}
+
+	if (ac.require_declaration) {
+		e->flags |= EntityFlag_Require;
+	}
+
 
 	if (e->pkg != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -943,6 +958,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 
 	if (ac.require_declaration) {
+		e->flags |= EntityFlag_Require;
 		mpmc_enqueue(&ctx->info->required_global_variable_queue, e);
 	}
 

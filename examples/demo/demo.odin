@@ -2339,10 +2339,18 @@ matrix_type :: proc() {
 		m4 := mat4(m2)
 		assert(m4[2, 2] == 1)
 		assert(m4[3, 3] == 1)
-		fmt.println("m2", m2)
+		fmt.printf("m2 %#v\n", m2)
 		fmt.println("m4", m4)
 		fmt.println("mat2(m4)", mat2(m4))
 		assert(mat2(m4) == m2)
+		
+		b4 := mat4{
+			1, 2, 0, 0,
+			3, 4, 0, 0,
+			5, 0, 6, 0,
+			0, 7, 0, 8,
+		}
+		fmt.println("b4", matrix_flatten(b4))
 	}
 	
 	{ // Casting non-square matrices

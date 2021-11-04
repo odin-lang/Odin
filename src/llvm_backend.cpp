@@ -785,7 +785,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
 		call_cleanup = false;
-	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
+	} else if (build_context.metrics.os == TargetOs_windows && (build_context.metrics.arch == TargetArch_386 || build_context.no_crt)) {
 		name = str_lit("mainCRTStartup");
 	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
@@ -1498,6 +1498,8 @@ void lb_generate_code(lbGenerator *gen) {
 				LLVMSetLinkage(g.value, LLVMInternalLinkage);
 			}
 		}
+		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+		
 		if (e->Variable.link_section.len > 0) {
 			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
 		}
@@ -1675,7 +1677,7 @@ void lb_generate_code(lbGenerator *gen) {
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
 		
-		lb_run_remove_unused_function_pass(m->mod);
+		lb_run_remove_unused_function_pass(m);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;

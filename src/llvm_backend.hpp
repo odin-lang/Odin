@@ -606,3 +606,5 @@ char const *llvm_linkage_strings[] = {
 	"linker private linkage",
 	"linker private weak linkage"
 };
+
+#define ODIN_METADATA_REQUIRE "odin-metadata-require", 21
