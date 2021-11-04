@@ -26,6 +26,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		
 	}
 } else when ODIN_NO_CRT {
+	@(export)
 	@(link_name="memset")
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 		if ptr != nil && len != 0 {
@@ -38,6 +39,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		return ptr
 	}
 	
+	@(export)
 	@(link_name="memmove")
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
@@ -50,6 +52,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		return dst
 		
 	}
+	@(export)
 	@(link_name="memcpy")
 	memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
