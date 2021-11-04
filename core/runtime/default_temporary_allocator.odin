@@ -3,21 +3,14 @@ package runtime
 DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 1<<22)
 
 
-when ODIN_OS == "freestanding" {
-	Default_Temp_Allocator :: struct {
-	}
+when ODIN_OS == "freestanding" || ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+	Default_Temp_Allocator :: struct {}
 	
-	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {
-	}
+	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {}
 	
-	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {
-	}
+	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {}
 	
-	default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-	                                    size, alignment: int,
-	                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
-		return nil, nil		
-	}
+	default_temp_allocator_proc :: nil_allocator_proc
 } else {
 	Default_Temp_Allocator :: struct {
 		data:               []byte,
