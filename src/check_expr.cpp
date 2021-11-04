@@ -659,8 +659,8 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 	
 	if (is_type_matrix(dst)) {
-		Type *elem = base_array_type(dst);
-		i64 distance = check_distance_between_types(c, operand, elem);
+		Type *dst_elem = base_array_type(dst);
+		i64 distance = check_distance_between_types(c, operand, dst_elem);
 		if (distance >= 0) {
 			return distance + 7;
 		}
@@ -2467,7 +2467,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_matrix(src) && is_type_matrix(dst)) {
 		GB_ASSERT(src->kind == Type_Matrix);
 		GB_ASSERT(dst->kind == Type_Matrix);
-		if (!are_types_identical(src->Matrix.elem, dst->Matrix.elem)) {
+		Operand op = *operand;
+		op.type = src->Matrix.elem;
+		if (!check_is_castable_to(c, &op, dst->Matrix.elem)) {
 			return false;
 		}
 		
@@ -2477,11 +2479,7 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 			return src_count == dst_count;
 		}
 		
-		if (dst->Matrix.row_count != dst->Matrix.column_count) {
-			return false;
-		}
-		
-		return true;
+		return is_matrix_square(dst) && is_matrix_square(src);
 	}
 
 
