@@ -783,6 +783,7 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
 	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
 	add_global_bool_constant("ODIN_NO_CRT",                   bc->no_crt);
+	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",     bc->use_separate_modules);
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 
 
@@ -1388,7 +1389,9 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 					return false;
 				} else if (name == "init") {
 					return false;
-				}
+				} else if (name == "linkage") {
+					return false;
+				} 
 			}
 		}
 	}
@@ -2658,6 +2661,32 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			return false;
 		}
 		return true;
+	} else if (name == "linkage") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(value, "Expected either a string 'linkage'");
+			return false;
+		}
+		String linkage = ev.value_string;
+		if (linkage == "internal" ||
+		    linkage == "strong" ||
+		    linkage == "weak" ||
+		    linkage == "link_once") {
+			ac->linkage = linkage;
+		} else {
+			error(elem, "Invalid linkage '%.*s'. Valid kinds:", LIT(linkage));
+			error_line("\tinternal\n");
+			error_line("\tstrong\n");
+			error_line("\tweak\n");
+			error_line("\tlink_once\n");
+		}
+		return true;
+	} else if (name == "require") {
+		if (value != nullptr) {
+			error(elem, "'require' does not have any parameters");
+		}
+		ac->require_declaration = true;
+		return true;
 	} else if (name == "init") {
 		if (value != nullptr) {
 			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
@@ -2894,7 +2923,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 
 	if (name == "require") {
 		if (value != nullptr) {
-			error(elem, "'static' does not have any parameters");
+			error(elem, "'require' does not have any parameters");
 		}
 		ac->require_declaration = true;
 		return true;
@@ -2910,6 +2939,26 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		if (ac->thread_local_model != "") {
 			error(elem, "An exported variable cannot be thread local");
+		}
+		return true;
+	} else if (name == "linkage") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(value, "Expected either a string 'linkage'");
+			return false;
+		}
+		String linkage = ev.value_string;
+		if (linkage == "internal" ||
+		    linkage == "strong" ||
+		    linkage == "weak" ||
+		    linkage == "link_once") {
+			ac->linkage = linkage;
+		} else {
+			error(elem, "Invalid linkage '%.*s'. Valid kinds:", LIT(linkage));
+			error_line("\tinternal\n");
+			error_line("\tstrong\n");
+			error_line("\tweak\n");
+			error_line("\tlink_once\n");
 		}
 		return true;
 	} else if (name == "link_name") {
@@ -3959,6 +4008,8 @@ DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 	if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
+		} else if (name == "force") {
+			warning(elem, "'force' is deprecated and is identical to 'require'");
 		}
 		ac->require_declaration = true;
 		return true;

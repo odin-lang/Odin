@@ -102,6 +102,7 @@ struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
 	String  link_section;
+	String  linkage;
 	isize   init_expr_list_count;
 	String  thread_local_model;
 	String  deprecated_message;

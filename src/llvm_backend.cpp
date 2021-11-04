@@ -1498,6 +1498,8 @@ void lb_generate_code(lbGenerator *gen) {
 				LLVMSetLinkage(g.value, LLVMInternalLinkage);
 			}
 		}
+		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+		
 		if (e->Variable.link_section.len > 0) {
 			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
 		}
@@ -1675,7 +1677,7 @@ void lb_generate_code(lbGenerator *gen) {
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
 		
-		lb_run_remove_unused_function_pass(m->mod);
+		lb_run_remove_unused_function_pass(m);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;
