@@ -823,6 +823,7 @@ dot :: proc{
 	dot_uvec3,
 	dot_uvec4,
 	dot_quat,
+	dot_dquat,
 }
 dot_i32  :: proc "c" (a, b: i32)  -> i32 { return a*b }
 dot_u32  :: proc "c" (a, b: u32)  -> u32 { return a*b }
@@ -841,6 +842,7 @@ dot_uvec2 :: proc "c" (a, b: uvec2) -> u32 { return a.x*b.x + a.y*b.y }
 dot_uvec3 :: proc "c" (a, b: uvec3) -> u32 { return a.x*b.x + a.y*b.y + a.z*b.z }
 dot_uvec4 :: proc "c" (a, b: uvec4) -> u32 { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w }
 dot_quat :: proc "c" (a, b: quat) -> f32 { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w }
+dot_dquat :: proc "c" (a, b: dquat) -> f64 { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w }
 
 length :: proc{
 	length_f32,
@@ -1428,112 +1430,6 @@ mat4FromQuat :: proc "c" (q: quat) -> (m: mat4) {
 	return
 }
 
-quatAxisAngle :: proc "c" (axis: vec3, radians: f32) -> (q: quat) {
-	t := radians*0.5
-	v := normalize(axis) * sin(t)
-	q.x = v.x
-	q.y = v.y
-	q.z = v.z
-	q.w = cos(t)
-	return
-}
-dquatot :: proc "c" (a, b: quat) -> f32 {
-	return dot(transmute(vec4)a, transmute(vec4)b)
-}
-quatNlerp :: proc "c" (a, b: quat, t: f32) -> (c: quat) {
-	c.x = a.x + (b.x-a.x)*t
-	c.y = a.y + (b.y-a.y)*t
-	c.z = a.z + (b.z-a.z)*t
-	c.w = a.w + (b.w-a.w)*t
-	return c/builtin.abs(c)
-}
-
-quatSlerp :: proc "c" (x, y: quat, t: f32) -> (q: quat) {
-	a, b := x, y
-	cos_angle := dquatot(a, b)
-	if cos_angle < 0 {
-		b = -b
-		cos_angle = -cos_angle
-	}
-	if cos_angle > 1 - F32_EPSILON {
-		q.x = a.x + (b.x-a.x)*t
-		q.y = a.y + (b.y-a.y)*t
-		q.z = a.z + (b.z-a.z)*t
-		q.w = a.w + (b.w-a.w)*t
-		return
-	}
-
-	angle := acos(cos_angle)
-	sin_angle := sin(angle)
-	factor_a := sin((1-t) * angle) / sin_angle
-	factor_b := sin(t * angle)     / sin_angle
-
-	q.x = factor_a * a.x + factor_b * b.x
-	q.y = factor_a * a.y + factor_b * b.y
-	q.z = factor_a * a.z + factor_b * b.z
-	q.w = factor_a * a.w + factor_b * b.w
-	return
-}
-quatFromMat3 :: proc "c" (m: mat3) -> (q: quat) {
-	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
-	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
-	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
-	four_w_squared_minus_1 := m[0, 0] + m[1, 1] + m[2, 2]
-
-	biggest_index := 0
-	four_biggest_squared_minus_1 := four_w_squared_minus_1
-	if four_x_squared_minus_1 > four_biggest_squared_minus_1 {
-		four_biggest_squared_minus_1 = four_x_squared_minus_1
-		biggest_index = 1
-	}
-	if four_y_squared_minus_1 > four_biggest_squared_minus_1 {
-		four_biggest_squared_minus_1 = four_y_squared_minus_1
-		biggest_index = 2
-	}
-	if four_z_squared_minus_1 > four_biggest_squared_minus_1 {
-		four_biggest_squared_minus_1 = four_z_squared_minus_1
-		biggest_index = 3
-	}
-
-	biggest_val := sqrt(four_biggest_squared_minus_1 + 1) * 0.5
-	mult := 0.25 / biggest_val
-
-	q = 1
-	switch biggest_index {
-	case 0:
-		q.w = biggest_val
-		q.x = (m[2, 1] - m[1, 2]) * mult
-		q.y = (m[0, 2] - m[2, 0]) * mult
-		q.z = (m[1, 0] - m[0, 1]) * mult
-	case 1:
-		q.w = (m[2, 1] - m[1, 2]) * mult
-		q.x = biggest_val
-		q.y = (m[1, 0] + m[0, 1]) * mult
-		q.z = (m[0, 2] + m[2, 0]) * mult
-	case 2:
-		q.w = (m[0, 2] - m[2, 0]) * mult
-		q.x = (m[1, 0] + m[0, 1]) * mult
-		q.y = biggest_val
-		q.z = (m[2, 1] + m[1, 2]) * mult
-	case 3:
-		q.w = (m[1, 0] - m[0, 1]) * mult
-		q.x = (m[0, 2] + m[2, 0]) * mult
-		q.y = (m[2, 1] + m[1, 2]) * mult
-		q.z = biggest_val
-	}
-	return
-}
-quatFromMat4 :: proc "c" (m: mat4) -> (q: quat) {
-	return quatFromMat3(mat3(m))
-}
-
-quatMulVec3 :: proc "c" (q: quat, v: vec3) -> vec3 {
-	xyz := vec3{q.x, q.y, q.z}
-	t := cross(xyz, v)
-	return v + q.w*t + cross(xyz, t)
-}
-
-
 
 dmat4Perspective :: proc "c" (fovy, aspect, near, far: f64) -> (m: dmat4) {
 	tan_half_fovy := tan(0.5 * fovy)
@@ -1652,7 +1548,117 @@ dmat4FromDquat :: proc "c" (q: dquat) -> (m: dmat4) {
 	return
 }
 
+nlerp :: proc{
+	quatNlerp,
+	dquatNlerp,
+}
+slerp :: proc{
+	quatSlerp,
+	dquatSlerp,
+}
 
+
+quatAxisAngle :: proc "c" (axis: vec3, radians: f32) -> (q: quat) {
+	t := radians*0.5
+	v := normalize(axis) * sin(t)
+	q.x = v.x
+	q.y = v.y
+	q.z = v.z
+	q.w = cos(t)
+	return
+}
+quatNlerp :: proc "c" (a, b: quat, t: f32) -> (c: quat) {
+	c.x = a.x + (b.x-a.x)*t
+	c.y = a.y + (b.y-a.y)*t
+	c.z = a.z + (b.z-a.z)*t
+	c.w = a.w + (b.w-a.w)*t
+	return c/builtin.abs(c)
+}
+
+quatSlerp :: proc "c" (x, y: quat, t: f32) -> (q: quat) {
+	a, b := x, y
+	cos_angle := dot(a, b)
+	if cos_angle < 0 {
+		b = -b
+		cos_angle = -cos_angle
+	}
+	if cos_angle > 1 - F32_EPSILON {
+		q.x = a.x + (b.x-a.x)*t
+		q.y = a.y + (b.y-a.y)*t
+		q.z = a.z + (b.z-a.z)*t
+		q.w = a.w + (b.w-a.w)*t
+		return
+	}
+
+	angle := acos(cos_angle)
+	sin_angle := sin(angle)
+	factor_a := sin((1-t) * angle) / sin_angle
+	factor_b := sin(t * angle)     / sin_angle
+
+	q.x = factor_a * a.x + factor_b * b.x
+	q.y = factor_a * a.y + factor_b * b.y
+	q.z = factor_a * a.z + factor_b * b.z
+	q.w = factor_a * a.w + factor_b * b.w
+	return
+}
+quatFromMat3 :: proc "c" (m: mat3) -> (q: quat) {
+	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
+	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
+	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
+	four_w_squared_minus_1 := m[0, 0] + m[1, 1] + m[2, 2]
+
+	biggest_index := 0
+	four_biggest_squared_minus_1 := four_w_squared_minus_1
+	if four_x_squared_minus_1 > four_biggest_squared_minus_1 {
+		four_biggest_squared_minus_1 = four_x_squared_minus_1
+		biggest_index = 1
+	}
+	if four_y_squared_minus_1 > four_biggest_squared_minus_1 {
+		four_biggest_squared_minus_1 = four_y_squared_minus_1
+		biggest_index = 2
+	}
+	if four_z_squared_minus_1 > four_biggest_squared_minus_1 {
+		four_biggest_squared_minus_1 = four_z_squared_minus_1
+		biggest_index = 3
+	}
+
+	biggest_val := sqrt(four_biggest_squared_minus_1 + 1) * 0.5
+	mult := 0.25 / biggest_val
+
+	q = 1
+	switch biggest_index {
+	case 0:
+		q.w = biggest_val
+		q.x = (m[2, 1] - m[1, 2]) * mult
+		q.y = (m[0, 2] - m[2, 0]) * mult
+		q.z = (m[1, 0] - m[0, 1]) * mult
+	case 1:
+		q.w = (m[2, 1] - m[1, 2]) * mult
+		q.x = biggest_val
+		q.y = (m[1, 0] + m[0, 1]) * mult
+		q.z = (m[0, 2] + m[2, 0]) * mult
+	case 2:
+		q.w = (m[0, 2] - m[2, 0]) * mult
+		q.x = (m[1, 0] + m[0, 1]) * mult
+		q.y = biggest_val
+		q.z = (m[2, 1] + m[1, 2]) * mult
+	case 3:
+		q.w = (m[1, 0] - m[0, 1]) * mult
+		q.x = (m[0, 2] + m[2, 0]) * mult
+		q.y = (m[2, 1] + m[1, 2]) * mult
+		q.z = biggest_val
+	}
+	return
+}
+quatFromMat4 :: proc "c" (m: mat4) -> (q: quat) {
+	return quatFromMat3(mat3(m))
+}
+
+quatMulVec3 :: proc "c" (q: quat, v: vec3) -> vec3 {
+	xyz := vec3{q.x, q.y, q.z}
+	t := cross(xyz, v)
+	return v + q.w*t + cross(xyz, t)
+}
 
 dquatAxisAngle :: proc "c" (axis: dvec3, radians: f64) -> (q: dquat) {
 	t := radians*0.5
@@ -1662,9 +1668,6 @@ dquatAxisAngle :: proc "c" (axis: dvec3, radians: f64) -> (q: dquat) {
 	q.z = v.z
 	q.w = cos(t)
 	return
-}
-dquatDot :: proc "c" (a, b: dquat) -> f64 {
-	return dot(transmute(dvec4)a, transmute(dvec4)b)
 }
 dquatNlerp :: proc "c" (a, b: dquat, t: f64) -> (c: dquat) {
 	c.x = a.x + (b.x-a.x)*t
@@ -1676,12 +1679,12 @@ dquatNlerp :: proc "c" (a, b: dquat, t: f64) -> (c: dquat) {
 
 dquatSlerp :: proc "c" (x, y: dquat, t: f64) -> (q: dquat) {
 	a, b := x, y
-	cos_angle := dquatDot(a, b)
+	cos_angle := dot(a, b)
 	if cos_angle < 0 {
 		b = -b
 		cos_angle = -cos_angle
 	}
-	if cos_angle > 1 - F32_EPSILON {
+	if cos_angle > 1 - F64_EPSILON {
 		q.x = a.x + (b.x-a.x)*t
 		q.y = a.y + (b.y-a.y)*t
 		q.z = a.z + (b.z-a.z)*t
