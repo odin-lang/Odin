@@ -1,8 +1,7 @@
+// core:math/linalg/glsl implements a GLSL-like mathematics library plus numerous other utility procedures
 package math_linalg_glsl
 
 import "core:builtin"
-
-foreign import math "webgl_math"
 
 TAU          :: 6.28318530717958647692528676655900576
 PI           :: 3.14159265358979323846264338327950288
