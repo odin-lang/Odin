@@ -1185,7 +1185,7 @@ bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							if (str == "dll" || str == "shared") {
+							if (str == "dll" || str == "shared" || str == "dynamic") {
 								build_context.build_mode = BuildMode_DynamicLibrary;
 							} else if (str == "obj" || str == "object") {
 								build_context.build_mode = BuildMode_Object;

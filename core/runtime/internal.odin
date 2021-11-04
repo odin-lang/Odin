@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @(private)
-RUNTIME_LINKAGE :: "strong" when ODIN_USE_SEPARATE_MODULES else "internal"
+RUNTIME_LINKAGE :: "strong" when (ODIN_USE_SEPARATE_MODULES || ODIN_BUILD_MODE == "dynamic") else "internal"
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
