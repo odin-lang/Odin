@@ -357,14 +357,14 @@ void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
 }
 
 
-void lb_run_remove_unused_function_pass(LLVMModuleRef mod) {
+void lb_run_remove_unused_function_pass(lbModule *m) {
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
 	// Custom remove dead function pass
 	for (; pass_count < max_pass_count; pass_count++) {
 		bool was_dead_function = false;	
-		for (LLVMValueRef func = LLVMGetFirstFunction(mod);
+		for (LLVMValueRef func = LLVMGetFirstFunction(m->mod);
 		     func != nullptr;
 		     /**/
 		     ) {
@@ -382,30 +382,20 @@ void lb_run_remove_unused_function_pass(LLVMModuleRef mod) {
 				// Ignore for the time being
 				continue;
 			}
-			
-			if (name == "memset" ||
-			    name == "memmove" ||
-			    name == "memcpy") {
+			LLVMLinkage linkage = LLVMGetLinkage(curr_func);
+			if (linkage != LLVMInternalLinkage) {
 				continue;
 			}
-			if (is_arch_wasm()) {
-				if (name == "__ashlti3") {
-					LLVMSetLinkage(curr_func, LLVMExternalLinkage);
+			
+			Entity **found = map_get(&m->procedure_values, hash_pointer(curr_func));
+			if (found && *found) {
+				Entity *e = *found;
+				bool is_required = (e->flags & EntityFlag_Require) == EntityFlag_Require;
+				if (is_required) {
 					continue;
 				}
 			}
-			
-			LLVMLinkage linkage = LLVMGetLinkage(curr_func);
-						
-			switch (linkage) {
-			case LLVMExternalLinkage:
-			case LLVMDLLImportLinkage:
-			case LLVMDLLExportLinkage:
-			default:
-				continue;
-			case LLVMInternalLinkage:
-				break;
-			}
+
 			LLVMDeleteFunction(curr_func);
 			was_dead_function = true;
 			removal_count += 1;

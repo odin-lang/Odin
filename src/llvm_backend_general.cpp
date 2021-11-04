@@ -2692,3 +2692,16 @@ lbAddr lb_add_local_generated_temp(lbProcedure *p, Type *type, i64 min_alignment
 	lb_try_update_alignment(res.addr, cast(unsigned)min_alignment);
 	return res;
 }
+
+
+void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef value, u64 flags) {
+	if (flags & EntityFlag_CustomLinkage_Internal) {
+		LLVMSetLinkage(value, LLVMInternalLinkage);
+	} else if (flags & EntityFlag_CustomLinkage_Strong) {
+		LLVMSetLinkage(value, LLVMExternalLinkage);
+	} else if (flags & EntityFlag_CustomLinkage_Weak) {
+		LLVMSetLinkage(value, LLVMExternalWeakLinkage);
+	} else if (flags & EntityFlag_CustomLinkage_LinkOnce) {
+		LLVMSetLinkage(value, LLVMLinkOnceAnyLinkage);
+	}
+}

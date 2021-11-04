@@ -76,6 +76,12 @@ enum EntityFlag : u64 {
 	EntityFlag_Init          = 1ull<<31,
 	
 	EntityFlag_CustomLinkName = 1ull<<40,
+	EntityFlag_CustomLinkage_Internal = 1ull<<41,
+	EntityFlag_CustomLinkage_Strong   = 1ull<<42,
+	EntityFlag_CustomLinkage_Weak     = 1ull<<43,
+	EntityFlag_CustomLinkage_LinkOnce = 1ull<<44,
+	
+	EntityFlag_Require = 1ull<<50,
 
 	EntityFlag_Overridden    = 1ull<<63,
 };

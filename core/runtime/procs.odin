@@ -1,7 +1,7 @@
 package runtime
 
 when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
-	@(link_name="memset")
+	@(link_name="memset", require)
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 		if ptr != nil && len != 0 {
 			b := byte(val)
@@ -13,7 +13,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		return ptr
 	}
 	
-	@(link_name="memmove")
+	@(link_name="memmove", require)
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
@@ -26,8 +26,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		
 	}
 } else when ODIN_NO_CRT {
-	@(export)
-	@(link_name="memset")
+	@(link_name="memset", linkage=RUNTIME_LINKAGE, require)
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 		if ptr != nil && len != 0 {
 			b := byte(val)
@@ -39,8 +38,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		return ptr
 	}
 	
-	@(export)
-	@(link_name="memmove")
+	@(link_name="memmove", linkage=RUNTIME_LINKAGE, require)
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
@@ -52,8 +50,7 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" {
 		return dst
 		
 	}
-	@(export)
-	@(link_name="memcpy")
+	@(link_name="memcpy", linkage=RUNTIME_LINKAGE, require)
 	memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
