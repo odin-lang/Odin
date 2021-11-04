@@ -3,22 +3,23 @@ package math_linalg_glsl
 
 import "core:builtin"
 
-TAU          :: 6.28318530717958647692528676655900576
-PI           :: 3.14159265358979323846264338327950288
-E            :: 2.71828182845904523536
-τ :: TAU
-π :: PI
-e :: E
+TAU :: 6.28318530717958647692528676655900576
+PI  :: 3.14159265358979323846264338327950288
+E   :: 2.71828182845904523536
+τ   :: TAU
+π   :: PI
+e   :: E
 
-SQRT_TWO     :: 1.41421356237309504880168872420969808
-SQRT_THREE   :: 1.73205080756887729352744634150587236
-SQRT_FIVE    :: 2.23606797749978969640917366873127623
+SQRT_TWO   :: 1.41421356237309504880168872420969808
+SQRT_THREE :: 1.73205080756887729352744634150587236
+SQRT_FIVE  :: 2.23606797749978969640917366873127623
 
-LN2          :: 0.693147180559945309417232121458176568
-LN10         :: 2.30258509299404568401799145468436421
+LN2  :: 0.693147180559945309417232121458176568
+LN10 :: 2.30258509299404568401799145468436421
 
 F32_EPSILON :: 1e-7
 
+// Odin matrices are stored internally as Column-Major, which matches OpenGL/GLSL by default
 mat2 :: distinct matrix[2, 2]f32
 mat3 :: distinct matrix[3, 3]f32
 mat4 :: distinct matrix[4, 4]f32
@@ -26,7 +27,10 @@ mat2x2 :: mat2
 mat3x3 :: mat3
 mat4x4 :: mat4
 
-// Should this be renamed the other way around?
+// IMPORTANT NOTE: These data types are "backwards" in normal mathematical terms
+// but they match how GLSL and OpenGL defines them in name
+// Odin: matrix[R, C]f32 
+// GLSL: matCxR
 mat3x2 :: distinct matrix[2, 3]f32
 mat4x2 :: distinct matrix[2, 4]f32
 mat2x3 :: distinct matrix[3, 2]f32
