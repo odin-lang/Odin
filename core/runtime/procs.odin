@@ -38,11 +38,11 @@ when ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64" || (ODIN_NO_CRT && ODIN_OS !
 		
 	}
 } else when ODIN_NO_CRT && ODIN_OS == "windows" {
-	foreign import Kernel32 "system:Kernel32.lib"
+	foreign import lib "system:NtDll.lib"
 	
 	@(private="file")
 	@(default_calling_convention="std")
-	foreign Kernel32 {
+	foreign lib {
 		RtlMoveMemory :: proc(dst, src: rawptr, length: int) ---
 		RtlFillMemory :: proc(dst: rawptr, length: int, fill: i32) ---
 	}
