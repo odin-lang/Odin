@@ -30,6 +30,7 @@ import bits           "core:math/bits"
 import fixed          "core:math/fixed"
 import linalg         "core:math/linalg"
 import glm            "core:math/linalg/glsl"
+import hlm            "core:math/linalg/hlsl"
 import rand           "core:math/rand"
 import mem            "core:mem"
 import ast            "core:odin/ast"
@@ -86,6 +87,7 @@ _ :: bits
 _ :: fixed
 _ :: linalg
 _ :: glm
+_ :: hlm
 _ :: rand
 _ :: mem
 _ :: ast
