@@ -778,6 +778,8 @@ void init_universal(void) {
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+	
+	add_global_string_constant("ODIN_BUILD_MODE", bc->ODIN_BUILD_MODE);
 	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
 	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
