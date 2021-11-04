@@ -1790,16 +1790,24 @@ dquatMulDvec3 :: proc "c" (q: dquat, v: dvec3) -> dvec3 {
 
 
 
-inverse_mat2 :: proc "c" (m: mat2) -> mat2 { return builtin.inverse(m) }
-inverse_mat3 :: proc "c" (m: mat3) -> mat3 { return builtin.inverse(m) }
-inverse_mat4 :: proc "c" (m: mat4) -> mat4 { return builtin.inverse(m) }
-inverse_quat :: proc "c" (q: quat) -> quat { return 1/q }
+inverse_mat2  :: proc "c" (m: mat2)  -> mat2  { return builtin.inverse(m) }
+inverse_mat3  :: proc "c" (m: mat3)  -> mat3  { return builtin.inverse(m) }
+inverse_mat4  :: proc "c" (m: mat4)  -> mat4  { return builtin.inverse(m) }
+inverse_dmat2 :: proc "c" (m: dmat2) -> dmat2 { return builtin.inverse(m) }
+inverse_dmat3 :: proc "c" (m: dmat3) -> dmat3 { return builtin.inverse(m) }
+inverse_dmat4 :: proc "c" (m: dmat4) -> dmat4 { return builtin.inverse(m) }
+inverse_quat  :: proc "c" (q: quat)  -> quat  { return 1/q }
+inverse_dquat :: proc "c" (q: dquat) -> dquat { return 1/q }
 
 inverse :: proc{
 	inverse_mat2,
 	inverse_mat3,
 	inverse_mat4,
+	inverse_dmat2,
+	inverse_dmat3,
+	inverse_dmat4,
 	inverse_quat,
+	inverse_dquat,
 }
 
 transpose         :: builtin.transpose
