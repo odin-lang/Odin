@@ -782,6 +782,7 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
 	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);
 	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",      bc->no_dynamic_literals);
+	add_global_bool_constant("ODIN_NO_CRT",                   bc->no_crt);
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 
 
