@@ -1,4 +1,3 @@
-//+build !freestanding !wasm32
 package math_linalg_glsl
 
 import "core:math"
