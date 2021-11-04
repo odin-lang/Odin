@@ -6108,6 +6108,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		    name == "defined" || 
 		    name == "config" || 
 		    name == "load" ||
+		    name == "load_hash" ||
 		    name == "load_or"
 		) {
 			operand->mode = Addressing_Builtin;
@@ -6943,6 +6944,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			    name == "defined" ||
 			    name == "config" ||
 			    name == "load" ||
+			    name == "load_hash" ||
 			    name == "load_or"
 			) {
 				error(node, "'#%.*s' must be used as a call", LIT(name));
