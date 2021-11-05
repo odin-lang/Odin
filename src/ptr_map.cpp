@@ -14,10 +14,9 @@ template <typename K, typename V>
 struct PtrMapEntry {
 	static_assert(sizeof(K) == sizeof(void *), "Key size must be pointer size");
 	
-	u32      hash;
-	MapIndex next;
 	K        key;
 	V        value;
+	MapIndex next;
 };
 
 template <typename K, typename V>
@@ -27,14 +26,33 @@ struct PtrMap {
 };
 
 
-u32 ptr_map_hash_key(void const *key) {
-	// TODO(bill): Improve ptr_map_hash_key
-	return fnv32a(&key, gb_size_of(key));
-}
 u32 ptr_map_hash_key(uintptr key) {
+#if defined(GB_ARCH_64_BIT)
 	// TODO(bill): Improve ptr_map_hash_key
-	return fnv32a(&key, gb_size_of(key));
+	u32 key0 = (u32)(key & 0xffffffff);
+	u32 key1 = (u32)(key >> 32);
+
+	u32 word;
+	u32 state = 0;
+
+	state += key0 * 747796405u + 2891336453u;
+	word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+	state = (word >> 22u) ^ word;
+	state += key1 * 747796405u + 2891336453u;
+	word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+	state = (word >> 22u) ^ word;
+	return state;
+	
+#elif defined(GB_ARCH_32_BIT)
+	u32 state = ((u32)key) * 747796405u + 2891336453u;
+	u32 word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+	return (word >> 22u) ^ word;
+#endif
 }
+u32 ptr_map_hash_key(void const *key) {
+	return ptr_map_hash_key((uintptr)key);
+}
+
 
 template <typename K, typename V> void map_init             (PtrMap<K, V> *h, gbAllocator a, isize capacity = 16);
 template <typename K, typename V> void map_destroy          (PtrMap<K, V> *h);
@@ -77,7 +95,6 @@ gb_inline void map_destroy(PtrMap<K, V> *h) {
 template <typename K, typename V>
 gb_internal MapIndex map__add_entry(PtrMap<K, V> *h, K key) {
 	PtrMapEntry<K, V> e = {};
-	e.hash = ptr_map_hash_key(key);
 	e.key = key;
 	e.next = MAP_SENTINEL;
 	array_add(&h->entries, e);
@@ -109,7 +126,8 @@ gb_internal MapFindResult map__find_from_entry(PtrMap<K, V> *h, PtrMapEntry<K, V
 	if (h->hashes.count == 0) {
 		return fr;
 	}
-	fr.hash_index  = cast(MapIndex)(e->hash & (h->hashes.count-1));
+	u32 hash = ptr_map_hash_key(e->key);
+	fr.hash_index  = cast(MapIndex)(hash & (h->hashes.count-1));
 	fr.entry_index = h->hashes.data[fr.hash_index];
 	while (fr.entry_index != MAP_SENTINEL) {
 		if (&h->entries.data[fr.entry_index] == e) {
