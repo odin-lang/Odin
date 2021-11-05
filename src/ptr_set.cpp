@@ -30,6 +30,7 @@ template <typename T> void ptr_set_remove (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_clear  (PtrSet<T> *s);
 template <typename T> void ptr_set_grow   (PtrSet<T> *s);
 template <typename T> void ptr_set_rehash (PtrSet<T> *s, isize new_count);
+template <typename T> void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
 
 template <typename T>
@@ -79,6 +80,25 @@ gb_internal PtrSetFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
+gb_internal PtrSetFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> *e) {
+	PtrSetFindResult fr = {PTR_SET_SENTINEL, PTR_SET_SENTINEL, PTR_SET_SENTINEL};
+	if (s->hashes.count != 0) {
+		u64 hash = 0xcbf29ce484222325ull ^ cast(u64)cast(uintptr)e->ptr;
+		u64 n = cast(u64)s->hashes.count;
+		fr.hash_index = cast(PtrSetIndex)(hash & (n-1));
+		fr.entry_index = s->hashes.data[fr.hash_index];
+		while (fr.entry_index != PTR_SET_SENTINEL) {
+			if (&s->entries.data[fr.entry_index] == e) {
+				return fr;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = s->entries.data[fr.entry_index].next;
+		}
+	}
+	return fr;
+}
+
+template <typename T>
 gb_internal bool ptr_set__full(PtrSet<T> *s) {
 	return 0.75f * s->hashes.count <= s->entries.count;
 }
@@ -90,37 +110,38 @@ gb_inline void ptr_set_grow(PtrSet<T> *s) {
 }
 
 template <typename T>
-void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
-	isize i, j;
-	PtrSet<T> ns = {};
-	new_count = next_pow2_isize(new_count);
-	ns.hashes = s->hashes;
-	ns.entries.allocator = s->entries.allocator;
-	slice_resize(&ns.hashes, s->entries.allocator, new_count);
-	for (i = 0; i < new_count; i++) {
-		ns.hashes.data[i] = PTR_SET_SENTINEL;
+void ptr_set_reset_entries(PtrSet<T> *s) {
+	PtrSetIndex i;
+	for (i = 0; i < cast(PtrSetIndex)s->hashes.count; i++) {
+		s->hashes.data[i] = PTR_SET_SENTINEL;
 	}
-	array_reserve(&ns.entries, ARRAY_GROW_FORMULA(s->entries.count));
-	for (i = 0; i < s->entries.count; i++) {
-		PtrSetEntry<T> *e = &s->entries.data[i];
+	for (i = 0; i < cast(PtrSetIndex)s->entries.count; i++) {
 		PtrSetFindResult fr;
-		if (ns.hashes.count == 0) {
-			ptr_set_grow(&ns);
-		}
-		fr = ptr_set__find(&ns, e->ptr);
-		j = ptr_set__add_entry(&ns, e->ptr);
+		PtrSetEntry<T> *e = &s->entries.data[i];
+		e->next = PTR_SET_SENTINEL;
+		fr = ptr_set__find_from_entry(s, e);
 		if (fr.entry_prev == PTR_SET_SENTINEL) {
-			ns.hashes.data[fr.hash_index] = cast(PtrSetIndex)j;
+			s->hashes[fr.hash_index] = i;
 		} else {
-			ns.entries.data[fr.entry_prev].next = cast(PtrSetIndex)j;
-		}
-		ns.entries.data[j].next = fr.entry_index;
-		if (ptr_set__full(&ns)) {
-			ptr_set_grow(&ns);
+			s->entries[fr.entry_prev].next = i;
 		}
 	}
-	array_free(&s->entries);
-	*s = ns;
+}
+
+template <typename T>
+void ptr_set_reserve(PtrSet<T> *s, isize cap) {
+	array_reserve(&s->entries, cap);
+	if (s->entries.count*2 < s->hashes.count) {
+		return;
+	}
+	slice_resize(&s->hashes, s->entries.allocator, cap*2);
+	ptr_set_reset_entries(s);
+}
+
+
+template <typename T>
+void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
+	ptr_set_reserve(s, new_count);
 }
 
 template <typename T>
