@@ -406,13 +406,6 @@ gb_global AstPackage *intrinsics_pkg = nullptr;
 gb_global AstPackage *config_pkg      = nullptr;
 
 
-HashKey hash_node     (Ast *node)  { return hash_pointer(node); }
-HashKey hash_ast_file (AstFile *file)  { return hash_pointer(file); }
-HashKey hash_entity   (Entity *e)      { return hash_pointer(e); }
-HashKey hash_type     (Type *t)        { return hash_pointer(t); }
-HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
-
-
 // CheckerInfo API
 TypeAndValue type_and_value_of_expr (Ast *expr);
 Type *       type_of_expr           (Ast *expr);
