@@ -290,13 +290,13 @@ struct StringIntern {
 	char str[1];
 };
 
-Map<StringIntern *> string_intern_map = {}; // Key: u64
+PtrMap<uintptr, StringIntern *> string_intern_map = {}; // Key: u64
 gb_global Arena string_intern_arena = {};
 
 char const *string_intern(char const *text, isize len) {
 	u64 hash = gb_fnv64a(text, len);
-	u64 key = hash ? hash : 1;
-	StringIntern **found = map_get(&string_intern_map, hash_integer(key));
+	uintptr key = cast(uintptr)(hash ? hash : 1);
+	StringIntern **found = map_get(&string_intern_map, key);
 	if (found) {
 		for (StringIntern *it = *found; it != nullptr; it = it->next) {
 			if (it->len == len && gb_strncmp(it->str, (char *)text, len) == 0) {
@@ -310,7 +310,7 @@ char const *string_intern(char const *text, isize len) {
 	new_intern->next = found ? *found : nullptr;
 	gb_memmove(new_intern->str, text, len);
 	new_intern->str[len] = 0;
-	map_set(&string_intern_map, hash_integer(key), new_intern);
+	map_set(&string_intern_map, key, new_intern);
 	return new_intern->str;
 }
 
