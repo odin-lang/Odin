@@ -1,28 +1,11 @@
-// NOTE(bill): This util stuff is the same for every `Map`
-
-typedef u32 StringMapIndex;
-
-struct StringMapFindResult {
-	StringMapIndex hash_index;
-	StringMapIndex entry_prev;
-	StringMapIndex entry_index;
-};
-
-enum : StringMapIndex { STRING_MAP_SENTINEL = ~(StringMapIndex)0 };
-
-
 struct StringHashKey {
-	u64    hash;
+	u32    hash;
 	String string;
 };
 
-u64 string_hashing_proc(void const *data, isize len) {
-	return fnv64a(data, len);
-}
-
 gb_inline StringHashKey string_hash_string(String const &s) {
 	StringHashKey hash_key = {};
-	hash_key.hash = string_hashing_proc(s.text, s.len);
+	hash_key.hash = fnv32a(s.text, s.len);
 	hash_key.string = s;
 	return hash_key;
 }
@@ -40,14 +23,14 @@ bool operator!=(StringHashKey const &a, StringHashKey const &b) { return !string
 
 template <typename T>
 struct StringMapEntry {
-	StringHashKey  key;
-	StringMapIndex next;
-	T              value;
+	StringHashKey key;
+	MapIndex      next;
+	T             value;
 };
 
 template <typename T>
 struct StringMap {
-	Slice<StringMapIndex>     hashes;
+	Slice<MapIndex>           hashes;
 	Array<StringMapEntry<T> > entries;
 };
 
@@ -79,7 +62,7 @@ gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize capacity) {
 	slice_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
-		h->hashes.data[i] = STRING_MAP_SENTINEL;
+		h->hashes.data[i] = MAP_SENTINEL;
 	}
 }
 
@@ -90,21 +73,21 @@ gb_inline void string_map_destroy(StringMap<T> *h) {
 }
 
 template <typename T>
-gb_internal StringMapIndex string_map__add_entry(StringMap<T> *h, StringHashKey const &key) {
+gb_internal MapIndex string_map__add_entry(StringMap<T> *h, StringHashKey const &key) {
 	StringMapEntry<T> e = {};
 	e.key = key;
-	e.next = STRING_MAP_SENTINEL;
+	e.next = MAP_SENTINEL;
 	array_add(&h->entries, e);
-	return cast(StringMapIndex)(h->entries.count-1);
+	return cast(MapIndex)(h->entries.count-1);
 }
 
 template <typename T>
-gb_internal StringMapFindResult string_map__find(StringMap<T> *h, StringHashKey const &key) {
-	StringMapFindResult fr = {STRING_MAP_SENTINEL, STRING_MAP_SENTINEL, STRING_MAP_SENTINEL};
+gb_internal MapFindResult string_map__find(StringMap<T> *h, StringHashKey const &key) {
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (h->hashes.count != 0) {
-		fr.hash_index = cast(StringMapIndex)(key.hash & (h->hashes.count-1));
+		fr.hash_index = cast(MapIndex)(key.hash & (h->hashes.count-1));
 		fr.entry_index = h->hashes.data[fr.hash_index];
-		while (fr.entry_index != STRING_MAP_SENTINEL) {
+		while (fr.entry_index != MAP_SENTINEL) {
 			if (string_hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
 				return fr;
 			}
@@ -116,12 +99,12 @@ gb_internal StringMapFindResult string_map__find(StringMap<T> *h, StringHashKey 
 }
 
 template <typename T>
-gb_internal StringMapFindResult string_map__find_from_entry(StringMap<T> *h, StringMapEntry<T> *e) {
-	StringMapFindResult fr = {STRING_MAP_SENTINEL, STRING_MAP_SENTINEL, STRING_MAP_SENTINEL};
+gb_internal MapFindResult string_map__find_from_entry(StringMap<T> *h, StringMapEntry<T> *e) {
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (h->hashes.count != 0) {
-		fr.hash_index  = cast(StringMapIndex)(e->key.hash & (h->hashes.count-1));
+		fr.hash_index  = cast(MapIndex)(e->key.hash & (h->hashes.count-1));
 		fr.entry_index = h->hashes.data[fr.hash_index];
-		while (fr.entry_index != STRING_MAP_SENTINEL) {
+		while (fr.entry_index != MAP_SENTINEL) {
 			if (&h->entries.data[fr.entry_index] == e) {
 				return fr;
 			}
@@ -147,17 +130,17 @@ gb_inline void string_map_grow(StringMap<T> *h) {
 template <typename T>
 void string_map_reset_entries(StringMap<T> *h) {
 	for (isize i = 0; i < h->hashes.count; i++) {
-		h->hashes.data[i] = STRING_MAP_SENTINEL;
+		h->hashes.data[i] = MAP_SENTINEL;
 	}
 	for (isize i = 0; i < h->entries.count; i++) {
-		StringMapFindResult fr;
+		MapFindResult fr;
 		StringMapEntry<T> *e = &h->entries.data[i];
-		e->next = STRING_MAP_SENTINEL;
+		e->next = MAP_SENTINEL;
 		fr = string_map__find_from_entry(h, e);
-		if (fr.entry_prev == STRING_MAP_SENTINEL) {
-			h->hashes[fr.hash_index] = cast(StringMapIndex)i;
+		if (fr.entry_prev == MAP_SENTINEL) {
+			h->hashes[fr.hash_index] = cast(MapIndex)i;
 		} else {
-			h->entries[fr.entry_prev].next = cast(StringMapIndex)i;
+			h->entries[fr.entry_prev].next = cast(MapIndex)i;
 		}
 	}
 }
@@ -181,7 +164,7 @@ void string_map_rehash(StringMap<T> *h, isize new_count) {
 template <typename T>
 T *string_map_get(StringMap<T> *h, StringHashKey const &key) {
 	isize index = string_map__find(h, key).entry_index;
-	if (index != STRING_MAP_SENTINEL) {
+	if (index != MAP_SENTINEL) {
 		return &h->entries.data[index].value;
 	}
 	return nullptr;
@@ -200,7 +183,7 @@ gb_inline T *string_map_get(StringMap<T> *h, char const *key) {
 template <typename T>
 T &string_map_must_get(StringMap<T> *h, StringHashKey const &key) {
 	isize index = string_map__find(h, key).entry_index;
-	GB_ASSERT(index != STRING_MAP_SENTINEL);
+	GB_ASSERT(index != MAP_SENTINEL);
 	return h->entries.data[index].value;
 }
 
@@ -216,17 +199,17 @@ gb_inline T &string_map_must_get(StringMap<T> *h, char const *key) {
 
 template <typename T>
 void string_map_set(StringMap<T> *h, StringHashKey const &key, T const &value) {
-	StringMapIndex index;
-	StringMapFindResult fr;
+	MapIndex index;
+	MapFindResult fr;
 	if (h->hashes.count == 0) {
 		string_map_grow(h);
 	}
 	fr = string_map__find(h, key);
-	if (fr.entry_index != STRING_MAP_SENTINEL) {
+	if (fr.entry_index != MAP_SENTINEL) {
 		index = fr.entry_index;
 	} else {
 		index = string_map__add_entry(h, key);
-		if (fr.entry_prev != STRING_MAP_SENTINEL) {
+		if (fr.entry_prev != MAP_SENTINEL) {
 			h->entries.data[fr.entry_prev].next = index;
 		} else {
 			h->hashes.data[fr.hash_index] = index;
@@ -251,9 +234,9 @@ gb_inline void string_map_set(StringMap<T> *h, char const *key, T const &value) 
 
 
 template <typename T>
-void string_map__erase(StringMap<T> *h, StringMapFindResult const &fr) {
-	StringMapFindResult last;
-	if (fr.entry_prev == STRING_MAP_SENTINEL) {
+void string_map__erase(StringMap<T> *h, MapFindResult const &fr) {
+	MapFindResult last;
+	if (fr.entry_prev == MAP_SENTINEL) {
 		h->hashes.data[fr.hash_index] = h->entries.data[fr.entry_index].next;
 	} else {
 		h->entries.data[fr.entry_prev].next = h->entries.data[fr.entry_index].next;
@@ -264,7 +247,7 @@ void string_map__erase(StringMap<T> *h, StringMapFindResult const &fr) {
 	}
 	h->entries.data[fr.entry_index] = h->entries.data[h->entries.count-1];
 	last = string_map__find(h, h->entries.data[fr.entry_index].key);
-	if (last.entry_prev != STRING_MAP_SENTINEL) {
+	if (last.entry_prev != MAP_SENTINEL) {
 		h->entries.data[last.entry_prev].next = fr.entry_index;
 	} else {
 		h->hashes.data[last.hash_index] = fr.entry_index;
@@ -273,8 +256,8 @@ void string_map__erase(StringMap<T> *h, StringMapFindResult const &fr) {
 
 template <typename T>
 void string_map_remove(StringMap<T> *h, StringHashKey const &key) {
-	StringMapFindResult fr = string_map__find(h, key);
-	if (fr.entry_index != STRING_MAP_SENTINEL) {
+	MapFindResult fr = string_map__find(h, key);
+	if (fr.entry_index != MAP_SENTINEL) {
 		string_map__erase(h, fr);
 	}
 }
@@ -283,7 +266,7 @@ template <typename T>
 gb_inline void string_map_clear(StringMap<T> *h) {
 	array_clear(&h->entries);
 	for (isize i = 0; i < h->hashes.count; i++) {
-		h->hashes.data[i] = STRING_MAP_SENTINEL;
+		h->hashes.data[i] = MAP_SENTINEL;
 	}
 }
 

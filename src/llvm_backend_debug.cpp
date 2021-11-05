@@ -2,7 +2,7 @@ LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
 	if (key == nullptr) {
 		return nullptr;
 	}
-	auto found = map_get(&m->debug_values, hash_pointer(key));
+	auto found = map_get(&m->debug_values, key);
 	if (found) {
 		return *found;
 	}
@@ -10,7 +10,7 @@ LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
 }
 void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef value) {
 	if (key != nullptr) {
-		map_set(&m->debug_values, hash_pointer(key), value);
+		map_set(&m->debug_values, key, value);
 	}
 }
 

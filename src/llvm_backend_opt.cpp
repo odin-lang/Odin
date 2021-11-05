@@ -387,7 +387,7 @@ void lb_run_remove_unused_function_pass(lbModule *m) {
 				continue;
 			}
 			
-			Entity **found = map_get(&m->procedure_values, hash_pointer(curr_func));
+			Entity **found = map_get(&m->procedure_values, curr_func);
 			if (found && *found) {
 				Entity *e = *found;
 				bool is_required = (e->flags & EntityFlag_Require) == EntityFlag_Require;

@@ -228,7 +228,7 @@ Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type,
 	mutex_lock(&ctx->info->gen_types_mutex);
 	defer (mutex_unlock(&ctx->info->gen_types_mutex));
 
-	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
+	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
 	if (found_gen_types != nullptr) {
 		// GB_ASSERT_MSG(ordered_operands.count >= param_count, "%td >= %td", ordered_operands.count, param_count);
 
@@ -311,13 +311,13 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 	named_type->Named.type_name = e;
 
 	mutex_lock(&ctx->info->gen_types_mutex);
-	auto *found_gen_types = map_get(&ctx->info->gen_types, hash_pointer(original_type));
+	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
 	if (found_gen_types) {
 		array_add(found_gen_types, e);
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, e);
-		map_set(&ctx->info->gen_types, hash_pointer(original_type), array);
+		map_set(&ctx->info->gen_types, original_type, array);
 	}
 	mutex_unlock(&ctx->info->gen_types_mutex);
 }
