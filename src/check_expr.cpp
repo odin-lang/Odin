@@ -314,7 +314,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 		return false;
 	}
 
-	auto *found_gen_procs = map_get(&info->gen_procs, hash_pointer(base_entity->identifier));
+	auto *found_gen_procs = map_get(&info->gen_procs, base_entity->identifier.load());
 	if (found_gen_procs) {
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
@@ -423,7 +423,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, entity);
-		map_set(&info->gen_procs, hash_pointer(base_entity->identifier), array);
+		map_set(&info->gen_procs, base_entity->identifier.load(), array);
 	}
 
 	if (poly_proc_data) {

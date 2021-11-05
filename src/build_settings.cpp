@@ -244,7 +244,7 @@ struct BuildContext {
 	gbAffinity affinity;
 	isize      thread_count;
 
-	Map<ExactValue> defined_values; // Key:
+	PtrMap<char const *, ExactValue> defined_values;
 };
 
 
