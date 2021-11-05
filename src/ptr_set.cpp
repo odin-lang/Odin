@@ -94,7 +94,7 @@ gb_internal bool ptr_set__full(PtrSet<T> *s) {
 
 template <typename T>
 gb_inline void ptr_set_grow(PtrSet<T> *s) {
-	isize new_count = s->hashes.count*2;
+	isize new_count = gb_max(s->hashes.count<<1, 16);
 	ptr_set_rehash(s, new_count);
 }
 

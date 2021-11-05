@@ -5,7 +5,7 @@ struct StringSetEntry {
 };
 
 struct StringSet {
-	Array<MapIndex>       hashes;
+	Slice<MapIndex>       hashes;
 	Array<StringSetEntry> entries;
 };
 
@@ -21,13 +21,18 @@ void string_set_rehash (StringSet *s, isize new_count);
 
 
 gb_inline void string_set_init(StringSet *s, gbAllocator a, isize capacity) {
-	array_init(&s->hashes,  a);
-	array_init(&s->entries, a);
+	capacity = next_pow2_isize(gb_max(16, capacity));
+	
+	slice_init(&s->hashes,  a, capacity);
+	array_init(&s->entries, a, 0, capacity);
+	for (isize i = 0; i < capacity; i++) {
+		s->hashes.data[i] = MAP_SENTINEL;
+	}
 }
 
 gb_inline void string_set_destroy(StringSet *s) {
+	slice_free(&s->hashes, s->entries.allocator);
 	array_free(&s->entries);
-	array_free(&s->hashes);
 }
 
 gb_internal MapIndex string_set__add_entry(StringSet *s, StringHashKey const &key) {
@@ -42,7 +47,6 @@ gb_internal MapIndex string_set__add_entry(StringSet *s, StringHashKey const &ke
 gb_internal MapFindResult string_set__find(StringSet *s, StringHashKey const &key) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (s->hashes.count > 0) {
-		// fr.hash_index  = u128_to_i64(key.key % u128_from_i64(s->hashes.count));
 		fr.hash_index = cast(MapIndex)(((u64)key.hash) % s->hashes.count);
 		fr.entry_index = s->hashes[fr.hash_index];
 		while (fr.entry_index != MAP_SENTINEL) {
@@ -56,47 +60,62 @@ gb_internal MapFindResult string_set__find(StringSet *s, StringHashKey const &ke
 	}
 	return fr;
 }
+gb_internal MapFindResult string_set__find_from_entry(StringSet *s, StringSetEntry *e) {
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
+	if (s->hashes.count > 0) {
+		fr.hash_index = cast(MapIndex)(e->hash % s->hashes.count);
+		fr.entry_index = s->hashes[fr.hash_index];
+		while (fr.entry_index != MAP_SENTINEL) {
+			if (&s->entries[fr.entry_index] == e) {
+				return fr;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = s->entries[fr.entry_index].next;
+		}
+	}
+	return fr;
+}
+
 
 gb_internal b32 string_set__full(StringSet *s) {
 	return 0.75f * s->hashes.count <= s->entries.count;
 }
 
 gb_inline void string_set_grow(StringSet *s) {
-	isize new_count = ARRAY_GROW_FORMULA(s->entries.count);
+	isize new_count = gb_max(s->hashes.count<<1, 16);
 	string_set_rehash(s, new_count);
 }
 
-void string_set_rehash(StringSet *s, isize new_count) {
-	isize i, j;
-	StringSet ns = {};
-	string_set_init(&ns, s->hashes.allocator);
-	array_resize(&ns.hashes, new_count);
-	array_reserve(&ns.entries, s->entries.count);
-	for (i = 0; i < new_count; i++) {
-		ns.hashes[i] = MAP_SENTINEL;
+
+void string_set_reset_entries(StringSet *s) {
+	for (isize i = 0; i < s->hashes.count; i++) {
+		s->hashes.data[i] = MAP_SENTINEL;
 	}
-	for (i = 0; i < s->entries.count; i++) {
-		StringSetEntry *e = &s->entries[i];
+	for (isize i = 0; i < s->entries.count; i++) {
 		MapFindResult fr;
-		if (ns.hashes.count == 0) {
-			string_set_grow(&ns);
-		}
-		StringHashKey key = {e->hash, e->value};
-		fr = string_set__find(&ns, key);
-		j = string_set__add_entry(&ns, key);
+		StringSetEntry *e = &s->entries.data[i];
+		e->next = MAP_SENTINEL;
+		fr = string_set__find_from_entry(s, e);
 		if (fr.entry_prev == MAP_SENTINEL) {
-			ns.hashes[fr.hash_index] = cast(MapIndex)j;
+			s->hashes[fr.hash_index] = cast(MapIndex)i;
 		} else {
-			ns.entries[fr.entry_prev].next = cast(MapIndex)j;
-		}
-		ns.entries[j].next = fr.entry_index;
-		ns.entries[j].value = e->value;
-		if (string_set__full(&ns)) {
-			string_set_grow(&ns);
+			s->entries[fr.entry_prev].next = cast(MapIndex)i;
 		}
 	}
-	string_set_destroy(s);
-	*s = ns;
+}
+
+void string_set_reserve(StringSet *s, isize cap) {
+	array_reserve(&s->entries, cap);
+	if (s->entries.count*2 < s->hashes.count) {
+		return;
+	}
+	slice_resize(&s->hashes, s->entries.allocator, cap*2);
+	string_set_reset_entries(s);
+}
+
+
+void string_set_rehash(StringSet *s, isize new_count) {
+	string_set_reserve(s, new_count);
 }
 
 gb_inline bool string_set_exists(StringSet *s, String const &str) {
