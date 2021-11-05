@@ -1109,7 +1109,7 @@ bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							HashKey key = hash_pointer(string_intern(name));
+							char const *key = string_intern(name);
 
 							if (map_get(&build_context.defined_values, key) != nullptr) {
 								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));

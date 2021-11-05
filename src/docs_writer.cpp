@@ -26,12 +26,10 @@ struct OdinDocWriter {
 
 	StringMap<OdinDocString> string_cache;
 
-	Map<OdinDocFileIndex>   file_cache;      // Key: AstFile *
-	Map<OdinDocPkgIndex>    pkg_cache;       // Key: AstPackage *
-	Map<OdinDocEntityIndex> entity_cache;    // Key: Entity *
-	Map<Entity *>           entity_id_cache; // Key: OdinDocEntityIndex
-	Map<OdinDocTypeIndex>   type_cache;      // Key: Type *
-	Map<Type *>             type_id_cache;   // Key: OdinDocTypeIndex
+	PtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
+	PtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
+	PtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
+	PtrMap<Type *,       OdinDocTypeIndex>   type_cache;
 
 	OdinDocWriterItemTracker<OdinDocFile>   files;
 	OdinDocWriterItemTracker<OdinDocPkg>    pkgs;
@@ -61,9 +59,7 @@ void odin_doc_writer_prepare(OdinDocWriter *w) {
 	map_init(&w->file_cache, a);
 	map_init(&w->pkg_cache, a);
 	map_init(&w->entity_cache, a);
-	map_init(&w->entity_id_cache, a);
 	map_init(&w->type_cache, a);
-	map_init(&w->type_id_cache, a);
 
 	odin_doc_writer_item_tracker_init(&w->files,    1);
 	odin_doc_writer_item_tracker_init(&w->pkgs,     1);
@@ -81,9 +77,7 @@ void odin_doc_writer_destroy(OdinDocWriter *w) {
 	map_destroy(&w->file_cache);
 	map_destroy(&w->pkg_cache);
 	map_destroy(&w->entity_cache);
-	map_destroy(&w->entity_id_cache);
 	map_destroy(&w->type_cache);
-	map_destroy(&w->type_id_cache);
 }
 
 
@@ -115,9 +109,7 @@ void odin_doc_writer_start_writing(OdinDocWriter *w) {
 	map_clear(&w->file_cache);
 	map_clear(&w->pkg_cache);
 	map_clear(&w->entity_cache);
-	map_clear(&w->entity_id_cache);
 	map_clear(&w->type_cache);
-	map_clear(&w->type_id_cache);
 
 	isize total_size = odin_doc_writer_calc_total_size(w);
 	total_size = align_formula_isize(total_size, 8);
@@ -267,7 +259,7 @@ OdinDocPosition odin_doc_token_pos_cast(OdinDocWriter *w, TokenPos const &pos) {
 	if (pos.file_id != 0) {
 		AstFile *file = get_ast_file_from_id(pos.file_id);
 		if (file != nullptr) {
-			OdinDocFileIndex *file_index_found = map_get(&w->file_cache, hash_pointer(file));
+			OdinDocFileIndex *file_index_found = map_get(&w->file_cache, file);
 			GB_ASSERT(file_index_found != nullptr);
 			file_index = *file_index_found;
 		}
@@ -483,16 +475,16 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	if (type == nullptr) {
 		return 0;
 	}
-	OdinDocTypeIndex *found = map_get(&w->type_cache, hash_pointer(type));
+	OdinDocTypeIndex *found = map_get(&w->type_cache, type);
 	if (found) {
 		return *found;
 	}
 	for_array(i, w->type_cache.entries) {
 		// NOTE(bill): THIS IS SLOW
-		Type *other = cast(Type *)cast(uintptr)w->type_cache.entries[i].key.key;
+		Type *other = w->type_cache.entries[i].key;
 		if (are_types_identical(type, other)) {
 			OdinDocTypeIndex index = w->type_cache.entries[i].value;
-			map_set(&w->type_cache, hash_pointer(type), index);
+			map_set(&w->type_cache, type, index);
 			return index;
 		}
 	}
@@ -502,8 +494,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	OdinDocType doc_type = {};
 	OdinDocTypeIndex type_index = 0;
 	type_index = odin_doc_write_item(w, &w->types, &doc_type, &dst);
-	map_set(&w->type_cache, hash_pointer(type), type_index);
-	map_set(&w->type_id_cache, hash_integer(type_index), type);
+	map_set(&w->type_cache, type, type_index);
 
 	switch (type->kind) {
 	case Type_Basic:
@@ -776,12 +767,12 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		return 0;
 	}
 
-	OdinDocEntityIndex *prev_index = map_get(&w->entity_cache, hash_pointer(e));
+	OdinDocEntityIndex *prev_index = map_get(&w->entity_cache, e);
 	if (prev_index) {
 		return *prev_index;
 	}
 
-	if (e->pkg != nullptr && map_get(&w->pkg_cache, hash_pointer(e->pkg)) == nullptr) {
+	if (e->pkg != nullptr && map_get(&w->pkg_cache, e->pkg) == nullptr) {
 		return 0;
 	}
 
@@ -789,8 +780,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 	OdinDocEntity* dst = nullptr;
 
 	OdinDocEntityIndex doc_entity_index = odin_doc_write_item(w, &w->entities, &doc_entity, &dst);
-	map_set(&w->entity_cache, hash_pointer(e), doc_entity_index);
-	map_set(&w->entity_id_cache, hash_integer(doc_entity_index), e);
+	map_set(&w->entity_cache, e, doc_entity_index);
 
 
 	Ast *type_expr = nullptr;
@@ -901,7 +891,7 @@ void odin_doc_update_entities(OdinDocWriter *w) {
 		defer (array_free(&entities));
 
 		for_array(i, w->entity_cache.entries) {
-			Entity *e = cast(Entity *)cast(uintptr)w->entity_cache.entries[i].key.key;
+			Entity *e = w->entity_cache.entries[i].key;
 			entities[i] = e;
 		}
 		for_array(i, entities) {
@@ -912,7 +902,7 @@ void odin_doc_update_entities(OdinDocWriter *w) {
 	}
 
 	for_array(i, w->entity_cache.entries) {
-		Entity *e = cast(Entity *)cast(uintptr)w->entity_cache.entries[i].key.key;
+		Entity *e = w->entity_cache.entries[i].key;
 		OdinDocEntityIndex entity_index = w->entity_cache.entries[i].value;
 		OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
 
@@ -955,7 +945,7 @@ OdinDocArray<OdinDocEntityIndex> odin_doc_add_pkg_entities(OdinDocWriter *w, Ast
 	if (pkg->scope == nullptr) {
 		return {};
 	}
-	if (map_get(&w->pkg_cache, hash_pointer(pkg)) == nullptr) {
+	if (map_get(&w->pkg_cache, pkg) == nullptr) {
 		return {};
 	}
 
@@ -1056,7 +1046,7 @@ void odin_doc_write_docs(OdinDocWriter *w) {
 
 		OdinDocPkg *dst = nullptr;
 		OdinDocPkgIndex pkg_index = odin_doc_write_item(w, &w->pkgs, &doc_pkg, &dst);
-		map_set(&w->pkg_cache, hash_pointer(pkg), pkg_index);
+		map_set(&w->pkg_cache, pkg, pkg_index);
 
 		auto file_indices = array_make<OdinDocFileIndex>(heap_allocator(), 0, pkg->files.count);
 		defer (array_free(&file_indices));
@@ -1067,7 +1057,7 @@ void odin_doc_write_docs(OdinDocWriter *w) {
 			doc_file.pkg = pkg_index;
 			doc_file.name = odin_doc_write_string(w, file->fullpath);
 			OdinDocFileIndex file_index = odin_doc_write_item(w, &w->files, &doc_file);
-			map_set(&w->file_cache, hash_pointer(file), file_index);
+			map_set(&w->file_cache, file, file_index);
 			array_add(&file_indices, file_index);
 		}
 

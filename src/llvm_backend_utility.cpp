@@ -401,7 +401,7 @@ lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
 			GB_ASSERT(end_entity->token.string.len != 0);
 
 			// NOTE(bill): store the named values before returning
-			lbValue found = map_must_get(&p->module->values, hash_entity(end_entity));
+			lbValue found = map_must_get(&p->module->values, end_entity);
 			lb_emit_store(p, found, rhs);
 
 			lb_build_return_stmt(p, {});
@@ -811,9 +811,9 @@ lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t) {
 	t = base_type(t);
 	LLVMTypeRef struct_type = lb_type(m, t);
-	auto *field_remapping = map_get(&m->struct_field_remapping, hash_pointer(struct_type));
+	auto *field_remapping = map_get(&m->struct_field_remapping, cast(void *)struct_type);
 	if (field_remapping == nullptr) {
-		field_remapping = map_get(&m->struct_field_remapping, hash_pointer(t));
+		field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
 	}
 	GB_ASSERT(field_remapping != nullptr);
 	return *field_remapping;

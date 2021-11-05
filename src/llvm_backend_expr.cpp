@@ -3142,7 +3142,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 }
 
 lbAddr lb_get_soa_variable_addr(lbProcedure *p, Entity *e) {
-	return map_must_get(&p->module->soa_values, hash_entity(e));
+	return map_must_get(&p->module->soa_values, e);
 }
 lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Using);
@@ -3150,7 +3150,7 @@ lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(parent->type, name, false);
 	GB_ASSERT(sel.entity != nullptr);
-	lbValue *pv = map_get(&p->module->values, hash_entity(parent));
+	lbValue *pv = map_get(&p->module->values, parent);
 
 	lbValue v = {};
 
@@ -3190,7 +3190,7 @@ lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *expr) {
 
 
 	lbValue v = {};
-	lbValue *found = map_get(&p->module->values, hash_entity(e));
+	lbValue *found = map_get(&p->module->values, e);
 	if (found) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {

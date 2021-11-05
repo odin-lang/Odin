@@ -314,7 +314,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 		return false;
 	}
 
-	auto *found_gen_procs = map_get(&info->gen_procs, hash_pointer(base_entity->identifier));
+	auto *found_gen_procs = map_get(&info->gen_procs, base_entity->identifier.load());
 	if (found_gen_procs) {
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
@@ -423,7 +423,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, entity);
-		map_set(&info->gen_procs, hash_pointer(base_entity->identifier), array);
+		map_set(&info->gen_procs, base_entity->identifier.load(), array);
 	}
 
 	if (poly_proc_data) {
@@ -659,8 +659,8 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 	
 	if (is_type_matrix(dst)) {
-		Type *elem = base_array_type(dst);
-		i64 distance = check_distance_between_types(c, operand, elem);
+		Type *dst_elem = base_array_type(dst);
+		i64 distance = check_distance_between_types(c, operand, dst_elem);
 		if (distance >= 0) {
 			return distance + 7;
 		}
@@ -2467,7 +2467,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_matrix(src) && is_type_matrix(dst)) {
 		GB_ASSERT(src->kind == Type_Matrix);
 		GB_ASSERT(dst->kind == Type_Matrix);
-		if (!are_types_identical(src->Matrix.elem, dst->Matrix.elem)) {
+		Operand op = *operand;
+		op.type = src->Matrix.elem;
+		if (!check_is_castable_to(c, &op, dst->Matrix.elem)) {
 			return false;
 		}
 		
@@ -2477,11 +2479,7 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 			return src_count == dst_count;
 		}
 		
-		if (dst->Matrix.row_count != dst->Matrix.column_count) {
-			return false;
-		}
-		
-		return true;
+		return is_matrix_square(dst) && is_matrix_square(src);
 	}
 
 
@@ -6108,6 +6106,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		    name == "defined" || 
 		    name == "config" || 
 		    name == "load" ||
+		    name == "load_hash" ||
 		    name == "load_or"
 		) {
 			operand->mode = Addressing_Builtin;
@@ -6943,6 +6942,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			    name == "defined" ||
 			    name == "config" ||
 			    name == "load" ||
+			    name == "load_hash" ||
 			    name == "load_or"
 			) {
 				error(node, "'#%.*s' must be used as a call", LIT(name));
