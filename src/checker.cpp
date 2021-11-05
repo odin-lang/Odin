@@ -2179,25 +2179,6 @@ bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
-void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, EntityGraphNode *n, Type *tuple) {
-	if (tuple == nullptr) {
-		return;
-	}
-	GB_ASSERT(tuple->kind == Type_Tuple);
-	TypeTuple *t = &tuple->Tuple;
-	for_array(i, t->variables) {
-		Entity *v = t->variables[i];
-		EntityGraphNode **found = map_get(M, hash_pointer(v));
-		if (found == nullptr) {
-			continue;
-		}
-		EntityGraphNode *m = *found;
-		entity_graph_node_set_add(&n->succ, m);
-		entity_graph_node_set_add(&m->pred, n);
-	}
-
-}
-
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
 	PtrMap<Entity *, EntityGraphNode *> M = {};
 	map_init(&M, allocator, info->entities.count);
