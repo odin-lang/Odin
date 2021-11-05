@@ -17,7 +17,7 @@ struct PtrSetEntry {
 
 template <typename T>
 struct PtrSet {
-	Array<PtrSetIndex>    hashes;
+	Slice<PtrSetIndex>    hashes;
 	Array<PtrSetEntry<T>> entries;
 };
 
@@ -36,7 +36,7 @@ template <typename T>
 void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 	capacity = next_pow2_isize(gb_max(16, capacity));
 
-	array_init(&s->hashes,  a, capacity);
+	slice_init(&s->hashes,  a, capacity);
 	array_init(&s->entries, a, 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		s->hashes.data[i] = PTR_SET_SENTINEL;
@@ -45,7 +45,7 @@ void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 
 template <typename T>
 void ptr_set_destroy(PtrSet<T> *s) {
-	array_free(&s->hashes);
+	slice_free(&s->hashes, s->entries.allocator);
 	array_free(&s->entries);
 }
 
@@ -93,12 +93,14 @@ template <typename T>
 void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
 	isize i, j;
 	PtrSet<T> ns = {};
-	ptr_set_init(&ns, s->hashes.allocator);
-	array_resize(&ns.hashes, new_count);
-	array_reserve(&ns.entries, s->entries.count);
+	new_count = next_pow2_isize(new_count);
+	ns.hashes = s->hashes;
+	ns.entries.allocator = s->entries.allocator;
+	slice_resize(&ns.hashes, s->entries.allocator, new_count);
 	for (i = 0; i < new_count; i++) {
 		ns.hashes.data[i] = PTR_SET_SENTINEL;
 	}
+	array_reserve(&ns.entries, ARRAY_GROW_FORMULA(s->entries.count));
 	for (i = 0; i < s->entries.count; i++) {
 		PtrSetEntry<T> *e = &s->entries.data[i];
 		PtrSetFindResult fr;
@@ -117,7 +119,7 @@ void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
 			ptr_set_grow(&ns);
 		}
 	}
-	ptr_set_destroy(s);
+	array_free(&s->entries);
 	*s = ns;
 }
 
@@ -208,6 +210,8 @@ void ptr_set_remove(PtrSet<T> *s, T ptr) {
 
 template <typename T>
 gb_inline void ptr_set_clear(PtrSet<T> *s) {
-	array_clear(&s->hashes);
 	array_clear(&s->entries);
+	for (isize i = 0; i < s->hashes.count; i++) {
+		s->hashes.data[i] = PTR_SET_SENTINEL;
+	}
 }
