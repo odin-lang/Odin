@@ -53,9 +53,8 @@ template <typename T>
 gb_internal MapFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (s->hashes.count != 0) {
-		u64 hash = 0xcbf29ce484222325ull ^ cast(u64)cast(uintptr)ptr;
-		u64 n = cast(u64)s->hashes.count;
-		fr.hash_index = cast(MapIndex)(hash & (n-1));
+		u32 hash = ptr_map_hash_key(ptr);
+		fr.hash_index = cast(MapIndex)(hash & (s->hashes.count-1));
 		fr.entry_index = s->hashes.data[fr.hash_index];
 		while (fr.entry_index != MAP_SENTINEL) {
 			if (s->entries.data[fr.entry_index].ptr == ptr) {
@@ -72,9 +71,8 @@ template <typename T>
 gb_internal MapFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> *e) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (s->hashes.count != 0) {
-		u64 hash = 0xcbf29ce484222325ull ^ cast(u64)cast(uintptr)e->ptr;
-		u64 n = cast(u64)s->hashes.count;
-		fr.hash_index = cast(MapIndex)(hash & (n-1));
+		u32 hash = ptr_map_hash_key(e->ptr);
+		fr.hash_index = cast(MapIndex)(hash & (s->hashes.count-1));
 		fr.entry_index = s->hashes.data[fr.hash_index];
 		while (fr.entry_index != MAP_SENTINEL) {
 			if (&s->entries.data[fr.entry_index] == e) {
