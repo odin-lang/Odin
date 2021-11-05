@@ -5207,6 +5207,17 @@ void check_sort_init_procedures(Checker *c) {
 	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
 }
 
+void add_type_info_for_type_definitions(Checker *c) {
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			i64 align = type_align_of(e->type);
+			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
+				add_type_info_type(&c->builtin_ctx, e->type);
+			}
+		}
+	}
+}
 
 void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
@@ -5286,7 +5297,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 
-	TIME_SECTION("add type information");
+	TIME_SECTION("add basic type information");
 	// Add "Basic" type information
 	for (isize i = 0; i < Basic_COUNT; i++) {
 		Type *t = &basic_types[i];
@@ -5331,16 +5342,7 @@ void check_parsed_files(Checker *c) {
 	check_unchecked_bodies(c);
 
 	TIME_SECTION("add type info for type definitions");
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			i64 align = type_align_of(e->type);
-			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
-				add_type_info_type(&c->builtin_ctx, e->type);
-			}
-		}
-	}
-
+	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check entry point");
