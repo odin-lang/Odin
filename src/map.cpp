@@ -8,7 +8,7 @@
 #define MAP_UTIL_STUFF
 // NOTE(bill): This util stuff is the same for every `Map`
 
-typedef isize MapIndex;
+typedef u32 MapIndex;
 
 struct MapFindResult {
 	MapIndex hash_index;
@@ -58,13 +58,13 @@ gb_inline bool operator!=(HashKey a, HashKey b) { return !hash_key_equal(a, b); 
 template <typename T>
 struct MapEntry {
 	HashKey  key;
-	isize    next;
+	MapIndex next;
 	T        value;
 };
 
 template <typename T>
 struct Map {
-	Slice<isize>        hashes;
+	Slice<MapIndex>     hashes;
 	Array<MapEntry<T> > entries;
 };
 
@@ -109,12 +109,12 @@ gb_inline void map_destroy(Map<T> *h) {
 }
 
 template <typename T>
-gb_internal isize map__add_entry(Map<T> *h, HashKey const &key) {
+gb_internal MapIndex map__add_entry(Map<T> *h, HashKey const &key) {
 	MapEntry<T> e = {};
 	e.key = key;
 	e.next = MAP_SENTINEL;
 	array_add(&h->entries, e);
-	return h->entries.count-1;
+	return cast(MapIndex)(h->entries.count-1);
 }
 
 template <typename T>
@@ -123,7 +123,7 @@ gb_internal MapFindResult map__find(Map<T> *h, HashKey const &key) {
 	if (h->hashes.count == 0) {
 		return fr;
 	}
-	fr.hash_index = key.key & (h->hashes.count-1);
+	fr.hash_index = cast(MapIndex)(key.key & (h->hashes.count-1));
 	fr.entry_index = h->hashes.data[fr.hash_index];
 	while (fr.entry_index != MAP_SENTINEL) {
 		if (hash_key_equal(h->entries.data[fr.entry_index].key, key)) {
@@ -141,7 +141,7 @@ gb_internal MapFindResult map__find_from_entry(Map<T> *h, MapEntry<T> *e) {
 	if (h->hashes.count == 0) {
 		return fr;
 	}
-	fr.hash_index  = e->key.key & (h->hashes.count-1);
+	fr.hash_index  = cast(MapIndex)(e->key.key & (h->hashes.count-1));
 	fr.entry_index = h->hashes.data[fr.hash_index];
 	while (fr.entry_index != MAP_SENTINEL) {
 		if (&h->entries.data[fr.entry_index] == e) {
@@ -166,19 +166,18 @@ gb_inline void map_grow(Map<T> *h) {
 
 template <typename T>
 void map_reset_entries(Map<T> *h) {
-	isize i;
-	for (i = 0; i < h->hashes.count; i++) {
+	for (isize i = 0; i < h->hashes.count; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
-	for (i = 0; i < h->entries.count; i++) {
+	for (isize i = 0; i < h->entries.count; i++) {
 		MapFindResult fr;
 		MapEntry<T> *e = &h->entries.data[i];
 		e->next = MAP_SENTINEL;
 		fr = map__find_from_entry(h, e);
 		if (fr.entry_prev == MAP_SENTINEL) {
-			h->hashes[fr.hash_index] = i;
+			h->hashes[fr.hash_index] = cast(MapIndex)i;
 		} else {
-			h->entries[fr.entry_prev].next = i;
+			h->entries[fr.entry_prev].next = cast(MapIndex)i;
 		}
 	}
 }
@@ -217,7 +216,7 @@ T &map_must_get(Map<T> *h, HashKey const &key) {
 
 template <typename T>
 void map_set(Map<T> *h, HashKey const &key, T const &value) {
-	isize index;
+	MapIndex index;
 	MapFindResult fr;
 	if (h->hashes.count == 0) {
 		map_grow(h);
@@ -327,7 +326,7 @@ void multi_map_get_all(Map<T> *h, HashKey const &key, T *items) {
 template <typename T>
 void multi_map_insert(Map<T> *h, HashKey const &key, T const &value) {
 	MapFindResult fr;
-	isize i;
+	MapIndex i;
 	if (h->hashes.count == 0) {
 		map_grow(h);
 	}

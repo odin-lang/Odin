@@ -111,19 +111,18 @@ gb_inline void ptr_set_grow(PtrSet<T> *s) {
 
 template <typename T>
 void ptr_set_reset_entries(PtrSet<T> *s) {
-	PtrSetIndex i;
-	for (i = 0; i < cast(PtrSetIndex)s->hashes.count; i++) {
+	for (isize i = 0; i < s->hashes.count; i++) {
 		s->hashes.data[i] = PTR_SET_SENTINEL;
 	}
-	for (i = 0; i < cast(PtrSetIndex)s->entries.count; i++) {
+	for (isize i = 0; i < s->entries.count; i++) {
 		PtrSetFindResult fr;
 		PtrSetEntry<T> *e = &s->entries.data[i];
 		e->next = PTR_SET_SENTINEL;
 		fr = ptr_set__find_from_entry(s, e);
 		if (fr.entry_prev == PTR_SET_SENTINEL) {
-			s->hashes[fr.hash_index] = i;
+			s->hashes[fr.hash_index] = cast(PtrSetIndex)i;
 		} else {
-			s->entries[fr.entry_prev].next = i;
+			s->entries[fr.entry_prev].next = cast(PtrSetIndex)i;
 		}
 	}
 }
