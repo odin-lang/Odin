@@ -168,7 +168,7 @@ void map_rehash(PtrMap<K, V> *h, isize new_count) {
 
 template <typename K, typename V>
 V *map_get(PtrMap<K, V> *h, K key) {
-	isize index = map__find(h, key).entry_index;
+	MapIndex index = map__find(h, key).entry_index;
 	if (index != MAP_SENTINEL) {
 		return &h->entries.data[index].value;
 	}
@@ -177,7 +177,7 @@ V *map_get(PtrMap<K, V> *h, K key) {
 
 template <typename K, typename V>
 V &map_must_get(PtrMap<K, V> *h, K key) {
-	isize index = map__find(h, key).entry_index;
+	MapIndex index = map__find(h, key).entry_index;
 	GB_ASSERT(index != MAP_SENTINEL);
 	return h->entries.data[index].value;
 }
@@ -251,7 +251,7 @@ gb_inline void map_clear(PtrMap<K, V> *h) {
 #if PTR_MAP_ENABLE_MULTI_MAP
 template <typename K, typename V>
 PtrMapEntry<K, V> *multi_map_find_first(PtrMap<K, V> *h, K key) {
-	isize i = map__find(h, key).entry_index;
+	MapIndex i = map__find(h, key).entry_index;
 	if (i == MAP_SENTINEL) {
 		return nullptr;
 	}
@@ -260,7 +260,7 @@ PtrMapEntry<K, V> *multi_map_find_first(PtrMap<K, V> *h, K key) {
 
 template <typename K, typename V>
 PtrMapEntry<K, V> *multi_map_find_next(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
-	isize i = e->next;
+	MapIndex i = e->next;
 	while (i != MAP_SENTINEL) {
 		if (h->entries.data[i].key == e->key) {
 			return &h->entries.data[i];
