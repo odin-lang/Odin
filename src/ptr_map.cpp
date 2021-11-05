@@ -29,11 +29,11 @@ struct PtrMap {
 
 u32 ptr_map_hash_key(void const *key) {
 	// TODO(bill): Improve ptr_map_hash_key
-	return gb_fnv32a(&key, gb_size_of(key));
+	return fnv32a(&key, gb_size_of(key));
 }
 u32 ptr_map_hash_key(uintptr key) {
 	// TODO(bill): Improve ptr_map_hash_key
-	return gb_fnv32a(&key, gb_size_of(key));
+	return fnv32a(&key, gb_size_of(key));
 }
 
 template <typename K, typename V> void map_init             (PtrMap<K, V> *h, gbAllocator a, isize capacity = 16);
