@@ -318,6 +318,151 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_string(result);
 
+		} else if (name == "load_hash") {
+			if (ce->args.count != 2) {
+				if (ce->args.count == 0) {
+					error(ce->close, "'#load_hash' expects 2 argument, got 0");
+				} else {
+					error(ce->args[0], "'#load_hash' expects 2 argument, got %td", ce->args.count);
+				}
+				return false;
+			}
+
+			Ast *arg0 = ce->args[0];
+			Ast *arg1 = ce->args[1];
+			Operand o = {};
+			check_expr(c, &o, arg0);
+			if (o.mode != Addressing_Constant) {
+				error(arg0, "'#load_hash' expected a constant string argument");
+				return false;
+			}
+
+			if (!is_type_string(o.type)) {
+				gbString str = type_to_string(o.type);
+				error(arg0, "'#load_hash' expected a constant string, got %s", str);
+				gb_string_free(str);
+				return false;
+			}
+			
+			Operand o_hash = {};
+			check_expr(c, &o_hash, arg1);
+			if (o_hash.mode != Addressing_Constant) {
+				error(arg1, "'#load_hash' expected a constant string argument");
+				return false;
+			}
+
+			if (!is_type_string(o_hash.type)) {
+				gbString str = type_to_string(o.type);
+				error(arg1, "'#load_hash' expected a constant string, got %s", str);
+				gb_string_free(str);
+				return false;
+			}
+			
+
+			gbAllocator a = heap_allocator();
+
+			GB_ASSERT(o.value.kind == ExactValue_String);
+			GB_ASSERT(o_hash.value.kind == ExactValue_String);
+			
+			String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
+			String original_string = o.value.value_string;
+			String hash_kind = o_hash.value.value_string;
+			
+			String supported_hashes[] = {
+				str_lit("adler32"),
+				str_lit("crc32"),
+				str_lit("crc64"),
+				str_lit("fnv32"),
+				str_lit("fnv64"),
+				str_lit("fnv32a"),
+				str_lit("fnv64a"),
+				str_lit("murmur32"),
+				str_lit("murmur64"),
+			};
+			
+			bool hash_found = false;
+			for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
+				if (supported_hashes[i] == hash_kind) {
+					hash_found = true;
+					break;
+				}
+			}
+			if (!hash_found) {
+				ERROR_BLOCK();
+				error(ce->proc, "Invalid hash kind passed to `#load_hash`, got: %.*s", LIT(hash_kind));
+				error_line("\tAvailable hash kinds:\n");
+				for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
+					error_line("\t%.*s\n", LIT(supported_hashes[i]));
+				}
+				return false;
+			}
+			
+
+			BlockingMutex *ignore_mutex = nullptr;
+			String path = {};
+			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+			gb_unused(ok);
+
+			char *c_str = alloc_cstring(a, path);
+			defer (gb_free(a, c_str));
+
+
+			gbFile f = {};
+			gbFileError file_err = gb_file_open(&f, c_str);
+			defer (gb_file_close(&f));
+
+			switch (file_err) {
+			default:
+			case gbFileError_Invalid:
+				error(ce->proc, "Failed to `#load_hash` file: %s; invalid file or cannot be found", c_str);
+				return false;
+			case gbFileError_NotExists:
+				error(ce->proc, "Failed to `#load_hash` file: %s; file cannot be found", c_str);
+				return false;
+			case gbFileError_Permission:
+				error(ce->proc, "Failed to `#load_hash` file: %s; file permissions problem", c_str);
+				return false;
+			case gbFileError_None:
+				// Okay
+				break;
+			}
+			
+			// TODO(bill): make these procedures fast :P
+			
+			u64 hash_value = 0;
+			String result = {};
+			isize file_size = cast(isize)gb_file_size(&f);
+			if (file_size > 0) {
+				u8 *data = cast(u8 *)gb_alloc(a, file_size);
+				gb_file_read_at(&f, data, file_size, 0);
+				if (hash_kind == "adler32") {
+					hash_value = gb_adler32(data, file_size);
+				} else if (hash_kind == "crc32") {
+					hash_value = gb_crc32(data, file_size);
+				} else if (hash_kind == "crc64") {
+					hash_value = gb_crc64(data, file_size);
+				} else if (hash_kind == "fnv32") {
+					hash_value = gb_fnv32(data, file_size);
+				} else if (hash_kind == "fnv64") {
+					hash_value = gb_fnv64(data, file_size);
+				} else if (hash_kind == "fnv32a") {
+					hash_value = gb_fnv32a(data, file_size);
+				} else if (hash_kind == "fnv64a") {
+					hash_value = gb_fnv64a(data, file_size);
+				} else if (hash_kind == "murmur32") {
+					hash_value = gb_murmur32(data, file_size);
+				} else if (hash_kind == "murmur64") {
+					hash_value = gb_murmur64(data, file_size);
+				} else {
+					compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));	
+				}
+				gb_free(a, data);
+			}
+
+			operand->type = t_untyped_integer;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(hash_value);
+
 		} else if (name == "load_or") {
 			if (ce->args.count != 2) {
 				if (ce->args.count == 0) {

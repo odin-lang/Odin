@@ -810,7 +810,7 @@ void init_universal(void) {
 
 	bool defined_values_double_declaration = false;
 	for_array(i, bc->defined_values.entries) {
-		char const *name = cast(char const *)cast(uintptr)bc->defined_values.entries[i].key.key;
+		char const *name = bc->defined_values.entries[i].key;
 		ExactValue value = bc->defined_values.entries[i].value;
 		GB_ASSERT(value.kind != ExactValue_Invalid);
 
@@ -1086,7 +1086,7 @@ Scope *scope_of_node(Ast *node) {
 }
 ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	if (c->untyped != nullptr) {
-		ExprInfo **found = map_get(c->untyped, hash_pointer(expr));
+		ExprInfo **found = map_get(c->untyped, expr);
 		if (found) {
 			return *found;
 		}
@@ -1094,7 +1094,7 @@ ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	} else {
 		mutex_lock(&c->info->global_untyped_mutex);
 		defer (mutex_unlock(&c->info->global_untyped_mutex));
-		ExprInfo **found = map_get(&c->info->global_untyped, hash_pointer(expr));
+		ExprInfo **found = map_get(&c->info->global_untyped, expr);
 		if (found) {
 			return *found;
 		}
@@ -1104,23 +1104,23 @@ ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 
 void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (c->untyped != nullptr) {
-		map_set(c->untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+		map_set(c->untyped, expr, make_expr_info(mode, type, value, false));
 	} else {
 		mutex_lock(&c->info->global_untyped_mutex);
-		map_set(&c->info->global_untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+		map_set(&c->info->global_untyped, expr, make_expr_info(mode, type, value, false));
 		mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
 void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	if (c->untyped != nullptr) {
-		map_remove(c->untyped, hash_pointer(e));
-		GB_ASSERT(map_get(c->untyped, hash_pointer(e)) == nullptr);
+		map_remove(c->untyped, e);
+		GB_ASSERT(map_get(c->untyped, e) == nullptr);
 	} else {
 		auto *untyped = &c->info->global_untyped;
 		mutex_lock(&c->info->global_untyped_mutex);
-		map_remove(untyped, hash_pointer(e));
-		GB_ASSERT(map_get(untyped, hash_pointer(e)) == nullptr);
+		map_remove(untyped, e);
+		GB_ASSERT(map_get(untyped, e) == nullptr);
 		mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
@@ -1135,8 +1135,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	mutex_lock(&info->type_info_mutex);
 
 	isize entry_index = -1;
-	HashKey key = hash_type(type);
-	isize *found_entry_index = map_get(&info->type_info_map, key);
+	isize *found_entry_index = map_get(&info->type_info_map, type);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
 	}
@@ -1145,11 +1144,10 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		// TODO(bill): This is O(n) and can be very slow
 		for_array(i, info->type_info_map.entries){
 			auto *e = &info->type_info_map.entries[i];
-			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
-			if (are_types_identical(prev_type, type)) {
+			if (are_types_identical(e->key, type)) {
 				entry_index = e->value;
 				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, key, entry_index);
+				map_set(&info->type_info_map, type, entry_index);
 				break;
 			}
 		}
@@ -1484,7 +1482,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	add_type_info_dependency(c->decl, t);
 
-	auto found = map_get(&c->info->type_info_map, hash_type(t));
+	auto found = map_get(&c->info->type_info_map, t);
 	if (found != nullptr) {
 		// Types have already been added
 		return;
@@ -1494,8 +1492,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	isize ti_index = -1;
 	for_array(i, c->info->type_info_map.entries) {
 		auto *e = &c->info->type_info_map.entries[i];
-		Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
-		if (are_types_identical(t, prev_type)) {
+		if (are_types_identical(t, e->key)) {
 			// Duplicate entry
 			ti_index = e->value;
 			prev = true;
@@ -1508,7 +1505,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		ti_index = c->info->type_info_types.count;
 		array_add(&c->info->type_info_types, t);
 	}
-	map_set(&c->checker->info.type_info_map, hash_type(t), ti_index);
+	map_set(&c->checker->info.type_info_map, t, ti_index);
 
 	if (prev) {
 		// NOTE(bill): If a previous one exists already, no need to continue
@@ -2182,27 +2179,8 @@ bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
-void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, EntityGraphNode *n, Type *tuple) {
-	if (tuple == nullptr) {
-		return;
-	}
-	GB_ASSERT(tuple->kind == Type_Tuple);
-	TypeTuple *t = &tuple->Tuple;
-	for_array(i, t->variables) {
-		Entity *v = t->variables[i];
-		EntityGraphNode **found = map_get(M, hash_pointer(v));
-		if (found == nullptr) {
-			continue;
-		}
-		EntityGraphNode *m = *found;
-		entity_graph_node_set_add(&n->succ, m);
-		entity_graph_node_set_add(&m->pred, n);
-	}
-
-}
-
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
-	Map<EntityGraphNode *> M = {}; // Key: Entity *
+	PtrMap<Entity *, EntityGraphNode *> M = {};
 	map_init(&M, allocator, info->entities.count);
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
@@ -2210,7 +2188,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 		if (is_entity_a_dependency(e)) {
 			EntityGraphNode *n = gb_alloc_item(allocator, EntityGraphNode);
 			n->entity = e;
-			map_set(&M, hash_pointer(e), n);
+			map_set(&M, e, n);
 		}
 	}
 
@@ -2230,9 +2208,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 			}
 			GB_ASSERT(dep != nullptr);
 			if (is_entity_a_dependency(dep)) {
-				EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
-				GB_ASSERT(m_ != nullptr);
-				EntityGraphNode *m = *m_;
+				EntityGraphNode *m = map_must_get(&M, dep);
 				entity_graph_node_set_add(&n->succ, m);
 				entity_graph_node_set_add(&m->pred, n);
 			}
@@ -2247,7 +2223,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
-		auto *e = cast(Entity *)cast(uintptr)entry->key.key;
+		auto *e = entry->key;
 		EntityGraphNode *n = entry->value;
 
 		if (e->kind == Entity_Procedure) {
@@ -3731,7 +3707,7 @@ String path_to_entity_name(String name, String fullpath, bool strip_extension=tr
 
 #if 1
 
-void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M) {
+void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
 	AstPackage *parent_pkg = decl->file->pkg;
 
 	switch (decl->kind) {
@@ -3755,11 +3731,11 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 		ImportGraphNode *m = nullptr;
 		ImportGraphNode *n = nullptr;
 
-		found_node = map_get(M, hash_pointer(pkg));
+		found_node = map_get(M, pkg);
 		GB_ASSERT(found_node != nullptr);
 		m = *found_node;
 
-		found_node = map_get(M, hash_pointer(parent_pkg));
+		found_node = map_get(M, parent_pkg);
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
@@ -3797,14 +3773,14 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 }
 
 Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
-	Map<ImportGraphNode *> M = {}; // Key: AstPackage *
+	PtrMap<AstPackage *, ImportGraphNode *> M = {}; 
 	map_init(&M, heap_allocator(), 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 		ImportGraphNode *n = import_graph_node_create(heap_allocator(), pkg);
-		map_set(&M, hash_pointer(pkg), n);
+		map_set(&M, pkg, n);
 	}
 
 	// Calculate edges for graph M
@@ -4510,9 +4486,9 @@ void check_import_entities(Checker *c) {
 }
 
 
-Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited = nullptr);
+Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited = nullptr);
 
-bool find_entity_path_tuple(Type *tuple, Entity *end, Map<Entity *> *visited, Array<Entity *> *path_) {
+bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity *> *visited, Array<Entity *> *path_) {
 	GB_ASSERT(path_ != nullptr);
 	if (tuple == nullptr) {
 		return false;
@@ -4544,26 +4520,24 @@ bool find_entity_path_tuple(Type *tuple, Entity *end, Map<Entity *> *visited, Ar
 	return false;
 }
 
-Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited) {
-	Map<Entity *> visited_ = {};
+Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited) {
+	PtrSet<Entity *> visited_ = {};
 	bool made_visited = false;
 	if (visited == nullptr) {
 		made_visited = true;
-		map_init(&visited_, heap_allocator());
+		ptr_set_init(&visited_, heap_allocator());
 		visited = &visited_;
 	}
 	defer (if (made_visited) {
-		map_destroy(&visited_);
+		ptr_set_destroy(&visited_);
 	});
 
 	Array<Entity *> empty_path = {};
 
-	HashKey key = hash_pointer(start);
-
-	if (map_get(visited, key) != nullptr) {
+	if (ptr_set_exists(visited, start)) {
 		return empty_path;
 	}
-	map_set(visited, key, start);
+	ptr_set_add(visited, start);
 
 	DeclInfo *decl = start->decl_info;
 	if (decl) {
@@ -4955,7 +4929,7 @@ void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 		return;
 	}
 	for_array(i, untyped->entries) {
-		Ast *expr = cast(Ast *)cast(uintptr)untyped->entries[i].key.key;
+		Ast *expr = untyped->entries[i].key;
 		ExprInfo *info = untyped->entries[i].value;
 		if (expr != nullptr && info != nullptr) {
 			mpmc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});
@@ -5207,6 +5181,17 @@ void check_sort_init_procedures(Checker *c) {
 	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
 }
 
+void add_type_info_for_type_definitions(Checker *c) {
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			i64 align = type_align_of(e->type);
+			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
+				add_type_info_type(&c->builtin_ctx, e->type);
+			}
+		}
+	}
+}
 
 void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
@@ -5286,7 +5271,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 
-	TIME_SECTION("add type information");
+	TIME_SECTION("add basic type information");
 	// Add "Basic" type information
 	for (isize i = 0; i < Basic_COUNT; i++) {
 		Type *t = &basic_types[i];
@@ -5331,16 +5316,7 @@ void check_parsed_files(Checker *c) {
 	check_unchecked_bodies(c);
 
 	TIME_SECTION("add type info for type definitions");
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			i64 align = type_align_of(e->type);
-			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
-				add_type_info_type(&c->builtin_ctx, e->type);
-			}
-		}
-	}
-
+	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check entry point");

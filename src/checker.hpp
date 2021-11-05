@@ -264,7 +264,7 @@ struct UntypedExprInfo {
 	ExprInfo *info;
 };
 
-typedef Map<ExprInfo *> UntypedExprInfoMap; // Key: Ast *
+typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
 typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
 // CheckerInfo stores all the symbol information for a type-checked program
@@ -316,12 +316,12 @@ struct CheckerInfo {
 
 	RecursiveMutex gen_procs_mutex;
 	RecursiveMutex gen_types_mutex;
-	Map<Array<Entity *> > gen_procs; // Key: Ast * | Identifier -> Entity
-	Map<Array<Entity *> > gen_types; // Key: Type *
+	PtrMap<Ast *, Array<Entity *> > gen_procs; // Key: Ast * | Identifier -> Entity
+	PtrMap<Type *, Array<Entity *> > gen_types; 
 
 	BlockingMutex type_info_mutex; // NOT recursive
 	Array<Type *> type_info_types;
-	Map<isize>    type_info_map;   // Key: Type *
+	PtrMap<Type *, isize> type_info_map;
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
@@ -404,13 +404,6 @@ struct Checker {
 gb_global AstPackage *builtin_pkg    = nullptr;
 gb_global AstPackage *intrinsics_pkg = nullptr;
 gb_global AstPackage *config_pkg      = nullptr;
-
-
-HashKey hash_node     (Ast *node)  { return hash_pointer(node); }
-HashKey hash_ast_file (AstFile *file)  { return hash_pointer(file); }
-HashKey hash_entity   (Entity *e)      { return hash_pointer(e); }
-HashKey hash_type     (Type *t)        { return hash_pointer(t); }
-HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
 
 
 // CheckerInfo API

@@ -83,7 +83,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		DeclInfo *decl = decl_info_of_entity(e);
 		ast_node(pl, ProcLit, decl->proc_lit);
 		if (pl->body != nullptr) {
-			auto *found = map_get(&info->gen_procs, hash_pointer(ident));
+			auto *found = map_get(&info->gen_procs, ident);
 			if (found) {
 				auto procs = *found;
 				for_array(i, procs) {
@@ -670,7 +670,7 @@ void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *sco
 		Entity *e = entity_of_node(rs->vals[0]);
 		if (e != nullptr) {
 			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
-			map_set(&p->module->soa_values, hash_entity(e), soa_val);
+			map_set(&p->module->soa_values, e, soa_val);
 		}
 	}
 	if (val_types[1]) {
@@ -1525,7 +1525,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	} else if (return_count == 1) {
 		Entity *e = tuple->variables[0];
 		if (res_count == 0) {
-			lbValue found = map_must_get(&p->module->values, hash_entity(e));
+			lbValue found = map_must_get(&p->module->values, e);
 			res = lb_emit_load(p, found);
 		} else {
 			res = lb_build_expr(p, return_results[0]);
@@ -1534,7 +1534,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 		if (p->type->Proc.has_named_results) {
 			// NOTE(bill): store the named values before returning
 			if (e->token.string != "") {
-				lbValue found = map_must_get(&p->module->values, hash_entity(e));
+				lbValue found = map_must_get(&p->module->values, e);
 				lb_emit_store(p, found, lb_emit_conv(p, res, e->type));
 			}
 		}
@@ -1558,7 +1558,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 		} else {
 			for (isize res_index = 0; res_index < return_count; res_index++) {
 				Entity *e = tuple->variables[res_index];
-				lbValue found = map_must_get(&p->module->values, hash_entity(e));
+				lbValue found = map_must_get(&p->module->values, e);
 				lbValue res = lb_emit_load(p, found);
 				array_add(&results, res);
 			}
@@ -1580,7 +1580,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 				if (e->token.string == "") {
 					continue;
 				}
-				named_results[i] = map_must_get(&p->module->values, hash_entity(e));
+				named_results[i] = map_must_get(&p->module->values, e);
 				values[i] = lb_emit_conv(p, results[i], e->type);
 			}
 

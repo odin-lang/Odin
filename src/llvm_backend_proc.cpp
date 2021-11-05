@@ -948,7 +948,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 	}
 
-	Entity **found = map_get(&p->module->procedure_values, hash_pointer(value.value));
+	Entity **found = map_get(&p->module->procedure_values, value.value);
 	if (found != nullptr) {
 		Entity *e = *found;
 		if (e != nullptr && entity_has_deferred_procedure(e)) {

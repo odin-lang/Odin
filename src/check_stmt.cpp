@@ -699,7 +699,7 @@ struct TypeAndToken {
 };
 
 
-void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Operand operand, bool use_expr = true) {
+void add_constant_switch_case(CheckerContext *ctx, PtrMap<uintptr, TypeAndToken> *seen, Operand operand, bool use_expr = true) {
 	if (operand.mode != Addressing_Constant) {
 		return;
 	}
@@ -707,7 +707,7 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 		return;
 	}
 	
-	HashKey key = hash_exact_value(operand.value);
+	uintptr key = hash_exact_value(operand.value);
 	TypeAndToken *found = map_get(seen, key);
 	if (found != nullptr) {
 		isize count = multi_map_count(seen, key);
@@ -964,7 +964,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 	}
 
-	Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap, Key: ExactValue
+	PtrMap<uintptr, TypeAndToken> seen = {}; // NOTE(bill): Multimap, Key: ExactValue
 	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
@@ -1133,8 +1133,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				continue;
 			}
 			ExactValue v = f->Constant.value;
-			HashKey key = hash_exact_value(v);
-			auto found = map_get(&seen, key);
+			auto found = map_get(&seen, hash_exact_value(v));
 			if (!found) {
 				array_add(&unhandled, f);
 			}

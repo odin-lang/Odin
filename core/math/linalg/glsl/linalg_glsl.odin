@@ -769,6 +769,31 @@ step_dvec2 :: proc "c" (edge, x: dvec2) -> dvec2 { return {step(edge.x, x.x), st
 step_dvec3 :: proc "c" (edge, x: dvec3) -> dvec3 { return {step(edge.x, x.x), step(edge.y, x.y), step(edge.z, x.z)} }
 step_dvec4 :: proc "c" (edge, x: dvec4) -> dvec4 { return {step(edge.x, x.x), step(edge.y, x.y), step(edge.z, x.z), step(edge.w, x.w)} }
 
+smoothstep :: proc{
+	smoothstep_f32,
+	smoothstep_f64,
+	smoothstep_vec2,
+	smoothstep_vec3,
+	smoothstep_vec4,
+	smoothstep_dvec2,
+	smoothstep_dvec3,
+	smoothstep_dvec4,
+}
+smoothstep_f32 :: proc "c" (edge0, edge1, x: f32) -> f32 { 
+	y := clamp(((x-edge0) / (edge1 - edge0)), 0, 1)
+	return y * y * (3 - 2*y)
+}
+smoothstep_f64 :: proc "c" (edge0, edge1, x: f64) -> f64 { 
+	y := clamp(((x-edge0) / (edge1 - edge0)), 0, 1)
+	return y * y * (3 - 2*y)
+}
+smoothstep_vec2  :: proc "c" (edge0, edge1, x: vec2) -> vec2   { return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y)} }
+smoothstep_vec3  :: proc "c" (edge0, edge1, x: vec3) -> vec3   { return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y), smoothstep(edge0.z, edge1.z, x.z)} }
+smoothstep_vec4  :: proc "c" (edge0, edge1, x: vec4) -> vec4   { return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y), smoothstep(edge0.z, edge1.z, x.z), smoothstep(edge0.w, edge1.w, x.w)} }
+smoothstep_dvec2 :: proc "c" (edge0, edge1, x: dvec2) -> dvec2 { return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y)} }
+smoothstep_dvec3 :: proc "c" (edge0, edge1, x: dvec3) -> dvec3 { return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y), smoothstep(edge0.z, edge1.z, x.z)} }
+smoothstep_dvec4 :: proc "c" (edge0, edge1, x: dvec4) -> dvec4 { return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y), smoothstep(edge0.z, edge1.z, x.z), smoothstep(edge0.w, edge1.w, x.w)} }
+
 
 abs :: proc{
 	abs_i32,
@@ -1765,16 +1790,24 @@ dquatMulDvec3 :: proc "c" (q: dquat, v: dvec3) -> dvec3 {
 
 
 
-inverse_mat2 :: proc "c" (m: mat2) -> mat2 { return builtin.inverse(m) }
-inverse_mat3 :: proc "c" (m: mat3) -> mat3 { return builtin.inverse(m) }
-inverse_mat4 :: proc "c" (m: mat4) -> mat4 { return builtin.inverse(m) }
-inverse_quat :: proc "c" (q: quat) -> quat { return 1/q }
+inverse_mat2  :: proc "c" (m: mat2)  -> mat2  { return builtin.inverse(m) }
+inverse_mat3  :: proc "c" (m: mat3)  -> mat3  { return builtin.inverse(m) }
+inverse_mat4  :: proc "c" (m: mat4)  -> mat4  { return builtin.inverse(m) }
+inverse_dmat2 :: proc "c" (m: dmat2) -> dmat2 { return builtin.inverse(m) }
+inverse_dmat3 :: proc "c" (m: dmat3) -> dmat3 { return builtin.inverse(m) }
+inverse_dmat4 :: proc "c" (m: dmat4) -> dmat4 { return builtin.inverse(m) }
+inverse_quat  :: proc "c" (q: quat)  -> quat  { return 1/q }
+inverse_dquat :: proc "c" (q: dquat) -> dquat { return 1/q }
 
 inverse :: proc{
 	inverse_mat2,
 	inverse_mat3,
 	inverse_mat4,
+	inverse_dmat2,
+	inverse_dmat3,
+	inverse_dmat4,
 	inverse_quat,
+	inverse_dquat,
 }
 
 transpose         :: builtin.transpose

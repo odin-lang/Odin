@@ -114,25 +114,23 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // associated
 
-	Map<LLVMTypeRef> types;                             // Key: Type *
-	Map<lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
-	Map<Type *> llvm_types;                             // Key: LLVMTypeRef
+	PtrMap<Type *, LLVMTypeRef> types;
+	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
 	i32 internal_type_level;
 
-	Map<lbValue>  values;           // Key: Entity *
-	Map<lbAddr>   soa_values;       // Key: Entity *
+	PtrMap<Entity *, lbValue> values;           
+	PtrMap<Entity *, lbAddr>  soa_values;       
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
-	Map<Entity *> procedure_values; // Key: LLVMValueRef
+	PtrMap<LLVMValueRef, Entity *> procedure_values;
 	Array<lbProcedure *> missing_procedures_to_check;
 
 	StringMap<LLVMValueRef> const_strings;
 
-	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
-	Map<struct lbFunctionType *> function_type_map; // Key: Type *
+	PtrMap<Type *, struct lbFunctionType *> function_type_map; 
 
-	Map<lbProcedure *> equal_procs; // Key: Type *
-	Map<lbProcedure *> hasher_procs; // Key: Type *
+	PtrMap<Type *, lbProcedure *> equal_procs;
+	PtrMap<Type *, lbProcedure *> hasher_procs;
 
 	u32 nested_type_name_guid;
 
@@ -143,7 +141,7 @@ struct lbModule {
 
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;
-	Map<LLVMMetadataRef> debug_values; // Key: Pointer
+	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
 };
@@ -155,11 +153,11 @@ struct lbGenerator {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
-	Map<lbModule *> modules; // Key: AstPackage *
-	Map<lbModule *> modules_through_ctx; // Key: LLVMContextRef *
+	PtrMap<AstPackage *, lbModule *> modules; 
+	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
+	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
