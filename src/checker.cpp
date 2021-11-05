@@ -810,7 +810,7 @@ void init_universal(void) {
 
 	bool defined_values_double_declaration = false;
 	for_array(i, bc->defined_values.entries) {
-		char const *name = cast(char const *)cast(uintptr)bc->defined_values.entries[i].key.key;
+		char const *name = bc->defined_values.entries[i].key;
 		ExactValue value = bc->defined_values.entries[i].value;
 		GB_ASSERT(value.kind != ExactValue_Invalid);
 
@@ -2199,7 +2199,7 @@ void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, 
 }
 
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
-	Map<EntityGraphNode *> M = {}; // Key: Entity *
+	PtrMap<Entity *, EntityGraphNode *> M = {};
 	map_init(&M, allocator, info->entities.count);
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
@@ -2207,7 +2207,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 		if (is_entity_a_dependency(e)) {
 			EntityGraphNode *n = gb_alloc_item(allocator, EntityGraphNode);
 			n->entity = e;
-			map_set(&M, hash_pointer(e), n);
+			map_set(&M, e, n);
 		}
 	}
 
@@ -2227,9 +2227,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 			}
 			GB_ASSERT(dep != nullptr);
 			if (is_entity_a_dependency(dep)) {
-				EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
-				GB_ASSERT(m_ != nullptr);
-				EntityGraphNode *m = *m_;
+				EntityGraphNode *m = map_must_get(&M, dep);
 				entity_graph_node_set_add(&n->succ, m);
 				entity_graph_node_set_add(&m->pred, n);
 			}
@@ -2244,7 +2242,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
-		auto *e = cast(Entity *)cast(uintptr)entry->key.key;
+		auto *e = entry->key;
 		EntityGraphNode *n = entry->value;
 
 		if (e->kind == Entity_Procedure) {
@@ -3728,7 +3726,7 @@ String path_to_entity_name(String name, String fullpath, bool strip_extension=tr
 
 #if 1
 
-void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M) {
+void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
 	AstPackage *parent_pkg = decl->file->pkg;
 
 	switch (decl->kind) {
@@ -3752,11 +3750,11 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 		ImportGraphNode *m = nullptr;
 		ImportGraphNode *n = nullptr;
 
-		found_node = map_get(M, hash_pointer(pkg));
+		found_node = map_get(M, pkg);
 		GB_ASSERT(found_node != nullptr);
 		m = *found_node;
 
-		found_node = map_get(M, hash_pointer(parent_pkg));
+		found_node = map_get(M, parent_pkg);
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
@@ -3794,14 +3792,14 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 }
 
 Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
-	Map<ImportGraphNode *> M = {}; // Key: AstPackage *
+	PtrMap<AstPackage *, ImportGraphNode *> M = {}; 
 	map_init(&M, heap_allocator(), 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 		ImportGraphNode *n = import_graph_node_create(heap_allocator(), pkg);
-		map_set(&M, hash_pointer(pkg), n);
+		map_set(&M, pkg, n);
 	}
 
 	// Calculate edges for graph M
@@ -4507,9 +4505,9 @@ void check_import_entities(Checker *c) {
 }
 
 
-Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited = nullptr);
+Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited = nullptr);
 
-bool find_entity_path_tuple(Type *tuple, Entity *end, Map<Entity *> *visited, Array<Entity *> *path_) {
+bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity *> *visited, Array<Entity *> *path_) {
 	GB_ASSERT(path_ != nullptr);
 	if (tuple == nullptr) {
 		return false;
@@ -4541,26 +4539,24 @@ bool find_entity_path_tuple(Type *tuple, Entity *end, Map<Entity *> *visited, Ar
 	return false;
 }
 
-Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited) {
-	Map<Entity *> visited_ = {};
+Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited) {
+	PtrSet<Entity *> visited_ = {};
 	bool made_visited = false;
 	if (visited == nullptr) {
 		made_visited = true;
-		map_init(&visited_, heap_allocator());
+		ptr_set_init(&visited_, heap_allocator());
 		visited = &visited_;
 	}
 	defer (if (made_visited) {
-		map_destroy(&visited_);
+		ptr_set_destroy(&visited_);
 	});
 
 	Array<Entity *> empty_path = {};
 
-	HashKey key = hash_pointer(start);
-
-	if (map_get(visited, key) != nullptr) {
+	if (ptr_set_exists(visited, start)) {
 		return empty_path;
 	}
-	map_set(visited, key, start);
+	ptr_set_add(visited, start);
 
 	DeclInfo *decl = start->decl_info;
 	if (decl) {

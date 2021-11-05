@@ -83,7 +83,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 		DeclInfo *decl = decl_info_of_entity(e);
 		ast_node(pl, ProcLit, decl->proc_lit);
 		if (pl->body != nullptr) {
-			auto *found = map_get(&info->gen_procs, hash_pointer(ident));
+			auto *found = map_get(&info->gen_procs, ident);
 			if (found) {
 				auto procs = *found;
 				for_array(i, procs) {
