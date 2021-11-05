@@ -1,5 +1,14 @@
 #define PTR_MAP_ENABLE_MULTI_MAP 1
 
+typedef u32 MapIndex;
+
+struct MapFindResult {
+	MapIndex hash_index;
+	MapIndex entry_prev;
+	MapIndex entry_index;
+};
+
+enum : MapIndex { MAP_SENTINEL = ~(MapIndex)0 };
 
 template <typename K, typename V>
 struct PtrMapEntry {
