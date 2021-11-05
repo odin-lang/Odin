@@ -123,8 +123,7 @@ lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
 	Type *pt = alloc_type_pointer(type);
 	LLVMTypeRef ptr_type = lb_type(m, pt);
 
-	auto key = hash_type(type);
-	lbProcedure **found = map_get(&m->equal_procs, key);
+	lbProcedure **found = map_get(&m->equal_procs, type);
 	lbProcedure *compare_proc = nullptr;
 	if (found) {
 		compare_proc = *found;
@@ -140,7 +139,7 @@ lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
 	String proc_name = make_string_c(str);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
-	map_set(&m->equal_procs, key, p);
+	map_set(&m->equal_procs, type, p);
 	lb_begin_procedure_body(p);
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -279,8 +278,7 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 	Type *pt = alloc_type_pointer(type);
 
-	auto key = hash_type(type);
-	lbProcedure **found = map_get(&m->hasher_procs, key);
+	lbProcedure **found = map_get(&m->hasher_procs, type);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
@@ -294,7 +292,7 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 	String proc_name = make_string_c(str);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
-	map_set(&m->hasher_procs, key, p);
+	map_set(&m->hasher_procs, type, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
@@ -433,7 +431,7 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 
 lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
-	lbProcedure **found = map_get(&m->gen->anonymous_proc_lits, hash_pointer(expr));
+	lbProcedure **found = map_get(&m->gen->anonymous_proc_lits, expr);
 	if (found) {
 		return lb_find_procedure_value_from_entity(m, (*found)->entity);
 	}
@@ -473,8 +471,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 		string_map_set(&m->members, name, value);
 	}
 
-	map_set(&m->anonymous_proc_lits, hash_pointer(expr), p);
-	map_set(&m->gen->anonymous_proc_lits, hash_pointer(expr), p);
+	map_set(&m->gen->anonymous_proc_lits, expr, p);
 
 	return value;
 }
