@@ -1086,7 +1086,7 @@ Scope *scope_of_node(Ast *node) {
 }
 ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	if (c->untyped != nullptr) {
-		ExprInfo **found = map_get(c->untyped, hash_pointer(expr));
+		ExprInfo **found = map_get(c->untyped, expr);
 		if (found) {
 			return *found;
 		}
@@ -1094,7 +1094,7 @@ ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	} else {
 		mutex_lock(&c->info->global_untyped_mutex);
 		defer (mutex_unlock(&c->info->global_untyped_mutex));
-		ExprInfo **found = map_get(&c->info->global_untyped, hash_pointer(expr));
+		ExprInfo **found = map_get(&c->info->global_untyped, expr);
 		if (found) {
 			return *found;
 		}
@@ -1104,23 +1104,23 @@ ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 
 void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (c->untyped != nullptr) {
-		map_set(c->untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+		map_set(c->untyped, expr, make_expr_info(mode, type, value, false));
 	} else {
 		mutex_lock(&c->info->global_untyped_mutex);
-		map_set(&c->info->global_untyped, hash_pointer(expr), make_expr_info(mode, type, value, false));
+		map_set(&c->info->global_untyped, expr, make_expr_info(mode, type, value, false));
 		mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
 void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	if (c->untyped != nullptr) {
-		map_remove(c->untyped, hash_pointer(e));
-		GB_ASSERT(map_get(c->untyped, hash_pointer(e)) == nullptr);
+		map_remove(c->untyped, e);
+		GB_ASSERT(map_get(c->untyped, e) == nullptr);
 	} else {
 		auto *untyped = &c->info->global_untyped;
 		mutex_lock(&c->info->global_untyped_mutex);
-		map_remove(untyped, hash_pointer(e));
-		GB_ASSERT(map_get(untyped, hash_pointer(e)) == nullptr);
+		map_remove(untyped, e);
+		GB_ASSERT(map_get(untyped, e) == nullptr);
 		mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
@@ -4952,7 +4952,7 @@ void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 		return;
 	}
 	for_array(i, untyped->entries) {
-		Ast *expr = cast(Ast *)cast(uintptr)untyped->entries[i].key.key;
+		Ast *expr = untyped->entries[i].key;
 		ExprInfo *info = untyped->entries[i].value;
 		if (expr != nullptr && info != nullptr) {
 			mpmc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});

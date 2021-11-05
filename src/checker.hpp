@@ -264,7 +264,7 @@ struct UntypedExprInfo {
 	ExprInfo *info;
 };
 
-typedef Map<ExprInfo *> UntypedExprInfoMap; // Key: Ast *
+typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
 typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
 // CheckerInfo stores all the symbol information for a type-checked program
