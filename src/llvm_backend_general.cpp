@@ -57,14 +57,12 @@ void lb_init_module(lbModule *m, Checker *c) {
 	gbAllocator a = heap_allocator();
 	map_init(&m->types, a);
 	map_init(&m->struct_field_remapping, a);
-	map_init(&m->llvm_types, a);
 	map_init(&m->values, a);
 	map_init(&m->soa_values, a);
 	string_map_init(&m->members, a);
 	map_init(&m->procedure_values, a);
 	string_map_init(&m->procedures, a);
 	string_map_init(&m->const_strings, a);
-	map_init(&m->anonymous_proc_lits, a);
 	map_init(&m->function_type_map, a);
 	map_init(&m->equal_procs, a);
 	map_init(&m->hasher_procs, a);
@@ -133,20 +131,20 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
-			map_set(&gen->modules, hash_pointer(pkg), m);
+			map_set(&gen->modules, pkg, m);
 			lb_init_module(m, c);
 		}
 	}
 
 	gen->default_module.gen = gen;
-	map_set(&gen->modules, hash_pointer(nullptr), &gen->default_module);
+	map_set(&gen->modules, cast(AstPackage *)nullptr, &gen->default_module);
 	lb_init_module(&gen->default_module, c);
 
 
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
 		LLVMContextRef ctx = LLVMGetModuleContext(m->mod);
-		map_set(&gen->modules_through_ctx, hash_pointer(ctx), m);
+		map_set(&gen->modules_through_ctx, ctx, m);
 	}
 
 	return true;
@@ -251,7 +249,7 @@ bool lb_is_instr_terminating(LLVMValueRef instr) {
 
 
 lbModule *lb_pkg_module(lbGenerator *gen, AstPackage *pkg) {
-	auto *found = map_get(&gen->modules, hash_pointer(pkg));
+	auto *found = map_get(&gen->modules, pkg);
 	if (found) {
 		return *found;
 	}
@@ -1590,7 +1588,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return lb_type_internal(m, base);
 			}
 
-			LLVMTypeRef *found = map_get(&m->types, hash_type(base));
+			LLVMTypeRef *found = map_get(&m->types, base);
 			if (found) {
 				LLVMTypeKind kind = LLVMGetTypeKind(*found);
 				if (kind == LLVMStructTypeKind) {
@@ -1600,7 +1598,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 						return llvm_type;
 					}
 					llvm_type = LLVMStructCreateNamed(ctx, name);
-					map_set(&m->types, hash_type(type), llvm_type);
+					map_set(&m->types, type, llvm_type);
 					lb_clone_struct_type(llvm_type, *found);
 					return llvm_type;
 				}
@@ -1616,7 +1614,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 						return llvm_type;
 					}
 					llvm_type = LLVMStructCreateNamed(ctx, name);
-					map_set(&m->types, hash_type(type), llvm_type);
+					map_set(&m->types, type, llvm_type);
 					lb_clone_struct_type(llvm_type, lb_type(m, base));
 					return llvm_type;
 				}
@@ -1697,7 +1695,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				for_array(i, entries_field_remapping) {
 					entries_field_remapping[i] = cast(i32)i;
 				}
-				map_set(&m->struct_field_remapping, hash_pointer(fields[1]), entries_field_remapping);
+				map_set(&m->struct_field_remapping, cast(void *)fields[1], entries_field_remapping);
 			}
 			
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
@@ -1721,8 +1719,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				field_remapping[0] = 0;
 				
 				LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
-				map_set(&m->struct_field_remapping, hash_pointer(struct_type), field_remapping);
-				map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);
+				map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
+				map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);
 				return struct_type;
 			}
 			
@@ -1768,8 +1766,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			
 			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, type->Struct.is_packed);
-			map_set(&m->struct_field_remapping, hash_pointer(struct_type), field_remapping);
-			map_set(&m->struct_field_remapping, hash_pointer(type), field_remapping);			
+			map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
+			map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);			
 			#if 0
 			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size, 
 			              "(%lld) %s vs (%lld) %s", 
@@ -1930,7 +1928,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
 			}
 
-			map_set(&m->function_type_map, hash_type(type), ft);
+			map_set(&m->function_type_map, type, ft);
 			LLVMTypeRef new_abi_fn_ptr_type = lb_function_type_to_llvm_ptr(ft, type->Proc.c_vararg);
 			LLVMTypeRef new_abi_fn_type = LLVMGetElementType(new_abi_fn_ptr_type);
 
@@ -1991,7 +1989,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 LLVMTypeRef lb_type(lbModule *m, Type *type) {
 	type = default_type(type);
 
-	LLVMTypeRef *found = map_get(&m->types, hash_type(type));
+	LLVMTypeRef *found = map_get(&m->types, type);
 	if (found) {
 		return *found;
 	}
@@ -2002,21 +2000,18 @@ LLVMTypeRef lb_type(lbModule *m, Type *type) {
 	llvm_type = lb_type_internal(m, type);
 	m->internal_type_level -= 1;
 	if (m->internal_type_level == 0) {
-		map_set(&m->types, hash_type(type), llvm_type);
-		if (is_type_named(type)) {
-			map_set(&m->llvm_types, hash_pointer(llvm_type), type);
-		}
+		map_set(&m->types, type, llvm_type);
 	}
 	return llvm_type;
 }
 
 lbFunctionType *lb_get_function_type(lbModule *m, lbProcedure *p, Type *pt) {
 	lbFunctionType **ft_found = nullptr;
-	ft_found = map_get(&m->function_type_map, hash_type(pt));
+	ft_found = map_get(&m->function_type_map, pt);
 	if (!ft_found) {
 		LLVMTypeRef llvm_proc_type = lb_type(p->module, pt);
 		gb_unused(llvm_proc_type);
-		ft_found = map_get(&m->function_type_map, hash_type(pt));
+		ft_found = map_get(&m->function_type_map, pt);
 	}
 	GB_ASSERT(ft_found != nullptr);
 
@@ -2027,12 +2022,11 @@ void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 	if (p->abi_function_type != nullptr) {
 		return;
 	}
-	auto hash = hash_type(p->type);
-	lbFunctionType **ft_found = map_get(&m->function_type_map, hash);
+	lbFunctionType **ft_found = map_get(&m->function_type_map, p->type);
 	if (ft_found == nullptr) {
 		LLVMTypeRef llvm_proc_type = lb_type(p->module, p->type);
 		gb_unused(llvm_proc_type);
-		ft_found = map_get(&m->function_type_map, hash);
+		ft_found = map_get(&m->function_type_map, p->type);
 	}
 	GB_ASSERT(ft_found != nullptr);
 	p->abi_function_type = *ft_found;
@@ -2041,7 +2035,7 @@ void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 
 void lb_add_entity(lbModule *m, Entity *e, lbValue val) {
 	if (e != nullptr) {
-		map_set(&m->values, hash_entity(e), val);
+		map_set(&m->values, e, val);
 	}
 }
 void lb_add_member(lbModule *m, String const &name, lbValue val) {
@@ -2054,7 +2048,7 @@ void lb_add_member(lbModule *m, StringHashKey const &key, lbValue val) {
 }
 void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
 	if (p->entity != nullptr) {
-		map_set(&m->procedure_values, hash_pointer(p->value), p->entity);
+		map_set(&m->procedure_values, p->value, p->entity);
 	}
 	string_map_set(&m->procedures, p->name, p);
 }
@@ -2368,7 +2362,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 
 
 lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
-	auto *found = map_get(&m->values, hash_entity(e));
+	auto *found = map_get(&m->values, e);
 	if (found) {
 		auto v = *found;
 		// NOTE(bill): This is because pointers are already pointers in LLVM
@@ -2417,7 +2411,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
 
-	auto *found = map_get(&m->values, hash_entity(e));
+	auto *found = map_get(&m->values, e);
 	if (found) {
 		return *found;
 	}
@@ -2437,7 +2431,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	if (!ignore_body) {
 		array_add(&m->missing_procedures_to_check, missing_proc);
 	}
-	found = map_get(&m->values, hash_entity(e));
+	found = map_get(&m->values, e);
 	if (found) {
 		return *found;
 	}
@@ -2501,7 +2495,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 		return lb_find_procedure_value_from_entity(m, e);
 	}
 
-	auto *found = map_get(&m->values, hash_entity(e));
+	auto *found = map_get(&m->values, e);
 	if (found) {
 		return *found;
 	}
