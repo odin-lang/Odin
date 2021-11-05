@@ -63,44 +63,39 @@ struct ExactValue {
 
 gb_global ExactValue const empty_exact_value = {};
 
-HashKey hash_exact_value(ExactValue v) {
+uintptr hash_exact_value(ExactValue v) {
 	mutex_lock(&hash_exact_value_mutex);
 	defer (mutex_unlock(&hash_exact_value_mutex));
 	
-	HashKey empty = {};
 	switch (v.kind) {
 	case ExactValue_Invalid:
-		return empty;
+		return 0;
 	case ExactValue_Bool:
-		return hash_integer(u64(v.value_bool));
+		return gb_fnv32a(&v.value_bool, gb_size_of(v.value_bool));
 	case ExactValue_String:
-		{
-			char const *str = string_intern(v.value_string);
-			return hash_pointer(str);
-		}
+		return ptr_map_hash_key(string_intern(v.value_string));
 	case ExactValue_Integer:
 		{
-			HashKey key = hashing_proc(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
+			u32 key = gb_fnv32a(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
 			u8 last = (u8)v.value_integer.sign;
-			key.key = (key.key ^ last) * 0x100000001b3ll;
-			return key;
+			return (key ^ last) * 0x01000193;
 		}
 	case ExactValue_Float:
-		return hash_f64(v.value_float);
+		return gb_fnv32a(&v.value_float, gb_size_of(v.value_float));
 	case ExactValue_Pointer:
-		return hash_integer(v.value_pointer);
+		return ptr_map_hash_key(v.value_pointer);
 	case ExactValue_Complex:
-		return hashing_proc(v.value_complex, gb_size_of(Complex128));
+		return gb_fnv32a(v.value_complex, gb_size_of(Complex128));
 	case ExactValue_Quaternion:
-		return hashing_proc(v.value_quaternion, gb_size_of(Quaternion256));
+		return gb_fnv32a(v.value_quaternion, gb_size_of(Quaternion256));
 	case ExactValue_Compound:
-		return hash_pointer(v.value_compound);
+		return ptr_map_hash_key(v.value_compound);
 	case ExactValue_Procedure:
-		return hash_pointer(v.value_procedure);
+		return ptr_map_hash_key(v.value_procedure);
 	case ExactValue_Typeid:
-		return hash_pointer(v.value_typeid);
+		return ptr_map_hash_key(v.value_typeid);
 	}
-	return hashing_proc(&v, gb_size_of(ExactValue));
+	return gb_fnv32a(&v, gb_size_of(ExactValue));
 
 }
 

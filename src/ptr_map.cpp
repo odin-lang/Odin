@@ -253,7 +253,7 @@ template <typename K, typename V>
 PtrMapEntry<K, V> *multi_map_find_next(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
 	isize i = e->next;
 	while (i != MAP_SENTINEL) {
-		if (hash_key_equal(h->entries.data[i].key, e->key)) {
+		if (h->entries.data[i].key == e->key) {
 			return &h->entries.data[i];
 		}
 		i = h->entries.data[i].next;
