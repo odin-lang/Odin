@@ -321,7 +321,7 @@ struct CheckerInfo {
 
 	BlockingMutex type_info_mutex; // NOT recursive
 	Array<Type *> type_info_types;
-	Map<isize>    type_info_map;   // Key: Type *
+	PtrMap<Type *, isize> type_info_map;
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;

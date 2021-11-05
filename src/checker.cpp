@@ -1135,8 +1135,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	mutex_lock(&info->type_info_mutex);
 
 	isize entry_index = -1;
-	HashKey key = hash_type(type);
-	isize *found_entry_index = map_get(&info->type_info_map, key);
+	isize *found_entry_index = map_get(&info->type_info_map, type);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
 	}
@@ -1145,11 +1144,10 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		// TODO(bill): This is O(n) and can be very slow
 		for_array(i, info->type_info_map.entries){
 			auto *e = &info->type_info_map.entries[i];
-			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
-			if (are_types_identical(prev_type, type)) {
+			if (are_types_identical(e->key, type)) {
 				entry_index = e->value;
 				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, key, entry_index);
+				map_set(&info->type_info_map, type, entry_index);
 				break;
 			}
 		}
@@ -1484,7 +1482,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	add_type_info_dependency(c->decl, t);
 
-	auto found = map_get(&c->info->type_info_map, hash_type(t));
+	auto found = map_get(&c->info->type_info_map, t);
 	if (found != nullptr) {
 		// Types have already been added
 		return;
@@ -1494,8 +1492,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	isize ti_index = -1;
 	for_array(i, c->info->type_info_map.entries) {
 		auto *e = &c->info->type_info_map.entries[i];
-		Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
-		if (are_types_identical(t, prev_type)) {
+		if (are_types_identical(t, e->key)) {
 			// Duplicate entry
 			ti_index = e->value;
 			prev = true;
@@ -1508,7 +1505,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		ti_index = c->info->type_info_types.count;
 		array_add(&c->info->type_info_types, t);
 	}
-	map_set(&c->checker->info.type_info_map, hash_type(t), ti_index);
+	map_set(&c->checker->info.type_info_map, t, ti_index);
 
 	if (prev) {
 		// NOTE(bill): If a previous one exists already, no need to continue
