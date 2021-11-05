@@ -219,7 +219,7 @@ void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
 }
 
 template <typename K, typename V>
-void map_remove(PtrMap<K, V> *h, HashKey const &key) {
+void map_remove(PtrMap<K, V> *h, K key) {
 	MapFindResult fr = map__find(h, key);
 	if (fr.entry_index != MAP_SENTINEL) {
 		map__erase(h, fr);
