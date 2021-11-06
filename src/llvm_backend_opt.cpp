@@ -22,9 +22,9 @@ void lb_add_must_preserve_predicate_pass(lbModule *m, LLVMPassManagerRef fpm, i3
 
 
 #if LLVM_VERSION_MAJOR < 12
-#define LLVM_ADD_CONSTANT_VALUE_PASS LLVMAddConstantPropagationPass
+#define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) LLVMAddConstantPropagationPass(fpm)
 #else
-#define LLVM_ADD_CONSTANT_VALUE_PASS LLVMAddCorrelatedValuePropagationPass
+#define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) 
 #endif
 
 void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm) {
@@ -61,16 +61,7 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
 	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
 #else
-	LLVMAddMemCpyOptPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddCFGSimplificationPass(fpm);
+	lb_basic_populate_function_pass_manager(fpm);
 
 	LLVMAddSCCPPass(fpm);
 
