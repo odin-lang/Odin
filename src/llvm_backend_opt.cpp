@@ -1,3 +1,36 @@
+/**************************************************************************
+
+	IMPORTANT NOTE(bill, 2021-11-06): Regarding Optimization Passes
+
+	A lot of the passes taken here have been modified with what was 
+	partially done in LLVM 11. 
+
+	Passes that CANNOT be used by Odin due to C-like optimizations which 
+	are not compatible with Odin:
+		
+		LLVMAddCorrelatedValuePropagationPass 
+		LLVMAddAggressiveInstCombinerPass
+		LLVMAddInstructionCombiningPass
+		LLVMAddIndVarSimplifyPass
+		LLVMAddLoopUnrollPass
+		LLVMAddEarlyCSEMemSSAPass
+		LLVMAddGVNPass
+		
+	Odin does not allow poison-value based optimizations. 
+	
+	For example, *-flowing integers in C is "undefined behaviour" and thus 
+	many optimizers, including LLVM, take advantage of this for a certain 
+	class of optimizations. Odin on the other hand defines *-flowing 
+	behaviour to obey the rules of 2's complement, meaning wrapping is a 
+	expected. This means any outputted IR containing the following flags 
+	may cause incorrect behaviour:
+	
+		nsw (no signed wrap)
+		nuw (no unsigned wrap)
+		poison (poison value)
+**************************************************************************/
+
+
 void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level);
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level);
 void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level);
@@ -33,10 +66,10 @@ void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm) {
 	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddCFGSimplificationPass(fpm);
+	// LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
+	// LLVMAddMergedLoadStoreMotionPass(fpm);
+	// LLVMAddPromoteMemoryToRegisterPass(fpm);
+	// LLVMAddCFGSimplificationPass(fpm);
 }
 
 void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
@@ -61,6 +94,7 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
 	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
 #else
+	LLVMAddMemCpyOptPass(fpm);
 	lb_basic_populate_function_pass_manager(fpm);
 
 	LLVMAddSCCPPass(fpm);
@@ -116,17 +150,10 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 }
 
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
-	LLVMAddEarlyCSEMemSSAPass(mpm);
-
-	LLVMAddGVNPass(mpm);
 	LLVMAddCFGSimplificationPass(mpm);
 
 	LLVMAddJumpThreadingPass(mpm);
 
-	// if (optimization_level > 2) {
-		// LLVMAddAggressiveInstCombinerPass(mpm);
-	// }
-	LLVMAddInstructionCombiningPass(mpm);
 	LLVMAddSimplifyLibCallsPass(mpm);
 
 	LLVMAddTailCallEliminationPass(mpm);
@@ -138,23 +165,16 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 	LLVMAddLoopUnswitchPass(mpm);
 
 	LLVMAddCFGSimplificationPass(mpm);
-	LLVMAddInstructionCombiningPass(mpm);
-	LLVMAddIndVarSimplifyPass(mpm);
 	LLVMAddLoopIdiomPass(mpm);
 	LLVMAddLoopDeletionPass(mpm);
 
-	LLVMAddLoopUnrollPass(mpm);
-
 	LLVMAddMergedLoadStoreMotionPass(mpm);
-
-	LLVMAddGVNPass(mpm);
 
 	LLVMAddMemCpyOptPass(mpm);
 	LLVMAddSCCPPass(mpm);
 
 	LLVMAddBitTrackingDCEPass(mpm);
 
-	LLVMAddInstructionCombiningPass(mpm);
 	LLVMAddJumpThreadingPass(mpm);
 	LLVM_ADD_CONSTANT_VALUE_PASS(mpm);
 	LLVMAddDeadStoreEliminationPass(mpm);
@@ -163,7 +183,6 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 	LLVMAddLoopRerollPass(mpm);
 	LLVMAddAggressiveDCEPass(mpm);
 	LLVMAddCFGSimplificationPass(mpm);
-	LLVMAddInstructionCombiningPass(mpm);
 }
 
 
@@ -191,6 +210,7 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 		// LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
 		// return;
 	}
+	
 
 	LLVMAddIPSCCPPass(mpm);
 	LLVMAddCalledValuePropagationPass(mpm);
@@ -198,8 +218,6 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	LLVMAddGlobalOptimizerPass(mpm);
 	LLVMAddDeadArgEliminationPass(mpm);
 
-	// LLVMAddConstantMergePass(mpm); // ???
-	LLVMAddInstructionCombiningPass(mpm);
 	LLVMAddCFGSimplificationPass(mpm);
 
 	LLVMAddPruneEHPass(mpm);
@@ -208,25 +226,24 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	}
 
 	LLVMAddFunctionInliningPass(mpm);
+	
 	lb_add_function_simplifcation_passes(mpm, optimization_level);
-
+	
+	
 	LLVMAddGlobalDCEPass(mpm);
 	LLVMAddGlobalOptimizerPass(mpm);
-
-	// LLVMAddLowerConstantIntrinsicsPass(mpm);
+	
 
 	LLVMAddLoopRotatePass(mpm);
 
 	LLVMAddLoopVectorizePass(mpm);
-
-	LLVMAddInstructionCombiningPass(mpm);
+	
 	if (optimization_level >= 2) {
 		LLVMAddEarlyCSEPass(mpm);
 		LLVM_ADD_CONSTANT_VALUE_PASS(mpm);
 		LLVMAddLICMPass(mpm);
 		LLVMAddLoopUnswitchPass(mpm);
 		LLVMAddCFGSimplificationPass(mpm);
-		LLVMAddInstructionCombiningPass(mpm);
 	}
 
 	LLVMAddCFGSimplificationPass(mpm);
@@ -245,6 +262,15 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 
 	LLVMAddCFGSimplificationPass(mpm);
 }
+
+
+
+/**************************************************************************
+	IMPORTANT NOTE(bill, 2021-11-06): Custom Passes
+	
+	The procedures below are custom written passes to aid in the 
+	optimization of Odin programs	
+**************************************************************************/
 
 void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	isize removal_count = 0;

@@ -1084,7 +1084,7 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 				scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
 			}
 			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
-			LLVMValueRef sv = LLVMBuildShuffleVector(p->builder, v, LLVMGetUndef(vector_type), mask, "");
+			LLVMValueRef sv = llvm_basic_shuffle(p, v, mask);
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
 			LLVMBuildStore(p->builder, sv, dst);

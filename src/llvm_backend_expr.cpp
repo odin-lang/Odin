@@ -577,7 +577,7 @@ LLVMValueRef lb_matrix_to_trimmed_vector(lbProcedure *p, lbValue m) {
 	}
 	
 	LLVMValueRef mask = lb_matrix_trimmed_vector_mask(p, mt);
-	LLVMValueRef trimmed_vector = LLVMBuildShuffleVector(p->builder, vector, LLVMGetUndef(LLVMTypeOf(vector)), mask, "");
+	LLVMValueRef trimmed_vector = llvm_basic_shuffle(p, vector, mask);
 	return trimmed_vector;
 }
 
@@ -608,7 +608,7 @@ lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *type) {
 			
 			// transpose mask
 			LLVMValueRef mask = LLVMConstVector(mask_elems.data, column_count);
-			LLVMValueRef row = LLVMBuildShuffleVector(p->builder, vector, LLVMGetUndef(LLVMTypeOf(vector)), mask, "");
+			LLVMValueRef row = llvm_basic_shuffle(p, vector, mask);
 			rows[i] = row;
 		}
 		
@@ -747,13 +747,13 @@ lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs, Type *type)
 			
 			// transpose mask
 			LLVMValueRef mask = LLVMConstVector(mask_elems.data, inner);
-			LLVMValueRef row = LLVMBuildShuffleVector(p->builder, x_vector, LLVMGetUndef(LLVMTypeOf(x_vector)), mask, "");
+			LLVMValueRef row = llvm_basic_shuffle(p, x_vector, mask);
 			x_rows[i] = row;
 		}
 		
 		for (unsigned i = 0; i < outer_columns; i++) {
 			LLVMValueRef mask = llvm_mask_iota(p->module, y_stride*i, inner);
-			LLVMValueRef column = LLVMBuildShuffleVector(p->builder, y_vector, LLVMGetUndef(LLVMTypeOf(y_vector)), mask, "");
+			LLVMValueRef column = llvm_basic_shuffle(p, y_vector, mask);
 			y_columns[i] = column;
 		}
 		
@@ -825,7 +825,7 @@ lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 		
 		for (unsigned column_index = 0; column_index < column_count; column_index++) {
 			LLVMValueRef mask = llvm_mask_iota(p->module, stride*column_index, row_count);
-			LLVMValueRef column = LLVMBuildShuffleVector(p->builder, matrix_vector, LLVMGetUndef(LLVMTypeOf(matrix_vector)), mask, "");
+			LLVMValueRef column = llvm_basic_shuffle(p, matrix_vector, mask);
 			m_columns[column_index] = column;
 		}
 		
@@ -901,7 +901,7 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 			
 			// transpose mask
 			LLVMValueRef mask = LLVMConstVector(mask_elems.data, column_count);
-			LLVMValueRef column = LLVMBuildShuffleVector(p->builder, matrix_vector, LLVMGetUndef(LLVMTypeOf(matrix_vector)), mask, "");
+			LLVMValueRef column = llvm_basic_shuffle(p, matrix_vector, mask);
 			m_columns[row_index] = column;
 		}
 		

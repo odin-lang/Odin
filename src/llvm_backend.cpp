@@ -684,7 +684,8 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 			if (init.value == nullptr) {
 				LLVMTypeRef global_type = LLVMGetElementType(LLVMTypeOf(var->var.value));
 				if (is_type_untyped_undef(init.type)) {
-					LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
+					// LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
+					LLVMSetInitializer(var->var.value, LLVMConstNull(global_type));
 					var->is_initialized = true;
 					continue;
 				} else if (is_type_untyped_nil(init.type)) {
