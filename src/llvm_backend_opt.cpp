@@ -15,6 +15,7 @@
 		LLVMAddLoopUnrollPass
 		LLVMAddEarlyCSEMemSSAPass
 		LLVMAddGVNPass
+		LLVMAddDeadStoreEliminationPass - Causes too many false positive
 		
 	Odin does not allow poison-value based optimizations. 
 	
@@ -177,7 +178,6 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 
 	LLVMAddJumpThreadingPass(mpm);
 	LLVM_ADD_CONSTANT_VALUE_PASS(mpm);
-	LLVMAddDeadStoreEliminationPass(mpm);
 	LLVMAddLICMPass(mpm);
 
 	LLVMAddLoopRerollPass(mpm);
@@ -227,9 +227,9 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 
 	LLVMAddFunctionInliningPass(mpm);
 	
+	
 	lb_add_function_simplifcation_passes(mpm, optimization_level);
-	
-	
+		
 	LLVMAddGlobalDCEPass(mpm);
 	LLVMAddGlobalOptimizerPass(mpm);
 	
