@@ -116,6 +116,7 @@ main :: proc() {
     test_haval_256(&t)
 
     // "modern" crypto tests
+    test_chacha20(&t)
     test_poly1305(&t)
     test_x25519(&t)
 
