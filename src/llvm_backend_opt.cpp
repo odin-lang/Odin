@@ -373,6 +373,20 @@ void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
 	lb_run_remove_dead_instruction_pass(p);
 }
 
+void llvm_delete_function(LLVMValueRef func) {
+	// for (LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(func); block != nullptr; /**/) {
+	// 	LLVMBasicBlockRef curr_block = block;
+	// 	block = LLVMGetNextBasicBlock(block);
+	// 	for (LLVMValueRef instr = LLVMGetFirstInstruction(curr_block); instr != nullptr; /**/) {
+	// 		LLVMValueRef curr_instr = instr;
+	// 		instr = LLVMGetNextInstruction(instr);
+			
+	// 		LLVMInstructionEraseFromParent(curr_instr);
+	// 	}
+	// 	LLVMRemoveBasicBlockFromParent(curr_block);
+	// }
+	LLVMDeleteFunction(func);
+}
 
 void lb_run_remove_unused_function_pass(lbModule *m) {
 	isize removal_count = 0;
@@ -380,7 +394,7 @@ void lb_run_remove_unused_function_pass(lbModule *m) {
 	isize const max_pass_count = 10;
 	// Custom remove dead function pass
 	for (; pass_count < max_pass_count; pass_count++) {
-		bool was_dead_function = false;	
+		bool was_dead = false;	
 		for (LLVMValueRef func = LLVMGetFirstFunction(m->mod);
 		     func != nullptr;
 		     /**/
@@ -412,12 +426,58 @@ void lb_run_remove_unused_function_pass(lbModule *m) {
 					continue;
 				}
 			}
-
-			LLVMDeleteFunction(curr_func);
-			was_dead_function = true;
+			
+			llvm_delete_function(curr_func);
+			was_dead = true;
 			removal_count += 1;
 		}
-		if (!was_dead_function) {
+		if (!was_dead) {
+			break;
+		}
+	}
+}
+
+
+void lb_run_remove_unused_globals_pass(lbModule *m) {
+	isize removal_count = 0;
+	isize pass_count = 0;
+	isize const max_pass_count = 10;
+	// Custom remove dead function pass
+	for (; pass_count < max_pass_count; pass_count++) {
+		bool was_dead = false;	
+		for (LLVMValueRef global = LLVMGetFirstGlobal(m->mod);
+		     global != nullptr;
+		     /**/
+		     ) {
+		     	LLVMValueRef curr_global = global;
+		     	global = LLVMGetNextGlobal(global);
+		     	
+			LLVMUseRef first_use = LLVMGetFirstUse(curr_global);
+			if (first_use != nullptr)  {
+				continue;
+			}
+			String name = {};
+			name.text = cast(u8 *)LLVMGetValueName2(curr_global, cast(size_t *)&name.len);
+						
+			LLVMLinkage linkage = LLVMGetLinkage(curr_global);
+			if (linkage != LLVMInternalLinkage) {
+				continue;
+			}
+			
+			Entity **found = map_get(&m->procedure_values, curr_global);
+			if (found && *found) {
+				Entity *e = *found;
+				bool is_required = (e->flags & EntityFlag_Require) == EntityFlag_Require;
+				if (is_required) {
+					continue;
+				}
+			}
+
+			LLVMDeleteGlobal(curr_global);
+			was_dead = true;
+			removal_count += 1;
+		}
+		if (!was_dead) {
 			break;
 		}
 	}

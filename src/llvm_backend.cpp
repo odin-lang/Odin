@@ -1676,6 +1676,7 @@ void lb_generate_code(lbGenerator *gen) {
 		lbModule *m = gen->modules.entries[i].value;
 		
 		lb_run_remove_unused_function_pass(m);
+		lb_run_remove_unused_globals_pass(m);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;

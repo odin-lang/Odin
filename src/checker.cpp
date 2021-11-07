@@ -2660,10 +2660,14 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "require") {
-		if (value != nullptr) {
-			error(elem, "'require' does not have any parameters");
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->require_declaration = true;
+		} else if (ev.kind == ExactValue_Bool) {
+			ac->require_declaration = ev.value_bool;
+		} else {
+			error(value, "Expected either a boolean or no parameter for 'require'");
 		}
-		ac->require_declaration = true;
 		return true;
 	} else if (name == "init") {
 		if (value != nullptr) {
