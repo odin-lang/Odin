@@ -9,7 +9,7 @@ RUNTIME_LINKAGE :: "strong" when (
 	!ODIN_NO_CRT) &&
 	!(ODIN_ARCH == "wasm32" || 
 	  ODIN_ARCH == "wasm64")) else "internal"
-RUNTIME_REQUIRE :: !(ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64")
+RUNTIME_REQUIRE :: true
 
 
 @(private)

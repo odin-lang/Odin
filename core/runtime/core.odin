@@ -528,5 +528,5 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 		}
 		print_byte('\n')
 	}
-	intrinsics.trap()
+	trap()
 }

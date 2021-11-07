@@ -1,4 +1,4 @@
-//+build !freestanding
+//+build !freestanding !js
 package fmt
 
 import "core:runtime"
