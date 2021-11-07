@@ -106,6 +106,7 @@ parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 }
 
 parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
+	err = .None
 	token := p.curr_token
 	#partial switch token.kind {
 	case .Null:
@@ -175,6 +176,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 }
 
 parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
+	err = .None
 	expect_token(p, .Open_Bracket) or_return
 
 	array: Array
@@ -266,15 +268,14 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 			break
 		}
 	}	
-	return
+	return obj, .None
 }
 
 parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	expect_token(p, .Open_Brace) or_return
 	obj := parse_object_body(p, .Close_Brace) or_return
 	expect_token(p, .Close_Brace) or_return
-	value = obj
-	return
+	return obj, .None
 }
 
 
