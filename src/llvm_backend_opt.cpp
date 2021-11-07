@@ -79,11 +79,6 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
 	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
-
-	if (!ignore_memcpy_pass) {
-		LLVMAddMemCpyOptPass(fpm);
-	}
-
 	if (optimization_level == 0) {
 		if (!build_context.ODIN_DEBUG) {
 			lb_basic_populate_function_pass_manager(fpm);
@@ -98,7 +93,10 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
 	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
 #else
-	LLVMAddMemCpyOptPass(fpm);
+	if (!ignore_memcpy_pass) {
+		LLVMAddMemCpyOptPass(fpm);
+	}
+
 	lb_basic_populate_function_pass_manager(fpm);
 
 	LLVMAddSCCPPass(fpm);
