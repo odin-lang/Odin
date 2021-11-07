@@ -68,14 +68,14 @@ use_odin :: #force_inline proc() {
 @(private)
 _create_groestl_ctx :: #force_inline proc(size: _ctx.Hash_Size) {
     ctx: Groestl_Context
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
     #partial switch size {
         case ._28: ctx.hashbitlen = 224
         case ._32: ctx.hashbitlen = 256
         case ._48: ctx.hashbitlen = 384
         case ._64: ctx.hashbitlen = 512
     }
+    _hash_impl.internal_ctx = ctx
+    _hash_impl.hash_size    = size
 }
 
 /*
