@@ -1,3 +1,4 @@
+//+build !js
 package math
 
 @(default_calling_convention="none")
