@@ -200,8 +200,6 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 		}
 	}
 
-	LLVMAddTypeBasedAliasAnalysisPass(mpm); //NOTE(Jesse):
-
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
