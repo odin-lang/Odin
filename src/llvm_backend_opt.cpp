@@ -37,23 +37,6 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level);
 void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level);
 
-LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data) {
-	lbModule *m = cast(lbModule *)user_data;
-	if (m == nullptr) {
-		return false;
-	}
-	if (value == nullptr) {
-		return false;
-	}
-	return LLVMIsAAllocaInst(value) != nullptr;
-}
-
-void lb_add_must_preserve_predicate_pass(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
-	if (false && optimization_level == 0 && m->debug_builder) {
-		// LLVMAddInternalizePassWithMustPreservePredicate(fpm, m, lb_must_preserve_predicate_callback);
-	}
-}
-
 
 #if LLVM_VERSION_MAJOR < 12
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) LLVMAddConstantPropagationPass(fpm)
@@ -78,7 +61,6 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
 	if (optimization_level == 0) {
 		if (!build_context.ODIN_DEBUG) {
 			lb_basic_populate_function_pass_manager(fpm);
@@ -114,8 +96,6 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
-
-	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
 
 	if (optimization_level == 0) { //NOTE(Jesse): This is the only path taken for opt:[1,2]
 		if (!build_context.ODIN_DEBUG) {
