@@ -73,9 +73,6 @@ use_odin :: #force_inline proc() {
 @(private)
 _create_haval_ctx :: #force_inline proc(size: _ctx.Hash_Size, rounds: u32) {
     ctx: Haval_Context
-    ctx.rounds              = rounds
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
     #partial switch size {
         case ._16: ctx.hashbitlen = 128
         case ._20: ctx.hashbitlen = 160
@@ -83,6 +80,9 @@ _create_haval_ctx :: #force_inline proc(size: _ctx.Hash_Size, rounds: u32) {
         case ._28: ctx.hashbitlen = 224
         case ._32: ctx.hashbitlen = 256
     }
+    ctx.rounds              = rounds
+    _hash_impl.internal_ctx = ctx
+    _hash_impl.hash_size    = size
 }
 
 /*
