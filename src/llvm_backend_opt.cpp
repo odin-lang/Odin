@@ -106,6 +106,8 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 	}
 
 #if 1
+	lb_basic_populate_function_pass_manager(fpm);
+
 	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
 	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
 	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
