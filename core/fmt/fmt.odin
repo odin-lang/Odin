@@ -1929,12 +1929,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if fi.hash { 
 			// Printed as it is written
 			io.write_byte(fi.writer, '\n')
-			for col in 0..<info.column_count {
+			for row in 0..<info.row_count {
 				fmt_write_indent(fi)
-				for row in 0..<info.row_count {
-					if row > 0 { io.write_string(fi.writer, ", ") }
+				for col in 0..<info.column_count {
+					if col > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := (col + row*info.elem_stride)*info.elem_size
+					offset := (row + col*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -1943,12 +1943,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		} else {
 			// Printed in Row-Major layout to match text layout
-			for col in 0..<info.column_count {
-				if col > 0 { io.write_string(fi.writer, "; ") }
-				for row in 0..<info.row_count {
-					if row > 0 { io.write_string(fi.writer, ", ") }
+			for row in 0..<info.row_count {
+				if row > 0 { io.write_string(fi.writer, "; ") }
+				for col in 0..<info.column_count {
+					if col > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := (col + row*info.elem_stride)*info.elem_size
+					offset := (row + col*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
