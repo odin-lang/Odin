@@ -1417,7 +1417,14 @@ i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 	i64 row_index    = index/t->Matrix.column_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
 }
-
+i64 matrix_column_major_index_to_offset(Type *t, i64 index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	i64 row_index    = index%t->Matrix.row_count;
+	i64 column_index = index/t->Matrix.row_count;
+	return matrix_indices_to_offset(t, row_index, column_index);
+}
 
 
 bool is_matrix_square(Type *t) {
