@@ -61,10 +61,8 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	if (optimization_level == 0) {
-		if (!build_context.ODIN_DEBUG) {
-			lb_basic_populate_function_pass_manager(fpm);
-		} 
+	if ((optimization_level == 0) && build_context.ODIN_DEBUG) {
+		//NOTE(Jesse): Do not populate function pass manager for -opt:0 -debug case.
 
 		return;
 	}
@@ -97,20 +95,18 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	if (optimization_level == 0) { //NOTE(Jesse): This is the only path taken for opt:[1,2]
-		if (!build_context.ODIN_DEBUG) {
-			lb_basic_populate_function_pass_manager(fpm);
-		}
-
-		return;
-	}
-
 #if 1
-	lb_basic_populate_function_pass_manager(fpm);
 
 	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
 	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
 	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
+
+	if ((optimization_level == 0) && build_context.ODIN_DEBUG) {
+		//NOTE(Jesse): Do not populate function pass manager for -opt:0 -debug case.
+	} else {
+		lb_basic_populate_function_pass_manager(fpm);
+	}
+
 	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
 #else
 	LLVMAddMemCpyOptPass(fpm);
@@ -176,10 +172,8 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
-	if (build_context.ODIN_DEBUG) {
-		if (optimization_level == 0) {
-			return;
-		}
+	if ((optimization_level == 0) && build_context.ODIN_DEBUG) {
+		return;
 	}
 
 	LLVMAddAlwaysInlinerPass(mpm);
@@ -216,7 +210,6 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	}
 
 	LLVMAddFunctionInliningPass(mpm);
-	
 	
 	lb_add_function_simplifcation_passes(mpm, optimization_level);
 		
