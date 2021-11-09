@@ -6,55 +6,12 @@ package md2
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the MD2 hashing algorithm, as defined in RFC 1319 <https://datatracker.ietf.org/doc/html/rfc1319>
 */
 
 import "core:os"
 import "core:io"
-
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_16  = hash_bytes_odin
-    ctx.hash_file_16   = hash_file_odin
-    ctx.hash_stream_16 = hash_stream_odin
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan does nothing, since MD2 is not available in Botan
-@(warning="MD2 is not provided by the Botan API. Odin implementation will be used")
-use_botan :: #force_inline proc() {
-    use_odin()
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
 
 /*
     High level API
@@ -69,22 +26,44 @@ hash_string :: proc(data: string) -> [16]byte {
 // hash_bytes will hash the given input and return the
 // computed hash
 hash_bytes :: proc(data: []byte) -> [16]byte {
-	_create_md2_ctx()
-    return _hash_impl->hash_bytes_16(data)
+	hash: [16]byte
+	ctx: Md2_Context
+    // init(&ctx) No-op
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
 }
 
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
 hash_stream :: proc(s: io.Stream) -> ([16]byte, bool) {
-	_create_md2_ctx()
-    return _hash_impl->hash_stream_16(s)
+	hash: [16]byte
+	ctx: Md2_Context
+	// init(&ctx) No-op
+	buf := make([]byte, 512)
+	defer delete(buf)
+	read := 1
+	for read > 0 {
+	    read, _ = s->impl_read(buf)
+	    if read > 0 {
+			update(&ctx, buf[:read])
+	    } 
+	}
+	final(&ctx, hash[:])
+	return hash, true
 }
 
 // hash_file will read the file provided by the given handle
 // and compute a hash
 hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-	_create_md2_ctx()
-    return _hash_impl->hash_file_16(hd, load_at_once)
+	if !load_at_once {
+        return hash_stream(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes(buf[:]), ok
+        }
+    }
+    return [16]byte{}, false
 }
 
 hash :: proc {
@@ -98,85 +77,32 @@ hash :: proc {
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+@(warning="Init is a no-op for MD2")
+init :: proc(ctx: ^Md2_Context) {
+	// No action needed here
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
+update :: proc(ctx: ^Md2_Context, data: []byte) {
+	for i := 0; i < len(data); i += 1 {
+		ctx.data[ctx.datalen] = data[i]
+		ctx.datalen += 1
+		if (ctx.datalen == 16) {
+			transform(ctx, ctx.data[:])
+			ctx.datalen = 0
+		}
+	}
 }
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
-
-hash_bytes_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [16]byte {
-    hash: [16]byte
-    if c, ok := ctx.internal_ctx.(Md2_Context); ok {
-    	init_odin(&c)
-    	update_odin(&c, data)
-    	final_odin(&c, hash[:])
+final :: proc(ctx: ^Md2_Context, hash: []byte) {
+	to_pad := byte(16 - ctx.datalen)
+    for ctx.datalen < 16 {
+        ctx.data[ctx.datalen] = to_pad
+		ctx.datalen += 1
     }
-    return hash
-}
-
-hash_stream_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
-    if c, ok := ctx.internal_ctx.(Md2_Context); ok {
-    	init_odin(&c)
-	    buf := make([]byte, 512)
-	    defer delete(buf)
-	    read := 1
-	    for read > 0 {
-	        read, _ = fs->impl_read(buf)
-	        if read > 0 {
-	            update_odin(&c, buf[:read])
-	        } 
-	    }
-	    final_odin(&c, hash[:])
-	    return hash, true
-    } else {
-    	return hash, false
-    }
-}
-
-hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin(ctx, buf[:]), ok
-        }
-    }
-    return [16]byte{}, false
-}
-
-@(private)
-_create_md2_ctx :: #force_inline proc() {
-	ctx: Md2_Context
-	_hash_impl.internal_ctx = ctx
-	_hash_impl.hash_size    = ._16
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_md2_ctx()
-    if c, ok := ctx.internal_ctx.(Md2_Context); ok {
-    	init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Md2_Context); ok {
-    	update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Md2_Context); ok {
-    	final_odin(&c, hash)
+	transform(ctx, ctx.data[:])
+	transform(ctx, ctx.checksum[:])
+    for i := 0; i < 16; i += 1 {
+        hash[i] = ctx.state[i]
     }
 }
 
@@ -231,32 +157,4 @@ transform :: proc(ctx: ^Md2_Context, data: []byte) {
 		ctx.checksum[j] ~= PI_TABLE[data[j] ~ t]
 		t = ctx.checksum[j]
 	}
-}
-
-init_odin :: proc(ctx: ^Md2_Context) {
-	// No action needed here
-}
-
-update_odin :: proc(ctx: ^Md2_Context, data: []byte) {
-	for i := 0; i < len(data); i += 1 {
-		ctx.data[ctx.datalen] = data[i]
-		ctx.datalen += 1
-		if (ctx.datalen == 16) {
-			transform(ctx, ctx.data[:])
-			ctx.datalen = 0
-		}
-	}
-}
-
-final_odin :: proc(ctx: ^Md2_Context, hash: []byte) {
-	to_pad := byte(16 - ctx.datalen)
-    for ctx.datalen < 16 {
-        ctx.data[ctx.datalen] = to_pad
-		ctx.datalen += 1
-    }
-	transform(ctx, ctx.data[:])
-	transform(ctx, ctx.checksum[:])
-    for i := 0; i < 16; i += 1 {
-        hash[i] = ctx.state[i]
-    }
 }
