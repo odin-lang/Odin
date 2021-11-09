@@ -137,11 +137,17 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-
+		
+	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+	#else
+		result = system_exec_command_line_app("wasm-ld",
+			"wasm-ld \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+	#endif
 		return result;
 	}
 
