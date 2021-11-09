@@ -157,7 +157,11 @@ enum CmdDocFlag : u32 {
 	CmdDocFlag_DocFormat   = 1<<2,
 };
 
-
+enum TimingsExportFormat : i32 {
+	TimingsExportUnspecified = 0,
+	TimingsExportJson        = 1,
+	TimingsExportCSV         = 2,
+};
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
@@ -197,6 +201,8 @@ struct BuildContext {
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
+	TimingsExportFormat export_timings_format;
+	String export_timings_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;
