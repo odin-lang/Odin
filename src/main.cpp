@@ -859,9 +859,9 @@ bool parse_build_flags(Array<String> args) {
 					} else {
 						ok = true;
 						switch (bf.param_kind) {
-						default:
+						default: {
 							ok = false;
-							break;
+						} break;
 						case BuildFlagParam_Boolean: {
 							if (str_eq_ignore_case(param, str_lit("t")) ||
 								str_eq_ignore_case(param, str_lit("true")) ||
@@ -875,12 +875,12 @@ bool parse_build_flags(Array<String> args) {
 								gb_printf_err("Invalid flag parameter for '%.*s' : '%.*s'\n", LIT(name), LIT(param));
 							}
 						} break;
-						case BuildFlagParam_Integer:
+						case BuildFlagParam_Integer: {
 							value = exact_value_integer_from_string(param);
-							break;
-						case BuildFlagParam_Float:
+						} break;
+						case BuildFlagParam_Float: {
 							value = exact_value_float_from_string(param);
-							break;
+						} break;
 						case BuildFlagParam_String: {
 							value = exact_value_string(param);
 							if (value.kind == ExactValue_String) {
@@ -933,10 +933,10 @@ bool parse_build_flags(Array<String> args) {
 						}
 
 						if (ok) switch (bf.kind) {
-						case BuildFlag_Help:
+						case BuildFlag_Help: {
 							build_context.show_help = true;
 							break;
-
+						}
 						case BuildFlag_OutFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -949,7 +949,7 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_OptimizationLevel:
+						case BuildFlag_OptimizationLevel: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							if (set_flags[BuildFlag_OptimizationMode]) {
 								gb_printf_err("Mixture of -opt and -o is not allowed\n");
@@ -958,7 +958,8 @@ bool parse_build_flags(Array<String> args) {
 							}
 							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
 							break;
-						case BuildFlag_OptimizationMode:
+						}
+						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (set_flags[BuildFlag_OptimizationLevel]) {
 								gb_printf_err("Mixture of -opt and -o is not allowed\n");
@@ -981,25 +982,29 @@ bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
-						case BuildFlag_ShowTimings:
+						}
+						case BuildFlag_ShowTimings: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							break;
-						case BuildFlag_ShowUnused:
+						}
+						case BuildFlag_ShowUnused: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
 							break;
-						case BuildFlag_ShowUnusedWithLocation:
+						}
+						case BuildFlag_ShowUnusedWithLocation: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
 							build_context.show_unused_with_location = true;
 							break;
+						}
 						case BuildFlag_ShowMoreTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
 							break;
-						case BuildFlag_ExportTimings:
+						case BuildFlag_ExportTimings: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							/*
 								NOTE(Jeroen): `build_context.export_timings_format == 0` means the option wasn't used.
@@ -1017,7 +1022,8 @@ bool parse_build_flags(Array<String> args) {
 							}
 
 							break;
-						case BuildFlag_ExportTimingsFile:
+						}
+						case BuildFlag_ExportTimingsFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
 							String export_path = string_trim_whitespace(value.value_string);
@@ -1029,10 +1035,12 @@ bool parse_build_flags(Array<String> args) {
 							}
 
 							break;
-						case BuildFlag_ShowSystemCalls:
+						}
+						case BuildFlag_ShowSystemCalls: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_system_calls = true;
 							break;
+						}
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							isize count = cast(isize)big_int_to_i64(&value.value_integer);
@@ -1044,11 +1052,11 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_KeepTempFiles:
+						case BuildFlag_KeepTempFiles: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.keep_temp_files = true;
 							break;
-
+						}
 						case BuildFlag_Collection: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
@@ -1112,8 +1120,6 @@ bool parse_build_flags(Array<String> args) {
 							// NOTE(bill): Allow for multiple library collections
 							continue;
 						}
-
-
 						case BuildFlag_Define: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
@@ -1530,10 +1536,10 @@ bool parse_build_flags(Array<String> args) {
 		}
 	}
 
-	if (!build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len == 0) {
+	if ((!(build_context.export_timings_format == TimingsExportUnspecified)) && (build_context.export_timings_file.len == 0)) {
 		gb_printf_err("`-export-timings:format` requires `-export-timings-file:filename` to be specified as well\n");
 		bad_flags = true;
-	} else if (build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len > 0) {
+	} else if ((build_context.export_timings_format == TimingsExportUnspecified) && (build_context.export_timings_file.len > 0)) {
 		gb_printf_err("`-export-timings-file:filename` requires `-export-timings:format` to be specified as well\n");
 		bad_flags = true;
 	}
@@ -1556,7 +1562,7 @@ bool parse_build_flags(Array<String> args) {
 }
 
 void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
-	GB_ASSERT(!build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len > 0);
+	GB_ASSERT((!(build_context.export_timings_format == TimingsExportUnspecified) && build_context.export_timings_file.len > 0));
 
 	/*
 		NOTE(Jeroen): Whether we call `timings_print_all()`, then `timings_export_all()`, the other way around,
@@ -1605,11 +1611,11 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 		gb_fprintf(&f, "{\n");
 		gb_fprintf(&f, "\t\"totals\": [\n");
 
-		gb_fprintf(&f, "\t\t{\"name\": \"total_packages\",  \"count\": %d},\n", packages);
-		gb_fprintf(&f, "\t\t{\"name\": \"total_files\",     \"count\": %d},\n", files);
-		gb_fprintf(&f, "\t\t{\"name\": \"total_lines\",     \"count\": %d},\n", lines);
-		gb_fprintf(&f, "\t\t{\"name\": \"total_tokens\",    \"count\": %d},\n", tokens);
-		gb_fprintf(&f, "\t\t{\"name\": \"total_file_size\", \"count\": %d},\n", total_file_size);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_packages\",  \"count\": %td},\n", packages);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_files\",     \"count\": %td},\n", files);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_lines\",     \"count\": %td},\n", lines);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_tokens\",    \"count\": %td},\n", tokens);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_file_size\", \"count\": %td},\n", total_file_size);
 
 		gb_fprintf(&f, "\t],\n");
 
@@ -1677,7 +1683,7 @@ void show_timings(Checker *c, Timings *t) {
 
 	timings_print_all(t);
 
-	if (!build_context.export_timings_format == TimingsExportUnspecified) {
+	if (!(build_context.export_timings_format == TimingsExportUnspecified)) {
 		timings_export_all(t, c, true);
 	}
 
