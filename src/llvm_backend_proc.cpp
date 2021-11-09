@@ -1,4 +1,4 @@
-void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false) {
+void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
@@ -27,7 +27,7 @@ void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue l
 	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile);
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
-void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false) {
+void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
