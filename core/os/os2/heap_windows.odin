@@ -1,7 +1,6 @@
 //+private
 package os2
 
-import "core:runtime"
 import "core:mem"
 import win32 "core:sys/windows"
 
