@@ -14,10 +14,11 @@ when ODIN_OS == "windows" {
 when ODIN_OS == "linux"  { foreign import lib "linux/libraylib.a" }
 when ODIN_OS == "darwin" { foreign import lib "macos/libraylib.a" }
 
-GRAPHICS_API_OPENGL_11 :: false
-GRAPHICS_API_OPENGL_21 :: true
-GRAPHICS_API_OPENGL_33 :: GRAPHICS_API_OPENGL_21
+GRAPHICS_API_OPENGL_11  :: false
+GRAPHICS_API_OPENGL_21  :: true
+GRAPHICS_API_OPENGL_33  :: GRAPHICS_API_OPENGL_21
 GRAPHICS_API_OPENGL_ES2 :: false
+GRAPHICS_API_OPENGL_43  :: false
 
 when !GRAPHICS_API_OPENGL_ES2 {
 	// This is the maximum amount of elements (quads) per batch
@@ -35,24 +36,20 @@ DEFAULT_BATCH_DRAWCALLS        :: 256                  // Default number of batc
 MAX_BATCH_ACTIVE_TEXTURES      :: 4                    // Maximum number of additional textures that can be activated on batch drawing (SetShaderValueTexture())
 
 // Internal Matrix stack
-MAX_MATRIX_STACK_SIZE           :: 32                  // Maximum size of Matrix stack
+MAX_MATRIX_STACK_SIZE          :: 32                   // Maximum size of Matrix stack
 
-// Vertex buffers id limit
-MAX_MESH_VERTEX_BUFFERS          :: 7                  // Maximum vertex buffers (VBO) per mesh
-
-// Shader and material limits
-MAX_SHADER_LOCATIONS            :: 32                  // Maximum number of shader locations supported
-MAX_MATERIAL_MAPS               :: 12                  // Maximum number of shader maps supported
+// Shader limits
+MAX_SHADER_LOCATIONS           :: 32                   // Maximum number of shader locations supported
 
 // Projection matrix culling
-RL_CULL_DISTANCE_NEAR         :: 0.01                  // Default near cull distance
-RL_CULL_DISTANCE_FAR          :: 1000.0                // Default far cull distance
+RL_CULL_DISTANCE_NEAR          :: 0.01                 // Default near cull distance
+RL_CULL_DISTANCE_FAR           :: 1000.0               // Default far cull distance
 
 // Texture parameters (equivalent to OpenGL defines)
-RL_TEXTURE_WRAP_S               :: 0x2802              // GL_TEXTURE_WRAP_S
-RL_TEXTURE_WRAP_T               :: 0x2803              // GL_TEXTURE_WRAP_T
-RL_TEXTURE_MAG_FILTER           :: 0x2800              // GL_TEXTURE_MAG_FILTER
-RL_TEXTURE_MIN_FILTER           :: 0x2801              // GL_TEXTURE_MIN_FILTER
+RL_TEXTURE_WRAP_S                       :: 0x2802      // GL_TEXTURE_WRAP_S
+RL_TEXTURE_WRAP_T                       :: 0x2803      // GL_TEXTURE_WRAP_T
+RL_TEXTURE_MAG_FILTER                   :: 0x2800      // GL_TEXTURE_MAG_FILTER
+RL_TEXTURE_MIN_FILTER                   :: 0x2801      // GL_TEXTURE_MIN_FILTER
 
 RL_TEXTURE_FILTER_NEAREST               :: 0x2600      // GL_NEAREST
 RL_TEXTURE_FILTER_LINEAR                :: 0x2601      // GL_LINEAR
@@ -68,18 +65,34 @@ RL_TEXTURE_WRAP_MIRROR_REPEAT           :: 0x8370      // GL_MIRRORED_REPEAT
 RL_TEXTURE_WRAP_MIRROR_CLAMP            :: 0x8742      // GL_MIRROR_CLAMP_EXT
 
 // Matrix modes (equivalent to OpenGL)
-RL_MODELVIEW                    :: 0x1700              // GL_MODELVIEW
-RL_PROJECTION                   :: 0x1701              // GL_PROJECTION
-RL_TEXTURE                      :: 0x1702              // GL_TEXTURE
+RL_MODELVIEW                            :: 0x1700      // GL_MODELVIEW
+RL_PROJECTION                           :: 0x1701      // GL_PROJECTION
+RL_TEXTURE                              :: 0x1702      // GL_TEXTURE
 
 // Primitive assembly draw modes
-RL_LINES                        :: 0x0001              // GL_LINES
-RL_TRIANGLES                    :: 0x0004              // GL_TRIANGLES
-RL_QUADS                        :: 0x0007              // GL_QUADS
+RL_LINES                                :: 0x0001      // GL_LINES
+RL_TRIANGLES                            :: 0x0004      // GL_TRIANGLES
+RL_QUADS                                :: 0x0007      // GL_QUADS
 
 // GL equivalent data types
-RL_UNSIGNED_BYTE                :: 0x1401              // GL_UNSIGNED_BYTE
-RL_f32                        :: 0x1406              // GL_f32
+RL_UNSIGNED_BYTE                        :: 0x1401      // GL_UNSIGNED_BYTE
+RL_FLOAT                                :: 0x1406      // GL_FLOAT
+
+// Buffer usage hint
+RL_STREAM_DRAW                          :: 0x88E0      // GL_STREAM_DRAW
+RL_STREAM_READ                          :: 0x88E1      // GL_STREAM_READ
+RL_STREAM_COPY                          :: 0x88E2      // GL_STREAM_COPY
+RL_STATIC_DRAW                          :: 0x88E4      // GL_STATIC_DRAW
+RL_STATIC_READ                          :: 0x88E5      // GL_STATIC_READ
+RL_STATIC_COPY                          :: 0x88E6      // GL_STATIC_COPY
+RL_DYNAMIC_DRAW                         :: 0x88E8      // GL_DYNAMIC_DRAW
+RL_DYNAMIC_READ                         :: 0x88E9      // GL_DYNAMIC_READ
+RL_DYNAMIC_COPY                         :: 0x88EA      // GL_DYNAMIC_COPY
+
+// GL Shader type
+RL_FRAGMENT_SHADER                      :: 0x8B30      // GL_FRAGMENT_SHADER
+RL_VERTEX_SHADER                        :: 0x8B31      // GL_VERTEX_SHADER
+RL_COMPUTE_SHADER                       :: 0x91B9      // GL_COMPUTE_SHADER
 
 
 //----------------------------------------------------------------------------------
@@ -230,26 +243,29 @@ foreign lib {
 	// Framebuffer state
 	rlEnableFramebuffer  :: proc(id: u32) ---                                     // Enable render texture (fbo)
 	rlDisableFramebuffer :: proc() ---                                            // Disable render texture (fbo), return to default framebuffer
+	rlActiveDrawBuffers  :: proc(count: c.int) ---                                // Activate multiple draw color buffers
 
 	// General render state
-	rlEnableDepthTest        :: proc() ---                                        // Enable depth test
-	rlDisableDepthTest       :: proc() ---                                        // Disable depth test
-	rlEnableDepthMask        :: proc() ---                                        // Enable depth write
-	rlDisableDepthMask       :: proc() ---                                        // Disable depth write
-	rlEnableBackfaceCulling  :: proc() ---                                        // Enable backface culling
-	rlDisableBackfaceCulling :: proc() ---                                        // Disable backface culling
-	rlEnableScissorTest      :: proc() ---                                        // Enable scissor test
-	rlDisableScissorTest     :: proc() ---                                        // Disable scissor test
-	rlScissor                :: proc(x, y, width, height: c.int) ---              // Scissor test
-	rlEnableWireMode         :: proc() ---                                        // Enable wire mode
-	rlDisableWireMode        :: proc() ---                                        // Disable wire mode
-	rlSetLineWidth           :: proc(width: f32) ---                              // Set the line drawing width
-	rlGetLineWidth           :: proc() -> f32 ---                                 // Get the line drawing width
-	rlEnableSmoothLines      :: proc() ---                                        // Enable line aliasing
-	rlDisableSmoothLines     :: proc() ---                                        // Disable line aliasing
-	rlEnableStereoRender     :: proc() ---                                        // Enable stereo rendering
-	rlDisableStereoRender    :: proc() ---                                        // Disable stereo rendering
-	rlIsStereoRenderEnabled  :: proc() -> bool ---                                // Check if stereo render is enabled
+	rlEnableColorBlend       :: proc() ---                           // Enable color blending
+	rlDisableColorBlend      :: proc() ---                           // Disable color blending
+	rlEnableDepthTest        :: proc() ---                           // Enable depth test
+	rlDisableDepthTest       :: proc() ---                           // Disable depth test
+	rlEnableDepthMask        :: proc() ---                           // Enable depth write
+	rlDisableDepthMask       :: proc() ---                           // Disable depth write
+	rlEnableBackfaceCulling  :: proc() ---                           // Enable backface culling
+	rlDisableBackfaceCulling :: proc() ---                           // Disable backface culling
+	rlEnableScissorTest      :: proc() ---                           // Enable scissor test
+	rlDisableScissorTest     :: proc() ---                           // Disable scissor test
+	rlScissor                :: proc(x, y, width, height: c.int) --- // Scissor test
+	rlEnableWireMode         :: proc() ---                           // Enable wire mode
+	rlDisableWireMode        :: proc() ---                           // Disable wire mode
+	rlSetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
+	rlGetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
+	rlEnableSmoothLines      :: proc() ---                           // Enable line aliasing
+	rlDisableSmoothLines     :: proc() ---                           // Disable line aliasing
+	rlEnableStereoRender     :: proc() ---                           // Enable stereo rendering
+	rlDisableStereoRender    :: proc() ---                           // Disable stereo rendering
+	rlIsStereoRenderEnabled  :: proc() -> bool ---                   // Check if stereo render is enabled
 
 	rlClearColor         :: proc(r, g, b, a: u8) ---                              // Clear color buffer with color
 	rlClearScreenBuffers :: proc() ---                                            // Clear used screen buffers (color and depth)
@@ -268,8 +284,9 @@ foreign lib {
 	rlGetFramebufferWidth  :: proc() -> c.int ---                                          // Get default framebuffer width
 	rlGetFramebufferHeight :: proc() -> c.int ---                                          // Get default framebuffer height
 
-	rlGetShaderDefault  :: proc() -> Shader ---                                            // Get default shader
-	rlGetTextureDefault :: proc() -> Texture2D ---                                         // Get default texture
+	rlGetTextureIdDefault  :: proc() -> u32 ---                                            // Get default texture id
+	rlGetShaderIdDefault   :: proc() -> u32 ---                                            // Get default shader id
+	rlGetShaderLocsDefault :: proc() -> [^]i32 ---                                         // Get default shader locations
 
 	// Render batch management
 	// NOTE: rlgl provides a default render batch to behave like OpenGL 1.1 immediate mode
@@ -305,6 +322,7 @@ foreign lib {
 	rlLoadTextureCubemap   :: proc(data: rawptr, size: c.int, format: c.int) -> u32 ---                               // Load texture cubemap
 	rlUpdateTexture        :: proc(id: u32, offsetX, offsetY, width, height: c.int, format: c.int, data: rawptr) ---  // Update GPU texture with new data
 	rlGetGlTextureFormats  :: proc(format: c.int, glInternalFormat: ^u32, glFormat: ^u32, glType: ^u32) ---           // Get OpenGL internal formats
+	rlGetPixelFormatName   :: proc(format: PixelFormat) -> cstring ---                                                // Get name string for pixel format
 	rlUnloadTexture        :: proc(id: u32) ---                                                                       // Unload texture from GPU memory
 	rlGenerateMipmaps      :: proc(texture: ^Texture2D) ---                                                           // Generate mipmap data for selected texture
 	rlReadTexturePixels    :: proc(texture: Texture2D) -> rawptr ---                                                  // Read texture pixel data
@@ -327,6 +345,24 @@ foreign lib {
 	rlSetUniformMatrix    :: proc(locIndex: c.int, mat: Matrix) ---                                     // Set shader value matrix
 	rlSetUniformSampler   :: proc(locIndex: c.int, textureId: u32) ---                                  // Set shader value sampler
 	rlSetShader           :: proc(shader: Shader) ---                                                   // Set shader currently active
+
+	// Compute shader management
+	rlLoadComputeShaderProgram :: proc(shaderId: u32) -> u32 ---        // Load compute shader program
+	rlComputeShaderDispatch    :: proc(groupX, groupY, groupZ: u32) --- // Dispatch compute shader (equivalent to *draw* for graphics pilepine)
+
+	
+	// Shader buffer storage object management (ssbo)
+	rlLoadShaderBuffer           :: proc(size: u64, data: rawptr, usageHint: c.int) -> u32 ---  // Load shader storage buffer object (SSBO)
+	rlUnloadShaderBuffer         :: proc(ssboId: u32) ---                                       // Unload shader storage buffer object (SSBO)
+	rlUpdateShaderBufferElements :: proc(id: u32, data: rawptr, dataSize: u64, offset: u64) --- // Update SSBO buffer data
+	rlGetShaderBufferSize        :: proc(id: u32) -> u64 ---                                    // Get SSBO buffer size
+	rlReadShaderBufferElements   :: proc(id: u32, dest: rawptr, count: u64, offset: u64) ---    // Bind SSBO buffer
+	rlBindShaderBuffer           :: proc(id: u32, index: u32) ---                               // Copy SSBO buffer data
+
+	// Buffer management
+	rlCopyBuffersElements  :: proc(destId, srcId: u32, destOffset, srcOffset: u64, count: u64) --- // Copy SSBO buffer data
+	rlBindImageTexture     :: proc(id: u32, index: u32, format: u32, readonly: b32) ---            // Bind image texture
+
 
 	// Matrix state management
 	rlGetMatrixModelview        :: proc() -> Matrix ---           // Get internal modelview matrix
