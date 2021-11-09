@@ -36,66 +36,6 @@ MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal
 RAD_PER_DEG :: TAU/360.0
 DEG_PER_RAD :: 360.0/TAU
 
-
-@(default_calling_convention="none")
-foreign _ {
-	@(link_name="llvm.sqrt.f16")
-	sqrt_f16 :: proc(x: f16) -> f16 ---
-	@(link_name="llvm.sqrt.f32")
-	sqrt_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.sqrt.f64")
-	sqrt_f64 :: proc(x: f64) -> f64 ---
-
-	@(link_name="llvm.sin.f16")
-	sin_f16 :: proc(θ: f16) -> f16 ---
-	@(link_name="llvm.sin.f32")
-	sin_f32 :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.sin.f64")
-	sin_f64 :: proc(θ: f64) -> f64 ---
-
-	@(link_name="llvm.cos.f16")
-	cos_f16 :: proc(θ: f16) -> f16 ---
-	@(link_name="llvm.cos.f32")
-	cos_f32 :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.cos.f64")
-	cos_f64 :: proc(θ: f64) -> f64 ---
-
-	@(link_name="llvm.pow.f16")
-	pow_f16 :: proc(x, power: f16) -> f16 ---
-	@(link_name="llvm.pow.f32")
-	pow_f32 :: proc(x, power: f32) -> f32 ---
-	@(link_name="llvm.pow.f64")
-	pow_f64 :: proc(x, power: f64) -> f64 ---
-
-	@(link_name="llvm.fmuladd.f16")
-	fmuladd_f16 :: proc(a, b, c: f16) -> f16 ---
-	@(link_name="llvm.fmuladd.f32")
-	fmuladd_f32 :: proc(a, b, c: f32) -> f32 ---
-	@(link_name="llvm.fmuladd.f64")
-	fmuladd_f64 :: proc(a, b, c: f64) -> f64 ---
-
-	@(link_name="llvm.log.f16")
-	ln_f16 :: proc(x: f16) -> f16 ---
-	@(link_name="llvm.log.f32")
-	ln_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.log.f64")
-	ln_f64 :: proc(x: f64) -> f64 ---
-
-	@(link_name="llvm.exp.f16")
-	exp_f16 :: proc(x: f16) -> f16 ---
-	@(link_name="llvm.exp.f32")
-	exp_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.exp.f64")
-	exp_f64 :: proc(x: f64) -> f64 ---
-
-	@(link_name="llvm.ldexp.f16")
-	ldexp_f16 :: proc(val: f16, exp: i32) -> f16 ---
-	@(link_name="llvm.ldexp.f32")
-	ldexp_f32 :: proc(val: f32, exp: i32) -> f32 ---
-	@(link_name="llvm.ldexp.f64")
-	ldexp_f64 :: proc(val: f64, exp: i32) -> f64 ---
-}
-
 sqrt_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))) }
 sqrt_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))) }
 sqrt_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(sqrt_f32(f32(x))) }

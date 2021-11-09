@@ -2,7 +2,9 @@
 package runtime
 
 @(link_name="__ashlti3", linkage="strong")
-__ashlti3 :: proc "c" (a: i64, b: u32) -> i64 {
+__ashlti3 :: proc "c" (a: i64, b_: i32) -> i64 {
+	/*
+	b := u32(b_)
 	input := transmute([2]i32)a
 	result: [2]i32
 	if b & 32 != 0 {
@@ -16,4 +18,6 @@ __ashlti3 :: proc "c" (a: i64, b: u32) -> i64 {
 		result[1] = (input[1]<<b) | (input[0]>>(32-b))
 	}
 	return transmute(i64)result
+	*/
+	return 0
 }
