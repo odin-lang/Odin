@@ -592,6 +592,8 @@ enum BuildFlagKind {
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
 	BuildFlag_ShowMoreTimings,
+	BuildFlag_ExportTimings,
+	BuildFlag_ExportTimingsFile,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
@@ -740,6 +742,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OptimizationMode,  str_lit("O"),                   BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportTimings,     str_lit("export-timings"),      BuildFlagParam_String, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportTimingsFile, str_lit("export-timings-file"), BuildFlagParam_String, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None, Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None, Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None, Command_all);
@@ -994,6 +998,36 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
+							break;
+						case BuildFlag_ExportTimings:
+							GB_ASSERT(value.kind == ExactValue_String);
+							/*
+								NOTE(Jeroen): `build_context.export_timings_format == 0` means the option wasn't used.
+							*/
+							if (value.value_string == "json") {
+								build_context.export_timings_format = TimingsExportJson;
+							} else if (value.value_string == "csv") {
+								build_context.export_timings_format = TimingsExportCSV;
+							} else {
+								gb_printf_err("Invalid export format for -export-timings:<string>, got %.*s\n", LIT(value.value_string));
+								gb_printf_err("Valid export formats:\n");
+								gb_printf_err("\tjson\n");
+								gb_printf_err("\tcsv\n");
+								bad_flags = true;
+							}
+
+							break;
+						case BuildFlag_ExportTimingsFile:
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_timings_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-timings-file path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+
 							break;
 						case BuildFlag_ShowSystemCalls:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1496,6 +1530,19 @@ bool parse_build_flags(Array<String> args) {
 		}
 	}
 
+	if (build_context.export_timings_format && !(build_context.show_timings || build_context.show_more_timings)) {
+		gb_printf_err("`-export-timings:format` requires `-show-timings` or `-show-more-timings` to be present\n");
+		bad_flags = true;
+	}
+
+	if (!build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len == 0) {
+		gb_printf_err("`-export-timings:format` requires `-export-timings-file:filename` to be specified as well\n");
+		bad_flags = true;
+	} else if (build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len > 0) {
+		gb_printf_err("`-export-timings-file:filename` requires `-export-timings:format` to be specified as well\n");
+		bad_flags = true;
+	}
+
 	if (build_context.query_data_set_settings.ok) {
 		if (build_context.query_data_set_settings.kind == QueryDataSet_Invalid) {
 			gb_printf_err("'odin query' requires a flag determining the kind of query data set to be returned\n");
@@ -1737,6 +1784,15 @@ void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-show-more-timings");
 		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-timings");
+		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`");
+		print_usage_line(2, "Accepted values: json, csv");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-timings-file:filename");
+		print_usage_line(2, "Specify the filename for `-export-timings`.");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-thread-count:<integer>");
