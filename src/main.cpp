@@ -1530,16 +1530,16 @@ bool parse_build_flags(Array<String> args) {
 		}
 	}
 
-	if (build_context.export_timings_format && !(build_context.show_timings || build_context.show_more_timings)) {
-		gb_printf_err("`-export-timings:format` requires `-show-timings` or `-show-more-timings` to be present\n");
-		bad_flags = true;
-	}
-
 	if (!build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len == 0) {
 		gb_printf_err("`-export-timings:format` requires `-export-timings-file:filename` to be specified as well\n");
 		bad_flags = true;
 	} else if (build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len > 0) {
 		gb_printf_err("`-export-timings-file:filename` requires `-export-timings:format` to be specified as well\n");
+		bad_flags = true;
+	}
+
+	if (build_context.export_timings_format && !(build_context.show_timings || build_context.show_more_timings)) {
+		gb_printf_err("`-export-timings:format` requires `-show-timings` or `-show-more-timings` to be present\n");
 		bad_flags = true;
 	}
 
@@ -1553,6 +1553,107 @@ bool parse_build_flags(Array<String> args) {
 	}
 
 	return !bad_flags;
+}
+
+void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
+	GB_ASSERT(!build_context.export_timings_format == TimingsExportUnspecified && build_context.export_timings_file.len > 0);
+
+	/*
+		NOTE(Jeroen): Whether we call `timings_print_all()`, then `timings_export_all()`, the other way around,
+		or just one of them, we only need to stop the clock once.
+	*/
+	if (!timings_are_finalized) {
+		timings__stop_current_section(t);
+		t->total.finish = time_stamp_time_now();
+	}
+
+	TimingUnit unit = TimingUnit_Millisecond;
+
+	/*
+		Prepare file for export.
+	*/
+	gbFile f = {};
+	char * fileName = (char *)build_context.export_timings_file.text;
+	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
+	if (err != gbFileError_None) {
+		gb_printf_err("Failed to export timings to: %s\n", fileName);
+		gb_exit(1);
+		return;
+	} else {
+		gb_printf("\nExporting timings to '%s'... ", fileName);
+	}
+	defer (gb_file_close(&f));
+
+	/*
+		JSON export
+	*/
+	if (build_context.export_timings_format == TimingsExportJson) {
+		Parser *p             = c->parser;
+		isize lines           = p->total_line_count;
+		isize tokens          = p->total_token_count;
+		isize files           = 0;
+		isize packages        = p->packages.count;
+		isize total_file_size = 0;
+		for_array(i, p->packages) {
+			files += p->packages[i]->files.count;
+			for_array(j, p->packages[i]->files) {
+				AstFile *file = p->packages[i]->files[j];
+				total_file_size += file->tokenizer.end - file->tokenizer.start;
+			}
+		}
+
+		gb_fprintf(&f, "{\n");
+		gb_fprintf(&f, "\t\"totals\": [\n");
+
+		gb_fprintf(&f, "\t\t{\"name\": \"total_packages\",  \"count\": %d},\n", packages);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_files\",     \"count\": %d},\n", files);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_lines\",     \"count\": %d},\n", lines);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_tokens\",    \"count\": %d},\n", tokens);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_file_size\", \"count\": %d},\n", total_file_size);
+
+		gb_fprintf(&f, "\t],\n");
+
+		gb_fprintf(&f, "\t\"timings\": [\n");
+
+		t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
+		f64 total_time = time_stamp(t->total, t->freq, unit);
+
+		gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
+		    LIT(t->total.label), total_time);
+
+		for_array(i, t->sections) {
+			TimeStamp ts = t->sections[i];
+			f64 section_time = time_stamp(ts, t->freq, unit);
+			gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
+			    LIT(ts.label), section_time);
+		}
+
+		gb_fprintf(&f, "\t],\n");
+
+		gb_fprintf(&f, "}\n");
+	}
+
+	/*
+		CSV export
+	*/
+	else if (build_context.export_timings_format == TimingsExportCSV) {
+
+		t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
+		f64 total_time = time_stamp(t->total, t->freq, unit);
+
+		/*
+			CSV doesn't really like floating point values. Cast to `int`.
+		*/
+		gb_fprintf(&f, "\"%.*s\", %d\n", LIT(t->total.label), int(total_time));
+
+		for_array(i, t->sections) {
+			TimeStamp ts = t->sections[i];
+			f64 section_time = time_stamp(ts, t->freq, unit);
+			gb_fprintf(&f, "\"%.*s\", %d\n", LIT(ts.label), int(section_time));
+		}
+	}
+
+	gb_printf("Done.\n");
 }
 
 void show_timings(Checker *c, Timings *t) {
@@ -1575,6 +1676,11 @@ void show_timings(Checker *c, Timings *t) {
 	}
 
 	timings_print_all(t);
+
+	if (!build_context.export_timings_format == TimingsExportUnspecified) {
+		timings_export_all(t, c, true);
+	}
+
 	if (build_context.show_debug_messages && build_context.show_more_timings) {
 		{
 			gb_printf("\n");
