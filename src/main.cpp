@@ -1256,87 +1256,88 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						}
 
-						case BuildFlag_Debug:
+						case BuildFlag_Debug: {
 							build_context.ODIN_DEBUG = true;
 							break;
-
-						case BuildFlag_DisableAssert:
+						}
+						case BuildFlag_DisableAssert: {
 							build_context.ODIN_DISABLE_ASSERT = true;
 							break;
-
-						case BuildFlag_NoBoundsCheck:
+						}
+						case BuildFlag_NoBoundsCheck: {
 							build_context.no_bounds_check = true;
 							break;
-
-						case BuildFlag_NoDynamicLiterals:
+						}
+						case BuildFlag_NoDynamicLiterals: {
 							build_context.no_dynamic_literals = true;
 							break;
-
-						case BuildFlag_NoCRT:
+						}
+						case BuildFlag_NoCRT: {
 							build_context.no_crt = true;
 							break;
-
-						case BuildFlag_NoEntryPoint:
+						}
+						case BuildFlag_NoEntryPoint: {
 							build_context.no_entry_point = true;
 							break;
-
-						case BuildFlag_UseLLD:
+						}
+						case BuildFlag_UseLLD: {
 							build_context.use_lld = true;
 							break;
-
-						case BuildFlag_UseSeparateModules:
+						}
+						case BuildFlag_UseSeparateModules: {
 							build_context.use_separate_modules = true;
 							break;
-
-						case BuildFlag_ThreadedChecker:
+						}
+						case BuildFlag_ThreadedChecker: {
 							#if defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-threaded-checker is the default on this platform\n");
 							bad_flags = true;
 							#endif
 							build_context.threaded_checker = true;
 							break;
-
-						case BuildFlag_NoThreadedChecker:
+						}
+						case BuildFlag_NoThreadedChecker: {
 							#if !defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-no-threaded-checker is the default on this platform\n");
 							bad_flags = true;
 							#endif
 							build_context.threaded_checker = false;
 							break;
-
-						case BuildFlag_ShowDebugMessages:
+						}
+						case BuildFlag_ShowDebugMessages: {
 							build_context.show_debug_messages = true;
 							break;
-
-						case BuildFlag_Vet:
+						}
+						case BuildFlag_Vet: {
 							build_context.vet = true;
 							break;
-						case BuildFlag_VetExtra:
+						}
+						case BuildFlag_VetExtra: {
 							build_context.vet = true;
 							build_context.vet_extra = true;
 							break;
-
-						case BuildFlag_UseLLVMApi:
+						}
+						case BuildFlag_UseLLVMApi: {
 							gb_printf_err("-llvm-api flag is not required any more\n");
 							bad_flags = true;
 							break;
-
-						case BuildFlag_IgnoreUnknownAttributes:
+						}
+						case BuildFlag_IgnoreUnknownAttributes: {
 							build_context.ignore_unknown_attributes = true;
 							break;
-
-						case BuildFlag_ExtraLinkerFlags:
+						}
+						case BuildFlag_ExtraLinkerFlags: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
 							break;
-
-						case BuildFlag_Microarch:
+						}
+						case BuildFlag_Microarch: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
 							string_to_lower(&build_context.microarch);
 							break;
-
-						case BuildFlag_TestName:
+						}
+						case BuildFlag_TestName: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							{
 								String name = value.value_string;
@@ -1350,35 +1351,35 @@ bool parse_build_flags(Array<String> args) {
 								// NOTE(bill): Allow for multiple -test-name
 								continue;
 							}
-
-						case BuildFlag_DisallowDo:
+						}
+						case BuildFlag_DisallowDo: {
 							build_context.disallow_do = true;
 							break;
-
-						case BuildFlag_DefaultToNilAllocator:
+						}
+						case BuildFlag_DefaultToNilAllocator: {
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
 							break;
-
-						case BuildFlag_InsertSemicolon:
+						}
+						case BuildFlag_InsertSemicolon: {
 							gb_printf_err("-insert-semicolon flag is not required any more\n");
 							bad_flags = true;
 							break;
-
-						case BuildFlag_StrictStyle:
+						}
+						case BuildFlag_StrictStyle: {
 							if (build_context.strict_style_init_only) {
 								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
 							}
 							build_context.strict_style = true;
 							break;
-						case BuildFlag_StrictStyleInitOnly:
+						}
+						case BuildFlag_StrictStyleInitOnly: {
 							if (build_context.strict_style) {
 								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
 							}
 							build_context.strict_style_init_only = true;
 							break;
-
-
-						case BuildFlag_Compact:
+						}
+						case BuildFlag_Compact: {
 							if (!build_context.query_data_set_settings.ok) {
 								gb_printf_err("Invalid use of -compact flag, only allowed with 'odin query'\n");
 								bad_flags = true;
@@ -1386,8 +1387,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.query_data_set_settings.compact = true;
 							}
 							break;
-
-						case BuildFlag_GlobalDefinitions:
+						}
+						case BuildFlag_GlobalDefinitions: {
 							if (!build_context.query_data_set_settings.ok) {
 								gb_printf_err("Invalid use of -global-definitions flag, only allowed with 'odin query'\n");
 								bad_flags = true;
@@ -1398,7 +1399,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.query_data_set_settings.kind = QueryDataSet_GlobalDefinitions;
 							}
 							break;
-						case BuildFlag_GoToDefinitions:
+						}
+						case BuildFlag_GoToDefinitions: {
 							if (!build_context.query_data_set_settings.ok) {
 								gb_printf_err("Invalid use of -go-to-definitions flag, only allowed with 'odin query'\n");
 								bad_flags = true;
@@ -1409,17 +1411,20 @@ bool parse_build_flags(Array<String> args) {
 								build_context.query_data_set_settings.kind = QueryDataSet_GoToDefinitions;
 							}
 							break;
-
-						case BuildFlag_Short:
+						}
+						case BuildFlag_Short: {
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
-						case BuildFlag_AllPackages:
+						}
+						case BuildFlag_AllPackages: {
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
 							break;
-						case BuildFlag_DocFormat:
+						}
+						case BuildFlag_DocFormat: {
 							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
 							break;
-						case BuildFlag_IgnoreWarnings:
+						}
+						case BuildFlag_IgnoreWarnings: {
 							if (build_context.warnings_as_errors) {
 								gb_printf_err("-ignore-warnings cannot be used with -warnings-as-errors\n");
 								bad_flags = true;
@@ -1427,7 +1432,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.ignore_warnings = true;
 							}
 							break;
-						case BuildFlag_WarningsAsErrors:
+						}
+						case BuildFlag_WarningsAsErrors: {
 							if (build_context.ignore_warnings) {
 								gb_printf_err("-warnings-as-errors cannot be used with -ignore-warnings\n");
 								bad_flags = true;
@@ -1435,21 +1441,21 @@ bool parse_build_flags(Array<String> args) {
 								build_context.warnings_as_errors = true;
 							}
 							break;
-
-						case BuildFlag_VerboseErrors:
+						}
+						case BuildFlag_VerboseErrors: {
 							build_context.show_error_line = true;
 							break;
-
-						case BuildFlag_InternalIgnoreLazy:
+						}
+						case BuildFlag_InternalIgnoreLazy: {
 							build_context.ignore_lazy = true;
 							break;
-
+						}
 					#if defined(GB_SYSTEM_WINDOWS)
-						case BuildFlag_IgnoreVsSearch:
+						case BuildFlag_IgnoreVsSearch: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.ignore_microsoft_magic = true;
 							break;
-
+						}
 						case BuildFlag_ResourceFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -1537,15 +1543,15 @@ bool parse_build_flags(Array<String> args) {
 	}
 
 	if ((!(build_context.export_timings_format == TimingsExportUnspecified)) && (build_context.export_timings_file.len == 0)) {
-		gb_printf_err("`-export-timings:format` requires `-export-timings-file:filename` to be specified as well\n");
+		gb_printf_err("`-export-timings:<format>` requires `-export-timings-file:<filename>` to be specified as well\n");
 		bad_flags = true;
 	} else if ((build_context.export_timings_format == TimingsExportUnspecified) && (build_context.export_timings_file.len > 0)) {
-		gb_printf_err("`-export-timings-file:filename` requires `-export-timings:format` to be specified as well\n");
+		gb_printf_err("`-export-timings-file:<filename>` requires `-export-timings:<format>` to be specified as well\n");
 		bad_flags = true;
 	}
 
 	if (build_context.export_timings_format && !(build_context.show_timings || build_context.show_more_timings)) {
-		gb_printf_err("`-export-timings:format` requires `-show-timings` or `-show-more-timings` to be present\n");
+		gb_printf_err("`-export-timings:<format>` requires `-show-timings` or `-show-more-timings` to be present\n");
 		bad_flags = true;
 	}
 
@@ -1898,13 +1904,16 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-export-timings");
+		print_usage_line(1, "-export-timings:<format>");
 		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`");
-		print_usage_line(2, "Accepted values: json, csv");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-export-timings:json        Export compile time stats to JSON");
+		print_usage_line(3, "-export-timings:csv         Export compile time stats to CSV");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-export-timings-file:filename");
-		print_usage_line(2, "Specify the filename for `-export-timings`.");
+		print_usage_line(1, "-export-timings-file:<filename>");
+		print_usage_line(2, "Specify the filename for `-export-timings`");
+		print_usage_line(2, "Example: -export-timings-file:timings.json");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-thread-count:<integer>");
