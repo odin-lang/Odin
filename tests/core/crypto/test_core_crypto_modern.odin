@@ -6,6 +6,7 @@ import "core:mem"
 import "core:time"
 
 import "core:crypto/chacha20"
+import "core:crypto/chacha20poly1305"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
 
@@ -30,13 +31,14 @@ _decode_hex32 :: proc(s: string) -> [32]byte{
 	return b
 }
 
+_PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
+
 @(test)
 test_chacha20 :: proc(t: ^testing.T) {
 	log(t, "Testing (X)ChaCha20")
 
 	// Test cases taken from RFC 8439, and draft-irtf-cfrg-xchacha-03
-	plaintext_str := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
-	plaintext := transmute([]byte)(plaintext_str)
+	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
 
 	key := [chacha20.KEY_SIZE]byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -182,6 +184,80 @@ test_poly1305 :: proc(t: ^testing.T) {
 	expect(t, derived_tag_str == tag_str, fmt.tprintf("Expected %s for init/update/final - incremental, but got %s instead", tag_str, derived_tag_str))
 }
 
+@(test)
+test_chacha20poly1305 :: proc(t: ^testing.T) {
+	log(t, "Testing chacha20poly1205")
+
+	plaintext := transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR)
+
+	aad := [12]byte{
+		0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1, 0xc2, 0xc3,
+		0xc4, 0xc5, 0xc6, 0xc7,
+	}
+
+	key := [chacha20poly1305.KEY_SIZE]byte{
+		0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+		0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+		0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+		0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
+	}
+
+	nonce := [chacha20poly1305.NONCE_SIZE]byte{
+		0x07, 0x00, 0x00, 0x00,
+		0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+	}
+
+	ciphertext := [114]byte{
+		0xd3, 0x1a, 0x8d, 0x34, 0x64, 0x8e, 0x60, 0xdb,
+		0x7b, 0x86, 0xaf, 0xbc, 0x53, 0xef, 0x7e, 0xc2,
+		0xa4, 0xad, 0xed, 0x51, 0x29, 0x6e, 0x08, 0xfe,
+		0xa9, 0xe2, 0xb5, 0xa7, 0x36, 0xee, 0x62, 0xd6,
+		0x3d, 0xbe, 0xa4, 0x5e, 0x8c, 0xa9, 0x67, 0x12,
+		0x82, 0xfa, 0xfb, 0x69, 0xda, 0x92, 0x72, 0x8b,
+		0x1a, 0x71, 0xde, 0x0a, 0x9e, 0x06, 0x0b, 0x29,
+		0x05, 0xd6, 0xa5, 0xb6, 0x7e, 0xcd, 0x3b, 0x36,
+		0x92, 0xdd, 0xbd, 0x7f, 0x2d, 0x77, 0x8b, 0x8c,
+		0x98, 0x03, 0xae, 0xe3, 0x28, 0x09, 0x1b, 0x58,
+		0xfa, 0xb3, 0x24, 0xe4, 0xfa, 0xd6, 0x75, 0x94,
+		0x55, 0x85, 0x80, 0x8b, 0x48, 0x31, 0xd7, 0xbc,
+		0x3f, 0xf4, 0xde, 0xf0, 0x8e, 0x4b, 0x7a, 0x9d,
+		0xe5, 0x76, 0xd2, 0x65, 0x86, 0xce, 0xc6, 0x4b,
+		0x61, 0x16,
+	}
+	ciphertext_str := hex_string(ciphertext[:])
+
+	tag := [chacha20poly1305.TAG_SIZE]byte{
+		0x1a, 0xe1, 0x0b, 0x59, 0x4f, 0x09, 0xe2, 0x6a,
+		0x7e, 0x90, 0x2e, 0xcb, 0xd0, 0x60, 0x06, 0x91,
+	}
+	tag_str := hex_string(tag[:])
+
+	derived_tag: [chacha20poly1305.TAG_SIZE]byte
+	derived_ciphertext: [114]byte
+
+	chacha20poly1305.encrypt(derived_ciphertext[:], derived_tag[:], key[:], nonce[:], aad[:], plaintext)
+
+	derived_ciphertext_str := hex_string(derived_ciphertext[:])
+	expect(t, derived_ciphertext_str == ciphertext_str, fmt.tprintf("Expected ciphertext %s for encrypt(aad, plaintext), but got %s instead", ciphertext_str, derived_ciphertext_str))
+
+	derived_tag_str := hex_string(derived_tag[:])
+	expect(t, derived_tag_str == tag_str, fmt.tprintf("Expected tag %s for encrypt(aad, plaintext), but got %s instead", tag_str, derived_tag_str))
+
+	derived_plaintext: [114]byte
+	ok := chacha20poly1305.decrypt(derived_plaintext[:], tag[:], key[:], nonce[:], aad[:], ciphertext[:])
+	derived_plaintext_str := string(derived_plaintext[:])
+	expect(t, ok, "Expected true for decrypt(tag, aad, ciphertext)")
+	expect(t, derived_plaintext_str == _PLAINTEXT_SUNSCREEN_STR, fmt.tprintf("Expected plaintext %s for decrypt(tag, aad, ciphertext), but got %s instead", _PLAINTEXT_SUNSCREEN_STR, derived_plaintext_str))
+
+	derived_ciphertext[0] ~= 0xa5
+	ok = chacha20poly1305.decrypt(derived_plaintext[:], tag[:], key[:], nonce[:], aad[:], derived_ciphertext[:])
+	expect(t, !ok, "Expected false for decrypt(tag, aad, corrupted_ciphertext)")
+
+	aad[0] ~= 0xa5
+	ok = chacha20poly1305.decrypt(derived_plaintext[:], tag[:], key[:], nonce[:], aad[:], ciphertext[:])
+	expect(t, !ok, "Expected false for decrypt(tag, corrupted_aad, ciphertext)")
+}
+
 TestECDH :: struct {
 	scalar:  string,
 	point:   string,
@@ -233,6 +309,7 @@ bench_modern :: proc(t: ^testing.T) {
 
 	bench_chacha20(t)
 	bench_poly1305(t)
+	bench_chacha20poly1305(t)
 	bench_x25519(t)
 }
 
@@ -293,6 +370,29 @@ _benchmark_poly1305 :: proc(options: ^time.Benchmark_Options, allocator := conte
 	return nil
 }
 
+_benchmark_chacha20poly1305 :: proc(options: ^time.Benchmark_Options, allocator := context.allocator) -> (err: time.Benchmark_Error) {
+	buf := options.input
+	key := [chacha20.KEY_SIZE]byte{
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+	}
+	nonce := [chacha20.NONCE_SIZE]byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+	}
+
+	tag: [chacha20poly1305.TAG_SIZE]byte = ---
+
+	for _ in 0..=options.rounds {
+		chacha20poly1305.encrypt(buf,tag[:], key[:], nonce[:], nil, buf)
+	}
+	options.count     = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
 benchmark_print :: proc(name: string, options: ^time.Benchmark_Options) {
 	fmt.printf("\t[%v] %v rounds, %v bytes processed in %v ns\n\t\t%5.3f rounds/s, %5.3f MiB/s\n",
 		name,
@@ -347,6 +447,33 @@ bench_poly1305 :: proc(t: ^testing.T) {
 
 	name = "Poly1305 1024 zero bytes"
 	options.bytes = 1024
+	err = time.benchmark(options, context.allocator)
+	expect(t, err == nil, name)
+	benchmark_print(name, options)
+}
+
+bench_chacha20poly1305 :: proc(t: ^testing.T) {
+	name    := "chacha20poly1305 64 bytes"
+	options := &time.Benchmark_Options{
+		rounds   = 1_000,
+		bytes    = 64,
+		setup    = _setup_sized_buf,
+		bench    = _benchmark_chacha20poly1305,
+		teardown = _teardown_sized_buf,
+	}
+
+	err  := time.benchmark(options, context.allocator)
+	expect(t, err == nil, name)
+	benchmark_print(name, options)
+
+	name = "chacha20poly1305 1024 bytes"
+	options.bytes = 1024
+	err = time.benchmark(options, context.allocator)
+	expect(t, err == nil, name)
+	benchmark_print(name, options)
+
+	name = "chacha20poly1305 65536 bytes"
+	options.bytes = 65536
 	err = time.benchmark(options, context.allocator)
 	expect(t, err == nil, name)
 	benchmark_print(name, options)
