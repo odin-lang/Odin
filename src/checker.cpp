@@ -4773,6 +4773,10 @@ void check_unchecked_bodies(Checker *c) {
 }
 
 void check_test_procedures(Checker *c) {
+	if (build_context.test_names.entries.count == 0) {
+		return;
+	}
+
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 
