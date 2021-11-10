@@ -39,6 +39,11 @@ foreign ws2_32 {
 		g: GROUP,
 		dwFlags: DWORD,
 	) -> SOCKET ---
+	socket :: proc(
+		af: c_int,
+		type: c_int,
+		protocol: c_int,
+	) -> SOCKET ---
 
 	ioctlsocket :: proc(s: SOCKET, cmd: c_long, argp: ^c_ulong) -> c_int ---
 	closesocket :: proc(socket: SOCKET) -> c_int ---
