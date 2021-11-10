@@ -933,10 +933,9 @@ bool parse_build_flags(Array<String> args) {
 						}
 
 						if (ok) switch (bf.kind) {
-						case BuildFlag_Help: {
+						case BuildFlag_Help:
 							build_context.show_help = true;
 							break;
-						}
 						case BuildFlag_OutFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -1256,38 +1255,30 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						}
 
-						case BuildFlag_Debug: {
+						case BuildFlag_Debug:
 							build_context.ODIN_DEBUG = true;
 							break;
-						}
-						case BuildFlag_DisableAssert: {
+						case BuildFlag_DisableAssert:
 							build_context.ODIN_DISABLE_ASSERT = true;
 							break;
-						}
-						case BuildFlag_NoBoundsCheck: {
+						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
 							break;
-						}
-						case BuildFlag_NoDynamicLiterals: {
+						case BuildFlag_NoDynamicLiterals:
 							build_context.no_dynamic_literals = true;
 							break;
-						}
-						case BuildFlag_NoCRT: {
+						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
 							break;
-						}
-						case BuildFlag_NoEntryPoint: {
+						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
-						}
-						case BuildFlag_UseLLD: {
+						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
 							break;
-						}
-						case BuildFlag_UseSeparateModules: {
+						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
 							break;
-						}
 						case BuildFlag_ThreadedChecker: {
 							#if defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-threaded-checker is the default on this platform\n");
@@ -1304,14 +1295,12 @@ bool parse_build_flags(Array<String> args) {
 							build_context.threaded_checker = false;
 							break;
 						}
-						case BuildFlag_ShowDebugMessages: {
+						case BuildFlag_ShowDebugMessages:
 							build_context.show_debug_messages = true;
 							break;
-						}
-						case BuildFlag_Vet: {
+						case BuildFlag_Vet:
 							build_context.vet = true;
 							break;
-						}
 						case BuildFlag_VetExtra: {
 							build_context.vet = true;
 							build_context.vet_extra = true;
@@ -1322,10 +1311,9 @@ bool parse_build_flags(Array<String> args) {
 							bad_flags = true;
 							break;
 						}
-						case BuildFlag_IgnoreUnknownAttributes: {
+						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
-						}
 						case BuildFlag_ExtraLinkerFlags: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
@@ -1352,14 +1340,12 @@ bool parse_build_flags(Array<String> args) {
 								continue;
 							}
 						}
-						case BuildFlag_DisallowDo: {
+						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
-						}
-						case BuildFlag_DefaultToNilAllocator: {
+						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
 							break;
-						}
 						case BuildFlag_InsertSemicolon: {
 							gb_printf_err("-insert-semicolon flag is not required any more\n");
 							bad_flags = true;
@@ -1412,18 +1398,15 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_Short: {
+						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
-						}
-						case BuildFlag_AllPackages: {
+						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
 							break;
-						}
-						case BuildFlag_DocFormat: {
+						case BuildFlag_DocFormat:
 							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
 							break;
-						}
 						case BuildFlag_IgnoreWarnings: {
 							if (build_context.warnings_as_errors) {
 								gb_printf_err("-ignore-warnings cannot be used with -warnings-as-errors\n");
@@ -1442,14 +1425,12 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_VerboseErrors: {
+						case BuildFlag_VerboseErrors:
 							build_context.show_error_line = true;
 							break;
-						}
-						case BuildFlag_InternalIgnoreLazy: {
+						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;
-						}
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1596,10 +1577,10 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 	}
 	defer (gb_file_close(&f));
 
-	/*
-		JSON export
-	*/
 	if (build_context.export_timings_format == TimingsExportJson) {
+		/*
+			JSON export
+		*/
 		Parser *p             = c->parser;
 		isize lines           = p->total_line_count;
 		isize tokens          = p->total_token_count;
@@ -1643,13 +1624,10 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 		gb_fprintf(&f, "\t],\n");
 
 		gb_fprintf(&f, "}\n");
-	}
-
-	/*
-		CSV export
-	*/
-	else if (build_context.export_timings_format == TimingsExportCSV) {
-
+	} else if (build_context.export_timings_format == TimingsExportCSV) {
+		/*
+			CSV export
+		*/
 		t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
 		f64 total_time = time_stamp(t->total, t->freq, unit);
 
