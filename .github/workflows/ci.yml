@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, botan
-        run: sudo apt-get install llvm-11 clang-11 llvm libbotan-2-13 libbotan-2-dev botan
+        run: sudo apt-get install llvm-11 clang-11 llvm libbotan botan
       - name: build odin
         run: make release
       - name: Odin version
