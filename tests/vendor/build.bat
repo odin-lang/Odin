@@ -6,3 +6,8 @@ echo ---
 echo Running vendor:botan tests
 echo ---
 %PATH_TO_ODIN% run botan %COMMON%
+
+echo ---
+echo Running vendor:glfw tests
+echo ---
+%PATH_TO_ODIN% run glfw %COMMON%
