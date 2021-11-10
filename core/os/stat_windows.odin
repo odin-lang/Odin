@@ -115,12 +115,16 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	}
 	buf = buf[:N]
 
-	if len(buf) >= 4 {
-		if buf[0] == '\\' &&
-		   buf[1] == '\\' &&
-		   buf[2] == '?'  &&
-		   buf[3] == '\\' {
-			buf = buf[4:]
+	if len(buf) >= 4 && buf[0] == '\\' && buf[1] == '\\' && buf[2] == '?' && buf[3] == '\\' {
+		buf = buf[4:]
+
+		/*
+			NOTE(Jeroen): Properly handle UNC paths.
+			We need to turn `\\?\UNC\synology.local` into `\\synology.local`.
+		*/
+		if len(buf) >= 3 && buf[0] == 'U' && buf[1] == 'N' && buf[2] == 'C' {
+			buf = buf[2:]
+			buf[0] = '\\'
 		}
 	}
 	return buf
