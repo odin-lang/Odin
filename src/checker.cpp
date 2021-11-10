@@ -5261,9 +5261,6 @@ void check_parsed_files(Checker *c) {
 		check_scope_usage(c, f->scope);
 	}
 
-	TIME_SECTION("check test procedures");
-	check_test_procedures(c);
-
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
 	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
@@ -5315,6 +5312,9 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
 
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);
