@@ -76,10 +76,10 @@ foreign ws2_32 {
 	listen :: proc(socket: SOCKET, backlog: c_int) -> c_int ---
 	connect :: proc(socket: SOCKET, address: ^SOCKADDR, len: c_int) -> c_int ---
 	getaddrinfo :: proc(
-		node: ^c_char,
-		service: ^c_char,
+		node: cstring,
+		service: cstring,
 		hints: ^ADDRINFOA,
-		res: ^ADDRINFOA,
+		res: ^^ADDRINFOA,
 	) -> c_int ---
 	freeaddrinfo :: proc(res: ^ADDRINFOA) ---
 	select :: proc(
