@@ -43,7 +43,7 @@ gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
 		}
 		line_end += 1;
 	}
-	String the_line = make_string(line_start, line_end-line_start);
+	String the_line = make_string(line_start, line_end - line_start + 1);
 	the_line = string_trim_whitespace(the_line);
 
 	if (offset_) *offset_ = cast(i32)(pos_offset - the_line.text);
