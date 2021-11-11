@@ -39,3 +39,14 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 	// iff v == 0, setting the sign-bit, which gets returned.
 	return int((u32(v)-1) >> 31)
 }
+
+// rand_bytes fills the dst buffer with cryptographic entropy taken from
+// the system entropy source.  This routine will block if the system entropy
+// source is not ready yet.  All system entropy source failures are treated
+// as catastrophic, resulting in a panic.
+rand_bytes :: proc (dst: []byte) {
+	// zero-fill the buffer first
+	mem.zero_explicit(raw_data(dst), len(dst))
+
+	_rand_bytes(dst)
+}

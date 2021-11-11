@@ -4,6 +4,7 @@ import "core:testing"
 import "core:fmt"
 import "core:mem"
 import "core:time"
+import "core:crypto"
 
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
@@ -301,6 +302,45 @@ test_x25519 :: proc(t: ^testing.T) {
 
     // TODO/tests: Run the wycheproof test vectors, once I figure out
     // how to work with JSON.
+}
+
+@(test)
+test_rand_bytes :: proc(t: ^testing.T) {
+	log(t, "Testing rand_bytes")
+
+	if ODIN_OS != "linux" {
+		log(t, "rand_bytes not supported - skipping")
+		return
+	}
+
+	allocator := context.allocator
+
+	buf := make([]byte, 1 << 25, allocator)
+	defer delete(buf)
+
+	// Testing a CSPRNG for correctness is incredibly involved and
+	// beyond the scope of an implementation that offloads
+	// responsibility for correctness to the OS.
+	//
+	// Just attempt to randomize a sufficiently large buffer, where
+	// sufficiently large is:
+	//  * Larger than the maximum getentropy request size (256 bytes).
+	//  * Larger than the maximum getrandom request size (2^25 - 1 bytes).
+	//
+	// While theoretically non-deterministic, if this fails, chances
+	// are the CSPRNG is busted.
+	seems_ok := false
+	for i := 0; i < 256; i = i + 1 {
+		mem.zero_explicit(raw_data(buf), len(buf))
+		crypto.rand_bytes(buf)
+
+		if buf[0] != 0 && buf[len(buf)-1] != 0 {
+			seems_ok = true
+			break
+		}
+	}
+
+	expect(t, seems_ok, "Expected to randomize the head and tail of the buffer within a handful of attempts")
 }
 
 @(test)

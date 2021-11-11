@@ -120,6 +120,7 @@ main :: proc() {
     test_poly1305(&t)
     test_chacha20poly1305(&t)
     test_x25519(&t)
+    test_rand_bytes(&t)
 
     bench_modern(&t)
 
