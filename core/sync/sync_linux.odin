@@ -1,11 +1,9 @@
 package sync
 
 import "core:sys/unix"
-import "core:intrinsics"
 
 current_thread_id :: proc "contextless" () -> int {
-	SYS_GETTID :: 186
-	return int(intrinsics.syscall(SYS_GETTID))
+	return unix.sys_gettid()
 }
 
 
