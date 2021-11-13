@@ -222,6 +222,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		advance_token(p)
 		return
 	case .False, .True:
+		advance_token(p)
 		if assign_bool(v, token.kind == .True) {
 			return
 		}
