@@ -1985,11 +1985,27 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			case TargetArch_amd64:
 				{
 					GB_ASSERT(arg_count <= 7);
-					
+
+					// FreeBSD additionally clobbers r8, r9, r10, but they
+					// can also be used to pass in arguments, so this needs
+					// to be handled in two parts.
+					bool clobber_arg_regs[7] = {
+						false, false, false, false, false, false, false
+					};
+					if (build_context.metrics.os == TargetOs_freebsd) {
+						clobber_arg_regs[4] = true; // r10
+						clobber_arg_regs[5] = true; // r8
+						clobber_arg_regs[6] = true; // r9
+					}
+
 					char asm_string[] = "syscall";
 					gbString constraints = gb_string_make(heap_allocator(), "={rax}");
 					for (unsigned i = 0; i < arg_count; i++) {
-						constraints = gb_string_appendc(constraints, ",{");
+						if (!clobber_arg_regs[i]) {
+							constraints = gb_string_appendc(constraints, ",{");
+						} else {
+							constraints = gb_string_appendc(constraints, ",+{");
+						}
 						static char const *regs[] = {
 							"rax",
 							"rdi",
@@ -2013,10 +2029,35 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 					// Some but not all system calls will additionally
 					// clobber memory.
 					//
-					// TODO: FreeBSD is different and will also clobber
-					// R8, R9, and R10.  Additionally CF is used to
-					// indicate an error instead of -errno.
+					// As a fix for CVE-2019-5595, FreeBSD started
+					// clobbering R8, R9, and R10, instead of restoring
+					// them.  Additionally unlike Linux, instead of
+					// returning negative errno, positive errno is
+					// returned and CF is set.
+					//
+					// TODO:
+					//  * Figure out what Darwin does.
+					//  * Add some extra handling to propagate CF back
+					//    up to the caller on FreeBSD systems so that
+					//    the caller knows that the return value is
+					//    positive errno.
 					constraints = gb_string_appendc(constraints, ",~{rcx},~{r11},~{memory}");
+					if (build_context.metrics.os == TargetOs_freebsd) {
+						// Second half of dealing with FreeBSD's system
+						// call semantics.  Explicitly clobber the registers
+						// that were not used to pass in arguments, and
+						// then clobber RFLAGS.
+						if (arg_count < 5) {
+							constraints = gb_string_appendc(constraints, ",~{r10}");
+						}
+						if (arg_count < 6) {
+							constraints = gb_string_appendc(constraints, ",~{r8}");
+						}
+						if (arg_count < 7) {
+							constraints = gb_string_appendc(constraints, ",~{r9}");
+						}
+						constraints = gb_string_appendc(constraints, ",~{cc}");
+					}
 
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
