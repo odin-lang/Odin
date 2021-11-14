@@ -10,7 +10,8 @@ get_network_interfaces :: proc() -> []Address {
 }
 
 @private
-to_socket_address :: proc(family: Socket_IP_Family, addr: Address, port: int) -> (sockaddr: union{win.sockaddr_in, win.sockaddr_in6}, addrsize: i32) {
+address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: union{win.sockaddr_in, win.sockaddr_in6}, addrsize: i32) {
+	family := family_from_address(addr)
 	switch a in addr {
 	case Ipv4_Address:
 		return win.sockaddr_in {
@@ -29,7 +30,7 @@ to_socket_address :: proc(family: Socket_IP_Family, addr: Address, port: int) ->
 }
 
 @private
-to_canonical_endpoint :: proc(native_addr: ^win.SOCKADDR, auto_cast addr_size: int) -> (ep: Endpoint) {
+sockaddr_to_endpoint :: proc(native_addr: ^win.SOCKADDR_STORAGE_LH, auto_cast addr_size: int) -> (ep: Endpoint) {
 	switch addr_size {
 	case size_of(win.sockaddr_in):
 		addr := cast(^win.sockaddr_in) native_addr

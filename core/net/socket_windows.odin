@@ -89,10 +89,53 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error)
 
 	_ = set_option(skt, .Reuse_Address, true)
 
-	sockaddr, addrsize := to_socket_address(family, addr, port)
+	sockaddr, addrsize := address_to_sockaddr(addr, port)
 	res := win.connect(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), addrsize)
 	if res < 0 {
 		err = Specific_Dial_Error(win.WSAGetLastError())
+		return
+	}
+
+	return
+}
+
+
+
+Make_Unbound_Udp_Socket_Error :: union {
+	Create_Socket_Error,
+}
+
+// Make a UDP socket that you will primarily be sending data with.
+// This is akin to a client TCP socket.
+make_udp_socket :: proc(addr: Address, port: int) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
+	family := family_from_address(addr)
+	sock := create_socket(family, .Udp) or_return
+	defer if err != nil do close(skt)
+	skt = sock.(Udp_Socket)
+	return
+}
+
+
+Make_Bound_Udp_Socket_Error :: union {
+	Make_Unbound_Udp_Socket_Error,
+	Bind_Socket_Error,
+}
+Bind_Socket_Error :: enum c.int {
+	Address_In_Use = win.WSAEADDRINUSE,
+}
+
+// Make a UDP socket that reads data from other people.
+// This is akin to a listening TCP socket, but since it's UDP it can also
+// send data unsolicited, as well.
+//
+// The bound_address is the address to bind to. Use a loopback address if you don't care what interface to use.
+make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Make_Bound_Udp_Socket_Error) {
+	skt = make_udp_socket(bound_address, port) or_return
+
+	sockaddr, addrsize := address_to_sockaddr(bound_address, port)
+	res := win.bind(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), addrsize)
+	if res < 0 {
+		err = Bind_Socket_Error(win.WSAGetLastError())
 		return
 	}
 
@@ -130,7 +173,7 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 
 	_ = set_option(skt, .Exclusive_Addr_Use, true)
 
-	sockaddr, addrsize := to_socket_address(family, local_addr, port)
+	sockaddr, addrsize := address_to_sockaddr(local_addr, port)
 	res := win.bind(win.SOCKET(skt), cast(^win.SOCKADDR) &sockaddr, addrsize)
 	if res == win.SOCKET_ERROR {
 		err = Specific_Listen_Error(win.WSAGetLastError())
@@ -197,53 +240,61 @@ close :: proc(skt: Any_Socket) {
 
 
 
-Recv_Error :: union {
-	Tcp_Recv_Error,
-	Udp_Recv_Error,
-}
-
-Udp_Recv_Error :: enum c.int {
-	Truncated = win.WSAEMSGSIZE,
-}
-
-// TODO: audit these errors; consider if they can be cleaned up further
-// same for Send_Error
 Tcp_Recv_Error :: enum c.int {
+	Ok = 0,
 	Shutdown = win.WSAESHUTDOWN,
 	Not_Connected = win.WSAENOTCONN,
+	Connection_Broken = win.WSAENETRESET,
+	Not_Socket = win.WSAENOTSOCK,
 	Aborted = win.WSAECONNABORTED,
-	Reset = win.WSAECONNRESET,
+	Reset = win.WSAECONNRESET, // Gracefully shutdown
 	Offline = win.WSAENETDOWN,
 	Host_Unreachable = win.WSAEHOSTUNREACH,
 	Interrupted = win.WSAEINTR,
 	Timeout = win.WSAETIMEDOUT,
 }
 
-recv :: proc(skt: Any_Socket, buf: []byte) -> (bytes_read: int, err: Recv_Error) {
-	s := any_socket_to_socket(skt)
-	res := win.recv(win.SOCKET(s), raw_data(buf), c.int(len(buf)), 0)
+recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Tcp_Recv_Error) {
+	if len(buf) <= 0 {
+		return
+	}
+	res := win.recv(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0)
 	if res < 0 {
-		switch in skt {
-		case Tcp_Socket:  err = Tcp_Recv_Error(win.WSAGetLastError())
-		case Udp_Socket:  err = Udp_Recv_Error(win.WSAGetLastError())
-		case:
-			unreachable()
-		}
+		err = Tcp_Recv_Error(win.WSAGetLastError())
 		return
 	}
 	return int(res), nil
 }
 
-
-
-Send_Error :: union {
-	Tcp_Send_Error,
-	Udp_Send_Error,
-}
-
-Udp_Send_Error :: enum c.int {
+Udp_Recv_Error :: enum c.int {
+	Ok = 0,
 	Truncated = win.WSAEMSGSIZE,
+	Reset = win.WSAECONNRESET,
+	Not_Socket = win.WSAENOTSOCK,
+	Socket_Not_Bound = win.WSAEINVAL, // .. or unknown flag specified; or MSG_OOB specified with SO_OOBINLINE enabled
 }
+
+recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Udp_Recv_Error) {
+	if len(buf) <= 0 {
+		return
+	}
+
+	from: win.SOCKADDR_STORAGE_LH
+	fromsize := c.int(size_of(from))
+	res := win.recvfrom(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0, cast(^win.SOCKADDR) &from, &fromsize)
+	if res < 0 {
+		err = Udp_Recv_Error(win.WSAGetLastError())
+		return
+	}
+
+	bytes_read = int(res)
+	remote_endpoint = sockaddr_to_endpoint(&from, fromsize)
+	return
+}
+
+recv :: proc{recv_tcp, recv_udp}
+
+
 
 Tcp_Send_Error :: enum c.int {
 	Aborted = win.WSAECONNABORTED,
@@ -260,24 +311,39 @@ Tcp_Send_Error :: enum c.int {
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
-send :: proc(skt: Any_Socket, buf: []byte) -> (bytes_written: int, err: Send_Error) {
-	s := any_socket_to_socket(skt)
+send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Tcp_Send_Error) {
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
-		res := win.send(win.SOCKET(s), raw_data(buf), c.int(limit), 0)
+		res := win.send(win.SOCKET(skt), raw_data(buf), c.int(limit), 0)
 		if res < 0 {
-			switch in skt {
-			case Tcp_Socket:  err = Tcp_Send_Error(win.WSAGetLastError())
-			case Udp_Socket:  err = Udp_Send_Error(win.WSAGetLastError())
-			case:
-				unreachable()
-			}
+			err = Tcp_Send_Error(win.WSAGetLastError())
 			return
 		}
 		bytes_written += int(res)
 	}
 	return
 }
+
+Udp_Send_Error :: enum c.int {
+	Truncated = win.WSAEMSGSIZE,
+}
+
+send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Udp_Send_Error) {
+	toaddr, toaddrsize := address_to_sockaddr(to.addr, to.port)
+	for bytes_written < len(buf) {
+		limit := min(1<<31, len(buf) - bytes_written)
+		res := win.sendto(win.SOCKET(skt), raw_data(buf), c.int(limit), 0, cast(^win.SOCKADDR) &toaddr, toaddrsize)
+		if res < 0 {
+			err = Udp_Send_Error(win.WSAGetLastError())
+			return
+		}
+		bytes_written += int(res)
+	}
+	return
+}
+
+send :: proc{send_tcp, send_udp}
+
 
 
 
