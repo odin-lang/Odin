@@ -207,13 +207,14 @@ addr_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> st
 					i += 1
 				}
 				fmt.sbprintf(&b, "::")
-				break // TODO: do we need this?
 			} else if i > 0 {
 				fmt.sbprint(&b, ":")
 			}
 
-			fmt.sbprintf(&b, "%x", v[i])
-			i += 1
+			if i < len(v) {
+				fmt.sbprintf(&b, "%x", v[i])
+				i += 1
+			}
 		}
 	}
 
