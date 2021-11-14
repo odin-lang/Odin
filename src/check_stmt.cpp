@@ -1616,7 +1616,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 			Operand lhs = {Addressing_Invalid};
 			Operand rhs = {Addressing_Invalid};
-			Ast *binary_expr = alloc_ast_node(node->file, Ast_BinaryExpr);
+			Ast *binary_expr = alloc_ast_node(node->file(), Ast_BinaryExpr);
 			ast_node(be, BinaryExpr, binary_expr);
 			be->op = op;
 			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));

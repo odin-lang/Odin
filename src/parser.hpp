@@ -255,14 +255,14 @@ ProcCallingConvention default_calling_convention(void) {
 	return ProcCC_Odin;
 }
 
-enum StateFlag : u16 {
+enum StateFlag : u8 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
 
-	StateFlag_BeenHandled = 1<<15,
+	StateFlag_BeenHandled = 1<<7,
 };
 
-enum ViralStateFlag : u16 {
+enum ViralStateFlag : u8 {
 	ViralStateFlag_ContainsDeferredProcedure = 1<<0,
 };
 
@@ -666,7 +666,7 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 AST_KIND(_TypeEnd,  "", bool)
 
-enum AstKind {
+enum AstKind : u16 {
 	Ast_Invalid,
 #define AST_KIND(_kind_name_, ...) GB_JOIN2(Ast_, _kind_name_),
 	AST_KINDS
@@ -696,18 +696,18 @@ isize const ast_variant_sizes[] = {
 
 struct AstCommonStuff {
 	AstKind      kind;
-	u16          state_flags;
-	u16          viral_state_flags;
-	AstFile *    file;
+	u8           state_flags;
+	u8           viral_state_flags;
+	i32          file_id;
 	Scope *      scope;
 	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
 };
 
 struct Ast {
 	AstKind      kind;
-	u16          state_flags;
-	u16          viral_state_flags;
-	AstFile *    file;
+	u8           state_flags;
+	u8           viral_state_flags;
+	i32          file_id;
 	Scope *      scope;
 	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
 
@@ -717,6 +717,13 @@ struct Ast {
 	AST_KINDS
 #undef AST_KIND
 	};
+	
+	
+	// NOTE(bill): I know I dislike methods but this is hopefully a temporary thing 
+	// for refactoring purposes
+	AstFile *file() const {
+		return get_ast_file_from_id(this->file_id);
+	}
 };
 
 

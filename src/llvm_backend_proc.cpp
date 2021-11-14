@@ -258,8 +258,8 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		if (entity->file != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->file);
 			scope = file;
-		} else if (ident != nullptr && ident->file != nullptr) {
-			file = lb_get_llvm_metadata(m, ident->file);
+		} else if (ident != nullptr && ident->file_id != 0) {
+			file = lb_get_llvm_metadata(m, ident->file());
 			scope = file;
 		} else if (entity->scope != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->scope->file);

@@ -454,7 +454,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	token.kind = Token_Ident;
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
-	e->file = expr->file;
+	e->file = expr->file();
 	e->decl_info = pl->decl;
 	e->code_gen_module = m;
 	e->flags |= EntityFlag_ProcBodyChecked;
@@ -1278,8 +1278,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 			if (Entity *entry_point = m->info->entry_point) {
 				if (Ast *ident = entry_point->identifier.load()) {
-					if (ident->file) {
-						init_file = ident->file;
+					if (ident->file_id) {
+						init_file = ident->file();
 					}
 				}
 			}

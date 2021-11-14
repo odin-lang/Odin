@@ -212,8 +212,9 @@ void lb_open_scope(lbProcedure *p, Scope *s) {
 			unsigned column = cast(unsigned)token.pos.column;
 
 			LLVMMetadataRef file = nullptr;
-			if (s->node->file != nullptr) {
-				file = lb_get_llvm_metadata(m, s->node->file);
+			AstFile *ast_file = s->node->file();
+			if (ast_file != nullptr) {
+				file = lb_get_llvm_metadata(m, ast_file);
 			}
 			LLVMMetadataRef scope = nullptr;
 			if (p->scope_stack.count > 0) {

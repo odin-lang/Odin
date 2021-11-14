@@ -3712,7 +3712,7 @@ String path_to_entity_name(String name, String fullpath, bool strip_extension=tr
 #if 1
 
 void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
-	AstPackage *parent_pkg = decl->file->pkg;
+	AstPackage *parent_pkg = decl->file()->pkg;
 
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
