@@ -40,7 +40,7 @@ parse_ipv4_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, 
 		if strings.contains(part, ":") do return
 		n, ok := strconv.parse_uint(part, 10)
 		if !ok do return // NOTE(tetra): Not all of it was an integer.
-		if n < 0 || n > uint(max(u8)) do return
+		if n > uint(max(u8)) do return
 		addr[i] = byte(n)
 	}
 
@@ -76,9 +76,8 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 		}
 		n, ok := strconv.parse_uint(part, 16)
 		if !ok do return // NOTE(tetra): Not all of this part was digits.
-		n16 := u16(n)
-		if n16 >= max(u16) do return
-		addr[i] = u16be(n16)
+		if n > uint(max(u16)) do return
+		addr[i] = u16be(u16(n))
 	}
 
 	if double_colon {
@@ -90,9 +89,8 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 			}
 			n, ok := strconv.parse_uint(part, 16)
 			if !ok do return // NOTE(tetra): Not all of this part was digits.
-			n16 := u16(n)
-			if n16 >= max(u16) do return
-			addr[len(addr)-1-i] = u16be(n16)
+			if n > uint(max(u16)) do return
+			addr[len(addr)-1-i] = u16be(u16(n))
 		}
 	}
 	ok = true
