@@ -36,14 +36,14 @@ sockaddr_to_endpoint :: proc(native_addr: ^win.SOCKADDR_STORAGE_LH, auto_cast ad
 		addr := cast(^win.sockaddr_in) native_addr
 		port := int(addr.sin_port)
 		ep = Endpoint {
-			addr = Ipv4_Address(transmute([4]byte) addr.sin_addr),
+			address = Ipv4_Address(transmute([4]byte) addr.sin_addr),
 			port = port,
 		}
 	case size_of(win.sockaddr_in6):
 		addr := cast(^win.sockaddr_in6) native_addr
 		port := int(addr.sin6_port)
 		ep = Endpoint {
-			addr = Ipv6_Address(transmute([8]u16be) addr.sin6_addr),
+			address = Ipv6_Address(transmute([8]u16be) addr.sin6_addr),
 			port = port,
 		}
 	case:
