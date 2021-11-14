@@ -318,7 +318,43 @@ void add_scope(CheckerContext *c, Ast *node, Scope *scope) {
 	GB_ASSERT(node != nullptr);
 	GB_ASSERT(scope != nullptr);
 	scope->node = node;
-	node->scope = scope;
+	switch (node->kind) {
+	case Ast_BlockStmt:       node->BlockStmt.scope       = scope; break;
+	case Ast_IfStmt:          node->IfStmt.scope          = scope; break;
+	case Ast_ForStmt:         node->ForStmt.scope         = scope; break;
+	case Ast_RangeStmt:       node->RangeStmt.scope       = scope; break;
+	case Ast_UnrollRangeStmt: node->UnrollRangeStmt.scope = scope; break;
+	case Ast_CaseClause:      node->CaseClause.scope      = scope; break;
+	case Ast_SwitchStmt:      node->SwitchStmt.scope      = scope; break;
+	case Ast_TypeSwitchStmt:  node->TypeSwitchStmt.scope  = scope; break;
+	case Ast_ProcType:        node->ProcType.scope        = scope; break;
+	case Ast_StructType:      node->StructType.scope      = scope; break;
+	case Ast_UnionType:       node->UnionType.scope       = scope; break;
+	case Ast_EnumType:        node->EnumType.scope        = scope; break;
+	default: GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
+	}
+}
+
+Scope *scope_of_node(Ast *node) {
+	if (node == nullptr) {
+		return nullptr;
+	}
+	switch (node->kind) {
+	case Ast_BlockStmt:       return node->BlockStmt.scope;
+	case Ast_IfStmt:          return node->IfStmt.scope;
+	case Ast_ForStmt:         return node->ForStmt.scope;
+	case Ast_RangeStmt:       return node->RangeStmt.scope;
+	case Ast_UnrollRangeStmt: return node->UnrollRangeStmt.scope;
+	case Ast_CaseClause:      return node->CaseClause.scope;
+	case Ast_SwitchStmt:      return node->SwitchStmt.scope;
+	case Ast_TypeSwitchStmt:  return node->TypeSwitchStmt.scope;
+	case Ast_ProcType:        return node->ProcType.scope;
+	case Ast_StructType:      return node->StructType.scope;
+	case Ast_UnionType:       return node->UnionType.scope;
+	case Ast_EnumType:        return node->EnumType.scope;
+	}
+	GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
+	return nullptr;
 }
 
 
@@ -1080,9 +1116,6 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 		return *found;
 	}
 	return nullptr;
-}
-Scope *scope_of_node(Ast *node) {
-	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	if (c->untyped != nullptr) {

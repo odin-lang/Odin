@@ -424,11 +424,13 @@ AST_KIND(_StmtBegin,     "", bool) \
 	}) \
 AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \
+		Scope *scope; \
 		Slice<Ast *> stmts; \
 		Ast *label;         \
 		Token open, close; \
 	}) \
 	AST_KIND(IfStmt, "if statement", struct { \
+		Scope *scope; \
 		Token token;     \
 		Ast *label;      \
 		Ast * init;      \
@@ -449,6 +451,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Slice<Ast *> results; \
 	}) \
 	AST_KIND(ForStmt, "for statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label; \
 		Ast *init; \
@@ -457,6 +460,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(RangeStmt, "range statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label; \
 		Slice<Ast *> vals; \
@@ -465,6 +469,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
+		Scope *scope; \
 		Token unroll_token; \
 		Token for_token; \
 		Ast *val0; \
@@ -474,12 +479,14 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(CaseClause, "case clause", struct { \
+		Scope *scope; \
 		Token token;             \
 		Slice<Ast *> list;   \
 		Slice<Ast *> stmts;  \
 		Entity *implicit_entity; \
 	}) \
 	AST_KIND(SwitchStmt, "switch statement", struct { \
+		Scope *scope; \
 		Token token;  \
 		Ast *label;   \
 		Ast *init;    \
@@ -488,6 +495,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		bool partial; \
 	}) \
 	AST_KIND(TypeSwitchStmt, "type switch statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label;  \
 		Ast *tag;    \
@@ -589,6 +597,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast * specialization;  \
 	}) \
 	AST_KIND(ProcType, "procedure type", struct { \
+		Scope *scope; \
 		Token token;   \
 		Ast *params;  \
 		Ast *results; \
@@ -621,6 +630,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *tag;  \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
+		Scope *scope; \
 		Token token;                \
 		Slice<Ast *> fields;        \
 		isize field_count;          \
@@ -632,6 +642,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		bool is_raw_union;          \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
+		Scope *scope; \
 		Token        token;         \
 		Slice<Ast *> variants;      \
 		Ast *polymorphic_params;    \
@@ -642,6 +653,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Slice<Ast *> where_clauses; \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
+		Scope *scope; \
 		Token        token; \
 		Ast *        base_type; \
 		Slice<Ast *> fields; /* FieldValue */ \
@@ -695,21 +707,19 @@ isize const ast_variant_sizes[] = {
 };
 
 struct AstCommonStuff {
-	AstKind      kind;
+	AstKind      kind; // u16
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	Scope *      scope;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 };
 
 struct Ast {
-	AstKind      kind;
+	AstKind      kind; // u16
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	Scope *      scope;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
