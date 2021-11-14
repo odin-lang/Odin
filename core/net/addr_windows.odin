@@ -1,6 +1,5 @@
 package net
 
-import "core:c"
 import win "core:sys/windows"
 
 
@@ -11,7 +10,7 @@ get_network_interfaces :: proc() -> []Address {
 }
 
 @private
-to_socket_address :: proc(family: c.int, addr: Address, port: int) -> (sockaddr: union{win.sockaddr_in, win.sockaddr_in6}, addrsize: i32) {
+to_socket_address :: proc(family: Socket_IP_Family, addr: Address, port: int) -> (sockaddr: union{win.sockaddr_in, win.sockaddr_in6}, addrsize: i32) {
 	switch a in addr {
 	case Ipv4_Address:
 		return win.sockaddr_in {

@@ -177,42 +177,44 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 
 // // TODO(tetra): The whole "table" stuff in encoding/base64 is too impenetrable for me to
 // // make a table for this ... sigh - so this'll do for now.
-// base64url_encode :: proc(data: []byte, allocator := context.allocator) -> string {
-// 	out := transmute([]byte) base64.encode(data, base64.ENC_TABLE, allocator);
-// 	for b, i in out {
-// 		switch b {
-// 		case '+': out[i] = '-';
-// 		case '/': out[i] = '_';
-// 		}
-// 	}
-// 	i := len(out)-1;
-// 	for ; i >= 0; i -= 1 {
-// 		if out[i] != '=' do break;
-// 	}
-// 	return string(out[:i+1]);
-// }
+/*
+base64url_encode :: proc(data: []byte, allocator := context.allocator) -> string {
+	out := transmute([]byte) base64.encode(data, base64.ENC_TABLE, allocator);
+	for b, i in out {
+		switch b {
+		case '+': out[i] = '-';
+		case '/': out[i] = '_';
+		}
+	}
+	i := len(out)-1;
+	for ; i >= 0; i -= 1 {
+		if out[i] != '=' do break;
+	}
+	return string(out[:i+1]);
+}
 
-// base64url_decode :: proc(s: string, allocator := context.allocator) -> []byte {
-// 	size := len(s);
-// 	padding := 0;
-// 	for size % 4 != 0 {
-// 		size += 1; // TODO: SPEED
-// 		padding += 1;
-// 	}
+base64url_decode :: proc(s: string, allocator := context.allocator) -> []byte {
+	size := len(s);
+	padding := 0;
+	for size % 4 != 0 {
+		size += 1; // TODO: SPEED
+		padding += 1;
+	}
 
-// 	temp := make([]byte, size, context.temp_allocator);
-// 	copy(temp, transmute([]byte) s);
+	temp := make([]byte, size, context.temp_allocator);
+	copy(temp, transmute([]byte) s);
 
-// 	for b, i in temp {
-// 		switch b {
-// 		case '-': temp[i] = '+';
-// 		case '_': temp[i] = '/';
-// 		}
-// 	}
+	for b, i in temp {
+		switch b {
+		case '-': temp[i] = '+';
+		case '_': temp[i] = '/';
+		}
+	}
 
-// 	for in 0..padding-1 {
-// 		temp[len(temp)-1] = '=';
-// 	}
+	for in 0..padding-1 {
+		temp[len(temp)-1] = '=';
+	}
 
-// 	return base64.decode(string(temp), base64.DEC_TABLE, allocator);
-// }
+	return base64.decode(string(temp), base64.DEC_TABLE, allocator);
+}
+*/
