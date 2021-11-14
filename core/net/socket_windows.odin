@@ -105,10 +105,11 @@ Make_Unbound_Udp_Socket_Error :: union {
 	Create_Socket_Error,
 }
 
-// Make a UDP socket that you will primarily be sending data with.
-// This is akin to a client TCP socket.
-make_udp_socket :: proc(addr: Address, port: int) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
-	family := family_from_address(addr)
+// This type of socket becomes bound when you try to send data.
+// This is likely what you want if you only want to send data unsolicited.
+//
+// This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
+make_unbound_udp_socket :: proc(family: Socket_IP_Family) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
 	sock := create_socket(family, .Udp) or_return
 	defer if err != nil do close(skt)
 	skt = sock.(Udp_Socket)
@@ -124,13 +125,14 @@ Bind_Socket_Error :: enum c.int {
 	Address_In_Use = win.WSAEADDRINUSE,
 }
 
-// Make a UDP socket that reads data from other people.
-// This is akin to a listening TCP socket, but since it's UDP it can also
-// send data unsolicited, as well.
+// This type of socket is bound immediately, which enables it to receive data on the port.
+// Since it's UDP, it's also able to send data without receiving any first.
+//
+// This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
 // The bound_address is the address to bind to. Use a loopback address if you don't care what interface to use.
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Make_Bound_Udp_Socket_Error) {
-	skt = make_udp_socket(bound_address, port) or_return
+	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 
 	sockaddr, addrsize := address_to_sockaddr(bound_address, port)
 	res := win.bind(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), addrsize)
