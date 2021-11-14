@@ -38,7 +38,7 @@ import win "core:sys/windows"
 // ```
 //
 resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (addr4, addr6: Address, ok: bool) {
-	if addr := parse_addr(hostname); addr != nil {
+	if addr := parse_address(hostname); addr != nil {
 		switch a in addr {
 		case Ipv4_Address: addr4 = addr
 		case Ipv6_Address: addr6 = addr

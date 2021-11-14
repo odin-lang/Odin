@@ -331,7 +331,7 @@ Udp_Send_Error :: enum c.int {
 }
 
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Udp_Send_Error) {
-	toaddr, toaddrsize := address_to_sockaddr(to.addr, to.port)
+	toaddr, toaddrsize := address_to_sockaddr(to.address, to.port)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		res := win.sendto(win.SOCKET(skt), raw_data(buf), c.int(limit), 0, cast(^win.SOCKADDR) &toaddr, toaddrsize)
