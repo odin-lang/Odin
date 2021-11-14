@@ -100,7 +100,7 @@ request_destroy :: proc(using req: Request) {
 
 
 
-send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.Socket, ok: bool) {
+send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.Tcp_Socket, ok: bool) {
 	if r.scheme != "http" {
 		fmt.panicf("%v is not a supported scheme at this time", r.scheme)
 	}
@@ -114,21 +114,21 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 	addr := addr4 != nil ? addr4 : addr6
 
 	// TODO(tetra): SSL/TLS.
-	skt, err := net.dial(addr, port, .Tcp)
-	if err != .Ok do return
+	skt, err := net.dial_tcp(addr, port)
+	if err != nil do return
 
 	bytes := request_to_bytes(r, allocator)
 	if bytes == nil do return
 	defer delete(bytes)
 
 	_, write_err := net.send(skt, bytes)
-	if write_err != .Ok do return
+	if write_err != nil do return
 
 	return skt, true
 }
 
 // TODO(tetra): Ideally, we'd have a nice way to read from a slice too.
-recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp: Response, ok: bool) {
+recv_response :: proc(skt: net.Tcp_Socket, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	using strings
 
 	context.allocator = allocator
@@ -142,7 +142,7 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 		// if has_suffix(to_string(incoming), "\r\n\r\n") do break;
 
 		n, read_err := net.recv(skt, read_buf[:])
-		if read_err != .Ok do return
+		if read_err != nil do return
 		if n == 0 do break
 
 		write_bytes(&incoming, read_buf[:n])
