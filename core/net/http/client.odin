@@ -17,7 +17,7 @@ Request_Status :: enum {
 Client_Request :: struct {
 	request:   Request,
 	response:  Response,
-	socket:    net.Socket, // only valid if status == .Wait_Reply
+	socket:    net.Tcp_Socket, // only valid if status == .Wait_Reply
 	status:    Request_Status,
 }
 
@@ -107,7 +107,7 @@ client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Res
 }
 
 client_process_requests :: proc(using c: ^Client) {
-	close_socket :: proc(s: ^net.Socket) {
+	close_socket :: proc(s: ^net.Tcp_Socket) {
 		net.close(s^);
 		s^ = {};
 	}
@@ -182,7 +182,7 @@ client_begin_request :: proc(using c: ^Client, req: Request) -> (token: Client_R
 	assert(tk > 0);
 
 	skt, err := net.start_dial(addr, 80);
-	if err != .Ok do return;
+	if err != nil do return;
 
 	slot^ = Client_Connecting_Request {
 		req = req,
@@ -202,7 +202,7 @@ client_poll_events :: proc(using c: ^Client) -> (updated: int) {
 		switch r in req {
 		case Client_Connecting_Request:
 			done, err := net.try_finish_dial(c);
-			if err != .Ok {
+			if err != nil {
 				net.close(c);
 				requests[i] = Client_Failed_Request {
 					req = r.req,
