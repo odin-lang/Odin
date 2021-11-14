@@ -64,7 +64,6 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 
 	parts := strings.split(addr_str, ":")
 	if len(parts) < 3 do return
-
 	double_colon := false
 	outer: for part, i in parts {
 		switch len(part) {
@@ -135,8 +134,8 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 		return
 	}
 
-	// Ipv4 addr_or_host:port
 	if n := strings.count(endpoint_str, ":"); n == 1 {
+		// Ipv4 addr_or_host:port
 		i := strings.last_index(endpoint_str, ":")
 		assert(i != -1)
 
@@ -144,7 +143,7 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 		port, ok = strconv.parse_int(endpoint_str[i+1:], 10)
 		return
 	} else if n > 1 {
-		return
+		// Ipv6 address without port
 	}
 
 	// No port
