@@ -238,4 +238,14 @@ endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) ->
 	return
 }
 
-to_string :: proc{addr_to_string, endpoint_to_string};
+to_string :: proc{addr_to_string, endpoint_to_string}
+
+
+family_from_address :: proc(addr: Address) -> Socket_IP_Family {
+	switch in addr {
+	case Ipv4_Address: return .V4
+	case Ipv6_Address: return .V6
+	case:
+		unreachable()
+	}
+}
