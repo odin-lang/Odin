@@ -2,12 +2,10 @@
 
 setlocal EnableDelayedExpansion
 
-for /f "usebackq tokens=1,2 delims=,=- " %%i in (`wmic os get LocalDateTime /value`) do @if %%i==LocalDateTime (
-	set CURR_DATE_TIME=%%j
+:: Get raw version string. Call `src\build-environment\build.bat` if you want to recompile the helper.
+for /f "usebackq" %%i in (`src\build-environment\get-version-raw.exe`) do  (
+	set odin_version_raw="%%i"
 )
-
-set curr_year=%CURR_DATE_TIME:~0,4%
-set curr_month=%CURR_DATE_TIME:~4,2%
 
 :: Make sure this is a decent name and not generic
 set exe_name=odin.exe
@@ -28,12 +26,11 @@ if "%2" == "1" (
 	set nightly=0
 )
 
-set odin_version_raw="dev-%curr_year%-%curr_month%"
-
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
+
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
 if %nightly% equ 1 set compiler_defines=%compiler_defines% -DNIGHTLY
 
