@@ -21,7 +21,7 @@ Ipv6_Loopback := Ipv6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 Ipv4_Any := Ipv4_Address{}
 Ipv6_Any := Ipv6_Address{}
 
-parse_ipv4_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, ok: bool) {
+parse_ipv4_address :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, ok: bool) {
 	buf: [1024]byte
 	arena: mem.Arena
 	mem.init_arena(&arena, buf[:])
@@ -49,7 +49,7 @@ parse_ipv4_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, 
 }
 
 // TODO(tetra): Scopeid?
-parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, ok: bool) {
+parse_ipv6_address :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, ok: bool) {
 	// Rule 1: If the high-byte of any block is zero, it can be omitted. (00XX => XX)
 	// Rule 2: Two or more all-zero blocks in a row can be replaced with '::' (FF00:0000:0000:XXXX => FF00::XXXX)
 	//         but this can only happen _once_.
@@ -96,10 +96,10 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 	return
 }
 
-parse_addr :: proc(address_and_maybe_port: string) -> Address {
-	addr6, ok6 := parse_ipv6_addr(address_and_maybe_port)
+parse_address :: proc(address_and_maybe_port: string) -> Address {
+	addr6, ok6 := parse_ipv6_address(address_and_maybe_port)
 	if ok6 do return addr6
-	addr4, ok4 := parse_ipv4_addr(address_and_maybe_port)
+	addr4, ok4 := parse_ipv4_address(address_and_maybe_port)
 	if ok4 do return addr4
 	return nil
 }
@@ -107,7 +107,7 @@ parse_addr :: proc(address_and_maybe_port: string) -> Address {
 
 
 Endpoint :: struct {
-	addr: Address,
+	address: Address,
 	port: int,
 }
 
@@ -115,10 +115,10 @@ parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
 	addr_str, port, split_ok := split_port(address)
 	if !split_ok do return
 
-	addr := parse_addr(addr_str)
+	addr := parse_address(addr_str)
 	if addr == nil do return
 
-	ep = Endpoint { addr = addr, port = port }
+	ep = Endpoint { address = addr, port = port }
 	ok = true
 	return
 }
@@ -160,16 +160,16 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.alloc
 
 	b := strings.make_builder(allocator)
 
-	addr := parse_addr(addr_or_host)
+	addr := parse_address(addr_or_host)
 	if addr == nil {
 		// hostname
 		fmt.sbprintf(&b, "%v:%v", addr_or_host, port)
 	} else {
 		switch in addr {
 		case Ipv4_Address:
-			fmt.sbprintf(&b, "%v:%v", addr_to_string(addr), port)
+			fmt.sbprintf(&b, "%v:%v", address_to_string(addr), port)
 		case Ipv6_Address:
-			fmt.sbprintf(&b, "[%v]:%v", addr_to_string(addr), port)
+			fmt.sbprintf(&b, "[%v]:%v", address_to_string(addr), port)
 		}
 	}
 	return strings.to_string(b)
@@ -192,7 +192,7 @@ map_to_ipv6 :: proc(addr: Address) -> Address {
 
 
 // Returns a temporarily-allocated string representation of the address.
-addr_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
+address_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
 	b := strings.make_builder(allocator)
 	switch v in addr {
 	case Ipv4_Address:
@@ -222,12 +222,12 @@ addr_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> st
 }
 
 // Returns a temporarily-allocated string representation of the endpoint.
-// If there's a port, uses the `[addr]:port` format.
+// If there's a port, uses the `[address]:port` format.
 endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> (s: string) {
-	s = addr_to_string(ep.addr, allocator)
+	s = address_to_string(ep.address, allocator)
 	if ep.port != 0 {
 		b := strings.make_builder(allocator)
-		switch a in ep.addr {
+		switch a in ep.address {
 		case Ipv4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
 		case Ipv6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
 		}
@@ -236,7 +236,7 @@ endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) ->
 	return
 }
 
-to_string :: proc{addr_to_string, endpoint_to_string}
+to_string :: proc{address_to_string, endpoint_to_string}
 
 
 family_from_address :: proc(addr: Address) -> Socket_IP_Family {
