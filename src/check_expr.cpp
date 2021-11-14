@@ -8413,14 +8413,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (check_is_assignable_to(c, &z, first_type)) {
 				// NOTE(bill): AST GENERATION HACK!
 				Token op = {Token_Pointer};
-				first_arg = ast_deref_expr(first_arg->file, first_arg, op);
+				first_arg = ast_deref_expr(first_arg->file(), first_arg, op);
 			} else if (y.mode == Addressing_Variable) {
 				Operand w = y;
 				w.type = alloc_type_pointer(y.type);
 				if (check_is_assignable_to(c, &w, first_type)) {
 					// NOTE(bill): AST GENERATION HACK!
 					Token op = {Token_And};
-					first_arg = ast_unary_expr(first_arg->file, op, first_arg);
+					first_arg = ast_unary_expr(first_arg->file(), op, first_arg);
 				}
 			}
 		}
@@ -8443,7 +8443,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 			if (!fail && first_is_field_value) {
 				Token op = {Token_Eq};
-				AstFile *f = first_arg->file;
+				AstFile *f = first_arg->file();
 				first_arg = ast_field_value(f, ast_ident(f, make_token_ident(first_arg_name)), first_arg, op);
 			}
 		}

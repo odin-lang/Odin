@@ -18,7 +18,7 @@ LLVMMetadataRef lb_get_llvm_file_metadata_from_node(lbModule *m, Ast *node) {
 	if (node == nullptr) {
 		return nullptr;
 	}
-	return lb_get_llvm_metadata(m, node->file);
+	return lb_get_llvm_metadata(m, node->file());
 }
 
 LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
@@ -660,7 +660,7 @@ void lb_debug_complete_types(lbModule *m) {
 			case Type_Struct:
 				if (file == nullptr) {
 					if (bt->Struct.node) {
-						file = lb_get_llvm_metadata(m, bt->Struct.node->file);
+						file = lb_get_llvm_metadata(m, bt->Struct.node->file());
 						line_number = cast(unsigned)ast_token(bt->Struct.node).pos.line;
 					}
 				}
@@ -741,7 +741,7 @@ void lb_debug_complete_types(lbModule *m) {
 				{
 					if (file == nullptr) {
 						GB_ASSERT(bt->Union.node != nullptr);
-						file = lb_get_llvm_metadata(m, bt->Union.node->file);
+						file = lb_get_llvm_metadata(m, bt->Union.node->file());
 						line_number = cast(unsigned)ast_token(bt->Union.node).pos.line;
 					}
 
@@ -801,7 +801,7 @@ void lb_debug_complete_types(lbModule *m) {
 				{
 					if (file == nullptr) {
 						GB_ASSERT(bt->BitSet.node != nullptr);
-						file = lb_get_llvm_metadata(m, bt->BitSet.node->file);
+						file = lb_get_llvm_metadata(m, bt->BitSet.node->file());
 						line_number = cast(unsigned)ast_token(bt->BitSet.node).pos.line;
 					}
 
@@ -929,7 +929,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	}
 
 
-	AstFile *file = p->body->file;
+	AstFile *file = p->body->file();
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
 	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
@@ -975,7 +975,7 @@ void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
 	}
 	TokenPos pos = {};
 
-	pos.file_id = p->body->file ? p->body->file->id : 0;
+	pos.file_id = p->body->file_id;
 	pos.line = LLVMDILocationGetLine(loc);
 	pos.column = LLVMDILocationGetColumn(loc);
 
