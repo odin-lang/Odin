@@ -257,7 +257,7 @@ OdinDocArray<T> odin_write_item_as_slice(OdinDocWriter *w, T data) {
 OdinDocPosition odin_doc_token_pos_cast(OdinDocWriter *w, TokenPos const &pos) {
 	OdinDocFileIndex file_index = 0;
 	if (pos.file_id != 0) {
-		AstFile *file = get_ast_file_from_id(pos.file_id);
+		AstFile *file = global_files[pos.file_id];
 		if (file != nullptr) {
 			OdinDocFileIndex *file_index_found = map_get(&w->file_cache, file);
 			GB_ASSERT(file_index_found != nullptr);
