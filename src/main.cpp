@@ -2541,7 +2541,8 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	if (init_filename == "-help") {
+	if (init_filename == "-help" ||
+	    init_filename == "--help") {
 		build_context.show_help = true;
 	}
 
