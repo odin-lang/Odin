@@ -192,7 +192,7 @@ gb_global Array<String>           global_file_path_strings; // index is file id
 gb_global Array<struct AstFile *> global_files; // index is file id
 
 String   get_file_path_string(i32 index);
-struct AstFile *get_ast_file_from_id(i32 index);
+struct AstFile *thread_safe_get_ast_file_from_id(i32 index);
 
 struct TokenPos {
 	i32 file_id;
@@ -318,7 +318,7 @@ bool set_file_path_string(i32 index, String const &path) {
 	return ok;
 }
 
-bool set_ast_file_from_id(i32 index, AstFile *file) {
+bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.string_mutex);
@@ -349,7 +349,7 @@ String get_file_path_string(i32 index) {
 	return path;
 }
 
-AstFile *get_ast_file_from_id(i32 index) {
+AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.string_mutex);
 
