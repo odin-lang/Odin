@@ -2076,9 +2076,11 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case f32be:      fmt_float(fi, f64(a), 32, verb)
 	case f64be:      fmt_float(fi, f64(a), 64, verb)
 
+	case complex32:  fmt_complex(fi, complex128(a), 32, verb)
 	case complex64:  fmt_complex(fi, complex128(a), 64, verb)
 	case complex128: fmt_complex(fi, a, 128, verb)
 
+	case quaternion64:  fmt_quaternion(fi, quaternion256(a),  64, verb)
 	case quaternion128: fmt_quaternion(fi, quaternion256(a), 128, verb)
 	case quaternion256: fmt_quaternion(fi, a, 256, verb)
 
