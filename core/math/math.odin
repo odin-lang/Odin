@@ -96,18 +96,6 @@ fmuladd       :: proc{
 	fmuladd_f64, fmuladd_f64le, fmuladd_f64be,
 }
 
-ln_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(ln_f16(f16(x))) }
-ln_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(ln_f16(f16(x))) }
-ln_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(ln_f32(f32(x))) }
-ln_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(ln_f32(f32(x))) }
-ln_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(ln_f64(f64(x))) }
-ln_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(ln_f64(f64(x))) }
-ln       :: proc{
-	ln_f16, ln_f16le, ln_f16be,
-	ln_f32, ln_f32le, ln_f32be,
-	ln_f64, ln_f64le, ln_f64be,
-}
-
 exp_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(exp_f16(f16(x))) }
 exp_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(exp_f16(f16(x))) }
 exp_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(exp_f32(f32(x))) }
