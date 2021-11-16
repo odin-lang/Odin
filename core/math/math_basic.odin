@@ -151,7 +151,7 @@ ln_f64 :: proc "contextless" (x: f64) -> f64 {
 	t2 := s4 * (L2 + s4*(L4+s4*L6))
 	R := t1 + t2
 	hfsq := 0.5 * f * f
-	return k*Ln2Hi_ - ((hfsq - (s*(hfsq+R) + k*LN2_LO)) - f)
+	return k*LN2_HI - ((hfsq - (s*(hfsq+R) + k*LN2_LO)) - f)
 }
 
 ln_f16 :: proc "contextless" (x: f16) -> f16 { return #force_inline f16(ln_f64(f64(x))) }
