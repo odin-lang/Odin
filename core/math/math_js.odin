@@ -1,12 +1,12 @@
 //+build js
 package math
 
+import "core:intrinsics"
+
 foreign import "odin_env"
 
 @(default_calling_convention="c")
 foreign odin_env {
-	@(link_name="sqrt")
-	sqrt_f64 :: proc(x: f64) -> f64 ---
 	@(link_name="sin")
 	sin_f64 :: proc(θ: f64) -> f64 ---
 	@(link_name="cos")
@@ -21,6 +21,9 @@ foreign odin_env {
 	exp_f64 :: proc(x: f64) -> f64 ---
 }
 
+sqrt_f64 :: proc "contextless" (x: f64) -> f64 {
+	return intrinsics.sqrt(x)
+}
 
 sqrt_f16    :: proc "c" (x: f16) -> f16             { return f16(sqrt_f64(f64(x)))                    }
 sin_f16     :: proc "c" (θ: f16) -> f16             { return f16(sin_f64(f64(θ)))                     }
