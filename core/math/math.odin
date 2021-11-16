@@ -1465,8 +1465,48 @@ acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	return T(log1p(t + sqrt(2*t + t*t)))
 }
 
-atanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return 0.5*ln((1+x)/(1-x))
+atanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	// The original C code, the long comment, and the constants
+	// below are from FreeBSD's /usr/src/lib/msun/src/e_atanh.c
+	// and came with this notice. 
+	//
+	// ====================================================
+	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	//
+	// Developed at SunPro, a Sun Microsystems, Inc. business.
+	// Permission to use, copy, modify, and distribute this
+	// software is freely granted, provided that this notice
+	// is preserved.
+	// ====================================================
+	NEAR_ZERO :: 1.0 / (1 << 28)
+	x := f64(y)
+	switch {
+	case x < -1 || x > 1 || is_nan(x):
+		return T(nan_f64())
+	case x == 1:
+		return T(inf_f64(1))
+	case x == -1:
+		return T(inf_f64(-1))
+	}
+	sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	temp: f64
+	switch {
+	case x < NEAR_ZERO:
+		temp = x
+	case x < 0.5:
+		temp = x + x
+		temp = 0.5 * log1p(temp + temp*x/(1-x))
+	case:
+		temp = 0.5 * log1p((x+x)/(1-x))
+	}
+	if sign {
+		temp = -temp
+	}
+	return T(temp)
 }
 
 ilogb_f16 :: proc "contextless" (val: f16) -> int {
