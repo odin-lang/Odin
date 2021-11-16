@@ -19,8 +19,6 @@ foreign odin_env {
 	ln_f64 :: proc(x: f64) -> f64 ---
 	@(link_name="exp")
 	exp_f64 :: proc(x: f64) -> f64 ---
-	@(link_name="ldexp")
-	ldexp_f64 :: proc(val: f64, exp: i32) -> f64 ---
 }
 
 
@@ -31,7 +29,6 @@ pow_f16     :: proc "c" (x, power: f16) -> f16      { return f16(pow_f64(f64(x),
 fmuladd_f16 :: proc "c" (a, b, c: f16) -> f16       { return f16(fmuladd_f64(f64(a), f64(a), f64(c))) }
 ln_f16      :: proc "c" (x: f16) -> f16             { return f16(ln_f64(f64(x)))                      }
 exp_f16     :: proc "c" (x: f16) -> f16             { return f16(exp_f64(f64(x)))                     }
-ldexp_f16   :: proc "c" (val: f16, exp: i32) -> f16 { return f16(ldexp_f64(f64(val), exp) )           }
 
 sqrt_f32    :: proc "c" (x: f32) -> f32             { return f32(sqrt_f64(f64(x)))                    }
 sin_f32     :: proc "c" (θ: f32) -> f32             { return f32(sin_f64(f64(θ)))                     }
@@ -40,4 +37,3 @@ pow_f32     :: proc "c" (x, power: f32) -> f32      { return f32(pow_f64(f64(x),
 fmuladd_f32 :: proc "c" (a, b, c: f32) -> f32       { return f32(fmuladd_f64(f64(a), f64(a), f64(c))) }
 ln_f32      :: proc "c" (x: f32) -> f32             { return f32(ln_f64(f64(x)))                      }
 exp_f32     :: proc "c" (x: f32) -> f32             { return f32(exp_f64(f64(x)))                     }
-ldexp_f32   :: proc "c" (val: f32, exp: i32) -> f32 { return f32(ldexp_f64(f64(val), exp) )           }

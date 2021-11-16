@@ -51,11 +51,4 @@ foreign _ {
 	exp_f32 :: proc(x: f32) -> f32 ---
 	@(link_name="llvm.exp.f64")
 	exp_f64 :: proc(x: f64) -> f64 ---
-
-	@(link_name="llvm.ldexp.f16")
-	ldexp_f16 :: proc(val: f16, exp: i32) -> f16 ---
-	@(link_name="llvm.ldexp.f32")
-	ldexp_f32 :: proc(val: f32, exp: i32) -> f32 ---
-	@(link_name="llvm.ldexp.f64")
-	ldexp_f64 :: proc(val: f64, exp: i32) -> f64 ---
 }
