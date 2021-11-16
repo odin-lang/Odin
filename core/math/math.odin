@@ -1642,6 +1642,28 @@ nextafter :: proc{
 	nextafter_f64, nextafter_f64le, nextafter_f64be,
 }
 
+signbit_f16 :: proc "contextless" (x: f16) -> bool {
+	return (transmute(u16)x)&(1<<15) != 0
+}
+signbit_f32 :: proc "contextless" (x: f32) -> bool {
+	return (transmute(u32)x)&(1<<31) != 0
+}
+signbit_f64 :: proc "contextless" (x: f64) -> bool {
+	return (transmute(u64)x)&(1<<63) != 0
+}
+signbit_f16le :: proc "contextless" (x: f16le) -> bool { return signbit_f16(f16(x)) }
+signbit_f32le :: proc "contextless" (x: f32le) -> bool { return signbit_f32(f32(x)) }
+signbit_f64le :: proc "contextless" (x: f64le) -> bool { return signbit_f64(f64(x)) }
+signbit_f16be :: proc "contextless" (x: f16be) -> bool { return signbit_f16(f16(x)) }
+signbit_f32be :: proc "contextless" (x: f32be) -> bool { return signbit_f32(f32(x)) }
+signbit_f64be :: proc "contextless" (x: f64be) -> bool { return signbit_f64(f64(x)) }
+
+signbit :: proc{
+	signbit_f16, signbit_f16le, signbit_f16be,
+	signbit_f32, signbit_f32le, signbit_f32be,
+	signbit_f64, signbit_f64le, signbit_f64be,
+}
+
 
 F16_DIG        :: 3
 F16_EPSILON    :: 0.00097656
