@@ -197,22 +197,16 @@ log       :: proc{
 	log_f64, log_f64le, log_f64be,
 }
 
-log2_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN2 }
-log2_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log2_f16(f16(x))) }
-log2_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(log2_f16(f16(x))) }
-
-log2_f32   :: proc "contextless" (x: f32)   -> f32   { return ln(x)/LN2 }
-log2_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(log2_f32(f32(x))) }
-log2_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(log2_f32(f32(x))) }
-
-log2_f64   :: proc "contextless" (x: f64)   -> f64   { return ln(x)/LN2 }
-log2_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log2_f64(f64(x))) }
-log2_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log2_f64(f64(x))) }
-log2       :: proc{
-	log2_f16, log2_f16le, log2_f16be,
-	log2_f32, log2_f32le, log2_f32be,
-	log2_f64, log2_f64le, log2_f64be,
-}
+log2_f16   :: logb_f16
+log2_f16le :: logb_f16le
+log2_f16be :: logb_f16be
+log2_f32   :: logb_f32
+log2_f32le :: logb_f32le
+log2_f32be :: logb_f32be
+log2_f64   :: logb_f64
+log2_f64le :: logb_f64le
+log2_f64be :: logb_f64be
+log2       :: logb
 
 log10_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN10 }
 log10_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log10_f16(f16(x))) }
@@ -1394,16 +1388,172 @@ tanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return (t - 1) / (t + 1)
 }
 
-asinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return ln(x + sqrt(x*x + 1))
+asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	// The original C code, the long comment, and the constants
+	// below are from FreeBSD's /usr/src/lib/msun/src/s_asinh.c
+	// and came with this notice. 
+	//
+	// ====================================================
+	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	//
+	// Developed at SunPro, a Sun Microsystems, Inc. business.
+	// Permission to use, copy, modify, and distribute this
+	// software is freely granted, provided that this notice
+	// is preserved.
+	// ====================================================
+	
+	LN2       :: 0h3FE62E42FEFA39EF
+	NEAR_ZERO :: 1.0 / (1 << 28)
+	LARGE     :: 1 << 28
+	
+	x := f64(y)
+	
+	if is_nan(x) || is_inf(x) {
+		return T(x)
+	}
+	sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	temp: f64
+	switch {
+	case x > LARGE:
+		temp = ln(x) + LN2
+	case x > 2:
+		temp = ln(2*x + 1/(sqrt(x*x + 1) + x))
+	case x < NEAR_ZERO:
+		temp = x
+	case:
+		temp = log1p(x + x*x/(1 + sqrt(1 + x*x)))
+	}
+	
+	if sign {
+		temp = -temp
+	}
+	return T(temp)
 }
 
-acosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return ln(x + sqrt(x*x - 1))
+acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	// The original C code, the long comment, and the constants
+	// below are from FreeBSD's /usr/src/lib/msun/src/e_acosh.c
+	// and came with this notice. 
+	//
+	// ====================================================
+	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	//
+	// Developed at SunPro, a Sun Microsystems, Inc. business.
+	// Permission to use, copy, modify, and distribute this
+	// software is freely granted, provided that this notice
+	// is preserved.
+	// ====================================================
+	
+	LARGE :: 1<<28
+	LN2 :: 0h3FE62E42FEFA39EF
+	x := f64(y)
+	switch {
+	case x < 1 || is_nan(x):
+		return T(nan_f64())
+	case x == 1:
+		return 0
+	case x >= LARGE:
+		return T(ln(x) + LN2)
+	case x > 2:
+		return T(ln(2*x - 1/(x+sqrt(x*x-1))))
+	}
+	t := x-1
+	return T(log1p(t + sqrt(2*t + t*t)))
 }
 
 atanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return 0.5*ln((1+x)/(1-x))
+}
+
+ilogb_f16 :: proc "contextless" (val: f16) -> int {
+	switch {
+	case val == 0:    return int(min(i32))
+	case is_nan(val): return int(max(i32))
+	case is_inf(val): return int(max(i32))
+	}
+	x, exp := normalize_f16(val)
+	return int(((transmute(u16)x)>>F16_SHIFT)&F16_MASK) - F16_BIAS + exp
+}
+ilogb_f32 :: proc "contextless" (val: f32) -> int {
+	switch {
+	case val == 0:    return int(min(i32))
+	case is_nan(val): return int(max(i32))
+	case is_inf(val): return int(max(i32))
+	}
+	x, exp := normalize_f32(val)
+	return int(((transmute(u32)x)>>F32_SHIFT)&F32_MASK) - F32_BIAS + exp
+}
+ilogb_f64 :: proc "contextless" (val: f64) -> int {
+	switch {
+	case val == 0:    return int(min(i32))
+	case is_nan(val): return int(max(i32))
+	case is_inf(val): return int(max(i32))
+	}
+	x, exp := normalize_f64(val)
+	return int(((transmute(u64)x)>>F64_SHIFT)&F64_MASK) - F64_BIAS + exp
+}
+ilogb_f16le :: proc "contextless" (value: f16le) -> int { return ilogb_f16(f16(value)) }
+ilogb_f16be :: proc "contextless" (value: f16be) -> int { return ilogb_f16(f16(value)) }
+ilogb_f32le :: proc "contextless" (value: f32le) -> int { return ilogb_f32(f32(value)) }
+ilogb_f32be :: proc "contextless" (value: f32be) -> int { return ilogb_f32(f32(value)) }
+ilogb_f64le :: proc "contextless" (value: f64le) -> int { return ilogb_f64(f64(value)) }
+ilogb_f64be :: proc "contextless" (value: f64be) -> int { return ilogb_f64(f64(value)) }
+ilogb :: proc {
+	ilogb_f16,
+	ilogb_f32,
+	ilogb_f64,
+	ilogb_f16le,
+	ilogb_f16be,
+	ilogb_f32le,
+	ilogb_f32be,
+	ilogb_f64le,
+	ilogb_f64be,
+}
+
+logb_f16 :: proc "contextless" (val: f16) -> f16 {
+	switch {
+	case val == 0:    return inf_f16(-1)
+	case is_inf(val): return inf_f16(+1)
+	case is_nan(val): return val
+	}
+	return f16(ilogb(val))
+}
+logb_f32 :: proc "contextless" (val: f32) -> f32 {
+	switch {
+	case val == 0:    return inf_f32(-1)
+	case is_inf(val): return inf_f32(+1)
+	case is_nan(val): return val
+	}
+	return f32(ilogb(val))
+}
+logb_f64 :: proc "contextless" (val: f64) -> f64 {
+	switch {
+	case val == 0:    return inf_f64(-1)
+	case is_inf(val): return inf_f64(+1)
+	case is_nan(val): return val
+	}
+	return f64(ilogb(val))
+}
+logb_f16le :: proc "contextless" (value: f16le) -> f16le { return f16le(logb_f16(f16(value))) }
+logb_f16be :: proc "contextless" (value: f16be) -> f16be { return f16be(logb_f16(f16(value))) }
+logb_f32le :: proc "contextless" (value: f32le) -> f32le { return f32le(logb_f32(f32(value))) }
+logb_f32be :: proc "contextless" (value: f32be) -> f32be { return f32be(logb_f32(f32(value))) }
+logb_f64le :: proc "contextless" (value: f64le) -> f64le { return f64le(logb_f64(f64(value))) }
+logb_f64be :: proc "contextless" (value: f64be) -> f64be { return f64be(logb_f64(f64(value))) }
+logb :: proc {
+	logb_f16,
+	logb_f32,
+	logb_f64,
+	logb_f16le,
+	logb_f16be,
+	logb_f32le,
+	logb_f32be,
+	logb_f64le,
+	logb_f64be,
 }
 
 F16_DIG        :: 3
