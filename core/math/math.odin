@@ -1584,6 +1584,65 @@ logb :: proc {
 	logb_f64be,
 }
 
+nextafter_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {
+	switch {
+	case is_nan(x) || is_nan(y):
+		r = nan_f16()
+	case x == y:
+		r = x
+	case x == 0:
+		r = copy_sign_f16(1, y)
+	case (y > x) == (x > 0):
+		r = transmute(f16)(transmute(u16)x + 1)
+	case:
+		r = transmute(f16)(transmute(u16)x - 1)
+	}
+	return
+}
+nextafter_f32 :: proc "contextless" (x, y: f32) -> (r: f32) {
+	switch {
+	case is_nan(x) || is_nan(y):
+		r = nan_f32()
+	case x == y:
+		r = x
+	case x == 0:
+		r = copy_sign_f32(1, y)
+	case (y > x) == (x > 0):
+		r = transmute(f32)(transmute(u32)x + 1)
+	case:
+		r = transmute(f32)(transmute(u32)x - 1)
+	}
+	return
+}
+nextafter_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
+	switch {
+	case is_nan(x) || is_nan(y):
+		r = nan_f64()
+	case x == y:
+		r = x
+	case x == 0:
+		r = copy_sign_f64(1, y)
+	case (y > x) == (x > 0):
+		r = transmute(f64)(transmute(u64)x + 1)
+	case:
+		r = transmute(f64)(transmute(u64)x - 1)
+	}
+	return
+}
+nextafter_f16le :: proc "contextless" (x, y: f16le) -> (r: f16le) { return f16le(nextafter_f16(f16(x), f16(y))) }
+nextafter_f16be :: proc "contextless" (x, y: f16be) -> (r: f16be) { return f16be(nextafter_f16(f16(x), f16(y))) }
+nextafter_f32le :: proc "contextless" (x, y: f32le) -> (r: f32le) { return f32le(nextafter_f32(f32(x), f32(y))) }
+nextafter_f32be :: proc "contextless" (x, y: f32be) -> (r: f32be) { return f32be(nextafter_f32(f32(x), f32(y))) }
+nextafter_f64le :: proc "contextless" (x, y: f64le) -> (r: f64le) { return f64le(nextafter_f64(f64(x), f64(y))) }
+nextafter_f64be :: proc "contextless" (x, y: f64be) -> (r: f64be) { return f64be(nextafter_f64(f64(x), f64(y))) }
+
+nextafter :: proc{
+	nextafter_f16, nextafter_f16le, nextafter_f16be,
+	nextafter_f32, nextafter_f32le, nextafter_f32be,
+	nextafter_f64, nextafter_f64le, nextafter_f64be,
+}
+
+
 F16_DIG        :: 3
 F16_EPSILON    :: 0.00097656
 F16_GUARD      :: 0
