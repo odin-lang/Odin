@@ -1,15 +1,10 @@
 //+build !js
 package math
 
+import "core:intrinsics"
+
 @(default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.sqrt.f16")
-	sqrt_f16 :: proc(x: f16) -> f16 ---
-	@(link_name="llvm.sqrt.f32")
-	sqrt_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.sqrt.f64")
-	sqrt_f64 :: proc(x: f64) -> f64 ---
-
 	@(link_name="llvm.sin.f16")
 	sin_f16 :: proc(θ: f16) -> f16 ---
 	@(link_name="llvm.sin.f32")
@@ -51,4 +46,14 @@ foreign _ {
 	exp_f32 :: proc(x: f32) -> f32 ---
 	@(link_name="llvm.exp.f64")
 	exp_f64 :: proc(x: f64) -> f64 ---
+}
+
+sqrt_f16 :: proc "contextless" (x: f16) -> f16 {
+	return intrinsics.sqrt(x)
+}
+sqrt_f32 :: proc "contextless" (x: f32) -> f32 {
+	return intrinsics.sqrt(x)
+}
+sqrt_f64 :: proc "contextless" (x: f64) -> f64 {
+	return intrinsics.sqrt(x)
 }
