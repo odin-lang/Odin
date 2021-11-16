@@ -545,8 +545,8 @@ void usage(String argv0) {
 	print_usage_line(1, "version   print version");
 	print_usage_line(1, "report    print information useful to reporting a bug");
 	print_usage_line(0, "");
-	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
-	print_usage_line(1, "-help");
+	print_usage_line(0, "For further details on a command, use -help or --help after the command name");
+	print_usage_line(1, "e.g. odin build -help");
 }
 
 
