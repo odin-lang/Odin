@@ -2603,11 +2603,18 @@ ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
 	return ev;
 }
 
+#define ATTRIBUTE_USER_TAG_NAME "tag"
+
 
 DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	ExactValue ev = check_decl_attribute_value(c, value);
 
-	if (name == "default_calling_convention") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "default_calling_convention") {
 		if (ev.kind == ExactValue_String) {
 			auto cc = string_to_calling_convention(ev.value_string);
 			if (cc == ProcCC_Invalid) {
@@ -2655,7 +2662,13 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
-	if (name == "test") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "test") {
 		if (value != nullptr) {
 			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
 		}
@@ -2896,7 +2909,12 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	ExactValue ev = check_decl_attribute_value(c, value);
 
-	if (name == "static") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "static") {
 		if (value != nullptr) {
 			error(elem, "'static' does not have any parameters");
 		}
@@ -3011,7 +3029,13 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(const_decl_attribute) {
-	if (name == "private") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	}
@@ -3019,7 +3043,13 @@ DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(type_decl_attribute) {
-	if (name == "private") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	}
@@ -4020,7 +4050,13 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 }
 
 DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
-	if (name == "force" || name == "require") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		} else if (name == "force") {
