@@ -1369,7 +1369,7 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			Type *rt = base_type(right.type);
 			if (is_type_pointer(rt)) {
 				right = lb_emit_load(p, right);
-				rt = type_deref(rt);
+				rt = base_type(type_deref(rt));
 			}
 
 			switch (rt->kind) {
