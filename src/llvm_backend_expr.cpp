@@ -490,15 +490,11 @@ bool lb_is_matrix_simdable(Type *t) {
 	}
 	
 	switch (build_context.metrics.arch) {
+	default:
+		return false;
 	case TargetArch_amd64:
 	case TargetArch_arm64:
-		// possible
 		break;
-	case TargetArch_386:
-	case TargetArch_wasm32:
-	case TargetArch_wasm64:
-		// nope
-		return false;
 	}
 	
 	if (elem->kind == Type_Basic) {
@@ -577,7 +573,7 @@ LLVMValueRef lb_matrix_to_trimmed_vector(lbProcedure *p, lbValue m) {
 	}
 	
 	LLVMValueRef mask = lb_matrix_trimmed_vector_mask(p, mt);
-	LLVMValueRef trimmed_vector = LLVMBuildShuffleVector(p->builder, vector, LLVMGetUndef(LLVMTypeOf(vector)), mask, "");
+	LLVMValueRef trimmed_vector = llvm_basic_shuffle(p, vector, mask);
 	return trimmed_vector;
 }
 
@@ -608,7 +604,7 @@ lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *type) {
 			
 			// transpose mask
 			LLVMValueRef mask = LLVMConstVector(mask_elems.data, column_count);
-			LLVMValueRef row = LLVMBuildShuffleVector(p->builder, vector, LLVMGetUndef(LLVMTypeOf(vector)), mask, "");
+			LLVMValueRef row = llvm_basic_shuffle(p, vector, mask);
 			rows[i] = row;
 		}
 		
@@ -747,13 +743,13 @@ lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs, Type *type)
 			
 			// transpose mask
 			LLVMValueRef mask = LLVMConstVector(mask_elems.data, inner);
-			LLVMValueRef row = LLVMBuildShuffleVector(p->builder, x_vector, LLVMGetUndef(LLVMTypeOf(x_vector)), mask, "");
+			LLVMValueRef row = llvm_basic_shuffle(p, x_vector, mask);
 			x_rows[i] = row;
 		}
 		
 		for (unsigned i = 0; i < outer_columns; i++) {
 			LLVMValueRef mask = llvm_mask_iota(p->module, y_stride*i, inner);
-			LLVMValueRef column = LLVMBuildShuffleVector(p->builder, y_vector, LLVMGetUndef(LLVMTypeOf(y_vector)), mask, "");
+			LLVMValueRef column = llvm_basic_shuffle(p, y_vector, mask);
 			y_columns[i] = column;
 		}
 		
@@ -825,7 +821,7 @@ lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 		
 		for (unsigned column_index = 0; column_index < column_count; column_index++) {
 			LLVMValueRef mask = llvm_mask_iota(p->module, stride*column_index, row_count);
-			LLVMValueRef column = LLVMBuildShuffleVector(p->builder, matrix_vector, LLVMGetUndef(LLVMTypeOf(matrix_vector)), mask, "");
+			LLVMValueRef column = llvm_basic_shuffle(p, matrix_vector, mask);
 			m_columns[column_index] = column;
 		}
 		
@@ -901,7 +897,7 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 			
 			// transpose mask
 			LLVMValueRef mask = LLVMConstVector(mask_elems.data, column_count);
-			LLVMValueRef column = LLVMBuildShuffleVector(p->builder, matrix_vector, LLVMGetUndef(LLVMTypeOf(matrix_vector)), mask, "");
+			LLVMValueRef column = llvm_basic_shuffle(p, matrix_vector, mask);
 			m_columns[row_index] = column;
 		}
 		
@@ -1373,7 +1369,7 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			Type *rt = base_type(right.type);
 			if (is_type_pointer(rt)) {
 				right = lb_emit_load(p, right);
-				rt = type_deref(rt);
+				rt = base_type(type_deref(rt));
 			}
 
 			switch (rt->kind) {
@@ -2018,14 +2014,23 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			i64 src_count = src->Matrix.row_count*src->Matrix.column_count;
 			GB_ASSERT(dst_count == src_count);
 			
-			for (i64 j = 0; j < src->Matrix.column_count; j++) {
-				for (i64 i = 0; i < src->Matrix.row_count; i++) {
-					lbValue s = lb_emit_matrix_ev(p, value, i, j);
-					i64 index = i + j*src->Matrix.row_count;					
-					i64 dst_i = index%dst->Matrix.row_count;
-					i64 dst_j = index/dst->Matrix.row_count;
-					lbValue d = lb_emit_matrix_epi(p, v.addr, dst_i, dst_j);
-					lb_emit_store(p, d, s);
+			lbValue pdst = v.addr;
+			lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+			
+			bool same_elem_base_types = are_types_identical(
+				base_type(dst->Matrix.elem),
+				base_type(src->Matrix.elem)
+			);
+			
+			if (same_elem_base_types && type_size_of(dst) == type_size_of(src)) {
+				lb_mem_copy_overlapping(p, v.addr, psrc, lb_const_int(p->module, t_int, type_size_of(dst)));
+			} else {
+				for (i64 i = 0; i < src_count; i++) {
+					lbValue dp = lb_emit_array_epi(p, v.addr, matrix_column_major_index_to_offset(dst, i));
+					lbValue sp = lb_emit_array_epi(p, psrc,   matrix_column_major_index_to_offset(src, i));
+					lbValue s = lb_emit_load(p, sp);
+					s = lb_emit_conv(p, s, dst->Matrix.elem);
+					lb_emit_store(p, dp, s);
 				}
 			}
 		}

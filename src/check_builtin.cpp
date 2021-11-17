@@ -446,9 +446,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				} else if (hash_kind == "fnv64") {
 					hash_value = gb_fnv64(data, file_size);
 				} else if (hash_kind == "fnv32a") {
-					hash_value = gb_fnv32a(data, file_size);
+					hash_value = fnv32a(data, file_size);
 				} else if (hash_kind == "fnv64a") {
-					hash_value = gb_fnv64a(data, file_size);
+					hash_value = fnv64a(data, file_size);
 				} else if (hash_kind == "murmur32") {
 					hash_value = gb_murmur32(data, file_size);
 				} else if (hash_kind == "murmur64") {

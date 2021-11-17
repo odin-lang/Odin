@@ -1406,18 +1406,26 @@ i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_index) {
 	GB_ASSERT(0 <= row_index && row_index < t->Matrix.row_count);
 	GB_ASSERT(0 <= column_index && column_index < t->Matrix.column_count);
 	i64 stride_elems = matrix_type_stride_in_elems(t);
-	return stride_elems*column_index + row_index;
+	// NOTE(bill): Column-major layout internally
+	return row_index + stride_elems*column_index;
 }
 
 i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	
-	i64 column_index = index%t->Matrix.column_count;
 	i64 row_index    = index/t->Matrix.column_count;
+	i64 column_index = index%t->Matrix.column_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
 }
-
+i64 matrix_column_major_index_to_offset(Type *t, i64 index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	i64 row_index    = index%t->Matrix.row_count;
+	i64 column_index = index/t->Matrix.row_count;
+	return matrix_indices_to_offset(t, row_index, column_index);
+}
 
 
 bool is_matrix_square(Type *t) {

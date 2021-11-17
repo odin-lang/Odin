@@ -454,7 +454,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	token.kind = Token_Ident;
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
-	e->file = expr->file;
+	e->file = expr->file();
 	e->decl_info = pl->decl;
 	e->code_gen_module = m;
 	e->flags |= EntityFlag_ProcBodyChecked;
@@ -684,7 +684,8 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 			if (init.value == nullptr) {
 				LLVMTypeRef global_type = LLVMGetElementType(LLVMTypeOf(var->var.value));
 				if (is_type_untyped_undef(init.type)) {
-					LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
+					// LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
+					LLVMSetInitializer(var->var.value, LLVMConstNull(global_type));
 					var->is_initialized = true;
 					continue;
 				} else if (is_type_untyped_nil(init.type)) {
@@ -1277,8 +1278,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 			if (Entity *entry_point = m->info->entry_point) {
 				if (Ast *ident = entry_point->identifier.load()) {
-					if (ident->file) {
-						init_file = ident->file;
+					if (ident->file_id) {
+						init_file = ident->file();
 					}
 				}
 			}
@@ -1675,6 +1676,7 @@ void lb_generate_code(lbGenerator *gen) {
 		lbModule *m = gen->modules.entries[i].value;
 		
 		lb_run_remove_unused_function_pass(m);
+		lb_run_remove_unused_globals_pass(m);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;

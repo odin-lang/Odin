@@ -1939,8 +1939,9 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 			error(proc_type_node, "A procedure type with the #optional_second tag requires 2 return values, got %td", result_count);
 		} else {
 			bool ok = false;
-			if (proc_type_node->file && proc_type_node->file->pkg) {
-				ok = proc_type_node->file->pkg->scope == ctx->info->runtime_package->scope;
+			AstFile *file = proc_type_node->file();
+			if (file && file->pkg) {
+				ok = file->pkg->scope == ctx->info->runtime_package->scope;
 			}
 
 			if (!ok) {

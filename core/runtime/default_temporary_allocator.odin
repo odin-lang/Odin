@@ -3,7 +3,7 @@ package runtime
 DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 1<<22)
 
 
-when ODIN_OS == "freestanding" || ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+when ODIN_OS == "freestanding" || ODIN_OS == "js" || ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 	Default_Temp_Allocator :: struct {}
 	
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {}

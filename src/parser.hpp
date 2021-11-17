@@ -255,14 +255,14 @@ ProcCallingConvention default_calling_convention(void) {
 	return ProcCC_Odin;
 }
 
-enum StateFlag : u16 {
+enum StateFlag : u8 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
 
-	StateFlag_BeenHandled = 1<<15,
+	StateFlag_BeenHandled = 1<<7,
 };
 
-enum ViralStateFlag : u16 {
+enum ViralStateFlag : u8 {
 	ViralStateFlag_ContainsDeferredProcedure = 1<<0,
 };
 
@@ -424,11 +424,13 @@ AST_KIND(_StmtBegin,     "", bool) \
 	}) \
 AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \
+		Scope *scope; \
 		Slice<Ast *> stmts; \
 		Ast *label;         \
 		Token open, close; \
 	}) \
 	AST_KIND(IfStmt, "if statement", struct { \
+		Scope *scope; \
 		Token token;     \
 		Ast *label;      \
 		Ast * init;      \
@@ -449,6 +451,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Slice<Ast *> results; \
 	}) \
 	AST_KIND(ForStmt, "for statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label; \
 		Ast *init; \
@@ -457,6 +460,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(RangeStmt, "range statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label; \
 		Slice<Ast *> vals; \
@@ -465,6 +469,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
+		Scope *scope; \
 		Token unroll_token; \
 		Token for_token; \
 		Ast *val0; \
@@ -474,12 +479,14 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(CaseClause, "case clause", struct { \
+		Scope *scope; \
 		Token token;             \
 		Slice<Ast *> list;   \
 		Slice<Ast *> stmts;  \
 		Entity *implicit_entity; \
 	}) \
 	AST_KIND(SwitchStmt, "switch statement", struct { \
+		Scope *scope; \
 		Token token;  \
 		Ast *label;   \
 		Ast *init;    \
@@ -488,6 +495,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		bool partial; \
 	}) \
 	AST_KIND(TypeSwitchStmt, "type switch statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label;  \
 		Ast *tag;    \
@@ -589,6 +597,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast * specialization;  \
 	}) \
 	AST_KIND(ProcType, "procedure type", struct { \
+		Scope *scope; \
 		Token token;   \
 		Ast *params;  \
 		Ast *results; \
@@ -621,6 +630,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *tag;  \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
+		Scope *scope; \
 		Token token;                \
 		Slice<Ast *> fields;        \
 		isize field_count;          \
@@ -632,6 +642,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		bool is_raw_union;          \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
+		Scope *scope; \
 		Token        token;         \
 		Slice<Ast *> variants;      \
 		Ast *polymorphic_params;    \
@@ -642,6 +653,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Slice<Ast *> where_clauses; \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
+		Scope *scope; \
 		Token        token; \
 		Ast *        base_type; \
 		Slice<Ast *> fields; /* FieldValue */ \
@@ -666,7 +678,7 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 AST_KIND(_TypeEnd,  "", bool)
 
-enum AstKind {
+enum AstKind : u16 {
 	Ast_Invalid,
 #define AST_KIND(_kind_name_, ...) GB_JOIN2(Ast_, _kind_name_),
 	AST_KINDS
@@ -695,21 +707,19 @@ isize const ast_variant_sizes[] = {
 };
 
 struct AstCommonStuff {
-	AstKind      kind;
-	u16          state_flags;
-	u16          viral_state_flags;
-	AstFile *    file;
-	Scope *      scope;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
+	AstKind      kind; // u16
+	u8           state_flags;
+	u8           viral_state_flags;
+	i32          file_id;
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 };
 
 struct Ast {
-	AstKind      kind;
-	u16          state_flags;
-	u16          viral_state_flags;
-	AstFile *    file;
-	Scope *      scope;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
+	AstKind      kind; // u16
+	u8           state_flags;
+	u8           viral_state_flags;
+	i32          file_id;
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
@@ -717,6 +727,17 @@ struct Ast {
 	AST_KINDS
 #undef AST_KIND
 	};
+	
+	
+	// NOTE(bill): I know I dislike methods but this is hopefully a temporary thing 
+	// for refactoring purposes
+	gb_inline AstFile *file() const {
+		// NOTE(bill): This doesn't need to call get_ast_file_from_id which 
+		return global_files[this->file_id];
+	}
+	gb_inline AstFile *thread_safe_file() const {
+		return thread_safe_get_ast_file_from_id(this->file_id);
+	}
 };
 
 

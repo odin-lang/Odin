@@ -18,6 +18,7 @@ enum TargetOsKind {
 	TargetOs_freebsd,
 	
 	TargetOs_wasi,
+	TargetOs_js,
 
 	TargetOs_freestanding,
 
@@ -54,6 +55,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("freebsd"),
 	
 	str_lit("wasi"),
+	str_lit("js"),
 
 	str_lit("freestanding"),
 };
@@ -155,7 +157,11 @@ enum CmdDocFlag : u32 {
 	CmdDocFlag_DocFormat   = 1<<2,
 };
 
-
+enum TimingsExportFormat : i32 {
+	TimingsExportUnspecified = 0,
+	TimingsExportJson        = 1,
+	TimingsExportCSV         = 2,
+};
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
@@ -195,6 +201,8 @@ struct BuildContext {
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
+	TimingsExportFormat export_timings_format;
+	String export_timings_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;
@@ -344,12 +352,12 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 	str_lit(""),
 };
 
-gb_global TargetMetrics target_freestanding_wasm64 = {
-	TargetOs_freestanding,
-	TargetArch_wasm64,
+gb_global TargetMetrics target_js_wasm32 = {
+	TargetOs_js,
+	TargetArch_wasm32,
+	4,
 	8,
-	16,
-	str_lit("wasm64-freestanding-js"),
+	str_lit("wasm32-js-js"),
 	str_lit(""),
 };
 
@@ -363,6 +371,14 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 };
 
 
+// gb_global TargetMetrics target_freestanding_wasm64 = {
+// 	TargetOs_freestanding,
+// 	TargetArch_wasm64,
+// 	8,
+// 	16,
+// 	str_lit("wasm64-freestanding-js"),
+// 	str_lit(""),
+// };
 
 
 
@@ -372,18 +388,19 @@ struct NamedTargetMetrics {
 };
 
 gb_global NamedTargetMetrics named_targets[] = {
-	{ str_lit("darwin_amd64"),   &target_darwin_amd64   },
-	{ str_lit("darwin_arm64"),   &target_darwin_arm64   },
-	{ str_lit("essence_amd64"),  &target_essence_amd64  },
-	{ str_lit("linux_386"),      &target_linux_386      },
-	{ str_lit("linux_amd64"),    &target_linux_amd64    },
-	{ str_lit("windows_386"),    &target_windows_386    },
-	{ str_lit("windows_amd64"),  &target_windows_amd64  },
-	{ str_lit("freebsd_386"),    &target_freebsd_386    },
-	{ str_lit("freebsd_amd64"),  &target_freebsd_amd64  },
+	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
+	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
+	{ str_lit("essence_amd64"),       &target_essence_amd64  },
+	{ str_lit("linux_386"),           &target_linux_386      },
+	{ str_lit("linux_amd64"),         &target_linux_amd64    },
+	{ str_lit("windows_386"),         &target_windows_386    },
+	{ str_lit("windows_amd64"),       &target_windows_amd64  },
+	{ str_lit("freebsd_386"),         &target_freebsd_386    },
+	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
+	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
+	{ str_lit("js_wasm32"),           &target_js_wasm32 },
 	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
-	{ str_lit("wasi_wasm32"), &target_wasi_wasm32 },
 };
 
 NamedTargetMetrics *selected_target_metrics;

@@ -516,14 +516,17 @@ __init_context :: proc "contextless" (c: ^Context) {
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
-	print_caller_location(loc)
-	print_string(" ")
-	print_string(prefix)
-	if len(message) > 0 {
-		print_string(": ")
-		print_string(message)
+	when ODIN_OS == "freestanding" {
+		// Do nothing
+	} else {
+		print_caller_location(loc)
+		print_string(" ")
+		print_string(prefix)
+		if len(message) > 0 {
+			print_string(": ")
+			print_string(message)
+		}
+		print_byte('\n')
 	}
-	print_byte('\n')
-	// intrinsics.debug_trap();
-	intrinsics.trap()
+	trap()
 }
