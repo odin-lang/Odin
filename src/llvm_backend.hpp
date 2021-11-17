@@ -471,6 +471,12 @@ lbValue lb_consume_copy_elision_hint(lbProcedure *p);
 lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);
 LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 
+LLVMValueRef llvm_basic_shuffle(lbProcedure *p, LLVMValueRef vector, LLVMValueRef mask);
+
+void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
+void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
+
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"

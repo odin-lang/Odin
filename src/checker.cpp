@@ -225,8 +225,8 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
-	ptr_set_init(&s->imported, heap_allocator(), 0);
+	string_map_init(&s->elements, permanent_allocator(), init_elements_capacity);
+	ptr_set_init(&s->imported, permanent_allocator(), 0);
 	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -318,7 +318,43 @@ void add_scope(CheckerContext *c, Ast *node, Scope *scope) {
 	GB_ASSERT(node != nullptr);
 	GB_ASSERT(scope != nullptr);
 	scope->node = node;
-	node->scope = scope;
+	switch (node->kind) {
+	case Ast_BlockStmt:       node->BlockStmt.scope       = scope; break;
+	case Ast_IfStmt:          node->IfStmt.scope          = scope; break;
+	case Ast_ForStmt:         node->ForStmt.scope         = scope; break;
+	case Ast_RangeStmt:       node->RangeStmt.scope       = scope; break;
+	case Ast_UnrollRangeStmt: node->UnrollRangeStmt.scope = scope; break;
+	case Ast_CaseClause:      node->CaseClause.scope      = scope; break;
+	case Ast_SwitchStmt:      node->SwitchStmt.scope      = scope; break;
+	case Ast_TypeSwitchStmt:  node->TypeSwitchStmt.scope  = scope; break;
+	case Ast_ProcType:        node->ProcType.scope        = scope; break;
+	case Ast_StructType:      node->StructType.scope      = scope; break;
+	case Ast_UnionType:       node->UnionType.scope       = scope; break;
+	case Ast_EnumType:        node->EnumType.scope        = scope; break;
+	default: GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
+	}
+}
+
+Scope *scope_of_node(Ast *node) {
+	if (node == nullptr) {
+		return nullptr;
+	}
+	switch (node->kind) {
+	case Ast_BlockStmt:       return node->BlockStmt.scope;
+	case Ast_IfStmt:          return node->IfStmt.scope;
+	case Ast_ForStmt:         return node->ForStmt.scope;
+	case Ast_RangeStmt:       return node->RangeStmt.scope;
+	case Ast_UnrollRangeStmt: return node->UnrollRangeStmt.scope;
+	case Ast_CaseClause:      return node->CaseClause.scope;
+	case Ast_SwitchStmt:      return node->SwitchStmt.scope;
+	case Ast_TypeSwitchStmt:  return node->TypeSwitchStmt.scope;
+	case Ast_ProcType:        return node->ProcType.scope;
+	case Ast_StructType:      return node->StructType.scope;
+	case Ast_UnionType:       return node->UnionType.scope;
+	case Ast_EnumType:        return node->EnumType.scope;
+	}
+	GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
+	return nullptr;
 }
 
 
@@ -1080,9 +1116,6 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 		return *found;
 	}
 	return nullptr;
-}
-Scope *scope_of_node(Ast *node) {
-	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	if (c->untyped != nullptr) {
@@ -2660,10 +2693,14 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "require") {
-		if (value != nullptr) {
-			error(elem, "'require' does not have any parameters");
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->require_declaration = true;
+		} else if (ev.kind == ExactValue_Bool) {
+			ac->require_declaration = ev.value_bool;
+		} else {
+			error(value, "Expected either a boolean or no parameter for 'require'");
 		}
-		ac->require_declaration = true;
 		return true;
 	} else if (name == "init") {
 		if (value != nullptr) {
@@ -3708,7 +3745,7 @@ String path_to_entity_name(String name, String fullpath, bool strip_extension=tr
 #if 1
 
 void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
-	AstPackage *parent_pkg = decl->file->pkg;
+	AstPackage *parent_pkg = decl->file()->pkg;
 
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
@@ -5257,9 +5294,6 @@ void check_parsed_files(Checker *c) {
 		check_scope_usage(c, f->scope);
 	}
 
-	TIME_SECTION("check test procedures");
-	check_test_procedures(c);
-
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
 	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
@@ -5311,6 +5345,9 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
 
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);

@@ -212,8 +212,9 @@ void lb_open_scope(lbProcedure *p, Scope *s) {
 			unsigned column = cast(unsigned)token.pos.column;
 
 			LLVMMetadataRef file = nullptr;
-			if (s->node->file != nullptr) {
-				file = lb_get_llvm_metadata(m, s->node->file);
+			AstFile *ast_file = s->node->file();
+			if (ast_file != nullptr) {
+				file = lb_get_llvm_metadata(m, ast_file);
 			}
 			LLVMMetadataRef scope = nullptr;
 			if (p->scope_stack.count > 0) {
@@ -1624,7 +1625,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 
 void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	ast_node(is, IfStmt, node);
-	lb_open_scope(p, node->scope); // Scope #1
+	lb_open_scope(p, is->scope); // Scope #1
 	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
 
 	if (is->init != nullptr) {
@@ -1674,7 +1675,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 				lb_emit_jump(p, else_);
 				lb_start_block(p, else_);
 
-				lb_open_scope(p, is->else_stmt->scope);
+				lb_open_scope(p, scope_of_node(is->else_stmt));
 				lb_build_stmt(p, is->else_stmt);
 				lb_close_scope(p, lbDeferExit_Default, nullptr);
 			}
@@ -1691,7 +1692,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		if (is->else_stmt != nullptr) {
 			lb_start_block(p, else_);
 
-			lb_open_scope(p, is->else_stmt->scope);
+			lb_open_scope(p, scope_of_node(is->else_stmt));
 			lb_build_stmt(p, is->else_stmt);
 			lb_close_scope(p, lbDeferExit_Default, nullptr);
 
@@ -1709,7 +1710,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	ast_node(fs, ForStmt, node);
 
-	lb_open_scope(p, node->scope); // Open Scope here
+	lb_open_scope(p, fs->scope); // Open Scope here
 
 	if (fs->init != nullptr) {
 	#if 1
@@ -2055,7 +2056,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			tl->is_block = true;
 		}
 
-		lb_open_scope(p, node->scope);
+		lb_open_scope(p, bs->scope);
 		lb_build_stmt_list(p, bs->stmts);
 		lb_close_scope(p, lbDeferExit_Default, nullptr);
 
@@ -2136,15 +2137,15 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
-		lb_build_range_stmt(p, rs, node->scope);
+		lb_build_range_stmt(p, rs, rs->scope);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
-		lb_build_unroll_range_stmt(p, rs, node->scope);
+		lb_build_unroll_range_stmt(p, rs, rs->scope);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
-		lb_build_switch_stmt(p, ss, node->scope);
+		lb_build_switch_stmt(p, ss, ss->scope);
 	case_end;
 
 	case_ast_node(ss, TypeSwitchStmt, node);
