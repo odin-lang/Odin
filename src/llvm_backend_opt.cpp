@@ -49,11 +49,6 @@ void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm) {
 	LLVMAddMergedLoadStoreMotionPass(fpm);
 	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
 	LLVMAddEarlyCSEPass(fpm);
-
-	// LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	// LLVMAddMergedLoadStoreMotionPass(fpm);
-	// LLVMAddPromoteMemoryToRegisterPass(fpm);
-	// LLVMAddCFGSimplificationPass(fpm);
 }
 
 void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
@@ -62,17 +57,9 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
 	if ((optimization_level == 0) && build_context.ODIN_DEBUG) {
-		//NOTE(Jesse): Do not populate function pass manager for -opt:0 -debug case.
-
-		return;
+		return; //NOTE(Jesse): Do not populate function pass manager for -opt:0 -debug case.
 	}
 
-#if 0
-	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
-	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
-#else
 	if (!ignore_memcpy_pass) {
 		LLVMAddMemCpyOptPass(fpm);
 	}
@@ -87,48 +74,27 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	LLVMAddCFGSimplificationPass(fpm);
 	LLVMAddEarlyCSEPass(fpm);
 	LLVMAddLowerExpectIntrinsicPass(fpm);
-#endif
 }
 
 void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
+	if (optimization_level == 0) {
+		if (build_context.ODIN_DEBUG) {
+			return; //NOTE(Jesse): Do not populate function pass manager for -opt:0 -debug case.
+		}
 
-#if 1
+		LLVMAddMemCpyOptPass(fpm);
+		lb_basic_populate_function_pass_manager(fpm); 
+		return; //NOTE(Jesse): Fixes LLVM crash on Linux.  Passless LLVMPassManagerBuilderRef segfaults.
+	}
 
 	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
 	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
 	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
 
-	if ((optimization_level == 0) && build_context.ODIN_DEBUG) {
-		//NOTE(Jesse): Do not populate function pass manager for -opt:0 -debug case.
-	} else {
-		lb_basic_populate_function_pass_manager(fpm);
-	}
-
 	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
-#else
-	LLVMAddMemCpyOptPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddCFGSimplificationPass(fpm);
-
-	LLVMAddSCCPPass(fpm);
-
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddUnifyFunctionExitNodesPass(fpm);
-
-	LLVMAddCFGSimplificationPass(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-	LLVMAddLowerExpectIntrinsicPass(fpm);
-#endif
 }
 
 void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
@@ -184,17 +150,7 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 		return;
 	}
 
-	LLVMAddGlobalDCEPass(mpm);
-
-	if (optimization_level >= 2) {
-		// NOTE(bill, 2021-03-29: use this causes invalid code generation)
-		// LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
-		// LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-		// LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
-		// LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
-		// return;
-	}
-	
+	LLVMAddGlobalDCEPass(mpm);	
 
 	LLVMAddIPSCCPPass(mpm);
 	LLVMAddCalledValuePropagationPass(mpm);
