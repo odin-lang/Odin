@@ -2033,6 +2033,55 @@ matrix4_look_at :: proc{
 }
 
 
+matrix4_look_at_from_fru_f16 :: proc(eye, f, r, u: Vector3f16, flip_z_axis := true) -> (m: Matrix4f16) {
+	f, s, u := f, r, u
+	f = normalize(f)
+	s = normalize(s)
+	u = normalize(u)
+	fe := dot(f, eye)
+
+	return {
+		{+s.x, +u.x, -f.x, 0},
+		{+s.y, +u.y, -f.y, 0},
+		{+s.z, +u.z, -f.z, 0},
+		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+	}
+}
+matrix4_look_at_from_fru_f32 :: proc(eye, f, r, u: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
+	f, s, u := f, r, u
+	f = normalize(f)
+	s = normalize(s)
+	u = normalize(u)
+	fe := dot(f, eye)
+
+	return {
+		{+s.x, +u.x, -f.x, 0},
+		{+s.y, +u.y, -f.y, 0},
+		{+s.z, +u.z, -f.z, 0},
+		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+	}
+}
+matrix4_look_at_from_fru_f64 :: proc(eye, f, r, u: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
+	f, s, u := f, r, u
+	f = normalize(f)
+	s = normalize(s)
+	u = normalize(u)
+	fe := dot(f, eye)
+
+	return {
+		{+s.x, +u.x, -f.x, 0},
+		{+s.y, +u.y, -f.y, 0},
+		{+s.z, +u.z, -f.z, 0},
+		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+	}
+}
+matrix4_look_at_from_fru :: proc{
+	matrix4_look_at_from_fru_f16,
+	matrix4_look_at_from_fru_f32,
+	matrix4_look_at_from_fru_f64,
+}
+
+
 matrix4_perspective_f16 :: proc(fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0][0] = 1 / (aspect*tan_half_fovy)

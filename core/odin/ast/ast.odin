@@ -579,6 +579,7 @@ Field_Flags_Signature :: Field_Flags{
 	.No_Alias,
 	.C_Vararg,
 	.Auto_Cast,
+	.Any_Int,
 	.Default_Parameters,
 }
 

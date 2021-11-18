@@ -6,7 +6,6 @@ package _sha3
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the Keccak hashing algorithm, standardized as SHA3 in <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf>
     To use the original Keccak padding, set the is_keccak bool to true, otherwise it will use SHA3 padding.
@@ -115,14 +114,14 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
     }
 }
 
-init_odin :: proc "contextless" (c: ^Sha3_Context) {
+init :: proc "contextless" (c: ^Sha3_Context) {
     for i := 0; i < 25; i += 1 {
         c.st.q[i] = 0
     }
     c.rsiz = 200 - 2 * c.mdlen
 }
 
-update_odin :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
+update :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
     j := c.pt
     for i := 0; i < len(data); i += 1 {
         c.st.b[j] ~= data[i]
@@ -135,7 +134,7 @@ update_odin :: proc "contextless" (c: ^Sha3_Context, data: []byte) {
     c.pt = j
 }
 
-final_odin :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
+final :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
     if c.is_keccak {
         c.st.b[c.pt] ~= 0x01
     } else {
@@ -149,14 +148,14 @@ final_odin :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
     }
 }
 
-shake_xof_odin :: proc "contextless" (c: ^Sha3_Context) {
+shake_xof :: proc "contextless" (c: ^Sha3_Context) {
     c.st.b[c.pt]       ~= 0x1F
     c.st.b[c.rsiz - 1] ~= 0x80
     keccakf(&c.st.q)
     c.pt = 0
 }
 
-shake_out_odin :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
+shake_out :: proc "contextless" (c: ^Sha3_Context, hash: []byte) {
     j := c.pt
     for i := 0; i < len(hash); i += 1 {
         if j >= c.rsiz {

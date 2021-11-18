@@ -6,7 +6,6 @@ package _blake2
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the BLAKE2 hashing algorithm, as defined in <https://datatracker.ietf.org/doc/html/rfc7693> and <https://www.blake2.net/>
 */
@@ -76,7 +75,7 @@ BLAKE2B_IV := [8]u64 {
 	0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
 }
 
-init_odin :: proc(ctx: ^$T) {
+init :: proc(ctx: ^$T) {
 	when T == Blake2s_Context {
 		block_size :: BLAKE2S_BLOCK_SIZE
 	} else when T == Blake2b_Context {
@@ -139,17 +138,17 @@ init_odin :: proc(ctx: ^$T) {
 	}
 	if len(ctx.cfg.key) > 0 {
 		copy(ctx.padded_key[:], ctx.cfg.key)
-		update_odin(ctx, ctx.padded_key[:])
+		update(ctx, ctx.padded_key[:])
 		ctx.is_keyed = true
 	}
 	copy(ctx.ih[:], ctx.h[:])
 	copy(ctx.h[:],  ctx.ih[:])
 	if ctx.is_keyed {
-		update_odin(ctx, ctx.padded_key[:])
+		update(ctx, ctx.padded_key[:])
 	}
 }
 
-update_odin :: proc(ctx: ^$T, p: []byte) {
+update :: proc "contextless" (ctx: ^$T, p: []byte) {
 	p := p
 	when T == Blake2s_Context {
 		block_size :: BLAKE2S_BLOCK_SIZE
@@ -161,7 +160,7 @@ update_odin :: proc(ctx: ^$T, p: []byte) {
 	if len(p) > left {
 		copy(ctx.x[ctx.nx:], p[:left])
 		p = p[left:]
-		blake2_blocks(ctx, ctx.x[:])
+		blocks(ctx, ctx.x[:])
 		ctx.nx = 0
 	}
 	if len(p) > block_size {
@@ -169,13 +168,22 @@ update_odin :: proc(ctx: ^$T, p: []byte) {
 		if n == len(p) {
 			n -= block_size
 		}
-		blake2_blocks(ctx, p[:n])
+		blocks(ctx, p[:n])
 		p = p[n:]
 	}
 	ctx.nx += copy(ctx.x[ctx.nx:], p)
 }
 
-blake2s_final_odin :: proc(ctx: $T, hash: []byte) {
+final :: proc "contextless" (ctx: ^$T, hash: []byte) {
+	when T == Blake2s_Context {
+		blake2s_final(ctx, hash)
+	}
+	when T == Blake2b_Context {
+		blake2b_final(ctx, hash)
+	}
+}
+
+blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
 	if ctx.is_keyed {
 		for i := 0; i < len(ctx.padded_key); i += 1 {
 			ctx.padded_key[i] = 0
@@ -193,7 +201,7 @@ blake2s_final_odin :: proc(ctx: $T, hash: []byte) {
 		ctx.f[1] = 0xffffffff
 	}
 
-	blake2_blocks(ctx, ctx.x[:])
+	blocks(ctx, ctx.x[:])
 
 	j := 0
 	for s, _ in ctx.h[:(ctx.size - 1) / 4 + 1] {
@@ -205,7 +213,7 @@ blake2s_final_odin :: proc(ctx: $T, hash: []byte) {
 	}
 }
 
-blake2b_final_odin :: proc(ctx: $T, hash: []byte) {
+blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 	if ctx.is_keyed {
 		for i := 0; i < len(ctx.padded_key); i += 1 {
 			ctx.padded_key[i] = 0
@@ -223,7 +231,7 @@ blake2b_final_odin :: proc(ctx: $T, hash: []byte) {
 		ctx.f[1] = 0xffffffffffffffff
 	} 
 
-	blake2_blocks(ctx, ctx.x[:])
+	blocks(ctx, ctx.x[:])
 
 	j := 0
 	for s, _ in ctx.h[:(ctx.size - 1) / 8 + 1] {
@@ -239,7 +247,7 @@ blake2b_final_odin :: proc(ctx: $T, hash: []byte) {
 	}
 }
 
-blake2_blocks :: proc(ctx: ^$T, p: []byte) {
+blocks :: proc "contextless" (ctx: ^$T, p: []byte) {
 	when T == Blake2s_Context {
 		blake2s_blocks(ctx, p)
 	}
@@ -248,7 +256,7 @@ blake2_blocks :: proc(ctx: ^$T, p: []byte) {
 	}
 }
 
-blake2s_blocks :: #force_inline proc "contextless"(ctx: ^Blake2s_Context, p: []byte) {
+blake2s_blocks :: #force_inline proc "contextless" (ctx: ^Blake2s_Context, p: []byte) {
 	h0, h1, h2, h3, h4, h5, h6, h7 := ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
 	p := p
 	for len(p) >= BLAKE2S_BLOCK_SIZE {
@@ -1404,7 +1412,7 @@ blake2s_blocks :: #force_inline proc "contextless"(ctx: ^Blake2s_Context, p: []b
 	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] = h0, h1, h2, h3, h4, h5, h6, h7
 }
 
-blake2b_blocks :: #force_inline proc "contextless"(ctx: ^Blake2b_Context, p: []byte) {
+blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []byte) {
 	h0, h1, h2, h3, h4, h5, h6, h7 := ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7]
 	p := p
 	for len(p) >= BLAKE2B_BLOCK_SIZE {

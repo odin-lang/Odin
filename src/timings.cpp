@@ -169,14 +169,19 @@ f64 time_stamp(TimeStamp const &ts, u64 freq, TimingUnit unit) {
 	}
 }
 
-void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Millisecond) {
+void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Millisecond, bool timings_are_finalized = false) {
 	isize const SPACES_LEN = 256;
 	char SPACES[SPACES_LEN+1] = {0};
 	gb_memset(SPACES, ' ', SPACES_LEN);
 
-
-	timings__stop_current_section(t);
-	t->total.finish = time_stamp_time_now();
+	/*
+		NOTE(Jeroen): Whether we call `timings_print_all()`, then `timings_export_all()`, the other way around,
+		or just one of them, we only need to stop the clock once.
+	*/
+	if (!timings_are_finalized) {
+		timings__stop_current_section(t);
+		t->total.finish = time_stamp_time_now();
+	}
 
 	isize max_len = gb_min(36, t->total.label.len);
 	for_array(i, t->sections) {

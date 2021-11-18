@@ -1,4 +1,4 @@
-package botan
+package botan_bindings
 
 /*
     Copyright 2021 zhibog
@@ -73,10 +73,7 @@ HASH_SHA3_384       :: "SHA-3(384)"
 HASH_SHA3_512       :: "SHA-3(512)"
 HASH_SHAKE_128      :: "SHAKE-128"
 HASH_SHAKE_256      :: "SHAKE-256"
-HASH_KECCAK_224     :: "KECCAK(224)"
-HASH_KECCAK_256     :: "KECCAK(256)"
-HASH_KECCAK_384     :: "KECCAK(384)"
-HASH_KECCAK_512     :: "KECCAK(512)"
+HASH_KECCAK_512     :: "Keccak-1600"
 HASH_RIPEMD_160     :: "RIPEMD-160"
 HASH_WHIRLPOOL      :: "Whirlpool"
 HASH_BLAKE2B        :: "BLAKE2b"
@@ -91,15 +88,8 @@ HASH_STREEBOG_512   :: "Streebog-512"
 HASH_SM3            :: "SM3"
 HASH_SKEIN_512_256  :: "Skein-512(256)"
 HASH_SKEIN_512_512  :: "Skein-512(512)"
-HASH_SKEIN_512_1024 :: "Skein-512(1024)"
 
 // Not real values from Botan, only used for context setup within the crypto lib
-HASH_SHA2        :: "SHA2"
-HASH_SHA3        :: "SHA3"
-HASH_SHAKE       :: "SHAKE"
-HASH_KECCAK      :: "KECCAK"
-HASH_STREEBOG    :: "STREEBOG"
-HASH_TIGER       :: "TIGER"
 HASH_SKEIN_512   :: "SKEIN_512"
 
 MAC_HMAC_SHA1    :: "HMAC(SHA1)"
