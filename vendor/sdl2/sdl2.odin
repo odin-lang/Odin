@@ -25,8 +25,12 @@ package sdl2
 import "core:c"
 import "core:intrinsics"
 
-when ODIN_OS == "windows" { foreign import lib "SDL2.lib"    }
-when ODIN_OS == "linux"   { foreign import lib "system:SDL2" }
+when ODIN_OS == "windows" { foreign import lib "SDL2.lib" }
+when ODIN_OS == "linux" {
+	foreign import lib "linux-SDL2.a" // commit @3ed0c62
+	@require foreign import "system:dl"
+	@require foreign import "system:pthread"
+}
 when ODIN_OS == "darwin"  { foreign import lib "system:SDL2" }
 when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
 
