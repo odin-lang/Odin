@@ -5,9 +5,11 @@ import SDL ".."
 
 when ODIN_OS == "windows" { foreign import lib "SDL2_mixer.lib" }
 when ODIN_OS == "linux" {
-	foreign import lib "linux-SDL2_mixer.a" // commit @64120a4
-	@require foreign import "system:dl"
-	@require foreign import "system:pthread"
+	foreign import lib { // commit @64120a4
+		"linux-SDL2_mixer.a",
+		"system:dl",
+		"system:pthread",
+	}
 }
 when ODIN_OS == "darwin"  { foreign import lib "system:SDL2_mixer" }
 when ODIN_OS == "freebsd" { foreign import lib "system:SDL2_mixer" }

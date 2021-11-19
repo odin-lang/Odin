@@ -5,9 +5,11 @@ import SDL ".."
 
 when ODIN_OS == "windows" { foreign import lib "SDL2_ttf.lib" }
 when ODIN_OS == "linux" {
-	foreign import lib "linux-SDL2_ttf.a" // commit @393fdc9
-	@require foreign import "system:dl"
-	@require foreign import "system:pthread"
+	foreign import lib { // commit @393fdc9
+		"linux-SDL2_ttf.a",
+		"system:dl",
+		"system:pthread",
+	}
 }
 when ODIN_OS == "darwin"  { foreign import lib "system:SDL2_ttf" }
 when ODIN_OS == "freebsd" { foreign import lib "system:SDL2_ttf" }
