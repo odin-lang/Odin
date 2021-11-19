@@ -161,6 +161,8 @@ O_APPEND   :: 0x00400
 O_SYNC     :: 0x01000
 O_ASYNC    :: 0x02000
 O_CLOEXEC  :: 0x80000
+O_DIRECTORY:: 0o0200000
+O_TMPFILE  :: (0o020000000 | O_DIRECTORY)
 
 
 SEEK_SET   :: 0
@@ -176,6 +178,45 @@ RTLD_LAZY         :: 0x001
 RTLD_NOW          :: 0x002
 RTLD_BINDING_MASK :: 0x3
 RTLD_GLOBAL       :: 0x100
+
+PROT_NONE       :: 0           /* Page can not be accessed.  */
+PROT_READ       :: 0x1         /* Page can be read.  */
+PROT_WRITE      :: 0x2         /* Page can be written.  */
+PROT_EXEC       :: 0x4         /* Page can be executed.  */
+PROT_GROWS_DOWN :: 0x01000000  /* Extend change to start of
+                                  growsdown vma (mprotect only).  */
+PROT_GROWS_UP   :: 0x02000000  /* Extend change to start of
+                                  growsup vma (mprotect only).  */
+
+/* Sharing types (must choose one and only one of these).  */
+MAP_SHARED          :: 0x01       /* Share changes.  */
+MAP_PRIVATE         :: 0x02       /* Changes are private.  */
+MAP_SHARED_VALIDATE :: 0x03       /* Share changes and validate
+                                     extension flags.  */
+MAP_TYPE            :: 0x0f       /* Mask for type of mapping.  */
+/* Other flags.  */
+MAP_FIXED           :: 0x10       /* Interpret addr exactly.  */
+MAP_ANONYMOUS       :: 0x20       /* Don't use a file.  */
+
+MAP_GROWSDOWN       :: 0x00100    /* Stack-like segment.  */
+MAP_DENYWRITE       :: 0x00800    /* ETXTBSY.  */
+MAP_EXECUTABLE      :: 0x01000    /* Mark it as an executable.  */
+MAP_LOCKED          :: 0x02000    /* Lock the mapping.  */
+MAP_NORESERVE       :: 0x04000    /* Don't check for reservations.  */
+MAP_POPULATE        :: 0x08000    /* Populate (prefault) pagetables.  */
+MAP_NONBLOCK        :: 0x10000    /* Do not block on IO.  */
+MAP_STACK           :: 0x20000    /* Allocation is for a stack.  */
+MAP_HUGETLB         :: 0x40000    /* Create huge page mapping.  */
+MAP_SYNC            :: 0x80000    /* Perform synchronous page
+                                     faults for the mapping.  */
+MAP_FIXED_NOREPLACE :: 0x100000   /* Fixed but do not unmap
+                                     underlying mapping.  */
+
+/* When MAP_HUGETLB is set bits [26:31] encode the log2 of the huge page size.  */
+MAP_HUGE_SHIFT      :: 26
+MAP_HUGE_MASK       :: 0x3f
+
+MAP_FAILED          :: rawptr(~uintptr(0))
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
@@ -295,6 +336,13 @@ foreign libc {
 	@(link_name="getcwd")           _unix_getcwd        :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")            _unix_chdir         :: proc(buf: cstring) -> c.int ---
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+
+	@(link_name="remove")           _unix_remove        :: proc(path: cstring) -> c.int ---
+	@(link_name="rename")           _unix_rename        :: proc(old: cstring, new: cstring) -> c.int ---
+
+	@(link_name="mmap")             _unix_mmap          :: proc(addr: uintptr, length: c.size_t, prot: c.int, flags: c.int, fd: Handle, offset: i64) -> rawptr ---
+	@(link_name="munmap")           _unix_munmap        :: proc(addr: rawptr, length: c.size_t) -> c.int ---
+	@(link_name="ftruncate")        _unix_ftruncate     :: proc(fildes: Handle, length: i64) -> c.int ---
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---
 }
@@ -637,4 +685,68 @@ _alloc_command_line_arguments :: proc() -> []string {
 		res[i] = string(arg)
 	}
 	return res
+}
+
+
+exists :: proc(path: string) -> bool {
+	_, err := _stat(path)
+	return err == ERROR_NONE
+}
+
+is_file :: proc(path: string) -> bool {
+	s, err := _stat(path)
+	if err != ERROR_NONE do return false
+	return S_ISREG(s.mode)
+}
+
+is_dir :: proc(path: string) -> bool {
+	s, err := _stat(path)
+	if err != ERROR_NONE do return false
+	return S_ISDIR(s.mode)
+}
+
+remove :: proc(path: string) -> Errno {
+	cstr := strings.clone_to_cstring(path)
+	defer delete(cstr)
+
+	result := _unix_remove(cstr)
+	if result == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+rename :: proc(old_path, new_path: string) -> Errno {
+	old_cstr := strings.clone_to_cstring(old_path)
+	new_cstr := strings.clone_to_cstring(new_path)
+	defer delete(old_cstr)
+	defer delete(new_cstr)
+
+	result := _unix_rename(old_cstr, new_cstr)
+	if result == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+mmap :: proc(addr: uintptr, length: uintptr, prot: i32, flags: i32, fd: Handle, offset: i64) -> (rawptr, Errno) {
+	r := _unix_mmap(addr, transmute(c.size_t)length, transmute(c.int)prot, transmute(c.int)flags, fd, offset)
+	if r == MAP_FAILED {
+		return nil, Errno(get_last_error())
+	}
+	return r, ERROR_NONE
+}
+
+munmap :: proc(addr: rawptr, length: uintptr) -> Errno {
+	if _unix_munmap(addr, transmute(c.size_t)length) == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+ftruncate :: proc(fildes: Handle, length: i64) -> Errno {
+	if _unix_ftruncate(fildes, length) == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
