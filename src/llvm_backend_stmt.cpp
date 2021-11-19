@@ -1485,7 +1485,14 @@ void lb_build_return_stmt_internal(lbProcedure *p, lbValue const &res) {
 
 	if (return_by_pointer) {
 		if (res.value != nullptr) {
-			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
+			LLVMValueRef res_val = res.value;
+			i64 sz = type_size_of(res.type);
+			if (LLVMIsALoadInst(res_val) && sz > build_context.word_size) {
+				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
+				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
+			} else {
+				LLVMBuildStore(p->builder, res_val, p->return_ptr.addr.value);
+			}
 		} else {
 			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
 		}
