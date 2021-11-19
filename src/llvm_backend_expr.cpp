@@ -1841,7 +1841,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
-	#if 1
 	if (is_type_union(dst)) {
 		for_array(i, dst->Union.variants) {
 			Type *vt = dst->Union.variants[i];
@@ -1852,7 +1851,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			}
 		}
 	}
-	#endif
 
 	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
 	// subtype polymorphism casting
