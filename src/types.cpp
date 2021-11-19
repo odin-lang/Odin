@@ -4019,7 +4019,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_type_to_string(str, type->BitSet.elem);
+		if (is_type_enum(type->BitSet.elem)) {
+			str = write_type_to_string(str, type->BitSet.elem);
+		} else {
+			str = gb_string_append_fmt(str, "%lld", type->BitSet.lower);
+			str = gb_string_append_fmt(str, "..=");
+			str = gb_string_append_fmt(str, "%lld", type->BitSet.upper);
+		}
 		if (type->BitSet.underlying != nullptr) {
 			str = gb_string_appendc(str, "; ");
 			str = write_type_to_string(str, type->BitSet.underlying);
