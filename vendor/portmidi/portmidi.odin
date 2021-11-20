@@ -3,7 +3,13 @@ package portmidi
 import "core:c"
 import "core:strings"
 
-when ODIN_OS == "windows" { foreign import lib "portmidi.lib" }
+when ODIN_OS == "windows" { 
+	foreign import lib {
+		"portmidi_s.lib",
+		"system:Winmm.lib",
+		"system:Advapi32.lib",
+	}
+}
 
 #assert(size_of(b32) == size_of(c.int))
 
@@ -140,7 +146,7 @@ foreign lib {
 	    not be manipulated or freed. The pointer is guaranteed to be valid
 	    between calls to Initialize() and Terminate().
 	*/
-	GetDeviceInfo :: proc(id: DeviceID) -> DeviceInfo ---
+	GetDeviceInfo :: proc(id: DeviceID) -> ^DeviceInfo ---
 	
 	/**
 	    OpenInput() and OpenOutput() open devices.
