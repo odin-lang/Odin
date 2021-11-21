@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 2
-#define OdinDocVersionType_Patch 0
+#define OdinDocVersionType_Patch 1
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -175,7 +175,8 @@ enum OdinDocEntityFlag : u64 {
 
 struct OdinDocEntity {
 	OdinDocEntityKind  kind;
-	u32                flags;
+	u32                reserved;
+	u64                flags;
 	OdinDocPosition    pos;
 	OdinDocString      name;
 	OdinDocTypeIndex   type;
