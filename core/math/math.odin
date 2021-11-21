@@ -607,9 +607,9 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 }
 
 modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
-	shift :: 16 - 5 - 1
-	mask  :: 0x1f
-	bias  :: 15
+	shift :: F16_SHIFT
+	mask  :: F16_MASK
+	bias  :: F16_BIAS
 
 	if x < 1 {
 		switch {
@@ -641,9 +641,9 @@ modf_f16be :: proc "contextless" (x: f16be) -> (int: f16be, frac: f16be) {
 	return f16be(i), f16be(f)
 }
 modf_f32   :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
-	shift :: 32 - 8 - 1
-	mask  :: 0xff
-	bias  :: 127
+	shift :: F32_SHIFT
+	mask  :: F32_MASK
+	bias  :: F32_BIAS
 
 	if x < 1 {
 		switch {
@@ -674,10 +674,10 @@ modf_f32be :: proc "contextless" (x: f32be) -> (int: f32be, frac: f32be) {
 	i, f := #force_inline modf_f32(f32(x))
 	return f32be(i), f32be(f)
 }
-modf_f64   :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
-	shift :: 64 - 11 - 1
-	mask  :: 0x7ff
-	bias  :: 1023
+modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
+	shift :: F64_SHIFT
+	mask  :: F64_MASK
+	bias  :: F64_BIAS
 
 	if x < 1 {
 		switch {
@@ -708,7 +708,7 @@ modf_f64be :: proc "contextless" (x: f64be) -> (int: f64be, frac: f64be) {
 	i, f := #force_inline modf_f64(f64(x))
 	return f64be(i), f64be(f)
 }
-modf       :: proc{
+modf :: proc{
 	modf_f16, modf_f16le, modf_f16be,
 	modf_f32, modf_f32le, modf_f32be,
 	modf_f64, modf_f64le, modf_f64be,
@@ -1127,13 +1127,11 @@ inf_f32be :: proc "contextless" (sign: int) -> f32be {
 	return f32be(inf_f64(sign))
 }
 inf_f64   :: proc "contextless" (sign: int) -> f64 {
-	v: u64
 	if sign >= 0 {
-		v = 0x7ff00000_00000000
+		return 0h7ff00000_00000000
 	} else {
-		v = 0xfff00000_00000000
+		return 0hfff00000_00000000
 	}
-	return transmute(f64)v
 }
 inf_f64le :: proc "contextless" (sign: int) -> f64le {
 	return f64le(inf_f64(sign))
@@ -1161,8 +1159,7 @@ nan_f32be :: proc "contextless" () -> f32be {
 	return f32be(nan_f64())
 }
 nan_f64   :: proc "contextless" () -> f64 {
-	v: u64 = 0x7ff80000_00000001
-	return transmute(f64)v
+	return 0h7ff80000_00000001
 }
 nan_f64le :: proc "contextless" () -> f64le {
 	return f64le(nan_f64())

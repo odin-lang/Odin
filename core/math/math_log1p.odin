@@ -100,11 +100,11 @@ log1p_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log1p_f64(f
 log1p_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log1p_f64(f64(x))) }
 
 log1p_f64 :: proc "contextless" (x: f64) -> f64 {
-	SQRT2_M1      :: 0h3fda827999fcef34 // Sqrt(2)-1 
-	SQRT2_HALF_M1 :: 0hbfd2bec333018866 // Sqrt(2)/2-1
+	SQRT2_M1      :: 0h3fda827999fcef34 // sqrt(2)-1 
+	SQRT2_HALF_M1 :: 0hbfd2bec333018866 // sqrt(2)/2-1
 	SMALL         :: 0h3e20000000000000 // 2**-29
-	TINY          :: 1.0 / (1 << 54)    // 2**-54
-	TWO53         :: 1 << 53            // 2**53
+	TINY          :: 0h3c90000000000000 // 2**-54
+	TWO53         :: 0h4340000000000000 // 2**53
 	LN2HI         :: 0h3fe62e42fee00000
 	LN2LO         :: 0h3dea39ef35793c76
 	LP1           :: 0h3FE5555555555593
@@ -128,15 +128,15 @@ log1p_f64 :: proc "contextless" (x: f64) -> f64 {
 	f: f64
 	iu: u64
 	k := 1
-	if absx < SQRT2_M1 { //  |x| < Sqrt(2)-1
+	if absx < SQRT2_M1 { //  |x| < sqrt(2)-1
 		if absx < SMALL { // |x| < 2**-29
 			if absx < TINY { // |x| < 2**-54
 				return x
 			}
 			return x - x*x*0.5
 		}
-		if x > SQRT2_HALF_M1 { // Sqrt(2)/2-1 < x
-			// (Sqrt(2)/2-1) < x < (Sqrt(2)-1)
+		if x > SQRT2_HALF_M1 { // sqrt(2)/2-1 < x
+			// (sqrt(2)/2-1) < x < (sqrt(2)-1)
 			k = 0
 			f = x
 			iu = 1
@@ -163,14 +163,14 @@ log1p_f64 :: proc "contextless" (x: f64) -> f64 {
 			c = 0
 		}
 		iu &= 0x000fffffffffffff
-		if iu < 0x0006a09e667f3bcd { // mantissa of Sqrt(2)
+		if iu < 0x0006a09e667f3bcd { // mantissa of sqrt(2)
 			u = transmute(f64)(iu | 0x3ff0000000000000) // normalize u
 		} else {
 			k += 1
 			u = transmute(f64)(iu | 0x3fe0000000000000) // normalize u/2
 			iu = (0x0010000000000000 - iu) >> 2
 		}
-		f = u - 1.0 // Sqrt(2)/2 < u < Sqrt(2)
+		f = u - 1.0 // sqrt(2)/2 < u < sqrt(2)
 	}
 	hfsq := 0.5 * f * f
 	s, R, z: f64
