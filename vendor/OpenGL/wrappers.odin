@@ -1,6 +1,6 @@
 package odin_gl
 
-#assert(size_of(bool) == size_of(u8));
+#assert(size_of(bool) == size_of(u8))
 
 when !ODIN_DEBUG {
 	// VERSION_1_0
