@@ -150,7 +150,7 @@ join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	for elem, i in elems {
 		if elem != "" {
-			s := strings.join(elems[i:], "/")
+			s := strings.join(elems[i:], "/", context.temp_allocator)
 			return clean(s)
 		}
 	}
