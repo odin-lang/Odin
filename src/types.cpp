@@ -697,6 +697,7 @@ Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
 
 bool is_type_pointer(Type *t);
+bool is_type_proc(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
 bool type_set_offsets(Type *t);
@@ -1284,6 +1285,10 @@ bool is_type_multi_pointer(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_MultiPointer;
 }
+bool is_type_internally_pointer_like(Type *t) {
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+}
+
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
