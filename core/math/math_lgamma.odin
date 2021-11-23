@@ -197,9 +197,9 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 	}
 
 	
-	Y_MIN  :: 1.461632144968362245
+	Y_MIN  :: 0h3ff762d86356be3f // 1.461632144968362245
 	TWO_52 :: 0h4330000000000000 // ~4.5036e+15
-	TWO_53  :: 0h4340000000000000 // ~9.0072e+15
+	TWO_53 :: 0h4340000000000000 // ~9.0072e+15
 	TWO_58 :: 0h4390000000000000 // ~2.8823e+17
 	TINY   :: 0h3b90000000000000 // ~8.47033e-22
 	Tc     :: 0h3FF762D86356BE3F
@@ -345,8 +345,8 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 }
 
 
-lgamma_f16 :: proc "contextless" (x: f16) -> (lgamma: f16, sign: int) { r, s := lgamma_f64(f64(x)); return f16(r), s }
-lgamma_f32 :: proc "contextless" (x: f32) -> (lgamma: f32, sign: int) { r, s := lgamma_f64(f64(x)); return f32(r), s }
+lgamma_f16   :: proc "contextless" (x: f16)   -> (lgamma: f16, sign: int)   { r, s := lgamma_f64(f64(x)); return f16(r), s }
+lgamma_f32   :: proc "contextless" (x: f32)   -> (lgamma: f32, sign: int)   { r, s := lgamma_f64(f64(x)); return f32(r), s }
 lgamma_f16le :: proc "contextless" (x: f16le) -> (lgamma: f16le, sign: int) { r, s := lgamma_f64(f64(x)); return f16le(r), s }
 lgamma_f16be :: proc "contextless" (x: f16be) -> (lgamma: f16be, sign: int) { r, s := lgamma_f64(f64(x)); return f16be(r), s }
 lgamma_f32le :: proc "contextless" (x: f32le) -> (lgamma: f32le, sign: int) { r, s := lgamma_f64(f64(x)); return f32le(r), s }
