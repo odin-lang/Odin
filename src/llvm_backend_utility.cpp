@@ -179,32 +179,24 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: '%s' to '%s'", type_to_string(src_type), type_to_string(t));
 
 	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
-	if (is_type_uintptr(src) && is_type_pointer(dst)) {
+	if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
-	if (is_type_pointer(src) && is_type_uintptr(dst)) {
-		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	}
-	if (is_type_uintptr(src) && is_type_proc(dst)) {
-		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	}
-	if (is_type_proc(src) && is_type_uintptr(dst)) {
+	if (is_type_internally_pointer_like(src) && is_type_uintptr(dst)) {
 		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
 
-	if (is_type_integer(src) && (is_type_pointer(dst) || is_type_cstring(dst))) {
+	if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
-	} else if ((is_type_pointer(src) || is_type_cstring(src)) && is_type_integer(dst)) {
+	} else if (is_type_internally_pointer_like(src) && is_type_integer(dst)) {
 		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
 
-	if (is_type_pointer(src) && is_type_pointer(dst)) {
+	if (is_type_internally_pointer_like(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
 	}
