@@ -175,6 +175,9 @@ i32 linker_stage(lbGenerator *gen) {
 		}
 		timings_start_section(timings, section_name);
 
+		gbString nasm_str = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(nasm_str));
+
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
@@ -212,26 +215,47 @@ i32 linker_stage(lbGenerator *gen) {
 			add_path(find_result.windows_sdk_ucrt_library_path);
 			add_path(find_result.vs_library_path);
 		}
+		
+		
+		StringSet libs = {};
+		string_set_init(&libs, heap_allocator(), 64);
+		defer (string_set_destroy(&libs));
+		
+		StringSet asm_files = {};
+		string_set_init(&asm_files, heap_allocator(), 64);
+		defer (string_set_destroy(&asm_files));
 
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			for_array(i, m->foreign_library_paths) {
 				String lib = m->foreign_library_paths[i];
-				GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-				gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-							" \"%.*s\"", LIT(lib));
-				lib_str = gb_string_appendc(lib_str, lib_str_buf);
+				if (string_ends_with(lib, str_lit(".asm"))) {
+					string_set_add(&asm_files, lib);
+				} else {
+					string_set_add(&libs, lib);
+				}
 			}
 		}
 
 		for_array(i, gen->default_module.foreign_library_paths) {
 			String lib = gen->default_module.foreign_library_paths[i];
-			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-			gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-						" \"%.*s\"", LIT(lib));
-			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+			if (string_ends_with(lib, str_lit(".asm"))) {
+				string_set_add(&asm_files, lib);
+			} else {
+				string_set_add(&libs, lib);
+			}
 		}
-
+		
+		for_array(i, libs.entries) {
+			String lib = libs.entries[i].value;
+			lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+		}
+		
+		
+		for_array(i, asm_files.entries) {
+			String lib = asm_files.entries[i].value;
+			nasm_str = gb_string_append_fmt(nasm_str, " \"%.*s\"", LIT(lib));
+		}
 
 
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
@@ -253,6 +277,24 @@ i32 linker_stage(lbGenerator *gen) {
 
 		if (build_context.ODIN_DEBUG) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
+		}
+		
+		if (asm_files.entries.count > 0) {
+			String obj_file = str_lit("__odin__nasm.obj");
+			
+			result = system_exec_command_line_app("nasm",
+				"\"%.*s\\bin\\nasm\\nasm.exe\" %s "
+				"-f win64 "
+				"-o %.*s "
+				"",
+				LIT(build_context.ODIN_ROOT), nasm_str,
+				LIT(obj_file)
+			);
+			
+			if (result) {
+				return result;
+			}
+			array_add(&gen->output_object_paths, obj_file);
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -325,10 +367,10 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
-			  
-			  if (result) {
+			
+			if (result) {
 				return result;
-			  }
+			}
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
