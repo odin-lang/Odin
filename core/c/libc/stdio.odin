@@ -2,6 +2,8 @@ package libc
 
 when ODIN_OS == "windows" {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == "darwin" {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
@@ -67,12 +69,42 @@ when ODIN_OS == "linux" {
 	SEEK_CUR      :: 1
 	SEEK_END      :: 2
 
-	TMP_MAX       :: 10000
+	TMP_MAX       :: 308915776
 
 	foreign libc {
 		stderr: ^FILE
 		stdin:  ^FILE
 		stdout: ^FILE
+	}
+}
+
+when ODIN_OS == "darwin" {
+	fpos_t :: distinct i64
+	
+	_IOFBF        :: 0
+	_IOLBF        :: 1
+	_IONBF        :: 2
+
+	BUFSIZ        :: 1024
+
+	EOF           :: int(-1)
+
+	FOPEN_MAX     :: 20
+
+	FILENAME_MAX  :: 1024
+
+	L_tmpnam      :: 1024
+
+	SEEK_SET      :: 0
+	SEEK_CUR      :: 1
+	SEEK_END      :: 2
+
+	TMP_MAX       :: 308915776
+
+	foreign libc {
+		@(link_name="__stderrp") stderr: ^FILE
+		@(link_name="__stdinp")  stdin:  ^FILE
+		@(link_name="__stdoutp") stdout: ^FILE
 	}
 }
 

@@ -697,6 +697,7 @@ Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
 
 bool is_type_pointer(Type *t);
+bool is_type_proc(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
 bool type_set_offsets(Type *t);
@@ -1284,6 +1285,10 @@ bool is_type_multi_pointer(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_MultiPointer;
 }
+bool is_type_internally_pointer_like(Type *t) {
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+}
+
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
@@ -4019,7 +4024,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_type_to_string(str, type->BitSet.elem);
+		if (is_type_enum(type->BitSet.elem)) {
+			str = write_type_to_string(str, type->BitSet.elem);
+		} else {
+			str = gb_string_append_fmt(str, "%lld", type->BitSet.lower);
+			str = gb_string_append_fmt(str, "..=");
+			str = gb_string_append_fmt(str, "%lld", type->BitSet.upper);
+		}
 		if (type->BitSet.underlying != nullptr) {
 			str = gb_string_appendc(str, "; ");
 			str = write_type_to_string(str, type->BitSet.underlying);

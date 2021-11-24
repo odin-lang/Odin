@@ -1369,7 +1369,7 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			Type *rt = base_type(right.type);
 			if (is_type_pointer(rt)) {
 				right = lb_emit_load(p, right);
-				rt = type_deref(rt);
+				rt = base_type(type_deref(rt));
 			}
 
 			switch (rt->kind) {
@@ -1841,7 +1841,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
-	#if 1
 	if (is_type_union(dst)) {
 		for_array(i, dst->Union.variants) {
 			Type *vt = dst->Union.variants[i];
@@ -1852,7 +1851,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			}
 		}
 	}
-	#endif
 
 	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
 	// subtype polymorphism casting

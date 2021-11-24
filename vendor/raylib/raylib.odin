@@ -1077,6 +1077,7 @@ foreign lib {
 	GetMouseX             :: proc() -> c.int ---                      // Returns mouse position X
 	GetMouseY             :: proc() -> c.int ---                      // Returns mouse position Y
 	GetMousePosition      :: proc() -> Vector2 ---                    // Returns mouse position XY
+	GetMouseDelta         :: proc() -> Vector2 ---                    // Returns mouse delta XY
 	SetMousePosition      :: proc(x, y: c.int) ---                    // Set mouse position XY
 	SetMouseOffset        :: proc(offsetX, offsetY: c.int) ---        // Set mouse offset
 	SetMouseScale         :: proc(scaleX, scaleY: f32) ---            // Set mouse scaling

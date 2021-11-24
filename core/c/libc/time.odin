@@ -4,6 +4,8 @@ package libc
 
 when ODIN_OS == "windows" {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == "darwin" {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
@@ -43,7 +45,7 @@ when ODIN_OS == "windows" {
 	}
 }
 
-when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
+when ODIN_OS == "linux" || ODIN_OS == "freebsd" || ODIN_OS == "darwin" {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.27.2 Time manipulation functions
@@ -75,7 +77,7 @@ when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
 
 	tm :: struct {
 		tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst: int,
-		_: long,
-		_: rawptr,
+		tm_gmtoff: long,
+		tm_zone: rawptr,
 	}
 }
