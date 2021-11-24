@@ -175,9 +175,6 @@ i32 linker_stage(lbGenerator *gen) {
 		}
 		timings_start_section(timings, section_name);
 
-		gbString nasm_str = gb_string_make(heap_allocator(), "");
-		defer (gb_string_free(nasm_str));
-
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
@@ -252,12 +249,6 @@ i32 linker_stage(lbGenerator *gen) {
 		}
 		
 		
-		for_array(i, asm_files.entries) {
-			String lib = asm_files.entries[i].value;
-			nasm_str = gb_string_append_fmt(nasm_str, " \"%.*s\"", LIT(lib));
-		}
-
-
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
 			output_ext = "dll";
 			link_settings = gb_string_append_fmt(link_settings, " /DLL");
@@ -279,15 +270,16 @@ i32 linker_stage(lbGenerator *gen) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
 		
-		if (asm_files.entries.count > 0) {
-			String obj_file = str_lit("__odin__nasm.obj");
-			
+		for_array(i, asm_files.entries) {
+			String asm_file = asm_files.entries[i].value;
+			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+
 			result = system_exec_command_line_app("nasm",
-				"\"%.*s\\bin\\nasm\\nasm.exe\" %s "
+				"\"%.*s\\bin\\nasm\\nasm.exe\" \"%.*s\" "
 				"-f win64 "
-				"-o %.*s "
+				"-o \"%.*s\" "
 				"",
-				LIT(build_context.ODIN_ROOT), nasm_str,
+				LIT(build_context.ODIN_ROOT), LIT(asm_file),
 				LIT(obj_file)
 			);
 			
