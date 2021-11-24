@@ -416,7 +416,16 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
-	return expect_token(p, .Close_Brace)
+	expect_brace := expect_token(p, .Close_Brace)
+
+	if expect_brace.kind != .Close_Brace {
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+			advance_token(p)
+		}
+		return p.curr_tok
+	} 
+
+	return expect_brace
 }
 
 
