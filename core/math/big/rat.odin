@@ -436,7 +436,7 @@ internal_rat_to_float :: proc($T: typeid, z: ^Rat, allocator := context.allocato
 	
 	mantissa >>= 1
 	
-	f = T(math.ldexp(f64(mantissa), i32(exp-MSIZE1)))
+	f = T(math.ldexp(f64(mantissa), exp-MSIZE1))
 	if math.is_inf(f, 0) {
 		exact = false
 	}

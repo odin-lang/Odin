@@ -20,7 +20,7 @@ swap :: proc(array: $T/[]$E, a, b: int) {
 }
 
 swap_between :: proc(a, b: $T/[]$E) {
-	n := min(len(a), len(b))
+	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
 	}	
