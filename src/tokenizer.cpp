@@ -295,8 +295,8 @@ void init_global_error_collector(void) {
 	mutex_init(&global_error_collector.string_mutex);
 	array_init(&global_error_collector.errors, heap_allocator());
 	array_init(&global_error_collector.error_buffer, heap_allocator());
-	array_init(&global_file_path_strings, heap_allocator(), 4096);
-	array_init(&global_files, heap_allocator(), 4096);
+	array_init(&global_file_path_strings, heap_allocator(), 1, 4096);
+	array_init(&global_files,             heap_allocator(), 1, 4096);
 }
 
 
@@ -306,7 +306,7 @@ bool set_file_path_string(i32 index, String const &path) {
 	mutex_lock(&global_error_collector.string_mutex);
 
 	if (index >= global_file_path_strings.count) {
-		array_resize(&global_file_path_strings, index);
+		array_resize(&global_file_path_strings, index+1);
 	}
 	String prev = global_file_path_strings[index];
 	if (prev.len == 0) {
@@ -324,7 +324,7 @@ bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 	mutex_lock(&global_error_collector.string_mutex);
 
 	if (index >= global_files.count) {
-		array_resize(&global_files, index);
+		array_resize(&global_files, index+1);
 	}
 	AstFile *prev = global_files[index];
 	if (prev == nullptr) {
