@@ -98,6 +98,7 @@ pack_range :: struct {
 pack_context :: struct {
 	user_allocator_context, pack_info:       rawptr,
 	width, height, stride_in_bytes, padding: c.int,
+	skip_missing:                            b32,
 	h_oversample, v_oversample:              u32,
 	pixels:                                  [^]byte,
 	nodes:                                   rawptr,
