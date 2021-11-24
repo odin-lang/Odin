@@ -196,6 +196,7 @@ struct BuildContext {
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
+	String extra_assembler_flags;
 	String microarch;
 	BuildModeKind build_mode;
 	bool   generate_docs;

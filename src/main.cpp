@@ -177,7 +177,6 @@ i32 linker_stage(lbGenerator *gen) {
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
-		char lib_str_buf[1024] = {0};
 
 		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
@@ -278,9 +277,11 @@ i32 linker_stage(lbGenerator *gen) {
 				"\"%.*s\\bin\\nasm\\nasm.exe\" \"%.*s\" "
 				"-f win64 "
 				"-o \"%.*s\" "
+				"%.*s "
 				"",
 				LIT(build_context.ODIN_ROOT), LIT(asm_file),
-				LIT(obj_file)
+				LIT(obj_file),
+				LIT(build_context.extra_assembler_flags)
 			);
 			
 			if (result) {
@@ -651,6 +652,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
+	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 
 	BuildFlag_TestName,
@@ -802,7 +804,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,    str_lit("extra-linker-flags"),            BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags, str_lit("extra-assembler-flags"),         BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
@@ -1348,11 +1351,14 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
-						case BuildFlag_ExtraLinkerFlags: {
+						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
 							break;
-						}
+						case BuildFlag_ExtraAssemblerFlags: 
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.extra_assembler_flags = value.value_string;
+							break;
 						case BuildFlag_Microarch: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
@@ -2065,6 +2071,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
+		
+		print_usage_line(1, "-extra-assembler-flags:<string>");
+		print_usage_line(2, "Adds extra assembler specific flags in a string");
+		print_usage_line(0, "");
+
 
 		print_usage_line(1, "-microarch:<string>");
 		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");
