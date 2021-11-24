@@ -5,6 +5,7 @@ package sync2
 import "core:c"
 import "core:time"
 import "core:intrinsics"
+import "core:sys/unix"
 
 FUTEX_WAIT :: 0
 FUTEX_WAKE :: 1
@@ -34,7 +35,7 @@ get_errno :: proc(r: int) -> int {
 }
 
 internal_futex :: proc(f: ^Futex, op: c.int, val: u32, timeout: rawptr) -> int {
-	code := int(intrinsics.syscall(202, uintptr(f), uintptr(op), uintptr(val), uintptr(timeout), 0, 0))
+	code := int(intrinsics.syscall(unix.SYS_futex, uintptr(f), uintptr(op), uintptr(val), uintptr(timeout), 0, 0))
 	return get_errno(code)
 }
 
