@@ -419,7 +419,7 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 	expect_brace := expect_token(p, .Close_Brace)
 
 	if expect_brace.kind != .Close_Brace {
-		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
 			advance_token(p)
 		}
 		return p.curr_tok
@@ -428,6 +428,9 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 	return expect_brace
 }
 
+is_non_inserted_semicolon :: proc(tok: tokenizer.Token) -> bool {
+	return tok.kind == .Semicolon && tok.text != "\n"
+}
 
 is_blank_ident :: proc{
 	is_blank_ident_string,
