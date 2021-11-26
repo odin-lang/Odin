@@ -4121,8 +4121,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		add_entity_use(ctx, nullptr, e);
 	}
 	
-	String ext = path_extension(fullpath);
-	if (ext == ".asm") {
+	if (has_asm_extension(fullpath)) {
 		if (build_context.metrics.arch != TargetArch_amd64 ||
 		    build_context.metrics.os   != TargetOs_windows) {
 			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s", 

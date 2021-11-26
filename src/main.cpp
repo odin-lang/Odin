@@ -225,7 +225,7 @@ i32 linker_stage(lbGenerator *gen) {
 			lbModule *m = gen->modules.entries[j].value;
 			for_array(i, m->foreign_library_paths) {
 				String lib = m->foreign_library_paths[i];
-				if (string_ends_with(lib, str_lit(".asm"))) {
+				if (has_asm_extension(lib)) {
 					string_set_add(&asm_files, lib);
 				} else {
 					string_set_add(&libs, lib);
@@ -235,7 +235,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 		for_array(i, gen->default_module.foreign_library_paths) {
 			String lib = gen->default_module.foreign_library_paths[i];
-			if (string_ends_with(lib, str_lit(".asm"))) {
+			if (has_asm_extension(lib)) {
 				string_set_add(&asm_files, lib);
 			} else {
 				string_set_add(&libs, lib);
