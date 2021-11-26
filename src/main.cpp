@@ -274,7 +274,7 @@ i32 linker_stage(lbGenerator *gen) {
 			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
 
 			result = system_exec_command_line_app("nasm",
-				"\"%.*s\\bin\\nasm\\nasm.exe\" \"%.*s\" "
+				"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
 				"-f win64 "
 				"-o \"%.*s\" "
 				"%.*s "
