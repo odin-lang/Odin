@@ -4120,6 +4120,15 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
+	
+	String ext = path_extension(fullpath);
+	if (ext == ".asm") {
+		if (build_context.metrics.arch != TargetArch_amd64 ||
+		    build_context.metrics.os   != TargetOs_windows) {
+			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s", 
+			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
+		}
+	}
 }
 
 // Returns true if a new package is present
