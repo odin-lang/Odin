@@ -196,6 +196,7 @@ struct BuildContext {
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
+	String extra_assembler_flags;
 	String microarch;
 	BuildModeKind build_mode;
 	bool   generate_docs;
@@ -819,6 +820,18 @@ String get_fullpath_core(gbAllocator a, String path) {
 
 bool show_error_line(void) {
 	return build_context.show_error_line;
+}
+
+bool has_asm_extension(String const &path) {
+	String ext = path_extension(path);
+	if (ext == ".asm") {
+		return true;
+	} else if (ext == ".s") {
+		return true;
+	} else if (ext == ".S") {
+		return true;
+	}
+	return false;
 }
 
 
