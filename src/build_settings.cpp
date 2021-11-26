@@ -822,6 +822,18 @@ bool show_error_line(void) {
 	return build_context.show_error_line;
 }
 
+bool has_asm_extension(String const &path) {
+	String ext = path_extension(path);
+	if (ext == ".asm") {
+		return true;
+	} else if (ext == ".s") {
+		return true;
+	} else if (ext == ".S") {
+		return true;
+	}
+	return false;
+}
+
 
 void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
