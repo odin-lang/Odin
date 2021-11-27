@@ -4611,6 +4611,16 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		return lb_addr(res);
 	case_end;
+	
+	case_ast_node(oe, OrElseExpr, expr);
+		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
+		return lb_addr(ptr);
+	case_end;
+	
+	case_ast_node(oe, OrReturnExpr, expr);
+		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
+		return lb_addr(ptr);
+	case_end;
 	}
 
 	TokenPos token_pos = ast_token(expr).pos;
