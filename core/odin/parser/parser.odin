@@ -2825,6 +2825,7 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		ast.Dynamic_Array_Type,
 		ast.Map_Type,
 		ast.Bit_Set_Type,
+		ast.Matrix_Type,
 		ast.Call_Expr:
 		return true
 	}
