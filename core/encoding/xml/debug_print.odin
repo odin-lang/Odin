@@ -47,10 +47,9 @@ print_element :: proc(writer: io.Writer, element: ^Element, indent := 0) -> (wri
 	using fmt
 
 	tab :: proc(writer: io.Writer, indent: int) {
-		tabs := "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"
-
-		i := max(0, min(indent, len(tabs)))
-		wprintf(writer, "%v", tabs[:i])
+		for _ in 0..=indent {
+			wprintf(writer, "\t")
+		}
 	}
 
 	tab(writer, indent)
