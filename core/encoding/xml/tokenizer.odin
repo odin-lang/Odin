@@ -180,7 +180,7 @@ is_valid_identifier_rune :: proc(r: rune) -> bool {
 		}
 	}
 
-	if unicode.is_digit(r) || unicode.is_letter(r) {
+	if unicode.is_letter(r) || unicode.is_digit(r) {
 		return true
 	}
 	return false
@@ -317,17 +317,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '\n':
 			lit = "\n"
 
-		case '\\':
-			token := scan(t)
-			if token.pos.line == pos.line {
-				error(t, token.pos.offset, "expected a newline after \\")
-			}
-			return token
-
 		case:
-			if ch != utf8.RUNE_BOM {
-				// error(t, t.offset, "illegal character '%r': %d", ch, ch)
-			}
 			kind = .Invalid
 		}
 	}
