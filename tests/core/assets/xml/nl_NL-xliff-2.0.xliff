@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:2.0" version="2.0" srcLang="en" trgLang="nl">
+	<file id="f1">
+		<notes>
+			<note id="n1">Note for file</note>
+		</notes>
+		<unit id="u1">
+			<notes>
+				<note id="n1">Note for unit</note>
+			</notes>
+			<segment id="s1" state="initial">
+				<source>text</source>
+				<target></target>
+			</segment>
+		</unit>
+		<unit id="u2">
+			<notes>
+				<note id="n2">Note for unit 2</note>
+			</notes>
+			<segment id="s2" state="translated">
+				<source>text 2</source>
+				<target>translation 2</target>
+			</segment>
+		</unit>
+		<unit id="u3">
+			<notes>
+				<note id="n3">Note for unit 3</note>
+			</notes>
+			<segment id="s3" state="final">
+				<source>text 3</source>
+				<target>approved translation 3</target>
+			</segment>
+		</unit>
+		<group id="90290" type="x-gettext:plurals">
+			<unit id="90291" name="90290[0]">
+				<notes>
+					<note category="context">Plurals</note>
+				</notes>
+				<segment>
+					<source>%d month</source>
+					<target xml:lang="nl">%d maand</target>
+				</segment>
+			</unit>
+			<unit id="90292" name="90290[1]">
+				<segment>
+					<source>%d months</source>
+					<target xml:lang="nl">%d maanden</target>
+				</segment>
+			</unit>
+		</group>
+	</file>
+</xliff>

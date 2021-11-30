@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+	<file id="42" original="Foozle.xml" source-language="en" target-language="nl-NL" datatype="plaintext">
+		<body>
+			<trans-unit id="874396" maxwidth="20" size-unit="char">
+				<source>text</source>
+				<target state="translated">tekst</target>
+				<note>Context</note>
+			</trans-unit>
+			<trans-unit id="874397" approved="yes">
+				<source>text 1</source>
+				<target state="translated">tekst 1</target>
+				<note>Context 1</note>
+			</trans-unit>
+			<trans-unit id="874398">
+				<source>text 2</source>
+				<target state="needs-translation"/>
+				<context context-type="context">Context of the segment 2</context>
+			</trans-unit>
+			<trans-unit id="874399" translate="no">
+				<source>text 3</source>
+				<target state="final">translation 3</target>
+				<note>Context 3</note>
+			</trans-unit>
+			<group restype="x-gettext-plurals">
+				<note>Plurals</note>
+				<trans-unit id="14343743[0]">
+					<source>%d month</source>
+					<target xml:lang="nl" state="translated">%d maand</target>
+				</trans-unit>
+				<trans-unit id="14343743[1]">
+					<source>%d months</source>
+					<target xml:lang="nl" state="translated">%d maanden</target>
+				</trans-unit>
+			</group>
+		</body>
+	</file>
+</xliff>
