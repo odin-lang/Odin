@@ -75,6 +75,7 @@ Option_Flag :: enum {
 	*/
 	Decode_SGML_Entities,
 }
+Option_Flags :: bit_set[Option_Flag; u8]
 
 Document :: struct {
 	root:     ^Element,
@@ -122,7 +123,6 @@ Options :: struct {
 	flags:            Option_Flags,
 	expected_doctype: string,
 }
-Option_Flags :: bit_set[Option_Flag]
 
 Encoding :: enum {
 	Unknown,

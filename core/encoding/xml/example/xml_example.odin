@@ -2,6 +2,7 @@ package xml_example
 
 import "core:encoding/xml"
 import "core:mem"
+import "core:strings"
 import "core:fmt"
 
 Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {
@@ -28,7 +29,12 @@ _main :: proc() {
 	doc, err := xml.parse(DOC, OPTIONS, FILENAME, Error_Handler)
 	defer xml.destroy(doc)
 
-	xml.print(doc)
+	buf: strings.Builder
+	defer strings.destroy_builder(&buf)
+	w := strings.to_writer(&buf)
+
+	xml.print(w, doc)
+	println(strings.to_string(buf))
 
 	if err != .None {
 		printf("Parse error: %v\n", err)
