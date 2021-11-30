@@ -10,64 +10,69 @@ package xml
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+import "core:io"
 import "core:fmt"
 
 /*
 	Just for debug purposes.
 */
-print :: proc(doc: ^Document) {
-	assert(doc != nil)
-
+print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error) {
+	if doc == nil { return }
 	using fmt
-	println("[XML Prolog]")
+
+	written += wprintf(writer, "[XML Prolog]\n")
 
 	for attr in doc.prolog {
-		printf("\t%v: %v\n", attr.key, attr.val)
+		written += wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
 	}
 
-	printf("[Encoding] %v\n",  doc.encoding)
-	printf("[DOCTYPE]  %v\n",  doc.doctype.ident)
+	written += wprintf(writer, "[Encoding] %v\n", doc.encoding)
+	written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 	if len(doc.doctype.rest) > 0 {
-		printf("\t%v\n", doc.doctype.rest)
+	 	wprintf(writer, "\t%v\n", doc.doctype.rest)
 	}
 
 	if doc.root != nil {
-		println(" --- ")
-		print_element(0, doc.root)
-		println(" --- ")		
-	}
+	 	wprintln(writer, " --- ")
+	 	print_element(writer, doc.root)
+	 	wprintln(writer, " --- ")		
+	 }
+
+	return written, .None
 }
 
-print_element :: proc(indent: int, element: ^Element) {
+print_element :: proc(writer: io.Writer, element: ^Element, indent := 0) -> (written: int, err: io.Error) {
 	if element == nil { return }
 	using fmt
 
-	tab :: proc(indent: int) {
+	tab :: proc(writer: io.Writer, indent: int) {
 		tabs := "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"
 
 		i := max(0, min(indent, len(tabs)))
-		printf("%v", tabs[:i])
+		wprintf(writer, "%v", tabs[:i])
 	}
 
-	tab(indent)
+	tab(writer, indent)
 
 	if element.kind == .Element {
-		printf("<%v>\n", element.ident)
+		wprintf(writer, "<%v>\n", element.ident)
 		if len(element.value) > 0 {
-			tab(indent + 1)
-			printf("[Value] %v\n", element.value)
+			tab(writer, indent + 1)
+			wprintf(writer, "[Value] %v\n", element.value)
 		}
 
 		for attr in element.attribs {
-			tab(indent + 1)
-			printf("[Attr] %v: %v\n", attr.key, attr.val)
+			tab(writer, indent + 1)
+			wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
 		}
 
 		for child in element.children {
-			print_element(indent + 1, child)
+			print_element(writer, child, indent + 1)
 		}
 	} else if element.kind == .Comment {
-		printf("[COMMENT] %v\n", element.value)
+		wprintf(writer, "[COMMENT] %v\n", element.value)
 	}
+
+	return written, .None
 }
