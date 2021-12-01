@@ -205,7 +205,7 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 	return string(t.src[offset : t.offset])
 }
 
-scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false) -> (value: string, err: Error) {
+scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
 	err = .None
 	in_cdata := false
 
@@ -238,7 +238,7 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 			}
 
 		case '\n':
-			if !in_cdata {
+			if !(multiline || in_cdata) {
 				error(t, offset, string(t.src[offset : t.offset]))
 				error(t, offset, "[scan_string] Not terminated\n")
 				err = .Invalid_Tag_Value
@@ -256,7 +256,22 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 		advance_rune(t)
 	}
 
+	/*
+		Strip trailing whitespace.
+	*/
 	lit := string(t.src[offset : t.offset])
+
+	end := len(lit)
+	eat: for ; end > 0; end -= 1 {
+		ch := lit[end - 1]
+		switch ch {
+		case ' ', '\t', '\r', '\n':
+		case:
+			break eat
+		}
+	}
+	lit = lit[:end]
+
 	if consume_close {
 		advance_rune(t)
 	}
@@ -307,7 +322,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case ':': kind = .Colon
 
 		case '"', '\'':
-			lit, err = scan_string(t, t.offset, ch, true)
+			lit, err = scan_string(t, t.offset, ch, true, false)
 			if err == .None {
 				kind = .String
 			} else {

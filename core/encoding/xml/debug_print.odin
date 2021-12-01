@@ -27,10 +27,13 @@ print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error
 	}
 
 	written += wprintf(writer, "[Encoding] %v\n", doc.encoding)
-	written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
-	if len(doc.doctype.rest) > 0 {
-	 	wprintf(writer, "\t%v\n", doc.doctype.rest)
+	if len(doc.doctype.ident) > 0 {
+		written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
+
+		if len(doc.doctype.rest) > 0 {
+		 	wprintf(writer, "\t%v\n", doc.doctype.rest)
+		}
 	}
 
 	if doc.root != nil {
