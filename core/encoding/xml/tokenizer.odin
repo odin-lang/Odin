@@ -46,8 +46,11 @@ Token_Kind :: enum {
 	EOF,
 }
 
-CDATA_START :: "<![CDATA["
-CDATA_END   :: "]]>"
+CDATA_START   :: "<![CDATA["
+CDATA_END     :: "]]>"
+
+COMMENT_START :: "<!--"
+COMMENT_END   :: "-->"
 
 Tokenizer :: struct {
 	// Immutable data
@@ -214,10 +217,83 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 	return string(t.src[offset : t.offset])
 }
 
+/*
+	A comment ends when we see -->, preceded by a character that's not a dash.
+	"For compatibility, the string "--" (double-hyphen) must not occur within comments."
+
+	See: https://www.w3.org/TR/2006/REC-xml11-20060816/#dt-comment
+
+	Thanks to the length (4) of the comment start, we also have enough lookback,
+	and the peek at the next byte asserts that there's at least one more character
+	that's a `>`.
+*/
+scan_comment :: proc(t: ^Tokenizer) -> (comment: string, err: Error) {
+	offset := t.offset
+
+	for {
+		advance_rune(t)
+		ch := t.ch
+
+		if ch < 0 {
+			error(t, offset, "[parse] Comment was not terminated\n")
+			return "", .Unclosed_Comment
+		}
+
+		if string(t.src[t.offset - 1:][:2]) == "--" {
+			if peek_byte(t) == '>' {
+				break
+			} else {
+				error(t, t.offset - 1, "Invalid -- sequence in comment.\n")
+				return "", .Invalid_Sequence_In_Comment
+			}
+		}
+	}
+
+	expect(t, .Dash)
+	expect(t, .Gt)
+
+	return string(t.src[offset : t.offset - 1]), .None
+}
+
+/*
+	Skip CDATA
+*/
+skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
+	if t.read_offset + len(CDATA_START) >= len(t.src) {
+		/*
+			Can't be the start of a CDATA tag.
+		*/
+		return .None
+	}
+
+	if string(t.src[t.offset:][:len(CDATA_START)]) == CDATA_START {
+		t.read_offset += len(CDATA_START)
+		offset := t.offset
+
+		cdata_scan: for {
+			advance_rune(t)
+			if t.ch < 0 {
+				error(t, offset, "[scan_string] CDATA was not terminated\n")
+				return .Premature_EOF
+			}
+
+			/*
+				Scan until the end of a CDATA tag.
+			*/
+			if t.read_offset + len(CDATA_END) < len(t.src) {
+				if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
+					t.read_offset += len(CDATA_END)
+					break cdata_scan
+				}
+			}
+		}
+	}
+	return
+}
+
 @(optimization_mode="speed")
 scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
 	err = .None
-	in_cdata := false
 
 	loop: for {
 		ch := t.ch
@@ -228,27 +304,23 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 			return "", .Premature_EOF
 
 		case '<':
-			/*
-				Might be the start of a CDATA tag.
-			*/
-			if t.read_offset + len(CDATA_START) < len(t.src) {
-				if string(t.src[t.offset:][:len(CDATA_START)]) == CDATA_START {
-					in_cdata = true
-				}
-			}
-
-		case ']':
-			/*
-				Might be the end of a CDATA tag.
-			*/
-			if t.read_offset + len(CDATA_END) < len(t.src) {
-				if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
-					in_cdata = false
+			if peek_byte(t) == '!' {
+				if peek_byte(t, 1) == '[' {
+					/*
+						Might be the start of a CDATA tag.
+					*/
+					skip_cdata(t) or_return
+				} else if peek_byte(t, 1) == '-' && peek_byte(t, 2) == '-' {
+					/*
+						Comment start. Eat comment.
+					*/
+					t.read_offset += 3
+					_ = scan_comment(t) or_return
 				}
 			}
 
 		case '\n':
-			if !(multiline || in_cdata) {
+			if !multiline {
 				error(t, offset, string(t.src[offset : t.offset]))
 				error(t, offset, "[scan_string] Not terminated\n")
 				err = .Invalid_Tag_Value
@@ -256,13 +328,12 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 			}
 		}
 
-		if ch == close && !in_cdata {
+		if t.ch == close {
 			/*
-				If it's not a CDATA tag, it's the end of this body.
+				If it's not a CDATA or comment, it's the end of this body.
 			*/
 			break loop
 		}
-
 		advance_rune(t)
 	}
 

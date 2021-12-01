@@ -307,39 +307,10 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 						The grammar does not allow a comment to end in --->
 					*/
 					expect(t, .Dash)
-					offset := t.offset
-
-					for {
-						advance_rune(t)
-						ch := t.ch
-
-						/*
-							A comment ends when we see -->, preceded by a character that's not a dash.
-							"For compatibility, the string "--" (double-hyphen) must not occur within comments."
-
-							See: https://www.w3.org/TR/2006/REC-xml11-20060816/#dt-comment
-
-							Thanks to the length (4) of the comment start, we also have enough lookback,
-							and the peek at the next byte asserts that there's at least one more character
-							that's a `>`.
-						*/
-						if ch < 0 {
-							error(t, offset, "[parse] Comment was not terminated\n")
-							return doc, .Unclosed_Comment
-						}
-
-						if string(t.src[t.offset - 1:][:2]) == "--" {
-							if peek_byte(t) == '>' {
-								break
-							} else {
-								error(t, t.offset - 1, "Invalid -- sequence in comment.\n")
-								return doc, .Invalid_Sequence_In_Comment
-							}
-						}
-					}
+					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						comment := strings.intern_get(&doc.intern, string(t.src[offset : t.offset - 1]))
+						comment = strings.intern_get(&doc.intern, comment)
 
 						if doc.root == nil {
 							append(&doc.comments, comment)
@@ -351,9 +322,6 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 							append(&element.children, el)
 						}
 					}
-
-					expect(t, .Dash)
-					expect(t, .Gt)
 
 				case:
 					error(t, t.offset, "Invalid Token after <!. Expected .Ident, got %#v\n", next)
