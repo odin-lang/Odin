@@ -36,6 +36,10 @@ print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error
 		}
 	}
 
+	for comment in doc.comments {
+		written += wprintf(writer, "[Pre-root comment]  %v\n", comment)
+	}
+
 	if doc.root != nil {
 	 	wprintln(writer, " --- ")
 	 	print_element(writer, doc.root)

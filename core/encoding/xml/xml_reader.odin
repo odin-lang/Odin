@@ -86,9 +86,15 @@ Document :: struct {
 		/*
 			We only scan the <!DOCTYPE IDENT part and skip the rest.
 		*/
-		ident: string,
-		rest:  string,
+		ident:   string,
+		rest:    string,
 	},
+
+	/*
+		If we encounter comments before the root node, and the option to intern comments is given, this is where they'll live.
+		Otherwise they'll be in the element tree.
+	*/
+	comments: [dynamic]string,
 
 	/*
 		Internal
@@ -218,6 +224,8 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 	err =               .Unexpected_Token
 	element, parent:    ^Element
 
+	tag_is_open := false
+
 	/*
 		If a DOCTYPE is present, the root tag has to match.
 		If an expected DOCTYPE is given in options (i.e. it's non-empty), the DOCTYPE (if present) and root tag have to match.
@@ -225,10 +233,14 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 	expected_doctype := options.expected_doctype
 
 	loop: for {
-		tok := scan(t)
-		#partial switch tok.kind {
+		skip_whitespace(t)
+		switch t.ch {
+		case '<':
+			/*
+				Consume peeked `<`
+			*/
+			tok := scan(t)
 
-		case .Lt:
 			open := scan(t)
 			#partial switch open.kind {
 
@@ -247,8 +259,10 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 						*/
 						return doc, .Too_Many_Prologs
 					} else {
-						error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", tok.text)	
-						return
+						/*
+							Could be `<?xml-stylesheet`, etc. Ignore it.
+						*/
+						skip_element(t) or_return
 					}
 				case:
 					error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", tok.text)
@@ -292,10 +306,6 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 						Comment: <!-- -->.
 						The grammar does not allow a comment to end in --->
 					*/
-					if doc.root == nil {
-						return doc, .Comment_Before_Root_Element
-					}
-
 					expect(t, .Dash)
 					offset := t.offset
 
@@ -329,12 +339,17 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					}
 
 					if .Intern_Comments in opts.flags {
-						el := new(Element)
+						comment := strings.intern_get(&doc.intern, string(t.src[offset : t.offset - 1]))
 
-						el.parent = element
-						el.kind   = .Comment
-						el.value  = strings.intern_get(&doc.intern, string(t.src[offset : t.offset - 1]))
-						append(&element.children, el)
+						if doc.root == nil {
+							append(&doc.comments, comment)
+						} else {
+							el := new(Element)
+							el.parent = element
+							el.kind   = .Comment
+							el.value  = comment
+							append(&element.children, el)
+						}
 					}
 
 					expect(t, .Dash)
@@ -350,6 +365,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					e.g. <odin - Start of new element.
 				*/
 				element = new(Element)
+				tag_is_open = true
 
 				if doc.root == nil {
 					/*
@@ -384,7 +400,6 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					- `/>`, which means this is an 'empty' or self-closing tag.
 				*/
 				end_token := scan(t)
-
 				#partial switch end_token.kind {
 				case .Gt:
 					/*
@@ -394,9 +409,12 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 
 				case .Slash:
 					/*
-						Empty tag?
+						Empty tag. Close it.
 					*/
 					expect(t, .Gt) or_return
+					parent      = element.parent
+					element     = parent
+					tag_is_open = false
 
 				case:
 					error(t, t.offset, "Expected close tag, got: %#v\n", end_token)
@@ -411,25 +429,33 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 				_      = expect(t, .Gt)    or_return
 
 				if element.ident != ident.text {
-					error(t, t.offset, "Mismatched Closing Tag: %v\n", ident.text)
+					error(t, t.offset, "Mismatched Closing Tag. Expected %v, got %v\n", element.ident, ident.text)
 					return doc, .Mismatched_Closing_Tag
 				}
-				parent  = element.parent
-				element = parent
+				parent      = element.parent
+				element     = parent
+				tag_is_open = false
 
 			case:
 				error(t, t.offset, "Invalid Token after <: %#v\n", open)
 				return
 			}
 
-		case .EOF:
+		case -1:
+			/*
+				End of file.
+			*/
+			if tag_is_open {
+				return doc, .Premature_EOF
+			}
 			break loop
 
 		case:
 			/*
 				This should be a tag's body text.
 			*/
-			element.value = scan_string(t, tok.pos.offset) or_return
+			body_text    := scan_string(t, t.offset) or_return
+			element.value = strings.intern_get(&doc.intern, body_text)
 		}
 	}
 
@@ -480,6 +506,7 @@ destroy :: proc(doc: ^Document) {
 	strings.intern_destroy(&doc.intern)
 
 	delete(doc.prolog)
+	delete(doc.comments)
 	free(doc)
 }
 
