@@ -110,44 +110,51 @@ error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 	t.error_count += 1
 }
 
+@(optimization_mode="speed")
 advance_rune :: proc(using t: ^Tokenizer) {
-	if read_offset < len(src) {
-		offset = read_offset
-		if ch == '\n' {
-			line_offset = offset
-			line_count += 1
-		}
-		r, w := rune(src[read_offset]), 1
-		switch {
-		case r == 0:
-			error(t, t.offset, "illegal character NUL")
-		case r >= utf8.RUNE_SELF:
-			r, w = utf8.decode_rune_in_string(src[read_offset:])
-			if r == utf8.RUNE_ERROR && w == 1 {
-				error(t, t.offset, "illegal UTF-8 encoding")
-			} else if r == utf8.RUNE_BOM && offset > 0 {
-				error(t, t.offset, "illegal byte order mark")
+	#no_bounds_check {
+		/*
+			Already bounds-checked here.
+		*/
+		if read_offset < len(src) {
+			offset = read_offset
+			if ch == '\n' {
+				line_offset = offset
+				line_count += 1
 			}
+			r, w := rune(src[read_offset]), 1
+			switch {
+			case r == 0:
+				error(t, t.offset, "illegal character NUL")
+			case r >= utf8.RUNE_SELF:
+				r, w = #force_inline utf8.decode_rune_in_string(src[read_offset:])
+				if r == utf8.RUNE_ERROR && w == 1 {
+					error(t, t.offset, "illegal UTF-8 encoding")
+				} else if r == utf8.RUNE_BOM && offset > 0 {
+					error(t, t.offset, "illegal byte order mark")
+				}
+			}
+			read_offset += w
+			ch = r
+		} else {
+			offset = len(src)
+			if ch == '\n' {
+				line_offset = offset
+				line_count += 1
+			}
+			ch = -1
 		}
-		read_offset += w
-		ch = r
-	} else {
-		offset = len(src)
-		if ch == '\n' {
-			line_offset = offset
-			line_count += 1
-		}
-		ch = -1
 	}
 }
 
 peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 	if t.read_offset+offset < len(t.src) {
-		return t.src[t.read_offset+offset]
+		#no_bounds_check return t.src[t.read_offset+offset]
 	}
 	return 0
 }
 
+@(optimization_mode="speed")
 skip_whitespace :: proc(t: ^Tokenizer) {
 	for {
 		switch t.ch {
@@ -159,6 +166,7 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 	}
 }
 
+@(optimization_mode="speed")
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
@@ -177,6 +185,7 @@ is_valid_identifier_rune :: proc(r: rune) -> bool {
 		case '_', '-', ':':        return true
 		case 'A'..='Z', 'a'..='z': return true
 		case '0'..'9':             return true
+		case -1:                   return false
 		}
 	}
 
@@ -205,6 +214,7 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 	return string(t.src[offset : t.offset])
 }
 
+@(optimization_mode="speed")
 scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
 	err = .None
 	in_cdata := false
