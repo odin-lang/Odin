@@ -239,7 +239,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			/*
 				Consume peeked `<`
 			*/
-			tok := scan(t)
+			advance_rune(t)
 
 			open := scan(t)
 			#partial switch open.kind {
@@ -265,7 +265,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 						skip_element(t) or_return
 					}
 				case:
-					error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", tok.text)
+					error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", next.text)
 					return
 				}
 
