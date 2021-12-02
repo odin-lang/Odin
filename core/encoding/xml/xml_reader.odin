@@ -18,10 +18,6 @@ package xml
 		- We do NOT support UTF-16. If you have a UTF-16 XML file, please convert it to UTF-8 first. Also, our condolences.
 		- <[!ELEMENT and <[!ATTLIST are not supported, and will be either ignored or return an error depending on the parser options.
 
-	TODO:
-	- Optional CDATA unboxing.
-	- Optional `&gt;`, `&#32;`, `&#x20;` and other escape substitution in tag bodies.
-
 	MAYBE:
 	- XML writer?
 	- Serialize/deserialize Odin types?
@@ -31,6 +27,7 @@ package xml
 */
 
 import "core:strings"
+import "core:encoding/entity"
 import "core:mem"
 import "core:os"
 
@@ -196,12 +193,6 @@ Error :: enum {
 
 	Duplicate_Attribute,
 	Conflicting_Options,
-
-	/*
-		Unhandled TODO:
-	*/
-	Unhandled_CDATA_Unboxing,
-	Unhandled_SGML_Entity_Decoding,
 }
 
 /*
@@ -422,8 +413,25 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			/*
 				This should be a tag's body text.
 			*/
-			body_text    := scan_string(t, t.offset) or_return
-			element.value = strings.intern_get(&doc.intern, body_text)
+			body_text   := scan_string(t, t.offset) or_return
+
+			decode_opts := entity.XML_Decode_Options{ .Comment_Strip }
+
+			if .Decode_SGML_Entities not_in opts.flags {
+				decode_opts += { .No_Entity_Decode }
+			}
+			if .Unbox_CDATA in opts.flags {
+				decode_opts += { .Unbox_CDATA, .Decode_CDATA }
+			}
+
+			decoded, decode_err := entity.decode_xml(body_text, decode_opts)
+			defer delete(decoded)
+
+			if decode_err == .None {
+				element.value = strings.intern_get(&doc.intern, decoded)
+			} else {
+				element.value = strings.intern_get(&doc.intern, body_text)
+			}
 		}
 	}
 
@@ -488,15 +496,6 @@ validate_options :: proc(options: Options) -> (validated: Options, err: Error) {
 	if .Error_on_Unsupported in validated.flags && .Ignore_Unsupported in validated.flags {
 		return options, .Conflicting_Options
 	}
-
-	if .Unbox_CDATA in validated.flags {
-		return options, .Unhandled_CDATA_Unboxing
-	}
-
-	if .Decode_SGML_Entities in validated.flags {
-		return options, .Unhandled_SGML_Entity_Decoding
-	}
-
 	return validated, .None
 }
 
