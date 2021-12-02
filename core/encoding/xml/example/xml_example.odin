@@ -1,45 +1,55 @@
 package xml_example
 
 import "core:encoding/xml"
+import "core:os"
+import "core:path"
 import "core:mem"
-import "core:strings"
 import "core:fmt"
 
-Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {
+/*
+	Silent error handler for the parser.
+*/
+Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {}
 
-}
+OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "unicode", }
 
-FILENAME :: "../../../../tests/core/assets/xml/nl_NL-xliff-1.0.xliff"
-DOC      :: #load(FILENAME)
-
-OPTIONS  :: xml.Options{
-	flags            = {
-		.Ignore_Unsupported, .Intern_Comments,
-	},
-	expected_doctype = "",
-}
-
-_main :: proc() {
+example :: proc() {
 	using fmt
 
-	println("--- DOCUMENT TO PARSE  ---")
-	println(string(DOC))
-	println("--- /DOCUMENT TO PARSE ---\n")
+	filename := path.join(ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml")
+	defer delete(filename)
 
-	doc, err := xml.parse(DOC, OPTIONS, FILENAME, Error_Handler)
+	doc, err := xml.parse(filename, OPTIONS, Error_Handler)
 	defer xml.destroy(doc)
 
-	buf: strings.Builder
-	defer strings.destroy_builder(&buf)
-	w := strings.to_writer(&buf)
-
-	xml.print(w, doc)
-	println(strings.to_string(buf))
-
 	if err != .None {
-		printf("Parse error: %v\n", err)
-	} else {
-		println("DONE!")
+		printf("Load/Parse error: %v\n", err)
+		if err == .File_Error {
+			printf("\"%v\" not found. Did you run \"tests\\download_assets.py\"?", filename)
+		}
+		os.exit(1)
+	}
+
+	printf("\"%v\" loaded and parsed.\n", filename)
+
+	charlist, charlist_ok := xml.find_child_by_ident(doc.root, "charlist")
+	if !charlist_ok {
+		eprintln("Could not locate top-level `<charlist>` tag.")
+		os.exit(1)
+	}
+
+	printf("Found `<charlist>` with %v children.\n", len(charlist.children))
+
+	for char in charlist.children {
+		if char.ident != "character" {
+			eprintf("Expected `<character>`, got `<%v>`\n", char.ident)
+			os.exit(1)
+		}
+
+		if _, ok := xml.find_attribute_val_by_key(char, "dec"); !ok {
+			eprintln("`<character dec=\"...\">` attribute not found.")
+			os.exit(1)
+		}
 	}
 }
 
@@ -50,12 +60,13 @@ main :: proc() {
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
 
-	_main()
+	example()
 
 	if len(track.allocation_map) > 0 {
 		println()
 		for _, v in track.allocation_map {
 			printf("%v Leaked %v bytes.\n", v.location, v.size)
 		}
-	}	
+	}
+	println("Done and cleaned up!")
 }
