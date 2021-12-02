@@ -47,6 +47,8 @@ Parser :: struct {
 
 	fix_count: int,
 	fix_prev_pos: tokenizer.Pos,
+
+	peeking: bool,
 }
 
 MAX_FIX_COUNT :: 10
@@ -209,7 +211,12 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 
 peek_token_kind :: proc(p: ^Parser, kind: tokenizer.Token_Kind, lookahead := 0) -> (ok: bool) {
 	prev_parser := p^
-	defer p^ = prev_parser
+	p.peeking = true
+
+	defer {
+		p^ = prev_parser
+		p.peeking = false
+	}
 
 	p.tok.err = nil
 	for i := 0; i <= lookahead; i += 1 {
@@ -222,7 +229,12 @@ peek_token_kind :: proc(p: ^Parser, kind: tokenizer.Token_Kind, lookahead := 0) 
 
 peek_token :: proc(p: ^Parser, lookahead := 0) -> (tok: tokenizer.Token) {
 	prev_parser := p^
-	defer p^ = prev_parser
+	p.peeking = true
+
+	defer {
+		p^ = prev_parser
+		p.peeking = false
+	}
 
 	p.tok.err = nil
 	for i := 0; i <= lookahead; i += 1 {
@@ -305,7 +317,7 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 		append(&list, comment)
 	}
 
-	if len(list) > 0 {
+	if len(list) > 0 && !p.peeking {
 		comments = ast.new(ast.Comment_Group, list[0].pos, end_pos(list[len(list)-1]))
 		comments.list = list[:]
 		append(&p.file.comments, comments)
