@@ -61,15 +61,21 @@ COMMENT_END   :: "-->"
 */
 XML_Decode_Option :: enum u8 {
 	/*
+		Do not decode & entities. It decodes by default.
+		If given, overrides `Decode_CDATA`.
+	*/
+	No_Entity_Decode,
+
+	/*
 		CDATA is unboxed.
 	*/
-	CDATA_Unbox,
+	Unbox_CDATA,
 
 	/*
 		Unboxed CDATA is decoded as well.
-		Ignored if `.CDATA_Unbox` is not given.
+		Ignored if `.Unbox_CDATA` is not given.
 	*/
-	CDATA_Decode,
+	Decode_CDATA,
 
 	/*
 		Comments are stripped.
@@ -129,7 +135,7 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 			}
 
 		case:
-			if in_data && .CDATA_Decode not_in options {
+			if in_data && .Decode_CDATA not_in options {
 				/*
 					Unboxed, but undecoded.
 				*/
@@ -145,17 +151,20 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 					*/
 					write_string(&builder, entity)
 				} else {
-					if decoded, ok := xml_decode_entity(entity); ok {
-						write_rune(&builder, decoded)
-					} else {
-						/*
-							Decode failed. Pass through original.
-						*/
-						write_string(&builder, "&")
-						write_string(&builder, entity)
-						write_string(&builder, ";")
+
+					if .No_Entity_Decode not_in options {
+						if decoded, ok := xml_decode_entity(entity); ok {
+							write_rune(&builder, decoded)
+							continue
+						}
 					}
 
+					/*
+						Literal passthrough because the decode failed or we want entities not decoded.
+					*/
+					write_string(&builder, "&")
+					write_string(&builder, entity)
+					write_string(&builder, ";")
 				}
 			} else {
 				write_rune(&builder, t.r)
@@ -290,7 +299,7 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 	if string(t.src[t.offset:][:len(CDATA_START)]) == CDATA_START {
 		t.read_offset += len(CDATA_START) - 1
 
-		if .CDATA_Unbox in options && .CDATA_Decode in options {
+		if .Unbox_CDATA in options && .Decode_CDATA in options {
 			/*
 				We're unboxing _and_ decoding CDATA
 			*/
@@ -315,7 +324,7 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 
 					cdata := string(t.src[offset : t.read_offset])
 	
-					if .CDATA_Unbox in options {
+					if .Unbox_CDATA in options {
 						cdata = cdata[len(CDATA_START):]
 						cdata = cdata[:len(cdata) - len(CDATA_END)]
 					}

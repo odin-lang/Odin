@@ -1,18 +1,10 @@
 package unicode_entity_example
 
 import "core:encoding/xml"
-import "core:encoding/entity"
 import "core:strings"
 import "core:mem"
 import "core:fmt"
 import "core:time"
-
-OPTIONS  :: xml.Options{
-	flags            = {
-		.Ignore_Unsupported, .Intern_Comments,
-	},
-	expected_doctype = "",
-}
 
 doc_print :: proc(doc: ^xml.Document) {
 	buf: strings.Builder
@@ -28,6 +20,13 @@ _entities :: proc() {
 	err: xml.Error
 
 	DOC :: #load("../../../../tests/core/assets/XML/unicode.xml")
+
+	OPTIONS  :: xml.Options{
+		flags            = {
+			.Ignore_Unsupported, .Intern_Comments,
+		},
+		expected_doctype = "",
+	}
 
 	parse_duration: time.Duration
 
@@ -50,57 +49,11 @@ _entities :: proc() {
 _main :: proc() {
 	using fmt
 
-	doc, err := xml.parse(#load("test.html"))
+	options := xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities }}
+	doc, _ := xml.parse(#load("test.html"), options)
+
 	defer xml.destroy(doc)
 	doc_print(doc)
-
-	if false {
-		val := doc.root.children[1].children[2].value
-
-		println()
-		replaced, ok := entity.decode_xml(val)
-		defer delete(replaced)
-
-		printf("Before:      '%v', Err: %v\n", val, err)
-		printf("Passthrough: '%v'\nOK: %v\n", replaced, ok)
-		println()
-	}
-
-	if false {
-		val := doc.root.children[1].children[2].value
-
-		println()
-		replaced, ok := entity.decode_xml(val, { .CDATA_Unbox })
-		defer delete(replaced)
-
-		printf("Before:      '%v', Err: %v\n", val, err)
-		printf("CDATA_Unbox: '%v'\nOK: %v\n", replaced, ok)
-		println()
-	}
-
-	if true {
-		val := doc.root.children[1].children[2].value
-
-		println()
-		replaced, ok := entity.decode_xml(val, { .CDATA_Unbox, .CDATA_Decode })
-		defer delete(replaced)
-
-		printf("Before: '%v', Err: %v\n", val, err)
-		printf("CDATA_Decode: '%v'\nOK: %v\n", replaced, ok)
-		println()
-	}
-
-	if true {
-		val := doc.root.children[1].children[1].value
-
-		println()
-		replaced, ok := entity.decode_xml(val, { .Comment_Strip })
-		defer delete(replaced)
-
-		printf("Before: '%v', Err: %v\n", val, err)
-		printf("Comment_Strip: '%v'\nOK: %v\n", replaced, ok)
-		println()
-	}
 }
 
 main :: proc() {
