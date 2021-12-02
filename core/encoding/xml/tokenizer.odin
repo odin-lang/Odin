@@ -403,11 +403,11 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case ':': kind = .Colon
 
 		case '"', '\'':
+			kind = .Invalid
+
 			lit, err = scan_string(t, t.offset, ch, true, false)
 			if err == .None {
 				kind = .String
-			} else {
-				kind = .Invalid
 			}
 
 		case '\n':
@@ -418,7 +418,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		}
 	}
 
-	if lit == "" {
+	if kind != .String && lit == "" {
 		lit = string(t.src[offset : t.offset])
 	}
 	return Token{kind, lit, pos}

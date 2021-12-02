@@ -519,6 +519,8 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attr, offset: int, err: Error)
 	_       = expect(t, .Eq)     or_return
 	value  := expect(t, .String) or_return
 
+	error(t, t.offset, "String: %v\n", value)
+
 	attr.key = strings.intern_get(&doc.intern, key.text)
 	attr.val = strings.intern_get(&doc.intern, value.text)
 

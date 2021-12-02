@@ -35,7 +35,7 @@ TESTS :: []TEST{
 		First we test that certain files parse without error.
 	*/
 	{
-		filename  = "assets/xml/utf8.xml",
+		filename  = "assets/XML/utf8.xml",
 		options   = OPTIONS,
 		expected  = {
 			error        = .None,
@@ -45,7 +45,7 @@ TESTS :: []TEST{
 		},
 	},
 	{
-		filename  = "assets/xml/nl_NL-qt-ts.ts",
+		filename  = "assets/XML/nl_NL-qt-ts.ts",
 		options   = OPTIONS,
 		expected  = {
 			error        = .None,
@@ -55,7 +55,7 @@ TESTS :: []TEST{
 		},
 	},
 	{
-		filename  = "assets/xml/nl_NL-xliff-1.0.xliff",
+		filename  = "assets/XML/nl_NL-xliff-1.0.xliff",
 		options   = OPTIONS,
 		expected  = {
 			error        = .None,
@@ -65,7 +65,7 @@ TESTS :: []TEST{
 		},
 	},
 	{
-		filename  = "assets/xml/nl_NL-xliff-2.0.xliff",
+		filename  = "assets/XML/nl_NL-xliff-2.0.xliff",
 		options   = OPTIONS,
 		expected  = {
 			error        = .None,
@@ -79,7 +79,7 @@ TESTS :: []TEST{
 		Then we test that certain errors are returned as expected.
 	*/
 	{
-		filename  = "assets/xml/utf8.xml",
+		filename  = "assets/XML/utf8.xml",
 		options   = {
 			flags            = {
 				.Ignore_Unsupported, .Intern_Comments,
