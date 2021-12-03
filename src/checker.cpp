@@ -2050,6 +2050,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		
 		// WASM Specific
 		str_lit("__ashlti3"),
+		str_lit("__multi3"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
