@@ -173,23 +173,20 @@ TESTS :: []TEST{
 }
 
 when ODIN_TEST {
-    expect  :: testing.expect
-    log     :: testing.log
+	expect  :: testing.expect
+	log     :: testing.log
 } else {
-    expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        TEST_count += 1
-        if !condition {
-            TEST_fail += 1
-            fmt.println(message)
-            return
-        }
-        fmt.println(" PASS")
-    }
-    log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        fmt.printf("log: %v\n", v)
-    }
+	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
+		TEST_count += 1
+		if !condition {
+			TEST_fail += 1
+			fmt.printf("[%v] %v\n", loc, message)
+			return
+		}
+	}
+	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
+		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
+	}
 }
 
 test_file_path :: proc(filename: string) -> (path: string) {
@@ -229,7 +226,7 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 			written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 			if len(doc.doctype.rest) > 0 {
-			 	wprintf(writer, "\t%v\n", doc.doctype.rest)
+				wprintf(writer, "\t%v\n", doc.doctype.rest)
 			}
 		}
 
@@ -238,9 +235,9 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 		}
 
 		if doc.root != nil {
-		 	wprintln(writer, " --- ")
-		 	print_element(writer, doc.root)
-		 	wprintln(writer, " --- ")		
+			wprintln(writer, " --- ")
+			print_element(writer, doc.root)
+			wprintln(writer, " --- ")		
 		 }
 
 		return written, .None
@@ -293,7 +290,7 @@ run_tests :: proc(t: ^testing.T) {
 
 	for test in TESTS {
 		path := test_file_path(test.filename)
-		printf("\nTrying to parse %v\n\n", path)
+		log(t, fmt.tprintf("Trying to parse %v", path))
 
 		doc, err := xml.parse(path, test.options, Silent)
 		defer xml.destroy(doc)
@@ -323,7 +320,7 @@ run_tests :: proc(t: ^testing.T) {
 }
 
 main :: proc() {
-    t := testing.T{}
+	t := testing.T{}
 
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
@@ -338,5 +335,5 @@ main :: proc() {
 		}
 	}	
 
-    fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 }

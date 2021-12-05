@@ -25,38 +25,49 @@ import "core:time"
 
 import "core:runtime"
 
-WRITE_PPM_ON_FAIL :: #config(WRITE_PPM_ON_FAIL, false)
-TEST_SUITE_PATH   :: "assets/PNG"
+WRITE_PPM_ON_FAIL     :: #config(WRITE_PPM_ON_FAIL, false)
+TEST_FILE_PATH_PREFIX :: "tests/core/assets/PNG"
 
 TEST_count := 0
 TEST_fail  := 0
 
 when ODIN_TEST {
-    expect  :: testing.expect
-    log     :: testing.log
+	expect  :: testing.expect
+	log     :: testing.log
 } else {
-    expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        TEST_count += 1
-        if !condition {
-            TEST_fail += 1
-            fmt.println(message)
-            return
-        }
-        fmt.println(" PASS")
-    }
-    log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        fmt.printf("log: %v\n", v)
-    }
+	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
+		TEST_count += 1
+		if !condition {
+			TEST_fail += 1
+			fmt.printf("[%v] %v\n", loc, message)
+			return
+		}
+	}
+	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
+		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
+	}
 }
+
 I_Error :: image.Error
 
 main :: proc() {
 	t := testing.T{}
 	png_test(&t)
 
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+}
+
+test_file_path :: proc(filename: string, extension := "png") -> (path: string) {
+
+	path = fmt.tprintf("%v%v/%v.%v", ODIN_ROOT, TEST_FILE_PATH_PREFIX, filename, extension)
+	temp := transmute([]u8)path
+
+	for r, i in path {
+		if r == '\\' {
+			temp[i] = '/'
+		}
+	}
+	return path
 }
 
 PNG_Test :: struct {
@@ -1461,7 +1472,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 	context = runtime.default_context()
 
 	for file in suite {
-		test_file := fmt.tprintf("%v/%v.png", TEST_SUITE_PATH, file.file)
+		test_file := test_file_path(file.file)
 
 		img: ^png.Image
 		err: png.Error
