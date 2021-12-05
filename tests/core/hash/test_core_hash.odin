@@ -14,18 +14,15 @@ when ODIN_TEST {
 	log     :: testing.log
 } else {
 	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
-			fmt.println(" FAIL:", message)
+			fmt.printf("[%v] %v", loc, message)
 			return
 		}
-		fmt.println(" PASS")
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
+		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
 	}
 }
 
@@ -34,7 +31,7 @@ main :: proc() {
 	test_benchmark_runner(&t)
 	test_xxhash_vectors(&t)
 	test_crc64_vectors(&t)
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 }
 
 /*
