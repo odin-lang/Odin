@@ -2,35 +2,40 @@ package xml_example
 
 import "core:encoding/xml"
 import "core:os"
-import "core:path"
 import "core:mem"
 import "core:fmt"
-
-/*
-	Silent error handler for the parser.
-*/
-Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {}
-
-OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "unicode", }
+import "core:time"
+import "core:strings"
+import "core:hash"
 
 example :: proc() {
 	using fmt
 
-	filename := path.join(ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml")
-	defer delete(filename)
+	doc: ^xml.Document
+	err: xml.Error
 
-	doc, err := xml.parse(filename, OPTIONS, Error_Handler)
+	DOC :: #load("../../../../tests/core/assets/XML/unicode.xml")
+
+	parse_duration: time.Duration
+	{
+		time.SCOPED_TICK_DURATION(&parse_duration)
+		doc, err = xml.parse(DOC, xml.Options{flags={.Ignore_Unsupported}})
+	}
 	defer xml.destroy(doc)
+
+	ms := time.duration_milliseconds(parse_duration)
+	speed := (f64(1000.0) / ms) * f64(len(DOC)) / 1_024.0 / 1_024.0
+	fmt.printf("Parse time: %v bytes in %.2f ms (%.2f MiB/s).\n", len(DOC), ms, speed)
 
 	if err != .None {
 		printf("Load/Parse error: %v\n", err)
 		if err == .File_Error {
-			printf("\"%v\" not found. Did you run \"tests\\download_assets.py\"?", filename)
+			println("\"unicode.xml\" not found. Did you run \"tests\\download_assets.py\"?")
 		}
 		os.exit(1)
 	}
 
-	printf("\"%v\" loaded and parsed.\n", filename)
+	println("\"unicode.xml\" loaded and parsed.")
 
 	charlist, charlist_ok := xml.find_child_by_ident(doc.root, "charlist")
 	if !charlist_ok {
@@ -40,17 +45,19 @@ example :: proc() {
 
 	printf("Found `<charlist>` with %v children.\n", len(charlist.children))
 
-	for char in charlist.children {
-		if char.ident != "character" {
-			eprintf("Expected `<character>`, got `<%v>`\n", char.ident)
-			os.exit(1)
-		}
+	crc32 := doc_hash(doc)
+	printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0xcaa042b9 else "🤬", crc32)
+}
 
-		if _, ok := xml.find_attribute_val_by_key(char, "dec"); !ok {
-			eprintln("`<character dec=\"...\">` attribute not found.")
-			os.exit(1)
-		}
-	}
+doc_hash :: proc(doc: ^xml.Document, print := false) -> (crc32: u32) {
+	buf: strings.Builder
+	defer strings.destroy_builder(&buf)
+	w := strings.to_writer(&buf)
+
+	xml.print(w, doc)
+	tree := strings.to_string(buf)
+	if print { fmt.println(tree) }
+	return hash.crc32(transmute([]u8)tree)
 }
 
 main :: proc() {

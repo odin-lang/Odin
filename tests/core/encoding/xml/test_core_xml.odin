@@ -8,9 +8,7 @@ import "core:io"
 import "core:fmt"
 import "core:hash"
 
-Silent :: proc(pos: xml.Pos, fmt: string, args: ..any) {
-	// Custom (silent) error handler.
-}
+Silent :: proc(pos: xml.Pos, format: string, args: ..any) {}
 
 OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, },
 	expected_doctype = "",
@@ -75,7 +73,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0x6d38ac58,
+		crc32     = 0xad31d8e8,
 	},
 
 	{
@@ -131,7 +129,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0xdb4a1e79,
+		crc32     = 0x573c1033,
 	},
 
 	{
@@ -306,7 +304,7 @@ run_tests :: proc(t: ^testing.T) {
 		expect(t, err == test.err, err_msg)
 
 		failed |= crc32 != test.crc32
-		err_msg  = tprintf("Expected CRC 0x%08x, got 0x%08x", test.crc32, crc32)
+		err_msg  = tprintf("Expected CRC 0x%08x, got 0x%08x, with options %v", test.crc32, crc32, test.options)
 		expect(t, crc32 == test.crc32, err_msg)
 
 		if failed {

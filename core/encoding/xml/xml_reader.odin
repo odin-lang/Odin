@@ -71,6 +71,12 @@ Option_Flag :: enum {
 		This option decodes them when encountered.
 	*/
 	Decode_SGML_Entities,
+
+	/*
+		If a tag body has a comment, it will be stripped unless this option is given.
+	*/
+	Keep_Tag_Body_Comments,
+
 }
 Option_Flags :: bit_set[Option_Flag; u8]
 
@@ -413,15 +419,29 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			/*
 				This should be a tag's body text.
 			*/
-			body_text   := scan_string(t, t.offset) or_return
+			body_text        := scan_string(t, t.offset) or_return
+			needs_processing := .Unbox_CDATA          in opts.flags
+			needs_processing |= .Decode_SGML_Entities in opts.flags
 
-			decode_opts := entity.XML_Decode_Options{ .Comment_Strip }
+			if !needs_processing {
+				element.value = strings.intern_get(&doc.intern, body_text)
+				continue
+			}
+
+			decode_opts := entity.XML_Decode_Options{}
+			if .Keep_Tag_Body_Comments not_in opts.flags {
+				decode_opts += { .Comment_Strip }
+			}
 
 			if .Decode_SGML_Entities not_in opts.flags {
 				decode_opts += { .No_Entity_Decode }
 			}
+
 			if .Unbox_CDATA in opts.flags {
-				decode_opts += { .Unbox_CDATA, .Decode_CDATA }
+				decode_opts += { .Unbox_CDATA }
+				if .Decode_SGML_Entities in opts.flags {
+					decode_opts += { .Decode_CDATA }
+				}
 			}
 
 			decoded, decode_err := entity.decode_xml(body_text, decode_opts)
