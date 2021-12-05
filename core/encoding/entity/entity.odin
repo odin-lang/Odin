@@ -115,7 +115,14 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 
 				We don't need to check if we need to write a `<`, because if it isn't CDATA or a comment,
 				it couldn't have been part of an XML tag body to be decoded here.
+
+				Keep in mind that we could already *be* inside a CDATA tag.
+				If so, write `>` as a literal and continue.
 			*/
+			if in_data {
+				write_rune(&builder, '<')
+				continue
+			}
 			in_data = _handle_xml_special(&t, &builder, options) or_return
 
 		case ']':

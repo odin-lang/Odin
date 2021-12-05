@@ -3,16 +3,16 @@ package test_core_xml
 import "core:encoding/xml"
 import "core:testing"
 import "core:mem"
+import "core:strings"
+import "core:io"
 import "core:fmt"
+import "core:hash"
 
 Silent :: proc(pos: xml.Pos, fmt: string, args: ..any) {
 	// Custom (silent) error handler.
 }
 
-OPTIONS :: xml.Options{
-	flags            = {
-		.Ignore_Unsupported, .Intern_Comments,
-	},
+OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, },
 	expected_doctype = "",
 }
 
@@ -22,76 +22,153 @@ TEST_fail  := 0
 TEST :: struct {
 	filename: string,
 	options:  xml.Options,
-	expected: struct {
-		error:        xml.Error,
-		xml_version:  string,
-		xml_encoding: string,
-		doctype:      string,
-	},
+	err:      xml.Error,
+	crc32:    u32,
 }
+
+/*
+	Relative to ODIN_ROOT
+*/
+TEST_FILE_PATH_PREFIX :: "tests/core/assets/XML"
 
 TESTS :: []TEST{
 	/*
 		First we test that certain files parse without error.
 	*/
+
 	{
-		filename  = "assets/XML/utf8.xml",
-		options   = OPTIONS,
-		expected  = {
-			error        = .None,
-			xml_version  = "1.0",
-			xml_encoding = "utf-8",
-			doctype      = "恥ずべきフクロウ",
+		/*
+		<?xml version="1.0" encoding="utf-8"?>
+		<!DOCTYPE 恥ずべきフクロウ>
+		<恥ずべきフクロウ 올빼미_id="Foozle&#32;<![CDATA[<greeting>Hello, world!"</greeting>]]>Barzle">
+		<부끄러운:barzle>
+			<name foo:bar="birmese">ရှက်စရာ ဇီးကွက်</name>
+			<nickname>Owl of Shame</nickname>
+			<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] <$]]> Nonsense.</data>
+		</부끄러운:barzle>
+		*/
+
+		/*
+			Tests UTF-8 idents and values.
+			Test namespaced ident.
+			Tests that nested partial CDATA start doesn't trip up parser.
+		*/
+		filename  = "utf8.xml",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments,
+			},
+			expected_doctype = "恥ずべきフクロウ",
 		},
+		crc32     = 0x30d82264,
 	},
+
 	{
-		filename  = "assets/XML/nl_NL-qt-ts.ts",
-		options   = OPTIONS,
-		expected  = {
-			error        = .None,
-			xml_version  = "1.0",
-			xml_encoding = "utf-8",
-			doctype      = "TS",
+		/*
+			Same as above.
+			Unbox CDATA in data tag.
+		*/
+		filename  = "utf8.xml",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
+			},
+			expected_doctype = "恥ずべきフクロウ",
 		},
+		crc32     = 0x6d38ac58,
 	},
+
 	{
-		filename  = "assets/XML/nl_NL-xliff-1.0.xliff",
-		options   = OPTIONS,
-		expected  = {
-			error        = .None,
-			xml_version  = "1.0",
-			xml_encoding = "UTF-8",
-			doctype      = "",
+		/*
+			Simple Qt TS translation file.
+			`core:i18n` requires it to be parsed properly.
+		*/
+		filename  = "nl_NL-qt-ts.ts",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+			},
+			expected_doctype = "TS",
 		},
+		crc32     = 0x7bce2630,
 	},
+
 	{
-		filename  = "assets/XML/nl_NL-xliff-2.0.xliff",
-		options   = OPTIONS,
-		expected  = {
-			error        = .None,
-			xml_version  = "1.0",
-			xml_encoding = "utf-8",
-			doctype      = "",
+		/*
+			Simple XLiff 1.2 file.
+			`core:i18n` requires it to be parsed properly.
+		*/
+		filename  = "nl_NL-xliff-1.2.xliff",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+			},
+			expected_doctype = "xliff",
 		},
+		crc32     = 0x43f19d61,
+	},
+
+	{
+		/*
+			Simple XLiff 2.0 file.
+			`core:i18n` requires it to be parsed properly.
+		*/
+		filename  = "nl_NL-xliff-2.0.xliff",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+			},
+			expected_doctype = "xliff",
+		},
+		crc32     = 0x961e7635,
+	},
+
+	{
+		filename  = "entities.html",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments,
+			},
+			expected_doctype = "html",
+		},
+		crc32     = 0xdb4a1e79,
+	},
+
+	{
+		filename  = "entities.html",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
+			},
+			expected_doctype = "html",
+		},
+		crc32     = 0x82588917,
+	},
+
+	{
+		filename  = "entities.html",
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+			},
+			expected_doctype = "html",
+		},
+		crc32     = 0x5e74d8a6,
 	},
 
 	/*
 		Then we test that certain errors are returned as expected.
 	*/
 	{
-		filename  = "assets/XML/utf8.xml",
+		filename  = "utf8.xml",
 		options   = {
 			flags            = {
 				.Ignore_Unsupported, .Intern_Comments,
 			},
 			expected_doctype = "Odin",
 		},
-		expected  = {
-			error        = .Invalid_DocType,
-			xml_version  = "1.0",
-			xml_encoding = "utf-8",
-			doctype      = "恥ずべきフクロウ",
-		},
+		err       = .Invalid_DocType,
+		crc32     = 0x49b83d0a,
 	},
 }
 
@@ -115,6 +192,136 @@ when ODIN_TEST {
     }
 }
 
+test_file_path :: proc(filename: string) -> (path: string) {
+
+	path = fmt.tprintf("%v%v/%v", ODIN_ROOT, TEST_FILE_PATH_PREFIX, filename)
+	temp := transmute([]u8)path
+
+	for r, i in path {
+		if r == '\\' {
+			temp[i] = '/'
+		}
+	}
+	return path
+}
+
+doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
+	/*
+		Effectively a clone of the debug printer in the xml package.
+		We duplicate it here so that the way it prints an XML document to a string is stable.
+
+		This way we can hash the output. If it changes, it means that the document or how it was parsed changed,
+		not how it was printed. One less source of variability.
+	*/
+	print :: proc(writer: io.Writer, doc: ^xml.Document) -> (written: int, err: io.Error) {
+		if doc == nil { return }
+		using fmt
+
+		written += wprintf(writer, "[XML Prolog]\n")
+
+		for attr in doc.prolog {
+			written += wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
+		}
+
+		written += wprintf(writer, "[Encoding] %v\n", doc.encoding)
+
+		if len(doc.doctype.ident) > 0 {
+			written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
+
+			if len(doc.doctype.rest) > 0 {
+			 	wprintf(writer, "\t%v\n", doc.doctype.rest)
+			}
+		}
+
+		for comment in doc.comments {
+			written += wprintf(writer, "[Pre-root comment]  %v\n", comment)
+		}
+
+		if doc.root != nil {
+		 	wprintln(writer, " --- ")
+		 	print_element(writer, doc.root)
+		 	wprintln(writer, " --- ")		
+		 }
+
+		return written, .None
+	}
+
+	print_element :: proc(writer: io.Writer, element: ^xml.Element, indent := 0) -> (written: int, err: io.Error) {
+		if element == nil { return }
+		using fmt
+
+		tab :: proc(writer: io.Writer, indent: int) {
+			for _ in 0..=indent {
+				wprintf(writer, "\t")
+			}
+		}
+
+		tab(writer, indent)
+
+		if element.kind == .Element {
+			wprintf(writer, "<%v>\n", element.ident)
+			if len(element.value) > 0 {
+				tab(writer, indent + 1)
+				wprintf(writer, "[Value] %v\n", element.value)
+			}
+
+			for attr in element.attribs {
+				tab(writer, indent + 1)
+				wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
+			}
+
+			for child in element.children {
+				print_element(writer, child, indent + 1)
+			}
+		} else if element.kind == .Comment {
+			wprintf(writer, "[COMMENT] %v\n", element.value)
+		}
+
+		return written, .None
+	}
+
+	buf: strings.Builder
+	defer strings.destroy_builder(&buf)
+
+	print(strings.to_writer(&buf), doc)
+	return strings.clone(strings.to_string(buf))
+}
+
+@test
+run_tests :: proc(t: ^testing.T) {
+	using fmt
+
+	for test in TESTS {
+		path := test_file_path(test.filename)
+		printf("\nTrying to parse %v\n\n", path)
+
+		doc, err := xml.parse(path, test.options, Silent)
+		defer xml.destroy(doc)
+
+		tree_string := doc_to_string(doc)
+		tree_bytes  := transmute([]u8)tree_string
+		defer delete(tree_bytes)
+
+		crc32 := hash.crc32(tree_bytes)
+
+		failed := err != test.err
+		err_msg := tprintf("Expected return value %v, got %v", test.err, err)
+		expect(t, err == test.err, err_msg)
+
+		failed |= crc32 != test.crc32
+		err_msg  = tprintf("Expected CRC 0x%08x, got 0x%08x", test.crc32, crc32)
+		expect(t, crc32 == test.crc32, err_msg)
+
+		if failed {
+			/*
+				Don't fully print big trees.
+			*/
+			tree_string = tree_string[:min(2_048, len(tree_string))]
+			println(tree_string)
+		}
+	}
+}
+
 main :: proc() {
     t := testing.T{}
 
@@ -132,133 +339,4 @@ main :: proc() {
 	}	
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-}
-
-@test
-run_tests :: proc(t: ^testing.T) {
-	using fmt
-
-	count := 0
-
-	for test in TESTS {
-		printf("Trying to parse %v\n\n", test.filename)
-
-		doc, err := xml.parse(test.filename, test.options, Silent)
-		defer xml.destroy(doc)
-
-		err_msg := tprintf("Expected return value %v, got %v", test.expected.error, err)
-		expect(t, err == test.expected.error, err_msg)
-
-		if len(test.expected.xml_version) > 0 {
-			xml_version := ""
-			for attr in doc.prolog {
-				if attr.key == "version" {
-					xml_version = attr.val
-				}
-			}
-
-			err_msg  = tprintf("Expected XML version %v, got %v", test.expected.xml_version, xml_version)
-			expect(t, xml_version == test.expected.xml_version, err_msg)
-		}
-
-		if len(test.expected.xml_encoding) > 0 {
-			xml_encoding := ""
-			for attr in doc.prolog {
-				if attr.key == "encoding" {
-					xml_encoding = attr.val
-				}
-			}
-
-			err_msg  = tprintf("Expected XML encoding %v, got %v", test.expected.xml_encoding, xml_encoding)
-			expect(t, xml_encoding == test.expected.xml_encoding, err_msg)
-		}
-
-		err_msg  = tprintf("Expected DOCTYPE %v, got %v", test.expected.doctype, doc.doctype.ident)
-		expect(t, doc.doctype.ident == test.expected.doctype, err_msg)
-
-		/*
-			File-specific tests.
-		*/
-		switch count {
-		case 0:
-			expect(t, len(doc.root.attribs) > 0, "Expected the root tag to have an attribute.")
-			attr := doc.root.attribs[0]
-
-			attr_key_expected := "올빼미_id"
-			attr_val_expected := "Foozle&#32;<![CDATA[<greeting>Hello, world!\"</greeting>]]>Barzle"
-
-			attr_err := tprintf("Expected %v, got %v", attr_key_expected, attr.key)
-			expect(t, attr.key == attr_key_expected, attr_err)
-
-			attr_err  = tprintf("Expected %v, got %v", attr_val_expected, attr.val)
-			expect(t, attr.val == attr_val_expected, attr_err)
-
-			expect(t, len(doc.root.children) > 0, "Expected the root tag to have children.")
-			child := doc.root.children[0]
-
-			first_child_ident := "부끄러운:barzle"
-			attr_err  = tprintf("Expected first child tag's ident to be %v, got %v", first_child_ident, child.ident)
-			expect(t, child.ident == first_child_ident, attr_err)
-
-		case 2:
-			expect(t, len(doc.root.attribs) > 0, "Expected the root tag to have an attribute.")
-
-			{
-				attr := doc.root.attribs[0]
-
-				attr_key_expected := "version"
-				attr_val_expected := "1.2"
-
-				attr_err := tprintf("Expected %v, got %v", attr_key_expected, attr.key)
-				expect(t, attr.key == attr_key_expected, attr_err)
-
-				attr_err  = tprintf("Expected %v, got %v", attr_val_expected, attr.val)
-				expect(t, attr.val == attr_val_expected, attr_err)
-			}
-
-			{
-				attr := doc.root.attribs[1]
-
-				attr_key_expected := "xmlns"
-				attr_val_expected := "urn:oasis:names:tc:xliff:document:1.2"
-
-				attr_err := tprintf("Expected %v, got %v", attr_key_expected, attr.key)
-				expect(t, attr.key == attr_key_expected, attr_err)
-
-				attr_err  = tprintf("Expected %v, got %v", attr_val_expected, attr.val)
-				expect(t, attr.val == attr_val_expected, attr_err)
-			}
-
-		case 3:
-			expect(t, len(doc.root.attribs) > 0, "Expected the root tag to have an attribute.")
-
-			{
-				attr := doc.root.attribs[0]
-
-				attr_key_expected := "xmlns"
-				attr_val_expected := "urn:oasis:names:tc:xliff:document:2.0"
-
-				attr_err := tprintf("Expected %v, got %v", attr_key_expected, attr.key)
-				expect(t, attr.key == attr_key_expected, attr_err)
-
-				attr_err  = tprintf("Expected %v, got %v", attr_val_expected, attr.val)
-				expect(t, attr.val == attr_val_expected, attr_err)
-			}
-
-			{
-				attr := doc.root.attribs[1]
-
-				attr_key_expected := "version"
-				attr_val_expected := "2.0"
-
-				attr_err := tprintf("Expected %v, got %v", attr_key_expected, attr.key)
-				expect(t, attr.key == attr_key_expected, attr_err)
-
-				attr_err  = tprintf("Expected %v, got %v", attr_val_expected, attr.val)
-				expect(t, attr.val == attr_val_expected, attr_err)
-			}
-		}
-
-		count += 1
-	}
 }

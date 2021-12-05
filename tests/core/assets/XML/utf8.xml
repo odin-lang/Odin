@@ -4,5 +4,5 @@
 <부끄러운:barzle>
 	<name foo:bar="birmese">ရှက်စရာ ဇီးကွက်</name>
 	<nickname>Owl of Shame</nickname>
-	<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] < ]]> Nonsense.</data>
+	<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] <$]]> Nonsense.</data>
 </부끄러운:barzle>
