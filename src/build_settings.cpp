@@ -782,15 +782,17 @@ String path_to_fullpath(gbAllocator a, String s) {
 
 
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
-	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
+	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
 	isize i = 0;
 	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
-	gb_memmove(str+i, "/", 1);                      i += 1;
+	// avoid having a double / in the path
+	if ((base_dir.len > 0 && str[base_dir.len-1] != '/') || (base_dir.len == 0)) {
+		gb_memmove(str+i, "/", 1);											i += 1;
+	}
 	gb_memmove(str+i, path.text,     path.len);     i += path.len;
 	str[i] = 0;
-
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);

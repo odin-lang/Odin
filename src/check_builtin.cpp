@@ -283,7 +283,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			char *c_str = alloc_cstring(a, path);
 			defer (gb_free(a, c_str));
 
-
 			gbFile f = {};
 			gbFileError file_err = gb_file_open(&f, c_str);
 			defer (gb_file_close(&f));
@@ -291,10 +290,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			switch (file_err) {
 			default:
 			case gbFileError_Invalid:
-				error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
+				error(ce->proc, "Failed to `#load` file: %.*s; invalid file or cannot be found", LIT(original_string));
 				return false;
 			case gbFileError_NotExists:
-				error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
+				error(ce->proc, "Failed to `#load` file: %.s; file cannot be found", LIT(original_string));
 				return false;
 			case gbFileError_Permission:
 				error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
