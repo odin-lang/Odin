@@ -26,6 +26,7 @@ package xml
 		Jeroen van Rijn: Initial implementation.
 */
 
+import "core:bytes"
 import "core:strings"
 import "core:encoding/entity"
 import "core:mem"
@@ -39,6 +40,12 @@ DEFAULT_Options :: Options{
 }
 
 Option_Flag :: enum {
+	/*
+		If the caller says that input may be modified, we can perform in-situ parsing.
+		If this flag isn't provided, the XML parser first duplicates the input so that it can.
+	*/
+	Input_May_Be_Modified,
+
 	/*
 		Document MUST start with `<?xml` prolog.
 	*/
@@ -78,7 +85,7 @@ Option_Flag :: enum {
 	Keep_Tag_Body_Comments,
 
 }
-Option_Flags :: bit_set[Option_Flag; u8]
+Option_Flags :: bit_set[Option_Flag; u16]
 
 Document :: struct {
 	root:     ^Element,
@@ -104,7 +111,12 @@ Document :: struct {
 	*/
 	tokenizer: ^Tokenizer,
 	allocator: mem.Allocator,
-	intern:    strings.Intern,
+
+	/*
+		Input. Either the original buffer, or a copy if `.Input_May_Be_Modified` isn't specified.
+	*/
+	input:           []u8,
+	strings_to_free: [dynamic]string,
 }
 
 Element :: struct {
@@ -205,9 +217,17 @@ Error :: enum {
 	Implementation starts here.
 */
 parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+	data := data
 	context.allocator = allocator
 
 	opts := validate_options(options) or_return
+
+	/*
+		If `.Input_May_Be_Modified` is not specified, we duplicate the input so that we can modify it in-place.
+	*/
+	if .Input_May_Be_Modified not_in opts.flags {
+		data = bytes.clone(data)
+	}
 
 	t := &Tokenizer{}
 	init(t, string(data), path, error_handler)
@@ -215,11 +235,12 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 	doc = new(Document)
 	doc.allocator = allocator
 	doc.tokenizer = t
+	doc.input     = data
 
-	strings.intern_init(&doc.intern, allocator, allocator)
+	// strings.intern_init(&doc.intern, allocator, allocator)
 
-	err =               .Unexpected_Token
-	element, parent:    ^Element
+	err =            .Unexpected_Token
+	element, parent: ^Element
 
 	tag_is_open := false
 
@@ -292,8 +313,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					case:
 						if .Error_on_Unsupported in opts.flags {
 							error(t, t.offset, "Unhandled: <!%v\n", next.text)
-							err = .Unhandled_Bang
-							return	
+							return doc, .Unhandled_Bang
 						}
 						skip_element(t) or_return
 					}
@@ -307,8 +327,6 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						comment = strings.intern_get(&doc.intern, comment)
-
 						if doc.root == nil {
 							append(&doc.comments, comment)
 						} else {
@@ -343,7 +361,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 				}
 
 				element.parent = parent
-				element.ident  = strings.intern_get(&doc.intern, open.text)
+				element.ident  = open.text
 
 				parse_attributes(doc, &element.attribs) or_return
 
@@ -424,7 +442,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			needs_processing |= .Decode_SGML_Entities in opts.flags
 
 			if !needs_processing {
-				element.value = strings.intern_get(&doc.intern, body_text)
+				element.value = body_text
 				continue
 			}
 
@@ -445,12 +463,11 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			}
 
 			decoded, decode_err := entity.decode_xml(body_text, decode_opts)
-			defer delete(decoded)
-
 			if decode_err == .None {
-				element.value = strings.intern_get(&doc.intern, decoded)
+				element.value = decoded
+				append(&doc.strings_to_free, decoded)
 			} else {
-				element.value = strings.intern_get(&doc.intern, body_text)
+				element.value = body_text
 			}
 		}
 	}
@@ -468,11 +485,12 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 
 parse_from_file :: proc(filename: string, options := DEFAULT_Options, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	context.allocator = allocator
+	options := options
 
 	data, data_ok := os.read_entire_file(filename)
-	defer delete(data)
-
 	if !data_ok { return {}, .File_Error }
+
+	options.flags += { .Input_May_Be_Modified }
 
 	return parse_from_slice(data, options, filename, error_handler, allocator)
 }
@@ -499,10 +517,16 @@ destroy :: proc(doc: ^Document) {
 	if doc == nil { return }
 
 	free_element(doc.root)
-	strings.intern_destroy(&doc.intern)
 
 	delete(doc.prolog)
 	delete(doc.comments)
+	delete(doc.input)
+
+	for s in doc.strings_to_free {
+		delete(s)
+	}
+	delete(doc.strings_to_free)
+
 	free(doc)
 }
 
@@ -538,8 +562,8 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attr, offset: int, err: Error)
 	_       = expect(t, .Eq)     or_return
 	value  := expect(t, .String) or_return
 
-	attr.key = strings.intern_get(&doc.intern, key.text)
-	attr.val = strings.intern_get(&doc.intern, value.text)
+	attr.key = key.text
+	attr.val = value.text
 
 	err = .None
 	return
@@ -651,7 +675,7 @@ parse_doctype :: proc(doc: ^Document) -> (err: Error) {
 	t := doc.tokenizer
 
 	tok := expect(t, .Ident) or_return
-	doc.doctype.ident = strings.intern_get(&doc.intern, tok.text)
+	doc.doctype.ident = tok.text
 
 	skip_whitespace(t)
 	offset := t.offset
@@ -660,6 +684,6 @@ parse_doctype :: proc(doc: ^Document) -> (err: Error) {
 	/*
 		-1 because the current offset is that of the closing tag, so the rest of the DOCTYPE tag ends just before it.
 	*/
-	doc.doctype.rest = strings.intern_get(&doc.intern, string(t.src[offset : t.offset - 1]))
+	doc.doctype.rest = string(t.src[offset : t.offset - 1])
 	return .None
 }
