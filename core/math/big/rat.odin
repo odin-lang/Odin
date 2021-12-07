@@ -112,14 +112,14 @@ rat_set_u64 :: proc(dst: ^Rat, x: u64, allocator := context.allocator) -> (err: 
 	assert_if_nil(dst)
 	context.allocator = allocator
 	internal_set(&dst.a, x) or_return
-	internal_set(&dst.a, 1) or_return
+	internal_set(&dst.b, 1) or_return
 	return
 }
 rat_set_i64 :: proc(dst: ^Rat, x: i64, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst)
 	context.allocator = allocator
 	internal_set(&dst.a, x) or_return
-	internal_set(&dst.a, 1) or_return
+	internal_set(&dst.b, 1) or_return
 	return
 }
 
@@ -265,7 +265,7 @@ rat_mul_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Er
 		return
 	}
 	
-	int_sub(&dst.a, &x.a, &y.a)                or_return
+	int_mul(&dst.a, &x.a, &y.a)                or_return
 	internal_int_mul_denom(&dst.b, &x.b, &y.b) or_return
 	return internal_rat_norm(dst)
 }
