@@ -2307,6 +2307,35 @@ internal_int_get_i32 :: proc(a: ^Int) -> (res: i32, err: Error) {
 }
 internal_get_i32 :: proc { internal_int_get_i32, }
 
+internal_get_low_u32 :: proc(a: ^Int) -> u32 #no_bounds_check {
+	if a == nil {
+		return 0
+	}
+	
+	if a.used == 0 {
+		return 0
+	}
+	
+	return u32(a.digit[0])
+}
+internal_get_low_u64 :: proc(a: ^Int) -> u64 #no_bounds_check {
+	if a == nil {
+		return 0
+	}
+	
+	if a.used == 0 {
+		return 0
+	}
+	
+	v := u64(a.digit[0])
+	when size_of(DIGIT) == 4 {
+		if a.used > 1 {
+			return u64(a.digit[1])<<32 | v
+		}
+	}
+	return v
+}
+
 /*
 	TODO: Think about using `count_bits` to check if the value could be returned completely,
 	and maybe return max(T), .Integer_Overflow if not?
