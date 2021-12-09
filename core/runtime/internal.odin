@@ -2,13 +2,15 @@ package runtime
 
 import "core:intrinsics"
 
+@(private="file")
+IS_WASM :: ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64"
+
 @(private)
 RUNTIME_LINKAGE :: "strong" when (
 	(ODIN_USE_SEPARATE_MODULES || 
 	ODIN_BUILD_MODE == "dynamic" || 
 	!ODIN_NO_CRT) &&
-	!(ODIN_ARCH == "wasm32" || 
-	  ODIN_ARCH == "wasm64")) else "internal"
+	!IS_WASM) else "internal"
 RUNTIME_REQUIRE :: true
 
 
@@ -752,6 +754,9 @@ extendhfsf2 :: proc "c" (value: u16) -> f32 {
 
 @(link_name="__floattidf", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf :: proc "c" (a: i128) -> f64 {
+when IS_WASM {
+	return 0
+} else {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -791,10 +796,14 @@ floattidf :: proc "c" (a: i128) -> f64 {
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
+}
 
 
 @(link_name="__floattidf_unsigned", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf_unsigned :: proc "c" (a: u128) -> f64 {
+when IS_WASM {
+	return 0
+} else {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -831,6 +840,7 @@ floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 	        u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
+}
 }
 
 
