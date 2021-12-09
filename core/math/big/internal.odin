@@ -2332,7 +2332,12 @@ internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intr
 		if a.sign == .Zero_or_Positive {
 			target_bit_size -= 1
 		}
+	} else {
+		if a.sign == .Negative {
+			return 0, .Integer_Underflow
+		}
 	}
+
 	bits_used := internal_count_bits(a)
 
 	if bits_used > target_bit_size {
