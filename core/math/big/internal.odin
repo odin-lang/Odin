@@ -34,6 +34,10 @@ package math_big
 import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
+import "core:builtin"
+
+import "core:fmt"
+__ :: fmt
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -1880,8 +1884,6 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 	where intrinsics.type_is_integer(T) {
 	context.allocator = allocator
 
-	src := src
-
 	internal_error_if_immutable(dest) or_return
 	/*
 		Most internal procs asssume an Int to have already been initialize,
@@ -1892,13 +1894,27 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 	dest.flags = {} // We're not -Inf, Inf, NaN or Immutable.
 
 	dest.used  = 0
-	dest.sign = .Zero_or_Positive if src >= 0 else .Negative
-	src = internal_abs(src)
+	dest.sign = .Negative if src < 0 else .Zero_or_Positive
 
-	#no_bounds_check for src != 0 {
-		dest.digit[dest.used] = DIGIT(src) & _MASK
+	temp := src
+
+	is_maximally_negative := src == min(T)
+	if is_maximally_negative {
+		/*
+			Prevent overflow on abs()
+		*/
+		temp += 1
+	}
+	temp = -temp if temp < 0 else temp
+
+	#no_bounds_check for temp != 0 {
+		dest.digit[dest.used] = DIGIT(temp) & _MASK
 		dest.used += 1
-		src >>= _DIGIT_BITS
+		temp >>= _DIGIT_BITS
+	}
+
+	if is_maximally_negative {
+		return internal_sub(dest, dest, 1)
 	}
 	internal_zero_unused(dest)
 	return nil
@@ -2307,28 +2323,31 @@ internal_int_get_i32 :: proc(a: ^Int) -> (res: i32, err: Error) {
 }
 internal_get_i32 :: proc { internal_int_get_i32, }
 
-/*
-	TODO: Think about using `count_bits` to check if the value could be returned completely,
-	and maybe return max(T), .Integer_Overflow if not?
-*/
 internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
-	size_in_bits := int(size_of(T) * 8)
-	i := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
-	i  = min(int(a.used), i)
-
-	#no_bounds_check for ; i >= 0; i -= 1 {
-		res <<= uint(0) if size_in_bits <= _DIGIT_BITS else _DIGIT_BITS
-		res |= T(a.digit[i])
-		if size_in_bits <= _DIGIT_BITS {
-			break
+	/*
+		Calculate target bit size.
+	*/
+	target_bit_size := int(size_of(T) * 8)
+	when !intrinsics.type_is_unsigned(T) {
+		if a.sign == .Zero_or_Positive {
+			target_bit_size -= 1
 		}
+	}
+	bits_used := internal_count_bits(a)
+
+	if bits_used > target_bit_size {
+		if a.sign == .Negative {
+			return min(T), .Integer_Underflow
+		}
+		return max(T), .Integer_Overflow
+	}
+
+	for i := a.used; i > 0; i -= 1 {
+		res <<= _DIGIT_BITS
+		res |=  T(a.digit[i - 1])
 	}
 
 	when !intrinsics.type_is_unsigned(T) {
-		/*
-			Mask off sign bit.
-		*/
-		res ~= 1 << uint(size_in_bits - 1)
 		/*
 			Set the sign.
 		*/

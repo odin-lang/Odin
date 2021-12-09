@@ -127,17 +127,22 @@ def we_iterate():
 # Error enum values
 #
 class Error(Enum):
-	Okay                   = 0
-	Out_Of_Memory          = 1
-	Invalid_Pointer        = 2
-	Invalid_Argument       = 3
-	Unknown_Error          = 4
-	Max_Iterations_Reached = 5
-	Buffer_Overflow        = 6
-	Integer_Overflow       = 7
-	Division_by_Zero       = 8
-	Math_Domain_Error      = 9
-	Unimplemented          = 127
+	Okay                    = 0
+	Out_Of_Memory           = 1
+	Invalid_Pointer         = 2
+	Invalid_Argument        = 3
+	Unknown_Error           = 4
+	Assignment_To_Immutable = 10
+	Max_Iterations_Reached  = 11
+	Buffer_Overflow         = 12
+	Integer_Overflow        = 13
+	Integer_Underflow       = 14
+	Division_by_Zero        = 30
+	Math_Domain_Error       = 31
+	Cannot_Open_File        = 50
+	Cannot_Read_File        = 51
+	Cannot_Write_File       = 52
+	Unimplemented           = 127
 
 #
 # Disable garbage collection
