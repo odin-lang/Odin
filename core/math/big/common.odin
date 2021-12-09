@@ -158,13 +158,14 @@ Error :: enum int {
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
 
-	Assignment_To_Immutable = 4,
-	Max_Iterations_Reached  = 5,
-	Buffer_Overflow         = 6,
-	Integer_Overflow        = 7,
+	Assignment_To_Immutable = 10,
+	Max_Iterations_Reached  = 11,
+	Buffer_Overflow         = 12,
+	Integer_Overflow        = 13,
+	Integer_Underflow       = 14,
 
-	Division_by_Zero        = 8,
-	Math_Domain_Error       = 9,
+	Division_by_Zero        = 30,
+	Math_Domain_Error       = 31,
 
 	Cannot_Open_File        = 50,
 	Cannot_Read_File        = 51,
