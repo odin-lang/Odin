@@ -215,7 +215,7 @@ _MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS)
 /*
 	Maximum number of digits.
 	- Must be small enough such that `_bit_count` does not overflow.
- 	- Must be small enough such that `_radix_size` for base 2 does not overflow.
+	- Must be small enough such that `_radix_size` for base 2 does not overflow.
 	`_radix_size` needs two additional bytes for zero termination and sign.
 */
 _MAX_BIT_COUNT   :: (max(int) - 2)
@@ -251,7 +251,7 @@ Order :: enum i8 {
 }
 
 Endianness :: enum i8 {
-   Little   = -1,
-   Platform =  0,
-   Big      =  1,
-};
+	Little   = -1,
+	Platform =  0,
+	Big      =  1,
+}
