@@ -1288,7 +1288,7 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&substrings, s[start : end])
+		append(&substrings, s[start : end + 1])
 	}
 
 	return substrings[:]
