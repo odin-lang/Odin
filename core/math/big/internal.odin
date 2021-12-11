@@ -2648,7 +2648,7 @@ internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, all
 		Shift by as many digits in the bit count.
 	*/
 	if bits >= _DIGIT_BITS {
-		internal_shr_digit(quotient, bits / _DIGIT_BITS) or_return
+		_private_int_shr_leg(quotient, bits / _DIGIT_BITS) or_return
 	}
 
 	/*
@@ -2688,37 +2688,6 @@ internal_int_shr :: proc(dest, source: ^Int, bits: int, allocator := context.all
 internal_shr :: proc { internal_int_shr, }
 
 /*
-	Shift right by `digits` * _DIGIT_BITS bits.
-*/
-internal_int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	if digits <= 0 { return nil }
-
-	/*
-		If digits > used simply zero and return.
-	*/
-	if digits > quotient.used { return internal_zero(quotient) }
-
-	/*
-		Much like `int_shl_digit`, this is implemented using a sliding window,
-		except the window goes the other way around.
-
-		b-2 | b-1 | b0 | b1 | b2 | ... | bb |   ---->
-					/\                   |      ---->
-					 \-------------------/      ---->
-	*/
-
-	#no_bounds_check for x := 0; x < (quotient.used - digits); x += 1 {
-		quotient.digit[x] = quotient.digit[x + digits]
-	}
-	quotient.used -= digits
-	internal_zero_unused(quotient)
-	return internal_clamp(quotient)
-}
-internal_shr_digit :: proc { internal_int_shr_digit, }
-
-/*
 	Shift right by a certain bit count with sign extension.
 */
 internal_int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
@@ -2756,7 +2725,7 @@ internal_int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.alloca
 		Shift by as many digits in the bit count as we have.
 	*/
 	if bits >= _DIGIT_BITS {
-		internal_shl_digit(dest, bits / _DIGIT_BITS) or_return
+		_private_int_shl_leg(dest, bits / _DIGIT_BITS) or_return
 	}
 
 	/*
@@ -2785,45 +2754,6 @@ internal_int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.alloca
 	return internal_clamp(dest)
 }
 internal_shl :: proc { internal_int_shl, }
-
-
-/*
-	Shift left by `digits` * _DIGIT_BITS bits.
-*/
-internal_int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	if digits <= 0 { return nil }
-
-	/*
-		No need to shift a zero.
-	*/
-	if #force_inline internal_is_zero(quotient) {
-		return nil
-	}
-
-	/*
-		Resize `quotient` to accomodate extra digits.
-	*/
-	#force_inline internal_grow(quotient, quotient.used + digits) or_return
-
-	/*
-		Increment the used by the shift amount then copy upwards.
-	*/
-
-	/*
-		Much like `int_shr_digit`, this is implemented using a sliding window,
-		except the window goes the other way around.
-	*/
-	#no_bounds_check for x := quotient.used; x > 0; x -= 1 {
-		quotient.digit[x+digits-1] = quotient.digit[x-1]
-	}
-
-	quotient.used += digits
-	mem.zero_slice(quotient.digit[:digits])
-	return nil
-}
-internal_shl_digit :: proc { internal_int_shl_digit, }
 
 /*
 	Count bits in an `Int`.
