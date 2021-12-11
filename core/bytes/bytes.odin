@@ -1143,7 +1143,7 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&subslices, s[start : end])
+		append(&subslices, s[start : len(s)])
 	}
 
 	return subslices[:]
