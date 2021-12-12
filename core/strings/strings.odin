@@ -504,8 +504,8 @@ index_any :: proc(s, chars: string) -> int {
 		}
 	}
 
-	for c in s {
-		if i := index_rune(chars, c); i >= 0 {
+	for c, i in s {
+		if index_rune(chars, c) >= 0 {
 			return i
 		}
 	}
