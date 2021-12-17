@@ -530,6 +530,8 @@ heap_alloc :: proc(size: int) -> rawptr {
 	return _unix_calloc(1, size)
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
+	// POSIX platforms. Ensure your caller takes this into account.
 	return _unix_realloc(ptr, new_size)
 }
 heap_free :: proc(ptr: rawptr) {
