@@ -2243,6 +2243,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						error(e->token, "The 'static' attribute is not allowed to be applied to '_'");
 					} else {
 						e->flags |= EntityFlag_Static;
+						if (ctx->in_defer) {
+							error(e->token, "'static' variables cannot be declared within a defer statement");
+						}
 					}
 				}
 				if (ac.thread_local_model != "") {
@@ -2251,9 +2254,13 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						error(e->token, "The 'thread_local' attribute is not allowed to be applied to '_'");
 					} else {
 						e->flags |= EntityFlag_Static;
+						if (ctx->in_defer) {
+							error(e->token, "'thread_local' variables cannot be declared within a defer statement");
+						}
 					}
 					e->Variable.thread_local_model = ac.thread_local_model;
 				}
+				
 
 				if (ac.is_static && ac.thread_local_model != "") {
 					error(e->token, "The 'static' attribute is not needed if 'thread_local' is applied");
