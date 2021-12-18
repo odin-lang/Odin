@@ -1196,6 +1196,7 @@ sum :: proc "contextless" (x: $T/[]$E) -> (res: E)
 
 prod :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	where intrinsics.type_is_numeric(E) {
+	res = 1
 	for i in x {
 		res *= i
 	}
