@@ -23,7 +23,7 @@ swap_between :: proc(a, b: $T/[]$E) {
 	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
-	}	
+	}
 }
 
 
@@ -206,7 +206,7 @@ into_dynamic :: proc(a: $T/[]$E) -> [dynamic]E {
 	s := transmute(mem.Raw_Slice)a
 	d := mem.Raw_Dynamic_Array{
 		data = s.data,
-		len  = 0,
+		len  = s.len,
 		cap  = s.len,
 		allocator = mem.nil_allocator(),
 	}
