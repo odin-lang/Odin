@@ -296,6 +296,8 @@ u32 thread_current_id(void) {
 	__asm__("mov %%gs:0x08,%0" : "=r"(thread_id));
 #elif defined(GB_ARCH_64_BIT) && defined(GB_CPU_X86)
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
+#elif defined(GB_SYSTEM_LINUX)
+	thread_id = gettid();
 #else
 	#error Unsupported architecture for thread_current_id()
 #endif
@@ -315,6 +317,8 @@ gb_inline void yield_thread(void) {
 	#endif
 #elif defined(GB_CPU_X86)
 	_mm_pause();
+#elif defined(GB_CPU_ARM)
+	__asm__ volatile ("yield" : : : "memory");
 #else
 #error Unknown architecture
 #endif
