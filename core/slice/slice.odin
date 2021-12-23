@@ -304,6 +304,27 @@ filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -
 	return r[:]
 }
 
+scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U)->V, allocator := context.allocator) -> []V {
+  if len(s) == 0 { return {} }
+  p := as_ptr(s)
+
+  res := make([]V, len(s), allocator)
+
+  q := as_ptr(res)
+  l := len(res)
+
+  r := initializer 
+
+  for l > 0 {
+    r = f(r, p^)
+    q^ = r
+    p = intrinsics.ptr_offset(p, 1)
+    q = intrinsics.ptr_offset(q, 1)
+    l -= 1
+  }
+
+  return res
+}
 
 
 min :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
