@@ -888,6 +888,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			error(p, body.pos, "the body of a 'do' must be on the same line as the 'for' token")
 		}
 	} else {
+		allow_token(p, .Semicolon)
 		body = parse_body(p)
 	}
 
