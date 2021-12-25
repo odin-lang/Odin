@@ -216,9 +216,9 @@ LLVMValueRef llvm_one(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_i32), 1, false);
 }
 
-LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment) {
-	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, "");
-	LLVMSetAlignment(val, alignment);
+LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const* name) {
+	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, name);
+	LLVMSetAlignment(val, cast(unsigned int)alignment);
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
 	return val;
@@ -2655,7 +2655,7 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 		alignment *= 2; // NOTE(bill): Just in case
 	}
 
-	LLVMValueRef ptr = llvm_alloca(p, llvm_type, alignment);
+	LLVMValueRef ptr = llvm_alloca(p, llvm_type, alignment, name);
 
 	if (!zero_init && !force_no_init) {
 		// If there is any padding of any kind, just zero init regardless of zero_init parameter
