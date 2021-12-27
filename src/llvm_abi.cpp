@@ -965,6 +965,10 @@ namespace lbAbiArm64 {
 		}
 		return false;
 	}
+    
+    unsigned is_homogenous_aggregate_small_enough(LLVMTypeRef *base_type_, unsigned member_count_) {
+        return (member_count_ <= 4);
+    }
 
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef type, bool return_is_defined) {
 		LLVMTypeRef homo_base_type = {};
@@ -975,7 +979,16 @@ namespace lbAbiArm64 {
 		} else if (is_register(type)) {
 			return non_struct(c, type);
 		} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
-			return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+            if(is_homogenous_aggregate_small_enough(&homo_base_type, homo_member_count)) {
+                return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+            } else {
+                //TODO(Platin): do i need to create stuff that can handle the diffrent return type?
+                //              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
+                
+                //LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
+                LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
+                return lb_arg_type_indirect(type, attr);
+            }
 		} else {
 			i64 size = lb_sizeof(type);
 			if (size <= 16) {
