@@ -672,9 +672,9 @@ class WebGLInterface {
 					this.ctx.texImage3D(target, level, internalformat, width, height, depth, border, format, type, null);
 				}
 			},
-			TexSubImage3D: (target, level, xoffset, yoffset, width, height, depth, format, type, size, data) => {
+			TexSubImage3D: (target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, size, data) => {
 				this.assertWebGL2();
-				this.ctx.texSubImage3D(target, level, xoffset, yoffset, width, height, depth, format, type, this.mem.loadBytes(data, size));
+				this.ctx.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, this.mem.loadBytes(data, size));
 			},
 			CompressedTexImage3D: (target, level, internalformat, width, height, depth, border, imageSize, data) => {
 				this.assertWebGL2();
@@ -684,12 +684,12 @@ class WebGLInterface {
 					this.ctx.compressedTexImage3D(target, level, internalformat, width, height, depth, border, null);
 				}
 			},
-			CompressedTexSubImage3D: (target, level, xoffset, yoffset, width, height, depth, format, imageSize, data) => {
+			CompressedTexSubImage3D: (target, level, xoffset, yoffset, zoffset, width, height, depth, format, imageSize, data) => {
 				this.assertWebGL2();
 				if (data) {
-					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, width, height, depth, format, this.mem.loadBytes(data, imageSize));
+					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, this.mem.loadBytes(data, imageSize));
 				} else {
-					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, width, height, depth, format, null);
+					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, null);
 				}
 			},
 			
