@@ -273,7 +273,7 @@ get_ptr :: proc(array: $T/[]$E, index: int) -> (value: ^E, ok: bool) {
 	return
 }
 
-as_ptr :: proc(array: $T/[]$E) -> ^E {
+as_ptr :: proc(array: $T/[]$E) -> [^]E {
 	return raw_data(array)
 }
 

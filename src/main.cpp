@@ -439,13 +439,14 @@ i32 linker_stage(lbGenerator *gen) {
 			// so use ld instead.
 			// :UseLDForShared
 			linker = "ld";
-			link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
+				link_settings = gb_string_appendc(link_settings, "-init '___$startup_runtime' ");
 				link_settings = gb_string_appendc(link_settings, "-dylib -dynamic ");
 			#else
 				output_ext = STR_LIT(".so");
+				link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
 				link_settings = gb_string_appendc(link_settings, "-shared ");
 			#endif
 		} else {
