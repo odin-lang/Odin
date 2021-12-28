@@ -981,16 +981,16 @@ namespace lbAbiArm64 {
 			if (size <= 16) {
 				LLVMTypeRef cast_type = nullptr;
 				if (size <= 1) {
-					cast_type = LLVMIntTypeInContext(c, 8);
+					cast_type = LLVMInt8TypeInContext(c);
 				} else if (size <= 2) {
-					cast_type = LLVMIntTypeInContext(c, 16);
+					cast_type = LLVMInt16TypeInContext(c);
 				} else if (size <= 4) {
-					cast_type = LLVMIntTypeInContext(c, 32);
+					cast_type = LLVMInt32TypeInContext(c);
 				} else if (size <= 8) {
-					cast_type = LLVMIntTypeInContext(c, 64);
+					cast_type = LLVMInt64TypeInContext(c);
 				} else {
 					unsigned count = cast(unsigned)((size+7)/8);
-					cast_type = LLVMArrayType(LLVMIntTypeInContext(c, 64), count);
+					cast_type = LLVMArrayType(LLVMInt64TypeInContext(c), count);
 				}
 				return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 			} else {
@@ -999,7 +999,7 @@ namespace lbAbiArm64 {
 			}
 		}
 	}
-
+    
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
 		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
 
