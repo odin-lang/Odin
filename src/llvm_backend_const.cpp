@@ -410,8 +410,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				// NOTE(bill, 2020-06-08): This is a bit of a hack but a "constant" slice needs
 				// its backing data on the stack
 				lbProcedure *p = m->curr_procedure;
-				LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
-
 				LLVMTypeRef llvm_type = lb_type(m, t);
 
 				array_data = llvm_alloca(p, llvm_type, 16);
