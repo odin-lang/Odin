@@ -217,8 +217,11 @@ LLVMValueRef llvm_one(lbModule *m) {
 }
 
 LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const* name) {
+	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
+
 	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, name);
 	LLVMSetAlignment(val, cast(unsigned int)alignment);
+
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
 	return val;
@@ -2273,7 +2276,6 @@ general_end:;
 		return loaded_val;
 	} else {
 		GB_ASSERT(p->decl_block != p->curr_block);
-		LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
 		max_align = gb_max(max_align, 4);
