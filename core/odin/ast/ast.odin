@@ -711,6 +711,7 @@ Union_Type :: struct {
 	poly_params:   ^Field_List,
 	align:         ^Expr,
 	is_maybe:      bool,
+	is_no_nil:     bool,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 	variants:      []^Expr,

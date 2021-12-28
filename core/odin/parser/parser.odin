@@ -888,6 +888,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			error(p, body.pos, "the body of a 'do' must be on the same line as the 'for' token")
 		}
 	} else {
+		allow_token(p, .Semicolon)
 		body = parse_body(p)
 	}
 
@@ -2600,6 +2601,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		poly_params: ^ast.Field_List
 		align:       ^ast.Expr
 		is_maybe:    bool
+		is_no_nil:   bool
 
 		if allow_token(p, .Open_Paren) {
 			param_count: int
@@ -2626,6 +2628,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
 				}
 				is_maybe = true
+			case "no_nil":
+				if is_no_nil {
+					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
+				}
+				is_no_nil = true
 			case:
 				error(p, tag.pos, "invalid union tag '#%s", tag.text)
 			}
@@ -2669,6 +2676,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		ut.where_token   = where_token
 		ut.where_clauses = where_clauses
 		ut.is_maybe      = is_maybe
+		ut.is_no_nil     = is_no_nil
 
 		return ut
 

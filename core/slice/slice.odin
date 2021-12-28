@@ -185,7 +185,7 @@ concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T) {
 	return
 }
 
-// copies slice into a new dynamic array
+// copies a slice into a new slice
 clone :: proc(a: $T/[]$E, allocator := context.allocator) -> []E {
 	d := make([]E, len(a), allocator)
 	copy(d[:], a)
@@ -194,11 +194,12 @@ clone :: proc(a: $T/[]$E, allocator := context.allocator) -> []E {
 
 
 // copies slice into a new dynamic array
-to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> [dynamic]E {
+clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> [dynamic]E {
 	d := make([dynamic]E, len(a), allocator)
 	copy(d[:], a)
 	return d
 }
+to_dynamic :: clone_to_dynamic
 
 // Converts slice into a dynamic array without cloning or allocating memory
 into_dynamic :: proc(a: $T/[]$E) -> [dynamic]E {
