@@ -42,16 +42,16 @@ resize :: proc(a: ^$A/Small_Array, length: int) {
 
 
 push_back :: proc(a: ^$A/Small_Array($N, $T), item: T) -> bool {
-	if a.len < builtin.len(a.data) {
+	if a.len < cap(a^) {
+		a.data[a.len] = item
 		a.len += 1
-		a.data[a.len-1] = item
 		return true
 	}
 	return false
 }
 
 push_front :: proc(a: ^$A/Small_Array($N, $T), item: T) -> bool {
-	if a.len < builtin.len(a.data) {
+	if a.len < cap(a^) {
 		a.len += 1
 		data := slice(a)
 		copy(data[1:], data[:])
