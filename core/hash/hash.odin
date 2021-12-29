@@ -55,6 +55,23 @@ djb2 :: proc(data: []byte, seed := u32(5381)) -> u32 {
 	return hash
 }
 
+djbx33a :: proc(data: []byte, seed := u32(5381)) -> (result: [16]byte) #no_bounds_check {
+	state := [4]u32{seed, seed, seed, seed}
+	
+	s: u32 = 0
+	for p in data {
+		state[s] = (state[s] << 5) + state[s] + u32(p) // hash * 33 + u32(b)
+		s = (s + 1) & 3
+	}
+	
+	
+	(^u32le)(&result[0])^  = u32le(state[0])
+	(^u32le)(&result[4])^  = u32le(state[1])
+	(^u32le)(&result[8])^  = u32le(state[2])
+	(^u32le)(&result[12])^ = u32le(state[3])
+	return
+}
+
 @(optimization_mode="speed")
 fnv32 :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	h: u32 = seed
