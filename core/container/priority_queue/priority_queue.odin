@@ -3,138 +3,136 @@ package container_priority_queue
 import "core:builtin"
 
 Priority_Queue :: struct($T: typeid) {
-	data:     [dynamic]T,
-	len:      int,
-	priority: proc(item: T) -> int,
+	queue: [dynamic]T,
+	
+	less:  proc(a, b: T) -> bool,
+	swap:  proc(q: []T, i, j: int),
 }
 
 DEFAULT_CAPACITY :: 16
 
-init_none :: proc(q: ^$Q/Priority_Queue($T), f: proc(item: T) -> int, allocator := context.allocator) {
-	init_len(q, f, 0, allocator)
-}
-init_len :: proc(q: ^$Q/Priority_Queue($T), f: proc(item: T) -> int, len: int, allocator := context.allocator) {
-	init_len_cap(q, f, 0, DEFAULT_CAPACITY, allocator)
-}
-init_len_cap :: proc(q: ^$Q/Priority_Queue($T), f: proc(item: T) -> int, len: int, cap: int, allocator := context.allocator) {
-	if q.data.allocator.procedure == nil {
-		q.data.allocator = allocator
+init :: proc(pq: ^$Q/Priority_Queue($T), less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int), capacity := DEFAULT_CAPACITY, allocator := context.allocator) {
+	if pq.queue.allocator.procedure == nil {
+		pq.queue.allocator = allocator
 	}
-	builtin.resize(&q.data, cap)
-	q.len = len
-	q.priority = f
+	reserve(pq, capacity)
+	pq.less = less
+	pq.swap = swap
 }
 
-init :: proc{init_none, init_len, init_len_cap}
-
-
-delete :: proc(q: $Q/Priority_Queue($T)) {
-	builtin.delete(q.data)
-}
-
-clear :: proc(q: ^$Q/Priority_Queue($T)) {
-	q.len = 0
-}
-
-len :: proc(q: $Q/Priority_Queue($T)) -> int {
-	return q.len
-}
-
-cap :: proc(q: $Q/Priority_Queue($T)) -> int {
-	return builtin.cap(q.data)
-}
-
-space :: proc(q: $Q/Priority_Queue($T)) -> int {
-	return builtin.len(q.data) - q.len
-}
-
-reserve :: proc(q: ^$Q/Priority_Queue($T), capacity: int) {
-	if capacity > q.len {
-		builtin.resize(&q.data, capacity)
+init_from_dynamic_array :: proc(pq: ^$Q/Priority_Queue($T), queue: [dynamic]T, less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int)) {
+	pq.queue = queue
+	pq.less = less
+	pq.swap = swap
+	n := builtin.len(pq.queue)
+	for i := n/2 - 1; i >= 0; i -= 1 {
+		_shift_down(pq, i, n)
 	}
 }
 
-resize :: proc(q: ^$Q/Priority_Queue($T), length: int) {
-	if length > q.len {
-		builtin.resize(&q.data, length)
-	}
-	q.len = length
+destroy :: proc(pq: ^$Q/Priority_Queue($T)) {
+	clear(pq)
+	delete(pq.queue)
 }
 
-_grow :: proc(q: ^$Q/Priority_Queue($T), min_capacity: int = 8) {
-	new_capacity := max(builtin.len(q.data)*2, min_capacity, 1)
-	builtin.resize(&q.data, new_capacity)
+reserve :: proc(pq: ^$Q/Priority_Queue($T), capacity: int) {
+	builtin.reserve(&pq.queue, capacity)
+}
+clear :: proc(pq: ^$Q/Priority_Queue($T)) {
+	builtin.clear(&pq.queue)
+}
+len :: proc(pq: $Q/Priority_Queue($T)) -> int {
+	return builtin.len(pq.queue)
+}
+cap :: proc(pq: $Q/Priority_Queue($T)) -> int {
+	return builtin.cap(pq.queue)
 }
 
-
-push :: proc(q: ^$Q/Priority_Queue($T), item: T) {
-	if builtin.len(q.data) - q.len == 0 {
-		_grow(q)
+_shift_down :: proc(pq: ^$Q/Priority_Queue($T), i0, n: int) -> bool {
+	// O(n log n)
+	i := i0
+	j, j1, j2: int
+	if 0 > i || i > n {
+		return false
 	}
-
-	s := q.data[:]
-	s[q.len] = item
-
-	i := q.len
-	for i > 0 {
-		p := (i - 1) / 2
-		if q.priority(s[p]) <= q.priority(item) { 
-			break 
+	
+	queue := pq.queue[:]
+	
+	for {
+		j1 := 2*i + 1
+		if 0 > j1 || j1 >= n {
+			break
 		}
-		s[i] = s[p]
-		i = p
-	}
-
-	q.len += 1
-	if q.len > 0 { 
-		s[i] = item 
-	} 
-}
-
-pop :: proc(q: ^$Q/Priority_Queue($T), loc := #caller_location) -> T {
-	val, ok := pop_safe(q)
-	assert(condition=ok, loc=loc)
-	return val
-}
-
-
-pop_safe :: proc(q: ^$Q/Priority_Queue($T)) -> (T, bool) {
-	if q.len > 0 {
-		s := q.data[:]
-		min := s[0]
-		root := s[q.len-1]
-		q.len -= 1
-
-		i := 0
-		for i * 2 + 1 < q.len {
-			a := i * 2 + 1
-			b := i * 2 + 2
-			c := b < q.len && q.priority(s[b]) < q.priority(s[a]) ? b : a
-
-			if q.priority(s[c]) >= q.priority(root) {
-				break
-			}
-			s[i] = s[c]
-			i = c
+		j, j2 = j1, j1+1
+		if j1 < n && pq.less(queue[j2], queue[j1])  {
+			j1 = j2
 		}
-
-		if q.len > 0 {
-			s[i] = root
+		if !pq.less(queue[i], queue[j]) {
+			break
 		}
-		return min, true
+		
+		pq.swap(queue, i, j)
+		i = j
 	}
-	return T{}, false
+	return i > i0
 }
 
-peek :: proc(q: ^$Q/Priority_Queue($T), loc := #caller_location) -> T {
-	assert(condition=q.len > 0, loc=loc)
-
-	return q.data[0]
-}
-
-peek_safe :: proc(q: ^$Q/Priority_Queue($T)) -> (T, bool) {
-	if q.len > 0 {
-		return q.data[0], true
+_shift_up :: proc(pq: ^$Q/Priority_Queue($T), j: int) {
+	j := j
+	queue := pq.queue[:]
+	n := builtin.len(queue)
+	for 0 <= j && j < n {
+		i := (j-1)/2
+		if i == j || !pq.less(queue[j], queue[i]) {
+			break
+		}
+		pq.swap(queue, i, j)
+		j = i
 	}
-	return T{}, false
 }
+
+// NOTE(bill): When an element at index 'i' has changed its value, this will fix the
+// the heap ordering. This is using a basic "heapsort" with shift up and a shift down parts.
+fix :: proc(pq: ^$Q/Priority_Queue($T), i: int) {
+	if !_shift_down(pq, i, builtin.len(pq.queue)) {
+		_shift_up(pq, i)
+	}
+}
+
+push :: proc(pq: ^$Q/Priority_Queue($T), value: T) {
+	append(&pq.queue, value)
+	_shift_up(pq, builtin.len(pq.queue)-1)
+}
+
+pop :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T) {
+	assert(condition=builtin.len(pq.queue)>0, loc=loc)
+	
+	n := builtin.len(pq.queue)-1
+	pq.swap(pq.queue[:], 0, n)
+	_shift_down(pq, 0, n)
+	return builtin.pop(&pq.queue)
+}
+
+pop_safe :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T, ok: bool) {
+	if builtin.len(pq.queue) > 0 {
+		n := builtin.len(pq.queue)-1
+		pq.swap(pq.queue[:], 0, n)
+		_shift_down(pq, 0, n)
+		return builtin.pop_safe(&pq.queue)
+	}
+	return
+}
+
+remove :: proc(pq: ^$Q/Priority_Queue($T), i: int) -> (value: T, ok: bool) {
+	n := builtin.len(pq.queue)
+	if 0 <= i && i < n {
+		if n != i {
+			pq.swap(pq.queue[:], i, n)
+			_shift_down(pq, i, n)
+			_shift_up(pq, i)
+		}
+		value, ok = builtin.pop_safe(&pq.queue)
+	}
+	return
+}
+
