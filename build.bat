@@ -12,6 +12,12 @@ set curr_month=%CURR_DATE_TIME:~4,2%
 :: Make sure this is a decent name and not generic
 set exe_name=odin.exe
 
+if "%VSCMD_ARG_TGT_ARCH%" equ "arm64" (
+	set build_arm=1
+) else (
+	set build_arm=0
+)
+
 :: Debug = 0, Release = 1
 if "%1" == "1" (
 	set release_mode=1
@@ -51,9 +57,13 @@ set compiler_warnings= ^
 
 set compiler_includes= ^
 	/Isrc\
-set libs= ^
-	kernel32.lib ^
-	bin\llvm\windows\LLVM-C.lib
+
+set libs= kernel32.lib
+if %build_arm% equ 1 (
+	set libs= %libs% bin\llvm\windows\arm64\LLVM-C.lib
+) else (
+	set libs= %libs% bin\llvm\windows\LLVM-C.lib
+)
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
@@ -72,10 +82,19 @@ del *.ilk > NUL 2> NUL
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
 
+if %build_arm% equ 1 (
+	copy bin\llvm\windows\arm64\LLVM-C.dll LLVM-C.dll
+) else (
+	copy bin\llvm\windows\LLVM-C.dll LLVM-C.dll
+)
+
 call build_vendor.bat
 if %errorlevel% neq 0 goto end_of_build
 
-if %release_mode% EQU 0 odin run examples/demo
+set examples_run_flags= 
+if %build_arm% equ 1 set examples_run_flags= %examples_run_flags% -target:windows_arm64
+
+if %release_mode% EQU 0 odin run examples/demo %examples_run_flags%
 
 del *.obj > NUL 2> NUL
 

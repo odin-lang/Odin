@@ -2897,12 +2897,12 @@ gb_inline isize       gb_pointer_diff     (void const *begin, void const *end) {
 gb_inline void gb_zero_size(void *ptr, isize size) { gb_memset(ptr, 0, size); }
 
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(GB_CPU_ARM)
 #pragma intrinsic(__movsb)
 #endif
 
 gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(GB_CPU_ARM)
 	if (dest == NULL) {
 		return NULL;
 	}
@@ -6712,7 +6712,14 @@ gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) 
 //
 
 #if defined(GB_COMPILER_MSVC) && !defined(__clang__)
+#if defined(GB_CPU_ARM)
+	gb_inline u64 gb_rdtsc(void) {
+		// returns content of the CNTPCT_EL0 register which contains the cycle counter
+ 		return _ReadStatusReg(ARM64_SYSREG(0b11, 0b011, 0b1110, 0b0000, 0b001));
+	}
+#else
 	gb_inline u64 gb_rdtsc(void) { return __rdtsc(); }
+#endif
 #elif defined(__i386__)
 	gb_inline u64 gb_rdtsc(void) {
 		u64 x;

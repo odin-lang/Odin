@@ -283,6 +283,14 @@ gb_global TargetMetrics target_windows_amd64 = {
 	str_lit("x86_64-pc-windows-msvc"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
+gb_global TargetMetrics target_windows_arm64 = {
+	TargetOs_windows,
+	TargetArch_arm64,
+	8,
+	16,
+	str_lit("aarch64-pc-windows-msvc"),
+	str_lit("e-m:e-i8:8:32-i16:32-i64:64-i128:128-n32:64-S128"),
+};
 
 gb_global TargetMetrics target_linux_386 = {
 	TargetOs_linux,
@@ -405,6 +413,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
 	{ str_lit("windows_386"),         &target_windows_386    },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
+	{ str_lit("windows_arm64"),		  &target_windows_arm64	 },
 	{ str_lit("freebsd_386"),         &target_freebsd_386    },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },

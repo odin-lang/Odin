@@ -96,7 +96,7 @@
 #include "libtommath/mp_rshd.c"
 #include "libtommath/mp_sbin_size.c"
 #include "libtommath/mp_set.c"
-#include "libtommath/mp_set_double.c"
+// #include "libtommath/mp_set_double.c"
 #include "libtommath/mp_set_i32.c"
 #include "libtommath/mp_set_i64.c"
 #include "libtommath/mp_set_l.c"

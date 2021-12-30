@@ -312,7 +312,7 @@ void big_int_mul(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 u64 leading_zeros_u64(u64 x) {
 #if defined(GB_COMPILER_MSVC)
-	#if defined(GB_ARCH_64_BIT)
+	#if defined(GB_ARCH_64_BIT) && !defined(GB_CPU_ARM)
 		return __lzcnt64(x);
 	#else
 		u64 y, n;

@@ -2,7 +2,11 @@ package runtime
 
 bounds_trap :: proc "contextless" () -> ! {
 	when ODIN_OS == "windows" {
-		windows_trap_array_bounds()
+		when ODIN_ARCH == "arm64" {
+			trap()
+		} else {
+			windows_trap_array_bounds()
+		}
 	} else {
 		trap()
 	}
@@ -10,7 +14,11 @@ bounds_trap :: proc "contextless" () -> ! {
 
 type_assertion_trap :: proc "contextless" () -> ! {
 	when ODIN_OS == "windows" {
-		windows_trap_type_assertion()
+		when ODIN_ARCH == "arm64" {
+			trap()
+		} else {
+			windows_trap_type_assertion()
+		}
 	} else {
 		trap()
 	}
