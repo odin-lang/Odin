@@ -276,3 +276,4 @@ shared/
 *.ll
 
 *.sublime-workspace
+/LLVM-C.dll
