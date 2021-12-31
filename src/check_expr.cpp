@@ -649,6 +649,13 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return 4;
 		}
 	}
+	
+	if (is_type_complex_or_quaternion(dst)) {
+		Type *elem = base_complex_elem_type(dst);
+		if (are_types_identical(elem, base_type(src))) {
+			return 5;
+		}
+	}
 
 	if (is_type_array(dst)) {
 		Type *elem = base_array_type(dst);
