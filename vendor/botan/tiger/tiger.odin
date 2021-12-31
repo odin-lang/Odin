@@ -20,16 +20,20 @@ import botan "../bindings"
     High level API
 */
 
+DIGEST_SIZE_128 :: 16
+DIGEST_SIZE_160 :: 20
+DIGEST_SIZE_192 :: 24
+
 // hash_string_128 will hash the given input and return the
 // computed hash
-hash_string_128 :: proc(data: string) -> [16]byte {
+hash_string_128 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128(transmute([]byte)(data))
 }
 
 // hash_bytes_128 will hash the given input and return the
 // computed hash
-hash_bytes_128 :: proc(data: []byte) -> [16]byte {
-    hash: [16]byte
+hash_bytes_128 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
     ctx: botan.hash_t
     botan.hash_init(&ctx, botan.HASH_TIGER_128, 0)
     botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
@@ -38,10 +42,29 @@ hash_bytes_128 :: proc(data: []byte) -> [16]byte {
     return hash
 }
 
+// hash_string_to_buffer_128 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_128 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: botan.hash_t
+    botan.hash_init(&ctx, botan.HASH_TIGER_128, 0)
+    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
+    botan.hash_final(ctx, &hash[0])
+    botan.hash_destroy(ctx)
+}
+
 // hash_stream_128 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
+hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
     ctx: botan.hash_t
     botan.hash_init(&ctx, botan.HASH_TIGER_128, 0)
     buf := make([]byte, 512)
@@ -60,7 +83,7 @@ hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
 
 // hash_file_128 will read the file provided by the given handle
 // and compute a hash
-hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
     if !load_at_once {
         return hash_stream_128(os.stream_from_handle(hd))
     } else {
@@ -68,7 +91,7 @@ hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) 
             return hash_bytes_128(buf[:]), ok
         }
     }
-    return [16]byte{}, false
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128 :: proc {
@@ -76,18 +99,20 @@ hash_128 :: proc {
     hash_file_128,
     hash_bytes_128,
     hash_string_128,
+    hash_bytes_to_buffer_128,
+    hash_string_to_buffer_128,
 }
 
 // hash_string_160 will hash the given input and return the
 // computed hash
-hash_string_160 :: proc(data: string) -> [20]byte {
+hash_string_160 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160(transmute([]byte)(data))
 }
 
 // hash_bytes_160 will hash the given input and return the
 // computed hash
-hash_bytes_160 :: proc(data: []byte) -> [20]byte {
-    hash: [20]byte
+hash_bytes_160 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
     ctx: botan.hash_t
     botan.hash_init(&ctx, botan.HASH_TIGER_160, 0)
     botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
@@ -96,10 +121,29 @@ hash_bytes_160 :: proc(data: []byte) -> [20]byte {
     return hash
 }
 
+// hash_string_to_buffer_160 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_160 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: botan.hash_t
+    botan.hash_init(&ctx, botan.HASH_TIGER_160, 0)
+    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
+    botan.hash_final(ctx, &hash[0])
+    botan.hash_destroy(ctx)
+}
+
 // hash_stream_160 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
+hash_stream_160 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
     ctx: botan.hash_t
     botan.hash_init(&ctx, botan.HASH_TIGER_160, 0)
     buf := make([]byte, 512)
@@ -118,7 +162,7 @@ hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
 
 // hash_file_160 will read the file provided by the given handle
 // and compute a hash
-hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
     if !load_at_once {
         return hash_stream_160(os.stream_from_handle(hd))
     } else {
@@ -126,7 +170,7 @@ hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) 
             return hash_bytes_160(buf[:]), ok
         }
     }
-    return [20]byte{}, false
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160 :: proc {
@@ -134,18 +178,20 @@ hash_160 :: proc {
     hash_file_160,
     hash_bytes_160,
     hash_string_160,
+    hash_bytes_to_buffer_160,
+    hash_string_to_buffer_160,
 }
 
 // hash_string_192 will hash the given input and return the
 // computed hash
-hash_string_192 :: proc(data: string) -> [24]byte {
+hash_string_192 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192(transmute([]byte)(data))
 }
 
 // hash_bytes_192 will hash the given input and return the
 // computed hash
-hash_bytes_192 :: proc(data: []byte) -> [24]byte {
-    hash: [24]byte
+hash_bytes_192 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
     ctx: botan.hash_t
     botan.hash_init(&ctx, botan.HASH_TIGER_192, 0)
     botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
@@ -154,10 +200,29 @@ hash_bytes_192 :: proc(data: []byte) -> [24]byte {
     return hash
 }
 
+// hash_string_to_buffer_192 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_192 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: botan.hash_t
+    botan.hash_init(&ctx, botan.HASH_TIGER_192, 0)
+    botan.hash_update(ctx, len(data) == 0 ? nil : &data[0], uint(len(data)))
+    botan.hash_final(ctx, &hash[0])
+    botan.hash_destroy(ctx)
+}
+
 // hash_stream_192 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    hash: [24]byte
+hash_stream_192 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
     ctx: botan.hash_t
     botan.hash_init(&ctx, botan.HASH_TIGER_192, 0)
     buf := make([]byte, 512)
@@ -176,7 +241,7 @@ hash_stream_192 :: proc(s: io.Stream) -> ([24]byte, bool) {
 
 // hash_file_192 will read the file provided by the given handle
 // and compute a hash
-hash_file_192 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
+hash_file_192 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
     if !load_at_once {
         return hash_stream_192(os.stream_from_handle(hd))
     } else {
@@ -184,7 +249,7 @@ hash_file_192 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) 
             return hash_bytes_192(buf[:]), ok
         }
     }
-    return [24]byte{}, false
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192 :: proc {
@@ -192,6 +257,8 @@ hash_192 :: proc {
     hash_file_192,
     hash_bytes_192,
     hash_string_192,
+    hash_bytes_to_buffer_192,
+    hash_string_to_buffer_192,
 }
 
 /*
