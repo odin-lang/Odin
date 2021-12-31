@@ -17,16 +17,18 @@ import "core:io"
     High level API
 */
 
+DIGEST_SIZE :: 16
+
 // hash_string will hash the given input and return the
 // computed hash
-hash_string :: proc(data: string) -> [16]byte {
+hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
     return hash_bytes(transmute([]byte)(data))
 }
 
 // hash_bytes will hash the given input and return the
 // computed hash
-hash_bytes :: proc(data: []byte) -> [16]byte {
-	hash: [16]byte
+hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
+	hash: [DIGEST_SIZE]byte
 	ctx: Md2_Context
     // init(&ctx) No-op
     update(&ctx, data)
@@ -34,10 +36,28 @@ hash_bytes :: proc(data: []byte) -> [16]byte {
     return hash
 }
 
+// hash_string_to_buffer will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer :: proc(data: string, hash: []byte) {
+	hash_bytes_to_buffer(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer :: proc(data, hash: []byte) {
+	assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
+    ctx: Md2_Context
+    // init(&ctx) No-op
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
-hash_stream :: proc(s: io.Stream) -> ([16]byte, bool) {
-	hash: [16]byte
+hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
+	hash: [DIGEST_SIZE]byte
 	ctx: Md2_Context
 	// init(&ctx) No-op
 	buf := make([]byte, 512)
@@ -55,7 +75,7 @@ hash_stream :: proc(s: io.Stream) -> ([16]byte, bool) {
 
 // hash_file will read the file provided by the given handle
 // and compute a hash
-hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE]byte, bool) {
 	if !load_at_once {
         return hash_stream(os.stream_from_handle(hd))
     } else {
@@ -63,7 +83,7 @@ hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
             return hash_bytes(buf[:]), ok
         }
     }
-    return [16]byte{}, false
+    return [DIGEST_SIZE]byte{}, false
 }
 
 hash :: proc {
@@ -71,6 +91,8 @@ hash :: proc {
     hash_file,
     hash_bytes,
     hash_string,
+    hash_bytes_to_buffer,
+    hash_string_to_buffer,
 }
 
 /*
@@ -86,7 +108,7 @@ update :: proc(ctx: ^Md2_Context, data: []byte) {
 	for i := 0; i < len(data); i += 1 {
 		ctx.data[ctx.datalen] = data[i]
 		ctx.datalen += 1
-		if (ctx.datalen == 16) {
+		if (ctx.datalen == DIGEST_SIZE) {
 			transform(ctx, ctx.data[:])
 			ctx.datalen = 0
 		}
@@ -94,14 +116,14 @@ update :: proc(ctx: ^Md2_Context, data: []byte) {
 }
 
 final :: proc(ctx: ^Md2_Context, hash: []byte) {
-	to_pad := byte(16 - ctx.datalen)
-    for ctx.datalen < 16 {
+	to_pad := byte(DIGEST_SIZE - ctx.datalen)
+    for ctx.datalen < DIGEST_SIZE {
         ctx.data[ctx.datalen] = to_pad
 		ctx.datalen += 1
     }
 	transform(ctx, ctx.data[:])
 	transform(ctx, ctx.checksum[:])
-    for i := 0; i < 16; i += 1 {
+    for i := 0; i < DIGEST_SIZE; i += 1 {
         hash[i] = ctx.state[i]
     }
 }
@@ -111,9 +133,9 @@ final :: proc(ctx: ^Md2_Context, hash: []byte) {
 */
 
 Md2_Context :: struct {
-    data:     [16]byte,
-    state:    [16 * 3]byte,
-    checksum: [16]byte,
+    data:     [DIGEST_SIZE]byte,
+    state:    [DIGEST_SIZE * 3]byte,
+    checksum: [DIGEST_SIZE]byte,
     datalen:  int,
 }
 
@@ -140,20 +162,20 @@ PI_TABLE := [?]byte {
 
 transform :: proc(ctx: ^Md2_Context, data: []byte) {
     j,k,t: byte
-	for j = 0; j < 16; j += 1 {
-		ctx.state[j + 16] = data[j]
-		ctx.state[j + 16 * 2] = (ctx.state[j + 16] ~ ctx.state[j])
+	for j = 0; j < DIGEST_SIZE; j += 1 {
+		ctx.state[j + DIGEST_SIZE] = data[j]
+		ctx.state[j + DIGEST_SIZE * 2] = (ctx.state[j + DIGEST_SIZE] ~ ctx.state[j])
 	}
 	t = 0
-	for j = 0; j < 16 + 2; j += 1 {
-		for k = 0; k < 16 * 3; k += 1 {
+	for j = 0; j < DIGEST_SIZE + 2; j += 1 {
+		for k = 0; k < DIGEST_SIZE * 3; k += 1 {
 			ctx.state[k] ~= PI_TABLE[t]
 			t = ctx.state[k]
 		}
 		t = (t + j) & 0xff
 	}
-	t = ctx.checksum[16 - 1]
-	for j = 0; j < 16; j += 1 {
+	t = ctx.checksum[DIGEST_SIZE - 1]
+	for j = 0; j < DIGEST_SIZE; j += 1 {
 		ctx.checksum[j] ~= PI_TABLE[data[j] ~ t]
 		t = ctx.checksum[j]
 	}
