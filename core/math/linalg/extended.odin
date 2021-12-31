@@ -103,10 +103,10 @@ max :: proc{max_single, max_double, max_triple}
 abs :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = builtin.abs(a[i])
+			out[i] = auto_cast builtin.abs(a[i])
 		}
 	} else {
-		out = builtin.abs(a)
+		out = auto_cast builtin.abs(a)
 	}
 	return
 }
