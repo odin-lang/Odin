@@ -14,7 +14,7 @@ ifeq ($(OS), Darwin)
     LLVM_VERSION_PATTERN="^11\."
     LLVM_VERSION="11"
     ifeq ($(ARCH), arm64)
-	    LLVM_VERSION="13"
+        LLVM_VERSION="13"
         LLVM_VERSION_PATTERN="^13"
     endif
 
