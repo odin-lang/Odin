@@ -56,24 +56,23 @@ cap :: proc(pq: $Q/Priority_Queue($T)) -> int {
 
 _shift_down :: proc(pq: ^$Q/Priority_Queue($T), i0, n: int) -> bool {
 	// O(n log n)
-	i := i0
-	j, j1, j2: int
-	if 0 > i || i > n {
+	if 0 > i0 || i0 > n {
 		return false
 	}
 	
+	i := i0
 	queue := pq.queue[:]
 	
 	for {
 		j1 := 2*i + 1
-		if 0 > j1 || j1 >= n {
+		if j1 < 0 || j1 >= n {
 			break
 		}
-		j, j2 = j1, j1+1
-		if j1 < n && pq.less(queue[j2], queue[j1])  {
+		j := j1
+		if j2 := j1+1; j2 < n && pq.less(queue[j2], queue[j1]) {
 			j = j2
 		}
-		if !pq.less(queue[i], queue[j]) {
+		if !pq.less(queue[j], queue[i]) {
 			break
 		}
 		
@@ -87,7 +86,7 @@ _shift_up :: proc(pq: ^$Q/Priority_Queue($T), j: int) {
 	j := j
 	queue := pq.queue[:]
 	n := builtin.len(queue)
-	for 0 <= j && j < n {
+	for 0 <= j {
 		i := (j-1)/2
 		if i == j || !pq.less(queue[j], queue[i]) {
 			break
