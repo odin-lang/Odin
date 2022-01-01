@@ -136,3 +136,8 @@ when ODIN_OS == "linux" {
 		tss_set       :: proc(key: tss_t, val: rawptr) -> int ---
 	}
 }
+
+
+when ODIN_OS == "darwin" {
+	// TODO: find out what this is meant to be!
+}

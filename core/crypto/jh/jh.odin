@@ -6,7 +6,6 @@ package jh
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the JH hashing algorithm, as defined in <https://www3.ntu.edu.sg/home/wuhj/research/jh/index.html>
 */
@@ -14,99 +13,83 @@ package jh
 import "core:os"
 import "core:io"
 
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_28  = hash_bytes_odin_28
-    ctx.hash_file_28   = hash_file_odin_28
-    ctx.hash_stream_28 = hash_stream_odin_28
-    ctx.hash_bytes_32  = hash_bytes_odin_32
-    ctx.hash_file_32   = hash_file_odin_32
-    ctx.hash_stream_32 = hash_stream_odin_32
-    ctx.hash_bytes_48  = hash_bytes_odin_48
-    ctx.hash_file_48   = hash_file_odin_48
-    ctx.hash_stream_48 = hash_stream_odin_48
-    ctx.hash_bytes_64  = hash_bytes_odin_64
-    ctx.hash_file_64   = hash_file_odin_64
-    ctx.hash_stream_64 = hash_stream_odin_64
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan does nothing, since JH is not available in Botan
-@(warning="JH is not provided by the Botan API. Odin implementation will be used")
-use_botan :: #force_inline proc() {
-    use_odin()
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
-
-@(private)
-_create_jh_ctx :: #force_inline proc(size: _ctx.Hash_Size) {
-    ctx: Jh_Context
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
-    #partial switch size {
-        case ._28: ctx.hashbitlen = 224
-        case ._32: ctx.hashbitlen = 256
-        case ._48: ctx.hashbitlen = 384
-        case ._64: ctx.hashbitlen = 512
-    }
-}
-
 /*
     High level API
 */
 
+DIGEST_SIZE_224 :: 28
+DIGEST_SIZE_256 :: 32
+DIGEST_SIZE_384 :: 48
+DIGEST_SIZE_512 :: 64
+
 // hash_string_224 will hash the given input and return the
 // computed hash
-hash_string_224 :: proc(data: string) -> [28]byte {
+hash_string_224 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224(transmute([]byte)(data))
 }
 
 // hash_bytes_224 will hash the given input and return the
 // computed hash
-hash_bytes_224 :: proc(data: []byte) -> [28]byte {
-    _create_jh_ctx(._28)
-    return _hash_impl->hash_bytes_28(data)
+hash_bytes_224 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 224
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_224 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_224 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Jh_Context
+    ctx.hashbitlen = 224
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_224 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_jh_ctx(._28)
-    return _hash_impl->hash_stream_28(s)
+hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 224
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_224 will read the file provided by the given handle
 // and compute a hash
-hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_jh_ctx(._28)
-    return _hash_impl->hash_file_28(hd, load_at_once)
+hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
+    if !load_at_once {
+        return hash_stream_224(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_224(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224 :: proc {
@@ -114,33 +97,78 @@ hash_224 :: proc {
     hash_file_224,
     hash_bytes_224,
     hash_string_224,
+    hash_bytes_to_buffer_224,
+    hash_string_to_buffer_224,
 }
 
 // hash_string_256 will hash the given input and return the
 // computed hash
-hash_string_256 :: proc(data: string) -> [32]byte {
+hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256(transmute([]byte)(data))
 }
 
 // hash_bytes_256 will hash the given input and return the
 // computed hash
-hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    _create_jh_ctx(._32)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 256
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Jh_Context
+    ctx.hashbitlen = 256
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_jh_ctx(._32)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 256
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_jh_ctx(._32)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256 :: proc {
@@ -148,33 +176,78 @@ hash_256 :: proc {
     hash_file_256,
     hash_bytes_256,
     hash_string_256,
+    hash_bytes_to_buffer_256,
+    hash_string_to_buffer_256,
 }
 
 // hash_string_384 will hash the given input and return the
 // computed hash
-hash_string_384 :: proc(data: string) -> [48]byte {
+hash_string_384 :: proc(data: string) -> [DIGEST_SIZE_384]byte {
     return hash_bytes_384(transmute([]byte)(data))
 }
 
 // hash_bytes_384 will hash the given input and return the
 // computed hash
-hash_bytes_384 :: proc(data: []byte) -> [48]byte {
-    _create_jh_ctx(._48)
-    return _hash_impl->hash_bytes_48(data)
+hash_bytes_384 :: proc(data: []byte) -> [DIGEST_SIZE_384]byte {
+    hash: [DIGEST_SIZE_384]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 384
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_384 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_384(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_384 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_384, "Size of destination buffer is smaller than the digest size")
+    ctx: Jh_Context
+    ctx.hashbitlen = 384
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_384 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_384 :: proc(s: io.Stream) -> ([48]byte, bool) {
-    _create_jh_ctx(._48)
-    return _hash_impl->hash_stream_48(s)
+hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
+    hash: [DIGEST_SIZE_384]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 384
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_384 will read the file provided by the given handle
 // and compute a hash
-hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    _create_jh_ctx(._48)
-    return _hash_impl->hash_file_48(hd, load_at_once)
+hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_384]byte, bool) {
+    if !load_at_once {
+        return hash_stream_384(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_384(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_384]byte{}, false
 }
 
 hash_384 :: proc {
@@ -182,33 +255,78 @@ hash_384 :: proc {
     hash_file_384,
     hash_bytes_384,
     hash_string_384,
+    hash_bytes_to_buffer_384,
+    hash_string_to_buffer_384,
 }
 
 // hash_string_512 will hash the given input and return the
 // computed hash
-hash_string_512 :: proc(data: string) -> [64]byte {
+hash_string_512 :: proc(data: string) -> [DIGEST_SIZE_512]byte {
     return hash_bytes_512(transmute([]byte)(data))
 }
 
 // hash_bytes_512 will hash the given input and return the
 // computed hash
-hash_bytes_512 :: proc(data: []byte) -> [64]byte {
-    _create_jh_ctx(._64)
-    return _hash_impl->hash_bytes_64(data)
+hash_bytes_512 :: proc(data: []byte) -> [DIGEST_SIZE_512]byte {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 512
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_512 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_512(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_512 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_512, "Size of destination buffer is smaller than the digest size")
+    ctx: Jh_Context
+    ctx.hashbitlen = 512
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_512 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_512 :: proc(s: io.Stream) -> ([64]byte, bool) {
-    _create_jh_ctx(._64)
-    return _hash_impl->hash_stream_64(s)
+hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Jh_Context
+    ctx.hashbitlen = 512
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_512 will read the file provided by the given handle
 // and compute a hash
-hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    _create_jh_ctx(._64)
-    return _hash_impl->hash_file_64(hd, load_at_once)
+hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_512]byte, bool) {
+    if !load_at_once {
+        return hash_stream_512(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_512(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_512]byte{}, false
 }
 
 hash_512 :: proc {
@@ -216,207 +334,106 @@ hash_512 :: proc {
     hash_file_512,
     hash_bytes_512,
     hash_string_512,
+    hash_bytes_to_buffer_512,
+    hash_string_to_buffer_512,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+init :: proc(ctx: ^Jh_Context) {
+    assert(ctx.hashbitlen == 224 || ctx.hashbitlen == 256 || ctx.hashbitlen == 384 || ctx.hashbitlen == 512, "hashbitlen must be set to 224, 256, 384 or 512")
+    ctx.H[1] = byte(ctx.hashbitlen)      & 0xff
+    ctx.H[0] = byte(ctx.hashbitlen >> 8) & 0xff
+    F8(ctx)
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
-}
+update :: proc(ctx: ^Jh_Context, data: []byte) {
+    databitlen     := u64(len(data)) * 8
+    ctx.databitlen += databitlen
+    i              := u64(0)
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
-
-hash_bytes_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [28]byte {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
+    if (ctx.buffer_size > 0) && ((ctx.buffer_size + databitlen) < 512) {
+        if (databitlen & 7) == 0 {
+            copy(ctx.buffer[ctx.buffer_size >> 3:], data[:64 - (ctx.buffer_size >> 3)])
+        } else {
+            copy(ctx.buffer[ctx.buffer_size >> 3:], data[:64 - (ctx.buffer_size >> 3) + 1])
+        } 
+        ctx.buffer_size += databitlen
+        databitlen = 0
     }
-    return hash
-}
 
-hash_stream_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+    if (ctx.buffer_size > 0 ) && ((ctx.buffer_size + databitlen) >= 512) {
+        copy(ctx.buffer[ctx.buffer_size >> 3:], data[:64 - (ctx.buffer_size >> 3)])
+        i      = 64 - (ctx.buffer_size >> 3)
+        databitlen = databitlen - (512 - ctx.buffer_size)
+        F8(ctx)
+        ctx.buffer_size = 0
+    }
+
+    for databitlen >= 512 {
+        copy(ctx.buffer[:], data[i:i + 64])
+        F8(ctx)
+        i += 64
+        databitlen -= 512
+    }
+
+    if databitlen > 0 {
+        if (databitlen & 7) == 0 {
+            copy(ctx.buffer[:], data[i:i + ((databitlen & 0x1ff) >> 3)])
+        } else {
+            copy(ctx.buffer[:], data[i:i + ((databitlen & 0x1ff) >> 3) + 1])
         }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
+        ctx.buffer_size = databitlen
     }
 }
 
-hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_28(ctx, buf[:]), ok
+final :: proc(ctx: ^Jh_Context, hash: []byte) {
+    if ctx.databitlen & 0x1ff == 0 {
+        for i := 0; i < 64; i += 1 {
+            ctx.buffer[i] = 0
         }
-    }
-    return [28]byte{}, false
-}
-
-hash_bytes_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
+        ctx.buffer[0]  = 0x80
+        ctx.buffer[63] = byte(ctx.databitlen)       & 0xff
+        ctx.buffer[62] = byte(ctx.databitlen >> 8)  & 0xff
+        ctx.buffer[61] = byte(ctx.databitlen >> 16) & 0xff
+        ctx.buffer[60] = byte(ctx.databitlen >> 24) & 0xff
+        ctx.buffer[59] = byte(ctx.databitlen >> 32) & 0xff
+        ctx.buffer[58] = byte(ctx.databitlen >> 40) & 0xff
+        ctx.buffer[57] = byte(ctx.databitlen >> 48) & 0xff
+        ctx.buffer[56] = byte(ctx.databitlen >> 56) & 0xff
+        F8(ctx)
     } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_32(ctx, buf[:]), ok
+        if ctx.buffer_size & 7 == 0 {
+            for i := (ctx.databitlen & 0x1ff) >> 3; i < 64; i += 1 {
+                ctx.buffer[i] = 0
+            }
+        } else {
+            for i := ((ctx.databitlen & 0x1ff) >> 3) + 1; i < 64; i += 1 {
+                ctx.buffer[i] = 0
+            }
         }
-    }
-    return [32]byte{}, false
-}
-
-hash_bytes_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [48]byte {
-    hash: [48]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([48]byte, bool) {
-    hash: [48]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+        ctx.buffer[(ctx.databitlen & 0x1ff) >> 3] |= 1 << (7 - (ctx.databitlen & 7))
+        F8(ctx)
+        for i := 0; i < 64; i += 1 {
+            ctx.buffer[i] = 0
         }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
+        ctx.buffer[63] = byte(ctx.databitlen)       & 0xff
+        ctx.buffer[62] = byte(ctx.databitlen >> 8)  & 0xff
+        ctx.buffer[61] = byte(ctx.databitlen >> 16) & 0xff
+        ctx.buffer[60] = byte(ctx.databitlen >> 24) & 0xff
+        ctx.buffer[59] = byte(ctx.databitlen >> 32) & 0xff
+        ctx.buffer[58] = byte(ctx.databitlen >> 40) & 0xff
+        ctx.buffer[57] = byte(ctx.databitlen >> 48) & 0xff
+        ctx.buffer[56] = byte(ctx.databitlen >> 56) & 0xff
+        F8(ctx)
     }
-}
-
-hash_file_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_48(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_48(ctx, buf[:]), ok
-        }
-    }
-    return [48]byte{}, false
-}
-
-hash_bytes_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [64]byte {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([64]byte, bool) {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_64(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_64(ctx, buf[:]), ok
-        }
-    }
-    return [64]byte{}, false
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_jh_ctx(ctx.hash_size)
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Jh_Context); ok {
-        final_odin(&c, hash)
+    switch ctx.hashbitlen {
+        case 224: copy(hash[:], ctx.H[100:128])
+        case 256: copy(hash[:], ctx.H[96:128])
+        case 384: copy(hash[:], ctx.H[80:128])
+        case 512: copy(hash[:], ctx.H[64:128])
     }
 }
 
@@ -424,7 +441,7 @@ _final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
     JH implementation
 */
 
-JH_ROUNDCONSTANT_ZERO := [64]byte {
+ROUNDCONSTANT_ZERO := [64]byte {
     0x6, 0xa, 0x0, 0x9, 0xe, 0x6, 0x6, 0x7,
     0xf, 0x3, 0xb, 0xc, 0xc, 0x9, 0x0, 0x8,
     0xb, 0x2, 0xf, 0xb, 0x1, 0x3, 0x6, 0x6,
@@ -435,7 +452,7 @@ JH_ROUNDCONSTANT_ZERO := [64]byte {
     0x0, 0x6, 0x6, 0x7, 0x3, 0x2, 0x2, 0xa,
 }
 
-JH_S := [2][16]byte {
+SBOX := [2][16]byte {
     {9, 0,  4, 11, 13, 12, 3, 15, 1,  10, 2, 6, 7,  5,  8,  14},
     {3, 12, 6, 13, 5,  7,  1, 9,  15, 2,  0, 4, 11, 10, 14, 8},
 }
@@ -450,7 +467,7 @@ Jh_Context :: struct {
     buffer:        [64]byte,
 }
 
-JH_E8_finaldegroup :: proc(ctx: ^Jh_Context) {
+E8_finaldegroup :: proc(ctx: ^Jh_Context) {
     t0,t1,t2,t3: byte
     tem: [256]byte
     for i := 0; i < 128; i += 1 {
@@ -473,11 +490,11 @@ JH_E8_finaldegroup :: proc(ctx: ^Jh_Context) {
     }
 }
 
-jh_update_roundconstant :: proc(ctx: ^Jh_Context) {
+update_roundconstant :: proc(ctx: ^Jh_Context) {
     tem: [64]byte
     t: byte
     for i := 0; i < 64; i += 1 {
-        tem[i] = JH_S[0][ctx.roundconstant[i]]
+        tem[i] = SBOX[0][ctx.roundconstant[i]]
     }
     for i := 0; i < 64; i += 2 {
         tem[i + 1] ~= ((tem[i]   << 1)   ~ (tem[i]   >> 3)   ~ ((tem[i]   >> 2) & 2))   & 0xf
@@ -499,14 +516,14 @@ jh_update_roundconstant :: proc(ctx: ^Jh_Context) {
     }
 }
 
-JH_R8 :: proc(ctx: ^Jh_Context) {
+R8 :: proc(ctx: ^Jh_Context) {
     t: byte
     tem, roundconstant_expanded: [256]byte
     for i := u32(0); i < 256; i += 1 {
         roundconstant_expanded[i] = (ctx.roundconstant[i >> 2] >> (3 - (i & 3)) ) & 1
     }
     for i := 0; i < 256; i += 1 {
-        tem[i] = JH_S[roundconstant_expanded[i]][ctx.A[i]]
+        tem[i] = SBOX[roundconstant_expanded[i]][ctx.A[i]]
     }
     for i := 0; i < 256; i += 2 {
         tem[i+1] ~= ((tem[i]   << 1)   ~ (tem[i]   >> 3)   ~ ((tem[i]   >> 2) & 2))   & 0xf
@@ -528,7 +545,7 @@ JH_R8 :: proc(ctx: ^Jh_Context) {
     }
 }
 
-JH_E8_initialgroup :: proc(ctx: ^Jh_Context) {
+E8_initialgroup :: proc(ctx: ^Jh_Context) {
     t0, t1, t2, t3: byte
     tem:            [256]byte
     for i := u32(0); i < 256; i += 1 {
@@ -544,118 +561,24 @@ JH_E8_initialgroup :: proc(ctx: ^Jh_Context) {
     }
 }
 
-JH_E8 :: proc(ctx: ^Jh_Context) {
+E8 :: proc(ctx: ^Jh_Context) {
     for i := 0; i < 64; i += 1 {
-        ctx.roundconstant[i] = JH_ROUNDCONSTANT_ZERO[i]
+        ctx.roundconstant[i] = ROUNDCONSTANT_ZERO[i]
     }
-    JH_E8_initialgroup(ctx)
+    E8_initialgroup(ctx)
     for i := 0; i < 42; i += 1 {
-        JH_R8(ctx)
-        jh_update_roundconstant(ctx)
+        R8(ctx)
+        update_roundconstant(ctx)
     }
-    JH_E8_finaldegroup(ctx)
+    E8_finaldegroup(ctx)
 }
 
-JH_F8 :: proc(ctx: ^Jh_Context) {
+F8 :: proc(ctx: ^Jh_Context) {
     for i := 0; i < 64; i += 1 {
         ctx.H[i] ~= ctx.buffer[i]
     }
-    JH_E8(ctx)
+    E8(ctx)
     for i := 0; i < 64; i += 1 {
         ctx.H[i + 64] ~= ctx.buffer[i]
-    }
-}
-
-init_odin :: proc(ctx: ^Jh_Context) {
-    ctx.H[1] = byte(ctx.hashbitlen)      & 0xff
-    ctx.H[0] = byte(ctx.hashbitlen >> 8) & 0xff
-    JH_F8(ctx)
-}
-
-update_odin :: proc(ctx: ^Jh_Context, data: []byte) {
-    databitlen     := u64(len(data)) * 8
-    ctx.databitlen += databitlen
-    i              := u64(0)
-
-    if (ctx.buffer_size > 0) && ((ctx.buffer_size + databitlen) < 512) {
-        if (databitlen & 7) == 0 {
-            copy(ctx.buffer[ctx.buffer_size >> 3:], data[:64 - (ctx.buffer_size >> 3)])
-		} else {
-            copy(ctx.buffer[ctx.buffer_size >> 3:], data[:64 - (ctx.buffer_size >> 3) + 1])
-        } 
-        ctx.buffer_size += databitlen
-        databitlen = 0
-    }
-
-    if (ctx.buffer_size > 0 ) && ((ctx.buffer_size + databitlen) >= 512) {
-        copy(ctx.buffer[ctx.buffer_size >> 3:], data[:64 - (ctx.buffer_size >> 3)])
-	    i      = 64 - (ctx.buffer_size >> 3)
-	    databitlen = databitlen - (512 - ctx.buffer_size)
-	    JH_F8(ctx)
-	    ctx.buffer_size = 0
-    }
-
-    for databitlen >= 512 {
-        copy(ctx.buffer[:], data[i:i + 64])
-        JH_F8(ctx)
-        i += 64
-        databitlen -= 512
-    }
-
-    if databitlen > 0 {
-        if (databitlen & 7) == 0 {
-            copy(ctx.buffer[:], data[i:i + ((databitlen & 0x1ff) >> 3)])
-        } else {
-            copy(ctx.buffer[:], data[i:i + ((databitlen & 0x1ff) >> 3) + 1])
-        }
-        ctx.buffer_size = databitlen
-    }
-}
-
-final_odin :: proc(ctx: ^Jh_Context, hash: []byte) {
-    if ctx.databitlen & 0x1ff == 0 {
-        for i := 0; i < 64; i += 1 {
-            ctx.buffer[i] = 0
-        }
-        ctx.buffer[0]  = 0x80
-        ctx.buffer[63] = byte(ctx.databitlen)       & 0xff
-        ctx.buffer[62] = byte(ctx.databitlen >> 8)  & 0xff
-        ctx.buffer[61] = byte(ctx.databitlen >> 16) & 0xff
-        ctx.buffer[60] = byte(ctx.databitlen >> 24) & 0xff
-        ctx.buffer[59] = byte(ctx.databitlen >> 32) & 0xff
-        ctx.buffer[58] = byte(ctx.databitlen >> 40) & 0xff
-        ctx.buffer[57] = byte(ctx.databitlen >> 48) & 0xff
-        ctx.buffer[56] = byte(ctx.databitlen >> 56) & 0xff
-        JH_F8(ctx)
-    } else {
-        if ctx.buffer_size & 7 == 0 {
-            for i := (ctx.databitlen & 0x1ff) >> 3; i < 64; i += 1 {
-                ctx.buffer[i] = 0
-            }
-        } else {
-            for i := ((ctx.databitlen & 0x1ff) >> 3) + 1; i < 64; i += 1 {
-                ctx.buffer[i] = 0
-            }
-        }
-        ctx.buffer[(ctx.databitlen & 0x1ff) >> 3] |= 1 << (7 - (ctx.databitlen & 7))
-        JH_F8(ctx)
-        for i := 0; i < 64; i += 1 {
-            ctx.buffer[i] = 0
-        }
-        ctx.buffer[63] = byte(ctx.databitlen)       & 0xff
-        ctx.buffer[62] = byte(ctx.databitlen >> 8)  & 0xff
-        ctx.buffer[61] = byte(ctx.databitlen >> 16) & 0xff
-        ctx.buffer[60] = byte(ctx.databitlen >> 24) & 0xff
-        ctx.buffer[59] = byte(ctx.databitlen >> 32) & 0xff
-        ctx.buffer[58] = byte(ctx.databitlen >> 40) & 0xff
-        ctx.buffer[57] = byte(ctx.databitlen >> 48) & 0xff
-        ctx.buffer[56] = byte(ctx.databitlen >> 56) & 0xff
-        JH_F8(ctx)
-    }
-    switch ctx.hashbitlen {
-        case 224: copy(hash[:], ctx.H[100:128])
-        case 256: copy(hash[:], ctx.H[96:128])
-        case 384: copy(hash[:], ctx.H[80:128])
-        case 512: copy(hash[:], ctx.H[64:128])
     }
 }

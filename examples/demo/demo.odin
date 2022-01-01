@@ -2127,7 +2127,7 @@ or_return_operator :: proc() {
 	foo_2()
 }
 
-arbitrary_precision_maths :: proc() {
+arbitrary_precision_mathematics :: proc() {
 	fmt.println("\n# core:math/big")
 
 	print_bigint :: proc(name: string, a: ^big.Int, base := i8(10), print_name := true, newline := true, print_extra_info := true) {
@@ -2454,7 +2454,7 @@ main :: proc() {
 		relative_data_types()
 		or_else_operator()
 		or_return_operator()
-		arbitrary_precision_maths()
+		arbitrary_precision_mathematics()
 		matrix_type()
 	}
 }

@@ -6,7 +6,6 @@ package haval
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation for the HAVAL hashing algorithm as defined in <https://web.archive.org/web/20150111210116/http://labs.calyptix.com/haval.php>
 */
@@ -16,104 +15,91 @@ import "core:os"
 import "core:io"
 
 import "../util"
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_16  = hash_bytes_odin_16
-    ctx.hash_file_16   = hash_file_odin_16
-    ctx.hash_stream_16 = hash_stream_odin_16
-    ctx.hash_bytes_20  = hash_bytes_odin_20
-    ctx.hash_file_20   = hash_file_odin_20
-    ctx.hash_stream_20 = hash_stream_odin_20
-    ctx.hash_bytes_24  = hash_bytes_odin_24
-    ctx.hash_file_24   = hash_file_odin_24
-    ctx.hash_stream_24 = hash_stream_odin_24
-    ctx.hash_bytes_28  = hash_bytes_odin_28
-    ctx.hash_file_28   = hash_file_odin_28
-    ctx.hash_stream_28 = hash_stream_odin_28
-    ctx.hash_bytes_32  = hash_bytes_odin_32
-    ctx.hash_file_32   = hash_file_odin_32
-    ctx.hash_stream_32 = hash_stream_odin_32
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan does nothing, since HAVAL is not available in Botan
-@(warning="HAVAL is not provided by the Botan API. Odin implementation will be used")
-use_botan :: #force_inline proc() {
-    use_odin()
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
-
-@(private)
-_create_haval_ctx :: #force_inline proc(size: _ctx.Hash_Size, rounds: u32) {
-    ctx: Haval_Context
-    ctx.rounds              = rounds
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
-    #partial switch size {
-        case ._16: ctx.hashbitlen = 128
-        case ._20: ctx.hashbitlen = 160
-        case ._24: ctx.hashbitlen = 192
-        case ._28: ctx.hashbitlen = 224
-        case ._32: ctx.hashbitlen = 256
-    }
-}
 
 /*
     High level API
 */
 
+DIGEST_SIZE_128 :: 16
+DIGEST_SIZE_160 :: 20
+DIGEST_SIZE_192 :: 24
+DIGEST_SIZE_224 :: 28
+DIGEST_SIZE_256 :: 32
+
 // hash_string_128_3 will hash the given input and return the
 // computed hash
-hash_string_128_3 :: proc(data: string) -> [16]byte {
+hash_string_128_3 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128_3(transmute([]byte)(data))
 }
 
 // hash_bytes_128_3 will hash the given input and return the
 // computed hash
-hash_bytes_128_3 :: proc(data: []byte) -> [16]byte {
-    _create_haval_ctx(._16, 3)
-    return _hash_impl->hash_bytes_16(data)
+hash_bytes_128_3 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_128_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128_3(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_128_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_128_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128_3 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    _create_haval_ctx(._16, 3)
-    return _hash_impl->hash_stream_16(s)
+hash_stream_128_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 3
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_128_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_128_3 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    _create_haval_ctx(._16, 3)
-    return _hash_impl->hash_file_16(hd, load_at_once)
+hash_file_128_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
+    if !load_at_once {
+        return hash_stream_128_3(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_128_3(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128_3 :: proc {
@@ -121,33 +107,84 @@ hash_128_3 :: proc {
     hash_file_128_3,
     hash_bytes_128_3,
     hash_string_128_3,
+    hash_bytes_to_buffer_128_3,
+    hash_string_to_buffer_128_3,
 }
 
 // hash_string_128_4 will hash the given input and return the
 // computed hash
-hash_string_128_4 :: proc(data: string) -> [16]byte {
+hash_string_128_4 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128_4(transmute([]byte)(data))
 }
 
 // hash_bytes_128_4 will hash the given input and return the
 // computed hash
-hash_bytes_128_4 :: proc(data: []byte) -> [16]byte {
-    _create_haval_ctx(._16, 4)
-    return _hash_impl->hash_bytes_16(data)
+hash_bytes_128_4 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_128_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128_4(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_128_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_128_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128_4 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    _create_haval_ctx(._16, 4)
-    return _hash_impl->hash_stream_16(s)
+hash_stream_128_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 4
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_128_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_128_4 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    _create_haval_ctx(._16, 4)
-    return _hash_impl->hash_file_16(hd, load_at_once)
+hash_file_128_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
+    if !load_at_once {
+        return hash_stream_128_4(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_128_4(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128_4 :: proc {
@@ -155,33 +192,84 @@ hash_128_4 :: proc {
     hash_file_128_4,
     hash_bytes_128_4,
     hash_string_128_4,
+    hash_bytes_to_buffer_128_4,
+    hash_string_to_buffer_128_4,
 }
 
 // hash_string_128_5 will hash the given input and return the
 // computed hash
-hash_string_128_5 :: proc(data: string) -> [16]byte {
+hash_string_128_5 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128_5(transmute([]byte)(data))
 }
 
 // hash_bytes_128_5 will hash the given input and return the
 // computed hash
-hash_bytes_128_5 :: proc(data: []byte) -> [16]byte {
-    _create_haval_ctx(._16, 5)
-    return _hash_impl->hash_bytes_16(data)
+hash_bytes_128_5 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_128_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128_5(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_128_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_128_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128_5 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    _create_haval_ctx(._16, 5)
-    return _hash_impl->hash_stream_16(s)
+hash_stream_128_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 5
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_128_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_128_5 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    _create_haval_ctx(._16, 5)
-    return _hash_impl->hash_file_16(hd, load_at_once)
+hash_file_128_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
+    if !load_at_once {
+        return hash_stream_128_5(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_128_5(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128_5 :: proc {
@@ -189,33 +277,84 @@ hash_128_5 :: proc {
     hash_file_128_5,
     hash_bytes_128_5,
     hash_string_128_5,
+    hash_bytes_to_buffer_128_5,
+    hash_string_to_buffer_128_5,
 }
 
 // hash_string_160_3 will hash the given input and return the
 // computed hash
-hash_string_160_3 :: proc(data: string) -> [20]byte {
+hash_string_160_3 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160_3(transmute([]byte)(data))
 }
 
 // hash_bytes_160_3 will hash the given input and return the
 // computed hash
-hash_bytes_160_3 :: proc(data: []byte) -> [20]byte {
-    _create_haval_ctx(._20, 3)
-    return _hash_impl->hash_bytes_20(data)
+hash_bytes_160_3 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_160_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160_3(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_160_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_160_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160_3 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    _create_haval_ctx(._20, 3)
-    return _hash_impl->hash_stream_20(s)
+hash_stream_160_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 3
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_160_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_160_3 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    _create_haval_ctx(._20, 3)
-    return _hash_impl->hash_file_20(hd, load_at_once)
+hash_file_160_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
+    if !load_at_once {
+        return hash_stream_160_3(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_160_3(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160_3 :: proc {
@@ -223,33 +362,84 @@ hash_160_3 :: proc {
     hash_file_160_3,
     hash_bytes_160_3,
     hash_string_160_3,
+    hash_bytes_to_buffer_160_3,
+    hash_string_to_buffer_160_3,
 }
 
 // hash_string_160_4 will hash the given input and return the
 // computed hash
-hash_string_160_4 :: proc(data: string) -> [20]byte {
+hash_string_160_4 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160_4(transmute([]byte)(data))
 }
 
 // hash_bytes_160_4 will hash the given input and return the
 // computed hash
-hash_bytes_160_4 :: proc(data: []byte) -> [20]byte {
-    _create_haval_ctx(._20, 4)
-    return _hash_impl->hash_bytes_20(data)
+hash_bytes_160_4 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_160_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160_4(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_160_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_160_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160_4 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    _create_haval_ctx(._20, 4)
-    return _hash_impl->hash_stream_20(s)
+hash_stream_160_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 4
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_160_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_160_4 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    _create_haval_ctx(._20, 4)
-    return _hash_impl->hash_file_20(hd, load_at_once)
+hash_file_160_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
+    if !load_at_once {
+        return hash_stream_160_4(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_160_4(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160_4 :: proc {
@@ -257,33 +447,84 @@ hash_160_4 :: proc {
     hash_file_160_4,
     hash_bytes_160_4,
     hash_string_160_4,
+    hash_bytes_to_buffer_160_4,
+    hash_string_to_buffer_160_4,
 }
 
 // hash_string_160_5 will hash the given input and return the
 // computed hash
-hash_string_160_5 :: proc(data: string) -> [20]byte {
+hash_string_160_5 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160_5(transmute([]byte)(data))
 }
 
 // hash_bytes_160_5 will hash the given input and return the
 // computed hash
-hash_bytes_160_5 :: proc(data: []byte) -> [20]byte {
-    _create_haval_ctx(._20, 5)
-    return _hash_impl->hash_bytes_20(data)
+hash_bytes_160_5 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_160_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160_5(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_160_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_160_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160_5 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    _create_haval_ctx(._20, 5)
-    return _hash_impl->hash_stream_20(s)
+hash_stream_160_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 5
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_160_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_160_5 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    _create_haval_ctx(._20, 5)
-    return _hash_impl->hash_file_20(hd, load_at_once)
+hash_file_160_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
+    if !load_at_once {
+        return hash_stream_160_5(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_160_5(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160_5 :: proc {
@@ -291,33 +532,84 @@ hash_160_5 :: proc {
     hash_file_160_5,
     hash_bytes_160_5,
     hash_string_160_5,
+    hash_bytes_to_buffer_160_5,
+    hash_string_to_buffer_160_5,
 }
 
 // hash_string_192_3 will hash the given input and return the
 // computed hash
-hash_string_192_3 :: proc(data: string) -> [24]byte {
+hash_string_192_3 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192_3(transmute([]byte)(data))
 }
 
 // hash_bytes_192_3 will hash the given input and return the
 // computed hash
-hash_bytes_192_3 :: proc(data: []byte) -> [24]byte {
-    _create_haval_ctx(._24, 3)
-    return _hash_impl->hash_bytes_24(data)
+hash_bytes_192_3 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_192_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192_3(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_192_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_192_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192_3 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    _create_haval_ctx(._24, 3)
-    return _hash_impl->hash_stream_24(s)
+hash_stream_192_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 3
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_192_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_192_3 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
-    _create_haval_ctx(._24, 3)
-    return _hash_impl->hash_file_24(hd, load_at_once)
+hash_file_192_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
+    if !load_at_once {
+        return hash_stream_192_3(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_192_3(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192_3 :: proc {
@@ -325,33 +617,84 @@ hash_192_3 :: proc {
     hash_file_192_3,
     hash_bytes_192_3,
     hash_string_192_3,
+    hash_bytes_to_buffer_192_3,
+    hash_string_to_buffer_192_3,
 }
 
 // hash_string_192_4 will hash the given input and return the
 // computed hash
-hash_string_192_4 :: proc(data: string) -> [24]byte {
+hash_string_192_4 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192_4(transmute([]byte)(data))
 }
 
 // hash_bytes_192_4 will hash the given input and return the
 // computed hash
-hash_bytes_192_4 :: proc(data: []byte) -> [24]byte {
-    _create_haval_ctx(._24, 4)
-    return _hash_impl->hash_bytes_24(data)
+hash_bytes_192_4 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_192_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192_4(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_192_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_192_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192_4 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    _create_haval_ctx(._24, 4)
-    return _hash_impl->hash_stream_24(s)
+hash_stream_192_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 4
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_192_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_192_4 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
-    _create_haval_ctx(._24, 4)
-    return _hash_impl->hash_file_24(hd, load_at_once)
+hash_file_192_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
+    if !load_at_once {
+        return hash_stream_192_4(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_192_4(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192_4 :: proc {
@@ -359,33 +702,84 @@ hash_192_4 :: proc {
     hash_file_192_4,
     hash_bytes_192_4,
     hash_string_192_4,
+    hash_bytes_to_buffer_192_4,
+    hash_string_to_buffer_192_4,
 }
 
 // hash_string_192_5 will hash the given input and return the
 // computed hash
-hash_string_192_5 :: proc(data: string) -> [24]byte {
+hash_string_192_5 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192_5(transmute([]byte)(data))
 }
 
-// hash_bytes_224_5 will hash the given input and return the
+// hash_bytes_2DIGEST_SIZE_192_5 will hash the given input and return the
 // computed hash
-hash_bytes_192_5 :: proc(data: []byte) -> [24]byte {
-    _create_haval_ctx(._24, 5)
-    return _hash_impl->hash_bytes_24(data)
+hash_bytes_192_5 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_192_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192_5(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_192_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_192_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192_5 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    _create_haval_ctx(._24, 5)
-    return _hash_impl->hash_stream_24(s)
+hash_stream_192_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 5
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_192_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_192_5 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
-    _create_haval_ctx(._24, 5)
-    return _hash_impl->hash_file_24(hd, load_at_once)
+hash_file_192_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
+    if !load_at_once {
+        return hash_stream_192_5(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_192_5(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192_5 :: proc {
@@ -393,33 +787,84 @@ hash_192_5 :: proc {
     hash_file_192_5,
     hash_bytes_192_5,
     hash_string_192_5,
+    hash_bytes_to_buffer_192_5,
+    hash_string_to_buffer_192_5,
 }
 
 // hash_string_224_3 will hash the given input and return the
 // computed hash
-hash_string_224_3 :: proc(data: string) -> [28]byte {
+hash_string_224_3 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224_3(transmute([]byte)(data))
 }
 
 // hash_bytes_224_3 will hash the given input and return the
 // computed hash
-hash_bytes_224_3 :: proc(data: []byte) -> [28]byte {
-    _create_haval_ctx(._28, 3)
-    return _hash_impl->hash_bytes_28(data)
+hash_bytes_224_3 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_224_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224_3(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_224_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_224_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224_3 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_haval_ctx(._28, 3)
-    return _hash_impl->hash_stream_28(s)
+hash_stream_224_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 3
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_224_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_224_3 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_haval_ctx(._28, 3)
-    return _hash_impl->hash_file_28(hd, load_at_once)
+hash_file_224_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
+    if !load_at_once {
+        return hash_stream_224_3(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_224_3(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224_3 :: proc {
@@ -427,33 +872,84 @@ hash_224_3 :: proc {
     hash_file_224_3,
     hash_bytes_224_3,
     hash_string_224_3,
+    hash_bytes_to_buffer_224_3,
+    hash_string_to_buffer_224_3,
 }
 
 // hash_string_224_4 will hash the given input and return the
 // computed hash
-hash_string_224_4 :: proc(data: string) -> [28]byte {
+hash_string_224_4 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224_4(transmute([]byte)(data))
 }
 
 // hash_bytes_224_4 will hash the given input and return the
 // computed hash
-hash_bytes_224_4 :: proc(data: []byte) -> [28]byte {
-    _create_haval_ctx(._28, 4)
-    return _hash_impl->hash_bytes_28(data)
+hash_bytes_224_4 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_224_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224_4(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_224_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_224_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224_4 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_haval_ctx(._28, 4)
-    return _hash_impl->hash_stream_28(s)
+hash_stream_224_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 4
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_224_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_224_4 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_haval_ctx(._28, 4)
-    return _hash_impl->hash_file_28(hd, load_at_once)
+hash_file_224_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
+    if !load_at_once {
+        return hash_stream_224_4(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_224_4(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224_4 :: proc {
@@ -461,33 +957,84 @@ hash_224_4 :: proc {
     hash_file_224_4,
     hash_bytes_224_4,
     hash_string_224_4,
+    hash_bytes_to_buffer_224_4,
+    hash_string_to_buffer_224_4,
 }
 
 // hash_string_224_5 will hash the given input and return the
 // computed hash
-hash_string_224_5 :: proc(data: string) -> [28]byte {
+hash_string_224_5 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224_5(transmute([]byte)(data))
 }
 
 // hash_bytes_224_5 will hash the given input and return the
 // computed hash
-hash_bytes_224_5 :: proc(data: []byte) -> [28]byte {
-    _create_haval_ctx(._28, 5)
-    return _hash_impl->hash_bytes_28(data)
+hash_bytes_224_5 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_224_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224_5(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_224_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_224_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224_5 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_haval_ctx(._28, 5)
-    return _hash_impl->hash_stream_28(s)
+hash_stream_224_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 5
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_224_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_224_5 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_haval_ctx(._28, 5)
-    return _hash_impl->hash_file_28(hd, load_at_once)
+hash_file_224_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
+    if !load_at_once {
+        return hash_stream_224_5(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_224_5(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224_5 :: proc {
@@ -495,33 +1042,84 @@ hash_224_5 :: proc {
     hash_file_224_5,
     hash_bytes_224_5,
     hash_string_224_5,
+    hash_bytes_to_buffer_224_5,
+    hash_string_to_buffer_224_5,
 }
 
 // hash_string_256_3 will hash the given input and return the
 // computed hash
-hash_string_256_3 :: proc(data: string) -> [32]byte {
+hash_string_256_3 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256_3(transmute([]byte)(data))
 }
 
 // hash_bytes_256_3 will hash the given input and return the
 // computed hash
-hash_bytes_256_3 :: proc(data: []byte) -> [32]byte {
-    _create_haval_ctx(._32, 3)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256_3 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256_3(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256_3 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_haval_ctx(._32, 3)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 3
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_256_3 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_haval_ctx(._32, 3)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256_3(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256_3(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256_3 :: proc {
@@ -529,33 +1127,84 @@ hash_256_3 :: proc {
     hash_file_256_3,
     hash_bytes_256_3,
     hash_string_256_3,
+    hash_bytes_to_buffer_256_3,
+    hash_string_to_buffer_256_3,
 }
 
 // hash_string_256_4 will hash the given input and return the
 // computed hash
-hash_string_256_4 :: proc(data: string) -> [32]byte {
+hash_string_256_4 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256_4(transmute([]byte)(data))
 }
 
 // hash_bytes_256_4 will hash the given input and return the
 // computed hash
-hash_bytes_256_4 :: proc(data: []byte) -> [32]byte {
-    _create_haval_ctx(._32, 4)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256_4 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256_4(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256_4 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_haval_ctx(._32, 4)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 4
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_256_4 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_haval_ctx(._32, 4)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256_4(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256_4(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256_4 :: proc {
@@ -563,33 +1212,85 @@ hash_256_4 :: proc {
     hash_file_256_4,
     hash_bytes_256_4,
     hash_string_256_4,
+    hash_bytes_to_buffer_256_4,
+    hash_string_to_buffer_256_4,
 }
 
 // hash_string_256_5 will hash the given input and return the
 // computed hash
-hash_string_256_5 :: proc(data: string) -> [32]byte {
+hash_string_256_5 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256_5(transmute([]byte)(data))
 }
 
 // hash_bytes_256_5 will hash the given input and return the
 // computed hash
-hash_bytes_256_5 :: proc(data: []byte) -> [32]byte {
-    _create_haval_ctx(._32, 5)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256_5 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
 }
+
+// hash_string_to_buffer_256_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256_5(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 
 // hash_stream_256_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256_5 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_haval_ctx(._32, 5)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 5
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        ctx.str_len = u32(len(buf[:read]))
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_256_5 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_haval_ctx(._32, 5)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256_5(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256_5(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256_5 :: proc {
@@ -597,266 +1298,101 @@ hash_256_5 :: proc {
     hash_file_256_5,
     hash_bytes_256_5,
     hash_string_256_5,
+    hash_bytes_to_buffer_256_5,
+    hash_string_to_buffer_256_5,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+init :: proc(ctx: ^Haval_Context) {
+    assert(ctx.hashbitlen == 128 || ctx.hashbitlen == 160 || ctx.hashbitlen == 192 || ctx.hashbitlen == 224 || ctx.hashbitlen == 256, "hashbitlen must be set to 128, 160, 192, 224 or 256")
+    assert(ctx.rounds == 3 || ctx.rounds == 4 || ctx.rounds == 5, "rounds must be set to 3, 4 or 5")
+    ctx.fingerprint[0] = 0x243f6a88
+    ctx.fingerprint[1] = 0x85a308d3
+    ctx.fingerprint[2] = 0x13198a2e
+    ctx.fingerprint[3] = 0x03707344
+    ctx.fingerprint[4] = 0xa4093822
+    ctx.fingerprint[5] = 0x299f31d0
+    ctx.fingerprint[6] = 0x082efa98
+    ctx.fingerprint[7] = 0xec4e6c89
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
-}
+// @note(zh): Make sure to set ctx.str_len to the remaining buffer size before calling this proc - e.g. ctx.str_len = u32(len(data))
+update :: proc(ctx: ^Haval_Context, data: []byte) {
+    i: u32
+    rmd_len  := u32((ctx.count[0] >> 3) & 0x7f)
+    fill_len := 128 - rmd_len
+    str_len  := ctx.str_len
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
-
-hash_bytes_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [16]byte {
-    hash: [16]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        c.str_len = u32(len(data))
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
+    ctx.count[0] += str_len << 3
+    if ctx.count[0] < (str_len << 3) {
+        ctx.count[1] += 1
     }
-    return hash
-}
+    ctx.count[1] += str_len >> 29
 
-hash_stream_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                c.str_len = u32(len(buf[:read]))
-                update_odin(&c, buf[:read])
-            } 
+    when ODIN_ENDIAN == "little" {
+        if rmd_len + str_len >= 128 {
+            copy(util.slice_to_bytes(ctx.block[:])[rmd_len:], data[:fill_len])
+            block(ctx, ctx.rounds)
+            for i = fill_len; i + 127 < str_len; i += 128 {
+                copy(util.slice_to_bytes(ctx.block[:]), data[i:128])
+                block(ctx, ctx.rounds)
+            }
+            rmd_len = 0
+        } else {
+            i = 0
         }
-        final_odin(&c, hash[:])
-        return hash, true
+        copy(util.slice_to_bytes(ctx.block[:])[rmd_len:], data[i:])
     } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_16(ctx, buf[:]), ok
+        if rmd_len + str_len >= 128 {
+            copy(ctx.remainder[rmd_len:], data[:fill_len])
+            CH2UINT(ctx.remainder[:], ctx.block[:])
+            block(ctx, ctx.rounds)
+            for i = fill_len; i + 127 < str_len; i += 128 {
+                copy(ctx.remainder[:], data[i:128])
+                CH2UINT(ctx.remainder[:], ctx.block[:])
+                block(ctx, ctx.rounds)
+            }
+            rmd_len = 0
+        } else {
+            i = 0
         }
+        copy(ctx.remainder[rmd_len:], data[i:])
     }
-    return [16]byte{}, false
 }
 
-hash_bytes_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [20]byte {
-    hash: [20]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        c.str_len = u32(len(data))
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
+final :: proc(ctx: ^Haval_Context, hash: []byte) {
+    pad_len: u32
+    tail: [10]byte
 
-hash_stream_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                c.str_len = u32(len(buf[:read]))
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
+    tail[0] = byte(ctx.hashbitlen & 0x3) << 6 | byte(ctx.rounds & 0x7) << 3 | (VERSION & 0x7)
+    tail[1] = byte(ctx.hashbitlen >> 2) & 0xff
+
+    UINT2CH(ctx.count[:], util.slice_to_bytes(tail[2:]), 2)
+    rmd_len := (ctx.count[0] >> 3) & 0x7f
+    if rmd_len < 118 {
+        pad_len = 118 - rmd_len
     } else {
-        return hash, false
+        pad_len = 246 - rmd_len
     }
-}
 
-hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_20(ctx, buf[:]), ok
-        }
-    }
-    return [20]byte{}, false
-}
+    ctx.str_len = pad_len
+    update(ctx, PADDING[:])
+    ctx.str_len = 10
+    update(ctx, tail[:])
+    tailor(ctx, ctx.hashbitlen)
+    UINT2CH(ctx.fingerprint[:], hash, ctx.hashbitlen >> 5)
 
-hash_bytes_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [24]byte {
-    hash: [24]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        c.str_len = u32(len(data))
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([24]byte, bool) {
-    hash: [24]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            c.str_len = u32(len(buf[:read]))
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_24 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_24(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_24(ctx, buf[:]), ok
-        }
-    }
-    return [24]byte{}, false
-}
-
-hash_bytes_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [28]byte {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        c.str_len = u32(len(data))
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            c.str_len = u32(len(buf[:read]))
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_28(ctx, buf[:]), ok
-        }
-    }
-    return [28]byte{}, false
-}
-
-hash_bytes_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        c.str_len = u32(len(data))
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            c.str_len = u32(len(buf[:read]))
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_32(ctx, buf[:]), ok
-        }
-    }
-    return [32]byte{}, false
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        c.str_len = u32(len(data))
-        update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Haval_Context); ok {
-        final_odin(&c, hash)
-    }
+    mem.set(ctx, 0, size_of(ctx))
 }
 
 /*
     HAVAL implementation
 */
 
-HAVAL_VERSION :: 1
+VERSION :: 1
 
 Haval_Context :: struct {
     count:       [2]u32,
@@ -879,23 +1415,23 @@ PADDING := [128]byte {
    0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-F_1 :: #force_inline proc(x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
+F_1 :: #force_inline proc "contextless" (x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
     return ((x1) & ((x0) ~ (x4)) ~ (x2) & (x5) ~ (x3) & (x6) ~ (x0))
 }
 
-F_2 :: #force_inline proc(x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
+F_2 :: #force_inline proc "contextless" (x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
     return ((x2) & ((x1) & ~(x3) ~ (x4) & (x5) ~ (x6) ~ (x0)) ~ (x4) & ((x1) ~ (x5)) ~ (x3) & (x5) ~ (x0))
 }
 
-F_3 :: #force_inline proc(x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
+F_3 :: #force_inline proc "contextless" (x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
     return ((x3) & ((x1) & (x2) ~ (x6) ~ (x0)) ~ (x1) & (x4) ~ (x2) & (x5) ~ (x0))
 }
 
-F_4 :: #force_inline proc(x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
+F_4 :: #force_inline proc "contextless" (x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
     return ((x4) & ((x5) & ~(x2) ~ (x3) & ~(x6) ~ (x1) ~ (x6) ~ (x0)) ~ (x3) & ((x1) & (x2) ~ (x5) ~ (x6)) ~ (x2) & (x6) ~ (x0))
 }
 
-F_5 :: #force_inline proc(x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
+F_5 :: #force_inline proc "contextless" (x6, x5, x4, x3, x2, x1, x0: u32) -> u32 {
     return ((x0) & ((x1) & (x2) & (x3) ~ ~(x5)) ~ (x1) & (x4) ~ (x2) & (x5) ~ (x3) & (x6))
 }
 
@@ -976,13 +1512,13 @@ FF_5 :: #force_inline proc(x7, x6, x5, x4, x3, x2, x1, x0, w, c, rounds: u32) ->
     return x8
 }
 
-HAVAL_CH2UINT :: #force_inline proc  (str: []byte, word: []u32) {
+CH2UINT :: #force_inline proc "contextless" (str: []byte, word: []u32) {
     for _, i in word[:32] {
         word[i] = u32(str[i*4+0]) << 0 | u32(str[i*4+1]) << 8 | u32(str[i*4+2]) << 16 | u32(str[i*4+3]) << 24
     }
 }
 
-HAVAL_UINT2CH :: #force_inline proc(word: []u32, str: []byte, wlen: u32) {
+UINT2CH :: #force_inline proc "contextless" (word: []u32, str: []byte, wlen: u32) {
     for _, i in word[:wlen] {
         str[i*4+0] = byte(word[i] >> 0) & 0xff
         str[i*4+1] = byte(word[i] >> 8) & 0xff
@@ -991,7 +1527,7 @@ HAVAL_UINT2CH :: #force_inline proc(word: []u32, str: []byte, wlen: u32) {
     }
 }
 
-haval_block :: proc(ctx: ^Haval_Context, rounds: u32) {
+block :: proc(ctx: ^Haval_Context, rounds: u32) {
     t0, t1, t2, t3 := ctx.fingerprint[0], ctx.fingerprint[1], ctx.fingerprint[2], ctx.fingerprint[3]
     t4, t5, t6, t7 := ctx.fingerprint[4], ctx.fingerprint[5], ctx.fingerprint[6], ctx.fingerprint[7]
     w := ctx.block
@@ -1190,7 +1726,7 @@ haval_block :: proc(ctx: ^Haval_Context, rounds: u32) {
     ctx.fingerprint[7] += t7
 }
 
-haval_tailor :: proc(ctx: ^Haval_Context, size: u32) {
+tailor :: proc(ctx: ^Haval_Context, size: u32) {
     temp: u32
     switch size {
         case 128:
@@ -1275,83 +1811,4 @@ haval_tailor :: proc(ctx: ^Haval_Context, size: u32) {
             ctx.fingerprint[5] += (ctx.fingerprint[7] >>  4) & 0x1f
             ctx.fingerprint[6] +=  ctx.fingerprint[7]        & 0x0f                
     }
-}
-
-init_odin :: proc(ctx: ^Haval_Context) {
-    ctx.fingerprint[0] = 0x243f6a88
-    ctx.fingerprint[1] = 0x85a308d3
-    ctx.fingerprint[2] = 0x13198a2e
-    ctx.fingerprint[3] = 0x03707344
-    ctx.fingerprint[4] = 0xa4093822
-    ctx.fingerprint[5] = 0x299f31d0
-    ctx.fingerprint[6] = 0x082efa98
-    ctx.fingerprint[7] = 0xec4e6c89
-}
-
-update_odin :: proc(ctx: ^Haval_Context, data: []byte) {
-    i: u32
-    rmd_len  := u32((ctx.count[0] >> 3) & 0x7f)
-    fill_len := 128 - rmd_len
-    str_len  := ctx.str_len
-
-    ctx.count[0] += str_len << 3
-    if ctx.count[0] < (str_len << 3) {
-        ctx.count[1] += 1
-    }
-    ctx.count[1] += str_len >> 29
-
-    when ODIN_ENDIAN == "little" {
-        if rmd_len + str_len >= 128 {
-            copy(util.slice_to_bytes(ctx.block[:])[rmd_len:], data[:fill_len])
-            haval_block(ctx, ctx.rounds)
-            for i = fill_len; i + 127 < str_len; i += 128 {
-                copy(util.slice_to_bytes(ctx.block[:]), data[i:128])
-                haval_block(ctx, ctx.rounds)
-            }
-            rmd_len = 0
-        } else {
-            i = 0
-        }
-        copy(util.slice_to_bytes(ctx.block[:])[rmd_len:], data[i:])
-    } else {
-        if rmd_len + str_len >= 128 {
-            copy(ctx.remainder[rmd_len:], data[:fill_len])
-            HAVAL_CH2UINT(ctx.remainder[:], ctx.block[:])
-            haval_block(ctx, ctx.rounds)
-            for i = fill_len; i + 127 < str_len; i += 128 {
-                copy(ctx.remainder[:], data[i:128])
-                HAVAL_CH2UINT(ctx.remainder[:], ctx.block[:])
-                haval_block(ctx, ctx.rounds)
-            }
-            rmd_len = 0
-        } else {
-            i = 0
-        }
-        copy(ctx.remainder[rmd_len:], data[i:])
-    }
-}
-
-final_odin :: proc(ctx: ^Haval_Context, hash: []byte) {
-    pad_len: u32
-    tail: [10]byte
-
-    tail[0] = byte(ctx.hashbitlen & 0x3) << 6 | byte(ctx.rounds & 0x7) << 3 | (HAVAL_VERSION & 0x7)
-    tail[1] = byte(ctx.hashbitlen >> 2) & 0xff
-
-    HAVAL_UINT2CH(ctx.count[:], util.slice_to_bytes(tail[2:]), 2)
-    rmd_len := (ctx.count[0] >> 3) & 0x7f
-    if rmd_len < 118 {
-        pad_len = 118 - rmd_len
-    } else {
-        pad_len = 246 - rmd_len
-    }
-
-    ctx.str_len = pad_len
-    update_odin(ctx, PADDING[:])
-    ctx.str_len = 10
-    update_odin(ctx, tail[:])
-    haval_tailor(ctx, ctx.hashbitlen)
-    HAVAL_UINT2CH(ctx.fingerprint[:], hash, ctx.hashbitlen >> 5)
-
-    mem.set(ctx, 0, size_of(ctx))
 }

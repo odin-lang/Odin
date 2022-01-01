@@ -18,7 +18,7 @@ Marshal_Error :: union {
 
 marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.make_builder(allocator)
-	defer if err != nil || data == nil {
+	defer if err != .None {
 		strings.destroy_builder(&b)
 	}
 
@@ -27,7 +27,7 @@ marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: M
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
-	return
+	return data, .None
 }
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {

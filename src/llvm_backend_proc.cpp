@@ -1,4 +1,4 @@
-void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false) {
+void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
@@ -27,7 +27,7 @@ void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue l
 	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile);
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
-void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false) {
+void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
@@ -258,8 +258,8 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		if (entity->file != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->file);
 			scope = file;
-		} else if (ident != nullptr && ident->file != nullptr) {
-			file = lb_get_llvm_metadata(m, ident->file);
+		} else if (ident != nullptr && ident->file_id != 0) {
+			file = lb_get_llvm_metadata(m, ident->file());
 			scope = file;
 		} else if (entity->scope != nullptr) {
 			file = lb_get_llvm_metadata(m, entity->scope->file);
@@ -735,6 +735,10 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		}
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
+
+		if (return_ptr.value != nullptr) {
+			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
+		}
 
 		switch (inlining) {
 		case ProcInlining_none:
@@ -2002,7 +2006,22 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");
 					}
-					
+
+					// The SYSCALL instruction stores the address of the
+					// following instruction into RCX, and RFLAGS in R11.
+					//
+					// RSP is not saved, but at least on Linux it appears
+					// that the kernel system-call handler does the right
+					// thing.
+					//
+					// Some but not all system calls will additionally
+					// clobber memory.
+					//
+					// TODO: FreeBSD is different and will also clobber
+					// R8, R9, and R10.  Additionally CF is used to
+					// indicate an error instead of -errno.
+					constraints = gb_string_appendc(constraints, ",~{rcx},~{r11},~{memory}");
+
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;

@@ -42,7 +42,6 @@ when ODIN_NO_CRT && ODIN_OS == "windows" {
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
-			d_end, s_end := d[len:], s[len:]
 			for i := len-1; i >= 0; i -= 1 {
 				d[i] = s[i]
 			}
@@ -54,7 +53,6 @@ when ODIN_NO_CRT && ODIN_OS == "windows" {
 	memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
-			d_end, s_end := d[len:], s[len:]
 			for i := len-1; i >= 0; i -= 1 {
 				d[i] = s[i]
 			}

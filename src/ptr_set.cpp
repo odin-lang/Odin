@@ -24,7 +24,9 @@ template <typename T> void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
 template <typename T>
 void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
-	capacity = next_pow2_isize(gb_max(16, capacity));
+	if (capacity != 0) {
+		capacity = next_pow2_isize(gb_max(16, capacity));
+	}
 
 	slice_init(&s->hashes,  a, capacity);
 	array_init(&s->entries, a, 0, capacity);

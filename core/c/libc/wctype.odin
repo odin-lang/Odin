@@ -4,6 +4,8 @@ package libc
 
 when ODIN_OS == "windows" {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == "darwin" {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
@@ -14,8 +16,13 @@ when ODIN_OS == "windows" {
 }
 
 when ODIN_OS == "linux" {
-	wctrans_t :: distinct rawptr
+	wctrans_t :: distinct intptr_t
 	wctype_t  :: distinct ulong
+}
+
+when ODIN_OS == "darwin" {
+	wctrans_t :: distinct int
+	wctype_t  :: distinct u32
 }
 
 @(default_calling_convention="c")

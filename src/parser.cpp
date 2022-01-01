@@ -11,7 +11,7 @@ Token token_end_of_line(AstFile *f, Token tok) {
 }
 
 gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
-	AstFile *file = get_ast_file_from_id(pos.file_id);
+	AstFile *file = thread_safe_get_ast_file_from_id(pos.file_id);
 	if (file == nullptr) {
 		return nullptr;
 	}
@@ -65,7 +65,7 @@ Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 
 	Ast *node = cast(Ast *)gb_alloc(a, size);
 	node->kind = kind;
-	node->file = f;
+	node->file_id = f ? f->id : 0;
 	return node;
 }
 
@@ -95,7 +95,8 @@ Ast *clone_ast(Ast *node) {
 	if (node == nullptr) {
 		return nullptr;
 	}
-	Ast *n = alloc_ast_node(node->file, node->kind);
+	AstFile *f = node->thread_safe_file();
+	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
 
 	switch (n->kind) {
@@ -399,8 +400,9 @@ void error(Ast *node, char const *fmt, ...) {
 	va_start(va, fmt);
 	error_va(token.pos, end_pos, fmt, va);
 	va_end(va);
-	if (node != nullptr && node->file != nullptr) {
-		node->file->error_count += 1;
+	if (node != nullptr && node->file_id != 0) {
+		AstFile *f = node->thread_safe_file();
+		f->error_count += 1;
 	}
 }
 
@@ -413,8 +415,9 @@ void error_no_newline(Ast *node, char const *fmt, ...) {
 	va_start(va, fmt);
 	error_no_newline_va(token.pos, fmt, va);
 	va_end(va);
-	if (node != nullptr && node->file != nullptr) {
-		node->file->error_count += 1;
+	if (node != nullptr && node->file_id != 0) {
+		AstFile *f = node->thread_safe_file();
+		f->error_count += 1;
 	}
 }
 
@@ -442,8 +445,9 @@ void syntax_error(Ast *node, char const *fmt, ...) {
 	va_start(va, fmt);
 	syntax_error_va(token.pos, end_pos, fmt, va);
 	va_end(va);
-	if (node != nullptr && node->file != nullptr) {
-		node->file->error_count += 1;
+	if (node != nullptr && node->file_id != 0) {
+		AstFile *f = node->thread_safe_file();
+		f->error_count += 1;
 	}
 }
 
@@ -4665,7 +4669,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
 	set_file_path_string(f->id, fullpath);
-	set_ast_file_from_id(f->id, f);
+	thread_safe_set_ast_file_from_id(f->id, f);
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}

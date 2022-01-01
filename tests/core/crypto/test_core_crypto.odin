@@ -33,7 +33,6 @@ import "core:crypto/tiger2"
 import "core:crypto/gost"
 import "core:crypto/streebog"
 import "core:crypto/sm3"
-import "core:crypto/skein"
 import "core:crypto/jh"
 import "core:crypto/groestl"
 import "core:crypto/haval"
@@ -102,7 +101,6 @@ main :: proc() {
     test_tiger2_160(&t)
     test_tiger2_192(&t)
     test_sm3(&t)
-    test_skein512(&t)
     test_jh_224(&t)
     test_jh_256(&t)
     test_jh_384(&t)
@@ -116,6 +114,15 @@ main :: proc() {
     test_haval_192(&t)
     test_haval_224(&t)
     test_haval_256(&t)
+
+    // "modern" crypto tests
+    test_chacha20(&t)
+    test_poly1305(&t)
+    test_chacha20poly1305(&t)
+    test_x25519(&t)
+    test_rand_bytes(&t)
+
+    bench_modern(&t)
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 }
@@ -171,13 +178,6 @@ test_md4 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    md4.use_botan()
-    for v, _ in test_vectors {
-        computed     := md4.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-
 }
 
 @(test)
@@ -192,12 +192,6 @@ test_md5 :: proc(t: ^testing.T) {
         TestHash{"d174ab98d277d9f5a5611c2c9f419d9f", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
         TestHash{"57edf4a22be3c955ac49da2e2107b67a", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
     }
-    for v, _ in test_vectors {
-        computed     := md5.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    md5.use_botan()
     for v, _ in test_vectors {
         computed     := md5.hash(v.str)
         computed_str := hex_string(computed[:])
@@ -225,14 +219,7 @@ test_sha1 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha1.use_botan()
-    for v, _ in test_vectors {
-        computed     := sha1.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
-
 
 @(test)
 test_sha224 :: proc(t: ^testing.T) {
@@ -245,12 +232,6 @@ test_sha224 :: proc(t: ^testing.T) {
         TestHash{"75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
         TestHash{"c97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"},
     }
-    for v, _ in test_vectors {
-        computed     := sha2.hash_224(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    sha2.use_botan()
     for v, _ in test_vectors {
         computed     := sha2.hash_224(v.str)
         computed_str := hex_string(computed[:])
@@ -274,13 +255,6 @@ test_sha256 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha2.use_botan()
-    for v, _ in test_vectors {
-        computed     := sha2.hash_256(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-
 }
 
 @(test)
@@ -299,13 +273,6 @@ test_sha384 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha2.use_botan()
-    for v, _ in test_vectors {
-        computed     := sha2.hash_384(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-
 }
 
 @(test)
@@ -324,14 +291,7 @@ test_sha512 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha2.use_botan()
-    for v, _ in test_vectors {
-        computed     := sha2.hash_512(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
-
 
 @(test)
 test_sha3_224 :: proc(t: ^testing.T) {
@@ -348,12 +308,6 @@ test_sha3_224 :: proc(t: ^testing.T) {
         TestHash{"8a24108b154ada21c9fd5574494479ba5c7e7ab76ef264ead0fcce33", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
         TestHash{"543e6868e1666c1a643630df77367ae5a62a85070a51c14cbf665cbc", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"},
     }
-    for v, _ in test_vectors {
-        computed     := sha3.hash_224(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    sha3.use_botan()
     for v, _ in test_vectors {
         computed     := sha3.hash_224(v.str)
         computed_str := hex_string(computed[:])
@@ -381,12 +335,6 @@ test_sha3_256 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha3.use_botan()
-    for v, _ in test_vectors {
-        computed     := sha3.hash_256(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -404,12 +352,6 @@ test_sha3_384 :: proc(t: ^testing.T) {
         TestHash{"991c665755eb3a4b6bbdfb75c78a492e8c56a22c5c4d7e429bfdbc32b9d4ad5aa04a1f076e62fea19eef51acd0657c22", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
         TestHash{"79407d3b5916b59c3e30b09822974791c313fb9ecc849e406f23592d04f625dc8c709b98b43b3852b337216179aa7fc7", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"},
     }
-    for v, _ in test_vectors {
-        computed     := sha3.hash_384(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    sha3.use_botan()
     for v, _ in test_vectors {
         computed     := sha3.hash_384(v.str)
         computed_str := hex_string(computed[:])
@@ -437,12 +379,6 @@ test_sha3_512 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha3.use_botan()
-    for v, _ in test_vectors {
-        computed     := sha3.hash_512(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -457,12 +393,6 @@ test_shake_128 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    sha3.use_botan()
-    for v, _ in test_vectors {
-        computed     := shake.hash_128(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -472,12 +402,6 @@ test_shake_256 :: proc(t: ^testing.T) {
         TestHash{"2f671343d9b2e1604dc9dcf0753e5fe15c7c64a0d283cbbf722d411a0e36f6ca", "The quick brown fox jumps over the lazy dog"},
         TestHash{"46b1ebb2e142c38b9ac9081bef72877fe4723959640fa57119b366ce6899d401", "The quick brown fox jumps over the lazy dof"},
     }
-    for v, _ in test_vectors {
-        computed     := shake.hash_256(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    sha3.use_botan()
     for v, _ in test_vectors {
         computed     := shake.hash_256(v.str)
         computed_str := hex_string(computed[:])
@@ -499,12 +423,6 @@ test_keccak_224 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    keccak.use_botan()
-    for v, _ in test_vectors {
-        computed     := keccak.hash_224(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -516,12 +434,6 @@ test_keccak_256 :: proc(t: ^testing.T) {
         TestHash{"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", ""},
         TestHash{"4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", "abc"},
     }
-    for v, _ in test_vectors {
-        computed     := keccak.hash_256(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    keccak.use_botan()
     for v, _ in test_vectors {
         computed     := keccak.hash_256(v.str)
         computed_str := hex_string(computed[:])
@@ -543,12 +455,6 @@ test_keccak_384 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    keccak.use_botan()
-    for v, _ in test_vectors {
-        computed     := keccak.hash_384(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -560,12 +466,6 @@ test_keccak_512 :: proc(t: ^testing.T) {
         TestHash{"0eab42de4c3ceb9235fc91acffe746b29c29a8c366b7c60e4e67c466f36a4304c00fa9caf9d87976ba469bcbe06713b435f091ef2769fb160cdab33d3670680e", ""},
         TestHash{"18587dc2ea106b9a1563e32b3312421ca164c7f1f07bc922a9c83d77cea3a1e5d0c69910739025372dc14ac9642629379540c17e2a65b19d77aa511a9d00bb96", "abc"},
     }
-    for v, _ in test_vectors {
-        computed     := keccak.hash_512(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    keccak.use_botan()
     for v, _ in test_vectors {
         computed     := keccak.hash_512(v.str)
         computed_str := hex_string(computed[:])
@@ -597,12 +497,6 @@ test_whirlpool :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    whirlpool.use_botan()
-    for v, _ in test_vectors {
-        computed     := whirlpool.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -623,12 +517,6 @@ test_gost :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    gost.use_botan()
-    for v, _ in test_vectors {
-        computed     := gost.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -643,12 +531,6 @@ test_streebog_256 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    streebog.use_botan()
-    for v, _ in test_vectors {
-        computed     := streebog.hash_256(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -658,12 +540,6 @@ test_streebog_512 :: proc(t: ^testing.T) {
         TestHash{"d2b793a0bb6cb5904828b5b6dcfb443bb8f33efc06ad09368878ae4cdc8245b97e60802469bed1e7c21a64ff0b179a6a1e0bb74d92965450a0adab69162c00fe", "The quick brown fox jumps over the lazy dog"},
         TestHash{"fe0c42f267d921f940faa72bd9fcf84f9f1bd7e9d055e9816e4c2ace1ec83be82d2957cd59b86e123d8f5adee80b3ca08a017599a9fc1a14d940cf87c77df070", "The quick brown fox jumps over the lazy dog."},
     }
-    for v, _ in test_vectors {
-        computed     := streebog.hash_512(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    streebog.use_botan()
     for v, _ in test_vectors {
         computed     := streebog.hash_512(v.str)
         computed_str := hex_string(computed[:])
@@ -738,12 +614,6 @@ test_blake2b :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    blake2b.use_botan()
-    for v, _ in test_vectors {
-        computed     := blake2b.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -792,12 +662,6 @@ test_ripemd_160 :: proc(t: ^testing.T) {
         TestHash{"12a053384a9c0c88e405a06c27dcf49ada62eb2b", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
         TestHash{"b0e20b6e3116640286ed3a87a5713079b21f5189", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
     }
-    for v, _ in test_vectors {
-        computed     := ripemd.hash_160(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    ripemd.use_botan()
     for v, _ in test_vectors {
         computed     := ripemd.hash_160(v.str)
         computed_str := hex_string(computed[:])
@@ -863,12 +727,6 @@ test_tiger_128 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    tiger.use_botan()
-    for v, _ in test_vectors {
-        computed     := tiger.hash_128(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -889,12 +747,6 @@ test_tiger_160 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
-    tiger.use_botan()
-    for v, _ in test_vectors {
-        computed     := tiger.hash_160(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
 }
 
 @(test)
@@ -910,12 +762,6 @@ test_tiger_192 :: proc(t: ^testing.T) {
         TestHash{"1c14795529fd9f207a958f84c52f11e887fa0cabdfd91bfd", "12345678901234567890123456789012345678901234567890123456789012345678901234567890"},
         TestHash{"6d12a41e72e644f017b6f0e2f7b44c6285f06dd5d2c5b075", "The quick brown fox jumps over the lazy dog"},
     }
-    for v, _ in test_vectors {
-        computed     := tiger.hash_192(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    tiger.use_botan()
     for v, _ in test_vectors {
         computed     := tiger.hash_192(v.str)
         computed_str := hex_string(computed[:])
@@ -976,26 +822,6 @@ test_sm3 :: proc(t: ^testing.T) {
     }
     for v, _ in test_vectors {
         computed     := sm3.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-    sm3.use_botan()
-    for v, _ in test_vectors {
-        computed     := sm3.hash(v.str)
-        computed_str := hex_string(computed[:])
-        expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
-    }
-}
-
-@(test)
-test_skein512 :: proc(t: ^testing.T) {
-    test_vectors := [?]TestHash {
-        TestHash{"bc5b4c50925519c290cc634277ae3d6257212395cba733bbad37a4af0fa06af41fca7903d06564fea7a2d3730dbdb80c1f85562dfcc070334ea4d1d9e72cba7a", ""},
-        TestHash{"94c2ae036dba8783d0b3f7d6cc111ff810702f5c77707999be7e1c9486ff238a7044de734293147359b4ac7e1d09cd247c351d69826b78dcddd951f0ef912713", "The quick brown fox jumps over the lazy dog"},
-    }
-    skein.use_botan()
-    for v, _ in test_vectors {
-        computed     := skein.hash_skein512(v.str, 64)
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }

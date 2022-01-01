@@ -504,8 +504,8 @@ index_any :: proc(s, chars: string) -> int {
 		}
 	}
 
-	for c in chars {
-		if i := index_rune(s, c); i >= 0 {
+	for c, i in s {
+		if index_rune(chars, c) >= 0 {
 			return i
 		}
 	}
@@ -1288,7 +1288,7 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&substrings, s[start : end])
+		append(&substrings, s[start : len(s)])
 	}
 
 	return substrings[:]

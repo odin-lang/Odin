@@ -1010,6 +1010,11 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						if (op != Token_RangeHalf) {
 							hi += 1;
 						}
+						GB_ASSERT(0 <= lo && lo <= max_count);
+						GB_ASSERT(0 <= hi && hi <= max_count);
+						GB_ASSERT(lo <= hi);
+						
+						
 						TypeAndValue tav = fv->value->tav;
 						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
 						for (i64 k = lo; k < hi; k++) {
@@ -1021,6 +1026,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						TypeAndValue index_tav = fv->field->tav;
 						GB_ASSERT(index_tav.mode == Addressing_Constant);
 						i64 index = exact_value_to_i64(index_tav.value);
+						GB_ASSERT(index < max_count);
 						TypeAndValue tav = fv->value->tav;
 						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
 						i64 offset = matrix_row_major_index_to_offset(type, index);

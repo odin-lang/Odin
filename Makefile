@@ -8,16 +8,27 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
-    LLVM11_DIR=$(and $(shell which brew),$(shell brew --prefix llvm@11))
-    ifneq ($(LLVM11_DIR),)
-        LLVM_CONFIG="$(LLVM11_DIR)/bin/llvm-config"
-    else
-        LLVM_CONFIG=llvm-config
-        ifneq ($(shell llvm-config --version | grep '^11\.'),)
-            LLVM_CONFIG=llvm-config
+    ARCH=$(shell uname -m)
+
+    # LLVM Version Setting  
+    LLVM_VERSION_PATTERN="^11\."
+    LLVM_VERSION="11"
+    ifeq ($(ARCH), arm64)
+	    LLVM_VERSION="13"
+        LLVM_VERSION_PATTERN="^13"
+    endif
+
+    ifeq ($(LLVM_CONFIG),)
+        LLVMXX_DIR=$(and $(shell which brew),$(shell brew --prefix llvm@$(LLVM_VERSION)))
+        ifneq ($(LLVMXX_DIR),)
+            LLVM_CONFIG="$(LLVMXX_DIR)/bin/llvm-config"
         else
-            $(error "Requirement: llvm-config must be version 11")
+            LLVM_CONFIG=llvm-config
         endif
+    endif
+
+    ifeq ($(shell $(LLVM_CONFIG) --version | grep $(LLVM_VERSION_PATTERN)),)
+        $(error "Requirement: llvm-config must be version $(LLVM_VERSION)")
     endif
 
     LDFLAGS:=$(LDFLAGS) -liconv

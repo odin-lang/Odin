@@ -579,6 +579,7 @@ Field_Flags_Signature :: Field_Flags{
 	.No_Alias,
 	.C_Vararg,
 	.Auto_Cast,
+	.Any_Int,
 	.Default_Parameters,
 }
 
@@ -710,6 +711,7 @@ Union_Type :: struct {
 	poly_params:   ^Field_List,
 	align:         ^Expr,
 	is_maybe:      bool,
+	is_no_nil:     bool,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 	variants:      []^Expr,

@@ -3,7 +3,13 @@ package portmidi
 import "core:c"
 import "core:strings"
 
-when ODIN_OS == "windows" { foreign import lib "portmidi.lib" }
+when ODIN_OS == "windows" { 
+	foreign import lib {
+		"portmidi_s.lib",
+		"system:Winmm.lib",
+		"system:Advapi32.lib",
+	}
+}
 
 #assert(size_of(b32) == size_of(c.int))
 
@@ -15,17 +21,17 @@ Error :: enum c.int {
 	GotData = 1, /**< A "no error" return that also indicates data available */
 	HostError = -10000,
 	InvalidDeviceId, /** out of range or 
-		            * output device when input is requested or 
-		            * input device when output is requested or
-		            * device is already opened 
-		            */
+	                   * output device when input is requested or 
+	                   * input device when output is requested or
+	                   * device is already opened 
+	                   */
 	InsufficientMemory,
 	BufferTooSmall,
 	BufferOverflow,
 	BadPtr, /* Stream parameter is nil or
-		     * stream is not opened or
-		     * stream is output when input is required or
-		     * stream is input when output is required */
+	         * stream is not opened or
+	         * stream is output when input is required or
+	         * stream is input when output is required */
 	BadData, /** illegal midi data, e.g. missing EOX */
 	InternalError,
 	BufferMaxSize, /** buffer is already as large as it can be */
@@ -38,30 +44,30 @@ Stream :: distinct rawptr
 @(default_calling_convention="c", link_prefix="Pm_")
 foreign lib {
 	/**
-	    Initialize() is the library initialisation function - call this before
-	    using the library.
+		Initialize() is the library initialisation function - call this before
+		using the library.
 	*/
 	Initialize :: proc() -> Error ---
 	
 	/**
-	    Terminate() is the library termination function - call this after
-	    using the library.
+		Terminate() is the library termination function - call this after
+		using the library.
 	*/
 	Terminate  :: proc() -> Error ---
 	
 	/**
-	    Test whether stream has a pending host error. Normally, the client finds
-	    out about errors through returned error codes, but some errors can occur
-	    asynchronously where the client does not
-	    explicitly call a function, and therefore cannot receive an error code.
-	    The client can test for a pending error using HasHostError(). If true,
-	    the error can be accessed and cleared by calling GetErrorText(). 
-	    Errors are also cleared by calling other functions that can return
-	    errors, e.g. OpenInput(), OpenOutput(), Read(), Write(). The
-	    client does not need to call HasHostError(). Any pending error will be
-	    reported the next time the client performs an explicit function call on 
-	    the stream, e.g. an input or output operation. Until the error is cleared,
-	    no new error codes will be obtained, even for a different stream.
+		Test whether stream has a pending host error. Normally, the client finds
+		out about errors through returned error codes, but some errors can occur
+		asynchronously where the client does not
+		explicitly call a function, and therefore cannot receive an error code.
+		The client can test for a pending error using HasHostError(). If true,
+		the error can be accessed and cleared by calling GetErrorText(). 
+		Errors are also cleared by calling other functions that can return
+		errors, e.g. OpenInput(), OpenOutput(), Read(), Write(). The
+		client does not need to call HasHostError(). Any pending error will be
+		reported the next time the client performs an explicit function call on 
+		the stream, e.g. an input or output operation. Until the error is cleared,
+		no new error codes will be obtained, even for a different stream.
 	*/
 	HasHostError :: proc(stream: Stream) -> b32 ---	
 }
@@ -103,8 +109,8 @@ DeviceInfo :: struct {
 	structVersion: c.int,   /**< this internal structure version */ 
 	interf:        cstring, /**< underlying MIDI API, e.g. MMSystem or DirectX */
 	name:          cstring, /**< device name, e.g. USB MidiSport 1x1 */
-	input:         c.int,   /**< true iff input is available */
-	output:        c.int,   /**< true iff output is available */
+	input:         b32,     /**< true iff input is available */
+	output:        b32,     /**< true iff output is available */
 	opened:        b32,     /**< used by generic PortMidi code to do error checking on arguments */
 }
 
@@ -132,79 +138,78 @@ Before :: #force_inline proc "c" (t1, t2: Timestamp) -> b32 {
 @(default_calling_convention="c", link_prefix="Pm_")
 foreign lib {
 	/**
-	    GetDeviceInfo() returns a pointer to a DeviceInfo structure
-	    referring to the device specified by id.
-	    If id is out of range the function returns nil.
+		GetDeviceInfo() returns a pointer to a DeviceInfo structure
+		referring to the device specified by id.
+		If id is out of range the function returns nil.
 
-	    The returned structure is owned by the PortMidi implementation and must
-	    not be manipulated or freed. The pointer is guaranteed to be valid
-	    between calls to Initialize() and Terminate().
+		The returned structure is owned by the PortMidi implementation and must
+		not be manipulated or freed. The pointer is guaranteed to be valid
+		between calls to Initialize() and Terminate().
 	*/
-	GetDeviceInfo :: proc(id: DeviceID) -> DeviceInfo ---
+	GetDeviceInfo :: proc(id: DeviceID) -> ^DeviceInfo ---
 	
 	/**
-	    OpenInput() and OpenOutput() open devices.
+		OpenInput() and OpenOutput() open devices.
 
-	    stream is the address of a Stream pointer which will receive
-	    a pointer to the newly opened stream.
+		stream is the address of a Stream pointer which will receive
+		a pointer to the newly opened stream.
 
-	    inputDevice is the id of the device used for input (see DeviceID above).
+		inputDevice is the id of the device used for input (see DeviceID above).
 
-	    inputDriverInfo is a pointer to an optional driver specific data structure
-	    containing additional information for device setup or handle processing.
-	    inputDriverInfo is never required for correct operation. If not used
-	    inputDriverInfo should be nil.
+		inputDriverInfo is a pointer to an optional driver specific data structure
+		containing additional information for device setup or handle processing.
+		inputDriverInfo is never required for correct operation. If not used
+		inputDriverInfo should be nil.
 
-	    outputDevice is the id of the device used for output (see DeviceID above.)
+		outputDevice is the id of the device used for output (see DeviceID above.)
 
-	    outputDriverInfo is a pointer to an optional driver specific data structure
-	    containing additional information for device setup or handle processing.
-	    outputDriverInfo is never required for correct operation. If not used
-	    outputDriverInfo should be nil.
+		outputDriverInfo is a pointer to an optional driver specific data structure
+		containing additional information for device setup or handle processing.
+		outputDriverInfo is never required for correct operation. If not used
+		outputDriverInfo should be nil.
 
-	    For input, the buffersize specifies the number of input events to be 
-	    buffered waiting to be read using Read(). For output, buffersize 
-	    specifies the number of output events to be buffered waiting for output. 
-	    (In some cases -- see below -- PortMidi does not buffer output at all
-	    and merely passes data to a lower-level API, in which case buffersize
-	    is ignored.)
-	    
-	    latency is the delay in milliseconds applied to timestamps to determine 
-	    when the output should actually occur. (If latency is < 0, 0 is assumed.) 
-	    If latency is zero, timestamps are ignored and all output is delivered
-	    immediately. If latency is greater than zero, output is delayed until the
-	    message timestamp plus the latency. (NOTE: the time is measured relative 
-	    to the time source indicated by time_proc. Timestamps are absolute,
-	    not relative delays or offsets.) In some cases, PortMidi can obtain
-	    better timing than your application by passing timestamps along to the
-	    device driver or hardware. Latency may also help you to synchronize midi
-	    data to audio data by matching midi latency to the audio buffer latency.
+		For input, the buffersize specifies the number of input events to be 
+		buffered waiting to be read using Read(). For output, buffersize 
+		specifies the number of output events to be buffered waiting for output. 
+		(In some cases -- see below -- PortMidi does not buffer output at all
+		and merely passes data to a lower-level API, in which case buffersize
+		is ignored.)
 
-	    time_proc is a pointer to a procedure that returns time in milliseconds. It
-	    may be nil, in which case a default millisecond timebase (PortTime) is 
-	    used. If the application wants to use PortTime, it should start the timer
-	    (call Pt_Start) before calling OpenInput or OpenOutput. If the
-	    application tries to start the timer *after* OpenInput or OpenOutput,
-	    it may get a ptAlreadyStarted error from Pt_Start, and the application's
-	    preferred time resolution and callback function will be ignored.
-	    time_proc result values are appended to incoming MIDI data, and time_proc
-	    times are used to schedule outgoing MIDI data (when latency is non-zero).
+		latency is the delay in milliseconds applied to timestamps to determine 
+		when the output should actually occur. (If latency is < 0, 0 is assumed.) 
+		If latency is zero, timestamps are ignored and all output is delivered
+		immediately. If latency is greater than zero, output is delayed until the
+		message timestamp plus the latency. (NOTE: the time is measured relative 
+		to the time source indicated by time_proc. Timestamps are absolute,
+		not relative delays or offsets.) In some cases, PortMidi can obtain
+		better timing than your application by passing timestamps along to the
+		device driver or hardware. Latency may also help you to synchronize midi
+		data to audio data by matching midi latency to the audio buffer latency.
 
-	    time_info is a pointer passed to time_proc.
+		time_proc is a pointer to a procedure that returns time in milliseconds. It
+		may be nil, in which case a default millisecond timebase (PortTime) is 
+		used. If the application wants to use PortTime, it should start the timer
+		(call Pt_Start) before calling OpenInput or OpenOutput. If the
+		application tries to start the timer *after* OpenInput or OpenOutput,
+		it may get a ptAlreadyStarted error from Pt_Start, and the application's
+		preferred time resolution and callback function will be ignored.
+		time_proc result values are appended to incoming MIDI data, and time_proc
+		times are used to schedule outgoing MIDI data (when latency is non-zero).
 
-	    Example: If I provide a timestamp of 5000, latency is 1, and time_proc
-	    returns 4990, then the desired output time will be when time_proc returns
-	    timestamp+latency = 5001. This will be 5001-4990 = 11ms from now.
+		time_info is a pointer passed to time_proc.
 
-	    return value:
-	    Upon success Open() returns NoError and places a pointer to a
-	    valid Stream in the stream argument.
-	    If a call to Open() fails a nonzero error code is returned (see
-	    PMError above) and the value of port is invalid.
+		Example: If I provide a timestamp of 5000, latency is 1, and time_proc
+		returns 4990, then the desired output time will be when time_proc returns
+		timestamp+latency = 5001. This will be 5001-4990 = 11ms from now.
 
-	    Any stream that is successfully opened should eventually be closed
-	    by calling Close().
+		return value:
+		Upon success Open() returns NoError and places a pointer to a
+		valid Stream in the stream argument.
+		If a call to Open() fails a nonzero error code is returned (see
+		PMError above) and the value of port is invalid.
 
+		Any stream that is successfully opened should eventually be closed
+		by calling Close().
 	*/
 	OpenInput :: proc(stream: ^Stream,
 	                  inputDevice: DeviceID,
@@ -373,71 +378,80 @@ MessageData2  :: #force_inline proc "c" (msg: Message) -> c.int {
 	return c.int((msg >> 16) & 0xFF)
 }
 
+MessageCompose :: MessageMake
+MessageDecompose :: #force_inline proc "c" (msg: Message) -> (status, data1, data2: c.int) {
+	status = c.int(msg & 0xFF)
+	data1  = c.int((msg >> 8) & 0xFF)
+	data2  = c.int((msg >> 16) & 0xFF)
+	return
+}
+
+
 Message :: distinct i32
 /**
-   All midi data comes in the form of Event structures. A sysex
-   message is encoded as a sequence of Event structures, with each
-   structure carrying 4 bytes of the message, i.e. only the first
-   Event carries the status byte.
+	All midi data comes in the form of Event structures. A sysex
+	message is encoded as a sequence of Event structures, with each
+	structure carrying 4 bytes of the message, i.e. only the first
+	Event carries the status byte.
 
-   Note that MIDI allows nested messages: the so-called "real-time" MIDI 
-   messages can be inserted into the MIDI byte stream at any location, 
-   including within a sysex message. MIDI real-time messages are one-byte
-   messages used mainly for timing (see the MIDI spec). PortMidi retains 
-   the order of non-real-time MIDI messages on both input and output, but 
-   it does not specify exactly how real-time messages are processed. This
-   is particulary problematic for MIDI input, because the input parser 
-   must either prepare to buffer an unlimited number of sysex message 
-   bytes or to buffer an unlimited number of real-time messages that 
-   arrive embedded in a long sysex message. To simplify things, the input
-   parser is allowed to pass real-time MIDI messages embedded within a 
-   sysex message, and it is up to the client to detect, process, and 
-   remove these messages as they arrive.
+	Note that MIDI allows nested messages: the so-called "real-time" MIDI 
+	messages can be inserted into the MIDI byte stream at any location, 
+	including within a sysex message. MIDI real-time messages are one-byte
+	messages used mainly for timing (see the MIDI spec). PortMidi retains 
+	the order of non-real-time MIDI messages on both input and output, but 
+	it does not specify exactly how real-time messages are processed. This
+	is particulary problematic for MIDI input, because the input parser 
+	must either prepare to buffer an unlimited number of sysex message 
+	bytes or to buffer an unlimited number of real-time messages that 
+	arrive embedded in a long sysex message. To simplify things, the input
+	parser is allowed to pass real-time MIDI messages embedded within a 
+	sysex message, and it is up to the client to detect, process, and 
+	remove these messages as they arrive.
 
-   When receiving sysex messages, the sysex message is terminated
-   by either an EOX status byte (anywhere in the 4 byte messages) or
-   by a non-real-time status byte in the low order byte of the message.
-   If you get a non-real-time status byte but there was no EOX byte, it 
-   means the sysex message was somehow truncated. This is not
-   considered an error; e.g., a missing EOX can result from the user
-   disconnecting a MIDI cable during sysex transmission.
+	When receiving sysex messages, the sysex message is terminated
+	by either an EOX status byte (anywhere in the 4 byte messages) or
+	by a non-real-time status byte in the low order byte of the message.
+	If you get a non-real-time status byte but there was no EOX byte, it 
+	means the sysex message was somehow truncated. This is not
+	considered an error; e.g., a missing EOX can result from the user
+	disconnecting a MIDI cable during sysex transmission.
 
-   A real-time message can occur within a sysex message. A real-time 
-   message will always occupy a full Event with the status byte in 
-   the low-order byte of the Event message field. (This implies that
-   the byte-order of sysex bytes and real-time message bytes may not
-   be preserved -- for example, if a real-time message arrives after
-   3 bytes of a sysex message, the real-time message will be delivered
-   first. The first word of the sysex message will be delivered only
-   after the 4th byte arrives, filling the 4-byte Event message field.
-   
-   The timestamp field is observed when the output port is opened with
-   a non-zero latency. A timestamp of zero means "use the current time",
-   which in turn means to deliver the message with a delay of
-   latency (the latency parameter used when opening the output port.)
-   Do not expect PortMidi to sort data according to timestamps -- 
-   messages should be sent in the correct order, and timestamps MUST 
-   be non-decreasing. See also "Example" for OpenOutput() above.
+	A real-time message can occur within a sysex message. A real-time 
+	message will always occupy a full Event with the status byte in 
+	the low-order byte of the Event message field. (This implies that
+	the byte-order of sysex bytes and real-time message bytes may not
+	be preserved -- for example, if a real-time message arrives after
+	3 bytes of a sysex message, the real-time message will be delivered
+	first. The first word of the sysex message will be delivered only
+	after the 4th byte arrives, filling the 4-byte Event message field.
 
-   A sysex message will generally fill many Event structures. On 
-   output to a Stream with non-zero latency, the first timestamp
-   on sysex message data will determine the time to begin sending the 
-   message. PortMidi implementations may ignore timestamps for the 
-   remainder of the sysex message. 
-   
-   On input, the timestamp ideally denotes the arrival time of the 
-   status byte of the message. The first timestamp on sysex message 
-   data will be valid. Subsequent timestamps may denote 
-   when message bytes were actually received, or they may be simply 
-   copies of the first timestamp.
+	The timestamp field is observed when the output port is opened with
+	a non-zero latency. A timestamp of zero means "use the current time",
+	which in turn means to deliver the message with a delay of
+	latency (the latency parameter used when opening the output port.)
+	Do not expect PortMidi to sort data according to timestamps -- 
+	messages should be sent in the correct order, and timestamps MUST 
+	be non-decreasing. See also "Example" for OpenOutput() above.
 
-   Timestamps for nested messages: If a real-time message arrives in 
-   the middle of some other message, it is enqueued immediately with 
-   the timestamp corresponding to its arrival time. The interrupted 
-   non-real-time message or 4-byte packet of sysex data will be enqueued 
-   later. The timestamp of interrupted data will be equal to that of
-   the interrupting real-time message to insure that timestamps are
-   non-decreasing.
+	A sysex message will generally fill many Event structures. On 
+	output to a Stream with non-zero latency, the first timestamp
+	on sysex message data will determine the time to begin sending the 
+	message. PortMidi implementations may ignore timestamps for the 
+	remainder of the sysex message. 
+
+	On input, the timestamp ideally denotes the arrival time of the 
+	status byte of the message. The first timestamp on sysex message 
+	data will be valid. Subsequent timestamps may denote 
+	when message bytes were actually received, or they may be simply 
+	copies of the first timestamp.
+
+	Timestamps for nested messages: If a real-time message arrives in 
+	the middle of some other message, it is enqueued immediately with 
+	the timestamp corresponding to its arrival time. The interrupted 
+	non-real-time message or 4-byte packet of sysex data will be enqueued 
+	later. The timestamp of interrupted data will be equal to that of
+	the interrupting real-time message to insure that timestamps are
+	non-decreasing.
  */
 Event :: struct {
 	message:   Message,
@@ -480,18 +494,18 @@ foreign lib {
 	
 	/** 
 		Write() writes midi data from a buffer. This may contain:
-		    - short messages 
+			- short messages 
 		or 
-		    - sysex messages that are converted into a sequence of Event
-		      structures, e.g. sending data from a file or forwarding them
-		      from midi input.
+			- sysex messages that are converted into a sequence of Event
+			  structures, e.g. sending data from a file or forwarding them
+			  from midi input.
 
 		Use WriteSysEx() to write a sysex message stored as a contiguous 
 		array of bytes.
 
 		Sysex data may contain embedded real-time messages.
 	*/
-	Write      :: proc(stream: Stream, buffer: [^]Event, length: i32) -> Error ---
+	Write :: proc(stream: Stream, buffer: [^]Event, length: i32) -> Error ---
 	
 	/**
 		WriteShort() writes a timestamped non-system-exclusive midi message.

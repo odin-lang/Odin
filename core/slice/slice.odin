@@ -20,7 +20,7 @@ swap :: proc(array: $T/[]$E, a, b: int) {
 }
 
 swap_between :: proc(a, b: $T/[]$E) {
-	n := min(len(a), len(b))
+	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
 	}	
@@ -185,7 +185,7 @@ concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T) {
 	return
 }
 
-// copies slice into a new dynamic array
+// copies a slice into a new slice
 clone :: proc(a: $T/[]$E, allocator := context.allocator) -> []E {
 	d := make([]E, len(a), allocator)
 	copy(d[:], a)
@@ -194,11 +194,12 @@ clone :: proc(a: $T/[]$E, allocator := context.allocator) -> []E {
 
 
 // copies slice into a new dynamic array
-to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> [dynamic]E {
+clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> [dynamic]E {
 	d := make([dynamic]E, len(a), allocator)
 	copy(d[:], a)
 	return d
 }
+to_dynamic :: clone_to_dynamic
 
 // Converts slice into a dynamic array without cloning or allocating memory
 into_dynamic :: proc(a: $T/[]$E) -> [dynamic]E {
@@ -272,7 +273,7 @@ get_ptr :: proc(array: $T/[]$E, index: int) -> (value: ^E, ok: bool) {
 	return
 }
 
-as_ptr :: proc(array: $T/[]$E) -> ^E {
+as_ptr :: proc(array: $T/[]$E) -> [^]E {
 	return raw_data(array)
 }
 

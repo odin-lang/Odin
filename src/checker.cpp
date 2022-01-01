@@ -225,8 +225,8 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
-	ptr_set_init(&s->imported, heap_allocator(), 0);
+	string_map_init(&s->elements, permanent_allocator(), init_elements_capacity);
+	ptr_set_init(&s->imported, permanent_allocator(), 0);
 	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -318,7 +318,43 @@ void add_scope(CheckerContext *c, Ast *node, Scope *scope) {
 	GB_ASSERT(node != nullptr);
 	GB_ASSERT(scope != nullptr);
 	scope->node = node;
-	node->scope = scope;
+	switch (node->kind) {
+	case Ast_BlockStmt:       node->BlockStmt.scope       = scope; break;
+	case Ast_IfStmt:          node->IfStmt.scope          = scope; break;
+	case Ast_ForStmt:         node->ForStmt.scope         = scope; break;
+	case Ast_RangeStmt:       node->RangeStmt.scope       = scope; break;
+	case Ast_UnrollRangeStmt: node->UnrollRangeStmt.scope = scope; break;
+	case Ast_CaseClause:      node->CaseClause.scope      = scope; break;
+	case Ast_SwitchStmt:      node->SwitchStmt.scope      = scope; break;
+	case Ast_TypeSwitchStmt:  node->TypeSwitchStmt.scope  = scope; break;
+	case Ast_ProcType:        node->ProcType.scope        = scope; break;
+	case Ast_StructType:      node->StructType.scope      = scope; break;
+	case Ast_UnionType:       node->UnionType.scope       = scope; break;
+	case Ast_EnumType:        node->EnumType.scope        = scope; break;
+	default: GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
+	}
+}
+
+Scope *scope_of_node(Ast *node) {
+	if (node == nullptr) {
+		return nullptr;
+	}
+	switch (node->kind) {
+	case Ast_BlockStmt:       return node->BlockStmt.scope;
+	case Ast_IfStmt:          return node->IfStmt.scope;
+	case Ast_ForStmt:         return node->ForStmt.scope;
+	case Ast_RangeStmt:       return node->RangeStmt.scope;
+	case Ast_UnrollRangeStmt: return node->UnrollRangeStmt.scope;
+	case Ast_CaseClause:      return node->CaseClause.scope;
+	case Ast_SwitchStmt:      return node->SwitchStmt.scope;
+	case Ast_TypeSwitchStmt:  return node->TypeSwitchStmt.scope;
+	case Ast_ProcType:        return node->ProcType.scope;
+	case Ast_StructType:      return node->StructType.scope;
+	case Ast_UnionType:       return node->UnionType.scope;
+	case Ast_EnumType:        return node->EnumType.scope;
+	}
+	GB_PANIC("Invalid node for add_scope: %.*s", LIT(ast_strings[node->kind]));
+	return nullptr;
 }
 
 
@@ -1080,9 +1116,6 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 		return *found;
 	}
 	return nullptr;
-}
-Scope *scope_of_node(Ast *node) {
-	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	if (c->untyped != nullptr) {
@@ -2017,6 +2050,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		
 		// WASM Specific
 		str_lit("__ashlti3"),
+		str_lit("__multi3"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
@@ -2570,11 +2604,18 @@ ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
 	return ev;
 }
 
+#define ATTRIBUTE_USER_TAG_NAME "tag"
+
 
 DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	ExactValue ev = check_decl_attribute_value(c, value);
 
-	if (name == "default_calling_convention") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "default_calling_convention") {
 		if (ev.kind == ExactValue_String) {
 			auto cc = string_to_calling_convention(ev.value_string);
 			if (cc == ProcCC_Invalid) {
@@ -2622,7 +2663,13 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
-	if (name == "test") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "test") {
 		if (value != nullptr) {
 			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
 		}
@@ -2660,10 +2707,14 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "require") {
-		if (value != nullptr) {
-			error(elem, "'require' does not have any parameters");
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->require_declaration = true;
+		} else if (ev.kind == ExactValue_Bool) {
+			ac->require_declaration = ev.value_bool;
+		} else {
+			error(value, "Expected either a boolean or no parameter for 'require'");
 		}
-		ac->require_declaration = true;
 		return true;
 	} else if (name == "init") {
 		if (value != nullptr) {
@@ -2859,7 +2910,12 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	ExactValue ev = check_decl_attribute_value(c, value);
 
-	if (name == "static") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "static") {
 		if (value != nullptr) {
 			error(elem, "'static' does not have any parameters");
 		}
@@ -2974,7 +3030,13 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(const_decl_attribute) {
-	if (name == "private") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	}
@@ -2982,7 +3044,13 @@ DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(type_decl_attribute) {
-	if (name == "private") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	}
@@ -3708,7 +3776,7 @@ String path_to_entity_name(String name, String fullpath, bool strip_extension=tr
 #if 1
 
 void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
-	AstPackage *parent_pkg = decl->file->pkg;
+	AstPackage *parent_pkg = decl->file()->pkg;
 
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
@@ -3983,7 +4051,13 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 }
 
 DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
-	if (name == "force" || name == "require") {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		} else if (name == "force") {
@@ -4046,6 +4120,14 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (ac.require_declaration) {
 		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
+	}
+	
+	if (has_asm_extension(fullpath)) {
+		if (build_context.metrics.arch != TargetArch_amd64 ||
+		    build_context.metrics.os   != TargetOs_windows) {
+			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s", 
+			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
+		}
 	}
 }
 
@@ -4769,6 +4851,10 @@ void check_unchecked_bodies(Checker *c) {
 }
 
 void check_test_procedures(Checker *c) {
+	if (build_context.test_names.entries.count == 0) {
+		return;
+	}
+
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 
@@ -5257,9 +5343,6 @@ void check_parsed_files(Checker *c) {
 		check_scope_usage(c, f->scope);
 	}
 
-	TIME_SECTION("check test procedures");
-	check_test_procedures(c);
-
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
 	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
@@ -5311,6 +5394,9 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check test procedures");
+	check_test_procedures(c);
 
 	TIME_SECTION("check bodies have all been checked");
 	check_unchecked_bodies(c);

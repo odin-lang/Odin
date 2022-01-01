@@ -6,7 +6,6 @@ package _tiger
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the Tiger hashing algorithm, as defined in <https://www.cs.technion.ac.il/~biham/Reports/Tiger/>
 */
@@ -291,7 +290,7 @@ Tiger_Context :: struct {
 	ver:    int,
 }
 
-round :: #force_inline proc "contextless"(a, b, c, x, mul: u64) -> (u64, u64, u64) {
+round :: #force_inline proc "contextless" (a, b, c, x, mul: u64) -> (u64, u64, u64) {
 	a, b, c := a, b, c
 	c ~= x
 	a -= T1[c & 0xff] ~ T2[(c >> 16) & 0xff] ~ T3[(c >> 32) & 0xff] ~ T4[(c >> 48) & 0xff]
@@ -300,7 +299,7 @@ round :: #force_inline proc "contextless"(a, b, c, x, mul: u64) -> (u64, u64, u6
 	return a, b, c
 }
 
-pass :: #force_inline proc "contextless"(a, b, c: u64, d: []u64, mul: u64) -> (x, y, z: u64) {
+pass :: #force_inline proc "contextless" (a, b, c: u64, d: []u64, mul: u64) -> (x, y, z: u64) {
 	x, y, z = round(a, b, c, d[0], mul)
 	y, z, x = round(y, z, x, d[1], mul)
 	z, x, y = round(z, x, y, d[2], mul)
@@ -312,7 +311,7 @@ pass :: #force_inline proc "contextless"(a, b, c: u64, d: []u64, mul: u64) -> (x
 	return
 }
 
-key_schedule :: #force_inline proc "contextless"(x: []u64) {
+key_schedule :: #force_inline proc "contextless" (x: []u64) {
 	x[0] -= x[7] ~ 0xa5a5a5a5a5a5a5a5
 	x[1] ~= x[0]
 	x[2] += x[1]
@@ -331,7 +330,7 @@ key_schedule :: #force_inline proc "contextless"(x: []u64) {
 	x[7] -= x[6] ~ 0x0123456789abcdef
 }
 
-compress :: #force_inline proc "contextless"(ctx: ^Tiger_Context, data: []byte) {
+compress :: #force_inline proc "contextless" (ctx: ^Tiger_Context, data: []byte) {
 	a := ctx.a
 	b := ctx.b
 	c := ctx.c
@@ -346,13 +345,13 @@ compress :: #force_inline proc "contextless"(ctx: ^Tiger_Context, data: []byte) 
 	ctx.c += c
 }
 
-init_odin :: proc(ctx: ^Tiger_Context) {
+init :: proc "contextless" (ctx: ^Tiger_Context) {
 	ctx.a = 0x0123456789abcdef
 	ctx.b = 0xfedcba9876543210
 	ctx.c = 0xf096a5b4c3b2e187
 }
 
-update_odin :: proc(ctx: ^Tiger_Context, input: []byte) {
+update :: proc(ctx: ^Tiger_Context, input: []byte) {
 	p := make([]byte, len(input))
 	copy(p, input)
 
@@ -380,7 +379,7 @@ update_odin :: proc(ctx: ^Tiger_Context, input: []byte) {
 	}
 }
 
-final_odin :: proc(ctx: ^Tiger_Context, hash: []byte) {
+final :: proc(ctx: ^Tiger_Context, hash: []byte) {
 	length := ctx.length
 	tmp: [64]byte
 	if ctx.ver == 1 {
@@ -391,16 +390,16 @@ final_odin :: proc(ctx: ^Tiger_Context, hash: []byte) {
 
 	size := length & 0x3f
 	if size < 56 {
-		update_odin(ctx, tmp[:56 - size])
+		update(ctx, tmp[:56 - size])
 	} else {
-		update_odin(ctx, tmp[:64 + 56 - size])
+		update(ctx, tmp[:64 + 56 - size])
 	}
 
 	length <<= 3
 	for i := uint(0); i < 8; i += 1 {
 		tmp[i] = byte(length >> (8 * i))
 	}
-	update_odin(ctx, tmp[:8])
+	update(ctx, tmp[:8])
 
 	for i := uint(0); i < 8; i += 1 {
 		tmp[i]      = byte(ctx.a >> (8 * i))

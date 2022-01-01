@@ -697,6 +697,7 @@ Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
 
 bool is_type_pointer(Type *t);
+bool is_type_proc(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
 bool type_set_offsets(Type *t);
@@ -1252,6 +1253,13 @@ bool is_type_quaternion(Type *t) {
 	}
 	return false;
 }
+bool is_type_complex_or_quaternion(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & (BasicFlag_Complex|BasicFlag_Quaternion)) != 0;
+	}
+	return false;
+}
 bool is_type_f16(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
@@ -1284,6 +1292,10 @@ bool is_type_multi_pointer(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_MultiPointer;
 }
+bool is_type_internally_pointer_like(Type *t) {
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+}
+
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
@@ -1406,18 +1418,26 @@ i64 matrix_indices_to_offset(Type *t, i64 row_index, i64 column_index) {
 	GB_ASSERT(0 <= row_index && row_index < t->Matrix.row_count);
 	GB_ASSERT(0 <= column_index && column_index < t->Matrix.column_count);
 	i64 stride_elems = matrix_type_stride_in_elems(t);
-	return stride_elems*column_index + row_index;
+	// NOTE(bill): Column-major layout internally
+	return row_index + stride_elems*column_index;
 }
 
 i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
 	
-	i64 column_index = index%t->Matrix.column_count;
 	i64 row_index    = index/t->Matrix.column_count;
+	i64 column_index = index%t->Matrix.column_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
 }
-
+i64 matrix_column_major_index_to_offset(Type *t, i64 index) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+	
+	i64 row_index    = index%t->Matrix.row_count;
+	i64 column_index = index/t->Matrix.row_count;
+	return matrix_indices_to_offset(t, row_index, column_index);
+}
 
 
 bool is_matrix_square(Type *t) {
@@ -4011,7 +4031,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_type_to_string(str, type->BitSet.elem);
+		if (is_type_enum(type->BitSet.elem)) {
+			str = write_type_to_string(str, type->BitSet.elem);
+		} else {
+			str = gb_string_append_fmt(str, "%lld", type->BitSet.lower);
+			str = gb_string_append_fmt(str, "..=");
+			str = gb_string_append_fmt(str, "%lld", type->BitSet.upper);
+		}
 		if (type->BitSet.underlying != nullptr) {
 			str = gb_string_appendc(str, "; ");
 			str = write_type_to_string(str, type->BitSet.underlying);

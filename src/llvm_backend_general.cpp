@@ -1084,7 +1084,7 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 				scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
 			}
 			LLVMValueRef mask = LLVMConstVector(scalars, addr.swizzle.count);
-			LLVMValueRef sv = LLVMBuildShuffleVector(p->builder, v, LLVMGetUndef(vector_type), mask, "");
+			LLVMValueRef sv = llvm_basic_shuffle(p, v, mask);
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
 			LLVMBuildStore(p->builder, sv, dst);
@@ -1142,7 +1142,7 @@ lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 
 	LLVMTypeRef uvt = LLVMGetElementType(LLVMTypeOf(u.value));
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
-	GB_ASSERT_MSG(element_count == 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
+	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
 	lbValue tag_ptr = {};
 	tag_ptr.value = LLVMBuildStructGEP(p->builder, u.value, 1, "");
@@ -1795,7 +1795,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 			unsigned block_size = cast(unsigned)type->Union.variant_block_size;
 
-			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 2);
+			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 3);
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
@@ -1804,7 +1804,12 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef tag_type   = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
 				array_add(&fields, tag_type);
-				
+				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
+				i64 padding = size - used_size;
+				if (padding > 0) {
+					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
+					array_add(&fields, padding_type);
+				}
 			}
 			
 			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, false);

@@ -118,3 +118,12 @@ See also LICENSE.txt in the `portmidi` directory itself.
 `enet.lib` and `enet64.lib` are available under ENet's [MIT](http://enet.bespin.org/License.html) license.
 
 See also LICENSE in the `ENet` directory itself.
+
+## Botan
+
+[Botan](https://botan.randombit.net/) Crypto and TLS library.
+
+`botan.lib` is available under Botan's [BSD](https://botan.randombit.net/license.txt) license.
+
+See also LICENSE in the `botan` directory itself.
+Includes full bindings as well as wrappers to match the `core:crypto` API.

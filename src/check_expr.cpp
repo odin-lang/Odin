@@ -649,6 +649,13 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return 4;
 		}
 	}
+	
+	if (is_type_complex_or_quaternion(dst)) {
+		Type *elem = base_complex_elem_type(dst);
+		if (are_types_identical(elem, base_type(src))) {
+			return 5;
+		}
+	}
 
 	if (is_type_array(dst)) {
 		Type *elem = base_array_type(dst);
@@ -1837,11 +1844,12 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 }
 
 
-void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
+bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 	GB_ASSERT(o->mode == Addressing_Constant);
 	ExactValue out_value = o->value;
 	if (is_type_constant_type(type) && check_representable_as_constant(ctx, o->value, type, &out_value)) {
 		o->value = out_value;
+		return true;
 	} else {
 		o->value = out_value;
 
@@ -1866,6 +1874,7 @@ void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 			error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
+		return false;
 	}
 }
 
@@ -2453,6 +2462,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_float(src) && is_type_complex(dst)) {
+		return true;
+	}
 	if (is_type_float(src) && is_type_quaternion(dst)) {
 		return true;
 	}
@@ -3201,6 +3213,16 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 	x->mode = Addressing_Value;
 }
 
+Operand make_operand_from_node(Ast *node) {
+	GB_ASSERT(node != nullptr);
+	Operand x = {};
+	x.expr  = node;
+	x.mode  = node->tav.mode;
+	x.type  = node->tav.type;
+	x.value = node->tav.value;
+	return x;
+}
+
 
 void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	GB_ASSERT(e != nullptr);
@@ -3249,9 +3271,18 @@ void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final)
 			// See above note in UnaryExpr case
 			break;
 		}
-
-		update_untyped_expr_type(c, te->x, type, final);
-		update_untyped_expr_type(c, te->y, type, final);
+		
+		// NOTE(bill): This is a bit of a hack to get around the edge cases of ternary if expressions
+		// having an untyped value
+		Operand x = make_operand_from_node(te->x);
+		Operand y = make_operand_from_node(te->y);		
+		if (x.mode != Addressing_Constant || check_is_expressible(c, &x, type)) {
+			update_untyped_expr_type(c, te->x, type, final);
+		}
+		if (y.mode != Addressing_Constant || check_is_expressible(c, &y, type)) {
+			update_untyped_expr_type(c, te->y, type, final);
+		}
+		
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, e);
@@ -8413,14 +8444,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (check_is_assignable_to(c, &z, first_type)) {
 				// NOTE(bill): AST GENERATION HACK!
 				Token op = {Token_Pointer};
-				first_arg = ast_deref_expr(first_arg->file, first_arg, op);
+				first_arg = ast_deref_expr(first_arg->file(), first_arg, op);
 			} else if (y.mode == Addressing_Variable) {
 				Operand w = y;
 				w.type = alloc_type_pointer(y.type);
 				if (check_is_assignable_to(c, &w, first_type)) {
 					// NOTE(bill): AST GENERATION HACK!
 					Token op = {Token_And};
-					first_arg = ast_unary_expr(first_arg->file, op, first_arg);
+					first_arg = ast_unary_expr(first_arg->file(), op, first_arg);
 				}
 			}
 		}
@@ -8443,7 +8474,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 			if (!fail && first_is_field_value) {
 				Token op = {Token_Eq};
-				AstFile *f = first_arg->file;
+				AstFile *f = first_arg->file();
 				first_arg = ast_field_value(f, ast_ident(f, make_token_ident(first_arg_name)), first_arg, op);
 			}
 		}

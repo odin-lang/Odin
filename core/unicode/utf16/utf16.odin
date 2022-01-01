@@ -1,5 +1,7 @@
 package utf16
 
+import "core:unicode/utf8"
+
 REPLACEMENT_CHAR :: '\ufffd'
 MAX_RUNE         :: '\U0010ffff'
 
@@ -79,4 +81,50 @@ encode_string :: proc(d: []u16, s: string) -> int {
 		}
 	}
 	return n
+}
+
+decode :: proc(d: []rune, s: []u16) -> (n: int) {
+	for i := 0; i < len(s); i += 1 {
+		if n >= len(d) {
+			return
+		}
+		
+		r := rune(REPLACEMENT_CHAR)
+		
+		switch c := s[i]; {
+		case c < _surr1, _surr3 <= c:
+			r = rune(c)
+		case _surr1 <= c && c < _surr2 && i+1 < len(s) && 
+			_surr2 <= s[i+1] && s[i+1] < _surr3:
+			r = decode_surrogate_pair(rune(c), rune(s[i+1]))
+			i += 1
+		}
+		d[n] = r
+		
+		n += 1
+	}
+	return
+}
+
+
+decode_to_utf8 :: proc(d: []byte, s: []u16) -> (n: int) {
+	for i := 0; i < len(s); i += 1 {
+		if n >= len(d) {
+			return
+		}
+		r := rune(REPLACEMENT_CHAR)
+		
+		switch c := s[i]; {
+		case c < _surr1, _surr3 <= c:
+			r = rune(c)
+		case _surr1 <= r && r < _surr2 && i+1 < len(s) && 
+			_surr2 <= s[i+1] && s[i+1] < _surr3:
+			r = decode_surrogate_pair(rune(r), rune(s[i+1]))
+			i += 1
+		}
+		
+		b, w := utf8.encode_rune(rune(r))
+		n += copy(d[n:], b[:w])
+	}
+	return
 }

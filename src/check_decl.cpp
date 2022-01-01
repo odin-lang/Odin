@@ -1302,9 +1302,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				Type *t = base_type(type_deref(e->type));
 				if (t->kind == Type_Struct) {
 					Scope *scope = t->Struct.scope;
-					if (scope == nullptr) {
-						scope = scope_of_node(t->Struct.node);
-					}
 					GB_ASSERT(scope != nullptr);
 					for_array(i, scope->elements.entries) {
 						Entity *f = scope->elements.entries[i].value;

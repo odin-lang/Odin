@@ -137,11 +137,17 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-
+		
+	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+	#else
+		result = system_exec_command_line_app("wasm-ld",
+			"wasm-ld \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+	#endif
 		return result;
 	}
 
@@ -171,7 +177,6 @@ i32 linker_stage(lbGenerator *gen) {
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
-		char lib_str_buf[1024] = {0};
 
 		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
@@ -206,28 +211,43 @@ i32 linker_stage(lbGenerator *gen) {
 			add_path(find_result.windows_sdk_ucrt_library_path);
 			add_path(find_result.vs_library_path);
 		}
+		
+		
+		StringSet libs = {};
+		string_set_init(&libs, heap_allocator(), 64);
+		defer (string_set_destroy(&libs));
+		
+		StringSet asm_files = {};
+		string_set_init(&asm_files, heap_allocator(), 64);
+		defer (string_set_destroy(&asm_files));
 
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			for_array(i, m->foreign_library_paths) {
 				String lib = m->foreign_library_paths[i];
-				GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-				gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-							" \"%.*s\"", LIT(lib));
-				lib_str = gb_string_appendc(lib_str, lib_str_buf);
+				if (has_asm_extension(lib)) {
+					string_set_add(&asm_files, lib);
+				} else {
+					string_set_add(&libs, lib);
+				}
 			}
 		}
 
 		for_array(i, gen->default_module.foreign_library_paths) {
 			String lib = gen->default_module.foreign_library_paths[i];
-			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-			gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-						" \"%.*s\"", LIT(lib));
-			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+			if (has_asm_extension(lib)) {
+				string_set_add(&asm_files, lib);
+			} else {
+				string_set_add(&libs, lib);
+			}
 		}
-
-
-
+		
+		for_array(i, libs.entries) {
+			String lib = libs.entries[i].value;
+			lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+		}
+		
+		
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
 			output_ext = "dll";
 			link_settings = gb_string_append_fmt(link_settings, " /DLL");
@@ -247,6 +267,27 @@ i32 linker_stage(lbGenerator *gen) {
 
 		if (build_context.ODIN_DEBUG) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
+		}
+		
+		for_array(i, asm_files.entries) {
+			String asm_file = asm_files.entries[i].value;
+			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+
+			result = system_exec_command_line_app("nasm",
+				"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
+				"-f win64 "
+				"-o \"%.*s\" "
+				"%.*s "
+				"",
+				LIT(build_context.ODIN_ROOT), LIT(asm_file),
+				LIT(obj_file),
+				LIT(build_context.extra_assembler_flags)
+			);
+			
+			if (result) {
+				return result;
+			}
+			array_add(&gen->output_object_paths, obj_file);
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -319,10 +360,10 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
-			  
-			  if (result) {
+			
+			if (result) {
 				return result;
-			  }
+			}
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
@@ -398,13 +439,14 @@ i32 linker_stage(lbGenerator *gen) {
 			// so use ld instead.
 			// :UseLDForShared
 			linker = "ld";
-			link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
+				link_settings = gb_string_appendc(link_settings, "-init '___$startup_runtime' ");
 				link_settings = gb_string_appendc(link_settings, "-dylib -dynamic ");
 			#else
 				output_ext = STR_LIT(".so");
+				link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
 				link_settings = gb_string_appendc(link_settings, "-shared ");
 			#endif
 		} else {
@@ -539,8 +581,8 @@ void usage(String argv0) {
 	print_usage_line(1, "version   print version");
 	print_usage_line(1, "report    print information useful to reporting a bug");
 	print_usage_line(0, "");
-	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
-	print_usage_line(1, "-help");
+	print_usage_line(0, "For further details on a command, use -help after the command name");
+	print_usage_line(1, "e.g. odin build -help");
 }
 
 
@@ -586,6 +628,8 @@ enum BuildFlagKind {
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
 	BuildFlag_ShowMoreTimings,
+	BuildFlag_ExportTimings,
+	BuildFlag_ExportTimingsFile,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
@@ -609,6 +653,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
+	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 
 	BuildFlag_TestName,
@@ -734,6 +779,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OptimizationMode,  str_lit("O"),                   BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportTimings,     str_lit("export-timings"),      BuildFlagParam_String, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportTimingsFile, str_lit("export-timings-file"), BuildFlagParam_String, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None, Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None, Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None, Command_all);
@@ -758,7 +805,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,    str_lit("extra-linker-flags"),            BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags, str_lit("extra-assembler-flags"),         BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
@@ -849,9 +897,9 @@ bool parse_build_flags(Array<String> args) {
 					} else {
 						ok = true;
 						switch (bf.param_kind) {
-						default:
+						default: {
 							ok = false;
-							break;
+						} break;
 						case BuildFlagParam_Boolean: {
 							if (str_eq_ignore_case(param, str_lit("t")) ||
 								str_eq_ignore_case(param, str_lit("true")) ||
@@ -865,12 +913,12 @@ bool parse_build_flags(Array<String> args) {
 								gb_printf_err("Invalid flag parameter for '%.*s' : '%.*s'\n", LIT(name), LIT(param));
 							}
 						} break;
-						case BuildFlagParam_Integer:
+						case BuildFlagParam_Integer: {
 							value = exact_value_integer_from_string(param);
-							break;
-						case BuildFlagParam_Float:
+						} break;
+						case BuildFlagParam_Float: {
 							value = exact_value_float_from_string(param);
-							break;
+						} break;
 						case BuildFlagParam_String: {
 							value = exact_value_string(param);
 							if (value.kind == ExactValue_String) {
@@ -926,7 +974,6 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_Help:
 							build_context.show_help = true;
 							break;
-
 						case BuildFlag_OutFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -939,7 +986,7 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_OptimizationLevel:
+						case BuildFlag_OptimizationLevel: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							if (set_flags[BuildFlag_OptimizationMode]) {
 								gb_printf_err("Mixture of -opt and -o is not allowed\n");
@@ -948,7 +995,8 @@ bool parse_build_flags(Array<String> args) {
 							}
 							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
 							break;
-						case BuildFlag_OptimizationMode:
+						}
+						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (set_flags[BuildFlag_OptimizationLevel]) {
 								gb_printf_err("Mixture of -opt and -o is not allowed\n");
@@ -971,28 +1019,65 @@ bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
-						case BuildFlag_ShowTimings:
+						}
+						case BuildFlag_ShowTimings: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							break;
-						case BuildFlag_ShowUnused:
+						}
+						case BuildFlag_ShowUnused: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
 							break;
-						case BuildFlag_ShowUnusedWithLocation:
+						}
+						case BuildFlag_ShowUnusedWithLocation: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
 							build_context.show_unused_with_location = true;
 							break;
+						}
 						case BuildFlag_ShowMoreTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
 							break;
-						case BuildFlag_ShowSystemCalls:
+						case BuildFlag_ExportTimings: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							/*
+								NOTE(Jeroen): `build_context.export_timings_format == 0` means the option wasn't used.
+							*/
+							if (value.value_string == "json") {
+								build_context.export_timings_format = TimingsExportJson;
+							} else if (value.value_string == "csv") {
+								build_context.export_timings_format = TimingsExportCSV;
+							} else {
+								gb_printf_err("Invalid export format for -export-timings:<string>, got %.*s\n", LIT(value.value_string));
+								gb_printf_err("Valid export formats:\n");
+								gb_printf_err("\tjson\n");
+								gb_printf_err("\tcsv\n");
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_ExportTimingsFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_timings_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-timings-file path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_ShowSystemCalls: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_system_calls = true;
 							break;
+						}
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							isize count = cast(isize)big_int_to_i64(&value.value_integer);
@@ -1004,11 +1089,11 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_KeepTempFiles:
+						case BuildFlag_KeepTempFiles: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.keep_temp_files = true;
 							break;
-
+						}
 						case BuildFlag_Collection: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
@@ -1072,8 +1157,6 @@ bool parse_build_flags(Array<String> args) {
 							// NOTE(bill): Allow for multiple library collections
 							continue;
 						}
-
-
 						case BuildFlag_Define: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
@@ -1213,84 +1296,77 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_Debug:
 							build_context.ODIN_DEBUG = true;
 							break;
-
 						case BuildFlag_DisableAssert:
 							build_context.ODIN_DISABLE_ASSERT = true;
 							break;
-
 						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
 							break;
-
 						case BuildFlag_NoDynamicLiterals:
 							build_context.no_dynamic_literals = true;
 							break;
-
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
 							break;
-
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
-
 						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
 							break;
-
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
 							break;
-
-						case BuildFlag_ThreadedChecker:
+						case BuildFlag_ThreadedChecker: {
 							#if defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-threaded-checker is the default on this platform\n");
 							bad_flags = true;
 							#endif
 							build_context.threaded_checker = true;
 							break;
-
-						case BuildFlag_NoThreadedChecker:
+						}
+						case BuildFlag_NoThreadedChecker: {
 							#if !defined(DEFAULT_TO_THREADED_CHECKER)
 							gb_printf_err("-no-threaded-checker is the default on this platform\n");
 							bad_flags = true;
 							#endif
 							build_context.threaded_checker = false;
 							break;
-
+						}
 						case BuildFlag_ShowDebugMessages:
 							build_context.show_debug_messages = true;
 							break;
-
 						case BuildFlag_Vet:
 							build_context.vet = true;
 							break;
-						case BuildFlag_VetExtra:
+						case BuildFlag_VetExtra: {
 							build_context.vet = true;
 							build_context.vet_extra = true;
 							break;
-
-						case BuildFlag_UseLLVMApi:
+						}
+						case BuildFlag_UseLLVMApi: {
 							gb_printf_err("-llvm-api flag is not required any more\n");
 							bad_flags = true;
 							break;
-
+						}
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
-
 						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
 							break;
-
-						case BuildFlag_Microarch:
+						case BuildFlag_ExtraAssemblerFlags: 
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.extra_assembler_flags = value.value_string;
+							break;
+						case BuildFlag_Microarch: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
 							string_to_lower(&build_context.microarch);
 							break;
-
-						case BuildFlag_TestName:
+						}
+						case BuildFlag_TestName: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							{
 								String name = value.value_string;
@@ -1304,35 +1380,33 @@ bool parse_build_flags(Array<String> args) {
 								// NOTE(bill): Allow for multiple -test-name
 								continue;
 							}
-
+						}
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
-
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
 							break;
-
-						case BuildFlag_InsertSemicolon:
+						case BuildFlag_InsertSemicolon: {
 							gb_printf_err("-insert-semicolon flag is not required any more\n");
 							bad_flags = true;
 							break;
-
-						case BuildFlag_StrictStyle:
+						}
+						case BuildFlag_StrictStyle: {
 							if (build_context.strict_style_init_only) {
 								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
 							}
 							build_context.strict_style = true;
 							break;
-						case BuildFlag_StrictStyleInitOnly:
+						}
+						case BuildFlag_StrictStyleInitOnly: {
 							if (build_context.strict_style) {
 								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
 							}
 							build_context.strict_style_init_only = true;
 							break;
-
-
-						case BuildFlag_Compact:
+						}
+						case BuildFlag_Compact: {
 							if (!build_context.query_data_set_settings.ok) {
 								gb_printf_err("Invalid use of -compact flag, only allowed with 'odin query'\n");
 								bad_flags = true;
@@ -1340,8 +1414,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.query_data_set_settings.compact = true;
 							}
 							break;
-
-						case BuildFlag_GlobalDefinitions:
+						}
+						case BuildFlag_GlobalDefinitions: {
 							if (!build_context.query_data_set_settings.ok) {
 								gb_printf_err("Invalid use of -global-definitions flag, only allowed with 'odin query'\n");
 								bad_flags = true;
@@ -1352,7 +1426,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.query_data_set_settings.kind = QueryDataSet_GlobalDefinitions;
 							}
 							break;
-						case BuildFlag_GoToDefinitions:
+						}
+						case BuildFlag_GoToDefinitions: {
 							if (!build_context.query_data_set_settings.ok) {
 								gb_printf_err("Invalid use of -go-to-definitions flag, only allowed with 'odin query'\n");
 								bad_flags = true;
@@ -1363,7 +1438,7 @@ bool parse_build_flags(Array<String> args) {
 								build_context.query_data_set_settings.kind = QueryDataSet_GoToDefinitions;
 							}
 							break;
-
+						}
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
@@ -1373,7 +1448,7 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DocFormat:
 							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
 							break;
-						case BuildFlag_IgnoreWarnings:
+						case BuildFlag_IgnoreWarnings: {
 							if (build_context.warnings_as_errors) {
 								gb_printf_err("-ignore-warnings cannot be used with -warnings-as-errors\n");
 								bad_flags = true;
@@ -1381,7 +1456,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.ignore_warnings = true;
 							}
 							break;
-						case BuildFlag_WarningsAsErrors:
+						}
+						case BuildFlag_WarningsAsErrors: {
 							if (build_context.ignore_warnings) {
 								gb_printf_err("-warnings-as-errors cannot be used with -ignore-warnings\n");
 								bad_flags = true;
@@ -1389,21 +1465,19 @@ bool parse_build_flags(Array<String> args) {
 								build_context.warnings_as_errors = true;
 							}
 							break;
-
+						}
 						case BuildFlag_VerboseErrors:
 							build_context.show_error_line = true;
 							break;
-
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;
-
 					#if defined(GB_SYSTEM_WINDOWS)
-						case BuildFlag_IgnoreVsSearch:
+						case BuildFlag_IgnoreVsSearch: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.ignore_microsoft_magic = true;
 							break;
-
+						}
 						case BuildFlag_ResourceFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -1490,6 +1564,19 @@ bool parse_build_flags(Array<String> args) {
 		}
 	}
 
+	if ((!(build_context.export_timings_format == TimingsExportUnspecified)) && (build_context.export_timings_file.len == 0)) {
+		gb_printf_err("`-export-timings:<format>` requires `-export-timings-file:<filename>` to be specified as well\n");
+		bad_flags = true;
+	} else if ((build_context.export_timings_format == TimingsExportUnspecified) && (build_context.export_timings_file.len > 0)) {
+		gb_printf_err("`-export-timings-file:<filename>` requires `-export-timings:<format>` to be specified as well\n");
+		bad_flags = true;
+	}
+
+	if (build_context.export_timings_format && !(build_context.show_timings || build_context.show_more_timings)) {
+		gb_printf_err("`-export-timings:<format>` requires `-show-timings` or `-show-more-timings` to be present\n");
+		bad_flags = true;
+	}
+
 	if (build_context.query_data_set_settings.ok) {
 		if (build_context.query_data_set_settings.kind == QueryDataSet_Invalid) {
 			gb_printf_err("'odin query' requires a flag determining the kind of query data set to be returned\n");
@@ -1500,6 +1587,104 @@ bool parse_build_flags(Array<String> args) {
 	}
 
 	return !bad_flags;
+}
+
+void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
+	GB_ASSERT((!(build_context.export_timings_format == TimingsExportUnspecified) && build_context.export_timings_file.len > 0));
+
+	/*
+		NOTE(Jeroen): Whether we call `timings_print_all()`, then `timings_export_all()`, the other way around,
+		or just one of them, we only need to stop the clock once.
+	*/
+	if (!timings_are_finalized) {
+		timings__stop_current_section(t);
+		t->total.finish = time_stamp_time_now();
+	}
+
+	TimingUnit unit = TimingUnit_Millisecond;
+
+	/*
+		Prepare file for export.
+	*/
+	gbFile f = {};
+	char * fileName = (char *)build_context.export_timings_file.text;
+	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
+	if (err != gbFileError_None) {
+		gb_printf_err("Failed to export timings to: %s\n", fileName);
+		gb_exit(1);
+		return;
+	} else {
+		gb_printf("\nExporting timings to '%s'... ", fileName);
+	}
+	defer (gb_file_close(&f));
+
+	if (build_context.export_timings_format == TimingsExportJson) {
+		/*
+			JSON export
+		*/
+		Parser *p             = c->parser;
+		isize lines           = p->total_line_count;
+		isize tokens          = p->total_token_count;
+		isize files           = 0;
+		isize packages        = p->packages.count;
+		isize total_file_size = 0;
+		for_array(i, p->packages) {
+			files += p->packages[i]->files.count;
+			for_array(j, p->packages[i]->files) {
+				AstFile *file = p->packages[i]->files[j];
+				total_file_size += file->tokenizer.end - file->tokenizer.start;
+			}
+		}
+
+		gb_fprintf(&f, "{\n");
+		gb_fprintf(&f, "\t\"totals\": [\n");
+
+		gb_fprintf(&f, "\t\t{\"name\": \"total_packages\",  \"count\": %td},\n", packages);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_files\",     \"count\": %td},\n", files);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_lines\",     \"count\": %td},\n", lines);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_tokens\",    \"count\": %td},\n", tokens);
+		gb_fprintf(&f, "\t\t{\"name\": \"total_file_size\", \"count\": %td},\n", total_file_size);
+
+		gb_fprintf(&f, "\t],\n");
+
+		gb_fprintf(&f, "\t\"timings\": [\n");
+
+		t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
+		f64 total_time = time_stamp(t->total, t->freq, unit);
+
+		gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
+		    LIT(t->total.label), total_time);
+
+		for_array(i, t->sections) {
+			TimeStamp ts = t->sections[i];
+			f64 section_time = time_stamp(ts, t->freq, unit);
+			gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
+			    LIT(ts.label), section_time);
+		}
+
+		gb_fprintf(&f, "\t],\n");
+
+		gb_fprintf(&f, "}\n");
+	} else if (build_context.export_timings_format == TimingsExportCSV) {
+		/*
+			CSV export
+		*/
+		t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
+		f64 total_time = time_stamp(t->total, t->freq, unit);
+
+		/*
+			CSV doesn't really like floating point values. Cast to `int`.
+		*/
+		gb_fprintf(&f, "\"%.*s\", %d\n", LIT(t->total.label), int(total_time));
+
+		for_array(i, t->sections) {
+			TimeStamp ts = t->sections[i];
+			f64 section_time = time_stamp(ts, t->freq, unit);
+			gb_fprintf(&f, "\"%.*s\", %d\n", LIT(ts.label), int(section_time));
+		}
+	}
+
+	gb_printf("Done.\n");
 }
 
 void show_timings(Checker *c, Timings *t) {
@@ -1522,6 +1707,11 @@ void show_timings(Checker *c, Timings *t) {
 	}
 
 	timings_print_all(t);
+
+	if (!(build_context.export_timings_format == TimingsExportUnspecified)) {
+		timings_export_all(t, c, true);
+	}
+
 	if (build_context.show_debug_messages && build_context.show_more_timings) {
 		{
 			gb_printf("\n");
@@ -1733,6 +1923,18 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
 		print_usage_line(0, "");
 
+		print_usage_line(1, "-export-timings:<format>");
+		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-export-timings:json        Export compile time stats to JSON");
+		print_usage_line(3, "-export-timings:csv         Export compile time stats to CSV");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-export-timings-file:<filename>");
+		print_usage_line(2, "Specify the filename for `-export-timings`");
+		print_usage_line(2, "Example: -export-timings-file:timings.json");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-thread-count:<integer>");
 		print_usage_line(2, "Override the number of threads the compiler will use to compile with");
 		print_usage_line(2, "Example: -thread-count:2");
@@ -1870,6 +2072,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
+		
+		print_usage_line(1, "-extra-assembler-flags:<string>");
+		print_usage_line(2, "Adds extra assembler specific flags in a string");
+		print_usage_line(0, "");
+
 
 		print_usage_line(1, "-microarch:<string>");
 		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");
@@ -2380,7 +2587,8 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	if (init_filename == "-help") {
+	if (init_filename == "-help" ||
+	    init_filename == "--help") {
 		build_context.show_help = true;
 	}
 

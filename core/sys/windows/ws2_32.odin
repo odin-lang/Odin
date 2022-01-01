@@ -39,6 +39,11 @@ foreign ws2_32 {
 		g: GROUP,
 		dwFlags: DWORD,
 	) -> SOCKET ---
+	socket :: proc(
+		af: c_int,
+		type: c_int,
+		protocol: c_int,
+	) -> SOCKET ---
 
 	ioctlsocket :: proc(s: SOCKET, cmd: c_long, argp: ^c_ulong) -> c_int ---
 	closesocket :: proc(socket: SOCKET) -> c_int ---
@@ -76,10 +81,10 @@ foreign ws2_32 {
 	listen :: proc(socket: SOCKET, backlog: c_int) -> c_int ---
 	connect :: proc(socket: SOCKET, address: ^SOCKADDR, len: c_int) -> c_int ---
 	getaddrinfo :: proc(
-		node: ^c_char,
-		service: ^c_char,
+		node: cstring,
+		service: cstring,
 		hints: ^ADDRINFOA,
-		res: ^ADDRINFOA,
+		res: ^^ADDRINFOA,
 	) -> c_int ---
 	freeaddrinfo :: proc(res: ^ADDRINFOA) ---
 	select :: proc(

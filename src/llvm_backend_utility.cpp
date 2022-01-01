@@ -179,32 +179,24 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: '%s' to '%s'", type_to_string(src_type), type_to_string(t));
 
 	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
-	if (is_type_uintptr(src) && is_type_pointer(dst)) {
+	if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
-	if (is_type_pointer(src) && is_type_uintptr(dst)) {
-		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	}
-	if (is_type_uintptr(src) && is_type_proc(dst)) {
-		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	}
-	if (is_type_proc(src) && is_type_uintptr(dst)) {
+	if (is_type_internally_pointer_like(src) && is_type_uintptr(dst)) {
 		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
 
-	if (is_type_integer(src) && (is_type_pointer(dst) || is_type_cstring(dst))) {
+	if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
-	} else if ((is_type_pointer(src) || is_type_cstring(src)) && is_type_integer(dst)) {
+	} else if (is_type_internally_pointer_like(src) && is_type_integer(dst)) {
 		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	}
 
-	if (is_type_pointer(src) && is_type_pointer(dst)) {
+	if (is_type_internally_pointer_like(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
 	}
@@ -1208,7 +1200,7 @@ lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, isize index) {
 }
 
 lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
-	index = lb_correct_endianness(p, index);
+	index = lb_emit_conv(p, index, t_int);
 	LLVMValueRef indices[1] = {index.value};
 	lbValue res = {};
 	res.type = ptr.type;
@@ -1544,6 +1536,19 @@ LLVMValueRef llvm_mask_zero(lbModule *m, unsigned count) {
 	return LLVMConstNull(LLVMVectorType(lb_type(m, t_u32), count));
 }
 
+#define LLVM_VECTOR_DUMMY_VALUE(type) LLVMGetUndef((type))
+// #define LLVM_VECTOR_DUMMY_VALUE(type) LLVMConstNull((type))
+
+
+LLVMValueRef llvm_basic_shuffle(lbProcedure *p, LLVMValueRef vector, LLVMValueRef mask) {
+	return LLVMBuildShuffleVector(p->builder, vector, LLVM_VECTOR_DUMMY_VALUE(LLVMTypeOf(vector)), mask, "");
+}
+LLVMValueRef llvm_basic_const_shuffle(LLVMValueRef vector, LLVMValueRef mask) {
+	return LLVMConstShuffleVector(vector, LLVM_VECTOR_DUMMY_VALUE(LLVMTypeOf(vector)), mask);
+}
+
+
+
 LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef value, unsigned count) {
 	GB_ASSERT(count > 0);
 	if (LLVMIsConstant(value)) {
@@ -1552,7 +1557,7 @@ LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef value, unsigned 
 			return single;
 		}
 		LLVMValueRef mask = llvm_mask_zero(p->module, count);
-		return LLVMConstShuffleVector(single, LLVMGetUndef(LLVMTypeOf(single)), mask);
+		return llvm_basic_const_shuffle(single, mask);
 	}
 	
 	LLVMTypeRef single_type = LLVMVectorType(LLVMTypeOf(value), 1);
@@ -1561,7 +1566,7 @@ LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef value, unsigned 
 		return single;
 	}
 	LLVMValueRef mask = llvm_mask_zero(p->module, count);
-	return LLVMBuildShuffleVector(p->builder, single, LLVMGetUndef(LLVMTypeOf(single)), mask, "");
+	return llvm_basic_shuffle(p, single, mask);
 }
 
 LLVMValueRef llvm_vector_shuffle_reduction(lbProcedure *p, LLVMValueRef value, LLVMOpcode op_code) {
@@ -1582,8 +1587,8 @@ LLVMValueRef llvm_vector_shuffle_reduction(lbProcedure *p, LLVMValueRef value, L
 		LLVMValueRef rhs_mask = llvm_mask_iota(p->module, mask_len, mask_len);
 		GB_ASSERT(LLVMTypeOf(lhs_mask) == LLVMTypeOf(rhs_mask));
 
-		LLVMValueRef lhs = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), lhs_mask, "");
-		LLVMValueRef rhs = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), rhs_mask, "");
+		LLVMValueRef lhs = llvm_basic_shuffle(p, value, lhs_mask);
+		LLVMValueRef rhs = llvm_basic_shuffle(p, value, rhs_mask);
 		GB_ASSERT(LLVMTypeOf(lhs) == LLVMTypeOf(rhs));
 		
 		value = LLVMBuildBinOp(p->builder, op_code, lhs, rhs, "");
@@ -1675,8 +1680,8 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 		GB_ASSERT(len_pow_2 < len);
 		LLVMValueRef lower_mask = llvm_mask_iota(p->module, 0, len_pow_2);
 		LLVMValueRef upper_mask = llvm_mask_iota(p->module, len_pow_2, len-len_pow_2);
-		LLVMValueRef lower = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), lower_mask, "");
-		LLVMValueRef upper = LLVMBuildShuffleVector(p->builder, value, LLVMGetUndef(LLVMTypeOf(value)), upper_mask, "");
+		LLVMValueRef lower = llvm_basic_shuffle(p, value, lower_mask);
+		LLVMValueRef upper = llvm_basic_shuffle(p, value, upper_mask);
 		upper = llvm_vector_expand_to_power_of_two(p, upper);
 
 		LLVMValueRef lower_reduced = llvm_vector_shuffle_reduction(p, lower, op_code);

@@ -6,7 +6,6 @@ package sha1
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the SHA1 hashing algorithm, as defined in RFC 3174 <https://datatracker.ietf.org/doc/html/rfc3174>
 */
@@ -16,77 +15,78 @@ import "core:os"
 import "core:io"
 
 import "../util"
-import "../botan"
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_20  = hash_bytes_odin
-    ctx.hash_file_20   = hash_file_odin
-    ctx.hash_stream_20 = hash_stream_odin
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan assigns the internal vtable of the hash context to use the Botan bindings
-use_botan :: #force_inline proc() {
-    botan.assign_hash_vtable(_hash_impl, botan.HASH_SHA1)
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
 
 /*
     High level API
 */
 
+DIGEST_SIZE :: 20
+
 // hash_string will hash the given input and return the
 // computed hash
-hash_string :: proc(data: string) -> [20]byte {
+hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
     return hash_bytes(transmute([]byte)(data))
 }
 
 // hash_bytes will hash the given input and return the
 // computed hash
-hash_bytes :: proc(data: []byte) -> [20]byte {
-	_create_sha1_ctx()
-    return _hash_impl->hash_bytes_20(data)
+hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
+    hash: [DIGEST_SIZE]byte
+    ctx: Sha1_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
+    ctx: Sha1_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
-hash_stream :: proc(s: io.Stream) -> ([20]byte, bool) {
-	_create_sha1_ctx()
-    return _hash_impl->hash_stream_20(s)
+hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
+    hash: [DIGEST_SIZE]byte
+    ctx: Sha1_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file will read the file provided by the given handle
 // and compute a hash
-hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-	_create_sha1_ctx()
-    return _hash_impl->hash_file_20(hd, load_at_once)
+hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE]byte, bool) {
+    if !load_at_once {
+        return hash_stream(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE]byte{}, false
 }
 
 hash :: proc {
@@ -94,92 +94,78 @@ hash :: proc {
     hash_file,
     hash_bytes,
     hash_string,
+    hash_bytes_to_buffer,
+    hash_string_to_buffer,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+init :: proc(ctx: ^Sha1_Context) {
+	ctx.state[0] = 0x67452301
+	ctx.state[1] = 0xefcdab89
+	ctx.state[2] = 0x98badcfe
+	ctx.state[3] = 0x10325476
+	ctx.state[4] = 0xc3d2e1f0
+	ctx.k[0]     = 0x5a827999
+	ctx.k[1]     = 0x6ed9eba1
+	ctx.k[2]     = 0x8f1bbcdc
+	ctx.k[3]     = 0xca62c1d6
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
+update :: proc(ctx: ^Sha1_Context, data: []byte) {
+	for i := 0; i < len(data); i += 1 {
+		ctx.data[ctx.datalen] = data[i]
+		ctx.datalen += 1
+		if (ctx.datalen == BLOCK_SIZE) {
+			transform(ctx, ctx.data[:])
+			ctx.bitlen += 512
+			ctx.datalen = 0
+		}
+	}
 }
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
+final :: proc(ctx: ^Sha1_Context, hash: []byte) {
+	i := ctx.datalen
 
-hash_bytes_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [20]byte {
-    hash: [20]byte
-    if c, ok := ctx.internal_ctx.(Sha1_Context); ok {
-    	init_odin(&c)
-    	update_odin(&c, data)
-    	final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
-    if c, ok := ctx.internal_ctx.(Sha1_Context); ok {
-    	init_odin(&c)
-	    buf := make([]byte, 512)
-	    defer delete(buf)
-	    read := 1
-	    for read > 0 {
-	        read, _ = fs->impl_read(buf)
-	        if read > 0 {
-	            update_odin(&c, buf[:read])
-	        } 
-	    }
-	    final_odin(&c, hash[:])
-	    return hash, true
-    } else {
-    	return hash, false
-    }
-}
-
-hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin(ctx, buf[:]), ok
+	if ctx.datalen < 56 {
+		ctx.data[i] = 0x80
+        i += 1
+        for i < 56 {
+            ctx.data[i] = 0x00
+            i += 1
         }
-    }
-    return [20]byte{}, false
-}
+	}
+	else {
+		ctx.data[i] = 0x80
+        i += 1
+        for i < BLOCK_SIZE {
+            ctx.data[i] = 0x00
+            i += 1
+        }
+		transform(ctx, ctx.data[:])
+		mem.set(&ctx.data, 0, 56)
+	}
 
-@(private)
-_create_sha1_ctx :: #force_inline proc() {
-	ctx: Sha1_Context
-	_hash_impl.internal_ctx = ctx
-	_hash_impl.hash_size    = ._20
-}
+	ctx.bitlen  += u64(ctx.datalen * 8)
+	ctx.data[63] = u8(ctx.bitlen)
+	ctx.data[62] = u8(ctx.bitlen >> 8)
+	ctx.data[61] = u8(ctx.bitlen >> 16)
+	ctx.data[60] = u8(ctx.bitlen >> 24)
+	ctx.data[59] = u8(ctx.bitlen >> 32)
+	ctx.data[58] = u8(ctx.bitlen >> 40)
+	ctx.data[57] = u8(ctx.bitlen >> 48)
+	ctx.data[56] = u8(ctx.bitlen >> 56)
+	transform(ctx, ctx.data[:])
 
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_sha1_ctx()
-    if c, ok := ctx.internal_ctx.(Sha1_Context); ok {
-    	init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Sha1_Context); ok {
-    	update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Sha1_Context); ok {
-    	final_odin(&c, hash)
-    }
+	for j: u32 = 0; j < 4; j += 1 {
+		hash[j]      = u8(ctx.state[0] >> (24 - j * 8)) & 0x000000ff
+		hash[j + 4]  = u8(ctx.state[1] >> (24 - j * 8)) & 0x000000ff
+		hash[j + 8]  = u8(ctx.state[2] >> (24 - j * 8)) & 0x000000ff
+		hash[j + 12] = u8(ctx.state[3] >> (24 - j * 8)) & 0x000000ff
+		hash[j + 16] = u8(ctx.state[4] >> (24 - j * 8)) & 0x000000ff
+	}
 }
 
 /*
@@ -257,70 +243,4 @@ transform :: proc(ctx: ^Sha1_Context, data: []byte) {
 	ctx.state[2] += c
 	ctx.state[3] += d
 	ctx.state[4] += e
-}
-
-init_odin :: proc(ctx: ^Sha1_Context) {
-	ctx.state[0] = 0x67452301
-	ctx.state[1] = 0xefcdab89
-	ctx.state[2] = 0x98badcfe
-	ctx.state[3] = 0x10325476
-	ctx.state[4] = 0xc3d2e1f0
-	ctx.k[0]     = 0x5a827999
-	ctx.k[1]     = 0x6ed9eba1
-	ctx.k[2]     = 0x8f1bbcdc
-	ctx.k[3]     = 0xca62c1d6
-}
-
-update_odin :: proc(ctx: ^Sha1_Context, data: []byte) {
-	for i := 0; i < len(data); i += 1 {
-		ctx.data[ctx.datalen] = data[i]
-		ctx.datalen += 1
-		if (ctx.datalen == BLOCK_SIZE) {
-			transform(ctx, ctx.data[:])
-			ctx.bitlen += 512
-			ctx.datalen = 0
-		}
-	}
-}
-
-final_odin :: proc(ctx: ^Sha1_Context, hash: []byte) {
-	i := ctx.datalen
-
-	if ctx.datalen < 56 {
-		ctx.data[i] = 0x80
-        i += 1
-        for i < 56 {
-            ctx.data[i] = 0x00
-            i += 1
-        }
-	}
-	else {
-		ctx.data[i] = 0x80
-        i += 1
-        for i < BLOCK_SIZE {
-            ctx.data[i] = 0x00
-            i += 1
-        }
-		transform(ctx, ctx.data[:])
-		mem.set(&ctx.data, 0, 56)
-	}
-
-	ctx.bitlen  += u64(ctx.datalen * 8)
-	ctx.data[63] = u8(ctx.bitlen)
-	ctx.data[62] = u8(ctx.bitlen >> 8)
-	ctx.data[61] = u8(ctx.bitlen >> 16)
-	ctx.data[60] = u8(ctx.bitlen >> 24)
-	ctx.data[59] = u8(ctx.bitlen >> 32)
-	ctx.data[58] = u8(ctx.bitlen >> 40)
-	ctx.data[57] = u8(ctx.bitlen >> 48)
-	ctx.data[56] = u8(ctx.bitlen >> 56)
-	transform(ctx, ctx.data[:])
-
-	for j: u32 = 0; j < 4; j += 1 {
-		hash[j]      = u8(ctx.state[0] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 4]  = u8(ctx.state[1] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 8]  = u8(ctx.state[2] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 12] = u8(ctx.state[3] >> (24 - j * 8)) & 0x000000ff
-		hash[j + 16] = u8(ctx.state[4] >> (24 - j * 8)) & 0x000000ff
-	}
 }

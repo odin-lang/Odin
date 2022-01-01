@@ -6,7 +6,6 @@ package streebog
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the Streebog hashing algorithm, standardized as GOST R 34.11-2012 in RFC 6986 <https://datatracker.ietf.org/doc/html/rfc6986>
 */
@@ -15,88 +14,82 @@ import "core:os"
 import "core:io"
 
 import "../util"
-import "../botan"
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_32  = hash_bytes_odin_32
-    ctx.hash_file_32   = hash_file_odin_32
-    ctx.hash_stream_32 = hash_stream_odin_32
-    ctx.hash_bytes_64  = hash_bytes_odin_64
-    ctx.hash_file_64   = hash_file_odin_64
-    ctx.hash_stream_64 = hash_stream_odin_64
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan assigns the internal vtable of the hash context to use the Botan bindings
-use_botan :: #force_inline proc() {
-    botan.assign_hash_vtable(_hash_impl, botan.HASH_STREEBOG)
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
-
-@(private)
-_create_streebog_ctx :: #force_inline proc(is256: bool) {
-	ctx: Streebog_Context
-	ctx.is256               = is256
-	_hash_impl.internal_ctx = ctx
-	_hash_impl.hash_size    = is256 ? ._32 : ._64
-}
 
 /*
     High level API
 */
 
+DIGEST_SIZE_256 :: 32
+DIGEST_SIZE_512 :: 64
+
 // hash_string_256 will hash the given input and return the
 // computed hash
-hash_string_256 :: proc(data: string) -> [32]byte {
+hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256(transmute([]byte)(data))
 }
 
 // hash_bytes_256 will hash the given input and return the
 // computed hash
-hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-	_create_streebog_ctx(true)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Streebog_Context
+    ctx.is256 = true
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Streebog_Context
+    ctx.is256 = true
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-	_create_streebog_ctx(true)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Streebog_Context
+    ctx.is256 = true
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-	_create_streebog_ctx(true)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256 :: proc {
@@ -104,33 +97,75 @@ hash_256 :: proc {
     hash_file_256,
     hash_bytes_256,
     hash_string_256,
+	hash_bytes_to_buffer_256,
+    hash_string_to_buffer_256,
 }
 
 // hash_string_512 will hash the given input and return the
 // computed hash
-hash_string_512 :: proc(data: string) -> [64]byte {
+hash_string_512 :: proc(data: string) -> [DIGEST_SIZE_512]byte {
     return hash_bytes_512(transmute([]byte)(data))
 }
 
 // hash_bytes_512 will hash the given input and return the
 // computed hash
-hash_bytes_512 :: proc(data: []byte) -> [64]byte {
-	_create_streebog_ctx(false)
-    return _hash_impl->hash_bytes_64(data)
+hash_bytes_512 :: proc(data: []byte) -> [DIGEST_SIZE_512]byte {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Streebog_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_512 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_512(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_512 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_512, "Size of destination buffer is smaller than the digest size")
+    ctx: Streebog_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
 }
 
 // hash_stream_512 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_512 :: proc(s: io.Stream) -> ([64]byte, bool) {
-	_create_streebog_ctx(false)
-    return _hash_impl->hash_stream_64(s)
+hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Streebog_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_512 will read the file provided by the given handle
 // and compute a hash
-hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-	_create_streebog_ctx(false)
-    return _hash_impl->hash_file_64(hd, load_at_once)
+hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_512]byte, bool) {
+    if !load_at_once {
+        return hash_stream_512(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_512(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_512]byte{}, false
 }
 
 hash_512 :: proc {
@@ -138,126 +173,72 @@ hash_512 :: proc {
     hash_file_512,
     hash_bytes_512,
     hash_string_512,
+    hash_bytes_to_buffer_512,
+    hash_string_to_buffer_512,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+init :: proc(ctx: ^Streebog_Context) {
+	if ctx.is256 {
+		ctx.hash_size = 256
+		for _, i in ctx.h {
+			ctx.h[i] = 0x01
+		}
+	} else {
+		ctx.hash_size = 512
+	}
+	ctx.v_512[1] = 0x02
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
+update :: proc(ctx: ^Streebog_Context, data: []byte) {
+	length := u64(len(data))
+	chk_size: u64
+	data := data
+	for (length > 63) && (ctx.buf_size == 0) {
+		stage2(ctx, data)
+		data = data[64:]
+		length -= 64
+	}
+
+	for length != 0 {
+		chk_size = 64 - ctx.buf_size
+		if chk_size > length {
+			chk_size = length
+		}
+		copy(ctx.buffer[ctx.buf_size:], data[:chk_size])
+		ctx.buf_size += chk_size
+		length -= chk_size
+		data = data[chk_size:]
+		if ctx.buf_size == 64 {
+			stage2(ctx, ctx.buffer[:])
+			ctx.buf_size = 0
+		}
+	}
 }
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
+final :: proc(ctx: ^Streebog_Context, hash: []byte) {
+	t: [64]byte
+	t[1] = byte((ctx.buf_size * 8) >> 8) & 0xff
+	t[0] = byte((ctx.buf_size) * 8) & 0xff
 
-hash_bytes_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-    	init_odin(&c)
-		update_odin(&c, data)
-		final_odin(&c, hash[:])
-    }
-    return hash
-}
+	padding(ctx)
 
-hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-    	init_odin(&c)
-	    buf := make([]byte, 512)
-	    defer delete(buf)
-	    read := 1
-	    for read > 0 {
-	        read, _ = fs->impl_read(buf)
-	        if read > 0 {
-	            update_odin(&c, buf[:read])
-	        } 
-	    }
-	    final_odin(&c, hash[:])
-	    return hash, true
-    } else {
-    	return hash, false
-    }
-}
+	G(ctx.h[:], ctx.n[:], ctx.buffer[:])
 
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_32(ctx, buf[:]), ok
-        }
-    }
-    return [32]byte{}, false
-}
+	add_mod_512(ctx.n[:], t[:], ctx.n[:])
+	add_mod_512(ctx.sigma[:], ctx.buffer[:], ctx.sigma[:])
 
-hash_bytes_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [64]byte {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-    	init_odin(&c)
-		update_odin(&c, data)
-		final_odin(&c, hash[:])
-    }
-    return hash
-}
+	G(ctx.h[:], ctx.v_0[:], ctx.n[:])
+	G(ctx.h[:], ctx.v_0[:], ctx.sigma[:])
 
-hash_stream_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([64]byte, bool) {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-    	init_odin(&c)
-	    buf := make([]byte, 512)
-	    defer delete(buf)
-	    read := 1
-	    for read > 0 {
-	        read, _ = fs->impl_read(buf)
-	        if read > 0 {
-	            update_odin(&c, buf[:read])
-	        } 
-	    }
-	    final_odin(&c, hash[:])
-	    return hash, true
-    } else {
-    	return hash, false
-    }
-}
-
-hash_file_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_64(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_64(ctx, buf[:]), ok
-        }
-    }
-    return [64]byte{}, false
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_streebog_ctx(ctx.hash_size == ._32)
-    if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-    	init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-        update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-	if c, ok := ctx.internal_ctx.(Streebog_Context); ok {
-        final_odin(&c, hash)
-    }
+	if ctx.is256 {
+		copy(hash[:], ctx.h[32:])
+	} else {
+		copy(hash[:], ctx.h[:])
+	}
 }
 
 /*
@@ -532,65 +513,5 @@ padding :: proc(ctx: ^Streebog_Context) {
 		copy(t[:], ctx.buffer[:int(ctx.buf_size)])
 		t[ctx.buf_size] = 0x01
 		copy(ctx.buffer[:], t[:])
-	}
-}
-
-init_odin :: proc(ctx: ^Streebog_Context) {
-	if ctx.is256 {
-		ctx.hash_size = 256
-		for _, i in ctx.h {
-			ctx.h[i] = 0x01
-		}
-	} else {
-		ctx.hash_size = 512
-	}
-	ctx.v_512[1] = 0x02
-}
-
-update_odin :: proc(ctx: ^Streebog_Context, data: []byte) {
-	length := u64(len(data))
-	chk_size: u64
-	data := data
-	for (length > 63) && (ctx.buf_size == 0) {
-		stage2(ctx, data)
-		data = data[64:]
-		length -= 64
-	}
-
-	for length != 0 {
-		chk_size = 64 - ctx.buf_size
-		if chk_size > length {
-			chk_size = length
-		}
-		copy(ctx.buffer[ctx.buf_size:], data[:chk_size])
-		ctx.buf_size += chk_size
-		length -= chk_size
-		data = data[chk_size:]
-		if ctx.buf_size == 64 {
-			stage2(ctx, ctx.buffer[:])
-			ctx.buf_size = 0
-		}
-	}
-}
-
-final_odin :: proc(ctx: ^Streebog_Context, hash: []byte) {
-	t: [64]byte
-	t[1] = byte((ctx.buf_size * 8) >> 8) & 0xff
-	t[0] = byte((ctx.buf_size) * 8) & 0xff
-
-	padding(ctx)
-
-	G(ctx.h[:], ctx.n[:], ctx.buffer[:])
-
-	add_mod_512(ctx.n[:], t[:], ctx.n[:])
-	add_mod_512(ctx.sigma[:], ctx.buffer[:], ctx.sigma[:])
-
-	G(ctx.h[:], ctx.v_0[:], ctx.n[:])
-	G(ctx.h[:], ctx.v_0[:], ctx.sigma[:])
-
-	if ctx.is256 {
-		copy(hash[:], ctx.h[32:])
-	} else {
-		copy(hash[:], ctx.h[:])
 	}
 }

@@ -2,8 +2,17 @@ package runtime
 
 import "core:intrinsics"
 
+@(private="file")
+IS_WASM :: ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64"
+
 @(private)
-RUNTIME_LINKAGE :: "strong" when (ODIN_USE_SEPARATE_MODULES || ODIN_BUILD_MODE == "dynamic" || !ODIN_NO_CRT) else "internal"
+RUNTIME_LINKAGE :: "strong" when (
+	(ODIN_USE_SEPARATE_MODULES || 
+	ODIN_BUILD_MODE == "dynamic" || 
+	!ODIN_NO_CRT) &&
+	!IS_WASM) else "internal"
+RUNTIME_REQUIRE :: true
+
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
@@ -649,7 +658,7 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	return quaternion(t0, t1, t2, t3)
 }
 
-@(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncsfhf2 :: proc "c" (value: f32) -> u16 {
 	v: struct #raw_union { i: u32, f: f32 }
 	i, s, e, m: i32
@@ -707,12 +716,12 @@ truncsfhf2 :: proc "c" (value: f32) -> u16 {
 }
 
 
-@(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncdfhf2 :: proc "c" (value: f64) -> u16 {
 	return truncsfhf2(f32(value))
 }
 
-@(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
 	fp32 :: struct #raw_union { u: u32, f: f32 }
 
@@ -731,20 +740,23 @@ gnu_h2f_ieee :: proc "c" (value: u16) -> f32 {
 }
 
 
-@(link_name="__gnu_f2h_ieee", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__gnu_f2h_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 gnu_f2h_ieee :: proc "c" (value: f32) -> u16 {
 	return truncsfhf2(value)
 }
 
-@(link_name="__extendhfsf2", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__extendhfsf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 extendhfsf2 :: proc "c" (value: u16) -> f32 {
 	return gnu_h2f_ieee(value)
 }
 
 
 
-@(link_name="__floattidf", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__floattidf", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf :: proc "c" (a: i128) -> f64 {
+when IS_WASM {
+	return 0
+} else {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -784,10 +796,14 @@ floattidf :: proc "c" (a: i128) -> f64 {
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
+}
 
 
-@(link_name="__floattidf_unsigned", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__floattidf_unsigned", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf_unsigned :: proc "c" (a: u128) -> f64 {
+when IS_WASM {
+	return 0
+} else {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -825,17 +841,18 @@ floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
+}
 
 
 
-@(link_name="__fixunsdfti", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__fixunsdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 fixunsdfti :: #force_no_inline proc "c" (a: f64) -> u128 {
 	// TODO(bill): implement `fixunsdfti` correctly
 	x := u64(a)
 	return u128(x)
 }
 
-@(link_name="__fixunsdfdi", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__fixunsdfdi", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 fixunsdfdi :: #force_no_inline proc "c" (a: f64) -> i128 {
 	// TODO(bill): implement `fixunsdfdi` correctly
 	x := i64(a)
@@ -845,7 +862,7 @@ fixunsdfdi :: #force_no_inline proc "c" (a: f64) -> i128 {
 
 
 
-@(link_name="__umodti3", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__umodti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 umodti3 :: proc "c" (a, b: u128) -> u128 {
 	r: u128 = ---
 	_ = udivmod128(a, b, &r)
@@ -853,18 +870,18 @@ umodti3 :: proc "c" (a, b: u128) -> u128 {
 }
 
 
-@(link_name="__udivmodti4", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__udivmodti4", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 udivmodti4 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	return udivmod128(a, b, rem)
 }
 
-@(link_name="__udivti3", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__udivti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 udivti3 :: proc "c" (a, b: u128) -> u128 {
 	return udivmodti4(a, b, nil)
 }
 
 
-@(link_name="__modti3", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__modti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 modti3 :: proc "c" (a, b: i128) -> i128 {
 	s_a := a >> (128 - 1)
 	s_b := b >> (128 - 1)
@@ -877,20 +894,20 @@ modti3 :: proc "c" (a, b: i128) -> i128 {
 }
 
 
-@(link_name="__divmodti4", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__divmodti4", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divmodti4 :: proc "c" (a, b: i128, rem: ^i128) -> i128 {
 	u := udivmod128(transmute(u128)a, transmute(u128)b, cast(^u128)rem)
 	return transmute(i128)u
 }
 
-@(link_name="__divti3", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__divti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divti3 :: proc "c" (a, b: i128) -> i128 {
 	u := udivmodti4(transmute(u128)a, transmute(u128)b, nil)
 	return transmute(i128)u
 }
 
 
-@(link_name="__fixdfti", linkage=RUNTIME_LINKAGE, require)
+@(link_name="__fixdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 fixdfti :: proc(a: u64) -> i128 {
 	significandBits :: 52
 	typeWidth       :: (size_of(u64)*8)

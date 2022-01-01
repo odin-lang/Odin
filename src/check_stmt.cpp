@@ -635,10 +635,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 		bool is_ptr = is_type_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
-			Scope *found = scope_of_node(t->Struct.node);
-			if (found == nullptr) {
-				found = t->Struct.scope;
-			}
+			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
@@ -1399,9 +1396,9 @@ void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	ast_node(bs, BlockStmt, body);
 	// NOTE(bill, 2020-09-23): This logic is prevent common erros with block statements
 	// e.g. if cond { x := 123; } // this is an error
-	if (body->scope != nullptr && body->scope->elements.entries.count > 0) {
-		if (body->scope->parent->node != nullptr) {
-			switch (body->scope->parent->node->kind) {
+	if (bs->scope != nullptr && bs->scope->elements.entries.count > 0) {
+		if (bs->scope->parent->node != nullptr) {
+			switch (bs->scope->parent->node->kind) {
 			case Ast_IfStmt:
 			case Ast_ForStmt:
 			case Ast_RangeStmt:
@@ -1616,7 +1613,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 			Operand lhs = {Addressing_Invalid};
 			Operand rhs = {Addressing_Invalid};
-			Ast *binary_expr = alloc_ast_node(node->file, Ast_BinaryExpr);
+			Ast *binary_expr = alloc_ast_node(node->file(), Ast_BinaryExpr);
 			ast_node(be, BinaryExpr, binary_expr);
 			be->op = op;
 			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
@@ -2246,6 +2243,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						error(e->token, "The 'static' attribute is not allowed to be applied to '_'");
 					} else {
 						e->flags |= EntityFlag_Static;
+						if (ctx->in_defer) {
+							error(e->token, "'static' variables cannot be declared within a defer statement");
+						}
 					}
 				}
 				if (ac.thread_local_model != "") {
@@ -2254,9 +2254,13 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						error(e->token, "The 'thread_local' attribute is not allowed to be applied to '_'");
 					} else {
 						e->flags |= EntityFlag_Static;
+						if (ctx->in_defer) {
+							error(e->token, "'thread_local' variables cannot be declared within a defer statement");
+						}
 					}
 					e->Variable.thread_local_model = ac.thread_local_model;
 				}
+				
 
 				if (ac.is_static && ac.thread_local_model != "") {
 					error(e->token, "The 'static' attribute is not needed if 'thread_local' is applied");
@@ -2339,7 +2343,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					} else if (is_type_struct(t) || is_type_raw_union(t)) {
 						ERROR_BLOCK();
 						
-						Scope *scope = scope_of_node(t->Struct.node);
+						Scope *scope = t->Struct.scope;
+						GB_ASSERT(scope != nullptr);
 						for_array(i, scope->elements.entries) {
 							Entity *f = scope->elements.entries[i].value;
 							if (f->kind == Entity_Variable) {

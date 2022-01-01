@@ -6,7 +6,6 @@ package groestl
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the GROESTL hashing algorithm, as defined in <http://www.groestl.info/Groestl.zip>
 */
@@ -14,99 +13,83 @@ package groestl
 import "core:os"
 import "core:io"
 
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_28  = hash_bytes_odin_28
-    ctx.hash_file_28   = hash_file_odin_28
-    ctx.hash_stream_28 = hash_stream_odin_28
-    ctx.hash_bytes_32  = hash_bytes_odin_32
-    ctx.hash_file_32   = hash_file_odin_32
-    ctx.hash_stream_32 = hash_stream_odin_32
-    ctx.hash_bytes_48  = hash_bytes_odin_48
-    ctx.hash_file_48   = hash_file_odin_48
-    ctx.hash_stream_48 = hash_stream_odin_48
-    ctx.hash_bytes_64  = hash_bytes_odin_64
-    ctx.hash_file_64   = hash_file_odin_64
-    ctx.hash_stream_64 = hash_stream_odin_64
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan does nothing, since GROESTL is not available in Botan
-@(warning="GROESTL is not provided by the Botan API. Odin implementation will be used")
-use_botan :: #force_inline proc() {
-    use_odin()
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
-
-@(private)
-_create_groestl_ctx :: #force_inline proc(size: _ctx.Hash_Size) {
-    ctx: Groestl_Context
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
-    #partial switch size {
-        case ._28: ctx.hashbitlen = 224
-        case ._32: ctx.hashbitlen = 256
-        case ._48: ctx.hashbitlen = 384
-        case ._64: ctx.hashbitlen = 512
-    }
-}
-
 /*
     High level API
 */
 
+DIGEST_SIZE_224 :: 28
+DIGEST_SIZE_256 :: 32
+DIGEST_SIZE_384 :: 48
+DIGEST_SIZE_512 :: 64
+
 // hash_string_224 will hash the given input and return the
 // computed hash
-hash_string_224 :: proc(data: string) -> [28]byte {
+hash_string_224 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224(transmute([]byte)(data))
 }
 
 // hash_bytes_224 will hash the given input and return the
 // computed hash
-hash_bytes_224 :: proc(data: []byte) -> [28]byte {
-    _create_groestl_ctx(._28)
-    return _hash_impl->hash_bytes_28(data)
+hash_bytes_224 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 224
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_224 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_224 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Groestl_Context
+    ctx.hashbitlen = 224
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_224 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_groestl_ctx(._28)
-    return _hash_impl->hash_stream_28(s)
+hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 224
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_224 will read the file provided by the given handle
 // and compute a hash
-hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_groestl_ctx(._28)
-    return _hash_impl->hash_file_28(hd, load_at_once)
+hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
+    if !load_at_once {
+        return hash_stream_224(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_224(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224 :: proc {
@@ -114,33 +97,78 @@ hash_224 :: proc {
     hash_file_224,
     hash_bytes_224,
     hash_string_224,
+    hash_bytes_to_buffer_224,
+    hash_string_to_buffer_224,
 }
 
 // hash_string_256 will hash the given input and return the
 // computed hash
-hash_string_256 :: proc(data: string) -> [32]byte {
+hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256(transmute([]byte)(data))
 }
 
 // hash_bytes_256 will hash the given input and return the
 // computed hash
-hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    _create_groestl_ctx(._32)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 256
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Groestl_Context
+    ctx.hashbitlen = 256
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_groestl_ctx(._32)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 256
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_groestl_ctx(._32)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256 :: proc {
@@ -148,33 +176,78 @@ hash_256 :: proc {
     hash_file_256,
     hash_bytes_256,
     hash_string_256,
+    hash_bytes_to_buffer_256,
+    hash_string_to_buffer_256,
 }
 
 // hash_string_384 will hash the given input and return the
 // computed hash
-hash_string_384 :: proc(data: string) -> [48]byte {
+hash_string_384 :: proc(data: string) -> [DIGEST_SIZE_384]byte {
     return hash_bytes_384(transmute([]byte)(data))
 }
 
 // hash_bytes_384 will hash the given input and return the
 // computed hash
-hash_bytes_384 :: proc(data: []byte) -> [48]byte {
-    _create_groestl_ctx(._48)
-    return _hash_impl->hash_bytes_48(data)
+hash_bytes_384 :: proc(data: []byte) -> [DIGEST_SIZE_384]byte {
+    hash: [DIGEST_SIZE_384]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 384
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_384 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_384(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_384 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_384, "Size of destination buffer is smaller than the digest size")
+    ctx: Groestl_Context
+    ctx.hashbitlen = 384
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_384 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_384 :: proc(s: io.Stream) -> ([48]byte, bool) {
-    _create_groestl_ctx(._48)
-    return _hash_impl->hash_stream_48(s)
+hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
+    hash: [DIGEST_SIZE_384]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 384
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_384 will read the file provided by the given handle
 // and compute a hash
-hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    _create_groestl_ctx(._48)
-    return _hash_impl->hash_file_48(hd, load_at_once)
+hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_384]byte, bool) {
+    if !load_at_once {
+        return hash_stream_384(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_384(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_384]byte{}, false
 }
 
 hash_384 :: proc {
@@ -182,33 +255,78 @@ hash_384 :: proc {
     hash_file_384,
     hash_bytes_384,
     hash_string_384,
+    hash_bytes_to_buffer_384,
+    hash_string_to_buffer_384,
 }
 
 // hash_string_512 will hash the given input and return the
 // computed hash
-hash_string_512 :: proc(data: string) -> [64]byte {
+hash_string_512 :: proc(data: string) -> [DIGEST_SIZE_512]byte {
     return hash_bytes_512(transmute([]byte)(data))
 }
 
 // hash_bytes_512 will hash the given input and return the
 // computed hash
-hash_bytes_512 :: proc(data: []byte) -> [64]byte {
-    _create_groestl_ctx(._64)
-    return _hash_impl->hash_bytes_64(data)
+hash_bytes_512 :: proc(data: []byte) -> [DIGEST_SIZE_512]byte {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 512
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_512 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_512(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_512 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_512, "Size of destination buffer is smaller than the digest size")
+    ctx: Groestl_Context
+    ctx.hashbitlen = 512
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_512 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_512 :: proc(s: io.Stream) -> ([64]byte, bool) {
-    _create_groestl_ctx(._64)
-    return _hash_impl->hash_stream_64(s)
+hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Groestl_Context
+    ctx.hashbitlen = 512
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_512 will read the file provided by the given handle
 // and compute a hash
-hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    _create_groestl_ctx(._64)
-    return _hash_impl->hash_file_64(hd, load_at_once)
+hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_512]byte, bool) {
+    if !load_at_once {
+        return hash_stream_512(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_512(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_512]byte{}, false
 }
 
 hash_512 :: proc {
@@ -216,207 +334,109 @@ hash_512 :: proc {
     hash_file_512,
     hash_bytes_512,
     hash_string_512,
+    hash_bytes_to_buffer_512,
+    hash_string_to_buffer_512,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
-}
-
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
-}
-
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
-
-hash_bytes_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [28]byte {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
+init :: proc(ctx: ^Groestl_Context) {
+    assert(ctx.hashbitlen == 224 || ctx.hashbitlen == 256 || ctx.hashbitlen == 384 || ctx.hashbitlen == 512, "hashbitlen must be set to 224, 256, 384 or 512")
+    if ctx.hashbitlen <= 256 {
+        ctx.rounds    = 10
+        ctx.columns   = 8
+        ctx.statesize = 64
     } else {
-        return hash, false
+        ctx.rounds    = 14
+        ctx.columns   = 16
+        ctx.statesize = 128
+    }
+    for i := 8 - size_of(i32); i < 8; i += 1 {
+        ctx.chaining[i][ctx.columns - 1] = byte(ctx.hashbitlen >> (8 * (7 - uint(i))))
     }
 }
 
-hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_28(ctx, buf[:]), ok
+update :: proc(ctx: ^Groestl_Context, data: []byte) {
+    databitlen := len(data) * 8
+    msglen     := databitlen / 8
+    rem        := databitlen % 8
+
+    i: int
+    assert(ctx.bits_in_last_byte == 0)
+
+    if ctx.buf_ptr != 0 {
+        for i = 0; ctx.buf_ptr < ctx.statesize && i < msglen; i, ctx.buf_ptr =  i + 1, ctx.buf_ptr + 1 {
+            ctx.buffer[ctx.buf_ptr] = data[i]
         }
-    }
-    return [28]byte{}, false
-}
 
-hash_bytes_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+        if ctx.buf_ptr < ctx.statesize {
+            if rem != 0 {
+                ctx.bits_in_last_byte    = rem
+                ctx.buffer[ctx.buf_ptr]  = data[i]
+                ctx.buf_ptr             += 1
+            }
+            return
         }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
+
+        ctx.buf_ptr = 0
+        transform(ctx, ctx.buffer[:], u32(ctx.statesize))
+    }
+
+    transform(ctx, data[i:], u32(msglen - i))
+    i += ((msglen - i) / ctx.statesize) * ctx.statesize
+    for i < msglen {
+        ctx.buffer[ctx.buf_ptr] = data[i]
+        i, ctx.buf_ptr          = i + 1, ctx.buf_ptr + 1
+    }
+    
+    if rem != 0 {
+        ctx.bits_in_last_byte    = rem
+        ctx.buffer[ctx.buf_ptr]  = data[i]
+        ctx.buf_ptr             += 1
     }
 }
 
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
+final :: proc(ctx: ^Groestl_Context, hash: []byte) {
+    hashbytelen := ctx.hashbitlen / 8
+
+    if ctx.bits_in_last_byte != 0 {
+        ctx.buffer[ctx.buf_ptr - 1] &= ((1 << uint(ctx.bits_in_last_byte)) - 1) << (8 - uint(ctx.bits_in_last_byte))
+        ctx.buffer[ctx.buf_ptr - 1] ~= 0x1 << (7 - uint(ctx.bits_in_last_byte))
     } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_32(ctx, buf[:]), ok
+        ctx.buffer[ctx.buf_ptr]  = 0x80
+        ctx.buf_ptr             += 1
+    }
+
+    if ctx.buf_ptr > ctx.statesize - 8 {
+        for ctx.buf_ptr < ctx.statesize {
+            ctx.buffer[ctx.buf_ptr]  = 0
+            ctx.buf_ptr             += 1
         }
+        transform(ctx, ctx.buffer[:], u32(ctx.statesize))
+        ctx.buf_ptr = 0
     }
-    return [32]byte{}, false
-}
 
-hash_bytes_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [48]byte {
-    hash: [48]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
+    for ctx.buf_ptr < ctx.statesize - 8 {
+        ctx.buffer[ctx.buf_ptr]  = 0
+        ctx.buf_ptr             += 1
     }
-    return hash
-}
 
-hash_stream_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([48]byte, bool) {
-    hash: [48]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
+    ctx.block_counter += 1
+    ctx.buf_ptr        = ctx.statesize
+
+    for ctx.buf_ptr > ctx.statesize - 8 {
+        ctx.buf_ptr              -= 1
+        ctx.buffer[ctx.buf_ptr]   = byte(ctx.block_counter)
+        ctx.block_counter       >>= 8
     }
-}
 
-hash_file_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_48(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_48(ctx, buf[:]), ok
-        }
-    }
-    return [48]byte{}, false
-}
+    transform(ctx, ctx.buffer[:], u32(ctx.statesize))
+    output_transformation(ctx)
 
-hash_bytes_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [64]byte {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([64]byte, bool) {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_64(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_64(ctx, buf[:]), ok
-        }
-    }
-    return [64]byte{}, false
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_groestl_ctx(ctx.hash_size)
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Groestl_Context); ok {
-        final_odin(&c, hash)
+    for i, j := ctx.statesize - hashbytelen , 0; i < ctx.statesize; i, j = i + 1, j + 1 {
+        hash[j] = ctx.chaining[i % 8][i / 8]
     }
 }
 
@@ -629,102 +649,5 @@ add_roundconstant :: proc(x: [][16]byte, columns: int, round: byte, v: Groestl_V
             for i := 0; i < columns; i += 1 {
                 x[7][i] ~= byte(i << 4) ~ 0xff ~ round
             }
-    }
-}
-
-init_odin :: proc(ctx: ^Groestl_Context) {
-    if ctx.hashbitlen <= 256 {
-        ctx.rounds    = 10
-        ctx.columns   = 8
-        ctx.statesize = 64
-    } else {
-        ctx.rounds    = 14
-        ctx.columns   = 16
-        ctx.statesize = 128
-    }
-    for i := 8 - size_of(i32); i < 8; i += 1 {
-        ctx.chaining[i][ctx.columns - 1] = byte(ctx.hashbitlen >> (8 * (7 - uint(i))))
-    }
-}
-
-update_odin :: proc(ctx: ^Groestl_Context, data: []byte) {
-    databitlen := len(data) * 8
-    msglen     := databitlen / 8
-    rem        := databitlen % 8
-
-    i: int
-    assert(ctx.bits_in_last_byte == 0)
-
-    if ctx.buf_ptr != 0 {
-        for i = 0; ctx.buf_ptr < ctx.statesize && i < msglen; i, ctx.buf_ptr =  i + 1, ctx.buf_ptr + 1 {
-            ctx.buffer[ctx.buf_ptr] = data[i]
-        }
-
-        if ctx.buf_ptr < ctx.statesize {
-            if rem != 0 {
-                ctx.bits_in_last_byte    = rem
-                ctx.buffer[ctx.buf_ptr]  = data[i]
-                ctx.buf_ptr             += 1
-            }
-            return
-        }
-
-        ctx.buf_ptr = 0
-        transform(ctx, ctx.buffer[:], u32(ctx.statesize))
-    }
-
-    transform(ctx, data[i:], u32(msglen - i))
-    i += ((msglen - i) / ctx.statesize) * ctx.statesize
-    for i < msglen {
-        ctx.buffer[ctx.buf_ptr] = data[i]
-        i, ctx.buf_ptr          = i + 1, ctx.buf_ptr + 1
-    }
-    
-    if rem != 0 {
-        ctx.bits_in_last_byte    = rem
-        ctx.buffer[ctx.buf_ptr]  = data[i]
-        ctx.buf_ptr             += 1
-    }
-}
-
-final_odin :: proc(ctx: ^Groestl_Context, hash: []byte) {
-    hashbytelen := ctx.hashbitlen / 8
-
-    if ctx.bits_in_last_byte != 0 {
-        ctx.buffer[ctx.buf_ptr - 1] &= ((1 << uint(ctx.bits_in_last_byte)) - 1) << (8 - uint(ctx.bits_in_last_byte))
-        ctx.buffer[ctx.buf_ptr - 1] ~= 0x1 << (7 - uint(ctx.bits_in_last_byte))
-    } else {
-        ctx.buffer[ctx.buf_ptr]  = 0x80
-        ctx.buf_ptr             += 1
-    }
-
-    if ctx.buf_ptr > ctx.statesize - 8 {
-        for ctx.buf_ptr < ctx.statesize {
-            ctx.buffer[ctx.buf_ptr]  = 0
-            ctx.buf_ptr             += 1
-        }
-        transform(ctx, ctx.buffer[:], u32(ctx.statesize))
-        ctx.buf_ptr = 0
-    }
-
-    for ctx.buf_ptr < ctx.statesize - 8 {
-        ctx.buffer[ctx.buf_ptr]  = 0
-        ctx.buf_ptr             += 1
-    }
-
-    ctx.block_counter += 1
-    ctx.buf_ptr        = ctx.statesize
-
-    for ctx.buf_ptr > ctx.statesize - 8 {
-        ctx.buf_ptr              -= 1
-        ctx.buffer[ctx.buf_ptr]   = byte(ctx.block_counter)
-        ctx.block_counter       >>= 8
-    }
-
-    transform(ctx, ctx.buffer[:], u32(ctx.statesize))
-    output_transformation(ctx)
-
-    for i, j := ctx.statesize - hashbytelen , 0; i < ctx.statesize; i, j = i + 1, j + 1 {
-        hash[j] = ctx.chaining[i % 8][i / 8]
     }
 }

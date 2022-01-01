@@ -31,3 +31,8 @@ echo ---
 echo Running core:crypto hash tests
 echo ---
 %PATH_TO_ODIN% run crypto %COMMON%
+
+echo ---
+echo Running core:encoding tests
+echo ---
+%PATH_TO_ODIN% run encoding %COMMON%

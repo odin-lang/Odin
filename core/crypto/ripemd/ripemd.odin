@@ -6,7 +6,6 @@ package ripemd
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation for the RIPEMD hashing algorithm as defined in <https://homes.esat.kuleuven.be/~bosselae/ripemd160.html>
 */
@@ -15,86 +14,81 @@ import "core:os"
 import "core:io"
 
 import "../util"
-import "../botan"
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_16  = hash_bytes_odin_16
-    ctx.hash_file_16   = hash_file_odin_16
-    ctx.hash_stream_16 = hash_stream_odin_16
-    ctx.hash_bytes_20  = hash_bytes_odin_20
-    ctx.hash_file_20   = hash_file_odin_20
-    ctx.hash_stream_20 = hash_stream_odin_20
-    ctx.hash_bytes_32  = hash_bytes_odin_32
-    ctx.hash_file_32   = hash_file_odin_32
-    ctx.hash_stream_32 = hash_stream_odin_32
-    ctx.hash_bytes_40  = hash_bytes_odin_40
-    ctx.hash_file_40   = hash_file_odin_40
-    ctx.hash_stream_40 = hash_stream_odin_40
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan assigns the internal vtable of the hash context to use the Botan bindings
-use_botan :: #force_inline proc() {
-    botan.assign_hash_vtable(_hash_impl, botan.HASH_RIPEMD_160)
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
 
 /*
     High level API
 */
 
+DIGEST_SIZE_128 :: 16
+DIGEST_SIZE_160 :: 20
+DIGEST_SIZE_256 :: 32
+DIGEST_SIZE_320 :: 40
+
 // hash_string_128 will hash the given input and return the
 // computed hash
-hash_string_128 :: proc(data: string) -> [16]byte {
+hash_string_128 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128(transmute([]byte)(data))
 }
 
 // hash_bytes_128 will hash the given input and return the
 // computed hash
-hash_bytes_128 :: proc(data: []byte) -> [16]byte {
-    _create_ripemd_ctx(16)
-    return _hash_impl->hash_bytes_16(data)
+hash_bytes_128 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Ripemd128_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_128 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_128 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd128_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_128 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    _create_ripemd_ctx(16)
-    return _hash_impl->hash_stream_16(s)
+hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
+    ctx: Ripemd128_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_128 will read the file provided by the given handle
 // and compute a hash
-hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    _create_ripemd_ctx(16)
-    return _hash_impl->hash_file_16(hd, load_at_once)
+hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
+    if !load_at_once {
+        return hash_stream_128(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_128(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128 :: proc {
@@ -102,33 +96,75 @@ hash_128 :: proc {
     hash_file_128,
     hash_bytes_128,
     hash_string_128,
+    hash_bytes_to_buffer_128,
+    hash_string_to_buffer_128,
 }
 
 // hash_string_160 will hash the given input and return the
 // computed hash
-hash_string_160 :: proc(data: string) -> [20]byte {
+hash_string_160 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160(transmute([]byte)(data))
 }
 
 // hash_bytes_160 will hash the given input and return the
 // computed hash
-hash_bytes_160 :: proc(data: []byte) -> [20]byte {
-    _create_ripemd_ctx(20)
-    return _hash_impl->hash_bytes_20(data)
+hash_bytes_160 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Ripemd160_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_160 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_160 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd160_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_160 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    _create_ripemd_ctx(20)
-    return _hash_impl->hash_stream_20(s)
+hash_stream_160 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
+    ctx: Ripemd160_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_160 will read the file provided by the given handle
 // and compute a hash
-hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    _create_ripemd_ctx(20)
-    return _hash_impl->hash_file_20(hd, load_at_once)
+hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
+    if !load_at_once {
+        return hash_stream_160(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_160(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160 :: proc {
@@ -136,33 +172,75 @@ hash_160 :: proc {
     hash_file_160,
     hash_bytes_160,
     hash_string_160,
+    hash_bytes_to_buffer_160,
+    hash_string_to_buffer_160,
 }
 
 // hash_string_256 will hash the given input and return the
 // computed hash
-hash_string_256 :: proc(data: string) -> [32]byte {
+hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256(transmute([]byte)(data))
 }
 
 // hash_bytes_256 will hash the given input and return the
 // computed hash
-hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    _create_ripemd_ctx(32)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Ripemd256_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd256_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_ripemd_ctx(32)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Ripemd256_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_ripemd_ctx(32)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256 :: proc {
@@ -170,33 +248,75 @@ hash_256 :: proc {
     hash_file_256,
     hash_bytes_256,
     hash_string_256,
+    hash_bytes_to_buffer_256,
+    hash_string_to_buffer_256,
 }
 
 // hash_string_320 will hash the given input and return the
 // computed hash
-hash_string_320 :: proc(data: string) -> [40]byte {
+hash_string_320 :: proc(data: string) -> [DIGEST_SIZE_320]byte {
     return hash_bytes_320(transmute([]byte)(data))
 }
 
 // hash_bytes_320 will hash the given input and return the
 // computed hash
-hash_bytes_320 :: proc(data: []byte) -> [40]byte {
-    _create_ripemd_ctx(40)
-    return _hash_impl->hash_bytes_40(data)
+hash_bytes_320 :: proc(data: []byte) -> [DIGEST_SIZE_320]byte {
+    hash: [DIGEST_SIZE_320]byte
+    ctx: Ripemd320_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_320 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_320 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_320(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_320 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_320 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_320, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd320_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_320 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_320 :: proc(s: io.Stream) -> ([40]byte, bool) {
-    _create_ripemd_ctx(40)
-    return _hash_impl->hash_stream_40(s)
+hash_stream_320 :: proc(s: io.Stream) -> ([DIGEST_SIZE_320]byte, bool) {
+    hash: [DIGEST_SIZE_320]byte
+    ctx: Ripemd320_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_320 will read the file provided by the given handle
 // and compute a hash
-hash_file_320 :: proc(hd: os.Handle, load_at_once := false) -> ([40]byte, bool) {
-    _create_ripemd_ctx(40)
-    return _hash_impl->hash_file_40(hd, load_at_once)
+hash_file_320 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_320]byte, bool) {
+    if !load_at_once {
+        return hash_stream_320(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_320(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_320]byte{}, false
 }
 
 hash_320 :: proc {
@@ -204,263 +324,126 @@ hash_320 :: proc {
     hash_file_320,
     hash_bytes_320,
     hash_string_320,
+    hash_bytes_to_buffer_320,
+    hash_string_to_buffer_320,
 }
 
-hash_bytes_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [16]byte {
-    hash: [16]byte
-    if c, ok := ctx.internal_ctx.(Ripemd128_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
+/*
+    Low level API
+*/
+
+init :: proc(ctx: ^$T) {
+    when T == Ripemd128_Context {
+        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3] = S0, S1, S2, S3
+    } else when T == Ripemd160_Context {
+        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3], ctx.s[4] = S0, S1, S2, S3, S4
+    } else when T == Ripemd256_Context {
+        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3] = S0, S1, S2, S3
+        ctx.s[4], ctx.s[5], ctx.s[6], ctx.s[7] = S5, S6, S7, S8
+    } else when T == Ripemd320_Context {
+        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3], ctx.s[4] = S0, S1, S2, S3, S4
+        ctx.s[5], ctx.s[6], ctx.s[7], ctx.s[8], ctx.s[9] = S5, S6, S7, S8, S9
     }
-    return hash
 }
 
-hash_stream_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
-    if c, ok := ctx.internal_ctx.(Ripemd128_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+update :: proc(ctx: ^$T, data: []byte) {
+    ctx.tc += u64(len(data))
+    data := data
+    if ctx.nx > 0 {
+        n := len(data)
+
+        when T == Ripemd128_Context {
+            if n > RIPEMD_128_BLOCK_SIZE - ctx.nx {
+                n = RIPEMD_128_BLOCK_SIZE - ctx.nx
+            }
+        } else when T == Ripemd160_Context {
+            if n > RIPEMD_160_BLOCK_SIZE - ctx.nx {
+                n = RIPEMD_160_BLOCK_SIZE - ctx.nx
+            }
+        } else when T == Ripemd256_Context{
+            if n > RIPEMD_256_BLOCK_SIZE - ctx.nx {
+                n = RIPEMD_256_BLOCK_SIZE - ctx.nx
+            }
+        } else when T == Ripemd320_Context{
+            if n > RIPEMD_320_BLOCK_SIZE - ctx.nx {
+                n = RIPEMD_320_BLOCK_SIZE - ctx.nx
+            }
         }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
 
-hash_file_odin_16 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_16(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_16(ctx, buf[:]), ok
+        for i := 0; i < n; i += 1 {
+            ctx.x[ctx.nx + i] = data[i]
         }
-    }
-    return [16]byte{}, false
-}
 
-hash_bytes_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [20]byte {
-    hash: [20]byte
-    if c, ok := ctx.internal_ctx.(Ripemd160_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
-    if c, ok := ctx.internal_ctx.(Ripemd160_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+        ctx.nx += n
+        when T == Ripemd128_Context {
+            if ctx.nx == RIPEMD_128_BLOCK_SIZE {
+                block(ctx, ctx.x[0:])
+                ctx.nx = 0
+            }
+        } else when T == Ripemd160_Context {
+            if ctx.nx == RIPEMD_160_BLOCK_SIZE {
+                block(ctx, ctx.x[0:])
+                ctx.nx = 0
+            }
+        } else when T == Ripemd256_Context{
+            if ctx.nx == RIPEMD_256_BLOCK_SIZE {
+                block(ctx, ctx.x[0:])
+                ctx.nx = 0
+            }
+        } else when T == Ripemd320_Context{
+            if ctx.nx == RIPEMD_320_BLOCK_SIZE {
+                block(ctx, ctx.x[0:])
+                ctx.nx = 0
+            }
         }
-        final_odin(&c, hash[:])
-        return hash, true
+        data = data[n:]
+    }
+    n := block(ctx, data)
+    data = data[n:]
+    if len(data) > 0 {
+        ctx.nx = copy(ctx.x[:], data)
+    }
+}
+
+final :: proc(ctx: ^$T, hash: []byte) {
+    d := ctx
+    tc := d.tc
+    tmp: [64]byte
+    tmp[0] = 0x80
+
+    if tc % 64 < 56 {
+        update(d, tmp[0:56 - tc % 64])
     } else {
-        return hash, false
+        update(d, tmp[0:64 + 56 - tc % 64])
     }
+
+    tc <<= 3
+    for i : u32 = 0; i < 8; i += 1 {
+        tmp[i] = byte(tc >> (8 * i))
+    }
+
+    update(d, tmp[0:8])
+
+    when T == Ripemd128_Context {
+        size :: RIPEMD_128_SIZE
+    } else when T == Ripemd160_Context {
+        size :: RIPEMD_160_SIZE
+    } else when T == Ripemd256_Context{
+        size :: RIPEMD_256_SIZE
+    } else when T == Ripemd320_Context{
+        size :: RIPEMD_320_SIZE
+    }
+
+    digest: [size]byte
+    for s, i in d.s {
+        digest[i * 4]     = byte(s)
+        digest[i * 4 + 1] = byte(s >> 8)
+        digest[i * 4 + 2] = byte(s >> 16)
+        digest[i * 4 + 3] = byte(s >> 24)
+    }
+    copy(hash[:], digest[:])
 }
 
-hash_file_odin_20 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_20(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_20(ctx, buf[:]), ok
-        }
-    }
-    return [20]byte{}, false
-}
-
-hash_bytes_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Ripemd256_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Ripemd256_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_32(ctx, buf[:]), ok
-        }
-    }
-    return [32]byte{}, false
-}
-
-hash_bytes_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [40]byte {
-    hash: [40]byte
-    if c, ok := ctx.internal_ctx.(Ripemd320_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([40]byte, bool) {
-    hash: [40]byte
-    if c, ok := ctx.internal_ctx.(Ripemd320_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_40 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([40]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_40(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_40(ctx, buf[:]), ok
-        }
-    }
-    return [40]byte{}, false
-}
-
-@(private)
-_create_ripemd_ctx :: #force_inline proc(hash_size: int) {
-    switch hash_size {
-        case 16: 
-            ctx: Ripemd128_Context
-            _hash_impl.internal_ctx = ctx
-            _hash_impl.hash_size    = ._16
-        case 20: 
-            ctx: Ripemd160_Context
-            _hash_impl.internal_ctx = ctx
-            _hash_impl.hash_size    = ._20
-        case 32: 
-            ctx: Ripemd256_Context
-            _hash_impl.internal_ctx = ctx
-            _hash_impl.hash_size    = ._32
-        case 40: 
-            ctx: Ripemd320_Context
-            _hash_impl.internal_ctx = ctx
-            _hash_impl.hash_size    = ._40
-    }
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    #partial switch ctx.hash_size {
-        case ._16: 
-            _create_ripemd_ctx(16)
-            if c, ok := ctx.internal_ctx.(Ripemd128_Context); ok {
-                init_odin(&c)
-            }
-        case ._20: 
-            _create_ripemd_ctx(20)
-            if c, ok := ctx.internal_ctx.(Ripemd160_Context); ok {
-                init_odin(&c)
-            }
-        case ._32: 
-            _create_ripemd_ctx(32)
-            if c, ok := ctx.internal_ctx.(Ripemd256_Context); ok {
-                init_odin(&c)
-            }
-        case ._40: 
-            _create_ripemd_ctx(40)
-            if c, ok := ctx.internal_ctx.(Ripemd320_Context); ok {
-                init_odin(&c)
-            }
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    #partial switch ctx.hash_size {
-        case ._16: 
-            if c, ok := ctx.internal_ctx.(Ripemd128_Context); ok {
-                update_odin(&c, data)
-            }
-        case ._20: 
-            if c, ok := ctx.internal_ctx.(Ripemd160_Context); ok {
-                update_odin(&c, data)
-            }
-        case ._32: 
-            if c, ok := ctx.internal_ctx.(Ripemd256_Context); ok {
-                update_odin(&c, data)
-            }
-        case ._40: 
-            if c, ok := ctx.internal_ctx.(Ripemd320_Context); ok {
-                update_odin(&c, data)
-            }
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    #partial switch ctx.hash_size {
-        case ._16: 
-            if c, ok := ctx.internal_ctx.(Ripemd128_Context); ok {
-                final_odin(&c, hash)
-            }
-        case ._20: 
-            if c, ok := ctx.internal_ctx.(Ripemd160_Context); ok {
-                final_odin(&c, hash)
-            }
-        case ._32: 
-            if c, ok := ctx.internal_ctx.(Ripemd256_Context); ok {
-                final_odin(&c, hash)
-            }
-        case ._40: 
-            if c, ok := ctx.internal_ctx.(Ripemd320_Context); ok {
-                final_odin(&c, hash)
-            }
-    }
-}
 
 /*
     RIPEMD implementation
@@ -572,20 +555,6 @@ RIPEMD_160_R1 := [80]uint {
 	9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5,
 	15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8,
 	8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11,
-}
-
-init_odin :: proc(ctx: ^$T) {
-    when T == Ripemd128_Context {
-        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3] = S0, S1, S2, S3
-    } else when T == Ripemd160_Context {
-        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3], ctx.s[4] = S0, S1, S2, S3, S4
-    } else when T == Ripemd256_Context {
-        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3] = S0, S1, S2, S3
-        ctx.s[4], ctx.s[5], ctx.s[6], ctx.s[7] = S5, S6, S7, S8
-    } else when T == Ripemd320_Context {
-        ctx.s[0], ctx.s[1], ctx.s[2], ctx.s[3], ctx.s[4] = S0, S1, S2, S3, S4
-        ctx.s[5], ctx.s[6], ctx.s[7], ctx.s[8], ctx.s[9] = S5, S6, S7, S8, S9
-    }
 }
 
 block :: #force_inline proc (ctx: ^$T, p: []byte) -> int {
@@ -947,102 +916,4 @@ ripemd_320_block :: proc(ctx: ^$T, p: []byte) -> int {
 		n += RIPEMD_320_BLOCK_SIZE
 	}
 	return n
-}
-
-update_odin :: proc(ctx: ^$T, p: []byte) {
-    ctx.tc += u64(len(p))
-	p := p
-	if ctx.nx > 0 {
-		n := len(p)
-
-        when T == Ripemd128_Context {
-            if n > RIPEMD_128_BLOCK_SIZE - ctx.nx {
-			    n = RIPEMD_128_BLOCK_SIZE - ctx.nx
-		    }
-        } else when T == Ripemd160_Context {
-            if n > RIPEMD_160_BLOCK_SIZE - ctx.nx {
-			    n = RIPEMD_160_BLOCK_SIZE - ctx.nx
-		    }
-        } else when T == Ripemd256_Context{
-            if n > RIPEMD_256_BLOCK_SIZE - ctx.nx {
-			    n = RIPEMD_256_BLOCK_SIZE - ctx.nx
-		    }
-        } else when T == Ripemd320_Context{
-            if n > RIPEMD_320_BLOCK_SIZE - ctx.nx {
-			    n = RIPEMD_320_BLOCK_SIZE - ctx.nx
-		    }
-        }
-
-		for i := 0; i < n; i += 1 {
-			ctx.x[ctx.nx + i] = p[i]
-		}
-
-		ctx.nx += n
-        when T == Ripemd128_Context {
-            if ctx.nx == RIPEMD_128_BLOCK_SIZE {
-                block(ctx, ctx.x[0:])
-                ctx.nx = 0
-            }
-        } else when T == Ripemd160_Context {
-            if ctx.nx == RIPEMD_160_BLOCK_SIZE {
-                block(ctx, ctx.x[0:])
-                ctx.nx = 0
-            }
-        } else when T == Ripemd256_Context{
-            if ctx.nx == RIPEMD_256_BLOCK_SIZE {
-                block(ctx, ctx.x[0:])
-                ctx.nx = 0
-            }
-        } else when T == Ripemd320_Context{
-            if ctx.nx == RIPEMD_320_BLOCK_SIZE {
-                block(ctx, ctx.x[0:])
-                ctx.nx = 0
-            }
-        }
-		p = p[n:]
-	}
-    n := block(ctx, p)
-	p = p[n:]
-	if len(p) > 0 {
-		ctx.nx = copy(ctx.x[:], p)
-	}
-}
-
-final_odin :: proc(ctx: ^$T, hash: []byte) {
-	d := ctx
-    tc := d.tc
-    tmp: [64]byte
-    tmp[0] = 0x80
-
-    if tc % 64 < 56 {
-        update_odin(d, tmp[0:56 - tc % 64])
-    } else {
-        update_odin(d, tmp[0:64 + 56 - tc % 64])
-    }
-
-    tc <<= 3
-    for i : u32 = 0; i < 8; i += 1 {
-        tmp[i] = byte(tc >> (8 * i))
-    }
-
-    update_odin(d, tmp[0:8])
-
-    when T == Ripemd128_Context {
-        size :: RIPEMD_128_SIZE
-    } else when T == Ripemd160_Context {
-        size :: RIPEMD_160_SIZE
-    } else when T == Ripemd256_Context{
-        size :: RIPEMD_256_SIZE
-    } else when T == Ripemd320_Context{
-        size :: RIPEMD_320_SIZE
-    }
-
-    digest: [size]byte
-    for s, i in d.s {
-		digest[i * 4] 	  = byte(s)
-		digest[i * 4 + 1] = byte(s >> 8)
-		digest[i * 4 + 2] = byte(s >> 16)
-		digest[i * 4 + 3] = byte(s >> 24)
-	}
-    copy(hash[:], digest[:])
 }

@@ -6,7 +6,6 @@ package blake
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the BLAKE hashing algorithm, as defined in <https://web.archive.org/web/20190915215948/https://131002.net/blake>
 */
@@ -14,102 +13,83 @@ package blake
 import "core:os"
 import "core:io"
 
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_28  = hash_bytes_odin_28
-    ctx.hash_file_28   = hash_file_odin_28
-    ctx.hash_stream_28 = hash_stream_odin_28
-    ctx.hash_bytes_32  = hash_bytes_odin_32
-    ctx.hash_file_32   = hash_file_odin_32
-    ctx.hash_stream_32 = hash_stream_odin_32
-    ctx.hash_bytes_48  = hash_bytes_odin_48
-    ctx.hash_file_48   = hash_file_odin_48
-    ctx.hash_stream_48 = hash_stream_odin_48
-    ctx.hash_bytes_64  = hash_bytes_odin_64
-    ctx.hash_file_64   = hash_file_odin_64
-    ctx.hash_stream_64 = hash_stream_odin_64
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan does nothing, since BLAKE is not available in Botan
-@(warning="BLAKE is not provided by the Botan API. Odin implementation will be used")
-use_botan :: #force_inline proc() {
-    use_odin()
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
-
-@(private)
-_create_blake256_ctx :: #force_inline proc(is224: bool, size: _ctx.Hash_Size) {
-    ctx: Blake256_Context
-    ctx.is224               = is224
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
-}
-
-@(private)
-_create_blake512_ctx :: #force_inline proc(is384: bool, size: _ctx.Hash_Size) {
-    ctx: Blake512_Context
-    ctx.is384               = is384
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = size
-}
-
 /*
     High level API
 */
 
+DIGEST_SIZE_224 :: 28
+DIGEST_SIZE_256 :: 32
+DIGEST_SIZE_384 :: 48
+DIGEST_SIZE_512 :: 64
+
 // hash_string_224 will hash the given input and return the
 // computed hash
-hash_string_224 :: proc(data: string) -> [28]byte {
+hash_string_224 :: proc "contextless" (data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224(transmute([]byte)(data))
 }
 
 // hash_bytes_224 will hash the given input and return the
 // computed hash
-hash_bytes_224 :: proc(data: []byte) -> [28]byte {
-    _create_blake256_ctx(true, ._28)
-    return _hash_impl->hash_bytes_28(data)
+hash_bytes_224 :: proc "contextless" (data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Blake256_Context
+    ctx.is224 = true
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_224 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_224 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Blake256_Context
+    ctx.is224 = true
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_224 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    _create_blake256_ctx(true, ._28)
-    return _hash_impl->hash_stream_28(s)
+hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
+    ctx: Blake256_Context
+    ctx.is224 = true
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_224 will read the file provided by the given handle
 // and compute a hash
-hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    _create_blake256_ctx(true, ._28)
-    return _hash_impl->hash_file_28(hd, load_at_once)
+hash_file_224 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
+    if !load_at_once {
+        return hash_stream_224(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_224(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224 :: proc {
@@ -117,33 +97,78 @@ hash_224 :: proc {
     hash_file_224,
     hash_bytes_224,
     hash_string_224,
+    hash_bytes_to_buffer_224,
+    hash_string_to_buffer_224,
 }
 
 // hash_string_256 will hash the given input and return the
 // computed hash
-hash_string_256 :: proc(data: string) -> [32]byte {
+hash_string_256 :: proc "contextless" (data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256(transmute([]byte)(data))
 }
 
 // hash_bytes_256 will hash the given input and return the
 // computed hash
-hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    _create_blake256_ctx(false, ._32)
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes_256 :: proc "contextless" (data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Blake256_Context
+    ctx.is224 = false
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Blake256_Context
+    ctx.is224 = false
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_blake256_ctx(false, ._32)
-    return _hash_impl->hash_stream_32(s)
+hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
+    ctx: Blake256_Context
+    ctx.is224 = false
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_blake256_ctx(false, ._32)
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
+    if !load_at_once {
+        return hash_stream_256(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_256(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256 :: proc {
@@ -151,33 +176,78 @@ hash_256 :: proc {
     hash_file_256,
     hash_bytes_256,
     hash_string_256,
+    hash_bytes_to_buffer_256,
+    hash_string_to_buffer_256,
 }
 
 // hash_string_384 will hash the given input and return the
 // computed hash
-hash_string_384 :: proc(data: string) -> [48]byte {
+hash_string_384 :: proc "contextless" (data: string) -> [DIGEST_SIZE_384]byte {
     return hash_bytes_384(transmute([]byte)(data))
 }
 
 // hash_bytes_384 will hash the given input and return the
 // computed hash
-hash_bytes_384 :: proc(data: []byte) -> [48]byte {
-    _create_blake512_ctx(true, ._48)
-    return _hash_impl->hash_bytes_48(data)
+hash_bytes_384 :: proc "contextless" (data: []byte) -> [DIGEST_SIZE_384]byte {
+    hash: [DIGEST_SIZE_384]byte
+    ctx: Blake512_Context
+    ctx.is384 = true
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_384 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_384 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_384(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_384 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_384 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_384, "Size of destination buffer is smaller than the digest size")
+    ctx: Blake512_Context
+    ctx.is384 = true
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_384 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_384 :: proc(s: io.Stream) -> ([48]byte, bool) {
-    _create_blake512_ctx(true, ._48)
-    return _hash_impl->hash_stream_48(s)
+hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
+    hash: [DIGEST_SIZE_384]byte
+    ctx: Blake512_Context
+    ctx.is384 = true
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_384 will read the file provided by the given handle
 // and compute a hash
-hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    _create_blake512_ctx(true, ._48)
-    return _hash_impl->hash_file_48(hd, load_at_once)
+hash_file_384 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_384]byte, bool) {
+    if !load_at_once {
+        return hash_stream_384(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_384(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_384]byte{}, false
 }
 
 hash_384 :: proc {
@@ -185,33 +255,78 @@ hash_384 :: proc {
     hash_file_384,
     hash_bytes_384,
     hash_string_384,
+    hash_bytes_to_buffer_384,
+    hash_string_to_buffer_384,
 }
 
 // hash_string_512 will hash the given input and return the
 // computed hash
-hash_string_512 :: proc(data: string) -> [64]byte {
+hash_string_512 :: proc "contextless" (data: string) -> [DIGEST_SIZE_512]byte {
     return hash_bytes_512(transmute([]byte)(data))
 }
 
 // hash_bytes_512 will hash the given input and return the
 // computed hash
-hash_bytes_512 :: proc(data: []byte) -> [64]byte {
-    _create_blake512_ctx(false, ._64)
-    return _hash_impl->hash_bytes_64(data)
+hash_bytes_512 :: proc "contextless" (data: []byte) -> [DIGEST_SIZE_512]byte {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Blake512_Context
+    ctx.is384 = false
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer_512 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_512 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_512(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer_512 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_512 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_512, "Size of destination buffer is smaller than the digest size")
+    ctx: Blake512_Context
+    ctx.is384 = false
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream_512 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_512 :: proc(s: io.Stream) -> ([64]byte, bool) {
-    _create_blake512_ctx(false, ._64)
-    return _hash_impl->hash_stream_64(s)
+hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
+    hash: [DIGEST_SIZE_512]byte
+    ctx: Blake512_Context
+    ctx.is384 = false
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true
 }
 
 // hash_file_512 will read the file provided by the given handle
 // and compute a hash
-hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    _create_blake512_ctx(false, ._64)
-    return _hash_impl->hash_file_64(hd, load_at_once)
+hash_file_512 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_512]byte, bool) {
+    if !load_at_once {
+        return hash_stream_512(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes_512(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE_512]byte{}, false
 }
 
 hash_512 :: proc {
@@ -219,236 +334,195 @@ hash_512 :: proc {
     hash_file_512,
     hash_bytes_512,
     hash_string_512,
+    hash_bytes_to_buffer_512,
+    hash_string_to_buffer_512,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
-}
-
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
-}
-
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
-
-hash_bytes_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [28]byte {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
-    if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+init :: proc "contextless" (ctx: ^$T) {
+    when T == Blake256_Context {
+        if ctx.is224 {
+            ctx.h[0] = 0xc1059ed8
+            ctx.h[1] = 0x367cd507
+            ctx.h[2] = 0x3070dd17
+            ctx.h[3] = 0xf70e5939
+            ctx.h[4] = 0xffc00b31
+            ctx.h[5] = 0x68581511
+            ctx.h[6] = 0x64f98fa7
+            ctx.h[7] = 0xbefa4fa4
+        } else {
+            ctx.h[0] = 0x6a09e667
+            ctx.h[1] = 0xbb67ae85
+            ctx.h[2] = 0x3c6ef372
+            ctx.h[3] = 0xa54ff53a
+            ctx.h[4] = 0x510e527f
+            ctx.h[5] = 0x9b05688c
+            ctx.h[6] = 0x1f83d9ab
+            ctx.h[7] = 0x5be0cd19
         }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_28 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_28(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_28(ctx, buf[:]), ok
-        }
-    }
-    return [28]byte{}, false
-}
-
-hash_bytes_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_32 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_32(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_32(ctx, buf[:]), ok
-        }
-    }
-    return [32]byte{}, false
-}
-
-hash_bytes_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [48]byte {
-    hash: [48]byte
-    if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([48]byte, bool) {
-    hash: [48]byte
-    if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_48 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([48]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_48(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_48(ctx, buf[:]), ok
-        }
-    }
-    return [48]byte{}, false
-}
-
-hash_bytes_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [64]byte {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([64]byte, bool) {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
-
-hash_file_odin_64 :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin_64(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin_64(ctx, buf[:]), ok
-        }
-    }
-    return [64]byte{}, false
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    if ctx.hash_size == ._28 || ctx.hash_size == ._32 {
-        _create_blake256_ctx(ctx.hash_size == ._28, ctx.hash_size)
-        if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-            init_odin(&c)
-        }
-        return
-    }
-    if ctx.hash_size == ._48 || ctx.hash_size == ._64 {
-        _create_blake512_ctx(ctx.hash_size == ._48, ctx.hash_size)
-        if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-            init_odin(&c)
+    } else when T == Blake512_Context {
+        if ctx.is384 {
+            ctx.h[0] = 0xcbbb9d5dc1059ed8
+            ctx.h[1] = 0x629a292a367cd507
+            ctx.h[2] = 0x9159015a3070dd17
+            ctx.h[3] = 0x152fecd8f70e5939
+            ctx.h[4] = 0x67332667ffc00b31
+            ctx.h[5] = 0x8eb44a8768581511
+            ctx.h[6] = 0xdb0c2e0d64f98fa7
+            ctx.h[7] = 0x47b5481dbefa4fa4
+        } else {
+            ctx.h[0] = 0x6a09e667f3bcc908
+            ctx.h[1] = 0xbb67ae8584caa73b
+            ctx.h[2] = 0x3c6ef372fe94f82b
+            ctx.h[3] = 0xa54ff53a5f1d36f1
+            ctx.h[4] = 0x510e527fade682d1
+            ctx.h[5] = 0x9b05688c2b3e6c1f
+            ctx.h[6] = 0x1f83d9abfb41bd6b
+            ctx.h[7] = 0x5be0cd19137e2179
         }
     }
 }
 
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    #partial switch ctx.hash_size {
-        case ._28, ._32:
-            if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-                update_odin(&c, data)
+update :: proc "contextless" (ctx: ^$T, data: []byte) {
+    data := data
+    when T == Blake256_Context {
+        if ctx.nx > 0 {
+            n := copy(ctx.x[ctx.nx:], data)
+            ctx.nx += n
+            if ctx.nx == BLOCKSIZE_256 {
+                block256(ctx, ctx.x[:])
+                ctx.nx = 0
             }
-        case ._48, ._64:
-            if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-                update_odin(&c, data)
+            data = data[n:]
+        }
+        if len(data) >= BLOCKSIZE_256 {
+            n := len(data) &~ (BLOCKSIZE_256 - 1)
+            block256(ctx, data[:n])
+            data = data[n:]
+        }
+        if len(data) > 0 {
+            ctx.nx = copy(ctx.x[:], data)
+        }
+    } else when T == Blake512_Context {
+        if ctx.nx > 0 {
+            n := copy(ctx.x[ctx.nx:], data)
+            ctx.nx += n
+            if ctx.nx == BLOCKSIZE_512 {
+                block512(ctx, ctx.x[:])
+                ctx.nx = 0
             }
+            data = data[n:]
+        }
+        if len(data) >= BLOCKSIZE_512 {
+            n := len(data) &~ (BLOCKSIZE_512 - 1)
+            block512(ctx, data[:n])
+            data = data[n:]
+        }
+        if len(data) > 0 {
+            ctx.nx = copy(ctx.x[:], data)
+        }
     }
 }
 
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    #partial switch ctx.hash_size {
-        case ._28, ._32:
-            if c, ok := ctx.internal_ctx.(Blake256_Context); ok {
-                final_odin(&c, hash)
+final :: proc "contextless" (ctx: ^$T, hash: []byte) {
+    when T == Blake256_Context {
+        tmp: [65]byte
+    } else when T == Blake512_Context {
+        tmp: [129]byte
+    }
+    nx     := u64(ctx.nx)
+    tmp[0]  = 0x80
+    length := (ctx.t + nx) << 3
+
+    when T == Blake256_Context {
+        if nx == 55 {
+            if ctx.is224 {
+                write_additional(ctx, {0x80})
+            } else {
+                write_additional(ctx, {0x81})
             }
-        case ._48, ._64:
-            if c, ok := ctx.internal_ctx.(Blake512_Context); ok {
-                final_odin(&c, hash)
+        } else {
+            if nx < 55 {
+                if nx == 0 {
+                    ctx.nullt = true
+                }
+                write_additional(ctx, tmp[0 : 55 - nx])
+            } else { 
+                write_additional(ctx, tmp[0 : 64 - nx])
+                write_additional(ctx, tmp[1:56])
+                ctx.nullt = true
             }
+            if ctx.is224 {
+                write_additional(ctx, {0x00})
+            } else {
+                write_additional(ctx, {0x01})
+            }
+        }
+
+        for i : uint = 0; i < 8; i += 1 {
+            tmp[i] = byte(length >> (56 - 8 * i))
+        }
+        write_additional(ctx, tmp[0:8])
+
+        h := ctx.h[:]
+        if ctx.is224 {
+            h = h[0:7]
+        }
+        for s, i in h {
+            hash[i * 4]     = byte(s >> 24)
+            hash[i * 4 + 1] = byte(s >> 16)
+            hash[i * 4 + 2] = byte(s >> 8)
+            hash[i * 4 + 3] = byte(s)
+        }
+    } else when T == Blake512_Context {
+        if nx == 111 {
+            if ctx.is384 {
+                write_additional(ctx, {0x80})
+            } else {
+                write_additional(ctx, {0x81})
+            }
+        } else {
+            if nx < 111 {
+                if nx == 0 {
+                    ctx.nullt = true
+                }
+                write_additional(ctx, tmp[0 : 111 - nx])
+            } else { 
+                write_additional(ctx, tmp[0 : 128 - nx])
+                write_additional(ctx, tmp[1:112])
+                ctx.nullt = true
+            }
+            if ctx.is384 {
+                write_additional(ctx, {0x00})
+            } else {
+                write_additional(ctx, {0x01})
+            }
+        }
+
+        for i : uint = 0; i < 16; i += 1 {
+            tmp[i] = byte(length >> (120 - 8 * i))
+        }
+        write_additional(ctx, tmp[0:16])
+
+        h := ctx.h[:]
+        if ctx.is384 {
+            h = h[0:6]
+        }
+        for s, i in h {
+            hash[i * 8]     = byte(s >> 56)
+            hash[i * 8 + 1] = byte(s >> 48)
+            hash[i * 8 + 2] = byte(s >> 40)
+            hash[i * 8 + 3] = byte(s >> 32)
+            hash[i * 8 + 4] = byte(s >> 24)
+            hash[i * 8 + 5] = byte(s >> 16)
+            hash[i * 8 + 6] = byte(s >> 8)
+            hash[i * 8 + 7] = byte(s)
+        }
     }
 }
-
-/*
-    BLAKE implementation
-*/
 
 SIZE_224 :: 28
 SIZE_256 :: 32
@@ -542,8 +616,8 @@ G512 :: #force_inline proc "contextless" (a, b, c, d: u64, m: [16]u64, i, j: int
     return a, b, c, d
 }
 
-block256 :: proc "contextless" (ctx: ^Blake256_Context, p: []byte) {
-    i, j: int = ---, ---
+block256 :: proc "contextless" (ctx: ^Blake256_Context, p: []byte) #no_bounds_check {
+    i, j: int     = ---, ---
     v, m: [16]u32 = ---, ---
     p := p
     for len(p) >= BLOCKSIZE_256 {
@@ -595,7 +669,7 @@ block256 :: proc "contextless" (ctx: ^Blake256_Context, p: []byte) {
 }
 
 block512 :: proc "contextless" (ctx: ^Blake512_Context, p: []byte) #no_bounds_check {
-    i, j: int = ---, ---
+    i, j: int     = ---, ---
     v, m: [16]u64 = ---, ---
     p := p
     for len(p) >= BLOCKSIZE_512 {
@@ -646,189 +720,7 @@ block512 :: proc "contextless" (ctx: ^Blake512_Context, p: []byte) #no_bounds_ch
     }
 }
 
-init_odin :: proc(ctx: ^$T) {
-    when T == Blake256_Context {
-        if ctx.is224 {
-            ctx.h[0] = 0xc1059ed8
-            ctx.h[1] = 0x367cd507
-            ctx.h[2] = 0x3070dd17
-            ctx.h[3] = 0xf70e5939
-            ctx.h[4] = 0xffc00b31
-            ctx.h[5] = 0x68581511
-            ctx.h[6] = 0x64f98fa7
-            ctx.h[7] = 0xbefa4fa4
-        } else {
-            ctx.h[0] = 0x6a09e667
-            ctx.h[1] = 0xbb67ae85
-            ctx.h[2] = 0x3c6ef372
-            ctx.h[3] = 0xa54ff53a
-            ctx.h[4] = 0x510e527f
-            ctx.h[5] = 0x9b05688c
-            ctx.h[6] = 0x1f83d9ab
-            ctx.h[7] = 0x5be0cd19
-        }
-    } else when T == Blake512_Context {
-        if ctx.is384 {
-            ctx.h[0] = 0xcbbb9d5dc1059ed8
-            ctx.h[1] = 0x629a292a367cd507
-            ctx.h[2] = 0x9159015a3070dd17
-            ctx.h[3] = 0x152fecd8f70e5939
-            ctx.h[4] = 0x67332667ffc00b31
-            ctx.h[5] = 0x8eb44a8768581511
-            ctx.h[6] = 0xdb0c2e0d64f98fa7
-            ctx.h[7] = 0x47b5481dbefa4fa4
-        } else {
-            ctx.h[0] = 0x6a09e667f3bcc908
-            ctx.h[1] = 0xbb67ae8584caa73b
-            ctx.h[2] = 0x3c6ef372fe94f82b
-            ctx.h[3] = 0xa54ff53a5f1d36f1
-            ctx.h[4] = 0x510e527fade682d1
-            ctx.h[5] = 0x9b05688c2b3e6c1f
-            ctx.h[6] = 0x1f83d9abfb41bd6b
-            ctx.h[7] = 0x5be0cd19137e2179
-        }
-    }
-}
-
-update_odin :: proc(ctx: ^$T, data: []byte) {
-    data := data
-    when T == Blake256_Context {
-        if ctx.nx > 0 {
-            n := copy(ctx.x[ctx.nx:], data)
-            ctx.nx += n
-            if ctx.nx == BLOCKSIZE_256 {
-                block256(ctx, ctx.x[:])
-                ctx.nx = 0
-            }
-            data = data[n:]
-        }
-        if len(data) >= BLOCKSIZE_256 {
-            n := len(data) &~ (BLOCKSIZE_256 - 1)
-            block256(ctx, data[:n])
-            data = data[n:]
-        }
-        if len(data) > 0 {
-            ctx.nx = copy(ctx.x[:], data)
-        }
-    } else when T == Blake512_Context {
-        if ctx.nx > 0 {
-            n := copy(ctx.x[ctx.nx:], data)
-            ctx.nx += n
-            if ctx.nx == BLOCKSIZE_512 {
-                block512(ctx, ctx.x[:])
-                ctx.nx = 0
-            }
-            data = data[n:]
-        }
-        if len(data) >= BLOCKSIZE_512 {
-            n := len(data) &~ (BLOCKSIZE_512 - 1)
-            block512(ctx, data[:n])
-            data = data[n:]
-        }
-        if len(data) > 0 {
-            ctx.nx = copy(ctx.x[:], data)
-        }
-    }
-}
-
-final_odin :: proc(ctx: ^$T, hash: []byte) {
-	when T == Blake256_Context {
-		tmp: [65]byte
-	} else when T == Blake512_Context {
-		tmp: [129]byte
-	}
-	nx 	   := u64(ctx.nx)
-    tmp[0]  = 0x80
-    length := (ctx.t + nx) << 3
-
-    when T == Blake256_Context {
-        if nx == 55 {
-	        if ctx.is224 {
-	            write_additional(ctx, {0x80})
-	        } else {
-	            write_additional(ctx, {0x81})
-	        }
-	    } else {
-	        if nx < 55 {
-	            if nx == 0 {
-	                ctx.nullt = true
-	            }
-	            write_additional(ctx, tmp[0 : 55 - nx])
-	        } else { 
-	            write_additional(ctx, tmp[0 : 64 - nx])
-	            write_additional(ctx, tmp[1:56])
-	            ctx.nullt = true
-	        }
-	        if ctx.is224 {
-	            write_additional(ctx, {0x00})
-	        } else {
-	            write_additional(ctx, {0x01})
-	        }
-	    }
-
-	    for i : uint = 0; i < 8; i += 1 {
-	        tmp[i] = byte(length >> (56 - 8 * i))
-	    }
-	    write_additional(ctx, tmp[0:8])
-
-	    h := ctx.h[:]
-	    if ctx.is224 {
-	        h = h[0:7]
-	    }
-	    for s, i in h {
-	        hash[i * 4]     = byte(s >> 24)
-	        hash[i * 4 + 1] = byte(s >> 16)
-	        hash[i * 4 + 2] = byte(s >> 8)
-	        hash[i * 4 + 3] = byte(s)
-	    }
-    } else when T == Blake512_Context {
-        if nx == 111 {
-	        if ctx.is384 {
-	            write_additional(ctx, {0x80})
-	        } else {
-	            write_additional(ctx, {0x81})
-	        }
-	    } else {
-	        if nx < 111 {
-	            if nx == 0 {
-	                ctx.nullt = true
-	            }
-	            write_additional(ctx, tmp[0 : 111 - nx])
-	        } else { 
-	            write_additional(ctx, tmp[0 : 128 - nx])
-	            write_additional(ctx, tmp[1:112])
-	            ctx.nullt = true
-	        }
-	        if ctx.is384 {
-	            write_additional(ctx, {0x00})
-	        } else {
-	            write_additional(ctx, {0x01})
-	        }
-	    }
-
-	    for i : uint = 0; i < 16; i += 1 {
-	        tmp[i] = byte(length >> (120 - 8 * i))
-	    }
-	    write_additional(ctx, tmp[0:16])
-
-	    h := ctx.h[:]
-	    if ctx.is384 {
-	        h = h[0:6]
-	    }
-	    for s, i in h {
-	        hash[i * 8]     = byte(s >> 56)
-	        hash[i * 8 + 1] = byte(s >> 48)
-	        hash[i * 8 + 2] = byte(s >> 40)
-	        hash[i * 8 + 3] = byte(s >> 32)
-	        hash[i * 8 + 4] = byte(s >> 24)
-	        hash[i * 8 + 5] = byte(s >> 16)
-	        hash[i * 8 + 6] = byte(s >> 8)
-	        hash[i * 8 + 7] = byte(s)
-	    }
-    }
-}
-
-write_additional :: proc(ctx: ^$T, data: []byte) {
+write_additional :: proc "contextless" (ctx: ^$T, data: []byte) {
 	ctx.t -= u64(len(data)) << 3
-    update_odin(ctx, data)
+    update(ctx, data)
 }

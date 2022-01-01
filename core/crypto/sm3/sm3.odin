@@ -6,7 +6,6 @@ package sm3
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the SM3 hashing algorithm, as defined in <https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02>
 */
@@ -15,77 +14,78 @@ import "core:os"
 import "core:io"
 
 import "../util"
-import "../botan"
-import "../_ctx"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_32  = hash_bytes_odin
-    ctx.hash_file_32   = hash_file_odin
-    ctx.hash_stream_32 = hash_stream_odin
-    ctx.init           = _init_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan assigns the internal vtable of the hash context to use the Botan bindings
-use_botan :: #force_inline proc() {
-    botan.assign_hash_vtable(_hash_impl, botan.HASH_SM3)
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
 
 /*
     High level API
 */
 
+DIGEST_SIZE :: 32
+
 // hash_string will hash the given input and return the
 // computed hash
-hash_string :: proc(data: string) -> [32]byte {
+hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
     return hash_bytes(transmute([]byte)(data))
 }
 
 // hash_bytes will hash the given input and return the
 // computed hash
-hash_bytes :: proc(data: []byte) -> [32]byte {
-    _create_sm3_ctx()
-    return _hash_impl->hash_bytes_32(data)
+hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
+    hash: [DIGEST_SIZE]byte
+    ctx: Sm3_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
+    ctx: Sm3_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
-hash_stream :: proc(s: io.Stream) -> ([32]byte, bool) {
-    _create_sm3_ctx()
-    return _hash_impl->hash_stream_32(s)
+hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
+    hash: [DIGEST_SIZE]byte
+    ctx: Sm3_Context
+    init(&ctx)
+    buf := make([]byte, 512)
+    defer delete(buf)
+    read := 1
+    for read > 0 {
+        read, _ = s->impl_read(buf)
+        if read > 0 {
+            update(&ctx, buf[:read])
+        } 
+    }
+    final(&ctx, hash[:])
+    return hash, true 
 }
 
 // hash_file will read the file provided by the given handle
 // and compute a hash
-hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    _create_sm3_ctx()
-    return _hash_impl->hash_file_32(hd, load_at_once)
+hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE]byte, bool) {
+    if !load_at_once {
+        return hash_stream(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE]byte{}, false
 }
 
 hash :: proc {
@@ -93,92 +93,72 @@ hash :: proc {
     hash_file,
     hash_bytes,
     hash_string,
+    hash_bytes_to_buffer,
+    hash_string_to_buffer,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+init :: proc(ctx: ^Sm3_Context) {
+    ctx.state[0] = IV[0]
+    ctx.state[1] = IV[1]
+    ctx.state[2] = IV[2]
+    ctx.state[3] = IV[3]
+    ctx.state[4] = IV[4]
+    ctx.state[5] = IV[5]
+    ctx.state[6] = IV[6]
+    ctx.state[7] = IV[7]
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
-}
+update :: proc(ctx: ^Sm3_Context, data: []byte) {
+    data := data
+    ctx.length += u64(len(data))
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
-
-hash_bytes_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [32]byte {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Sm3_Context); ok {
-        init_odin(&c)
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
-
-hash_stream_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
-    if c, ok := ctx.internal_ctx.(Sm3_Context); ok {
-        init_odin(&c)
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
+    if ctx.bitlength > 0 {
+        n := copy(ctx.x[ctx.bitlength:], data[:])
+        ctx.bitlength += u64(n)
+        if ctx.bitlength == 64 {
+            block(ctx, ctx.x[:])
+            ctx.bitlength = 0
         }
-        final_odin(&c, hash[:])
-        return hash, true
+        data = data[n:]
+    }
+    if len(data) >= 64 {
+        n := len(data) &~ (64 - 1)
+        block(ctx, data[:n])
+        data = data[n:]
+    }
+    if len(data) > 0 {
+        ctx.bitlength = u64(copy(ctx.x[:], data[:]))
+    }
+}
+
+final :: proc(ctx: ^Sm3_Context, hash: []byte) {
+    length := ctx.length
+
+    pad: [64]byte
+    pad[0] = 0x80
+    if length % 64 < 56 {
+        update(ctx, pad[0: 56 - length % 64])
     } else {
-        return hash, false
+        update(ctx, pad[0: 64 + 56 - length % 64])
     }
-}
 
-hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin(ctx, buf[:]), ok
-        }
-    }
-    return [32]byte{}, false
-}
+    length <<= 3
+    util.PUT_U64_BE(pad[:], length)
+    update(ctx, pad[0: 8])
+    assert(ctx.bitlength == 0)
 
-@(private)
-_create_sm3_ctx :: #force_inline proc() {
-    ctx: Sm3_Context
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = ._32
-}
-
-@(private)
-_init_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    _create_sm3_ctx()
-    if c, ok := ctx.internal_ctx.(Sm3_Context); ok {
-        init_odin(&c)
-    }
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Sm3_Context); ok {
-        update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Sm3_Context); ok {
-        final_odin(&c, hash)
-    }
+    util.PUT_U32_BE(hash[0:],  ctx.state[0])
+    util.PUT_U32_BE(hash[4:],  ctx.state[1])
+    util.PUT_U32_BE(hash[8:],  ctx.state[2])
+    util.PUT_U32_BE(hash[12:], ctx.state[3])
+    util.PUT_U32_BE(hash[16:], ctx.state[4])
+    util.PUT_U32_BE(hash[20:], ctx.state[5])
+    util.PUT_U32_BE(hash[24:], ctx.state[6])
+    util.PUT_U32_BE(hash[28:], ctx.state[7])
 }
 
 /*
@@ -192,23 +172,9 @@ Sm3_Context :: struct {
     length:    u64,
 }
 
-BLOCK_SIZE_IN_BYTES :: 64
-BLOCK_SIZE_IN_32    :: 16
-
 IV := [8]u32 {
     0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
     0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e,
-}
-
-init_odin :: proc(ctx: ^Sm3_Context) {
-    ctx.state[0] = IV[0]
-    ctx.state[1] = IV[1]
-    ctx.state[2] = IV[2]
-    ctx.state[3] = IV[3]
-    ctx.state[4] = IV[4]
-    ctx.state[5] = IV[5]
-    ctx.state[6] = IV[6]
-    ctx.state[7] = IV[7]
 }
 
 block :: proc "contextless" (ctx: ^Sm3_Context, buf: []byte) {
@@ -281,53 +247,4 @@ block :: proc "contextless" (ctx: ^Sm3_Context, buf: []byte) {
 
     ctx.state[0], ctx.state[1], ctx.state[2], ctx.state[3] = state0, state1, state2, state3
     ctx.state[4], ctx.state[5], ctx.state[6], ctx.state[7] = state4, state5, state6, state7
-}
-
-update_odin :: proc(ctx: ^Sm3_Context, data: []byte) {
-    data := data
-    ctx.length += u64(len(data))
-
-    if ctx.bitlength > 0 {
-        n := copy(ctx.x[ctx.bitlength:], data[:])
-        ctx.bitlength += u64(n)
-        if ctx.bitlength == 64 {
-            block(ctx, ctx.x[:])
-            ctx.bitlength = 0
-        }
-        data = data[n:]
-    }
-    if len(data) >= 64 {
-        n := len(data) &~ (64 - 1)
-        block(ctx, data[:n])
-        data = data[n:]
-    }
-    if len(data) > 0 {
-        ctx.bitlength = u64(copy(ctx.x[:], data[:]))
-    }
-}
-
-final_odin :: proc(ctx: ^Sm3_Context, hash: []byte) {
-    length := ctx.length
-
-    pad: [64]byte
-    pad[0] = 0x80
-    if length % 64 < 56 {
-        update_odin(ctx, pad[0: 56 - length % 64])
-    } else {
-        update_odin(ctx, pad[0: 64 + 56 - length % 64])
-    }
-
-    length <<= 3
-    util.PUT_U64_BE(pad[:], length)
-    update_odin(ctx, pad[0: 8])
-    assert(ctx.bitlength == 0)
-
-    util.PUT_U32_BE(hash[0:],  ctx.state[0])
-    util.PUT_U32_BE(hash[4:],  ctx.state[1])
-    util.PUT_U32_BE(hash[8:],  ctx.state[2])
-    util.PUT_U32_BE(hash[12:], ctx.state[3])
-    util.PUT_U32_BE(hash[16:], ctx.state[4])
-    util.PUT_U32_BE(hash[20:], ctx.state[5])
-    util.PUT_U32_BE(hash[24:], ctx.state[6])
-    util.PUT_U32_BE(hash[28:], ctx.state[7])
 }

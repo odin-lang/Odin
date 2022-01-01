@@ -4,9 +4,10 @@ import "core:c"
 import vk "vendor:vulkan"
 
 when ODIN_OS == "linux"   { foreign import glfw "system:glfw" } // TODO: Add the billion-or-so static libs to link to in linux
+when ODIN_OS == "darwin"  { foreign import glfw "system:glfw" }
 when ODIN_OS == "windows" { 
 	foreign import glfw { 
-		"lib/glfw3.lib", 
+		"../lib/glfw3_mt.lib",
 		"system:user32.lib", 
 		"system:gdi32.lib", 
 		"system:shell32.lib",

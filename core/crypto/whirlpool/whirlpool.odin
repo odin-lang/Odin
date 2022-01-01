@@ -6,7 +6,6 @@ package whirlpool
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
-        Jeroen van Rijn: Context design to be able to change from Odin implementation to bindings.
 
     Implementation of the Whirlpool hashing algorithm, as defined in <https://web.archive.org/web/20171129084214/http://www.larc.usp.br/~pbarreto/WhirlpoolPage.html>
 */
@@ -14,77 +13,79 @@ package whirlpool
 import "core:os"
 import "core:io"
 
-import "../botan"
-import "../_ctx"
 import "../util"
-
-/*
-    Context initialization and switching between the Odin implementation and the bindings
-*/
-
-USE_BOTAN_LIB :: bool(#config(USE_BOTAN_LIB, false))
-
-@(private)
-_init_vtable :: #force_inline proc() -> ^_ctx.Hash_Context {
-    ctx := _ctx._init_vtable()
-    when USE_BOTAN_LIB {
-        use_botan()
-    } else {
-        _assign_hash_vtable(ctx)
-    }
-    return ctx
-}
-
-@(private)
-_assign_hash_vtable :: #force_inline proc(ctx: ^_ctx.Hash_Context) {
-    ctx.hash_bytes_64  = hash_bytes_odin
-    ctx.hash_file_64   = hash_file_odin
-    ctx.hash_stream_64 = hash_stream_odin
-    ctx.update         = _update_odin
-    ctx.final          = _final_odin
-}
-
-_hash_impl := _init_vtable()
-
-// use_botan assigns the internal vtable of the hash context to use the Botan bindings
-use_botan :: #force_inline proc() {
-    botan.assign_hash_vtable(_hash_impl, botan.HASH_WHIRLPOOL)
-}
-
-// use_odin assigns the internal vtable of the hash context to use the Odin implementation
-use_odin :: #force_inline proc() {
-    _assign_hash_vtable(_hash_impl)
-}
 
 /*
     High level API
 */
 
+DIGEST_SIZE :: 64
+
 // hash_string will hash the given input and return the
 // computed hash
-hash_string :: proc(data: string) -> [64]byte {
+hash_string :: proc(data: string) -> [DIGEST_SIZE]byte {
     return hash_bytes(transmute([]byte)(data))
 }
 
 // hash_bytes will hash the given input and return the
 // computed hash
-hash_bytes :: proc(data: []byte) -> [64]byte {
-    _create_whirlpool_ctx()
-    return _hash_impl->hash_bytes_64(data)
+hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
+	hash: [DIGEST_SIZE]byte
+	ctx: Whirlpool_Context
+    // init(&ctx) No-op
+    update(&ctx, data)
+    final(&ctx, hash[:])
+    return hash
+}
+
+// hash_string_to_buffer will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer(transmute([]byte)(data), hash);
+}
+
+// hash_bytes_to_buffer will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE, "Size of destination buffer is smaller than the digest size")
+    ctx: Whirlpool_Context
+    // init(&ctx) No-op
+    update(&ctx, data)
+    final(&ctx, hash)
 }
 
 // hash_stream will read the stream in chunks and compute a
 // hash from its contents
-hash_stream :: proc(s: io.Stream) -> ([64]byte, bool) {
-    _create_whirlpool_ctx()
-    return _hash_impl->hash_stream_64(s)
+hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
+	hash: [DIGEST_SIZE]byte
+	ctx: Whirlpool_Context
+	// init(&ctx) No-op
+	buf := make([]byte, 512)
+	defer delete(buf)
+	read := 1
+	for read > 0 {
+	    read, _ = s->impl_read(buf)
+	    if read > 0 {
+			update(&ctx, buf[:read])
+	    } 
+	}
+	final(&ctx, hash[:])
+	return hash, true
 }
 
 // hash_file will read the file provided by the given handle
 // and compute a hash
-hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    _create_whirlpool_ctx()
-    return _hash_impl->hash_file_64(hd, load_at_once)
+hash_file :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE]byte, bool) {
+	if !load_at_once {
+        return hash_stream(os.stream_from_handle(hd))
+    } else {
+        if buf, ok := os.read_entire_file(hd); ok {
+            return hash_bytes(buf[:]), ok
+        }
+    }
+    return [DIGEST_SIZE]byte{}, false
 }
 
 hash :: proc {
@@ -92,82 +93,111 @@ hash :: proc {
     hash_file,
     hash_bytes,
     hash_string,
+    hash_bytes_to_buffer,
+    hash_string_to_buffer,
 }
 
 /*
     Low level API
 */
 
-init :: proc(ctx: ^_ctx.Hash_Context) {
-    _hash_impl->init()
+@(warning="Init is a no-op for Whirlpool")
+init :: proc(ctx: ^Whirlpool_Context) {
+	// No action needed here
 }
 
-update :: proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    _hash_impl->update(data)
+update :: proc(ctx: ^Whirlpool_Context, source: []byte) {
+    source_pos: int
+    nn := len(source)
+    source_bits := u64(nn * 8)
+    source_gap := u32((8 - (int(source_bits & 7))) & 7)
+    buffer_rem := uint(ctx.buffer_bits & 7)
+    b: u32
+
+	for i, carry, value := 31, u32(0), u32(source_bits); i >= 0 && (carry != 0 || value != 0); i -= 1 {
+		carry += u32(ctx.bitlength[i]) + (u32(value & 0xff))
+		ctx.bitlength[i] = byte(carry)
+		carry >>= 8
+		value >>= 8
+	}
+
+	for source_bits > 8 {
+		b = u32(u32((source[source_pos] << source_gap) & 0xff) | u32((source[source_pos+1] & 0xff) >> (8 - source_gap)))
+
+		ctx.buffer[ctx.buffer_pos] |= u8(b >> buffer_rem)
+		ctx.buffer_pos += 1
+		ctx.buffer_bits += int(8 - buffer_rem)
+
+		if ctx.buffer_bits == 512 {
+			transform(ctx)
+			ctx.buffer_bits = 0
+			ctx.buffer_pos = 0
+		}
+		ctx.buffer[ctx.buffer_pos] = byte(b << (8 - buffer_rem))
+		ctx.buffer_bits += int(buffer_rem)
+		source_bits -= 8
+		source_pos += 1
+	}
+
+	if source_bits > 0 {
+		b = u32((source[source_pos] << source_gap) & 0xff)
+		ctx.buffer[ctx.buffer_pos] |= byte(b) >> buffer_rem
+	} else {b = 0}
+
+	if u64(buffer_rem) + source_bits < 8 {
+		ctx.buffer_bits += int(source_bits)
+	} else {
+		ctx.buffer_pos += 1
+		ctx.buffer_bits += 8 - int(buffer_rem)
+		source_bits -= u64(8 - buffer_rem)
+
+		if ctx.buffer_bits == 512 {
+			transform(ctx)
+			ctx.buffer_bits = 0
+			ctx.buffer_pos = 0
+		}
+		ctx.buffer[ctx.buffer_pos] = byte(b << (8 - buffer_rem))
+		ctx.buffer_bits += int(source_bits)
+	}
 }
 
-final :: proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    _hash_impl->final(hash)
-}
+final :: proc(ctx: ^Whirlpool_Context, hash: []byte) {
+	n := ctx
+	n.buffer[n.buffer_pos] |= 0x80 >> (uint(n.buffer_bits) & 7)
+	n.buffer_pos += 1
 
-hash_bytes_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) -> [64]byte {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Whirlpool_Context); ok {
-        update_odin(&c, data)
-        final_odin(&c, hash[:])
-    }
-    return hash
-}
+	if n.buffer_pos > 64 - 32 {
+		if n.buffer_pos < 64 {
+			for i := 0; i < 64 - n.buffer_pos; i += 1 {
+				n.buffer[n.buffer_pos + i] = 0
+			}
+		}
+		transform(ctx)
+		n.buffer_pos = 0
+	}
 
-hash_stream_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, fs: io.Stream) -> ([64]byte, bool) {
-    hash: [64]byte
-    if c, ok := ctx.internal_ctx.(Whirlpool_Context); ok {
-        buf := make([]byte, 512)
-        defer delete(buf)
-        read := 1
-        for read > 0 {
-            read, _ = fs->impl_read(buf)
-            if read > 0 {
-                update_odin(&c, buf[:read])
-            } 
-        }
-        final_odin(&c, hash[:])
-        return hash, true
-    } else {
-        return hash, false
-    }
-}
+	if n.buffer_pos < 64 - 32 {
+		for i := 0; i < (64 - 32) - n.buffer_pos; i += 1 {
+			n.buffer[n.buffer_pos + i] = 0
+		}
+	}
+	n.buffer_pos = 64 - 32
 
-hash_file_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hd: os.Handle, load_at_once := false) -> ([64]byte, bool) {
-    if !load_at_once {
-        return hash_stream_odin(ctx, os.stream_from_handle(hd))
-    } else {
-        if buf, ok := os.read_entire_file(hd); ok {
-            return hash_bytes_odin(ctx, buf[:]), ok
-        }
-    }
-    return [64]byte{}, false
-}
+	for i := 0; i < 32; i += 1 {
+		n.buffer[n.buffer_pos + i] = n.bitlength[i]
+	}
+	transform(ctx)
 
-@(private)
-_create_whirlpool_ctx :: #force_inline proc() {
-    ctx: Whirlpool_Context
-    _hash_impl.internal_ctx = ctx
-    _hash_impl.hash_size    = ._64
-}
-
-@(private)
-_update_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, data: []byte) {
-    if c, ok := ctx.internal_ctx.(Whirlpool_Context); ok {
-        update_odin(&c, data)
-    }
-}
-
-@(private)
-_final_odin :: #force_inline proc(ctx: ^_ctx.Hash_Context, hash: []byte) {
-    if c, ok := ctx.internal_ctx.(Whirlpool_Context); ok {
-        final_odin(&c, hash)
-    }
+	for i := 0; i < 8; i += 1 {
+		hash[i * 8]     = byte(n.hash[i] >> 56)
+		hash[i * 8 + 1] = byte(n.hash[i] >> 48)
+		hash[i * 8 + 2] = byte(n.hash[i] >> 40)
+		hash[i * 8 + 3] = byte(n.hash[i] >> 32)
+		hash[i * 8 + 4] = byte(n.hash[i] >> 24)
+		hash[i * 8 + 5] = byte(n.hash[i] >> 16)
+		hash[i * 8 + 6] = byte(n.hash[i] >> 8)
+		hash[i * 8 + 7] = byte(n.hash[i])
+	}
 }
 
 /*
@@ -773,98 +803,4 @@ transform :: proc (ctx: ^Whirlpool_Context) {
 		for i := 0; i < 8; i += 1 {state[i] = L[i]}
 	}
 	for i := 0; i < 8; i += 1 {ctx.hash[i] ~= state[i] ~ block[i]}
-}
-
-update_odin :: proc(ctx: ^Whirlpool_Context, source: []byte) {
-    source_pos: int
-    nn := len(source)
-    source_bits := u64(nn * 8)
-    source_gap := u32((8 - (int(source_bits & 7))) & 7)
-    buffer_rem := uint(ctx.buffer_bits & 7)
-    b: u32
-
-	for i, carry, value := 31, u32(0), u32(source_bits); i >= 0 && (carry != 0 || value != 0); i -= 1 {
-		carry += u32(ctx.bitlength[i]) + (u32(value & 0xff))
-		ctx.bitlength[i] = byte(carry)
-		carry >>= 8
-		value >>= 8
-	}
-
-	for source_bits > 8 {
-		b = u32(u32((source[source_pos] << source_gap) & 0xff) | u32((source[source_pos+1] & 0xff) >> (8 - source_gap)))
-
-		ctx.buffer[ctx.buffer_pos] |= u8(b >> buffer_rem)
-		ctx.buffer_pos += 1
-		ctx.buffer_bits += int(8 - buffer_rem)
-
-		if ctx.buffer_bits == 512 {
-			transform(ctx)
-			ctx.buffer_bits = 0
-			ctx.buffer_pos = 0
-		}
-		ctx.buffer[ctx.buffer_pos] = byte(b << (8 - buffer_rem))
-		ctx.buffer_bits += int(buffer_rem)
-		source_bits -= 8
-		source_pos += 1
-	}
-
-	if source_bits > 0 {
-		b = u32((source[source_pos] << source_gap) & 0xff)
-		ctx.buffer[ctx.buffer_pos] |= byte(b) >> buffer_rem
-	} else {b = 0}
-
-	if u64(buffer_rem) + source_bits < 8 {
-		ctx.buffer_bits += int(source_bits)
-	} else {
-		ctx.buffer_pos += 1
-		ctx.buffer_bits += 8 - int(buffer_rem)
-		source_bits -= u64(8 - buffer_rem)
-
-		if ctx.buffer_bits == 512 {
-			transform(ctx)
-			ctx.buffer_bits = 0
-			ctx.buffer_pos = 0
-		}
-		ctx.buffer[ctx.buffer_pos] = byte(b << (8 - buffer_rem))
-		ctx.buffer_bits += int(source_bits)
-	}
-}
-
-final_odin :: proc(ctx: ^Whirlpool_Context, hash: []byte) {
-	n := ctx
-	n.buffer[n.buffer_pos] |= 0x80 >> (uint(n.buffer_bits) & 7)
-	n.buffer_pos += 1
-
-	if n.buffer_pos > 64 - 32 {
-		if n.buffer_pos < 64 {
-			for i := 0; i < 64 - n.buffer_pos; i += 1 {
-				n.buffer[n.buffer_pos + i] = 0
-			}
-		}
-		transform(ctx)
-		n.buffer_pos = 0
-	}
-
-	if n.buffer_pos < 64 - 32 {
-		for i := 0; i < (64 - 32) - n.buffer_pos; i += 1 {
-			n.buffer[n.buffer_pos + i] = 0
-		}
-	}
-	n.buffer_pos = 64 - 32
-
-	for i := 0; i < 32; i += 1 {
-		n.buffer[n.buffer_pos + i] = n.bitlength[i]
-	}
-	transform(ctx)
-
-	for i := 0; i < 8; i += 1 {
-		hash[i * 8]     = byte(n.hash[i] >> 56)
-		hash[i * 8 + 1] = byte(n.hash[i] >> 48)
-		hash[i * 8 + 2] = byte(n.hash[i] >> 40)
-		hash[i * 8 + 3] = byte(n.hash[i] >> 32)
-		hash[i * 8 + 4] = byte(n.hash[i] >> 24)
-		hash[i * 8 + 5] = byte(n.hash[i] >> 16)
-		hash[i * 8 + 6] = byte(n.hash[i] >> 8)
-		hash[i * 8 + 7] = byte(n.hash[i])
-	}
 }

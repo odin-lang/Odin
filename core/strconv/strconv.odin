@@ -882,7 +882,9 @@ unquote_string :: proc(lit: string, allocator := context.allocator) -> (res: str
 		return -1
 	}
 
-	assert(len(lit) >= 2)
+	if len(lit) < 2 {
+		return
+	}
 	if lit[0] == '`' {
 		return lit[1:len(lit)-1], false, true
 	}

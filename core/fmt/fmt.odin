@@ -1929,12 +1929,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if fi.hash { 
 			// Printed as it is written
 			io.write_byte(fi.writer, '\n')
-			for col in 0..<info.column_count {
+			for row in 0..<info.row_count {
 				fmt_write_indent(fi)
-				for row in 0..<info.row_count {
-					if row > 0 { io.write_string(fi.writer, ", ") }
+				for col in 0..<info.column_count {
+					if col > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := (col + row*info.elem_stride)*info.elem_size
+					offset := (row + col*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -1943,12 +1943,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		} else {
 			// Printed in Row-Major layout to match text layout
-			for col in 0..<info.column_count {
-				if col > 0 { io.write_string(fi.writer, "; ") }
-				for row in 0..<info.row_count {
-					if row > 0 { io.write_string(fi.writer, ", ") }
+			for row in 0..<info.row_count {
+				if row > 0 { io.write_string(fi.writer, "; ") }
+				for col in 0..<info.column_count {
+					if col > 0 { io.write_string(fi.writer, ", ") }
 					
-					offset := (col + row*info.elem_stride)*info.elem_size
+					offset := (row + col*info.elem_stride)*info.elem_size
 					
 					data := uintptr(v.data) + uintptr(offset)
 					fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -2076,9 +2076,11 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case f32be:      fmt_float(fi, f64(a), 32, verb)
 	case f64be:      fmt_float(fi, f64(a), 64, verb)
 
+	case complex32:  fmt_complex(fi, complex128(a), 32, verb)
 	case complex64:  fmt_complex(fi, complex128(a), 64, verb)
 	case complex128: fmt_complex(fi, a, 128, verb)
 
+	case quaternion64:  fmt_quaternion(fi, quaternion256(a),  64, verb)
 	case quaternion128: fmt_quaternion(fi, quaternion256(a), 128, verb)
 	case quaternion256: fmt_quaternion(fi, a, 256, verb)
 

@@ -11,7 +11,7 @@ String :: distinct Array(byte)
 
 Version_Type_Major :: 0
 Version_Type_Minor :: 2
-Version_Type_Patch :: 0
+Version_Type_Patch :: 1
 
 Version_Type :: struct {
 	major, minor, patch: u8,

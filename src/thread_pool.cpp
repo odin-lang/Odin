@@ -95,7 +95,7 @@ bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 	thread_pool_queue_push(pool, task);
 	GB_ASSERT(pool->ready >= 0);
 	pool->ready++;
-	condition_signal(&pool->task_cond);
+	condition_broadcast(&pool->task_cond);
 	mutex_unlock(&pool->mutex);
 	return true;
 }	
