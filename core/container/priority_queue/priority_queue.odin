@@ -11,6 +11,12 @@ Priority_Queue :: struct($T: typeid) {
 
 DEFAULT_CAPACITY :: 16
 
+default_swap_proc :: proc($T: typeid) -> proc(q: []T, i, j: int) {
+	return proc(q: []T, i, j: int) {
+		q[i], q[j] = q[j], q[i]
+	}
+}
+
 init :: proc(pq: ^$Q/Priority_Queue($T), less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int), capacity := DEFAULT_CAPACITY, allocator := context.allocator) {
 	if pq.queue.allocator.procedure == nil {
 		pq.queue.allocator = allocator
@@ -65,7 +71,7 @@ _shift_down :: proc(pq: ^$Q/Priority_Queue($T), i0, n: int) -> bool {
 		}
 		j, j2 = j1, j1+1
 		if j1 < n && pq.less(queue[j2], queue[j1])  {
-			j1 = j2
+			j = j2
 		}
 		if !pq.less(queue[i], queue[j]) {
 			break
