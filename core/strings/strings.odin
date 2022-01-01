@@ -6,9 +6,8 @@ import "core:unicode"
 import "core:unicode/utf8"
 
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> string {
-	c := make([]byte, len(s)+1, allocator, loc)
+	c := make([]byte, len(s), allocator, loc)
 	copy(c, s)
-	c[len(s)] = 0
 	return string(c[:len(s)])
 }
 
