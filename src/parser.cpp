@@ -5362,6 +5362,15 @@ isize calc_decl_count(Ast *decl) {
 			count += calc_decl_count(decl->BlockStmt.stmts.data[i]);
 		}
 		break;
+	case Ast_WhenStmt:
+		{
+			isize inner_count = calc_decl_count(decl->WhenStmt.body);
+			if (decl->WhenStmt.else_stmt) {
+				inner_count = gb_max(inner_count, calc_decl_count(decl->WhenStmt.else_stmt));
+			}
+			count += inner_count;
+		}
+		break;
 	case Ast_ValueDecl:
 		count = decl->ValueDecl.names.count;
 		break;
