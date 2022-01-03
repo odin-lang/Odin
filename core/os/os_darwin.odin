@@ -327,7 +327,7 @@ get_last_error_string :: proc() -> string {
 	return cast(string)_darwin_string_error(cast(c.int)get_last_error());
 }
 
-open :: proc(path: string, flags: int = O_RDWR|O_CREATE, mode: int = 0) -> (Handle, Errno) {
+open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
 	cstr := strings.clone_to_cstring(path)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	delete(cstr)
