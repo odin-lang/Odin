@@ -296,6 +296,8 @@ foreign libc {
 	@(link_name="readdir_r$INODE64") _unix_readdir_r    :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
+	@(link_name="fchmod") _unix_fchmod :: proc(fildes: Handle, mode: u16) -> c.int ---;
+
 	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
 	@(link_name="free")     _unix_free     :: proc(ptr: rawptr) ---
@@ -304,6 +306,8 @@ foreign libc {
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+
+	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---;
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
@@ -319,14 +323,33 @@ get_last_error :: proc() -> int {
 	return __error()^
 }
 
-open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
+get_last_error_string :: proc() -> string {
+	return cast(string)_darwin_string_error(cast(c.int)get_last_error());
+}
+
+open :: proc(path: string, flags: int = O_RDWR|O_CREATE, mode: int = 0) -> (Handle, Errno) {
 	cstr := strings.clone_to_cstring(path)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	delete(cstr)
 	if handle == -1 {
 		return INVALID_HANDLE, 1
 	}
+
+when  ODIN_OS == "darwin" && ODIN_ARCH == "arm64" {
+	if mode != 0 {
+		err := fchmod(handle, cast(u16)mode)
+		if err != 0 {
+			_unix_close(handle)
+			return INVALID_HANDLE, 1
+		}
+	}
+}
+
 	return handle, 0
+}
+
+fchmod :: proc(fildes: Handle, mode: u16) -> Errno {
+	return cast(Errno)_unix_fchmod(fildes, mode)
 }
 
 close :: proc(fd: Handle) {
