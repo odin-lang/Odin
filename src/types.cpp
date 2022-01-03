@@ -1253,6 +1253,13 @@ bool is_type_quaternion(Type *t) {
 	}
 	return false;
 }
+bool is_type_complex_or_quaternion(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & (BasicFlag_Complex|BasicFlag_Quaternion)) != 0;
+	}
+	return false;
+}
 bool is_type_f16(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {

@@ -32,9 +32,11 @@ Please see the chart below for the options.
 
 #### High level API
 Each hash algorithm contains a procedure group named `hash`, or if the algorithm provides more than one digest size `hash_<size>`\*.  
-Included in these groups are four procedures.
+Included in these groups are six procedures.
 * `hash_string` - Hash a given string and return the computed hash. Just calls `hash_bytes` internally
 * `hash_bytes` - Hash a given byte slice and return the computed hash
+* `hash_string_to_buffer` - Hash a given string and put the computed hash in the second proc parameter. Just calls `hash_bytes_to_buffer` internally
+* `hash_bytes_to_buffer` - Hash a given string and put the computed hash in the second proc parameter. The destination buffer has to be at least as big as the digest size of the hash
 * `hash_stream` - Takes a stream from io.Stream and returns the computed hash from it
 * `hash_file` - Takes a file handle and returns the computed hash from it. A second optional boolean parameter controls if the file is streamed (this is the default) or read at once (set to true)
 
@@ -58,6 +60,10 @@ main :: proc() {
 
     // Compute the hash, using the high level API
     computed_hash := md4.hash(input)
+
+    // Variant that takes a destination buffer, instead of returning the computed hash
+    hash := make([]byte, md4.DIGEST_SIZE) // @note: Destination buffer has to be at least as big as the digest size of the hash
+    md4.hash(input, hash[:])
 
     // Compute the hash, using the low level API
     ctx: md4.Md4_Context

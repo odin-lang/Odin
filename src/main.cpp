@@ -177,7 +177,6 @@ i32 linker_stage(lbGenerator *gen) {
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
-		char lib_str_buf[1024] = {0};
 
 		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
@@ -212,28 +211,43 @@ i32 linker_stage(lbGenerator *gen) {
 			add_path(find_result.windows_sdk_ucrt_library_path);
 			add_path(find_result.vs_library_path);
 		}
+		
+		
+		StringSet libs = {};
+		string_set_init(&libs, heap_allocator(), 64);
+		defer (string_set_destroy(&libs));
+		
+		StringSet asm_files = {};
+		string_set_init(&asm_files, heap_allocator(), 64);
+		defer (string_set_destroy(&asm_files));
 
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			for_array(i, m->foreign_library_paths) {
 				String lib = m->foreign_library_paths[i];
-				GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-				gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-							" \"%.*s\"", LIT(lib));
-				lib_str = gb_string_appendc(lib_str, lib_str_buf);
+				if (has_asm_extension(lib)) {
+					string_set_add(&asm_files, lib);
+				} else {
+					string_set_add(&libs, lib);
+				}
 			}
 		}
 
 		for_array(i, gen->default_module.foreign_library_paths) {
 			String lib = gen->default_module.foreign_library_paths[i];
-			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-			gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-						" \"%.*s\"", LIT(lib));
-			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+			if (has_asm_extension(lib)) {
+				string_set_add(&asm_files, lib);
+			} else {
+				string_set_add(&libs, lib);
+			}
 		}
-
-
-
+		
+		for_array(i, libs.entries) {
+			String lib = libs.entries[i].value;
+			lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+		}
+		
+		
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
 			output_ext = "dll";
 			link_settings = gb_string_append_fmt(link_settings, " /DLL");
@@ -253,6 +267,27 @@ i32 linker_stage(lbGenerator *gen) {
 
 		if (build_context.ODIN_DEBUG) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
+		}
+		
+		for_array(i, asm_files.entries) {
+			String asm_file = asm_files.entries[i].value;
+			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+
+			result = system_exec_command_line_app("nasm",
+				"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
+				"-f win64 "
+				"-o \"%.*s\" "
+				"%.*s "
+				"",
+				LIT(build_context.ODIN_ROOT), LIT(asm_file),
+				LIT(obj_file),
+				LIT(build_context.extra_assembler_flags)
+			);
+			
+			if (result) {
+				return result;
+			}
+			array_add(&gen->output_object_paths, obj_file);
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -325,10 +360,10 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
-			  
-			  if (result) {
+			
+			if (result) {
 				return result;
-			  }
+			}
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
@@ -404,13 +439,14 @@ i32 linker_stage(lbGenerator *gen) {
 			// so use ld instead.
 			// :UseLDForShared
 			linker = "ld";
-			link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
+				link_settings = gb_string_appendc(link_settings, "-init '___$startup_runtime' ");
 				link_settings = gb_string_appendc(link_settings, "-dylib -dynamic ");
 			#else
 				output_ext = STR_LIT(".so");
+				link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
 				link_settings = gb_string_appendc(link_settings, "-shared ");
 			#endif
 		} else {
@@ -545,8 +581,8 @@ void usage(String argv0) {
 	print_usage_line(1, "version   print version");
 	print_usage_line(1, "report    print information useful to reporting a bug");
 	print_usage_line(0, "");
-	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
-	print_usage_line(1, "-help");
+	print_usage_line(0, "For further details on a command, use -help after the command name");
+	print_usage_line(1, "e.g. odin build -help");
 }
 
 
@@ -617,6 +653,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
+	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 
 	BuildFlag_TestName,
@@ -768,7 +805,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,    str_lit("extra-linker-flags"),            BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags, str_lit("extra-assembler-flags"),         BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
@@ -1314,11 +1352,14 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
-						case BuildFlag_ExtraLinkerFlags: {
+						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
 							break;
-						}
+						case BuildFlag_ExtraAssemblerFlags: 
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.extra_assembler_flags = value.value_string;
+							break;
 						case BuildFlag_Microarch: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
@@ -2031,6 +2072,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
+		
+		print_usage_line(1, "-extra-assembler-flags:<string>");
+		print_usage_line(2, "Adds extra assembler specific flags in a string");
+		print_usage_line(0, "");
+
 
 		print_usage_line(1, "-microarch:<string>");
 		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");

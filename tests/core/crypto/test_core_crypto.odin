@@ -115,6 +115,15 @@ main :: proc() {
     test_haval_224(&t)
     test_haval_256(&t)
 
+    // "modern" crypto tests
+    test_chacha20(&t)
+    test_poly1305(&t)
+    test_chacha20poly1305(&t)
+    test_x25519(&t)
+    test_rand_bytes(&t)
+
+    bench_modern(&t)
+
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 }
 

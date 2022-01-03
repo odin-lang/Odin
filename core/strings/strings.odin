@@ -6,9 +6,8 @@ import "core:unicode"
 import "core:unicode/utf8"
 
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> string {
-	c := make([]byte, len(s)+1, allocator, loc)
+	c := make([]byte, len(s), allocator, loc)
 	copy(c, s)
-	c[len(s)] = 0
 	return string(c[:len(s)])
 }
 
@@ -504,8 +503,8 @@ index_any :: proc(s, chars: string) -> int {
 		}
 	}
 
-	for c in chars {
-		if i := index_rune(s, c); i >= 0 {
+	for c, i in s {
+		if index_rune(chars, c) >= 0 {
 			return i
 		}
 	}
@@ -1288,7 +1287,7 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&substrings, s[start : end])
+		append(&substrings, s[start : len(s)])
 	}
 
 	return substrings[:]

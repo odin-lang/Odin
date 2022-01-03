@@ -826,6 +826,9 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		}
 		if (e->flags & EntityFlag_Static) { flags |= OdinDocEntityFlag_Var_Static; }
 		link_name = e->Variable.link_name;
+		if (init_expr == nullptr) {
+			init_expr = e->Variable.init_expr;
+		}
 		break;
 	case Entity_Procedure:
 		if (e->Procedure.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
@@ -856,8 +859,8 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 				init_string = odin_doc_write_string(w, make_string_c(exact_value_to_string(e->Constant.value)));
 			}
 		} else if (e->kind == Entity_Variable) {
-			if (e->Variable.param_expr) {
-				init_string = odin_doc_expr_string(w, e->Variable.param_expr);
+			if (e->Variable.param_value.original_ast_expr) {
+				init_string = odin_doc_expr_string(w, e->Variable.param_value.original_ast_expr);
 			}
 		}
 	}

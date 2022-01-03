@@ -1564,7 +1564,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					p->flags &= ~FieldFlag_const;
 				}
 				if (p->flags&FieldFlag_any_int) {
-					error(name, "'#const' can only be applied to variable fields");
+					error(name, "'#any_int' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_any_int;
 				}
 
@@ -1614,7 +1614,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 								ok = false;
 							}
 						} else if (p->flags&FieldFlag_any_int) {
-							if (!is_type_integer(op.type) || !is_type_integer(type)) {
+							if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
 								ok = false;
 							} else if (!check_is_castable_to(ctx, &op, type)) {
 								ok = false;
@@ -1684,7 +1684,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				param->flags |= EntityFlag_AutoCast;
 			}
 			if (p->flags&FieldFlag_any_int) {
-				if (!is_type_integer(param->type)) {
+				if (!is_type_integer(param->type) && !is_type_enum(param->type)) {
 					gbString str = type_to_string(param->type);
 					error(name, "A parameter with '#any_int' must be an integer, got %s", str);
 					gb_string_free(str);

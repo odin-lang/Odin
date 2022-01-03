@@ -2050,6 +2050,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		
 		// WASM Specific
 		str_lit("__ashlti3"),
+		str_lit("__multi3"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
@@ -4120,6 +4121,14 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
+	
+	if (has_asm_extension(fullpath)) {
+		if (build_context.metrics.arch != TargetArch_amd64 ||
+		    build_context.metrics.os   != TargetOs_windows) {
+			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s", 
+			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
+		}
+	}
 }
 
 // Returns true if a new package is present
@@ -4842,6 +4851,10 @@ void check_unchecked_bodies(Checker *c) {
 }
 
 void check_test_procedures(Checker *c) {
+	if (build_context.test_names.entries.count == 0) {
+		return;
+	}
+
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 

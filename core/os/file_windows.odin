@@ -2,6 +2,7 @@ package os
 
 import win32 "core:sys/windows"
 import "core:intrinsics"
+import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
@@ -96,26 +97,78 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return int(total_write), ERROR_NONE
 }
 
+@(private="file")
+read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
+	if len(b) == 0 {
+		return 0, 0
+	}
+	
+	BUF_SIZE :: 386
+	buf16: [BUF_SIZE]u16
+	buf8: [4*BUF_SIZE]u8
+	
+	for n < len(b) && err == 0 {
+		max_read := u32(min(BUF_SIZE, len(b)/4))
+		
+		single_read_length: u32
+		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
+		if !ok {
+			err = Errno(win32.GetLastError())
+		}
+		
+		buf8_len := utf16.decode_to_utf8(buf8[:], buf16[:single_read_length])
+		src := buf8[:buf8_len]
+		
+		ctrl_z := false
+		for i := 0; i < len(src) && n+i < len(b); i += 1 {
+			x := src[i]
+			if x == 0x1a { // ctrl-z
+				ctrl_z = true
+				break
+			}
+			b[n] = x
+			n += 1
+		}
+		if ctrl_z || single_read_length < len(buf16) {
+			break
+		}
+	}
+	
+	return
+}
+
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
+	
+	handle := win32.HANDLE(fd)
+	
+	m: u32
+	is_console := win32.GetConsoleMode(handle, &m)
 
 	single_read_length: win32.DWORD
-	total_read: i64
-	length := i64(len(data))
+	total_read: int
+	length := len(data)
 
-	for total_read < length {
-		remaining := length - total_read
-		to_read := min(win32.DWORD(remaining), MAX_RW)
+	to_read := min(win32.DWORD(length), MAX_RW)
 
-		e := win32.ReadFile(win32.HANDLE(fd), &data[total_read], to_read, &single_read_length, nil)
-		if single_read_length <= 0 || !e {
-			err := Errno(win32.GetLastError())
+	e: win32.BOOL
+	if is_console {
+		n, err := read_console(handle, data[total_read:][:to_read])
+		total_read += n
+		if err != 0 {
 			return int(total_read), err
 		}
-		total_read += i64(single_read_length)
+	} else {
+		e = win32.ReadFile(handle, &data[total_read], to_read, &single_read_length, nil)
 	}
+	if single_read_length <= 0 || !e {
+		err := Errno(win32.GetLastError())
+		return int(total_read), err
+	}
+	total_read += int(single_read_length)
+	
 	return int(total_read), ERROR_NONE
 }
 
@@ -171,6 +224,8 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		OffsetHigh = u32(offset>>32),
 		Offset = u32(offset),
 	}
+
+	// TODO(bill): Determine the correct behaviour for consoles
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD

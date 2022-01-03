@@ -1200,7 +1200,7 @@ lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, isize index) {
 }
 
 lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
-	index = lb_correct_endianness(p, index);
+	index = lb_emit_conv(p, index, t_int);
 	LLVMValueRef indices[1] = {index.value};
 	lbValue res = {};
 	res.type = ptr.type;
