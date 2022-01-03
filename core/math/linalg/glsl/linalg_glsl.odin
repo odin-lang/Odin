@@ -1597,7 +1597,7 @@ quatNlerp :: proc "c" (a, b: quat, t: f32) -> (c: quat) {
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
 	c.w = a.w + (b.w-a.w)*t
-	return c/builtin.abs(c)
+	return c/quat(builtin.abs(c))
 }
 
 quatSlerp :: proc "c" (x, y: quat, t: f32) -> (q: quat) {
@@ -1699,7 +1699,7 @@ dquatNlerp :: proc "c" (a, b: dquat, t: f64) -> (c: dquat) {
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
 	c.w = a.w + (b.w-a.w)*t
-	return c/builtin.abs(c)
+	return c/dquat(builtin.abs(c))
 }
 
 dquatSlerp :: proc "c" (x, y: dquat, t: f64) -> (q: dquat) {
