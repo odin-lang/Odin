@@ -5,9 +5,8 @@ import "core:unicode"
 import "core:unicode/utf8"
 
 clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
-	c := make([]byte, len(s)+1, allocator, loc)
+	c := make([]byte, len(s), allocator, loc)
 	copy(c, s)
-	c[len(s)] = 0
 	return c[:len(s)]
 }
 
@@ -1143,7 +1142,7 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&subslices, s[start : end])
+		append(&subslices, s[start : len(s)])
 	}
 
 	return subslices[:]

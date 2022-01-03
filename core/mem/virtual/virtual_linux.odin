@@ -4,64 +4,56 @@ package mem_virtual
 
 import "core:c"
 import "core:intrinsics"
+import "core:sys/unix"
 
-when ODIN_ARCH == "amd64" {
-	SYS_mmap     :: 9
-	SYS_mprotect :: 10
-	SYS_munmap   :: 11
-	SYS_madvise  :: 28
-	
-	PROT_NONE  :: 0x0
-	PROT_READ  :: 0x1
-	PROT_WRITE :: 0x2
-	PROT_EXEC  :: 0x4
-	PROT_GROWSDOWN :: 0x01000000
-	PROT_GROWSUP :: 0x02000000
+PROT_NONE  :: 0x0
+PROT_READ  :: 0x1
+PROT_WRITE :: 0x2
+PROT_EXEC  :: 0x4
+PROT_GROWSDOWN :: 0x01000000
+PROT_GROWSUP :: 0x02000000
 
-	MAP_FIXED     :: 0x1
-	MAP_PRIVATE   :: 0x2
-	MAP_SHARED    :: 0x4
-	MAP_ANONYMOUS :: 0x20
-	
-	MADV_NORMAL      :: 0
-	MADV_RANDOM      :: 1
-	MADV_SEQUENTIAL  :: 2
-	MADV_WILLNEED    :: 3
-	MADV_DONTNEED    :: 4
-	MADV_FREE        :: 8
-	MADV_REMOVE      :: 9
-	MADV_DONTFORK    :: 10
-	MADV_DOFORK      :: 11
-	MADV_MERGEABLE   :: 12
-	MADV_UNMERGEABLE :: 13
-	MADV_HUGEPAGE    :: 14
-	MADV_NOHUGEPAGE  :: 15
-	MADV_DONTDUMP    :: 16
-	MADV_DODUMP      :: 17
-	MADV_WIPEONFORK  :: 18
-	MADV_KEEPONFORK  :: 19
-	MADV_HWPOISON    :: 100
-} else {
-	#panic("Unsupported architecture")
-}
+MAP_FIXED     :: 0x1
+MAP_PRIVATE   :: 0x2
+MAP_SHARED    :: 0x4
+MAP_ANONYMOUS :: 0x20
+
+MADV_NORMAL      :: 0
+MADV_RANDOM      :: 1
+MADV_SEQUENTIAL  :: 2
+MADV_WILLNEED    :: 3
+MADV_DONTNEED    :: 4
+MADV_FREE        :: 8
+MADV_REMOVE      :: 9
+MADV_DONTFORK    :: 10
+MADV_DOFORK      :: 11
+MADV_MERGEABLE   :: 12
+MADV_UNMERGEABLE :: 13
+MADV_HUGEPAGE    :: 14
+MADV_NOHUGEPAGE  :: 15
+MADV_DONTDUMP    :: 16
+MADV_DODUMP      :: 17
+MADV_WIPEONFORK  :: 18
+MADV_KEEPONFORK  :: 19
+MADV_HWPOISON    :: 100
 
 mmap :: proc "contextless" (addr: rawptr, length: uint, prot: c.int, flags: c.int, fd: c.int, offset: uintptr) -> rawptr {
-	res := intrinsics.syscall(SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset)
+	res := intrinsics.syscall(unix.SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset)
 	return rawptr(res)
 }
 
 munmap :: proc "contextless" (addr: rawptr, length: uint) -> c.int {
-	res := intrinsics.syscall(SYS_munmap, uintptr(addr), uintptr(length))
+	res := intrinsics.syscall(unix.SYS_munmap, uintptr(addr), uintptr(length))
 	return c.int(res)
 }
 
 mprotect :: proc "contextless" (addr: rawptr, length: uint, prot: c.int) -> c.int {
-	res := intrinsics.syscall(SYS_mprotect, uintptr(addr), uintptr(length), uint(prot))
+	res := intrinsics.syscall(unix.SYS_mprotect, uintptr(addr), uintptr(length), uint(prot))
 	return c.int(res)
 }
 
 madvise :: proc "contextless" (addr: rawptr, length: uint, advice: c.int) -> c.int {
-	res := intrinsics.syscall(SYS_madvise, uintptr(addr), uintptr(length), uintptr(advice))
+	res := intrinsics.syscall(unix.SYS_madvise, uintptr(addr), uintptr(length), uintptr(advice))
 	return c.int(res)
 }
 

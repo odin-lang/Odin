@@ -55,6 +55,25 @@ write_encoded_rune :: proc(fd: Handle, r: rune) {
 	write_byte(fd, '\'')
 }
 
+read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno) {
+	if len(buf) < min {
+		return 0, -1
+	}
+	for n < min && err == 0 {
+		nn: int
+		nn, err = read(fd, buf[n:])
+		n += nn
+	}
+	if n >= min {
+		err = 0
+	}
+	return
+}
+
+read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Errno) {
+	return read_at_least(fd, buf, len(buf))
+}
+
 
 file_size_from_path :: proc(path: string) -> i64 {
 	fd, err := open(path, O_RDONLY, 0)
@@ -85,27 +104,27 @@ read_entire_file_from_filename :: proc(name: string, allocator := context.alloca
 read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator) -> (data: []byte, success: bool) {
 	context.allocator = allocator
 
-    length: i64
-    err: Errno
-    if length, err = file_size(fd); err != 0 {
-        return nil, false
-    }
+	length: i64
+	err: Errno
+	if length, err = file_size(fd); err != 0 {
+	    return nil, false
+	}
 
-    if length <= 0 {
-        return nil, true
-    }
+	if length <= 0 {
+		return nil, true
+	}
 
-    data = make([]byte, int(length), allocator)
-    if data == nil {
-        return nil, false
-    }
+	data = make([]byte, int(length), allocator)
+	if data == nil {
+	return nil, false
+	}
 
-    bytes_read, read_err := read(fd, data)
-    if read_err != ERROR_NONE {
-        delete(data)
-        return nil, false
-    }
-    return data[:bytes_read], true
+	bytes_read, read_err := read_full(fd, data)
+	if read_err != ERROR_NONE {
+		delete(data)
+		return nil, false
+	}
+	return data[:bytes_read], true
 }
 
 read_entire_file :: proc {

@@ -8,6 +8,7 @@ import "core:strings"
 import "core:c"
 import "core:strconv"
 import "core:intrinsics"
+import "core:sys/unix"
 
 Handle    :: distinct i32
 File_Time :: distinct u64
@@ -264,8 +265,6 @@ F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
 W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
-
-SYS_GETTID :: 186
 
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
@@ -594,7 +593,7 @@ exit :: proc "contextless" (code: int) -> ! {
 }
 
 current_thread_id :: proc "contextless" () -> int {
-	return cast(int)intrinsics.syscall(SYS_GETTID)
+	return unix.sys_gettid()
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {

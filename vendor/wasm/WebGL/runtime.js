@@ -416,7 +416,7 @@ class WebGLInterface {
 					log = log.substring(0, n);
 					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
 					
-					storeInt(length_ptr, n);
+					this.mem.storeInt(length_ptr, n);
 				}
 			},
 			GetShaderInfoLog: (shader, buf_ptr, buf_len, length_ptr) => {
@@ -429,7 +429,7 @@ class WebGLInterface {
 					log = log.substring(0, n);
 					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
 					
-					storeInt(length_ptr, n);
+					this.mem.storeInt(length_ptr, n);
 				}
 			},
 			GetShaderiv: (shader, pname, p) => {
@@ -439,11 +439,11 @@ class WebGLInterface {
 						if (log === null) {
 							log = "(unknown error)";
 						}
-						storeInt(p, log.length+1);
+						this.mem.storeInt(p, log.length+1);
 					} else if (pname == 35720) {
 						let source = this.ctx.getShaderSource(this.shaders[shader]);
 						let sourceLength = (source === null || source.length == 0) ? 0 : source.length+1;
-						storeInt(p, sourceLength);
+						this.mem.storeInt(p, sourceLength);
 					} else {
 						let param = this.ctx.getShaderParameter(this.shaders[shader], pname);
 						this.mem.storeI32(p, param);
@@ -672,9 +672,9 @@ class WebGLInterface {
 					this.ctx.texImage3D(target, level, internalformat, width, height, depth, border, format, type, null);
 				}
 			},
-			TexSubImage3D: (target, level, xoffset, yoffset, width, height, depth, format, type, size, data) => {
+			TexSubImage3D: (target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, size, data) => {
 				this.assertWebGL2();
-				this.ctx.texSubImage3D(target, level, xoffset, yoffset, width, height, depth, format, type, this.mem.loadBytes(data, size));
+				this.ctx.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, this.mem.loadBytes(data, size));
 			},
 			CompressedTexImage3D: (target, level, internalformat, width, height, depth, border, imageSize, data) => {
 				this.assertWebGL2();
@@ -684,12 +684,12 @@ class WebGLInterface {
 					this.ctx.compressedTexImage3D(target, level, internalformat, width, height, depth, border, null);
 				}
 			},
-			CompressedTexSubImage3D: (target, level, xoffset, yoffset, width, height, depth, format, imageSize, data) => {
+			CompressedTexSubImage3D: (target, level, xoffset, yoffset, zoffset, width, height, depth, format, imageSize, data) => {
 				this.assertWebGL2();
 				if (data) {
-					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, width, height, depth, format, this.mem.loadBytes(data, imageSize));
+					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, this.mem.loadBytes(data, imageSize));
 				} else {
-					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, width, height, depth, format, null);
+					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, null);
 				}
 			},
 			
@@ -994,7 +994,7 @@ class WebGLInterface {
 				let n = Math.min(buf_len, name.length);
 				name = name.substring(0, n);
 				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(name))
-				storeInt(length_ptr, n);
+				this.mem.storeInt(length_ptr, n);
 			},
 			UniformBlockBinding: (program, uniformBlockIndex, uniformBlockBinding) => {
 				this.assertWebGL2();

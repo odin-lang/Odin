@@ -47,6 +47,8 @@ Parser :: struct {
 
 	fix_count: int,
 	fix_prev_pos: tokenizer.Pos,
+
+	peeking: bool,
 }
 
 MAX_FIX_COUNT :: 10
@@ -209,7 +211,12 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 
 peek_token_kind :: proc(p: ^Parser, kind: tokenizer.Token_Kind, lookahead := 0) -> (ok: bool) {
 	prev_parser := p^
-	defer p^ = prev_parser
+	p.peeking = true
+
+	defer {
+		p^ = prev_parser
+		p.peeking = false
+	}
 
 	p.tok.err = nil
 	for i := 0; i <= lookahead; i += 1 {
@@ -222,7 +229,12 @@ peek_token_kind :: proc(p: ^Parser, kind: tokenizer.Token_Kind, lookahead := 0) 
 
 peek_token :: proc(p: ^Parser, lookahead := 0) -> (tok: tokenizer.Token) {
 	prev_parser := p^
-	defer p^ = prev_parser
+	p.peeking = true
+
+	defer {
+		p^ = prev_parser
+		p.peeking = false
+	}
 
 	p.tok.err = nil
 	for i := 0; i <= lookahead; i += 1 {
@@ -305,7 +317,7 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 		append(&list, comment)
 	}
 
-	if len(list) > 0 {
+	if len(list) > 0 && !p.peeking {
 		comments = ast.new(ast.Comment_Group, list[0].pos, end_pos(list[len(list)-1]))
 		comments.list = list[:]
 		append(&p.file.comments, comments)
@@ -876,6 +888,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			error(p, body.pos, "the body of a 'do' must be on the same line as the 'for' token")
 		}
 	} else {
+		allow_token(p, .Semicolon)
 		body = parse_body(p)
 	}
 
@@ -2588,6 +2601,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		poly_params: ^ast.Field_List
 		align:       ^ast.Expr
 		is_maybe:    bool
+		is_no_nil:   bool
 
 		if allow_token(p, .Open_Paren) {
 			param_count: int
@@ -2614,6 +2628,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
 				}
 				is_maybe = true
+			case "no_nil":
+				if is_no_nil {
+					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
+				}
+				is_no_nil = true
 			case:
 				error(p, tag.pos, "invalid union tag '#%s", tag.text)
 			}
@@ -2657,6 +2676,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		ut.where_token   = where_token
 		ut.where_clauses = where_clauses
 		ut.is_maybe      = is_maybe
+		ut.is_no_nil     = is_no_nil
 
 		return ut
 
@@ -2825,6 +2845,7 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		ast.Dynamic_Array_Type,
 		ast.Map_Type,
 		ast.Bit_Set_Type,
+		ast.Matrix_Type,
 		ast.Call_Expr:
 		return true
 	}

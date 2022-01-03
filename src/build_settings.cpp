@@ -196,6 +196,7 @@ struct BuildContext {
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
+	String extra_assembler_flags;
 	String microarch;
 	BuildModeKind build_mode;
 	bool   generate_docs;
@@ -299,6 +300,14 @@ gb_global TargetMetrics target_linux_amd64 = {
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
+gb_global TargetMetrics target_linux_arm64 = {
+	TargetOs_linux,
+	TargetArch_arm64,
+	8,
+	16,
+	str_lit("aarch64-linux-elf"),
+	str_lit("e-m:e-i8:8:32-i16:32-i64:64-i128:128-n32:64-S128"),
+};
 
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
@@ -393,6 +402,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
 	{ str_lit("linux_386"),           &target_linux_386      },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
+	{ str_lit("linux_arm64"),         &target_linux_arm64    },
 	{ str_lit("windows_386"),         &target_windows_386    },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
 	{ str_lit("freebsd_386"),         &target_freebsd_386    },
@@ -821,6 +831,18 @@ bool show_error_line(void) {
 	return build_context.show_error_line;
 }
 
+bool has_asm_extension(String const &path) {
+	String ext = path_extension(path);
+	if (ext == ".asm") {
+		return true;
+	} else if (ext == ".s") {
+		return true;
+	} else if (ext == ".S") {
+		return true;
+	}
+	return false;
+}
+
 
 void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
@@ -867,6 +889,8 @@ void init_build_context(TargetMetrics *cross_target) {
 			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
 			metrics = &target_freebsd_amd64;
+		#elif defined(GB_CPU_ARM)
+			metrics = &target_linux_arm64;
 		#else
 			metrics = &target_linux_amd64;
 		#endif
@@ -945,6 +969,9 @@ void init_build_context(TargetMetrics *cross_target) {
 		switch (bc->metrics.os) {
 		case TargetOs_darwin:
 			bc->link_flags = str_lit("-arch arm64 ");
+			break;
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch aarch64 ");
 			break;
 		}
 	} else if (is_arch_wasm()) {

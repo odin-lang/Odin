@@ -1858,7 +1858,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				f64 r = operand->value.value_complex->real;
 				f64 i = operand->value.value_complex->imag;
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i));
-
+				break;
+			}
+			case ExactValue_Quaternion: {
+				f64 r = operand->value.value_quaternion->real;
+				f64 i = operand->value.value_quaternion->imag;
+				f64 j = operand->value.value_quaternion->jmag;
+				f64 k = operand->value.value_quaternion->kmag;
+				operand->value = exact_value_float(gb_sqrt(r*r + i*i + j*j + k*k));
 				break;
 			}
 			default:
@@ -1877,10 +1884,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 		}
 
-		if (is_type_complex(operand->type)) {
+		if (is_type_complex_or_quaternion(operand->type)) {
 			operand->type = base_complex_elem_type(operand->type);
 		}
-		GB_ASSERT(!is_type_complex(operand->type));
+		GB_ASSERT(!is_type_complex_or_quaternion(operand->type));
 
 		break;
 	}

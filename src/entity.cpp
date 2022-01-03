@@ -166,7 +166,6 @@ struct Entity {
 			i32  field_index;
 
 			ParameterValue param_value;
-			Ast *          param_expr;
 
 			String     thread_local_model;
 			Entity *   foreign_library;

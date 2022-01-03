@@ -127,17 +127,22 @@ def we_iterate():
 # Error enum values
 #
 class Error(Enum):
-	Okay                   = 0
-	Out_Of_Memory          = 1
-	Invalid_Pointer        = 2
-	Invalid_Argument       = 3
-	Unknown_Error          = 4
-	Max_Iterations_Reached = 5
-	Buffer_Overflow        = 6
-	Integer_Overflow       = 7
-	Division_by_Zero       = 8
-	Math_Domain_Error      = 9
-	Unimplemented          = 127
+	Okay                    = 0
+	Out_Of_Memory           = 1
+	Invalid_Pointer         = 2
+	Invalid_Argument        = 3
+	Unknown_Error           = 4
+	Assignment_To_Immutable = 10
+	Max_Iterations_Reached  = 11
+	Buffer_Overflow         = 12
+	Integer_Overflow        = 13
+	Integer_Underflow       = 14
+	Division_by_Zero        = 30
+	Math_Domain_Error       = 31
+	Cannot_Open_File        = 50
+	Cannot_Read_File        = 51
+	Cannot_Write_File       = 52
+	Unimplemented           = 127
 
 #
 # Disable garbage collection
@@ -182,8 +187,8 @@ int_sqrt   =     load(l.test_sqrt,       [c_char_p            ], Res)
 int_root_n =     load(l.test_root_n,     [c_char_p, c_longlong], Res)
 
 # Logical operations
-int_shl_digit  = load(l.test_shl_digit,  [c_char_p, c_longlong], Res)
-int_shr_digit  = load(l.test_shr_digit,  [c_char_p, c_longlong], Res)
+int_shl_leg    = load(l.test_shl_leg,    [c_char_p, c_longlong], Res)
+int_shr_leg    = load(l.test_shr_leg,    [c_char_p, c_longlong], Res)
 int_shl        = load(l.test_shl,        [c_char_p, c_longlong], Res)
 int_shr        = load(l.test_shr,        [c_char_p, c_longlong], Res)
 int_shr_signed = load(l.test_shr_signed, [c_char_p, c_longlong], Res)
@@ -397,17 +402,17 @@ def test_root_n(number = 0, root = 0, expected_error = Error.Okay):
 
 	return test("test_root_n", res, [number, root], expected_error, expected_result)
 
-def test_shl_digit(a = 0, digits = 0, expected_error = Error.Okay):
+def test_shl_leg(a = 0, digits = 0, expected_error = Error.Okay):
 	args  = [arg_to_odin(a), digits]
-	res   = int_shl_digit(*args)
+	res   = int_shl_leg(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		expected_result = a << (digits * 60)
-	return test("test_shl_digit", res, [a, digits], expected_error, expected_result)
+	return test("test_shl_leg", res, [a, digits], expected_error, expected_result)
 
-def test_shr_digit(a = 0, digits = 0, expected_error = Error.Okay):
+def test_shr_leg(a = 0, digits = 0, expected_error = Error.Okay):
 	args  = [arg_to_odin(a), digits]
-	res   = int_shr_digit(*args)
+	res   = int_shr_leg(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
 		if a < 0:
@@ -416,7 +421,7 @@ def test_shr_digit(a = 0, digits = 0, expected_error = Error.Okay):
 		else:
 			expected_result = a >> (digits * 60)
 		
-	return test("test_shr_digit", res, [a, digits], expected_error, expected_result)
+	return test("test_shr_leg", res, [a, digits], expected_error, expected_result)
 
 def test_shl(a = 0, bits = 0, expected_error = Error.Okay):
 	args  = [arg_to_odin(a), bits]
@@ -551,12 +556,12 @@ TESTS = {
 	test_root_n: [
 		[  1298074214633706907132624082305024, 2, Error.Okay, ],	
 	],
-	test_shl_digit: [
+	test_shl_leg: [
 		[ 3192,			1 ],
 		[ 1298074214633706907132624082305024, 2 ],
 		[ 1024,			3 ],
 	],
-	test_shr_digit: [
+	test_shr_leg: [
 		[ 3680125442705055547392, 1 ],
 		[ 1725436586697640946858688965569256363112777243042596638790631055949824, 2 ],
 		[ 219504133884436710204395031992179571, 2 ],
@@ -614,10 +619,10 @@ total_failures = 0
 # test_shr_signed also tests shr, so we're not going to test shr randomly.
 #
 RANDOM_TESTS = [
-	test_add, test_sub, test_mul, test_sqr, test_div,
-	test_log, test_pow, test_sqrt, test_root_n,
-	test_shl_digit, test_shr_digit, test_shl, test_shr_signed,
-	test_gcd, test_lcm, test_is_square,
+	test_add,     test_sub,     test_mul,       test_sqr,
+	test_log,     test_pow,     test_sqrt,      test_root_n,
+	test_shl_leg, test_shr_leg, test_shl,       test_shr_signed,
+	test_gcd,     test_lcm,     test_is_square, test_div,
 ]
 SKIP_LARGE   = [
 	test_pow, test_root_n, # test_gcd,
@@ -714,9 +719,9 @@ if __name__ == '__main__':
 					a = randint(1, 1 << BITS)
 					b = TEST_ROOT_N_PARAMS[index]
 					index = (index + 1) % len(TEST_ROOT_N_PARAMS)
-				elif test_proc == test_shl_digit:
+				elif test_proc == test_shl_leg:
 					b = randint(0, 10);
-				elif test_proc == test_shr_digit:
+				elif test_proc == test_shr_leg:
 					a = abs(a)
 					b = randint(0, 10);
 				elif test_proc == test_shl:
