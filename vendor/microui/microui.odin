@@ -1030,9 +1030,7 @@ number_textbox :: proc(ctx: ^Context, value: ^Real, r: Rect, id: Id, fmt_string:
 	if ctx.number_edit_id == id {
 		res := textbox_raw(ctx, ctx.number_edit_buf[:], &ctx.number_edit_len, id, r, {})
 		if .SUBMIT in res || ctx.focus_id != id {
-			ok: bool
-			value^, ok = parse_real(string(ctx.number_edit_buf[:ctx.number_edit_len]))
-			assert(ok == true)
+			value^, _ = parse_real(string(ctx.number_edit_buf[:ctx.number_edit_len]))
 			ctx.number_edit_id = 0
 		} else {
 			return true
