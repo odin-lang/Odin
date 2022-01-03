@@ -276,3 +276,5 @@ shared/
 *.ll
 
 *.sublime-workspace
+
+.DS_Store
