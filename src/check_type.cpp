@@ -922,20 +922,19 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 		i64 lower = big_int_to_i64(&i);
 		i64 upper = big_int_to_i64(&j);
 		
-		bool lower_changed = false;
+		i64 actual_lower = lower;
 		i64 bits = MAX_BITS;
 		if (type->BitSet.underlying != nullptr) {
 			bits = 8*type_size_of(type->BitSet.underlying);
 			
 			if (lower > 0) {
-				lower = 0;
-				lower_changed = true;
+				actual_lower = 0;
 			} else if (lower < 0) {
 				error(bs->elem, "bit_set does not allow a negative lower bound (%lld) when an underlying type is set", lower);
 			}
 		}
 
-		i64 bits_required = upper-lower;
+		i64 bits_required = upper-actual_lower;
 		switch (be->op.kind) {
 		case Token_Ellipsis:
 		case Token_RangeFull:
@@ -959,7 +958,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 			break;
 		}
 		if (!is_valid) {
-			if (lower_changed) {
+			if (actual_lower != lower) {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internal the lower changed was changed 0 as an underlying type was set)", bits, bits_required);
 			} else {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
