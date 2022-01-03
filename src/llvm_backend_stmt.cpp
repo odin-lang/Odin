@@ -2188,6 +2188,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
 		}
 		lb_emit_jump(p, block);
+		lb_start_block(p, lb_create_block(p, "unreachable"));
 	case_end;
 	}
 }
