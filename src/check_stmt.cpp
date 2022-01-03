@@ -58,6 +58,30 @@ bool contains_deferred_call(Ast *node) {
 	return false;
 }
 
+Ast *last_stmt_blocking_in_list(Slice<Ast *> const &stmts) {
+	for_array(i, stmts) {
+		Ast *n = stmts[i];
+		switch (n->kind) {
+		case Ast_ReturnStmt:
+			return n;
+		case Ast_BranchStmt:
+			return n;
+		case Ast_ExprStmt:
+			if (is_diverging_stmt(n)) {
+				return n;
+			}
+			break;
+		case Ast_BlockStmt:
+			n = last_stmt_blocking_in_list(n->BlockStmt.stmts);
+			if (n != nullptr) {
+				return n;
+			}
+			break;
+		}
+	}
+	return nullptr;
+}
+
 void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
@@ -102,6 +126,7 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 		check_stmt(ctx, n, new_flags);
 
 		if (i+1 < max_non_constant_declaration) {
+		never_executed_error:;
 			switch (n->kind) {
 			case Ast_ReturnStmt:
 				error(n, "Statements after this 'return' are never executed");
@@ -114,6 +139,13 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 			case Ast_ExprStmt:
 				if (is_diverging_stmt(n)) {
 					error(n, "Statements after a diverging procedure call are never executed");
+				}
+				break;
+
+			case Ast_BlockStmt:
+				n = last_stmt_blocking_in_list(n->BlockStmt.stmts);
+				if (n != nullptr) {
+					goto never_executed_error;
 				}
 				break;
 			}
