@@ -956,7 +956,7 @@ substitute_token :: proc(cpp: ^Preprocessor, tok: ^Token, args: ^Macro_Arg) -> ^
 			continue
 		}
 
-		if tok.lit == "__VA__OPT__" && tok.next.lit == "(" {
+		if tok.lit == "__VA_OPT__" && tok.next.lit == "(" {
 			opt_arg := read_macro_arg_one(cpp, &tok, tok.next.next, true)
 			if has_varargs(args) {
 				for t := opt_arg.tok; t.kind != .EOF; t = t.next {
