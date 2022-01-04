@@ -598,6 +598,15 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 				}
 				doc_type.where_clauses = odin_doc_where_clauses(w, st->where_clauses);
 			}
+
+			auto tags = array_make<OdinDocString>(heap_allocator(), type->Struct.fields.count);
+			defer (array_free(&tags));
+
+			for_array(i, type->Struct.fields) {
+				tags[i] = odin_doc_write_string(w, type->Struct.tags[i]);
+			}
+
+			doc_type.tags = odin_write_slice(w, tags.data, tags.count);
 		}
 		break;
 	case Type_Union:
