@@ -2058,26 +2058,47 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				break;
 			case TargetArch_arm64:
 				{
-					GB_ASSERT(arg_count <= 7);
-					
-					char asm_string[] = "svc #0";
-					gbString constraints = gb_string_make(heap_allocator(), "={x0}");
-					for (unsigned i = 0; i < arg_count; i++) {
-						constraints = gb_string_appendc(constraints, ",{");
-						static char const *regs[] = {
-							"x8",
-							"x0",
-							"x1",
-							"x2",
-							"x3",
-							"x4",
-							"x5",
-						};
-						constraints = gb_string_appendc(constraints, regs[i]);
-						constraints = gb_string_appendc(constraints, "}");
-					}
+                    GB_ASSERT(arg_count <= 7);
+                    
+                    if(build_context.metrics.os == TargetOs_darwin) {
+                        char asm_string[] = "svc #0x80";
+                        gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+                        for (unsigned i = 0; i < arg_count; i++) {
+                            constraints = gb_string_appendc(constraints, ",{");
+                            static char const *regs[] = {
+                                "x16",
+                                "x0",
+                                "x1",
+                                "x2",
+                                "x3",
+                                "x4",
+                                "x5",
+                            };
+                            constraints = gb_string_appendc(constraints, regs[i]);
+                            constraints = gb_string_appendc(constraints, "}");
+                        }
 
-					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+                        inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+                    } else {
+                        char asm_string[] = "svc #0";
+                        gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+                        for (unsigned i = 0; i < arg_count; i++) {
+                            constraints = gb_string_appendc(constraints, ",{");
+                            static char const *regs[] = {
+                                "x8",
+                                "x0",
+                                "x1",
+                                "x2",
+                                "x3",
+                                "x4",
+                                "x5",
+                            };
+                            constraints = gb_string_appendc(constraints, regs[i]);
+                            constraints = gb_string_appendc(constraints, "}");
+                        }
+
+                        inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+                    }
 				}
 				break;
 			default:
