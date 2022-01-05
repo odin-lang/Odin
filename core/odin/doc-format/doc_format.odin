@@ -11,7 +11,7 @@ String :: distinct Array(byte)
 
 Version_Type_Major :: 0
 Version_Type_Minor :: 2
-Version_Type_Patch :: 1
+Version_Type_Patch :: 2
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -242,6 +242,8 @@ Type :: struct {
 	polymorphic_params: Type_Index,
 	// Used By: .Struct, .Union
 	where_clauses: Array(String),
+	// Used By: .Struct
+	tags: Array(String),
 }
 
 Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le]

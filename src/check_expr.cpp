@@ -7688,6 +7688,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 
+			if (t->kind == Type_Matrix) {
+				if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+					if (0 < max && max < max_type_count) {
+						error(node, "Expected %lld values for this matrix literal, got %lld", cast(long long)max_type_count, cast(long long)max);
+					}
+				}
+			}
+
 			break;
 		}
 

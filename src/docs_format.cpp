@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 2
-#define OdinDocVersionType_Patch 1
+#define OdinDocVersionType_Patch 2
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -137,6 +137,7 @@ struct OdinDocType {
 	OdinDocArray<OdinDocEntityIndex> entities;
 	OdinDocTypeIndex polmorphic_params;
 	OdinDocArray<OdinDocString> where_clauses;
+	OdinDocArray<OdinDocString> tags; // struct field tags
 };
 
 struct OdinDocAttribute {

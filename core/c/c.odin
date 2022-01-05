@@ -3,6 +3,8 @@ package c
 import builtin "core:builtin"
 
 char           :: builtin.u8  // assuming -funsigned-char
+
+schar          :: builtin.i8
 short          :: builtin.i16
 int            :: builtin.i32
 long           :: builtin.i32 when (ODIN_OS == "windows" || size_of(builtin.rawptr) == 4) else builtin.i64
