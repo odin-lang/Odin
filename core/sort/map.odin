@@ -4,6 +4,9 @@ import "core:intrinsics"
 import "core:runtime"
 import "core:slice"
 
+_ :: runtime
+_ :: slice
+
 map_entries_by_key :: proc(m: ^$M/map[$K]$V, loc := #caller_location) where intrinsics.type_is_ordered(K) {
 	Entry :: struct {
 		hash:  uintptr,
