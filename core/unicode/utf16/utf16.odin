@@ -117,9 +117,9 @@ decode_to_utf8 :: proc(d: []byte, s: []u16) -> (n: int) {
 		switch c := s[i]; {
 		case c < _surr1, _surr3 <= c:
 			r = rune(c)
-		case _surr1 <= r && r < _surr2 && i+1 < len(s) && 
+		case _surr1 <= c && c < _surr2 && i+1 < len(s) && 
 			_surr2 <= s[i+1] && s[i+1] < _surr3:
-			r = decode_surrogate_pair(rune(r), rune(s[i+1]))
+			r = decode_surrogate_pair(rune(c), rune(s[i+1]))
 			i += 1
 		}
 		
