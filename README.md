@@ -84,7 +84,7 @@ The official Odin Language specification.
 
 ### Articles
 
-#### [The Odin Blog](https://odin-lang.org/blog)
+#### [The Odin Blog](https://odin-lang.org/news/)
 
 The official blog of the Odin programming language, featuring announcements, news, and in-depth articles by the Odin team and guests.
 
