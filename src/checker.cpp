@@ -622,7 +622,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
 
-	for_array(i, scope->elements.entries) {
+	MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
 		Entity *e = scope->elements.entries[i].value;
 		if (e == nullptr) continue;
 		VettedEntity ve = {};

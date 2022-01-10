@@ -1286,7 +1286,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	using_entities.allocator = heap_allocator();
 	defer (array_free(&using_entities));
 
-	{
+	MUTEX_GUARD_BLOCK(ctx->scope->mutex) {
 		if (type->Proc.param_count > 0) {
 			TypeTuple *params = &type->Proc.params->Tuple;
 			for_array(i, params->variables) {

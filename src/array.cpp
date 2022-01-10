@@ -77,15 +77,19 @@ template <typename T> Slice<T> slice_from_array(Array<T> const &a);
 
 template <typename T>
 Slice<T> slice_make(gbAllocator const &allocator, isize count) {
+	GB_ASSERT(count >= 0);
 	Slice<T> s = {};
 	s.data = gb_alloc_array(allocator, T, count);
+	GB_ASSERT(s.data != nullptr);
 	s.count = count;
 	return s;
 }
 
 template <typename T>
 void slice_init(Slice<T> *s, gbAllocator const &allocator, isize count) {
+	GB_ASSERT(count >= 0);
 	s->data = gb_alloc_array(allocator, T, count);
+	GB_ASSERT(s->data != nullptr);
 	s->count = count;
 }
 
