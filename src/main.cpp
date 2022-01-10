@@ -432,40 +432,39 @@ i32 linker_stage(lbGenerator *gen) {
 		// typically executable files on *NIX systems don't have extensions.
 		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
-		char const *linker;
+
+		// NOTE(dweiler): We use clang as a frontend for the linker as there are
+		// other runtime and compiler support libraries that need to be linked in
+		// very specific orders such as libgcc_s, ld-linux-so, unwind, etc.
+		// These are not always typically inside /lib, /lib64, or /usr versions
+		// of that, e.g libgcc.a is in /usr/lib/gcc/{version}, and can vary on
+		// the distribution of Linux even. The gcc or clang specs is the only
+		// reliable way to query this information to call ld directly.
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
-			// NOTE(tetra, 2020-11-06): __$startup_runtime must be called at DLL load time.
-			// Clang, for some reason, won't let us pass the '-init' flag that lets us do this,
-			// so use ld instead.
-			// :UseLDForShared
-			linker = "ld";
+			// NOTE(dweiler): Let the frontend know we're building a shared library
+			// so it doesn't generate symbols which cannot be relocated.
+			link_settings = gb_string_appendc(link_settings, "-shared ");
+
+			// NOTE(dweiler): __$startup_runtime must be called at initialization
+			// time of the shared object, we can pass -init to the linker by using
+			// a comma separated list of arguments to -Wl.
+			//
+			// This previously used ld but ld cannot actually build a shared library
+			// correctly this way since all the other dependencies provided implicitly
+			// by the compiler frontend are still needed and most of the command
+			// line arguments prepared previously are incompatible with ld.
+			//
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
-				link_settings = gb_string_appendc(link_settings, "-init '___$startup_runtime' ");
-				link_settings = gb_string_appendc(link_settings, "-dylib -dynamic ");
+				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'___$startup_runtime' ");
 			#else
 				output_ext = STR_LIT(".so");
-				link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
-				link_settings = gb_string_appendc(link_settings, "-shared ");
+				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__$startup_runtime' ");
 			#endif
 		} else {
-			#if defined(GB_SYSTEM_OSX)
-				linker = "ld";
-			#else
-				// TODO(zangent): Figure out how to make ld work on Linux.
-				//   It probably has to do with including the entire CRT, but
-				//   that's quite a complicated issue to solve while remaining distro-agnostic.
-				//   Clang can figure out linker flags for us, and that's good enough _for now_.
-				linker = "clang -Wno-unused-command-line-argument";
-			#endif
-		}
-
-		if (build_context.metrics.os == TargetOs_linux) {
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
 		}
-
-
 		if (build_context.out_filepath.len > 0) {
 			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
 			isize pos = string_extension_position(build_context.out_filepath);
@@ -475,7 +474,7 @@ i32 linker_stage(lbGenerator *gen) {
 		}
 
 		result = system_exec_command_line_app("ld-link",
-			"%s %s -o \"%.*s%.*s\" %s "
+			"clang -Wunused-command-line-argument %s -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
 			" %.*s "
@@ -492,7 +491,7 @@ i32 linker_stage(lbGenerator *gen) {
 				// This points the linker to where the entry point is
 				" -e _main "
 			#endif
-			, linker, object_files, LIT(output_base), LIT(output_ext),
+			, object_files, LIT(output_base), LIT(output_ext),
 			#if defined(GB_SYSTEM_OSX)
 			  "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
 			#else
