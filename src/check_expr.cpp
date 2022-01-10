@@ -4021,10 +4021,12 @@ void check_did_you_mean_scope(String const &name, Scope *scope) {
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
 	defer (did_you_mean_destroy(&d));
 
+	mutex_lock(&scope->mutex);
 	for_array(i, scope->elements.entries) {
 		Entity *e = scope->elements.entries[i].value;
 		did_you_mean_append(&d, e->token.string);
 	}
+	mutex_unlock(&scope->mutex);
 	check_did_you_mean_print(&d);
 }
 

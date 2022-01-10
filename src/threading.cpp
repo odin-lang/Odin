@@ -68,6 +68,40 @@ void yield_thread(void);
 void yield_process(void);
 
 
+struct MutexGuard {
+	MutexGuard() = delete;
+	MutexGuard(MutexGuard const &) = delete;
+
+	MutexGuard(BlockingMutex *bm) : bm{bm} {
+		mutex_lock(this->bm);
+	}
+	MutexGuard(RecursiveMutex *rm) : rm{rm} {
+		mutex_lock(this->rm);
+	}
+	MutexGuard(BlockingMutex &bm) : bm{&bm} {
+		mutex_lock(this->bm);
+	}
+	MutexGuard(RecursiveMutex &rm) : rm{&rm} {
+		mutex_lock(this->rm);
+	}
+	~MutexGuard() {
+		if (this->bm) {
+			mutex_unlock(this->bm);
+		} else if (this->rm) {
+			mutex_unlock(this->rm);
+		}
+	}
+
+	operator bool() const { return true; }
+
+	BlockingMutex *bm;
+	RecursiveMutex *rm;
+};
+
+#define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_) = m)
+#define MUTEX_GUARD(m) MutexGuard GB_DEFER_3(_mutex_guard_) = m
+
+
 #if defined(GB_SYSTEM_WINDOWS)
 	struct BlockingMutex {
 		SRWLOCK srwlock;
