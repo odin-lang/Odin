@@ -1238,12 +1238,18 @@ void lb_generate_code(lbGenerator *gen) {
 	// NOTE(bill, 2021-05-04): Target machines must be unique to each module because they are not thread safe
 	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), gen->modules.entries.count);
 
+	// NOTE(dweiler): Dynamic libraries require position-independent code.
+	LLVMRelocMode reloc_mode = LLVMRelocDefault;
+	if (build_context.build_mode == BuildMode_DynamicLibrary) {
+		reloc_mode = LLVMRelocPIC;
+	}
+
 	for_array(i, gen->modules.entries) {
 		target_machines[i] = LLVMCreateTargetMachine(
 			target, target_triple, llvm_cpu,
 			llvm_features,
 			code_gen_level,
-			LLVMRelocDefault,
+			reloc_mode,
 			code_mode);
 		LLVMSetModuleDataLayout(gen->modules.entries[i].value->mod, LLVMCreateTargetDataLayout(target_machines[i]));
 	}
