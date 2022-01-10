@@ -1,5 +1,10 @@
 package linalg
 
+/*
+	These procedures are to allow for swizzling with non-compile (runtime) known components
+*/
+
+
 Scalar_Components :: enum u8 {
 	x = 0,
 	r = 0,

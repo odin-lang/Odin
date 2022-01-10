@@ -1,5 +1,6 @@
 package linalg
 
+import "core:builtin"
 import "core:math"
 
 F16_EPSILON :: 1e-3
@@ -10,25 +11,25 @@ Vector2f16 :: distinct [2]f16
 Vector3f16 :: distinct [3]f16
 Vector4f16 :: distinct [4]f16
 
-Matrix1x1f16 :: distinct [1][1]f16
-Matrix1x2f16 :: distinct [1][2]f16
-Matrix1x3f16 :: distinct [1][3]f16
-Matrix1x4f16 :: distinct [1][4]f16
+Matrix1x1f16 :: distinct matrix[1, 1]f16
+Matrix1x2f16 :: distinct matrix[1, 2]f16
+Matrix1x3f16 :: distinct matrix[1, 3]f16
+Matrix1x4f16 :: distinct matrix[1, 4]f16
 
-Matrix2x1f16 :: distinct [2][1]f16
-Matrix2x2f16 :: distinct [2][2]f16
-Matrix2x3f16 :: distinct [2][3]f16
-Matrix2x4f16 :: distinct [2][4]f16
+Matrix2x1f16 :: distinct matrix[2, 1]f16
+Matrix2x2f16 :: distinct matrix[2, 2]f16
+Matrix2x3f16 :: distinct matrix[2, 3]f16
+Matrix2x4f16 :: distinct matrix[2, 4]f16
 
-Matrix3x1f16 :: distinct [3][1]f16
-Matrix3x2f16 :: distinct [3][2]f16
-Matrix3x3f16 :: distinct [3][3]f16
-Matrix3x4f16 :: distinct [3][4]f16
+Matrix3x1f16 :: distinct matrix[3, 1]f16
+Matrix3x2f16 :: distinct matrix[3, 2]f16
+Matrix3x3f16 :: distinct matrix[3, 3]f16
+Matrix3x4f16 :: distinct matrix[3, 4]f16
 
-Matrix4x1f16 :: distinct [4][1]f16
-Matrix4x2f16 :: distinct [4][2]f16
-Matrix4x3f16 :: distinct [4][3]f16
-Matrix4x4f16 :: distinct [4][4]f16
+Matrix4x1f16 :: distinct matrix[4, 1]f16
+Matrix4x2f16 :: distinct matrix[4, 2]f16
+Matrix4x3f16 :: distinct matrix[4, 3]f16
+Matrix4x4f16 :: distinct matrix[4, 4]f16
 
 Matrix1f16 :: Matrix1x1f16
 Matrix2f16 :: Matrix2x2f16
@@ -39,25 +40,25 @@ Vector2f32 :: distinct [2]f32
 Vector3f32 :: distinct [3]f32
 Vector4f32 :: distinct [4]f32
 
-Matrix1x1f32 :: distinct [1][1]f32
-Matrix1x2f32 :: distinct [1][2]f32
-Matrix1x3f32 :: distinct [1][3]f32
-Matrix1x4f32 :: distinct [1][4]f32
+Matrix1x1f32 :: distinct matrix[1, 1]f32
+Matrix1x2f32 :: distinct matrix[1, 2]f32
+Matrix1x3f32 :: distinct matrix[1, 3]f32
+Matrix1x4f32 :: distinct matrix[1, 4]f32
 
-Matrix2x1f32 :: distinct [2][1]f32
-Matrix2x2f32 :: distinct [2][2]f32
-Matrix2x3f32 :: distinct [2][3]f32
-Matrix2x4f32 :: distinct [2][4]f32
+Matrix2x1f32 :: distinct matrix[2, 1]f32
+Matrix2x2f32 :: distinct matrix[2, 2]f32
+Matrix2x3f32 :: distinct matrix[2, 3]f32
+Matrix2x4f32 :: distinct matrix[2, 4]f32
 
-Matrix3x1f32 :: distinct [3][1]f32
-Matrix3x2f32 :: distinct [3][2]f32
-Matrix3x3f32 :: distinct [3][3]f32
-Matrix3x4f32 :: distinct [3][4]f32
+Matrix3x1f32 :: distinct matrix[3, 1]f32
+Matrix3x2f32 :: distinct matrix[3, 2]f32
+Matrix3x3f32 :: distinct matrix[3, 3]f32
+Matrix3x4f32 :: distinct matrix[3, 4]f32
 
-Matrix4x1f32 :: distinct [4][1]f32
-Matrix4x2f32 :: distinct [4][2]f32
-Matrix4x3f32 :: distinct [4][3]f32
-Matrix4x4f32 :: distinct [4][4]f32
+Matrix4x1f32 :: distinct matrix[4, 1]f32
+Matrix4x2f32 :: distinct matrix[4, 2]f32
+Matrix4x3f32 :: distinct matrix[4, 3]f32
+Matrix4x4f32 :: distinct matrix[4, 4]f32
 
 Matrix1f32 :: Matrix1x1f32
 Matrix2f32 :: Matrix2x2f32
@@ -68,25 +69,25 @@ Vector2f64 :: distinct [2]f64
 Vector3f64 :: distinct [3]f64
 Vector4f64 :: distinct [4]f64
 
-Matrix1x1f64 :: distinct [1][1]f64
-Matrix1x2f64 :: distinct [1][2]f64
-Matrix1x3f64 :: distinct [1][3]f64
-Matrix1x4f64 :: distinct [1][4]f64
+Matrix1x1f64 :: distinct matrix[1, 1]f64
+Matrix1x2f64 :: distinct matrix[1, 2]f64
+Matrix1x3f64 :: distinct matrix[1, 3]f64
+Matrix1x4f64 :: distinct matrix[1, 4]f64
 
-Matrix2x1f64 :: distinct [2][1]f64
-Matrix2x2f64 :: distinct [2][2]f64
-Matrix2x3f64 :: distinct [2][3]f64
-Matrix2x4f64 :: distinct [2][4]f64
+Matrix2x1f64 :: distinct matrix[2, 1]f64
+Matrix2x2f64 :: distinct matrix[2, 2]f64
+Matrix2x3f64 :: distinct matrix[2, 3]f64
+Matrix2x4f64 :: distinct matrix[2, 4]f64
 
-Matrix3x1f64 :: distinct [3][1]f64
-Matrix3x2f64 :: distinct [3][2]f64
-Matrix3x3f64 :: distinct [3][3]f64
-Matrix3x4f64 :: distinct [3][4]f64
+Matrix3x1f64 :: distinct matrix[3, 1]f64
+Matrix3x2f64 :: distinct matrix[3, 2]f64
+Matrix3x3f64 :: distinct matrix[3, 3]f64
+Matrix3x4f64 :: distinct matrix[3, 4]f64
 
-Matrix4x1f64 :: distinct [4][1]f64
-Matrix4x2f64 :: distinct [4][2]f64
-Matrix4x3f64 :: distinct [4][3]f64
-Matrix4x4f64 :: distinct [4][4]f64
+Matrix4x1f64 :: distinct matrix[4, 1]f64
+Matrix4x2f64 :: distinct matrix[4, 2]f64
+Matrix4x3f64 :: distinct matrix[4, 3]f64
+Matrix4x4f64 :: distinct matrix[4, 4]f64
 
 Matrix1f64 :: Matrix1x1f64
 Matrix2f64 :: Matrix2x2f64
@@ -97,20 +98,20 @@ Quaternionf16 :: distinct quaternion64
 Quaternionf32 :: distinct quaternion128
 Quaternionf64 :: distinct quaternion256
 
-MATRIX1F16_IDENTITY :: Matrix1f16{{1}}
-MATRIX2F16_IDENTITY :: Matrix2f16{{1, 0}, {0, 1}}
-MATRIX3F16_IDENTITY :: Matrix3f16{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}
-MATRIX4F16_IDENTITY :: Matrix4f16{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}
+MATRIX1F16_IDENTITY :: Matrix1f16(1)
+MATRIX2F16_IDENTITY :: Matrix2f16(1)
+MATRIX3F16_IDENTITY :: Matrix3f16(1)
+MATRIX4F16_IDENTITY :: Matrix4f16(1)
 
-MATRIX1F32_IDENTITY :: Matrix1f32{{1}}
-MATRIX2F32_IDENTITY :: Matrix2f32{{1, 0}, {0, 1}}
-MATRIX3F32_IDENTITY :: Matrix3f32{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}
-MATRIX4F32_IDENTITY :: Matrix4f32{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}
+MATRIX1F32_IDENTITY :: Matrix1f32(1)
+MATRIX2F32_IDENTITY :: Matrix2f32(1)
+MATRIX3F32_IDENTITY :: Matrix3f32(1)
+MATRIX4F32_IDENTITY :: Matrix4f32(1)
 
-MATRIX1F64_IDENTITY :: Matrix1f64{{1}}
-MATRIX2F64_IDENTITY :: Matrix2f64{{1, 0}, {0, 1}}
-MATRIX3F64_IDENTITY :: Matrix3f64{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}
-MATRIX4F64_IDENTITY :: Matrix4f64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}
+MATRIX1F64_IDENTITY :: Matrix1f64(1)
+MATRIX2F64_IDENTITY :: Matrix2f64(1)
+MATRIX3F64_IDENTITY :: Matrix3f64(1)
+MATRIX4F64_IDENTITY :: Matrix4f64(1)
 
 QUATERNIONF16_IDENTITY :: Quaternionf16(1)
 QUATERNIONF32_IDENTITY :: Quaternionf32(1)
@@ -558,9 +559,9 @@ quaternion_from_forward_and_up_f16 :: proc(forward, up: Vector3f16) -> Quaternio
 	s := normalize(cross(f, up))
 	u := cross(s, f)
 	m := Matrix3f16{
-		{+s.x, +u.x, -f.x},
-		{+s.y, +u.y, -f.y},
-		{+s.z, +u.z, -f.z},
+		+s.x, +s.y, +s.z,
+		+u.x, +u.y, +u.z,
+		-f.x, -f.y, -f.z,
 	}
 
 	tr := trace(m)
@@ -571,26 +572,26 @@ quaternion_from_forward_and_up_f16 :: proc(forward, up: Vector3f16) -> Quaternio
 	case tr > 0:
 		S := 2 * math.sqrt(1 + tr)
 		q.w = 0.25 * S
-		q.x = (m[2][1] - m[1][2]) / S
-		q.y = (m[0][2] - m[2][0]) / S
-		q.z = (m[1][0] - m[0][1]) / S
-	case (m[0][0] > m[1][1]) && (m[0][0] > m[2][2]):
-		S := 2 * math.sqrt(1 + m[0][0] - m[1][1] - m[2][2])
-		q.w = (m[2][1] - m[1][2]) / S
+		q.x = (m[1, 2] - m[2, 1]) / S
+		q.y = (m[2, 0] - m[0, 2]) / S
+		q.z = (m[0, 1] - m[1, 0]) / S
+	case (m[0, 0] > m[1, 1]) && (m[0, 0] > m[2, 2]):
+		S := 2 * math.sqrt(1 + m[0, 0] - m[1, 1] - m[2, 2])
+		q.w = (m[1, 2] - m[2, 1]) / S
 		q.x = 0.25 * S
-		q.y = (m[0][1] + m[1][0]) / S
-		q.z = (m[0][2] + m[2][0]) / S
-	case m[1][1] > m[2][2]:
-		S := 2 * math.sqrt(1 + m[1][1] - m[0][0] - m[2][2])
-		q.w = (m[0][2] - m[2][0]) / S
-		q.x = (m[0][1] + m[1][0]) / S
+		q.y = (m[1, 0] + m[0, 1]) / S
+		q.z = (m[2, 0] + m[0, 2]) / S
+	case m[1, 1] > m[2, 2]:
+		S := 2 * math.sqrt(1 + m[1, 1] - m[0, 0] - m[2, 2])
+		q.w = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[1, 0] + m[0, 1]) / S
 		q.y = 0.25 * S
-		q.z = (m[1][2] + m[2][1]) / S
+		q.z = (m[2, 1] + m[1, 2]) / S
 	case:
-		S := 2 * math.sqrt(1 + m[2][2] - m[0][0] - m[1][1])
-		q.w = (m[1][0] - m[0][1]) / S
-		q.x = (m[0][2] - m[2][0]) / S
-		q.y = (m[1][2] + m[2][1]) / S
+		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
+		q.w = (m[0, 1] - m[1, 0]) / S
+		q.x = (m[2, 0] - m[0, 2]) / S
+		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
 
@@ -601,9 +602,9 @@ quaternion_from_forward_and_up_f32 :: proc(forward, up: Vector3f32) -> Quaternio
 	s := normalize(cross(f, up))
 	u := cross(s, f)
 	m := Matrix3f32{
-		{+s.x, +u.x, -f.x},
-		{+s.y, +u.y, -f.y},
-		{+s.z, +u.z, -f.z},
+		+s.x, +s.y, +s.z,
+		+u.x, +u.y, +u.z,
+		-f.x, -f.y, -f.z,
 	}
 
 	tr := trace(m)
@@ -614,26 +615,26 @@ quaternion_from_forward_and_up_f32 :: proc(forward, up: Vector3f32) -> Quaternio
 	case tr > 0:
 		S := 2 * math.sqrt(1 + tr)
 		q.w = 0.25 * S
-		q.x = (m[2][1] - m[1][2]) / S
-		q.y = (m[0][2] - m[2][0]) / S
-		q.z = (m[1][0] - m[0][1]) / S
-	case (m[0][0] > m[1][1]) && (m[0][0] > m[2][2]):
-		S := 2 * math.sqrt(1 + m[0][0] - m[1][1] - m[2][2])
-		q.w = (m[2][1] - m[1][2]) / S
+		q.x = (m[1, 2] - m[2, 1]) / S
+		q.y = (m[2, 0] - m[0, 2]) / S
+		q.z = (m[0, 1] - m[1, 0]) / S
+	case (m[0, 0] > m[1, 1]) && (m[0, 0] > m[2, 2]):
+		S := 2 * math.sqrt(1 + m[0, 0] - m[1, 1] - m[2, 2])
+		q.w = (m[1, 2] - m[2, 1]) / S
 		q.x = 0.25 * S
-		q.y = (m[0][1] + m[1][0]) / S
-		q.z = (m[0][2] + m[2][0]) / S
-	case m[1][1] > m[2][2]:
-		S := 2 * math.sqrt(1 + m[1][1] - m[0][0] - m[2][2])
-		q.w = (m[0][2] - m[2][0]) / S
-		q.x = (m[0][1] + m[1][0]) / S
+		q.y = (m[1, 0] + m[0, 1]) / S
+		q.z = (m[2, 0] + m[0, 2]) / S
+	case m[1, 1] > m[2, 2]:
+		S := 2 * math.sqrt(1 + m[1, 1] - m[0, 0] - m[2, 2])
+		q.w = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[1, 0] + m[0, 1]) / S
 		q.y = 0.25 * S
-		q.z = (m[1][2] + m[2][1]) / S
+		q.z = (m[2, 1] + m[1, 2]) / S
 	case:
-		S := 2 * math.sqrt(1 + m[2][2] - m[0][0] - m[1][1])
-		q.w = (m[1][0] - m[0][1]) / S
-		q.x = (m[0][2] - m[2][0]) / S
-		q.y = (m[1][2] + m[2][1]) / S
+		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
+		q.w = (m[0, 1] - m[1, 0]) / S
+		q.x = (m[2, 0] - m[0, 2]) / S
+		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
 
@@ -644,9 +645,9 @@ quaternion_from_forward_and_up_f64 :: proc(forward, up: Vector3f64) -> Quaternio
 	s := normalize(cross(f, up))
 	u := cross(s, f)
 	m := Matrix3f64{
-		{+s.x, +u.x, -f.x},
-		{+s.y, +u.y, -f.y},
-		{+s.z, +u.z, -f.z},
+		+s.x, +s.y, +s.z,
+		+u.x, +u.y, +u.z,
+		-f.x, -f.y, -f.z,
 	}
 
 	tr := trace(m)
@@ -657,26 +658,26 @@ quaternion_from_forward_and_up_f64 :: proc(forward, up: Vector3f64) -> Quaternio
 	case tr > 0:
 		S := 2 * math.sqrt(1 + tr)
 		q.w = 0.25 * S
-		q.x = (m[2][1] - m[1][2]) / S
-		q.y = (m[0][2] - m[2][0]) / S
-		q.z = (m[1][0] - m[0][1]) / S
-	case (m[0][0] > m[1][1]) && (m[0][0] > m[2][2]):
-		S := 2 * math.sqrt(1 + m[0][0] - m[1][1] - m[2][2])
-		q.w = (m[2][1] - m[1][2]) / S
+		q.x = (m[1, 2] - m[2, 1]) / S
+		q.y = (m[2, 0] - m[0, 2]) / S
+		q.z = (m[0, 1] - m[1, 0]) / S
+	case (m[0, 0] > m[1, 1]) && (m[0, 0] > m[2, 2]):
+		S := 2 * math.sqrt(1 + m[0, 0] - m[1, 1] - m[2, 2])
+		q.w = (m[1, 2] - m[2, 1]) / S
 		q.x = 0.25 * S
-		q.y = (m[0][1] + m[1][0]) / S
-		q.z = (m[0][2] + m[2][0]) / S
-	case m[1][1] > m[2][2]:
-		S := 2 * math.sqrt(1 + m[1][1] - m[0][0] - m[2][2])
-		q.w = (m[0][2] - m[2][0]) / S
-		q.x = (m[0][1] + m[1][0]) / S
+		q.y = (m[1, 0] + m[0, 1]) / S
+		q.z = (m[2, 0] + m[0, 2]) / S
+	case m[1, 1] > m[2, 2]:
+		S := 2 * math.sqrt(1 + m[1, 1] - m[0, 0] - m[2, 2])
+		q.w = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[1, 0] + m[0, 1]) / S
 		q.y = 0.25 * S
-		q.z = (m[1][2] + m[2][1]) / S
+		q.z = (m[2, 1] + m[1, 2]) / S
 	case:
-		S := 2 * math.sqrt(1 + m[2][2] - m[0][0] - m[1][1])
-		q.w = (m[1][0] - m[0][1]) / S
-		q.x = (m[0][2] - m[2][0]) / S
-		q.y = (m[1][2] + m[2][1]) / S
+		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
+		q.w = (m[0, 1] - m[1, 0]) / S
+		q.x = (m[2, 0] - m[0, 2]) / S
+		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
 
@@ -842,23 +843,23 @@ quaternion_squad :: proc{
 
 quaternion_from_matrix4_f16 :: proc(m: Matrix4f16) -> (q: Quaternionf16) {
 	m3: Matrix3f16 = ---
-	m3[0][0], m3[0][1], m3[0][2] = m[0][0], m[0][1], m[0][2]
-	m3[1][0], m3[1][1], m3[1][2] = m[1][0], m[1][1], m[1][2]
-	m3[2][0], m3[2][1], m3[2][2] = m[2][0], m[2][1], m[2][2]
+	m3[0, 0], m3[1, 0], m3[2, 0] = m[0, 0], m[1, 0], m[2, 0]
+	m3[0, 1], m3[1, 1], m3[2, 1] = m[0, 1], m[1, 1], m[2, 1]
+	m3[0, 2], m3[1, 2], m3[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return quaternion_from_matrix3(m3)
 }
 quaternion_from_matrix4_f32 :: proc(m: Matrix4f32) -> (q: Quaternionf32) {
 	m3: Matrix3f32 = ---
-	m3[0][0], m3[0][1], m3[0][2] = m[0][0], m[0][1], m[0][2]
-	m3[1][0], m3[1][1], m3[1][2] = m[1][0], m[1][1], m[1][2]
-	m3[2][0], m3[2][1], m3[2][2] = m[2][0], m[2][1], m[2][2]
+	m3[0, 0], m3[1, 0], m3[2, 0] = m[0, 0], m[1, 0], m[2, 0]
+	m3[0, 1], m3[1, 1], m3[2, 1] = m[0, 1], m[1, 1], m[2, 1]
+	m3[0, 2], m3[1, 2], m3[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return quaternion_from_matrix3(m3)
 }
 quaternion_from_matrix4_f64 :: proc(m: Matrix4f64) -> (q: Quaternionf64) {
 	m3: Matrix3f64 = ---
-	m3[0][0], m3[0][1], m3[0][2] = m[0][0], m[0][1], m[0][2]
-	m3[1][0], m3[1][1], m3[1][2] = m[1][0], m[1][1], m[1][2]
-	m3[2][0], m3[2][1], m3[2][2] = m[2][0], m[2][1], m[2][2]
+	m3[0, 0], m3[1, 0], m3[2, 0] = m[0, 0], m[1, 0], m[2, 0]
+	m3[0, 1], m3[1, 1], m3[2, 1] = m[0, 1], m[1, 1], m[2, 1]
+	m3[0, 2], m3[1, 2], m3[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return quaternion_from_matrix3(m3)
 }
 quaternion_from_matrix4 :: proc{
@@ -869,10 +870,10 @@ quaternion_from_matrix4 :: proc{
 
 
 quaternion_from_matrix3_f16 :: proc(m: Matrix3f16) -> (q: Quaternionf16) {
-	four_x_squared_minus_1 := m[0][0] - m[1][1] - m[2][2]
-	four_y_squared_minus_1 := m[1][1] - m[0][0] - m[2][2]
-	four_z_squared_minus_1 := m[2][2] - m[0][0] - m[1][1]
-	four_w_squared_minus_1 := m[0][0] + m[1][1] + m[2][2]
+	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
+	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
+	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
+	four_w_squared_minus_1 := m[0, 0] + m[1, 1] + m[2, 2]
 
 	biggest_index := 0
 	four_biggest_squared_minus_1 := four_w_squared_minus_1
@@ -896,32 +897,32 @@ quaternion_from_matrix3_f16 :: proc(m: Matrix3f16) -> (q: Quaternionf16) {
 	switch biggest_index {
 	case 0:
 		q.w = biggest_val
-		q.x = (m[1][2] - m[2][1]) * mult
-		q.y = (m[2][0] - m[0][2]) * mult
-		q.z = (m[0][1] - m[1][0]) * mult
+		q.x = (m[2, 1] - m[1, 2]) * mult
+		q.y = (m[0, 2] - m[2, 0]) * mult
+		q.z = (m[1, 0] - m[0, 1]) * mult
 	case 1:
-		q.w = (m[1][2] - m[2][1]) * mult
+		q.w = (m[2, 1] - m[1, 2]) * mult
 		q.x = biggest_val
-		q.y = (m[0][1] + m[1][0]) * mult
-		q.z = (m[2][0] + m[0][2]) * mult
+		q.y = (m[1, 0] + m[0, 1]) * mult
+		q.z = (m[0, 2] + m[2, 0]) * mult
 	case 2:
-		q.w = (m[2][0] - m[0][2]) * mult
-		q.x = (m[0][1] + m[1][0]) * mult
+		q.w = (m[0, 2] - m[2, 0]) * mult
+		q.x = (m[1, 0] + m[0, 1]) * mult
 		q.y = biggest_val
-		q.z = (m[1][2] + m[2][1]) * mult
+		q.z = (m[2, 1] + m[1, 2]) * mult
 	case 3:
-		q.w = (m[0][1] - m[1][0]) * mult
-		q.x = (m[2][0] + m[0][2]) * mult
-		q.y = (m[1][2] + m[2][1]) * mult
+		q.w = (m[1, 0] - m[0, 1]) * mult
+		q.x = (m[0, 2] + m[2, 0]) * mult
+		q.y = (m[2, 1] + m[1, 2]) * mult
 		q.z = biggest_val
 	}
 	return
 }
 quaternion_from_matrix3_f32 :: proc(m: Matrix3f32) -> (q: Quaternionf32) {
-	four_x_squared_minus_1 := m[0][0] - m[1][1] - m[2][2]
-	four_y_squared_minus_1 := m[1][1] - m[0][0] - m[2][2]
-	four_z_squared_minus_1 := m[2][2] - m[0][0] - m[1][1]
-	four_w_squared_minus_1 := m[0][0] + m[1][1] + m[2][2]
+	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
+	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
+	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
+	four_w_squared_minus_1 := m[0, 0] + m[1, 1] + m[2, 2]
 
 	biggest_index := 0
 	four_biggest_squared_minus_1 := four_w_squared_minus_1
@@ -945,32 +946,32 @@ quaternion_from_matrix3_f32 :: proc(m: Matrix3f32) -> (q: Quaternionf32) {
 	switch biggest_index {
 	case 0:
 		q.w = biggest_val
-		q.x = (m[1][2] - m[2][1]) * mult
-		q.y = (m[2][0] - m[0][2]) * mult
-		q.z = (m[0][1] - m[1][0]) * mult
+		q.x = (m[2, 1] - m[1, 2]) * mult
+		q.y = (m[0, 2] - m[2, 0]) * mult
+		q.z = (m[1, 0] - m[0, 1]) * mult
 	case 1:
-		q.w = (m[1][2] - m[2][1]) * mult
+		q.w = (m[2, 1] - m[1, 2]) * mult
 		q.x = biggest_val
-		q.y = (m[0][1] + m[1][0]) * mult
-		q.z = (m[2][0] + m[0][2]) * mult
+		q.y = (m[1, 0] + m[0, 1]) * mult
+		q.z = (m[0, 2] + m[2, 0]) * mult
 	case 2:
-		q.w = (m[2][0] - m[0][2]) * mult
-		q.x = (m[0][1] + m[1][0]) * mult
+		q.w = (m[0, 2] - m[2, 0]) * mult
+		q.x = (m[1, 0] + m[0, 1]) * mult
 		q.y = biggest_val
-		q.z = (m[1][2] + m[2][1]) * mult
+		q.z = (m[2, 1] + m[1, 2]) * mult
 	case 3:
-		q.w = (m[0][1] - m[1][0]) * mult
-		q.x = (m[2][0] + m[0][2]) * mult
-		q.y = (m[1][2] + m[2][1]) * mult
+		q.w = (m[1, 0] - m[0, 1]) * mult
+		q.x = (m[0, 2] + m[2, 0]) * mult
+		q.y = (m[2, 1] + m[1, 2]) * mult
 		q.z = biggest_val
 	}
 	return
 }
 quaternion_from_matrix3_f64 :: proc(m: Matrix3f64) -> (q: Quaternionf64) {
-	four_x_squared_minus_1 := m[0][0] - m[1][1] - m[2][2]
-	four_y_squared_minus_1 := m[1][1] - m[0][0] - m[2][2]
-	four_z_squared_minus_1 := m[2][2] - m[0][0] - m[1][1]
-	four_w_squared_minus_1 := m[0][0] + m[1][1] + m[2][2]
+	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
+	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
+	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
+	four_w_squared_minus_1 := m[0, 0] + m[1, 1] + m[2, 2]
 
 	biggest_index := 0
 	four_biggest_squared_minus_1 := four_w_squared_minus_1
@@ -994,23 +995,23 @@ quaternion_from_matrix3_f64 :: proc(m: Matrix3f64) -> (q: Quaternionf64) {
 	switch biggest_index {
 	case 0:
 		q.w = biggest_val
-		q.x = (m[1][2] - m[2][1]) * mult
-		q.y = (m[2][0] - m[0][2]) * mult
-		q.z = (m[0][1] - m[1][0]) * mult
+		q.x = (m[2, 1] - m[1, 2]) * mult
+		q.y = (m[0, 2] - m[2, 0]) * mult
+		q.z = (m[1, 0] - m[0, 1]) * mult
 	case 1:
-		q.w = (m[1][2] - m[2][1]) * mult
+		q.w = (m[2, 1] - m[1, 2]) * mult
 		q.x = biggest_val
-		q.y = (m[0][1] + m[1][0]) * mult
-		q.z = (m[2][0] + m[0][2]) * mult
+		q.y = (m[1, 0] + m[0, 1]) * mult
+		q.z = (m[0, 2] + m[2, 0]) * mult
 	case 2:
-		q.w = (m[2][0] - m[0][2]) * mult
-		q.x = (m[0][1] + m[1][0]) * mult
+		q.w = (m[0, 2] - m[2, 0]) * mult
+		q.x = (m[1, 0] + m[0, 1]) * mult
 		q.y = biggest_val
-		q.z = (m[1][2] + m[2][1]) * mult
+		q.z = (m[2, 1] + m[1, 2]) * mult
 	case 3:
-		q.w = (m[0][1] - m[1][0]) * mult
-		q.x = (m[2][0] + m[0][2]) * mult
-		q.y = (m[1][2] + m[2][1]) * mult
+		q.w = (m[1, 0] - m[0, 1]) * mult
+		q.x = (m[0, 2] + m[2, 0]) * mult
+		q.y = (m[2, 1] + m[1, 2]) * mult
 		q.z = biggest_val
 	}
 	return
@@ -1093,30 +1094,30 @@ quaternion_between_two_vector3 :: proc{
 
 
 matrix2_inverse_transpose_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
-	d := m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
-	c[0][0] = +m[1][1] * id
-	c[0][1] = -m[0][1] * id
-	c[1][0] = -m[1][0] * id
-	c[1][1] = +m[0][0] * id
+	c[0, 0] = +m[1, 1] * id
+	c[1, 0] = -m[1, 0] * id
+	c[0, 1] = -m[0, 1] * id
+	c[1, 1] = +m[0, 0] * id
 	return c
 }
 matrix2_inverse_transpose_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
-	d := m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
-	c[0][0] = +m[1][1] * id
-	c[0][1] = -m[0][1] * id
-	c[1][0] = -m[1][0] * id
-	c[1][1] = +m[0][0] * id
+	c[0, 0] = +m[1, 1] * id
+	c[1, 0] = -m[1, 0] * id
+	c[0, 1] = -m[0, 1] * id
+	c[1, 1] = +m[0, 0] * id
 	return c
 }
 matrix2_inverse_transpose_f64 :: proc(m: Matrix2f64) -> (c: Matrix2f64) {
-	d := m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
-	c[0][0] = +m[1][1] * id
-	c[0][1] = -m[0][1] * id
-	c[1][0] = -m[1][0] * id
-	c[1][1] = +m[0][0] * id
+	c[0, 0] = +m[1, 1] * id
+	c[1, 0] = -m[1, 0] * id
+	c[0, 1] = -m[0, 1] * id
+	c[1, 1] = +m[0, 0] * id
 	return c
 }
 matrix2_inverse_transpose :: proc{
@@ -1127,13 +1128,13 @@ matrix2_inverse_transpose :: proc{
 
 
 matrix2_determinant_f16 :: proc(m: Matrix2f16) -> f16 {
-	return m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
 matrix2_determinant_f32 :: proc(m: Matrix2f32) -> f32 {
-	return m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
 matrix2_determinant_f64 :: proc(m: Matrix2f64) -> f64 {
-	return m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
 matrix2_determinant :: proc{
 	matrix2_determinant_f16,
@@ -1143,30 +1144,30 @@ matrix2_determinant :: proc{
 
 
 matrix2_inverse_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
-	d := m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
-	c[0][0] = +m[1][1] * id
-	c[1][0] = -m[0][1] * id
-	c[0][1] = -m[1][0] * id
-	c[1][1] = +m[0][0] * id
+	c[0, 0] = +m[1, 1] * id
+	c[0, 1] = -m[1, 0] * id
+	c[1, 0] = -m[0, 1] * id
+	c[1, 1] = +m[0, 0] * id
 	return c
 }
 matrix2_inverse_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
-	d := m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
-	c[0][0] = +m[1][1] * id
-	c[1][0] = -m[0][1] * id
-	c[0][1] = -m[1][0] * id
-	c[1][1] = +m[0][0] * id
+	c[0, 0] = +m[1, 1] * id
+	c[0, 1] = -m[1, 0] * id
+	c[1, 0] = -m[0, 1] * id
+	c[1, 1] = +m[0, 0] * id
 	return c
 }
 matrix2_inverse_f64 :: proc(m: Matrix2f64) -> (c: Matrix2f64) {
-	d := m[0][0]*m[1][1] - m[1][0]*m[0][1]
+	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
-	c[0][0] = +m[1][1] * id
-	c[1][0] = -m[0][1] * id
-	c[0][1] = -m[1][0] * id
-	c[1][1] = +m[0][0] * id
+	c[0, 0] = +m[1, 1] * id
+	c[0, 1] = -m[1, 0] * id
+	c[1, 0] = -m[0, 1] * id
+	c[1, 1] = +m[0, 0] * id
 	return c
 }
 matrix2_inverse :: proc{
@@ -1177,24 +1178,24 @@ matrix2_inverse :: proc{
 
 
 matrix2_adjoint_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
-	c[0][0] = +m[1][1]
-	c[0][1] = -m[1][0]
-	c[1][0] = -m[0][1]
-	c[1][1] = +m[0][0]
+	c[0, 0] = +m[1, 1]
+	c[1, 0] = -m[0, 1]
+	c[0, 1] = -m[1, 0]
+	c[1, 1] = +m[0, 0]
 	return c
 }
 matrix2_adjoint_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
-	c[0][0] = +m[1][1]
-	c[0][1] = -m[1][0]
-	c[1][0] = -m[0][1]
-	c[1][1] = +m[0][0]
+	c[0, 0] = +m[1, 1]
+	c[1, 0] = -m[0, 1]
+	c[0, 1] = -m[1, 0]
+	c[1, 1] = +m[0, 0]
 	return c
 }
 matrix2_adjoint_f64 :: proc(m: Matrix2f64) -> (c: Matrix2f64) {
-	c[0][0] = +m[1][1]
-	c[0][1] = -m[1][0]
-	c[1][0] = -m[0][1]
-	c[1][1] = +m[0][0]
+	c[0, 0] = +m[1, 1]
+	c[1, 0] = -m[0, 1]
+	c[0, 1] = -m[1, 0]
+	c[1, 1] = +m[0, 0]
 	return c
 }
 matrix2_adjoint :: proc{
@@ -1215,17 +1216,17 @@ matrix3_from_quaternion_f16 :: proc(q: Quaternionf16) -> (m: Matrix3f16) {
 	qwy := q.w * q.y
 	qwz := q.w * q.z
 
-	m[0][0] = 1 - 2 * (qyy + qzz)
-	m[0][1] = 2 * (qxy + qwz)
-	m[0][2] = 2 * (qxz - qwy)
+	m[0, 0] = 1 - 2 * (qyy + qzz)
+	m[1, 0] = 2 * (qxy + qwz)
+	m[2, 0] = 2 * (qxz - qwy)
 
-	m[1][0] = 2 * (qxy - qwz)
-	m[1][1] = 1 - 2 * (qxx + qzz)
-	m[1][2] = 2 * (qyz + qwx)
+	m[0, 1] = 2 * (qxy - qwz)
+	m[1, 1] = 1 - 2 * (qxx + qzz)
+	m[2, 1] = 2 * (qyz + qwx)
 
-	m[2][0] = 2 * (qxz + qwy)
-	m[2][1] = 2 * (qyz - qwx)
-	m[2][2] = 1 - 2 * (qxx + qyy)
+	m[0, 2] = 2 * (qxz + qwy)
+	m[1, 2] = 2 * (qyz - qwx)
+	m[2, 2] = 1 - 2 * (qxx + qyy)
 	return m
 }
 matrix3_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix3f32) {
@@ -1239,17 +1240,17 @@ matrix3_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix3f32) {
 	qwy := q.w * q.y
 	qwz := q.w * q.z
 
-	m[0][0] = 1 - 2 * (qyy + qzz)
-	m[0][1] = 2 * (qxy + qwz)
-	m[0][2] = 2 * (qxz - qwy)
+	m[0, 0] = 1 - 2 * (qyy + qzz)
+	m[1, 0] = 2 * (qxy + qwz)
+	m[2, 0] = 2 * (qxz - qwy)
 
-	m[1][0] = 2 * (qxy - qwz)
-	m[1][1] = 1 - 2 * (qxx + qzz)
-	m[1][2] = 2 * (qyz + qwx)
+	m[0, 1] = 2 * (qxy - qwz)
+	m[1, 1] = 1 - 2 * (qxx + qzz)
+	m[2, 1] = 2 * (qyz + qwx)
 
-	m[2][0] = 2 * (qxz + qwy)
-	m[2][1] = 2 * (qyz - qwx)
-	m[2][2] = 1 - 2 * (qxx + qyy)
+	m[0, 2] = 2 * (qxz + qwy)
+	m[1, 2] = 2 * (qyz - qwx)
+	m[2, 2] = 1 - 2 * (qxx + qyy)
 	return m
 }
 matrix3_from_quaternion_f64 :: proc(q: Quaternionf64) -> (m: Matrix3f64) {
@@ -1263,17 +1264,17 @@ matrix3_from_quaternion_f64 :: proc(q: Quaternionf64) -> (m: Matrix3f64) {
 	qwy := q.w * q.y
 	qwz := q.w * q.z
 
-	m[0][0] = 1 - 2 * (qyy + qzz)
-	m[0][1] = 2 * (qxy + qwz)
-	m[0][2] = 2 * (qxz - qwy)
+	m[0, 0] = 1 - 2 * (qyy + qzz)
+	m[1, 0] = 2 * (qxy + qwz)
+	m[2, 0] = 2 * (qxz - qwy)
 
-	m[1][0] = 2 * (qxy - qwz)
-	m[1][1] = 1 - 2 * (qxx + qzz)
-	m[1][2] = 2 * (qyz + qwx)
+	m[0, 1] = 2 * (qxy - qwz)
+	m[1, 1] = 1 - 2 * (qxx + qzz)
+	m[2, 1] = 2 * (qyz + qwx)
 
-	m[2][0] = 2 * (qxz + qwy)
-	m[2][1] = 2 * (qyz - qwx)
-	m[2][2] = 1 - 2 * (qxx + qyy)
+	m[0, 2] = 2 * (qxz + qwy)
+	m[1, 2] = 2 * (qyz - qwx)
+	m[2, 2] = 1 - 2 * (qxx + qyy)
 	return m
 }
 matrix3_from_quaternion :: proc{
@@ -1300,21 +1301,21 @@ matrix3_inverse :: proc{
 
 
 matrix3_determinant_f16 :: proc(m: Matrix3f16) -> f16 {
-	a := +m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2])
-	b := -m[1][0] * (m[0][1] * m[2][2] - m[2][1] * m[0][2])
-	c := +m[2][0] * (m[0][1] * m[1][2] - m[1][1] * m[0][2])
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
 matrix3_determinant_f32 :: proc(m: Matrix3f32) -> f32 {
-	a := +m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2])
-	b := -m[1][0] * (m[0][1] * m[2][2] - m[2][1] * m[0][2])
-	c := +m[2][0] * (m[0][1] * m[1][2] - m[1][1] * m[0][2])
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
 matrix3_determinant_f64 :: proc(m: Matrix3f64) -> f64 {
-	a := +m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2])
-	b := -m[1][0] * (m[0][1] * m[2][2] - m[2][1] * m[0][2])
-	c := +m[2][0] * (m[0][1] * m[1][2] - m[1][1] * m[0][2])
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
 matrix3_determinant :: proc{
@@ -1325,39 +1326,39 @@ matrix3_determinant :: proc{
 
 
 matrix3_adjoint_f16 :: proc(m: Matrix3f16) -> (adjoint: Matrix3f16) {
-	adjoint[0][0] = +(m[1][1] * m[2][2] - m[1][2] * m[2][1])
-	adjoint[1][0] = -(m[0][1] * m[2][2] - m[0][2] * m[2][1])
-	adjoint[2][0] = +(m[0][1] * m[1][2] - m[0][2] * m[1][1])
-	adjoint[0][1] = -(m[1][0] * m[2][2] - m[1][2] * m[2][0])
-	adjoint[1][1] = +(m[0][0] * m[2][2] - m[0][2] * m[2][0])
-	adjoint[2][1] = -(m[0][0] * m[1][2] - m[0][2] * m[1][0])
-	adjoint[0][2] = +(m[1][0] * m[2][1] - m[1][1] * m[2][0])
-	adjoint[1][2] = -(m[0][0] * m[2][1] - m[0][1] * m[2][0])
-	adjoint[2][2] = +(m[0][0] * m[1][1] - m[0][1] * m[1][0])
+	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	adjoint[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	adjoint[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	adjoint[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	adjoint[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
 matrix3_adjoint_f32 :: proc(m: Matrix3f32) -> (adjoint: Matrix3f32) {
-	adjoint[0][0] = +(m[1][1] * m[2][2] - m[1][2] * m[2][1])
-	adjoint[1][0] = -(m[0][1] * m[2][2] - m[0][2] * m[2][1])
-	adjoint[2][0] = +(m[0][1] * m[1][2] - m[0][2] * m[1][1])
-	adjoint[0][1] = -(m[1][0] * m[2][2] - m[1][2] * m[2][0])
-	adjoint[1][1] = +(m[0][0] * m[2][2] - m[0][2] * m[2][0])
-	adjoint[2][1] = -(m[0][0] * m[1][2] - m[0][2] * m[1][0])
-	adjoint[0][2] = +(m[1][0] * m[2][1] - m[1][1] * m[2][0])
-	adjoint[1][2] = -(m[0][0] * m[2][1] - m[0][1] * m[2][0])
-	adjoint[2][2] = +(m[0][0] * m[1][1] - m[0][1] * m[1][0])
+	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	adjoint[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	adjoint[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	adjoint[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	adjoint[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
 matrix3_adjoint_f64 :: proc(m: Matrix3f64) -> (adjoint: Matrix3f64) {
-	adjoint[0][0] = +(m[1][1] * m[2][2] - m[1][2] * m[2][1])
-	adjoint[1][0] = -(m[0][1] * m[2][2] - m[0][2] * m[2][1])
-	adjoint[2][0] = +(m[0][1] * m[1][2] - m[0][2] * m[1][1])
-	adjoint[0][1] = -(m[1][0] * m[2][2] - m[1][2] * m[2][0])
-	adjoint[1][1] = +(m[0][0] * m[2][2] - m[0][2] * m[2][0])
-	adjoint[2][1] = -(m[0][0] * m[1][2] - m[0][2] * m[1][0])
-	adjoint[0][2] = +(m[1][0] * m[2][1] - m[1][1] * m[2][0])
-	adjoint[1][2] = -(m[0][0] * m[2][1] - m[0][1] * m[2][0])
-	adjoint[2][2] = +(m[0][0] * m[1][1] - m[0][1] * m[1][0])
+	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	adjoint[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	adjoint[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	adjoint[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	adjoint[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
 matrix3_adjoint :: proc{
@@ -1369,37 +1370,13 @@ matrix3_adjoint :: proc{
 
 
 matrix3_inverse_transpose_f16 :: proc(m: Matrix3f16) -> (inverse_transpose: Matrix3f16) {
-	adjoint := matrix3_adjoint(m)
-	determinant := matrix3_determinant(m)
-	inv_determinant := 1.0 / determinant
-	for i in 0..<3 {
-		for j in 0..<3 {
-			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
-		}
-	}
-	return
+	return builtin.inverse_transpose(m)
 }
 matrix3_inverse_transpose_f32 :: proc(m: Matrix3f32) -> (inverse_transpose: Matrix3f32) {
-	adjoint := matrix3_adjoint(m)
-	determinant := matrix3_determinant(m)
-	inv_determinant := 1.0 / determinant
-	for i in 0..<3 {
-		for j in 0..<3 {
-			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
-		}
-	}
-	return
+	return builtin.inverse_transpose(m)
 }
 matrix3_inverse_transpose_f64 :: proc(m: Matrix3f64) -> (inverse_transpose: Matrix3f64) {
-	adjoint := matrix3_adjoint(m)
-	determinant := matrix3_determinant(m)
-	inv_determinant := 1.0 / determinant
-	for i in 0..<3 {
-		for j in 0..<3 {
-			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
-		}
-	}
-	return
+	return builtin.inverse_transpose(m)
 }
 matrix3_inverse_transpose :: proc{
 	matrix3_inverse_transpose_f16,
@@ -1409,21 +1386,21 @@ matrix3_inverse_transpose :: proc{
 
 
 matrix3_scale_f16 :: proc(s: Vector3f16) -> (m: Matrix3f16) {
-	m[0][0] = s[0]
-	m[1][1] = s[1]
-	m[2][2] = s[2]
+	m[0, 0] = s[0]
+	m[1, 1] = s[1]
+	m[2, 2] = s[2]
 	return m
 }
 matrix3_scale_f32 :: proc(s: Vector3f32) -> (m: Matrix3f32) {
-	m[0][0] = s[0]
-	m[1][1] = s[1]
-	m[2][2] = s[2]
+	m[0, 0] = s[0]
+	m[1, 1] = s[1]
+	m[2, 2] = s[2]
 	return m
 }
 matrix3_scale_f64 :: proc(s: Vector3f64) -> (m: Matrix3f64) {
-	m[0][0] = s[0]
-	m[1][1] = s[1]
-	m[2][2] = s[2]
+	m[0, 0] = s[0]
+	m[1, 1] = s[1]
+	m[2, 2] = s[2]
 	return m
 }
 matrix3_scale :: proc{
@@ -1440,17 +1417,17 @@ matrix3_rotate_f16 :: proc(angle_radians: f16, v: Vector3f16) -> (rot: Matrix3f1
 	a := normalize(v)
 	t := a * (1-c)
 
-	rot[0][0] = c + t[0]*a[0]
-	rot[0][1] = 0 + t[0]*a[1] + s*a[2]
-	rot[0][2] = 0 + t[0]*a[2] - s*a[1]
+	rot[0, 0] = c + t[0]*a[0]
+	rot[1, 0] = 0 + t[0]*a[1] + s*a[2]
+	rot[2, 0] = 0 + t[0]*a[2] - s*a[1]
 
-	rot[1][0] = 0 + t[1]*a[0] - s*a[2]
-	rot[1][1] = c + t[1]*a[1]
-	rot[1][2] = 0 + t[1]*a[2] + s*a[0]
+	rot[0, 1] = 0 + t[1]*a[0] - s*a[2]
+	rot[1, 1] = c + t[1]*a[1]
+	rot[2, 1] = 0 + t[1]*a[2] + s*a[0]
 
-	rot[2][0] = 0 + t[2]*a[0] + s*a[1]
-	rot[2][1] = 0 + t[2]*a[1] - s*a[0]
-	rot[2][2] = c + t[2]*a[2]
+	rot[0, 2] = 0 + t[2]*a[0] + s*a[1]
+	rot[1, 2] = 0 + t[2]*a[1] - s*a[0]
+	rot[2, 2] = c + t[2]*a[2]
 
 	return rot
 }
@@ -1461,17 +1438,17 @@ matrix3_rotate_f32 :: proc(angle_radians: f32, v: Vector3f32) -> (rot: Matrix3f3
 	a := normalize(v)
 	t := a * (1-c)
 
-	rot[0][0] = c + t[0]*a[0]
-	rot[0][1] = 0 + t[0]*a[1] + s*a[2]
-	rot[0][2] = 0 + t[0]*a[2] - s*a[1]
+	rot[0, 0] = c + t[0]*a[0]
+	rot[1, 0] = 0 + t[0]*a[1] + s*a[2]
+	rot[2, 0] = 0 + t[0]*a[2] - s*a[1]
 
-	rot[1][0] = 0 + t[1]*a[0] - s*a[2]
-	rot[1][1] = c + t[1]*a[1]
-	rot[1][2] = 0 + t[1]*a[2] + s*a[0]
+	rot[0, 1] = 0 + t[1]*a[0] - s*a[2]
+	rot[1, 1] = c + t[1]*a[1]
+	rot[2, 1] = 0 + t[1]*a[2] + s*a[0]
 
-	rot[2][0] = 0 + t[2]*a[0] + s*a[1]
-	rot[2][1] = 0 + t[2]*a[1] - s*a[0]
-	rot[2][2] = c + t[2]*a[2]
+	rot[0, 2] = 0 + t[2]*a[0] + s*a[1]
+	rot[1, 2] = 0 + t[2]*a[1] - s*a[0]
+	rot[2, 2] = c + t[2]*a[2]
 
 	return rot
 }
@@ -1482,17 +1459,17 @@ matrix3_rotate_f64 :: proc(angle_radians: f64, v: Vector3f64) -> (rot: Matrix3f6
 	a := normalize(v)
 	t := a * (1-c)
 
-	rot[0][0] = c + t[0]*a[0]
-	rot[0][1] = 0 + t[0]*a[1] + s*a[2]
-	rot[0][2] = 0 + t[0]*a[2] - s*a[1]
+	rot[0, 0] = c + t[0]*a[0]
+	rot[1, 0] = 0 + t[0]*a[1] + s*a[2]
+	rot[2, 0] = 0 + t[0]*a[2] - s*a[1]
 
-	rot[1][0] = 0 + t[1]*a[0] - s*a[2]
-	rot[1][1] = c + t[1]*a[1]
-	rot[1][2] = 0 + t[1]*a[2] + s*a[0]
+	rot[0, 1] = 0 + t[1]*a[0] - s*a[2]
+	rot[1, 1] = c + t[1]*a[1]
+	rot[2, 1] = 0 + t[1]*a[2] + s*a[0]
 
-	rot[2][0] = 0 + t[2]*a[0] + s*a[1]
-	rot[2][1] = 0 + t[2]*a[1] - s*a[0]
-	rot[2][2] = c + t[2]*a[2]
+	rot[0, 2] = 0 + t[2]*a[0] + s*a[1]
+	rot[1, 2] = 0 + t[2]*a[1] - s*a[0]
+	rot[2, 2] = c + t[2]*a[2]
 
 	return rot
 }
@@ -1508,9 +1485,9 @@ matrix3_look_at_f16 :: proc(eye, centre, up: Vector3f16) -> Matrix3f16 {
 	s := normalize(cross(f, up))
 	u := cross(s, f)
 	return Matrix3f16{
-		{+s.x, +u.x, -f.x},
-		{+s.y, +u.y, -f.y},
-		{+s.z, +u.z, -f.z},
+		+s.x, +s.y, +s.z,
+		+u.x, +u.y, +u.z,
+		-f.x, -f.y, -f.z,
 	}
 }
 matrix3_look_at_f32 :: proc(eye, centre, up: Vector3f32) -> Matrix3f32 {
@@ -1518,9 +1495,9 @@ matrix3_look_at_f32 :: proc(eye, centre, up: Vector3f32) -> Matrix3f32 {
 	s := normalize(cross(f, up))
 	u := cross(s, f)
 	return Matrix3f32{
-		{+s.x, +u.x, -f.x},
-		{+s.y, +u.y, -f.y},
-		{+s.z, +u.z, -f.z},
+		+s.x, +s.y, +s.z,
+		+u.x, +u.y, +u.z,
+		-f.x, -f.y, -f.z,
 	}
 }
 matrix3_look_at_f64 :: proc(eye, centre, up: Vector3f64) -> Matrix3f64 {
@@ -1528,9 +1505,9 @@ matrix3_look_at_f64 :: proc(eye, centre, up: Vector3f64) -> Matrix3f64 {
 	s := normalize(cross(f, up))
 	u := cross(s, f)
 	return Matrix3f64{
-		{+s.x, +u.x, -f.x},
-		{+s.y, +u.y, -f.y},
-		{+s.z, +u.z, -f.z},
+		+s.x, +s.y, +s.z,
+		+u.x, +u.y, +u.z,
+		-f.x, -f.y, -f.z,
 	}
 }
 matrix3_look_at :: proc{
@@ -1551,19 +1528,19 @@ matrix4_from_quaternion_f16 :: proc(q: Quaternionf16) -> (m: Matrix4f16) {
 	qwy := q.w * q.y
 	qwz := q.w * q.z
 
-	m[0][0] = 1 - 2 * (qyy + qzz)
-	m[0][1] = 2 * (qxy + qwz)
-	m[0][2] = 2 * (qxz - qwy)
+	m[0, 0] = 1 - 2 * (qyy + qzz)
+	m[1, 0] = 2 * (qxy + qwz)
+	m[2, 0] = 2 * (qxz - qwy)
 
-	m[1][0] = 2 * (qxy - qwz)
-	m[1][1] = 1 - 2 * (qxx + qzz)
-	m[1][2] = 2 * (qyz + qwx)
+	m[0, 1] = 2 * (qxy - qwz)
+	m[1, 1] = 1 - 2 * (qxx + qzz)
+	m[2, 1] = 2 * (qyz + qwx)
 
-	m[2][0] = 2 * (qxz + qwy)
-	m[2][1] = 2 * (qyz - qwx)
-	m[2][2] = 1 - 2 * (qxx + qyy)
+	m[0, 2] = 2 * (qxz + qwy)
+	m[1, 2] = 2 * (qyz - qwx)
+	m[2, 2] = 1 - 2 * (qxx + qyy)
 
-	m[3][3] = 1
+	m[3, 3] = 1
 
 	return m
 }
@@ -1578,19 +1555,19 @@ matrix4_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix4f32) {
 	qwy := q.w * q.y
 	qwz := q.w * q.z
 
-	m[0][0] = 1 - 2 * (qyy + qzz)
-	m[0][1] = 2 * (qxy + qwz)
-	m[0][2] = 2 * (qxz - qwy)
+	m[0, 0] = 1 - 2 * (qyy + qzz)
+	m[1, 0] = 2 * (qxy + qwz)
+	m[2, 0] = 2 * (qxz - qwy)
 
-	m[1][0] = 2 * (qxy - qwz)
-	m[1][1] = 1 - 2 * (qxx + qzz)
-	m[1][2] = 2 * (qyz + qwx)
+	m[0, 1] = 2 * (qxy - qwz)
+	m[1, 1] = 1 - 2 * (qxx + qzz)
+	m[2, 1] = 2 * (qyz + qwx)
 
-	m[2][0] = 2 * (qxz + qwy)
-	m[2][1] = 2 * (qyz - qwx)
-	m[2][2] = 1 - 2 * (qxx + qyy)
+	m[0, 2] = 2 * (qxz + qwy)
+	m[1, 2] = 2 * (qyz - qwx)
+	m[2, 2] = 1 - 2 * (qxx + qyy)
 
-	m[3][3] = 1
+	m[3, 3] = 1
 
 	return m
 }
@@ -1605,19 +1582,19 @@ matrix4_from_quaternion_f64 :: proc(q: Quaternionf64) -> (m: Matrix4f64) {
 	qwy := q.w * q.y
 	qwz := q.w * q.z
 
-	m[0][0] = 1 - 2 * (qyy + qzz)
-	m[0][1] = 2 * (qxy + qwz)
-	m[0][2] = 2 * (qxz - qwy)
+	m[0, 0] = 1 - 2 * (qyy + qzz)
+	m[1, 0] = 2 * (qxy + qwz)
+	m[2, 0] = 2 * (qxz - qwy)
 
-	m[1][0] = 2 * (qxy - qwz)
-	m[1][1] = 1 - 2 * (qxx + qzz)
-	m[1][2] = 2 * (qyz + qwx)
+	m[0, 1] = 2 * (qxy - qwz)
+	m[1, 1] = 1 - 2 * (qxx + qzz)
+	m[2, 1] = 2 * (qyz + qwx)
 
-	m[2][0] = 2 * (qxz + qwy)
-	m[2][1] = 2 * (qyz - qwx)
-	m[2][2] = 1 - 2 * (qxx + qyy)
+	m[0, 2] = 2 * (qxz + qwy)
+	m[1, 2] = 2 * (qyz - qwx)
+	m[2, 2] = 1 - 2 * (qxx + qyy)
 
-	m[3][3] = 1
+	m[3, 3] = 1
 
 	return m
 }
@@ -1992,10 +1969,10 @@ matrix4_look_at_f16 :: proc(eye, centre, up: Vector3f16, flip_z_axis := true) ->
 	fe := dot(f, eye)
 
 	return {
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+		+s.x, +s.y, +s.z, -dot(s, eye),
+		+u.x, +u.y, +u.z, -dot(u, eye),
+		-f.x, -f.y, -f.z, +fe if flip_z_axis else -fe,
+		   0,    0,    0, 1,
 	}
 }
 matrix4_look_at_f32 :: proc(eye, centre, up: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
@@ -2006,10 +1983,10 @@ matrix4_look_at_f32 :: proc(eye, centre, up: Vector3f32, flip_z_axis := true) ->
 	fe := dot(f, eye)
 
 	return {
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+		+s.x, +s.y, +s.z, -dot(s, eye),
+		+u.x, +u.y, +u.z, -dot(u, eye),
+		-f.x, -f.y, -f.z, +fe if flip_z_axis else -fe,
+		   0,    0,    0, 1,
 	}
 }
 matrix4_look_at_f64 :: proc(eye, centre, up: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
@@ -2020,10 +1997,10 @@ matrix4_look_at_f64 :: proc(eye, centre, up: Vector3f64, flip_z_axis := true) ->
 	fe := dot(f, eye)
 
 	return {
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+		+s.x, +s.y, +s.z, -dot(s, eye),
+		+u.x, +u.y, +u.z, -dot(u, eye),
+		-f.x, -f.y, -f.z, +fe if flip_z_axis else -fe,
+		   0,    0,    0, 1,
 	}
 }
 matrix4_look_at :: proc{
@@ -2041,10 +2018,10 @@ matrix4_look_at_from_fru_f16 :: proc(eye, f, r, u: Vector3f16, flip_z_axis := tr
 	fe := dot(f, eye)
 
 	return {
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+		+s.x, +s.y, +s.z, -dot(s, eye),
+		+u.x, +u.y, +u.z, -dot(u, eye),
+		-f.x, -f.y, -f.z, +fe if flip_z_axis else -fe,
+		   0,    0,    0, 1,
 	}
 }
 matrix4_look_at_from_fru_f32 :: proc(eye, f, r, u: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
@@ -2055,10 +2032,10 @@ matrix4_look_at_from_fru_f32 :: proc(eye, f, r, u: Vector3f32, flip_z_axis := tr
 	fe := dot(f, eye)
 
 	return {
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+		+s.x, +s.y, +s.z, -dot(s, eye),
+		+u.x, +u.y, +u.z, -dot(u, eye),
+		-f.x, -f.y, -f.z, +fe if flip_z_axis else -fe,
+		   0,    0,    0, 1,
 	}
 }
 matrix4_look_at_from_fru_f64 :: proc(eye, f, r, u: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
@@ -2069,10 +2046,10 @@ matrix4_look_at_from_fru_f64 :: proc(eye, f, r, u: Vector3f64, flip_z_axis := tr
 	fe := dot(f, eye)
 
 	return {
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
+		+s.x, +s.y, +s.z, -dot(s, eye),
+		+u.x, +u.y, +u.z, -dot(u, eye),
+		-f.x, -f.y, -f.z, +fe if flip_z_axis else -fe,
+		   0,    0,    0, 1,
 	}
 }
 matrix4_look_at_from_fru :: proc{
@@ -2084,11 +2061,11 @@ matrix4_look_at_from_fru :: proc{
 
 matrix4_perspective_f16 :: proc(fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	tan_half_fovy := math.tan(0.5 * fovy)
-	m[0][0] = 1 / (aspect*tan_half_fovy)
-	m[1][1] = 1 / (tan_half_fovy)
-	m[2][2] = +(far + near) / (far - near)
-	m[2][3] = +1
-	m[3][2] = -2*far*near / (far - near)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +(far + near) / (far - near)
+	m[3, 2] = +1
+	m[2, 3] = -2*far*near / (far - near)
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2098,11 +2075,11 @@ matrix4_perspective_f16 :: proc(fovy, aspect, near, far: f16, flip_z_axis := tru
 }
 matrix4_perspective_f32 :: proc(fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	tan_half_fovy := math.tan(0.5 * fovy)
-	m[0][0] = 1 / (aspect*tan_half_fovy)
-	m[1][1] = 1 / (tan_half_fovy)
-	m[2][2] = +(far + near) / (far - near)
-	m[2][3] = +1
-	m[3][2] = -2*far*near / (far - near)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +(far + near) / (far - near)
+	m[3, 2] = +1
+	m[2, 3] = -2*far*near / (far - near)
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2112,11 +2089,11 @@ matrix4_perspective_f32 :: proc(fovy, aspect, near, far: f32, flip_z_axis := tru
 }
 matrix4_perspective_f64 :: proc(fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	tan_half_fovy := math.tan(0.5 * fovy)
-	m[0][0] = 1 / (aspect*tan_half_fovy)
-	m[1][1] = 1 / (tan_half_fovy)
-	m[2][2] = +(far + near) / (far - near)
-	m[2][3] = +1
-	m[3][2] = -2*far*near / (far - near)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +(far + near) / (far - near)
+	m[3, 2] = +1
+	m[2, 3] = -2*far*near / (far - near)
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2133,13 +2110,13 @@ matrix4_perspective :: proc{
 
 
 matrix_ortho3d_f16 :: proc(left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
-	m[0][0] = +2 / (right - left)
-	m[1][1] = +2 / (top - bottom)
-	m[2][2] = +2 / (far - near)
-	m[3][0] = -(right + left)   / (right - left)
-	m[3][1] = -(top   + bottom) / (top - bottom)
-	m[3][2] = -(far + near) / (far- near)
-	m[3][3] = 1
+	m[0, 0] = +2 / (right - left)
+	m[1, 1] = +2 / (top - bottom)
+	m[2, 2] = +2 / (far - near)
+	m[0, 3] = -(right + left)   / (right - left)
+	m[1, 3] = -(top   + bottom) / (top - bottom)
+	m[2, 3] = -(far + near) / (far- near)
+	m[3, 3] = 1
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2148,13 +2125,13 @@ matrix_ortho3d_f16 :: proc(left, right, bottom, top, near, far: f16, flip_z_axis
 	return
 }
 matrix_ortho3d_f32 :: proc(left, right, bottom, top, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
-	m[0][0] = +2 / (right - left)
-	m[1][1] = +2 / (top - bottom)
-	m[2][2] = +2 / (far - near)
-	m[3][0] = -(right + left)   / (right - left)
-	m[3][1] = -(top   + bottom) / (top - bottom)
-	m[3][2] = -(far + near) / (far- near)
-	m[3][3] = 1
+	m[0, 0] = +2 / (right - left)
+	m[1, 1] = +2 / (top - bottom)
+	m[2, 2] = +2 / (far - near)
+	m[0, 3] = -(right + left)   / (right - left)
+	m[1, 3] = -(top   + bottom) / (top - bottom)
+	m[2, 3] = -(far + near) / (far- near)
+	m[3, 3] = 1
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2163,13 +2140,13 @@ matrix_ortho3d_f32 :: proc(left, right, bottom, top, near, far: f32, flip_z_axis
 	return
 }
 matrix_ortho3d_f64 :: proc(left, right, bottom, top, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
-	m[0][0] = +2 / (right - left)
-	m[1][1] = +2 / (top - bottom)
-	m[2][2] = +2 / (far - near)
-	m[3][0] = -(right + left)   / (right - left)
-	m[3][1] = -(top   + bottom) / (top - bottom)
-	m[3][2] = -(far + near) / (far- near)
-	m[3][3] = 1
+	m[0, 0] = +2 / (right - left)
+	m[1, 1] = +2 / (top - bottom)
+	m[2, 2] = +2 / (far - near)
+	m[0, 3] = -(right + left)   / (right - left)
+	m[1, 3] = -(top   + bottom) / (top - bottom)
+	m[2, 3] = -(far + near) / (far- near)
+	m[3, 3] = 1
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2187,11 +2164,11 @@ matrix_ortho3d :: proc{
 
 matrix4_infinite_perspective_f16 :: proc(fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	tan_half_fovy := math.tan(0.5 * fovy)
-	m[0][0] = 1 / (aspect*tan_half_fovy)
-	m[1][1] = 1 / (tan_half_fovy)
-	m[2][2] = +1
-	m[2][3] = +1
-	m[3][2] = -2*near
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +1
+	m[3, 2] = +1
+	m[2, 3] = -2*near
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2201,11 +2178,11 @@ matrix4_infinite_perspective_f16 :: proc(fovy, aspect, near: f16, flip_z_axis :=
 }
 matrix4_infinite_perspective_f32 :: proc(fovy, aspect, near: f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	tan_half_fovy := math.tan(0.5 * fovy)
-	m[0][0] = 1 / (aspect*tan_half_fovy)
-	m[1][1] = 1 / (tan_half_fovy)
-	m[2][2] = +1
-	m[2][3] = +1
-	m[3][2] = -2*near
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +1
+	m[3, 2] = +1
+	m[2, 3] = -2*near
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2215,11 +2192,11 @@ matrix4_infinite_perspective_f32 :: proc(fovy, aspect, near: f32, flip_z_axis :=
 }
 matrix4_infinite_perspective_f64 :: proc(fovy, aspect, near: f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	tan_half_fovy := math.tan(0.5 * fovy)
-	m[0][0] = 1 / (aspect*tan_half_fovy)
-	m[1][1] = 1 / (tan_half_fovy)
-	m[2][2] = +1
-	m[2][3] = +1
-	m[3][2] = -2*near
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +1
+	m[3, 2] = +1
+	m[2, 3] = -2*near
 
 	if flip_z_axis {
 		m[2] = -m[2]
@@ -2236,18 +2213,18 @@ matrix4_infinite_perspective :: proc{
 
 
 matrix2_from_scalar_f16 :: proc(f: f16) -> (m: Matrix2f16) {
-	m[0][0], m[0][1] = f, 0
-	m[1][0], m[1][1] = 0, f
+	m[0, 0], m[1, 0] = f, 0
+	m[0, 1], m[1, 1] = 0, f
 	return
 }
 matrix2_from_scalar_f32 :: proc(f: f32) -> (m: Matrix2f32) {
-	m[0][0], m[0][1] = f, 0
-	m[1][0], m[1][1] = 0, f
+	m[0, 0], m[1, 0] = f, 0
+	m[0, 1], m[1, 1] = 0, f
 	return
 }
 matrix2_from_scalar_f64 :: proc(f: f64) -> (m: Matrix2f64) {
-	m[0][0], m[0][1] = f, 0
-	m[1][0], m[1][1] = 0, f
+	m[0, 0], m[1, 0] = f, 0
+	m[0, 1], m[1, 1] = 0, f
 	return
 }
 matrix2_from_scalar :: proc{
@@ -2258,21 +2235,21 @@ matrix2_from_scalar :: proc{
 
 
 matrix3_from_scalar_f16 :: proc(f: f16) -> (m: Matrix3f16) {
-	m[0][0], m[0][1], m[0][2] = f, 0, 0
-	m[1][0], m[1][1], m[1][2] = 0, f, 0
-	m[2][0], m[2][1], m[2][2] = 0, 0, f
+	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
+	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
+	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
 matrix3_from_scalar_f32 :: proc(f: f32) -> (m: Matrix3f32) {
-	m[0][0], m[0][1], m[0][2] = f, 0, 0
-	m[1][0], m[1][1], m[1][2] = 0, f, 0
-	m[2][0], m[2][1], m[2][2] = 0, 0, f
+	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
+	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
+	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
 matrix3_from_scalar_f64 :: proc(f: f64) -> (m: Matrix3f64) {
-	m[0][0], m[0][1], m[0][2] = f, 0, 0
-	m[1][0], m[1][1], m[1][2] = 0, f, 0
-	m[2][0], m[2][1], m[2][2] = 0, 0, f
+	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
+	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
+	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
 matrix3_from_scalar :: proc{
@@ -2283,24 +2260,24 @@ matrix3_from_scalar :: proc{
 
 
 matrix4_from_scalar_f16 :: proc(f: f16) -> (m: Matrix4f16) {
-	m[0][0], m[0][1], m[0][2], m[0][3] = f, 0, 0, 0
-	m[1][0], m[1][1], m[1][2], m[1][3] = 0, f, 0, 0
-	m[2][0], m[2][1], m[2][2], m[2][3] = 0, 0, f, 0
-	m[3][0], m[3][1], m[3][2], m[3][3] = 0, 0, 0, f
+	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
+	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
+	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
+	m[0, 3], m[1, 3], m[2, 3], m[3, 3] = 0, 0, 0, f
 	return
 }
 matrix4_from_scalar_f32 :: proc(f: f32) -> (m: Matrix4f32) {
-	m[0][0], m[0][1], m[0][2], m[0][3] = f, 0, 0, 0
-	m[1][0], m[1][1], m[1][2], m[1][3] = 0, f, 0, 0
-	m[2][0], m[2][1], m[2][2], m[2][3] = 0, 0, f, 0
-	m[3][0], m[3][1], m[3][2], m[3][3] = 0, 0, 0, f
+	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
+	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
+	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
+	m[0, 3], m[1, 3], m[2, 3], m[3, 3] = 0, 0, 0, f
 	return
 }
 matrix4_from_scalar_f64 :: proc(f: f64) -> (m: Matrix4f64) {
-	m[0][0], m[0][1], m[0][2], m[0][3] = f, 0, 0, 0
-	m[1][0], m[1][1], m[1][2], m[1][3] = 0, f, 0, 0
-	m[2][0], m[2][1], m[2][2], m[2][3] = 0, 0, f, 0
-	m[3][0], m[3][1], m[3][2], m[3][3] = 0, 0, 0, f
+	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
+	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
+	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
+	m[0, 3], m[1, 3], m[2, 3], m[3, 3] = 0, 0, 0, f
 	return
 }
 matrix4_from_scalar :: proc{
@@ -2311,18 +2288,18 @@ matrix4_from_scalar :: proc{
 
 
 matrix2_from_matrix3_f16 :: proc(m: Matrix3f16) -> (r: Matrix2f16) {
-	r[0][0], r[0][1] = m[0][0], m[0][1]
-	r[1][0], r[1][1] = m[1][0], m[1][1]
+	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
+	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 matrix2_from_matrix3_f32 :: proc(m: Matrix3f32) -> (r: Matrix2f32) {
-	r[0][0], r[0][1] = m[0][0], m[0][1]
-	r[1][0], r[1][1] = m[1][0], m[1][1]
+	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
+	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 matrix2_from_matrix3_f64 :: proc(m: Matrix3f64) -> (r: Matrix2f64) {
-	r[0][0], r[0][1] = m[0][0], m[0][1]
-	r[1][0], r[1][1] = m[1][0], m[1][1]
+	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
+	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 matrix2_from_matrix3 :: proc{
@@ -2333,18 +2310,18 @@ matrix2_from_matrix3 :: proc{
 
 
 matrix2_from_matrix4_f16 :: proc(m: Matrix4f16) -> (r: Matrix2f16) {
-	r[0][0], r[0][1] = m[0][0], m[0][1]
-	r[1][0], r[1][1] = m[1][0], m[1][1]
+	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
+	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 matrix2_from_matrix4_f32 :: proc(m: Matrix4f32) -> (r: Matrix2f32) {
-	r[0][0], r[0][1] = m[0][0], m[0][1]
-	r[1][0], r[1][1] = m[1][0], m[1][1]
+	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
+	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 matrix2_from_matrix4_f64 :: proc(m: Matrix4f64) -> (r: Matrix2f64) {
-	r[0][0], r[0][1] = m[0][0], m[0][1]
-	r[1][0], r[1][1] = m[1][0], m[1][1]
+	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
+	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
 matrix2_from_matrix4 :: proc{
@@ -2355,21 +2332,21 @@ matrix2_from_matrix4 :: proc{
 
 
 matrix3_from_matrix2_f16 :: proc(m: Matrix2f16) -> (r: Matrix3f16) {
-	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], 0
-	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], 0
-	r[2][0], r[2][1], r[2][2] =       0,       0, 1
+	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
+	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
+	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
 matrix3_from_matrix2_f32 :: proc(m: Matrix2f32) -> (r: Matrix3f32) {
-	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], 0
-	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], 0
-	r[2][0], r[2][1], r[2][2] =       0,       0, 1
+	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
+	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
+	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
 matrix3_from_matrix2_f64 :: proc(m: Matrix2f64) -> (r: Matrix3f64) {
-	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], 0
-	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], 0
-	r[2][0], r[2][1], r[2][2] =       0,       0, 1
+	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
+	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
+	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
 matrix3_from_matrix2 :: proc{
@@ -2380,21 +2357,21 @@ matrix3_from_matrix2 :: proc{
 
 
 matrix3_from_matrix4_f16 :: proc(m: Matrix4f16) -> (r: Matrix3f16) {
-	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], m[0][2]
-	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], m[1][2]
-	r[2][0], r[2][1], r[2][2] = m[2][0], m[2][1], m[2][2]
+	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
+	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
+	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
 matrix3_from_matrix4_f32 :: proc(m: Matrix4f32) -> (r: Matrix3f32) {
-	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], m[0][2]
-	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], m[1][2]
-	r[2][0], r[2][1], r[2][2] = m[2][0], m[2][1], m[2][2]
+	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
+	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
+	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
 matrix3_from_matrix4_f64 :: proc(m: Matrix4f64) -> (r: Matrix3f64) {
-	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], m[0][2]
-	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], m[1][2]
-	r[2][0], r[2][1], r[2][2] = m[2][0], m[2][1], m[2][2]
+	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
+	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
+	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
 matrix3_from_matrix4 :: proc{
@@ -2405,24 +2382,24 @@ matrix3_from_matrix4 :: proc{
 
 
 matrix4_from_matrix2_f16 :: proc(m: Matrix2f16) -> (r: Matrix4f16) {
-	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], 0, 0
-	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], 0, 0
-	r[2][0], r[2][1], r[2][2], r[2][3] =       0,       0, 1, 0
-	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0, 0, 1
+	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
+	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
+	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
+	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0, 0, 1
 	return
 }
 matrix4_from_matrix2_f32 :: proc(m: Matrix2f32) -> (r: Matrix4f32) {
-	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], 0, 0
-	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], 0, 0
-	r[2][0], r[2][1], r[2][2], r[2][3] =       0,       0, 1, 0
-	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0, 0, 1
+	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
+	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
+	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
+	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0, 0, 1
 	return
 }
 matrix4_from_matrix2_f64 :: proc(m: Matrix2f64) -> (r: Matrix4f64) {
-	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], 0, 0
-	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], 0, 0
-	r[2][0], r[2][1], r[2][2], r[2][3] =       0,       0, 1, 0
-	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0, 0, 1
+	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
+	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
+	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
+	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0, 0, 1
 	return
 }
 matrix4_from_matrix2 :: proc{
@@ -2433,24 +2410,24 @@ matrix4_from_matrix2 :: proc{
 
 
 matrix4_from_matrix3_f16 :: proc(m: Matrix3f16) -> (r: Matrix4f16) {
-	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], m[0][2], 0
-	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], m[1][2], 0
-	r[2][0], r[2][1], r[2][2], r[2][3] = m[2][0], m[2][1], m[2][2], 0
-	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0,       0, 1
+	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
+	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
+	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
+	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0,       0, 1
 	return
 }
 matrix4_from_matrix3_f32 :: proc(m: Matrix3f32) -> (r: Matrix4f32) {
-	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], m[0][2], 0
-	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], m[1][2], 0
-	r[2][0], r[2][1], r[2][2], r[2][3] = m[2][0], m[2][1], m[2][2], 0
-	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0,       0, 1
+	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
+	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
+	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
+	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0,       0, 1
 	return
 }
 matrix4_from_matrix3_f64 :: proc(m: Matrix3f64) -> (r: Matrix4f64) {
-	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], m[0][2], 0
-	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], m[1][2], 0
-	r[2][0], r[2][1], r[2][2], r[2][3] = m[2][0], m[2][1], m[2][2], 0
-	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0,       0, 1
+	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
+	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
+	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
+	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0,       0, 1
 	return
 }
 matrix4_from_matrix3 :: proc{
