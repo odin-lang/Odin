@@ -2284,10 +2284,21 @@ void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 	}
 	
 	if (!is_type_valid_for_matrix_elems(elem)) {
+		if (elem == t_typeid) {
+			Entity *e = entity_of_node(mt->elem);
+			if (e && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+				// HACK TODO(bill): This is to allow polymorphic parameters for matrix elements
+				// proc($T: typeid) -> matrix[2, 2]T
+				//
+				// THIS IS NEEDS TO BE FIXED AND NOT USE THIS HACK
+				goto type_assign;
+			}
+		}
 		gbString s = type_to_string(elem);
 		error(column.expr, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
 		gb_string_free(s);
 	}
+type_assign:;
 	
 	*type = alloc_type_matrix(elem, row_count, column_count, generic_row, generic_column);
 	
