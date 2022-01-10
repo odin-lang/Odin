@@ -98,8 +98,8 @@ struct MutexGuard {
 	RecursiveMutex *rm;
 };
 
-#define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_) = m)
-#define MUTEX_GUARD(m) MutexGuard GB_DEFER_3(_mutex_guard_) = m
+#define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_){m})
+#define MUTEX_GUARD(m) MutexGuard GB_DEFER_3(_mutex_guard_){m}
 
 
 #if defined(GB_SYSTEM_WINDOWS)
