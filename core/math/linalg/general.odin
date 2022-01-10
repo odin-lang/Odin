@@ -287,10 +287,10 @@ array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bo
 	return
 }
 
-matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) #no_bounds_check {
-	for i in 0..<M {
-		for j in 0..<N {
-			w[i][j] = Elem_Type(v[i][j])
+matrix_cast :: proc(v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M, N]Elem_Type) #no_bounds_check {
+	for j in 0..<N {
+		for i in 0..<M {
+			w[i, j] = Elem_Type(v[i, j])
 		}
 	}
 	return
