@@ -4941,7 +4941,6 @@ void check_procedure_bodies(Checker *c) {
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
 	}
-	worker_count = 0;
 	if (worker_count == 0) {
 		auto *this_queue = &c->procs_to_check_queue;
 		
