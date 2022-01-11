@@ -74,16 +74,16 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	isize cmd_len = 0;
 	va_list va;
 	i32 exit_code = 0;
-	
+
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
 	va_end(va);
-	
+
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
 	String16 wcmd = {};
-	
+
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
 	start_info.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
@@ -118,11 +118,11 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	}
 	exit_code = system(cmd_line);
 #endif
-	
+
 	if (exit_code) {
 		exit(exit_code);
 	}
-	
+
 	return exit_code;
 }
 
@@ -137,7 +137,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-		
+
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
@@ -211,12 +211,12 @@ i32 linker_stage(lbGenerator *gen) {
 			add_path(find_result.windows_sdk_ucrt_library_path);
 			add_path(find_result.vs_library_path);
 		}
-		
-		
+
+
 		StringSet libs = {};
 		string_set_init(&libs, heap_allocator(), 64);
 		defer (string_set_destroy(&libs));
-		
+
 		StringSet asm_files = {};
 		string_set_init(&asm_files, heap_allocator(), 64);
 		defer (string_set_destroy(&asm_files));
@@ -241,13 +241,13 @@ i32 linker_stage(lbGenerator *gen) {
 				string_set_add(&libs, lib);
 			}
 		}
-		
+
 		for_array(i, libs.entries) {
 			String lib = libs.entries[i].value;
 			lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
 		}
-		
-		
+
+
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
 			output_ext = "dll";
 			link_settings = gb_string_append_fmt(link_settings, " /DLL");
@@ -268,7 +268,7 @@ i32 linker_stage(lbGenerator *gen) {
 		if (build_context.ODIN_DEBUG) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
-		
+
 		for_array(i, asm_files.entries) {
 			String asm_file = asm_files.entries[i].value;
 			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
@@ -283,7 +283,7 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(obj_file),
 				LIT(build_context.extra_assembler_flags)
 			);
-			
+
 			if (result) {
 				return result;
 			}
@@ -305,7 +305,7 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
-				
+
 				if (result) {
 					return result;
 				}
@@ -340,11 +340,11 @@ i32 linker_stage(lbGenerator *gen) {
 					lib_str
 				);
 			}
-			
+
 			if (result) {
 				return result;
 			}
-			
+
 		} else { // lld
 			result = system_exec_command_line_app("msvc-lld-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
@@ -360,7 +360,7 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
-			
+
 			if (result) {
 				return result;
 			}
@@ -432,40 +432,39 @@ i32 linker_stage(lbGenerator *gen) {
 		// typically executable files on *NIX systems don't have extensions.
 		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
-		char const *linker;
+
+		// NOTE(dweiler): We use clang as a frontend for the linker as there are
+		// other runtime and compiler support libraries that need to be linked in
+		// very specific orders such as libgcc_s, ld-linux-so, unwind, etc.
+		// These are not always typically inside /lib, /lib64, or /usr versions
+		// of that, e.g libgcc.a is in /usr/lib/gcc/{version}, and can vary on
+		// the distribution of Linux even. The gcc or clang specs is the only
+		// reliable way to query this information to call ld directly.
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
-			// NOTE(tetra, 2020-11-06): __$startup_runtime must be called at DLL load time.
-			// Clang, for some reason, won't let us pass the '-init' flag that lets us do this,
-			// so use ld instead.
-			// :UseLDForShared
-			linker = "ld";
+			// NOTE(dweiler): Let the frontend know we're building a shared library
+			// so it doesn't generate symbols which cannot be relocated.
+			link_settings = gb_string_appendc(link_settings, "-shared ");
+
+			// NOTE(dweiler): __$startup_runtime must be called at initialization
+			// time of the shared object, we can pass -init to the linker by using
+			// a comma separated list of arguments to -Wl.
+			//
+			// This previously used ld but ld cannot actually build a shared library
+			// correctly this way since all the other dependencies provided implicitly
+			// by the compiler frontend are still needed and most of the command
+			// line arguments prepared previously are incompatible with ld.
+			//
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
-				link_settings = gb_string_appendc(link_settings, "-init '___$startup_runtime' ");
-				link_settings = gb_string_appendc(link_settings, "-dylib -dynamic ");
+				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'___$startup_runtime' ");
 			#else
 				output_ext = STR_LIT(".so");
-				link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
-				link_settings = gb_string_appendc(link_settings, "-shared ");
+				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__$startup_runtime' ");
 			#endif
 		} else {
-			#if defined(GB_SYSTEM_OSX)
-				linker = "ld";
-			#else
-				// TODO(zangent): Figure out how to make ld work on Linux.
-				//   It probably has to do with including the entire CRT, but
-				//   that's quite a complicated issue to solve while remaining distro-agnostic.
-				//   Clang can figure out linker flags for us, and that's good enough _for now_.
-				linker = "clang -Wno-unused-command-line-argument";
-			#endif
-		}
-
-		if (build_context.metrics.os == TargetOs_linux) {
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
 		}
-
-
 		if (build_context.out_filepath.len > 0) {
 			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
 			isize pos = string_extension_position(build_context.out_filepath);
@@ -475,7 +474,7 @@ i32 linker_stage(lbGenerator *gen) {
 		}
 
 		result = system_exec_command_line_app("ld-link",
-			"%s %s -o \"%.*s%.*s\" %s "
+			"clang -Wno-unused-command-line-argument %s -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
 			" %.*s "
@@ -492,7 +491,7 @@ i32 linker_stage(lbGenerator *gen) {
 				// This points the linker to where the entry point is
 				" -e _main "
 			#endif
-			, linker, object_files, LIT(output_base), LIT(output_ext),
+			, object_files, LIT(output_base), LIT(output_ext),
 			#if defined(GB_SYSTEM_OSX)
 			  "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
 			#else
@@ -502,7 +501,7 @@ i32 linker_stage(lbGenerator *gen) {
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
-		
+
 		if (result) {
 			return result;
 		}
@@ -514,7 +513,7 @@ i32 linker_stage(lbGenerator *gen) {
 			result = system_exec_command_line_app("dsymutil",
 				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 			);
-			
+
 			if (result) {
 				return result;
 			}
@@ -675,9 +674,9 @@ enum BuildFlagKind {
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_VerboseErrors,
-	
+
 	// internal use only
-	BuildFlag_InternalIgnoreLazy, 
+	BuildFlag_InternalIgnoreLazy,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -827,7 +826,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,    str_lit("verbose-errors"),     BuildFlagParam_None, Command_all);
-	
+
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy, str_lit("internal-ignore-lazy"), BuildFlagParam_None, Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1356,7 +1355,7 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
 							break;
-						case BuildFlag_ExtraAssemblerFlags: 
+						case BuildFlag_ExtraAssemblerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_assembler_flags = value.value_string;
 							break;
@@ -1818,7 +1817,7 @@ void show_timings(Checker *c, Timings *t) {
 
 void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
-	
+
 	TIME_SECTION("remove keep temp files");
 
 	for_array(i, gen->output_temp_paths) {
@@ -1867,7 +1866,7 @@ void print_show_help(String const arg0, String const &command) {
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
 		print_usage_line(2, "parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
-	} 
+	}
 
 	bool doc = command == "doc";
 	bool build = command == "build";
@@ -2072,7 +2071,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
-		
+
 		print_usage_line(1, "-extra-assembler-flags:<string>");
 		print_usage_line(2, "Adds extra assembler specific flags in a string");
 		print_usage_line(0, "");
@@ -2098,7 +2097,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-strict-style");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
 		print_usage_line(0, "");
-		
+
 		print_usage_line(1, "-strict-style-init-only");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons, only on the initial project");
 		print_usage_line(0, "");
@@ -2263,7 +2262,7 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 			}
 			written += to_write;
 			prev_offset = token_pos_end(*token).offset;
-		} 
+		}
 		if (token->flags & TokenFlag_Replace) {
 			if (token->kind == Token_Ellipsis) {
 				if (!gb_file_write(f, "..=", 3)) {
@@ -2282,7 +2281,7 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 		}
 		written += to_write;
 	}
-	
+
 	if (written_) *written_ = written;
 	return err;
 }
@@ -2293,14 +2292,14 @@ int strip_semicolons(Parser *parser) {
 		AstPackage *pkg = parser->packages[i];
 		file_count += pkg->files.count;
 	}
-	
+
 	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
-	
+
 	for_array(i, parser->packages) {
 		AstPackage *pkg = parser->packages[i];
 		for_array(j, pkg->files) {
 			AstFile *file = pkg->files[j];
-			
+
 			bool nothing_to_change = true;
 			for_array(i, file->tokens) {
 				Token *token = &file->tokens[i];
@@ -2309,29 +2308,29 @@ int strip_semicolons(Parser *parser) {
 					break;
 				}
 			}
-			
+
 			if (nothing_to_change) {
 				continue;
 			}
-			
+
 			String old_fullpath = copy_string(permanent_allocator(), file->fullpath);
-				
+
 			// assumes .odin extension
 			String fullpath_base = substring(old_fullpath, 0, old_fullpath.len-5);
-			
+
 			String old_fullpath_backup = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~backup.odin-temp"));
 			String new_fullpath = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~temp.odin-temp"));
-			
+
 			array_add(&generated_files, StripSemicolonFile{old_fullpath, old_fullpath_backup, new_fullpath, file});
 		}
 	}
-	
+
 	gb_printf_err("File count to be stripped of unneeded tokens: %td\n", generated_files.count);
-	
-	
+
+
 	isize generated_count = 0;
 	bool failed = false;
-	
+
 	for_array(i, generated_files) {
 		auto *file = &generated_files[i];
 		char const *filename = cast(char const *)file->new_fullpath.text;
@@ -2339,15 +2338,15 @@ int strip_semicolons(Parser *parser) {
 		defer (if (err != gbFileError_None) {
 			failed = true;
 		});
-		
-		gbFile f = {}; 
+
+		gbFile f = {};
 		err = gb_file_create(&f, filename);
 		if (err) {
 			break;
 		}
 		defer (err = gb_file_close(&f));
 		generated_count += 1;
-		
+
 		i64 written = 0;
 		defer (err = gb_file_truncate(&f, written));
 
@@ -2368,23 +2367,23 @@ int strip_semicolons(Parser *parser) {
 		}
 		return 1;
 	}
-	
+
 	isize overwritten_files = 0;
-	
+
 	for_array(i, generated_files) {
 		auto *file = &generated_files[i];
-		
+
 		char const *old_fullpath = cast(char const *)file->old_fullpath.text;
 		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
 		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
-		
+
 		debugf("Copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
 			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 			failed = true;
 			break;
 		}
-		
+
 		debugf("Copy '%s' to '%s'\n", new_fullpath, old_fullpath);
 
 		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
@@ -2401,19 +2400,19 @@ int strip_semicolons(Parser *parser) {
 		if (!gb_file_remove(old_fullpath_backup)) {
 			gb_printf_err("failed to remove '%s'\n", old_fullpath_backup);
 		}
-		
+
 		overwritten_files++;
 	}
-	
+
 	if (!build_context.keep_temp_files) {
 		for_array(i, generated_files) {
 			auto *file = &generated_files[i];
 			char const *filename = nullptr;
 			filename = cast(char const *)file->new_fullpath.text;
-			
+
 			debugf("Remove '%s'\n", filename);
 			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
-			
+
 			filename = cast(char const *)file->old_fullpath_backup.text;
 			debugf("Remove '%s'\n", filename);
 			if (gb_file_exists(filename) && !gb_file_remove(filename)) {
@@ -2424,10 +2423,10 @@ int strip_semicolons(Parser *parser) {
 			}
 		}
 	}
-	
+
 	gb_printf_err("Files stripped of unneeded token: %td\n", generated_files.count);
-	
-	
+
+
 	return cast(int)failed;
 }
 
@@ -2443,7 +2442,7 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(&global_timings));
 
 	MAIN_TIME_SECTION("initialization");
-	
+
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
 	mutex_init(&hash_exact_value_mutex);
@@ -2618,7 +2617,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	init_global_thread_pool();
 	defer (thread_pool_destroy(&global_thread_pool));
-	
+
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
@@ -2650,7 +2649,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (any_errors()) {
 		return 1;
 	}
-	
+
 	if (build_context.command_kind == Command_strip_semicolon) {
 		return strip_semicolons(parser);
 	}
@@ -2704,7 +2703,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	remove_temp_files(gen);
-	
+
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
 	}
