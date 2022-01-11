@@ -423,7 +423,7 @@ Entity *entity_of_node(Ast *expr);
 Entity *scope_lookup_current(Scope *s, String const &name);
 Entity *scope_lookup (Scope *s, String const &name);
 void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
-Entity *scope_insert (Scope *s, Entity *entity);
+Entity *scope_insert (Scope *s, Entity *entity, bool use_mutex=true);
 
 
 void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);

@@ -140,7 +140,7 @@ void report_windows_product_type(DWORD ProductType) {
 		break;
 
 	default:
-		gb_printf("Unknown Edition (%08x)", ProductType);
+		gb_printf("Unknown Edition (%08x)", cast(unsigned)ProductType);
 	}
 }
 #endif
@@ -316,14 +316,14 @@ void print_bug_report_help() {
 			}
 
 			if (false) {
-				gb_printf("dwMajorVersion:    %d\n", osvi.dwMajorVersion);
-				gb_printf("dwMinorVersion:    %d\n", osvi.dwMinorVersion);
-				gb_printf("dwBuildNumber:     %d\n", osvi.dwBuildNumber);
-				gb_printf("dwPlatformId:      %d\n", osvi.dwPlatformId);
-				gb_printf("wServicePackMajor: %d\n", osvi.wServicePackMajor);
-				gb_printf("wServicePackMinor: %d\n", osvi.wServicePackMinor);
-				gb_printf("wSuiteMask:        %d\n", osvi.wSuiteMask);
-				gb_printf("wProductType:      %d\n", osvi.wProductType);
+				gb_printf("dwMajorVersion:    %u\n", cast(unsigned)osvi.dwMajorVersion);
+				gb_printf("dwMinorVersion:    %u\n", cast(unsigned)osvi.dwMinorVersion);
+				gb_printf("dwBuildNumber:     %u\n", cast(unsigned)osvi.dwBuildNumber);
+				gb_printf("dwPlatformId:      %u\n", cast(unsigned)osvi.dwPlatformId);
+				gb_printf("wServicePackMajor: %u\n", cast(unsigned)osvi.wServicePackMajor);
+				gb_printf("wServicePackMinor: %u\n", cast(unsigned)osvi.wServicePackMinor);
+				gb_printf("wSuiteMask:        %u\n", cast(unsigned)osvi.wSuiteMask);
+				gb_printf("wProductType:      %u\n", cast(unsigned)osvi.wProductType);
 			}
 
 			gb_printf("Windows ");
@@ -441,18 +441,18 @@ void print_bug_report_help() {
 				TEXT("DisplayVersion"),
 				RRF_RT_REG_SZ,
 				ValueType,
-				&DisplayVersion,
+				DisplayVersion,
 				&ValueSize
 			);
 
 			if (status == 0x0) {
-				gb_printf(" (version: %s)", &DisplayVersion);
+				gb_printf(" (version: %s)", DisplayVersion);
 			}
 
 			/*
 				Now print build number.
 			*/
-			gb_printf(", build %d", osvi.dwBuildNumber);
+			gb_printf(", build %u", cast(unsigned)osvi.dwBuildNumber);
 
 			ValueSize = sizeof(UBR);
 			status = RegGetValue(
@@ -466,7 +466,7 @@ void print_bug_report_help() {
 			);
 
 			if (status == 0x0) {
-				gb_printf(".%d", UBR);
+				gb_printf(".%u", cast(unsigned)UBR);
 			}
 			gb_printf("\n");
 		}

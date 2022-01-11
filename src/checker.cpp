@@ -446,7 +446,7 @@ Entity *scope_lookup(Scope *s, String const &name) {
 
 
 
-Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
+Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity, bool use_mutex=true) {
 	if (name == "") {
 		return nullptr;
 	}
@@ -454,8 +454,8 @@ Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
 	Entity **found = nullptr;
 	Entity *result = nullptr;
 
-	mutex_lock(&s->mutex);
-	defer (mutex_unlock(&s->mutex));
+	if (use_mutex) mutex_lock(&s->mutex);
+	defer (if (use_mutex) mutex_unlock(&s->mutex));
 	
 	found = string_map_get(&s->elements, key);
 
@@ -485,9 +485,9 @@ end:;
 	return result;
 }
 
-Entity *scope_insert(Scope *s, Entity *entity) {
+Entity *scope_insert(Scope *s, Entity *entity, bool use_mutex) {
 	String name = entity->token.string;
-	return scope_insert_with_name(s, name, entity);
+	return scope_insert_with_name(s, name, entity, use_mutex);
 }
 
 
