@@ -1286,7 +1286,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	using_entities.allocator = heap_allocator();
 	defer (array_free(&using_entities));
 
-	MUTEX_GUARD_BLOCK(ctx->scope->mutex) {
+	{
 		if (type->Proc.param_count > 0) {
 			TypeTuple *params = &type->Proc.params->Tuple;
 			for_array(i, params->variables) {
@@ -1303,7 +1303,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (t->kind == Type_Struct) {
 					Scope *scope = t->Struct.scope;
 					GB_ASSERT(scope != nullptr);
-					for_array(i, scope->elements.entries) {
+					MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
 						Entity *f = scope->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
@@ -1321,11 +1321,10 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		}
 	}
 
-
-	for_array(i, using_entities) {
+	MUTEX_GUARD_BLOCK(ctx->scope->mutex) for_array(i, using_entities) {
 		Entity *e = using_entities[i].e;
 		Entity *uvar = using_entities[i].uvar;
-		Entity *prev = scope_insert(ctx->scope, uvar);
+		Entity *prev = scope_insert(ctx->scope, uvar, false);
 		if (prev != nullptr) {
 			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
 			error_line("%.*s != %.*s\n", LIT(uvar->token.string), LIT(prev->token.string));

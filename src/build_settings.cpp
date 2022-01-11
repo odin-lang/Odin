@@ -5,7 +5,7 @@
 
 
 // #if defined(GB_SYSTEM_WINDOWS)
-#define DEFAULT_TO_THREADED_CHECKER
+// #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
 enum TargetOsKind {
