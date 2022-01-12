@@ -1406,19 +1406,15 @@ void lb_generate_code(lbGenerator *gen) {
 
 	isize global_variable_max_count = 0;
 	Entity *entry_point = info->entry_point;
-	bool has_dll_main = false;
-	bool has_win_main = false;
 	bool already_has_entry_point = false;
 
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
 		String name = e->token.string;
 
-		bool is_global = e->pkg != nullptr;
-
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
-		} else if (e->kind == Entity_Procedure && !is_global) {
+		} else if (e->kind == Entity_Procedure) {
 			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
 				GB_ASSERT(e == entry_point);
 				// entry_point = e;
@@ -1426,12 +1422,9 @@ void lb_generate_code(lbGenerator *gen) {
 			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
 			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
-				if (name == "main" || name == "DllMain" || name == "WinMain" || name == "mainCRTStartup") {
+			    	String link_name = e->Procedure.link_name;
+				if (link_name == "main" || link_name == "DllMain" || link_name == "WinMain" || link_name == "mainCRTStartup") {
 					already_has_entry_point = true;
-				} else if (!has_dll_main && name == "DllMain") {
-					has_dll_main = true;
-				} else if (!has_win_main && name == "WinMain") {
-					has_win_main = true;
 				}
 			}
 		}
@@ -1647,10 +1640,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	if (!already_has_entry_point) {
-		if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
-			TIME_SECTION("LLVM main");
-			lb_create_main_procedure(default_module, startup_runtime);
-		}
+		TIME_SECTION("LLVM main");
+		lb_create_main_procedure(default_module, startup_runtime);
 	}
 
 	for_array(j, gen->modules.entries) {
