@@ -34,6 +34,7 @@ when ODIN_BUILD_MODE == "dynamic" {
 	} else {
 		@(link_name="main", linkage="strong", require)
 		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
+			args__ = argv[:argc]
 			context = default_context()
 			#force_no_inline _startup_runtime()
 			intrinsics.__entry_point()
