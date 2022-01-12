@@ -9,6 +9,7 @@ when ODIN_BUILD_MODE == "dynamic" {
 	_odin_entry_point :: proc "c" () {
 		context = default_context()
 		#force_no_inline _startup_runtime()
+		intrinsics._odin_entry_point()
 	}
 	@(link_name="_odin_exit_point", linkage="strong", require)
 	_odin_exit_point :: proc "c" () {
