@@ -777,21 +777,23 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 
 	if (e->pkg != nullptr && e->token.string == "main") {
-		if (pt->param_count != 0 ||
-		    pt->result_count != 0) {
-			gbString str = type_to_string(proc_type);
-			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
-			gb_string_free(str);
-		}
-		if (pt->calling_convention != default_calling_convention()) {
-			error(e->token, "Procedure 'main' cannot have a custom calling convention");
-		}
-		pt->calling_convention = default_calling_convention();
-		if (e->pkg->kind == Package_Init) {
-			if (ctx->info->entry_point != nullptr) {
-				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
-			} else {
-				ctx->info->entry_point = e;
+		if (e->pkg->kind != Package_Runtime) {
+			if (pt->param_count != 0 ||
+			    pt->result_count != 0) {
+				gbString str = type_to_string(proc_type);
+				error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
+				gb_string_free(str);
+			}
+			if (pt->calling_convention != default_calling_convention()) {
+				error(e->token, "Procedure 'main' cannot have a custom calling convention");
+			}
+			pt->calling_convention = default_calling_convention();
+			if (e->pkg->kind == Package_Init) {
+				if (ctx->info->entry_point != nullptr) {
+					error(e->token, "Redeclaration of the entry pointer procedure 'main'");
+				} else {
+					ctx->info->entry_point = e;
+				}
 			}
 		}
 	}
@@ -924,7 +926,9 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				      "\tother at %s",
 				      LIT(name), token_pos_to_string(pos));
 			} else if (name == "main") {
-				error(d->proc_lit, "The link name 'main' is reserved for internal use");
+				if (d->entity->pkg->kind != Package_Runtime) {
+					error(d->proc_lit, "The link name 'main' is reserved for internal use");
+				}
 			} else {
 				string_map_set(fp, key, e);
 			}
