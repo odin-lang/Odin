@@ -445,7 +445,7 @@ i32 linker_stage(lbGenerator *gen) {
 			// so it doesn't generate symbols which cannot be relocated.
 			link_settings = gb_string_appendc(link_settings, "-shared ");
 
-			// NOTE(dweiler): __$startup_runtime must be called at initialization
+			// NOTE(dweiler): _odin_entry_point must be called at initialization
 			// time of the shared object, we can pass -init to the linker by using
 			// a comma separated list of arguments to -Wl.
 			//
@@ -457,10 +457,10 @@ i32 linker_stage(lbGenerator *gen) {
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
-				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'___$startup_runtime' ");
+				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__odin_entry_point' ");
 			#else
 				output_ext = STR_LIT(".so");
-				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__$startup_runtime' ");
+				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__odin_entry_point' ");
 			#endif
 		} else {
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
