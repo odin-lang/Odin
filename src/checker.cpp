@@ -2113,10 +2113,14 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		case Entity_Variable:
 			if (e->Variable.is_export) {
 				add_dependency_to_set(c, e);
+			} else if (e->flags & EntityFlag_Require) {
+				add_dependency_to_set(c, e);
 			}
 			break;
 		case Entity_Procedure:
 			if (e->Procedure.is_export) {
+				add_dependency_to_set(c, e);
+			} else if (e->flags & EntityFlag_Require) {
 				add_dependency_to_set(c, e);
 			}
 			if (e->flags & EntityFlag_Init) {
@@ -5440,7 +5444,9 @@ void check_parsed_files(Checker *c) {
 		Ast *node = nullptr;
 		while (mpmc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
 			if (c->info.entry_point == nullptr && node != nullptr) {
-				warning(node, "usage of intrinsics.__entry_point will be a no-op");
+				if (node->file()->pkg->kind != Package_Runtime) {
+					warning(node, "usage of intrinsics.__entry_point will be a no-op");
+				}
 			}
 		}
 	}
