@@ -873,7 +873,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	} else {
 		if (m->info->entry_point != nullptr) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
-			lb_emit_call(p, entry_point, {});
+			lb_emit_call(p, entry_point, {}, ProcInlining_no_inline);
 		}
 	}
 
@@ -1408,6 +1408,7 @@ void lb_generate_code(lbGenerator *gen) {
 	Entity *entry_point = info->entry_point;
 	bool has_dll_main = false;
 	bool has_win_main = false;
+	bool already_has_entry_point = false;
 
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
@@ -1425,7 +1426,9 @@ void lb_generate_code(lbGenerator *gen) {
 			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
 			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
-				if (!has_dll_main && name == "DllMain") {
+				if (name == "main" || name == "DllMain" || name == "WinMain" || name == "mainCRTStartup") {
+					already_has_entry_point = true;
+				} else if (!has_dll_main && name == "DllMain") {
 					has_dll_main = true;
 				} else if (!has_win_main && name == "WinMain") {
 					has_win_main = true;
@@ -1643,9 +1646,11 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
-		TIME_SECTION("LLVM main");
-		lb_create_main_procedure(default_module, startup_runtime);
+	if (!already_has_entry_point) {
+		if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
+			TIME_SECTION("LLVM main");
+			lb_create_main_procedure(default_module, startup_runtime);
+		}
 	}
 
 	for_array(j, gen->modules.entries) {

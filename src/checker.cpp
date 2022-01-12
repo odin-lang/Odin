@@ -823,6 +823,7 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_CRT",                   bc->no_crt);
 	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",     bc->use_separate_modules);
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
+	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
 
 
 // Builtin Procedures
@@ -941,6 +942,8 @@ void init_checker_info(CheckerInfo *i) {
 	mutex_init(&i->foreign_mutex);
 
 	semaphore_init(&i->collect_semaphore);
+
+	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -1228,7 +1231,7 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 	while (prev_expr != expr) {
 		prev_expr = expr;
 		expr->tav.mode = mode;
-		if (type != nullptr && expr->tav.type != nullptr && 
+		if (type != nullptr && expr->tav.type != nullptr &&
 		    is_type_any(type) && is_type_untyped(expr->tav.type)) {
 			// ignore
 		} else {
@@ -1424,7 +1427,7 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 					return false;
 				} else if (name == "linkage") {
 					return false;
-				} 
+				}
 			}
 		}
 	}
@@ -1704,7 +1707,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
 		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
 		break;
-		
+
 	case Type_Matrix:
 		add_type_info_type_internal(c, bt->Matrix.elem);
 		break;
@@ -1919,7 +1922,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
 		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
 		break;
-		
+
 	case Type_Matrix:
 		add_min_dep_type_info(c, bt->Matrix.elem);
 		break;
@@ -2020,7 +2023,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__init_context"),
 		str_lit("__type_info_of"),
 		str_lit("cstring_to_string"),
-		str_lit("_cleanup_runtime"), 
+		str_lit("_cleanup_runtime"),
 
 		// Pseudo-CRT required procedures
 		str_lit("memset"),
@@ -2047,7 +2050,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("gnu_h2f_ieee"),
 		str_lit("gnu_f2h_ieee"),
 		str_lit("extendhfsf2"),
-		
+
 		// WASM Specific
 		str_lit("__ashlti3"),
 		str_lit("__multi3"),
@@ -2119,25 +2122,25 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			if (e->flags & EntityFlag_Init) {
 				Type *t = base_type(e->type);
 				GB_ASSERT(t->kind == Type_Proc);
-				
+
 				bool is_init = true;
-				
+
 				if (t->Proc.param_count != 0 || t->Proc.result_count != 0) {
 					gbString str = type_to_string(t);
 					error(e->token, "@(init) procedures must have a signature type with no parameters nor results, got %s", str);
 					gb_string_free(str);
 					is_init = false;
 				}
-				
+
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(init) procedures must be declared at the file scope");
 					is_init = false;
 				}
-				
+
 				if (is_init) {
 					add_dependency_to_set(c, e);
 					array_add(&c->info.init_procedures, e);
-				}					
+				}
 			}
 			break;
 		}
@@ -3677,11 +3680,6 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 			error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
 			return;
 		}
-	} else if (pkg->kind == Package_Runtime) {
-		if (e->token.string == "main") {
-			error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
-			return;
-		}
 	}
 
 	check_entity_decl(ctx, e, d, nullptr);
@@ -3841,7 +3839,7 @@ void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, Impo
 }
 
 Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
-	PtrMap<AstPackage *, ImportGraphNode *> M = {}; 
+	PtrMap<AstPackage *, ImportGraphNode *> M = {};
 	map_init(&M, heap_allocator(), 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
@@ -4121,11 +4119,11 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
-	
+
 	if (has_asm_extension(fullpath)) {
 		if (build_context.metrics.arch != TargetArch_amd64 ||
 		    build_context.metrics.os   != TargetOs_windows) {
-			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s", 
+			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s",
 			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
 		}
 	}
@@ -4327,7 +4325,7 @@ void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
 	}
-	
+
 	semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
 	if (worker_count == 0) {
 		ThreadProcCheckerSection section_all = {};
@@ -4351,7 +4349,7 @@ void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
 	}
 	GB_ASSERT(remaining_count <= 0);
 
-	
+
 	for (isize i = 0; i < thread_count; i++) {
 		global_thread_pool_add_task(proc, thread_data+i);
 	}
@@ -4750,11 +4748,11 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 	ctx.decl = pi->decl;
 	ctx.procs_to_check_queue = procs_to_check_queue;
 	GB_ASSERT(procs_to_check_queue != nullptr);
-	
+
 	GB_ASSERT(pi->type->kind == Type_Proc);
 	TypeProc *pt = &pi->type->Proc;
 	String name = pi->token.string;
-	
+
 	if (pt->is_polymorphic && !pt->is_poly_specialized) {
 		Token token = pi->token;
 		if (pi->poly_def_node != nullptr) {
@@ -4832,7 +4830,7 @@ void check_unchecked_bodies(Checker *c) {
 			if (pi->body == nullptr) {
 				continue;
 			}
-			
+
 			debugf("unchecked: %.*s\n", LIT(e->token.string));
 			mpmc_enqueue(&c->procs_to_check_queue, pi);
 		}
@@ -4943,14 +4941,14 @@ void check_procedure_bodies(Checker *c) {
 	}
 	if (worker_count == 0) {
 		auto *this_queue = &c->procs_to_check_queue;
-		
+
 		UntypedExprInfoMap untyped = {};
 		map_init(&untyped, heap_allocator());
-		
+
 		for (ProcInfo *pi = nullptr; mpmc_dequeue(this_queue, &pi); /**/) {
 			consume_proc_info_queue(c, pi, this_queue, &untyped);
 		}
-		
+
 		map_destroy(&untyped);
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
@@ -4994,7 +4992,7 @@ void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(total_queued == original_queue_count);
 
 	semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
-	
+
 	for (isize i = 0; i < thread_count; i++) {
 		global_thread_pool_add_task(thread_proc_body, thread_data+i);
 	}
@@ -5031,7 +5029,7 @@ void check_deferred_procedures(Checker *c) {
 		Entity *dst = src->Procedure.deferred_procedure.entity;
 		GB_ASSERT(dst != nullptr);
 		GB_ASSERT(dst->kind == Entity_Procedure);
-		
+
 		char const *attribute = "deferred_none";
 		switch (dst_kind) {
 		case DeferredProcedure_none:
@@ -5232,7 +5230,7 @@ GB_COMPARE_PROC(init_procedures_cmp) {
 		cmp = 0;
 		return cmp;
 	}
-	
+
 	if (x->pkg != y->pkg) {
 		isize order_x = x->pkg ? x->pkg->order : 0;
 		isize order_y = y->pkg ? y->pkg->order : 0;
@@ -5246,14 +5244,14 @@ GB_COMPARE_PROC(init_procedures_cmp) {
 		String fullpath_y = y->file ? y->file->fullpath : (String{});
 		String file_x = filename_from_path(fullpath_x);
 		String file_y = filename_from_path(fullpath_y);
-		
+
 		cmp = string_compare(file_x, file_y);
 		if (cmp) {
 			return cmp;
 		}
 	}
 
-	
+
 	cmp = u64_cmp(x->order_in_src, y->order_in_src);
 	if (cmp) {
 		return cmp;
@@ -5433,9 +5431,19 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("sanity checks");
 	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
 	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
-	
+
 	TIME_SECTION("sort init procedures");
 	check_sort_init_procedures(c);
+
+	if (c->info.intrinsics_entry_point_usage.count > 0) {
+		TIME_SECTION("check intrinsics.__entry_point usage");
+		Ast *node = nullptr;
+		while (mpmc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
+			if (c->info.entry_point == nullptr && node != nullptr) {
+				warning(node, "usage of intrinsics.__entry_point will be a no-op");
+			}
+		}
+	}
 
 	TIME_SECTION("type check finish");
 }

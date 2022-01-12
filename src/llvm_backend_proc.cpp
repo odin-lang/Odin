@@ -1965,6 +1965,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 		
+	case BuiltinProc___entry_point:
+		if (p->module->info->entry_point) {
+			lbValue entry_point = lb_find_procedure_value_from_entity(p->module, p->module->info->entry_point);
+			GB_ASSERT(entry_point.value != nullptr);
+			lb_emit_call(p, entry_point, {});
+		}
+		return {};
+
 	case BuiltinProc_syscall:
 		{
 			unsigned arg_count = cast(unsigned)ce->args.count;

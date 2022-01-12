@@ -338,6 +338,9 @@ struct CheckerInfo {
 	MPMCQueue<Entity *> required_global_variable_queue;
 	MPMCQueue<Entity *> required_foreign_imports_through_force_queue;
 
+	MPMCQueue<Ast *> intrinsics_entry_point_usage;
+
+
 };
 
 struct CheckerContext {
