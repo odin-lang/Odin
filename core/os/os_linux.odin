@@ -666,9 +666,9 @@ _readlink :: proc(path: string) -> (string, Errno) {
 	buf := make([]byte, bufsz)
 	for {
 		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
-		if rc == -1 {
+		if rc < 0 {
 			delete(buf)
-			return "", Errno(get_last_error())
+			return "", _get_errno(rc)
 		} else if rc == int(bufsz) {
 			// NOTE(laleksic, 2021-01-21): Any cleaner way to resize the slice?
 			bufsz *= 2
