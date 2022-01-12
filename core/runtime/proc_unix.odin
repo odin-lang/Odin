@@ -16,4 +16,8 @@ when ODIN_BUILD_MODE == "dynamic" {
 		context = default_context()
 		#force_no_inline _cleanup_runtime()
 	}
+	@(link_name="main", linkage="strong", require)
+	main :: proc(argc: i32, argv: [^]cstring) -> i32 {
+		return 0
+	}
 }
