@@ -1280,7 +1280,7 @@ bool parse_build_flags(Array<String> args) {
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								gb_printf_err("Valid build modes:\n");
-								gb_printf_err("\tdll, shared\n");
+								gb_printf_err("\tdll, shared, dynamic\n");
 								gb_printf_err("\tobj, object\n");
 								gb_printf_err("\texe\n");
 								gb_printf_err("\tasm, assembly, assembler\n");
