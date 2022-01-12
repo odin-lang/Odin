@@ -17,7 +17,7 @@ when ODIN_BUILD_MODE == "dynamic" {
 		#force_no_inline _cleanup_runtime()
 	}
 	@(link_name="main", linkage="strong", require)
-	main :: proc(argc: i32, argv: [^]cstring) -> i32 {
+	main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
 		return 0
 	}
 }
