@@ -1405,7 +1405,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	isize global_variable_max_count = 0;
-	Entity *entry_point = info->entry_point;
 	bool already_has_entry_point = false;
 
 	for_array(i, info->entities) {
@@ -1416,14 +1415,17 @@ void lb_generate_code(lbGenerator *gen) {
 			global_variable_max_count++;
 		} else if (e->kind == Entity_Procedure) {
 			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
-				GB_ASSERT(e == entry_point);
-				// entry_point = e;
+				GB_ASSERT(e == info->entry_point);
 			}
 			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
 			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
 			    	String link_name = e->Procedure.link_name;
-				if (link_name == "main" || link_name == "DllMain" || link_name == "WinMain" || link_name == "mainCRTStartup") {
+				if (link_name == "main" ||
+				    link_name == "DllMain" ||
+				    link_name == "WinMain" ||
+				    link_name == "wWinMain" ||
+				    link_name == "mainCRTStartup") {
 					already_has_entry_point = true;
 				}
 			}
@@ -1562,6 +1564,11 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Runtime Type Information Creation");
+	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
+
+	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
+	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, global_variables);
 
 	TIME_SECTION("LLVM Global Procedures and Types");
 	for_array(i, info->entities) {
@@ -1620,14 +1627,6 @@ void lb_generate_code(lbGenerator *gen) {
 			break;
 		}
 	}
-
-
-	TIME_SECTION("LLVM Runtime Type Information Creation");
-	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
-
-	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
-	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, global_variables);
-
 
 	TIME_SECTION("LLVM Procedure Generation");
 	for_array(j, gen->modules.entries) {
