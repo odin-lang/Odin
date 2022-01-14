@@ -214,16 +214,16 @@ matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
 matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
 	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
 	when intrinsics.type_is_integer(T) {
-		y[0, 0] = x[1, 1] / d
-		y[0, 1] = x[1, 0] / d
-		y[1, 0] = x[0, 1] / d
-		y[1, 1] = x[0, 0] / d
+		y[0, 0] = +x[1, 1] / d
+		y[0, 1] = -x[1, 0] / d
+		y[1, 0] = -x[0, 1] / d
+		y[1, 1] = +x[0, 0] / d
 	} else {
 		id := 1 / d
-		y[0, 0] = x[1, 1] * id
-		y[0, 1] = x[1, 0] * id
-		y[1, 0] = x[0, 1] * id
-		y[1, 1] = x[0, 0] * id
+		y[0, 0] = +x[1, 1] * id
+		y[0, 1] = -x[1, 0] * id
+		y[1, 0] = -x[0, 1] * id
+		y[1, 1] = +x[0, 0] * id
 	}
 	return
 }
