@@ -86,7 +86,8 @@ push_back :: proc(q: ^$Q/Queue($T), elem: T) -> bool {
 	if space(q^) == 0 {
 		_grow(q) or_return
 	}
-	q.data[q.len] = elem
+	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	q.data[idx] = elem
 	q.len += 1
 	return true
 }
@@ -126,6 +127,7 @@ pop_back_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 pop_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
 	assert(condition=q.len > 0, loc=loc)
 	elem = q.data[q.offset]
+	q.offset = (q.offset+1)%builtin.len(q.data)
 	q.len -= 1
 	return
 }
@@ -133,6 +135,7 @@ pop_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
 pop_front_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	if q.len > 0 {
 		elem = q.data[q.offset]
+		q.offset = (q.offset+1)%builtin.len(q.data)
 		q.len -= 1
 		ok = true
 	}
