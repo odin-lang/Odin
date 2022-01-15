@@ -1868,11 +1868,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 
 	lbValue x = lb_addr_get_ptr(p, lhs);
-
-
 	if (inline_array_arith) {
-	#if 1
-		#if 1
 		unsigned n = cast(unsigned)count;
 
 		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
@@ -1896,50 +1892,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 		for (unsigned i = 0; i < n; i++) {
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
-
-		#else
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
-		unsigned n = cast(unsigned)count;
-
-		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
-		auto rhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
-		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
-		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
-		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
-
-		for (unsigned i = 0; i < n; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, x, i);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			rhs_ptrs[i] = lb_emit_array_epi(p, y, i);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			y_loads[i] = lb_emit_load(p, rhs_ptrs[i]);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		#endif
-	#else
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
-		for (i64 i = 0; i < count; i++) {
-			lbValue a_ptr = lb_emit_array_epi(p, x, i);
-			lbValue b_ptr = lb_emit_array_epi(p, y, i);
-
-			lbValue a = lb_emit_load(p, a_ptr);
-			lbValue b = lb_emit_load(p, b_ptr);
-			lbValue c = lb_emit_arith(p, op, a, b, elem_type);
-			lb_emit_store(p, a_ptr, c);
-		}
-	#endif
 	} else {
 		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
 
