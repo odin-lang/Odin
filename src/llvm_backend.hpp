@@ -267,7 +267,6 @@ struct lbProcedure {
 	bool            is_done;
 
 	lbAddr           return_ptr;
-	Array<lbValue>   params;
 	Array<lbDefer>   defer_stmts;
 	Array<lbBlock *> blocks;
 	Array<lbBranchBlocks> branch_blocks;
