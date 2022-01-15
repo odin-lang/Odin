@@ -1572,6 +1572,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
 	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, global_variables);
+	gb_unused(startup_runtime);
 
 	TIME_SECTION("LLVM Global Procedures and Types");
 	for_array(i, info->entities) {
@@ -1638,12 +1639,6 @@ void lb_generate_code(lbGenerator *gen) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			lb_generate_procedure(m, p);
 		}
-	}
-
-
-	if (!already_has_entry_point) {
-		TIME_SECTION("LLVM main");
-		lb_create_main_procedure(default_module, startup_runtime);
 	}
 
 	for_array(j, gen->modules.entries) {
