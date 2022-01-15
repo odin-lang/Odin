@@ -783,7 +783,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
 		call_cleanup = false;
-	} else if (build_context.metrics.os == TargetOs_windows && (build_context.metrics.arch == TargetArch_386 || build_context.no_crt)) {
+	} else if (build_context.metrics.os == TargetOs_windows && (build_context.metrics.arch == TargetArch_i386 || build_context.no_crt)) {
 		name = str_lit("mainCRTStartup");
 	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
@@ -1140,7 +1140,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
-	case TargetArch_386:
+	case TargetArch_i386:
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();

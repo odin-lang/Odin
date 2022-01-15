@@ -1193,7 +1193,7 @@ LB_ABI_INFO(lb_get_abi_info) {
 		} else {
 			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 		}
-	case TargetArch_386:
+	case TargetArch_i386:
 		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	case TargetArch_arm64:
 		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);

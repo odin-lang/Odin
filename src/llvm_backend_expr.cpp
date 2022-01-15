@@ -508,7 +508,7 @@ bool lb_is_matrix_simdable(Type *t) {
 			case TargetArch_arm64:
 				// TODO(bill): determine when this is fine
 				return true;
-			case TargetArch_386:
+			case TargetArch_i386:
 			case TargetArch_wasm32:
 			case TargetArch_wasm64:
 				return false;
