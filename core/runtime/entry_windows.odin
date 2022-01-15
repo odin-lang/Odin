@@ -22,7 +22,7 @@ when ODIN_BUILD_MODE == .Dynamic {
 		return true
 	}
 } else when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
-	when ODIN_ARCH == "386" || ODIN_NO_CRT {
+	when ODIN_ARCH == "i386" || ODIN_NO_CRT {
 		@(link_name="mainCRTStartup", linkage="strong", require)
 		mainCRTStartup :: proc "stdcall" () -> i32 {
 			context = default_context()

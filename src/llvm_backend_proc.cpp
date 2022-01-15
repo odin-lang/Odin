@@ -1361,7 +1361,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_cpu_relax:
-		if (build_context.metrics.arch == TargetArch_386 ||
+		if (build_context.metrics.arch == TargetArch_i386 ||
 		    build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
 			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {});
@@ -2018,7 +2018,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
-			case TargetArch_386:
+			case TargetArch_i386:
 				{
 					GB_ASSERT(arg_count <= 7);
 					

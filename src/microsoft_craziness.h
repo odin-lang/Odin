@@ -460,7 +460,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             wchar_t *library_path = nullptr;
             if (build_context.metrics.arch == TargetArch_amd64) {
                 library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
-            } else if (build_context.metrics.arch == TargetArch_386) {
+            } else if (build_context.metrics.arch == TargetArch_i386) {
                 library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x86\\");
             } else {
                 continue;
@@ -472,7 +472,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
                 wchar_t *link_exe_path = nullptr;
                 if (build_context.metrics.arch == TargetArch_amd64) {
                     link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
-                } else if (build_context.metrics.arch == TargetArch_386) {
+                } else if (build_context.metrics.arch == TargetArch_i386) {
                     link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx86\\x86\\");
                 } else {
                     continue;
@@ -529,7 +529,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 
             if (build_context.metrics.arch == TargetArch_amd64) {
                 lib_path = concat(buffer, L"VC\\Lib\\amd64\\");
-            } else if (build_context.metrics.arch == TargetArch_386) {
+            } else if (build_context.metrics.arch == TargetArch_i386) {
                 lib_path = concat(buffer, L"VC\\Lib\\");
             } else {
                 continue;
@@ -542,7 +542,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             if (os_file_exists(vcruntime_filename)) {
                 if (build_context.metrics.arch == TargetArch_amd64) {
                     result->vs_exe_path = concat(buffer, L"VC\\bin\\");
-                } else if (build_context.metrics.arch == TargetArch_386) {
+                } else if (build_context.metrics.arch == TargetArch_i386) {
                     // result->vs_exe_path = concat(buffer, L"VC\\bin\\amd64_x86\\");
                     result->vs_exe_path = concat(buffer, L"VC\\bin\\x86_amd64\\");
                 } else {
@@ -573,7 +573,7 @@ Find_Result find_visual_studio_and_windows_sdk() {
         if (build_context.metrics.arch == TargetArch_amd64) {
             result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"um\\x64\\");
             result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"ucrt\\x64\\");
-        } else if (build_context.metrics.arch == TargetArch_386) {
+        } else if (build_context.metrics.arch == TargetArch_i386) {
             result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"um\\x86\\");
             result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"ucrt\\x86\\");
         }
