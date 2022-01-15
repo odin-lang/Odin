@@ -107,7 +107,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
-	p->params.allocator        = a;
 	p->defer_stmts.allocator   = a;
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
@@ -323,7 +322,6 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 
 	gbAllocator a = permanent_allocator();
 	p->children.allocator      = a;
-	p->params.allocator        = a;
 	p->defer_stmts.allocator   = a;
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
@@ -478,42 +476,29 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				if (arg_type->kind == lbArg_Ignore) {
 					continue;
 				} else if (arg_type->kind == lbArg_Direct) {
-					lbParamPasskind kind = lbParamPass_Value;
-					LLVMTypeRef param_type = lb_type(p->module, e->type);
-					if (param_type != arg_type->type) {
-						kind = lbParamPass_BitCast;
+					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						LLVMTypeRef param_type = lb_type(p->module, e->type);
+						LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
+
+						value = OdinLLVMBuildTransmute(p, value, param_type);
+
+						lbValue param = {};
+						param.value = value;
+						param.type = e->type;
+
+						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
+						lb_add_entity(p->module, e, ptr);
 					}
-					LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
-
-					value = OdinLLVMBuildTransmute(p, value, param_type);
-
-					lbValue param = {};
-					param.value = value;
-					param.type = e->type;
-					array_add(&p->params, param);
-
-					if (e->token.string.len != 0) {
-						lbAddr l = lb_add_local(p, e->type, e, false, param_index);
-						lb_addr_store(p, l, param);
-					}
-
-					param_index += 1;
 				} else if (arg_type->kind == lbArg_Indirect) {
-					LLVMValueRef value_ptr = LLVMGetParam(p->value, param_offset+param_index);
-					LLVMValueRef value = LLVMBuildLoad(p->builder, value_ptr, "");
+					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						lbValue ptr = {};
+						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
+						ptr.type = alloc_type_pointer(e->type);
 
-					lbValue param = {};
-					param.value = value;
-					param.type = e->type;
-					array_add(&p->params, param);
-
-					lbValue ptr = {};
-					ptr.value = value_ptr;
-					ptr.type = alloc_type_pointer(e->type);
-
-					lb_add_entity(p->module, e, ptr);
-					param_index += 1;
+						lb_add_entity(p->module, e, ptr);
+					}
 				}
+				param_index += 1;
 			}
 		}
 
