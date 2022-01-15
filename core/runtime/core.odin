@@ -386,6 +386,19 @@ Raw_Cstring :: struct {
 }
 
 
+/*
+	// Defined internally by the compiler
+	Odin_Build_Mode_Type :: enum int {
+		Executable,
+		Dynamic,
+		Object,
+		Assembly,
+		LLVM_IR,
+	}
+*/
+Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
+
+
 /////////////////////////////
 // Init Startup Procedures //
 /////////////////////////////

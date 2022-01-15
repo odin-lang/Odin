@@ -780,6 +780,54 @@ AstPackage *create_builtin_package(char const *name) {
 	return pkg;
 }
 
+struct GlobalEnumValue {
+	char const *name;
+	i64 value;
+};
+
+Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count) {
+	Scope *scope = create_scope(nullptr, builtin_pkg->scope);
+	Entity *e = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+
+	Type *enum_type = alloc_type_enum();
+	Type *named_type = alloc_type_named(type_name, enum_type, e);
+	set_base_type(named_type, enum_type);
+	enum_type->Enum.base_type = t_int;
+	enum_type->Enum.scope = scope;
+
+	auto fields = array_make<Entity *>(permanent_allocator(), value_count);
+	for (isize i = 0; i < value_count; i++) {
+		i64 value = values[i].value;
+		Entity *e = alloc_entity_constant(scope, make_token_ident(values[i].name), named_type, exact_value_i64(value));
+		e->flags |= EntityFlag_Visited;
+		e->state = EntityState_Resolved;
+		fields[i] = e;
+
+		Entity *ie = scope_insert(scope, e);
+		GB_ASSERT(ie == nullptr);
+	}
+
+
+	enum_type->Enum.fields = fields;
+	enum_type->Enum.min_value_index = 0;
+	enum_type->Enum.max_value_index = value_count-1;
+	enum_type->Enum.min_value = &enum_type->Enum.fields[enum_type->Enum.min_value_index]->Constant.value;
+	enum_type->Enum.max_value = &enum_type->Enum.fields[enum_type->Enum.max_value_index]->Constant.value;
+
+	return slice_from_array(fields);
+}
+void add_global_enum_constant(Slice<Entity *> const &fields, char const *name, i64 value) {
+	for (Entity *field : fields) {
+		GB_ASSERT(field->kind == Entity_Constant);
+		if (value == exact_value_to_i64(field->Constant.value)) {
+			add_global_constant(name, field->type, field->Constant.value);
+			return;
+		}
+	}
+	GB_PANIC("Unfound enum value for global constant: %s %lld", name, cast(long long)value);
+}
+
+
 void init_universal(void) {
 	BuildContext *bc = &build_context;
 
@@ -815,7 +863,21 @@ void init_universal(void) {
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
 	
-	add_global_string_constant("ODIN_BUILD_MODE", bc->ODIN_BUILD_MODE);
+	{
+		GlobalEnumValue values[BuildMode_COUNT] = {
+			{"Executable", BuildMode_Executable},
+			{"Dynamic",    BuildMode_DynamicLibrary},
+			{"Object",     BuildMode_Object},
+			{"Assembly",   BuildMode_Assembly},
+			{"LLVM_IR",    BuildMode_LLVM_IR},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Build_Mode_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_BUILD_MODE", bc->build_mode);
+	}
+
+	// add_global_string_constant("ODIN_BUILD_MODE", bc->ODIN_BUILD_MODE);
+
 	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
 	add_global_bool_constant("ODIN_DEFAULT_TO_NIL_ALLOCATOR", bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR);

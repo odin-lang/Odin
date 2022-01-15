@@ -119,6 +119,58 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
 void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
 
+
+void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
+	auto results = did_you_mean_results(d);
+	if (results.count != 0) {
+		error_line("\tSuggestion: Did you mean?\n");
+		for_array(i, results) {
+			String const &target = results[i].target;
+			error_line("\t\t%s%.*s\n", prefix, LIT(target));
+			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
+		}
+	}
+}
+
+void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, char const *prefix = "") {
+	ERROR_BLOCK();
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, fields) {
+		did_you_mean_append(&d, fields[i]->token.string);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
+void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields, char const *prefix = "") {
+	ERROR_BLOCK();
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, fields) {
+		did_you_mean_append(&d, fields[i]->token.string);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
+void check_did_you_mean_scope(String const &name, Scope *scope, char const *prefix = "") {
+	ERROR_BLOCK();
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	mutex_lock(&scope->mutex);
+	for_array(i, scope->elements.entries) {
+		Entity *e = scope->elements.entries[i].value;
+		did_you_mean_append(&d, e->token.string);
+	}
+	mutex_unlock(&scope->mutex);
+	check_did_you_mean_print(&d, prefix);
+}
+
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
@@ -3361,7 +3413,17 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 			}
 		}
 	}
+	ERROR_BLOCK();
+
 	error(operand->expr, "Cannot convert untyped value '%s' to '%s' from '%s'%s", expr_str, type_str, from_type_str, extra_text);
+	if (operand->value.kind == ExactValue_String) {
+		String key = operand->value.value_string;
+		if (is_type_string(operand->type) && is_type_enum(target_type)) {
+			gb_printf_err("HERE!\n");
+			Type *et = base_type(target_type);
+			check_did_you_mean_type(key, et->Enum.fields, ".");
+		}
+	}
 
 	gb_string_free(from_type_str);
 	gb_string_free(type_str);
@@ -3978,56 +4040,6 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 
 	if (success_) *success_ = true;
 	return empty_exact_value;
-}
-void check_did_you_mean_print(DidYouMeanAnswers *d) {
-	auto results = did_you_mean_results(d);
-	if (results.count != 0) {
-		error_line("\tSuggestion: Did you mean?\n");
-		for_array(i, results) {
-			String const &target = results[i].target;
-			error_line("\t\t%.*s\n", LIT(target));
-			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
-		}
-	}
-}
-
-void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) {
-	ERROR_BLOCK();
-	
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
-	defer (did_you_mean_destroy(&d));
-
-	for_array(i, fields) {
-		did_you_mean_append(&d, fields[i]->token.string);
-	}
-	check_did_you_mean_print(&d);
-}
-
-void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields) {
-	ERROR_BLOCK();
-	
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
-	defer (did_you_mean_destroy(&d));
-
-	for_array(i, fields) {
-		did_you_mean_append(&d, fields[i]->token.string);
-	}
-	check_did_you_mean_print(&d);
-}
-
-void check_did_you_mean_scope(String const &name, Scope *scope) {
-	ERROR_BLOCK();
-	
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
-	defer (did_you_mean_destroy(&d));
-
-	mutex_lock(&scope->mutex);
-	for_array(i, scope->elements.entries) {
-		Entity *e = scope->elements.entries[i].value;
-		did_you_mean_append(&d, e->token.string);
-	}
-	mutex_unlock(&scope->mutex);
-	check_did_you_mean_print(&d);
 }
 
 Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize new_count) {
