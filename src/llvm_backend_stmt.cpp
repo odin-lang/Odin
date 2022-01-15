@@ -2172,10 +2172,6 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	lb_start_block(p, b);
 	if (d.kind == lbDefer_Node) {
 		lb_build_stmt(p, d.stmt);
-	} else if (d.kind == lbDefer_Instr) {
-		// NOTE(bill): Need to make a new copy
-		LLVMValueRef instr = LLVMInstructionClone(d.instr.value);
-		LLVMInsertIntoBuilder(p->builder, instr);
 	} else if (d.kind == lbDefer_Proc) {
 		lb_emit_call(p, d.proc.deferred, d.proc.result_as_args);
 	}
