@@ -1766,6 +1766,8 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 }
 
 void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
+	GB_ASSERT(op != Token_Eq);
+
 	Type *lhs_type = lb_addr_type(lhs);
 	Type *array_type = base_type(lhs_type);
 	GB_ASSERT(is_type_array_like(array_type));
@@ -1795,7 +1797,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			}
 			indices[index_count++] = index;
 		}
-		gb_sort_array(indices, index_count, gb_i32_cmp(0));
 
 		lbValue lhs_ptrs[4] = {};
 		lbValue x_loads[4]  = {};
@@ -1840,7 +1841,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			}
 			indices[index_count++] = index;
 		}
-		gb_sort_array(indices.data, index_count, gb_i32_cmp(0));
 
 		lbValue lhs_ptrs[4] = {};
 		lbValue x_loads[4]  = {};
