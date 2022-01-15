@@ -398,6 +398,16 @@ Raw_Cstring :: struct {
 */
 Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 
+/*
+	// Defined internally by the compiler
+	Odin_Endian_Type :: enum int {
+		Unknown,
+		Little,
+		Big,
+	}
+*/
+Odin_Endian_Type :: type_of(ODIN_ENDIAN)
+
 
 /////////////////////////////
 // Init Startup Procedures //

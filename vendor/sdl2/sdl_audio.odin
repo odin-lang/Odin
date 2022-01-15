@@ -59,7 +59,7 @@ AUDIO_F32LSB    :: 0x8120  /**< 32-bit floating point samples */
 AUDIO_F32MSB    :: 0x9120  /**< As above, but big-endian byte order */
 AUDIO_F32       :: AUDIO_F32LSB
 
-when ODIN_ENDIAN == "little"  {
+when ODIN_ENDIAN == .Little {
 	AUDIO_U16SYS :: AUDIO_U16LSB
 	AUDIO_S16SYS :: AUDIO_S16LSB
 	AUDIO_S32SYS :: AUDIO_S32LSB
