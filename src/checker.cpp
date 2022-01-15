@@ -858,7 +858,6 @@ void init_universal(void) {
 	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant("ODIN_OS",      bc->ODIN_OS);
 	add_global_string_constant("ODIN_ARCH",    bc->ODIN_ARCH);
-	add_global_string_constant("ODIN_ENDIAN",  bc->ODIN_ENDIAN);
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
@@ -876,7 +875,19 @@ void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_BUILD_MODE", bc->build_mode);
 	}
 
-	// add_global_string_constant("ODIN_BUILD_MODE", bc->ODIN_BUILD_MODE);
+	add_global_string_constant("ODIN_ENDIAN_STRING", target_endian_names[target_endians[bc->metrics.arch]]);
+	{
+		GlobalEnumValue values[TargetEndian_COUNT] = {
+			{"Unknown", TargetEndian_Invalid},
+
+			{"Little",  TargetEndian_Little},
+			{"Big",     TargetEndian_Big},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Endian_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_ENDIAN", target_endians[bc->metrics.arch]);
+	}
+
 
 	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);
