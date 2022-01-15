@@ -485,16 +485,16 @@ i32 linker_stage(lbGenerator *gen) {
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 				//       make sure to also change the 'mtriple' param passed to 'opt'
 				#if defined(GB_CPU_ARM)
-				" -macosx_version_min 11.0.0 "
+				" -mmacosx-version-min=11.0.0 "
 				#else
-				" -macosx_version_min 10.8.0 "
+				" -mmacosx-version-min=10.8.0 "
 				#endif
 				// This points the linker to where the entry point is
 				" -e _main "
 			#endif
 			, object_files, LIT(output_base), LIT(output_ext),
 			#if defined(GB_SYSTEM_OSX)
-			  "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
+			  "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
 			#else
 			  "-lc -lm",
 			#endif
