@@ -119,6 +119,8 @@ enum BuildModeKind {
 	BuildMode_Object,
 	BuildMode_Assembly,
 	BuildMode_LLVM_IR,
+
+	BuildMode_COUNT,
 };
 
 enum CommandKind : u32 {
@@ -172,10 +174,9 @@ struct BuildContext {
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_MODE;
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
-	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
 
 	TargetEndianKind endian_kind;
 
@@ -855,24 +856,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
-	switch (bc->build_mode) {
-	default:
-	case BuildMode_Executable:
-		bc->ODIN_BUILD_MODE = str_lit("executable");
-		break;
-	case BuildMode_DynamicLibrary:
-		bc->ODIN_BUILD_MODE = str_lit("dynamic");
-		break;
-	case BuildMode_Object:
-		bc->ODIN_BUILD_MODE = str_lit("object");
-		break;
-	case BuildMode_Assembly:
-		bc->ODIN_BUILD_MODE = str_lit("assembly");
-		break;
-	case BuildMode_LLVM_IR:
-		bc->ODIN_BUILD_MODE = str_lit("llvm-ir");
-		break;
-	}
 	
 	bc->copy_file_contents = true;
 

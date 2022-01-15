@@ -4,7 +4,7 @@ package runtime
 
 import "core:intrinsics"
 
-when ODIN_BUILD_MODE == "dynamic" {
+when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="DllMain", linkage="strong", require)
 	DllMain :: proc "stdcall" (hinstDLL: rawptr, fdwReason: u32, lpReserved: rawptr) -> b32 {
 		context = default_context()
