@@ -1767,7 +1767,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	img := image
 
 	// PBM 16-bit images are big endian
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		if img.depth == 16 {
 			// The pixel components are in Big Endian. Let's byteswap back.
 			input  := mem.slice_data_cast([]u16,   img.pixels.buf[:])
