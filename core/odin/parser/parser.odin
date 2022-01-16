@@ -1312,7 +1312,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		}
 
 		results: [dynamic]^ast.Expr
-		for p.curr_tok.kind != .Semicolon {
+		for p.curr_tok.kind != .Semicolon && p.curr_tok.kind != .Close_Brace {
 			result := parse_expr(p, false)
 			append(&results, result)
 			if p.curr_tok.kind != .Comma ||
