@@ -292,8 +292,9 @@ bool odin_doc_append_comment_group_string(Array<u8> *buf, CommentGroup *g) {
 		String comment = g->list[i].string;
 		String original_comment = comment;
 
-		bool slash_slash = comment[1] == '/';
+		bool slash_slash = false;
 		if (comment[1] == '/') {
+			slash_slash = true;
 			comment.text += 2;
 			comment.len  -= 2;
 		} else if (comment[1] == '*') {
@@ -330,7 +331,7 @@ bool odin_doc_append_comment_group_string(Array<u8> *buf, CommentGroup *g) {
 					}
 				}
 				String line = substring(comment, pos, end);
-				pos = end+1;
+				pos = end;
 				String trimmed_line = string_trim_whitespace(line);
 				if (trimmed_line.len == 0) {
 					if (count == 0) {
