@@ -513,7 +513,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		break;
 	case Type_Generic:
 		doc_type.kind = OdinDocType_Generic;
-		doc_type.name = odin_doc_write_string(w, type->Generic.name);
+		doc_type.name = odin_doc_write_string(w, type->Generic.entity->token.string);
 		if (type->Generic.specialized) {
 			doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
 		}

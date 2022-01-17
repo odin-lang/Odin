@@ -1,4 +1,3 @@
-//+ignore
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -8,7 +7,7 @@
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
 
-
+//+ignore
 package math_big
 
 import "core:time"
