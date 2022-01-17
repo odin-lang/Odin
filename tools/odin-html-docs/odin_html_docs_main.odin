@@ -114,27 +114,30 @@ main :: proc() {
 	entities = array(header.entities)
 	types    = array(header.types)
 
-	fullpaths: [dynamic]string
-	defer delete(fullpaths)
+	{
+		fullpaths: [dynamic]string
+		defer delete(fullpaths)
 
-	for pkg in pkgs[1:] {
-		append(&fullpaths, str(pkg.fullpath))
-	}
-	path_prefix := common_prefix(fullpaths[:])
-
-	pkgs_to_use = make(map[string]^doc.Pkg)
-	for fullpath, i in fullpaths {
-		path := strings.trim_prefix(fullpath, path_prefix)
-		if strings.has_prefix(path, "core/") {
-			pkgs_to_use[strings.trim_prefix(path, "core/")] = &pkgs[i+1]
+		for pkg in pkgs[1:] {
+			append(&fullpaths, str(pkg.fullpath))
 		}
-	}
-	sort.map_entries_by_key(&pkgs_to_use)
-	for path, pkg in pkgs_to_use {
-		pkg_to_path[pkg] = path
+		path_prefix := common_prefix(fullpaths[:])
+
+		pkgs_to_use = make(map[string]^doc.Pkg)
+		for fullpath, i in fullpaths {
+			path := strings.trim_prefix(fullpath, path_prefix)
+			if strings.has_prefix(path, "core/") {
+				pkgs_to_use[strings.trim_prefix(path, "core/")] = &pkgs[i+1]
+			}
+		}
+		sort.map_entries_by_key(&pkgs_to_use)
+		for path, pkg in pkgs_to_use {
+			pkg_to_path[pkg] = path
+		}
 	}
 
 	b := strings.make_builder()
+	defer strings.destroy_builder(&b)
 	w := strings.to_writer(&b)
 	{
 		strings.reset_builder(&b)
@@ -369,7 +372,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		if tn_pkg != pkg {
 			fmt.wprintf(w, `%s.`, str(pkgs[pkg].name))
 		}
-		fmt.wprintf(w, `<a href="/core/{0:s}/#{1:s}">{1:s}</a></span>`, pkg_to_path[&pkgs[tn_pkg]], name)
+		fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a></span>`, pkg_to_path[&pkgs[tn_pkg]], name)
 	case .Generic:
 		name := str(type.name)
 		io.write_byte(w, '$')
@@ -694,12 +697,49 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		case .Invalid, .Import_Name, .Library_Name:
 			// ignore
 		case .Constant:
+			fmt.wprint(w, "<pre>")
+			the_type := types[e.type]
+			if the_type.kind == .Basic && .Untyped in (transmute(doc.Type_Flags_Basic)the_type.flags) {
+				fmt.wprintf(w, "%s :: ", name)
+			} else {
+				fmt.wprintf(w, "%s: ", name)
+				write_type(writer, the_type, {.Allow_Indent})
+				fmt.wprintf(w, " : ")
+			}
+
+			init_string := str(e.init_string)
+			assert(init_string != "")
+			io.write_string(w, init_string)
+			fmt.wprintln(w, "</pre>")
 		case .Variable:
+			fmt.wprint(w, "<pre>")
+			fmt.wprintf(w, "%s: ", name)
+			write_type(writer, types[e.type], {.Allow_Indent})
+			init_string := str(e.init_string)
+			if init_string != "" {
+				io.write_string(w, " = ")
+				io.write_string(w, init_string)
+			}
+			fmt.wprintln(w, "</pre>")
+
 		case .Type_Name:
 			fmt.wprint(w, "<pre>")
 			fmt.wprintf(w, "%s :: ", name)
-			tn := base_type(types[e.type])
-			write_type(writer, tn, {.Allow_Indent})
+			the_type := types[e.type]
+			type_to_print := the_type
+			if the_type.kind == .Named {
+				if e.pos != entities[array(the_type.entities)[0]].pos {
+					io.write_string(w, "distinct ")
+				} else {
+					bt := base_type(the_type)
+					#partial switch bt.kind {
+					case .Struct, .Union, .Proc, .Enum:
+						io.write_string(w, "distinct ")
+						type_to_print = bt
+					}
+				}
+			}
+			write_type(writer, type_to_print, {.Allow_Indent})
 			fmt.wprintln(w, "</pre>")
 		case .Procedure:
 			fmt.wprint(w, "<pre>")
@@ -719,6 +759,25 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprint(w, " {…}")
 			fmt.wprintln(w, "</pre>")
 		case .Proc_Group:
+			fmt.wprint(w, "<pre>")
+			fmt.wprintf(w, "%s :: proc{{\n", name)
+			for entity_index in array(e.grouped_entities) {
+				this_proc := &entities[entity_index]
+				this_pkg := files[this_proc.pos.file].pkg
+				io.write_byte(w, '\t')
+				if this_pkg != pkg_index {
+					fmt.wprintf(w, "%s.", str(pkgs[this_pkg].name))
+				}
+				name := str(this_proc.name)
+				fmt.wprintf(w, `<a class="code-procedure" href="/core/{0:s}/#{1:s}">`, pkg_to_path[&pkgs[this_pkg]], name)
+				io.write_string(w, name)
+				io.write_string(w, `</a>`)
+				io.write_byte(w, ',')
+				io.write_byte(w, '\n')
+			}
+			fmt.wprintln(w, "}")
+			fmt.wprintln(w, "</pre>")
+
 		}
 
 		write_docs(w, pkg, strings.trim_space(str(e.docs)))

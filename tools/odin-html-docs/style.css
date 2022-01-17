@@ -29,3 +29,7 @@ pre {
 	font-weight: bold;
 	color: #00bfd5;
 }
+
+pre a.code-procedure {
+	color: #079300;
+}
