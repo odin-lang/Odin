@@ -45,6 +45,14 @@ base_type :: proc(t: doc.Type) -> doc.Type {
 	return t
 }
 
+is_type_untyped :: proc(type: doc.Type) -> bool {
+	if type.kind == .Basic {
+		flags := transmute(doc.Type_Flags_Basic)type.flags
+		return .Untyped in flags
+	}
+	return false
+}
+
 common_prefix :: proc(strs: []string) -> string {
 	if len(strs) == 0 {
 		return ""
@@ -275,7 +283,9 @@ write_core_directory :: proc(w: io.Writer) {
 			line_doc, _, _ := strings.partition(str(dir.pkg.docs), "\n")
 			line_doc = strings.trim_space(line_doc)
 			if line_doc != "" {
-				fmt.wprintf(w, `<td class="pkg-line-doc">%s</td>`, line_doc)
+				io.write_string(w, `<td class="pkg-line-doc">`)
+				write_doc_line(w, line_doc)
+				io.write_string(w, `</td>`)
 			}
 		}
 		fmt.wprintf(w, "</tr>\n")
@@ -289,7 +299,9 @@ write_core_directory :: proc(w: io.Writer) {
 			line_doc, _, _ := strings.partition(str(child.pkg.docs), "\n")
 			line_doc = strings.trim_space(line_doc)
 			if line_doc != "" {
-				fmt.wprintf(w, `<td class="pkg-line-doc">%s</td>`, line_doc)
+				io.write_string(w, `<td class="pkg-line-doc">`)
+				write_doc_line(w, line_doc)
+				io.write_string(w, `</td>`)
 			}
 
 			fmt.wprintf(w, "</tr>\n")
@@ -305,16 +317,31 @@ is_entity_blank :: proc(e: doc.Entity_Index) -> bool {
 	return name == "" || name == "_"
 }
 
+write_where_clauses :: proc(w: io.Writer, where_clauses: []doc.String) {
+	if len(where_clauses) != 0 {
+		io.write_string(w, " where ")
+		for clause, i in where_clauses {
+			if i > 0 {
+				io.write_string(w, ", ")
+			}
+			io.write_string(w, str(clause))
+		}
+	}
+}
+
+
 Write_Type_Flag :: enum {
 	Is_Results,
 	Variadic,
 	Allow_Indent,
+	Poly_Names,
 }
 Write_Type_Flags :: distinct bit_set[Write_Type_Flag]
 Type_Writer :: struct {
 	w:      io.Writer,
 	pkg:    doc.Pkg_Index,
 	indent: int,
+	generic_scope: map[string]bool,
 }
 
 write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
@@ -329,30 +356,65 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		if .Param_Any_Int   in e.flags { io.write_string(w, "#any_int ")   }
 
 		init_string := str(e.init_string)
-		switch init_string {
-		case "#caller_location":
+		switch {
+		case init_string == "#caller_location":
 			assert(name != "")
 			io.write_string(w, name)
 			io.write_string(w, " := ")
 			io.write_string(w, `<a href="/core/runtime/#Source_Code_Location">`)
 			io.write_string(w, init_string)
 			io.write_string(w, `</a>`)
-
+		case strings.has_prefix(init_string, "context."):
+			io.write_string(w, name)
+			io.write_string(w, " := ")
+			io.write_string(w, `<a href="/core/runtime/#Context">`)
+			io.write_string(w, init_string)
+			io.write_string(w, `</a>`)
 		case:
-			if name != "" {
-				io.write_string(w, name)
-				io.write_string(w, ": ")
-			}
-			padding := max(name_width-len(name), 0)
-			for _ in 0..<padding {
-				io.write_byte(w, ' ')
+			the_type := types[e.type]
+			type_flags := flags - {.Is_Results}
+			if .Param_Ellipsis in e.flags {
+				type_flags += {.Variadic}
 			}
 
-			param_flags := flags - {.Is_Results}
-			if .Param_Ellipsis in e.flags {
-				param_flags += {.Variadic}
+			#partial switch e.kind {
+			case .Constant:
+				assert(name != "")
+				io.write_byte(w, '$')
+				io.write_string(w, name)
+				generic_scope[name] = true
+				if !is_type_untyped(the_type) {
+					io.write_string(w, ": ")
+					write_type(writer, the_type, type_flags)
+					io.write_string(w, " = ")
+					io.write_string(w, init_string)
+				} else {
+					io.write_string(w, " := ")
+					io.write_string(w, init_string)
+				}
+				return
+
+			case .Variable:
+				if name != "" {
+					io.write_string(w, name)
+					io.write_string(w, ": ")
+				}
+				write_type(writer, the_type, type_flags)
+			case .Type_Name:
+				io.write_byte(w, '$')
+				io.write_string(w, name)
+				generic_scope[name] = true
+				io.write_string(w, ": ")
+				if the_type.kind == .Generic {
+					io.write_string(w, "typeid")
+					if ts := array(the_type.types); len(ts) == 1 {
+						io.write_byte(w, '/')
+						write_type(writer, types[ts[0]], type_flags)
+					}
+				} else {
+					write_type(writer, the_type, type_flags)
+				}
 			}
-			write_type(writer, types[e.type], param_flags)
 
 			if init_string != "" {
 				io.write_string(w, " = ")
@@ -361,14 +423,13 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		}
 	}
 	write_poly_params :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
-		type_entites := array(type.entities)
-		for entity_index, i in type_entites {
-			if i > 0 {
-				io.write_string(w, ", ")
-			}
-			write_param_entity(writer, &entities[entity_index], flags)
+		if type.polymorphic_params != 0 {
+			io.write_byte(w, '(')
+			write_type(writer, types[type.polymorphic_params], flags+{.Poly_Names})
+			io.write_byte(w, ')')
 		}
-		io.write_byte(w, ')')
+
+		write_where_clauses(w, array(type.where_clauses))
 	}
 	do_indent :: proc(using writer: ^Type_Writer, flags: Write_Type_Flags) {
 		if .Allow_Indent not_in flags {
@@ -400,7 +461,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		// ignore
 	case .Basic:
 		type_flags := transmute(doc.Type_Flags_Basic)type.flags
-		if .Untyped in type_flags {
+		if is_type_untyped(type) {
 			io.write_string(w, str(type.name))
 		} else {
 			fmt.wprintf(w, `<a href="">%s</a>`, str(type.name))
@@ -408,17 +469,23 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 	case .Named:
 		e := entities[type_entites[0]]
 		name := str(type.name)
-		fmt.wprintf(w, `<span>`)
 		tn_pkg := files[e.pos.file].pkg
 		if tn_pkg != pkg {
 			fmt.wprintf(w, `%s.`, str(pkgs[tn_pkg].name))
 		}
-		fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a></span>`, pkg_to_path[&pkgs[tn_pkg]], name)
+		if n := strings.contains_rune(name, '('); n >= 0 {
+			fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name[:n])
+			io.write_string(w, name[n:])
+		} else {
+			fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name)
+		}
 	case .Generic:
 		name := str(type.name)
-		io.write_byte(w, '$')
+		if name not_in generic_scope {
+			io.write_byte(w, '$')
+		}
 		io.write_string(w, name)
-		if len(array(type.types)) == 1 {
+		if name not_in generic_scope && len(array(type.types)) == 1 {
 			io.write_byte(w, '/')
 			write_type(writer, types[type_types[0]], flags)
 		}
@@ -454,9 +521,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 	case .Struct:
 		type_flags := transmute(doc.Type_Flags_Struct)type.flags
 		io.write_string(w, "struct")
-		if .Polymorphic in type_flags {
-			write_poly_params(writer, type, flags)
-		}
+		write_poly_params(writer, type, flags)
 		if .Packed in type_flags { io.write_string(w, " #packed") }
 		if .Raw_Union in type_flags { io.write_string(w, " #raw_union") }
 		if custom_align := str(type.custom_align); custom_align != "" {
@@ -483,9 +548,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 	case .Union:
 		type_flags := transmute(doc.Type_Flags_Union)type.flags
 		io.write_string(w, "union")
-		if .Polymorphic in type_flags {
-			write_poly_params(writer, type, flags)
-		}
+		write_poly_params(writer, type, flags)
 		if .No_Nil in type_flags { io.write_string(w, " #no_nil") }
 		if .Maybe in type_flags { io.write_string(w, " #maybe") }
 		if custom_align := str(type.custom_align); custom_align != "" {
@@ -631,6 +694,25 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 	}
 }
 
+write_doc_line :: proc(w: io.Writer, text: string) {
+	text := text
+	for len(text) != 0 {
+		if strings.count(text, "`") >= 2 {
+			n := strings.index_byte(text, '`')
+			io.write_string(w, text[:n])
+			io.write_string(w, "<code class=\"code-inline\">")
+			remaining := text[n+1:]
+			m := strings.index_byte(remaining, '`')
+			io.write_string(w, remaining[:m])
+			io.write_string(w, "</code>")
+			text = remaining[m+1:]
+		} else {
+			io.write_string(w, text)
+			return
+		}
+	}
+}
+
 write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 	if docs == "" {
 		return
@@ -663,8 +745,11 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 			fmt.wprintln(w, "<p>")
 		}
 		assert(!was_code)
+
 		was_paragraph = true
-		fmt.wprintln(w, text)
+		write_doc_line(w, text)
+
+		io.write_byte(w, '\n')
 	}
 	if was_code {
 		// assert(!was_paragraph, str(pkg.name))
@@ -677,6 +762,24 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 }
 
 write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
+	write_breadcrumbs :: proc(w: io.Writer, path: string) {
+		dirs := strings.split(path, "/")
+		io.write_string(w, "<ul class=\"documentation-breadcrumb\">\n")
+		for dir, i in dirs {
+			url := strings.join(dirs[:i+1], "/")
+			short_path := strings.join(dirs[1:i+1], "/")
+			if i == 0 || short_path in pkgs_to_use {
+				fmt.wprintf(w, "<li><a href=\"/%s\">%s</a></li>", url, dir)
+			} else {
+				fmt.wprintf(w, "<li>%s</li>", dir)
+			}
+		}
+		io.write_string(w, "</ul>\n")
+
+	}
+	write_breadcrumbs(w, fmt.tprintf("core/%s", path))
+
+
 	fmt.wprintf(w, "<h1>package core:%s</h1>\n", path)
 	fmt.wprintln(w, "<h2>Documentation</h2>")
 	docs := strings.trim_space(str(pkg.docs))
@@ -723,7 +826,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	slice.sort_by_key(pkg_vars[:],        entity_key)
 	slice.sort_by_key(pkg_consts[:],      entity_key)
 
-	print_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
+	write_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
 		fmt.wprintf(w, "<h4>%s</h4>\n", name)
 		fmt.wprintln(w, `<section class="documentation-index">`)
 		if len(entities) == 0 {
@@ -740,16 +843,16 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	}
 
 
-	print_index(w, "Procedures",       pkg_procs[:])
-	print_index(w, "Procedure Groups", pkg_proc_groups[:])
-	print_index(w, "Types",            pkg_types[:])
-	print_index(w, "Variables",        pkg_vars[:])
-	print_index(w, "Constants",        pkg_consts[:])
+	write_index(w, "Procedures",       pkg_procs[:])
+	write_index(w, "Procedure Groups", pkg_proc_groups[:])
+	write_index(w, "Types",            pkg_types[:])
+	write_index(w, "Variables",        pkg_vars[:])
+	write_index(w, "Constants",        pkg_consts[:])
 
 	fmt.wprintln(w, "</section>")
 
 
-	print_entity :: proc(w: io.Writer, e: ^doc.Entity) {
+	write_entity :: proc(w: io.Writer, e: ^doc.Entity) {
 		write_attributes :: proc(w: io.Writer, e: ^doc.Entity) {
 			for attr in array(e.attributes) {
 				io.write_string(w, "@(")
@@ -764,23 +867,24 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			}
 		}
 
-
 		pkg_index := files[e.pos.file].pkg
 		pkg := &pkgs[pkg_index]
 		writer := &Type_Writer{
 			w = w,
 			pkg = pkg_index,
 		}
+		defer delete(writer.generic_scope)
 
 		name := str(e.name)
 		path := pkg_to_path[pkg]
 		filename := slashpath.base(str(files[e.pos.file].name))
-		fmt.wprintf(w, "<h4 id=\"{0:s}\"><span><a class=\"documentation-id-link\" href=\"#%s\">{0:s}", name)
-		fmt.wprintf(w, "<span class=\"a-hidden\">&nbsp;¶</span></a></span></h4>\n")
-		defer if e.pos.file != 0 && e.pos.line > 0 {
+		fmt.wprintf(w, "<h4 id=\"{0:s}\"><span><a class=\"documentation-id-link\" href=\"#{0:s}\">{0:s}", name)
+		fmt.wprintf(w, "<span class=\"a-hidden\">&nbsp;¶</span></a></span>")
+		if e.pos.file != 0 && e.pos.line > 0 {
 			src_url := fmt.tprintf("%s/%s/%s#L%d", GITHUB_CORE_URL, path, filename, e.pos.line)
-			fmt.wprintf(w, "<a class=\"documentation-source\" href=\"{0:s}\"><em>Source:&nbsp;{0:s}</em></a>", src_url)
+			fmt.wprintf(w, "<div class=\"documentation-source\"><a href=\"{0:s}\"><em>Source</em></a></div>", src_url)
 		}
+		fmt.wprintf(w, "</h4>\n")
 
 		switch e.kind {
 		case .Invalid, .Import_Name, .Library_Name:
@@ -788,7 +892,21 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		case .Constant:
 			fmt.wprint(w, "<pre>")
 			the_type := types[e.type]
-			if the_type.kind == .Basic && .Untyped in (transmute(doc.Type_Flags_Basic)the_type.flags) {
+
+			init_string := str(e.init_string)
+			assert(init_string != "")
+
+			ignore_type := true
+			if the_type.kind == .Basic && is_type_untyped(the_type) {
+			} else {
+				ignore_type = false
+				type_name := str(the_type.name)
+				if type_name != "" && strings.has_prefix(init_string, type_name) {
+					ignore_type = true
+				}
+			}
+
+			if ignore_type {
 				fmt.wprintf(w, "%s :: ", name)
 			} else {
 				fmt.wprintf(w, "%s: ", name)
@@ -796,8 +914,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 				fmt.wprintf(w, " : ")
 			}
 
-			init_string := str(e.init_string)
-			assert(init_string != "")
+
 			io.write_string(w, init_string)
 			fmt.wprintln(w, "</pre>")
 		case .Variable:
@@ -835,17 +952,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprint(w, "<pre>")
 			fmt.wprintf(w, "%s :: ", name)
 			write_type(writer, types[e.type], nil)
-			where_clauses := array(e.where_clauses)
-			if len(where_clauses) != 0 {
-				io.write_string(w, " where ")
-				for clause, i in where_clauses {
-					if i > 0 {
-						io.write_string(w, ", ")
-					}
-					io.write_string(w, str(clause))
-				}
-			}
-
+			write_where_clauses(w, array(e.where_clauses))
 			fmt.wprint(w, " {…}")
 			fmt.wprintln(w, "</pre>")
 		case .Proc_Group:
@@ -872,24 +979,24 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 
 		write_docs(w, pkg, strings.trim_space(str(e.docs)))
 	}
-	print_entities :: proc(w: io.Writer, title: string, entities: []^doc.Entity) {
+	write_entities :: proc(w: io.Writer, title: string, entities: []^doc.Entity) {
 		fmt.wprintf(w, "<h3>%s</h3>\n", title)
 		fmt.wprintln(w, `<section class="documentation">`)
 		if len(entities) == 0 {
 			io.write_string(w, "<p>This section is empty.</p>\n")
 		} else {
 			for e in entities {
-				print_entity(w, e)
+				write_entity(w, e)
 			}
 		}
 		fmt.wprintln(w, "</section>")
 	}
 
-	print_entities(w, "Procedures",       pkg_procs[:])
-	print_entities(w, "Procedure Groups", pkg_proc_groups[:])
-	print_entities(w, "Types",            pkg_types[:])
-	print_entities(w, "Variables",        pkg_vars[:])
-	print_entities(w, "Constants",        pkg_consts[:])
+	write_entities(w, "Procedures",       pkg_procs[:])
+	write_entities(w, "Procedure Groups", pkg_proc_groups[:])
+	write_entities(w, "Types",            pkg_types[:])
+	write_entities(w, "Variables",        pkg_vars[:])
+	write_entities(w, "Constants",        pkg_consts[:])
 
 
 	fmt.wprintln(w, "<h3>Source Files</h3>")
