@@ -772,22 +772,22 @@ saturate :: proc{
 	saturate_uint3,
 	saturate_uint4,
 }
-saturate_int  :: proc "c" (x, y, z: int) -> int   { return builtin.clamp(x, 0, 1) }
-saturate_uint  :: proc "c" (x, y, z: uint) -> uint   { return builtin.clamp(x, 0, 1) }
-saturate_float  :: proc "c" (x, y, z: float) -> float   { return builtin.clamp(x, 0, 1) }
-saturate_double  :: proc "c" (x, y, z: double) -> double   { return builtin.clamp(x, 0, 1) }
-saturate_float2 :: proc "c" (x, y, z: float2) -> float2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_float3 :: proc "c" (x, y, z: float3) -> float3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_float4 :: proc "c" (x, y, z: float4) -> float4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-saturate_double2 :: proc "c" (x, y, z: double2) -> double2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_double3 :: proc "c" (x, y, z: double3) -> double3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_double4 :: proc "c" (x, y, z: double4) -> double4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-saturate_int2 :: proc "c" (x, y, z: int2) -> int2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_int3 :: proc "c" (x, y, z: int3) -> int3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_int4 :: proc "c" (x, y, z: int4) -> int4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-saturate_uint2 :: proc "c" (x, y, z: uint2) -> uint2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_uint3 :: proc "c" (x, y, z: uint3) -> uint3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_uint4 :: proc "c" (x, y, z: uint4) -> uint4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
+saturate_int  :: proc "c" (v: int) -> int   { return builtin.clamp(v, 0, 1) }
+saturate_uint  :: proc "c" (v: uint) -> uint   { return builtin.clamp(v, 0, 1) }
+saturate_float  :: proc "c" (v: float) -> float   { return builtin.clamp(v, 0, 1) }
+saturate_double  :: proc "c" (v: double) -> double   { return builtin.clamp(v, 0, 1) }
+saturate_float2 :: proc "c" (v: float2) -> float2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_float3 :: proc "c" (v: float3) -> float3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_float4 :: proc "c" (v: float4) -> float4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
+saturate_double2 :: proc "c" (v: double2) -> double2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_double3 :: proc "c" (v: double3) -> double3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_double4 :: proc "c" (v: double4) -> double4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
+saturate_int2 :: proc "c" (v: int2) -> int2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_int3 :: proc "c" (v: int3) -> int3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_int4 :: proc "c" (v: int4) -> int4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
+saturate_uint2 :: proc "c" (v: uint2) -> uint2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_uint3 :: proc "c" (v: uint3) -> uint3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_uint4 :: proc "c" (v: uint4) -> uint4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
 
 
 lerp :: proc{

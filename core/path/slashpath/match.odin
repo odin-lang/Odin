@@ -1,4 +1,4 @@
-package path
+package slashpath
 
 import "core:strings"
 import "core:unicode/utf8"
