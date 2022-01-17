@@ -107,6 +107,51 @@ write_html_header :: proc(w: io.Writer, title: string) {
 }
 
 write_html_footer :: proc(w: io.Writer) {
+	io.write_string(w, `
+	<script type="text/javascript">
+	(function (win, doc) {
+		'use strict';
+		if (!doc.querySelectorAll || !win.addEventListener) {
+			// doesn't cut the mustard.
+			return;
+		}
+		let toggles = doc.querySelectorAll('[aria-controls]');
+		for (let i = 0; i < toggles.length; i = i + 1) {
+			let toggleID = toggles[i].getAttribute('aria-controls');
+			if (doc.getElementById(toggleID)) {
+				let togglecontent = doc.getElementById(toggleID);
+				togglecontent.setAttribute('aria-hidden', 'true');
+				togglecontent.setAttribute('tabindex', '-1');
+				toggles[i].setAttribute('aria-expanded', 'false');
+			}
+		}
+		function toggle(ev) {
+			ev = ev || win.event;
+			var target = ev.target || ev.srcElement;
+			if (target.hasAttribute('data-aria-owns')) {
+				let toggleIDs = target.getAttribute('data-aria-owns').match(/[^ ]+/g);
+				toggleIDs.forEach(toggleID => {
+					if (doc.getElementById(toggleID)) {
+						ev.preventDefault();
+						let togglecontent = doc.getElementById(toggleID);
+						if (togglecontent.getAttribute('aria-hidden') == 'true') {
+							togglecontent.setAttribute('aria-hidden', 'false');
+							target.setAttribute('aria-expanded', 'true');
+							if (target.tagName == 'A') {
+								togglecontent.focus();
+							}
+						} else {
+							togglecontent.setAttribute('aria-hidden', 'true');
+							target.setAttribute('aria-expanded', 'false');
+						}
+					}
+				})
+			}
+		}
+		doc.addEventListener('click', toggle, false);
+	}(this, this.document));
+	</script>
+`)
 	fmt.wprintf(w, "</div></body>\n</html>\n")
 }
 
@@ -255,7 +300,7 @@ write_core_directory :: proc(w: io.Writer) {
 
 	fmt.wprintln(w, "<h2>Directories</h2>")
 
-	fmt.wprintln(w, "\t<table>")
+	fmt.wprintln(w, "\t<table class=\"documentation-directory\">")
 	fmt.wprintln(w, "\t\t<tbody>")
 
 	for dir := root.first_child; dir != nil; dir = dir.next {
@@ -264,7 +309,7 @@ write_core_directory :: proc(w: io.Writer) {
 			for child := dir.first_child; child != nil; child = child.next {
 				fmt.wprintf(w, "pkg-%s ", str(child.pkg.name))
 			}
-			fmt.wprint(w, `" class="directory-pkg"><td class="pkg-name" data-aria-owns="`)
+			fmt.wprint(w, `" class="directory-pkg"><td class="pkg-line pkg-name" data-aria-owns="`)
 			for child := dir.first_child; child != nil; child = child.next {
 				fmt.wprintf(w, "pkg-%s ", str(child.pkg.name))
 			}
@@ -278,32 +323,33 @@ write_core_directory :: proc(w: io.Writer) {
 		} else {
 			fmt.wprintf(w, "%s", dir.name)
 		}
-		fmt.wprintf(w, "</td>")
+		io.write_string(w, `</td>`)
+		io.write_string(w, `<td class="pkg-line pkg-line-doc">`)
 		if dir.pkg != nil {
 			line_doc, _, _ := strings.partition(str(dir.pkg.docs), "\n")
 			line_doc = strings.trim_space(line_doc)
 			if line_doc != "" {
-				io.write_string(w, `<td class="pkg-line-doc">`)
 				write_doc_line(w, line_doc)
-				io.write_string(w, `</td>`)
 			}
 		}
+		io.write_string(w, `</td>`)
 		fmt.wprintf(w, "</tr>\n")
 
 		for child := dir.first_child; child != nil; child = child.next {
 			assert(child.pkg != nil)
-			fmt.wprintf(w, `<tr id="pkg-%s" class="directory-pkg directory-child"><td class="pkg-name">`, str(child.pkg.name))
+			fmt.wprintf(w, `<tr id="pkg-%s" class="directory-pkg directory-child"><td class="pkg-line pkg-name">`, str(child.pkg.name))
 			fmt.wprintf(w, `<a href="/core/%s/">%s</a>`, child.path, child.name)
-			fmt.wprintf(w, "</td>")
+			io.write_string(w, `</td>`)
 
 			line_doc, _, _ := strings.partition(str(child.pkg.docs), "\n")
 			line_doc = strings.trim_space(line_doc)
+			io.write_string(w, `<td class="pkg-line pkg-line-doc">`)
 			if line_doc != "" {
-				io.write_string(w, `<td class="pkg-line-doc">`)
 				write_doc_line(w, line_doc)
-				io.write_string(w, `</td>`)
 			}
+			io.write_string(w, `</td>`)
 
+			fmt.wprintf(w, "</td>")
 			fmt.wprintf(w, "</tr>\n")
 		}
 	}
@@ -314,7 +360,7 @@ write_core_directory :: proc(w: io.Writer) {
 
 is_entity_blank :: proc(e: doc.Entity_Index) -> bool {
 	name := str(entities[e].name)
-	return name == "" || name == "_"
+	return name == ""
 }
 
 write_where_clauses :: proc(w: io.Writer, where_clauses: []doc.String) {
@@ -347,6 +393,12 @@ Type_Writer :: struct {
 write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
 	write_param_entity :: proc(using writer: ^Type_Writer, e: ^doc.Entity, flags: Write_Type_Flags, name_width := 0) {
 		name := str(e.name)
+
+		write_padding :: proc(w: io.Writer, name: string, name_width: int) {
+			for _ in 0..<name_width-len(name) {
+				io.write_byte(w, ' ')
+			}
+		}
 
 		if .Param_Using     in e.flags { io.write_string(w, "using ")      }
 		if .Param_Const     in e.flags { io.write_string(w, "#const ")     }
@@ -385,6 +437,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 				generic_scope[name] = true
 				if !is_type_untyped(the_type) {
 					io.write_string(w, ": ")
+					write_padding(w, name, name_width)
 					write_type(writer, the_type, type_flags)
 					io.write_string(w, " = ")
 					io.write_string(w, init_string)
@@ -398,6 +451,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 				if name != "" {
 					io.write_string(w, name)
 					io.write_string(w, ": ")
+					write_padding(w, name, name_width)
 				}
 				write_type(writer, the_type, type_flags)
 			case .Type_Name:
@@ -405,6 +459,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 				io.write_string(w, name)
 				generic_scope[name] = true
 				io.write_string(w, ": ")
+				write_padding(w, name, name_width)
 				if the_type.kind == .Generic {
 					io.write_string(w, "typeid")
 					if ts := array(the_type.types); len(ts) == 1 {
