@@ -1,0 +1,31 @@
+.container {
+	max-width: 60em;
+	margin: 0 auto;
+	padding-left: 0.01em 1em;
+}
+
+.directory-pkg {
+	width: 20em;
+}
+
+.directory-child .pkg-name {
+	position: relative;
+	left: 2em;
+	width: 18em;
+}
+
+pre {
+	white-space: pre;
+	tab-size: 8;
+	background-color: #f8f8f8;
+	color: #202224;
+	border: 1px solid #c6c8ca;
+	border-radius: 0.25rem;
+	padding: 0.625rem;
+}
+
+.documentation pre a {
+	text-decoration: none;
+	font-weight: bold;
+	color: #00bfd5;
+}
