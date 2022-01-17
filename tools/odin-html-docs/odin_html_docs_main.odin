@@ -9,6 +9,8 @@ import "core:path/slashpath"
 import "core:sort"
 import "core:slice"
 
+GITHUB_CORE_URL :: "https://github.com/odin-lang/Odin/tree/master/core"
+
 header:   ^doc.Header
 files:    []doc.File
 pkgs:     []doc.Pkg
@@ -62,6 +64,18 @@ common_prefix :: proc(strs: []string) -> string {
 		}
 	}
 	return prefix
+}
+
+recursive_make_directory :: proc(path: string, prefix := "") {
+	head, _, tail := strings.partition(path, "/")
+	path_to_make := head
+	if prefix != "" {
+		path_to_make = fmt.tprintf("%s/%s", prefix, head)
+	}
+	os.make_directory(path_to_make, 0)
+	if tail != "" {
+		recursive_make_directory(tail, path_to_make)
+	}
 }
 
 
@@ -124,11 +138,21 @@ main :: proc() {
 		path_prefix := common_prefix(fullpaths[:])
 
 		pkgs_to_use = make(map[string]^doc.Pkg)
-		for fullpath, i in fullpaths {
+		fullpath_loop: for fullpath, i in fullpaths {
 			path := strings.trim_prefix(fullpath, path_prefix)
-			if strings.has_prefix(path, "core/") {
-				pkgs_to_use[strings.trim_prefix(path, "core/")] = &pkgs[i+1]
+			if !strings.has_prefix(path, "core/") {
+				continue fullpath_loop
 			}
+			pkg := &pkgs[i+1]
+			if len(array(pkg.entities)) == 0 {
+				continue fullpath_loop
+			}
+			trimmed_path := strings.trim_prefix(path, "core/")
+			if strings.has_prefix(trimmed_path, "sys") {
+				continue fullpath_loop
+			}
+
+			pkgs_to_use[trimmed_path] = pkg
 		}
 		sort.map_entries_by_key(&pkgs_to_use)
 		for path, pkg in pkgs_to_use {
@@ -153,7 +177,7 @@ main :: proc() {
 		write_html_header(w, fmt.tprintf("package %s - pkg.odin-lang.org", path))
 		write_pkg(w, path, pkg)
 		write_html_footer(w)
-		os.make_directory(fmt.tprintf("core/%s", path), 0)
+		recursive_make_directory(path, "core")
 		os.write_entire_file(fmt.tprintf("core/%s/index.html", path), b.buf[:])
 	}
 }
@@ -304,20 +328,37 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		if .Param_No_Alias  in e.flags { io.write_string(w, "#no_alias ")  }
 		if .Param_Any_Int   in e.flags { io.write_string(w, "#any_int ")   }
 
-		if name != "" {
+		init_string := str(e.init_string)
+		switch init_string {
+		case "#caller_location":
+			assert(name != "")
 			io.write_string(w, name)
-			io.write_string(w, ": ")
-		}
-		padding := max(name_width-len(name), 0)
-		for _ in 0..<padding {
-			io.write_byte(w, ' ')
-		}
+			io.write_string(w, " := ")
+			io.write_string(w, `<a href="/core/runtime/#Source_Code_Location">`)
+			io.write_string(w, init_string)
+			io.write_string(w, `</a>`)
 
-		param_flags := flags - {.Is_Results}
-		if .Param_Ellipsis in e.flags {
-			param_flags += {.Variadic}
+		case:
+			if name != "" {
+				io.write_string(w, name)
+				io.write_string(w, ": ")
+			}
+			padding := max(name_width-len(name), 0)
+			for _ in 0..<padding {
+				io.write_byte(w, ' ')
+			}
+
+			param_flags := flags - {.Is_Results}
+			if .Param_Ellipsis in e.flags {
+				param_flags += {.Variadic}
+			}
+			write_type(writer, types[e.type], param_flags)
+
+			if init_string != "" {
+				io.write_string(w, " = ")
+				io.write_string(w, init_string)
+			}
 		}
-		write_type(writer, types[e.type], param_flags)
 	}
 	write_poly_params :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
 		type_entites := array(type.entities)
@@ -423,19 +464,21 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			io.write_string(w, custom_align)
 		}
 		io.write_string(w, " {")
-		do_newline(writer, flags)
-		indent += 1
-		name_width := calc_name_width(type_entites)
-
-		for entity_index in type_entites {
-			e := &entities[entity_index]
-			do_indent(writer, flags)
-			write_param_entity(writer, e, flags, name_width)
-			io.write_byte(w, ',')
+		if len(type_entites) != 0 {
 			do_newline(writer, flags)
+			indent += 1
+			name_width := calc_name_width(type_entites)
+
+			for entity_index in type_entites {
+				e := &entities[entity_index]
+				do_indent(writer, flags)
+				write_param_entity(writer, e, flags, name_width)
+				io.write_byte(w, ',')
+				do_newline(writer, flags)
+			}
+			indent -= 1
+			do_indent(writer, flags)
 		}
-		indent -= 1
-		do_indent(writer, flags)
 		io.write_string(w, "}")
 	case .Union:
 		type_flags := transmute(doc.Type_Flags_Union)type.flags
@@ -465,6 +508,10 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		io.write_string(w, "}")
 	case .Enum:
 		io.write_string(w, "enum")
+		if len(type_types) != 0 {
+			io.write_byte(w, ' ')
+			write_type(writer, types[type_types[0]], flags)
+		}
 		io.write_string(w, " {")
 		do_newline(writer, flags)
 		indent += 1
@@ -474,11 +521,12 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		for entity_index in type_entites {
 			e := &entities[entity_index]
 
+			name := str(e.name)
 			do_indent(writer, flags)
-			io.write_string(w, str(e.name))
+			io.write_string(w, name)
 
 			if init_string := str(e.init_string); init_string != "" {
-				for _ in 0..<name_width {
+				for _ in 0..<name_width-len(name) {
 					io.write_byte(w, ' ')
 				}
 				io.write_string(w, " = ")
@@ -532,6 +580,22 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 
 	case .Bit_Set:
 		type_flags := transmute(doc.Type_Flags_Bit_Set)type.flags
+		io.write_string(w, "bit_set[")
+		if .Op_Lt in type_flags {
+			io.write_uint(w, uint(type.elem_counts[0]))
+			io.write_string(w, "..<")
+			io.write_uint(w, uint(type.elem_counts[1]))
+		} else if .Op_Lt_Eq in type_flags {
+			io.write_uint(w, uint(type.elem_counts[0]))
+			io.write_string(w, "..=")
+			io.write_uint(w, uint(type.elem_counts[1]))
+		} else {
+			write_type(writer, types[type_types[0]], flags)
+		}
+		if .Underlying_Type in type_flags {
+			write_type(writer, types[type_types[1]], flags)
+		}
+		io.write_string(w, "]")
 	case .Simd_Vector:
 		io.write_string(w, "#simd[")
 		io.write_uint(w, uint(type.elem_counts[0]))
@@ -585,6 +649,7 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 		} else if was_code {
 			was_code = false
 			fmt.wprintln(w, "</code></pre>")
+			continue
 		}
 		text := strings.trim_space(line)
 		if text == "" {
@@ -604,8 +669,9 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 	if was_code {
 		// assert(!was_paragraph, str(pkg.name))
 		was_code = false
-		fmt.wprintln(w, "</code>")
-	} else if was_paragraph {
+		fmt.wprintln(w, "</code></pre>")
+	}
+	if was_paragraph {
 		fmt.wprintln(w, "</p>")
 	}
 }
@@ -684,6 +750,21 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 
 
 	print_entity :: proc(w: io.Writer, e: ^doc.Entity) {
+		write_attributes :: proc(w: io.Writer, e: ^doc.Entity) {
+			for attr in array(e.attributes) {
+				io.write_string(w, "@(")
+				name := str(attr.name)
+				value := str(attr.value)
+				io.write_string(w, name)
+				if value != "" {
+					io.write_string(w, "=")
+					io.write_string(w, value)
+				}
+				io.write_string(w, ")\n")
+			}
+		}
+
+
 		pkg_index := files[e.pos.file].pkg
 		pkg := &pkgs[pkg_index]
 		writer := &Type_Writer{
@@ -692,7 +773,15 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		}
 
 		name := str(e.name)
-		fmt.wprintf(w, "<h4 id=\"{0:s}\"><a href=\"#{0:s}\">{0:s}</a></h3>\n", name)
+		path := pkg_to_path[pkg]
+		filename := slashpath.base(str(files[e.pos.file].name))
+		fmt.wprintf(w, "<h4 id=\"{0:s}\"><span><a class=\"documentation-id-link\" href=\"#%s\">{0:s}", name)
+		fmt.wprintf(w, "<span class=\"a-hidden\">&nbsp;¶</span></a></span></h4>\n")
+		defer if e.pos.file != 0 && e.pos.line > 0 {
+			src_url := fmt.tprintf("%s/%s/%s#L%d", GITHUB_CORE_URL, path, filename, e.pos.line)
+			fmt.wprintf(w, "<a class=\"documentation-source\" href=\"{0:s}\"><em>Source:&nbsp;{0:s}</em></a>", src_url)
+		}
+
 		switch e.kind {
 		case .Invalid, .Import_Name, .Library_Name:
 			// ignore
@@ -713,6 +802,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintln(w, "</pre>")
 		case .Variable:
 			fmt.wprint(w, "<pre>")
+			write_attributes(w, e)
 			fmt.wprintf(w, "%s: ", name)
 			write_type(writer, types[e.type], {.Allow_Indent})
 			init_string := str(e.init_string)
@@ -804,11 +894,34 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 
 	fmt.wprintln(w, "<h3>Source Files</h3>")
 	fmt.wprintln(w, "<ul>")
-	for file_index in array(pkg.files) {
+	any_hidden := false
+	source_file_loop: for file_index in array(pkg.files) {
 		file := files[file_index]
 		filename := slashpath.base(str(file.name))
-		fmt.wprintf(w, `<li><a href="https://github.com/odin-lang/Odin/tree/master/core/%s/%s">%s</a></li>`, path, filename, filename)
+		switch {
+		case
+			strings.has_suffix(filename, "_windows.odin"),
+			strings.has_suffix(filename, "_darwin.odin"),
+			strings.has_suffix(filename, "_essence.odin"),
+			strings.has_suffix(filename, "_freebsd.odin"),
+			strings.has_suffix(filename, "_wasi.odin"),
+			strings.has_suffix(filename, "_js.odin"),
+			strings.has_suffix(filename, "_freestanding.odin"),
+
+			strings.has_suffix(filename, "_amd64.odin"),
+			strings.has_suffix(filename, "_i386.odin"),
+			strings.has_suffix(filename, "_arch64.odin"),
+			strings.has_suffix(filename, "_wasm32.odin"),
+			strings.has_suffix(filename, "_wasm64.odin"),
+			false:
+			any_hidden = true
+			continue source_file_loop
+		}
+		fmt.wprintf(w, `<li><a href="%s/%s/%s">%s</a></li>`, GITHUB_CORE_URL, path, filename, filename)
 		fmt.wprintln(w)
+	}
+	if any_hidden {
+		fmt.wprintln(w, "<li><em>(hidden platform specific files)</em></li>")
 	}
 	fmt.wprintln(w, "</ul>")
 
