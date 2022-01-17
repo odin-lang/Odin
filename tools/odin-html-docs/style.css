@@ -21,7 +21,7 @@
 
 pre {
 	white-space: pre-wrap;
-	word-break: break-all;
+	word-break: keep-all;
 	word-wrap: break-word;
 	tab-size: 8;
 	font-family: Consolas,Liberation Mono,Menlo,monospace!important;
@@ -44,10 +44,15 @@ pre a {
 }
 
 .documentation-source {
+	display: inline;
+	float: right;
+}
+
+.documentation-source a {
 	text-decoration: none;
 	color: #666666;
 }
-.documentation-source:hover {
+.documentation-source a:hover {
 	text-decoration: underline;
 }
 
@@ -56,4 +61,27 @@ a > .a-hidden {
 }
 a:hover > .a-hidden {
 	opacity: 100;
+}
+
+ul.documentation-breadcrumb {
+	list-style: none;
+}
+
+ul.documentation-breadcrumb li {
+	display: inline;
+}
+
+ul.documentation-breadcrumb li+li:before {
+	padding: 0.2rem;
+	color: black;
+	content:  "/\00a0";
+}
+
+.code-inline {
+	font-family: Consolas,Liberation Mono,Menlo,monospace!important;
+	background-color: #f8f8f8;
+	color: #202224;
+	border: 1px solid #c6c8ca;
+	border-radius: 0.25rem;
+	padding: 0.125rem;
 }
