@@ -32,6 +32,17 @@ errorf :: proc(format: string, args: ..any) -> ! {
 	os.exit(1)
 }
 
+base_type :: proc(t: doc.Type) -> doc.Type {
+	t := t
+	for {
+		if t.kind != .Named {
+			break
+		}
+		t = types[array(t.types)[0]]
+	}
+	return t
+}
+
 common_prefix :: proc(strs: []string) -> string {
 	if len(strs) == 0 {
 		return ""
@@ -270,10 +281,74 @@ is_entity_blank :: proc(e: doc.Entity_Index) -> bool {
 Write_Type_Flag :: enum {
 	Is_Results,
 	Variadic,
+	Allow_Indent,
 }
 Write_Type_Flags :: distinct bit_set[Write_Type_Flag]
+Type_Writer :: struct {
+	w:      io.Writer,
+	pkg:    doc.Pkg_Index,
+	indent: int,
+}
 
-write_type :: proc(w: io.Writer, pkg: doc.Pkg_Index, type: doc.Type, flags: Write_Type_Flags) {
+write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
+	write_param_entity :: proc(using writer: ^Type_Writer, e: ^doc.Entity, flags: Write_Type_Flags, name_width := 0) {
+		name := str(e.name)
+
+		if .Param_Using     in e.flags { io.write_string(w, "using ")      }
+		if .Param_Const     in e.flags { io.write_string(w, "#const ")     }
+		if .Param_Auto_Cast in e.flags { io.write_string(w, "#auto_cast ") }
+		if .Param_CVararg   in e.flags { io.write_string(w, "#c_vararg ")  }
+		if .Param_No_Alias  in e.flags { io.write_string(w, "#no_alias ")  }
+		if .Param_Any_Int   in e.flags { io.write_string(w, "#any_int ")   }
+
+		if name != "" {
+			io.write_string(w, name)
+			io.write_string(w, ": ")
+		}
+		padding := max(name_width-len(name), 0)
+		for _ in 0..<padding {
+			io.write_byte(w, ' ')
+		}
+
+		param_flags := flags - {.Is_Results}
+		if .Param_Ellipsis in e.flags {
+			param_flags += {.Variadic}
+		}
+		write_type(writer, types[e.type], param_flags)
+	}
+	write_poly_params :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
+		type_entites := array(type.entities)
+		for entity_index, i in type_entites {
+			if i > 0 {
+				io.write_string(w, ", ")
+			}
+			write_param_entity(writer, &entities[entity_index], flags)
+		}
+		io.write_byte(w, ')')
+	}
+	do_indent :: proc(using writer: ^Type_Writer, flags: Write_Type_Flags) {
+		if .Allow_Indent not_in flags {
+			return
+		}
+		for _ in 0..<indent {
+			io.write_byte(w, '\t')
+		}
+	}
+	do_newline :: proc(using writer: ^Type_Writer, flags: Write_Type_Flags) {
+		if .Allow_Indent in flags {
+			io.write_byte(w, '\n')
+		}
+	}
+	calc_name_width :: proc(type_entites: []doc.Entity_Index) -> (name_width: int) {
+		for entity_index in type_entites {
+			e := &entities[entity_index]
+			name := str(e.name)
+			name_width = max(len(name), name_width)
+		}
+		return
+	}
+
+
 	type_entites := array(type.entities)
 	type_types := array(type.types)
 	switch type.kind {
@@ -301,75 +376,128 @@ write_type :: proc(w: io.Writer, pkg: doc.Pkg_Index, type: doc.Type, flags: Writ
 		io.write_string(w, name)
 		if len(array(type.types)) == 1 {
 			io.write_byte(w, '/')
-			write_type(w, pkg, types[type_types[0]], flags)
+			write_type(writer, types[type_types[0]], flags)
 		}
 	case .Pointer:
 		io.write_byte(w, '^')
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	case .Array:
 		assert(type.elem_count_len == 1)
 		io.write_byte(w, '[')
 		io.write_uint(w, uint(type.elem_counts[0]))
 		io.write_byte(w, ']')
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	case .Enumerated_Array:
 		io.write_byte(w, '[')
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 		io.write_byte(w, ']')
-		write_type(w, pkg, types[type_types[1]], flags)
+		write_type(writer, types[type_types[1]], flags)
 	case .Slice:
 		if .Variadic in flags {
 			io.write_string(w, "..")
 		} else {
 			io.write_string(w, "[]")
 		}
-		write_type(w, pkg, types[type_types[0]], flags - {.Variadic})
+		write_type(writer, types[type_types[0]], flags - {.Variadic})
 	case .Dynamic_Array:
 		io.write_string(w, "[dynamic]")
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	case .Map:
 		io.write_string(w, "map[")
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 		io.write_byte(w, ']')
-		write_type(w, pkg, types[type_types[1]], flags)
+		write_type(writer, types[type_types[1]], flags)
 	case .Struct:
 		type_flags := transmute(doc.Type_Flags_Struct)type.flags
-		io.write_string(w, "struct {}")
+		io.write_string(w, "struct")
+		if .Polymorphic in type_flags {
+			write_poly_params(writer, type, flags)
+		}
+		if .Packed in type_flags { io.write_string(w, " #packed") }
+		if .Raw_Union in type_flags { io.write_string(w, " #raw_union") }
+		if custom_align := str(type.custom_align); custom_align != "" {
+			io.write_string(w, " #align")
+			io.write_string(w, custom_align)
+		}
+		io.write_string(w, " {")
+		do_newline(writer, flags)
+		indent += 1
+		name_width := calc_name_width(type_entites)
+
+		for entity_index in type_entites {
+			e := &entities[entity_index]
+			do_indent(writer, flags)
+			write_param_entity(writer, e, flags, name_width)
+			io.write_byte(w, ',')
+			do_newline(writer, flags)
+		}
+		indent -= 1
+		do_indent(writer, flags)
+		io.write_string(w, "}")
 	case .Union:
 		type_flags := transmute(doc.Type_Flags_Union)type.flags
-		io.write_string(w, "union {}")
+		io.write_string(w, "union")
+		if .Polymorphic in type_flags {
+			write_poly_params(writer, type, flags)
+		}
+		if .No_Nil in type_flags { io.write_string(w, " #no_nil") }
+		if .Maybe in type_flags { io.write_string(w, " #maybe") }
+		if custom_align := str(type.custom_align); custom_align != "" {
+			io.write_string(w, " #align")
+			io.write_string(w, custom_align)
+		}
+		io.write_string(w, " {")
+		if len(type_types) > 1 {
+			do_newline(writer, flags)
+			indent += 1
+			for type_index in type_types {
+				do_indent(writer, flags)
+				write_type(writer, types[type_index], flags)
+				io.write_string(w, ", ")
+				do_newline(writer, flags)
+			}
+			indent -= 1
+			do_indent(writer, flags)
+		}
+		io.write_string(w, "}")
 	case .Enum:
-		io.write_string(w, "enum {}")
+		io.write_string(w, "enum")
+		io.write_string(w, " {")
+		do_newline(writer, flags)
+		indent += 1
+
+		name_width := calc_name_width(type_entites)
+
+		for entity_index in type_entites {
+			e := &entities[entity_index]
+
+			do_indent(writer, flags)
+			io.write_string(w, str(e.name))
+
+			if init_string := str(e.init_string); init_string != "" {
+				for _ in 0..<name_width {
+					io.write_byte(w, ' ')
+				}
+				io.write_string(w, " = ")
+				io.write_string(w, init_string)
+			}
+			io.write_string(w, ", ")
+			do_newline(writer, flags)
+		}
+		indent -= 1
+		do_indent(writer, flags)
+		io.write_string(w, "}")
 	case .Tuple:
-		entity_indices := type_entites
-		if len(entity_indices) == 0 {
+		if len(type_entites) == 0 {
 			return
 		}
-		require_parens := (.Is_Results in flags) && (len(entity_indices) > 1 || !is_entity_blank(entity_indices[0]))
+		require_parens := (.Is_Results in flags) && (len(type_entites) > 1 || !is_entity_blank(type_entites[0]))
 		if require_parens { io.write_byte(w, '(') }
-		for entity_index, i in entity_indices {
-			e := &entities[entity_index]
-			name := str(e.name)
-
+		for entity_index, i in type_entites {
 			if i > 0 {
 				io.write_string(w, ", ")
 			}
-			if .Param_Using     in e.flags { io.write_string(w, "using ")      }
-			if .Param_Const     in e.flags { io.write_string(w, "#const ")     }
-			if .Param_Auto_Cast in e.flags { io.write_string(w, "#auto_cast ") }
-			if .Param_CVararg   in e.flags { io.write_string(w, "#c_vararg ")  }
-			if .Param_No_Alias  in e.flags { io.write_string(w, "#no_alias ")  }
-			if .Param_Any_Int   in e.flags { io.write_string(w, "#any_int ")   }
-
-			if name != "" {
-				io.write_string(w, name)
-				io.write_string(w, ": ")
-			}
-			param_flags := flags - {.Is_Results}
-			if .Param_Ellipsis in e.flags {
-				param_flags += {.Variadic}
-			}
-			write_type(w, pkg, types[e.type], param_flags)
+			write_param_entity(writer, &entities[entity_index], flags)
 		}
 		if require_parens { io.write_byte(w, ')') }
 
@@ -385,12 +513,12 @@ write_type :: proc(w: io.Writer, pkg: doc.Pkg_Index, type: doc.Type, flags: Writ
 		params := array(type.types)[0]
 		results := array(type.types)[1]
 		io.write_byte(w, '(')
-		write_type(w, pkg, types[params], flags)
+		write_type(writer, types[params], flags)
 		io.write_byte(w, ')')
 		if results != 0 {
 			assert(.Diverging not_in type_flags)
 			io.write_string(w, " -> ")
-			write_type(w, pkg, types[results], flags+{.Is_Results})
+			write_type(writer, types[results], flags+{.Is_Results})
 		}
 		if .Diverging in type_flags {
 			io.write_string(w, " -> !")
@@ -415,24 +543,24 @@ write_type :: proc(w: io.Writer, pkg: doc.Pkg_Index, type: doc.Type, flags: Writ
 		io.write_string(w, "#soa[dynamic]")
 	case .Relative_Pointer:
 		io.write_string(w, "#relative(")
-		write_type(w, pkg, types[type_types[1]], flags)
+		write_type(writer, types[type_types[1]], flags)
 		io.write_string(w, ") ")
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	case .Relative_Slice:
 		io.write_string(w, "#relative(")
-		write_type(w, pkg, types[type_types[1]], flags)
+		write_type(writer, types[type_types[1]], flags)
 		io.write_string(w, ") ")
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	case .Multi_Pointer:
 		io.write_string(w, "[^]")
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	case .Matrix:
 		io.write_string(w, "matrix[")
 		io.write_uint(w, uint(type.elem_counts[0]))
 		io.write_string(w, ", ")
 		io.write_uint(w, uint(type.elem_counts[1]))
 		io.write_string(w, "]")
-		write_type(w, pkg, types[type_types[0]], flags)
+		write_type(writer, types[type_types[0]], flags)
 	}
 }
 
@@ -529,12 +657,16 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	print_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
 		fmt.wprintf(w, "<h4>%s</h4>\n", name)
 		fmt.wprintln(w, `<section class="documentation-index">`)
-		fmt.wprintln(w, "<ul>")
-		for e in entities {
-			name := str(e.name)
-			fmt.wprintf(w, "<li><a href=\"#{0:s}\">{0:s}</a></li>\n", name)
+		if len(entities) == 0 {
+			io.write_string(w, "<p>This section is empty.</p>\n")
+		} else {
+			fmt.wprintln(w, "<ul>")
+			for e in entities {
+				name := str(e.name)
+				fmt.wprintf(w, "<li><a href=\"#{0:s}\">{0:s}</a></li>\n", name)
+			}
+			fmt.wprintln(w, "</ul>")
 		}
-		fmt.wprintln(w, "</ul>")
 		fmt.wprintln(w, "</section>")
 	}
 
@@ -549,7 +681,13 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 
 
 	print_entity :: proc(w: io.Writer, e: ^doc.Entity) {
-		pkg := &pkgs[files[e.pos.file].pkg]
+		pkg_index := files[e.pos.file].pkg
+		pkg := &pkgs[pkg_index]
+		writer := &Type_Writer{
+			w = w,
+			pkg = pkg_index,
+		}
+
 		name := str(e.name)
 		fmt.wprintf(w, "<h4 id=\"{0:s}\"><a href=\"#{0:s}\">{0:s}</a></h3>\n", name)
 		switch e.kind {
@@ -558,10 +696,15 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		case .Constant:
 		case .Variable:
 		case .Type_Name:
+			fmt.wprint(w, "<pre>")
+			fmt.wprintf(w, "%s :: ", name)
+			tn := base_type(types[e.type])
+			write_type(writer, tn, {.Allow_Indent})
+			fmt.wprintln(w, "</pre>")
 		case .Procedure:
 			fmt.wprint(w, "<pre>")
 			fmt.wprintf(w, "%s :: ", name)
-			write_type(w, files[e.pos.file].pkg, types[e.type], nil)
+			write_type(writer, types[e.type], nil)
 			where_clauses := array(e.where_clauses)
 			if len(where_clauses) != 0 {
 				io.write_string(w, " where ")
@@ -583,8 +726,12 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	print_entities :: proc(w: io.Writer, title: string, entities: []^doc.Entity) {
 		fmt.wprintf(w, "<h3>%s</h3>\n", title)
 		fmt.wprintln(w, `<section class="documentation">`)
-		for e in entities {
-			print_entity(w, e)
+		if len(entities) == 0 {
+			io.write_string(w, "<p>This section is empty.</p>\n")
+		} else {
+			for e in entities {
+				print_entity(w, e)
+			}
 		}
 		fmt.wprintln(w, "</section>")
 	}
