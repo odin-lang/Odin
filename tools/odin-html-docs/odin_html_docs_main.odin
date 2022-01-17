@@ -370,7 +370,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		fmt.wprintf(w, `<span>`)
 		tn_pkg := files[e.pos.file].pkg
 		if tn_pkg != pkg {
-			fmt.wprintf(w, `%s.`, str(pkgs[pkg].name))
+			fmt.wprintf(w, `%s.`, str(pkgs[tn_pkg].name))
 		}
 		fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a></span>`, pkg_to_path[&pkgs[tn_pkg]], name)
 	case .Generic:
@@ -727,16 +727,16 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintf(w, "%s :: ", name)
 			the_type := types[e.type]
 			type_to_print := the_type
-			if the_type.kind == .Named {
-				if e.pos != entities[array(the_type.entities)[0]].pos {
-					io.write_string(w, "distinct ")
-				} else {
+			if the_type.kind == .Named && .Type_Alias not_in e.flags {
+				if e.pos == entities[array(the_type.entities)[0]].pos {
 					bt := base_type(the_type)
 					#partial switch bt.kind {
 					case .Struct, .Union, .Proc, .Enum:
+						// Okay
+					case:
 						io.write_string(w, "distinct ")
-						type_to_print = bt
 					}
+					type_to_print = bt
 				}
 			}
 			write_type(writer, type_to_print, {.Allow_Indent})
