@@ -5412,6 +5412,15 @@ bool parse_file(Parser *p, AstFile *f) {
 	if (f->package_token.kind != Token_package) {
 		return false;
 	}
+	if (docs != nullptr) {
+		TokenPos end = token_pos_end(docs->list[docs->list.count-1]);
+		if (end.line == f->package_token.pos.line || end.line+1 == f->package_token.pos.line) {
+			// Okay
+		} else {
+			docs = nullptr;
+		}
+	}
+
 	Token package_name = expect_token_after(f, Token_Ident, "package");
 	if (package_name.kind == Token_Ident) {
 		if (package_name.string == "_") {

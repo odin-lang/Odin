@@ -48,7 +48,7 @@ int_least64_t  :: builtin.i64
 uint_least64_t :: builtin.u64
 
 // Same on Windows, Linux, and FreeBSD
-when ODIN_ARCH == "386" || ODIN_ARCH == "amd64" {
+when ODIN_ARCH == "i386" || ODIN_ARCH == "amd64" {
 	int_fast8_t    :: builtin.i8
 	uint_fast8_t   :: builtin.u8
 	int_fast16_t   :: builtin.i32

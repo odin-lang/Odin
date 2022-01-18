@@ -3933,7 +3933,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 						str = gb_string_appendc(str, " = ");
 						str = write_exact_value_to_string(str, var->Constant.value);
 					} else {
-						str = gb_string_appendc(str, "=");
+						str = gb_string_appendc(str, " := ");
 						str = write_exact_value_to_string(str, var->Constant.value);
 					}
 					continue;
@@ -3961,14 +3961,10 @@ gbString write_type_to_string(gbString str, Type *type) {
 						str = gb_string_appendc(str, "typeid/");
 						str = write_type_to_string(str, var->type);
 					} else {
-						if (var->kind == Entity_TypeName) {
-							str = gb_string_appendc(str, "$");
-							str = gb_string_append_length(str, name.text, name.len);
-							str = gb_string_appendc(str, "=");
-							str = write_type_to_string(str, var->type);
-						} else {
-							str = gb_string_appendc(str, "typeid");
-						}
+						str = gb_string_appendc(str, "$");
+						str = gb_string_append_length(str, name.text, name.len);
+						str = gb_string_appendc(str, "=");
+						str = write_type_to_string(str, var->type);
 					}
 				}
 			}

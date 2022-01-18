@@ -325,18 +325,32 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 // TODO(bill): Throughly test!
 	switch (type) {
 #if defined(GB_COMPILER_MSVC)
-	case gbAllocation_Alloc: {
-		isize aligned_size = align_formula_isize(size, alignment);
-		// TODO(bill): Make sure this is aligned correctly
-		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
-	} break;
-	case gbAllocation_Free:
-		HeapFree(GetProcessHeap(), 0, old_memory);
+	case gbAllocation_Alloc:
+		if (size == 0) {
+			return NULL;
+		} else {
+			isize aligned_size = align_formula_isize(size, alignment);
+			// TODO(bill): Make sure this is aligned correctly
+			ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
+		}
 		break;
-	case gbAllocation_Resize: {
-		isize aligned_size = align_formula_isize(size, alignment);
-		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
-	} break;
+	case gbAllocation_Free:
+		if (old_memory != nullptr) {
+			HeapFree(GetProcessHeap(), 0, old_memory);
+		}
+		break;
+	case gbAllocation_Resize:
+		if (old_memory != nullptr && size > 0) {
+			isize aligned_size = align_formula_isize(size, alignment);
+			ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
+		} else if (old_memory != nullptr) {
+			HeapFree(GetProcessHeap(), 0, old_memory);
+		} else if (size != 0) {
+			isize aligned_size = align_formula_isize(size, alignment);
+			// TODO(bill): Make sure this is aligned correctly
+			ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
+		}
+		break;
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {

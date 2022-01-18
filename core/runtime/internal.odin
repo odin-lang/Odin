@@ -8,7 +8,7 @@ IS_WASM :: ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64"
 @(private)
 RUNTIME_LINKAGE :: "strong" when (
 	(ODIN_USE_SEPARATE_MODULES || 
-	ODIN_BUILD_MODE == "dynamic" || 
+	ODIN_BUILD_MODE == .Dynamic ||
 	!ODIN_NO_CRT) &&
 	!IS_WASM) else "internal"
 RUNTIME_REQUIRE :: true

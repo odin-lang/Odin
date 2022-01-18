@@ -1,9 +1,9 @@
-// The path package is only to be used for paths separated by forward slashes,
+// The slashpath package is only to be used for paths separated by forward slashes,
 // e.g. paths in URLs
 //
 // This package does not deal with Windows/NT paths with volume letters or backslashes
 // To manipulate operating system specific paths, use the path/filepath package
-package path
+package slashpath
 
 import "core:strings"
 

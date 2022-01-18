@@ -57,17 +57,13 @@ LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data
 
 void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
 	if (optimization_level == 0 && build_context.ODIN_DEBUG) {
-		return;
+		LLVMAddMergedLoadStoreMotionPass(fpm);
+	} else {
+		LLVMAddPromoteMemoryToRegisterPass(fpm);
+		LLVMAddMergedLoadStoreMotionPass(fpm);
+		LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
+		LLVMAddEarlyCSEPass(fpm);
 	}
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-
-	// LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	// LLVMAddMergedLoadStoreMotionPass(fpm);
-	// LLVMAddPromoteMemoryToRegisterPass(fpm);
-	// LLVMAddCFGSimplificationPass(fpm);
 }
 
 void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
