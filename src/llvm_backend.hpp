@@ -204,7 +204,6 @@ enum lbDeferExitKind {
 
 enum lbDeferKind {
 	lbDefer_Node,
-	lbDefer_Instr,
 	lbDefer_Proc,
 };
 
@@ -215,8 +214,6 @@ struct lbDefer {
 	lbBlock *   block;
 	union {
 		Ast *stmt;
-		// NOTE(bill): 'instr' will be copied every time to create a new one
-		lbValue instr;
 		struct {
 			lbValue deferred;
 			Array<lbValue> result_as_args;
@@ -270,7 +267,6 @@ struct lbProcedure {
 	bool            is_done;
 
 	lbAddr           return_ptr;
-	Array<lbValue>   params;
 	Array<lbDefer>   defer_stmts;
 	Array<lbBlock *> blocks;
 	Array<lbBranchBlocks> branch_blocks;

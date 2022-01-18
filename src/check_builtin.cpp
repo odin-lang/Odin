@@ -219,6 +219,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_name));
 		break;
 
+	case BuiltinProc___entry_point:
+		operand->mode = Addressing_NoValue;
+		operand->type = nullptr;
+		mpmc_enqueue(&c->info->intrinsics_entry_point_usage, call);
+		break;
+
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name.string;
@@ -3219,7 +3225,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			case TargetOs_essence:
 			case TargetOs_freebsd:
 				switch (build_context.metrics.arch) {
-				case TargetArch_386:
+				case TargetArch_i386:
 				case TargetArch_amd64:
 				case TargetArch_arm64:
 					max_arg_count = 7;

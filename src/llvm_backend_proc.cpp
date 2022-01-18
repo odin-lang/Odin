@@ -107,7 +107,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
-	p->params.allocator        = a;
 	p->defer_stmts.allocator   = a;
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
@@ -304,7 +303,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type) {
 	{
 		lbValue *found = string_map_get(&m->members, link_name);
-		GB_ASSERT(found == nullptr);
+		GB_ASSERT_MSG(found == nullptr, "failed to create dummy procedure for: %.*s", LIT(link_name));
 	}
 
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
@@ -323,7 +322,6 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 
 	gbAllocator a = permanent_allocator();
 	p->children.allocator      = a;
-	p->params.allocator        = a;
 	p->defer_stmts.allocator   = a;
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
@@ -478,42 +476,29 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				if (arg_type->kind == lbArg_Ignore) {
 					continue;
 				} else if (arg_type->kind == lbArg_Direct) {
-					lbParamPasskind kind = lbParamPass_Value;
-					LLVMTypeRef param_type = lb_type(p->module, e->type);
-					if (param_type != arg_type->type) {
-						kind = lbParamPass_BitCast;
+					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						LLVMTypeRef param_type = lb_type(p->module, e->type);
+						LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
+
+						value = OdinLLVMBuildTransmute(p, value, param_type);
+
+						lbValue param = {};
+						param.value = value;
+						param.type = e->type;
+
+						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
+						lb_add_entity(p->module, e, ptr);
 					}
-					LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
-
-					value = OdinLLVMBuildTransmute(p, value, param_type);
-
-					lbValue param = {};
-					param.value = value;
-					param.type = e->type;
-					array_add(&p->params, param);
-
-					if (e->token.string.len != 0) {
-						lbAddr l = lb_add_local(p, e->type, e, false, param_index);
-						lb_addr_store(p, l, param);
-					}
-
-					param_index += 1;
 				} else if (arg_type->kind == lbArg_Indirect) {
-					LLVMValueRef value_ptr = LLVMGetParam(p->value, param_offset+param_index);
-					LLVMValueRef value = LLVMBuildLoad(p->builder, value_ptr, "");
+					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						lbValue ptr = {};
+						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
+						ptr.type = alloc_type_pointer(e->type);
 
-					lbValue param = {};
-					param.value = value;
-					param.type = e->type;
-					array_add(&p->params, param);
-
-					lbValue ptr = {};
-					ptr.value = value_ptr;
-					ptr.type = alloc_type_pointer(e->type);
-
-					lb_add_entity(p->module, e, ptr);
-					param_index += 1;
+						lb_add_entity(p->module, e, ptr);
+					}
 				}
+				param_index += 1;
 			}
 		}
 
@@ -1376,7 +1361,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_cpu_relax:
-		if (build_context.metrics.arch == TargetArch_386 ||
+		if (build_context.metrics.arch == TargetArch_i386 ||
 		    build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
 			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {});
@@ -1965,6 +1950,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 		
+	case BuiltinProc___entry_point:
+		if (p->module->info->entry_point) {
+			lbValue entry_point = lb_find_procedure_value_from_entity(p->module, p->module->info->entry_point);
+			GB_ASSERT(entry_point.value != nullptr);
+			lb_emit_call(p, entry_point, {});
+		}
+		return {};
+
 	case BuiltinProc_syscall:
 		{
 			unsigned arg_count = cast(unsigned)ce->args.count;
@@ -2025,7 +2018,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
-			case TargetArch_386:
+			case TargetArch_i386:
 				{
 					GB_ASSERT(arg_count <= 7);
 					

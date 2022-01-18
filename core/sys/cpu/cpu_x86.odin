@@ -1,4 +1,4 @@
-//+build 386, amd64
+//+build i386, amd64
 package sys_cpu
 
 _cache_line_size :: 64;

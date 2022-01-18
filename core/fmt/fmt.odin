@@ -1092,8 +1092,8 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		case runtime.Type_Info_Integer:
 			switch info.endianness {
 			case .Platform: return false
-			case .Little:   return ODIN_ENDIAN != "little"
-			case .Big:      return ODIN_ENDIAN != "big"
+			case .Little:   return ODIN_ENDIAN != .Little
+			case .Big:      return ODIN_ENDIAN != .Big
 			}
 		}
 		return false

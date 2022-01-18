@@ -27,7 +27,7 @@
 // 	Construction history, or BSP trees would make the format too large to serve its purpose.
 // 	The facilities of the formats to store meta data should make the format flexible enough
 // 	for most uses. Adding HxA support should be something anyone can do in a days work.
-
+//
 // Structure:
 // ----------
 // HxA is designed to be extremely simple to parse, and is therefore based around conventions. It has
@@ -45,17 +45,17 @@
 // of a number of named layers. All layers in the stack have the same number of elements. Each layer
 // describes one property of the primitive. Each layer can have multiple channels and each layer can
 // store data of a different type.
-
+//
 // HaX stores 3 kinds of nodes
 // 	- Pixel data.
 // 	- Polygon geometry data.
 // 	- Meta data only.
-
+//
 // Pixel Nodes stores pixels in a layer stack. A layer may store things like Albedo, Roughness,
 // Reflectance, Light maps, Masks, Normal maps, and Displacement. Layers use the channels of the
 // layers to store things like color. The length of the layer stack is determined by the type and
 // dimensions stored in the
-
+//
 // Geometry data is stored in 3 separate layer stacks for: vertex data, corner data and face data. The
 // vertex data stores things like verities, blend shapes, weight maps, and vertex colors. The first
 // layer in a vertex stack has to be a 3 channel layer named "position" describing the base position
@@ -63,7 +63,7 @@
 // for things like UV, normals, and adjacency. The first layer in a corner stack has to be a 1 channel
 // integer layer named "index" describing the vertices used to form polygons. The last value in each
 // polygon has a negative - 1 index to indicate the end of the polygon.
-
+//
 // Example:
 // 	A quad and a tri with the vertex index:
 // 		[0, 1, 2, 3] [1, 4, 2]
@@ -72,7 +72,7 @@
 // The face stack stores values per face. the length of the face stack has to match the number of
 // negative values in the index layer in the corner stack. The face stack can be used to store things
 // like material index.
-
+//
 // Storage
 // -------
 // All data is stored in little endian byte order with no padding. The layout mirrors the structs

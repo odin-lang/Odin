@@ -250,6 +250,8 @@ BuiltinProc__type_simple_boolean_end,
 
 BuiltinProc__type_end,
 
+	BuiltinProc___entry_point,
+
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
@@ -497,6 +499,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_equal_proc"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_hasher_proc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	
+
+
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 };

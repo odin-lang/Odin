@@ -346,7 +346,7 @@ _do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 		// Until dedicated assembly can be written leverage the fact that
 		// the callers of this routine ensure that src/dst are valid.
 
-		when ODIN_ARCH == "386" || ODIN_ARCH == "amd64" {
+		when ODIN_ARCH == "i386" || ODIN_ARCH == "amd64" {
 			// util.PUT_U32_LE/util.U32_LE are not required on little-endian
 			// systems that also happen to not be strict about aligned
 			// memory access.

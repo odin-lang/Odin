@@ -285,8 +285,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			case runtime.Type_Info_Integer:
 				switch info.endianness {
 				case .Platform: return false
-				case .Little:   return ODIN_ENDIAN != "little"
-				case .Big:      return ODIN_ENDIAN != "big"
+				case .Little:   return ODIN_ENDIAN != .Little
+				case .Big:      return ODIN_ENDIAN != .Big
 				}
 			}
 			return false

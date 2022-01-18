@@ -197,3 +197,8 @@ type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
 type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
+
+
+// Internal compiler use only
+
+__entry_point :: proc() ---

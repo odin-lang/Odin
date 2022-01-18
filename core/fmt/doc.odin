@@ -64,6 +64,7 @@ If not present, the width is whatever is necessary to represent the value.
 Precision is specified after the (optional) width followed by a period followed by a decimal number.
 If no period is present, a default precision is used.
 A period with no following number specifies a precision of 0.
+
 Examples:
 	%f     default width, default precision
 	%8f    width 8, default precision
@@ -84,7 +85,6 @@ Other flags:
 	               add leading 0z for dozenal (%#z)
 	               add leading 0x or 0X for hexadecimal (%#x or %#X)
 	               remove leading 0x for %p (%#p)
-
 	' '    (space) leave a space for elided sign in numbers (% d)
 	0      pad with leading zeros rather than spaces
 

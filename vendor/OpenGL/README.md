@@ -9,7 +9,7 @@ gl.load_up_to(4, 5, proc(p: rawptr, name: cstring) do (cast(^rawptr)p)^ = glfw.G
 ```
 [odin-glfw](https://github.com/vassvik/odin-glfw) also provides a useful helper you can pass straight to `gl.load_up_to`:
 ```go
-gl.load_up_to(4, 5, glfw.set_proc_address);
+gl.load_up_to(4, 5, glfw.gl_set_proc_address);
 ```
 
 #### NOTE: It is recommended to put this into the shared collection:

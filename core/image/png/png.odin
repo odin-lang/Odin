@@ -6,6 +6,11 @@
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
+
+
+// package png implements a PNG image reader
+//
+// The PNG specification is at https://www.w3.org/TR/PNG/.
 package png
 
 import "core:compress"
@@ -1611,7 +1616,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 			}
 		}
 	}
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		if img.depth == 16 {
 			// The pixel components are in Big Endian. Let's byteswap.
 			input  := mem.slice_data_cast([]u16be, img.pixels.buf[:])

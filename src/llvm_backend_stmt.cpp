@@ -1766,6 +1766,8 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 }
 
 void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
+	GB_ASSERT(op != Token_Eq);
+
 	Type *lhs_type = lb_addr_type(lhs);
 	Type *array_type = base_type(lhs_type);
 	GB_ASSERT(is_type_array_like(array_type));
@@ -1795,7 +1797,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			}
 			indices[index_count++] = index;
 		}
-		gb_sort_array(indices, index_count, gb_i32_cmp(0));
 
 		lbValue lhs_ptrs[4] = {};
 		lbValue x_loads[4]  = {};
@@ -1840,7 +1841,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			}
 			indices[index_count++] = index;
 		}
-		gb_sort_array(indices.data, index_count, gb_i32_cmp(0));
 
 		lbValue lhs_ptrs[4] = {};
 		lbValue x_loads[4]  = {};
@@ -1868,11 +1868,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 
 	lbValue x = lb_addr_get_ptr(p, lhs);
-
-
 	if (inline_array_arith) {
-	#if 1
-		#if 1
 		unsigned n = cast(unsigned)count;
 
 		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
@@ -1896,50 +1892,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 		for (unsigned i = 0; i < n; i++) {
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
-
-		#else
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
-		unsigned n = cast(unsigned)count;
-
-		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
-		auto rhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
-		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
-		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
-		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
-
-		for (unsigned i = 0; i < n; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, x, i);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			rhs_ptrs[i] = lb_emit_array_epi(p, y, i);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			y_loads[i] = lb_emit_load(p, rhs_ptrs[i]);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		#endif
-	#else
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
-		for (i64 i = 0; i < count; i++) {
-			lbValue a_ptr = lb_emit_array_epi(p, x, i);
-			lbValue b_ptr = lb_emit_array_epi(p, y, i);
-
-			lbValue a = lb_emit_load(p, a_ptr);
-			lbValue b = lb_emit_load(p, b_ptr);
-			lbValue c = lb_emit_arith(p, op, a, b, elem_type);
-			lb_emit_store(p, a_ptr, c);
-		}
-	#endif
 	} else {
 		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
 
@@ -2220,10 +2172,6 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	lb_start_block(p, b);
 	if (d.kind == lbDefer_Node) {
 		lb_build_stmt(p, d.stmt);
-	} else if (d.kind == lbDefer_Instr) {
-		// NOTE(bill): Need to make a new copy
-		LLVMValueRef instr = LLVMInstructionClone(d.instr.value);
-		LLVMInsertIntoBuilder(p->builder, instr);
 	} else if (d.kind == lbDefer_Proc) {
 		lb_emit_call(p, d.proc.deferred, d.proc.result_as_args);
 	}

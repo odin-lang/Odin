@@ -1332,7 +1332,7 @@ update :: proc(ctx: ^Haval_Context, data: []byte) {
     }
     ctx.count[1] += str_len >> 29
 
-    when ODIN_ENDIAN == "little" {
+    when ODIN_ENDIAN == .Little {
         if rmd_len + str_len >= 128 {
             copy(util.slice_to_bytes(ctx.block[:])[rmd_len:], data[:fill_len])
             block(ctx, ctx.rounds)

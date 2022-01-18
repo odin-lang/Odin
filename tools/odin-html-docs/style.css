@@ -1,0 +1,136 @@
+html {
+	font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+}
+
+.container {
+	max-width: 60em;
+	margin: 0 auto;
+	padding-left: 0.01em 1em;
+}
+
+table.documentation-directory {
+	/*border: 1px solid #ccc!important;*/
+	table-layout: fixed;
+	border-collapse: collapse;
+}
+
+.documentation-directory tr {
+	padding-left: 1em!important;
+	border-top: 1px solid #ccc!important;
+	border-bottom: 1px solid #ccc!important;
+}
+
+.documentation-directory td {
+	padding: 0.25em 0.5em;
+}
+.directory-child td {
+	padding-left: 2em!important;
+}
+
+.directory-child td+td {
+	position: relative;
+	left: -1.5em!important;
+	padding-right: 0;
+}
+.pkg-line-doc {
+	color: #444;
+}
+
+.documentation-directory tr[aria-controls]:hover {
+	background-color: #eee;
+}
+
+.documentation-directory tr[aria-expanded=true] td.pkg-name:before {
+	content: "\2193";
+}
+.documentation-directory tr[aria-expanded=false] td.pkg-name:before {
+	content: "\2192"!important;
+}
+
+.documentation-directory tr[aria-hidden=true] {
+	display: none;
+}
+
+pre {
+	white-space: pre-wrap;
+	word-break: keep-all;
+	word-wrap: break-word;
+	tab-size: 8;
+	font-family: Consolas,Liberation Mono,Menlo,monospace!important;
+	background-color: #f8f8f8;
+	color: #202224;
+	border: 1px solid #c6c8ca;
+	border-radius: 0.25rem;
+	padding: 0.625rem;
+}
+
+pre a {
+	font-family: Consolas,Liberation Mono,Menlo,monospace!important;
+	text-decoration: none;
+	/*font-weight: bold;*/
+	color: #00bfd5;
+}
+
+.documentation pre a.code-procedure {
+	color: #079300;
+}
+
+.documentation-source {
+	display: inline;
+	float: right;
+}
+
+.documentation-source a {
+	text-decoration: none;
+	color: #666666;
+}
+.documentation-source a:hover {
+	text-decoration: underline;
+}
+
+a > .a-hidden {
+	opacity: 0;
+}
+a:hover > .a-hidden {
+	opacity: 100;
+}
+
+ul.documentation-breadcrumb {
+	list-style: none;
+}
+
+ul.documentation-breadcrumb li {
+	display: inline;
+}
+
+ul.documentation-breadcrumb li+li:before {
+	padding: 0.2rem;
+	color: black;
+	content:  "/\00a0";
+}
+
+.code-inline {
+	font-family: Consolas,Liberation Mono,Menlo,monospace!important;
+	background-color: #f8f8f8;
+	color: #202224;
+	border: 1px solid #c6c8ca;
+	border-radius: 0.25rem;
+	padding: 0.125rem;
+}
+
+.documentation-directory {
+	width:  100%;
+}
+
+.documentation-directory tr {
+	/*background-color: #999;*/
+}
+
+
+.documentation-directory tr[aria-controls] {
+	cursor: pointer;
+}
+
+.documentation-directory tr.hidden {
+	display: none;
+}
