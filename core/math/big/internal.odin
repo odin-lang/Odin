@@ -1,11 +1,6 @@
-//+ignore
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
-
-	A BigInt implementation in Odin.
-	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
-	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
 	==========================    Low-level routines    ==========================
 
@@ -29,6 +24,9 @@
 
 	TODO: Handle +/- Infinity and NaN.
 */
+
+
+//+ignore
 package math_big
 
 import "core:mem"
