@@ -9,7 +9,7 @@ struct Ast;
 struct HashKey;
 struct Type;
 struct Entity;
-bool are_types_identical(Type *x, Type *y, bool check_tuple_names=false);
+bool are_types_identical(Type *x, Type *y);
 
 struct Complex128 {
 	f64 real, imag;
