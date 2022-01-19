@@ -815,7 +815,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 	String link_name = {};
 
 	OdinDocEntityKind kind = OdinDocEntity_Invalid;
-	u32 flags = 0;
+	u64 flags = 0;
 	i32 field_group_index = -1;
 
 	switch (e->kind) {
@@ -865,6 +865,9 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
 		if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
 		if (e->flags & EntityFlag_AnyInt)     { flags |= OdinDocEntityFlag_Param_AnyInt;   }
+	}
+	if (e->scope && (e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) && !is_entity_exported(e)) {
+		flags |= OdinDocEntityFlag_Private;
 	}
 
 	OdinDocString init_string = {};
