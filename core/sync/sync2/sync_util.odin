@@ -1,12 +1,11 @@
 package sync2
 
-
-// Example:
-//
-// if guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if guard(&m) {
+		...
+	}
+*/
 guard :: proc{
 	mutex_guard,
 	rw_mutex_guard,
@@ -17,13 +16,12 @@ guard :: proc{
 	atomic_recursive_mutex_guard,
 	atomic_rw_mutex_guard,
 }
-
-// Example:
-//
-// if shared_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if shared_guard(&m) {
+		...
+	}
+*/
 shared_guard :: proc{
 	rw_mutex_shared_guard,
 	atomic_rw_mutex_shared_guard,

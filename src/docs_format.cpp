@@ -172,6 +172,8 @@ enum OdinDocEntityFlag : u64 {
 
 	OdinDocEntityFlag_Var_Thread_Local = 1ull<<40,
 	OdinDocEntityFlag_Var_Static       = 1ull<<41,
+
+	OdinDocEntityFlag_Private          = 1ull<<50,
 };
 
 struct OdinDocEntity {

@@ -107,6 +107,8 @@ Entity_Flag :: enum u32le {
 
 	Var_Thread_Local = 40,
 	Var_Static       = 41,
+
+	Private = 50,
 }
 
 Entity_Flags :: distinct bit_set[Entity_Flag; u64le]

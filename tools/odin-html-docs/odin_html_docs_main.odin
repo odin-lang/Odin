@@ -543,10 +543,13 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		e := entities[type_entites[0]]
 		name := str(type.name)
 		tn_pkg := files[e.pos.file].pkg
+
 		if tn_pkg != pkg {
 			fmt.wprintf(w, `%s.`, str(pkgs[tn_pkg].name))
 		}
-		if n := strings.contains_rune(name, '('); n >= 0 {
+		if .Private in e.flags {
+			io.write_string(w, name)
+		} else if n := strings.contains_rune(name, '('); n >= 0 {
 			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name[:n], BASE_CORE_URL)
 			io.write_string(w, name[n:])
 		} else {

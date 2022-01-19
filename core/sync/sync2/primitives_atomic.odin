@@ -82,13 +82,12 @@ atomic_mutex_try_lock :: proc(m: ^Atomic_Mutex) -> bool {
 	return ok
 }
 
-
-// Example:
-//
-// if atomic_mutex_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if atomic_mutex_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=atomic_mutex_unlock)
 atomic_mutex_guard :: proc(m: ^Atomic_Mutex) -> bool {
 	atomic_mutex_lock(m)
@@ -193,25 +192,24 @@ atomic_rw_mutex_try_shared_lock :: proc(rw: ^Atomic_RW_Mutex) -> bool {
 	return false
 }
 
-
-// Example:
-//
-// if atomic_rw_mutex_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if atomic_rw_mutex_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=atomic_rw_mutex_unlock)
 atomic_rw_mutex_guard :: proc(m: ^Atomic_RW_Mutex) -> bool {
 	atomic_rw_mutex_lock(m)
 	return true
 }
 
-// Example:
-//
-// if atomic_rw_mutex_shared_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if atomic_rw_mutex_shared_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=atomic_rw_mutex_shared_unlock)
 atomic_rw_mutex_shared_guard :: proc(m: ^Atomic_RW_Mutex) -> bool {
 	atomic_rw_mutex_shared_lock(m)
@@ -270,13 +268,12 @@ atomic_recursive_mutex_try_lock :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
 	return true
 }
 
-
-// Example:
-//
-// if atomic_recursive_mutex_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if atomic_recursive_mutex_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=atomic_recursive_mutex_unlock)
 atomic_recursive_mutex_guard :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
 	atomic_recursive_mutex_lock(m)
