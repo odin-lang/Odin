@@ -199,7 +199,6 @@ main :: proc() {
 
 			pkgs_to_use[trimmed_path] = pkg
 		}
-		sort.map_entries_by_key(&pkgs_to_use)
 		for path, pkg in pkgs_to_use {
 			pkg_to_path[pkg] = path
 		}
@@ -228,66 +227,70 @@ main :: proc() {
 }
 
 
-write_core_directory :: proc(w: io.Writer) {
-	Node :: struct {
-		dir: string,
-		path: string,
-		name: string,
-		pkg: ^doc.Pkg,
-		next: ^Node,
-		first_child: ^Node,
-	}
-	add_child :: proc(parent: ^Node, child: ^Node) -> ^Node {
-		assert(parent != nil)
-		end := &parent.first_child
-		for end^ != nil {
-			end = &end^.next
-		}
-		child.next = end^
-		end^ = child
-		return child
-	}
+Dir_Node :: struct {
+	dir: string,
+	path: string,
+	name: string,
+	pkg: ^doc.Pkg,
+	children: [dynamic]^Dir_Node,
+}
 
-	root: Node
+generate_directory_tree :: proc() -> (root: ^Dir_Node) {
+	sort_tree :: proc(node: ^Dir_Node) {
+		slice.sort_by_key(node.children[:], proc(node: ^Dir_Node) -> string {return node.name})
+		for child in node.children {
+			sort_tree(child)
+		}
+	}
+	root = new(Dir_Node)
+	root.children = make([dynamic]^Dir_Node)
+	children := make([dynamic]^Dir_Node)
 	for path, pkg in pkgs_to_use {
 		dir, _, inner := strings.partition(path, "/")
-
-		node: ^Node = nil
-		for node = root.first_child; node != nil; node = node.next {
-			if node.dir == dir {
-				break
-			}
-		}
 		if inner == "" {
-			if node == nil {
-				add_child(&root, new_clone(Node{
-					dir  = dir,
-					name = dir,
-					path = path,
-					pkg  = pkg,
-				}))
-			} else {
-				node.dir  = dir
-				node.name = dir
-				node.path = path
-				node.pkg  = pkg
-			}
+			node := new_clone(Dir_Node{
+				dir  = dir,
+				name = dir,
+				path = path,
+				pkg  = pkg,
+			})
+			append(&root.children, node)
 		} else {
-			if node == nil {
-				node = add_child(&root, new_clone(Node{
-					dir  = dir,
-					name = dir,
-				}))
-			}
-			assert(node != nil)
-			child := add_child(node, new_clone(Node{
+			node := new_clone(Dir_Node{
 				dir  = dir,
 				name = inner,
 				path = path,
 				pkg  = pkg,
-			}))
+			})
+			append(&children, node)
 		}
 	}
+	child_loop: for child in children {
+		dir, _, inner := strings.partition(child.path, "/")
+		for node in root.children {
+			if node.dir == dir {
+				append(&node.children, child)
+				continue child_loop
+			}
+		}
+		parent := new_clone(Dir_Node{
+			dir  = dir,
+			name = dir,
+			path = dir,
+			pkg  = nil,
+		})
+		append(&root.children, parent)
+		append(&parent.children, child)
+	}
+
+	sort_tree(root)
+
+	return
+}
+
+write_core_directory :: proc(w: io.Writer) {
+
+	root := generate_directory_tree()
 
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
@@ -304,14 +307,14 @@ write_core_directory :: proc(w: io.Writer) {
 	fmt.wprintln(w, "\t<table class=\"doc-directory mt-4 mb-4\">")
 	fmt.wprintln(w, "\t\t<tbody>")
 
-	for dir := root.first_child; dir != nil; dir = dir.next {
-		if dir.first_child != nil {
+	for dir in root.children {
+		if len(dir.children) != 0 {
 			fmt.wprint(w, `<tr aria-controls="`)
-			for child := dir.first_child; child != nil; child = child.next {
+			for child in dir.children {
 				fmt.wprintf(w, "pkg-%s ", str(child.pkg.name))
 			}
 			fmt.wprint(w, `" class="directory-pkg"><td class="pkg-line pkg-name" data-aria-owns="`)
-			for child := dir.first_child; child != nil; child = child.next {
+			for child in dir.children {
 				fmt.wprintf(w, "pkg-%s ", str(child.pkg.name))
 			}
 			fmt.wprintf(w, `" id="pkg-%s">`, dir.dir)
@@ -336,7 +339,7 @@ write_core_directory :: proc(w: io.Writer) {
 		io.write_string(w, `</td>`)
 		fmt.wprintf(w, "</tr>\n")
 
-		for child := dir.first_child; child != nil; child = child.next {
+		for child in dir.children {
 			assert(child.pkg != nil)
 			fmt.wprintf(w, `<tr id="pkg-%s" class="directory-pkg directory-child"><td class="pkg-line pkg-name">`, str(child.pkg.name))
 			fmt.wprintf(w, `<a href="%s/%s/">%s</a>`, BASE_CORE_URL, child.path, child.name)
@@ -870,7 +873,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 				io.write_string(w, `<li class="breadcrumb-item">`)
 			}
 
-			if !is_curr && short_path in pkgs_to_use {
+			if !is_curr && (short_path in pkgs_to_use) {
 				fmt.wprintf(w, `<a href="%s/%s">%s</a>`, BASE_CORE_URL, url, dir)
 			} else {
 				io.write_string(w, dir)
