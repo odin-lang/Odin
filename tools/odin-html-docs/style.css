@@ -1,6 +1,6 @@
 /* doc directories */
 
-table.doc-directory {
+table.`directory {
 	/*border: 1px solid #ccc!important;*/
 	table-layout: fixed;
 	border-collapse: collapse;
@@ -78,6 +78,7 @@ pre.doc-code a.code-procedure {
 .doc-source a {
 	text-decoration: none;
 	color: #666666;
+	font-size: 0.75em;
 }
 .doc-source a:hover {
 	text-decoration: underline;
