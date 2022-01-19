@@ -10,6 +10,7 @@ import "core:sort"
 import "core:slice"
 
 GITHUB_CORE_URL :: "https://github.com/odin-lang/Odin/tree/master/core"
+BASE_CORE_URL :: "/core"
 
 header:   ^doc.Header
 files:    []doc.File
@@ -96,7 +97,7 @@ write_html_footer :: proc(w: io.Writer, include_directory_js: bool) {
 
 	io.write(w, #load("footer.txt.html"))
 
-	if include_directory_js {
+	if false && include_directory_js {
 		io.write_string(w, `
 <script type="text/javascript">
 (function (win, doc) {
@@ -319,7 +320,7 @@ write_core_directory :: proc(w: io.Writer) {
 		}
 
 		if dir.pkg != nil {
-			fmt.wprintf(w, `<a href="/core/%s">%s</a>`, dir.path, dir.name)
+			fmt.wprintf(w, `<a href="%s/%s">%s</a>`, BASE_CORE_URL, dir.path, dir.name)
 		} else {
 			fmt.wprintf(w, "%s", dir.name)
 		}
@@ -338,7 +339,7 @@ write_core_directory :: proc(w: io.Writer) {
 		for child := dir.first_child; child != nil; child = child.next {
 			assert(child.pkg != nil)
 			fmt.wprintf(w, `<tr id="pkg-%s" class="directory-pkg directory-child"><td class="pkg-line pkg-name">`, str(child.pkg.name))
-			fmt.wprintf(w, `<a href="/core/%s/">%s</a>`, child.path, child.name)
+			fmt.wprintf(w, `<a href="%s/%s/">%s</a>`, BASE_CORE_URL, child.path, child.name)
 			io.write_string(w, `</td>`)
 
 			line_doc, _, _ := strings.partition(str(child.pkg.docs), "\n")
@@ -392,7 +393,7 @@ Type_Writer :: struct {
 }
 
 write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type_Flags) {
-	write_param_entity :: proc(using writer: ^Type_Writer, e: ^doc.Entity, flags: Write_Type_Flags, name_width := 0) {
+	write_param_entity :: proc(using writer: ^Type_Writer, e, next_entity: ^doc.Entity, flags: Write_Type_Flags, name_width := 0) {
 		name := str(e.name)
 
 		write_padding :: proc(w: io.Writer, name: string, name_width: int) {
@@ -414,13 +415,13 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			assert(name != "")
 			io.write_string(w, name)
 			io.write_string(w, " := ")
-			io.write_string(w, `<a href="/core/runtime/#Source_Code_Location">`)
+			fmt.wprintf(w, `<a href="%s/runtime/#Source_Code_Location">`, BASE_CORE_URL)
 			io.write_string(w, init_string)
 			io.write_string(w, `</a>`)
 		case strings.has_prefix(init_string, "context."):
 			io.write_string(w, name)
 			io.write_string(w, " := ")
-			io.write_string(w, `<a href="/core/runtime/#Context">`)
+			fmt.wprintf(w, `<a href="%s/runtime/#Context">`, BASE_CORE_URL)
 			io.write_string(w, init_string)
 			io.write_string(w, `</a>`)
 		case:
@@ -435,6 +436,12 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 				assert(name != "")
 				io.write_byte(w, '$')
 				io.write_string(w, name)
+				if name != "" && init_string == "" && next_entity != nil && e.field_group_index >= 0 {
+					if e.field_group_index == next_entity.field_group_index && e.type == next_entity.type {
+						return
+					}
+				}
+
 				generic_scope[name] = true
 				if !is_type_untyped(the_type) {
 					io.write_string(w, ": ")
@@ -449,6 +456,13 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 				return
 
 			case .Variable:
+				if name != "" && init_string == "" && next_entity != nil && e.field_group_index >= 0 {
+					if e.field_group_index == next_entity.field_group_index && e.type == next_entity.type {
+						io.write_string(w, name)
+						return
+					}
+				}
+
 				if name != "" {
 					io.write_string(w, name)
 					io.write_string(w, ": ")
@@ -530,10 +544,10 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			fmt.wprintf(w, `%s.`, str(pkgs[tn_pkg].name))
 		}
 		if n := strings.contains_rune(name, '('); n >= 0 {
-			fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name[:n])
+			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name[:n], BASE_CORE_URL)
 			io.write_string(w, name[n:])
 		} else {
-			fmt.wprintf(w, `<a class="code-typename" href="/core/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name)
+			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name, BASE_CORE_URL)
 		}
 	case .Generic:
 		name := str(type.name)
@@ -590,10 +604,14 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			indent += 1
 			name_width := calc_name_width(type_entites)
 
-			for entity_index in type_entites {
+			for entity_index, i in type_entites {
 				e := &entities[entity_index]
+				next_entity: ^doc.Entity = nil
+				if i+1 < len(type_entites) {
+					next_entity = &entities[type_entites[i+1]]
+				}
 				do_indent(writer, flags)
-				write_param_entity(writer, e, flags, name_width)
+				write_param_entity(writer, e, next_entity, flags, name_width)
 				io.write_byte(w, ',')
 				do_newline(writer, flags)
 			}
@@ -667,7 +685,12 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			if i > 0 {
 				io.write_string(w, ", ")
 			}
-			write_param_entity(writer, &entities[entity_index], flags)
+			e := &entities[entity_index]
+			next_entity: ^doc.Entity = nil
+			if i+1 < len(type_entites) {
+				next_entity = &entities[type_entites[i+1]]
+			}
+			write_param_entity(writer, e, next_entity, flags)
 		}
 		if require_parens { io.write_byte(w, ')') }
 
@@ -821,7 +844,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
 
-	fmt.wprintln(w, `<article class="col-lg-9 p-4">`)
+	fmt.wprintln(w, `<article class="col-lg-9 p-4 documentation">`)
 
 	{ // breadcrumbs
 		fmt.wprintln(w, `<div class="row">`)
@@ -832,7 +855,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		io.write_string(w, "<ol class=\"breadcrumb\">\n")
 		defer io.write_string(w, "</ol>\n")
 
-		io.write_string(w, `<li class="breadcrumb-item"><a class="breadcrumb-link" href="/core">core</a></li>`)
+		fmt.wprintf(w, `<li class="breadcrumb-item"><a class="breadcrumb-link" href="%s">core</a></li>`, BASE_CORE_URL)
 
 		dirs := strings.split(path, "/")
 		for dir, i in dirs {
@@ -848,7 +871,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			}
 
 			if !is_curr && short_path in pkgs_to_use {
-				fmt.wprintf(w, `<a href="/core/%s">%s</a>`, url, dir)
+				fmt.wprintf(w, `<a href="%s/%s">%s</a>`, BASE_CORE_URL, url, dir)
 			} else {
 				io.write_string(w, dir)
 			}
@@ -858,19 +881,18 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 
 
 	fmt.wprintf(w, "<h1>package core:%s</h1>\n", path)
-	fmt.wprintln(w, "<h2>Documentation</h2>")
 	overview_docs := strings.trim_space(str(pkg.docs))
 	if overview_docs != "" {
-		fmt.wprintln(w, "<h3>Overview</h3>")
+		fmt.wprintln(w, "<h2>Overview</h2>")
 		fmt.wprintln(w, "<div id=\"pkg-overview\">")
 		defer fmt.wprintln(w, "</div>")
 
 		write_docs(w, pkg, overview_docs)
 	}
 
-	fmt.wprintln(w, `<h3>Index</h3>`)
+	fmt.wprintln(w, `<h2>Index</h2>`)
 	fmt.wprintln(w, `<section class="doc-index" id="pkg-index">`)
-	// fmt.wprintln(w, `<a class="btn btn-primary" data-bs-toggle="collapse" href="#pkg-index" role="button" aria-expanded="true" aria-controls="pkg-index"><h3>Index</h3></a>`)
+	// fmt.wprintln(w, `<a class="btn btn-primary" data-bs-toggle="collapse" href="#pkg-index" role="button" aria-expanded="true" aria-controls="pkg-index"><h2>Index</h2></a>`)
 	// fmt.wprintln(w, `<section class="doc-index collapse" id="pkg-index">`)
 	pkg_procs:       [dynamic]^doc.Entity
 	pkg_proc_groups: [dynamic]^doc.Entity
@@ -906,7 +928,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	slice.sort_by_key(pkg_consts[:],      entity_key)
 
 	write_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
-		fmt.wprintf(w, "<h4>%s</h4>\n", name)
+		fmt.wprintf(w, "<h3>%s</h3>\n", name)
 		fmt.wprintln(w, `<section class="doc-index">`)
 		if len(entities) == 0 {
 			io.write_string(w, "<p>This section is empty.</p>\n")
@@ -921,12 +943,18 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		fmt.wprintln(w, "</section>")
 	}
 
+	entity_ordering := [?]struct{name: string, entities: []^doc.Entity} {
+		{"Types",            pkg_types[:]},
+		{"Constants",        pkg_consts[:]},
+		{"Variables",        pkg_vars[:]},
+		{"Procedures",       pkg_procs[:]},
+		{"Procedure Groups", pkg_proc_groups[:]},
+	}
 
-	write_index(w, "Procedures",       pkg_procs[:])
-	write_index(w, "Procedure Groups", pkg_proc_groups[:])
-	write_index(w, "Types",            pkg_types[:])
-	write_index(w, "Variables",        pkg_vars[:])
-	write_index(w, "Constants",        pkg_consts[:])
+
+	for eo in entity_ordering {
+		write_index(w, eo.name, eo.entities)
+	}
 
 	fmt.wprintln(w, "</section>")
 
@@ -957,13 +985,13 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		name := str(e.name)
 		path := pkg_to_path[pkg]
 		filename := slashpath.base(str(files[e.pos.file].name))
-		fmt.wprintf(w, "<h4 id=\"{0:s}\"><span><a class=\"doc-id-link\" href=\"#{0:s}\">{0:s}", name)
+		fmt.wprintf(w, "<h3 id=\"{0:s}\"><span><a class=\"doc-id-link\" href=\"#{0:s}\">{0:s}", name)
 		fmt.wprintf(w, "<span class=\"a-hidden\">&nbsp;¶</span></a></span>")
 		if e.pos.file != 0 && e.pos.line > 0 {
 			src_url := fmt.tprintf("%s/%s/%s#L%d", GITHUB_CORE_URL, path, filename, e.pos.line)
 			fmt.wprintf(w, "<div class=\"doc-source\"><a href=\"{0:s}\"><em>Source</em></a></div>", src_url)
 		}
-		fmt.wprintf(w, "</h4>\n")
+		fmt.wprintf(w, "</h3>\n")
 
 		switch e.kind {
 		case .Invalid, .Import_Name, .Library_Name:
@@ -1045,7 +1073,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 					fmt.wprintf(w, "%s.", str(pkgs[this_pkg].name))
 				}
 				name := str(this_proc.name)
-				fmt.wprintf(w, `<a class="code-procedure" href="/core/{0:s}/#{1:s}">`, pkg_to_path[&pkgs[this_pkg]], name)
+				fmt.wprintf(w, `<a class="code-procedure" href="{2:s}/{0:s}/#{1:s}">`, pkg_to_path[&pkgs[this_pkg]], name, BASE_CORE_URL)
 				io.write_string(w, name)
 				io.write_string(w, `</a>`)
 				io.write_byte(w, ',')
@@ -1059,7 +1087,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		write_docs(w, pkg, strings.trim_space(str(e.docs)))
 	}
 	write_entities :: proc(w: io.Writer, title: string, entities: []^doc.Entity) {
-		fmt.wprintf(w, "<h3 id=\"pkg-{0:s}\">{0:s}</h3>\n", title)
+		fmt.wprintf(w, "<h2 id=\"pkg-{0:s}\">{0:s}</h2>\n", title)
 		fmt.wprintln(w, `<section class="documentation">`)
 		if len(entities) == 0 {
 			io.write_string(w, "<p>This section is empty.</p>\n")
@@ -1071,14 +1099,11 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		fmt.wprintln(w, "</section>")
 	}
 
-	write_entities(w, "Procedures",       pkg_procs[:])
-	write_entities(w, "Procedure Groups", pkg_proc_groups[:])
-	write_entities(w, "Types",            pkg_types[:])
-	write_entities(w, "Variables",        pkg_vars[:])
-	write_entities(w, "Constants",        pkg_consts[:])
+	for eo in entity_ordering {
+		write_entities(w, eo.name, eo.entities)
+	}
 
-
-	fmt.wprintln(w, `<h3 id="pkg-source-files">Source Files</h3>`)
+	fmt.wprintln(w, `<h2 id="pkg-source-files">Source Files</h2>`)
 	fmt.wprintln(w, "<ul>")
 	any_hidden := false
 	source_file_loop: for file_index in array(pkg.files) {
@@ -1118,29 +1143,21 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintf(w, `<li><a href="#%s">%s</a>`, id, text)
 		}
 
-		write_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
-			fmt.wprintf(w, `<li><a href="#pkg-{0:s}">{0:s}</a>`, name)
-			fmt.wprintln(w, `<ul>`)
-			for e in entities {
-				name := str(e.name)
-				fmt.wprintf(w, "<li><a href=\"#{0:s}\">{0:s}</a></li>\n", name)
-			}
-			fmt.wprintln(w, "</ul>")
-			fmt.wprintln(w, "</li>")
-		}
-
-
 		fmt.wprintln(w, `<div class="col-lg-3 odin-toc-border navbar-light"><div class="sticky-top odin-below-navbar py-3">`)
 		fmt.wprintln(w, `<nav id="TableOfContents">`)
 		fmt.wprintln(w, `<ul>`)
 		if overview_docs != "" {
 			write_link(w, "pkg-overview", "Overview")
 		}
-		write_index(w, "Procedures",       pkg_procs[:])
-		write_index(w, "Procedure Groups", pkg_proc_groups[:])
-		write_index(w, "Types",            pkg_types[:])
-		write_index(w, "Variables",        pkg_vars[:])
-		write_index(w, "Constants",        pkg_consts[:])
+		for eo in entity_ordering do if len(eo.entities) != 0 {
+			fmt.wprintf(w, `<li><a href="#pkg-{0:s}">{0:s}</a>`, eo.name)
+			fmt.wprintln(w, `<ul>`)
+			for e in eo.entities {
+				fmt.wprintf(w, "<li><a href=\"#{0:s}\">{0:s}</a></li>\n", str(e.name))
+			}
+			fmt.wprintln(w, "</ul>")
+			fmt.wprintln(w, "</li>")
+		}
 		write_link(w, "pkg-source-files", "Source Files")
 		fmt.wprintln(w, `</ul>`)
 		fmt.wprintln(w, `</nav>`)

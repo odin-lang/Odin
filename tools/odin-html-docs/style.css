@@ -91,6 +91,17 @@ a:hover > .a-hidden {
 	opacity: 100;
 }
 
-.documentation h4 {
+article.documentation h2 {
+	border-bottom: 1px dashed #c6c8ca;
+	padding-bottom: 0.5rem;
+}
+section.documentation h3 {
 	font-size: calc(1.1rem + .2vw);
+}
+
+
+
+.doc-index h3 {
+	border-bottom: 1px solid #c6c8ca;
+	padding-bottom: 0.25rem;
 }

@@ -512,10 +512,16 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.entities = odin_doc_add_entity_as_slice(w, type->Named.type_name);
 		break;
 	case Type_Generic:
-		doc_type.kind = OdinDocType_Generic;
-		doc_type.name = odin_doc_write_string(w, type->Generic.entity->token.string);
-		if (type->Generic.specialized) {
-			doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
+		{
+			String name = type->Generic.name;
+			if (type->Generic.entity) {
+				name = type->Generic.entity->token.string;
+			}
+			doc_type.kind = OdinDocType_Generic;
+			doc_type.name = odin_doc_write_string(w, name);
+			if (type->Generic.specialized) {
+				doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
+			}
 		}
 		break;
 	case Type_Pointer:
@@ -810,6 +816,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 
 	OdinDocEntityKind kind = OdinDocEntity_Invalid;
 	u32 flags = 0;
+	i32 field_group_index = -1;
 
 	switch (e->kind) {
 	case Entity_Invalid:     kind = OdinDocEntity_Invalid;     break;
@@ -839,6 +846,10 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (init_expr == nullptr) {
 			init_expr = e->Variable.init_expr;
 		}
+		field_group_index = e->Variable.field_group_index;
+		break;
+	case Entity_Constant:
+		field_group_index = e->Constant.field_group_index;
 		break;
 	case Entity_Procedure:
 		if (e->Procedure.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
@@ -883,6 +894,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 	doc_entity.init_string = init_string;
 	doc_entity.comment = odin_doc_comment_group_string(w, comment);
 	doc_entity.docs = odin_doc_comment_group_string(w, docs);
+	doc_entity.field_group_index = field_group_index;
 	doc_entity.foreign_library = 0; // Set later
 	doc_entity.link_name = odin_doc_write_string(w, link_name);
 	if (e->decl_info != nullptr) {
