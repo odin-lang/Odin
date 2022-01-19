@@ -88,71 +88,62 @@ recursive_make_directory :: proc(path: string, prefix := "") {
 
 
 write_html_header :: proc(w: io.Writer, title: string) {
-	fmt.wprintf(w, `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>%s</title>
-
-	<script type="text/javascript" src="https://livejs.com/live.js"></script>
-	<link rel="stylesheet" type="text/css" href="/style.css">
-
-	</style>
-</head>
-<body>`, title)
-	fmt.wprintln(w, "\n<div class=\"container\">")
-	fmt.wprintln(w, "\n<a href=\"/core\">Core Directory</a>")
-
+	fmt.wprintf(w, string(#load("header.txt.html")), title)
 }
 
-write_html_footer :: proc(w: io.Writer) {
-	io.write_string(w, `
-	<script type="text/javascript">
-	(function (win, doc) {
-		'use strict';
-		if (!doc.querySelectorAll || !win.addEventListener) {
-			// doesn't cut the mustard.
-			return;
+write_html_footer :: proc(w: io.Writer, include_directory_js: bool) {
+	fmt.wprintf(w, "\n")
+
+	io.write(w, #load("footer.txt.html"))
+
+	if include_directory_js {
+		io.write_string(w, `
+<script type="text/javascript">
+(function (win, doc) {
+	'use strict';
+	if (!doc.querySelectorAll || !win.addEventListener) {
+		// doesn't cut the mustard.
+		return;
+	}
+	let toggles = doc.querySelectorAll('[aria-controls]');
+	for (let i = 0; i < toggles.length; i = i + 1) {
+		let toggleID = toggles[i].getAttribute('aria-controls');
+		if (doc.getElementById(toggleID)) {
+			let togglecontent = doc.getElementById(toggleID);
+			togglecontent.setAttribute('aria-hidden', 'true');
+			togglecontent.setAttribute('tabindex', '-1');
+			toggles[i].setAttribute('aria-expanded', 'false');
 		}
-		let toggles = doc.querySelectorAll('[aria-controls]');
-		for (let i = 0; i < toggles.length; i = i + 1) {
-			let toggleID = toggles[i].getAttribute('aria-controls');
-			if (doc.getElementById(toggleID)) {
-				let togglecontent = doc.getElementById(toggleID);
-				togglecontent.setAttribute('aria-hidden', 'true');
-				togglecontent.setAttribute('tabindex', '-1');
-				toggles[i].setAttribute('aria-expanded', 'false');
-			}
-		}
-		function toggle(ev) {
-			ev = ev || win.event;
-			var target = ev.target || ev.srcElement;
-			if (target.hasAttribute('data-aria-owns')) {
-				let toggleIDs = target.getAttribute('data-aria-owns').match(/[^ ]+/g);
-				toggleIDs.forEach(toggleID => {
-					if (doc.getElementById(toggleID)) {
-						ev.preventDefault();
-						let togglecontent = doc.getElementById(toggleID);
-						if (togglecontent.getAttribute('aria-hidden') == 'true') {
-							togglecontent.setAttribute('aria-hidden', 'false');
-							target.setAttribute('aria-expanded', 'true');
-							if (target.tagName == 'A') {
-								togglecontent.focus();
-							}
-						} else {
-							togglecontent.setAttribute('aria-hidden', 'true');
-							target.setAttribute('aria-expanded', 'false');
+	}
+	function toggle(ev) {
+		ev = ev || win.event;
+		var target = ev.target || ev.srcElement;
+		if (target.hasAttribute('data-aria-owns')) {
+			let toggleIDs = target.getAttribute('data-aria-owns').match(/[^ ]+/g);
+			toggleIDs.forEach(toggleID => {
+				if (doc.getElementById(toggleID)) {
+					ev.preventDefault();
+					let togglecontent = doc.getElementById(toggleID);
+					if (togglecontent.getAttribute('aria-hidden') == 'true') {
+						togglecontent.setAttribute('aria-hidden', 'false');
+						target.setAttribute('aria-expanded', 'true');
+						if (target.tagName == 'A') {
+							togglecontent.focus();
 						}
+					} else {
+						togglecontent.setAttribute('aria-hidden', 'true');
+						target.setAttribute('aria-expanded', 'false');
 					}
-				})
-			}
+				}
+			})
 		}
-		doc.addEventListener('click', toggle, false);
-	}(this, this.document));
-	</script>
-`)
-	fmt.wprintf(w, "</div></body>\n</html>\n")
+	}
+	doc.addEventListener('click', toggle, false);
+}(this, this.document));
+</script>`)
+	}
+
+	fmt.wprintf(w, "</body>\n</html>\n")
 }
 
 main :: proc() {
@@ -220,7 +211,7 @@ main :: proc() {
 		strings.reset_builder(&b)
 		write_html_header(w, "core library - pkg.odin-lang.org")
 		write_core_directory(w)
-		write_html_footer(w)
+		write_html_footer(w, true)
 		os.make_directory("core", 0)
 		os.write_entire_file("core/index.html", b.buf[:])
 	}
@@ -229,7 +220,7 @@ main :: proc() {
 		strings.reset_builder(&b)
 		write_html_header(w, fmt.tprintf("package %s - pkg.odin-lang.org", path))
 		write_pkg(w, path, pkg)
-		write_html_footer(w)
+		write_html_footer(w, false)
 		recursive_make_directory(path, "core")
 		os.write_entire_file(fmt.tprintf("core/%s/index.html", path), b.buf[:])
 	}
@@ -297,10 +288,19 @@ write_core_directory :: proc(w: io.Writer) {
 		}
 	}
 
+	fmt.wprintln(w, `<div class="row odin-main">`)
+	defer fmt.wprintln(w, `</div>`)
+	fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
+	defer fmt.wprintln(w, `</article>`)
 
-	fmt.wprintln(w, "<h2>Directories</h2>")
+	fmt.wprintln(w, "<article>")
+	fmt.wprintln(w, "<header>")
+	fmt.wprintln(w, "<h1>Core Library Collection</h1>")
+	fmt.wprintln(w, "</header>")
+	fmt.wprintln(w, "</article>")
 
-	fmt.wprintln(w, "\t<table class=\"documentation-directory\">")
+	fmt.wprintln(w, "<div>")
+	fmt.wprintln(w, "\t<table class=\"doc-directory mt-4 mb-4\">")
 	fmt.wprintln(w, "\t\t<tbody>")
 
 	for dir := root.first_child; dir != nil; dir = dir.next {
@@ -356,6 +356,7 @@ write_core_directory :: proc(w: io.Writer) {
 
 	fmt.wprintln(w, "\t\t</tbody>")
 	fmt.wprintln(w, "\t</table>")
+	fmt.wprintln(w, "</div>")
 }
 
 is_entity_blank :: proc(e: doc.Entity_Index) -> bool {
@@ -817,23 +818,42 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 }
 
 write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
-	write_breadcrumbs :: proc(w: io.Writer, path: string) {
-		dirs := strings.split(path, "/")
-		io.write_string(w, "<ul class=\"documentation-breadcrumb\">\n")
-		for dir, i in dirs {
-			url := strings.join(dirs[:i+1], "/")
-			short_path := strings.join(dirs[1:i+1], "/")
-			if i == 0 || short_path in pkgs_to_use {
-				fmt.wprintf(w, "<li><a href=\"/%s\">%s</a></li>", url, dir)
-			} else {
-				fmt.wprintf(w, "<li>%s</li>", dir)
+
+
+	fmt.wprintln(w, `<div class="row odin-main">`)
+	defer fmt.wprintln(w, `</div>`)
+
+	{ // breadcrumbs
+		fmt.wprintln(w, `<nav class="col-lg-2 odin-side-bar-border navbar-light">`)
+		fmt.wprintln(w, `<div class="sticky-top odin-below-navbar py-3">`)
+		{
+			dirs := strings.split(path, "/")
+			io.write_string(w, "<ul class=\"nav nav-pills d-flex flex-column\">\n")
+			io.write_string(w, `<li class="nav-item"><a class="nav-link" href="/core">core</a></li>`)
+			for dir, i in dirs {
+				url := strings.join(dirs[:i+1], "/")
+				short_path := strings.join(dirs[1:i+1], "/")
+
+				io.write_string(w, `<li class="nav-item">`)
+				a_class := "nav-link"
+				if i+1 == len(dirs) {
+					a_class = "nav-link active"
+				}
+
+				if i == 0 || short_path in pkgs_to_use {
+					fmt.wprintf(w, `<a class="%s" href="/core/%s">%s</a></li>` + "\n", a_class, url, dir)
+				} else {
+					fmt.wprintf(w, "%s</li>\n", dir)
+				}
 			}
+			io.write_string(w, "</ul>\n")
 		}
-		io.write_string(w, "</ul>\n")
 
+		fmt.wprintln(w, `</div>`)
+		fmt.wprintln(w, `</nav>`)
 	}
-	write_breadcrumbs(w, fmt.tprintf("core/%s", path))
 
+	fmt.wprintln(w, `<article class="col-lg-8 p-4">`)
 
 	fmt.wprintf(w, "<h1>package core:%s</h1>\n", path)
 	fmt.wprintln(w, "<h2>Documentation</h2>")
@@ -847,7 +867,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	}
 
 	fmt.wprintln(w, "<h3>Index</h3>")
-	fmt.wprintln(w, `<section class="documentation-index">`)
+	fmt.wprintln(w, `<section class="doc-index">`)
 	pkg_procs:       [dynamic]^doc.Entity
 	pkg_proc_groups: [dynamic]^doc.Entity
 	pkg_types:       [dynamic]^doc.Entity
@@ -883,7 +903,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 
 	write_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
 		fmt.wprintf(w, "<h4>%s</h4>\n", name)
-		fmt.wprintln(w, `<section class="documentation-index">`)
+		fmt.wprintln(w, `<section class="doc-index">`)
 		if len(entities) == 0 {
 			io.write_string(w, "<p>This section is empty.</p>\n")
 		} else {
@@ -933,11 +953,11 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		name := str(e.name)
 		path := pkg_to_path[pkg]
 		filename := slashpath.base(str(files[e.pos.file].name))
-		fmt.wprintf(w, "<h4 id=\"{0:s}\"><span><a class=\"documentation-id-link\" href=\"#{0:s}\">{0:s}", name)
+		fmt.wprintf(w, "<h4 id=\"{0:s}\"><span><a class=\"doc-id-link\" href=\"#{0:s}\">{0:s}", name)
 		fmt.wprintf(w, "<span class=\"a-hidden\">&nbsp;¶</span></a></span>")
 		if e.pos.file != 0 && e.pos.line > 0 {
 			src_url := fmt.tprintf("%s/%s/%s#L%d", GITHUB_CORE_URL, path, filename, e.pos.line)
-			fmt.wprintf(w, "<div class=\"documentation-source\"><a href=\"{0:s}\"><em>Source</em></a></div>", src_url)
+			fmt.wprintf(w, "<div class=\"doc-source\"><a href=\"{0:s}\"><em>Source</em></a></div>", src_url)
 		}
 		fmt.wprintf(w, "</h4>\n")
 
@@ -945,7 +965,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		case .Invalid, .Import_Name, .Library_Name:
 			// ignore
 		case .Constant:
-			fmt.wprint(w, "<pre>")
+			fmt.wprint(w, `<pre class="doc-code">`)
 			the_type := types[e.type]
 
 			init_string := str(e.init_string)
@@ -973,7 +993,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			io.write_string(w, init_string)
 			fmt.wprintln(w, "</pre>")
 		case .Variable:
-			fmt.wprint(w, "<pre>")
+			fmt.wprint(w, `<pre class="doc-code">`)
 			write_attributes(w, e)
 			fmt.wprintf(w, "%s: ", name)
 			write_type(writer, types[e.type], {.Allow_Indent})
@@ -985,7 +1005,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintln(w, "</pre>")
 
 		case .Type_Name:
-			fmt.wprint(w, "<pre>")
+			fmt.wprint(w, `<pre class="doc-code">`)
 			fmt.wprintf(w, "%s :: ", name)
 			the_type := types[e.type]
 			type_to_print := the_type
@@ -1004,14 +1024,14 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			write_type(writer, type_to_print, {.Allow_Indent})
 			fmt.wprintln(w, "</pre>")
 		case .Procedure:
-			fmt.wprint(w, "<pre>")
+			fmt.wprint(w, `<pre class="doc-code">`)
 			fmt.wprintf(w, "%s :: ", name)
 			write_type(writer, types[e.type], nil)
 			write_where_clauses(w, array(e.where_clauses))
 			fmt.wprint(w, " {…}")
 			fmt.wprintln(w, "</pre>")
 		case .Proc_Group:
-			fmt.wprint(w, "<pre>")
+			fmt.wprint(w, `<pre class="doc-code">`)
 			fmt.wprintf(w, "%s :: proc{{\n", name)
 			for entity_index in array(e.grouped_entities) {
 				this_proc := &entities[entity_index]
@@ -1035,7 +1055,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		write_docs(w, pkg, strings.trim_space(str(e.docs)))
 	}
 	write_entities :: proc(w: io.Writer, title: string, entities: []^doc.Entity) {
-		fmt.wprintf(w, "<h3>%s</h3>\n", title)
+		fmt.wprintf(w, "<h3 id=\"pkg-{0:s}\">{0:s}</h3>\n", title)
 		fmt.wprintln(w, `<section class="documentation">`)
 		if len(entities) == 0 {
 			io.write_string(w, "<p>This section is empty.</p>\n")
@@ -1054,7 +1074,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	write_entities(w, "Constants",        pkg_consts[:])
 
 
-	fmt.wprintln(w, "<h3>Source Files</h3>")
+	fmt.wprintln(w, `<h3 id="pkg-source-files">Source Files</h3>`)
 	fmt.wprintln(w, "<ul>")
 	any_hidden := false
 	source_file_loop: for file_index in array(pkg.files) {
@@ -1086,5 +1106,39 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		fmt.wprintln(w, "<li><em>(hidden platform specific files)</em></li>")
 	}
 	fmt.wprintln(w, "</ul>")
+
+
+	fmt.wprintln(w, `</article>`)
+	{
+		write_link :: proc(w: io.Writer, id, text: string) {
+			fmt.wprintf(w, `<li><a href="#%s">%s</a>`, id, text)
+		}
+
+		write_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
+			fmt.wprintf(w, `<li><a href="#pkg-{0:s}">{0:s}</a>`, name)
+			fmt.wprintln(w, `<ul>`)
+			for e in entities {
+				name := str(e.name)
+				fmt.wprintf(w, "<li><a href=\"#{0:s}\">{0:s}</a></li>\n", name)
+			}
+			fmt.wprintln(w, "</ul>")
+			fmt.wprintln(w, "</li>")
+		}
+
+
+		fmt.wprintln(w, `<div class="col-lg-2 odin-toc-border navbar-light"><div class="sticky-top odin-below-navbar py-3">`)
+		fmt.wprintln(w, `<nav id="TableOfContents">`)
+		fmt.wprintln(w, `<ul>`)
+		write_link(w, "pkg-overview", "Overview")
+		write_index(w, "Procedures",       pkg_procs[:])
+		write_index(w, "Procedure Groups", pkg_proc_groups[:])
+		write_index(w, "Types",            pkg_types[:])
+		write_index(w, "Variables",        pkg_vars[:])
+		write_index(w, "Constants",        pkg_consts[:])
+		write_link(w, "pkg-source-files", "Source Files")
+		fmt.wprintln(w, `</ul>`)
+		fmt.wprintln(w, `</nav>`)
+		fmt.wprintln(w, `</div></div>`)
+	}
 
 }
