@@ -11,7 +11,7 @@ String :: distinct Array(byte)
 
 Version_Type_Major :: 0
 Version_Type_Minor :: 2
-Version_Type_Patch :: 2
+Version_Type_Patch :: 3
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -122,6 +122,10 @@ Entity :: struct {
 	_:                u32le, // reserved for init
 	comment:          String,
 	docs:             String,
+	// May be used by (Struct fields and procedure fields):
+	// .Variable
+	// .Constant
+	field_group_index: i32le,
 
 	// May used by:
 	// .Variable

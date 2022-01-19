@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 2
-#define OdinDocVersionType_Patch 2
+#define OdinDocVersionType_Patch 3
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -185,6 +185,7 @@ struct OdinDocEntity {
 	u32                reserved_for_init;
 	OdinDocString      comment;
 	OdinDocString      docs;
+	i32                field_group_index;
 	OdinDocEntityIndex foreign_library;
 	OdinDocString      link_name;
 	OdinDocArray<OdinDocAttribute> attributes;
