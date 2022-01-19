@@ -802,21 +802,31 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 	it := docs
 	was_code := true
 	was_paragraph := true
+	prev_line: string
 	for line in strings.split_iterator(&it, "\n") {
+		text := strings.trim_space(line)
+		defer prev_line = line
+
 		if strings.has_prefix(line, "\t") {
 			if !was_code {
 				was_code = true;
-				fmt.wprint(w, `<pre class="doc-code"><code>`)
+				if prev_line == "Example:"  {
+					fmt.wprint(w, `<pre class="doc-code doc-code-example"><code>`)
+				} else {
+					fmt.wprint(w, `<pre class="doc-code"><code>`)
+				}
 			}
 			fmt.wprintf(w, "%s\n", strings.trim_prefix(line, "\t"))
 			continue
 		} else if was_code {
+			if text == "" {
+				continue
+			}
 			was_code = false
 			fmt.wprintln(w, "</code></pre>")
-			continue
 		}
-		text := strings.trim_space(line)
 		if text == "" {
+
 			if was_paragraph {
 				was_paragraph = false
 				fmt.wprintln(w, "</p>")
