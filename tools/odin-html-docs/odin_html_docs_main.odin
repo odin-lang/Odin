@@ -818,56 +818,60 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 }
 
 write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
-
-
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
 
+	fmt.wprintln(w, `<article class="col-lg-9 p-4">`)
+
 	{ // breadcrumbs
-		fmt.wprintln(w, `<nav class="col-lg-2 odin-side-bar-border navbar-light">`)
-		fmt.wprintln(w, `<div class="sticky-top odin-below-navbar py-3">`)
-		{
-			dirs := strings.split(path, "/")
-			io.write_string(w, "<ul class=\"nav nav-pills d-flex flex-column\">\n")
-			io.write_string(w, `<li class="nav-item"><a class="nav-link" href="/core">core</a></li>`)
-			for dir, i in dirs {
-				url := strings.join(dirs[:i+1], "/")
-				short_path := strings.join(dirs[1:i+1], "/")
+		fmt.wprintln(w, `<div class="row">`)
+		defer fmt.wprintln(w, `</div>`)
 
-				io.write_string(w, `<li class="nav-item">`)
-				a_class := "nav-link"
-				if i+1 == len(dirs) {
-					a_class = "nav-link active"
-				}
+		fmt.wprintln(w, `<nav aria-label="breadcrumb">`)
+		defer fmt.wprintln(w, `</nav>`)
+		io.write_string(w, "<ol class=\"breadcrumb\">\n")
+		defer io.write_string(w, "</ol>\n")
 
-				if i == 0 || short_path in pkgs_to_use {
-					fmt.wprintf(w, `<a class="%s" href="/core/%s">%s</a></li>` + "\n", a_class, url, dir)
-				} else {
-					fmt.wprintf(w, "%s</li>\n", dir)
-				}
+		io.write_string(w, `<li class="breadcrumb-item"><a class="breadcrumb-link" href="/core">core</a></li>`)
+
+		dirs := strings.split(path, "/")
+		for dir, i in dirs {
+			url := strings.join(dirs[:i+1], "/")
+			short_path := strings.join(dirs[1:i+1], "/")
+
+			a_class := "breadcrumb-link"
+			is_curr := i+1 == len(dirs)
+			if is_curr {
+				io.write_string(w, `<li class="breadcrumb-item active" aria-current="page">`)
+			} else {
+				io.write_string(w, `<li class="breadcrumb-item">`)
 			}
-			io.write_string(w, "</ul>\n")
-		}
 
-		fmt.wprintln(w, `</div>`)
-		fmt.wprintln(w, `</nav>`)
+			if !is_curr && short_path in pkgs_to_use {
+				fmt.wprintf(w, `<a href="/core/%s">%s</a>`, url, dir)
+			} else {
+				io.write_string(w, dir)
+			}
+			io.write_string(w, "</li>\n")
+		}
 	}
 
-	fmt.wprintln(w, `<article class="col-lg-8 p-4">`)
 
 	fmt.wprintf(w, "<h1>package core:%s</h1>\n", path)
 	fmt.wprintln(w, "<h2>Documentation</h2>")
-	docs := strings.trim_space(str(pkg.docs))
-	if docs != "" {
+	overview_docs := strings.trim_space(str(pkg.docs))
+	if overview_docs != "" {
 		fmt.wprintln(w, "<h3>Overview</h3>")
 		fmt.wprintln(w, "<div id=\"pkg-overview\">")
 		defer fmt.wprintln(w, "</div>")
 
-		write_docs(w, pkg, docs)
+		write_docs(w, pkg, overview_docs)
 	}
 
-	fmt.wprintln(w, "<h3>Index</h3>")
-	fmt.wprintln(w, `<section class="doc-index">`)
+	fmt.wprintln(w, `<h3>Index</h3>`)
+	fmt.wprintln(w, `<section class="doc-index" id="pkg-index">`)
+	// fmt.wprintln(w, `<a class="btn btn-primary" data-bs-toggle="collapse" href="#pkg-index" role="button" aria-expanded="true" aria-controls="pkg-index"><h3>Index</h3></a>`)
+	// fmt.wprintln(w, `<section class="doc-index collapse" id="pkg-index">`)
 	pkg_procs:       [dynamic]^doc.Entity
 	pkg_proc_groups: [dynamic]^doc.Entity
 	pkg_types:       [dynamic]^doc.Entity
@@ -1126,10 +1130,12 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		}
 
 
-		fmt.wprintln(w, `<div class="col-lg-2 odin-toc-border navbar-light"><div class="sticky-top odin-below-navbar py-3">`)
+		fmt.wprintln(w, `<div class="col-lg-3 odin-toc-border navbar-light"><div class="sticky-top odin-below-navbar py-3">`)
 		fmt.wprintln(w, `<nav id="TableOfContents">`)
 		fmt.wprintln(w, `<ul>`)
-		write_link(w, "pkg-overview", "Overview")
+		if overview_docs != "" {
+			write_link(w, "pkg-overview", "Overview")
+		}
 		write_index(w, "Procedures",       pkg_procs[:])
 		write_index(w, "Procedure Groups", pkg_proc_groups[:])
 		write_index(w, "Types",            pkg_types[:])
