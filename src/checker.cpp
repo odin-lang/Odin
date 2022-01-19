@@ -1253,7 +1253,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		// TODO(bill): This is O(n) and can be very slow
 		for_array(i, info->type_info_map.entries){
 			auto *e = &info->type_info_map.entries[i];
-			if (are_types_identical(e->key, type)) {
+			if (are_types_identical_unique_tuples(e->key, type)) {
 				entry_index = e->value;
 				// NOTE(bill): Add it to the search map
 				map_set(&info->type_info_map, type, entry_index);
@@ -1601,7 +1601,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	isize ti_index = -1;
 	for_array(i, c->info->type_info_map.entries) {
 		auto *e = &c->info->type_info_map.entries[i];
-		if (are_types_identical(t, e->key)) {
+		if (are_types_identical_unique_tuples(t, e->key)) {
 			// Duplicate entry
 			ti_index = e->value;
 			prev = true;

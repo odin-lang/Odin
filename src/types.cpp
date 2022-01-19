@@ -694,7 +694,7 @@ gbString type_to_string       (Type *type);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
-bool are_types_identical(Type *x, Type *y, bool check_tuple_names/*=false*/);
+bool are_types_identical(Type *x, Type *y);
 
 bool is_type_pointer(Type *t);
 bool is_type_proc(Type *t);
@@ -2338,7 +2338,17 @@ Type *strip_type_aliasing(Type *x) {
 	return x;
 }
 
-bool are_types_identical(Type *x, Type *y, bool check_tuple_names) {
+bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names);
+
+bool are_types_identical(Type *x, Type *y) {
+	return are_types_identical_internal(x, y, false);
+}
+bool are_types_identical_unique_tuples(Type *x, Type *y) {
+	return are_types_identical_internal(x, y, true);
+}
+
+
+bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
 		return true;
 	}
