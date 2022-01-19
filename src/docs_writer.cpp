@@ -483,7 +483,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	for_array(i, w->type_cache.entries) {
 		// NOTE(bill): THIS IS SLOW
 		Type *other = w->type_cache.entries[i].key;
-		if (are_types_identical(type, other)) {
+		if (are_types_identical(type, other, true)) {
 			OdinDocTypeIndex index = w->type_cache.entries[i].value;
 			map_set(&w->type_cache, type, index);
 			return index;

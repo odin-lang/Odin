@@ -694,7 +694,7 @@ gbString type_to_string       (Type *type);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
-bool are_types_identical(Type *x, Type *y);
+bool are_types_identical(Type *x, Type *y, bool check_tuple_names/*=false*/);
 
 bool is_type_pointer(Type *t);
 bool is_type_proc(Type *t);
@@ -2338,7 +2338,7 @@ Type *strip_type_aliasing(Type *x) {
 	return x;
 }
 
-bool are_types_identical(Type *x, Type *y) {
+bool are_types_identical(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
 		return true;
 	}
@@ -2486,6 +2486,11 @@ bool are_types_identical(Type *x, Type *y) {
 					Entity *ye = y->Tuple.variables[i];
 					if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
 						return false;
+					}
+					if (check_tuple_names) {
+						if (xe->token.string != ye->token.string) {
+							return false;
+						}
 					}
 					if (xe->kind == Entity_Constant && !compare_exact_values(Token_CmpEq, xe->Constant.value, ye->Constant.value)) {
 						// NOTE(bill): This is needed for polymorphic procedures
