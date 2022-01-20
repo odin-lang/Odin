@@ -633,11 +633,9 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 				do_indent(writer, flags)
 				write_param_entity(writer, e, next_entity, flags, name_width)
 
-				if len(tags) == len(type_entities) {
-					if tag := str(tags[i]); tag != "" {
-						io.write_byte(w, ' ')
-						io.write_quoted_string(w, tag)
-					}
+				if tag := str(tags[i]); tag != "" {
+					io.write_byte(w, ' ')
+					io.write_quoted_string(w, tag)
 				}
 
 				io.write_byte(w, ',')
