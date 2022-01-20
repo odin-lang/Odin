@@ -212,12 +212,11 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 
 		new_memory = aligned_alloc(new_size, new_alignment, p) or_return
-		when ODIN_OS != "windows" {
-			// NOTE: realloc does not zero the new memory, so we do it
-			if new_size > old_size {
-				new_region := mem.raw_data(new_memory[old_size:])
-				mem.zero(new_region, new_size - old_size)
-			}
+		
+		// NOTE: heap_resize does not zero the new memory, so we do it
+		if new_size > old_size {
+			new_region := mem.raw_data(new_memory[old_size:])
+			mem.zero(new_region, new_size - old_size)
 		}
 		return
 	}
