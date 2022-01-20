@@ -528,8 +528,8 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			io.write_byte(w, '\n')
 		}
 	}
-	calc_name_width :: proc(type_entites: []doc.Entity_Index) -> (name_width: int) {
-		for entity_index in type_entites {
+	calc_name_width :: proc(type_entities: []doc.Entity_Index) -> (name_width: int) {
+		for entity_index in type_entities {
 			e := &entities[entity_index]
 			name := str(e.name)
 			name_width = max(len(name), name_width)
@@ -538,7 +538,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 	}
 
 
-	type_entites := array(type.entities)
+	type_entities := array(type.entities)
 	type_types := array(type.types)
 	switch type.kind {
 	case .Invalid:
@@ -551,7 +551,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			fmt.wprintf(w, `<a href="">%s</a>`, str(type.name))
 		}
 	case .Named:
-		e := entities[type_entites[0]]
+		e := entities[type_entities[0]]
 		name := str(type.name)
 		tn_pkg := files[e.pos.file].pkg
 
@@ -616,19 +616,30 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			io.write_string(w, custom_align)
 		}
 		io.write_string(w, " {")
-		if len(type_entites) != 0 {
+
+		tags := array(type.tags)
+
+		if len(type_entities) != 0 {
 			do_newline(writer, flags)
 			indent += 1
-			name_width := calc_name_width(type_entites)
+			name_width := calc_name_width(type_entities)
 
-			for entity_index, i in type_entites {
+			for entity_index, i in type_entities {
 				e := &entities[entity_index]
 				next_entity: ^doc.Entity = nil
-				if i+1 < len(type_entites) {
-					next_entity = &entities[type_entites[i+1]]
+				if i+1 < len(type_entities) {
+					next_entity = &entities[type_entities[i+1]]
 				}
 				do_indent(writer, flags)
 				write_param_entity(writer, e, next_entity, flags, name_width)
+
+				if len(tags) == len(type_entities) {
+					if tag := str(tags[i]); tag != "" {
+						io.write_byte(w, ' ')
+						io.write_quoted_string(w, tag)
+					}
+				}
+
 				io.write_byte(w, ',')
 				do_newline(writer, flags)
 			}
@@ -670,9 +681,9 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		do_newline(writer, flags)
 		indent += 1
 
-		name_width := calc_name_width(type_entites)
+		name_width := calc_name_width(type_entities)
 
-		for entity_index in type_entites {
+		for entity_index in type_entities {
 			e := &entities[entity_index]
 
 			name := str(e.name)
@@ -693,19 +704,19 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		do_indent(writer, flags)
 		io.write_string(w, "}")
 	case .Tuple:
-		if len(type_entites) == 0 {
+		if len(type_entities) == 0 {
 			return
 		}
-		require_parens := (.Is_Results in flags) && (len(type_entites) > 1 || !is_entity_blank(type_entites[0]))
+		require_parens := (.Is_Results in flags) && (len(type_entities) > 1 || !is_entity_blank(type_entities[0]))
 		if require_parens { io.write_byte(w, '(') }
-		for entity_index, i in type_entites {
+		for entity_index, i in type_entities {
 			if i > 0 {
 				io.write_string(w, ", ")
 			}
 			e := &entities[entity_index]
 			next_entity: ^doc.Entity = nil
-			if i+1 < len(type_entites) {
-				next_entity = &entities[type_entites[i+1]]
+			if i+1 < len(type_entities) {
+				next_entity = &entities[type_entities[i+1]]
 			}
 			write_param_entity(writer, e, next_entity, flags)
 		}
