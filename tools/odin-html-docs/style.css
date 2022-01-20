@@ -110,23 +110,17 @@ details.doc-index ul {
 	list-style-type: none;
 }
 
-
-.odin-doc-toggle {
-
+details.odin-doc-toggle > summary.hideme span:before {
+	content: "Expand description";
+}
+details.odin-doc-toggle[open] > summary.hideme span:before {
+	content: "Close description";
+	opacity: 0.8;
 }
 
 details.odin-doc-toggle[open] > summary.hideme {
 	margin-bottom: 0.5em;
 }
-
-details.odin-doc-toggle > summary.hideme {
-	cursor: pointer;
-}
-
-details.odin-doc-toggle[open] > summary.hideme span {
-	content: "";
-}
-
 
 details.code-example > summary {
 	font-weight: 700;
