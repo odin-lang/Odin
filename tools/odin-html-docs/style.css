@@ -25,10 +25,6 @@ table.`directory {
 	padding-right: 0;
 }
 
-.doc-directory tr[aria-controls]:hover {
-	background-color: #eee;
-}
-
 .doc-directory tr[aria-expanded=true] td.pkg-name:before {
 	content: "\2193";
 }
@@ -57,12 +53,12 @@ pre.doc-code {
 pre.doc-code a {
 	font-family: Consolas,Liberation Mono,Menlo,monospace!important;
 	text-decoration: none;
-	/*font-weight: bold;*/
-	color: #00bfd5;
+	color: #2179d8;
+	font-weight: 800;
 }
 
 pre.doc-code a.code-procedure {
-	color: #079300;
+	color: #047919;
 }
 
 .pkg-line-doc {
@@ -90,18 +86,48 @@ a > .a-hidden {
 a:hover > .a-hidden {
 	opacity: 100;
 }
-
-article.documentation h2 {
-	border-bottom: 1px dashed #c6c8ca;
-	padding-bottom: 0.5rem;
-}
 section.documentation h3 {
 	font-size: calc(1.1rem + .2vw);
 }
 
+.pkg-index h3 {
+	margin-top: 0  !important;
+	padding-top: 0 !important;
+}
 
 
-.doc-index h3 {
-	border-bottom: 1px solid #c6c8ca;
-	padding-bottom: 0.25rem;
+.documentation .pkg-entity {
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid #d0d0d0;
+}
+
+details.doc-index > summary {
+	position: relative;
+	font-size: 1.75rem;
+	left: -1.75rem;
+}
+details.doc-index ul {
+	list-style-type: none;
+}
+
+
+.odin-doc-toggle {
+
+}
+
+details.odin-doc-toggle[open] > summary.hideme {
+	margin-bottom: 0.5em;
+}
+
+details.odin-doc-toggle > summary.hideme {
+	cursor: pointer;
+}
+
+details.odin-doc-toggle[open] > summary.hideme span {
+	content: "";
+}
+
+
+details.code-example > summary {
+	font-weight: 700;
 }
