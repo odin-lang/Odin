@@ -388,6 +388,35 @@ Raw_Cstring :: struct {
 
 /*
 	// Defined internally by the compiler
+	Odin_OS_Type :: enum int {
+		Unknown,
+		Windows,
+		Darwin,
+		Linux,
+		Essence,
+		FreeBSD,
+		WASI,
+		JS,
+		Freestanding,
+	}
+*/
+Odin_OS_Type :: type_of(ODIN_OS)
+
+/*
+	// Defined internally by the compiler
+	Odin_Arch_Type :: enum int {
+		Unknown,
+		amd64,
+		i386,
+		arm64,
+		wasm32,
+		wasm64,
+	}
+*/
+Odin_Arch_Type :: type_of(ODIN_ARCH)
+
+/*
+	// Defined internally by the compiler
 	Odin_Build_Mode_Type :: enum int {
 		Executable,
 		Dynamic,
