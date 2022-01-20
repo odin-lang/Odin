@@ -3,8 +3,8 @@ package stb_vorbis
 import c "core:c/libc"
 
 
-when ODIN_OS == "windows" { foreign import lib "../lib/stb_vorbis.lib" }
-when ODIN_OS == "linux"   { foreign import lib "../lib/stb_vorbis.a"   }
+when ODIN_OS == .Windows { foreign import lib "../lib/stb_vorbis.lib" }
+when ODIN_OS == .Linux   { foreign import lib "../lib/stb_vorbis.a"   }
 
 
 

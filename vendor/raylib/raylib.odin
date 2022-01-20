@@ -91,7 +91,7 @@ MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 
 #assert(size_of(rune) == size_of(c.int))
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import lib {
 		"raylib.lib",
 		"system:Winmm.lib",
@@ -100,14 +100,14 @@ when ODIN_OS == "windows" {
 		"system:Shell32.lib",
 	}
 }
-when ODIN_OS == "linux"  { 
+when ODIN_OS == .Linux  {
 	foreign import lib { 
 		"linux/libraylib.a",
 		"system:dl",
 		"system:pthread",
 	}
 }
-when ODIN_OS == "darwin" { foreign import lib "macos/libraylib.a" }
+when ODIN_OS == .Darwin { foreign import lib "macos/libraylib.a" }
 
 VERSION :: "4.0"
 

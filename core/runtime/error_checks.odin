@@ -1,7 +1,7 @@
 package runtime
 
 bounds_trap :: proc "contextless" () -> ! {
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		windows_trap_array_bounds()
 	} else {
 		trap()
@@ -9,7 +9,7 @@ bounds_trap :: proc "contextless" () -> ! {
 }
 
 type_assertion_trap :: proc "contextless" () -> ! {
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		windows_trap_type_assertion()
 	} else {
 		trap()

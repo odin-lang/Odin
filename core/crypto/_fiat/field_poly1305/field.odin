@@ -22,7 +22,7 @@ fe_from_bytes :: #force_inline proc (out1: ^Tight_Field_Element, arg1: []byte, a
 
 	assert(len(arg1) == 16)
 
-	when ODIN_ARCH == "i386" || ODIN_ARCH == "amd64" {
+	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
 		// While it may be unwise to do deserialization here on our
 		// own when fiat-crypto provides equivalent functionality,
 		// doing it this way provides a little under 3x performance

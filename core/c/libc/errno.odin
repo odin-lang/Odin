@@ -2,9 +2,9 @@ package libc
 
 // 7.5 Errors
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
-} else when ODIN_OS == "darwin" {
+} else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
@@ -14,7 +14,7 @@ when ODIN_OS == "windows" {
 //	EDOM,
 //	EILSEQ
 //	ERANGE
-when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -27,7 +27,7 @@ when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
 	ERANGE :: 34
 }
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -40,7 +40,7 @@ when ODIN_OS == "windows" {
 	ERANGE :: 34
 }
 
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
