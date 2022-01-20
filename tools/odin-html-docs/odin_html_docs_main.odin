@@ -9,6 +9,7 @@ import "core:path/slashpath"
 import "core:sort"
 import "core:slice"
 
+GITHUB_LICENSE_URL :: "https://github.com/odin-lang/Odin/tree/master/LICENSE"
 GITHUB_CORE_URL :: "https://github.com/odin-lang/Odin/tree/master/core"
 BASE_CORE_URL :: "/core"
 
@@ -90,6 +91,7 @@ recursive_make_directory :: proc(path: string, prefix := "") {
 
 write_html_header :: proc(w: io.Writer, title: string) {
 	fmt.wprintf(w, string(#load("header.txt.html")), title)
+	io.write(w, #load("header-lower.txt.html"))
 }
 
 write_html_footer :: proc(w: io.Writer, include_directory_js: bool) {
@@ -289,19 +291,28 @@ generate_directory_tree :: proc() -> (root: ^Dir_Node) {
 }
 
 write_core_directory :: proc(w: io.Writer) {
-
 	root := generate_directory_tree()
 
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
+	{
+		fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
+		fmt.wprintln(w, "<header>")
+		fmt.wprintln(w, "<h1>Core Library Collection</h1>")
+		fmt.wprintln(w, "<ul>")
+		fmt.wprintf(w, "<li>License: <a href=\"{0:s}\">BSD-3-Clause</a></li>\n", GITHUB_LICENSE_URL)
+		fmt.wprintf(w, "<li>Repository: <a href=\"{0:s}\">{0:s}</a></li>\n", GITHUB_CORE_URL)
+		fmt.wprintln(w, "</ul>")
+		fmt.wprintln(w, "</header>")
+		fmt.wprintln(w, "</article>")
+		fmt.wprintln(w, "<hr>")
+	}
 	fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
 	defer fmt.wprintln(w, `</article>`)
 
-	fmt.wprintln(w, "<article>")
 	fmt.wprintln(w, "<header>")
-	fmt.wprintln(w, "<h1>Core Library Collection</h1>")
+	fmt.wprintln(w, `<h2><i class="bi bi-folder"></i>Directories</h2>`)
 	fmt.wprintln(w, "</header>")
-	fmt.wprintln(w, "</article>")
 
 	fmt.wprintln(w, "<div>")
 	fmt.wprintln(w, "\t<table class=\"doc-directory mt-4 mb-4\">")
@@ -802,57 +813,131 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 	if docs == "" {
 		return
 	}
-	it := docs
-	was_code := true
-	was_paragraph := true
-	prev_line: string
-	for line in strings.split_iterator(&it, "\n") {
-		text := strings.trim_space(line)
-		defer prev_line = line
+	Block_Kind :: enum {
+		Paragraph,
+		Code,
+	}
+	Block :: struct {
+		kind: Block_Kind,
+		lines: []string,
+	}
 
-		if strings.has_prefix(line, "\t") {
-			if !was_code {
-				was_code = true;
-				if prev_line == "Example:"  {
-					fmt.wprint(w, `<pre class="doc-code doc-code-example"><code>`)
-				} else {
-					fmt.wprint(w, `<pre class="doc-code"><code>`)
+	lines: [dynamic]string
+	it := docs
+	for line_ in strings.split_iterator(&it, "\n") {
+		line := strings.trim_right_space(line_)
+		append(&lines, line)
+	}
+
+	curr_block_kind := Block_Kind.Paragraph
+	start := 0
+	blocks: [dynamic]Block
+
+	for line, i in lines {
+		text := strings.trim_space(line)
+		switch curr_block_kind {
+		case .Paragraph:
+			if strings.has_prefix(line, "\t") {
+				if i-start > 0 {
+					append(&blocks, Block{curr_block_kind, lines[start:i]})
 				}
+				curr_block_kind, start = .Code, i
+			} else if text == "" {
+				if i-start > 0 {
+					append(&blocks, Block{curr_block_kind, lines[start:i]})
+				}
+				start = i
 			}
-			fmt.wprintf(w, "%s\n", strings.trim_prefix(line, "\t"))
-			continue
-		} else if was_code {
-			if text == "" {
+		case .Code:
+			if text == "" || strings.has_prefix(line, "\t") {
 				continue
 			}
-			was_code = false
-			fmt.wprintln(w, "</code></pre>")
-		}
-		if text == "" {
 
-			if was_paragraph {
-				was_paragraph = false
-				fmt.wprintln(w, "</p>")
+			if i-start > 0 {
+				append(&blocks, Block{curr_block_kind, lines[start:i]})
 			}
+			curr_block_kind, start = .Paragraph, i
+		}
+	}
+	if start < len(lines) {
+		if len(lines)-start > 0 {
+			append(&blocks, Block{curr_block_kind, lines[start:]})
+		}
+	}
+
+	for block in &blocks {
+		trim_amount := 0
+		for trim_amount = 0; trim_amount < len(block.lines); trim_amount += 1 {
+			line := block.lines[trim_amount]
+			if strings.trim_space(line) != "" {
+				break
+			}
+		}
+		block.lines = block.lines[trim_amount:]
+	}
+
+	for block, i in blocks {
+		if len(block.lines) == 0 {
 			continue
 		}
-		if !was_paragraph {
-			fmt.wprintln(w, "<p>")
+		prev_line := ""
+		if i > 0 {
+			prev_lines := blocks[i-1].lines
+			if len(prev_lines) > 0 {
+				prev_line = prev_lines[len(prev_lines)-1]
+			}
 		}
-		assert(!was_code)
+		prev_line = strings.trim_space(prev_line)
 
-		was_paragraph = true
-		write_doc_line(w, text)
+		lines := block.lines[:]
 
-		io.write_byte(w, '\n')
-	}
-	if was_code {
-		// assert(!was_paragraph, str(pkg.name))
-		was_code = false
-		fmt.wprintln(w, "</code></pre>")
-	}
-	if was_paragraph {
-		fmt.wprintln(w, "</p>")
+		end_line := block.lines[len(lines)-1]
+		if block.kind == .Paragraph && i+1 < len(blocks) {
+			if strings.has_prefix(end_line, "Example:") && blocks[i+1].kind == .Code {
+				lines = lines[:len(lines)-1]
+			}
+		}
+
+		switch block.kind {
+		case .Paragraph:
+			io.write_string(w, "<p>")
+			for line, line_idx in lines {
+				if line_idx > 0 {
+					io.write_string(w, "\n")
+				}
+				io.write_string(w, line)
+			}
+			io.write_string(w, "</p>\n")
+		case .Code:
+			all_blank := len(lines) > 0
+			for line in lines {
+				if strings.trim_space(line) != "" {
+					all_blank = false
+				}
+			}
+			if all_blank {
+				continue
+			}
+
+			if strings.has_prefix(prev_line, "Example:") {
+				io.write_string(w, "<details open class=\"code-example\">\n")
+				defer io.write_string(w, "</details>\n")
+				io.write_string(w, "<summary>Example:</summary>\n")
+				io.write_string(w, `<pre><code class="hljs" data-lang="odin">`)
+				for line in lines {
+					io.write_string(w, strings.trim_prefix(line, "\t"))
+					io.write_string(w, "\n")
+				}
+				io.write_string(w, "</code></pre>\n")
+			} else {
+				io.write_string(w, "<pre>")
+				for line in lines {
+					io.write_string(w, strings.trim_prefix(line, "\t"))
+					io.write_string(w, "\n")
+				}
+				io.write_string(w, "</pre>\n")
+			}
+		}
 	}
 }
 
@@ -860,7 +945,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
 
-	fmt.wprintln(w, `<article class="col-lg-9 p-4 documentation">`)
+	fmt.wprintln(w, `<article class="col-lg-9 p-4 documentation odin-article">`)
 
 	{ // breadcrumbs
 		fmt.wprintln(w, `<div class="row">`)
@@ -907,9 +992,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	}
 
 	fmt.wprintln(w, `<h2>Index</h2>`)
-	fmt.wprintln(w, `<section class="doc-index" id="pkg-index">`)
-	// fmt.wprintln(w, `<a class="btn btn-primary" data-bs-toggle="collapse" href="#pkg-index" role="button" aria-expanded="true" aria-controls="pkg-index"><h2>Index</h2></a>`)
-	// fmt.wprintln(w, `<section class="doc-index collapse" id="pkg-index">`)
+	fmt.wprintln(w, `<div id="pkg-index">`)
 	pkg_procs:       [dynamic]^doc.Entity
 	pkg_proc_groups: [dynamic]^doc.Entity
 	pkg_types:       [dynamic]^doc.Entity
@@ -944,8 +1027,16 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 	slice.sort_by_key(pkg_consts[:],      entity_key)
 
 	write_index :: proc(w: io.Writer, name: string, entities: []^doc.Entity) {
-		fmt.wprintf(w, "<h3>%s</h3>\n", name)
-		fmt.wprintln(w, `<section class="doc-index">`)
+		fmt.wprintln(w, `<div>`)
+		defer fmt.wprintln(w, `</div>`)
+
+
+		fmt.wprintf(w, `<details open class="doc-index" id="doc-index-{0:s}" aria-labelledby="#doc-index-{0:s}-header">`+"\n", name)
+		fmt.wprintf(w, `<summary id="#doc-index-{0:s}-header">`+"\n", name)
+		io.write_string(w, name)
+		fmt.wprintln(w, `</summary>`)
+		defer fmt.wprintln(w, `</details>`)
+
 		if len(entities) == 0 {
 			io.write_string(w, "<p>This section is empty.</p>\n")
 		} else {
@@ -956,7 +1047,6 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			}
 			fmt.wprintln(w, "</ul>")
 		}
-		fmt.wprintln(w, "</section>")
 	}
 
 	entity_ordering := [?]struct{name: string, entities: []^doc.Entity} {
@@ -972,7 +1062,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		write_index(w, eo.name, eo.entities)
 	}
 
-	fmt.wprintln(w, "</section>")
+	fmt.wprintln(w, "</div>")
 
 
 	write_entity :: proc(w: io.Writer, e: ^doc.Entity) {
@@ -1008,6 +1098,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintf(w, "<div class=\"doc-source\"><a href=\"{0:s}\"><em>Source</em></a></div>", src_url)
 		}
 		fmt.wprintf(w, "</h3>\n")
+		fmt.wprintln(w, `<div>`)
 
 		switch e.kind {
 		case .Invalid, .Import_Name, .Library_Name:
@@ -1048,7 +1139,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			init_string := str(e.init_string)
 			if init_string != "" {
 				io.write_string(w, " = ")
-				io.write_string(w, init_string)
+				io.write_string(w, "…")
 			}
 			fmt.wprintln(w, "</pre>")
 
@@ -1099,8 +1190,15 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintln(w, "</pre>")
 
 		}
+		fmt.wprintln(w, `</div>`)
 
-		write_docs(w, pkg, strings.trim_space(str(e.docs)))
+		the_docs := strings.trim_space(str(e.docs))
+		if the_docs != "" {
+			fmt.wprintln(w, `<details class="odin-doc-toggle" open>`)
+			fmt.wprintln(w, `<summary class="hideme"><span>&nbsp;</span></summary>`)
+			write_docs(w, pkg, the_docs)
+			fmt.wprintln(w, `</details>`)
+		}
 	}
 	write_entities :: proc(w: io.Writer, title: string, entities: []^doc.Entity) {
 		fmt.wprintf(w, "<h2 id=\"pkg-{0:s}\">{0:s}</h2>\n", title)
@@ -1109,7 +1207,9 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			io.write_string(w, "<p>This section is empty.</p>\n")
 		} else {
 			for e in entities {
+				fmt.wprintln(w, `<div class="pkg-entity">`)
 				write_entity(w, e)
+				fmt.wprintln(w, `</div>`)
 			}
 		}
 		fmt.wprintln(w, "</section>")
