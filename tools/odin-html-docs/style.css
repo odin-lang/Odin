@@ -1,10 +1,23 @@
 /* doc directories */
 
-table.`directory {
+table.directory {
 	/*border: 1px solid #ccc!important;*/
 	table-layout: fixed;
 	border-collapse: collapse;
 }
+
+header.collection-header ul {
+	margin-top: 1em;
+	margin-bottom: 0;
+	padding-left: 0.5em;
+	list-style-type: none;
+}
+
+hr.collection-hr {
+	margin: 0;
+	padding: 0;
+}
+
 
 .doc-directory tr {
 	padding-left: 1em!important;
