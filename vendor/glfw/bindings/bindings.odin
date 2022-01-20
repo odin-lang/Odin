@@ -3,9 +3,9 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
-when ODIN_OS == "linux"   { foreign import glfw "system:glfw" } // TODO: Add the billion-or-so static libs to link to in linux
-when ODIN_OS == "darwin"  { foreign import glfw "system:glfw" }
-when ODIN_OS == "windows" { 
+when ODIN_OS == .Linux   { foreign import glfw "system:glfw" } // TODO: Add the billion-or-so static libs to link to in linux
+when ODIN_OS == .Darwin  { foreign import glfw "system:glfw" }
+when ODIN_OS == .Windows {
 	foreign import glfw { 
 		"../lib/glfw3_mt.lib",
 		"system:user32.lib", 

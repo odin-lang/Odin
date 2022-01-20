@@ -335,7 +335,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		return INVALID_HANDLE, 1
 	}
 
-when  ODIN_OS == "darwin" && ODIN_ARCH == "arm64" {
+when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	if mode != 0 {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {

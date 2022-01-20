@@ -1,7 +1,7 @@
 //+build linux, darwin, freebsd
 package filepath
 
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	foreign import libc "System.framework"
 } else {
 	foreign import libc "system:c"
@@ -54,7 +54,7 @@ foreign libc {
 	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
 
 }
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	@(private)
 	foreign libc {
 		@(link_name="__error")          __error :: proc() -> ^i32 ---
