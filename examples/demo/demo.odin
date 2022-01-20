@@ -244,10 +244,10 @@ control_flow :: proc() {
 		// A switch statement is another way to write a sequence of if-else statements.
 		// In Odin, the default case is denoted as a case without any expression.
 
-		switch arch := ODIN_ARCH; arch {
-		case "386":
+		#partial switch arch := ODIN_ARCH; arch {
+		case .i386:
 			fmt.println("32-bit")
-		case "amd64":
+		case .amd64:
 			fmt.println("64-bit")
 		case: // default
 			fmt.println("Unsupported architecture")
@@ -363,12 +363,12 @@ control_flow :: proc() {
 		*/
 
 		// Example
-		when ODIN_ARCH == "386" {
+		when ODIN_ARCH == .i386 {
 			fmt.println("32 bit")
-		} else when ODIN_ARCH == "amd64" {
+		} else when ODIN_ARCH == .amd64 {
 			fmt.println("64 bit")
 		} else {
-			fmt.println("Unsupported architecture")
+			fmt.println("Unknown architecture")
 		}
 		// The when statement is very useful for writing platform specific code.
 		// This is akin to the #if construct in C’s preprocessor however, in Odin,
@@ -1100,7 +1100,7 @@ prefix_table := [?]string{
 }
 
 threading_example :: proc() {
-	if ODIN_OS == "darwin" {
+	if ODIN_OS == .Darwin {
 		// TODO: Fix threads on darwin/macOS
 		return
 	}
@@ -1606,13 +1606,13 @@ where_clauses :: proc() {
 }
 
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import kernel32 "system:kernel32.lib"
 }
 
 foreign_system :: proc() {
 	fmt.println("\n#foreign system")
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		// It is sometimes necessarily to interface with foreign code,
 		// such as a C library. In Odin, this is achieved through the
 		// foreign system. You can “import” a library into the code
