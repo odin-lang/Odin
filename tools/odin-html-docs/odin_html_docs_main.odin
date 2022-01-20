@@ -209,6 +209,15 @@ main :: proc() {
 	b := strings.make_builder()
 	defer strings.destroy_builder(&b)
 	w := strings.to_writer(&b)
+
+	{
+		strings.reset_builder(&b)
+		write_html_header(w, "Packages - pkg.odin-lang.org")
+		write_home_page(w)
+		write_html_footer(w, true)
+		os.write_entire_file("index.html", b.buf[:])
+	}
+
 	{
 		strings.reset_builder(&b)
 		write_html_header(w, "core library - pkg.odin-lang.org")
@@ -227,6 +236,49 @@ main :: proc() {
 		os.write_entire_file(fmt.tprintf("core/%s/index.html", path), b.buf[:])
 	}
 }
+
+write_home_page :: proc(w: io.Writer) {
+	fmt.wprintln(w, `<div class="row odin-main">`)
+	defer fmt.wprintln(w, `</div>`)
+
+	{
+		fmt.wprintln(w, `<nav class="col-lg-2 odin-sidebar-border navbar-light">`)
+		defer fmt.wprintln(w, `</nav>`)
+		fmt.wprintln(w, `<div class="sticky-top odin-below-navbar py-3">`)
+		defer fmt.wprintln(w, `</div>`)
+
+		fmt.wprintln(w, `<ul class="nav nav-pills d-flex flex-column">`)
+		fmt.wprintln(w, `<li class="nav-item"><a class="nav-link" href="/core">Core Library</a></li>`)
+		fmt.wprintln(w, `<li class="nav-item"><a class="nav-link" href="#">Vendor Library</a></li>`)
+		fmt.wprintln(w, `</ul>`)
+
+	}
+
+
+	fmt.wprintln(w, `<article class="col-lg-8 p-4">`)
+	defer fmt.wprintln(w, `</article>`)
+
+	fmt.wprintln(w, "<article><header>")
+	fmt.wprintln(w, "<h1>Odin Packages</h1>")
+	fmt.wprintln(w, "</header></article>")
+	fmt.wprintln(w, "<div>")
+	defer fmt.wprintln(w, "</div>")
+
+	fmt.wprintln(w, `<div class="mt-5">`)
+	fmt.wprintln(w, `<a href="/core" class="link-primary text-decoration-node"><h3>Core Library Collection</h3></a>`)
+	fmt.wprintln(w, `<p>Documentation for all the packages part of the <code>core</code> library collection.</p>`)
+	fmt.wprintln(w, `</div>`)
+
+	fmt.wprintln(w, `<div class="mt-5">`)
+	fmt.wprintln(w, `<a href="#" class="link-primary text-decoration-node"><h3>Vendor Library Collection</h3></a>`)
+	fmt.wprintln(w, `<p>Documentation for all the packages part of the <code>vendor</code> library collection.</p>`)
+	fmt.wprintln(w, `<p><em>Coming Soon.</em></p>`)
+	fmt.wprintln(w, `</div>`)
+
+
+
+}
+
 
 
 Dir_Node :: struct {
@@ -297,7 +349,7 @@ write_core_directory :: proc(w: io.Writer) {
 	defer fmt.wprintln(w, `</div>`)
 	{
 		fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
-		fmt.wprintln(w, "<header>")
+		fmt.wprintln(w, `<header class="collection-header">`)
 		fmt.wprintln(w, "<h1>Core Library Collection</h1>")
 		fmt.wprintln(w, "<ul>")
 		fmt.wprintf(w, "<li>License: <a href=\"{0:s}\">BSD-3-Clause</a></li>\n", GITHUB_LICENSE_URL)
@@ -305,7 +357,7 @@ write_core_directory :: proc(w: io.Writer) {
 		fmt.wprintln(w, "</ul>")
 		fmt.wprintln(w, "</header>")
 		fmt.wprintln(w, "</article>")
-		fmt.wprintln(w, "<hr>")
+		fmt.wprintln(w, `<hr class="collection-hr">`)
 	}
 	fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
 	defer fmt.wprintln(w, `</article>`)
