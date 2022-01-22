@@ -76,6 +76,7 @@ pre.doc-code a.code-procedure {
 
 .pkg-line-doc {
 	color: #444;
+	width: 100%;
 }
 
 
@@ -115,9 +116,7 @@ section.documentation h3 {
 }
 
 details.doc-index > summary {
-	position: relative;
 	font-size: 1.75rem;
-	left: -1.75rem;
 }
 details.doc-index ul {
 	list-style-type: none;
@@ -137,4 +136,28 @@ details.odin-doc-toggle[open] > summary.hideme {
 
 details.code-example > summary {
 	font-weight: 700;
+}
+
+@media only screen and (max-width: 991px) {
+	#pkg-sidebar {
+		display: none;
+	}
+}
+
+#pkg-sidebar ul {
+	list-style-type: none;
+	padding: 0;
+}
+
+#pkg-sidebar li:not(:last-child) {
+	margin-bottom: 0.25rem;
+}
+
+
+#pkg-sidebar li > ul {
+	padding-left: 1.25rem;
+}
+
+#pkg-sidebar a.active {
+	font-style: italic;
 }
