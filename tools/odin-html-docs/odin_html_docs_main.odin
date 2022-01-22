@@ -8,10 +8,13 @@ import "core:strings"
 import "core:path/slashpath"
 import "core:sort"
 import "core:slice"
+import "core:time"
 
 GITHUB_LICENSE_URL :: "https://github.com/odin-lang/Odin/tree/master/LICENSE"
 GITHUB_CORE_URL :: "https://github.com/odin-lang/Odin/tree/master/core"
+GITHUB_VENDOR_URL :: "https://github.com/odin-lang/Odin/tree/master/vendor"
 BASE_CORE_URL :: "/core"
+BASE_VENDOR_URL :: "/vendor"
 
 header:   ^doc.Header
 files:    []doc.File
@@ -19,8 +22,18 @@ pkgs:     []doc.Pkg
 entities: []doc.Entity
 types:    []doc.Type
 
-pkgs_to_use: map[string]^doc.Pkg // trimmed path
+core_pkgs_to_use: map[string]^doc.Pkg // trimmed path
+vendor_pkgs_to_use: map[string]^doc.Pkg // trimmed path
 pkg_to_path: map[^doc.Pkg]string // trimmed path
+pkg_to_collection: map[^doc.Pkg]^Collection
+
+Collection :: struct {
+	name: string,
+	pkgs_to_use: ^map[string]^doc.Pkg,
+	github_url: string,
+	base_url:   string,
+	root: ^Dir_Node,
+}
 
 array :: proc(a: $A/doc.Array($T)) -> []T {
 	return doc.from_array(header, a)
@@ -175,6 +188,21 @@ main :: proc() {
 	entities = array(header.entities)
 	types    = array(header.types)
 
+	core_collection := &Collection{
+		"Core",
+		&core_pkgs_to_use,
+		GITHUB_CORE_URL,
+		BASE_CORE_URL,
+		nil,
+	}
+	vendor_collection := &Collection{
+		"Vendor",
+		&vendor_pkgs_to_use,
+		GITHUB_VENDOR_URL,
+		BASE_VENDOR_URL,
+		nil,
+	}
+
 	{
 		fullpaths: [dynamic]string
 		defer delete(fullpaths)
@@ -184,25 +212,38 @@ main :: proc() {
 		}
 		path_prefix := common_prefix(fullpaths[:])
 
-		pkgs_to_use = make(map[string]^doc.Pkg)
+		core_pkgs_to_use = make(map[string]^doc.Pkg)
+		vendor_pkgs_to_use = make(map[string]^doc.Pkg)
 		fullpath_loop: for fullpath, i in fullpaths {
 			path := strings.trim_prefix(fullpath, path_prefix)
-			if !strings.has_prefix(path, "core/") {
-				continue fullpath_loop
-			}
 			pkg := &pkgs[i+1]
 			if len(array(pkg.entities)) == 0 {
 				continue fullpath_loop
 			}
-			trimmed_path := strings.trim_prefix(path, "core/")
-			if strings.has_prefix(trimmed_path, "sys") {
-				continue fullpath_loop
-			}
 
-			pkgs_to_use[trimmed_path] = pkg
+			switch {
+			case strings.has_prefix(path, "core/"):
+				trimmed_path := strings.trim_prefix(path, "core/")
+				if strings.has_prefix(trimmed_path, "sys") {
+					continue fullpath_loop
+				}
+
+				core_pkgs_to_use[trimmed_path] = pkg
+			case strings.has_prefix(path, "vendor/"):
+				trimmed_path := strings.trim_prefix(path, "vendor/")
+				if strings.contains(trimmed_path, "/bindings") {
+					continue fullpath_loop
+				}
+				vendor_pkgs_to_use[trimmed_path] = pkg
+			}
 		}
-		for path, pkg in pkgs_to_use {
+		for path, pkg in core_pkgs_to_use {
 			pkg_to_path[pkg] = path
+			pkg_to_collection[pkg] = core_collection
+		}
+		for path, pkg in vendor_pkgs_to_use {
+			pkg_to_path[pkg] = path
+			pkg_to_collection[pkg] = vendor_collection
 		}
 	}
 
@@ -218,42 +259,53 @@ main :: proc() {
 		os.write_entire_file("index.html", b.buf[:])
 	}
 
+	core_collection.root   = generate_directory_tree(core_pkgs_to_use)
+	vendor_collection.root = generate_directory_tree(vendor_pkgs_to_use)
+
+	generate_packages(&b, core_collection, "core")
+	generate_packages(&b, vendor_collection, "vendor")
+}
+
+generate_packages :: proc(b: ^strings.Builder, collection: ^Collection, dir: string) {
+	w := strings.to_writer(b)
+
 	{
-		strings.reset_builder(&b)
-		write_html_header(w, "core library - pkg.odin-lang.org")
-		write_core_directory(w)
+		strings.reset_builder(b)
+		write_html_header(w, fmt.tprintf("%s library - pkg.odin-lang.org", dir))
+		write_collection_directory(w, collection)
 		write_html_footer(w, true)
-		os.make_directory("core", 0)
-		os.write_entire_file("core/index.html", b.buf[:])
+		os.make_directory(dir, 0)
+		os.write_entire_file(fmt.tprintf("%s/index.html", dir), b.buf[:])
 	}
 
-	for path, pkg in pkgs_to_use {
-		strings.reset_builder(&b)
+	for path, pkg in collection.pkgs_to_use {
+		strings.reset_builder(b)
 		write_html_header(w, fmt.tprintf("package %s - pkg.odin-lang.org", path))
-		write_pkg(w, path, pkg)
+		write_pkg(w, path, pkg, collection)
 		write_html_footer(w, false)
-		recursive_make_directory(path, "core")
-		os.write_entire_file(fmt.tprintf("core/%s/index.html", path), b.buf[:])
+		recursive_make_directory(path, dir)
+		os.write_entire_file(fmt.tprintf("%s/%s/index.html", dir, path), b.buf[:])
 	}
+}
+
+
+write_home_sidebar :: proc(w: io.Writer) {
+	fmt.wprintln(w, `<nav class="col-lg-2 odin-sidebar-border navbar-light">`)
+	defer fmt.wprintln(w, `</nav>`)
+	fmt.wprintln(w, `<div class="sticky-top odin-below-navbar py-3">`)
+	defer fmt.wprintln(w, `</div>`)
+
+	fmt.wprintln(w, `<ul class="nav nav-pills d-flex flex-column">`)
+	fmt.wprintln(w, `<li class="nav-item"><a class="nav-link" href="/core">Core Library</a></li>`)
+	fmt.wprintln(w, `<li class="nav-item"><a class="nav-link" href="/vendor">Vendor Library</a></li>`)
+	fmt.wprintln(w, `</ul>`)
 }
 
 write_home_page :: proc(w: io.Writer) {
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
 
-	{
-		fmt.wprintln(w, `<nav class="col-lg-2 odin-sidebar-border navbar-light">`)
-		defer fmt.wprintln(w, `</nav>`)
-		fmt.wprintln(w, `<div class="sticky-top odin-below-navbar py-3">`)
-		defer fmt.wprintln(w, `</div>`)
-
-		fmt.wprintln(w, `<ul class="nav nav-pills d-flex flex-column">`)
-		fmt.wprintln(w, `<li class="nav-item"><a class="nav-link" href="/core">Core Library</a></li>`)
-		fmt.wprintln(w, `<li class="nav-item"><a class="nav-link" href="#">Vendor Library</a></li>`)
-		fmt.wprintln(w, `</ul>`)
-
-	}
-
+	write_home_sidebar(w)
 
 	fmt.wprintln(w, `<article class="col-lg-8 p-4">`)
 	defer fmt.wprintln(w, `</article>`)
@@ -270,9 +322,8 @@ write_home_page :: proc(w: io.Writer) {
 	fmt.wprintln(w, `</div>`)
 
 	fmt.wprintln(w, `<div class="mt-5">`)
-	fmt.wprintln(w, `<a href="#" class="link-primary text-decoration-node"><h3>Vendor Library Collection</h3></a>`)
+	fmt.wprintln(w, `<a href="/vendor" class="link-primary text-decoration-node"><h3>Vendor Library Collection</h3></a>`)
 	fmt.wprintln(w, `<p>Documentation for all the packages part of the <code>vendor</code> library collection.</p>`)
-	fmt.wprintln(w, `<p><em>Coming Soon.</em></p>`)
 	fmt.wprintln(w, `</div>`)
 
 
@@ -289,7 +340,7 @@ Dir_Node :: struct {
 	children: [dynamic]^Dir_Node,
 }
 
-generate_directory_tree :: proc() -> (root: ^Dir_Node) {
+generate_directory_tree :: proc(pkgs_to_use: map[string]^doc.Pkg) -> (root: ^Dir_Node) {
 	sort_tree :: proc(node: ^Dir_Node) {
 		slice.sort_by_key(node.children[:], proc(node: ^Dir_Node) -> string {return node.name})
 		for child in node.children {
@@ -342,25 +393,46 @@ generate_directory_tree :: proc() -> (root: ^Dir_Node) {
 	return
 }
 
-write_core_directory :: proc(w: io.Writer) {
-	root := generate_directory_tree()
+write_collection_directory :: proc(w: io.Writer, collection: ^Collection) {
+	get_line_doc :: proc(pkg: ^doc.Pkg) -> (line_doc: string, ok: bool) {
+		if pkg == nil {
+			return
+		}
+		line_doc, _, _ = strings.partition(str(pkg.docs), "\n")
+		line_doc = strings.trim_space(line_doc)
+		if line_doc == "" {
+			return
+		}
+		switch {
+		case strings.has_prefix(line_doc, "*"):
+			return "", false
+		case strings.has_prefix(line_doc, "Copyright"):
+			return "", false
+		}
+		return line_doc, true
+	}
+
 
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
+
+
+	write_home_sidebar(w)
+
+	fmt.wprintln(w, `<article class="col-lg-10 p-4">`)
+	defer fmt.wprintln(w, `</article>`)
 	{
-		fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
+		fmt.wprintln(w, `<article class="p-4">`)
 		fmt.wprintln(w, `<header class="collection-header">`)
-		fmt.wprintln(w, "<h1>Core Library Collection</h1>")
+		fmt.wprintf(w, "<h1>%s Library Collection</h1>\n", collection.name)
 		fmt.wprintln(w, "<ul>")
 		fmt.wprintf(w, "<li>License: <a href=\"{0:s}\">BSD-3-Clause</a></li>\n", GITHUB_LICENSE_URL)
-		fmt.wprintf(w, "<li>Repository: <a href=\"{0:s}\">{0:s}</a></li>\n", GITHUB_CORE_URL)
+		fmt.wprintf(w, "<li>Repository: <a href=\"{0:s}\">{0:s}</a></li>\n", collection.github_url)
 		fmt.wprintln(w, "</ul>")
 		fmt.wprintln(w, "</header>")
 		fmt.wprintln(w, "</article>")
 		fmt.wprintln(w, `<hr class="collection-hr">`)
 	}
-	fmt.wprintln(w, `<article class="col-lg-12 p-4">`)
-	defer fmt.wprintln(w, `</article>`)
 
 	fmt.wprintln(w, "<header>")
 	fmt.wprintln(w, `<h2><i class="bi bi-folder"></i>Directories</h2>`)
@@ -370,7 +442,7 @@ write_core_directory :: proc(w: io.Writer) {
 	fmt.wprintln(w, "\t<table class=\"doc-directory mt-4 mb-4\">")
 	fmt.wprintln(w, "\t\t<tbody>")
 
-	for dir in root.children {
+	for dir in collection.root.children {
 		if len(dir.children) != 0 {
 			fmt.wprint(w, `<tr aria-controls="`)
 			for child in dir.children {
@@ -386,18 +458,16 @@ write_core_directory :: proc(w: io.Writer) {
 		}
 
 		if dir.pkg != nil {
-			fmt.wprintf(w, `<a href="%s/%s">%s</a>`, BASE_CORE_URL, dir.path, dir.name)
+			fmt.wprintf(w, `<a href="%s/%s">%s</a>`, collection.base_url, dir.path, dir.name)
 		} else {
 			fmt.wprintf(w, "%s", dir.name)
 		}
 		io.write_string(w, `</td>`)
 		io.write_string(w, `<td class="pkg-line pkg-line-doc">`)
-		if dir.pkg != nil {
-			line_doc, _, _ := strings.partition(str(dir.pkg.docs), "\n")
-			line_doc = strings.trim_space(line_doc)
-			if line_doc != "" {
-				write_doc_line(w, line_doc)
-			}
+		if line_doc, ok := get_line_doc(dir.pkg); ok {
+			write_doc_line(w, line_doc)
+		} else {
+			io.write_string(w, `&nbsp;`)
 		}
 		io.write_string(w, `</td>`)
 		fmt.wprintf(w, "</tr>\n")
@@ -405,14 +475,16 @@ write_core_directory :: proc(w: io.Writer) {
 		for child in dir.children {
 			assert(child.pkg != nil)
 			fmt.wprintf(w, `<tr id="pkg-%s" class="directory-pkg directory-child"><td class="pkg-line pkg-name">`, str(child.pkg.name))
-			fmt.wprintf(w, `<a href="%s/%s/">%s</a>`, BASE_CORE_URL, child.path, child.name)
+			fmt.wprintf(w, `<a href="%s/%s/">%s</a>`, collection.base_url, child.path, child.name)
 			io.write_string(w, `</td>`)
 
 			line_doc, _, _ := strings.partition(str(child.pkg.docs), "\n")
 			line_doc = strings.trim_space(line_doc)
 			io.write_string(w, `<td class="pkg-line pkg-line-doc">`)
-			if line_doc != "" {
+			if line_doc, ok := get_line_doc(dir.pkg); ok {
 				write_doc_line(w, line_doc)
+			} else {
+				io.write_string(w, `&nbsp;`)
 			}
 			io.write_string(w, `</td>`)
 
@@ -606,6 +678,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		e := entities[type_entities[0]]
 		name := str(type.name)
 		tn_pkg := files[e.pos.file].pkg
+		collection: Collection // TODO determine this from package
 
 		if tn_pkg != pkg {
 			fmt.wprintf(w, `%s.`, str(pkgs[tn_pkg].name))
@@ -613,10 +686,10 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 		if .Private in e.flags {
 			io.write_string(w, name)
 		} else if n := strings.contains_rune(name, '('); n >= 0 {
-			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name[:n], BASE_CORE_URL)
+			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name[:n], collection.base_url)
 			io.write_string(w, name[n:])
 		} else {
-			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name, BASE_CORE_URL)
+			fmt.wprintf(w, `<a class="code-typename" href="{2:s}/{0:s}/#{1:s}">{1:s}</a>`, pkg_to_path[&pkgs[tn_pkg]], name, collection.base_url)
 		}
 	case .Generic:
 		name := str(type.name)
@@ -870,6 +943,10 @@ write_doc_line :: proc(w: io.Writer, text: string) {
 	}
 }
 
+write_doc_sidebar :: proc(w: io.Writer) {
+
+}
+
 write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 	if docs == "" {
 		return
@@ -1002,13 +1079,55 @@ write_docs :: proc(w: io.Writer, pkg: ^doc.Pkg, docs: string) {
 	}
 }
 
-write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
+write_pkg_sidebar :: proc(w: io.Writer, curr_pkg: ^doc.Pkg, collection: ^Collection) {
+
+	fmt.wprintln(w, `<nav id="pkg-sidebar" class="col-lg-2 odin-sidebar-border navbar-light">`)
+	defer fmt.wprintln(w, `</nav>`)
+	fmt.wprintln(w, `<div class="sticky-top odin-below-navbar py-3">`)
+	defer fmt.wprintln(w, `</div>`)
+
+	fmt.wprintf(w, "<h4>%s Library</h4>\n", collection.name)
+
+	fmt.wprintln(w, `<ul>`)
+	defer fmt.wprintln(w, `</ul>`)
+
+	for dir in collection.root.children {
+		fmt.wprint(w, `<li class="nav-item">`)
+		defer fmt.wprintln(w, `</li>`)
+		if dir.pkg == curr_pkg {
+			fmt.wprintf(w, `<a class="active" href="%s/%s">%s</a>`, collection.base_url, dir.path, dir.name)
+		} else if dir.pkg != nil {
+			fmt.wprintf(w, `<a href="%s/%s">%s</a>`, collection.base_url, dir.path, dir.name)
+		} else {
+			fmt.wprintf(w, "%s", dir.name)
+		}
+		if len(dir.children) != 0 {
+			fmt.wprintln(w, "<ul>")
+			defer fmt.wprintln(w, "</ul>\n")
+			for child in dir.children {
+				fmt.wprint(w, `<li>`)
+				defer fmt.wprintln(w, `</li>`)
+				if child.pkg == curr_pkg {
+					fmt.wprintf(w, `<a class="active" href="%s/%s">%s</a>`, collection.base_url, child.path, child.name)
+				} else if child.pkg != nil {
+					fmt.wprintf(w, `<a href="%s/%s">%s</a>`, collection.base_url, child.path, child.name)
+				} else {
+					fmt.wprintf(w, "%s", child.name)
+				}
+			}
+		}
+	}
+}
+
+write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg, collection: ^Collection) {
 	fmt.wprintln(w, `<div class="row odin-main">`)
 	defer fmt.wprintln(w, `</div>`)
 
-	fmt.wprintln(w, `<article class="col-lg-9 p-4 documentation odin-article">`)
+	write_pkg_sidebar(w, pkg, collection)
 
-	{ // breadcrumbs
+	fmt.wprintln(w, `<article class="col-lg-8 p-4 documentation odin-article">`)
+
+	if false { // breadcrumbs
 		fmt.wprintln(w, `<div class="row">`)
 		defer fmt.wprintln(w, `</div>`)
 
@@ -1017,7 +1136,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		io.write_string(w, "<ol class=\"breadcrumb\">\n")
 		defer io.write_string(w, "</ol>\n")
 
-		fmt.wprintf(w, `<li class="breadcrumb-item"><a class="breadcrumb-link" href="%s">core</a></li>`, BASE_CORE_URL)
+		fmt.wprintf(w, `<li class="breadcrumb-item"><a class="breadcrumb-link" href="%s">core</a></li>`, collection.base_url)
 
 		dirs := strings.split(path, "/")
 		for dir, i in dirs {
@@ -1032,8 +1151,8 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 				io.write_string(w, `<li class="breadcrumb-item">`)
 			}
 
-			if !is_curr && (short_path in pkgs_to_use) {
-				fmt.wprintf(w, `<a href="%s/%s">%s</a>`, BASE_CORE_URL, url, dir)
+			if !is_curr && (short_path in collection.pkgs_to_use) {
+				fmt.wprintf(w, `<a href="%s/%s">%s</a>`, collection.base_url, url, dir)
 			} else {
 				io.write_string(w, dir)
 			}
@@ -1148,6 +1267,8 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			pkg = pkg_index,
 		}
 		defer delete(writer.generic_scope)
+		collection := pkg_to_collection[pkg]
+		github_url := collection.github_url if collection != nil else GITHUB_CORE_URL
 
 		name := str(e.name)
 		path := pkg_to_path[pkg]
@@ -1155,7 +1276,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 		fmt.wprintf(w, "<h3 id=\"{0:s}\"><span><a class=\"doc-id-link\" href=\"#{0:s}\">{0:s}", name)
 		fmt.wprintf(w, "<span class=\"a-hidden\">&nbsp;¶</span></a></span>")
 		if e.pos.file != 0 && e.pos.line > 0 {
-			src_url := fmt.tprintf("%s/%s/%s#L%d", GITHUB_CORE_URL, path, filename, e.pos.line)
+			src_url := fmt.tprintf("%s/%s/%s#L%d", github_url, path, filename, e.pos.line)
 			fmt.wprintf(w, "<div class=\"doc-source\"><a href=\"{0:s}\"><em>Source</em></a></div>", src_url)
 		}
 		fmt.wprintf(w, "</h3>\n")
@@ -1240,8 +1361,10 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 				if this_pkg != pkg_index {
 					fmt.wprintf(w, "%s.", str(pkgs[this_pkg].name))
 				}
+				pkg := &pkgs[this_pkg]
+				collection := pkg_to_collection[pkg]
 				name := str(this_proc.name)
-				fmt.wprintf(w, `<a class="code-procedure" href="{2:s}/{0:s}/#{1:s}">`, pkg_to_path[&pkgs[this_pkg]], name, BASE_CORE_URL)
+				fmt.wprintf(w, `<a class="code-procedure" href="{2:s}/{0:s}/#{1:s}">`, pkg_to_path[pkg], name, collection.base_url)
 				io.write_string(w, name)
 				io.write_string(w, `</a>`)
 				io.write_byte(w, ',')
@@ -1305,13 +1428,20 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			any_hidden = true
 			continue source_file_loop
 		}
-		fmt.wprintf(w, `<li><a href="%s/%s/%s">%s</a></li>`, GITHUB_CORE_URL, path, filename, filename)
+		fmt.wprintf(w, `<li><a href="%s/%s/%s">%s</a></li>`, collection.github_url, path, filename, filename)
 		fmt.wprintln(w)
 	}
 	if any_hidden {
 		fmt.wprintln(w, "<li><em>(hidden platform specific files)</em></li>")
 	}
 	fmt.wprintln(w, "</ul>")
+
+	{
+		fmt.wprintln(w, `<h2 id="pkg-generation-information">Generation Information</h2>`)
+		now := time.now()
+		fmt.wprintf(w, "<p>Generated with <code>odin version %s (vendor %q) %s_%s @ %v</code></p>\n", ODIN_VERSION, ODIN_VENDOR, ODIN_OS, ODIN_ARCH, now)
+	}
+
 
 
 	fmt.wprintln(w, `</article>`)
@@ -1320,7 +1450,7 @@ write_pkg :: proc(w: io.Writer, path: string, pkg: ^doc.Pkg) {
 			fmt.wprintf(w, `<li><a href="#%s">%s</a>`, id, text)
 		}
 
-		fmt.wprintln(w, `<div class="col-lg-3 odin-toc-border navbar-light"><div class="sticky-top odin-below-navbar py-3">`)
+		fmt.wprintln(w, `<div class="col-lg-2 odin-toc-border navbar-light"><div class="sticky-top odin-below-navbar py-3">`)
 		fmt.wprintln(w, `<nav id="TableOfContents">`)
 		fmt.wprintln(w, `<ul>`)
 		if overview_docs != "" {
