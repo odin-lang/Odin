@@ -8,25 +8,33 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
+    
     ARCH=$(shell uname -m)
-    LLVM_CONFIG=llvm-config
+    LLVM_CONFIG=
 
+    # allow for arm only llvm's with version 13
     ifeq ($(ARCH), arm64)
-        ifneq ($(shell llvm-config --version | grep "^13\."),)
-            LLVM_CONFIG=llvm-config
-        else
-            $(error "Requirement: llvm-config must be version llvm 13 for arm64")
-        endif
+        LLVM_VERSIONS = "13.%.%"
     else
-        ifneq ($(shell llvm-config --version | grep "^11\."),)
-            LLVM_CONFIG=llvm-config
-        else ifneq ($(shell llvm-config --version | grep "^12\."),)
-            LLVM_CONFIG=llvm-config
-        else ifneq ($(shell llvm-config --version | grep "^13\."),)
-            LLVM_CONFIG=llvm-config
-        else
-            $(error "Requirement: llvm-config must be version llvm 11 or 12 or 13 for amd64/x86")
-        endif
+    # allow for x86 / amd64 all llvm versions begining from 11
+        LLVM_VERSIONS = "13.%.%" "12.0.1" "11.1.0" "11.0.1" "11.0.0"
+    endif
+
+    LLVM_VERSION_PATTERN_SEPERATOR = )|(
+    LLVM_VERSION_PATTERNS_ESCAPED_DOT = $(subst .,\.,$(LLVM_VERSIONS))
+    LLVM_VERSION_PATTERNS_REPLACE_PERCENT = $(subst %,.,$(LLVM_VERSION_PATTERNS_ESCAPED_DOT))
+    LLVM_VERSION_PATTERN_REMOVE_ELEMENTS = $(subst " ",$(LLVM_VERSION_PATTERN_SEPERATOR),$(LLVM_VERSION_PATTERNS_REPLACE_PERCENT))
+    LLMV_VERSION_PATTERN_REMOVE_SINGLE_STR = $(subst ",,$(LLVM_VERSION_PATTERN_REMOVE_ELEMENTS))
+    LLVM_VERSION_PATTERN = "^(($(LLMV_VERSION_PATTERN_REMOVE_SINGLE_STR)))"
+
+    ifneq ($(shell llvm-config --version | grep -E $(LLVM_VERSION_PATTERN)),)
+        LLVM_CONFIG=llvm-config
+    else
+        ifeq ($(ARCH), arm64)
+            $(error "Requirement: llvm-config must be base version 13 for arm64")
+        else 
+            $(error "Requirement: llvm-config must be base version greater than 11 for amd64/x86")
+        endif 
     endif 
 
     LDFLAGS:=$(LDFLAGS) -liconv
