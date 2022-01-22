@@ -481,7 +481,7 @@ write_collection_directory :: proc(w: io.Writer, collection: ^Collection) {
 			line_doc, _, _ := strings.partition(str(child.pkg.docs), "\n")
 			line_doc = strings.trim_space(line_doc)
 			io.write_string(w, `<td class="pkg-line pkg-line-doc">`)
-			if line_doc, ok := get_line_doc(dir.pkg); ok {
+			if line_doc, ok := get_line_doc(child.pkg); ok {
 				write_doc_line(w, line_doc)
 			} else {
 				io.write_string(w, `&nbsp;`)
