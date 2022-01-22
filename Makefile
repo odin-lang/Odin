@@ -11,19 +11,23 @@ ifeq ($(OS), Darwin)
     ARCH=$(shell uname -m)
     LLVM_CONFIG=llvm-config
 
-    # LLVM Version Setting  
-    LLVM_VERSION_PATTERN="^11\."
-    LLVM_VERSION="11"
     ifeq ($(ARCH), arm64)
-	LLVM_VERSION="13"
-        LLVM_VERSION_PATTERN="^13"
-    endif 
-
-    ifneq ($(shell llvm-config --version | grep $(LLVM_VERSION_PATTERN)),)
-        LLVM_CONFIG=llvm-config
+        ifneq ($(shell llvm-config --version | grep "^13\."),)
+            LLVM_CONFIG=llvm-config
+        else
+            $(error "Requirement: llvm-config must be version llvm 13 for arm64")
+        endif
     else
-        $(error "Requirement: llvm-config must be version $(LLVM_VERSION)")
-    endif
+        ifneq ($(shell llvm-config --version | grep "^11\."),)
+            LLVM_CONFIG=llvm-config
+        else ifneq ($(shell llvm-config --version | grep "^12\."),)
+            LLVM_CONFIG=llvm-config
+        else ifneq ($(shell llvm-config --version | grep "^13\."),)
+            LLVM_CONFIG=llvm-config
+        else
+            $(error "Requirement: llvm-config must be version llvm 11 or 12 or 13 for amd64/x86")
+        endif
+    endif 
 
     LDFLAGS:=$(LDFLAGS) -liconv
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
