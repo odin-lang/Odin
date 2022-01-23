@@ -144,6 +144,15 @@ details.code-example > summary {
 	}
 }
 
+#pkg-sidebar {
+	overflow-x: hidden;
+}
+
+#pkg-sidebar > div {
+	overflow-x: auto;
+}
+
+
 #pkg-sidebar ul {
 	list-style-type: none;
 	padding: 0;
@@ -160,4 +169,12 @@ details.code-example > summary {
 
 #pkg-sidebar a.active {
 	font-style: italic;
+}
+
+#TableOfContents {
+	overflow-x: hidden;
+}
+
+#TableOfContents > ul {
+	overflow-x: auto;
 }
