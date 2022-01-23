@@ -1,4 +1,4 @@
-package sys
+package darwin
 
 import "core:strings"
 import "core:c"
