@@ -160,10 +160,12 @@ struct Entity {
 			ExactValue value;
 			ParameterValue param_value;
 			u32 flags;
+			i32 field_group_index;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
+			i32  field_group_index;
 
 			ParameterValue param_value;
 

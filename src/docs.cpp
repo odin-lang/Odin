@@ -67,6 +67,14 @@ GB_COMPARE_PROC(cmp_ast_package_by_name) {
 #include "docs_format.cpp"
 #include "docs_writer.cpp"
 
+void print_doc_line(i32 indent, String const &data) {
+	while (indent --> 0) {
+		gb_printf("\t");
+	}
+	gb_file_write(gb_file_get_standard(gbFileStandard_Output), data.text, data.len);
+	gb_printf("\n");
+}
+
 void print_doc_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf("\t");
@@ -86,6 +94,13 @@ void print_doc_line_no_newline(i32 indent, char const *fmt, ...) {
 	gb_printf_va(fmt, va);
 	va_end(va);
 }
+void print_doc_line_no_newline(i32 indent, String const &data) {
+	while (indent --> 0) {
+		gb_printf("\t");
+	}
+	gb_file_write(gb_file_get_standard(gbFileStandard_Output), data.text, data.len);
+}
+
 
 bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 	if (g == nullptr) {
@@ -106,8 +121,9 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 		String comment = g->list[i].string;
 		String original_comment = comment;
 
-		bool slash_slash = comment[1] == '/';
+		bool slash_slash = false;
 		if (comment[1] == '/') {
+			slash_slash = true;
 			comment.text += 2;
 			comment.len  -= 2;
 		} else if (comment[1] == '*') {
@@ -131,7 +147,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 		}
 
 		if (slash_slash) {
-			print_doc_line(indent, "%.*s", LIT(comment));
+			print_doc_line(indent, comment);
 			count += 1;
 		} else {
 			isize pos = 0;
@@ -143,7 +159,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 					}
 				}
 				String line = substring(comment, pos, end);
-				pos = end+1;
+				pos = end;
 				String trimmed_line = string_trim_whitespace(line);
 				if (trimmed_line.len == 0) {
 					if (count == 0) {
@@ -159,7 +175,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 					line = substring(line, 2, line.len);
 				}
 
-				print_doc_line(indent, "%.*s", LIT(line));
+				print_doc_line(indent, line);
 				count += 1;
 			}
 		}
@@ -263,7 +279,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			}
 			GB_ASSERT(type_expr != nullptr || init_expr != nullptr);
 
-			print_doc_line_no_newline(2, "%.*s", LIT(e->token.string));
+			print_doc_line_no_newline(2, e->token.string);
 			if (type_expr != nullptr) {
 				gbString t = expr_to_string(type_expr);
 				gb_printf(": %s ", t);
@@ -298,7 +314,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			String filename = remove_directory_from_path(f->fullpath);
-			print_doc_line(2, "%.*s", LIT(filename));
+			print_doc_line(2, filename);
 		}
 	}
 

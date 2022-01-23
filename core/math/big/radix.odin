@@ -12,6 +12,8 @@
 		- Use Barrett reduction for non-powers-of-two.
 		- Also look at extracting and splatting several digits at once.
 */
+
+
 package math_big
 
 import "core:intrinsics"
