@@ -6,6 +6,11 @@
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
+
+
+// package png implements a PNG image reader
+//
+// The PNG specification is at https://www.w3.org/TR/PNG/.
 package png
 
 import "core:compress"

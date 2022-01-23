@@ -2338,7 +2338,17 @@ Type *strip_type_aliasing(Type *x) {
 	return x;
 }
 
+bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names);
+
 bool are_types_identical(Type *x, Type *y) {
+	return are_types_identical_internal(x, y, false);
+}
+bool are_types_identical_unique_tuples(Type *x, Type *y) {
+	return are_types_identical_internal(x, y, true);
+}
+
+
+bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
 		return true;
 	}
@@ -2486,6 +2496,11 @@ bool are_types_identical(Type *x, Type *y) {
 					Entity *ye = y->Tuple.variables[i];
 					if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
 						return false;
+					}
+					if (check_tuple_names) {
+						if (xe->token.string != ye->token.string) {
+							return false;
+						}
 					}
 					if (xe->kind == Entity_Constant && !compare_exact_values(Token_CmpEq, xe->Constant.value, ye->Constant.value)) {
 						// NOTE(bill): This is needed for polymorphic procedures
@@ -3933,7 +3948,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 						str = gb_string_appendc(str, " = ");
 						str = write_exact_value_to_string(str, var->Constant.value);
 					} else {
-						str = gb_string_appendc(str, "=");
+						str = gb_string_appendc(str, " := ");
 						str = write_exact_value_to_string(str, var->Constant.value);
 					}
 					continue;
@@ -3961,14 +3976,10 @@ gbString write_type_to_string(gbString str, Type *type) {
 						str = gb_string_appendc(str, "typeid/");
 						str = write_type_to_string(str, var->type);
 					} else {
-						if (var->kind == Entity_TypeName) {
-							str = gb_string_appendc(str, "$");
-							str = gb_string_append_length(str, name.text, name.len);
-							str = gb_string_appendc(str, "=");
-							str = write_type_to_string(str, var->type);
-						} else {
-							str = gb_string_appendc(str, "typeid");
-						}
+						str = gb_string_appendc(str, "$");
+						str = gb_string_append_length(str, name.text, name.len);
+						str = gb_string_appendc(str, "=");
+						str = write_type_to_string(str, var->type);
 					}
 				}
 			}

@@ -5,6 +5,9 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 */
+
+
+// package compress is a collection of utilities to aid with other compression packages
 package compress
 
 import "core:io"
