@@ -6085,7 +6085,8 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		}
 
 		// NOTE(bill): Add type info the parameters
-		add_type_info_type(c, o->type);
+		// TODO(bill, 2022-01-23): why was this line added in the first place? I'm commenting it out for the time being
+		// add_type_info_type(c, o->type);
 	}
 
 	{
