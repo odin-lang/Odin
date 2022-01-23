@@ -1,4 +1,4 @@
-package sys
+package darwin
 
 import "core:c"
 import "core:intrinsics"
