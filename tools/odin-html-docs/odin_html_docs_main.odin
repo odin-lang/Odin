@@ -886,6 +886,7 @@ write_type :: proc(using writer: ^Type_Writer, type: doc.Type, flags: Write_Type
 			write_type(writer, types[type_types[0]], flags)
 		}
 		if .Underlying_Type in type_flags {
+			io.write_string(w, "; ")
 			write_type(writer, types[type_types[1]], flags)
 		}
 		io.write_string(w, "]")
