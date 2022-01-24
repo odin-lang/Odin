@@ -1244,7 +1244,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	return comments;
 }
 
-void comsume_comment_groups(AstFile *f, Token prev) {
+void consume_comment_groups(AstFile *f, Token prev) {
 	if (f->curr_token.kind == Token_Comment) {
 		CommentGroup *comment = nullptr;
 		isize end_line = 0;
@@ -1288,7 +1288,7 @@ Token advance_token(AstFile *f) {
 	if (ok) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
-			comsume_comment_groups(f, prev);
+			consume_comment_groups(f, prev);
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -1699,6 +1699,16 @@ Array<Ast *> parse_element_list(AstFile *f) {
 
 	return elems;
 }
+CommentGroup *consume_line_comment(AstFile *f) {
+	CommentGroup *comment = f->line_comment;
+	if (f->line_comment == f->lead_comment) {
+		f->lead_comment = nullptr;
+	}
+	f->line_comment = nullptr;
+	return comment;
+
+}
+
 Array<Ast *> parse_enum_field_list(AstFile *f) {
 	auto elems = array_make<Ast *>(heap_allocator());
 
@@ -1713,7 +1723,7 @@ Array<Ast *> parse_enum_field_list(AstFile *f) {
 			value = parse_value(f);
 		}
 
-		comment = f->line_comment;
+		comment = consume_line_comment(f);
 
 		Ast *elem = ast_enum_field_value(f, name, value, docs, comment);
 		array_add(&elems, elem);
@@ -1723,7 +1733,7 @@ Array<Ast *> parse_enum_field_list(AstFile *f) {
 		}
 
 		if (!elem->EnumFieldValue.comment) {
-			elem->EnumFieldValue.comment = f->line_comment;
+			elem->EnumFieldValue.comment = consume_line_comment(f);
 		}
 	}
 
@@ -5438,7 +5448,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
 	if (f->curr_token.kind == Token_Comment) {
-		comsume_comment_groups(f, f->prev_token);
+		consume_comment_groups(f, f->prev_token);
 	}
 
 	CommentGroup *docs = f->lead_comment;
