@@ -9115,18 +9115,7 @@ gbString string_append_string(gbString str, String string) {
 
 
 gbString string_append_token(gbString str, Token token) {
-	if (token.kind == Token_String) {
-		str = gb_string_append_rune(str, '"');
-	} else if (token.kind == Token_Rune) {
-		str = gb_string_append_rune(str, '\'');
-	}
 	str = string_append_string(str, token.string);
-	if (token.kind == Token_String) {
-		str = gb_string_append_rune(str, '"');
-	} else if (token.kind == Token_Rune) {
-		str = gb_string_append_rune(str, '\'');
-	}
-
 	return str;
 }
 
