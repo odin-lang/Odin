@@ -120,6 +120,8 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 		ast_node(p, Field, param);
 		Ast *type_expr = p->type;
 		Type *type = nullptr;
+		CommentGroup *docs = p->docs;
+		CommentGroup *comment = p->comment;
 
 		if (type_expr != nullptr) {
 			type = check_type_expr(ctx, type_expr, nullptr);
@@ -156,6 +158,14 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx, ctx->scope, name, field);
 			field->Variable.field_group_index = field_group_index;
+
+			if (j == 0) {
+				field->Variable.docs = docs;
+			}
+			if (j+1 == p->names.count) {
+				field->Variable.comment = comment;
+			}
+
 			array_add(&fields_array, field);
 			String tag = p->tag.string;
 			if (tag.len != 0 && !unquote_string(permanent_allocator(), &tag, 0, tag.text[0] == '`')) {

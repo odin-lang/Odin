@@ -403,6 +403,7 @@ void compiler_error(char const *fmt, ...) {
 	gb_printf_err("Internal Compiler Error: %s\n",
 	              gb_bprintf_va(fmt, va));
 	va_end(va);
+	GB_DEBUG_TRAP();
 	gb_exit(1);
 }
 

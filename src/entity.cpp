@@ -175,6 +175,8 @@ struct Entity {
 			String     link_name;
 			String     link_prefix;
 			String     link_section;
+			CommentGroup *docs;
+			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 		} Variable;

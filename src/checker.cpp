@@ -688,12 +688,17 @@ void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
 	ptr_set_add(&d->deps, e);
 	mutex_unlock(&info->deps_mutex);
 }
-void add_type_info_dependency(DeclInfo *d, Type *type) {
+void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type, bool require_mutex) {
 	if (d == nullptr) {
 		return;
 	}
-	// NOTE(bill): no mutex is required here because the only procedure calling it is wrapped in a mutex already
+	if (require_mutex) {
+		mutex_lock(&info->deps_mutex);
+	}
 	ptr_set_add(&d->type_info_deps, type);
+	if (require_mutex) {
+		mutex_unlock(&info->deps_mutex);
+	}
 }
 
 AstPackage *get_core_package(CheckerInfo *info, String name) {
@@ -1589,7 +1594,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		return;
 	}
 
-	add_type_info_dependency(c->decl, t);
+	add_type_info_dependency(c->info, c->decl, t, false);
 
 	auto found = map_get(&c->info->type_info_map, t);
 	if (found != nullptr) {
@@ -1718,6 +1723,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		} else {
 			add_type_info_type_internal(c, t_type_info_ptr);
 		}
+		add_type_info_type_internal(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_type_info_type_internal(c, bt->Union.variants[i]);
 		}
@@ -1741,6 +1747,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 				}
 			}
 		}
+		add_type_info_type_internal(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type_internal(c, f->type);
@@ -1934,6 +1941,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		} else {
 			add_min_dep_type_info(c, t_type_info_ptr);
 		}
+		add_min_dep_type_info(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_min_dep_type_info(c, bt->Union.variants[i]);
 		}
@@ -1957,6 +1965,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 				}
 			}
 		}
+		add_min_dep_type_info(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_min_dep_type_info(c, f->type);
@@ -5473,9 +5482,6 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("calculate global init order");
 	calculate_global_init_order(c);
 
-	TIME_SECTION("generate minimum dependency set");
-	generate_minimum_dependency_set(c, c->info.entry_point);
-
 	TIME_SECTION("check test procedures");
 	check_test_procedures(c);
 
@@ -5485,6 +5491,9 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("add type info for type definitions");
 	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("generate minimum dependency set");
+	generate_minimum_dependency_set(c, c->info.entry_point);
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {

@@ -614,6 +614,10 @@ raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_str
 @(disabled=ODIN_DISABLE_ASSERT)
 assert :: proc(condition: bool, message := "", loc := #caller_location) {
 	if !condition {
+		// NOTE(bill): This is wrapped in a procedure call
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
 		proc(message: string, loc: Source_Code_Location) {
 			p := context.assertion_failure_proc
 			if p == nil {

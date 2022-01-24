@@ -353,6 +353,76 @@ split_after_n_iterator :: proc(s: ^string, sep: string, n: int) -> (string, bool
 }
 
 
+@(private)
+_trim_cr :: proc(s: string) -> string {
+	n := len(s)
+	if n > 0 {
+		if s[n-1] == '\r' {
+			return s[:n-1]
+		}
+	}
+	return s
+}
+
+split_lines :: proc(s: string, allocator := context.allocator) -> []string {
+	sep :: "\n"
+	lines := _split(s, sep, 0, -1, allocator)
+	for line in &lines {
+		line = _trim_cr(line)
+	}
+	return lines
+}
+
+split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> []string {
+	sep :: "\n"
+	lines := _split(s, sep, 0, n, allocator)
+	for line in &lines {
+		line = _trim_cr(line)
+	}
+	return lines
+}
+
+split_lines_after :: proc(s: string, allocator := context.allocator) -> []string {
+	sep :: "\n"
+	lines := _split(s, sep, len(sep), -1, allocator)
+	for line in &lines {
+		line = _trim_cr(line)
+	}
+	return lines
+}
+
+split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -> []string {
+	sep :: "\n"
+	lines := _split(s, sep, len(sep), n, allocator)
+	for line in &lines {
+		line = _trim_cr(line)
+	}
+	return lines
+}
+
+split_lines_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
+	sep :: "\n"
+	line = _split_iterator(s, sep, 0, -1) or_return
+	return _trim_cr(line), true
+}
+
+split_lines_n_iterator :: proc(s: ^string, n: int) -> (line: string, ok: bool) {
+	sep :: "\n"
+	line = _split_iterator(s, sep, 0, n) or_return
+	return _trim_cr(line), true
+}
+
+split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
+	sep :: "\n"
+	line = _split_iterator(s, sep, len(sep), -1) or_return
+	return _trim_cr(line), true
+}
+
+split_lines_after_n_iterator :: proc(s: ^string, n: int) -> (line: string, ok: bool) {
+	sep :: "\n"
+	line = _split_iterator(s, sep, len(sep), n) or_return
+	return _trim_cr(line), true
+}
 
 
 
