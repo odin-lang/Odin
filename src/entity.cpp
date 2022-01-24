@@ -161,6 +161,8 @@ struct Entity {
 			ParameterValue param_value;
 			u32 flags;
 			i32 field_group_index;
+			CommentGroup *docs;
+			CommentGroup *comment;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies

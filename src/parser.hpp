@@ -383,6 +383,12 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		void *sce_temp_data; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
+	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
+		Ast *name;          \
+		Ast *value;         \
+		CommentGroup *docs; \
+		CommentGroup *comment; \
+	}) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(OrElseExpr,      "or_else expression",       struct { Ast *x; Token token; Ast *y; }) \

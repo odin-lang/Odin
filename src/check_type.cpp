@@ -732,20 +732,19 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		Ast *ident = nullptr;
 		Ast *init = nullptr;
 		u32 entity_flags = 0;
-		if (field->kind == Ast_FieldValue) {
-			ast_node(fv, FieldValue, field);
-			if (fv->field == nullptr || fv->field->kind != Ast_Ident) {
-				error(field, "An enum field's name must be an identifier");
-				continue;
-			}
-			ident = fv->field;
-			init = fv->value;
-		} else if (field->kind == Ast_Ident) {
-			ident = field;
-		} else {
+		if (field->kind != Ast_EnumFieldValue) {
 			error(field, "An enum field's name must be an identifier");
 			continue;
 		}
+		ident = field->EnumFieldValue.name;
+		init = field->EnumFieldValue.value;
+		if (ident == nullptr || ident->kind != Ast_Ident) {
+			error(field, "An enum field's name must be an identifier");
+			continue;
+		}
+		CommentGroup *docs    = field->EnumFieldValue.docs;
+		CommentGroup *comment = field->EnumFieldValue.comment;
+
 		String name = ident->Ident.token.string;
 
 		if (init != nullptr) {
@@ -803,6 +802,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
 		e->Constant.flags |= entity_flags;
+		e->Constant.docs = docs;
+		e->Constant.comment = comment;
 
 		if (scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));

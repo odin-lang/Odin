@@ -693,6 +693,16 @@ Ast *ast_field_value(AstFile *f, Ast *field, Ast *value, Token eq) {
 	return result;
 }
 
+
+Ast *ast_enum_field_value(AstFile *f, Ast *name, Ast *value, CommentGroup *docs, CommentGroup *comment) {
+	Ast *result = alloc_ast_node(f, Ast_EnumFieldValue);
+	result->EnumFieldValue.name = name;
+	result->EnumFieldValue.value = value;
+	result->EnumFieldValue.docs = docs;
+	result->EnumFieldValue.comment = comment;
+	return result;
+}
+
 Ast *ast_compound_lit(AstFile *f, Ast *type, Array<Ast *> const &elems, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_CompoundLit);
 	result->CompoundLit.type = type;
@@ -1689,6 +1699,36 @@ Array<Ast *> parse_element_list(AstFile *f) {
 
 	return elems;
 }
+Array<Ast *> parse_enum_field_list(AstFile *f) {
+	auto elems = array_make<Ast *>(heap_allocator());
+
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		CommentGroup *docs = f->lead_comment;
+		CommentGroup *comment = nullptr;
+		Ast *name = parse_value(f);
+		Ast *value = nullptr;
+		if (f->curr_token.kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+			value = parse_value(f);
+		}
+
+		comment = f->line_comment;
+
+		Ast *elem = ast_enum_field_value(f, name, value, docs, comment);
+		array_add(&elems, elem);
+
+		if (!allow_token(f, Token_Comma)) {
+			break;
+		}
+
+		if (!elem->EnumFieldValue.comment) {
+			elem->EnumFieldValue.comment = f->line_comment;
+		}
+	}
+
+	return elems;
+}
 
 Ast *parse_literal_value(AstFile *f, Ast *type) {
 	Array<Ast *> elems = {};
@@ -2449,7 +2489,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 
-		Array<Ast *> values = parse_element_list(f);
+		Array<Ast *> values = parse_enum_field_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_enum_type(f, token, base_type, values);
