@@ -9341,6 +9341,13 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = gb_string_appendc(str, " = ");
 		str = write_expr_to_string(str, fv->value, shorthand);
 	case_end;
+	case_ast_node(fv, EnumFieldValue, node);
+		str = write_expr_to_string(str, fv->name, shorthand);
+		if (fv->value) {
+			str = gb_string_appendc(str, " = ");
+			str = write_expr_to_string(str, fv->value, shorthand);
+		}
+	case_end;
 
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
