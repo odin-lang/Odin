@@ -3419,7 +3419,6 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 	if (operand->value.kind == ExactValue_String) {
 		String key = operand->value.value_string;
 		if (is_type_string(operand->type) && is_type_enum(target_type)) {
-			gb_printf_err("HERE!\n");
 			Type *et = base_type(target_type);
 			check_did_you_mean_type(key, et->Enum.fields, ".");
 		}
