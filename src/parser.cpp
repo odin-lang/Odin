@@ -944,7 +944,7 @@ Ast *ast_field(AstFile *f, Array<Ast *> const &names, Ast *type, Ast *default_va
 	result->Field.default_value = default_value;
 	result->Field.flags         = flags;
 	result->Field.tag           = tag;
-	result->Field.docs = docs;
+	result->Field.docs          = docs;
 	result->Field.comment       = comment;
 	return result;
 }

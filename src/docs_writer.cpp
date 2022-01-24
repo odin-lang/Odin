@@ -811,6 +811,12 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		comment = e->decl_info->comment;
 		docs = e->decl_info->docs;
 	}
+	if (!comment && e->kind == Entity_Variable) {
+		comment = e->Variable.comment;
+	}
+	if (!docs && e->kind == Entity_Variable) {
+		docs = e->Variable.docs;
+	}
 
 	String link_name = {};
 

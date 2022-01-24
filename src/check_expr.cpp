@@ -3419,7 +3419,6 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 	if (operand->value.kind == ExactValue_String) {
 		String key = operand->value.value_string;
 		if (is_type_string(operand->type) && is_type_enum(target_type)) {
-			gb_printf_err("HERE!\n");
 			Type *et = base_type(target_type);
 			check_did_you_mean_type(key, et->Enum.fields, ".");
 		}
@@ -6085,7 +6084,8 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		}
 
 		// NOTE(bill): Add type info the parameters
-		add_type_info_type(c, o->type);
+		// TODO(bill, 2022-01-23): why was this line added in the first place? I'm commenting it out for the time being
+		// add_type_info_type(c, o->type);
 	}
 
 	{
@@ -9114,18 +9114,7 @@ gbString string_append_string(gbString str, String string) {
 
 
 gbString string_append_token(gbString str, Token token) {
-	if (token.kind == Token_String) {
-		str = gb_string_append_rune(str, '"');
-	} else if (token.kind == Token_Rune) {
-		str = gb_string_append_rune(str, '\'');
-	}
 	str = string_append_string(str, token.string);
-	if (token.kind == Token_String) {
-		str = gb_string_append_rune(str, '"');
-	} else if (token.kind == Token_Rune) {
-		str = gb_string_append_rune(str, '\'');
-	}
-
 	return str;
 }
 

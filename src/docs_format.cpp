@@ -185,8 +185,8 @@ struct OdinDocEntity {
 	OdinDocTypeIndex   type;
 	OdinDocString      init_string;
 	u32                reserved_for_init;
-	OdinDocString      comment;
-	OdinDocString      docs;
+	OdinDocString      comment; // line comment
+	OdinDocString      docs; // preceding comment
 	i32                field_group_index;
 	OdinDocEntityIndex foreign_library;
 	OdinDocString      link_name;
