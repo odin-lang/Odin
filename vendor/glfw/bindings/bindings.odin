@@ -9,7 +9,7 @@ when ODIN_OS == "darwin"  {
         "../lib/libglfw3.a",
         "system:Cocoa.framework",
         "system:IOKit.framework",
-        "system:OpenGL.framework"
+        "system:OpenGL.framework",
     }
 }
 when ODIN_OS == "windows" { 
