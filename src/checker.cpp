@@ -1618,9 +1618,6 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		// NOTE(bill): map entries grow linearly and in order
 		ti_index = c->info->type_info_types.count;
 		array_add(&c->info->type_info_types, t);
-		if (t->kind == Type_Named && t->Named.name == "A") {
-			gb_printf_err("HERE!\n");
-		}
 	}
 	map_set(&c->checker->info.type_info_map, t, ti_index);
 
