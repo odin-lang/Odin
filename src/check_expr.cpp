@@ -5755,8 +5755,12 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				ctx.curr_proc_sig  = e->type;
 
 				GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-				evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+				bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 				decl->where_clauses_evaluated = true;
+
+				if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
+					check_procedure_later(c, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+				}
 			}
 			return data;
 		}
@@ -5769,6 +5773,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 		Entity *e = entity_of_node(ident);
 
+
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		gb_unused(err);
@@ -5777,7 +5782,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		if (entity_to_use != nullptr) {
 			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 		}
-
 		if (data.gen_entity != nullptr) {
 			Entity *e = data.gen_entity;
 			DeclInfo *decl = data.gen_entity->decl_info;
@@ -5789,8 +5793,12 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			ctx.curr_proc_sig  = e->type;
 
 			GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-			evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+			bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 			decl->where_clauses_evaluated = true;
+
+			if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
+				check_procedure_later(c, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+			}
 		}
 		return data;
 	}
