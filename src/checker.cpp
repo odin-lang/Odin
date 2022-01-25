@@ -4855,13 +4855,12 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 		return false;
 	}
 
-	// NOTE(bill, 2022-01-25): Appears to be not needed any more
-	// if (pt->is_polymorphic && pt->is_poly_specialized) {
-	// 	if ((e->flags & EntityFlag_Used) == 0) {
-	// 		// NOTE(bill, 2019-08-31): It was never used, don't check
-	// 		return false;
-	// 	}
-	// }
+	if (pt->is_polymorphic && pt->is_poly_specialized) {
+		if ((e->flags & EntityFlag_Used) == 0) {
+			// NOTE(bill, 2019-08-31): It was never used, don't check
+			return false;
+		}
+	}
 
 	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
