@@ -111,9 +111,9 @@ ZFAST_MASK :: ((1 << ZFAST_BITS) - 1)
 */
 Huffman_Table :: struct {
 	fast:        [1 << ZFAST_BITS]u16,
-	firstcode:   [16]u16,
+	firstcode:   [17]u16,
 	maxcode:     [17]int,
-	firstsymbol: [16]u16,
+	firstsymbol: [17]u16,
 	size:        [288]u8,
 	value:       [288]u16,
 }
@@ -244,7 +244,7 @@ allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_T
 @(optimization_mode="speed")
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	sizes:     [HUFFMAN_MAX_BITS+1]int
-	next_code: [HUFFMAN_MAX_BITS]int
+	next_code: [HUFFMAN_MAX_BITS+1]int
 
 	k := int(0)
 
@@ -256,14 +256,14 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	}
 	sizes[0] = 0
 
-	for i in 1..<(HUFFMAN_MAX_BITS+1) {
+	for i in 1 ..< HUFFMAN_MAX_BITS {
 		if sizes[i] > (1 << uint(i)) {
 			return E_Deflate.Huffman_Bad_Sizes
 		}
 	}
 	code := int(0)
 
-	for i in 1..<HUFFMAN_MAX_BITS {
+	for i in 1 ..= HUFFMAN_MAX_BITS {
 		next_code[i]     = code
 		z.firstcode[i]   = u16(code)
 		z.firstsymbol[i] = u16(k)
