@@ -893,6 +893,16 @@ void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_ENDIAN", target_endians[bc->metrics.arch]);
 	}
 
+	{
+		GlobalEnumValue values[ErrorPosStyle_COUNT] = {
+			{"Default", ErrorPosStyle_Default},
+			{"Unix",    ErrorPosStyle_Unix},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Error_Pos_Style_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_ERROR_POS_STYLE", build_context.ODIN_ERROR_POS_STYLE);
+	}
+
 
 	add_global_bool_constant("ODIN_DEBUG",                    bc->ODIN_DEBUG);
 	add_global_bool_constant("ODIN_DISABLE_ASSERT",           bc->ODIN_DISABLE_ASSERT);

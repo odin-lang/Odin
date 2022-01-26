@@ -168,6 +168,8 @@ enum TimingsExportFormat : i32 {
 enum ErrorPosStyle {
 	ErrorPosStyle_Default, // path(line:column) msg
 	ErrorPosStyle_Unix,    // path:line:column: msg
+
+	ErrorPosStyle_COUNT
 };
 
 // This stores the information for the specify architecture of this build
