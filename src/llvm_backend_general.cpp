@@ -1602,8 +1602,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 						return llvm_type;
 					}
 					llvm_type = LLVMStructCreateNamed(ctx, name);
+					LLVMTypeRef found_val = *found;
 					map_set(&m->types, type, llvm_type);
-					lb_clone_struct_type(llvm_type, *found);
+					lb_clone_struct_type(llvm_type, found_val);
 					return llvm_type;
 				}
 			}
