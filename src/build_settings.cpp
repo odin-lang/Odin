@@ -894,9 +894,9 @@ void init_build_context(TargetMetrics *cross_target) {
 				gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
 				gb_printf_err("Valid formats:\n");
 				gb_printf_err("\t\"default\" or \"odin\"\n");
-				gb_printf_err("\t\tpath(line:column) message)\n");
+				gb_printf_err("\t\tpath(line:column) message\n");
 				gb_printf_err("\t\"unix\"\n");
-				gb_printf_err("\t\tpath:line:column: message)\n");
+				gb_printf_err("\t\tpath:line:column: message\n");
 				gb_exit(1);
 			}
 
