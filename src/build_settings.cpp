@@ -165,6 +165,11 @@ enum TimingsExportFormat : i32 {
 	TimingsExportCSV         = 2,
 };
 
+enum ErrorPosStyle {
+	ErrorPosStyle_Default, // path(line:column) msg
+	ErrorPosStyle_Unix,    // path:line:column: msg
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -175,7 +180,9 @@ struct BuildContext {
 	String ODIN_ROOT;    // Odin ROOT
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
-bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+
+	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
 	TargetEndianKind endian_kind;
 
@@ -254,6 +261,7 @@ bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil
 	isize      thread_count;
 
 	PtrMap<char const *, ExactValue> defined_values;
+
 };
 
 
@@ -843,6 +851,22 @@ bool has_asm_extension(String const &path) {
 	return false;
 }
 
+// temporary
+char *token_pos_to_string(TokenPos const &pos) {
+	gbString s = gb_string_make_reserve(temporary_allocator(), 128);
+	String file = get_file_path_string(pos.file_id);
+	switch (build_context.ODIN_ERROR_POS_STYLE) {
+	default: /*fallthrough*/
+	case ErrorPosStyle_Default:
+		s = gb_string_append_fmt(s, "%.*s(%d:%d)", LIT(file), pos.line, pos.column);
+		break;
+	case ErrorPosStyle_Unix:
+		s = gb_string_append_fmt(s, "%.*s:%d:%d:", LIT(file), pos.line, pos.column);
+		break;
+	}
+	return s;
+}
+
 
 void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
@@ -855,6 +879,31 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
+
+	{
+		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
+		if (found) {
+			ErrorPosStyle kind = ErrorPosStyle_Default;
+			String style = make_string_c(found);
+			style = string_trim_whitespace(style);
+			if (style == "" || style == "default" || style == "odin") {
+				kind = ErrorPosStyle_Default;
+			} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
+				kind = ErrorPosStyle_Unix;
+			} else {
+				gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
+				gb_printf_err("Valid formats:\n");
+				gb_printf_err("\t\"default\" or \"odin\"\n");
+				gb_printf_err("\t\tpath(line:column) message)\n");
+				gb_printf_err("\t\"unix\"\n");
+				gb_printf_err("\t\tpath:line:column: message)\n");
+				gb_exit(1);
+			}
+
+			build_context.ODIN_ERROR_POS_STYLE = kind;
+		}
+	}
+
 	
 	bc->copy_file_contents = true;
 
