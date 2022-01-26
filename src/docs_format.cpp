@@ -154,6 +154,7 @@ enum OdinDocEntityKind : u32 {
 	OdinDocEntity_ProcGroup   = 5,
 	OdinDocEntity_ImportName  = 6,
 	OdinDocEntity_LibraryName = 7,
+	OdinDocEntity_Builtin     = 8,
 };
 
 enum OdinDocEntityFlag : u64 {
@@ -169,6 +170,8 @@ enum OdinDocEntityFlag : u64 {
 	OdinDocEntityFlag_Param_AnyInt   = 1ull<<8,
 
 	OdinDocEntityFlag_Type_Alias = 1ull<<20,
+
+	OdinDocEntityFlag_Builtin_Procedure = 1ull<<30,
 
 	OdinDocEntityFlag_Var_Thread_Local = 1ull<<40,
 	OdinDocEntityFlag_Var_Static       = 1ull<<41,
@@ -201,14 +204,20 @@ enum OdinDocPkgFlags : u32 {
 	OdinDocPkgFlag_Init    = 1<<2,
 };
 
+struct OdinDocScopeEntry {
+	OdinDocString      name;
+	OdinDocEntityIndex entity;
+};
+
 struct OdinDocPkg {
 	OdinDocString fullpath;
 	OdinDocString name;
 	u32           flags;
 	OdinDocString docs;
-	OdinDocArray<OdinDocFileIndex>   files;
-	OdinDocArray<OdinDocEntityIndex> entities;
+	OdinDocArray<OdinDocFileIndex>  files;
+	OdinDocArray<OdinDocScopeEntry> entries;
 };
+
 
 struct OdinDocHeader {
 	OdinDocHeaderBase base;
