@@ -45,7 +45,7 @@ hash_bytes_128 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
 // computed hash to the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
-    hash_bytes_to_buffer_128(transmute([]byte)(data), hash);
+    hash_bytes_to_buffer_128(transmute([]byte)(data), hash)
 }
 
 // hash_bytes_to_buffer_128 will hash the given input and write the
@@ -124,7 +124,7 @@ hash_bytes_160 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
 // computed hash to the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_string_to_buffer_160 :: proc(data: string, hash: []byte) {
-    hash_bytes_to_buffer_160(transmute([]byte)(data), hash);
+    hash_bytes_to_buffer_160(transmute([]byte)(data), hash)
 }
 
 // hash_bytes_to_buffer_160 will hash the given input and write the
@@ -203,7 +203,7 @@ hash_bytes_192 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
 // computed hash to the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_string_to_buffer_192 :: proc(data: string, hash: []byte) {
-    hash_bytes_to_buffer_192(transmute([]byte)(data), hash);
+    hash_bytes_to_buffer_192(transmute([]byte)(data), hash)
 }
 
 // hash_bytes_to_buffer_192 will hash the given input and write the

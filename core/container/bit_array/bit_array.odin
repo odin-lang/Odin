@@ -88,7 +88,7 @@ create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -
 	res = Bit_Array{
 		bias = min_index,
 	}
-	return res, resize_if_needed(&res, size_in_bits)
+	return res, resize_if_needed(&res, legs)
 }
 
 /*

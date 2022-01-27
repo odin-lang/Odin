@@ -693,6 +693,16 @@ Ast *ast_field_value(AstFile *f, Ast *field, Ast *value, Token eq) {
 	return result;
 }
 
+
+Ast *ast_enum_field_value(AstFile *f, Ast *name, Ast *value, CommentGroup *docs, CommentGroup *comment) {
+	Ast *result = alloc_ast_node(f, Ast_EnumFieldValue);
+	result->EnumFieldValue.name = name;
+	result->EnumFieldValue.value = value;
+	result->EnumFieldValue.docs = docs;
+	result->EnumFieldValue.comment = comment;
+	return result;
+}
+
 Ast *ast_compound_lit(AstFile *f, Ast *type, Array<Ast *> const &elems, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_CompoundLit);
 	result->CompoundLit.type = type;
@@ -1234,7 +1244,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	return comments;
 }
 
-void comsume_comment_groups(AstFile *f, Token prev) {
+void consume_comment_groups(AstFile *f, Token prev) {
 	if (f->curr_token.kind == Token_Comment) {
 		CommentGroup *comment = nullptr;
 		isize end_line = 0;
@@ -1278,7 +1288,7 @@ Token advance_token(AstFile *f) {
 	if (ok) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
-			comsume_comment_groups(f, prev);
+			consume_comment_groups(f, prev);
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -1684,6 +1694,46 @@ Array<Ast *> parse_element_list(AstFile *f) {
 
 		if (!allow_token(f, Token_Comma)) {
 			break;
+		}
+	}
+
+	return elems;
+}
+CommentGroup *consume_line_comment(AstFile *f) {
+	CommentGroup *comment = f->line_comment;
+	if (f->line_comment == f->lead_comment) {
+		f->lead_comment = nullptr;
+	}
+	f->line_comment = nullptr;
+	return comment;
+
+}
+
+Array<Ast *> parse_enum_field_list(AstFile *f) {
+	auto elems = array_make<Ast *>(heap_allocator());
+
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		CommentGroup *docs = f->lead_comment;
+		CommentGroup *comment = nullptr;
+		Ast *name = parse_value(f);
+		Ast *value = nullptr;
+		if (f->curr_token.kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+			value = parse_value(f);
+		}
+
+		comment = consume_line_comment(f);
+
+		Ast *elem = ast_enum_field_value(f, name, value, docs, comment);
+		array_add(&elems, elem);
+
+		if (!allow_token(f, Token_Comma)) {
+			break;
+		}
+
+		if (!elem->EnumFieldValue.comment) {
+			elem->EnumFieldValue.comment = consume_line_comment(f);
 		}
 	}
 
@@ -2449,7 +2499,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 
-		Array<Ast *> values = parse_element_list(f);
+		Array<Ast *> values = parse_enum_field_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_enum_type(f, token, base_type, values);
@@ -5398,7 +5448,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
 	if (f->curr_token.kind == Token_Comment) {
-		comsume_comment_groups(f, f->prev_token);
+		consume_comment_groups(f, f->prev_token);
 	}
 
 	CommentGroup *docs = f->lead_comment;
