@@ -2168,7 +2168,7 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 	}
 
 	switch e in &ast.unparen_expr(expr).derived {
-	case ast.Proc_Lit:		
+	case ast.Proc_Lit:
 		if e.inlining != .None && e.inlining != pi {
 			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
 		}
