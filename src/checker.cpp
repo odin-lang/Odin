@@ -4875,6 +4875,9 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
+	bool type_assert    = (pi->tags & ProcTag_type_assert)    != 0;
+	bool no_type_assert = (pi->tags & ProcTag_no_type_assert) != 0;
+
 	if (bounds_check) {
 		ctx.state_flags |= StateFlag_bounds_check;
 		ctx.state_flags &= ~StateFlag_no_bounds_check;
@@ -4882,6 +4885,15 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 		ctx.state_flags |= StateFlag_no_bounds_check;
 		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
+
+	if (type_assert) {
+		ctx.state_flags |= StateFlag_type_assert;
+		ctx.state_flags &= ~StateFlag_no_type_assert;
+	} else if (no_type_assert) {
+		ctx.state_flags |= StateFlag_no_type_assert;
+		ctx.state_flags &= ~StateFlag_type_assert;
+	}
+
 	if (pi->body != nullptr && e != nullptr) {
 		GB_ASSERT((e->flags & EntityFlag_ProcBodyChecked) == 0);
 	}

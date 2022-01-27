@@ -226,6 +226,8 @@ enum ProcInlining {
 enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
+	ProcTag_type_assert     = 1<<2,
+	ProcTag_no_type_assert  = 1<<3,
 
 	ProcTag_require_results = 1<<4,
 	ProcTag_optional_ok     = 1<<5,
@@ -258,6 +260,8 @@ ProcCallingConvention default_calling_convention(void) {
 enum StateFlag : u8 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
+	StateFlag_type_assert     = 1<<2,
+	StateFlag_no_type_assert  = 1<<3,
 
 	StateFlag_BeenHandled = 1<<7,
 };
