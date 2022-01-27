@@ -61,7 +61,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
 	if (!entity->Procedure.is_foreign) {
-		GB_ASSERT(entity->flags & EntityFlag_ProcBodyChecked);
+		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s", LIT(entity->token.string), type_to_string(entity->type));
 	}
 
 	String link_name = {};

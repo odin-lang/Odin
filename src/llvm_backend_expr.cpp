@@ -3460,7 +3460,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 		if (is_type_map(t)) {
-			lbValue map_val = lb_build_addr_ptr(p, ie->expr);
+			lbAddr map_addr = lb_build_addr(p, ie->expr);
+			lbValue map_val = lb_addr_load(p, map_addr);
 			if (deref) {
 				map_val = lb_emit_load(p, map_val);
 			}
@@ -3469,7 +3470,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			key = lb_emit_conv(p, key, t->Map.key);
 
 			Type *result_type = type_of_expr(expr);
-			return lb_addr_map(map_val, key, t, result_type);
+			lbValue map_ptr = lb_address_from_load_or_generate_local(p, map_val);
+			return lb_addr_map(map_ptr, key, t, result_type);
 		}
 
 		switch (t->kind) {

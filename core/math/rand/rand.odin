@@ -70,7 +70,7 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	if n&(n-1) == 0 {
 		return int31(r) & (n-1)
 	}
-	max := i32((1<<31) - 1 - (1<<31)&u32(n))
+	max := i32((1<<31) - 1 - (1<<31)%u32(n))
 	v := int31(r)
 	for v > max {
 		v = int31(r)
@@ -85,7 +85,7 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 	if n&(n-1) == 0 {
 		return int63(r) & (n-1)
 	}
-	max := i64((1<<63) - 1 - (1<<63)&u64(n))
+	max := i64((1<<63) - 1 - (1<<63)%u64(n))
 	v := int63(r)
 	for v > max {
 		v = int63(r)
@@ -100,7 +100,7 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	if n&(n-1) == 0 {
 		return int127(r) & (n-1)
 	}
-	max := i128((1<<63) - 1 - (1<<63)&u128(n))
+	max := i128((1<<127) - 1 - (1<<127)%u128(n))
 	v := int127(r)
 	for v > max {
 		v = int127(r)
