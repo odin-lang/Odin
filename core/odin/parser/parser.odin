@@ -2168,7 +2168,7 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 	}
 
 	switch e in &ast.unparen_expr(expr).derived {
-	case ast.Proc_Lit:
+	case ast.Proc_Lit:		
 		if e.inlining != .None && e.inlining != pi {
 			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
 		}
@@ -2319,7 +2319,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return rt
 
 		case "force_inline", "force_no_inline":
-			return parse_inlining_operand(p, lhs, tok)
+			return parse_inlining_operand(p, lhs, name)
 		case:
 			expr := parse_expr(p, lhs)
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos)
