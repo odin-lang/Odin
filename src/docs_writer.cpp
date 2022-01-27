@@ -881,7 +881,6 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 			default:
 				GB_PANIC("Unhandled BuiltinProcPkg");
 			}
-			GB_PANIC("HERE");
 		}
 		break;
 	}
