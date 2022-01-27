@@ -490,6 +490,14 @@ void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 			out &= ~StateFlag_no_bounds_check;
 		}
 
+		if (in & StateFlag_no_type_assert) {
+			out |= StateFlag_no_type_assert;
+			out &= ~StateFlag_type_assert;
+		} else if (in & StateFlag_type_assert) {
+			out |= StateFlag_type_assert;
+			out &= ~StateFlag_no_type_assert;
+		}
+
 		ctx->state_flags = out;
 	}
 
