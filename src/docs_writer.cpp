@@ -821,6 +821,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 
 	String name = e->token.string;
 	String link_name = {};
+	TokenPos pos = e->token.pos;
 
 	OdinDocEntityKind kind = OdinDocEntity_Invalid;
 	u64 flags = 0;
@@ -865,6 +866,24 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (e->Procedure.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		link_name = e->Procedure.link_name;
 		break;
+	case Entity_Builtin:
+		{
+			auto bp = builtin_procs[e->Builtin.id];
+			pos = {};
+			name = bp.name;
+			switch (bp.pkg) {
+			case BuiltinProcPkg_builtin:
+				flags |= OdinDocEntityFlag_Builtin_Pkg_Builtin;
+				break;
+			case BuiltinProcPkg_intrinsics:
+				flags |= OdinDocEntityFlag_Builtin_Pkg_Intrinsics;
+				break;
+			default:
+				GB_PANIC("Unhandled BuiltinProcPkg");
+			}
+			GB_PANIC("HERE");
+		}
+		break;
 	}
 
 	if (e->flags & EntityFlag_Param) {
@@ -900,7 +919,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 
 	doc_entity.kind = kind;
 	doc_entity.flags = flags;
-	doc_entity.pos = odin_doc_token_pos_cast(w, e->token.pos);
+	doc_entity.pos = odin_doc_token_pos_cast(w, pos);
 	doc_entity.name = odin_doc_write_string(w, name);
 	doc_entity.type = 0; // Set later
 	doc_entity.init_string = init_string;
@@ -1011,7 +1030,7 @@ OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWriter *w, AstPa
 		if (e->pkg != pkg) {
 			continue;
 		}
-		if (!is_entity_exported(e)) {
+		if (!is_entity_exported(e, true)) {
 			continue;
 		}
 		if (e->token.string.len == 0) {

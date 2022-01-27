@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 2
-#define OdinDocVersionType_Patch 3
+#define OdinDocVersionType_Patch 4
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -171,7 +171,8 @@ enum OdinDocEntityFlag : u64 {
 
 	OdinDocEntityFlag_Type_Alias = 1ull<<20,
 
-	OdinDocEntityFlag_Builtin_Procedure = 1ull<<30,
+	OdinDocEntityFlag_Builtin_Pkg_Builtin    = 1ull<<30,
+	OdinDocEntityFlag_Builtin_Pkg_Intrinsics = 1ull<<31,
 
 	OdinDocEntityFlag_Var_Thread_Local = 1ull<<40,
 	OdinDocEntityFlag_Var_Static       = 1ull<<41,
