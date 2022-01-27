@@ -157,6 +157,7 @@ enum CmdDocFlag : u32 {
 	CmdDocFlag_Short       = 1<<0,
 	CmdDocFlag_AllPackages = 1<<1,
 	CmdDocFlag_DocFormat   = 1<<2,
+	CmdDocFlag_Web         = 1<<3,
 };
 
 enum TimingsExportFormat : i32 {

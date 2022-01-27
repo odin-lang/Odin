@@ -357,6 +357,23 @@ void generate_documentation(Checker *c) {
 		defer (gb_string_free(output_file_path));
 
 		odin_doc_write(info, output_file_path);
+	} else if (build_context.cmd_doc_flags & CmdDocFlag_Web){
+		#if defined(GB_SYSTEM_WINDOWS)
+		String init_fullpath = c->parser->init_fullpath;
+		String web_ext = {};
+		isize core_index = string_index_of(init_fullpath, str_lit("core"));
+		if (core_index >= 0) {
+			web_ext = substring(init_fullpath, core_index, init_fullpath.len);
+		}
+		isize vendor_index = string_index_of(init_fullpath, str_lit("vendor"));
+		if (vendor_index >= 0) {
+			web_ext = substring(init_fullpath, core_index, init_fullpath.len);
+		}
+		system_exec_command_line_app("doc webpage",
+			"cmd.exe /C start https://pkg.odin-lang.org/%.*s", LIT(web_ext));
+		#else
+		gb_printf("odin doc <dir> -web is currently unsupported for this OS");
+		#endif
 	} else {
 		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
 		for_array(i, info->packages.entries) {

@@ -44,7 +44,6 @@ gb_global Timings global_timings = {0};
 
 #include "parser.cpp"
 #include "checker.cpp"
-#include "docs.cpp"
 
 
 #include "llvm_backend.cpp"
@@ -126,8 +125,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	return exit_code;
 }
 
-
-
+#include "docs.cpp"
 
 i32 linker_stage(lbGenerator *gen) {
 	i32 result = 0;
@@ -671,6 +669,7 @@ enum BuildFlagKind {
 	BuildFlag_Short,
 	BuildFlag_AllPackages,
 	BuildFlag_DocFormat,
+	BuildFlag_Web,
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
@@ -823,6 +822,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_DocFormat,     str_lit("doc-format"),   BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_Web,     str_lit("web"),   BuildFlagParam_None, Command_doc);
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
@@ -1447,6 +1447,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_DocFormat:
 							build_context.cmd_doc_flags |= CmdDocFlag_DocFormat;
+							break;
+						case BuildFlag_Web:
+							build_context.cmd_doc_flags |= CmdDocFlag_Web;
 							break;
 						case BuildFlag_IgnoreWarnings: {
 							if (build_context.warnings_as_errors) {

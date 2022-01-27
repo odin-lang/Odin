@@ -89,7 +89,6 @@ String substring(String const &s, isize lo, isize hi) {
 	return make_string(s.text+lo, hi-lo);
 }
 
-
 char *alloc_cstring(gbAllocator a, String s) {
 	char *c_str = gb_alloc_array(a, char, s.len+1);
 	gb_memmove(c_str, s.text, s.len);
@@ -228,6 +227,34 @@ gb_inline bool string_ends_with(String const &s, u8 suffix) {
 	}
 
 	return s[s.len-1] == suffix;
+}
+
+bool string_contains(String const &s, String sub) {
+	if (sub.len > s.len) {
+		return false;
+	}
+
+	for (isize i = 0; i <= s.len - sub.len; i++) {
+		String curr = substring(s, i, i+sub.len);
+		if (str_eq(sub,curr)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+isize string_index_of(String const &s, String sub) {
+	if (sub.len > s.len) {
+		return -1;
+	}
+
+	for (isize i = 0; i <= s.len - sub.len; i++) {
+		String curr = substring(s, i, i+sub.len);
+		if (str_eq(sub,curr)) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 gb_inline isize string_extension_position(String const &str) {
