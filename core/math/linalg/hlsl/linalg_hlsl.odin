@@ -551,6 +551,23 @@ floor_double2 :: proc "c" (x: double2) -> double2 { return {floor(x.x), floor(x.
 floor_double3 :: proc "c" (x: double3) -> double3 { return {floor(x.x), floor(x.y), floor(x.z)} }
 floor_double4 :: proc "c" (x: double4) -> double4 { return {floor(x.x), floor(x.y), floor(x.z), floor(x.w)} }
 
+round :: proc{
+	round_float,
+	round_double,
+	round_float2,
+	round_float3,
+	round_float4,
+	round_double2,
+	round_double3,
+	round_double4,
+}
+round_float2 :: proc "c" (x: float2) -> float2 { return {round(x.x), round(x.y)} }
+round_float3 :: proc "c" (x: float3) -> float3 { return {round(x.x), round(x.y), round(x.z)} }
+round_float4 :: proc "c" (x: float4) -> float4 { return {round(x.x), round(x.y), round(x.z), round(x.w)} }
+round_double2 :: proc "c" (x: double2) -> double2 { return {round(x.x), round(x.y)} }
+round_double3 :: proc "c" (x: double3) -> double3 { return {round(x.x), round(x.y), round(x.z)} }
+round_double4 :: proc "c" (x: double4) -> double4 { return {round(x.x), round(x.y), round(x.z), round(x.w)} }
+
 
 ceil :: proc{
 	ceil_float,
@@ -569,6 +586,69 @@ ceil_double2 :: proc "c" (x: double2) -> double2 { return {ceil(x.x), ceil(x.y)}
 ceil_double3 :: proc "c" (x: double3) -> double3 { return {ceil(x.x), ceil(x.y), ceil(x.z)} }
 ceil_double4 :: proc "c" (x: double4) -> double4 { return {ceil(x.x), ceil(x.y), ceil(x.z), ceil(x.w)} }
 
+
+isfinite_float  :: proc "c" (x: float)  -> bool  { return !isinf_float(x) }
+isfinite_float2 :: proc "c" (x: float2) -> bool2 { return {isfinite_float(x.x), isfinite_float(x.y)} }
+isfinite_float3 :: proc "c" (x: float3) -> bool3 { return {isfinite_float(x.x), isfinite_float(x.y), isfinite_float(x.z)} }
+isfinite_float4 :: proc "c" (x: float4) -> bool4 { return {isfinite_float(x.x), isfinite_float(x.y), isfinite_float(x.z), isfinite_float(x.w)} }
+isfinite_double  :: proc "c" (x: double)  -> bool  { return !isinf_double(x) }
+isfinite_double2 :: proc "c" (x: double2) -> bool2 { return {isfinite_double(x.x), isfinite_double(x.y)} }
+isfinite_double3 :: proc "c" (x: double3) -> bool3 { return {isfinite_double(x.x), isfinite_double(x.y), isfinite_double(x.z)} }
+isfinite_double4 :: proc "c" (x: double4) -> bool4 { return {isfinite_double(x.x), isfinite_double(x.y), isfinite_double(x.z), isfinite_double(x.w)} }
+
+// isfinite is the opposite of isinf and returns true if the number is neither positive-infinite or negative-infinite
+isfinite :: proc{
+	isfinite_float,
+	isfinite_float2,
+	isfinite_float3,
+	isfinite_float4,
+	isfinite_double,
+	isfinite_double2,
+	isfinite_double3,
+	isfinite_double4,
+}
+
+
+isinf_float  :: proc "c" (x: float)  -> bool  { return x * 0.5 == x }
+isinf_float2 :: proc "c" (x: float2) -> bool2 { return {isinf_float(x.x), isinf_float(x.y)} }
+isinf_float3 :: proc "c" (x: float3) -> bool3 { return {isinf_float(x.x), isinf_float(x.y), isinf_float(x.z)} }
+isinf_float4 :: proc "c" (x: float4) -> bool4 { return {isinf_float(x.x), isinf_float(x.y), isinf_float(x.z), isinf_float(x.w)} }
+isinf_double  :: proc "c" (x: double)  -> bool  { return x * 0.5 == x }
+isinf_double2 :: proc "c" (x: double2) -> bool2 { return {isinf_double(x.x), isinf_double(x.y)} }
+isinf_double3 :: proc "c" (x: double3) -> bool3 { return {isinf_double(x.x), isinf_double(x.y), isinf_double(x.z)} }
+isinf_double4 :: proc "c" (x: double4) -> bool4 { return {isinf_double(x.x), isinf_double(x.y), isinf_double(x.z), isinf_double(x.w)} }
+
+// isinf is the opposite of isfinite and returns true if the number is either positive-infinite or negative-infinite
+isinf :: proc{
+	isinf_float,
+	isinf_float2,
+	isinf_float3,
+	isinf_float4,
+	isinf_double,
+	isinf_double2,
+	isinf_double3,
+	isinf_double4,
+}
+
+
+isnan_float2 :: proc "c" (x: float2) -> bool2 { return {isnan_float(x.x), isnan_float(x.y)} }
+isnan_float3 :: proc "c" (x: float3) -> bool3 { return {isnan_float(x.x), isnan_float(x.y), isnan_float(x.z)} }
+isnan_float4 :: proc "c" (x: float4) -> bool4 { return {isnan_float(x.x), isnan_float(x.y), isnan_float(x.z), isnan_float(x.w)} }
+isnan_double2 :: proc "c" (x: double2) -> bool2 { return {isnan_double(x.x), isnan_double(x.y)} }
+isnan_double3 :: proc "c" (x: double3) -> bool3 { return {isnan_double(x.x), isnan_double(x.y), isnan_double(x.z)} }
+isnan_double4 :: proc "c" (x: double4) -> bool4 { return {isnan_double(x.x), isnan_double(x.y), isnan_double(x.z), isnan_double(x.w)} }
+
+// isnan returns true if the input value is the special case of Not-A-Number
+isnan :: proc{
+	isnan_float,
+	isnan_float2,
+	isnan_float3,
+	isnan_float4,
+	isnan_double,
+	isnan_double2,
+	isnan_double3,
+	isnan_double4,
+}
 
 fmod :: proc{
 	fmod_float,
