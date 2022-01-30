@@ -13,7 +13,6 @@ import compress       "core:compress"
 import gzip           "core:compress/gzip"
 import zlib           "core:compress/zlib"
 
-import container      "core:container"
 import bit_array      "core:container/bit_array"
 import priority_queue "core:container/priority_queue"
 import queue          "core:container/queue"
@@ -49,7 +48,6 @@ import x25519           "core:crypto/x25519"
 
 import dynlib         "core:dynlib"
 
-import encoding       "core:encoding"
 import base32         "core:encoding/base32"
 import base64         "core:encoding/base64"
 import csv            "core:encoding/csv"
