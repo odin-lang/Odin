@@ -114,7 +114,6 @@ _ :: libc
 _ :: compress
 _ :: gzip
 _ :: zlib
-_ :: container
 _ :: bit_array
 _ :: priority_queue
 _ :: queue
@@ -147,7 +146,6 @@ _ :: crypto_util
 _ :: whirlpool
 _ :: x25519
 _ :: dynlib
-_ :: encoding
 _ :: base32
 _ :: base64
 _ :: csv
