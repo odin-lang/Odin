@@ -473,6 +473,25 @@ floor_dvec3 :: proc "c" (x: dvec3) -> dvec3 { return {floor(x.x), floor(x.y), fl
 floor_dvec4 :: proc "c" (x: dvec4) -> dvec4 { return {floor(x.x), floor(x.y), floor(x.z), floor(x.w)} }
 
 
+
+round :: proc{
+	round_f32,
+	round_f64,
+	round_vec2,
+	round_vec3,
+	round_vec4,
+	round_dvec2,
+	round_dvec3,
+	round_dvec4,
+}
+round_vec2 :: proc "c" (x: vec2) -> vec2 { return {round(x.x), round(x.y)} }
+round_vec3 :: proc "c" (x: vec3) -> vec3 { return {round(x.x), round(x.y), round(x.z)} }
+round_vec4 :: proc "c" (x: vec4) -> vec4 { return {round(x.x), round(x.y), round(x.z), round(x.w)} }
+round_dvec2 :: proc "c" (x: dvec2) -> dvec2 { return {round(x.x), round(x.y)} }
+round_dvec3 :: proc "c" (x: dvec3) -> dvec3 { return {round(x.x), round(x.y), round(x.z)} }
+round_dvec4 :: proc "c" (x: dvec4) -> dvec4 { return {round(x.x), round(x.y), round(x.z), round(x.w)} }
+
+
 ceil :: proc{
 	ceil_f32,
 	ceil_f64,
