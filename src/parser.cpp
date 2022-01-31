@@ -183,6 +183,11 @@ Ast *clone_ast(Ast *node) {
 		n->FieldValue.value = clone_ast(n->FieldValue.value);
 		break;
 
+	case Ast_EnumFieldValue:
+		n->EnumFieldValue.name = clone_ast(n->EnumFieldValue.name);
+		n->EnumFieldValue.value = clone_ast(n->EnumFieldValue.value);
+		break;
+
 	case Ast_TernaryIfExpr:
 		n->TernaryIfExpr.x    = clone_ast(n->TernaryIfExpr.x);
 		n->TernaryIfExpr.cond = clone_ast(n->TernaryIfExpr.cond);
