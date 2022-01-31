@@ -5307,18 +5307,18 @@ void check_unique_package_names(Checker *c) {
 			string_map_set(&pkgs, key, pkg);
 			continue;
 		}
-		auto *this = pkg->files[0]->pkg_decl;
-		auto *other = (*found)->files[0]->pkg_decl;
-		if (this == other) {
+		auto *curr = pkg->files[0]->pkg_decl;
+		auto *prev = (*found)->files[0]->pkg_decl;
+		if (curr == prev) {
 			// NOTE(bill): A false positive was found, ignore it
 			continue;
 		}
 
-		error(this, "Duplicate declaration of 'package %.*s'", LIT(name));
+		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
 		error_line("\tA package name must be unique\n"
 		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
 		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
-		error(other, "found at previous location");
+		error(prev, "found at previous location");
 	}
 }
 
