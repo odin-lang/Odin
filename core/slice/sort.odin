@@ -56,6 +56,32 @@ sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	}
 }
 
+// stable_sort sorts a slice
+stable_sort :: proc(data: $T/[]$E) where ORD(E) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			_stable_sort_general(data, struct{}{}, .Ordered)
+		}
+	}
+}
+
+// stable_sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
+stable_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			_stable_sort_general(data, less, .Less)
+		}
+	}
+}
+
+stable_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			_stable_sort_general(data, cmp, .Cmp)
+		}
+	}
+}
+
 is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
 	for i := len(array)-1; i > 0; i -= 1 {
 		if array[i] < array[i-1] {

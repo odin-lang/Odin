@@ -305,21 +305,21 @@ filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -
 }
 
 scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U)->V, allocator := context.allocator) -> []V {
-  if len(s) == 0 { return {} }
+	if len(s) == 0 { return {} }
 
-  res := make([]V, len(s), allocator)
-  p := as_ptr(s)
-  q := as_ptr(res)
-  r := initializer
+	res := make([]V, len(s), allocator)
+	p := as_ptr(s)
+	q := as_ptr(res)
+	r := initializer
 
-  for l := len(s); l > 0; l -= 1 {
-    r = f(r, p[0])
-    q[0] = r
-    p = p[1:]
-    q = q[1:]
-  }
+	for l := len(s); l > 0; l -= 1 {
+		r = f(r, p[0])
+		q[0] = r
+		p = p[1:]
+		q = q[1:]
+	}
 
-  return res
+	return res
 }
 
 
