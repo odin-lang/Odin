@@ -175,3 +175,26 @@ _quick_sort_general :: proc(data: $T/[]$E, a, b, max_depth: int, call: $P, $KIND
 		insertion_sort(data, a, b, call)
 	}
 }
+
+
+// merge sort
+_stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (ORD(E) && KIND == .Ordered) || (KIND != .Ordered) #no_bounds_check {
+	less :: #force_inline proc(a, b: $E, call: $P) -> bool {
+		when KIND == .Ordered {
+			return a < b
+		} else when KIND == .Less {
+			return call(a, b)
+		} else when KIND == .Cmp {
+			return call(a, b) == .Less
+		} else {
+			#panic("unhandled Sort_Kind")
+		}
+	}
+
+	n := len(data)
+	for i in 1..<n {
+		for j := i; j > 0 && less(data[j], data[j-1], call); j -= 1 {
+			swap(data, j, j-1)
+		}
+	}
+}
