@@ -142,8 +142,8 @@ read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 }
 
 // perm returns a slice of n ints in a pseudo-random permutation of integers in the range [0, n)
-perm :: proc(n: int, r: ^Rand = nil) -> []int {
-	m := make([]int, n)
+perm :: proc(n: int, r: ^Rand = nil, allocator := context.allocator) -> []int {
+	m := make([]int, n, allocator)
 	for i := 0; i < n; i += 1 {
 		j := int_max(i+1, r)
 		m[i] = m[j]
