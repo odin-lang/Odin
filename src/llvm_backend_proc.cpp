@@ -473,6 +473,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				}
 
 				lbArgType *arg_type = &ft->args[param_index];
+				defer (param_index += 1);
+
 				if (arg_type->kind == lbArg_Ignore) {
 					continue;
 				} else if (arg_type->kind == lbArg_Direct) {
@@ -487,20 +489,19 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						param.type = e->type;
 
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
+						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
 						lb_add_entity(p->module, e, ptr);
-						// lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						lbValue ptr = {};
 						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
 						ptr.type = alloc_type_pointer(e->type);
-
 						lb_add_entity(p->module, e, ptr);
-						// lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
 					}
 				}
-				param_index += 1;
 			}
 		}
 
