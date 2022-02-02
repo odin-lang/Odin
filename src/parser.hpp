@@ -78,9 +78,11 @@ struct ImportedFile {
 };
 
 enum AstFileFlag : u32 {
-	AstFile_IsPrivate = 1<<0,
-	AstFile_IsTest    = 1<<1,
-	AstFile_IsLazy    = 1<<2,
+	AstFile_IsPrivatePkg = 1<<0,
+	AstFile_IsPrivateFile = 1<<1,
+
+	AstFile_IsTest    = 1<<3,
+	AstFile_IsLazy    = 1<<4,
 };
 
 enum AstDelayQueueKind {

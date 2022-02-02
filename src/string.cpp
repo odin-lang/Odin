@@ -195,8 +195,6 @@ template <isize N> bool operator >  (String const &a, char const (&b)[N]) { retu
 template <isize N> bool operator <= (String const &a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
 template <isize N> bool operator >= (String const &a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
 
-
-
 gb_inline bool string_starts_with(String const &s, String const &prefix) {
 	if (prefix.len > s.len) {
 		return false;
@@ -229,6 +227,16 @@ gb_inline bool string_ends_with(String const &s, u8 suffix) {
 
 	return s[s.len-1] == suffix;
 }
+
+
+
+gb_inline String string_trim_starts_with(String const &s, String const &prefix) {
+	if (string_starts_with(s, prefix)) {
+		return substring(s, prefix.len, s.len);
+	}
+	return s;
+}
+
 
 gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
