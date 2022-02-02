@@ -245,7 +245,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
-	if (e->file != nullptr && (e->file->flags & AstFile_IsPrivate) != 0) {
+	if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) != 0) {
 		return false;
 	}
 

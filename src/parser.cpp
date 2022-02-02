@@ -5535,8 +5535,16 @@ bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
-					} else if (lc == "+private") {
-						f->flags |= AstFile_IsPrivate;
+					} else if (string_starts_with(lc, str_lit("+private"))) {
+						f->flags |= AstFile_IsPrivatePkg;
+						String command = string_trim_starts_with(lc, str_lit("+private "));
+						if (lc == "+private") {
+							f->flags |= AstFile_IsPrivatePkg;
+						} else if (command == "package") {
+							f->flags |= AstFile_IsPrivatePkg;
+						} else if (command == "file") {
+							f->flags |= AstFile_IsPrivateFile;
+						}
 					} else if (lc == "+lazy") {
 						if (build_context.ignore_lazy) {
 							// Ignore
