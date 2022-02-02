@@ -5538,6 +5538,7 @@ bool parse_file(Parser *p, AstFile *f) {
 					} else if (string_starts_with(lc, str_lit("+private"))) {
 						f->flags |= AstFile_IsPrivatePkg;
 						String command = string_trim_starts_with(lc, str_lit("+private "));
+						command = string_trim_whitespace(command);
 						if (lc == "+private") {
 							f->flags |= AstFile_IsPrivatePkg;
 						} else if (command == "package") {
