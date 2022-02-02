@@ -1,9 +1,9 @@
 package container_lru
 
+import "core:runtime"
 import "core:intrinsics"
-import "core:mem"
+_ :: runtime
 _ :: intrinsics
-_ :: mem
 
 Node :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
 	prev, next: ^Node(Key, Value),
@@ -23,11 +23,10 @@ Cache :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key
 	count:    int,
 	capacity: int,
 
-	node_allocator: mem.Allocator,
+	node_allocator: runtime.Allocator,
 
 	on_remove: proc(key: Key, value: Value, user_data: rawptr),
 	on_remove_user_data: rawptr,
-	call_on_remove_on_destroy: bool,
 }
 
 // init initializes a Cache
@@ -37,23 +36,28 @@ init :: proc(c: ^$C/Cache($Key, $Value), capacity: int, entries_allocator := con
 	c.capacity = capacity
 }
 
-// destroy deinitializes a Cache
-destroy :: proc(c: ^$C/Cache($Key, $Value)) {
+// destroy deinitializes a Cachem
+destroy :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
+	clear(c, call_on_remove)
+	delete(c.entries)
+}
+
+// clear the contents of a Cache
+clear :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
 	for _, node in c.entries {
-		if c.call_on_remove_on_destroy && c.on_remove != nil {
-			c.on_remove(node.key, node.value, c.on_remove_user_data)
+		if call_on_remove {
+			_call_on_remove(c, node)
 		}
 		free(node, c.node_allocator)
 	}
-	clear(&c.entries)
-	delete(c.entries)
+	runtime.clear(&c.entries)
 	c.head = nil
 	c.tail = nil
 	c.count = 0
 }
 
 // set the given key value pair. This operation updates the recent usage of the item.
-set :: proc(c: ^$C/Cache($Key, $Value), key: Key, value: Value) -> mem.Allocator_Error {
+set :: proc(c: ^$C/Cache($Key, $Value), key: Key, value: Value) -> runtime.Allocator_Error {
 	if e, ok := c.entries[key]; ok {
 		e.value = value
 		return nil
@@ -143,12 +147,17 @@ _remove_node :: proc(c: ^$C/Cache($Key, $Value), node: ^Node(Key, Value)) {
 
 	delete_key(&c.entries, node.key)
 
-	if c.on_remove != nil {
-		c.on_remove(node.key, node.value, c.on_remove_user_data)
-	}
+	_call_on_remove(c, node)
 
 	free(node, c.node_allocator)
 
+}
+
+@(private)
+_call_on_remove :: proc(c: ^$C/Cache($Key, $Value), node: ^Node(Key, Value)) {
+	if c.on_remove != nil {
+		c.on_remove(node.key, node.value, c.on_remove_user_data)
+	}
 }
 
 @(private)
