@@ -3563,9 +3563,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
-				// if (vd->type != nullptr) {
-				// 	error(name, "A type declaration cannot have an type parameter");
-				// }
 			} else if (init->kind == Ast_ProcLit) {
 				if (c->scope->flags&ScopeFlag_Type) {
 					error(name, "Procedure declarations are not allowed within a struct");
