@@ -385,7 +385,44 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 	Operand operand = {};
 
 	if (init != nullptr) {
-		Entity *entity = nullptr;
+		Entity *entity = check_entity_from_ident_or_selector(ctx, init);
+		if (entity != nullptr && entity->kind == Entity_TypeName) {
+			// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
+			// being "confused" as constants
+			//
+			//         A :: B
+			//         C :: proc "c" (^A)
+			//         B :: struct {x: C}
+			//
+			//     A gets evaluated first, and then checks B.
+			//     B then checks C.
+			//     C then tries to check A which is unresolved but thought to be a constant.
+			//     Therefore within C's check, A errs as "not a type".
+			//
+			// This is because a const declaration may or may not be a type and this cannot
+			// be determined from a syntactical standpoint.
+			// This check allows the compiler to override the entity to be checked as a type.
+			//
+			// There is no problem if B is prefixed with the `#type` helper enforcing at
+			// both a syntax and semantic level that B must be a type.
+			//
+			//         A :: #type B
+			//
+			// This approach is not fool proof and can fail in case such as:
+			//
+			//         X :: type_of(x)
+			//         X :: Foo(int).Type
+			//
+			// Since even these kind of declarations may cause weird checking cycles.
+			// For the time being, these are going to be treated as an unfortunate error
+			// until there is a proper delaying system to try declaration again if they
+			// have failed.
+
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
+		entity = nullptr;
 		if (init->kind == Ast_Ident) {
 			entity = check_ident(ctx, &operand, init, nullptr, e->type, true);
 		} else if (init->kind == Ast_SelectorExpr) {

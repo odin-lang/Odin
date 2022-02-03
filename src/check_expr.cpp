@@ -1286,7 +1286,6 @@ bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 	return false;
 }
 
-
 Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
@@ -1422,8 +1421,12 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	case Entity_TypeName:
 		o->mode = Addressing_Type;
 		if (check_cycle(c, e, true)) {
-			type = t_invalid;
+			o->type = t_invalid;
 		}
+		if (o->type != nullptr && type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
+			o->type = base_type(o->type);
+		}
+
 		break;
 
 	case Entity_ImportName:
@@ -4064,6 +4067,98 @@ Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize n
 }
 
 
+bool is_entity_declared_for_selector(Entity *entity, Scope *import_scope, bool *allow_builtin) {
+	bool is_declared = entity != nullptr;
+	if (is_declared) {
+		if (entity->kind == Entity_Builtin) {
+			// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
+			// This means that we should just ignore the found result through it
+			*allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
+		} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
+			is_declared = false;
+		}
+	}
+	return is_declared;
+}
+
+// NOTE(bill, 2022-02-03): see `check_const_decl` for why it exists reasoning
+Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node) {
+	if (node->kind == Ast_Ident) {
+		String name = node->Ident.token.string;
+		return scope_lookup(c->scope, name);
+	} else if (node->kind == Ast_SelectorExpr) {
+		ast_node(se, SelectorExpr, node);
+		if (!c->allow_arrow_right_selector_expr && se->token.kind == Token_ArrowRight) {
+			return nullptr;
+		}
+
+		Ast *op_expr  = se->expr;
+		Ast *selector = unparen_expr(se->selector);
+		if (selector == nullptr) {
+			return nullptr;
+		}
+		if (selector->kind != Ast_Ident) {
+			return nullptr;
+		}
+
+		Entity *entity = nullptr;
+		Entity *expr_entity = nullptr;
+		bool check_op_expr = true;
+
+		if (op_expr->kind == Ast_Ident) {
+			String op_name = op_expr->Ident.token.string;
+			Entity *e = scope_lookup(c->scope, op_name);
+			add_entity_use(c, op_expr, e);
+			expr_entity = e;
+
+			if (e != nullptr && e->kind == Entity_ImportName && selector->kind == Ast_Ident) {
+				// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
+				// It pretty much needs to be in this order and this way
+				// If you can clean this up, please do but be really careful
+				String import_name = op_name;
+				Scope *import_scope = e->ImportName.scope;
+				String entity_name = selector->Ident.token.string;
+
+				check_op_expr = false;
+				entity = scope_lookup_current(import_scope, entity_name);
+				bool allow_builtin = false;
+				if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
+					return nullptr;
+				}
+
+				check_entity_decl(c, entity, nullptr, nullptr);
+				if (entity->kind == Entity_ProcGroup) {
+					return entity;
+				}
+				GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
+			}
+		}
+
+		Operand operand = {};
+		if (check_op_expr) {
+			check_expr_base(c, &operand, op_expr, nullptr);
+			if (operand.mode == Addressing_Invalid) {
+				return nullptr;
+			}
+		}
+
+		if (entity == nullptr && selector->kind == Ast_Ident) {
+			String field_name = selector->Ident.token.string;
+			if (is_type_dynamic_array(type_deref(operand.type))) {
+				init_mem_allocator(c->checker);
+			}
+			auto sel = lookup_field(operand.type, field_name, operand.mode == Addressing_Type);
+			entity = sel.entity;
+		}
+
+		if (entity != nullptr) {
+			return entity;
+		}
+	}
+	return nullptr;
+}
+
+
 Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
@@ -4112,18 +4207,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 			check_op_expr = false;
 			entity = scope_lookup_current(import_scope, entity_name);
-			bool is_declared = entity != nullptr;
 			bool allow_builtin = false;
-			if (is_declared) {
-				if (entity->kind == Entity_Builtin) {
-					// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
-					// This means that we should just ignore the found result through it
-					allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
-				} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
-					is_declared = false;
-				}
-			}
-			if (!is_declared) {
+			if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
 				error(op_expr, "'%.*s' is not declared by '%.*s'", LIT(entity_name), LIT(import_name));
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
@@ -4213,7 +4298,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 	}
 
-	if (entity == nullptr  && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
+	if (entity == nullptr && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
 		// TODO(bill): Simd_Vector swizzling
 
 		String field_name = selector->Ident.token.string;
