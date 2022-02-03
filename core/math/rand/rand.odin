@@ -1,5 +1,7 @@
 package rand
 
+import "core:intrinsics"
+
 Rand :: struct {
 	state: u64,
 	inc:   u64,
@@ -7,9 +9,7 @@ Rand :: struct {
 
 
 @(private)
-_GLOBAL_SEED_DATA := 1234567890
-@(private)
-global_rand := create(u64(uintptr(&_GLOBAL_SEED_DATA)))
+global_rand := create(u64(intrinsics.read_cycle_counter()))
 
 set_global_seed :: proc(seed: u64) {
 	init(&global_rand, seed)
