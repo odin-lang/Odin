@@ -3670,7 +3670,7 @@ bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 		DeclInfo *d = e->decl_info;
 		if (d != nullptr && d->init_expr != nullptr) {
 			Ast *init = d->init_expr;
-			Entity *alias_of = check_entity_from_ident_or_selector(c, init);
+			Entity *alias_of = check_entity_from_ident_or_selector(c, init, true);
 			if (alias_of != nullptr && alias_of->kind == Entity_TypeName) {
 				e->kind = Entity_TypeName;
 				return true;

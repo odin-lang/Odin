@@ -4082,11 +4082,11 @@ bool is_entity_declared_for_selector(Entity *entity, Scope *import_scope, bool *
 }
 
 // NOTE(bill, 2022-02-03): see `check_const_decl` for why it exists reasoning
-Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node) {
+Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node, bool ident_only) {
 	if (node->kind == Ast_Ident) {
 		String name = node->Ident.token.string;
 		return scope_lookup(c->scope, name);
-	} else if (node->kind == Ast_SelectorExpr) {
+	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
 			return nullptr;
