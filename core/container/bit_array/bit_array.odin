@@ -11,10 +11,51 @@ INDEX_SHIFT :: 6
 @(private="file")
 INDEX_MASK  :: 63
 
+@(private="file")
+NUM_BITS :: 64
+
 Bit_Array :: struct {
 	bits: [dynamic]u64,
 	bias: int,
 }
+
+Bit_Array_Iterator :: struct {
+	array: ^Bit_Array,
+	current_word: uint,
+	current_bit: uint,
+}
+
+/*
+	In:
+		- it:    ^Bit_Array_Iterator - the iterator struct that holds the state.
+
+	Out:
+		- index: int - the next set bit of the Bit_Array referenced by `it`.
+		- ok:	 bool - `true` if the iterator returned a valid index,
+				`false` if there were no more bits set
+*/
+iterator :: proc (it: ^Bit_Array_Iterator) -> (int, bool) {
+	words := it.array.bits
+	// if the word is empty or we have already gone over all the bits in it,
+	// b.current_bit is greater than the index of any set bit in the word,
+	// meaning that word >> b.current_bit == 0.
+	for it.current_word < len(words) && (words[it.current_word] >> it.current_bit == 0) {
+		it.current_word += 1
+		it.current_bit = 0
+	}
+
+	if it.current_word >= len(words) { return 0, false }
+
+	// since we exited the loop and didn't return, this word has some bits higher than
+	// or equal to `it.current_bit` set.
+	offset := intrinsics.count_trailing_zeros(words[it.current_word] >> it.current_bit)
+	// skip over the bit, if the resulting it.current_bit is over 63,
+	// it is handled by the initial for loop in the next iteration.
+	it.current_bit += uint(offset)
+	defer it.current_bit += 1
+	return int(it.current_word * NUM_BITS + it.current_bit) + it.array.bias, true
+}
+
 
 /*
 	In:
