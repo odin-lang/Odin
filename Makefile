@@ -17,7 +17,7 @@ ifeq ($(OS), Darwin)
         LLVM_VERSIONS = "13.%.%"
     else
     # allow for x86 / amd64 all llvm versions begining from 11
-        LLVM_VERSIONS = "13.%.%" "12.0.1" "11.0.0"
+        LLVM_VERSIONS = "13.%.%" "12.0.1" "11.1.0"
     endif
 
     LLVM_VERSION_PATTERN_SEPERATOR = )|(
