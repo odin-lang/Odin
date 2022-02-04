@@ -385,7 +385,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 	Operand operand = {};
 
 	if (init != nullptr) {
-		Entity *entity = check_entity_from_ident_or_selector(ctx, init);
+		Entity *entity = check_entity_from_ident_or_selector(ctx, init, false);
 		if (entity != nullptr && entity->kind == Entity_TypeName) {
 			// @TypeAliasingProblem
 			// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
