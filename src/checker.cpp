@@ -3665,6 +3665,59 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	check_collect_entities(&c, block->stmts);
 }
 
+bool correct_single_type_alias(CheckerContext *c, Entity *e) {
+	if (e->kind == Entity_Constant) {
+		DeclInfo *d = e->decl_info;
+		if (d != nullptr && d->init_expr != nullptr) {
+			Ast *init = d->init_expr;
+			Entity *alias_of = check_entity_from_ident_or_selector(c, init);
+			if (alias_of != nullptr && alias_of->kind == Entity_TypeName) {
+				e->kind = Entity_TypeName;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
+	isize n = s->elements.entries.count;
+	bool correction = false;
+	for (isize i = n-1; i >= 0; i--) {
+		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	}
+	return correction;
+}
+bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
+	isize n = s->elements.entries.count;
+	bool correction = false;
+	for (isize i = 0; i < n; i++) {
+		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	}
+	return correction;
+}
+
+
+void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
+	// NOTE(bill, 2022-02-04): This is used to solve the problem caused by type aliases
+	// of type aliases being "confused" as constants
+	//
+	//         A :: C
+	//         B :: A
+	//         C :: struct {b: ^B}
+	//
+	// See @TypeAliasingProblem for more information
+	for (;;) {
+		bool corrections = false;
+		corrections |= correct_type_alias_in_scope_backwards(c, s);
+		corrections |= correct_type_alias_in_scope_forwards(c, s);
+		if (!corrections) {
+			return;
+		}
+	}
+}
+
+
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	AstFile *curr_file = nullptr;
@@ -3736,6 +3789,7 @@ void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 		}
 	}
 
+	// correct_type_aliases(c);
 
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
@@ -4381,10 +4435,11 @@ bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 
 	for_array(i, decls) {
 		if (collect_file_decl(ctx, decls[i])) {
+			correct_type_aliases_in_scope(ctx, ctx->scope);
 			return true;
 		}
 	}
-
+	correct_type_aliases_in_scope(ctx, ctx->scope);
 	return false;
 }
 
@@ -4654,6 +4709,15 @@ void check_import_entities(Checker *c) {
 			}
 			add_untyped_expressions(ctx.info, &untyped);
 		}
+
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			reset_checker_context(&ctx, f, &untyped);
+			ctx.collect_delayed_decls = false;
+
+			correct_type_aliases_in_scope(&ctx, pkg->scope);
+		}
+
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
