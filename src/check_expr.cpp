@@ -4088,7 +4088,7 @@ Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node) {
 		return scope_lookup(c->scope, name);
 	} else if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
-		if (!c->allow_arrow_right_selector_expr && se->token.kind == Token_ArrowRight) {
+		if (se->token.kind == Token_ArrowRight) {
 			return nullptr;
 		}
 
@@ -4108,6 +4108,9 @@ Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node) {
 		if (op_expr->kind == Ast_Ident) {
 			String op_name = op_expr->Ident.token.string;
 			Entity *e = scope_lookup(c->scope, op_name);
+			if (e == nullptr) {
+				return nullptr;
+			}
 			add_entity_use(c, op_expr, e);
 			expr_entity = e;
 
