@@ -4,6 +4,7 @@ import c "core:c/libc"
 
 when ODIN_OS == "windows" { foreign import lib "../lib/stb_image_resize.lib" }
 when ODIN_OS == "linux"   { foreign import lib "../lib/stb_image_resize.a"   }
+when ODIN_OS == "darwin"   { foreign import lib "../lib/darwin/stb_image_resize.a"   }
 
 //////////////////////////////////////////////////////////////////////////////
 //

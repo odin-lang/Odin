@@ -4,6 +4,7 @@ import c "core:c/libc"
 
 when ODIN_OS == "windows" { foreign import stbiw "../lib/stb_image_write.lib" }
 when ODIN_OS == "linux"   { foreign import stbiw "../lib/stb_image_write.a"   }
+when ODIN_OS == "darwin"   { foreign import stbiw "../lib/darwin/stb_image_write.a"   }
 
 
 write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int)
