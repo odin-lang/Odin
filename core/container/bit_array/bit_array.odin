@@ -34,7 +34,7 @@ Bit_Array_Iterator :: struct {
 		- ok:	 bool - `true` if the iterator returned a valid index,
 				`false` if there were no more bits set
 */
-iterator :: proc (it: ^Bit_Array_Iterator) -> (int, bool) {
+next :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	words := it.array.bits
 	// if the word is empty or we have already gone over all the bits in it,
 	// b.current_bit is greater than the index of any set bit in the word,
