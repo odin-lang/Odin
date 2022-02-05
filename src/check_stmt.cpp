@@ -961,9 +961,9 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 				TokenKind upper_op = Token_Invalid;
 				switch (be->op.kind) {
-				case Token_Ellipsis:  upper_op = Token_GtEq; break;
-				case Token_RangeFull: upper_op = Token_GtEq; break;
-				case Token_RangeHalf: upper_op = Token_Gt;   break;
+				case Token_Ellipsis:  upper_op = Token_LtEq; break;
+				case Token_RangeFull: upper_op = Token_LtEq; break;
+				case Token_RangeHalf: upper_op = Token_Lt;   break;
 				default: GB_PANIC("Invalid range operator"); break;
 				}
 
