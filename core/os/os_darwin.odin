@@ -472,7 +472,7 @@ rename :: proc(old: string, new: string) -> bool {
 
 remove :: proc(path: string) -> bool {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_remove(path) != -1 
+	return _unix_remove(path_cstr) != -1 
 }
 
 @private
