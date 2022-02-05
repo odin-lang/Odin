@@ -1921,14 +1921,14 @@ constant_literal_expressions :: proc() {
 
 	fmt.println("-------")
 
-	Partial_Baz :: enum{A=5, B, C, D=16}
-	#assert(len(Partial_Baz) < len(#partial [Partial_Baz]int))
-	PARTIAL_ENUM_ARRAY_CONST :: #partial [Partial_Baz]int{.A ..= .C = 1, .D = 16}
+	Sparse_Baz :: enum{A=5, B, C, D=16}
+	#assert(len(Sparse_Baz) < len(#sparse[Sparse_Baz]int))
+	SPARSE_ENUM_ARRAY_CONST :: #sparse[Sparse_Baz]int{.A ..= .C = 1, .D = 16}
 
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.A])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.B])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.C])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.D])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.A])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.B])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.C])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.D])
 
 	fmt.println("-------")
 

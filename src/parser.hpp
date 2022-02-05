@@ -350,6 +350,7 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Slice<Ast *> elems; \
 		Token open, close; \
 		i64 max_count; \
+		Ast *tag; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
