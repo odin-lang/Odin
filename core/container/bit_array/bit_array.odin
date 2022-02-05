@@ -178,7 +178,7 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 
 	resize_if_needed(ba, leg_index) or_return
 
-	if idx > ba.max_index { ba.max_index = idx }
+	ba.max_index = max(idx, ba.max_index)
 	ba.bits[leg_index] |= 1 << uint(bit_index)
 	return true
 }
