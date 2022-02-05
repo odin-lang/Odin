@@ -626,6 +626,12 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 
 	lbValue value_  = lb_address_from_load_or_generate_local(p, value);
 
+	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
+		// just do a bit cast of the data at the front
+		lbValue ptr = lb_emit_conv(p, value_, alloc_type_pointer(type));
+		return lb_emit_load(p, ptr);
+	}
+
 	lbValue tag = {};
 	lbValue dst_tag = {};
 	lbValue cond = {};
@@ -666,23 +672,22 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 	lb_start_block(p, end_block);
 
 	if (!is_tuple) {
-		{
-			// NOTE(bill): Panic on invalid conversion
-			Type *dst_type = tuple->Tuple.variables[0]->type;
+		GB_ASSERT((p->state_flags & StateFlag_no_type_assert) == 0);
+		// NOTE(bill): Panic on invalid conversion
+		Type *dst_type = tuple->Tuple.variables[0]->type;
 
-			lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
-			auto args = array_make<lbValue>(permanent_allocator(), 7);
-			args[0] = ok;
+		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
+		auto args = array_make<lbValue>(permanent_allocator(), 7);
+		args[0] = ok;
 
-			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-			args[2] = lb_const_int(m, t_i32, pos.line);
-			args[3] = lb_const_int(m, t_i32, pos.column);
+		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
+		args[2] = lb_const_int(m, t_i32, pos.line);
+		args[3] = lb_const_int(m, t_i32, pos.column);
 
-			args[4] = lb_typeid(m, src_type);
-			args[5] = lb_typeid(m, dst_type);
-			args[6] = lb_emit_conv(p, value_, t_rawptr);
-			lb_emit_runtime_call(p, "type_assertion_check2", args);
-		}
+		args[4] = lb_typeid(m, src_type);
+		args[5] = lb_typeid(m, dst_type);
+		args[6] = lb_emit_conv(p, value_, t_rawptr);
+		lb_emit_runtime_call(p, "type_assertion_check2", args);
 
 		return lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 0));
 	}
@@ -705,6 +710,13 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 		tuple = make_optional_ok_type(type);
 	}
 	Type *dst_type = tuple->Tuple.variables[0]->type;
+
+	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
+		// just do a bit cast of the data at the front
+		lbValue ptr = lb_emit_struct_ev(p, value, 0);
+		ptr = lb_emit_conv(p, ptr, alloc_type_pointer(type));
+		return lb_addr(ptr);
+	}
 
 	lbAddr v = lb_add_local_generated(p, tuple, true);
 
@@ -731,7 +743,6 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 
 	if (!is_tuple) {
 		// NOTE(bill): Panic on invalid conversion
-
 		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
 		auto args = array_make<lbValue>(permanent_allocator(), 7);
 		args[0] = ok;

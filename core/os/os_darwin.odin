@@ -296,7 +296,7 @@ foreign libc {
 	@(link_name="readdir_r$INODE64") _unix_readdir_r    :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
-	@(link_name="fchmod") _unix_fchmod :: proc(fildes: Handle, mode: u16) -> c.int ---;
+	@(link_name="fchmod") _unix_fchmod :: proc(fildes: Handle, mode: u16) -> c.int ---
 
 	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
@@ -307,7 +307,7 @@ foreign libc {
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
-	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---;
+	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
@@ -324,7 +324,7 @@ get_last_error :: proc() -> int {
 }
 
 get_last_error_string :: proc() -> string {
-	return cast(string)_darwin_string_error(cast(c.int)get_last_error());
+	return cast(string)_darwin_string_error(cast(c.int)get_last_error())
 }
 
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {

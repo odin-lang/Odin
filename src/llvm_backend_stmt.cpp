@@ -1991,6 +1991,13 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			out |= StateFlag_no_bounds_check;
 			out &= ~StateFlag_bounds_check;
 		}
+		if (in & StateFlag_no_type_assert) {
+			out |= StateFlag_no_type_assert;
+			out &= ~StateFlag_type_assert;
+		} else if (in & StateFlag_type_assert) {
+			out |= StateFlag_type_assert;
+			out &= ~StateFlag_no_type_assert;
+		}
 
 		p->state_flags = out;
 	}

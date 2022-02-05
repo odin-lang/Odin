@@ -29,12 +29,12 @@ mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	return _mutex_try_lock(m)
 }
 
-// Example:
-//
-// if mutex_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if mutex_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=mutex_unlock)
 mutex_guard :: proc(m: ^Mutex) -> bool {
 	mutex_lock(m)
@@ -80,25 +80,24 @@ rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
 rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw)
 }
-
-// Example:
-//
-// if rw_mutex_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if rw_mutex_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=rw_mutex_unlock)
 rw_mutex_guard :: proc(m: ^RW_Mutex) -> bool {
 	rw_mutex_lock(m)
 	return true
 }
 
-// Example:
-//
-// if rw_mutex_shared_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if rw_mutex_shared_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=rw_mutex_shared_unlock)
 rw_mutex_shared_guard :: proc(m: ^RW_Mutex) -> bool {
 	rw_mutex_shared_lock(m)
@@ -127,13 +126,12 @@ recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
 	return _recursive_mutex_try_lock(m)
 }
 
-
-// Example:
-//
-// if recursive_mutex_guard(&m) {
-//         ...
-// }
-//
+/*
+Example:
+	if recursive_mutex_guard(&m) {
+		...
+	}
+*/
 @(deferred_in=recursive_mutex_unlock)
 recursive_mutex_guard :: proc(m: ^Recursive_Mutex) -> bool {
 	recursive_mutex_lock(m)

@@ -2,7 +2,7 @@
 package builtin
 
 nil   :: nil;
-false :: 0!==0;
+false :: 0!=0;
 true  :: 0==0;
 
 ODIN_OS      :: ODIN_OS;

@@ -232,6 +232,7 @@ struct lbTargetList {
 
 enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
+	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
 struct lbCopyElisionHint {
