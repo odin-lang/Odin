@@ -238,6 +238,51 @@ isize total_attribute_count(DeclInfo *decl) {
 	return attribute_count;
 }
 
+Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
+	// NOTE(bill, 2022-02-05): Stupid edge case for `distinct` declarations
+	//
+	//         X :: enum {A, B, C}
+	//         Y :: distinct X
+	//
+	// To make Y be just like X, it will need to copy the elements of X and change their type
+	// so that they match Y rather than X.
+	GB_ASSERT(original_enum_type != nullptr);
+	GB_ASSERT(named_type != nullptr);
+	GB_ASSERT(original_enum_type->kind == Type_Enum);
+	GB_ASSERT(named_type->kind == Type_Named);
+
+	Scope *parent = original_enum_type->Enum.scope->parent;
+	Scope *scope = create_scope(nullptr, parent);
+
+
+	Type *et = alloc_type_enum();
+	et->Enum.base_type = original_enum_type->Enum.base_type;
+	et->Enum.min_value = original_enum_type->Enum.min_value;
+	et->Enum.max_value = original_enum_type->Enum.max_value;
+	et->Enum.min_value_index = original_enum_type->Enum.min_value_index;
+	et->Enum.max_value_index = original_enum_type->Enum.max_value_index;
+	et->Enum.scope = scope;
+
+	auto fields = array_make<Entity *>(permanent_allocator(), original_enum_type->Enum.fields.count);
+	for_array(i, fields) {
+		Entity *old = original_enum_type->Enum.fields[i];
+
+		Entity *e = alloc_entity_constant(scope, old->token, named_type, old->Constant.value);
+		e->file = old->file;
+		e->identifier = clone_ast(old->identifier);
+		e->flags |= EntityFlag_Visited;
+		e->state = EntityState_Resolved;
+		e->Constant.flags = old->Constant.flags;
+		e->Constant.docs = old->Constant.docs;
+		e->Constant.comment = old->Constant.comment;
+
+		fields[i] = e;
+		add_entity(ctx, scope, nullptr, e);
+		add_entity_use(ctx, e->identifier, e);
+	}
+	et->Enum.fields = fields;
+	return et;
+}
 
 void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
@@ -258,7 +303,11 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
 
-	named->Named.base = base_type(bt);
+	Type *base = base_type(bt);
+	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+		base = clone_enum_type(ctx, base, named);
+	}
+	named->Named.base = base;
 
 	if (is_distinct && is_type_typeid(e->type)) {
 		error(init_expr, "'distinct' cannot be applied to 'typeid'");
