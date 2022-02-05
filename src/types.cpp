@@ -221,6 +221,7 @@ struct TypeProc {
 		ExactValue *max_value;                            \
 		i64 count;                                        \
 		TokenKind op;                                     \
+		bool is_sparse;                                   \
 	})                                                        \
 	TYPE_KIND(Slice,   struct { Type *elem; })                \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })           \
@@ -3830,6 +3831,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_EnumeratedArray:
+		if (type->EnumeratedArray.is_sparse) {
+			str = gb_string_appendc(str, "#sparse");
+		}
 		str = gb_string_append_rune(str, '[');
 		str = write_type_to_string(str, type->EnumeratedArray.index);
 		str = gb_string_append_rune(str, ']');

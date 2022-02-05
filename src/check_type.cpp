@@ -2713,29 +2713,30 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, Token_Invalid);
 
-				bool is_partial = false;
+				bool is_sparse = false;
 				if (at->tag != nullptr) {
 					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
 					String name = at->tag->BasicDirective.name.string;
-					if (name == "partial") {
-						is_partial = true;
+					if (name == "sparse") {
+						is_sparse = true;
 					} else {
 						error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
 					}
 				}
 
-				if (!is_partial && t->EnumeratedArray.count > bt->Enum.fields.count) {
+				if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count) {
 					error(e, "Non-contiguous enumeration used as an index in an enumerated array");
 					long long ea_count   = cast(long long)t->EnumeratedArray.count;
 					long long enum_count = cast(long long)bt->Enum.fields.count;
 					error_line("\tenumerated array length: %lld\n", ea_count);
 					error_line("\tenum field count: %lld\n", enum_count);
-					error_line("\tSuggestion: prepend #partial to the enumerated array to allow for non-named elements\n");
+					error_line("\tSuggestion: prepend #sparse to the enumerated array to allow for non-contiguous elements\n");
 					if (2*enum_count < ea_count) {
 						error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
-						error_line("\t         this warning will be removed if #partial is applied\n");
+						error_line("\t         this warning will be removed if #sparse is applied\n");
 					}
 				}
+				t->EnumeratedArray.is_sparse = is_sparse;
 
 				*type = t;
 

@@ -260,6 +260,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_type(info.elem)
 
 	case Type_Info_Enumerated_Array:
+		if info.is_sparse {
+			print_string("#sparse")
+		}
 		print_byte('[')
 		print_type(info.index)
 		print_byte(']')
