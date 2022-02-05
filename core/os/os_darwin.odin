@@ -290,10 +290,15 @@ foreign libc {
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
-	@(link_name="fdopendir$INODE64") _unix_fdopendir    :: proc(fd: Handle) -> Dir ---
+
+	@(link_name="fdopendir$INODE64") _unix_fdopendir_amd64 :: proc(fd: Handle) -> Dir ---
+	@(link_name="readdir_r$INODE64") _unix_readdir_r_amd64 :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="fdopendir")         _unix_fdopendir_arm64 :: proc(fd: Handle) -> Dir ---
+	@(link_name="readdir_r")         _unix_readdir_r_arm64 :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
-	@(link_name="readdir_r$INODE64") _unix_readdir_r    :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
 	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
@@ -313,6 +318,14 @@ foreign libc {
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
+}
+
+when ODIN_ARCH != "arm64" {
+	_unix_fdopendir :: proc {_unix_fdopendir_amd64}
+	_unix_readdir_r :: proc {_unix_readdir_r_amd64}
+} else {
+	_unix_fdopendir :: proc {_unix_fdopendir_arm64}
+	_unix_readdir_r :: proc {_unix_readdir_r_arm64}
 }
 
 foreign dl {
