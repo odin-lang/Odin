@@ -23,16 +23,16 @@ jobs:
           import "core:sys/es"
           @(export) 
           _start :: proc "c" () {
-	          for {
-		          message := es.MessageReceive()
+                  for {
+                          message := es.MessageReceive()
           
-		          if message.type == .MSG_INSTANCE_CREATE {
-			          instance := es._EsInstanceCreate(size_of(es.INSTANCE_TYPE), message, "Hello Odin")
-			          es.TextDisplayCreate( instance.window, es.CELL_FILL, es.STYLE_PANEL_WINDOW_BACKGROUND, "Hello from Odin")
-			          es.Print("Reached Odin test application.\n")
-			          es.SystemShutdown(es.SHUTDOWN_ACTION_POWER_OFF)
-		          }
-	          }
+                          if message.type == .MSG_INSTANCE_CREATE {
+                                  instance := es._EsInstanceCreate(size_of(es.INSTANCE_TYPE), message, "Hello Odin")
+                                  es.TextDisplayCreate( instance.window, es.CELL_FILL, es.STYLE_PANEL_WINDOW_BACKGROUND, "Hello from Odin")
+                                  es.Print("Reached Odin test application.\n")
+                                  es.SystemShutdown(es.SHUTDOWN_ACTION_POWER_OFF)
+                          }
+                  }
           }
           EOF
           
