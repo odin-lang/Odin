@@ -508,6 +508,10 @@ bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 #define MAXIMUM_TYPE_DISTANCE 10
 
 i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type) {
+	if (c == nullptr) {
+		GB_ASSERT(operand->mode == Addressing_Value);
+		GB_ASSERT(is_type_typed(operand->type));
+	}
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
 		return -1;
@@ -816,6 +820,13 @@ bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type
 bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
 	i64 score = 0;
 	return check_is_assignable_to_with_score(c, operand, type, &score);
+}
+
+bool internal_check_is_assignable_to(Type *src, Type *dst) {
+	Operand x = {};
+	x.type = src;
+	x.mode = Addressing_Value;
+	return check_is_assignable_to(nullptr, &x, dst);
 }
 
 AstPackage *get_package_of_type(Type *type) {
