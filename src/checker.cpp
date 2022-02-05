@@ -504,6 +504,7 @@ enum VettedEntityKind {
 
 	VettedEntity_Unused,
 	VettedEntity_Shadowed,
+	VettedEntity_Shadowed_And_Unused,
 };
 struct VettedEntity {
 	VettedEntityKind kind;
@@ -625,12 +626,18 @@ void check_scope_usage(Checker *c, Scope *scope) {
 	MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
 		Entity *e = scope->elements.entries[i].value;
 		if (e == nullptr) continue;
-		VettedEntity ve = {};
-		if (vet_unused && check_vet_unused(c, e, &ve)) {
-			array_add(&vetted_entities, ve);
-		}
-		if (vet_shadowing && check_vet_shadowing(c, e, &ve)) {
-			array_add(&vetted_entities, ve);
+		VettedEntity ve_unused = {};
+		VettedEntity ve_shadowed = {};
+		bool is_unused = vet_unused && check_vet_unused(c, e, &ve_unused);
+		bool is_shadowed = vet_shadowing && check_vet_shadowing(c, e, &ve_shadowed);
+		if (is_unused && is_shadowed) {
+			VettedEntity ve_both = ve_shadowed;
+			ve_both.kind = VettedEntity_Shadowed_And_Unused;
+			array_add(&vetted_entities, ve_both);
+		} else if (is_unused) {
+			array_add(&vetted_entities, ve_unused);
+		} else if (is_shadowed) {
+			array_add(&vetted_entities, ve_shadowed);
 		}
 	}
 
@@ -642,16 +649,18 @@ void check_scope_usage(Checker *c, Scope *scope) {
 		Entity *other = ve.other;
 		String name = e->token.string;
 
-		if (build_context.vet) {
+		if (ve.kind == VettedEntity_Shadowed_And_Unused) {
+			error(e->token, "'%.*s' declared but not used, possibly shadows declaration at line %d", LIT(name), other->token.pos.line);
+		} else if (build_context.vet) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
 				error(e->token, "'%.*s' declared but not used", LIT(name));
 				break;
 			case VettedEntity_Shadowed:
 				if (e->flags&EntityFlag_Using) {
-					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				} else {
-					error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+					error(e->token, "Declaration of '%.*s' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				}
 				break;
 			default:
