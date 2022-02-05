@@ -7018,7 +7018,7 @@ void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Ope
 		Type *bt = base_type(x.type);
 		GB_ASSERT(bt->kind == Type_Enum);
 		for (i64 vi = v0; vi <= v1; vi++) {
-			if (upper_op != Token_GtEq && vi == v1) {
+			if (upper_op != Token_LtEq && vi == v1) {
 				break;
 			}
 
@@ -7040,7 +7040,7 @@ void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Ope
 		}
 	} else {
 		add_constant_switch_case(ctx, seen, lhs);
-		if (upper_op == Token_GtEq) {
+		if (upper_op == Token_LtEq) {
 			add_constant_switch_case(ctx, seen, rhs);
 		}
 	}
@@ -8036,7 +8036,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 						is_constant = is_constant && operand.mode == Addressing_Constant;
 
-						add_to_seen_map(c, &seen, op.kind, x, x, y);
+						TokenKind upper_op = Token_LtEq;
+						if (op.kind == Token_RangeHalf) {
+							upper_op = Token_Lt;
+						}
+						add_to_seen_map(c, &seen, upper_op, x, x, y);
 					} else {
 						Operand op_index = {};
 						check_expr_with_type_hint(c, &op_index, fv->field, index_type);
