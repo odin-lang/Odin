@@ -67,6 +67,7 @@ OS :: enum u8 {
 	Unknown      = 255,
 }
 OS_Name :: #sparse[OS]string{
+	._Unknown     = "",
 	.FAT          = "FAT",
 	.Amiga        = "Amiga",
 	.VMS          = "VMS/OpenVMS",

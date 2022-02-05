@@ -182,6 +182,7 @@ Error_String :: #sparse[Error]string{
 	.Max_Iterations_Reached  = "Max iterations reached",
 	.Buffer_Overflow         = "Buffer overflow",
 	.Integer_Overflow        = "Integer overflow",
+	.Integer_Underflow       = "Integer underflow",
 
 	.Division_by_Zero        = "Division by zero",
 	.Math_Domain_Error       = "Math domain error",
