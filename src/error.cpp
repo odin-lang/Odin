@@ -33,6 +33,10 @@ void init_global_error_collector(void) {
 }
 
 
+// temporary
+// defined in build_settings.cpp
+char *token_pos_to_string(TokenPos const &pos);
+
 bool set_file_path_string(i32 index, String const &path) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
@@ -403,6 +407,7 @@ void compiler_error(char const *fmt, ...) {
 	gb_printf_err("Internal Compiler Error: %s\n",
 	              gb_bprintf_va(fmt, va));
 	va_end(va);
+	GB_DEBUG_TRAP();
 	gb_exit(1);
 }
 

@@ -109,14 +109,19 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 	}
 
 	i32 field_src_index = 0;
+	i32 field_group_index = -1;
 	for_array(i, params) {
 		Ast *param = params[i];
 		if (param->kind != Ast_Field) {
 			continue;
 		}
+		field_group_index += 1;
+
 		ast_node(p, Field, param);
 		Ast *type_expr = p->type;
 		Type *type = nullptr;
+		CommentGroup *docs = p->docs;
+		CommentGroup *comment = p->comment;
 
 		if (type_expr != nullptr) {
 			type = check_type_expr(ctx, type_expr, nullptr);
@@ -152,6 +157,15 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx, ctx->scope, name, field);
+			field->Variable.field_group_index = field_group_index;
+
+			if (j == 0) {
+				field->Variable.docs = docs;
+			}
+			if (j+1 == p->names.count) {
+				field->Variable.comment = comment;
+			}
+
 			array_add(&fields_array, field);
 			String tag = p->tag.string;
 			if (tag.len != 0 && !unquote_string(permanent_allocator(), &tag, 0, tag.text[0] == '`')) {
@@ -718,20 +732,19 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		Ast *ident = nullptr;
 		Ast *init = nullptr;
 		u32 entity_flags = 0;
-		if (field->kind == Ast_FieldValue) {
-			ast_node(fv, FieldValue, field);
-			if (fv->field == nullptr || fv->field->kind != Ast_Ident) {
-				error(field, "An enum field's name must be an identifier");
-				continue;
-			}
-			ident = fv->field;
-			init = fv->value;
-		} else if (field->kind == Ast_Ident) {
-			ident = field;
-		} else {
+		if (field->kind != Ast_EnumFieldValue) {
 			error(field, "An enum field's name must be an identifier");
 			continue;
 		}
+		ident = field->EnumFieldValue.name;
+		init = field->EnumFieldValue.value;
+		if (ident == nullptr || ident->kind != Ast_Ident) {
+			error(field, "An enum field's name must be an identifier");
+			continue;
+		}
+		CommentGroup *docs    = field->EnumFieldValue.docs;
+		CommentGroup *comment = field->EnumFieldValue.comment;
+
 		String name = ident->Ident.token.string;
 
 		if (init != nullptr) {
@@ -789,6 +802,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
 		e->Constant.flags |= entity_flags;
+		e->Constant.docs = docs;
+		e->Constant.comment = comment;
 
 		if (scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
@@ -1366,11 +1381,13 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 	isize variadic_index = -1;
 	bool is_c_vararg = false;
 	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
+	i32 field_group_index = -1;
 	for_array(i, params) {
 		Ast *param = params[i];
 		if (param->kind != Ast_Field) {
 			continue;
 		}
+		field_group_index += 1;
 		ast_node(p, Field, param);
 		Ast *type_expr = unparen_expr(p->type);
 		Type *type = nullptr;
@@ -1671,9 +1688,11 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					}
 
 					param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));
+					param->Constant.field_group_index = field_group_index;
 				} else {
 					param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
 					param->Variable.param_value = param_value;
+					param->Variable.field_group_index = field_group_index;
 				}
 			}
 			if (p->flags&FieldFlag_no_alias) {
@@ -1767,7 +1786,10 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 	}
 
 	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
+	i32 field_group_index = -1;
 	for_array(i, results) {
+		field_group_index += 1;
+
 		ast_node(field, Field, results[i]);
 		Ast *default_value = unparen_expr(field->default_value);
 		ParameterValue param_value = {};
@@ -1798,6 +1820,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 			token.string = str_lit("");
 			Entity *param = alloc_entity_param(scope, token, type, false, false);
 			param->Variable.param_value = param_value;
+			param->Variable.field_group_index = -1;
 			array_add(&variables, param);
 		} else {
 			for_array(j, field->names) {
@@ -1821,6 +1844,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 				Entity *param = alloc_entity_param(scope, token, type, false, false);
 				param->flags |= EntityFlag_Result;
 				param->Variable.param_value = param_value;
+				param->Variable.field_group_index = field_group_index;
 				array_add(&variables, param);
 				add_entity(ctx, scope, name, param);
 				// NOTE(bill): Removes `declared but not used` when using -vet

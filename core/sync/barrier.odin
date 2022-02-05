@@ -1,44 +1,43 @@
 package sync
 
 
-// A barrier enabling multiple threads to synchronize the beginning of some computation
 /*
- * Example:
- *
- * 	package example
- *
- * 	import "core:fmt"
- * 	import "core:sync"
- * 	import "core:thread"
- *
- * 	barrier := &sync.Barrier{};
- *
- * 	main :: proc() {
- * 		fmt.println("Start");
- *
- * 		THREAD_COUNT :: 4;
- * 		threads: [THREAD_COUNT]^thread.Thread;
- *
- * 		sync.barrier_init(barrier, THREAD_COUNT);
- * 		defer sync.barrier_destroy(barrier);
- *
- *
- * 		for _, i in threads {
- * 			threads[i] = thread.create_and_start(proc(t: ^thread.Thread) {
- * 				// Same messages will be printed together but without any interleaving
- * 				fmt.println("Getting ready!");
- * 				sync.barrier_wait(barrier);
- * 				fmt.println("Off their marks they go!");
- * 			});
- * 		}
- *
- * 		for t in threads {
- * 			thread.destroy(t); // join and free thread
- * 		}
- * 		fmt.println("Finished");
- * 	}
- *
- */
+A barrier enabling multiple threads to synchronize the beginning of some computation
+Example:
+
+	package example
+
+	import "core:fmt"
+	import "core:sync"
+	import "core:thread"
+
+	barrier := &sync.Barrier{};
+
+	main :: proc() {
+		fmt.println("Start");
+
+		THREAD_COUNT :: 4;
+		threads: [THREAD_COUNT]^thread.Thread;
+
+		sync.barrier_init(barrier, THREAD_COUNT);
+		defer sync.barrier_destroy(barrier);
+
+
+		for _, i in threads {
+			threads[i] = thread.create_and_start(proc(t: ^thread.Thread) {
+				// Same messages will be printed together but without any interleaving
+				fmt.println("Getting ready!");
+				sync.barrier_wait(barrier);
+				fmt.println("Off their marks they go!");
+			});
+		}
+
+		for t in threads {
+			thread.destroy(t); // join and free thread
+		}
+		fmt.println("Finished");
+	}
+*/
 Barrier :: struct {
 	mutex: Blocking_Mutex,
 	cond:  Condition,

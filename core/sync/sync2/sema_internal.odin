@@ -1,3 +1,4 @@
+//+private
 package sync2
 
 import "core:time"

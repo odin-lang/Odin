@@ -40,7 +40,7 @@ hash_bytes :: proc(data: []byte) -> [DIGEST_SIZE]byte {
 // computed hash to the second parameter.
 // It requires that the destination buffer is at least as big as the digest size
 hash_string_to_buffer :: proc(data: string, hash: []byte) {
-	hash_bytes_to_buffer(transmute([]byte)(data), hash);
+	hash_bytes_to_buffer(transmute([]byte)(data), hash)
 }
 
 // hash_bytes_to_buffer will hash the given input and write the

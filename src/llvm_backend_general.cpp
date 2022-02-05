@@ -271,6 +271,10 @@ lbAddr lb_addr(lbValue addr) {
 
 
 lbAddr lb_addr_map(lbValue addr, lbValue map_key, Type *map_type, Type *map_result) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT(is_type_map(mt));
+
 	lbAddr v = {lbAddr_Map, addr};
 	v.map.key    = map_key;
 	v.map.type   = map_type;
@@ -1598,8 +1602,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 						return llvm_type;
 					}
 					llvm_type = LLVMStructCreateNamed(ctx, name);
+					LLVMTypeRef found_val = *found;
 					map_set(&m->types, type, llvm_type);
-					lb_clone_struct_type(llvm_type, *found);
+					lb_clone_struct_type(llvm_type, found_val);
 					return llvm_type;
 				}
 			}

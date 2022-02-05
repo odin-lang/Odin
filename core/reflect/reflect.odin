@@ -234,7 +234,7 @@ is_nil :: proc(v: any) -> bool {
 		return true
 	}
 	data := as_bytes(v)
-	if data != nil {
+	if data == nil {
 		return true
 	}
 	for v in data {
