@@ -17,12 +17,24 @@ NUM_BITS :: 64
 Bit_Array :: struct {
 	bits: [dynamic]u64,
 	bias: int,
+	max_index: int,
 }
 
 Bit_Array_Iterator :: struct {
 	array: ^Bit_Array,
-	current_word: uint,
-	current_bit: uint,
+	word_idx: int,
+	bit_idx: uint,
+}
+
+/*
+	In:
+		- ba:   ^Bit_Array - the array to iterate over
+
+	Out:
+		- it:   ^Bit_Array_Iterator - the iterator that holds iteration state
+*/
+make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
+	return Bit_Array_Iterator { array = ba }
 }
 
 /*
@@ -30,30 +42,85 @@ Bit_Array_Iterator :: struct {
 		- it:    ^Bit_Array_Iterator - the iterator struct that holds the state.
 
 	Out:
-		- index: int - the next set bit of the Bit_Array referenced by `it`.
-		- ok:	 bool - `true` if the iterator returned a valid index,
-				`false` if there were no more bits set
+		- set:    bool - the state of the bit at `index`
+		- index:  int - the next bit of the Bit_Array referenced by `it`.
+		- ok:	  bool - `true` if the iterator returned a valid index,
+			  `false` if there were no more bits
 */
-next :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
-	words := it.array.bits
-	// if the word is empty or we have already gone over all the bits in it,
-	// b.current_bit is greater than the index of any set bit in the word,
-	// meaning that word >> b.current_bit == 0.
-	for it.current_word < len(words) && (words[it.current_word] >> it.current_bit == 0) {
-		it.current_word += 1
-		it.current_bit = 0
+iterate_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
+	index = it.word_idx * NUM_BITS + int(it.bit_idx) + it.array.bias
+	if index > it.array.max_index { return false, 0, false }
+
+	word := it.array.bits[it.word_idx] if len(it.array.bits) > it.word_idx else 0
+	set = (word >> it.bit_idx & 1) == 1
+
+	it.bit_idx += 1
+	if it.bit_idx >= NUM_BITS {
+		it.bit_idx = 0
+		it.word_idx += 1
 	}
 
-	if it.current_word >= len(words) { return 0, false }
+	return set, index, true
+}
 
-	// since we exited the loop and didn't return, this word has some bits higher than
-	// or equal to `it.current_bit` set.
-	offset := intrinsics.count_trailing_zeros(words[it.current_word] >> it.current_bit)
-	// skip over the bit, if the resulting it.current_bit is over 63,
-	// it is handled by the initial for loop in the next iteration.
-	it.current_bit += uint(offset)
-	defer it.current_bit += 1
-	return int(it.current_word * NUM_BITS + it.current_bit) + it.array.bias, true
+/*
+	In:
+		- it:     ^Bit_Array_Iterator - the iterator struct that holds the state.
+
+	Out:
+		- index:  int - the next set bit of the Bit_Array referenced by `it`.
+		- ok:	  bool - `true` if the iterator returned a valid index,
+			  `false` if there were no more bits set
+*/
+iterate_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
+	return iterate_internal_(it, true)
+}
+
+/*
+	In:
+		- it:	  ^Bit_Array_Iterator - the iterator struct that holds the state.
+
+	Out:
+		- index:  int - the next unset bit of the Bit_Array referenced by `it`.
+		- ok:	  bool - `true` if the iterator returned a valid index,
+			  `false` if there were no more unset bits
+*/
+iterate_unset:: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
+	return iterate_internal_(it, false)
+}
+
+@(private="file")
+iterate_internal_ :: proc (it: ^Bit_Array_Iterator, $ITERATE_SET_BITS: bool) -> (index: int, ok: bool) {
+	word := it.array.bits[it.word_idx] if len(it.array.bits) > it.word_idx else 0
+	when ! ITERATE_SET_BITS { word = ~word }
+
+	// if the word is empty or we have already gone over all the bits in it,
+	// b.bit_idx is greater than the index of any set bit in the word,
+	// meaning that word >> b.bit_idx == 0.
+	for it.word_idx < len(it.array.bits) && word >> it.bit_idx == 0 {
+		it.word_idx += 1
+		it.bit_idx = 0
+		word = it.array.bits[it.word_idx] if len(it.array.bits) > it.word_idx else 0
+		when ! ITERATE_SET_BITS { word = ~word }
+	}
+
+	// if we are iterating the set bits, reaching the end of the array means we have no more bits to check
+	when ITERATE_SET_BITS {
+		if it.word_idx >= len(it.array.bits) {
+			return 0, false
+		}
+	}
+
+	// reaching here means that the word has some set bits
+	it.bit_idx += uint(intrinsics.count_trailing_zeros(word >> it.bit_idx))
+	index = it.word_idx * NUM_BITS + int(it.bit_idx) + it.array.bias
+
+	it.bit_idx += 1
+	if it.bit_idx >= NUM_BITS {
+		it.bit_idx = 0
+		it.word_idx += 1
+	}
+	return index, index <= it.array.max_index
 }
 
 
@@ -111,6 +178,7 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 
 	resize_if_needed(ba, leg_index) or_return
 
+	if idx > ba.max_index { ba.max_index = idx }
 	ba.bits[leg_index] |= 1 << uint(bit_index)
 	return true
 }
@@ -128,6 +196,7 @@ create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -
 
 	res = Bit_Array{
 		bias = min_index,
+		max_index = max_index,
 	}
 	return res, resize_if_needed(&res, legs)
 }
