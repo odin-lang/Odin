@@ -47,7 +47,7 @@ make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
 		- ok:	  bool - `true` if the iterator returned a valid index,
 			  `false` if there were no more bits
 */
-iterate_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
+iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
 	index = it.word_idx * NUM_BITS + int(it.bit_idx) + it.array.bias
 	if index > it.array.max_index { return false, 0, false }
 
@@ -72,7 +72,7 @@ iterate_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: boo
 		- ok:	  bool - `true` if the iterator returned a valid index,
 			  `false` if there were no more bits set
 */
-iterate_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
+iterate_by_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, true)
 }
 
@@ -85,7 +85,7 @@ iterate_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 		- ok:	  bool - `true` if the iterator returned a valid index,
 			  `false` if there were no more unset bits
 */
-iterate_unset:: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
+iterate_by_unset:: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, false)
 }
 
