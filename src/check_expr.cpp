@@ -8196,7 +8196,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					}
 					error_line("\n");
 
-					error_line("\tSuggestion: Was '#partial %s {...}' wanted?\n", type_to_string(index_type));
+					error_line("\tSuggestion: Was '#partial %s{...}' wanted?\n", type_to_string(type));
 				}
 			}
 
