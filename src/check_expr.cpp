@@ -8188,7 +8188,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					if (unhandled.count == 1) {
 						error_no_newline(node, "Unhandled enumerated array case: %.*s", LIT(unhandled[0]->token.string));
 					} else {
-						error_no_newline(node, "Unhandled enumerated array cases: ");
+						error(node, "Unhandled enumerated array cases:");
 						for_array(i, unhandled) {
 							Entity *f = unhandled[i];
 							error_line("\t%.*s\n", LIT(f->token.string));
