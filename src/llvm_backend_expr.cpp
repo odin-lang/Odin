@@ -1834,6 +1834,15 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				return lb_addr_load(p, parent);
 			}
 		}
+		if (dst->Union.variants.count == 1) {
+			Type *vt = dst->Union.variants[0];
+			if (internal_check_is_assignable_to(src, vt)) {
+				value = lb_emit_conv(p, value, vt);
+				lbAddr parent = lb_add_local_generated(p, t, true);
+				lb_emit_store_union_variant(p, parent.addr, value, vt);
+				return lb_addr_load(p, parent);
+			}
+		}
 	}
 
 	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
