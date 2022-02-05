@@ -1,0 +1,68 @@
+name: essence-check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install dependencies
+        run: |
+          sudo apt-get update  
+          sudo apt-get install --no-install-recommends -y ca-certificates xz-utils texinfo patch make curl \
+            ctags m4 nasm meson ninja-build libharfbuzz-dev qemu qemu-utils qemu-system-x86 gcc g++
+            
+      - name: create files
+        run: |
+          cat << EOF >> hello.odin
+          package hello_odin
+          import "core:sys/es"
+          @(export) 
+          _start :: proc "c" () {
+	          for {
+		          message := es.MessageReceive()
+          
+		          if message.type == .MSG_INSTANCE_CREATE {
+			          instance := es._EsInstanceCreate(size_of(es.INSTANCE_TYPE), message, "Hello Odin")
+			          es.TextDisplayCreate( instance.window, es.CELL_FILL, es.STYLE_PANEL_WINDOW_BACKGROUND, "Hello from Odin")
+			          es.Print("Reached Odin test application.\n")
+			          es.SystemShutdown(es.SHUTDOWN_ACTION_POWER_OFF)
+		          }
+	          }
+          }
+          EOF
+          
+          cat << EOF >> hello.ini
+          [general]
+          name=hello
+          permission_shutdown=1
+          [build]
+          custom_compile_command=../odin build ../hello.odin -target:essence_amd64 -build-mode:obj -out:hello.o -no-crt && x86_64-essence-gcc hello.o -o bin/hello -nostdlib
+          EOF
+          
+      - name: build
+        run: |
+          git clone --depth=1 https://gitlab.com/nakst/essence.git 
+          
+          cd essence 
+          mkdir -p bin 
+          gcc -o bin/script util/script.c -g -Wall -Wextra -O2 -pthread
+          bin/script --start=AutomationBuildDefault util/start.script
+          bin/build_core headers odin ../core/sys/es/api.odin
+          cd ..    
+          
+          make
+          
+          cd essence
+          echo ../hello.ini > bin/extra_applications.ini
+          echo "General.first_application=hello" >> bin/config.ini
+          echo "Emulator.SerialToFile=1" >> bin/config.ini
+          timeout 100 ./start.sh t2
+          cd ..
+          
+      - name: check
+        run: cat essence/bin/Logs/qemu_serial1.txt | grep "Reached Odin test application."
