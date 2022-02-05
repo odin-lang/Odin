@@ -6961,7 +6961,9 @@ struct TypeAndToken {
 	Token token;
 };
 
-void add_constant_switch_case(CheckerContext *ctx, PtrMap<uintptr, TypeAndToken> *seen, Operand operand, bool use_expr = true) {
+typedef PtrMap<uintptr, TypeAndToken> SeenMap;
+
+void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Operand operand, bool use_expr = true) {
 	if (operand.mode != Addressing_Constant) {
 		return;
 	}
@@ -7002,7 +7004,6 @@ void add_constant_switch_case(CheckerContext *ctx, PtrMap<uintptr, TypeAndToken>
 	multi_map_insert(seen, key, tap);
 }
 
-typedef PtrMap<uintptr, TypeAndToken> SeenMap;
 
 void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Operand const &x, Operand const &lhs, Operand const &rhs) {
 	if (is_type_enum(x.type)) {

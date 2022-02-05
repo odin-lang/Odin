@@ -921,7 +921,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 	}
 
-	PtrMap<uintptr, TypeAndToken> seen = {}; // NOTE(bill): Multimap, Key: ExactValue
+	SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
 	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
