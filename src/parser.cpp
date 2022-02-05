@@ -2134,7 +2134,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				break;
 			}
 			return original_type;
-		} else if (name.string == "partial") {
+		} else if (name.string == "sparse") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
