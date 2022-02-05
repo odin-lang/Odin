@@ -6956,6 +6956,100 @@ void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *typ
 }
 
 
+struct TypeAndToken {
+	Type *type;
+	Token token;
+};
+
+void add_constant_switch_case(CheckerContext *ctx, PtrMap<uintptr, TypeAndToken> *seen, Operand operand, bool use_expr = true) {
+	if (operand.mode != Addressing_Constant) {
+		return;
+	}
+	if (operand.value.kind == ExactValue_Invalid) {
+		return;
+	}
+
+	uintptr key = hash_exact_value(operand.value);
+	TypeAndToken *found = map_get(seen, key);
+	if (found != nullptr) {
+		isize count = multi_map_count(seen, key);
+		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
+
+		multi_map_get_all(seen, key, taps);
+		for (isize i = 0; i < count; i++) {
+			TypeAndToken tap = taps[i];
+			if (!are_types_identical(operand.type, tap.type)) {
+				continue;
+			}
+
+			TokenPos pos = tap.token.pos;
+			if (use_expr) {
+				gbString expr_str = expr_to_string(operand.expr);
+				error(operand.expr,
+				      "Duplicate case '%s'\n"
+				      "\tprevious case at %s",
+				      expr_str,
+				      token_pos_to_string(pos));
+				gb_string_free(expr_str);
+			} else {
+				error(operand.expr, "Duplicate case found with previous case at %s", token_pos_to_string(pos));
+			}
+			return;
+		}
+	}
+
+	TypeAndToken tap = {operand.type, ast_token(operand.expr)};
+	multi_map_insert(seen, key, tap);
+}
+
+typedef PtrMap<uintptr, TypeAndToken> SeenMap;
+
+void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Operand const &x, Operand const &lhs, Operand const &rhs) {
+	if (is_type_enum(x.type)) {
+		// TODO(bill): Fix this logic so it's fast!!!
+
+		i64 v0 = exact_value_to_i64(lhs.value);
+		i64 v1 = exact_value_to_i64(rhs.value);
+		Operand v = {};
+		v.mode = Addressing_Constant;
+		v.type = x.type;
+		v.expr = x.expr;
+
+		Type *bt = base_type(x.type);
+		GB_ASSERT(bt->kind == Type_Enum);
+		for (i64 vi = v0; vi <= v1; vi++) {
+			if (upper_op != Token_LtEq && vi == v1) {
+				break;
+			}
+
+			bool found = false;
+			for_array(j, bt->Enum.fields) {
+				Entity *f = bt->Enum.fields[j];
+				GB_ASSERT(f->kind == Entity_Constant);
+
+				i64 fv = exact_value_to_i64(f->Constant.value);
+				if (fv == vi) {
+					found = true;
+					break;
+				}
+			}
+			if (found) {
+				v.value = exact_value_i64(vi);
+				add_constant_switch_case(ctx, seen, v);
+			}
+		}
+	} else {
+		add_constant_switch_case(ctx, seen, lhs);
+		if (upper_op == Token_LtEq) {
+			add_constant_switch_case(ctx, seen, rhs);
+		}
+	}
+}
+void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, Operand const &x) {
+	add_constant_switch_case(ctx, seen, x);
+}
+
+
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	u32 prev_state_flags = c->state_flags;
 	defer (c->state_flags = prev_state_flags);
@@ -7863,6 +7957,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (bet == t_invalid) {
 				break;
 			}
+			bool is_partial = cl->tag && (cl->tag->BasicDirective.name.string == "partial");
+
+			SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
+			map_init(&seen, heap_allocator());
+			defer (map_destroy(&seen));
 
 			if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
 				RangeCache rc = range_cache_make(heap_allocator());
@@ -7936,6 +8035,12 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						check_assignment(c, &operand, elem_type, context_name);
 
 						is_constant = is_constant && operand.mode == Addressing_Constant;
+
+						TokenKind upper_op = Token_LtEq;
+						if (op.kind == Token_RangeHalf) {
+							upper_op = Token_Lt;
+						}
+						add_to_seen_map(c, &seen, upper_op, x, x, y);
 					} else {
 						Operand op_index = {};
 						check_expr_with_type_hint(c, &op_index, fv->field, index_type);
@@ -7971,6 +8076,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						check_assignment(c, &operand, elem_type, context_name);
 
 						is_constant = is_constant && operand.mode == Addressing_Constant;
+
+						add_to_seen_map(c, &seen, op_index);
 					}
 				}
 
@@ -8006,11 +8113,53 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 
+			bool was_error = false;
 			if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
 				if (0 < max && max < t->EnumeratedArray.count) {
 					error(node, "Expected %lld values for this enumerated array literal, got %lld", cast(long long)t->EnumeratedArray.count, cast(long long)max);
+					was_error = true;
 				} else {
 					error(node, "Enumerated array literals must only have 'field = value' elements, bare elements are not allowed");
+					was_error = true;
+				}
+			}
+
+			// NOTE(bill): Check for missing cases when `#partial literal` is not present
+			if (cl->elems.count > 0 && !was_error && !is_partial) {
+				Type *et = base_type(index_type);
+				GB_ASSERT(et->kind == Type_Enum);
+				auto fields = et->Enum.fields;
+
+				auto unhandled = array_make<Entity *>(temporary_allocator(), 0, fields.count);
+
+				for_array(i, fields) {
+					Entity *f = fields[i];
+					if (f->kind != Entity_Constant) {
+						continue;
+					}
+					ExactValue v = f->Constant.value;
+					auto found = map_get(&seen, hash_exact_value(v));
+					if (!found) {
+						array_add(&unhandled, f);
+					}
+				}
+
+				if (unhandled.count > 0) {
+					begin_error_block();
+					defer (end_error_block());
+
+					if (unhandled.count == 1) {
+						error_no_newline(node, "Unhandled enumerated array case: %.*s", LIT(unhandled[0]->token.string));
+					} else {
+						error_no_newline(node, "Unhandled enumerated array cases: ");
+						for_array(i, unhandled) {
+							Entity *f = unhandled[i];
+							error_line("\t%.*s\n", LIT(f->token.string));
+						}
+					}
+					error_line("\n");
+
+					error_line("\tSuggestion: Was '#partial %s {...}' wanted?\n", type_to_string(index_type));
 				}
 			}
 

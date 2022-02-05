@@ -454,7 +454,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_EnumeratedArray: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_enumerated_array_ptr);
 
-			LLVMValueRef vals[6] = {
+			LLVMValueRef vals[7] = {
 				lb_get_type_info_ptr(m, t->EnumeratedArray.elem).value,
 				lb_get_type_info_ptr(m, t->EnumeratedArray.index).value,
 				lb_const_int(m, t_int, type_size_of(t->EnumeratedArray.elem)).value,
@@ -463,6 +463,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				// Unions
 				LLVMConstNull(lb_type(m, t_type_info_enum_value)),
 				LLVMConstNull(lb_type(m, t_type_info_enum_value)),
+
+				lb_const_bool(m, t_bool, t->EnumeratedArray.is_sparse).value,
 			};
 
 			lbValue res = {};

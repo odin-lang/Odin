@@ -2136,6 +2136,22 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return original_type;
 		} else if (name.string == "partial") {
 			Ast *tag = ast_basic_directive(f, token, name);
+			Ast *original_expr = parse_expr(f, lhs);
+			Ast *expr = unparen_expr(original_expr);
+			switch (expr->kind) {
+			case Ast_ArrayType:
+				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
+				break;
+			case Ast_CompoundLit:
+				expr->CompoundLit.tag = tag;
+				break;
+			default:
+				syntax_error(expr, "Expected a compound literal after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[expr->kind]));
+				break;
+			}
+			return original_expr;
+		} else if (name.string == "sparse") {
+			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
 			switch (type->kind) {
