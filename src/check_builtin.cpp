@@ -2183,9 +2183,43 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		
 		operand->mode = Addressing_Value;
-		if (is_type_array(t)) {
+		if (t->kind == Type_Array) {
+			i32 rank = type_math_rank(t);
 			// Do nothing
-			operand->type = x.type;			
+			operand->type = x.type;
+			if (rank > 2) {
+				gbString s = type_to_string(x.type);
+				error(call, "'%.*s' expects a matrix or array with a rank of 2, got %s of rank %d", LIT(builtin_name), s, rank);
+				gb_string_free(s);
+				return false;
+			} else if (rank == 2) {
+				Type *inner = base_type(t->Array.elem);
+				GB_ASSERT(inner->kind == Type_Array);
+				Type *elem = inner->Array.elem;
+				Type *array_inner = alloc_type_array(elem, t->Array.count);
+				Type *array_outer = alloc_type_array(array_inner, inner->Array.count);
+				operand->type = array_outer;
+
+				i64 elements = t->Array.count*inner->Array.count;
+				i64 size = type_size_of(operand->type);
+				if (!is_type_valid_for_matrix_elems(elem)) {
+					gbString s = type_to_string(x.type);
+					error(call, "'%.*s' expects a matrix or array with a base element type of an integer, float, or complex number, got %s", LIT(builtin_name), s);
+					gb_string_free(s);
+				} else if (elements > MATRIX_ELEMENT_COUNT_MAX) {
+					gbString s = type_to_string(x.type);
+					error(call, "'%.*s' expects a matrix or array with a maximum of %d elements, got %s with %lld elements", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s, elements);
+					gb_string_free(s);
+				} else if (elements > MATRIX_ELEMENT_COUNT_MAX) {
+					gbString s = type_to_string(x.type);
+					error(call, "'%.*s' expects a matrix or array with non-zero elements, got %s", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s);
+					gb_string_free(s);
+				} else if (size > MATRIX_ELEMENT_MAX_SIZE) {
+					gbString s = type_to_string(x.type);
+					error(call, "Too large of a type for '%.*s', got %s of size %lld, maximum size %d", LIT(builtin_name), s, cast(long long)size, MATRIX_ELEMENT_MAX_SIZE);
+					gb_string_free(s);
+				}
+			}
 		} else {
 			GB_ASSERT(t->kind == Type_Matrix);
 			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count);
