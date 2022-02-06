@@ -580,6 +580,27 @@ LLVMValueRef lb_matrix_to_trimmed_vector(lbProcedure *p, lbValue m) {
 
 lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *type) {
 	if (is_type_array(m.type)) {
+		i32 rank = type_math_rank(m.type);
+		if (rank == 2) {
+			lbAddr addr = lb_add_local_generated(p, type, false);
+			lbValue dst = addr.addr;
+			lbValue src = m;
+			i32 n = cast(i32)get_array_type_count(m.type);
+			i32 m = cast(i32)get_array_type_count(type);
+			// m.type == [n][m]T
+			// type   == [m][n]T
+
+			for (i32 j = 0; j < m; j++) {
+				lbValue dst_col = lb_emit_struct_ep(p, dst, j);
+				for (i32 i = 0; i < n; i++) {
+					lbValue dst_row = lb_emit_struct_ep(p, dst_col, i);
+					lbValue src_col = lb_emit_struct_ev(p, src, i);
+					lbValue src_row = lb_emit_struct_ev(p, src_col, j);
+					lb_emit_store(p, dst_row, src_row);
+				}
+			}
+			return lb_addr_load(p, addr);
+		}
 		// no-op
 		m.type = type;
 		return m;
