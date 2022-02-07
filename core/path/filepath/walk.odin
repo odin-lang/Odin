@@ -71,7 +71,7 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc) -> (err: os.Errno, skip_
 
 @(private)
 read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os.File_Info, os.Errno) {
-	f, err := os.open(dir_name)
+	f, err := os.open(dir_name, os.O_RDONLY)
 	if err != 0 {
 		return nil, err
 	}

@@ -363,6 +363,7 @@ enum TypeInfoFlag : u32 {
 enum : int {
 	MATRIX_ELEMENT_COUNT_MIN = 1,
 	MATRIX_ELEMENT_COUNT_MAX = 16,
+	MATRIX_ELEMENT_MAX_SIZE = MATRIX_ELEMENT_COUNT_MAX * (2 * 8), // complex128
 };
 
 
@@ -1583,6 +1584,24 @@ Type *core_array_type(Type *t) {
 	}
 }
 
+i32 type_math_rank(Type *t) {
+	i32 rank = 0;
+	for (;;) {
+		t = base_type(t);
+		switch (t->kind) {
+		case Type_Array:
+			rank += 1;
+			t = t->Array.elem;
+			break;
+		case Type_Matrix:
+			rank += 2;
+			t = t->Matrix.elem;
+			break;
+		default:
+			return rank;
+		}
+	}
+}
 
 
 Type *base_complex_elem_type(Type *t) {
