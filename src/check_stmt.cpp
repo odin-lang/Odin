@@ -921,7 +921,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 	}
 
-	PtrMap<uintptr, TypeAndToken> seen = {}; // NOTE(bill): Multimap, Key: ExactValue
+	SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
 	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
@@ -1065,7 +1065,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (unhandled.count == 1) {
 				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
 			} else {
-				error_no_newline(node, "Unhandled switch cases: ");
+				error(node, "Unhandled switch cases:");
 				for_array(i, unhandled) {
 					Entity *f = unhandled[i];
 					error_line("\t%.*s\n", LIT(f->token.string));

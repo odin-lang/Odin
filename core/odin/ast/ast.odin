@@ -151,6 +151,7 @@ Comp_Lit :: struct {
 	open: tokenizer.Pos,
 	elems: []^Expr,
 	close: tokenizer.Pos,
+	tag: ^Expr,
 }
 
 

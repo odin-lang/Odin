@@ -290,11 +290,19 @@ foreign libc {
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---
-	@(link_name="fdopendir$INODE64") _unix_fdopendir    :: proc(fd: Handle) -> Dir ---
+
+	@(link_name="fdopendir$INODE64") _unix_fdopendir_amd64 :: proc(fd: Handle) -> Dir ---
+	@(link_name="readdir_r$INODE64") _unix_readdir_r_amd64 :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="fdopendir")         _unix_fdopendir_arm64 :: proc(fd: Handle) -> Dir ---
+	@(link_name="readdir_r")         _unix_readdir_r_arm64 :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
-	@(link_name="readdir_r$INODE64") _unix_readdir_r    :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
+
+	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
+	@(link_name="remove") _unix_remove :: proc(path: cstring) -> c.int ---
 
 	@(link_name="fchmod") _unix_fchmod :: proc(fildes: Handle, mode: u16) -> c.int ---
 
@@ -310,6 +318,14 @@ foreign libc {
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
+}
+
+when ODIN_ARCH != "arm64" {
+	_unix_fdopendir :: proc {_unix_fdopendir_amd64}
+	_unix_readdir_r :: proc {_unix_readdir_r_amd64}
+} else {
+	_unix_fdopendir :: proc {_unix_fdopendir_arm64}
+	_unix_readdir_r :: proc {_unix_readdir_r_arm64}
 }
 
 foreign dl {
@@ -412,6 +428,65 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
+is_file_handle :: proc(fd: Handle) -> bool {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISREG(cast(u32)s.mode)
+}
+
+is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
+	s: OS_Stat
+	err: Errno
+	if follow_links {
+		s, err = _stat(path)
+	} else {
+		s, err = _lstat(path)
+	}
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISREG(cast(u32)s.mode)
+}
+
+
+is_dir_handle :: proc(fd: Handle) -> bool {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISDIR(cast(u32)s.mode)
+}
+
+is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
+	s: OS_Stat
+	err: Errno
+	if follow_links {
+		s, err = _stat(path)
+	} else {
+		s, err = _lstat(path)
+	}
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISDIR(cast(u32)s.mode)
+}
+
+is_file :: proc {is_file_path, is_file_handle}
+is_dir :: proc {is_dir_path, is_dir_handle}
+
+
+rename :: proc(old: string, new: string) -> bool {
+	old_cstr := strings.clone_to_cstring(old, context.temp_allocator)
+	new_cstr := strings.clone_to_cstring(new, context.temp_allocator)
+	return _unix_rename(old_cstr, new_cstr) != -1 
+}
+
+remove :: proc(path: string) -> bool {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	return _unix_remove(path_cstr) != -1 
+}
 
 @private
 _stat :: proc(path: string) -> (OS_Stat, Errno) {
