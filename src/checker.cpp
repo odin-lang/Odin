@@ -3477,11 +3477,11 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	if (entity_visibility_kind == EntityVisiblity_Public &&
 	    (c->scope->flags&ScopeFlag_File) &&
 	    c->scope->file) {
-	    	if (c->scope->file->flags & AstFile_IsPrivatePkg) {
-			entity_visibility_kind = EntityVisiblity_PrivateToPackage;
-	    	} else if (c->scope->file->flags & AstFile_IsPrivateFile) {
+	    	if (c->scope->file->flags & AstFile_IsPrivateFile) {
 			entity_visibility_kind = EntityVisiblity_PrivateToFile;
-		}
+		} else if (c->scope->file->flags & AstFile_IsPrivatePkg) {
+			entity_visibility_kind = EntityVisiblity_PrivateToPackage;
+	    	}
 	}
 
 	if (entity_visibility_kind != EntityVisiblity_Public && !(c->scope->flags&ScopeFlag_File)) {
