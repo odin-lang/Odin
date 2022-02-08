@@ -241,6 +241,8 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_polymorphic_record_parameter_count,
 	BuiltinProc_type_polymorphic_record_parameter_value,
 
+	BuiltinProc_type_is_subtype_of,
+
 	BuiltinProc_type_field_index_of,
 
 	BuiltinProc_type_equal_proc,
@@ -251,7 +253,7 @@ BuiltinProc__type_end,
 	BuiltinProc___entry_point,
 
 	BuiltinProc_objc_send,
-	BuiltinProc_objc_create,
+	BuiltinProc_objc_selector_name,
 
 	BuiltinProc_COUNT,
 };
@@ -494,6 +496,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_polymorphic_record_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_polymorphic_record_parameter_value"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_is_subtype_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_equal_proc"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -505,5 +509,5 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("objc_send"),   3, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("objc_create"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_selector_name"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };
