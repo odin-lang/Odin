@@ -323,6 +323,8 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 	}
 
 	named_type->Named.type_name = e;
+	GB_ASSERT(original_type->kind == Type_Named);
+	e->TypeName.objc_class_name = original_type->Named.type_name->TypeName.objc_class_name;
 
 	mutex_lock(&ctx->info->gen_types_mutex);
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
