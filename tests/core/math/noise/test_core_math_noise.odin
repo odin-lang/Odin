@@ -128,10 +128,6 @@ Noise_Tests := []Test_Vector{
 	{SEED_2, COORD_2,      0.1354035,  noise.noise_4d_fallback},
 	{SEED_3, COORD_3,      0.14565045,  noise.noise_4d_fallback},
 
-	// TODO: Output according to C# - Figure out which of these two is right (and why).
-	// {SEED_1, COORD_1,     -0.14233987,  noise.noise_4d_fallback},
-	// {SEED_2, COORD_2,      0.1354035,   noise.noise_4d_fallback},
-	// {SEED_3, COORD_3,      0.14565045,  noise.noise_4d_fallback},
 }
 
 noise_test :: proc(t: ^testing.T) {
