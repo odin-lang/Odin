@@ -338,6 +338,9 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	if (decl != nullptr) {
 		AttributeContext ac = {};
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
+		if (e->kind == Entity_TypeName && ac.objc_class != "") {
+			e->TypeName.objc_class_name = ac.objc_class;
+		}
 	}
 
 

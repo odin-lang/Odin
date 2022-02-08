@@ -841,6 +841,17 @@ void add_global_enum_constant(Slice<Entity *> const &fields, char const *name, i
 	GB_PANIC("Unfound enum value for global constant: %s %lld", name, cast(long long)value);
 }
 
+Type *add_global_type_name(Scope *scope, String const &type_name, Type *backing_type) {
+	Entity *e = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+	Type *named_type = alloc_type_named(type_name, backing_type, e);
+	e->type = named_type;
+	set_base_type(named_type, backing_type);
+	if (scope_insert(scope, e)) {
+		compiler_error("double declaration of %.*s", LIT(e->token.string));
+	}
+	return named_type;
+}
+
 
 void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -985,6 +996,17 @@ void init_universal(void) {
 	t_f64_ptr      = alloc_type_pointer(t_f64);
 	t_u8_slice     = alloc_type_slice(t_u8);
 	t_string_slice = alloc_type_slice(t_string);
+
+	// intrinsics types for objective-c stuff
+	{
+		t_objc_object   = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_object"),   alloc_type_struct());
+		t_objc_selector = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_selector"), alloc_type_struct());
+		t_objc_class    = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_class"),    alloc_type_struct());
+
+		t_objc_id       = alloc_type_pointer(t_objc_object);
+		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
+		t_objc_Class    = alloc_type_pointer(t_objc_class);
+	}
 }
 
 
@@ -1041,6 +1063,9 @@ void init_checker_info(CheckerInfo *i) {
 	semaphore_init(&i->collect_semaphore);
 
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
+
+	mutex_init(&i->objc_types_mutex);
+	map_init(&i->objc_msgSend_types, a);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -1073,6 +1098,9 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->type_and_value_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
 	mutex_destroy(&i->foreign_mutex);
+
+	mutex_destroy(&i->objc_types_mutex);
+	map_destroy(&i->objc_msgSend_types);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -3160,6 +3188,14 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 		return true;
 	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "objc_class") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String || ev.value_string == "") {
+			error(elem, "Expected a non-empty string value for '%.*s'", LIT(name));
+		} else {
+			ac->objc_class = ev.value_string;
+		}
 		return true;
 	}
 	return false;
