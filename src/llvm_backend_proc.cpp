@@ -2109,6 +2109,9 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_objc_send:
 		return lb_handle_obj_send(p, expr);
+
+	case BuiltinProc_objc_selector_name:
+		return lb_handle_obj_selector_name(p, expr);
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

@@ -228,42 +228,6 @@ void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reser
 	}
 }
 
-
-isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false) {
-	Type *prev_src = src;
-	src = type_deref(src);
-	if (!src_is_ptr) {
-		src_is_ptr = src != prev_src;
-	}
-	src = base_type(src);
-
-	if (!is_type_struct(src)) {
-		return 0;
-	}
-
-	for_array(i, src->Struct.fields) {
-		Entity *f = src->Struct.fields[i];
-		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
-			continue;
-		}
-
-		if (are_types_identical(f->type, dst)) {
-			return level+1;
-		}
-		if (src_is_ptr && is_type_pointer(dst)) {
-			if (are_types_identical(f->type, type_deref(dst))) {
-				return level+1;
-			}
-		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr);
-		if (nested_level > 0) {
-			return nested_level;
-		}
-	}
-
-	return 0;
-}
-
 bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                             Array<Operand> *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////

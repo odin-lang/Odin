@@ -350,9 +350,15 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		return true;
 	} break;
 
-	case BuiltinProc_objc_create: {
-		GB_PANIC("TODO: BuiltinProc_objc_create");
-		return false;
+	case BuiltinProc_objc_selector_name: {
+		String sel_name = {};
+		if (!is_constant_string(c, builtin_name, ce->args[0], &sel_name)) {
+			return false;
+		}
+
+		operand->type = t_objc_SEL;
+		operand->mode = Addressing_Value;
+		return true;
 	} break;
 	}
 }
@@ -392,8 +398,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_len:
 	case BuiltinProc_min:
 	case BuiltinProc_max:
+	case BuiltinProc_type_is_subtype_of:
 	case BuiltinProc_objc_send:
-	case BuiltinProc_objc_create:
+	case BuiltinProc_objc_selector_name:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -435,7 +442,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_objc_send:
-	case BuiltinProc_objc_create:
+	case BuiltinProc_objc_selector_name:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
@@ -3944,6 +3951,31 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		break;
+
+	case BuiltinProc_type_is_subtype_of:
+		{
+			Operand op_src = {};
+			Operand op_dst = {};
+
+			check_expr_or_type(c, &op_src, ce->args[0]);
+			if (op_src.mode != Addressing_Type) {
+				gbString e = expr_to_string(op_src.expr);
+				error(op_src.expr, "'%.*s' expects a type, got %s", LIT(builtin_name), e);
+				gb_string_free(e);
+				return false;
+			}
+			check_expr_or_type(c, &op_dst, ce->args[1]);
+			if (op_dst.mode != Addressing_Type) {
+				gbString e = expr_to_string(op_dst.expr);
+				error(op_dst.expr, "'%.*s' expects a type, got %s", LIT(builtin_name), e);
+				gb_string_free(e);
+				return false;
+			}
+
+			operand->value = exact_value_bool(is_type_subtype_of(op_src.type, op_dst.type));
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+		} break;
 
 	case BuiltinProc_type_field_index_of:
 		{

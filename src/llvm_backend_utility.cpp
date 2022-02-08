@@ -1915,3 +1915,14 @@ lbValue lb_handle_obj_send(lbProcedure *p, Ast *expr) {
 
 	return lb_emit_call(p, the_proc, args);
 }
+
+
+lbValue lb_handle_obj_selector_name(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	return lb_handle_obj_selector(p, name);
+
+}
