@@ -3344,9 +3344,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_simple_compare:
 	case BuiltinProc_type_is_dereferenceable:
 	case BuiltinProc_type_is_valid_map_key:
+	case BuiltinProc_type_is_valid_matrix_elements:
 	case BuiltinProc_type_is_named:
 	case BuiltinProc_type_is_pointer:
 	case BuiltinProc_type_is_array:
+	case BuiltinProc_type_is_enumerated_array:
 	case BuiltinProc_type_is_slice:
 	case BuiltinProc_type_is_dynamic_array:
 	case BuiltinProc_type_is_map:
@@ -3354,10 +3356,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_union:
 	case BuiltinProc_type_is_enum:
 	case BuiltinProc_type_is_proc:
-	case BuiltinProc_type_is_bit_field:
-	case BuiltinProc_type_is_bit_field_value:
 	case BuiltinProc_type_is_bit_set:
 	case BuiltinProc_type_is_simd_vector:
+	case BuiltinProc_type_is_matrix:
 	case BuiltinProc_type_is_specialized_polymorphic_record:
 	case BuiltinProc_type_is_unspecialized_polymorphic_record:
 	case BuiltinProc_type_has_nil:
