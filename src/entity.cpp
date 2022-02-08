@@ -186,6 +186,7 @@ struct Entity {
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
 			bool   is_type_alias;
+			String objc_class_name;
 		} TypeName;
 		struct {
 			u64     tags;

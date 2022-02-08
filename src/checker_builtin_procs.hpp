@@ -250,6 +250,9 @@ BuiltinProc__type_end,
 
 	BuiltinProc___entry_point,
 
+	BuiltinProc_objc_send,
+	BuiltinProc_objc_create,
+
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
@@ -500,4 +503,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("objc_send"),   3, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_create"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };

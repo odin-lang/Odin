@@ -72,6 +72,9 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	map_init(&m->debug_values, a);
 	array_init(&m->debug_incomplete_types, a, 0, 1024);
+
+	string_map_init(&m->objc_classes, a);
+	string_map_init(&m->objc_selectors, a);
 }
 
 bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -2450,7 +2453,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	return {};
 }
 
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value, Entity **entity_) {
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
@@ -2476,6 +2479,9 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 
 	lb_add_entity(m, e, g);
 	lb_add_member(m, name, g);
+
+	if (entity_) *entity_ = e;
+
 	return lb_addr(g);
 }
 

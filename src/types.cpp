@@ -685,6 +685,16 @@ gb_global Type *t_map_header                     = nullptr;
 gb_global Type *t_equal_proc  = nullptr;
 gb_global Type *t_hasher_proc = nullptr;
 
+gb_global Type *t_objc_object   = nullptr;
+gb_global Type *t_objc_selector = nullptr;
+gb_global Type *t_objc_class    = nullptr;
+
+gb_global Type *t_objc_id    = nullptr;
+gb_global Type *t_objc_SEL   = nullptr;
+gb_global Type *t_objc_Class = nullptr;
+
+
+
 gb_global RecursiveMutex g_type_mutex;
 
 struct TypePath;

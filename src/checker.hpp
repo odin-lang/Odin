@@ -107,6 +107,7 @@ struct AttributeContext {
 	String  thread_local_model;
 	String  deprecated_message;
 	String  warning_message;
+	String  objc_class;
 	DeferredProcedure deferred_procedure;
 	bool    is_export           : 1;
 	bool    is_static           : 1;
@@ -267,6 +268,17 @@ struct UntypedExprInfo {
 typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
 typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
+enum ObjcMsgKind : u32 {
+	ObjcMsg_normal,
+	ObjcMsg_fpret,
+	ObjcMsg_fp2ret,
+	ObjcMsg_stret,
+};
+struct ObjcMsgData {
+	ObjcMsgKind kind;
+	Type *proc_type;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -340,7 +352,8 @@ struct CheckerInfo {
 
 	MPMCQueue<Ast *> intrinsics_entry_point_usage;
 
-
+	BlockingMutex objc_types_mutex;
+	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
 };
 
 struct CheckerContext {

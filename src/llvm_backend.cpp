@@ -652,7 +652,53 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	return p;
 }
 
-lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+lbProcedure *lb_create_objc_names(lbModule *main_module) {
+	if (build_context.metrics.os != TargetOs_darwin) {
+		return nullptr;
+	}
+	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
+	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit("__$init_objc_names"), proc_type);
+	p->is_startup = true;
+	return p;
+}
+
+void lb_finalize_objc_names(lbProcedure *p) {
+	if (p == nullptr) {
+		return;
+	}
+	lbModule *m = p->module;
+
+	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
+	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
+	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
+
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
+	lb_begin_procedure_body(p);
+	for_array(i, m->objc_classes.entries) {
+		auto const &entry = m->objc_classes.entries[i];
+		String name = entry.key.string;
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
+		lb_addr_store(p, entry.value, ptr);
+	}
+
+	for_array(i, m->objc_selectors.entries) {
+		auto const &entry = m->objc_selectors.entries[i];
+		String name = entry.key.string;
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
+		lb_addr_store(p, entry.value, ptr);
+	}
+
+	lb_end_procedure_body(p);
+
+	lb_run_function_pass_manager(default_function_pass_manager, p);
+
+}
+
+lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
 	lb_populate_function_pass_manager(main_module, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -665,6 +711,10 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	lb_begin_procedure_body(p);
 
 	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+
+	if (objc_names) {
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, objc_names->type)), objc_names->value, nullptr, 0, "");
+	}
 
 	for_array(i, global_variables) {
 		auto *var = &global_variables[i];
@@ -1570,8 +1620,10 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Runtime Type Information Creation");
 	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
 
+	lbProcedure *objc_names = lb_create_objc_names(default_module);
+
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
-	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, global_variables);
+	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, objc_names, global_variables);
 	gb_unused(startup_runtime);
 
 	TIME_SECTION("LLVM Global Procedures and Types");
@@ -1650,6 +1702,8 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	lb_finalize_objc_names(objc_names);
+
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
 		for_array(j, gen->modules.entries) {
@@ -1660,6 +1714,7 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 	}
+
 
 
 	TIME_SECTION("LLVM Function Pass");
