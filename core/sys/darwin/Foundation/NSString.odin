@@ -87,12 +87,12 @@ String_cStringUsingEncoding :: proc(self: ^String, encoding: StringEncoding) -> 
 	return msgSend(cstring, self, "cStringUsingEncoding:", encoding)
 }
 
-String_UTFString :: proc(self: ^String) -> cstring {
-	return msgSend(cstring, self, "UTFString")
+String_UTF8String :: proc(self: ^String) -> cstring {
+	return msgSend(cstring, self, "UTF8String")
 }
 
 String_OdinString :: proc(self: ^String) -> string {
-	return string(String_UTFString(self))
+	return string(String_UTF8String(self))
 }
 
 String_maximumLengthOfBytesUsingEncoding :: proc(self: ^String, encoding: StringEncoding) -> UInteger {
