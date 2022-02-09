@@ -16,8 +16,8 @@ Value_valueWithPointer :: proc(pointer: rawptr) -> ^Value {
 	return msgSend(^Value, Value, "valueWithPointer:", pointer)
 }
 
-Value_initWithBytes :: proc(value: rawptr, type: cstring) -> ^Value {
-	return msgSend(^Value, Value, "initWithBytes:objCType:", value, type)
+Value_initWithBytes :: proc(self: ^Value, value: rawptr, type: cstring) -> ^Value {
+	return msgSend(^Value, self, "initWithBytes:objCType:", value, type)
 }
 
 Value_initWithCoder :: proc(coder: ^Coder) -> ^Value {
@@ -46,19 +46,19 @@ Value_pointerValue :: proc(self: ^Value) -> rawptr {
 Number :: struct{using _: Copying(Number), using _: Value}
 
 
-Number_numberWithI8               :: proc(value: i8)   -> ^Number { return msgSend(^Number, Number, "numberWithChar:",             value) }
-Number_numberWithU8               :: proc(value: u8)   -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedChar:",     value) }
-Number_numberWithI16              :: proc(value: i16)  -> ^Number { return msgSend(^Number, Number, "numberWithShort:",            value) }
-Number_numberWithU16              :: proc(value: u16)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedShort:",    value) }
-Number_numberWithI32              :: proc(value: i32)  -> ^Number { return msgSend(^Number, Number, "numberWithInt:",              value) }
-Number_numberWithU32              :: proc(value: u32)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedInt:",      value) }
-Number_numberWithInt              :: proc(value: int)  -> ^Number { return msgSend(^Number, Number, "numberWithLong:",             value) }
-Number_numberWithUint             :: proc(value: uint) -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLong:",     value) }
-Number_numberWithU64              :: proc(value: u64)  -> ^Number { return msgSend(^Number, Number, "numberWithLongLong:",         value) }
-Number_numberWithI64              :: proc(value: i64)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLongLong:", value) }
-Number_numberWithF32              :: proc(value: f32)  -> ^Number { return msgSend(^Number, Number, "numberWithFloat:",            value) }
-Number_numberWithF64              :: proc(value: f64)  -> ^Number { return msgSend(^Number, Number, "numberWithDouble:",           value) }
-Number_numberWithBool             :: proc(value: BOOL) -> ^Number { return msgSend(^Number, Number, "numberWithBool:",             value) }
+Number_numberWithI8   :: proc(value: i8)   -> ^Number { return msgSend(^Number, Number, "numberWithChar:",             value) }
+Number_numberWithU8   :: proc(value: u8)   -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedChar:",     value) }
+Number_numberWithI16  :: proc(value: i16)  -> ^Number { return msgSend(^Number, Number, "numberWithShort:",            value) }
+Number_numberWithU16  :: proc(value: u16)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedShort:",    value) }
+Number_numberWithI32  :: proc(value: i32)  -> ^Number { return msgSend(^Number, Number, "numberWithInt:",              value) }
+Number_numberWithU32  :: proc(value: u32)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedInt:",      value) }
+Number_numberWithInt  :: proc(value: int)  -> ^Number { return msgSend(^Number, Number, "numberWithLong:",             value) }
+Number_numberWithUint :: proc(value: uint) -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLong:",     value) }
+Number_numberWithU64  :: proc(value: u64)  -> ^Number { return msgSend(^Number, Number, "numberWithLongLong:",         value) }
+Number_numberWithI64  :: proc(value: i64)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLongLong:", value) }
+Number_numberWithF32  :: proc(value: f32)  -> ^Number { return msgSend(^Number, Number, "numberWithFloat:",            value) }
+Number_numberWithF64  :: proc(value: f64)  -> ^Number { return msgSend(^Number, Number, "numberWithDouble:",           value) }
+Number_numberWithBool :: proc(value: BOOL) -> ^Number { return msgSend(^Number, Number, "numberWithBool:",             value) }
 
 Number_number :: proc{
 	Number_numberWithI8,
