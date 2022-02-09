@@ -13,3 +13,8 @@ AutoreleasePool_showPools :: proc(self: ^AutoreleasePool, obj: ^Object) {
 	msgSend(nil, self, "showPools")
 }
 
+
+@(deferred_out=AutoreleasePool_drain)
+scoped_autoreleasepool :: proc() -> ^AutoreleasePool {
+	return init(alloc(AutoreleasePool))
+}
