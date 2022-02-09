@@ -5,27 +5,27 @@ foreign import "system:Foundation.framework"
 ErrorDomain :: ^String
 
 foreign Foundation {
-	CocoaErrorDomain:    ErrorDomain
-	POSIXErrorDomain:    ErrorDomain
-	OSStatusErrorDomain: ErrorDomain
-	MachErrorDomain:     ErrorDomain
+	@(linkage="weak") CocoaErrorDomain:    ErrorDomain
+	@(linkage="weak") POSIXErrorDomain:    ErrorDomain
+	@(linkage="weak") OSStatusErrorDomain: ErrorDomain
+	@(linkage="weak") MachErrorDomain:     ErrorDomain
 }
 
 ErrorUserInfoKey :: ^String
 
 foreign Foundation {
-	UnderlyingErrorKey:                  ErrorUserInfoKey
-	LocalizedDescriptionKey:             ErrorUserInfoKey
-	LocalizedFailureReasonErrorKey:      ErrorUserInfoKey
-	LocalizedRecoverySuggestionErrorKey: ErrorUserInfoKey
-	LocalizedRecoveryOptionsErrorKey:    ErrorUserInfoKey
-	RecoveryAttempterErrorKey:           ErrorUserInfoKey
-	HelpAnchorErrorKey:                  ErrorUserInfoKey
-	DebugDescriptionErrorKey:            ErrorUserInfoKey
-	LocalizedFailureErrorKey:            ErrorUserInfoKey
-	StringEncodingErrorKey:              ErrorUserInfoKey
-	URLErrorKey:                         ErrorUserInfoKey
-	FilePathErrorKey:                    ErrorUserInfoKey
+	@(linkage="weak") UnderlyingErrorKey:                  ErrorUserInfoKey
+	@(linkage="weak") LocalizedDescriptionKey:             ErrorUserInfoKey
+	@(linkage="weak") LocalizedFailureReasonErrorKey:      ErrorUserInfoKey
+	@(linkage="weak") LocalizedRecoverySuggestionErrorKey: ErrorUserInfoKey
+	@(linkage="weak") LocalizedRecoveryOptionsErrorKey:    ErrorUserInfoKey
+	@(linkage="weak") RecoveryAttempterErrorKey:           ErrorUserInfoKey
+	@(linkage="weak") HelpAnchorErrorKey:                  ErrorUserInfoKey
+	@(linkage="weak") DebugDescriptionErrorKey:            ErrorUserInfoKey
+	@(linkage="weak") LocalizedFailureErrorKey:            ErrorUserInfoKey
+	@(linkage="weak") StringEncodingErrorKey:              ErrorUserInfoKey
+	@(linkage="weak") URLErrorKey:                         ErrorUserInfoKey
+	@(linkage="weak") FilePathErrorKey:                    ErrorUserInfoKey
 }
 
 @(objc_class="NSError")
