@@ -24,4 +24,10 @@ Dictionary_objectForKey :: proc(self: ^Dictionary, key: ^Object) -> ^Object {
 	return msgSend(^Dictionary, self, "objectForKey:", key)
 }
 
-// TODO(bill): enumerator
+Dictionary_count :: proc(self: ^Dictionary) -> UInteger {
+	return msgSend(UInteger, self, "count")
+}
+
+Dictionary_keyEnumerator :: proc(self: ^Dictionary, $KeyType: typeid) -> (enumerator: ^Enumerator(KeyType)) {
+	return msgSend(type_of(enumerator), self, "keyEnumerator")
+}

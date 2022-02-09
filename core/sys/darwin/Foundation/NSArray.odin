@@ -19,8 +19,8 @@ Array_objectAtIndex :: proc(self: ^Array($T), index: UInteger) -> ^Object {
 	return msgSend(^Object, self, "objectAtIndex:", index)
 }
 
-Array_object :: proc(self: ^Array($T), index: UInteger) -> ^T {
-	return (^T)(Array_objectAtIndex(self, index))
+Array_object :: proc(self: ^Array($T), index: UInteger) -> T {
+	return (T)(Array_objectAtIndex(self, index))
 }
 
 Array_count :: proc(self: ^Array($T)) -> UInteger {
