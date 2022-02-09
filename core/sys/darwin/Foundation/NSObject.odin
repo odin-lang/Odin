@@ -33,13 +33,18 @@ retain :: proc(self: ^$T) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 release :: proc(self: ^$T) where intrinsics.type_is_subtype_of(T, Object) {
 	msgSend(nil, self, "release")
 }
+autorelease :: proc(self: ^$T) where intrinsics.type_is_subtype_of(T, Object) {
+	msgSend(nil, self, "autorelease")
+}
 retainCount :: proc(self: ^$T) -> UInteger where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(UInteger, self, "retainCount")
 }
 
+
 copy :: proc(self: ^Copying($T)) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "copy")
 }
+
 
 hash :: proc(self: ^Object) -> UInteger {
 	return msgSend(UInteger, self, "hash")
@@ -58,6 +63,10 @@ debugDescription :: proc(self: ^Object) -> ^String {
 		return msgSend(^String, self, "debugDescription")
 	}
 	return nil
+}
+
+bridgingCast :: proc($T: typeid, obj: ^Object) where intrinsics.type_is_pointer(T), intrinsics.type_is_subtype_of(T, ^Object) {
+	return (T)(obj)
 }
 
 
