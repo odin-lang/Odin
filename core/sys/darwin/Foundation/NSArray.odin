@@ -3,7 +3,9 @@ package objc_Foundation
 import "core:intrinsics"
 
 @(objc_class="NSArray")
-Array :: struct($T: typeid) where intrinsics.type_is_pointer(T), intrinsics.type_is_subtype_of(T, ^Object) {using _: Copying(Array(T))}
+Array :: struct($T: typeid) where intrinsics.type_is_pointer(T), intrinsics.type_is_subtype_of(T, ^Object) {
+	using _: Copying(Array(T)),
+}
 
 Array_initWithObjects :: proc(self: ^$A/Array($T), objects: [^]^Object, count: UInteger) -> ^A {
 	return msgSend(^A, "initWithObjects:count:", objects, count)
