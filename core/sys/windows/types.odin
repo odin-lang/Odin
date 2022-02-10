@@ -202,6 +202,7 @@ INVALID_SOCKET :: ~SOCKET(0)
 
 WSAEINTR: c_int : 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
 WSAEACCES: c_int : 10013
+WSAEFAULT : c_int : 10014
 WSAEINVAL: c_int : 10022
 WSAEMFILE: c_int : 10024
 WSAEWOULDBLOCK: c_int : 10035
