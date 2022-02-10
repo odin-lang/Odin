@@ -88,7 +88,7 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error)
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same address, for the same socket immediately.
+	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr, addrsize := address_to_sockaddr(addr, port)
