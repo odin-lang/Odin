@@ -8,9 +8,26 @@ import "core:fmt"
 
 Socket :: distinct win.SOCKET
 
+General_Error :: enum {
+}
+
+Network_Error :: union {
+	General_Error,
+	Create_Socket_Error,
+	Dial_Error,
+	Listen_Error,
+	Accept_Error,
+	Bind_Error,
+	Tcp_Send_Error,
+	Udp_Send_Error,
+	Tcp_Recv_Error,
+	Udp_Recv_Error,
+	Shutdown_Error,
+	Socket_Option_Error,
+}
+
 
 Create_Socket_Error :: enum c.int {
-	Ok = 0,
 	Offline = win.WSAENETDOWN,
 	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	No_Socket_Descriptors_Available = win.WSAEMFILE,
@@ -20,7 +37,7 @@ Create_Socket_Error :: enum c.int {
 	Family_And_Socket_Type_Mismatch = win.WSAESOCKTNOSUPPORT,
 }
 
-create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
+create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	win.ensure_winsock_initialized()
 
 	c_type, c_protocol, c_family: c.int
@@ -54,14 +71,7 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 }
 
 
-
-Dial_Error :: union {
-	Specific_Dial_Error,
-	Create_Socket_Error,
-}
-
-Specific_Dial_Error :: enum c.int {
-	Ok = 0,
+Dial_Error :: enum c.int {
 	Address_In_Use = win.WSAEADDRINUSE,
 	In_Progress = win.WSAEALREADY,
 	Cannot_Use_Any_Address = win.WSAEADDRNOTAVAIL,
@@ -77,7 +87,7 @@ Specific_Dial_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK, // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error) {
+dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Error) {
 	family := family_from_address(addr)
 	sock := create_socket(family, .Tcp) or_return
 	skt = sock.(Tcp_Socket)
@@ -90,7 +100,7 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error)
 	sockaddr, addrsize := address_to_sockaddr(addr, port)
 	res := win.connect(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), addrsize)
 	if res < 0 {
-		err = Specific_Dial_Error(win.WSAGetLastError())
+		err = Dial_Error(win.WSAGetLastError())
 		return
 	}
 
@@ -99,25 +109,18 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error)
 
 
 
-Make_Unbound_Udp_Socket_Error :: Create_Socket_Error
-
 // This type of socket becomes bound when you try to send data.
 // This is likely what you want if you want to send data unsolicited.
 //
 // This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
+make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Network_Error) {
 	sock := create_socket(family, .Udp) or_return
 	skt = sock.(Udp_Socket)
 	return
 }
 
 
-Make_Bound_Udp_Socket_Error :: union {
-	Make_Unbound_Udp_Socket_Error,
-	Bind_Socket_Error,
-}
-Bind_Socket_Error :: enum c.int {
-	Ok = 0,
+Bind_Error :: enum c.int {
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = win.WSAEADDRINUSE,
 	// The address is not a local address on this machine.
@@ -138,13 +141,13 @@ Bind_Socket_Error :: enum c.int {
 // This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
 // The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
-make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Make_Bound_Udp_Socket_Error) {
+make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Network_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 
 	sockaddr, addrsize := address_to_sockaddr(bound_address, port)
 	res := win.bind(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), addrsize)
 	if res < 0 {
-		err = Bind_Socket_Error(win.WSAGetLastError())
+		err = Bind_Error(win.WSAGetLastError())
 		return
 	}
 
@@ -153,13 +156,7 @@ make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_So
 
 
 
-Listen_Error :: union {
-	Specific_Listen_Error,
-	Create_Socket_Error,
-}
-
-Specific_Listen_Error :: enum c.int {
-	Ok = 0,
+Listen_Error :: enum c.int {
 	Address_In_Use = win.WSAEADDRINUSE,
 	Already_Connected = win.WSAEISCONN,
 	No_Socket_Descriptors_Available = win.WSAEMFILE,
@@ -169,25 +166,27 @@ Specific_Listen_Error :: enum c.int {
 	Listening_Not_Supported_For_This_Socket = win.WSAEOPNOTSUPP,
 }
 
-listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp_Socket, err: Listen_Error) {
+listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
 	family := family_from_address(local_addr)
 	sock := create_socket(family, .Tcp) or_return
 	skt = sock.(Tcp_Socket)
 
+	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
+	// prevent hijacking of the server's endpoint by other applications.
 	_ = set_option(skt, .Exclusive_Addr_Use, true)
 
 	sockaddr, addrsize := address_to_sockaddr(local_addr, port)
 	res := win.bind(win.SOCKET(skt), cast(^win.SOCKADDR) &sockaddr, addrsize)
 	if res == win.SOCKET_ERROR {
-		err = Specific_Listen_Error(win.WSAGetLastError())
+		err = Listen_Error(win.WSAGetLastError())
 		return
 	}
 
 	res = win.listen(win.SOCKET(skt), i32(backlog))
 	if res == win.SOCKET_ERROR {
-		err = Specific_Listen_Error(win.WSAGetLastError())
+		err = Listen_Error(win.WSAGetLastError())
 		return
 	}
 
@@ -197,7 +196,6 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 
 
 Accept_Error :: enum c.int {
-	Ok = 0,
 	Reset = win.WSAECONNRESET,
 	Not_Listening = win.WSAEINVAL,
 	No_Socket_Descriptors_Available_For_Client_Socket = win.WSAEMFILE,
@@ -207,7 +205,7 @@ Accept_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK, // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, err: Accept_Error) {
+accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: win.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 	client_sock := win.accept(win.SOCKET(sock), cast(^win.SOCKADDR) &sockaddr, &sockaddrlen)
@@ -259,7 +257,7 @@ Tcp_Recv_Error :: enum c.int {
 	Timeout = win.WSAETIMEDOUT,
 }
 
-recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Tcp_Recv_Error) {
+recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
@@ -279,7 +277,7 @@ Udp_Recv_Error :: enum c.int {
 	Socket_Not_Bound = win.WSAEINVAL, // .. or unknown flag specified; or MSG_OOB specified with SO_OOBINLINE enabled
 }
 
-recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Udp_Recv_Error) {
+recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
@@ -317,7 +315,7 @@ Tcp_Send_Error :: enum c.int {
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
-send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Tcp_Send_Error) {
+send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		res := win.send(win.SOCKET(skt), raw_data(buf), c.int(limit), 0)
@@ -335,7 +333,7 @@ Udp_Send_Error :: enum c.int {
 	Truncated = win.WSAEMSGSIZE,
 }
 
-send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Udp_Send_Error) {
+send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	toaddr, toaddrsize := address_to_sockaddr(to.address, to.port)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
@@ -361,7 +359,6 @@ Shutdown_Manner :: enum c.int {
 }
 
 Shutdown_Error :: enum c.int {
-	Ok = 0,
 	Aborted = win.WSAECONNABORTED,
 	Reset = win.WSAECONNRESET,
 	Offline = win.WSAENETDOWN,
@@ -370,7 +367,7 @@ Shutdown_Error :: enum c.int {
 	Invalid_Manner = win.WSAEINVAL,
 }
 
-shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
+shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
 	res := win.shutdown(win.SOCKET(s), c.int(manner))
 	if res < 0 {
@@ -403,8 +400,6 @@ Socket_Option :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
-	Ok = 0,
-
 	Incorrect_Type,
 	Unknown_Option,
 
@@ -416,7 +411,7 @@ Socket_Option_Error :: enum c.int {
 }
 
 // Socket must be bound.
-set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Socket_Option_Error {
+set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_Error {
 	level := win.SOL_SOCKET
 	if option == .Tcp_Nodelay do level = win.IPPROTO_TCP
 
