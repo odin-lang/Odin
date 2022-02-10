@@ -10,6 +10,7 @@ Socket :: distinct win.SOCKET
 
 
 Create_Socket_Error :: enum c.int {
+	Ok = 0,
 	Offline = win.WSAENETDOWN,
 	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	No_Socket_Descriptors_Available = win.WSAEMFILE,
@@ -60,6 +61,7 @@ Dial_Error :: union {
 }
 
 Specific_Dial_Error :: enum c.int {
+	Ok = 0,
 	Address_In_Use = win.WSAEADDRINUSE,
 	In_Progress = win.WSAEALREADY,
 	Cannot_Use_Any_Address = win.WSAEADDRNOTAVAIL,
@@ -115,6 +117,7 @@ Make_Bound_Udp_Socket_Error :: union {
 	Bind_Socket_Error,
 }
 Bind_Socket_Error :: enum c.int {
+	Ok = 0,
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = win.WSAEADDRINUSE,
 	// The address is not a local address on this machine.
@@ -156,6 +159,7 @@ Listen_Error :: union {
 }
 
 Specific_Listen_Error :: enum c.int {
+	Ok = 0,
 	Address_In_Use = win.WSAEADDRINUSE,
 	Already_Connected = win.WSAEISCONN,
 	No_Socket_Descriptors_Available = win.WSAEMFILE,
@@ -298,6 +302,7 @@ recv :: proc{recv_tcp, recv_udp}
 
 
 Tcp_Send_Error :: enum c.int {
+	Ok = 0,
 	Aborted = win.WSAECONNABORTED,
 	Not_Connected = win.WSAENOTCONN,
 	Shutdown = win.WSAESHUTDOWN,
@@ -326,6 +331,7 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Tcp_
 }
 
 Udp_Send_Error :: enum c.int {
+	Ok = 0,
 	Truncated = win.WSAEMSGSIZE,
 }
 
