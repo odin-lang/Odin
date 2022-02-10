@@ -8,12 +8,6 @@ import "core:fmt"
 
 Socket :: distinct win.SOCKET
 
-Socket_IP_Family :: enum c.int {
-	V4 = win.AF_INET,
-	V6 = win.AF_INET6,
-}
-
-
 
 Create_Socket_Error :: enum c.int {
 	Offline = win.WSAENETDOWN,
@@ -25,14 +19,14 @@ Create_Socket_Error :: enum c.int {
 	Family_And_Socket_Type_Mismatch = win.WSAESOCKTNOSUPPORT,
 }
 
-create_socket :: proc(family: Socket_IP_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
+create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
 	win.ensure_winsock_initialized()
 
 	c_type, c_protocol, c_family: c.int
 
 	switch family {
-	case .V4:  c_family = win.AF_INET
-	case .V6:  c_family = win.AF_INET6
+	case .IPv4:  c_family = win.AF_INET
+	case .IPv6:  c_family = win.AF_INET6
 	case:
 		unreachable()
 	}
@@ -109,7 +103,7 @@ Make_Unbound_Udp_Socket_Error :: Create_Socket_Error
 // This is likely what you want if you want to send data unsolicited.
 //
 // This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Socket_IP_Family) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
+make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
 	sock := create_socket(family, .Udp) or_return
 	skt = sock.(Udp_Socket)
 	return
