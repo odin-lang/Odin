@@ -84,7 +84,6 @@ Specific_Dial_Error :: enum c.int {
 dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error) {
 	family := family_from_address(addr)
 	sock := create_socket(family, .Tcp) or_return
-	defer if err != nil do close(skt)
 	skt = sock.(Tcp_Socket)
 
 	_ = set_option(skt, .Reuse_Address, true)
@@ -111,7 +110,6 @@ Make_Unbound_Udp_Socket_Error :: union {
 // This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
 make_unbound_udp_socket :: proc(family: Socket_IP_Family) -> (skt: Udp_Socket, err: Make_Unbound_Udp_Socket_Error) {
 	sock := create_socket(family, .Udp) or_return
-	defer if err != nil do close(skt)
 	skt = sock.(Udp_Socket)
 	return
 }
