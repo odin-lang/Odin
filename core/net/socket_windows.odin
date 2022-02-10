@@ -177,7 +177,6 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 	family := family_from_address(local_addr)
 	sock := create_socket(family, .Tcp) or_return
 	skt = sock.(Tcp_Socket)
-	defer if err != nil do close(skt)
 
 	_ = set_option(skt, .Exclusive_Addr_Use, true)
 
