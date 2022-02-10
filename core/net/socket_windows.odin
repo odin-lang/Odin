@@ -123,7 +123,18 @@ Make_Bound_Udp_Socket_Error :: union {
 	Bind_Socket_Error,
 }
 Bind_Socket_Error :: enum c.int {
+	// Another application is currently bound to this endpoint.
 	Address_In_Use = win.WSAEADDRINUSE,
+	// The address is not a local address on this machine.
+	Given_Nonlocal_Address = win.WSAEADDRNOTAVAIL,
+	// To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
+	Broadcast_Disabled = win.WSAEACCES,
+	// The address family of the address does not match that of the socket.
+	Address_Family_Mismatch = win.WSAEFAULT,
+	// The socket is already bound to an address.
+	Already_Bound = win.WSAEINVAL,
+	// There are not enough ephemeral ports available.
+	No_Ports_Available = win.WSAENOBUFS,
 }
 
 // This type of socket is bound immediately, which enables it to receive data on the port.
