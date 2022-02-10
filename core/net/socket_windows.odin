@@ -128,7 +128,7 @@ Bind_Socket_Error :: enum c.int {
 //
 // This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
-// The bound_address is the address to bind to. Use a loopback address if you don't care what interface to use.
+// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Make_Bound_Udp_Socket_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 
