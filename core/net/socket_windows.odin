@@ -103,9 +103,7 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error)
 
 
 
-Make_Unbound_Udp_Socket_Error :: union {
-	Create_Socket_Error,
-}
+Make_Unbound_Udp_Socket_Error :: Create_Socket_Error
 
 // This type of socket becomes bound when you try to send data.
 // This is likely what you want if you only want to send data unsolicited.
