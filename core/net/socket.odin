@@ -12,6 +12,11 @@ Socket_Protocol :: enum {
     Udp,
 }
 
+Address_Family :: enum {
+    IPv4,
+    IPv6,
+}
+
 Any_Socket :: union {
     Tcp_Socket,
     Udp_Socket,
