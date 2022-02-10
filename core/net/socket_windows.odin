@@ -86,6 +86,9 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Dial_Error)
 	sock := create_socket(family, .Tcp) or_return
 	skt = sock.(Tcp_Socket)
 
+	// NOTE(tetra): This is so that if we crash while the socket is open, we can
+	// bypass the cooldown period, and allow the next run of the program to
+	// use the same address, for the same socket immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr, addrsize := address_to_sockaddr(addr, port)
@@ -159,10 +162,6 @@ Specific_Listen_Error :: enum c.int {
 	Listening_Not_Supported_For_This_Socket = win.WSAEOPNOTSUPP,
 }
 
-// NOTE(tetra): This is so that if we crash while the socket is open, we can
-// bypass the cooldown period, and allow the next run of the program to
-// use the same address, for the same socket immediately.
-// set_option(sock, .Reuse_Address);
 listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp_Socket, err: Listen_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
