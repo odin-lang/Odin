@@ -2,7 +2,6 @@ package net
 
 import win "core:sys/windows"
 
-
 // Returns an address for each interface that can be bound to.
 get_network_interfaces :: proc() -> []Address {
 	// TODO
@@ -11,19 +10,18 @@ get_network_interfaces :: proc() -> []Address {
 
 @private
 address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: union{win.sockaddr_in, win.sockaddr_in6}, addrsize: i32) {
-	family := family_from_address(addr)
 	switch a in addr {
 	case Ipv4_Address:
 		return win.sockaddr_in {
 			sin_port = u16be(win.USHORT(port)),
 			sin_addr = transmute(win.in_addr) a,
-			sin_family = u16(family),
+			sin_family = u16(win.AF_INET),
 		}, size_of(win.sockaddr_in)
 	case Ipv6_Address:
 		return win.sockaddr_in6 {
 			sin6_port = u16be(win.USHORT(port)),
 			sin6_addr = transmute(win.in6_addr) a,
-			sin6_family = u16(family),
+			sin6_family = u16(win.AF_INET6),
 		}, size_of(win.sockaddr_in6)
 	}
 	unreachable()
