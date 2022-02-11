@@ -287,15 +287,13 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		Operand self = {};
 		check_expr_or_type(c, &self, ce->args[1]);
 		if (self.mode == Addressing_Type) {
-			if (!internal_check_is_assignable_to(self.type, t_objc_object)) {
+			if (!is_type_objc_object(self.type)) {
 				gbString t = type_to_string(self.type);
 				error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got type %s", LIT(builtin_name), t);
 				gb_string_free(t);
 				return false;
 			}
-			if (!(self.type->kind == Type_Named &&
-			      self.type->Named.type_name != nullptr &&
-			      self.type->Named.type_name->TypeName.objc_class_name != "")) {
+			if (!has_type_got_objc_class_attribute(self.type)) {
 				gbString t = type_to_string(self.type);
 				error(self.expr, "'%.*s' expected a named type with the attribute @(obj_class=<string>) , got type %s", LIT(builtin_name), t);
 				gb_string_free(t);
@@ -306,7 +304,7 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		} else if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
 			gbString e = expr_to_string(self.expr);
 			gbString t = type_to_string(self.type);
-			error(self.expr, "'%.*s'3 expected a type or value derived from intrinsics.objc_object, got '%s' of type %s %d", LIT(builtin_name), e, t, self.type->kind);
+			error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s %d", LIT(builtin_name), e, t, self.type->kind);
 			gb_string_free(t);
 			gb_string_free(e);
 			return false;

@@ -107,7 +107,6 @@ struct AttributeContext {
 	String  thread_local_model;
 	String  deprecated_message;
 	String  warning_message;
-	String  objc_class;
 	DeferredProcedure deferred_procedure;
 	bool    is_export           : 1;
 	bool    is_static           : 1;
@@ -119,6 +118,11 @@ struct AttributeContext {
 	bool    init                : 1;
 	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
+
+	String  objc_class;
+	String  objc_name;
+	String  objc_class_name;
+	Type *  objc_type;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {

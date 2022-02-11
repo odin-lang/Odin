@@ -18,6 +18,19 @@ Enumerator :: struct($T: typeid) where intrinsics.type_is_pointer(T), intrinsics
 	using _: FastEnumeration,
 }
 
+
+@(objc_type=FastEnumeration, objc_class_name="alloc")
+FastEnumeration_alloc :: proc() -> ^FastEnumeration {
+	return msgSend(^FastEnumeration, FastEnumeration, "alloc")
+}
+
+@(objc_type=FastEnumeration, objc_name="init")
+FastEnumeration_init :: proc(self: ^FastEnumeration) -> ^FastEnumeration {
+	return msgSend(^FastEnumeration, self, "init")
+}
+
+
+@(objc_type=FastEnumeration, objc_name="countByEnumerating")
 FastEnumeration_countByEnumerating :: proc(self: ^FastEnumeration, state: ^FastEnumerationState, buffer: [^]^Object, len: UInteger) -> UInteger {
 	return msgSend(UInteger, self, "countByEnumeratingWithState:objects:count:", state, buffer, len)
 }
@@ -26,7 +39,7 @@ Enumerator_nextObject :: proc(self: ^$E/Enumerator($T)) -> T {
 	return msgSend(T, self, "nextObject")
 }
 
-Enumerator_allObjects :: proc(self: ^$E/Enumerator($T)) -> (all: Array(T)) {
+Enumerator_allObjects :: proc(self: ^$E/Enumerator($T)) -> (all: ^Array) {
 	return msgSend(type_of(all), self, "allObjects")
 }
 

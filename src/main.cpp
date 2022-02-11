@@ -585,37 +585,6 @@ void usage(String argv0) {
 	print_usage_line(1, "e.g. odin build -help");
 }
 
-
-bool string_is_valid_identifier(String str) {
-	if (str.len <= 0) return false;
-
-	isize rune_count = 0;
-
-	isize w = 0;
-	isize offset = 0;
-	while (offset < str.len) {
-		Rune r = 0;
-		w = utf8_decode(str.text, str.len, &r);
-		if (r == GB_RUNE_INVALID) {
-			return false;
-		}
-
-		if (rune_count == 0) {
-			if (!rune_is_letter(r)) {
-				return false;
-			}
-		} else {
-			if (!rune_is_letter(r) && !rune_is_digit(r)) {
-				return false;
-			}
-		}
-		rune_count += 1;
-		offset += w;
-	}
-
-	return true;
-}
-
 enum BuildFlagKind {
 	BuildFlag_Invalid,
 
@@ -2447,6 +2416,7 @@ int main(int arg_count, char const **arg_ptr) {
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
 	mutex_init(&hash_exact_value_mutex);
+	mutex_init(&global_type_name_objc_metadata_mutex);
 
 	init_string_buffer_memory();
 	init_string_interner();

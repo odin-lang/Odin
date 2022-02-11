@@ -31,38 +31,58 @@ foreign Foundation {
 @(objc_class="NSError")
 Error :: struct { using _: Copying(Error) }
 
+
+@(objc_type=Error, objc_class_name="alloc")
+Error_alloc :: proc() -> ^Error {
+	return msgSend(^Error, Error, "alloc")
+}
+
+@(objc_type=Error, objc_name="init")
+Error_init :: proc(self: ^Error) -> ^Error {
+	return msgSend(^Error, self, "init")
+}
+
+@(objc_type=Error, objc_class_name="errorWithDomain")
 Error_errorWithDomain :: proc(domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
 	return msgSend(^Error, Error, "errorWithDomain:code:userInfo:", domain, code, userInfo)
 }
 
+@(objc_type=Error, objc_name="initWithDomain")
 Error_initWithDomain :: proc(self: ^Error, domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
 	return msgSend(^Error, self, "initWithDomain:code:userInfo:", domain, code, userInfo)
 }
 
+@(objc_type=Error, objc_name="code")
 Error_code :: proc(self: ^Error) -> Integer {
 	return msgSend(Integer, self, "code")
 }
 
+@(objc_type=Error, objc_name="domain")
 Error_domain :: proc(self: ^Error) -> ErrorDomain {
 	return msgSend(ErrorDomain, self, "domain")
 }
 
+@(objc_type=Error, objc_name="userInfo")
 Error_userInfo :: proc(self: ^Error) -> ^Dictionary {
 	return msgSend(^Dictionary, self, "userInfo")
 }
 
+@(objc_type=Error, objc_name="localizedDescription")
 Error_localizedDescription :: proc(self: ^Error) -> ^String {
 	return msgSend(^String, self, "localizedDescription")
 }
 
-Error_localizedRecoveryOptions :: proc(self: ^Error) -> (options: ^Array(^Object)) {
+@(objc_type=Error, objc_name="localizedRecoveryOptions")
+Error_localizedRecoveryOptions :: proc(self: ^Error) -> (options: ^Array) {
 	return msgSend(type_of(options), self, "localizedRecoveryOptions")
 }
 
+@(objc_type=Error, objc_name="localizedRecoverySuggestion")
 Error_localizedRecoverySuggestion :: proc(self: ^Error) -> ^String {
 	return msgSend(^String, self, "localizedRecoverySuggestion")
 }
 
+@(objc_type=Error, objc_name="localizedFailureReason")
 Error_localizedFailureReason :: proc(self: ^Error) -> ^String {
 	return msgSend(^String, self, "localizedFailureReason")
 }
