@@ -27,37 +27,45 @@ alloc :: proc($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 init :: proc(self: ^$T) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "init")
 }
-retain :: proc(self: ^$T) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
-	return msgSend(^T, self, "retain")
-}
-release :: proc(self: ^$T) where intrinsics.type_is_subtype_of(T, Object) {
-	msgSend(nil, self, "release")
-}
-autorelease :: proc(self: ^$T) where intrinsics.type_is_subtype_of(T, Object) {
-	msgSend(nil, self, "autorelease")
-}
-retainCount :: proc(self: ^$T) -> UInteger where intrinsics.type_is_subtype_of(T, Object) {
-	return msgSend(UInteger, self, "retainCount")
-}
-
-
 copy :: proc(self: ^Copying($T)) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "copy")
 }
 
 
+@(objc_type=Object, objc_name="retain")
+retain :: proc(self: ^Object) {
+	_ = msgSend(^Object, self, "retain")
+}
+@(objc_type=Object, objc_name="release")
+release :: proc(self: ^Object) {
+	msgSend(nil, self, "release")
+}
+@(objc_type=Object, objc_name="autorelease")
+autorelease :: proc(self: ^Object) {
+	msgSend(nil, self, "autorelease")
+}
+@(objc_type=Object, objc_name="retainCount")
+retainCount :: proc(self: ^Object) -> UInteger {
+	return msgSend(UInteger, self, "retainCount")
+}
+
+
+@(objc_type=Object, objc_name="hash")
 hash :: proc(self: ^Object) -> UInteger {
 	return msgSend(UInteger, self, "hash")
 }
 
+@(objc_type=Object, objc_name="isEqual")
 isEqual :: proc(self, pObject: ^Object) -> BOOL {
 	return msgSend(BOOL, self, "isEqual:", pObject)
 }
 
+@(objc_type=Object, objc_name="description")
 description :: proc(self: ^Object) -> ^String {
 	return msgSend(^String, self, "description")
 }
 
+@(objc_type=Object, objc_name="debugDescription")
 debugDescription :: proc(self: ^Object) -> ^String {
 	if msgSendSafeCheck(self, intrinsics.objc_selector_name("debugDescription")) {
 		return msgSend(^String, self, "debugDescription")

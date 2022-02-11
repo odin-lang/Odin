@@ -4,7 +4,7 @@
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
-
+Type *check_type(CheckerContext *ctx, Ast *e);
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -2740,6 +2740,14 @@ ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
 	return ev;
 }
 
+Type *check_decl_attribute_type(CheckerContext *c, Ast *value) {
+	if (value != nullptr) {
+		return check_type(c, value);
+	}
+	return nullptr;
+}
+
+
 #define ATTRIBUTE_USER_TAG_NAME "tag"
 
 
@@ -3037,6 +3045,46 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			}
 		} else {
 			error(elem, "Expected a string for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_name = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_class_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_class_name = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_type") {
+		if (value == nullptr) {
+			error(elem, "Expected a type for '%.*s'", LIT(name));
+		} else {
+			Type *objc_type = check_type(c, value);
+			if (objc_type != nullptr) {
+				if (!has_type_got_objc_class_attribute(objc_type)) {
+					gbString t = type_to_string(objc_type);
+					error(value, "'%.*s' expected a named type with the attribute @(obj_class=<string>), got type %s", LIT(name), t);
+					gb_string_free(t);
+				} else {
+					ac->objc_type = objc_type;
+				}
+			}
 		}
 		return true;
 	}
