@@ -175,7 +175,7 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 
 	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
 	// prevent hijacking of the server's endpoint by other applications.
-	_ = set_option(skt, .Exclusive_Addr_Use, true)
+	set_option(skt, .Exclusive_Addr_Use, true) or_return
 
 	sockaddr, addrsize := address_to_sockaddr(local_addr, port)
 	res := win.bind(win.SOCKET(skt), cast(^win.SOCKADDR) &sockaddr, addrsize)
