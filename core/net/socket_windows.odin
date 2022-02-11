@@ -37,9 +37,12 @@ Create_Socket_Error :: enum c.int {
 	Family_And_Socket_Type_Mismatch = win.WSAESOCKTNOSUPPORT,
 }
 
-create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
+@(init, private)
+ensure_winsock_initialized :: proc() {
 	win.ensure_winsock_initialized()
+}
 
+create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	c_type, c_protocol, c_family: c.int
 
 	switch family {
