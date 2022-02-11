@@ -412,9 +412,7 @@ Socket_Option_Error :: enum c.int {
 
 // Socket must be bound.
 set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_Error {
-	level := win.SOL_SOCKET
-	if option == .Tcp_Nodelay do level = win.IPPROTO_TCP
-
+	level := win.SOL_SOCKET if option != .Tcp_Nodelay else win.IPPROTO_TCP
 
 	switch option {
 	case
