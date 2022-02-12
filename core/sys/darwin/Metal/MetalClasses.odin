@@ -22,7 +22,7 @@ Methods:
 	setBoundingBoxStride
 */
 @(objc_class="MTLAccelerationStructureBoundingBoxGeometryDescriptor")
-AccelerationStructureBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureBoundingBoxGeometryDescriptor) }
+AccelerationStructureBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureBoundingBoxGeometryDescriptor), using _: AccelerationStructureDescriptor  }
 
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_class_name="alloc")
 AccelerationStructureBoundingBoxGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureBoundingBoxGeometryDescriptor {
@@ -227,7 +227,7 @@ Methods:
 	vertexStride
 */
 @(objc_class="MTLAccelerationStructureTriangleGeometryDescriptor")
-AccelerationStructureTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureTriangleGeometryDescriptor) }
+AccelerationStructureTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureTriangleGeometryDescriptor), using _: AccelerationStructureDescriptor  }
 
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_class_name="alloc")
 AccelerationStructureTriangleGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureTriangleGeometryDescriptor {
@@ -506,7 +506,7 @@ Methods:
 	stride
 */
 @(objc_class="MTLArrayType")
-ArrayType :: struct { using _: NS.Object }
+ArrayType :: struct { using _: Type }
 
 @(objc_type=ArrayType, objc_class_name="alloc")
 ArrayType_alloc :: #force_inline proc() -> ^ArrayType {
@@ -1974,7 +1974,7 @@ Methods:
 	setInstancedAccelerationStructures
 */
 @(objc_class="MTLInstanceAccelerationStructureDescriptor")
-InstanceAccelerationStructureDescriptor :: struct { using _: NS.Copying(InstanceAccelerationStructureDescriptor) }
+InstanceAccelerationStructureDescriptor :: struct { using _: NS.Copying(InstanceAccelerationStructureDescriptor), using _: AccelerationStructureDescriptor  }
 
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_class_name="alloc")
 InstanceAccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^InstanceAccelerationStructureDescriptor {
@@ -2205,7 +2205,7 @@ Methods:
 	elementType
 */
 @(objc_class="MTLPointerType")
-PointerType :: struct { using _: NS.Object }
+PointerType :: struct { using _: Type }
 
 @(objc_type=PointerType, objc_class_name="alloc")
 PointerType_alloc :: #force_inline proc() -> ^PointerType {
@@ -2258,7 +2258,7 @@ Methods:
 	setGeometryDescriptors
 */
 @(objc_class="MTLPrimitiveAccelerationStructureDescriptor")
-PrimitiveAccelerationStructureDescriptor :: struct { using _: NS.Copying(PrimitiveAccelerationStructureDescriptor) }
+PrimitiveAccelerationStructureDescriptor :: struct { using _: NS.Copying(PrimitiveAccelerationStructureDescriptor), using _: AccelerationStructureDescriptor }
 
 @(objc_type=PrimitiveAccelerationStructureDescriptor, objc_class_name="alloc")
 PrimitiveAccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^PrimitiveAccelerationStructureDescriptor {
@@ -2624,7 +2624,7 @@ Methods:
 	setClearColor
 */
 @(objc_class="MTLRenderPassColorAttachmentDescriptor")
-RenderPassColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassColorAttachmentDescriptor) }
+RenderPassColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassColorAttachmentDescriptor), using _: RenderPassAttachmentDescriptor  }
 
 @(objc_type=RenderPassColorAttachmentDescriptor, objc_class_name="alloc")
 RenderPassColorAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassColorAttachmentDescriptor {
@@ -2690,7 +2690,7 @@ Methods:
 	setDepthResolveFilter
 */
 @(objc_class="MTLRenderPassDepthAttachmentDescriptor")
-RenderPassDepthAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassDepthAttachmentDescriptor) }
+RenderPassDepthAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassDepthAttachmentDescriptor), using _: RenderPassAttachmentDescriptor }
 
 @(objc_type=RenderPassDepthAttachmentDescriptor, objc_class_name="alloc")
 RenderPassDepthAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassDepthAttachmentDescriptor {
@@ -2757,7 +2757,7 @@ Methods:
 	visibilityResultBuffer
 */
 @(objc_class="MTLRenderPassDescriptor")
-RenderPassDescriptor :: struct { using _: NS.Copying(RenderPassDescriptor) }
+RenderPassDescriptor :: struct { using _: NS.Copying(RenderPassDescriptor), using _: AccelerationStructureDescriptor  }
 
 @(objc_type=RenderPassDescriptor, objc_class_name="alloc")
 RenderPassDescriptor_alloc :: #force_inline proc() -> ^RenderPassDescriptor {
@@ -3059,7 +3059,7 @@ Methods:
 	writeMask
 */
 @(objc_class="MTLRenderPipelineColorAttachmentDescriptor")
-RenderPipelineColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPipelineColorAttachmentDescriptor) }
+RenderPipelineColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPipelineColorAttachmentDescriptor), using _: RenderPassAttachmentDescriptor }
 
 @(objc_type=RenderPipelineColorAttachmentDescriptor, objc_class_name="alloc")
 RenderPipelineColorAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPipelineColorAttachmentDescriptor {
@@ -4071,7 +4071,7 @@ Methods:
 	members
 */
 @(objc_class="MTLStructType")
-StructType :: struct { using _: NS.Object }
+StructType :: struct { using _: Type }
 
 @(objc_type=StructType, objc_class_name="alloc")
 StructType_alloc :: #force_inline proc() -> ^StructType {
@@ -4292,7 +4292,7 @@ Methods:
 	textureType
 */
 @(objc_class="MTLTextureReferenceType")
-TextureReferenceType :: struct { using _: NS.Object }
+TextureReferenceType :: struct { using _: Type }
 
 @(objc_type=TextureReferenceType, objc_class_name="alloc")
 TextureReferenceType_alloc :: #force_inline proc() -> ^TextureReferenceType {
@@ -4844,7 +4844,7 @@ Methods:
 	writeCompactedAccelerationStructureSize
 */
 @(objc_class="MTLAccelerationStructureCommandEncoder")
-AccelerationStructureCommandEncoder :: struct { using _: NS.Object }
+AccelerationStructureCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="buildAccelerationStructure")
 AccelerationStructureCommandEncoder_buildAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, accelerationStructure: ^AccelerationStructure, descriptor: ^AccelerationStructureDescriptor, scratchBuffer: ^Buffer, scratchBufferOffset: NS.UInteger) {
@@ -5122,14 +5122,14 @@ Methods:
 	waitForFence
 */
 @(objc_class="MTLBlitCommandEncoder")
-BlitCommandEncoder :: struct { using _: NS.Object }
+BlitCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_")
-BlitCommandEncoder_copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
+BlitCommandEncoder_copyFromBufferEx :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:", sourceBuffer, sourceOffset, sourceBytesPerRow, sourceBytesPerImage, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_options_")
-BlitCommandEncoder_copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_options_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin, options: BlitOption) {
+BlitCommandEncoder_copyFromBufferExWithOptions :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin, options: BlitOption) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:options:", sourceBuffer, sourceOffset, sourceBytesPerRow, sourceBytesPerImage, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin, options)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_toBuffer_destinationOffset_size_")
@@ -5676,7 +5676,7 @@ Methods:
 	waitForFence
 */
 @(objc_class="MTLComputeCommandEncoder")
-ComputeCommandEncoder :: struct { using _: NS.Object }
+ComputeCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=ComputeCommandEncoder, objc_name="dispatchThreadgroups")
 ComputeCommandEncoder_dispatchThreadgroups :: #force_inline proc(self: ^ComputeCommandEncoder, threadgroupsPerGrid: Size, threadsPerThreadgroup: Size) {
@@ -6231,30 +6231,30 @@ Device_newCommandQueue :: #force_inline proc(self: ^Device) -> ^Device {
 Device_newCommandQueueWithMaxCommandBufferCount :: #force_inline proc(self: ^Device, maxCommandBufferCount: NS.UInteger) -> ^Device {
 	return msgSend(^Device, self, "newCommandQueueWithMaxCommandBufferCount:", maxCommandBufferCount)
 }
-@(objc_type=Device, objc_name="newComputePipelineStateWithDescriptor_options_completionHandler_")
-Device_newComputePipelineStateWithDescriptor_options_completionHandler_ :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
+@(objc_type=Device, objc_name="newComputePipelineStateWithDescriptorWithCompletionHandler")
+Device_newComputePipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newComputePipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
-@(objc_type=Device, objc_name="newComputePipelineStateWithDescriptor_options_reflection_error_")
-Device_newComputePipelineStateWithDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newComputePipelineStateWithDescriptorWithReflection")
+Device_newComputePipelineStateWithDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newComputePipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
-@(objc_type=Device, objc_name="newComputePipelineStateWithFunction_completionHandler_")
-Device_newComputePipelineStateWithFunction_completionHandler_ :: #force_inline proc(self: ^Device, computeFunction: ^Function, completionHandler: NewComputePipelineStateCompletionHandler) {
+@(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithCompletionHandler")
+Device_newComputePipelineStateWithFunctionWithCompletionHandler :: #force_inline proc(self: ^Device, computeFunction: ^Function, completionHandler: NewComputePipelineStateCompletionHandler) {
 	msgSend(nil, self, "newComputePipelineStateWithFunction:completionHandler:", computeFunction, completionHandler)
 }
-@(objc_type=Device, objc_name="newComputePipelineStateWithFunction_error_")
-Device_newComputePipelineStateWithFunction_error_ :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newComputePipelineStateWithFunction")
+Device_newComputePipelineStateWithFunction :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newComputePipelineStateWithFunction:error:", computeFunction, &error)
 	return
 }
-@(objc_type=Device, objc_name="newComputePipelineStateWithFunction_options_completionHandler_")
-Device_newComputePipelineStateWithFunction_options_completionHandler_ :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
+@(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler")
+Device_newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newComputePipelineStateWithFunction:options:completionHandler:", computeFunction, options, completionHandler)
 }
-@(objc_type=Device, objc_name="newComputePipelineStateWithFunction_options_reflection_error_")
-Device_newComputePipelineStateWithFunction_options_reflection_error_ :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithReflection")
+Device_newComputePipelineStateWithFunctionWithReflection :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newComputePipelineStateWithFunction:options:reflection:error:", computeFunction, options, reflection, &error)
 	return
 }
@@ -6312,12 +6312,12 @@ Device_newLibraryWithFile :: #force_inline proc(self: ^Device, filepath: ^NS.Str
 	device = msgSend(^Device, self, "newLibraryWithFile:error:", filepath, &error)
 	return
 }
-@(objc_type=Device, objc_name="newLibraryWithSource_options_completionHandler_")
-Device_newLibraryWithSource_options_completionHandler_ :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions, completionHandler: NewLibraryCompletionHandler) {
+@(objc_type=Device, objc_name="newLibraryWithSourceWithCompletionHandler")
+Device_newLibraryWithSourceWithCompletionHandler :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions, completionHandler: NewLibraryCompletionHandler) {
 	msgSend(nil, self, "newLibraryWithSource:options:completionHandler:", source, options, completionHandler)
 }
-@(objc_type=Device, objc_name="newLibraryWithSource_options_error_")
-Device_newLibraryWithSource_options_error_ :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newLibraryWithSource")
+Device_newLibraryWithSource :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newLibraryWithSource:options:error:", source, options, &error)
 	return
 }
@@ -6330,30 +6330,30 @@ Device_newLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (
 Device_newRasterizationRateMapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RasterizationRateMapDescriptor) -> ^Device {
 	return msgSend(^Device, self, "newRasterizationRateMapWithDescriptor:", descriptor)
 }
-@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_completionHandler_")
-Device_newRenderPipelineStateWithDescriptor_completionHandler_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, completionHandler: NewRenderPipelineStateCompletionHandler) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithCompletionHandler")
+Device_newRenderPipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, completionHandler: NewRenderPipelineStateCompletionHandler) {
 	msgSend(nil, self, "newRenderPipelineStateWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
-@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_error_")
-Device_newRenderPipelineStateWithDescriptor_error_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor")
+Device_newRenderPipelineStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:error:", descriptor, &error)
 	return
 }
-@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_options_completionHandler_")
-Device_newRenderPipelineStateWithDescriptor_options_completionHandler_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithOptionsAndCompletionHandler")
+Device_newRenderPipelineStateWithDescriptorWithOptionsAndCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newRenderPipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
-@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_options_reflection_error_")
-Device_newRenderPipelineStateWithDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithReflection")
+Device_newRenderPipelineStateWithDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
-@(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptor_options_completionHandler_")
-Device_newRenderPipelineStateWithTileDescriptor_options_completionHandler_ :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptorWithCompletionHandler")
+Device_newRenderPipelineStateWithTileDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newRenderPipelineStateWithTileDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
-@(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptor_options_reflection_error_")
-Device_newRenderPipelineStateWithTileDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptorWithReflection")
+Device_newRenderPipelineStateWithTileDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
 	device = msgSend(^Device, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
@@ -6381,8 +6381,8 @@ Device_newSharedTextureWithHandle :: #force_inline proc(self: ^Device, sharedHan
 Device_newTextureWithDescriptor :: #force_inline proc(self: ^Device, desc: ^TextureDescriptor) -> ^Device {
 	return msgSend(^Device, self, "newTextureWithDescriptor:", desc)
 }
-@(objc_type=Device, objc_name="newTextureWithDescriptor_iosurface_plane_")
-Device_newTextureWithDescriptor_iosurface_plane_ :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: NS.UInteger) -> ^Device {
+@(objc_type=Device, objc_name="newTextureWithDescriptorWithIOSurface")
+Device_newTextureWithDescriptorWithIOSurface :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: NS.UInteger) -> ^Device {
 	return msgSend(^Device, self, "newTextureWithDescriptor:iosurface:plane:", descriptor, iosurface, plane)
 }
 @(objc_type=Device, objc_name="peerCount")
@@ -6664,8 +6664,8 @@ Function_name :: #force_inline proc(self: ^Function) -> ^NS.String {
 Function_newArgumentEncoderWithBufferIndex :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger) -> ^Function {
 	return msgSend(^Function, self, "newArgumentEncoderWithBufferIndex:", bufferIndex)
 }
-@(objc_type=Function, objc_name="newArgumentEncoderWithBufferIndex_reflection_")
-Function_newArgumentEncoderWithBufferIndex_reflection_ :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger, reflection: ^AutoreleasedArgument) -> ^Function {
+@(objc_type=Function, objc_name="newArgumentEncoderWithBufferIndexWithReflection")
+Function_newArgumentEncoderWithBufferIndexWithReflection :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger, reflection: ^AutoreleasedArgument) -> ^Function {
 	return msgSend(^Function, self, "newArgumentEncoderWithBufferIndex:reflection:", bufferIndex, reflection)
 }
 @(objc_type=Function, objc_name="options")
@@ -6840,16 +6840,16 @@ Heap_maxAvailableSizeWithAlignment :: #force_inline proc(self: ^Heap, alignment:
 Heap_newBufferWithLength :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions) -> ^Heap {
 	return msgSend(^Heap, self, "newBufferWithLength:options:", length, options)
 }
-@(objc_type=Heap, objc_name="newBufferWithLength_options_offset_")
-Heap_newBufferWithLength_options_offset_ :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions, offset: NS.UInteger) -> ^Heap {
+@(objc_type=Heap, objc_name="newBufferWithLengthWithOptions")
+Heap_newBufferWithLengthWithOptions :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions, offset: NS.UInteger) -> ^Heap {
 	return msgSend(^Heap, self, "newBufferWithLength:options:offset:", length, options, offset)
 }
 @(objc_type=Heap, objc_name="newTextureWithDescriptor")
 Heap_newTextureWithDescriptor :: #force_inline proc(self: ^Heap, desc: ^TextureDescriptor) -> ^Heap {
 	return msgSend(^Heap, self, "newTextureWithDescriptor:", desc)
 }
-@(objc_type=Heap, objc_name="newTextureWithDescriptor_offset_")
-Heap_newTextureWithDescriptor_offset_ :: #force_inline proc(self: ^Heap, descriptor: ^TextureDescriptor, offset: NS.UInteger) -> ^Heap {
+@(objc_type=Heap, objc_name="newTextureWithDescriptorWithOffset")
+Heap_newTextureWithDescriptorWithOffset :: #force_inline proc(self: ^Heap, descriptor: ^TextureDescriptor, offset: NS.UInteger) -> ^Heap {
 	return msgSend(^Heap, self, "newTextureWithDescriptor:offset:", descriptor, offset)
 }
 @(objc_type=Heap, objc_name="resourceOptions")
@@ -7119,12 +7119,12 @@ Library_installName :: #force_inline proc(self: ^Library) -> ^NS.String {
 Library_label :: #force_inline proc(self: ^Library) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
-@(objc_type=Library, objc_name="newFunctionWithDescriptor_completionHandler_")
-Library_newFunctionWithDescriptor_completionHandler_ :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor, completionHandler: rawptr) {
+@(objc_type=Library, objc_name="newFunctionWithDescriptorWithCompletionHandler")
+Library_newFunctionWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor, completionHandler: rawptr) {
 	msgSend(nil, self, "newFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
-@(objc_type=Library, objc_name="newFunctionWithDescriptor_error_")
-Library_newFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
+@(objc_type=Library, objc_name="newFunctionWithDescriptor")
+Library_newFunctionWithDescriptor :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
 	library = msgSend(^Library, self, "newFunctionWithDescriptor:error:", descriptor, &error)
 	return
 }
@@ -7132,21 +7132,21 @@ Library_newFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, d
 Library_newFunctionWithName :: #force_inline proc(self: ^Library, functionName: ^NS.String) -> ^Library {
 	return msgSend(^Library, self, "newFunctionWithName:", functionName)
 }
-@(objc_type=Library, objc_name="newFunctionWithName_constantValues_completionHandler_")
-Library_newFunctionWithName_constantValues_completionHandler_ :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues, completionHandler: rawptr) {
+@(objc_type=Library, objc_name="newFunctionWithNameWithConstantValuesAndCompletionHandler")
+Library_newFunctionWithNameWithConstantValuesAndCompletionHandler :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues, completionHandler: rawptr) {
 	msgSend(nil, self, "newFunctionWithName:constantValues:completionHandler:", name, constantValues, completionHandler)
 }
-@(objc_type=Library, objc_name="newFunctionWithName_constantValues_error_")
-Library_newFunctionWithName_constantValues_error_ :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues) -> (library: ^Library, error: ^NS.Error) {
+@(objc_type=Library, objc_name="newFunctionWithNameWithConstantValues")
+Library_newFunctionWithNameWithConstantValues :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues) -> (library: ^Library, error: ^NS.Error) {
 	library = msgSend(^Library, self, "newFunctionWithName:constantValues:error:", name, constantValues, &error)
 	return
 }
-@(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptor_completionHandler_")
-Library_newIntersectionFunctionWithDescriptor_completionHandler_ :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor, completionHandler: rawptr) {
+@(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptorWithCompletionHandler")
+Library_newIntersectionFunctionWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor, completionHandler: rawptr) {
 	msgSend(nil, self, "newIntersectionFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
-@(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptor_error_")
-Library_newIntersectionFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
+@(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptor")
+Library_newIntersectionFunctionWithDescriptor :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
 	library = msgSend(^Library, self, "newIntersectionFunctionWithDescriptor:error:", descriptor, &error)
 	return
 }
@@ -7175,7 +7175,7 @@ Methods:
 	setStencilStoreActionOptions
 */
 @(objc_class="MTLParallelRenderCommandEncoder")
-ParallelRenderCommandEncoder :: struct { using _: NS.Object }
+ParallelRenderCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=ParallelRenderCommandEncoder, objc_name="renderCommandEncoder")
 ParallelRenderCommandEncoder_renderCommandEncoder :: #force_inline proc(self: ^ParallelRenderCommandEncoder) -> ^ParallelRenderCommandEncoder {
@@ -7363,7 +7363,7 @@ Methods:
 	waitForFence
 */
 @(objc_class="MTLRenderCommandEncoder")
-RenderCommandEncoder :: struct { using _: NS.Object }
+RenderCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=RenderCommandEncoder, objc_name="dispatchThreadsPerTile")
 RenderCommandEncoder_dispatchThreadsPerTile :: #force_inline proc(self: ^RenderCommandEncoder, threadsPerTile: Size) {
@@ -7677,32 +7677,32 @@ RenderCommandEncoder_updateFence :: #force_inline proc(self: ^RenderCommandEncod
 RenderCommandEncoder_useHeap :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^Heap) {
 	msgSend(nil, self, "useHeap:", heap)
 }
-@(objc_type=RenderCommandEncoder, objc_name="useHeap_stages_")
-RenderCommandEncoder_useHeap_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^Heap, stages: RenderStages) {
+@(objc_type=RenderCommandEncoder, objc_name="useHeapWithStages")
+RenderCommandEncoder_useHeapWithStages :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^Heap, stages: RenderStages) {
 	msgSend(nil, self, "useHeap:stages:", heap, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useHeaps")
 RenderCommandEncoder_useHeaps :: #force_inline proc(self: ^RenderCommandEncoder, heaps: [^]^Heap, count: NS.UInteger) {
 	msgSend(nil, self, "useHeaps:count:", heaps, count)
 }
-@(objc_type=RenderCommandEncoder, objc_name="useHeaps_count_stages_")
-RenderCommandEncoder_useHeaps_count_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, heaps: [^]^Heap, count: NS.UInteger, stages: RenderStages) {
+@(objc_type=RenderCommandEncoder, objc_name="useHeapsWithStages")
+RenderCommandEncoder_useHeapsWithStages :: #force_inline proc(self: ^RenderCommandEncoder, heaps: [^]^Heap, count: NS.UInteger, stages: RenderStages) {
 	msgSend(nil, self, "useHeaps:count:stages:", heaps, count, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useResource")
 RenderCommandEncoder_useResource :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^Resource, usage: ResourceUsage) {
 	msgSend(nil, self, "useResource:usage:", resource, usage)
 }
-@(objc_type=RenderCommandEncoder, objc_name="useResource_usage_stages_")
-RenderCommandEncoder_useResource_usage_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^Resource, usage: ResourceUsage, stages: RenderStages) {
+@(objc_type=RenderCommandEncoder, objc_name="useResourceWithStages")
+RenderCommandEncoder_useResourceWithStages :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^Resource, usage: ResourceUsage, stages: RenderStages) {
 	msgSend(nil, self, "useResource:usage:stages:", resource, usage, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useResources")
 RenderCommandEncoder_useResources :: #force_inline proc(self: ^RenderCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage) {
 	msgSend(nil, self, "useResources:count:usage:", resources, count, usage)
 }
-@(objc_type=RenderCommandEncoder, objc_name="useResources_count_usage_stages_")
-RenderCommandEncoder_useResources_count_usage_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage, stages: RenderStages) {
+@(objc_type=RenderCommandEncoder, objc_name="useResourcesStages")
+RenderCommandEncoder_useResourcesStages :: #force_inline proc(self: ^RenderCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage, stages: RenderStages) {
 	msgSend(nil, self, "useResources:count:usage:stages:", resources, count, usage, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="waitForFence")
@@ -7848,18 +7848,18 @@ Methods:
 	waitForFence
 */
 @(objc_class="MTLResourceStateCommandEncoder")
-ResourceStateCommandEncoder :: struct { using _: NS.Object }
+ResourceStateCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateFence")
 ResourceStateCommandEncoder_updateFence :: #force_inline proc(self: ^ResourceStateCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "updateFence:", fence)
 }
-@(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMapping_mode_indirectBuffer_indirectBufferOffset_")
-ResourceStateCommandEncoder_updateTextureMapping_mode_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
+@(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMappingIndirect")
+ResourceStateCommandEncoder_updateTextureMappingIndirect :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "updateTextureMapping:mode:indirectBuffer:indirectBufferOffset:", texture, mode, indirectBuffer, indirectBufferOffset)
 }
-@(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMapping_mode_region_mipLevel_slice_")
-ResourceStateCommandEncoder_updateTextureMapping_mode_region_mipLevel_slice_ :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, region: Region, mipLevel: NS.UInteger, slice: NS.UInteger) {
+@(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMapping")
+ResourceStateCommandEncoder_updateTextureMapping :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, region: Region, mipLevel: NS.UInteger, slice: NS.UInteger) {
 	msgSend(nil, self, "updateTextureMapping:mode:region:mipLevel:slice:", texture, mode, region, mipLevel, slice)
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMappings")
@@ -7906,7 +7906,7 @@ Methods:
 	signaledValue
 */
 @(objc_class="MTLSharedEvent")
-SharedEvent :: struct { using _: NS.Object }
+SharedEvent :: struct { using _: Event }
 
 @(objc_type=SharedEvent, objc_name="newSharedEventHandle")
 SharedEvent_newSharedEventHandle :: #force_inline proc(self: ^SharedEvent) -> ^SharedEventHandle {
