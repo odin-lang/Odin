@@ -138,11 +138,13 @@ foreign user32 {
 	@(link_name="PeekMessageA") peek_message_a :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool ---
 	@(link_name="PeekMessageW") peek_message_w :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool ---
 
-
 	@(link_name="PostMessageA") post_message_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---
 	@(link_name="PostMessageW") post_message_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---
 	@(link_name="SendMessageA") send_message_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---
 	@(link_name="SendMessageW") send_message_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---
+
+	@(link_name="PostThreadMessageA") post_thread_message_a :: proc(idThread: u32, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---
+	@(link_name="PostThreadMessageW") post_thread_message_w :: proc(idThread: u32, msg: u32, wparam: Wparam, lparam: Lparam) -> Bool ---
 
 	@(link_name="DefWindowProcA") def_window_proc_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---
 	@(link_name="DefWindowProcW") def_window_proc_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---
