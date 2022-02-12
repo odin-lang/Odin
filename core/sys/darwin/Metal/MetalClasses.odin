@@ -6051,7 +6051,7 @@ Methods:
 	newRenderPipelineStateWithDescriptor
 	newRenderPipelineStateWithTileDescriptor
 	newRenderPipelineStateWithTileDescriptor
-	newSamplerStateWithDescriptor
+	newSamplerState
 	newSharedEvent
 	newSharedEventWithHandle
 	newSharedTextureWithDescriptor
@@ -6357,9 +6357,9 @@ Device_newRenderPipelineStateWithTileDescriptorWithReflection :: #force_inline p
 	device = msgSend(^Device, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
-@(objc_type=Device, objc_name="newSamplerStateWithDescriptor")
-Device_newSamplerStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newSamplerStateWithDescriptor:", descriptor)
+@(objc_type=Device, objc_name="newSamplerState")
+Device_newSamplerState :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^Device {
+	return msgSend(^Device, self, "newSamplerState:", descriptor)
 }
 @(objc_type=Device, objc_name="newSharedEvent")
 Device_newSharedEvent :: #force_inline proc(self: ^Device) -> ^Device {
