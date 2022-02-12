@@ -37,36 +37,84 @@ AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxBuffer :: #force_i
 	return msgSend(^AccelerationStructureBoundingBoxGeometryDescriptor, self, "boundingBoxBuffer")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="boundingBoxBufferOffset")
-AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxBufferOffset :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "boundingBoxBufferOffset")
+AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxBufferOffset :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "boundingBoxBufferOffset")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="boundingBoxCount")
-AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxCount :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "boundingBoxCount")
+AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxCount :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "boundingBoxCount")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="boundingBoxStride")
-AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxStride :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "boundingBoxStride")
+AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxStride :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "boundingBoxStride")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_class_name="descriptor")
 AccelerationStructureBoundingBoxGeometryDescriptor_descriptor :: #force_inline proc() -> ^AccelerationStructureBoundingBoxGeometryDescriptor {
 	return msgSend(^AccelerationStructureBoundingBoxGeometryDescriptor, AccelerationStructureBoundingBoxGeometryDescriptor, "descriptor")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="setBoundingBoxBuffer")
-AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxBuffer :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxBuffer: ^NS.Object) {
+AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxBuffer :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxBuffer: ^Buffer) {
 	msgSend(nil, self, "setBoundingBoxBuffer:", boundingBoxBuffer)
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="setBoundingBoxBufferOffset")
-AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxBufferOffset :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxBufferOffset: NS.Integer) {
+AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxBufferOffset :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "setBoundingBoxBufferOffset:", boundingBoxBufferOffset)
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="setBoundingBoxCount")
-AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxCount :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxCount: NS.Integer) {
+AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxCount :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxCount: NS.UInteger) {
 	msgSend(nil, self, "setBoundingBoxCount:", boundingBoxCount)
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="setBoundingBoxStride")
-AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxStride :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxStride: NS.Integer) {
+AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxStride :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor, boundingBoxStride: NS.UInteger) {
 	msgSend(nil, self, "setBoundingBoxStride:", boundingBoxStride)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/*
+Class:
+	MotionKeyframeData
+Class Methods:
+	alloc
+	data
+Methods:
+	init
+	buffer
+	setBuffer
+	offset
+	setOffset
+*/
+
+@(objc_class="MTLMotionKeyframeData")
+MotionKeyframeData :: struct { using _: NS.Object }
+
+@(objc_type=MotionKeyframeData, objc_class_name="alloc")
+MotionKeyframeData_alloc :: #force_inline proc() -> ^MotionKeyframeData {
+	return msgSend(^MotionKeyframeData, MotionKeyframeData, "alloc")
+}
+@(objc_type=MotionKeyframeData, objc_class_name="data")
+MotionKeyframeData_data :: #force_inline proc() -> ^MotionKeyframeData {
+	return msgSend(^MotionKeyframeData, MotionKeyframeData, "data")
+}
+@(objc_type=MotionKeyframeData, objc_class_name="init")
+MotionKeyframeData_init :: #force_inline proc(self: ^MotionKeyframeData) -> ^MotionKeyframeData {
+	return msgSend(^MotionKeyframeData, self, "init")
+}
+@(objc_type=MotionKeyframeData, objc_class_name="buffer")
+MotionKeyframeData_buffer :: #force_inline proc(self: ^MotionKeyframeData) -> ^Buffer {
+	return msgSend(^Buffer, self, "buffer")
+}
+@(objc_type=MotionKeyframeData, objc_class_name="setBuffer")
+MotionKeyframeData_setBuffer :: #force_inline proc(self: ^MotionKeyframeData, buffer: ^Buffer) {
+	msgSend(nil, self, "setBuffer:", buffer)
+}
+@(objc_type=MotionKeyframeData, objc_class_name="offset")
+MotionKeyframeData_offset :: #force_inline proc(self: ^MotionKeyframeData) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "offset")
+}
+@(objc_type=MotionKeyframeData, objc_class_name="setOffset")
+MotionKeyframeData_setOffset :: #force_inline proc(self: ^MotionKeyframeData, offset: NS.UInteger) {
+	msgSend(nil, self, "setOffset:", offset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -133,8 +181,8 @@ AccelerationStructureGeometryDescriptor_allowDuplicateIntersectionFunctionInvoca
 	return msgSend(BOOL, self, "allowDuplicateIntersectionFunctionInvocation")
 }
 @(objc_type=AccelerationStructureGeometryDescriptor, objc_name="intersectionFunctionTableOffset")
-AccelerationStructureGeometryDescriptor_intersectionFunctionTableOffset :: #force_inline proc(self: ^AccelerationStructureGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "intersectionFunctionTableOffset")
+AccelerationStructureGeometryDescriptor_intersectionFunctionTableOffset :: #force_inline proc(self: ^AccelerationStructureGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "intersectionFunctionTableOffset")
 }
 @(objc_type=AccelerationStructureGeometryDescriptor, objc_name="opaque")
 AccelerationStructureGeometryDescriptor_opaque :: #force_inline proc(self: ^AccelerationStructureGeometryDescriptor) -> BOOL {
@@ -145,7 +193,7 @@ AccelerationStructureGeometryDescriptor_setAllowDuplicateIntersectionFunctionInv
 	msgSend(nil, self, "setAllowDuplicateIntersectionFunctionInvocation:", allowDuplicateIntersectionFunctionInvocation)
 }
 @(objc_type=AccelerationStructureGeometryDescriptor, objc_name="setIntersectionFunctionTableOffset")
-AccelerationStructureGeometryDescriptor_setIntersectionFunctionTableOffset :: #force_inline proc(self: ^AccelerationStructureGeometryDescriptor, intersectionFunctionTableOffset: NS.Integer) {
+AccelerationStructureGeometryDescriptor_setIntersectionFunctionTableOffset :: #force_inline proc(self: ^AccelerationStructureGeometryDescriptor, intersectionFunctionTableOffset: NS.UInteger) {
 	msgSend(nil, self, "setIntersectionFunctionTableOffset:", intersectionFunctionTableOffset)
 }
 @(objc_type=AccelerationStructureGeometryDescriptor, objc_name="setOpaque")
@@ -198,19 +246,19 @@ AccelerationStructureTriangleGeometryDescriptor_indexBuffer :: #force_inline pro
 	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, self, "indexBuffer")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="indexBufferOffset")
-AccelerationStructureTriangleGeometryDescriptor_indexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "indexBufferOffset")
+AccelerationStructureTriangleGeometryDescriptor_indexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "indexBufferOffset")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="indexType")
 AccelerationStructureTriangleGeometryDescriptor_indexType :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> IndexType {
 	return msgSend(IndexType, self, "indexType")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setIndexBuffer")
-AccelerationStructureTriangleGeometryDescriptor_setIndexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, indexBuffer: ^NS.Object) {
+AccelerationStructureTriangleGeometryDescriptor_setIndexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, indexBuffer: ^Buffer) {
 	msgSend(nil, self, "setIndexBuffer:", indexBuffer)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setIndexBufferOffset")
-AccelerationStructureTriangleGeometryDescriptor_setIndexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, indexBufferOffset: NS.Integer) {
+AccelerationStructureTriangleGeometryDescriptor_setIndexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, indexBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "setIndexBufferOffset:", indexBufferOffset)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setIndexType")
@@ -218,36 +266,36 @@ AccelerationStructureTriangleGeometryDescriptor_setIndexType :: #force_inline pr
 	msgSend(nil, self, "setIndexType:", indexType)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setTriangleCount")
-AccelerationStructureTriangleGeometryDescriptor_setTriangleCount :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, triangleCount: NS.Integer) {
+AccelerationStructureTriangleGeometryDescriptor_setTriangleCount :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, triangleCount: NS.UInteger) {
 	msgSend(nil, self, "setTriangleCount:", triangleCount)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setVertexBuffer")
-AccelerationStructureTriangleGeometryDescriptor_setVertexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, vertexBuffer: ^NS.Object) {
+AccelerationStructureTriangleGeometryDescriptor_setVertexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, vertexBuffer: ^Buffer) {
 	msgSend(nil, self, "setVertexBuffer:", vertexBuffer)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setVertexBufferOffset")
-AccelerationStructureTriangleGeometryDescriptor_setVertexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, vertexBufferOffset: NS.Integer) {
+AccelerationStructureTriangleGeometryDescriptor_setVertexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, vertexBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "setVertexBufferOffset:", vertexBufferOffset)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="setVertexStride")
-AccelerationStructureTriangleGeometryDescriptor_setVertexStride :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, vertexStride: NS.Integer) {
+AccelerationStructureTriangleGeometryDescriptor_setVertexStride :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor, vertexStride: NS.UInteger) {
 	msgSend(nil, self, "setVertexStride:", vertexStride)
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="triangleCount")
-AccelerationStructureTriangleGeometryDescriptor_triangleCount :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "triangleCount")
+AccelerationStructureTriangleGeometryDescriptor_triangleCount :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "triangleCount")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="vertexBuffer")
 AccelerationStructureTriangleGeometryDescriptor_vertexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> ^AccelerationStructureTriangleGeometryDescriptor {
 	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, self, "vertexBuffer")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="vertexBufferOffset")
-AccelerationStructureTriangleGeometryDescriptor_vertexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "vertexBufferOffset")
+AccelerationStructureTriangleGeometryDescriptor_vertexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "vertexBufferOffset")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="vertexStride")
-AccelerationStructureTriangleGeometryDescriptor_vertexStride :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "vertexStride")
+AccelerationStructureTriangleGeometryDescriptor_vertexStride :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "vertexStride")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -292,16 +340,16 @@ Argument_access :: #force_inline proc(self: ^Argument) -> ArgumentAccess {
 	return msgSend(ArgumentAccess, self, "access")
 }
 @(objc_type=Argument, objc_name="arrayLength")
-Argument_arrayLength :: #force_inline proc(self: ^Argument) -> NS.Integer {
-	return msgSend(NS.Integer, self, "arrayLength")
+Argument_arrayLength :: #force_inline proc(self: ^Argument) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "arrayLength")
 }
 @(objc_type=Argument, objc_name="bufferAlignment")
-Argument_bufferAlignment :: #force_inline proc(self: ^Argument) -> NS.Integer {
-	return msgSend(NS.Integer, self, "bufferAlignment")
+Argument_bufferAlignment :: #force_inline proc(self: ^Argument) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "bufferAlignment")
 }
 @(objc_type=Argument, objc_name="bufferDataSize")
-Argument_bufferDataSize :: #force_inline proc(self: ^Argument) -> NS.Integer {
-	return msgSend(NS.Integer, self, "bufferDataSize")
+Argument_bufferDataSize :: #force_inline proc(self: ^Argument) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "bufferDataSize")
 }
 @(objc_type=Argument, objc_name="bufferDataType")
 Argument_bufferDataType :: #force_inline proc(self: ^Argument) -> DataType {
@@ -316,8 +364,8 @@ Argument_bufferStructType :: #force_inline proc(self: ^Argument) -> ^StructType 
 	return msgSend(^StructType, self, "bufferStructType")
 }
 @(objc_type=Argument, objc_name="index")
-Argument_index :: #force_inline proc(self: ^Argument) -> NS.Integer {
-	return msgSend(NS.Integer, self, "index")
+Argument_index :: #force_inline proc(self: ^Argument) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "index")
 }
 @(objc_type=Argument, objc_name="isActive")
 Argument_isActive :: #force_inline proc(self: ^Argument) -> BOOL {
@@ -340,12 +388,12 @@ Argument_textureType :: #force_inline proc(self: ^Argument) -> TextureType {
 	return msgSend(TextureType, self, "textureType")
 }
 @(objc_type=Argument, objc_name="threadgroupMemoryAlignment")
-Argument_threadgroupMemoryAlignment :: #force_inline proc(self: ^Argument) -> NS.Integer {
-	return msgSend(NS.Integer, self, "threadgroupMemoryAlignment")
+Argument_threadgroupMemoryAlignment :: #force_inline proc(self: ^Argument) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "threadgroupMemoryAlignment")
 }
 @(objc_type=Argument, objc_name="threadgroupMemoryDataSize")
-Argument_threadgroupMemoryDataSize :: #force_inline proc(self: ^Argument) -> NS.Integer {
-	return msgSend(NS.Integer, self, "threadgroupMemoryDataSize")
+Argument_threadgroupMemoryDataSize :: #force_inline proc(self: ^Argument) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "threadgroupMemoryDataSize")
 }
 @(objc_type=Argument, objc_name="type")
 Argument_type :: #force_inline proc(self: ^Argument) -> ArgumentType {
@@ -395,31 +443,31 @@ ArgumentDescriptor_argumentDescriptor :: #force_inline proc() -> ^ArgumentDescri
 	return msgSend(^ArgumentDescriptor, ArgumentDescriptor, "argumentDescriptor")
 }
 @(objc_type=ArgumentDescriptor, objc_name="arrayLength")
-ArgumentDescriptor_arrayLength :: #force_inline proc(self: ^ArgumentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "arrayLength")
+ArgumentDescriptor_arrayLength :: #force_inline proc(self: ^ArgumentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "arrayLength")
 }
 @(objc_type=ArgumentDescriptor, objc_name="constantBlockAlignment")
-ArgumentDescriptor_constantBlockAlignment :: #force_inline proc(self: ^ArgumentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "constantBlockAlignment")
+ArgumentDescriptor_constantBlockAlignment :: #force_inline proc(self: ^ArgumentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "constantBlockAlignment")
 }
 @(objc_type=ArgumentDescriptor, objc_name="dataType")
 ArgumentDescriptor_dataType :: #force_inline proc(self: ^ArgumentDescriptor) -> DataType {
 	return msgSend(DataType, self, "dataType")
 }
 @(objc_type=ArgumentDescriptor, objc_name="index")
-ArgumentDescriptor_index :: #force_inline proc(self: ^ArgumentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "index")
+ArgumentDescriptor_index :: #force_inline proc(self: ^ArgumentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "index")
 }
 @(objc_type=ArgumentDescriptor, objc_name="setAccess")
 ArgumentDescriptor_setAccess :: #force_inline proc(self: ^ArgumentDescriptor, access: ArgumentAccess) {
 	msgSend(nil, self, "setAccess:", access)
 }
 @(objc_type=ArgumentDescriptor, objc_name="setArrayLength")
-ArgumentDescriptor_setArrayLength :: #force_inline proc(self: ^ArgumentDescriptor, arrayLength: NS.Integer) {
+ArgumentDescriptor_setArrayLength :: #force_inline proc(self: ^ArgumentDescriptor, arrayLength: NS.UInteger) {
 	msgSend(nil, self, "setArrayLength:", arrayLength)
 }
 @(objc_type=ArgumentDescriptor, objc_name="setConstantBlockAlignment")
-ArgumentDescriptor_setConstantBlockAlignment :: #force_inline proc(self: ^ArgumentDescriptor, constantBlockAlignment: NS.Integer) {
+ArgumentDescriptor_setConstantBlockAlignment :: #force_inline proc(self: ^ArgumentDescriptor, constantBlockAlignment: NS.UInteger) {
 	msgSend(nil, self, "setConstantBlockAlignment:", constantBlockAlignment)
 }
 @(objc_type=ArgumentDescriptor, objc_name="setDataType")
@@ -427,7 +475,7 @@ ArgumentDescriptor_setDataType :: #force_inline proc(self: ^ArgumentDescriptor, 
 	msgSend(nil, self, "setDataType:", dataType)
 }
 @(objc_type=ArgumentDescriptor, objc_name="setIndex")
-ArgumentDescriptor_setIndex :: #force_inline proc(self: ^ArgumentDescriptor, index: NS.Integer) {
+ArgumentDescriptor_setIndex :: #force_inline proc(self: ^ArgumentDescriptor, index: NS.UInteger) {
 	msgSend(nil, self, "setIndex:", index)
 }
 @(objc_type=ArgumentDescriptor, objc_name="setTextureType")
@@ -469,12 +517,12 @@ ArrayType_init :: #force_inline proc(self: ^ArrayType) -> ^ArrayType {
 	return msgSend(^ArrayType, self, "init")
 }
 @(objc_type=ArrayType, objc_name="argumentIndexStride")
-ArrayType_argumentIndexStride :: #force_inline proc(self: ^ArrayType) -> NS.Integer {
-	return msgSend(NS.Integer, self, "argumentIndexStride")
+ArrayType_argumentIndexStride :: #force_inline proc(self: ^ArrayType) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "argumentIndexStride")
 }
 @(objc_type=ArrayType, objc_name="arrayLength")
-ArrayType_arrayLength :: #force_inline proc(self: ^ArrayType) -> NS.Integer {
-	return msgSend(NS.Integer, self, "arrayLength")
+ArrayType_arrayLength :: #force_inline proc(self: ^ArrayType) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "arrayLength")
 }
 @(objc_type=ArrayType, objc_name="elementArrayType")
 ArrayType_elementArrayType :: #force_inline proc(self: ^ArrayType) -> ^ArrayType {
@@ -497,8 +545,8 @@ ArrayType_elementType :: #force_inline proc(self: ^ArrayType) -> DataType {
 	return msgSend(DataType, self, "elementType")
 }
 @(objc_type=ArrayType, objc_name="stride")
-ArrayType_stride :: #force_inline proc(self: ^ArrayType) -> NS.Integer {
-	return msgSend(NS.Integer, self, "stride")
+ArrayType_stride :: #force_inline proc(self: ^ArrayType) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "stride")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -529,8 +577,8 @@ Attribute_init :: #force_inline proc(self: ^Attribute) -> ^Attribute {
 	return msgSend(^Attribute, self, "init")
 }
 @(objc_type=Attribute, objc_name="attributeIndex")
-Attribute_attributeIndex :: #force_inline proc(self: ^Attribute) -> NS.Integer {
-	return msgSend(NS.Integer, self, "attributeIndex")
+Attribute_attributeIndex :: #force_inline proc(self: ^Attribute) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "attributeIndex")
 }
 @(objc_type=Attribute, objc_name="attributeType")
 Attribute_attributeType :: #force_inline proc(self: ^Attribute) -> DataType {
@@ -581,19 +629,19 @@ AttributeDescriptor_init :: #force_inline proc(self: ^AttributeDescriptor) -> ^A
 	return msgSend(^AttributeDescriptor, self, "init")
 }
 @(objc_type=AttributeDescriptor, objc_name="bufferIndex")
-AttributeDescriptor_bufferIndex :: #force_inline proc(self: ^AttributeDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "bufferIndex")
+AttributeDescriptor_bufferIndex :: #force_inline proc(self: ^AttributeDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "bufferIndex")
 }
 @(objc_type=AttributeDescriptor, objc_name="format")
 AttributeDescriptor_format :: #force_inline proc(self: ^AttributeDescriptor) -> AttributeFormat {
 	return msgSend(AttributeFormat, self, "format")
 }
 @(objc_type=AttributeDescriptor, objc_name="offset")
-AttributeDescriptor_offset :: #force_inline proc(self: ^AttributeDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "offset")
+AttributeDescriptor_offset :: #force_inline proc(self: ^AttributeDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "offset")
 }
 @(objc_type=AttributeDescriptor, objc_name="setBufferIndex")
-AttributeDescriptor_setBufferIndex :: #force_inline proc(self: ^AttributeDescriptor, bufferIndex: NS.Integer) {
+AttributeDescriptor_setBufferIndex :: #force_inline proc(self: ^AttributeDescriptor, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setBufferIndex:", bufferIndex)
 }
 @(objc_type=AttributeDescriptor, objc_name="setFormat")
@@ -601,7 +649,7 @@ AttributeDescriptor_setFormat :: #force_inline proc(self: ^AttributeDescriptor, 
 	msgSend(nil, self, "setFormat:", format)
 }
 @(objc_type=AttributeDescriptor, objc_name="setOffset")
-AttributeDescriptor_setOffset :: #force_inline proc(self: ^AttributeDescriptor, offset: NS.Integer) {
+AttributeDescriptor_setOffset :: #force_inline proc(self: ^AttributeDescriptor, offset: NS.UInteger) {
 	msgSend(nil, self, "setOffset:", offset)
 }
 
@@ -629,11 +677,11 @@ AttributeDescriptorArray_init :: #force_inline proc(self: ^AttributeDescriptorAr
 	return msgSend(^AttributeDescriptorArray, self, "init")
 }
 @(objc_type=AttributeDescriptorArray, objc_name="objectAtIndexedSubscript")
-AttributeDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^AttributeDescriptorArray, index: ^NS.Object) -> ^AttributeDescriptor {
+AttributeDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^AttributeDescriptorArray, index: NS.UInteger) -> ^AttributeDescriptor {
 	return msgSend(^AttributeDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=AttributeDescriptorArray, objc_name="setObject")
-AttributeDescriptorArray_setObject :: #force_inline proc(self: ^AttributeDescriptorArray, attributeDesc: ^AttributeDescriptor, index: ^NS.Object) {
+AttributeDescriptorArray_setObject :: #force_inline proc(self: ^AttributeDescriptorArray, attributeDesc: ^AttributeDescriptor, index: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attributeDesc, index)
 }
 
@@ -729,28 +777,28 @@ BlitPassSampleBufferAttachmentDescriptor_init :: #force_inline proc(self: ^BlitP
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptor, self, "init")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="endOfEncoderSampleIndex")
-BlitPassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "endOfEncoderSampleIndex")
+BlitPassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
 BlitPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> ^BlitPassSampleBufferAttachmentDescriptor {
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
-BlitPassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.Integer) {
+BlitPassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfEncoderSampleIndex:", endOfEncoderSampleIndex)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-BlitPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, sampleBuffer: ^NS.Object) {
+BlitPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setStartOfEncoderSampleIndex")
-BlitPassSampleBufferAttachmentDescriptor_setStartOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, startOfEncoderSampleIndex: NS.Integer) {
+BlitPassSampleBufferAttachmentDescriptor_setStartOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, startOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setStartOfEncoderSampleIndex:", startOfEncoderSampleIndex)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="startOfEncoderSampleIndex")
-BlitPassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "startOfEncoderSampleIndex")
+BlitPassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "startOfEncoderSampleIndex")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -777,11 +825,11 @@ BlitPassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self: ^
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-BlitPassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^BlitPassSampleBufferAttachmentDescriptor {
+BlitPassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^BlitPassSampleBufferAttachmentDescriptor {
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
-BlitPassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachment: ^BlitPassSampleBufferAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+BlitPassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachment: ^BlitPassSampleBufferAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -817,11 +865,11 @@ BufferLayoutDescriptor_setStepFunction :: #force_inline proc(self: ^BufferLayout
 	msgSend(nil, self, "setStepFunction:", stepFunction)
 }
 @(objc_type=BufferLayoutDescriptor, objc_name="setStepRate")
-BufferLayoutDescriptor_setStepRate :: #force_inline proc(self: ^BufferLayoutDescriptor, stepRate: NS.Integer) {
+BufferLayoutDescriptor_setStepRate :: #force_inline proc(self: ^BufferLayoutDescriptor, stepRate: NS.UInteger) {
 	msgSend(nil, self, "setStepRate:", stepRate)
 }
 @(objc_type=BufferLayoutDescriptor, objc_name="setStride")
-BufferLayoutDescriptor_setStride :: #force_inline proc(self: ^BufferLayoutDescriptor, stride: NS.Integer) {
+BufferLayoutDescriptor_setStride :: #force_inline proc(self: ^BufferLayoutDescriptor, stride: NS.UInteger) {
 	msgSend(nil, self, "setStride:", stride)
 }
 @(objc_type=BufferLayoutDescriptor, objc_name="stepFunction")
@@ -829,12 +877,12 @@ BufferLayoutDescriptor_stepFunction :: #force_inline proc(self: ^BufferLayoutDes
 	return msgSend(StepFunction, self, "stepFunction")
 }
 @(objc_type=BufferLayoutDescriptor, objc_name="stepRate")
-BufferLayoutDescriptor_stepRate :: #force_inline proc(self: ^BufferLayoutDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "stepRate")
+BufferLayoutDescriptor_stepRate :: #force_inline proc(self: ^BufferLayoutDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "stepRate")
 }
 @(objc_type=BufferLayoutDescriptor, objc_name="stride")
-BufferLayoutDescriptor_stride :: #force_inline proc(self: ^BufferLayoutDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "stride")
+BufferLayoutDescriptor_stride :: #force_inline proc(self: ^BufferLayoutDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "stride")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -861,11 +909,11 @@ BufferLayoutDescriptorArray_init :: #force_inline proc(self: ^BufferLayoutDescri
 	return msgSend(^BufferLayoutDescriptorArray, self, "init")
 }
 @(objc_type=BufferLayoutDescriptorArray, objc_name="objectAtIndexedSubscript")
-BufferLayoutDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^BufferLayoutDescriptorArray, index: ^NS.Object) -> ^BufferLayoutDescriptor {
+BufferLayoutDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^BufferLayoutDescriptorArray, index: NS.UInteger) -> ^BufferLayoutDescriptor {
 	return msgSend(^BufferLayoutDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=BufferLayoutDescriptorArray, objc_name="setObject")
-BufferLayoutDescriptorArray_setObject :: #force_inline proc(self: ^BufferLayoutDescriptorArray, bufferDesc: ^BufferLayoutDescriptor, index: ^NS.Object) {
+BufferLayoutDescriptorArray_setObject :: #force_inline proc(self: ^BufferLayoutDescriptorArray, bufferDesc: ^BufferLayoutDescriptor, index: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", bufferDesc, index)
 }
 
@@ -909,7 +957,7 @@ CaptureDescriptor_outputURL :: #force_inline proc(self: ^CaptureDescriptor) -> ^
 	return msgSend(^NS.URL, self, "outputURL")
 }
 @(objc_type=CaptureDescriptor, objc_name="setCaptureObject")
-CaptureDescriptor_setCaptureObject :: #force_inline proc(self: ^CaptureDescriptor, captureObject: ^NS.Object) {
+CaptureDescriptor_setCaptureObject :: #force_inline proc(self: ^CaptureDescriptor, captureObject: id) {
 	msgSend(nil, self, "setCaptureObject:", captureObject)
 }
 @(objc_type=CaptureDescriptor, objc_name="setDestination")
@@ -963,15 +1011,15 @@ CaptureManager_isCapturing :: #force_inline proc(self: ^CaptureManager) -> BOOL 
 	return msgSend(BOOL, self, "isCapturing")
 }
 @(objc_type=CaptureManager, objc_name="newCaptureScopeWithCommandQueue")
-CaptureManager_newCaptureScopeWithCommandQueue :: #force_inline proc(self: ^CaptureManager, commandQueue: ^NS.Object) -> ^CaptureManager {
+CaptureManager_newCaptureScopeWithCommandQueue :: #force_inline proc(self: ^CaptureManager, commandQueue: ^CommandQueue) -> ^CaptureManager {
 	return msgSend(^CaptureManager, self, "newCaptureScopeWithCommandQueue:", commandQueue)
 }
 @(objc_type=CaptureManager, objc_name="newCaptureScopeWithDevice")
-CaptureManager_newCaptureScopeWithDevice :: #force_inline proc(self: ^CaptureManager, device: ^NS.Object) -> ^CaptureManager {
+CaptureManager_newCaptureScopeWithDevice :: #force_inline proc(self: ^CaptureManager, device: ^Device) -> ^CaptureManager {
 	return msgSend(^CaptureManager, self, "newCaptureScopeWithDevice:", device)
 }
 @(objc_type=CaptureManager, objc_name="setDefaultCaptureScope")
-CaptureManager_setDefaultCaptureScope :: #force_inline proc(self: ^CaptureManager, defaultCaptureScope: ^NS.Object) {
+CaptureManager_setDefaultCaptureScope :: #force_inline proc(self: ^CaptureManager, defaultCaptureScope: ^CaptureScope) {
 	msgSend(nil, self, "setDefaultCaptureScope:", defaultCaptureScope)
 }
 @(objc_type=CaptureManager, objc_class_name="sharedCaptureManager")
@@ -979,19 +1027,20 @@ CaptureManager_sharedCaptureManager :: #force_inline proc() -> ^CaptureManager {
 	return msgSend(^CaptureManager, CaptureManager, "sharedCaptureManager")
 }
 @(objc_type=CaptureManager, objc_name="startCaptureWithCommandQueue")
-CaptureManager_startCaptureWithCommandQueue :: #force_inline proc(self: ^CaptureManager, commandQueue: ^NS.Object) {
+CaptureManager_startCaptureWithCommandQueue :: #force_inline proc(self: ^CaptureManager, commandQueue: ^CommandQueue) {
 	msgSend(nil, self, "startCaptureWithCommandQueue:", commandQueue)
 }
 @(objc_type=CaptureManager, objc_name="startCaptureWithDescriptor")
-CaptureManager_startCaptureWithDescriptor :: #force_inline proc(self: ^CaptureManager, descriptor: ^CaptureDescriptor, error: ^^NS.Error ) -> BOOL {
-	return msgSend(BOOL, self, "startCaptureWithDescriptor:error:", descriptor, error)
+CaptureManager_startCaptureWithDescriptor :: #force_inline proc(self: ^CaptureManager, descriptor: ^CaptureDescriptor) -> (ok: bool, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "startCaptureWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=CaptureManager, objc_name="startCaptureWithDevice")
-CaptureManager_startCaptureWithDevice :: #force_inline proc(self: ^CaptureManager, device: ^NS.Object) {
+CaptureManager_startCaptureWithDevice :: #force_inline proc(self: ^CaptureManager, device: ^Device) {
 	msgSend(nil, self, "startCaptureWithDevice:", device)
 }
 @(objc_type=CaptureManager, objc_name="startCaptureWithScope")
-CaptureManager_startCaptureWithScope :: #force_inline proc(self: ^CaptureManager, captureScope: ^NS.Object) {
+CaptureManager_startCaptureWithScope :: #force_inline proc(self: ^CaptureManager, captureScope: ^CaptureScope) {
 	msgSend(nil, self, "startCaptureWithScope:", captureScope)
 }
 @(objc_type=CaptureManager, objc_name="stopCapture")
@@ -1207,28 +1256,28 @@ ComputePassSampleBufferAttachmentDescriptor_init :: #force_inline proc(self: ^Co
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptor, self, "init")
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="endOfEncoderSampleIndex")
-ComputePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "endOfEncoderSampleIndex")
+ComputePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
 ComputePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> ^ComputePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
-ComputePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.Integer) {
+ComputePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfEncoderSampleIndex:", endOfEncoderSampleIndex)
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-ComputePassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, sampleBuffer: ^NS.Object) {
+ComputePassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="setStartOfEncoderSampleIndex")
-ComputePassSampleBufferAttachmentDescriptor_setStartOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, startOfEncoderSampleIndex: NS.Integer) {
+ComputePassSampleBufferAttachmentDescriptor_setStartOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, startOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setStartOfEncoderSampleIndex:", startOfEncoderSampleIndex)
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="startOfEncoderSampleIndex")
-ComputePassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "startOfEncoderSampleIndex")
+ComputePassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "startOfEncoderSampleIndex")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1255,11 +1304,11 @@ ComputePassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-ComputePassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^ComputePassSampleBufferAttachmentDescriptor {
+ComputePassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ComputePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
-ComputePassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachment: ^ComputePassSampleBufferAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+ComputePassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachment: ^ComputePassSampleBufferAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -1333,12 +1382,12 @@ ComputePipelineDescriptor_linkedFunctions :: #force_inline proc(self: ^ComputePi
 	return msgSend(^LinkedFunctions, self, "linkedFunctions")
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="maxCallStackDepth")
-ComputePipelineDescriptor_maxCallStackDepth :: #force_inline proc(self: ^ComputePipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxCallStackDepth")
+ComputePipelineDescriptor_maxCallStackDepth :: #force_inline proc(self: ^ComputePipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxCallStackDepth")
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="maxTotalThreadsPerThreadgroup")
-ComputePipelineDescriptor_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^ComputePipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxTotalThreadsPerThreadgroup")
+ComputePipelineDescriptor_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^ComputePipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadsPerThreadgroup")
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="reset")
 ComputePipelineDescriptor_reset :: #force_inline proc(self: ^ComputePipelineDescriptor) {
@@ -1349,7 +1398,7 @@ ComputePipelineDescriptor_setBinaryArchives :: #force_inline proc(self: ^Compute
 	msgSend(nil, self, "setBinaryArchives:", binaryArchives)
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="setComputeFunction")
-ComputePipelineDescriptor_setComputeFunction :: #force_inline proc(self: ^ComputePipelineDescriptor, computeFunction: ^NS.Object) {
+ComputePipelineDescriptor_setComputeFunction :: #force_inline proc(self: ^ComputePipelineDescriptor, computeFunction: ^Function) {
 	msgSend(nil, self, "setComputeFunction:", computeFunction)
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="setInsertLibraries")
@@ -1365,11 +1414,11 @@ ComputePipelineDescriptor_setLinkedFunctions :: #force_inline proc(self: ^Comput
 	msgSend(nil, self, "setLinkedFunctions:", linkedFunctions)
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="setMaxCallStackDepth")
-ComputePipelineDescriptor_setMaxCallStackDepth :: #force_inline proc(self: ^ComputePipelineDescriptor, maxCallStackDepth: NS.Integer) {
+ComputePipelineDescriptor_setMaxCallStackDepth :: #force_inline proc(self: ^ComputePipelineDescriptor, maxCallStackDepth: NS.UInteger) {
 	msgSend(nil, self, "setMaxCallStackDepth:", maxCallStackDepth)
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="setMaxTotalThreadsPerThreadgroup")
-ComputePipelineDescriptor_setMaxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^ComputePipelineDescriptor, maxTotalThreadsPerThreadgroup: NS.Integer) {
+ComputePipelineDescriptor_setMaxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^ComputePipelineDescriptor, maxTotalThreadsPerThreadgroup: NS.UInteger) {
 	msgSend(nil, self, "setMaxTotalThreadsPerThreadgroup:", maxTotalThreadsPerThreadgroup)
 }
 @(objc_type=ComputePipelineDescriptor, objc_name="setStageInputDescriptor")
@@ -1470,11 +1519,11 @@ CounterSampleBufferDescriptor_label :: #force_inline proc(self: ^CounterSampleBu
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="sampleCount")
-CounterSampleBufferDescriptor_sampleCount :: #force_inline proc(self: ^CounterSampleBufferDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "sampleCount")
+CounterSampleBufferDescriptor_sampleCount :: #force_inline proc(self: ^CounterSampleBufferDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "sampleCount")
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="setCounterSet")
-CounterSampleBufferDescriptor_setCounterSet :: #force_inline proc(self: ^CounterSampleBufferDescriptor, counterSet: ^NS.Object) {
+CounterSampleBufferDescriptor_setCounterSet :: #force_inline proc(self: ^CounterSampleBufferDescriptor, counterSet: ^CounterSet) {
 	msgSend(nil, self, "setCounterSet:", counterSet)
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="setLabel")
@@ -1482,7 +1531,7 @@ CounterSampleBufferDescriptor_setLabel :: #force_inline proc(self: ^CounterSampl
 	msgSend(nil, self, "setLabel:", label)
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="setSampleCount")
-CounterSampleBufferDescriptor_setSampleCount :: #force_inline proc(self: ^CounterSampleBufferDescriptor, sampleCount: NS.Integer) {
+CounterSampleBufferDescriptor_setSampleCount :: #force_inline proc(self: ^CounterSampleBufferDescriptor, sampleCount: NS.UInteger) {
 	msgSend(nil, self, "setSampleCount:", sampleCount)
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="setStorageMode")
@@ -1592,8 +1641,8 @@ FunctionConstant_init :: #force_inline proc(self: ^FunctionConstant) -> ^Functio
 	return msgSend(^FunctionConstant, self, "init")
 }
 @(objc_type=FunctionConstant, objc_name="index")
-FunctionConstant_index :: #force_inline proc(self: ^FunctionConstant) -> NS.Integer {
-	return msgSend(NS.Integer, self, "index")
+FunctionConstant_index :: #force_inline proc(self: ^FunctionConstant) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "index")
 }
 @(objc_type=FunctionConstant, objc_name="name")
 FunctionConstant_name :: #force_inline proc(self: ^FunctionConstant) -> ^NS.String {
@@ -1637,12 +1686,12 @@ FunctionConstantValues_init :: #force_inline proc(self: ^FunctionConstantValues)
 FunctionConstantValues_reset :: #force_inline proc(self: ^FunctionConstantValues) {
 	msgSend(nil, self, "reset")
 }
-@(objc_type=FunctionConstantValues, objc_name="setConstantValue_type_atIndex_")
-FunctionConstantValues_setConstantValue_type_atIndex_ :: #force_inline proc(self: ^FunctionConstantValues, value: rawptr, type: DataType, index: ^NS.Object) {
+@(objc_type=FunctionConstantValues, objc_name="setConstantValueAtIndex")
+FunctionConstantValues_setConstantValueAtIndex :: #force_inline proc(self: ^FunctionConstantValues, value: rawptr, type: DataType, index: NS.UInteger) {
 	msgSend(nil, self, "setConstantValue:type:atIndex:", value, type, index)
 }
-@(objc_type=FunctionConstantValues, objc_name="setConstantValue_type_withName_")
-FunctionConstantValues_setConstantValue_type_withName_ :: #force_inline proc(self: ^FunctionConstantValues, value: rawptr, type: DataType, name: ^NS.String) {
+@(objc_type=FunctionConstantValues, objc_name="setConstantValueWithName")
+FunctionConstantValues_setConstantValueWithName :: #force_inline proc(self: ^FunctionConstantValues, value: rawptr, type: DataType, name: ^NS.String) {
 	msgSend(nil, self, "setConstantValue:type:withName:", value, type, name)
 }
 @(objc_type=FunctionConstantValues, objc_name="setConstantValues")
@@ -1797,7 +1846,7 @@ HeapDescriptor_setResourceOptions :: #force_inline proc(self: ^HeapDescriptor, r
 	msgSend(nil, self, "setResourceOptions:", resourceOptions)
 }
 @(objc_type=HeapDescriptor, objc_name="setSize")
-HeapDescriptor_setSize :: #force_inline proc(self: ^HeapDescriptor, size: NS.Integer) {
+HeapDescriptor_setSize :: #force_inline proc(self: ^HeapDescriptor, size: NS.UInteger) {
 	msgSend(nil, self, "setSize:", size)
 }
 @(objc_type=HeapDescriptor, objc_name="setStorageMode")
@@ -1809,8 +1858,8 @@ HeapDescriptor_setType :: #force_inline proc(self: ^HeapDescriptor, type: HeapTy
 	msgSend(nil, self, "setType:", type)
 }
 @(objc_type=HeapDescriptor, objc_name="size")
-HeapDescriptor_size :: #force_inline proc(self: ^HeapDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "size")
+HeapDescriptor_size :: #force_inline proc(self: ^HeapDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "size")
 }
 @(objc_type=HeapDescriptor, objc_name="storageMode")
 HeapDescriptor_storageMode :: #force_inline proc(self: ^HeapDescriptor) -> StorageMode {
@@ -1867,16 +1916,16 @@ IndirectCommandBufferDescriptor_inheritPipelineState :: #force_inline proc(self:
 	return msgSend(BOOL, self, "inheritPipelineState")
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="maxFragmentBufferBindCount")
-IndirectCommandBufferDescriptor_maxFragmentBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxFragmentBufferBindCount")
+IndirectCommandBufferDescriptor_maxFragmentBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxFragmentBufferBindCount")
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="maxKernelBufferBindCount")
-IndirectCommandBufferDescriptor_maxKernelBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxKernelBufferBindCount")
+IndirectCommandBufferDescriptor_maxKernelBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxKernelBufferBindCount")
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="maxVertexBufferBindCount")
-IndirectCommandBufferDescriptor_maxVertexBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxVertexBufferBindCount")
+IndirectCommandBufferDescriptor_maxVertexBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxVertexBufferBindCount")
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="setCommandTypes")
 IndirectCommandBufferDescriptor_setCommandTypes :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, commandTypes: IndirectCommandType) {
@@ -1891,15 +1940,15 @@ IndirectCommandBufferDescriptor_setInheritPipelineState :: #force_inline proc(se
 	msgSend(nil, self, "setInheritPipelineState:", inheritPipelineState)
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="setMaxFragmentBufferBindCount")
-IndirectCommandBufferDescriptor_setMaxFragmentBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, maxFragmentBufferBindCount: NS.Integer) {
+IndirectCommandBufferDescriptor_setMaxFragmentBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, maxFragmentBufferBindCount: NS.UInteger) {
 	msgSend(nil, self, "setMaxFragmentBufferBindCount:", maxFragmentBufferBindCount)
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="setMaxKernelBufferBindCount")
-IndirectCommandBufferDescriptor_setMaxKernelBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, maxKernelBufferBindCount: NS.Integer) {
+IndirectCommandBufferDescriptor_setMaxKernelBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, maxKernelBufferBindCount: NS.UInteger) {
 	msgSend(nil, self, "setMaxKernelBufferBindCount:", maxKernelBufferBindCount)
 }
 @(objc_type=IndirectCommandBufferDescriptor, objc_name="setMaxVertexBufferBindCount")
-IndirectCommandBufferDescriptor_setMaxVertexBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, maxVertexBufferBindCount: NS.Integer) {
+IndirectCommandBufferDescriptor_setMaxVertexBufferBindCount :: #force_inline proc(self: ^IndirectCommandBufferDescriptor, maxVertexBufferBindCount: NS.UInteger) {
 	msgSend(nil, self, "setMaxVertexBufferBindCount:", maxVertexBufferBindCount)
 }
 
@@ -1940,39 +1989,39 @@ InstanceAccelerationStructureDescriptor_descriptor :: #force_inline proc() -> ^I
 	return msgSend(^InstanceAccelerationStructureDescriptor, InstanceAccelerationStructureDescriptor, "descriptor")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceCount")
-InstanceAccelerationStructureDescriptor_instanceCount :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "instanceCount")
+InstanceAccelerationStructureDescriptor_instanceCount :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "instanceCount")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceDescriptorBuffer")
 InstanceAccelerationStructureDescriptor_instanceDescriptorBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> ^InstanceAccelerationStructureDescriptor {
 	return msgSend(^InstanceAccelerationStructureDescriptor, self, "instanceDescriptorBuffer")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceDescriptorBufferOffset")
-InstanceAccelerationStructureDescriptor_instanceDescriptorBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "instanceDescriptorBufferOffset")
+InstanceAccelerationStructureDescriptor_instanceDescriptorBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "instanceDescriptorBufferOffset")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceDescriptorStride")
-InstanceAccelerationStructureDescriptor_instanceDescriptorStride :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "instanceDescriptorStride")
+InstanceAccelerationStructureDescriptor_instanceDescriptorStride :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "instanceDescriptorStride")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instancedAccelerationStructures")
 InstanceAccelerationStructureDescriptor_instancedAccelerationStructures :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> ^NS.Array {
 	return msgSend(^NS.Array, self, "instancedAccelerationStructures")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setInstanceCount")
-InstanceAccelerationStructureDescriptor_setInstanceCount :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceCount: NS.Integer) {
+InstanceAccelerationStructureDescriptor_setInstanceCount :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceCount: NS.UInteger) {
 	msgSend(nil, self, "setInstanceCount:", instanceCount)
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setInstanceDescriptorBuffer")
-InstanceAccelerationStructureDescriptor_setInstanceDescriptorBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceDescriptorBuffer: ^NS.Object) {
+InstanceAccelerationStructureDescriptor_setInstanceDescriptorBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceDescriptorBuffer: ^Buffer) {
 	msgSend(nil, self, "setInstanceDescriptorBuffer:", instanceDescriptorBuffer)
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setInstanceDescriptorBufferOffset")
-InstanceAccelerationStructureDescriptor_setInstanceDescriptorBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceDescriptorBufferOffset: NS.Integer) {
+InstanceAccelerationStructureDescriptor_setInstanceDescriptorBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceDescriptorBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "setInstanceDescriptorBufferOffset:", instanceDescriptorBufferOffset)
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setInstanceDescriptorStride")
-InstanceAccelerationStructureDescriptor_setInstanceDescriptorStride :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceDescriptorStride: NS.Integer) {
+InstanceAccelerationStructureDescriptor_setInstanceDescriptorStride :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instanceDescriptorStride: NS.UInteger) {
 	msgSend(nil, self, "setInstanceDescriptorStride:", instanceDescriptorStride)
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setInstancedAccelerationStructures")
@@ -2005,15 +2054,15 @@ IntersectionFunctionTableDescriptor_init :: #force_inline proc(self: ^Intersecti
 	return msgSend(^IntersectionFunctionTableDescriptor, self, "init")
 }
 @(objc_type=IntersectionFunctionTableDescriptor, objc_name="functionCount")
-IntersectionFunctionTableDescriptor_functionCount :: #force_inline proc(self: ^IntersectionFunctionTableDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "functionCount")
+IntersectionFunctionTableDescriptor_functionCount :: #force_inline proc(self: ^IntersectionFunctionTableDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "functionCount")
 }
 @(objc_type=IntersectionFunctionTableDescriptor, objc_class_name="intersectionFunctionTableDescriptor")
 IntersectionFunctionTableDescriptor_intersectionFunctionTableDescriptor :: #force_inline proc() -> ^IntersectionFunctionTableDescriptor {
 	return msgSend(^IntersectionFunctionTableDescriptor, IntersectionFunctionTableDescriptor, "intersectionFunctionTableDescriptor")
 }
 @(objc_type=IntersectionFunctionTableDescriptor, objc_name="setFunctionCount")
-IntersectionFunctionTableDescriptor_setFunctionCount :: #force_inline proc(self: ^IntersectionFunctionTableDescriptor, functionCount: NS.Integer) {
+IntersectionFunctionTableDescriptor_setFunctionCount :: #force_inline proc(self: ^IntersectionFunctionTableDescriptor, functionCount: NS.UInteger) {
 	msgSend(nil, self, "setFunctionCount:", functionCount)
 }
 
@@ -2130,11 +2179,11 @@ PipelineBufferDescriptorArray_init :: #force_inline proc(self: ^PipelineBufferDe
 	return msgSend(^PipelineBufferDescriptorArray, self, "init")
 }
 @(objc_type=PipelineBufferDescriptorArray, objc_name="objectAtIndexedSubscript")
-PipelineBufferDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^PipelineBufferDescriptorArray, bufferIndex: ^NS.Object) -> ^PipelineBufferDescriptor {
+PipelineBufferDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^PipelineBufferDescriptorArray, bufferIndex: NS.UInteger) -> ^PipelineBufferDescriptor {
 	return msgSend(^PipelineBufferDescriptor, self, "objectAtIndexedSubscript:", bufferIndex)
 }
 @(objc_type=PipelineBufferDescriptorArray, objc_name="setObject")
-PipelineBufferDescriptorArray_setObject :: #force_inline proc(self: ^PipelineBufferDescriptorArray, buffer: ^PipelineBufferDescriptor, bufferIndex: ^NS.Object) {
+PipelineBufferDescriptorArray_setObject :: #force_inline proc(self: ^PipelineBufferDescriptorArray, buffer: ^PipelineBufferDescriptor, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", buffer, bufferIndex)
 }
 
@@ -2171,12 +2220,12 @@ PointerType_access :: #force_inline proc(self: ^PointerType) -> ArgumentAccess {
 	return msgSend(ArgumentAccess, self, "access")
 }
 @(objc_type=PointerType, objc_name="alignment")
-PointerType_alignment :: #force_inline proc(self: ^PointerType) -> NS.Integer {
-	return msgSend(NS.Integer, self, "alignment")
+PointerType_alignment :: #force_inline proc(self: ^PointerType) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "alignment")
 }
 @(objc_type=PointerType, objc_name="dataSize")
-PointerType_dataSize :: #force_inline proc(self: ^PointerType) -> NS.Integer {
-	return msgSend(NS.Integer, self, "dataSize")
+PointerType_dataSize :: #force_inline proc(self: ^PointerType) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "dataSize")
 }
 @(objc_type=PointerType, objc_name="elementArrayType")
 PointerType_elementArrayType :: #force_inline proc(self: ^PointerType) -> ^ArrayType {
@@ -2256,11 +2305,11 @@ RasterizationRateLayerArray_init :: #force_inline proc(self: ^RasterizationRateL
 	return msgSend(^RasterizationRateLayerArray, self, "init")
 }
 @(objc_type=RasterizationRateLayerArray, objc_name="objectAtIndexedSubscript")
-RasterizationRateLayerArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RasterizationRateLayerArray, layerIndex: ^NS.Object) -> ^RasterizationRateLayerDescriptor {
+RasterizationRateLayerArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RasterizationRateLayerArray, layerIndex: NS.UInteger) -> ^RasterizationRateLayerDescriptor {
 	return msgSend(^RasterizationRateLayerDescriptor, self, "objectAtIndexedSubscript:", layerIndex)
 }
 @(objc_type=RasterizationRateLayerArray, objc_name="setObject")
-RasterizationRateLayerArray_setObject :: #force_inline proc(self: ^RasterizationRateLayerArray, layer: ^RasterizationRateLayerDescriptor, layerIndex: ^NS.Object) {
+RasterizationRateLayerArray_setObject :: #force_inline proc(self: ^RasterizationRateLayerArray, layer: ^RasterizationRateLayerDescriptor, layerIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", layer, layerIndex)
 }
 
@@ -2358,12 +2407,12 @@ RasterizationRateMapDescriptor_label :: #force_inline proc(self: ^RasterizationR
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=RasterizationRateMapDescriptor, objc_name="layerAtIndex")
-RasterizationRateMapDescriptor_layerAtIndex :: #force_inline proc(self: ^RasterizationRateMapDescriptor, layerIndex: ^NS.Object) -> ^RasterizationRateLayerDescriptor {
+RasterizationRateMapDescriptor_layerAtIndex :: #force_inline proc(self: ^RasterizationRateMapDescriptor, layerIndex: NS.UInteger) -> ^RasterizationRateLayerDescriptor {
 	return msgSend(^RasterizationRateLayerDescriptor, self, "layerAtIndex:", layerIndex)
 }
 @(objc_type=RasterizationRateMapDescriptor, objc_name="layerCount")
-RasterizationRateMapDescriptor_layerCount :: #force_inline proc(self: ^RasterizationRateMapDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "layerCount")
+RasterizationRateMapDescriptor_layerCount :: #force_inline proc(self: ^RasterizationRateMapDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "layerCount")
 }
 @(objc_type=RasterizationRateMapDescriptor, objc_name="layers")
 RasterizationRateMapDescriptor_layers :: #force_inline proc(self: ^RasterizationRateMapDescriptor) -> ^RasterizationRateLayerArray {
@@ -2373,12 +2422,12 @@ RasterizationRateMapDescriptor_layers :: #force_inline proc(self: ^Rasterization
 RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSize :: #force_inline proc(screenSize: Size) -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "rasterizationRateMapDescriptorWithScreenSize:", screenSize)
 }
-@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSize_layer_")
-RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSize_layer_ :: #force_inline proc(screenSize: Size, layer: ^RasterizationRateLayerDescriptor) -> ^RasterizationRateMapDescriptor {
+@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSizeWithLayer")
+RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSizeWithLayer :: #force_inline proc(screenSize: Size, layer: ^RasterizationRateLayerDescriptor) -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "rasterizationRateMapDescriptorWithScreenSize:layer:", screenSize, layer)
 }
-@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSize_layerCount_layers_")
-RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSize_layerCount_layers_ :: #force_inline proc(screenSize: Size, layerCount: ^NS.Object, layers: ^^RasterizationRateLayerDescriptor ) -> ^RasterizationRateMapDescriptor {
+@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSizeWithLayers")
+RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSizeWithLayers :: #force_inline proc(screenSize: Size, layerCount: NS.UInteger, layers: [^]^RasterizationRateLayerDescriptor) -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "rasterizationRateMapDescriptorWithScreenSize:layerCount:layers:", screenSize, layerCount, layers)
 }
 @(objc_type=RasterizationRateMapDescriptor, objc_name="screenSize")
@@ -2390,7 +2439,7 @@ RasterizationRateMapDescriptor_setLabel :: #force_inline proc(self: ^Rasterizati
 	msgSend(nil, self, "setLabel:", label)
 }
 @(objc_type=RasterizationRateMapDescriptor, objc_name="setLayer")
-RasterizationRateMapDescriptor_setLayer :: #force_inline proc(self: ^RasterizationRateMapDescriptor, layer: ^RasterizationRateLayerDescriptor, layerIndex: ^NS.Object) {
+RasterizationRateMapDescriptor_setLayer :: #force_inline proc(self: ^RasterizationRateMapDescriptor, layer: ^RasterizationRateLayerDescriptor, layerIndex: NS.UInteger) {
 	msgSend(nil, self, "setLayer:atIndex:", layer, layerIndex)
 }
 @(objc_type=RasterizationRateMapDescriptor, objc_name="setScreenSize")
@@ -2422,11 +2471,11 @@ RasterizationRateSampleArray_init :: #force_inline proc(self: ^RasterizationRate
 	return msgSend(^RasterizationRateSampleArray, self, "init")
 }
 @(objc_type=RasterizationRateSampleArray, objc_name="objectAtIndexedSubscript")
-RasterizationRateSampleArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RasterizationRateSampleArray, index: ^NS.Object) -> ^NS.Number {
-	return msgSend(^NS.Number, self, "objectAtIndexedSubscript:", index)
+RasterizationRateSampleArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RasterizationRateSampleArray, index: NS.UInteger) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=RasterizationRateSampleArray, objc_name="setObject")
-RasterizationRateSampleArray_setObject :: #force_inline proc(self: ^RasterizationRateSampleArray, value: ^NS.Number, index: ^NS.Object) {
+RasterizationRateSampleArray_setObject :: #force_inline proc(self: ^RasterizationRateSampleArray, value: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", value, index)
 }
 
@@ -2474,39 +2523,39 @@ RenderPassAttachmentDescriptor_init :: #force_inline proc(self: ^RenderPassAttac
 	return msgSend(^RenderPassAttachmentDescriptor, self, "init")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="depthPlane")
-RenderPassAttachmentDescriptor_depthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "depthPlane")
+RenderPassAttachmentDescriptor_depthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "depthPlane")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="level")
-RenderPassAttachmentDescriptor_level :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "level")
+RenderPassAttachmentDescriptor_level :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "level")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="loadAction")
 RenderPassAttachmentDescriptor_loadAction :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> LoadAction {
 	return msgSend(LoadAction, self, "loadAction")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="resolveDepthPlane")
-RenderPassAttachmentDescriptor_resolveDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "resolveDepthPlane")
+RenderPassAttachmentDescriptor_resolveDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "resolveDepthPlane")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="resolveLevel")
-RenderPassAttachmentDescriptor_resolveLevel :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "resolveLevel")
+RenderPassAttachmentDescriptor_resolveLevel :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "resolveLevel")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="resolveSlice")
-RenderPassAttachmentDescriptor_resolveSlice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "resolveSlice")
+RenderPassAttachmentDescriptor_resolveSlice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "resolveSlice")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="resolveTexture")
 RenderPassAttachmentDescriptor_resolveTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> ^RenderPassAttachmentDescriptor {
 	return msgSend(^RenderPassAttachmentDescriptor, self, "resolveTexture")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setDepthPlane")
-RenderPassAttachmentDescriptor_setDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, depthPlane: NS.Integer) {
+RenderPassAttachmentDescriptor_setDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, depthPlane: NS.UInteger) {
 	msgSend(nil, self, "setDepthPlane:", depthPlane)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setLevel")
-RenderPassAttachmentDescriptor_setLevel :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, level: NS.Integer) {
+RenderPassAttachmentDescriptor_setLevel :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, level: NS.UInteger) {
 	msgSend(nil, self, "setLevel:", level)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setLoadAction")
@@ -2514,23 +2563,23 @@ RenderPassAttachmentDescriptor_setLoadAction :: #force_inline proc(self: ^Render
 	msgSend(nil, self, "setLoadAction:", loadAction)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setResolveDepthPlane")
-RenderPassAttachmentDescriptor_setResolveDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveDepthPlane: NS.Integer) {
+RenderPassAttachmentDescriptor_setResolveDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveDepthPlane: NS.UInteger) {
 	msgSend(nil, self, "setResolveDepthPlane:", resolveDepthPlane)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setResolveLevel")
-RenderPassAttachmentDescriptor_setResolveLevel :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveLevel: NS.Integer) {
+RenderPassAttachmentDescriptor_setResolveLevel :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveLevel: NS.UInteger) {
 	msgSend(nil, self, "setResolveLevel:", resolveLevel)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setResolveSlice")
-RenderPassAttachmentDescriptor_setResolveSlice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveSlice: NS.Integer) {
+RenderPassAttachmentDescriptor_setResolveSlice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveSlice: NS.UInteger) {
 	msgSend(nil, self, "setResolveSlice:", resolveSlice)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setResolveTexture")
-RenderPassAttachmentDescriptor_setResolveTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveTexture: ^NS.Object) {
+RenderPassAttachmentDescriptor_setResolveTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, resolveTexture: ^Texture) {
 	msgSend(nil, self, "setResolveTexture:", resolveTexture)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setSlice")
-RenderPassAttachmentDescriptor_setSlice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, slice: NS.Integer) {
+RenderPassAttachmentDescriptor_setSlice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, slice: NS.UInteger) {
 	msgSend(nil, self, "setSlice:", slice)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setStoreAction")
@@ -2542,12 +2591,12 @@ RenderPassAttachmentDescriptor_setStoreActionOptions :: #force_inline proc(self:
 	msgSend(nil, self, "setStoreActionOptions:", storeActionOptions)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setTexture")
-RenderPassAttachmentDescriptor_setTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, texture: ^NS.Object) {
+RenderPassAttachmentDescriptor_setTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, texture: ^Texture) {
 	msgSend(nil, self, "setTexture:", texture)
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="slice")
-RenderPassAttachmentDescriptor_slice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "slice")
+RenderPassAttachmentDescriptor_slice :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "slice")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="storeAction")
 RenderPassAttachmentDescriptor_storeAction :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> StoreAction {
@@ -2618,11 +2667,11 @@ RenderPassColorAttachmentDescriptorArray_init :: #force_inline proc(self: ^Rende
 	return msgSend(^RenderPassColorAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-RenderPassColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^RenderPassColorAttachmentDescriptor {
+RenderPassColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassColorAttachmentDescriptor {
 	return msgSend(^RenderPassColorAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="setObject")
-RenderPassColorAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray, attachment: ^RenderPassColorAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+RenderPassColorAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray, attachment: ^RenderPassColorAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -2723,20 +2772,20 @@ RenderPassDescriptor_colorAttachments :: #force_inline proc(self: ^RenderPassDes
 	return msgSend(^RenderPassColorAttachmentDescriptorArray, self, "colorAttachments")
 }
 @(objc_type=RenderPassDescriptor, objc_name="defaultRasterSampleCount")
-RenderPassDescriptor_defaultRasterSampleCount :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "defaultRasterSampleCount")
+RenderPassDescriptor_defaultRasterSampleCount :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "defaultRasterSampleCount")
 }
 @(objc_type=RenderPassDescriptor, objc_name="depthAttachment")
 RenderPassDescriptor_depthAttachment :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RenderPassDepthAttachmentDescriptor {
 	return msgSend(^RenderPassDepthAttachmentDescriptor, self, "depthAttachment")
 }
 @(objc_type=RenderPassDescriptor, objc_name="getSamplePositions")
-RenderPassDescriptor_getSamplePositions :: #force_inline proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: ^NS.Object) -> ^RenderPassDescriptor {
+RenderPassDescriptor_getSamplePositions :: #force_inline proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: NS.UInteger) -> ^RenderPassDescriptor {
 	return msgSend(^RenderPassDescriptor, self, "getSamplePositions:count:", positions, count)
 }
 @(objc_type=RenderPassDescriptor, objc_name="imageblockSampleLength")
-RenderPassDescriptor_imageblockSampleLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "imageblockSampleLength")
+RenderPassDescriptor_imageblockSampleLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "imageblockSampleLength")
 }
 @(objc_type=RenderPassDescriptor, objc_name="rasterizationRateMap")
 RenderPassDescriptor_rasterizationRateMap :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RenderPassDescriptor {
@@ -2747,23 +2796,23 @@ RenderPassDescriptor_renderPassDescriptor :: #force_inline proc() -> ^RenderPass
 	return msgSend(^RenderPassDescriptor, RenderPassDescriptor, "renderPassDescriptor")
 }
 @(objc_type=RenderPassDescriptor, objc_name="renderTargetArrayLength")
-RenderPassDescriptor_renderTargetArrayLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "renderTargetArrayLength")
+RenderPassDescriptor_renderTargetArrayLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "renderTargetArrayLength")
 }
 @(objc_type=RenderPassDescriptor, objc_name="renderTargetHeight")
-RenderPassDescriptor_renderTargetHeight :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "renderTargetHeight")
+RenderPassDescriptor_renderTargetHeight :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "renderTargetHeight")
 }
 @(objc_type=RenderPassDescriptor, objc_name="renderTargetWidth")
-RenderPassDescriptor_renderTargetWidth :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "renderTargetWidth")
+RenderPassDescriptor_renderTargetWidth :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "renderTargetWidth")
 }
 @(objc_type=RenderPassDescriptor, objc_name="sampleBufferAttachments")
 RenderPassDescriptor_sampleBufferAttachments :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RenderPassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptorArray, self, "sampleBufferAttachments")
 }
 @(objc_type=RenderPassDescriptor, objc_name="setDefaultRasterSampleCount")
-RenderPassDescriptor_setDefaultRasterSampleCount :: #force_inline proc(self: ^RenderPassDescriptor, defaultRasterSampleCount: NS.Integer) {
+RenderPassDescriptor_setDefaultRasterSampleCount :: #force_inline proc(self: ^RenderPassDescriptor, defaultRasterSampleCount: NS.UInteger) {
 	msgSend(nil, self, "setDefaultRasterSampleCount:", defaultRasterSampleCount)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setDepthAttachment")
@@ -2771,27 +2820,27 @@ RenderPassDescriptor_setDepthAttachment :: #force_inline proc(self: ^RenderPassD
 	msgSend(nil, self, "setDepthAttachment:", depthAttachment)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setImageblockSampleLength")
-RenderPassDescriptor_setImageblockSampleLength :: #force_inline proc(self: ^RenderPassDescriptor, imageblockSampleLength: NS.Integer) {
+RenderPassDescriptor_setImageblockSampleLength :: #force_inline proc(self: ^RenderPassDescriptor, imageblockSampleLength: NS.UInteger) {
 	msgSend(nil, self, "setImageblockSampleLength:", imageblockSampleLength)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setRasterizationRateMap")
-RenderPassDescriptor_setRasterizationRateMap :: #force_inline proc(self: ^RenderPassDescriptor, rasterizationRateMap: ^NS.Object) {
+RenderPassDescriptor_setRasterizationRateMap :: #force_inline proc(self: ^RenderPassDescriptor, rasterizationRateMap: ^RasterizationRateMap) {
 	msgSend(nil, self, "setRasterizationRateMap:", rasterizationRateMap)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setRenderTargetArrayLength")
-RenderPassDescriptor_setRenderTargetArrayLength :: #force_inline proc(self: ^RenderPassDescriptor, renderTargetArrayLength: NS.Integer) {
+RenderPassDescriptor_setRenderTargetArrayLength :: #force_inline proc(self: ^RenderPassDescriptor, renderTargetArrayLength: NS.UInteger) {
 	msgSend(nil, self, "setRenderTargetArrayLength:", renderTargetArrayLength)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setRenderTargetHeight")
-RenderPassDescriptor_setRenderTargetHeight :: #force_inline proc(self: ^RenderPassDescriptor, renderTargetHeight: NS.Integer) {
+RenderPassDescriptor_setRenderTargetHeight :: #force_inline proc(self: ^RenderPassDescriptor, renderTargetHeight: NS.UInteger) {
 	msgSend(nil, self, "setRenderTargetHeight:", renderTargetHeight)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setRenderTargetWidth")
-RenderPassDescriptor_setRenderTargetWidth :: #force_inline proc(self: ^RenderPassDescriptor, renderTargetWidth: NS.Integer) {
+RenderPassDescriptor_setRenderTargetWidth :: #force_inline proc(self: ^RenderPassDescriptor, renderTargetWidth: NS.UInteger) {
 	msgSend(nil, self, "setRenderTargetWidth:", renderTargetWidth)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setSamplePositions")
-RenderPassDescriptor_setSamplePositions :: #force_inline proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: ^NS.Object) {
+RenderPassDescriptor_setSamplePositions :: #force_inline proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: NS.UInteger) {
 	msgSend(nil, self, "setSamplePositions:count:", positions, count)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setStencilAttachment")
@@ -2799,19 +2848,19 @@ RenderPassDescriptor_setStencilAttachment :: #force_inline proc(self: ^RenderPas
 	msgSend(nil, self, "setStencilAttachment:", stencilAttachment)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setThreadgroupMemoryLength")
-RenderPassDescriptor_setThreadgroupMemoryLength :: #force_inline proc(self: ^RenderPassDescriptor, threadgroupMemoryLength: NS.Integer) {
+RenderPassDescriptor_setThreadgroupMemoryLength :: #force_inline proc(self: ^RenderPassDescriptor, threadgroupMemoryLength: NS.UInteger) {
 	msgSend(nil, self, "setThreadgroupMemoryLength:", threadgroupMemoryLength)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setTileHeight")
-RenderPassDescriptor_setTileHeight :: #force_inline proc(self: ^RenderPassDescriptor, tileHeight: NS.Integer) {
+RenderPassDescriptor_setTileHeight :: #force_inline proc(self: ^RenderPassDescriptor, tileHeight: NS.UInteger) {
 	msgSend(nil, self, "setTileHeight:", tileHeight)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setTileWidth")
-RenderPassDescriptor_setTileWidth :: #force_inline proc(self: ^RenderPassDescriptor, tileWidth: NS.Integer) {
+RenderPassDescriptor_setTileWidth :: #force_inline proc(self: ^RenderPassDescriptor, tileWidth: NS.UInteger) {
 	msgSend(nil, self, "setTileWidth:", tileWidth)
 }
 @(objc_type=RenderPassDescriptor, objc_name="setVisibilityResultBuffer")
-RenderPassDescriptor_setVisibilityResultBuffer :: #force_inline proc(self: ^RenderPassDescriptor, visibilityResultBuffer: ^NS.Object) {
+RenderPassDescriptor_setVisibilityResultBuffer :: #force_inline proc(self: ^RenderPassDescriptor, visibilityResultBuffer: ^Buffer) {
 	msgSend(nil, self, "setVisibilityResultBuffer:", visibilityResultBuffer)
 }
 @(objc_type=RenderPassDescriptor, objc_name="stencilAttachment")
@@ -2819,16 +2868,16 @@ RenderPassDescriptor_stencilAttachment :: #force_inline proc(self: ^RenderPassDe
 	return msgSend(^RenderPassStencilAttachmentDescriptor, self, "stencilAttachment")
 }
 @(objc_type=RenderPassDescriptor, objc_name="threadgroupMemoryLength")
-RenderPassDescriptor_threadgroupMemoryLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "threadgroupMemoryLength")
+RenderPassDescriptor_threadgroupMemoryLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "threadgroupMemoryLength")
 }
 @(objc_type=RenderPassDescriptor, objc_name="tileHeight")
-RenderPassDescriptor_tileHeight :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "tileHeight")
+RenderPassDescriptor_tileHeight :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "tileHeight")
 }
 @(objc_type=RenderPassDescriptor, objc_name="tileWidth")
-RenderPassDescriptor_tileWidth :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "tileWidth")
+RenderPassDescriptor_tileWidth :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "tileWidth")
 }
 @(objc_type=RenderPassDescriptor, objc_name="visibilityResultBuffer")
 RenderPassDescriptor_visibilityResultBuffer :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RenderPassDescriptor {
@@ -2867,44 +2916,44 @@ RenderPassSampleBufferAttachmentDescriptor_init :: #force_inline proc(self: ^Ren
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptor, self, "init")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="endOfFragmentSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_endOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "endOfFragmentSampleIndex")
+RenderPassSampleBufferAttachmentDescriptor_endOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "endOfFragmentSampleIndex")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="endOfVertexSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_endOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "endOfVertexSampleIndex")
+RenderPassSampleBufferAttachmentDescriptor_endOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "endOfVertexSampleIndex")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
 RenderPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> ^RenderPassSampleBufferAttachmentDescriptor {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setEndOfFragmentSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_setEndOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, endOfFragmentSampleIndex: NS.Integer) {
+RenderPassSampleBufferAttachmentDescriptor_setEndOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, endOfFragmentSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfFragmentSampleIndex:", endOfFragmentSampleIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setEndOfVertexSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_setEndOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, endOfVertexSampleIndex: NS.Integer) {
+RenderPassSampleBufferAttachmentDescriptor_setEndOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, endOfVertexSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfVertexSampleIndex:", endOfVertexSampleIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-RenderPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, sampleBuffer: ^NS.Object) {
+RenderPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setStartOfFragmentSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_setStartOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, startOfFragmentSampleIndex: NS.Integer) {
+RenderPassSampleBufferAttachmentDescriptor_setStartOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, startOfFragmentSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setStartOfFragmentSampleIndex:", startOfFragmentSampleIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setStartOfVertexSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_setStartOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, startOfVertexSampleIndex: NS.Integer) {
+RenderPassSampleBufferAttachmentDescriptor_setStartOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, startOfVertexSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setStartOfVertexSampleIndex:", startOfVertexSampleIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="startOfFragmentSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_startOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "startOfFragmentSampleIndex")
+RenderPassSampleBufferAttachmentDescriptor_startOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "startOfFragmentSampleIndex")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="startOfVertexSampleIndex")
-RenderPassSampleBufferAttachmentDescriptor_startOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "startOfVertexSampleIndex")
+RenderPassSampleBufferAttachmentDescriptor_startOfVertexSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "startOfVertexSampleIndex")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2931,11 +2980,11 @@ RenderPassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self:
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-RenderPassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^RenderPassSampleBufferAttachmentDescriptor {
+RenderPassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassSampleBufferAttachmentDescriptor {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
-RenderPassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachment: ^RenderPassSampleBufferAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+RenderPassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachment: ^RenderPassSampleBufferAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -3117,11 +3166,11 @@ RenderPipelineColorAttachmentDescriptorArray_init :: #force_inline proc(self: ^R
 	return msgSend(^RenderPipelineColorAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-RenderPipelineColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^RenderPipelineColorAttachmentDescriptor {
+RenderPipelineColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPipelineColorAttachmentDescriptor {
 	return msgSend(^RenderPipelineColorAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="setObject")
-RenderPipelineColorAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray, attachment: ^RenderPipelineColorAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+RenderPipelineColorAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray, attachment: ^RenderPipelineColorAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -3239,24 +3288,24 @@ RenderPipelineDescriptor_label :: #force_inline proc(self: ^RenderPipelineDescri
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="maxTessellationFactor")
-RenderPipelineDescriptor_maxTessellationFactor :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxTessellationFactor")
+RenderPipelineDescriptor_maxTessellationFactor :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTessellationFactor")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="maxVertexAmplificationCount")
-RenderPipelineDescriptor_maxVertexAmplificationCount :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxVertexAmplificationCount")
+RenderPipelineDescriptor_maxVertexAmplificationCount :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxVertexAmplificationCount")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="rasterSampleCount")
-RenderPipelineDescriptor_rasterSampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "rasterSampleCount")
+RenderPipelineDescriptor_rasterSampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "rasterSampleCount")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="reset")
 RenderPipelineDescriptor_reset :: #force_inline proc(self: ^RenderPipelineDescriptor) {
 	msgSend(nil, self, "reset")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="sampleCount")
-RenderPipelineDescriptor_sampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "sampleCount")
+RenderPipelineDescriptor_sampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "sampleCount")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setAlphaToCoverageEnabled")
 RenderPipelineDescriptor_setAlphaToCoverageEnabled :: #force_inline proc(self: ^RenderPipelineDescriptor, alphaToCoverageEnabled: BOOL) {
@@ -3275,7 +3324,7 @@ RenderPipelineDescriptor_setDepthAttachmentPixelFormat :: #force_inline proc(sel
 	msgSend(nil, self, "setDepthAttachmentPixelFormat:", depthAttachmentPixelFormat)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setFragmentFunction")
-RenderPipelineDescriptor_setFragmentFunction :: #force_inline proc(self: ^RenderPipelineDescriptor, fragmentFunction: ^NS.Object) {
+RenderPipelineDescriptor_setFragmentFunction :: #force_inline proc(self: ^RenderPipelineDescriptor, fragmentFunction: ^Function) {
 	msgSend(nil, self, "setFragmentFunction:", fragmentFunction)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setInputPrimitiveTopology")
@@ -3287,15 +3336,15 @@ RenderPipelineDescriptor_setLabel :: #force_inline proc(self: ^RenderPipelineDes
 	msgSend(nil, self, "setLabel:", label)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setMaxTessellationFactor")
-RenderPipelineDescriptor_setMaxTessellationFactor :: #force_inline proc(self: ^RenderPipelineDescriptor, maxTessellationFactor: NS.Integer) {
+RenderPipelineDescriptor_setMaxTessellationFactor :: #force_inline proc(self: ^RenderPipelineDescriptor, maxTessellationFactor: NS.UInteger) {
 	msgSend(nil, self, "setMaxTessellationFactor:", maxTessellationFactor)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setMaxVertexAmplificationCount")
-RenderPipelineDescriptor_setMaxVertexAmplificationCount :: #force_inline proc(self: ^RenderPipelineDescriptor, maxVertexAmplificationCount: NS.Integer) {
+RenderPipelineDescriptor_setMaxVertexAmplificationCount :: #force_inline proc(self: ^RenderPipelineDescriptor, maxVertexAmplificationCount: NS.UInteger) {
 	msgSend(nil, self, "setMaxVertexAmplificationCount:", maxVertexAmplificationCount)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setRasterSampleCount")
-RenderPipelineDescriptor_setRasterSampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor, rasterSampleCount: NS.Integer) {
+RenderPipelineDescriptor_setRasterSampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor, rasterSampleCount: NS.UInteger) {
 	msgSend(nil, self, "setRasterSampleCount:", rasterSampleCount)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setRasterizationEnabled")
@@ -3303,7 +3352,7 @@ RenderPipelineDescriptor_setRasterizationEnabled :: #force_inline proc(self: ^Re
 	msgSend(nil, self, "setRasterizationEnabled:", rasterizationEnabled)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setSampleCount")
-RenderPipelineDescriptor_setSampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor, sampleCount: NS.Integer) {
+RenderPipelineDescriptor_setSampleCount :: #force_inline proc(self: ^RenderPipelineDescriptor, sampleCount: NS.UInteger) {
 	msgSend(nil, self, "setSampleCount:", sampleCount)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setStencilAttachmentPixelFormat")
@@ -3343,7 +3392,7 @@ RenderPipelineDescriptor_setVertexDescriptor :: #force_inline proc(self: ^Render
 	msgSend(nil, self, "setVertexDescriptor:", vertexDescriptor)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setVertexFunction")
-RenderPipelineDescriptor_setVertexFunction :: #force_inline proc(self: ^RenderPipelineDescriptor, vertexFunction: ^NS.Object) {
+RenderPipelineDescriptor_setVertexFunction :: #force_inline proc(self: ^RenderPipelineDescriptor, vertexFunction: ^Function) {
 	msgSend(nil, self, "setVertexFunction:", vertexFunction)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="stencilAttachmentPixelFormat")
@@ -3484,28 +3533,28 @@ ResourceStatePassSampleBufferAttachmentDescriptor_init :: #force_inline proc(sel
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptor, self, "init")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="endOfEncoderSampleIndex")
-ResourceStatePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "endOfEncoderSampleIndex")
+ResourceStatePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
 ResourceStatePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
-ResourceStatePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.Integer) {
+ResourceStatePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfEncoderSampleIndex:", endOfEncoderSampleIndex)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-ResourceStatePassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, sampleBuffer: ^NS.Object) {
+ResourceStatePassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setStartOfEncoderSampleIndex")
-ResourceStatePassSampleBufferAttachmentDescriptor_setStartOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, startOfEncoderSampleIndex: NS.Integer) {
+ResourceStatePassSampleBufferAttachmentDescriptor_setStartOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, startOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setStartOfEncoderSampleIndex:", startOfEncoderSampleIndex)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="startOfEncoderSampleIndex")
-ResourceStatePassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "startOfEncoderSampleIndex")
+ResourceStatePassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "startOfEncoderSampleIndex")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3532,11 +3581,11 @@ ResourceStatePassSampleBufferAttachmentDescriptorArray_init :: #force_inline pro
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-ResourceStatePassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
+ResourceStatePassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
-ResourceStatePassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachment: ^ResourceStatePassSampleBufferAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+ResourceStatePassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachment: ^ResourceStatePassSampleBufferAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -3620,8 +3669,8 @@ SamplerDescriptor_magFilter :: #force_inline proc(self: ^SamplerDescriptor) -> S
 	return msgSend(SamplerMinMagFilter, self, "magFilter")
 }
 @(objc_type=SamplerDescriptor, objc_name="maxAnisotropy")
-SamplerDescriptor_maxAnisotropy :: #force_inline proc(self: ^SamplerDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxAnisotropy")
+SamplerDescriptor_maxAnisotropy :: #force_inline proc(self: ^SamplerDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxAnisotropy")
 }
 @(objc_type=SamplerDescriptor, objc_name="minFilter")
 SamplerDescriptor_minFilter :: #force_inline proc(self: ^SamplerDescriptor) -> SamplerMinMagFilter {
@@ -3672,7 +3721,7 @@ SamplerDescriptor_setMagFilter :: #force_inline proc(self: ^SamplerDescriptor, m
 	msgSend(nil, self, "setMagFilter:", magFilter)
 }
 @(objc_type=SamplerDescriptor, objc_name="setMaxAnisotropy")
-SamplerDescriptor_setMaxAnisotropy :: #force_inline proc(self: ^SamplerDescriptor, maxAnisotropy: NS.Integer) {
+SamplerDescriptor_setMaxAnisotropy :: #force_inline proc(self: ^SamplerDescriptor, maxAnisotropy: NS.UInteger) {
 	msgSend(nil, self, "setMaxAnisotropy:", maxAnisotropy)
 }
 @(objc_type=SamplerDescriptor, objc_name="setMinFilter")
@@ -3759,15 +3808,15 @@ SharedEventListener_alloc :: #force_inline proc() -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, SharedEventListener, "alloc")
 }
 @(objc_type=SharedEventListener, objc_name="dispatchQueue")
-SharedEventListener_dispatchQueue :: #force_inline proc(self: ^SharedEventListener) -> NS.Integer {
-	return msgSend(NS.Integer, self, "dispatchQueue")
+SharedEventListener_dispatchQueue :: #force_inline proc(self: ^SharedEventListener) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "dispatchQueue")
 }
 @(objc_type=SharedEventListener, objc_name="init")
 SharedEventListener_init :: #force_inline proc(self: ^SharedEventListener) -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, self, "init")
 }
 @(objc_type=SharedEventListener, objc_name="initWithDispatchQueue")
-SharedEventListener_initWithDispatchQueue :: #force_inline proc(self: ^SharedEventListener, dispatchQueue: ^NS.Object) -> ^SharedEventListener {
+SharedEventListener_initWithDispatchQueue :: #force_inline proc(self: ^SharedEventListener, dispatchQueue: dispatch_queue_t) -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, self, "initWithDispatchQueue:", dispatchQueue)
 }
 
@@ -3837,8 +3886,8 @@ StageInputOutputDescriptor_attributes :: #force_inline proc(self: ^StageInputOut
 	return msgSend(^AttributeDescriptorArray, self, "attributes")
 }
 @(objc_type=StageInputOutputDescriptor, objc_name="indexBufferIndex")
-StageInputOutputDescriptor_indexBufferIndex :: #force_inline proc(self: ^StageInputOutputDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "indexBufferIndex")
+StageInputOutputDescriptor_indexBufferIndex :: #force_inline proc(self: ^StageInputOutputDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "indexBufferIndex")
 }
 @(objc_type=StageInputOutputDescriptor, objc_name="indexType")
 StageInputOutputDescriptor_indexType :: #force_inline proc(self: ^StageInputOutputDescriptor) -> IndexType {
@@ -3853,7 +3902,7 @@ StageInputOutputDescriptor_reset :: #force_inline proc(self: ^StageInputOutputDe
 	msgSend(nil, self, "reset")
 }
 @(objc_type=StageInputOutputDescriptor, objc_name="setIndexBufferIndex")
-StageInputOutputDescriptor_setIndexBufferIndex :: #force_inline proc(self: ^StageInputOutputDescriptor, indexBufferIndex: NS.Integer) {
+StageInputOutputDescriptor_setIndexBufferIndex :: #force_inline proc(self: ^StageInputOutputDescriptor, indexBufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setIndexBufferIndex:", indexBufferIndex)
 }
 @(objc_type=StageInputOutputDescriptor, objc_name="setIndexType")
@@ -3977,8 +4026,8 @@ StructMember_init :: #force_inline proc(self: ^StructMember) -> ^StructMember {
 	return msgSend(^StructMember, self, "init")
 }
 @(objc_type=StructMember, objc_name="argumentIndex")
-StructMember_argumentIndex :: #force_inline proc(self: ^StructMember) -> NS.Integer {
-	return msgSend(NS.Integer, self, "argumentIndex")
+StructMember_argumentIndex :: #force_inline proc(self: ^StructMember) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "argumentIndex")
 }
 @(objc_type=StructMember, objc_name="arrayType")
 StructMember_arrayType :: #force_inline proc(self: ^StructMember) -> ^ArrayType {
@@ -3993,8 +4042,8 @@ StructMember_name :: #force_inline proc(self: ^StructMember) -> ^NS.String {
 	return msgSend(^NS.String, self, "name")
 }
 @(objc_type=StructMember, objc_name="offset")
-StructMember_offset :: #force_inline proc(self: ^StructMember) -> NS.Integer {
-	return msgSend(NS.Integer, self, "offset")
+StructMember_offset :: #force_inline proc(self: ^StructMember) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "offset")
 }
 @(objc_type=StructMember, objc_name="pointerType")
 StructMember_pointerType :: #force_inline proc(self: ^StructMember) -> ^PointerType {
@@ -4100,28 +4149,28 @@ TextureDescriptor_allowGPUOptimizedContents :: #force_inline proc(self: ^Texture
 	return msgSend(BOOL, self, "allowGPUOptimizedContents")
 }
 @(objc_type=TextureDescriptor, objc_name="arrayLength")
-TextureDescriptor_arrayLength :: #force_inline proc(self: ^TextureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "arrayLength")
+TextureDescriptor_arrayLength :: #force_inline proc(self: ^TextureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "arrayLength")
 }
 @(objc_type=TextureDescriptor, objc_name="cpuCacheMode")
 TextureDescriptor_cpuCacheMode :: #force_inline proc(self: ^TextureDescriptor) -> CPUCacheMode {
 	return msgSend(CPUCacheMode, self, "cpuCacheMode")
 }
 @(objc_type=TextureDescriptor, objc_name="depth")
-TextureDescriptor_depth :: #force_inline proc(self: ^TextureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "depth")
+TextureDescriptor_depth :: #force_inline proc(self: ^TextureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "depth")
 }
 @(objc_type=TextureDescriptor, objc_name="hazardTrackingMode")
 TextureDescriptor_hazardTrackingMode :: #force_inline proc(self: ^TextureDescriptor) -> HazardTrackingMode {
 	return msgSend(HazardTrackingMode, self, "hazardTrackingMode")
 }
 @(objc_type=TextureDescriptor, objc_name="height")
-TextureDescriptor_height :: #force_inline proc(self: ^TextureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "height")
+TextureDescriptor_height :: #force_inline proc(self: ^TextureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "height")
 }
 @(objc_type=TextureDescriptor, objc_name="mipmapLevelCount")
-TextureDescriptor_mipmapLevelCount :: #force_inline proc(self: ^TextureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "mipmapLevelCount")
+TextureDescriptor_mipmapLevelCount :: #force_inline proc(self: ^TextureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "mipmapLevelCount")
 }
 @(objc_type=TextureDescriptor, objc_name="pixelFormat")
 TextureDescriptor_pixelFormat :: #force_inline proc(self: ^TextureDescriptor) -> PixelFormat {
@@ -4132,15 +4181,15 @@ TextureDescriptor_resourceOptions :: #force_inline proc(self: ^TextureDescriptor
 	return msgSend(ResourceOptions, self, "resourceOptions")
 }
 @(objc_type=TextureDescriptor, objc_name="sampleCount")
-TextureDescriptor_sampleCount :: #force_inline proc(self: ^TextureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "sampleCount")
+TextureDescriptor_sampleCount :: #force_inline proc(self: ^TextureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "sampleCount")
 }
 @(objc_type=TextureDescriptor, objc_name="setAllowGPUOptimizedContents")
 TextureDescriptor_setAllowGPUOptimizedContents :: #force_inline proc(self: ^TextureDescriptor, allowGPUOptimizedContents: BOOL) {
 	msgSend(nil, self, "setAllowGPUOptimizedContents:", allowGPUOptimizedContents)
 }
 @(objc_type=TextureDescriptor, objc_name="setArrayLength")
-TextureDescriptor_setArrayLength :: #force_inline proc(self: ^TextureDescriptor, arrayLength: NS.Integer) {
+TextureDescriptor_setArrayLength :: #force_inline proc(self: ^TextureDescriptor, arrayLength: NS.UInteger) {
 	msgSend(nil, self, "setArrayLength:", arrayLength)
 }
 @(objc_type=TextureDescriptor, objc_name="setCpuCacheMode")
@@ -4148,7 +4197,7 @@ TextureDescriptor_setCpuCacheMode :: #force_inline proc(self: ^TextureDescriptor
 	msgSend(nil, self, "setCpuCacheMode:", cpuCacheMode)
 }
 @(objc_type=TextureDescriptor, objc_name="setDepth")
-TextureDescriptor_setDepth :: #force_inline proc(self: ^TextureDescriptor, depth: NS.Integer) {
+TextureDescriptor_setDepth :: #force_inline proc(self: ^TextureDescriptor, depth: NS.UInteger) {
 	msgSend(nil, self, "setDepth:", depth)
 }
 @(objc_type=TextureDescriptor, objc_name="setHazardTrackingMode")
@@ -4156,11 +4205,11 @@ TextureDescriptor_setHazardTrackingMode :: #force_inline proc(self: ^TextureDesc
 	msgSend(nil, self, "setHazardTrackingMode:", hazardTrackingMode)
 }
 @(objc_type=TextureDescriptor, objc_name="setHeight")
-TextureDescriptor_setHeight :: #force_inline proc(self: ^TextureDescriptor, height: NS.Integer) {
+TextureDescriptor_setHeight :: #force_inline proc(self: ^TextureDescriptor, height: NS.UInteger) {
 	msgSend(nil, self, "setHeight:", height)
 }
 @(objc_type=TextureDescriptor, objc_name="setMipmapLevelCount")
-TextureDescriptor_setMipmapLevelCount :: #force_inline proc(self: ^TextureDescriptor, mipmapLevelCount: NS.Integer) {
+TextureDescriptor_setMipmapLevelCount :: #force_inline proc(self: ^TextureDescriptor, mipmapLevelCount: NS.UInteger) {
 	msgSend(nil, self, "setMipmapLevelCount:", mipmapLevelCount)
 }
 @(objc_type=TextureDescriptor, objc_name="setPixelFormat")
@@ -4172,7 +4221,7 @@ TextureDescriptor_setResourceOptions :: #force_inline proc(self: ^TextureDescrip
 	msgSend(nil, self, "setResourceOptions:", resourceOptions)
 }
 @(objc_type=TextureDescriptor, objc_name="setSampleCount")
-TextureDescriptor_setSampleCount :: #force_inline proc(self: ^TextureDescriptor, sampleCount: NS.Integer) {
+TextureDescriptor_setSampleCount :: #force_inline proc(self: ^TextureDescriptor, sampleCount: NS.UInteger) {
 	msgSend(nil, self, "setSampleCount:", sampleCount)
 }
 @(objc_type=TextureDescriptor, objc_name="setStorageMode")
@@ -4192,7 +4241,7 @@ TextureDescriptor_setUsage :: #force_inline proc(self: ^TextureDescriptor, usage
 	msgSend(nil, self, "setUsage:", usage)
 }
 @(objc_type=TextureDescriptor, objc_name="setWidth")
-TextureDescriptor_setWidth :: #force_inline proc(self: ^TextureDescriptor, width: NS.Integer) {
+TextureDescriptor_setWidth :: #force_inline proc(self: ^TextureDescriptor, width: NS.UInteger) {
 	msgSend(nil, self, "setWidth:", width)
 }
 @(objc_type=TextureDescriptor, objc_name="storageMode")
@@ -4204,15 +4253,15 @@ TextureDescriptor_swizzle :: #force_inline proc(self: ^TextureDescriptor) -> Tex
 	return msgSend(TextureSwizzleChannels, self, "swizzle")
 }
 @(objc_type=TextureDescriptor, objc_class_name="texture2DDescriptorWithPixelFormat")
-TextureDescriptor_texture2DDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: ^NS.Object, height: ^NS.Object, mipmapped: BOOL) -> ^TextureDescriptor {
+TextureDescriptor_texture2DDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, height: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", pixelFormat, width, height, mipmapped)
 }
 @(objc_type=TextureDescriptor, objc_class_name="textureBufferDescriptorWithPixelFormat")
-TextureDescriptor_textureBufferDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: ^NS.Object, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
+TextureDescriptor_textureBufferDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureBufferDescriptorWithPixelFormat:width:resourceOptions:usage:", pixelFormat, width, resourceOptions, usage)
 }
 @(objc_type=TextureDescriptor, objc_class_name="textureCubeDescriptorWithPixelFormat")
-TextureDescriptor_textureCubeDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, size: ^NS.Object, mipmapped: BOOL) -> ^TextureDescriptor {
+TextureDescriptor_textureCubeDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, size: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureCubeDescriptorWithPixelFormat:size:mipmapped:", pixelFormat, size, mipmapped)
 }
 @(objc_type=TextureDescriptor, objc_name="textureType")
@@ -4224,8 +4273,8 @@ TextureDescriptor_usage :: #force_inline proc(self: ^TextureDescriptor) -> Textu
 	return msgSend(TextureUsage, self, "usage")
 }
 @(objc_type=TextureDescriptor, objc_name="width")
-TextureDescriptor_width :: #force_inline proc(self: ^TextureDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "width")
+TextureDescriptor_width :: #force_inline proc(self: ^TextureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "width")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4326,11 +4375,11 @@ TileRenderPipelineColorAttachmentDescriptorArray_init :: #force_inline proc(self
 	return msgSend(^TileRenderPipelineColorAttachmentDescriptorArray, self, "init")
 }
 @(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-TileRenderPipelineColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachmentIndex: ^NS.Object) -> ^TileRenderPipelineColorAttachmentDescriptor {
+TileRenderPipelineColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^TileRenderPipelineColorAttachmentDescriptor {
 	return msgSend(^TileRenderPipelineColorAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="setObject")
-TileRenderPipelineColorAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachment: ^TileRenderPipelineColorAttachmentDescriptor, attachmentIndex: ^NS.Object) {
+TileRenderPipelineColorAttachmentDescriptorArray_setObject :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachment: ^TileRenderPipelineColorAttachmentDescriptor, attachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attachment, attachmentIndex)
 }
 
@@ -4383,12 +4432,12 @@ TileRenderPipelineDescriptor_label :: #force_inline proc(self: ^TileRenderPipeli
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="maxTotalThreadsPerThreadgroup")
-TileRenderPipelineDescriptor_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^TileRenderPipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxTotalThreadsPerThreadgroup")
+TileRenderPipelineDescriptor_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^TileRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadsPerThreadgroup")
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="rasterSampleCount")
-TileRenderPipelineDescriptor_rasterSampleCount :: #force_inline proc(self: ^TileRenderPipelineDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "rasterSampleCount")
+TileRenderPipelineDescriptor_rasterSampleCount :: #force_inline proc(self: ^TileRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "rasterSampleCount")
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="reset")
 TileRenderPipelineDescriptor_reset :: #force_inline proc(self: ^TileRenderPipelineDescriptor) {
@@ -4403,11 +4452,11 @@ TileRenderPipelineDescriptor_setLabel :: #force_inline proc(self: ^TileRenderPip
 	msgSend(nil, self, "setLabel:", label)
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="setMaxTotalThreadsPerThreadgroup")
-TileRenderPipelineDescriptor_setMaxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^TileRenderPipelineDescriptor, maxTotalThreadsPerThreadgroup: NS.Integer) {
+TileRenderPipelineDescriptor_setMaxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^TileRenderPipelineDescriptor, maxTotalThreadsPerThreadgroup: NS.UInteger) {
 	msgSend(nil, self, "setMaxTotalThreadsPerThreadgroup:", maxTotalThreadsPerThreadgroup)
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="setRasterSampleCount")
-TileRenderPipelineDescriptor_setRasterSampleCount :: #force_inline proc(self: ^TileRenderPipelineDescriptor, rasterSampleCount: NS.Integer) {
+TileRenderPipelineDescriptor_setRasterSampleCount :: #force_inline proc(self: ^TileRenderPipelineDescriptor, rasterSampleCount: NS.UInteger) {
 	msgSend(nil, self, "setRasterSampleCount:", rasterSampleCount)
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="setThreadgroupSizeMatchesTileSize")
@@ -4415,7 +4464,7 @@ TileRenderPipelineDescriptor_setThreadgroupSizeMatchesTileSize :: #force_inline 
 	msgSend(nil, self, "setThreadgroupSizeMatchesTileSize:", threadgroupSizeMatchesTileSize)
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="setTileFunction")
-TileRenderPipelineDescriptor_setTileFunction :: #force_inline proc(self: ^TileRenderPipelineDescriptor, tileFunction: ^NS.Object) {
+TileRenderPipelineDescriptor_setTileFunction :: #force_inline proc(self: ^TileRenderPipelineDescriptor, tileFunction: ^Function) {
 	msgSend(nil, self, "setTileFunction:", tileFunction)
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="threadgroupSizeMatchesTileSize")
@@ -4486,8 +4535,8 @@ VertexAttribute_init :: #force_inline proc(self: ^VertexAttribute) -> ^VertexAtt
 	return msgSend(^VertexAttribute, self, "init")
 }
 @(objc_type=VertexAttribute, objc_name="attributeIndex")
-VertexAttribute_attributeIndex :: #force_inline proc(self: ^VertexAttribute) -> NS.Integer {
-	return msgSend(NS.Integer, self, "attributeIndex")
+VertexAttribute_attributeIndex :: #force_inline proc(self: ^VertexAttribute) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "attributeIndex")
 }
 @(objc_type=VertexAttribute, objc_name="attributeType")
 VertexAttribute_attributeType :: #force_inline proc(self: ^VertexAttribute) -> DataType {
@@ -4538,19 +4587,19 @@ VertexAttributeDescriptor_init :: #force_inline proc(self: ^VertexAttributeDescr
 	return msgSend(^VertexAttributeDescriptor, self, "init")
 }
 @(objc_type=VertexAttributeDescriptor, objc_name="bufferIndex")
-VertexAttributeDescriptor_bufferIndex :: #force_inline proc(self: ^VertexAttributeDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "bufferIndex")
+VertexAttributeDescriptor_bufferIndex :: #force_inline proc(self: ^VertexAttributeDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "bufferIndex")
 }
 @(objc_type=VertexAttributeDescriptor, objc_name="format")
 VertexAttributeDescriptor_format :: #force_inline proc(self: ^VertexAttributeDescriptor) -> VertexFormat {
 	return msgSend(VertexFormat, self, "format")
 }
 @(objc_type=VertexAttributeDescriptor, objc_name="offset")
-VertexAttributeDescriptor_offset :: #force_inline proc(self: ^VertexAttributeDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "offset")
+VertexAttributeDescriptor_offset :: #force_inline proc(self: ^VertexAttributeDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "offset")
 }
 @(objc_type=VertexAttributeDescriptor, objc_name="setBufferIndex")
-VertexAttributeDescriptor_setBufferIndex :: #force_inline proc(self: ^VertexAttributeDescriptor, bufferIndex: NS.Integer) {
+VertexAttributeDescriptor_setBufferIndex :: #force_inline proc(self: ^VertexAttributeDescriptor, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setBufferIndex:", bufferIndex)
 }
 @(objc_type=VertexAttributeDescriptor, objc_name="setFormat")
@@ -4558,7 +4607,7 @@ VertexAttributeDescriptor_setFormat :: #force_inline proc(self: ^VertexAttribute
 	msgSend(nil, self, "setFormat:", format)
 }
 @(objc_type=VertexAttributeDescriptor, objc_name="setOffset")
-VertexAttributeDescriptor_setOffset :: #force_inline proc(self: ^VertexAttributeDescriptor, offset: NS.Integer) {
+VertexAttributeDescriptor_setOffset :: #force_inline proc(self: ^VertexAttributeDescriptor, offset: NS.UInteger) {
 	msgSend(nil, self, "setOffset:", offset)
 }
 
@@ -4586,11 +4635,11 @@ VertexAttributeDescriptorArray_init :: #force_inline proc(self: ^VertexAttribute
 	return msgSend(^VertexAttributeDescriptorArray, self, "init")
 }
 @(objc_type=VertexAttributeDescriptorArray, objc_name="objectAtIndexedSubscript")
-VertexAttributeDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^VertexAttributeDescriptorArray, index: ^NS.Object) -> ^VertexAttributeDescriptor {
+VertexAttributeDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^VertexAttributeDescriptorArray, index: NS.UInteger) -> ^VertexAttributeDescriptor {
 	return msgSend(^VertexAttributeDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=VertexAttributeDescriptorArray, objc_name="setObject")
-VertexAttributeDescriptorArray_setObject :: #force_inline proc(self: ^VertexAttributeDescriptorArray, attributeDesc: ^VertexAttributeDescriptor, index: ^NS.Object) {
+VertexAttributeDescriptorArray_setObject :: #force_inline proc(self: ^VertexAttributeDescriptorArray, attributeDesc: ^VertexAttributeDescriptor, index: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", attributeDesc, index)
 }
 
@@ -4626,11 +4675,11 @@ VertexBufferLayoutDescriptor_setStepFunction :: #force_inline proc(self: ^Vertex
 	msgSend(nil, self, "setStepFunction:", stepFunction)
 }
 @(objc_type=VertexBufferLayoutDescriptor, objc_name="setStepRate")
-VertexBufferLayoutDescriptor_setStepRate :: #force_inline proc(self: ^VertexBufferLayoutDescriptor, stepRate: NS.Integer) {
+VertexBufferLayoutDescriptor_setStepRate :: #force_inline proc(self: ^VertexBufferLayoutDescriptor, stepRate: NS.UInteger) {
 	msgSend(nil, self, "setStepRate:", stepRate)
 }
 @(objc_type=VertexBufferLayoutDescriptor, objc_name="setStride")
-VertexBufferLayoutDescriptor_setStride :: #force_inline proc(self: ^VertexBufferLayoutDescriptor, stride: NS.Integer) {
+VertexBufferLayoutDescriptor_setStride :: #force_inline proc(self: ^VertexBufferLayoutDescriptor, stride: NS.UInteger) {
 	msgSend(nil, self, "setStride:", stride)
 }
 @(objc_type=VertexBufferLayoutDescriptor, objc_name="stepFunction")
@@ -4638,12 +4687,12 @@ VertexBufferLayoutDescriptor_stepFunction :: #force_inline proc(self: ^VertexBuf
 	return msgSend(VertexStepFunction, self, "stepFunction")
 }
 @(objc_type=VertexBufferLayoutDescriptor, objc_name="stepRate")
-VertexBufferLayoutDescriptor_stepRate :: #force_inline proc(self: ^VertexBufferLayoutDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "stepRate")
+VertexBufferLayoutDescriptor_stepRate :: #force_inline proc(self: ^VertexBufferLayoutDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "stepRate")
 }
 @(objc_type=VertexBufferLayoutDescriptor, objc_name="stride")
-VertexBufferLayoutDescriptor_stride :: #force_inline proc(self: ^VertexBufferLayoutDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "stride")
+VertexBufferLayoutDescriptor_stride :: #force_inline proc(self: ^VertexBufferLayoutDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "stride")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4670,11 +4719,11 @@ VertexBufferLayoutDescriptorArray_init :: #force_inline proc(self: ^VertexBuffer
 	return msgSend(^VertexBufferLayoutDescriptorArray, self, "init")
 }
 @(objc_type=VertexBufferLayoutDescriptorArray, objc_name="objectAtIndexedSubscript")
-VertexBufferLayoutDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray, index: ^NS.Object) -> ^VertexBufferLayoutDescriptor {
+VertexBufferLayoutDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray, index: NS.UInteger) -> ^VertexBufferLayoutDescriptor {
 	return msgSend(^VertexBufferLayoutDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=VertexBufferLayoutDescriptorArray, objc_name="setObject")
-VertexBufferLayoutDescriptorArray_setObject :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray, bufferDesc: ^VertexBufferLayoutDescriptor, index: ^NS.Object) {
+VertexBufferLayoutDescriptorArray_setObject :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray, bufferDesc: ^VertexBufferLayoutDescriptor, index: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", bufferDesc, index)
 }
 
@@ -4745,11 +4794,11 @@ VisibleFunctionTableDescriptor_init :: #force_inline proc(self: ^VisibleFunction
 	return msgSend(^VisibleFunctionTableDescriptor, self, "init")
 }
 @(objc_type=VisibleFunctionTableDescriptor, objc_name="functionCount")
-VisibleFunctionTableDescriptor_functionCount :: #force_inline proc(self: ^VisibleFunctionTableDescriptor) -> NS.Integer {
-	return msgSend(NS.Integer, self, "functionCount")
+VisibleFunctionTableDescriptor_functionCount :: #force_inline proc(self: ^VisibleFunctionTableDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "functionCount")
 }
 @(objc_type=VisibleFunctionTableDescriptor, objc_name="setFunctionCount")
-VisibleFunctionTableDescriptor_setFunctionCount :: #force_inline proc(self: ^VisibleFunctionTableDescriptor, functionCount: NS.Integer) {
+VisibleFunctionTableDescriptor_setFunctionCount :: #force_inline proc(self: ^VisibleFunctionTableDescriptor, functionCount: NS.UInteger) {
 	msgSend(nil, self, "setFunctionCount:", functionCount)
 }
 @(objc_type=VisibleFunctionTableDescriptor, objc_class_name="visibleFunctionTableDescriptor")
@@ -4767,11 +4816,11 @@ Methods:
 	size
 */
 @(objc_class="MTLAccelerationStructure")
-AccelerationStructure :: struct { using _: NS.Object }
+AccelerationStructure :: struct { using _: Resource }
 
 @(objc_type=AccelerationStructure, objc_name="size")
-AccelerationStructure_size :: #force_inline proc(self: ^AccelerationStructure) -> NS.Integer {
-	return msgSend(NS.Integer, self, "size")
+AccelerationStructure_size :: #force_inline proc(self: ^AccelerationStructure) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "size")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4798,51 +4847,51 @@ Methods:
 AccelerationStructureCommandEncoder :: struct { using _: NS.Object }
 
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="buildAccelerationStructure")
-AccelerationStructureCommandEncoder_buildAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, accelerationStructure: ^NS.Object, descriptor: ^AccelerationStructureDescriptor, scratchBuffer: ^NS.Object, scratchBufferOffset: ^NS.Object) {
+AccelerationStructureCommandEncoder_buildAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, accelerationStructure: ^AccelerationStructure, descriptor: ^AccelerationStructureDescriptor, scratchBuffer: ^Buffer, scratchBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "buildAccelerationStructure:descriptor:scratchBuffer:scratchBufferOffset:", accelerationStructure, descriptor, scratchBuffer, scratchBufferOffset)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="copyAccelerationStructure")
-AccelerationStructureCommandEncoder_copyAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^NS.Object, destinationAccelerationStructure: ^NS.Object) {
+AccelerationStructureCommandEncoder_copyAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^AccelerationStructure, destinationAccelerationStructure: ^AccelerationStructure) {
 	msgSend(nil, self, "copyAccelerationStructure:toAccelerationStructure:", sourceAccelerationStructure, destinationAccelerationStructure)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="copyAndCompactAccelerationStructure")
-AccelerationStructureCommandEncoder_copyAndCompactAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^NS.Object, destinationAccelerationStructure: ^NS.Object) {
+AccelerationStructureCommandEncoder_copyAndCompactAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^AccelerationStructure, destinationAccelerationStructure: ^AccelerationStructure) {
 	msgSend(nil, self, "copyAndCompactAccelerationStructure:toAccelerationStructure:", sourceAccelerationStructure, destinationAccelerationStructure)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="refitAccelerationStructure")
-AccelerationStructureCommandEncoder_refitAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^NS.Object, descriptor: ^AccelerationStructureDescriptor, destinationAccelerationStructure: ^NS.Object, scratchBuffer: ^NS.Object, scratchBufferOffset: ^NS.Object) {
+AccelerationStructureCommandEncoder_refitAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^AccelerationStructure, descriptor: ^AccelerationStructureDescriptor, destinationAccelerationStructure: ^AccelerationStructure, scratchBuffer: ^Buffer, scratchBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "refitAccelerationStructure:descriptor:destination:scratchBuffer:scratchBufferOffset:", sourceAccelerationStructure, descriptor, destinationAccelerationStructure, scratchBuffer, scratchBufferOffset)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="sampleCountersInBuffer")
-AccelerationStructureCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sampleBuffer: ^NS.Object, sampleIndex: ^NS.Object, barrier: BOOL) {
+AccelerationStructureCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sampleBuffer: ^Buffer, sampleIndex: NS.UInteger, barrier: BOOL) {
 	msgSend(nil, self, "sampleCountersInBuffer:atSampleIndex:withBarrier:", sampleBuffer, sampleIndex, barrier)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="updateFence")
-AccelerationStructureCommandEncoder_updateFence :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, fence: ^NS.Object) {
+AccelerationStructureCommandEncoder_updateFence :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "updateFence:", fence)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useHeap")
-AccelerationStructureCommandEncoder_useHeap :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, heap: ^NS.Object) {
+AccelerationStructureCommandEncoder_useHeap :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, heap: ^Heap) {
 	msgSend(nil, self, "useHeap:", heap)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useHeaps")
-AccelerationStructureCommandEncoder_useHeaps :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, heaps: ^^NS.Object, count: ^NS.Object) {
+AccelerationStructureCommandEncoder_useHeaps :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, heaps: [^]^Heap, count: NS.UInteger) {
 	msgSend(nil, self, "useHeaps:count:", heaps, count)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useResource")
-AccelerationStructureCommandEncoder_useResource :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resource: ^NS.Object, usage: ResourceUsage) {
+AccelerationStructureCommandEncoder_useResource :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resource: ^Resource, usage: ResourceUsage) {
 	msgSend(nil, self, "useResource:usage:", resource, usage)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useResources")
-AccelerationStructureCommandEncoder_useResources :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resources: ^^NS.Object, count: ^NS.Object, usage: ResourceUsage) {
+AccelerationStructureCommandEncoder_useResources :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage) {
 	msgSend(nil, self, "useResources:count:usage:", resources, count, usage)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="waitForFence")
-AccelerationStructureCommandEncoder_waitForFence :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, fence: ^NS.Object) {
+AccelerationStructureCommandEncoder_waitForFence :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "waitForFence:", fence)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="writeCompactedAccelerationStructureSize")
-AccelerationStructureCommandEncoder_writeCompactedAccelerationStructureSize :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, accelerationStructure: ^NS.Object, buffer: ^NS.Object, offset: ^NS.Object) {
+AccelerationStructureCommandEncoder_writeCompactedAccelerationStructureSize :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, accelerationStructure: ^AccelerationStructure, buffer: ^Buffer, offset: NS.UInteger) {
 	msgSend(nil, self, "writeCompactedAccelerationStructureSize:toBuffer:offset:", accelerationStructure, buffer, offset)
 }
 
@@ -4884,11 +4933,11 @@ Methods:
 ArgumentEncoder :: struct { using _: NS.Object }
 
 @(objc_type=ArgumentEncoder, objc_name="alignment")
-ArgumentEncoder_alignment :: #force_inline proc(self: ^ArgumentEncoder) -> NS.Integer {
-	return msgSend(NS.Integer, self, "alignment")
+ArgumentEncoder_alignment :: #force_inline proc(self: ^ArgumentEncoder) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "alignment")
 }
 @(objc_type=ArgumentEncoder, objc_name="constantDataAtIndex")
-ArgumentEncoder_constantDataAtIndex :: #force_inline proc(self: ^ArgumentEncoder, index: ^NS.Object) -> rawptr {
+ArgumentEncoder_constantDataAtIndex :: #force_inline proc(self: ^ArgumentEncoder, index: NS.UInteger) -> rawptr {
 	return msgSend(rawptr, self, "constantDataAtIndex:", index)
 }
 @(objc_type=ArgumentEncoder, objc_name="device")
@@ -4896,59 +4945,59 @@ ArgumentEncoder_device :: #force_inline proc(self: ^ArgumentEncoder) -> ^Argumen
 	return msgSend(^ArgumentEncoder, self, "device")
 }
 @(objc_type=ArgumentEncoder, objc_name="encodedLength")
-ArgumentEncoder_encodedLength :: #force_inline proc(self: ^ArgumentEncoder) -> NS.Integer {
-	return msgSend(NS.Integer, self, "encodedLength")
+ArgumentEncoder_encodedLength :: #force_inline proc(self: ^ArgumentEncoder) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "encodedLength")
 }
 @(objc_type=ArgumentEncoder, objc_name="label")
 ArgumentEncoder_label :: #force_inline proc(self: ^ArgumentEncoder) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=ArgumentEncoder, objc_name="newArgumentEncoderForBufferAtIndex")
-ArgumentEncoder_newArgumentEncoderForBufferAtIndex :: #force_inline proc(self: ^ArgumentEncoder, index: ^NS.Object) -> ^ArgumentEncoder {
+ArgumentEncoder_newArgumentEncoderForBufferAtIndex :: #force_inline proc(self: ^ArgumentEncoder, index: NS.UInteger) -> ^ArgumentEncoder {
 	return msgSend(^ArgumentEncoder, self, "newArgumentEncoderForBufferAtIndex:", index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setAccelerationStructure")
-ArgumentEncoder_setAccelerationStructure :: #force_inline proc(self: ^ArgumentEncoder, accelerationStructure: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setAccelerationStructure :: #force_inline proc(self: ^ArgumentEncoder, accelerationStructure: ^AccelerationStructure, index: NS.UInteger) {
 	msgSend(nil, self, "setAccelerationStructure:atIndex:", accelerationStructure, index)
 }
-@(objc_type=ArgumentEncoder, objc_name="setArgumentBuffer_offset_")
-ArgumentEncoder_setArgumentBuffer_offset_ :: #force_inline proc(self: ^ArgumentEncoder, argumentBuffer: ^NS.Object, offset: ^NS.Object) {
+@(objc_type=ArgumentEncoder, objc_name="setArgumentBufferWithOffset")
+ArgumentEncoder_setArgumentBufferWithOffset :: #force_inline proc(self: ^ArgumentEncoder, argumentBuffer: ^Buffer, offset: NS.UInteger) {
 	msgSend(nil, self, "setArgumentBuffer:offset:", argumentBuffer, offset)
 }
-@(objc_type=ArgumentEncoder, objc_name="setArgumentBuffer_startOffset_arrayElement_")
-ArgumentEncoder_setArgumentBuffer_startOffset_arrayElement_ :: #force_inline proc(self: ^ArgumentEncoder, argumentBuffer: ^NS.Object, startOffset: ^NS.Object, arrayElement: ^NS.Object) {
+@(objc_type=ArgumentEncoder, objc_name="setArgumentBuffer_startOffsetWithStartOffset")
+ArgumentEncoder_setArgumentBuffer_startOffsetWithStartOffset :: #force_inline proc(self: ^ArgumentEncoder, argumentBuffer: ^Buffer, startOffset: NS.UInteger, arrayElement: NS.UInteger) {
 	msgSend(nil, self, "setArgumentBuffer:startOffset:arrayElement:", argumentBuffer, startOffset, arrayElement)
 }
 @(objc_type=ArgumentEncoder, objc_name="setBuffer")
-ArgumentEncoder_setBuffer :: #force_inline proc(self: ^ArgumentEncoder, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setBuffer :: #force_inline proc(self: ^ArgumentEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setBuffers")
-ArgumentEncoder_setBuffers :: #force_inline proc(self: ^ArgumentEncoder, buffers: ^^NS.Object, offsets: NS.Integer, range: NS.Range) {
+ArgumentEncoder_setBuffers :: #force_inline proc(self: ^ArgumentEncoder, buffers: [^]^Buffer, offsets: [^]NS.UInteger, range: NS.Range) {
 	msgSend(nil, self, "setBuffers:offsets:withRange:", buffers, offsets, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setComputePipelineState")
-ArgumentEncoder_setComputePipelineState :: #force_inline proc(self: ^ArgumentEncoder, pipeline: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setComputePipelineState :: #force_inline proc(self: ^ArgumentEncoder, pipeline: ^ComputePipelineState, index: NS.UInteger) {
 	msgSend(nil, self, "setComputePipelineState:atIndex:", pipeline, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setComputePipelineStates")
-ArgumentEncoder_setComputePipelineStates :: #force_inline proc(self: ^ArgumentEncoder, pipelines: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setComputePipelineStates :: #force_inline proc(self: ^ArgumentEncoder, pipelines: [^]^ComputePipelineState, range: NS.Range) {
 	msgSend(nil, self, "setComputePipelineStates:withRange:", pipelines, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIndirectCommandBuffer")
-ArgumentEncoder_setIndirectCommandBuffer :: #force_inline proc(self: ^ArgumentEncoder, indirectCommandBuffer: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setIndirectCommandBuffer :: #force_inline proc(self: ^ArgumentEncoder, indirectCommandBuffer: ^Buffer, index: NS.UInteger) {
 	msgSend(nil, self, "setIndirectCommandBuffer:atIndex:", indirectCommandBuffer, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIndirectCommandBuffers")
-ArgumentEncoder_setIndirectCommandBuffers :: #force_inline proc(self: ^ArgumentEncoder, buffers: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setIndirectCommandBuffers :: #force_inline proc(self: ^ArgumentEncoder, buffers: [^]^Buffer, range: NS.Range) {
 	msgSend(nil, self, "setIndirectCommandBuffers:withRange:", buffers, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIntersectionFunctionTable")
-ArgumentEncoder_setIntersectionFunctionTable :: #force_inline proc(self: ^ArgumentEncoder, intersectionFunctionTable: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setIntersectionFunctionTable :: #force_inline proc(self: ^ArgumentEncoder, intersectionFunctionTable: ^IntersectionFunctionTable, index: NS.UInteger) {
 	msgSend(nil, self, "setIntersectionFunctionTable:atIndex:", intersectionFunctionTable, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIntersectionFunctionTables")
-ArgumentEncoder_setIntersectionFunctionTables :: #force_inline proc(self: ^ArgumentEncoder, intersectionFunctionTables: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setIntersectionFunctionTables :: #force_inline proc(self: ^ArgumentEncoder, intersectionFunctionTables: [^]^IntersectionFunctionTable, range: NS.Range) {
 	msgSend(nil, self, "setIntersectionFunctionTables:withRange:", intersectionFunctionTables, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setLabel")
@@ -4956,35 +5005,35 @@ ArgumentEncoder_setLabel :: #force_inline proc(self: ^ArgumentEncoder, label: ^N
 	msgSend(nil, self, "setLabel:", label)
 }
 @(objc_type=ArgumentEncoder, objc_name="setRenderPipelineState")
-ArgumentEncoder_setRenderPipelineState :: #force_inline proc(self: ^ArgumentEncoder, pipeline: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setRenderPipelineState :: #force_inline proc(self: ^ArgumentEncoder, pipeline: ^RenderPipelineState, index: NS.UInteger) {
 	msgSend(nil, self, "setRenderPipelineState:atIndex:", pipeline, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setRenderPipelineStates")
-ArgumentEncoder_setRenderPipelineStates :: #force_inline proc(self: ^ArgumentEncoder, pipelines: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setRenderPipelineStates :: #force_inline proc(self: ^ArgumentEncoder, pipelines: [^]^RenderPipelineState, range: NS.Range) {
 	msgSend(nil, self, "setRenderPipelineStates:withRange:", pipelines, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setSamplerState")
-ArgumentEncoder_setSamplerState :: #force_inline proc(self: ^ArgumentEncoder, sampler: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setSamplerState :: #force_inline proc(self: ^ArgumentEncoder, sampler: ^SamplerState, index: NS.UInteger) {
 	msgSend(nil, self, "setSamplerState:atIndex:", sampler, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setSamplerStates")
-ArgumentEncoder_setSamplerStates :: #force_inline proc(self: ^ArgumentEncoder, samplers: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setSamplerStates :: #force_inline proc(self: ^ArgumentEncoder, samplers: [^]^SamplerState, range: NS.Range) {
 	msgSend(nil, self, "setSamplerStates:withRange:", samplers, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setTexture")
-ArgumentEncoder_setTexture :: #force_inline proc(self: ^ArgumentEncoder, texture: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setTexture :: #force_inline proc(self: ^ArgumentEncoder, texture: ^Texture, index: NS.UInteger) {
 	msgSend(nil, self, "setTexture:atIndex:", texture, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setTextures")
-ArgumentEncoder_setTextures :: #force_inline proc(self: ^ArgumentEncoder, textures: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setTextures :: #force_inline proc(self: ^ArgumentEncoder, textures: [^]^Texture, range: NS.Range) {
 	msgSend(nil, self, "setTextures:withRange:", textures, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setVisibleFunctionTable")
-ArgumentEncoder_setVisibleFunctionTable :: #force_inline proc(self: ^ArgumentEncoder, visibleFunctionTable: ^NS.Object, index: ^NS.Object) {
+ArgumentEncoder_setVisibleFunctionTable :: #force_inline proc(self: ^ArgumentEncoder, visibleFunctionTable: ^VisibleFunctionTable, index: NS.UInteger) {
 	msgSend(nil, self, "setVisibleFunctionTable:atIndex:", visibleFunctionTable, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setVisibleFunctionTables")
-ArgumentEncoder_setVisibleFunctionTables :: #force_inline proc(self: ^ArgumentEncoder, visibleFunctionTables: ^^NS.Object, range: NS.Range) {
+ArgumentEncoder_setVisibleFunctionTables :: #force_inline proc(self: ^ArgumentEncoder, visibleFunctionTables: [^]^VisibleFunctionTable, range: NS.Range) {
 	msgSend(nil, self, "setVisibleFunctionTables:withRange:", visibleFunctionTables, range)
 }
 
@@ -5007,16 +5056,19 @@ Methods:
 BinaryArchive :: struct { using _: NS.Copying(BinaryArchive) }
 
 @(objc_type=BinaryArchive, objc_name="addComputePipelineFunctionsWithDescriptor")
-BinaryArchive_addComputePipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^ComputePipelineDescriptor, error: ^^NS.Error ) -> BOOL {
-	return msgSend(BOOL, self, "addComputePipelineFunctionsWithDescriptor:error:", descriptor, error)
+BinaryArchive_addComputePipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^ComputePipelineDescriptor) -> (ok: bool, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "addComputePipelineFunctionsWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=BinaryArchive, objc_name="addRenderPipelineFunctionsWithDescriptor")
-BinaryArchive_addRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^RenderPipelineDescriptor, error: ^^NS.Error ) -> BOOL {
-	return msgSend(BOOL, self, "addRenderPipelineFunctionsWithDescriptor:error:", descriptor, error)
+BinaryArchive_addRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^RenderPipelineDescriptor) -> (ok: bool, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "addRenderPipelineFunctionsWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=BinaryArchive, objc_name="addTileRenderPipelineFunctionsWithDescriptor")
-BinaryArchive_addTileRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^TileRenderPipelineDescriptor, error: ^^NS.Error ) -> BOOL {
-	return msgSend(BOOL, self, "addTileRenderPipelineFunctionsWithDescriptor:error:", descriptor, error)
+BinaryArchive_addTileRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^TileRenderPipelineDescriptor) -> (ok: bool, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "addTileRenderPipelineFunctionsWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=BinaryArchive, objc_name="device")
 BinaryArchive_device :: #force_inline proc(self: ^BinaryArchive) -> ^BinaryArchive {
@@ -5027,8 +5079,9 @@ BinaryArchive_label :: #force_inline proc(self: ^BinaryArchive) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=BinaryArchive, objc_name="serializeToURL")
-BinaryArchive_serializeToURL :: #force_inline proc(self: ^BinaryArchive, url: ^NS.URL, error: ^^NS.Error ) -> BOOL {
-	return msgSend(BOOL, self, "serializeToURL:error:", url, error)
+BinaryArchive_serializeToURL :: #force_inline proc(self: ^BinaryArchive, url: ^NS.URL) -> (ok: bool, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "serializeToURL:error:", url, &error)
+	return
 }
 @(objc_type=BinaryArchive, objc_name="setLabel")
 BinaryArchive_setLabel :: #force_inline proc(self: ^BinaryArchive, label: ^NS.String) {
@@ -5072,103 +5125,103 @@ Methods:
 BlitCommandEncoder :: struct { using _: NS.Object }
 
 @(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_")
-BlitCommandEncoder_copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^NS.Object, sourceOffset: ^NS.Object, sourceBytesPerRow: ^NS.Object, sourceBytesPerImage: ^NS.Object, sourceSize: Size, destinationTexture: ^NS.Object, destinationSlice: ^NS.Object, destinationLevel: ^NS.Object, destinationOrigin: Origin) {
+BlitCommandEncoder_copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:", sourceBuffer, sourceOffset, sourceBytesPerRow, sourceBytesPerImage, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_options_")
-BlitCommandEncoder_copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_options_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^NS.Object, sourceOffset: ^NS.Object, sourceBytesPerRow: ^NS.Object, sourceBytesPerImage: ^NS.Object, sourceSize: Size, destinationTexture: ^NS.Object, destinationSlice: ^NS.Object, destinationLevel: ^NS.Object, destinationOrigin: Origin, options: BlitOption) {
+BlitCommandEncoder_copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_options_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin, options: BlitOption) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:options:", sourceBuffer, sourceOffset, sourceBytesPerRow, sourceBytesPerImage, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin, options)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_toBuffer_destinationOffset_size_")
-BlitCommandEncoder_copyFromBuffer_sourceOffset_toBuffer_destinationOffset_size_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^NS.Object, sourceOffset: ^NS.Object, destinationBuffer: ^NS.Object, destinationOffset: ^NS.Object, size: ^NS.Object) {
+BlitCommandEncoder_copyFromBuffer_sourceOffset_toBuffer_destinationOffset_size_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, size: NS.UInteger) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:", sourceBuffer, sourceOffset, destinationBuffer, destinationOffset, size)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^NS.Object, sourceSlice: ^NS.Object, sourceLevel: ^NS.Object, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^NS.Object, destinationOffset: ^NS.Object, destinationBytesPerRow: ^NS.Object, destinationBytesPerImage: ^NS.Object) {
+BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, destinationBytesPerRow: NS.UInteger, destinationBytesPerImage: NS.UInteger) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:", sourceTexture, sourceSlice, sourceLevel, sourceOrigin, sourceSize, destinationBuffer, destinationOffset, destinationBytesPerRow, destinationBytesPerImage)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_options_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_options_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^NS.Object, sourceSlice: ^NS.Object, sourceLevel: ^NS.Object, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^NS.Object, destinationOffset: ^NS.Object, destinationBytesPerRow: ^NS.Object, destinationBytesPerImage: ^NS.Object, options: BlitOption) {
+BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_options_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, destinationBytesPerRow: NS.UInteger, destinationBytesPerImage: NS.UInteger, options: BlitOption) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:options:", sourceTexture, sourceSlice, sourceLevel, sourceOrigin, sourceSize, destinationBuffer, destinationOffset, destinationBytesPerRow, destinationBytesPerImage, options)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^NS.Object, sourceSlice: ^NS.Object, sourceLevel: ^NS.Object, sourceOrigin: Origin, sourceSize: Size, destinationTexture: ^NS.Object, destinationSlice: ^NS.Object, destinationLevel: ^NS.Object, destinationOrigin: Origin) {
+BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:", sourceTexture, sourceSlice, sourceLevel, sourceOrigin, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_toTexture_destinationSlice_destinationLevel_sliceCount_levelCount_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_toTexture_destinationSlice_destinationLevel_sliceCount_levelCount_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^NS.Object, sourceSlice: ^NS.Object, sourceLevel: ^NS.Object, destinationTexture: ^NS.Object, destinationSlice: ^NS.Object, destinationLevel: ^NS.Object, sliceCount: ^NS.Object, levelCount: ^NS.Object) {
+BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_toTexture_destinationSlice_destinationLevel_sliceCount_levelCount_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, sliceCount: NS.UInteger, levelCount: NS.UInteger) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:toTexture:destinationSlice:destinationLevel:sliceCount:levelCount:", sourceTexture, sourceSlice, sourceLevel, destinationTexture, destinationSlice, destinationLevel, sliceCount, levelCount)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_toTexture_")
-BlitCommandEncoder_copyFromTexture_toTexture_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^NS.Object, destinationTexture: ^NS.Object) {
+@(objc_type=BlitCommandEncoder, objc_name="copyFromTexture")
+BlitCommandEncoder_copyFromTexture :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, destinationTexture: ^Texture) {
 	msgSend(nil, self, "copyFromTexture:toTexture:", sourceTexture, destinationTexture)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyIndirectCommandBuffer")
-BlitCommandEncoder_copyIndirectCommandBuffer :: #force_inline proc(self: ^BlitCommandEncoder, source: ^NS.Object, sourceRange: NS.Range, destination: ^NS.Object, destinationIndex: ^NS.Object) {
+BlitCommandEncoder_copyIndirectCommandBuffer :: #force_inline proc(self: ^BlitCommandEncoder, source: ^IndirectCommandBuffer, sourceRange: NS.Range, destination: ^IndirectCommandBuffer, destinationIndex: NS.UInteger) {
 	msgSend(nil, self, "copyIndirectCommandBuffer:sourceRange:destination:destinationIndex:", source, sourceRange, destination, destinationIndex)
 }
 @(objc_type=BlitCommandEncoder, objc_name="fillBuffer")
-BlitCommandEncoder_fillBuffer :: #force_inline proc(self: ^BlitCommandEncoder, buffer: ^NS.Object, range: NS.Range, value: u8) {
+BlitCommandEncoder_fillBuffer :: #force_inline proc(self: ^BlitCommandEncoder, buffer: ^Buffer, range: NS.Range, value: u8) {
 	msgSend(nil, self, "fillBuffer:range:value:", buffer, range, value)
 }
 @(objc_type=BlitCommandEncoder, objc_name="generateMipmapsForTexture")
-BlitCommandEncoder_generateMipmapsForTexture :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object) {
+BlitCommandEncoder_generateMipmapsForTexture :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture) {
 	msgSend(nil, self, "generateMipmapsForTexture:", texture)
 }
 @(objc_type=BlitCommandEncoder, objc_name="getTextureAccessCounters")
-BlitCommandEncoder_getTextureAccessCounters :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object, region: Region, mipLevel: ^NS.Object, slice: ^NS.Object, resetCounters: BOOL, countersBuffer: ^NS.Object, countersBufferOffset: ^NS.Object) {
+BlitCommandEncoder_getTextureAccessCounters :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture, region: Region, mipLevel: NS.UInteger, slice: NS.UInteger, resetCounters: BOOL, countersBuffer: ^Buffer, countersBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "getTextureAccessCounters:region:mipLevel:slice:resetCounters:countersBuffer:countersBufferOffset:", texture, region, mipLevel, slice, resetCounters, countersBuffer, countersBufferOffset)
 }
 @(objc_type=BlitCommandEncoder, objc_name="optimizeContentsForCPUAccess")
-BlitCommandEncoder_optimizeContentsForCPUAccess :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object) {
+BlitCommandEncoder_optimizeContentsForCPUAccess :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture) {
 	msgSend(nil, self, "optimizeContentsForCPUAccess:", texture)
 }
-@(objc_type=BlitCommandEncoder, objc_name="optimizeContentsForCPUAccess_slice_level_")
-BlitCommandEncoder_optimizeContentsForCPUAccess_slice_level_ :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object, slice: ^NS.Object, level: ^NS.Object) {
+@(objc_type=BlitCommandEncoder, objc_name="optimizeContentsForCPUAccessWithSliceAndLevel")
+BlitCommandEncoder_optimizeContentsForCPUAccessWithSliceAndLevel :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture, slice: NS.UInteger, level: NS.UInteger) {
 	msgSend(nil, self, "optimizeContentsForCPUAccess:slice:level:", texture, slice, level)
 }
 @(objc_type=BlitCommandEncoder, objc_name="optimizeContentsForGPUAccess")
-BlitCommandEncoder_optimizeContentsForGPUAccess :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object) {
+BlitCommandEncoder_optimizeContentsForGPUAccess :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture) {
 	msgSend(nil, self, "optimizeContentsForGPUAccess:", texture)
 }
-@(objc_type=BlitCommandEncoder, objc_name="optimizeContentsForGPUAccess_slice_level_")
-BlitCommandEncoder_optimizeContentsForGPUAccess_slice_level_ :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object, slice: ^NS.Object, level: ^NS.Object) {
+@(objc_type=BlitCommandEncoder, objc_name="optimizeContentsForGPUAccessWithSliceAndLevel")
+BlitCommandEncoder_optimizeContentsForGPUAccessWithSliceAndLevel :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture, slice: NS.UInteger, level: NS.UInteger) {
 	msgSend(nil, self, "optimizeContentsForGPUAccess:slice:level:", texture, slice, level)
 }
 @(objc_type=BlitCommandEncoder, objc_name="optimizeIndirectCommandBuffer")
-BlitCommandEncoder_optimizeIndirectCommandBuffer :: #force_inline proc(self: ^BlitCommandEncoder, indirectCommandBuffer: ^NS.Object, range: NS.Range) {
+BlitCommandEncoder_optimizeIndirectCommandBuffer :: #force_inline proc(self: ^BlitCommandEncoder, indirectCommandBuffer: ^Buffer, range: NS.Range) {
 	msgSend(nil, self, "optimizeIndirectCommandBuffer:withRange:", indirectCommandBuffer, range)
 }
 @(objc_type=BlitCommandEncoder, objc_name="resetCommandsInBuffer")
-BlitCommandEncoder_resetCommandsInBuffer :: #force_inline proc(self: ^BlitCommandEncoder, buffer: ^NS.Object, range: NS.Range) {
+BlitCommandEncoder_resetCommandsInBuffer :: #force_inline proc(self: ^BlitCommandEncoder, buffer: ^Buffer, range: NS.Range) {
 	msgSend(nil, self, "resetCommandsInBuffer:withRange:", buffer, range)
 }
 @(objc_type=BlitCommandEncoder, objc_name="resetTextureAccessCounters")
-BlitCommandEncoder_resetTextureAccessCounters :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object, region: Region, mipLevel: ^NS.Object, slice: ^NS.Object) {
+BlitCommandEncoder_resetTextureAccessCounters :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture, region: Region, mipLevel: NS.UInteger, slice: NS.UInteger) {
 	msgSend(nil, self, "resetTextureAccessCounters:region:mipLevel:slice:", texture, region, mipLevel, slice)
 }
 @(objc_type=BlitCommandEncoder, objc_name="resolveCounters")
-BlitCommandEncoder_resolveCounters :: #force_inline proc(self: ^BlitCommandEncoder, sampleBuffer: ^NS.Object, range: NS.Range, destinationBuffer: ^NS.Object, destinationOffset: ^NS.Object) {
+BlitCommandEncoder_resolveCounters :: #force_inline proc(self: ^BlitCommandEncoder, sampleBuffer: ^Buffer, range: NS.Range, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger) {
 	msgSend(nil, self, "resolveCounters:inRange:destinationBuffer:destinationOffset:", sampleBuffer, range, destinationBuffer, destinationOffset)
 }
 @(objc_type=BlitCommandEncoder, objc_name="sampleCountersInBuffer")
-BlitCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^BlitCommandEncoder, sampleBuffer: ^NS.Object, sampleIndex: ^NS.Object, barrier: BOOL) {
+BlitCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^BlitCommandEncoder, sampleBuffer: ^Buffer, sampleIndex: NS.UInteger, barrier: BOOL) {
 	msgSend(nil, self, "sampleCountersInBuffer:atSampleIndex:withBarrier:", sampleBuffer, sampleIndex, barrier)
 }
 @(objc_type=BlitCommandEncoder, objc_name="synchronizeResource")
-BlitCommandEncoder_synchronizeResource :: #force_inline proc(self: ^BlitCommandEncoder, resource: ^NS.Object) {
+BlitCommandEncoder_synchronizeResource :: #force_inline proc(self: ^BlitCommandEncoder, resource: ^Resource) {
 	msgSend(nil, self, "synchronizeResource:", resource)
 }
 @(objc_type=BlitCommandEncoder, objc_name="synchronizeTexture")
-BlitCommandEncoder_synchronizeTexture :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^NS.Object, slice: ^NS.Object, level: ^NS.Object) {
+BlitCommandEncoder_synchronizeTexture :: #force_inline proc(self: ^BlitCommandEncoder, texture: ^Texture, slice: NS.UInteger, level: NS.UInteger) {
 	msgSend(nil, self, "synchronizeTexture:slice:level:", texture, slice, level)
 }
 @(objc_type=BlitCommandEncoder, objc_name="updateFence")
-BlitCommandEncoder_updateFence :: #force_inline proc(self: ^BlitCommandEncoder, fence: ^NS.Object) {
+BlitCommandEncoder_updateFence :: #force_inline proc(self: ^BlitCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "updateFence:", fence)
 }
 @(objc_type=BlitCommandEncoder, objc_name="waitForFence")
-BlitCommandEncoder_waitForFence :: #force_inline proc(self: ^BlitCommandEncoder, fence: ^NS.Object) {
+BlitCommandEncoder_waitForFence :: #force_inline proc(self: ^BlitCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "waitForFence:", fence)
 }
 
@@ -5189,7 +5242,7 @@ Methods:
 	removeAllDebugMarkers
 */
 @(objc_class="MTLBuffer")
-Buffer :: struct { using _: NS.Object }
+Buffer :: struct { using _: Resource }
 
 @(objc_type=Buffer, objc_name="addDebugMarker")
 Buffer_addDebugMarker :: #force_inline proc(self: ^Buffer, marker: ^NS.String, range: NS.Range) {
@@ -5204,15 +5257,15 @@ Buffer_didModifyRange :: #force_inline proc(self: ^Buffer, range: NS.Range) {
 	msgSend(nil, self, "didModifyRange:", range)
 }
 @(objc_type=Buffer, objc_name="length")
-Buffer_length :: #force_inline proc(self: ^Buffer) -> NS.Integer {
-	return msgSend(NS.Integer, self, "length")
+Buffer_length :: #force_inline proc(self: ^Buffer) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "length")
 }
 @(objc_type=Buffer, objc_name="newRemoteBufferViewForDevice")
-Buffer_newRemoteBufferViewForDevice :: #force_inline proc(self: ^Buffer, device: ^NS.Object) -> ^Buffer {
+Buffer_newRemoteBufferViewForDevice :: #force_inline proc(self: ^Buffer, device: ^Device) -> ^Buffer {
 	return msgSend(^Buffer, self, "newRemoteBufferViewForDevice:", device)
 }
 @(objc_type=Buffer, objc_name="newTextureWithDescriptor")
-Buffer_newTextureWithDescriptor :: #force_inline proc(self: ^Buffer, descriptor: ^TextureDescriptor, offset: ^NS.Object, bytesPerRow: ^NS.Object) -> ^Buffer {
+Buffer_newTextureWithDescriptor :: #force_inline proc(self: ^Buffer, descriptor: ^TextureDescriptor, offset: NS.UInteger, bytesPerRow: NS.UInteger) -> ^Buffer {
 	return msgSend(^Buffer, self, "newTextureWithDescriptor:offset:bytesPerRow:", descriptor, offset, bytesPerRow)
 }
 @(objc_type=Buffer, objc_name="remoteStorageBuffer")
@@ -5366,11 +5419,11 @@ CommandBuffer_device :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuff
 	return msgSend(^CommandBuffer, self, "device")
 }
 @(objc_type=CommandBuffer, objc_name="encodeSignalEvent")
-CommandBuffer_encodeSignalEvent :: #force_inline proc(self: ^CommandBuffer, event: ^NS.Object, value: u64) {
+CommandBuffer_encodeSignalEvent :: #force_inline proc(self: ^CommandBuffer, event: ^Event, value: u64) {
 	msgSend(nil, self, "encodeSignalEvent:value:", event, value)
 }
 @(objc_type=CommandBuffer, objc_name="encodeWaitForEvent")
-CommandBuffer_encodeWaitForEvent :: #force_inline proc(self: ^CommandBuffer, event: ^NS.Object, value: u64) {
+CommandBuffer_encodeWaitForEvent :: #force_inline proc(self: ^CommandBuffer, event: ^Event, value: u64) {
 	msgSend(nil, self, "encodeWaitForEvent:value:", event, value)
 }
 @(objc_type=CommandBuffer, objc_name="enqueue")
@@ -5410,15 +5463,15 @@ CommandBuffer_popDebugGroup :: #force_inline proc(self: ^CommandBuffer) {
 	msgSend(nil, self, "popDebugGroup")
 }
 @(objc_type=CommandBuffer, objc_name="presentDrawable")
-CommandBuffer_presentDrawable :: #force_inline proc(self: ^CommandBuffer, drawable: ^NS.Object) {
+CommandBuffer_presentDrawable :: #force_inline proc(self: ^CommandBuffer, drawable: ^Drawable) {
 	msgSend(nil, self, "presentDrawable:", drawable)
 }
-@(objc_type=CommandBuffer, objc_name="presentDrawable_afterMinimumDuration_")
-CommandBuffer_presentDrawable_afterMinimumDuration_ :: #force_inline proc(self: ^CommandBuffer, drawable: ^NS.Object, duration: CFTimeInterval) {
+@(objc_type=CommandBuffer, objc_name="presentDrawableAfterMinimumDuration")
+CommandBuffer_presentDrawableAfterMinimumDuration :: #force_inline proc(self: ^CommandBuffer, drawable: ^Drawable, duration: CFTimeInterval) {
 	msgSend(nil, self, "presentDrawable:afterMinimumDuration:", drawable, duration)
 }
-@(objc_type=CommandBuffer, objc_name="presentDrawable_atTime_")
-CommandBuffer_presentDrawable_atTime_ :: #force_inline proc(self: ^CommandBuffer, drawable: ^NS.Object, presentationTime: CFTimeInterval) {
+@(objc_type=CommandBuffer, objc_name="presentDrawableAtTime")
+CommandBuffer_presentDrawableAtTime :: #force_inline proc(self: ^CommandBuffer, drawable: ^Drawable, presentationTime: CFTimeInterval) {
 	msgSend(nil, self, "presentDrawable:atTime:", drawable, presentationTime)
 }
 @(objc_type=CommandBuffer, objc_name="pushDebugGroup")
@@ -5630,7 +5683,7 @@ ComputeCommandEncoder_dispatchThreadgroups :: #force_inline proc(self: ^ComputeC
 	msgSend(nil, self, "dispatchThreadgroups:threadsPerThreadgroup:", threadgroupsPerGrid, threadsPerThreadgroup)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="dispatchThreadgroupsWithIndirectBuffer")
-ComputeCommandEncoder_dispatchThreadgroupsWithIndirectBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object, threadsPerThreadgroup: Size) {
+ComputeCommandEncoder_dispatchThreadgroupsWithIndirectBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger, threadsPerThreadgroup: Size) {
 	msgSend(nil, self, "dispatchThreadgroupsWithIndirectBuffer:indirectBufferOffset:threadsPerThreadgroup:", indirectBuffer, indirectBufferOffset, threadsPerThreadgroup)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="dispatchThreads")
@@ -5641,16 +5694,16 @@ ComputeCommandEncoder_dispatchThreads :: #force_inline proc(self: ^ComputeComman
 ComputeCommandEncoder_dispatchType :: #force_inline proc(self: ^ComputeCommandEncoder) -> DispatchType {
 	return msgSend(DispatchType, self, "dispatchType")
 }
-@(objc_type=ComputeCommandEncoder, objc_name="executeCommandsInBuffer_indirectBuffer_indirectBufferOffset_")
-ComputeCommandEncoder_executeCommandsInBuffer_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^ComputeCommandEncoder, indirectCommandbuffer: ^NS.Object, indirectRangeBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+@(objc_type=ComputeCommandEncoder, objc_name="executeCommandsInBuffer")
+ComputeCommandEncoder_executeCommandsInBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, indirectCommandbuffer: ^Buffer, indirectRangeBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:", indirectCommandbuffer, indirectRangeBuffer, indirectBufferOffset)
 }
-@(objc_type=ComputeCommandEncoder, objc_name="executeCommandsInBuffer_withRange_")
-ComputeCommandEncoder_executeCommandsInBuffer_withRange_ :: #force_inline proc(self: ^ComputeCommandEncoder, indirectCommandBuffer: ^NS.Object, executionRange: NS.Range) {
+@(objc_type=ComputeCommandEncoder, objc_name="executeCommandsInBufferWithRange")
+ComputeCommandEncoder_executeCommandsInBufferWithRange :: #force_inline proc(self: ^ComputeCommandEncoder, indirectCommandBuffer: ^Buffer, executionRange: NS.Range) {
 	msgSend(nil, self, "executeCommandsInBuffer:withRange:", indirectCommandBuffer, executionRange)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="memoryBarrierWithResources")
-ComputeCommandEncoder_memoryBarrierWithResources :: #force_inline proc(self: ^ComputeCommandEncoder, resources: ^^NS.Object, count: ^NS.Object) {
+ComputeCommandEncoder_memoryBarrierWithResources :: #force_inline proc(self: ^ComputeCommandEncoder, resources: [^]^Resource, count: NS.UInteger) {
 	msgSend(nil, self, "memoryBarrierWithResources:count:", resources, count)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="memoryBarrierWithScope")
@@ -5658,59 +5711,59 @@ ComputeCommandEncoder_memoryBarrierWithScope :: #force_inline proc(self: ^Comput
 	msgSend(nil, self, "memoryBarrierWithScope:", scope)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="sampleCountersInBuffer")
-ComputeCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, sampleBuffer: ^NS.Object, sampleIndex: ^NS.Object, barrier: BOOL) {
+ComputeCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, sampleBuffer: ^Buffer, sampleIndex: NS.UInteger, barrier: BOOL) {
 	msgSend(nil, self, "sampleCountersInBuffer:atSampleIndex:withBarrier:", sampleBuffer, sampleIndex, barrier)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setAccelerationStructure")
-ComputeCommandEncoder_setAccelerationStructure :: #force_inline proc(self: ^ComputeCommandEncoder, accelerationStructure: ^NS.Object, bufferIndex: ^NS.Object) {
+ComputeCommandEncoder_setAccelerationStructure :: #force_inline proc(self: ^ComputeCommandEncoder, accelerationStructure: ^AccelerationStructure, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setAccelerationStructure:atBufferIndex:", accelerationStructure, bufferIndex)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setBuffer")
-ComputeCommandEncoder_setBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+ComputeCommandEncoder_setBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setBufferOffset")
-ComputeCommandEncoder_setBufferOffset :: #force_inline proc(self: ^ComputeCommandEncoder, offset: ^NS.Object, index: ^NS.Object) {
+ComputeCommandEncoder_setBufferOffset :: #force_inline proc(self: ^ComputeCommandEncoder, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setBufferOffset:atIndex:", offset, index)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setBuffers")
-ComputeCommandEncoder_setBuffers :: #force_inline proc(self: ^ComputeCommandEncoder, buffers: ^^NS.Object, offsets: NS.Integer, range: NS.Range) {
+ComputeCommandEncoder_setBuffers :: #force_inline proc(self: ^ComputeCommandEncoder, buffers: [^]^Buffer, offsets: [^]NS.UInteger, range: NS.Range) {
 	msgSend(nil, self, "setBuffers:offsets:withRange:", buffers, offsets, range)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setBytes")
-ComputeCommandEncoder_setBytes :: #force_inline proc(self: ^ComputeCommandEncoder, bytes: rawptr, length: ^NS.Object, index: ^NS.Object) {
+ComputeCommandEncoder_setBytes :: #force_inline proc(self: ^ComputeCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setBytes:length:atIndex:", bytes, length, index)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setComputePipelineState")
-ComputeCommandEncoder_setComputePipelineState :: #force_inline proc(self: ^ComputeCommandEncoder, pipelineState: ^NS.Object) {
+ComputeCommandEncoder_setComputePipelineState :: #force_inline proc(self: ^ComputeCommandEncoder, pipelineState: ^ComputePipelineState) {
 	msgSend(nil, self, "setComputePipelineState:", pipelineState)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setImageblockWidth")
-ComputeCommandEncoder_setImageblockWidth :: #force_inline proc(self: ^ComputeCommandEncoder, width: ^NS.Object, height: ^NS.Object) {
+ComputeCommandEncoder_setImageblockWidth :: #force_inline proc(self: ^ComputeCommandEncoder, width: NS.UInteger, height: NS.UInteger) {
 	msgSend(nil, self, "setImageblockWidth:height:", width, height)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setIntersectionFunctionTable")
-ComputeCommandEncoder_setIntersectionFunctionTable :: #force_inline proc(self: ^ComputeCommandEncoder, intersectionFunctionTable: ^NS.Object, bufferIndex: ^NS.Object) {
+ComputeCommandEncoder_setIntersectionFunctionTable :: #force_inline proc(self: ^ComputeCommandEncoder, intersectionFunctionTable: ^IntersectionFunctionTable, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setIntersectionFunctionTable:atBufferIndex:", intersectionFunctionTable, bufferIndex)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setIntersectionFunctionTables")
-ComputeCommandEncoder_setIntersectionFunctionTables :: #force_inline proc(self: ^ComputeCommandEncoder, intersectionFunctionTables: ^^NS.Object, range: NS.Range) {
+ComputeCommandEncoder_setIntersectionFunctionTables :: #force_inline proc(self: ^ComputeCommandEncoder, intersectionFunctionTables: [^]^IntersectionFunctionTable, range: NS.Range) {
 	msgSend(nil, self, "setIntersectionFunctionTables:withBufferRange:", intersectionFunctionTables, range)
 }
-@(objc_type=ComputeCommandEncoder, objc_name="setSamplerState_atIndex_")
-ComputeCommandEncoder_setSamplerState_atIndex_ :: #force_inline proc(self: ^ComputeCommandEncoder, sampler: ^NS.Object, index: ^NS.Object) {
+@(objc_type=ComputeCommandEncoder, objc_name="setSamplerStateAtIndex")
+ComputeCommandEncoder_setSamplerStateAtIndex :: #force_inline proc(self: ^ComputeCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) {
 	msgSend(nil, self, "setSamplerState:atIndex:", sampler, index)
 }
-@(objc_type=ComputeCommandEncoder, objc_name="setSamplerState_lodMinClamp_lodMaxClamp_atIndex_")
-ComputeCommandEncoder_setSamplerState_lodMinClamp_lodMaxClamp_atIndex_ :: #force_inline proc(self: ^ComputeCommandEncoder, sampler: ^NS.Object, lodMinClamp: f32, lodMaxClamp: f32, index: ^NS.Object) {
+@(objc_type=ComputeCommandEncoder, objc_name="setSamplerState_lodMinClamp_lodMaxClampAtIndex")
+ComputeCommandEncoder_setSamplerState_lodMinClamp_lodMaxClampAtIndex :: #force_inline proc(self: ^ComputeCommandEncoder, sampler: ^SamplerState, lodMinClamp: f32, lodMaxClamp: f32, index: NS.UInteger) {
 	msgSend(nil, self, "setSamplerState:lodMinClamp:lodMaxClamp:atIndex:", sampler, lodMinClamp, lodMaxClamp, index)
 }
-@(objc_type=ComputeCommandEncoder, objc_name="setSamplerStates_lodMinClamps_lodMaxClamps_withRange_")
-ComputeCommandEncoder_setSamplerStates_lodMinClamps_lodMaxClamps_withRange_ :: #force_inline proc(self: ^ComputeCommandEncoder, samplers: ^^NS.Object, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
+@(objc_type=ComputeCommandEncoder, objc_name="setSamplerStates_lodMinClamps_lodMaxClampsWithRange")
+ComputeCommandEncoder_setSamplerStates_lodMinClamps_lodMaxClampsWithRange :: #force_inline proc(self: ^ComputeCommandEncoder, samplers: [^]^SamplerState, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
 	msgSend(nil, self, "setSamplerStates:lodMinClamps:lodMaxClamps:withRange:", samplers, lodMinClamps, lodMaxClamps, range)
 }
-@(objc_type=ComputeCommandEncoder, objc_name="setSamplerStates_withRange_")
-ComputeCommandEncoder_setSamplerStates_withRange_ :: #force_inline proc(self: ^ComputeCommandEncoder, samplers: ^^NS.Object, range: NS.Range) {
+@(objc_type=ComputeCommandEncoder, objc_name="setSamplerStatesWithRange")
+ComputeCommandEncoder_setSamplerStatesWithRange :: #force_inline proc(self: ^ComputeCommandEncoder, samplers: [^]^SamplerState, range: NS.Range) {
 	msgSend(nil, self, "setSamplerStates:withRange:", samplers, range)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setStageInRegion")
@@ -5718,51 +5771,51 @@ ComputeCommandEncoder_setStageInRegion :: #force_inline proc(self: ^ComputeComma
 	msgSend(nil, self, "setStageInRegion:", region)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setStageInRegionWithIndirectBuffer")
-ComputeCommandEncoder_setStageInRegionWithIndirectBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+ComputeCommandEncoder_setStageInRegionWithIndirectBuffer :: #force_inline proc(self: ^ComputeCommandEncoder, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "setStageInRegionWithIndirectBuffer:indirectBufferOffset:", indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setTexture")
-ComputeCommandEncoder_setTexture :: #force_inline proc(self: ^ComputeCommandEncoder, texture: ^NS.Object, index: ^NS.Object) {
+ComputeCommandEncoder_setTexture :: #force_inline proc(self: ^ComputeCommandEncoder, texture: ^Texture, index: NS.UInteger) {
 	msgSend(nil, self, "setTexture:atIndex:", texture, index)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setTextures")
-ComputeCommandEncoder_setTextures :: #force_inline proc(self: ^ComputeCommandEncoder, textures: ^^NS.Object, range: NS.Range) {
+ComputeCommandEncoder_setTextures :: #force_inline proc(self: ^ComputeCommandEncoder, textures: [^]^Texture, range: NS.Range) {
 	msgSend(nil, self, "setTextures:withRange:", textures, range)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setThreadgroupMemoryLength")
-ComputeCommandEncoder_setThreadgroupMemoryLength :: #force_inline proc(self: ^ComputeCommandEncoder, length: ^NS.Object, index: ^NS.Object) {
+ComputeCommandEncoder_setThreadgroupMemoryLength :: #force_inline proc(self: ^ComputeCommandEncoder, length: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setThreadgroupMemoryLength:atIndex:", length, index)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setVisibleFunctionTable")
-ComputeCommandEncoder_setVisibleFunctionTable :: #force_inline proc(self: ^ComputeCommandEncoder, visibleFunctionTable: ^NS.Object, bufferIndex: ^NS.Object) {
+ComputeCommandEncoder_setVisibleFunctionTable :: #force_inline proc(self: ^ComputeCommandEncoder, visibleFunctionTable: ^VisibleFunctionTable, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setVisibleFunctionTable:atBufferIndex:", visibleFunctionTable, bufferIndex)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="setVisibleFunctionTables")
-ComputeCommandEncoder_setVisibleFunctionTables :: #force_inline proc(self: ^ComputeCommandEncoder, visibleFunctionTables: ^^NS.Object, range: NS.Range) {
+ComputeCommandEncoder_setVisibleFunctionTables :: #force_inline proc(self: ^ComputeCommandEncoder, visibleFunctionTables: [^]^VisibleFunctionTable, range: NS.Range) {
 	msgSend(nil, self, "setVisibleFunctionTables:withBufferRange:", visibleFunctionTables, range)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="updateFence")
-ComputeCommandEncoder_updateFence :: #force_inline proc(self: ^ComputeCommandEncoder, fence: ^NS.Object) {
+ComputeCommandEncoder_updateFence :: #force_inline proc(self: ^ComputeCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "updateFence:", fence)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="useHeap")
-ComputeCommandEncoder_useHeap :: #force_inline proc(self: ^ComputeCommandEncoder, heap: ^NS.Object) {
+ComputeCommandEncoder_useHeap :: #force_inline proc(self: ^ComputeCommandEncoder, heap: ^Heap) {
 	msgSend(nil, self, "useHeap:", heap)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="useHeaps")
-ComputeCommandEncoder_useHeaps :: #force_inline proc(self: ^ComputeCommandEncoder, heaps: ^^NS.Object, count: ^NS.Object) {
+ComputeCommandEncoder_useHeaps :: #force_inline proc(self: ^ComputeCommandEncoder, heaps: [^]^Heap, count: NS.UInteger) {
 	msgSend(nil, self, "useHeaps:count:", heaps, count)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="useResource")
-ComputeCommandEncoder_useResource :: #force_inline proc(self: ^ComputeCommandEncoder, resource: ^NS.Object, usage: ResourceUsage) {
+ComputeCommandEncoder_useResource :: #force_inline proc(self: ^ComputeCommandEncoder, resource: ^Resource, usage: ResourceUsage) {
 	msgSend(nil, self, "useResource:usage:", resource, usage)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="useResources")
-ComputeCommandEncoder_useResources :: #force_inline proc(self: ^ComputeCommandEncoder, resources: ^^NS.Object, count: ^NS.Object, usage: ResourceUsage) {
+ComputeCommandEncoder_useResources :: #force_inline proc(self: ^ComputeCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage) {
 	msgSend(nil, self, "useResources:count:usage:", resources, count, usage)
 }
 @(objc_type=ComputeCommandEncoder, objc_name="waitForFence")
-ComputeCommandEncoder_waitForFence :: #force_inline proc(self: ^ComputeCommandEncoder, fence: ^NS.Object) {
+ComputeCommandEncoder_waitForFence :: #force_inline proc(self: ^ComputeCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "waitForFence:", fence)
 }
 
@@ -5793,7 +5846,7 @@ ComputePipelineState_device :: #force_inline proc(self: ^ComputePipelineState) -
 	return msgSend(^ComputePipelineState, self, "device")
 }
 @(objc_type=ComputePipelineState, objc_name="functionHandleWithFunction")
-ComputePipelineState_functionHandleWithFunction :: #force_inline proc(self: ^ComputePipelineState, function: ^NS.Object) -> ^ComputePipelineState {
+ComputePipelineState_functionHandleWithFunction :: #force_inline proc(self: ^ComputePipelineState, function: ^Function) -> ^ComputePipelineState {
 	return msgSend(^ComputePipelineState, self, "functionHandleWithFunction:", function)
 }
 @(objc_type=ComputePipelineState, objc_name="imageblockMemoryLengthForDimensions")
@@ -5805,12 +5858,13 @@ ComputePipelineState_label :: #force_inline proc(self: ^ComputePipelineState) ->
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=ComputePipelineState, objc_name="maxTotalThreadsPerThreadgroup")
-ComputePipelineState_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^ComputePipelineState) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxTotalThreadsPerThreadgroup")
+ComputePipelineState_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^ComputePipelineState) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadsPerThreadgroup")
 }
 @(objc_type=ComputePipelineState, objc_name="newComputePipelineStateWithAdditionalBinaryFunctions")
-ComputePipelineState_newComputePipelineStateWithAdditionalBinaryFunctions :: #force_inline proc(self: ^ComputePipelineState, functions: ^NS.Array, error: ^^NS.Error ) -> ^ComputePipelineState {
-	return msgSend(^ComputePipelineState, self, "newComputePipelineStateWithAdditionalBinaryFunctions:error:", functions, error)
+ComputePipelineState_newComputePipelineStateWithAdditionalBinaryFunctions :: #force_inline proc(self: ^ComputePipelineState, functions: ^NS.Array) -> (state: ^ComputePipelineState, error: ^NS.Error) {
+	state = msgSend(^ComputePipelineState, self, "newComputePipelineStateWithAdditionalBinaryFunctions:error:", functions, &error)
+	return
 }
 @(objc_type=ComputePipelineState, objc_name="newIntersectionFunctionTableWithDescriptor")
 ComputePipelineState_newIntersectionFunctionTableWithDescriptor :: #force_inline proc(self: ^ComputePipelineState, descriptor: ^IntersectionFunctionTableDescriptor) -> ^ComputePipelineState {
@@ -5821,16 +5875,16 @@ ComputePipelineState_newVisibleFunctionTableWithDescriptor :: #force_inline proc
 	return msgSend(^ComputePipelineState, self, "newVisibleFunctionTableWithDescriptor:", descriptor)
 }
 @(objc_type=ComputePipelineState, objc_name="staticThreadgroupMemoryLength")
-ComputePipelineState_staticThreadgroupMemoryLength :: #force_inline proc(self: ^ComputePipelineState) -> NS.Integer {
-	return msgSend(NS.Integer, self, "staticThreadgroupMemoryLength")
+ComputePipelineState_staticThreadgroupMemoryLength :: #force_inline proc(self: ^ComputePipelineState) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "staticThreadgroupMemoryLength")
 }
 @(objc_type=ComputePipelineState, objc_name="supportIndirectCommandBuffers")
 ComputePipelineState_supportIndirectCommandBuffers :: #force_inline proc(self: ^ComputePipelineState) -> BOOL {
 	return msgSend(BOOL, self, "supportIndirectCommandBuffers")
 }
 @(objc_type=ComputePipelineState, objc_name="threadExecutionWidth")
-ComputePipelineState_threadExecutionWidth :: #force_inline proc(self: ^ComputePipelineState) -> NS.Integer {
-	return msgSend(NS.Integer, self, "threadExecutionWidth")
+ComputePipelineState_threadExecutionWidth :: #force_inline proc(self: ^ComputePipelineState) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "threadExecutionWidth")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5878,8 +5932,8 @@ CounterSampleBuffer_resolveCounterRange :: #force_inline proc(self: ^CounterSamp
 	return msgSend(^NS.Data, self, "resolveCounterRange:", range)
 }
 @(objc_type=CounterSampleBuffer, objc_name="sampleCount")
-CounterSampleBuffer_sampleCount :: #force_inline proc(self: ^CounterSampleBuffer) -> NS.Integer {
-	return msgSend(NS.Integer, self, "sampleCount")
+CounterSampleBuffer_sampleCount :: #force_inline proc(self: ^CounterSampleBuffer) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "sampleCount")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6053,11 +6107,11 @@ Device_argumentBuffersSupport :: #force_inline proc(self: ^Device) -> ArgumentBu
 	return msgSend(ArgumentBuffersTier, self, "argumentBuffersSupport")
 }
 @(objc_type=Device, objc_name="convertSparsePixelRegions")
-Device_convertSparsePixelRegions :: #force_inline proc(self: ^Device, pixelRegions: ^Region, tileRegions: ^Region, tileSize: Size, mode: SparseTextureRegionAlignmentMode, numRegions: ^NS.Object) {
+Device_convertSparsePixelRegions :: #force_inline proc(self: ^Device, pixelRegions: ^Region, tileRegions: ^Region, tileSize: Size, mode: SparseTextureRegionAlignmentMode, numRegions: NS.UInteger) {
 	msgSend(nil, self, "convertSparsePixelRegions:toTileRegions:withTileSize:alignmentMode:numRegions:", pixelRegions, tileRegions, tileSize, mode, numRegions)
 }
 @(objc_type=Device, objc_name="convertSparseTileRegions")
-Device_convertSparseTileRegions :: #force_inline proc(self: ^Device, tileRegions: ^Region, pixelRegions: ^Region, tileSize: Size, numRegions: ^NS.Object) {
+Device_convertSparseTileRegions :: #force_inline proc(self: ^Device, tileRegions: ^Region, pixelRegions: ^Region, tileSize: Size, numRegions: NS.UInteger) {
 	msgSend(nil, self, "convertSparseTileRegions:toPixelRegions:withTileSize:numRegions:", tileRegions, pixelRegions, tileSize, numRegions)
 }
 @(objc_type=Device, objc_name="counterSets")
@@ -6065,11 +6119,11 @@ Device_counterSets :: #force_inline proc(self: ^Device) -> ^NS.Array {
 	return msgSend(^NS.Array, self, "counterSets")
 }
 @(objc_type=Device, objc_name="currentAllocatedSize")
-Device_currentAllocatedSize :: #force_inline proc(self: ^Device) -> NS.Integer {
-	return msgSend(NS.Integer, self, "currentAllocatedSize")
+Device_currentAllocatedSize :: #force_inline proc(self: ^Device) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "currentAllocatedSize")
 }
 @(objc_type=Device, objc_name="getDefaultSamplePositions")
-Device_getDefaultSamplePositions :: #force_inline proc(self: ^Device, positions: ^SamplePosition, count: ^NS.Object) {
+Device_getDefaultSamplePositions :: #force_inline proc(self: ^Device, positions: ^SamplePosition, count: NS.UInteger) {
 	msgSend(nil, self, "getDefaultSamplePositions:count:", positions, count)
 }
 @(objc_type=Device, objc_name="hasUnifiedMemory")
@@ -6077,7 +6131,7 @@ Device_hasUnifiedMemory :: #force_inline proc(self: ^Device) -> BOOL {
 	return msgSend(BOOL, self, "hasUnifiedMemory")
 }
 @(objc_type=Device, objc_name="heapBufferSizeAndAlignWithLength")
-Device_heapBufferSizeAndAlignWithLength :: #force_inline proc(self: ^Device, length: ^NS.Object, options: ResourceOptions) -> SizeAndAlign {
+Device_heapBufferSizeAndAlignWithLength :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> SizeAndAlign {
 	return msgSend(SizeAndAlign, self, "heapBufferSizeAndAlignWithLength:options:", length, options)
 }
 @(objc_type=Device, objc_name="heapTextureSizeAndAlignWithDescriptor")
@@ -6105,20 +6159,20 @@ Device_location :: #force_inline proc(self: ^Device) -> DeviceLocation {
 	return msgSend(DeviceLocation, self, "location")
 }
 @(objc_type=Device, objc_name="locationNumber")
-Device_locationNumber :: #force_inline proc(self: ^Device) -> NS.Integer {
-	return msgSend(NS.Integer, self, "locationNumber")
+Device_locationNumber :: #force_inline proc(self: ^Device) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "locationNumber")
 }
 @(objc_type=Device, objc_name="maxArgumentBufferSamplerCount")
-Device_maxArgumentBufferSamplerCount :: #force_inline proc(self: ^Device) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxArgumentBufferSamplerCount")
+Device_maxArgumentBufferSamplerCount :: #force_inline proc(self: ^Device) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxArgumentBufferSamplerCount")
 }
 @(objc_type=Device, objc_name="maxBufferLength")
-Device_maxBufferLength :: #force_inline proc(self: ^Device) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxBufferLength")
+Device_maxBufferLength :: #force_inline proc(self: ^Device) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxBufferLength")
 }
 @(objc_type=Device, objc_name="maxThreadgroupMemoryLength")
-Device_maxThreadgroupMemoryLength :: #force_inline proc(self: ^Device) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxThreadgroupMemoryLength")
+Device_maxThreadgroupMemoryLength :: #force_inline proc(self: ^Device) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxThreadgroupMemoryLength")
 }
 @(objc_type=Device, objc_name="maxThreadsPerThreadgroup")
 Device_maxThreadsPerThreadgroup :: #force_inline proc(self: ^Device) -> Size {
@@ -6145,7 +6199,7 @@ Device_newAccelerationStructureWithDescriptor :: #force_inline proc(self: ^Devic
 	return msgSend(^Device, self, "newAccelerationStructureWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newAccelerationStructureWithSize")
-Device_newAccelerationStructureWithSize :: #force_inline proc(self: ^Device, size: ^NS.Object) -> ^Device {
+Device_newAccelerationStructureWithSize :: #force_inline proc(self: ^Device, size: NS.UInteger) -> ^Device {
 	return msgSend(^Device, self, "newAccelerationStructureWithSize:", size)
 }
 @(objc_type=Device, objc_name="newArgumentEncoderWithArguments")
@@ -6153,19 +6207,20 @@ Device_newArgumentEncoderWithArguments :: #force_inline proc(self: ^Device, argu
 	return msgSend(^Device, self, "newArgumentEncoderWithArguments:", arguments)
 }
 @(objc_type=Device, objc_name="newBinaryArchiveWithDescriptor")
-Device_newBinaryArchiveWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^BinaryArchiveDescriptor, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newBinaryArchiveWithDescriptor:error:", descriptor, error)
+Device_newBinaryArchiveWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^BinaryArchiveDescriptor) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newBinaryArchiveWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=Device, objc_name="newBufferWithBytes")
-Device_newBufferWithBytes :: #force_inline proc(self: ^Device, pointer: rawptr, length: ^NS.Object, options: ResourceOptions) -> ^Device {
+Device_newBufferWithBytes :: #force_inline proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions) -> ^Device {
 	return msgSend(^Device, self, "newBufferWithBytes:length:options:", pointer, length, options)
 }
 @(objc_type=Device, objc_name="newBufferWithBytesNoCopy")
-Device_newBufferWithBytesNoCopy :: #force_inline proc(self: ^Device, pointer: rawptr, length: ^NS.Object, options: ResourceOptions, deallocator: rawptr) -> ^Device {
+Device_newBufferWithBytesNoCopy :: #force_inline proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions, deallocator: rawptr) -> ^Device {
 	return msgSend(^Device, self, "newBufferWithBytesNoCopy:length:options:deallocator:", pointer, length, options, deallocator)
 }
 @(objc_type=Device, objc_name="newBufferWithLength")
-Device_newBufferWithLength :: #force_inline proc(self: ^Device, length: ^NS.Object, options: ResourceOptions) -> ^Device {
+Device_newBufferWithLength :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Device {
 	return msgSend(^Device, self, "newBufferWithLength:options:", length, options)
 }
 @(objc_type=Device, objc_name="newCommandQueue")
@@ -6173,7 +6228,7 @@ Device_newCommandQueue :: #force_inline proc(self: ^Device) -> ^Device {
 	return msgSend(^Device, self, "newCommandQueue")
 }
 @(objc_type=Device, objc_name="newCommandQueueWithMaxCommandBufferCount")
-Device_newCommandQueueWithMaxCommandBufferCount :: #force_inline proc(self: ^Device, maxCommandBufferCount: ^NS.Object) -> ^Device {
+Device_newCommandQueueWithMaxCommandBufferCount :: #force_inline proc(self: ^Device, maxCommandBufferCount: NS.UInteger) -> ^Device {
 	return msgSend(^Device, self, "newCommandQueueWithMaxCommandBufferCount:", maxCommandBufferCount)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithDescriptor_options_completionHandler_")
@@ -6181,48 +6236,55 @@ Device_newComputePipelineStateWithDescriptor_options_completionHandler_ :: #forc
 	msgSend(nil, self, "newComputePipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithDescriptor_options_reflection_error_")
-Device_newComputePipelineStateWithDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newComputePipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, error)
+Device_newComputePipelineStateWithDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newComputePipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
+	return
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunction_completionHandler_")
-Device_newComputePipelineStateWithFunction_completionHandler_ :: #force_inline proc(self: ^Device, computeFunction: ^NS.Object, completionHandler: NewComputePipelineStateCompletionHandler) {
+Device_newComputePipelineStateWithFunction_completionHandler_ :: #force_inline proc(self: ^Device, computeFunction: ^Function, completionHandler: NewComputePipelineStateCompletionHandler) {
 	msgSend(nil, self, "newComputePipelineStateWithFunction:completionHandler:", computeFunction, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunction_error_")
-Device_newComputePipelineStateWithFunction_error_ :: #force_inline proc(self: ^Device, computeFunction: ^NS.Object, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newComputePipelineStateWithFunction:error:", computeFunction, error)
+Device_newComputePipelineStateWithFunction_error_ :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newComputePipelineStateWithFunction:error:", computeFunction, &error)
+	return
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunction_options_completionHandler_")
-Device_newComputePipelineStateWithFunction_options_completionHandler_ :: #force_inline proc(self: ^Device, computeFunction: ^NS.Object, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
+Device_newComputePipelineStateWithFunction_options_completionHandler_ :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newComputePipelineStateWithFunction:options:completionHandler:", computeFunction, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunction_options_reflection_error_")
-Device_newComputePipelineStateWithFunction_options_reflection_error_ :: #force_inline proc(self: ^Device, computeFunction: ^NS.Object, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newComputePipelineStateWithFunction:options:reflection:error:", computeFunction, options, reflection, error)
+Device_newComputePipelineStateWithFunction_options_reflection_error_ :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newComputePipelineStateWithFunction:options:reflection:error:", computeFunction, options, reflection, &error)
+	return
 }
 @(objc_type=Device, objc_name="newCounterSampleBufferWithDescriptor")
-Device_newCounterSampleBufferWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^CounterSampleBufferDescriptor, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newCounterSampleBufferWithDescriptor:error:", descriptor, error)
+Device_newCounterSampleBufferWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^CounterSampleBufferDescriptor) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newCounterSampleBufferWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=Device, objc_name="newDefaultLibrary")
 Device_newDefaultLibrary :: #force_inline proc(self: ^Device) -> ^Device {
 	return msgSend(^Device, self, "newDefaultLibrary")
 }
 @(objc_type=Device, objc_name="newDefaultLibraryWithBundle")
-Device_newDefaultLibraryWithBundle :: #force_inline proc(self: ^Device, bundle: ^NS.Bundle, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newDefaultLibraryWithBundle:error:", bundle, error)
+Device_newDefaultLibraryWithBundle :: #force_inline proc(self: ^Device, bundle: ^NS.Bundle) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newDefaultLibraryWithBundle:error:", bundle, &error)
+	return
 }
 @(objc_type=Device, objc_name="newDepthStencilStateWithDescriptor")
 Device_newDepthStencilStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^DepthStencilDescriptor) -> ^Device {
 	return msgSend(^Device, self, "newDepthStencilStateWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newDynamicLibrary")
-Device_newDynamicLibrary :: #force_inline proc(self: ^Device, library: ^NS.Object, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newDynamicLibrary:error:", library, error)
+Device_newDynamicLibrary :: #force_inline proc(self: ^Device, library: ^Library) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newDynamicLibrary:error:", library, &error)
+	return
 }
 @(objc_type=Device, objc_name="newDynamicLibraryWithURL")
-Device_newDynamicLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newDynamicLibraryWithURL:error:", url, error)
+Device_newDynamicLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newDynamicLibraryWithURL:error:", url, &error)
+	return
 }
 @(objc_type=Device, objc_name="newEvent")
 Device_newEvent :: #force_inline proc(self: ^Device) -> ^Device {
@@ -6237,28 +6299,32 @@ Device_newHeapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^H
 	return msgSend(^Device, self, "newHeapWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newIndirectCommandBufferWithDescriptor")
-Device_newIndirectCommandBufferWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^IndirectCommandBufferDescriptor, maxCount: ^NS.Object, options: ResourceOptions) -> ^Device {
+Device_newIndirectCommandBufferWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^IndirectCommandBufferDescriptor, maxCount: NS.UInteger, options: ResourceOptions) -> ^Device {
 	return msgSend(^Device, self, "newIndirectCommandBufferWithDescriptor:maxCommandCount:options:", descriptor, maxCount, options)
 }
 @(objc_type=Device, objc_name="newLibraryWithData")
-Device_newLibraryWithData :: #force_inline proc(self: ^Device, data: ^NS.Object, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newLibraryWithData:error:", data, error)
+Device_newLibraryWithData :: #force_inline proc(self: ^Device, data: dispatch_data_t) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newLibraryWithData:error:", data, &error)
+	return
 }
 @(objc_type=Device, objc_name="newLibraryWithFile")
-Device_newLibraryWithFile :: #force_inline proc(self: ^Device, filepath: ^NS.String, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newLibraryWithFile:error:", filepath, error)
+Device_newLibraryWithFile :: #force_inline proc(self: ^Device, filepath: ^NS.String) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newLibraryWithFile:error:", filepath, &error)
+	return
 }
 @(objc_type=Device, objc_name="newLibraryWithSource_options_completionHandler_")
 Device_newLibraryWithSource_options_completionHandler_ :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions, completionHandler: NewLibraryCompletionHandler) {
 	msgSend(nil, self, "newLibraryWithSource:options:completionHandler:", source, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newLibraryWithSource_options_error_")
-Device_newLibraryWithSource_options_error_ :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newLibraryWithSource:options:error:", source, options, error)
+Device_newLibraryWithSource_options_error_ :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newLibraryWithSource:options:error:", source, options, &error)
+	return
 }
 @(objc_type=Device, objc_name="newLibraryWithURL")
-Device_newLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newLibraryWithURL:error:", url, error)
+Device_newLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newLibraryWithURL:error:", url, &error)
+	return
 }
 @(objc_type=Device, objc_name="newRasterizationRateMapWithDescriptor")
 Device_newRasterizationRateMapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RasterizationRateMapDescriptor) -> ^Device {
@@ -6269,24 +6335,27 @@ Device_newRenderPipelineStateWithDescriptor_completionHandler_ :: #force_inline 
 	msgSend(nil, self, "newRenderPipelineStateWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_error_")
-Device_newRenderPipelineStateWithDescriptor_error_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:error:", descriptor, error)
+Device_newRenderPipelineStateWithDescriptor_error_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_options_completionHandler_")
 Device_newRenderPipelineStateWithDescriptor_options_completionHandler_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newRenderPipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor_options_reflection_error_")
-Device_newRenderPipelineStateWithDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, error)
+Device_newRenderPipelineStateWithDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
+	return
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptor_options_completionHandler_")
 Device_newRenderPipelineStateWithTileDescriptor_options_completionHandler_ :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
 	msgSend(nil, self, "newRenderPipelineStateWithTileDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptor_options_reflection_error_")
-Device_newRenderPipelineStateWithTileDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection, error: ^^NS.Error ) -> ^Device {
-	return msgSend(^Device, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, error)
+Device_newRenderPipelineStateWithTileDescriptor_options_reflection_error_ :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
+	device = msgSend(^Device, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
+	return
 }
 @(objc_type=Device, objc_name="newSamplerStateWithDescriptor")
 Device_newSamplerStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^Device {
@@ -6313,7 +6382,7 @@ Device_newTextureWithDescriptor :: #force_inline proc(self: ^Device, desc: ^Text
 	return msgSend(^Device, self, "newTextureWithDescriptor:", desc)
 }
 @(objc_type=Device, objc_name="newTextureWithDescriptor_iosurface_plane_")
-Device_newTextureWithDescriptor_iosurface_plane_ :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: ^NS.Object) -> ^Device {
+Device_newTextureWithDescriptor_iosurface_plane_ :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: NS.UInteger) -> ^Device {
 	return msgSend(^Device, self, "newTextureWithDescriptor:iosurface:plane:", descriptor, iosurface, plane)
 }
 @(objc_type=Device, objc_name="peerCount")
@@ -6345,11 +6414,11 @@ Device_sampleTimestamps :: #force_inline proc(self: ^Device, cpuTimestamp: ^Time
 	msgSend(nil, self, "sampleTimestamps:gpuTimestamp:", cpuTimestamp, gpuTimestamp)
 }
 @(objc_type=Device, objc_name="sparseTileSizeInBytes")
-Device_sparseTileSizeInBytes :: #force_inline proc(self: ^Device) -> NS.Integer {
-	return msgSend(NS.Integer, self, "sparseTileSizeInBytes")
+Device_sparseTileSizeInBytes :: #force_inline proc(self: ^Device) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "sparseTileSizeInBytes")
 }
 @(objc_type=Device, objc_name="sparseTileSizeWithTextureType")
-Device_sparseTileSizeWithTextureType :: #force_inline proc(self: ^Device, textureType: TextureType, pixelFormat: PixelFormat, sampleCount: ^NS.Object) -> Size {
+Device_sparseTileSizeWithTextureType :: #force_inline proc(self: ^Device, textureType: TextureType, pixelFormat: PixelFormat, sampleCount: NS.UInteger) -> Size {
 	return msgSend(Size, self, "sparseTileSizeWithTextureType:pixelFormat:sampleCount:", textureType, pixelFormat, sampleCount)
 }
 @(objc_type=Device, objc_name="supports32BitFloatFiltering")
@@ -6393,7 +6462,7 @@ Device_supportsQueryTextureLOD :: #force_inline proc(self: ^Device) -> BOOL {
 	return msgSend(BOOL, self, "supportsQueryTextureLOD")
 }
 @(objc_type=Device, objc_name="supportsRasterizationRateMapWithLayerCount")
-Device_supportsRasterizationRateMapWithLayerCount :: #force_inline proc(self: ^Device, layerCount: ^NS.Object) -> BOOL {
+Device_supportsRasterizationRateMapWithLayerCount :: #force_inline proc(self: ^Device, layerCount: NS.UInteger) -> BOOL {
 	return msgSend(BOOL, self, "supportsRasterizationRateMapWithLayerCount:", layerCount)
 }
 @(objc_type=Device, objc_name="supportsRaytracing")
@@ -6405,11 +6474,11 @@ Device_supportsShaderBarycentricCoordinates :: #force_inline proc(self: ^Device)
 	return msgSend(BOOL, self, "supportsShaderBarycentricCoordinates")
 }
 @(objc_type=Device, objc_name="supportsTextureSampleCount")
-Device_supportsTextureSampleCount :: #force_inline proc(self: ^Device, sampleCount: ^NS.Object) -> BOOL {
+Device_supportsTextureSampleCount :: #force_inline proc(self: ^Device, sampleCount: NS.UInteger) -> BOOL {
 	return msgSend(BOOL, self, "supportsTextureSampleCount:", sampleCount)
 }
 @(objc_type=Device, objc_name="supportsVertexAmplificationCount")
-Device_supportsVertexAmplificationCount :: #force_inline proc(self: ^Device, count: ^NS.Object) -> BOOL {
+Device_supportsVertexAmplificationCount :: #force_inline proc(self: ^Device, count: NS.UInteger) -> BOOL {
 	return msgSend(BOOL, self, "supportsVertexAmplificationCount:", count)
 }
 
@@ -6435,8 +6504,8 @@ Drawable_addPresentedHandler :: #force_inline proc(self: ^Drawable, block: Drawa
 	msgSend(nil, self, "addPresentedHandler:", block)
 }
 @(objc_type=Drawable, objc_name="drawableID")
-Drawable_drawableID :: #force_inline proc(self: ^Drawable) -> NS.Integer {
-	return msgSend(NS.Integer, self, "drawableID")
+Drawable_drawableID :: #force_inline proc(self: ^Drawable) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "drawableID")
 }
 @(objc_type=Drawable, objc_name="present")
 Drawable_present :: #force_inline proc(self: ^Drawable) {
@@ -6484,8 +6553,9 @@ DynamicLibrary_label :: #force_inline proc(self: ^DynamicLibrary) -> ^NS.String 
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=DynamicLibrary, objc_name="serializeToURL")
-DynamicLibrary_serializeToURL :: #force_inline proc(self: ^DynamicLibrary, url: ^NS.URL, error: ^^NS.Error ) -> BOOL {
-	return msgSend(BOOL, self, "serializeToURL:error:", url, error)
+DynamicLibrary_serializeToURL :: #force_inline proc(self: ^DynamicLibrary, url: ^NS.URL) -> (ok: bool, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "serializeToURL:error:", url, &error)
+	return
 }
 @(objc_type=DynamicLibrary, objc_name="setLabel")
 DynamicLibrary_setLabel :: #force_inline proc(self: ^DynamicLibrary, label: ^NS.String) {
@@ -6591,11 +6661,11 @@ Function_name :: #force_inline proc(self: ^Function) -> ^NS.String {
 	return msgSend(^NS.String, self, "name")
 }
 @(objc_type=Function, objc_name="newArgumentEncoderWithBufferIndex")
-Function_newArgumentEncoderWithBufferIndex :: #force_inline proc(self: ^Function, bufferIndex: ^NS.Object) -> ^Function {
+Function_newArgumentEncoderWithBufferIndex :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger) -> ^Function {
 	return msgSend(^Function, self, "newArgumentEncoderWithBufferIndex:", bufferIndex)
 }
 @(objc_type=Function, objc_name="newArgumentEncoderWithBufferIndex_reflection_")
-Function_newArgumentEncoderWithBufferIndex_reflection_ :: #force_inline proc(self: ^Function, bufferIndex: ^NS.Object, reflection: ^AutoreleasedArgument) -> ^Function {
+Function_newArgumentEncoderWithBufferIndex_reflection_ :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger, reflection: ^AutoreleasedArgument) -> ^Function {
 	return msgSend(^Function, self, "newArgumentEncoderWithBufferIndex:reflection:", bufferIndex, reflection)
 }
 @(objc_type=Function, objc_name="options")
@@ -6603,8 +6673,8 @@ Function_options :: #force_inline proc(self: ^Function) -> FunctionOptions {
 	return msgSend(FunctionOptions, self, "options")
 }
 @(objc_type=Function, objc_name="patchControlPointCount")
-Function_patchControlPointCount :: #force_inline proc(self: ^Function) -> NS.Integer {
-	return msgSend(NS.Integer, self, "patchControlPointCount")
+Function_patchControlPointCount :: #force_inline proc(self: ^Function) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "patchControlPointCount")
 }
 @(objc_type=Function, objc_name="patchType")
 Function_patchType :: #force_inline proc(self: ^Function) -> PatchType {
@@ -6702,16 +6772,16 @@ FunctionLogDebugLocation_URL :: #force_inline proc(self: ^FunctionLogDebugLocati
 	return msgSend(^NS.URL, self, "URL")
 }
 @(objc_type=FunctionLogDebugLocation, objc_name="column")
-FunctionLogDebugLocation_column :: #force_inline proc(self: ^FunctionLogDebugLocation) -> NS.Integer {
-	return msgSend(NS.Integer, self, "column")
+FunctionLogDebugLocation_column :: #force_inline proc(self: ^FunctionLogDebugLocation) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "column")
 }
 @(objc_type=FunctionLogDebugLocation, objc_name="functionName")
 FunctionLogDebugLocation_functionName :: #force_inline proc(self: ^FunctionLogDebugLocation) -> ^NS.String {
 	return msgSend(^NS.String, self, "functionName")
 }
 @(objc_type=FunctionLogDebugLocation, objc_name="line")
-FunctionLogDebugLocation_line :: #force_inline proc(self: ^FunctionLogDebugLocation) -> NS.Integer {
-	return msgSend(NS.Integer, self, "line")
+FunctionLogDebugLocation_line :: #force_inline proc(self: ^FunctionLogDebugLocation) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "line")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6747,8 +6817,8 @@ Heap_cpuCacheMode :: #force_inline proc(self: ^Heap) -> CPUCacheMode {
 	return msgSend(CPUCacheMode, self, "cpuCacheMode")
 }
 @(objc_type=Heap, objc_name="currentAllocatedSize")
-Heap_currentAllocatedSize :: #force_inline proc(self: ^Heap) -> NS.Integer {
-	return msgSend(NS.Integer, self, "currentAllocatedSize")
+Heap_currentAllocatedSize :: #force_inline proc(self: ^Heap) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "currentAllocatedSize")
 }
 @(objc_type=Heap, objc_name="device")
 Heap_device :: #force_inline proc(self: ^Heap) -> ^Heap {
@@ -6763,15 +6833,15 @@ Heap_label :: #force_inline proc(self: ^Heap) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=Heap, objc_name="maxAvailableSizeWithAlignment")
-Heap_maxAvailableSizeWithAlignment :: #force_inline proc(self: ^Heap, alignment: ^NS.Object) -> ^Heap {
+Heap_maxAvailableSizeWithAlignment :: #force_inline proc(self: ^Heap, alignment: NS.UInteger) -> ^Heap {
 	return msgSend(^Heap, self, "maxAvailableSizeWithAlignment:", alignment)
 }
 @(objc_type=Heap, objc_name="newBufferWithLength")
-Heap_newBufferWithLength :: #force_inline proc(self: ^Heap, length: ^NS.Object, options: ResourceOptions) -> ^Heap {
+Heap_newBufferWithLength :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions) -> ^Heap {
 	return msgSend(^Heap, self, "newBufferWithLength:options:", length, options)
 }
 @(objc_type=Heap, objc_name="newBufferWithLength_options_offset_")
-Heap_newBufferWithLength_options_offset_ :: #force_inline proc(self: ^Heap, length: ^NS.Object, options: ResourceOptions, offset: ^NS.Object) -> ^Heap {
+Heap_newBufferWithLength_options_offset_ :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions, offset: NS.UInteger) -> ^Heap {
 	return msgSend(^Heap, self, "newBufferWithLength:options:offset:", length, options, offset)
 }
 @(objc_type=Heap, objc_name="newTextureWithDescriptor")
@@ -6779,7 +6849,7 @@ Heap_newTextureWithDescriptor :: #force_inline proc(self: ^Heap, desc: ^TextureD
 	return msgSend(^Heap, self, "newTextureWithDescriptor:", desc)
 }
 @(objc_type=Heap, objc_name="newTextureWithDescriptor_offset_")
-Heap_newTextureWithDescriptor_offset_ :: #force_inline proc(self: ^Heap, descriptor: ^TextureDescriptor, offset: ^NS.Object) -> ^Heap {
+Heap_newTextureWithDescriptor_offset_ :: #force_inline proc(self: ^Heap, descriptor: ^TextureDescriptor, offset: NS.UInteger) -> ^Heap {
 	return msgSend(^Heap, self, "newTextureWithDescriptor:offset:", descriptor, offset)
 }
 @(objc_type=Heap, objc_name="resourceOptions")
@@ -6795,8 +6865,8 @@ Heap_setPurgeableState :: #force_inline proc(self: ^Heap, state: PurgeableState)
 	return msgSend(PurgeableState, self, "setPurgeableState:", state)
 }
 @(objc_type=Heap, objc_name="size")
-Heap_size :: #force_inline proc(self: ^Heap) -> NS.Integer {
-	return msgSend(NS.Integer, self, "size")
+Heap_size :: #force_inline proc(self: ^Heap) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "size")
 }
 @(objc_type=Heap, objc_name="storageMode")
 Heap_storageMode :: #force_inline proc(self: ^Heap) -> StorageMode {
@@ -6807,8 +6877,8 @@ Heap_type :: #force_inline proc(self: ^Heap) -> FunctionLogType {
 	return msgSend(FunctionLogType, self, "type")
 }
 @(objc_type=Heap, objc_name="usedSize")
-Heap_usedSize :: #force_inline proc(self: ^Heap) -> NS.Integer {
-	return msgSend(NS.Integer, self, "usedSize")
+Heap_usedSize :: #force_inline proc(self: ^Heap) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "usedSize")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6824,14 +6894,14 @@ Methods:
 	size
 */
 @(objc_class="MTLIndirectCommandBuffer")
-IndirectCommandBuffer :: struct { using _: NS.Object }
+IndirectCommandBuffer :: struct { using _: Resource }
 
 @(objc_type=IndirectCommandBuffer, objc_name="indirectComputeCommandAtIndex")
-IndirectCommandBuffer_indirectComputeCommandAtIndex :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: ^NS.Object) -> ^IndirectCommandBuffer {
+IndirectCommandBuffer_indirectComputeCommandAtIndex :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectCommandBuffer {
 	return msgSend(^IndirectCommandBuffer, self, "indirectComputeCommandAtIndex:", commandIndex)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="indirectRenderCommandAtIndex")
-IndirectCommandBuffer_indirectRenderCommandAtIndex :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: ^NS.Object) -> ^IndirectCommandBuffer {
+IndirectCommandBuffer_indirectRenderCommandAtIndex :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectCommandBuffer {
 	return msgSend(^IndirectCommandBuffer, self, "indirectRenderCommandAtIndex:", commandIndex)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="resetWithRange")
@@ -6839,8 +6909,8 @@ IndirectCommandBuffer_resetWithRange :: #force_inline proc(self: ^IndirectComman
 	msgSend(nil, self, "resetWithRange:", range)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="size")
-IndirectCommandBuffer_size :: #force_inline proc(self: ^IndirectCommandBuffer) -> NS.Integer {
-	return msgSend(NS.Integer, self, "size")
+IndirectCommandBuffer_size :: #force_inline proc(self: ^IndirectCommandBuffer) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "size")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6885,15 +6955,15 @@ IndirectComputeCommand_setBarrier :: #force_inline proc(self: ^IndirectComputeCo
 	msgSend(nil, self, "setBarrier")
 }
 @(objc_type=IndirectComputeCommand, objc_name="setComputePipelineState")
-IndirectComputeCommand_setComputePipelineState :: #force_inline proc(self: ^IndirectComputeCommand, pipelineState: ^NS.Object) {
+IndirectComputeCommand_setComputePipelineState :: #force_inline proc(self: ^IndirectComputeCommand, pipelineState: ^ComputePipelineState) {
 	msgSend(nil, self, "setComputePipelineState:", pipelineState)
 }
 @(objc_type=IndirectComputeCommand, objc_name="setImageblockWidth")
-IndirectComputeCommand_setImageblockWidth :: #force_inline proc(self: ^IndirectComputeCommand, width: ^NS.Object, height: ^NS.Object) {
+IndirectComputeCommand_setImageblockWidth :: #force_inline proc(self: ^IndirectComputeCommand, width: NS.UInteger, height: NS.UInteger) {
 	msgSend(nil, self, "setImageblockWidth:height:", width, height)
 }
 @(objc_type=IndirectComputeCommand, objc_name="setKernelBuffer")
-IndirectComputeCommand_setKernelBuffer :: #force_inline proc(self: ^IndirectComputeCommand, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+IndirectComputeCommand_setKernelBuffer :: #force_inline proc(self: ^IndirectComputeCommand, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setKernelBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=IndirectComputeCommand, objc_name="setStageInRegion")
@@ -6901,7 +6971,7 @@ IndirectComputeCommand_setStageInRegion :: #force_inline proc(self: ^IndirectCom
 	msgSend(nil, self, "setStageInRegion:", region)
 }
 @(objc_type=IndirectComputeCommand, objc_name="setThreadgroupMemoryLength")
-IndirectComputeCommand_setThreadgroupMemoryLength :: #force_inline proc(self: ^IndirectComputeCommand, length: ^NS.Object, index: ^NS.Object) {
+IndirectComputeCommand_setThreadgroupMemoryLength :: #force_inline proc(self: ^IndirectComputeCommand, length: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setThreadgroupMemoryLength:atIndex:", length, index)
 }
 
@@ -6925,19 +6995,19 @@ Methods:
 IndirectRenderCommand :: struct { using _: NS.Object }
 
 @(objc_type=IndirectRenderCommand, objc_name="drawIndexedPatches")
-IndirectRenderCommand_drawIndexedPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: ^NS.Object, patchStart: ^NS.Object, patchCount: ^NS.Object, patchIndexBuffer: ^NS.Object, patchIndexBufferOffset: ^NS.Object, controlPointIndexBuffer: ^NS.Object, controlPointIndexBufferOffset: ^NS.Object, instanceCount: ^NS.Object, baseInstance: ^NS.Object, buffer: ^NS.Object, offset: ^NS.Object, instanceStride: ^NS.Object) {
+IndirectRenderCommand_drawIndexedPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:instanceCount:baseInstance:tessellationFactorBuffer:tessellationFactorBufferOffset:tessellationFactorBufferInstanceStride:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, controlPointIndexBuffer, controlPointIndexBufferOffset, instanceCount, baseInstance, buffer, offset, instanceStride)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawIndexedPrimitives")
-IndirectRenderCommand_drawIndexedPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, indexCount: ^NS.Object, indexType: IndexType, indexBuffer: ^NS.Object, indexBufferOffset: ^NS.Object, instanceCount: ^NS.Object, baseVertex: ^NS.Object, baseInstance: ^NS.Object) {
+IndirectRenderCommand_drawIndexedPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, indexCount: NS.UInteger, indexType: IndexType, indexBuffer: ^Buffer, indexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseVertex: NS.Integer, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:instanceCount:baseVertex:baseInstance:", primitiveType, indexCount, indexType, indexBuffer, indexBufferOffset, instanceCount, baseVertex, baseInstance)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawPatches")
-IndirectRenderCommand_drawPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: ^NS.Object, patchStart: ^NS.Object, patchCount: ^NS.Object, patchIndexBuffer: ^NS.Object, patchIndexBufferOffset: ^NS.Object, instanceCount: ^NS.Object, baseInstance: ^NS.Object, buffer: ^NS.Object, offset: ^NS.Object, instanceStride: ^NS.Object) {
+IndirectRenderCommand_drawPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
 	msgSend(nil, self, "drawPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:instanceCount:baseInstance:tessellationFactorBuffer:tessellationFactorBufferOffset:tessellationFactorBufferInstanceStride:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, instanceCount, baseInstance, buffer, offset, instanceStride)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawPrimitives")
-IndirectRenderCommand_drawPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, vertexStart: ^NS.Object, vertexCount: ^NS.Object, instanceCount: ^NS.Object, baseInstance: ^NS.Object) {
+IndirectRenderCommand_drawPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:", primitiveType, vertexStart, vertexCount, instanceCount, baseInstance)
 }
 @(objc_type=IndirectRenderCommand, objc_name="reset")
@@ -6945,15 +7015,15 @@ IndirectRenderCommand_reset :: #force_inline proc(self: ^IndirectRenderCommand) 
 	msgSend(nil, self, "reset")
 }
 @(objc_type=IndirectRenderCommand, objc_name="setFragmentBuffer")
-IndirectRenderCommand_setFragmentBuffer :: #force_inline proc(self: ^IndirectRenderCommand, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+IndirectRenderCommand_setFragmentBuffer :: #force_inline proc(self: ^IndirectRenderCommand, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=IndirectRenderCommand, objc_name="setRenderPipelineState")
-IndirectRenderCommand_setRenderPipelineState :: #force_inline proc(self: ^IndirectRenderCommand, pipelineState: ^NS.Object) {
+IndirectRenderCommand_setRenderPipelineState :: #force_inline proc(self: ^IndirectRenderCommand, pipelineState: ^RenderPipelineState) {
 	msgSend(nil, self, "setRenderPipelineState:", pipelineState)
 }
 @(objc_type=IndirectRenderCommand, objc_name="setVertexBuffer")
-IndirectRenderCommand_setVertexBuffer :: #force_inline proc(self: ^IndirectRenderCommand, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+IndirectRenderCommand_setVertexBuffer :: #force_inline proc(self: ^IndirectRenderCommand, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexBuffer:offset:atIndex:", buffer, offset, index)
 }
 
@@ -6974,38 +7044,38 @@ Methods:
 	setVisibleFunctionTables
 */
 @(objc_class="MTLIntersectionFunctionTable")
-IntersectionFunctionTable :: struct { using _: NS.Object }
+IntersectionFunctionTable :: struct { using _: Resource }
 
 @(objc_type=IntersectionFunctionTable, objc_name="setBuffer")
-IntersectionFunctionTable_setBuffer :: #force_inline proc(self: ^IntersectionFunctionTable, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+IntersectionFunctionTable_setBuffer :: #force_inline proc(self: ^IntersectionFunctionTable, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=IntersectionFunctionTable, objc_name="setBuffers")
-IntersectionFunctionTable_setBuffers :: #force_inline proc(self: ^IntersectionFunctionTable, buffers: ^^NS.Object, offsets: NS.Integer, range: NS.Range) {
+IntersectionFunctionTable_setBuffers :: #force_inline proc(self: ^IntersectionFunctionTable, buffers: [^]^Buffer, offsets: [^]NS.UInteger, range: NS.Range) {
 	msgSend(nil, self, "setBuffers:offsets:withRange:", buffers, offsets, range)
 }
 @(objc_type=IntersectionFunctionTable, objc_name="setFunction")
-IntersectionFunctionTable_setFunction :: #force_inline proc(self: ^IntersectionFunctionTable, function: ^NS.Object, index: ^NS.Object) {
+IntersectionFunctionTable_setFunction :: #force_inline proc(self: ^IntersectionFunctionTable, function: ^FunctionHandle, index: NS.UInteger) {
 	msgSend(nil, self, "setFunction:atIndex:", function, index)
 }
 @(objc_type=IntersectionFunctionTable, objc_name="setFunctions")
-IntersectionFunctionTable_setFunctions :: #force_inline proc(self: ^IntersectionFunctionTable, functions: ^^NS.Object, range: NS.Range) {
+IntersectionFunctionTable_setFunctions :: #force_inline proc(self: ^IntersectionFunctionTable, functions: [^]^FunctionHandle, range: NS.Range) {
 	msgSend(nil, self, "setFunctions:withRange:", functions, range)
 }
-@(objc_type=IntersectionFunctionTable, objc_name="setOpaqueTriangleIntersectionFunctionWithSignature_atIndex_")
-IntersectionFunctionTable_setOpaqueTriangleIntersectionFunctionWithSignature_atIndex_ :: #force_inline proc(self: ^IntersectionFunctionTable, signature: IntersectionFunctionSignature, index: ^NS.Object) {
+@(objc_type=IntersectionFunctionTable, objc_name="setOpaqueTriangleIntersectionFunctionWithSignatureAtIndex")
+IntersectionFunctionTable_setOpaqueTriangleIntersectionFunctionWithSignatureAtIndex :: #force_inline proc(self: ^IntersectionFunctionTable, signature: IntersectionFunctionSignature, index: NS.UInteger) {
 	msgSend(nil, self, "setOpaqueTriangleIntersectionFunctionWithSignature:atIndex:", signature, index)
 }
-@(objc_type=IntersectionFunctionTable, objc_name="setOpaqueTriangleIntersectionFunctionWithSignature_withRange_")
-IntersectionFunctionTable_setOpaqueTriangleIntersectionFunctionWithSignature_withRange_ :: #force_inline proc(self: ^IntersectionFunctionTable, signature: IntersectionFunctionSignature, range: NS.Range) {
+@(objc_type=IntersectionFunctionTable, objc_name="setOpaqueTriangleIntersectionFunctionWithSignatureWithRange")
+IntersectionFunctionTable_setOpaqueTriangleIntersectionFunctionWithSignatureWithRange :: #force_inline proc(self: ^IntersectionFunctionTable, signature: IntersectionFunctionSignature, range: NS.Range) {
 	msgSend(nil, self, "setOpaqueTriangleIntersectionFunctionWithSignature:withRange:", signature, range)
 }
 @(objc_type=IntersectionFunctionTable, objc_name="setVisibleFunctionTable")
-IntersectionFunctionTable_setVisibleFunctionTable :: #force_inline proc(self: ^IntersectionFunctionTable, visibleFunctionTable: ^NS.Object, bufferIndex: ^NS.Object) {
+IntersectionFunctionTable_setVisibleFunctionTable :: #force_inline proc(self: ^IntersectionFunctionTable, visibleFunctionTable: ^VisibleFunctionTable, bufferIndex: NS.UInteger) {
 	msgSend(nil, self, "setVisibleFunctionTable:atBufferIndex:", visibleFunctionTable, bufferIndex)
 }
 @(objc_type=IntersectionFunctionTable, objc_name="setVisibleFunctionTables")
-IntersectionFunctionTable_setVisibleFunctionTables :: #force_inline proc(self: ^IntersectionFunctionTable, visibleFunctionTables: ^^NS.Object, range: NS.Range) {
+IntersectionFunctionTable_setVisibleFunctionTables :: #force_inline proc(self: ^IntersectionFunctionTable, visibleFunctionTables: [^]^VisibleFunctionTable, range: NS.Range) {
 	msgSend(nil, self, "setVisibleFunctionTables:withBufferRange:", visibleFunctionTables, range)
 }
 
@@ -7054,8 +7124,9 @@ Library_newFunctionWithDescriptor_completionHandler_ :: #force_inline proc(self:
 	msgSend(nil, self, "newFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
 @(objc_type=Library, objc_name="newFunctionWithDescriptor_error_")
-Library_newFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor, error: ^^NS.Error ) -> ^Library {
-	return msgSend(^Library, self, "newFunctionWithDescriptor:error:", descriptor, error)
+Library_newFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newFunctionWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=Library, objc_name="newFunctionWithName")
 Library_newFunctionWithName :: #force_inline proc(self: ^Library, functionName: ^NS.String) -> ^Library {
@@ -7066,16 +7137,18 @@ Library_newFunctionWithName_constantValues_completionHandler_ :: #force_inline p
 	msgSend(nil, self, "newFunctionWithName:constantValues:completionHandler:", name, constantValues, completionHandler)
 }
 @(objc_type=Library, objc_name="newFunctionWithName_constantValues_error_")
-Library_newFunctionWithName_constantValues_error_ :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues, error: ^^NS.Error ) -> ^Library {
-	return msgSend(^Library, self, "newFunctionWithName:constantValues:error:", name, constantValues, error)
+Library_newFunctionWithName_constantValues_error_ :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newFunctionWithName:constantValues:error:", name, constantValues, &error)
+	return
 }
 @(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptor_completionHandler_")
 Library_newIntersectionFunctionWithDescriptor_completionHandler_ :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor, completionHandler: rawptr) {
 	msgSend(nil, self, "newIntersectionFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
 @(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptor_error_")
-Library_newIntersectionFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor, error: ^^NS.Error ) -> ^Library {
-	return msgSend(^Library, self, "newIntersectionFunctionWithDescriptor:error:", descriptor, error)
+Library_newIntersectionFunctionWithDescriptor_error_ :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newIntersectionFunctionWithDescriptor:error:", descriptor, &error)
+	return
 }
 @(objc_type=Library, objc_name="setLabel")
 Library_setLabel :: #force_inline proc(self: ^Library, label: ^NS.String) {
@@ -7109,11 +7182,11 @@ ParallelRenderCommandEncoder_renderCommandEncoder :: #force_inline proc(self: ^P
 	return msgSend(^ParallelRenderCommandEncoder, self, "renderCommandEncoder")
 }
 @(objc_type=ParallelRenderCommandEncoder, objc_name="setColorStoreAction")
-ParallelRenderCommandEncoder_setColorStoreAction :: #force_inline proc(self: ^ParallelRenderCommandEncoder, storeAction: StoreAction, colorAttachmentIndex: ^NS.Object) {
+ParallelRenderCommandEncoder_setColorStoreAction :: #force_inline proc(self: ^ParallelRenderCommandEncoder, storeAction: StoreAction, colorAttachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setColorStoreAction:atIndex:", storeAction, colorAttachmentIndex)
 }
 @(objc_type=ParallelRenderCommandEncoder, objc_name="setColorStoreActionOptions")
-ParallelRenderCommandEncoder_setColorStoreActionOptions :: #force_inline proc(self: ^ParallelRenderCommandEncoder, storeActionOptions: StoreActionOptions, colorAttachmentIndex: ^NS.Object) {
+ParallelRenderCommandEncoder_setColorStoreActionOptions :: #force_inline proc(self: ^ParallelRenderCommandEncoder, storeActionOptions: StoreActionOptions, colorAttachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setColorStoreActionOptions:atIndex:", storeActionOptions, colorAttachmentIndex)
 }
 @(objc_type=ParallelRenderCommandEncoder, objc_name="setDepthStoreAction")
@@ -7155,7 +7228,7 @@ Methods:
 RasterizationRateMap :: struct { using _: NS.Object }
 
 @(objc_type=RasterizationRateMap, objc_name="copyParameterDataToBuffer")
-RasterizationRateMap_copyParameterDataToBuffer :: #force_inline proc(self: ^RasterizationRateMap, buffer: ^NS.Object, offset: ^NS.Object) {
+RasterizationRateMap_copyParameterDataToBuffer :: #force_inline proc(self: ^RasterizationRateMap, buffer: ^Buffer, offset: NS.UInteger) {
 	msgSend(nil, self, "copyParameterDataToBuffer:offset:", buffer, offset)
 }
 @(objc_type=RasterizationRateMap, objc_name="device")
@@ -7167,15 +7240,15 @@ RasterizationRateMap_label :: #force_inline proc(self: ^RasterizationRateMap) ->
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=RasterizationRateMap, objc_name="layerCount")
-RasterizationRateMap_layerCount :: #force_inline proc(self: ^RasterizationRateMap) -> NS.Integer {
-	return msgSend(NS.Integer, self, "layerCount")
+RasterizationRateMap_layerCount :: #force_inline proc(self: ^RasterizationRateMap) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "layerCount")
 }
 @(objc_type=RasterizationRateMap, objc_name="mapPhysicalToScreenCoordinates")
-RasterizationRateMap_mapPhysicalToScreenCoordinates :: #force_inline proc(self: ^RasterizationRateMap, physicalCoordinates: Coordinate2D, layerIndex: ^NS.Object) -> Coordinate2D {
+RasterizationRateMap_mapPhysicalToScreenCoordinates :: #force_inline proc(self: ^RasterizationRateMap, physicalCoordinates: Coordinate2D, layerIndex: NS.UInteger) -> Coordinate2D {
 	return msgSend(Coordinate2D, self, "mapPhysicalToScreenCoordinates:forLayer:", physicalCoordinates, layerIndex)
 }
 @(objc_type=RasterizationRateMap, objc_name="mapScreenToPhysicalCoordinates")
-RasterizationRateMap_mapScreenToPhysicalCoordinates :: #force_inline proc(self: ^RasterizationRateMap, screenCoordinates: Coordinate2D, layerIndex: ^NS.Object) -> Coordinate2D {
+RasterizationRateMap_mapScreenToPhysicalCoordinates :: #force_inline proc(self: ^RasterizationRateMap, screenCoordinates: Coordinate2D, layerIndex: NS.UInteger) -> Coordinate2D {
 	return msgSend(Coordinate2D, self, "mapScreenToPhysicalCoordinates:forLayer:", screenCoordinates, layerIndex)
 }
 @(objc_type=RasterizationRateMap, objc_name="parameterBufferSizeAndAlign")
@@ -7187,7 +7260,7 @@ RasterizationRateMap_physicalGranularity :: #force_inline proc(self: ^Rasterizat
 	return msgSend(Size, self, "physicalGranularity")
 }
 @(objc_type=RasterizationRateMap, objc_name="physicalSizeForLayer")
-RasterizationRateMap_physicalSizeForLayer :: #force_inline proc(self: ^RasterizationRateMap, layerIndex: ^NS.Object) -> Size {
+RasterizationRateMap_physicalSizeForLayer :: #force_inline proc(self: ^RasterizationRateMap, layerIndex: NS.UInteger) -> Size {
 	return msgSend(Size, self, "physicalSizeForLayer:", layerIndex)
 }
 @(objc_type=RasterizationRateMap, objc_name="screenSize")
@@ -7297,63 +7370,63 @@ RenderCommandEncoder_dispatchThreadsPerTile :: #force_inline proc(self: ^RenderC
 	msgSend(nil, self, "dispatchThreadsPerTile:", threadsPerTile)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPatches_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_indirectBuffer_indirectBufferOffset_")
-RenderCommandEncoder_drawIndexedPatches_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: ^NS.Object, patchIndexBuffer: ^NS.Object, patchIndexBufferOffset: ^NS.Object, controlPointIndexBuffer: ^NS.Object, controlPointIndexBufferOffset: ^NS.Object, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+RenderCommandEncoder_drawIndexedPatches_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPatches:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:indirectBuffer:indirectBufferOffset:", numberOfPatchControlPoints, patchIndexBuffer, patchIndexBufferOffset, controlPointIndexBuffer, controlPointIndexBufferOffset, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_instanceCount_baseInstance_")
-RenderCommandEncoder_drawIndexedPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: ^NS.Object, patchStart: ^NS.Object, patchCount: ^NS.Object, patchIndexBuffer: ^NS.Object, patchIndexBufferOffset: ^NS.Object, controlPointIndexBuffer: ^NS.Object, controlPointIndexBufferOffset: ^NS.Object, instanceCount: ^NS.Object, baseInstance: ^NS.Object) {
+RenderCommandEncoder_drawIndexedPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:instanceCount:baseInstance:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, controlPointIndexBuffer, controlPointIndexBufferOffset, instanceCount, baseInstance)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_")
-RenderCommandEncoder_drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexCount: ^NS.Object, indexType: IndexType, indexBuffer: ^NS.Object, indexBufferOffset: ^NS.Object) {
+RenderCommandEncoder_drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexCount: NS.UInteger, indexType: IndexType, indexBuffer: ^Buffer, indexBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:", primitiveType, indexCount, indexType, indexBuffer, indexBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_instanceCount_")
-RenderCommandEncoder_drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_instanceCount_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexCount: ^NS.Object, indexType: IndexType, indexBuffer: ^NS.Object, indexBufferOffset: ^NS.Object, instanceCount: ^NS.Object) {
+RenderCommandEncoder_drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_instanceCount_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexCount: NS.UInteger, indexType: IndexType, indexBuffer: ^Buffer, indexBufferOffset: NS.UInteger, instanceCount: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:instanceCount:", primitiveType, indexCount, indexType, indexBuffer, indexBufferOffset, instanceCount)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_instanceCount_baseVertex_baseInstance_")
-RenderCommandEncoder_drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_instanceCount_baseVertex_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexCount: ^NS.Object, indexType: IndexType, indexBuffer: ^NS.Object, indexBufferOffset: ^NS.Object, instanceCount: ^NS.Object, baseVertex: ^NS.Object, baseInstance: ^NS.Object) {
+RenderCommandEncoder_drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_instanceCount_baseVertex_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexCount: NS.UInteger, indexType: IndexType, indexBuffer: ^Buffer, indexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseVertex: NS.Integer, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:instanceCount:baseVertex:baseInstance:", primitiveType, indexCount, indexType, indexBuffer, indexBufferOffset, instanceCount, baseVertex, baseInstance)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPrimitives_indexType_indexBuffer_indexBufferOffset_indirectBuffer_indirectBufferOffset_")
-RenderCommandEncoder_drawIndexedPrimitives_indexType_indexBuffer_indexBufferOffset_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexType: IndexType, indexBuffer: ^NS.Object, indexBufferOffset: ^NS.Object, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+RenderCommandEncoder_drawIndexedPrimitives_indexType_indexBuffer_indexBufferOffset_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indexType: IndexType, indexBuffer: ^Buffer, indexBufferOffset: NS.UInteger, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPrimitives:indexType:indexBuffer:indexBufferOffset:indirectBuffer:indirectBufferOffset:", primitiveType, indexType, indexBuffer, indexBufferOffset, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPatches_patchIndexBuffer_patchIndexBufferOffset_indirectBuffer_indirectBufferOffset_")
-RenderCommandEncoder_drawPatches_patchIndexBuffer_patchIndexBufferOffset_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: ^NS.Object, patchIndexBuffer: ^NS.Object, patchIndexBufferOffset: ^NS.Object, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+RenderCommandEncoder_drawPatches_patchIndexBuffer_patchIndexBufferOffset_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "drawPatches:patchIndexBuffer:patchIndexBufferOffset:indirectBuffer:indirectBufferOffset:", numberOfPatchControlPoints, patchIndexBuffer, patchIndexBufferOffset, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_instanceCount_baseInstance_")
-RenderCommandEncoder_drawPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: ^NS.Object, patchStart: ^NS.Object, patchCount: ^NS.Object, patchIndexBuffer: ^NS.Object, patchIndexBufferOffset: ^NS.Object, instanceCount: ^NS.Object, baseInstance: ^NS.Object) {
+RenderCommandEncoder_drawPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:instanceCount:baseInstance:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, instanceCount, baseInstance)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPrimitives_indirectBuffer_indirectBufferOffset_")
-RenderCommandEncoder_drawPrimitives_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+RenderCommandEncoder_drawPrimitives_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "drawPrimitives:indirectBuffer:indirectBufferOffset:", primitiveType, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPrimitives_vertexStart_vertexCount_")
-RenderCommandEncoder_drawPrimitives_vertexStart_vertexCount_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: ^NS.Object, vertexCount: ^NS.Object) {
+RenderCommandEncoder_drawPrimitives_vertexStart_vertexCount_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:", primitiveType, vertexStart, vertexCount)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPrimitives_vertexStart_vertexCount_instanceCount_")
-RenderCommandEncoder_drawPrimitives_vertexStart_vertexCount_instanceCount_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: ^NS.Object, vertexCount: ^NS.Object, instanceCount: ^NS.Object) {
+RenderCommandEncoder_drawPrimitives_vertexStart_vertexCount_instanceCount_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:", primitiveType, vertexStart, vertexCount, instanceCount)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPrimitives_vertexStart_vertexCount_instanceCount_baseInstance_")
-RenderCommandEncoder_drawPrimitives_vertexStart_vertexCount_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: ^NS.Object, vertexCount: ^NS.Object, instanceCount: ^NS.Object, baseInstance: ^NS.Object) {
+RenderCommandEncoder_drawPrimitives_vertexStart_vertexCount_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:", primitiveType, vertexStart, vertexCount, instanceCount, baseInstance)
 }
-@(objc_type=RenderCommandEncoder, objc_name="executeCommandsInBuffer_indirectBuffer_indirectBufferOffset_")
-RenderCommandEncoder_executeCommandsInBuffer_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^RenderCommandEncoder, indirectCommandbuffer: ^NS.Object, indirectRangeBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="executeCommandsInBuffer")
+RenderCommandEncoder_executeCommandsInBuffer :: #force_inline proc(self: ^RenderCommandEncoder, indirectCommandbuffer: ^Buffer, indirectRangeBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:", indirectCommandbuffer, indirectRangeBuffer, indirectBufferOffset)
 }
-@(objc_type=RenderCommandEncoder, objc_name="executeCommandsInBuffer_withRange_")
-RenderCommandEncoder_executeCommandsInBuffer_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, indirectCommandBuffer: ^NS.Object, executionRange: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="executeCommandsInBufferWithRange")
+RenderCommandEncoder_executeCommandsInBufferWithRange :: #force_inline proc(self: ^RenderCommandEncoder, indirectCommandBuffer: ^Buffer, executionRange: NS.Range) {
 	msgSend(nil, self, "executeCommandsInBuffer:withRange:", indirectCommandBuffer, executionRange)
 }
 @(objc_type=RenderCommandEncoder, objc_name="memoryBarrierWithResources")
-RenderCommandEncoder_memoryBarrierWithResources :: #force_inline proc(self: ^RenderCommandEncoder, resources: ^^NS.Object, count: ^NS.Object, after: RenderStages, before: RenderStages) {
+RenderCommandEncoder_memoryBarrierWithResources :: #force_inline proc(self: ^RenderCommandEncoder, resources: [^]^Resource, count: NS.UInteger, after: RenderStages, before: RenderStages) {
 	msgSend(nil, self, "memoryBarrierWithResources:count:afterStages:beforeStages:", resources, count, after, before)
 }
 @(objc_type=RenderCommandEncoder, objc_name="memoryBarrierWithScope")
@@ -7361,7 +7434,7 @@ RenderCommandEncoder_memoryBarrierWithScope :: #force_inline proc(self: ^RenderC
 	msgSend(nil, self, "memoryBarrierWithScope:afterStages:beforeStages:", scope, after, before)
 }
 @(objc_type=RenderCommandEncoder, objc_name="sampleCountersInBuffer")
-RenderCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^RenderCommandEncoder, sampleBuffer: ^NS.Object, sampleIndex: ^NS.Object, barrier: BOOL) {
+RenderCommandEncoder_sampleCountersInBuffer :: #force_inline proc(self: ^RenderCommandEncoder, sampleBuffer: ^Buffer, sampleIndex: NS.UInteger, barrier: BOOL) {
 	msgSend(nil, self, "sampleCountersInBuffer:atSampleIndex:withBarrier:", sampleBuffer, sampleIndex, barrier)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setBlendColorRed")
@@ -7369,11 +7442,11 @@ RenderCommandEncoder_setBlendColorRed :: #force_inline proc(self: ^RenderCommand
 	msgSend(nil, self, "setBlendColorRed:green:blue:alpha:", red, green, blue, alpha)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setColorStoreAction")
-RenderCommandEncoder_setColorStoreAction :: #force_inline proc(self: ^RenderCommandEncoder, storeAction: StoreAction, colorAttachmentIndex: ^NS.Object) {
+RenderCommandEncoder_setColorStoreAction :: #force_inline proc(self: ^RenderCommandEncoder, storeAction: StoreAction, colorAttachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setColorStoreAction:atIndex:", storeAction, colorAttachmentIndex)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setColorStoreActionOptions")
-RenderCommandEncoder_setColorStoreActionOptions :: #force_inline proc(self: ^RenderCommandEncoder, storeActionOptions: StoreActionOptions, colorAttachmentIndex: ^NS.Object) {
+RenderCommandEncoder_setColorStoreActionOptions :: #force_inline proc(self: ^RenderCommandEncoder, storeActionOptions: StoreActionOptions, colorAttachmentIndex: NS.UInteger) {
 	msgSend(nil, self, "setColorStoreActionOptions:atIndex:", storeActionOptions, colorAttachmentIndex)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setCullMode")
@@ -7389,7 +7462,7 @@ RenderCommandEncoder_setDepthClipMode :: #force_inline proc(self: ^RenderCommand
 	msgSend(nil, self, "setDepthClipMode:", depthClipMode)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setDepthStencilState")
-RenderCommandEncoder_setDepthStencilState :: #force_inline proc(self: ^RenderCommandEncoder, depthStencilState: ^NS.Object) {
+RenderCommandEncoder_setDepthStencilState :: #force_inline proc(self: ^RenderCommandEncoder, depthStencilState: ^DepthStencilState) {
 	msgSend(nil, self, "setDepthStencilState:", depthStencilState)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setDepthStoreAction")
@@ -7401,43 +7474,43 @@ RenderCommandEncoder_setDepthStoreActionOptions :: #force_inline proc(self: ^Ren
 	msgSend(nil, self, "setDepthStoreActionOptions:", storeActionOptions)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFragmentBuffer")
-RenderCommandEncoder_setFragmentBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setFragmentBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFragmentBufferOffset")
-RenderCommandEncoder_setFragmentBufferOffset :: #force_inline proc(self: ^RenderCommandEncoder, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setFragmentBufferOffset :: #force_inline proc(self: ^RenderCommandEncoder, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentBufferOffset:atIndex:", offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFragmentBuffers")
-RenderCommandEncoder_setFragmentBuffers :: #force_inline proc(self: ^RenderCommandEncoder, buffers: ^^NS.Object, offsets: NS.Integer, range: NS.Range) {
+RenderCommandEncoder_setFragmentBuffers :: #force_inline proc(self: ^RenderCommandEncoder, buffers: [^]^Buffer, offsets: [^]NS.UInteger, range: NS.Range) {
 	msgSend(nil, self, "setFragmentBuffers:offsets:withRange:", buffers, offsets, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFragmentBytes")
-RenderCommandEncoder_setFragmentBytes :: #force_inline proc(self: ^RenderCommandEncoder, bytes: rawptr, length: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setFragmentBytes :: #force_inline proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentBytes:length:atIndex:", bytes, length, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerState_atIndex_")
-RenderCommandEncoder_setFragmentSamplerState_atIndex_ :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^NS.Object, index: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerStateAtIndex")
+RenderCommandEncoder_setFragmentSamplerStateAtIndex :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentSamplerState:atIndex:", sampler, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerState_lodMinClamp_lodMaxClamp_atIndex_")
-RenderCommandEncoder_setFragmentSamplerState_lodMinClamp_lodMaxClamp_atIndex_ :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^NS.Object, lodMinClamp: f32, lodMaxClamp: f32, index: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerState_lodMinClamp_lodMaxClampAtIndex")
+RenderCommandEncoder_setFragmentSamplerState_lodMinClamp_lodMaxClampAtIndex :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, lodMinClamp: f32, lodMaxClamp: f32, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentSamplerState:lodMinClamp:lodMaxClamp:atIndex:", sampler, lodMinClamp, lodMaxClamp, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerStates_lodMinClamps_lodMaxClamps_withRange_")
-RenderCommandEncoder_setFragmentSamplerStates_lodMinClamps_lodMaxClamps_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, samplers: ^^NS.Object, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerStates_lodMinClamps_lodMaxClampsWithRange")
+RenderCommandEncoder_setFragmentSamplerStates_lodMinClamps_lodMaxClampsWithRange :: #force_inline proc(self: ^RenderCommandEncoder, samplers: [^]^SamplerState, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
 	msgSend(nil, self, "setFragmentSamplerStates:lodMinClamps:lodMaxClamps:withRange:", samplers, lodMinClamps, lodMaxClamps, range)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerStates_withRange_")
-RenderCommandEncoder_setFragmentSamplerStates_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, samplers: ^^NS.Object, range: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentSamplerStatesWithRange")
+RenderCommandEncoder_setFragmentSamplerStatesWithRange :: #force_inline proc(self: ^RenderCommandEncoder, samplers: [^]^SamplerState, range: NS.Range) {
 	msgSend(nil, self, "setFragmentSamplerStates:withRange:", samplers, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFragmentTexture")
-RenderCommandEncoder_setFragmentTexture :: #force_inline proc(self: ^RenderCommandEncoder, texture: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setFragmentTexture :: #force_inline proc(self: ^RenderCommandEncoder, texture: ^Texture, index: NS.UInteger) {
 	msgSend(nil, self, "setFragmentTexture:atIndex:", texture, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFragmentTextures")
-RenderCommandEncoder_setFragmentTextures :: #force_inline proc(self: ^RenderCommandEncoder, textures: ^^NS.Object, range: NS.Range) {
+RenderCommandEncoder_setFragmentTextures :: #force_inline proc(self: ^RenderCommandEncoder, textures: [^]^Texture, range: NS.Range) {
 	msgSend(nil, self, "setFragmentTextures:withRange:", textures, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setFrontFacingWinding")
@@ -7445,7 +7518,7 @@ RenderCommandEncoder_setFrontFacingWinding :: #force_inline proc(self: ^RenderCo
 	msgSend(nil, self, "setFrontFacingWinding:", frontFacingWinding)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setRenderPipelineState")
-RenderCommandEncoder_setRenderPipelineState :: #force_inline proc(self: ^RenderCommandEncoder, pipelineState: ^NS.Object) {
+RenderCommandEncoder_setRenderPipelineState :: #force_inline proc(self: ^RenderCommandEncoder, pipelineState: ^RenderPipelineState) {
 	msgSend(nil, self, "setRenderPipelineState:", pipelineState)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setScissorRect")
@@ -7453,7 +7526,7 @@ RenderCommandEncoder_setScissorRect :: #force_inline proc(self: ^RenderCommandEn
 	msgSend(nil, self, "setScissorRect:", rect)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setScissorRects")
-RenderCommandEncoder_setScissorRects :: #force_inline proc(self: ^RenderCommandEncoder, scissorRects: ^ScissorRect, count: ^NS.Object) {
+RenderCommandEncoder_setScissorRects :: #force_inline proc(self: ^RenderCommandEncoder, scissorRects: ^ScissorRect, count: NS.UInteger) {
 	msgSend(nil, self, "setScissorRects:count:", scissorRects, count)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setStencilFrontReferenceValue")
@@ -7473,7 +7546,7 @@ RenderCommandEncoder_setStencilStoreActionOptions :: #force_inline proc(self: ^R
 	msgSend(nil, self, "setStencilStoreActionOptions:", storeActionOptions)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTessellationFactorBuffer")
-RenderCommandEncoder_setTessellationFactorBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^NS.Object, offset: ^NS.Object, instanceStride: ^NS.Object) {
+RenderCommandEncoder_setTessellationFactorBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
 	msgSend(nil, self, "setTessellationFactorBuffer:offset:instanceStride:", buffer, offset, instanceStride)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTessellationFactorScale")
@@ -7481,47 +7554,47 @@ RenderCommandEncoder_setTessellationFactorScale :: #force_inline proc(self: ^Ren
 	msgSend(nil, self, "setTessellationFactorScale:", scale)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setThreadgroupMemoryLength")
-RenderCommandEncoder_setThreadgroupMemoryLength :: #force_inline proc(self: ^RenderCommandEncoder, length: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setThreadgroupMemoryLength :: #force_inline proc(self: ^RenderCommandEncoder, length: NS.UInteger, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setThreadgroupMemoryLength:offset:atIndex:", length, offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTileBuffer")
-RenderCommandEncoder_setTileBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setTileBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setTileBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTileBufferOffset")
-RenderCommandEncoder_setTileBufferOffset :: #force_inline proc(self: ^RenderCommandEncoder, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setTileBufferOffset :: #force_inline proc(self: ^RenderCommandEncoder, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setTileBufferOffset:atIndex:", offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTileBuffers")
-RenderCommandEncoder_setTileBuffers :: #force_inline proc(self: ^RenderCommandEncoder, buffers: ^^NS.Object, offsets: NS.Integer, range: NS.Range) {
+RenderCommandEncoder_setTileBuffers :: #force_inline proc(self: ^RenderCommandEncoder, buffers: [^]^Buffer, offsets: [^]NS.UInteger, range: NS.Range) {
 	msgSend(nil, self, "setTileBuffers:offsets:withRange:", buffers, offsets, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTileBytes")
-RenderCommandEncoder_setTileBytes :: #force_inline proc(self: ^RenderCommandEncoder, bytes: rawptr, length: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setTileBytes :: #force_inline proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setTileBytes:length:atIndex:", bytes, length, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerState_atIndex_")
-RenderCommandEncoder_setTileSamplerState_atIndex_ :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^NS.Object, index: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerStateAtIndex")
+RenderCommandEncoder_setTileSamplerStateAtIndex :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) {
 	msgSend(nil, self, "setTileSamplerState:atIndex:", sampler, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerState_lodMinClamp_lodMaxClamp_atIndex_")
-RenderCommandEncoder_setTileSamplerState_lodMinClamp_lodMaxClamp_atIndex_ :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^NS.Object, lodMinClamp: f32, lodMaxClamp: f32, index: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerState_lodMinClamp_lodMaxClampAtIndex")
+RenderCommandEncoder_setTileSamplerState_lodMinClamp_lodMaxClampAtIndex :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, lodMinClamp: f32, lodMaxClamp: f32, index: NS.UInteger) {
 	msgSend(nil, self, "setTileSamplerState:lodMinClamp:lodMaxClamp:atIndex:", sampler, lodMinClamp, lodMaxClamp, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerStates_lodMinClamps_lodMaxClamps_withRange_")
-RenderCommandEncoder_setTileSamplerStates_lodMinClamps_lodMaxClamps_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, samplers: ^^NS.Object, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerStates_lodMinClamps_lodMaxClampsWithRange")
+RenderCommandEncoder_setTileSamplerStates_lodMinClamps_lodMaxClampsWithRange :: #force_inline proc(self: ^RenderCommandEncoder, samplers: [^]^SamplerState, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
 	msgSend(nil, self, "setTileSamplerStates:lodMinClamps:lodMaxClamps:withRange:", samplers, lodMinClamps, lodMaxClamps, range)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerStates_withRange_")
-RenderCommandEncoder_setTileSamplerStates_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, samplers: ^^NS.Object, range: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="setTileSamplerStatesWithRange")
+RenderCommandEncoder_setTileSamplerStatesWithRange :: #force_inline proc(self: ^RenderCommandEncoder, samplers: [^]^SamplerState, range: NS.Range) {
 	msgSend(nil, self, "setTileSamplerStates:withRange:", samplers, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTileTexture")
-RenderCommandEncoder_setTileTexture :: #force_inline proc(self: ^RenderCommandEncoder, texture: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setTileTexture :: #force_inline proc(self: ^RenderCommandEncoder, texture: ^Texture, index: NS.UInteger) {
 	msgSend(nil, self, "setTileTexture:atIndex:", texture, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTileTextures")
-RenderCommandEncoder_setTileTextures :: #force_inline proc(self: ^RenderCommandEncoder, textures: ^^NS.Object, range: NS.Range) {
+RenderCommandEncoder_setTileTextures :: #force_inline proc(self: ^RenderCommandEncoder, textures: [^]^Texture, range: NS.Range) {
 	msgSend(nil, self, "setTileTextures:withRange:", textures, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setTriangleFillMode")
@@ -7529,47 +7602,47 @@ RenderCommandEncoder_setTriangleFillMode :: #force_inline proc(self: ^RenderComm
 	msgSend(nil, self, "setTriangleFillMode:", fillMode)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexAmplificationCount")
-RenderCommandEncoder_setVertexAmplificationCount :: #force_inline proc(self: ^RenderCommandEncoder, count: ^NS.Object, viewMappings: ^VertexAmplificationViewMapping) {
+RenderCommandEncoder_setVertexAmplificationCount :: #force_inline proc(self: ^RenderCommandEncoder, count: NS.UInteger, viewMappings: ^VertexAmplificationViewMapping) {
 	msgSend(nil, self, "setVertexAmplificationCount:viewMappings:", count, viewMappings)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexBuffer")
-RenderCommandEncoder_setVertexBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^NS.Object, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setVertexBuffer :: #force_inline proc(self: ^RenderCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexBuffer:offset:atIndex:", buffer, offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexBufferOffset")
-RenderCommandEncoder_setVertexBufferOffset :: #force_inline proc(self: ^RenderCommandEncoder, offset: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setVertexBufferOffset :: #force_inline proc(self: ^RenderCommandEncoder, offset: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexBufferOffset:atIndex:", offset, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexBuffers")
-RenderCommandEncoder_setVertexBuffers :: #force_inline proc(self: ^RenderCommandEncoder, buffers: ^^NS.Object, offsets: NS.Integer, range: NS.Range) {
+RenderCommandEncoder_setVertexBuffers :: #force_inline proc(self: ^RenderCommandEncoder, buffers: [^]^Buffer, offsets: [^]NS.UInteger, range: NS.Range) {
 	msgSend(nil, self, "setVertexBuffers:offsets:withRange:", buffers, offsets, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexBytes")
-RenderCommandEncoder_setVertexBytes :: #force_inline proc(self: ^RenderCommandEncoder, bytes: rawptr, length: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setVertexBytes :: #force_inline proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexBytes:length:atIndex:", bytes, length, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerState_atIndex_")
-RenderCommandEncoder_setVertexSamplerState_atIndex_ :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^NS.Object, index: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerStateAtIndex")
+RenderCommandEncoder_setVertexSamplerStateAtIndex :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexSamplerState:atIndex:", sampler, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerState_lodMinClamp_lodMaxClamp_atIndex_")
-RenderCommandEncoder_setVertexSamplerState_lodMinClamp_lodMaxClamp_atIndex_ :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^NS.Object, lodMinClamp: f32, lodMaxClamp: f32, index: ^NS.Object) {
+@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerState_lodMinClamp_lodMaxClampAtIndex")
+RenderCommandEncoder_setVertexSamplerState_lodMinClamp_lodMaxClampAtIndex :: #force_inline proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, lodMinClamp: f32, lodMaxClamp: f32, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexSamplerState:lodMinClamp:lodMaxClamp:atIndex:", sampler, lodMinClamp, lodMaxClamp, index)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerStates_lodMinClamps_lodMaxClamps_withRange_")
-RenderCommandEncoder_setVertexSamplerStates_lodMinClamps_lodMaxClamps_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, samplers: ^^NS.Object, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerStates_lodMinClamps_lodMaxClampsWithRange")
+RenderCommandEncoder_setVertexSamplerStates_lodMinClamps_lodMaxClampsWithRange :: #force_inline proc(self: ^RenderCommandEncoder, samplers: [^]^SamplerState, lodMinClamps: ^f32, lodMaxClamps: ^f32, range: NS.Range) {
 	msgSend(nil, self, "setVertexSamplerStates:lodMinClamps:lodMaxClamps:withRange:", samplers, lodMinClamps, lodMaxClamps, range)
 }
-@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerStates_withRange_")
-RenderCommandEncoder_setVertexSamplerStates_withRange_ :: #force_inline proc(self: ^RenderCommandEncoder, samplers: ^^NS.Object, range: NS.Range) {
+@(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerStatesWithRange")
+RenderCommandEncoder_setVertexSamplerStatesWithRange :: #force_inline proc(self: ^RenderCommandEncoder, samplers: [^]^SamplerState, range: NS.Range) {
 	msgSend(nil, self, "setVertexSamplerStates:withRange:", samplers, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexTexture")
-RenderCommandEncoder_setVertexTexture :: #force_inline proc(self: ^RenderCommandEncoder, texture: ^NS.Object, index: ^NS.Object) {
+RenderCommandEncoder_setVertexTexture :: #force_inline proc(self: ^RenderCommandEncoder, texture: ^Texture, index: NS.UInteger) {
 	msgSend(nil, self, "setVertexTexture:atIndex:", texture, index)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVertexTextures")
-RenderCommandEncoder_setVertexTextures :: #force_inline proc(self: ^RenderCommandEncoder, textures: ^^NS.Object, range: NS.Range) {
+RenderCommandEncoder_setVertexTextures :: #force_inline proc(self: ^RenderCommandEncoder, textures: [^]^Texture, range: NS.Range) {
 	msgSend(nil, self, "setVertexTextures:withRange:", textures, range)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setViewport")
@@ -7577,11 +7650,11 @@ RenderCommandEncoder_setViewport :: #force_inline proc(self: ^RenderCommandEncod
 	msgSend(nil, self, "setViewport:", viewport)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setViewports")
-RenderCommandEncoder_setViewports :: #force_inline proc(self: ^RenderCommandEncoder, viewports: ^Viewport, count: ^NS.Object) {
+RenderCommandEncoder_setViewports :: #force_inline proc(self: ^RenderCommandEncoder, viewports: ^Viewport, count: NS.UInteger) {
 	msgSend(nil, self, "setViewports:count:", viewports, count)
 }
 @(objc_type=RenderCommandEncoder, objc_name="setVisibilityResultMode")
-RenderCommandEncoder_setVisibilityResultMode :: #force_inline proc(self: ^RenderCommandEncoder, mode: VisibilityResultMode, offset: ^NS.Object) {
+RenderCommandEncoder_setVisibilityResultMode :: #force_inline proc(self: ^RenderCommandEncoder, mode: VisibilityResultMode, offset: NS.UInteger) {
 	msgSend(nil, self, "setVisibilityResultMode:offset:", mode, offset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="textureBarrier")
@@ -7589,51 +7662,51 @@ RenderCommandEncoder_textureBarrier :: #force_inline proc(self: ^RenderCommandEn
 	msgSend(nil, self, "textureBarrier")
 }
 @(objc_type=RenderCommandEncoder, objc_name="tileHeight")
-RenderCommandEncoder_tileHeight :: #force_inline proc(self: ^RenderCommandEncoder) -> NS.Integer {
-	return msgSend(NS.Integer, self, "tileHeight")
+RenderCommandEncoder_tileHeight :: #force_inline proc(self: ^RenderCommandEncoder) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "tileHeight")
 }
 @(objc_type=RenderCommandEncoder, objc_name="tileWidth")
-RenderCommandEncoder_tileWidth :: #force_inline proc(self: ^RenderCommandEncoder) -> NS.Integer {
-	return msgSend(NS.Integer, self, "tileWidth")
+RenderCommandEncoder_tileWidth :: #force_inline proc(self: ^RenderCommandEncoder) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "tileWidth")
 }
 @(objc_type=RenderCommandEncoder, objc_name="updateFence")
-RenderCommandEncoder_updateFence :: #force_inline proc(self: ^RenderCommandEncoder, fence: ^NS.Object, stages: RenderStages) {
+RenderCommandEncoder_updateFence :: #force_inline proc(self: ^RenderCommandEncoder, fence: ^Fence, stages: RenderStages) {
 	msgSend(nil, self, "updateFence:afterStages:", fence, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useHeap")
-RenderCommandEncoder_useHeap :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^NS.Object) {
+RenderCommandEncoder_useHeap :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^Heap) {
 	msgSend(nil, self, "useHeap:", heap)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useHeap_stages_")
-RenderCommandEncoder_useHeap_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^NS.Object, stages: RenderStages) {
+RenderCommandEncoder_useHeap_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, heap: ^Heap, stages: RenderStages) {
 	msgSend(nil, self, "useHeap:stages:", heap, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useHeaps")
-RenderCommandEncoder_useHeaps :: #force_inline proc(self: ^RenderCommandEncoder, heaps: ^^NS.Object, count: ^NS.Object) {
+RenderCommandEncoder_useHeaps :: #force_inline proc(self: ^RenderCommandEncoder, heaps: [^]^Heap, count: NS.UInteger) {
 	msgSend(nil, self, "useHeaps:count:", heaps, count)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useHeaps_count_stages_")
-RenderCommandEncoder_useHeaps_count_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, heaps: ^^NS.Object, count: ^NS.Object, stages: RenderStages) {
+RenderCommandEncoder_useHeaps_count_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, heaps: [^]^Heap, count: NS.UInteger, stages: RenderStages) {
 	msgSend(nil, self, "useHeaps:count:stages:", heaps, count, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useResource")
-RenderCommandEncoder_useResource :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^NS.Object, usage: ResourceUsage) {
+RenderCommandEncoder_useResource :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^Resource, usage: ResourceUsage) {
 	msgSend(nil, self, "useResource:usage:", resource, usage)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useResource_usage_stages_")
-RenderCommandEncoder_useResource_usage_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^NS.Object, usage: ResourceUsage, stages: RenderStages) {
+RenderCommandEncoder_useResource_usage_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, resource: ^Resource, usage: ResourceUsage, stages: RenderStages) {
 	msgSend(nil, self, "useResource:usage:stages:", resource, usage, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useResources")
-RenderCommandEncoder_useResources :: #force_inline proc(self: ^RenderCommandEncoder, resources: ^^NS.Object, count: ^NS.Object, usage: ResourceUsage) {
+RenderCommandEncoder_useResources :: #force_inline proc(self: ^RenderCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage) {
 	msgSend(nil, self, "useResources:count:usage:", resources, count, usage)
 }
 @(objc_type=RenderCommandEncoder, objc_name="useResources_count_usage_stages_")
-RenderCommandEncoder_useResources_count_usage_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, resources: ^^NS.Object, count: ^NS.Object, usage: ResourceUsage, stages: RenderStages) {
+RenderCommandEncoder_useResources_count_usage_stages_ :: #force_inline proc(self: ^RenderCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage, stages: RenderStages) {
 	msgSend(nil, self, "useResources:count:usage:stages:", resources, count, usage, stages)
 }
 @(objc_type=RenderCommandEncoder, objc_name="waitForFence")
-RenderCommandEncoder_waitForFence :: #force_inline proc(self: ^RenderCommandEncoder, fence: ^NS.Object, stages: RenderStages) {
+RenderCommandEncoder_waitForFence :: #force_inline proc(self: ^RenderCommandEncoder, fence: ^Fence, stages: RenderStages) {
 	msgSend(nil, self, "waitForFence:beforeStages:", fence, stages)
 }
 
@@ -7664,16 +7737,16 @@ RenderPipelineState_imageblockMemoryLengthForDimensions :: #force_inline proc(se
 	return msgSend(^RenderPipelineState, self, "imageblockMemoryLengthForDimensions:", imageblockDimensions)
 }
 @(objc_type=RenderPipelineState, objc_name="imageblockSampleLength")
-RenderPipelineState_imageblockSampleLength :: #force_inline proc(self: ^RenderPipelineState) -> NS.Integer {
-	return msgSend(NS.Integer, self, "imageblockSampleLength")
+RenderPipelineState_imageblockSampleLength :: #force_inline proc(self: ^RenderPipelineState) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "imageblockSampleLength")
 }
 @(objc_type=RenderPipelineState, objc_name="label")
 RenderPipelineState_label :: #force_inline proc(self: ^RenderPipelineState) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=RenderPipelineState, objc_name="maxTotalThreadsPerThreadgroup")
-RenderPipelineState_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^RenderPipelineState) -> NS.Integer {
-	return msgSend(NS.Integer, self, "maxTotalThreadsPerThreadgroup")
+RenderPipelineState_maxTotalThreadsPerThreadgroup :: #force_inline proc(self: ^RenderPipelineState) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadsPerThreadgroup")
 }
 @(objc_type=RenderPipelineState, objc_name="supportIndirectCommandBuffers")
 RenderPipelineState_supportIndirectCommandBuffers :: #force_inline proc(self: ^RenderPipelineState) -> BOOL {
@@ -7709,8 +7782,8 @@ Methods:
 Resource :: struct { using _: NS.Object }
 
 @(objc_type=Resource, objc_name="allocatedSize")
-Resource_allocatedSize :: #force_inline proc(self: ^Resource) -> NS.Integer {
-	return msgSend(NS.Integer, self, "allocatedSize")
+Resource_allocatedSize :: #force_inline proc(self: ^Resource) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "allocatedSize")
 }
 @(objc_type=Resource, objc_name="cpuCacheMode")
 Resource_cpuCacheMode :: #force_inline proc(self: ^Resource) -> CPUCacheMode {
@@ -7729,8 +7802,8 @@ Resource_heap :: #force_inline proc(self: ^Resource) -> ^Resource {
 	return msgSend(^Resource, self, "heap")
 }
 @(objc_type=Resource, objc_name="heapOffset")
-Resource_heapOffset :: #force_inline proc(self: ^Resource) -> NS.Integer {
-	return msgSend(NS.Integer, self, "heapOffset")
+Resource_heapOffset :: #force_inline proc(self: ^Resource) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "heapOffset")
 }
 @(objc_type=Resource, objc_name="isAliasable")
 Resource_isAliasable :: #force_inline proc(self: ^Resource) -> BOOL {
@@ -7778,23 +7851,23 @@ Methods:
 ResourceStateCommandEncoder :: struct { using _: NS.Object }
 
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateFence")
-ResourceStateCommandEncoder_updateFence :: #force_inline proc(self: ^ResourceStateCommandEncoder, fence: ^NS.Object) {
+ResourceStateCommandEncoder_updateFence :: #force_inline proc(self: ^ResourceStateCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "updateFence:", fence)
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMapping_mode_indirectBuffer_indirectBufferOffset_")
-ResourceStateCommandEncoder_updateTextureMapping_mode_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^NS.Object, mode: SparseTextureMappingMode, indirectBuffer: ^NS.Object, indirectBufferOffset: ^NS.Object) {
+ResourceStateCommandEncoder_updateTextureMapping_mode_indirectBuffer_indirectBufferOffset_ :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) {
 	msgSend(nil, self, "updateTextureMapping:mode:indirectBuffer:indirectBufferOffset:", texture, mode, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMapping_mode_region_mipLevel_slice_")
-ResourceStateCommandEncoder_updateTextureMapping_mode_region_mipLevel_slice_ :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^NS.Object, mode: SparseTextureMappingMode, region: Region, mipLevel: NS.Integer, slice: NS.Integer) {
+ResourceStateCommandEncoder_updateTextureMapping_mode_region_mipLevel_slice_ :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, region: Region, mipLevel: NS.UInteger, slice: NS.UInteger) {
 	msgSend(nil, self, "updateTextureMapping:mode:region:mipLevel:slice:", texture, mode, region, mipLevel, slice)
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMappings")
-ResourceStateCommandEncoder_updateTextureMappings :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^NS.Object, mode: SparseTextureMappingMode, regions: ^Region, mipLevels: NS.Integer, slices: NS.Integer, numRegions: ^NS.Object) {
+ResourceStateCommandEncoder_updateTextureMappings :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, regions: ^Region, mipLevels: NS.UInteger, slices: NS.UInteger, numRegions: NS.UInteger) {
 	msgSend(nil, self, "updateTextureMappings:mode:regions:mipLevels:slices:numRegions:", texture, mode, regions, mipLevels, slices, numRegions)
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="waitForFence")
-ResourceStateCommandEncoder_waitForFence :: #force_inline proc(self: ^ResourceStateCommandEncoder, fence: ^NS.Object) {
+ResourceStateCommandEncoder_waitForFence :: #force_inline proc(self: ^ResourceStateCommandEncoder, fence: ^Fence) {
 	msgSend(nil, self, "waitForFence:", fence)
 }
 
@@ -7896,55 +7969,55 @@ Methods:
 	width
 */
 @(objc_class="MTLTexture")
-Texture :: struct { using _: NS.Object }
+Texture :: struct { using _: Resource }
 
 @(objc_type=Texture, objc_name="allowGPUOptimizedContents")
 Texture_allowGPUOptimizedContents :: #force_inline proc(self: ^Texture) -> BOOL {
 	return msgSend(BOOL, self, "allowGPUOptimizedContents")
 }
 @(objc_type=Texture, objc_name="arrayLength")
-Texture_arrayLength :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "arrayLength")
+Texture_arrayLength :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "arrayLength")
 }
 @(objc_type=Texture, objc_name="buffer")
 Texture_buffer :: #force_inline proc(self: ^Texture) -> ^Texture {
 	return msgSend(^Texture, self, "buffer")
 }
 @(objc_type=Texture, objc_name="bufferBytesPerRow")
-Texture_bufferBytesPerRow :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "bufferBytesPerRow")
+Texture_bufferBytesPerRow :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "bufferBytesPerRow")
 }
 @(objc_type=Texture, objc_name="bufferOffset")
-Texture_bufferOffset :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "bufferOffset")
+Texture_bufferOffset :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "bufferOffset")
 }
 @(objc_type=Texture, objc_name="depth")
-Texture_depth :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "depth")
+Texture_depth :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "depth")
 }
 @(objc_type=Texture, objc_name="firstMipmapInTail")
-Texture_firstMipmapInTail :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "firstMipmapInTail")
+Texture_firstMipmapInTail :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "firstMipmapInTail")
 }
 @(objc_type=Texture, objc_name="getBytes_bytesPerRow_bytesPerImage_fromRegion_mipmapLevel_slice_")
-Texture_getBytes_bytesPerRow_bytesPerImage_fromRegion_mipmapLevel_slice_ :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: ^NS.Object, bytesPerImage: ^NS.Object, region: Region, level: ^NS.Object, slice: ^NS.Object) {
+Texture_getBytes_bytesPerRow_bytesPerImage_fromRegion_mipmapLevel_slice_ :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: NS.UInteger, bytesPerImage: NS.UInteger, region: Region, level: NS.UInteger, slice: NS.UInteger) {
 	msgSend(nil, self, "getBytes:bytesPerRow:bytesPerImage:fromRegion:mipmapLevel:slice:", pixelBytes, bytesPerRow, bytesPerImage, region, level, slice)
 }
 @(objc_type=Texture, objc_name="getBytes_bytesPerRow_fromRegion_mipmapLevel_")
-Texture_getBytes_bytesPerRow_fromRegion_mipmapLevel_ :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: ^NS.Object, region: Region, level: ^NS.Object) {
+Texture_getBytes_bytesPerRow_fromRegion_mipmapLevel_ :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: NS.UInteger, region: Region, level: NS.UInteger) {
 	msgSend(nil, self, "getBytes:bytesPerRow:fromRegion:mipmapLevel:", pixelBytes, bytesPerRow, region, level)
 }
 @(objc_type=Texture, objc_name="height")
-Texture_height :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "height")
+Texture_height :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "height")
 }
 @(objc_type=Texture, objc_name="iosurface")
 Texture_iosurface :: #force_inline proc(self: ^Texture) -> IOSurfaceRef {
 	return msgSend(IOSurfaceRef, self, "iosurface")
 }
 @(objc_type=Texture, objc_name="iosurfacePlane")
-Texture_iosurfacePlane :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "iosurfacePlane")
+Texture_iosurfacePlane :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "iosurfacePlane")
 }
 @(objc_type=Texture, objc_name="isFramebufferOnly")
 Texture_isFramebufferOnly :: #force_inline proc(self: ^Texture) -> BOOL {
@@ -7959,11 +8032,11 @@ Texture_isSparse :: #force_inline proc(self: ^Texture) -> BOOL {
 	return msgSend(BOOL, self, "isSparse")
 }
 @(objc_type=Texture, objc_name="mipmapLevelCount")
-Texture_mipmapLevelCount :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "mipmapLevelCount")
+Texture_mipmapLevelCount :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "mipmapLevelCount")
 }
 @(objc_type=Texture, objc_name="newRemoteTextureViewForDevice")
-Texture_newRemoteTextureViewForDevice :: #force_inline proc(self: ^Texture, device: ^NS.Object) -> ^Texture {
+Texture_newRemoteTextureViewForDevice :: #force_inline proc(self: ^Texture, device: ^Device) -> ^Texture {
 	return msgSend(^Texture, self, "newRemoteTextureViewForDevice:", device)
 }
 @(objc_type=Texture, objc_name="newSharedTextureHandle")
@@ -7983,12 +8056,12 @@ Texture_newTextureViewWithPixelFormat_textureType_levels_slices_swizzle_ :: #for
 	return msgSend(^Texture, self, "newTextureViewWithPixelFormat:textureType:levels:slices:swizzle:", pixelFormat, textureType, levelRange, sliceRange, swizzle)
 }
 @(objc_type=Texture, objc_name="parentRelativeLevel")
-Texture_parentRelativeLevel :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "parentRelativeLevel")
+Texture_parentRelativeLevel :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "parentRelativeLevel")
 }
 @(objc_type=Texture, objc_name="parentRelativeSlice")
-Texture_parentRelativeSlice :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "parentRelativeSlice")
+Texture_parentRelativeSlice :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "parentRelativeSlice")
 }
 @(objc_type=Texture, objc_name="parentTexture")
 Texture_parentTexture :: #force_inline proc(self: ^Texture) -> ^Texture {
@@ -8003,11 +8076,11 @@ Texture_remoteStorageTexture :: #force_inline proc(self: ^Texture) -> ^Texture {
 	return msgSend(^Texture, self, "remoteStorageTexture")
 }
 @(objc_type=Texture, objc_name="replaceRegion_mipmapLevel_slice_withBytes_bytesPerRow_bytesPerImage_")
-Texture_replaceRegion_mipmapLevel_slice_withBytes_bytesPerRow_bytesPerImage_ :: #force_inline proc(self: ^Texture, region: Region, level: ^NS.Object, slice: ^NS.Object, pixelBytes: rawptr, bytesPerRow: ^NS.Object, bytesPerImage: ^NS.Object) {
+Texture_replaceRegion_mipmapLevel_slice_withBytes_bytesPerRow_bytesPerImage_ :: #force_inline proc(self: ^Texture, region: Region, level: NS.UInteger, slice: NS.UInteger, pixelBytes: rawptr, bytesPerRow: NS.UInteger, bytesPerImage: NS.UInteger) {
 	msgSend(nil, self, "replaceRegion:mipmapLevel:slice:withBytes:bytesPerRow:bytesPerImage:", region, level, slice, pixelBytes, bytesPerRow, bytesPerImage)
 }
 @(objc_type=Texture, objc_name="replaceRegion_mipmapLevel_withBytes_bytesPerRow_")
-Texture_replaceRegion_mipmapLevel_withBytes_bytesPerRow_ :: #force_inline proc(self: ^Texture, region: Region, level: ^NS.Object, pixelBytes: rawptr, bytesPerRow: ^NS.Object) {
+Texture_replaceRegion_mipmapLevel_withBytes_bytesPerRow_ :: #force_inline proc(self: ^Texture, region: Region, level: NS.UInteger, pixelBytes: rawptr, bytesPerRow: NS.UInteger) {
 	msgSend(nil, self, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", region, level, pixelBytes, bytesPerRow)
 }
 @(objc_type=Texture, objc_name="rootResource")
@@ -8015,16 +8088,16 @@ Texture_rootResource :: #force_inline proc(self: ^Texture) -> ^Texture {
 	return msgSend(^Texture, self, "rootResource")
 }
 @(objc_type=Texture, objc_name="sampleCount")
-Texture_sampleCount :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "sampleCount")
+Texture_sampleCount :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "sampleCount")
 }
 @(objc_type=Texture, objc_name="swizzle")
 Texture_swizzle :: #force_inline proc(self: ^Texture) -> TextureSwizzleChannels {
 	return msgSend(TextureSwizzleChannels, self, "swizzle")
 }
 @(objc_type=Texture, objc_name="tailSizeInBytes")
-Texture_tailSizeInBytes :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "tailSizeInBytes")
+Texture_tailSizeInBytes :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "tailSizeInBytes")
 }
 @(objc_type=Texture, objc_name="textureType")
 Texture_textureType :: #force_inline proc(self: ^Texture) -> TextureType {
@@ -8035,8 +8108,8 @@ Texture_usage :: #force_inline proc(self: ^Texture) -> TextureUsage {
 	return msgSend(TextureUsage, self, "usage")
 }
 @(objc_type=Texture, objc_name="width")
-Texture_width :: #force_inline proc(self: ^Texture) -> NS.Integer {
-	return msgSend(NS.Integer, self, "width")
+Texture_width :: #force_inline proc(self: ^Texture) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "width")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -8050,13 +8123,13 @@ Methods:
 	setFunctions
 */
 @(objc_class="MTLVisibleFunctionTable")
-VisibleFunctionTable :: struct { using _: NS.Object }
+VisibleFunctionTable :: struct { using _: Resource }
 
 @(objc_type=VisibleFunctionTable, objc_name="setFunction")
-VisibleFunctionTable_setFunction :: #force_inline proc(self: ^VisibleFunctionTable, function: ^NS.Object, index: ^NS.Object) {
+VisibleFunctionTable_setFunction :: #force_inline proc(self: ^VisibleFunctionTable, function: ^FunctionHandle, index: NS.UInteger) {
 	msgSend(nil, self, "setFunction:atIndex:", function, index)
 }
 @(objc_type=VisibleFunctionTable, objc_name="setFunctions")
-VisibleFunctionTable_setFunctions :: #force_inline proc(self: ^VisibleFunctionTable, functions: ^^NS.Object, range: NS.Range) {
+VisibleFunctionTable_setFunctions :: #force_inline proc(self: ^VisibleFunctionTable, functions: [^]^FunctionHandle, range: NS.Range) {
 	msgSend(nil, self, "setFunctions:withRange:", functions, range)
 }
