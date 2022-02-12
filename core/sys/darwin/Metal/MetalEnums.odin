@@ -197,7 +197,7 @@ CommandEncoderErrorState :: enum NS.Integer {
 CommandBufferHandler :: distinct rawptr
 
 DispatchType :: enum NS.UInteger {
-	Serial = 0,
+	Serial     = 0,
 	Concurrent = 1,
 }
 
@@ -220,7 +220,7 @@ BarrierScope :: distinct bit_set[BarrierScopeFlag; NS.UInteger]
 
 CounterSampleBufferError :: enum NS.Integer {
 	OutOfMemory = 0,
-	Invalid = 1,
+	Invalid     = 1,
 }
 
 CompareFunction :: enum NS.UInteger {
