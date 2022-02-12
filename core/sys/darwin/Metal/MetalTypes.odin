@@ -131,10 +131,7 @@ Region :: struct {
 	size:   Size,
 }
 
-SamplePosition :: struct {
-	x: f32,
-	y: f32,
-}
+SamplePosition :: distinct [2]f32
 
 ScissorRect :: struct {
 	x:      NS.Integer,
