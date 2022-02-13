@@ -7,6 +7,9 @@ Rect :: struct {
 	width, height: f64,
 }
 
+@(objc_class="NSColor")
+Color :: struct {using _: Object}
+
 @(objc_class="CALayer")
 Layer :: struct { using _: NS.Object }
 
@@ -28,14 +31,29 @@ Window_contentView :: proc(self: ^Window) -> ^View {
 Window_frame :: proc(self: ^Window) -> Rect {
 	return msgSend(Rect, self, "frame")
 }
-
 @(objc_type=Window, objc_name="setFrame")
 Window_setFrame :: proc(self: ^Window, frame: Rect) {
 	msgSend(nil, self, "setFrame:", frame)
 }
 
+@(objc_type=Window, objc_name="opaque")
+Window_opaque :: proc(self: ^Window) -> NS.BOOL {
+	return msgSend(NS.BOOL, self, "opaque")
+}
+@(objc_type=Window, objc_name="setOpaque")
+Window_setOpaque :: proc(self: ^Window, ok: NS.BOOL) {
+	msgSend(nil, self, "setOpaque:", ok)
+}
 
 
+@(objc_type=Window, objc_name="backgroundColor")
+Window_backgroundColor :: proc(self: ^Window) -> ^NS.Color {
+	return msgSend(^NS.Color, self, "backgroundColor")
+}
+@(objc_type=Window, objc_name="setBackgroundColor")
+Window_setBackgroundColor :: proc(self: ^Window, color: ^NS.Color) {
+	msgSend(nil, self, "setBackgroundColor:", color)
+}
 
 @(objc_type=View, objc_name="layer")
 View_layer :: proc(self: ^View) -> ^Layer {
