@@ -239,7 +239,6 @@ close :: proc(skt: Any_Socket) {
 
 
 Tcp_Recv_Error :: enum c.int {
-	Ok = 0,
 	Shutdown = c.int(os.ESHUTDOWN),
 	Not_Connected = c.int(os.ENOTCONN),
 	Connection_Broken = c.int(os.ENETRESET),
@@ -265,7 +264,6 @@ recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network
 }
 
 Udp_Recv_Error :: enum c.int {
-	Ok = 0,
 	Truncated = c.int(os.EMSGSIZE),
 	Reset = c.int(os.ECONNRESET),
 	Not_Socket = c.int(os.ENOTSOCK),
@@ -295,7 +293,6 @@ recv :: proc{recv_tcp, recv_udp}
 
 
 Tcp_Send_Error :: enum c.int {
-	Ok = 0,
 	Aborted = c.int(os.ECONNABORTED),
 	Not_Connected = c.int(os.ENOTCONN),
 	Shutdown = c.int(os.ESHUTDOWN),
@@ -324,7 +321,6 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 }
 
 Udp_Send_Error :: enum c.int {
-	Ok = 0,
 	Truncated = c.int(os.EMSGSIZE),
 }
 
