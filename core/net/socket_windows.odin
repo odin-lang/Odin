@@ -28,7 +28,7 @@ Network_Error :: union {
 
 
 Create_Socket_Error :: enum c.int {
-	Offline = win.WSAENETDOWN,
+	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	No_Socket_Descriptors_Available = win.WSAEMFILE,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
@@ -247,16 +247,17 @@ close :: proc(skt: Any_Socket) {
 
 
 Tcp_Recv_Error :: enum c.int {
-	Shutdown = win.WSAESHUTDOWN,
+	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Not_Connected = win.WSAENOTCONN,
-	Connection_Broken = win.WSAENETRESET,
+	Bad_Buffer = win.WSAEFAULT,
+	Keepalive_Failure = win.WSAENETRESET,
 	Not_Socket = win.WSAENOTSOCK,
-	Aborted = win.WSAECONNABORTED,
-	Reset = win.WSAECONNRESET, // Gracefully shutdown
-	Offline = win.WSAENETDOWN,
-	Host_Unreachable = win.WSAEHOSTUNREACH,
-	Interrupted = win.WSAEINTR,
+	Shutdown = win.WSAESHUTDOWN,
+	Would_Block = win.WSAEWOULDBLOCK,
+	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	Timeout = win.WSAETIMEDOUT,
+	Reset = win.WSAECONNRESET, // Gracefully shutdown
+	Host_Unreachable = win.WSAEHOSTUNREACH, // TODO: verify can actually happen
 }
 
 recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
@@ -272,10 +273,29 @@ recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network
 }
 
 Udp_Recv_Error :: enum c.int {
+	Network_Subsystem_Failure = win.WSAENETDOWN,
+	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
+	// UDP packets are limited in size, and the length of the incoming message exceeded it.
 	Truncated = win.WSAEMSGSIZE,
-	Reset = win.WSAECONNRESET,
+	// The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
+	Remote_Not_Listening = win.WSAECONNRESET,
+	Shutdown = win.WSAESHUTDOWN,
+	// A broadcast address was specified, but the .Broadcast socket option isn't set.
+	Broadcast_Disabled = win.WSAEACCES,
+	Bad_Buffer = win.WSAEFAULT,
+	No_Buffer_Space_Available = win.WSAENOBUFS,
+	// The socket is not valid socket handle.
 	Not_Socket = win.WSAENOTSOCK,
-	Socket_Not_Bound = win.WSAEINVAL, // .. or unknown flag specified; or MSG_OOB specified with SO_OOBINLINE enabled
+	Would_Block = win.WSAEWOULDBLOCK,
+	// The remote host cannot be reached from this host at this time.
+	Host_Unreachable = win.WSAEHOSTUNREACH,
+	// The network cannot be reached from this host at this time.
+	Offline = win.WSAENETUNREACH,
+	Timeout = win.WSAETIMEDOUT,
+	// The socket isn't bound; an unknown flag specified; or MSG_OOB specified with SO_OOBINLINE enabled.
+	Incorrectly_Configured = win.WSAEINVAL, // TODO: can this actually happen?
+	// The message took more hops than was allowed (the Time To Live) to reach the remote endpoint.
+	TTL_Expired = win.WSAENETRESET,
 }
 
 recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
@@ -299,17 +319,26 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 recv :: proc{recv_tcp, recv_udp}
 
 
+//
+// TODO: consider merging some errors to make handling them easier
+// TODO: verify once more what errors to actually expose
+//
 
 Tcp_Send_Error :: enum c.int {
-	Aborted = win.WSAECONNABORTED,
+	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	Not_Connected = win.WSAENOTCONN,
 	Shutdown = win.WSAESHUTDOWN,
 	Reset = win.WSAECONNRESET,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
-	Offline = win.WSAENETDOWN,
+	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Host_Unreachable = win.WSAEHOSTUNREACH,
-	Interrupted = win.WSAEINTR,
+	Offline = win.WSAENETUNREACH, // TODO: verify possible, as not mentioned in docs
 	Timeout = win.WSAETIMEDOUT,
+	// A broadcast address was specified, but the .Broadcast socket option isn't set.
+	Broadcast_Disabled = win.WSAEACCES,
+	Bad_Buffer = win.WSAEFAULT,
+	// Connection is broken due to keepalive activity detecting a failure during the operation.
+	Keepalive_Failure = win.WSAENETRESET, // TODO: not functionally different from Reset; merge?
 }
 
 // Repeatedly sends data until the entire buffer is sent.
@@ -329,8 +358,34 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 }
 
 Udp_Send_Error :: enum c.int {
-	// TODO
-	Truncated = win.WSAEMSGSIZE,
+	Network_Subsystem_Failure = win.WSAENETDOWN,
+	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
+	// UDP packets are limited in size, and len(buf) exceeded it.
+	Message_Too_Long = win.WSAEMSGSIZE,
+	// The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
+	Remote_Not_Listening = win.WSAECONNRESET,
+	Shutdown = win.WSAESHUTDOWN,
+	// A broadcast address was specified, but the .Broadcast socket option isn't set.
+	Broadcast_Disabled = win.WSAEACCES,
+	Bad_Buffer = win.WSAEFAULT,
+	// Connection is broken due to keepalive activity detecting a failure during the operation.
+	Keepalive_Failure = win.WSAENETRESET, // TODO: not functionally different from Reset; merge?
+	No_Buffer_Space_Available = win.WSAENOBUFS,
+	// The socket is not valid socket handle.
+	Not_Socket = win.WSAENOTSOCK,
+	// This socket is unidirectional and cannot be used to send any data.
+	// TODO: verify possible; decide whether to keep if not
+	Receive_Only = win.WSAEOPNOTSUPP,
+	Would_Block = win.WSAEWOULDBLOCK,
+	// The remote host cannot be reached from this host at this time.
+	Host_Unreachable = win.WSAEHOSTUNREACH,
+	// Attempt to send to the Any address.
+	Cannot_Use_Any_Address = win.WSAEADDRNOTAVAIL,
+	// The address is of an incorrect address family for this socket.
+	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
+	// The network cannot be reached from this host at this time.
+	Offline = win.WSAENETUNREACH,
+	Timeout = win.WSAETIMEDOUT,
 }
 
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
@@ -413,6 +468,8 @@ Socket_Option :: enum c.int {
 	//            For non-blocking sockets, ignored.
 	// TODO: verify that value of zero waits forever
 	Send_Timeout = win.SO_SNDTIMEO,
+	// bool: Allow sending to, receiving from, and binding to, a broadcast address.
+	Broadcast = win.SO_BROADCAST,
 }
 
 Socket_Option_Error :: enum c.int {
@@ -421,7 +478,7 @@ Socket_Option_Error :: enum c.int {
 	// The given socket option is unrecognised.
 	Unknown_Option,
 
-	Offline = win.WSAENETDOWN,
+	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Timeout_When_Keepalive_Set = win.WSAENETRESET,
 	Invalid_Option_For_Socket = win.WSAENOPROTOOPT,
 	Reset_When_Keepalive_Set = win.WSAENOTCONN,
@@ -440,7 +497,8 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_
 		.Conditional_Accept,
 		.Dont_Linger,
 		.Out_Of_Bounds_Data_Inline,
-		.Tcp_Nodelay:
+		.Tcp_Nodelay,
+		.Broadcast:
 			switch in value {
 			case bool:
 				// okay
