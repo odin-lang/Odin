@@ -10,12 +10,73 @@ import "core:strconv"
 import "core:intrinsics"
 import "core:sys/unix"
 
+Socket    :: distinct int
 Handle    :: distinct i32
 Pid       :: distinct i32
 File_Time :: distinct u64
 Errno     :: distinct i32
 
+socklen_t :: c.int
+
 INVALID_HANDLE :: ~Handle(0)
+
+SOL_SOCKET:   int : 0xffff
+
+AF_UNSPEC:    int : 0
+AF_UNIX:      int : 1
+AF_LOCAL:     int : AF_UNIX
+AF_INET:      int : 2
+AF_INET6:     int : 10
+AF_PACKET:    int : 17
+AF_BLUETOOTH: int : 31
+
+SOCK_STREAM:    int : 1
+SOCK_DGRAM:     int : 2
+SOCK_RAW:       int : 3
+SOCK_RDM:       int : 4
+SOCK_SEQPACKET: int : 5
+SOCK_PACKET:    int : 10
+
+INADDR_ANY:       c.ulong : 0
+INADDR_BROADCAST: c.ulong : 0xffffffff
+INADDR_NONE:      c.ulong : 0xffffffff
+INADDR_DUMMY:     c.ulong : 0xc0000008
+
+IPPROTO_IP:       int : 0
+IPPROTO_ICMP:     int : 1
+IPPROTO_TCP:      int : 6
+IPPROTO_UDP:      int : 17
+IPPROTO_IPV6:     int : 41
+IPPROTO_ETHERNET: int : 143
+IPPROTO_RAW:      int : 255
+
+SHUT_RD:   int : 0
+SHUT_WR:   int : 1
+SHUT_RDWR: int : 2
+
+SO_DEBUG:     int : 0x0000
+SO_REUSEADDR: int : 0x0004
+SO_KEEPALIVE: int : 0x0008
+SO_DONTROUTE: int : 0x0010
+SO_BROADCAST: int : 0x0020
+SO_LINGER:    int : 0x0080
+SO_OOBINLINE: int : 0x0100
+SO_REUSEPORT: int : 0x0200
+SO_SNDBUF: 	  int : 0x1001
+SO_RCVBUF: 	  int : 0x1002
+SO_RCVTIMEO_NEW: int : 66
+SO_SNDTIMEO_NEW: int : 67
+
+TCP_NODELAY: int : 1
+TCP_CORK:    int : 3
+
+DNS_TYPE_A     :: 0x1
+DNS_TYPE_NS    :: 0x2
+DNS_TYPE_CNAME :: 0x5
+DNS_TYPE_MX    :: 0xf
+DNS_TYPE_AAAA  :: 0x1c
+DNS_TYPE_TEXT  :: 0x10
+DNS_TYPE_SRV   :: 0x21
 
 ERROR_NONE:     Errno : 0
 EPERM:          Errno : 1
@@ -199,12 +260,69 @@ RTLD_NOW          :: 0x002
 RTLD_BINDING_MASK :: 0x3
 RTLD_GLOBAL       :: 0x100
 
+ADDRESS_FAMILY :: u16
+SOCKADDR :: struct {
+	sa_family: ADDRESS_FAMILY,
+	sa_data: [14]c.char,
+}
+
+SOCKADDR_STORAGE_LH :: struct {
+	ss_family: ADDRESS_FAMILY,
+	__ss_pad1: [6]c.char,
+	__ss_align: i64,
+	__ss_pad2: [112]c.char,
+}
+
+ADDRINFOA :: struct {
+	ai_flags: c.int,
+	ai_family: c.int,
+	ai_socktype: c.int,
+	ai_protocol: c.int,
+	ai_addrlen: c.size_t,
+	ai_canonname: ^c.char,
+	ai_addr: ^SOCKADDR,
+	ai_next: ^ADDRINFOA,
+}
+
+sockaddr_in :: struct {
+	sin_family: ADDRESS_FAMILY,
+	sin_port: u16be,
+	sin_addr: in_addr,
+	sin_zero: [8]c.char,
+}
+
+sockaddr_in6 :: struct {
+	sin6_family: ADDRESS_FAMILY,
+	sin6_port: u16be,
+	sin6_flowinfo: c.ulong,
+	sin6_addr: in6_addr,
+	sin6_scope_id: c.ulong,
+}
+
+in_addr :: struct {
+	s_addr: u32,
+}
+
+in6_addr :: struct {
+	s6_addr: [16]u8,
+}
+
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
 Unix_File_Time :: struct {
 	seconds:     i64,
 	nanoseconds: i64,
+}
+
+Timeval :: struct {
+	seconds: i64,
+	nanoseconds: int,
+}
+
+Linger :: struct {
+	onoff: int,
+	linger: int,
 }
 
 OS_Stat :: struct {
@@ -421,20 +539,36 @@ _unix_socket :: proc(domain: int, type: int, protocol: int) -> int {
 	return int(intrinsics.syscall(unix.SYS_socket, uintptr(domain), uintptr(type), uintptr(protocol)))
 }
 
-_unix_bind :: proc(fd: int, addr: rawptr, len: i32) -> int {
-	return int(intrinsics.syscall(unix.SYS_bind, uintptr(fd), uintptr(addr), uintptr(len)))
+_unix_connect :: proc(sd: int, addr: rawptr, len: socklen_t) -> int {
+	return int(intrinsics.syscall(unix.SYS_connect, uintptr(sd), uintptr(addr), uintptr(len)))
 }
 
-_unix_recvfrom :: proc(fd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
-	return i64(intrinsics.syscall(unix.SYS_recvfrom, uintptr(fd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+_unix_accept :: proc(sd: int, addr: rawptr, len: rawptr) -> int {
+	return int(intrinsics.syscall(unix.SYS_accept, uintptr(sd), uintptr(addr), uintptr(len)))
 }
 
-_unix_sendto :: proc(fd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
-	return i64(intrinsics.syscall(unix.SYS_sendto, uintptr(fd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+_unix_listen :: proc(sd: int, backlog: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_listen, uintptr(sd), uintptr(backlog)))
 }
 
-_unix_connect :: proc(fd: int, addr: rawptr, len i32) -> int {
-	return int(intrinsics.syscall(unix.SYS_connect, uintptr(fd), uintptr(addr), uintptr(len))
+_unix_bind :: proc(sd: int, addr: rawptr, len: socklen_t) -> int {
+	return int(intrinsics.syscall(unix.SYS_bind, uintptr(sd), uintptr(addr), uintptr(len)))
+}
+
+_unix_setsockopt :: proc(sd: int, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> int {
+	return int(intrinsics.syscall(unix.SYS_setsockopt, uintptr(sd), uintptr(level), uintptr(optname), uintptr(optval), uintptr(optlen)))
+}
+
+_unix_recvfrom :: proc(sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
+	return i64(intrinsics.syscall(unix.SYS_recvfrom, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+_unix_sendto :: proc(sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
+	return i64(intrinsics.syscall(unix.SYS_sendto, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+_unix_shutdown :: proc(sd: int, how: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_shutdown, uintptr(sd), uintptr(how)))
 }
 
 foreign libc {
@@ -645,6 +779,95 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	modified := s.modified.seconds * 1_000_000_000 + s.modified.nanoseconds
 	return File_Time(modified), ERROR_NONE
 }
+
+socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
+	result := _unix_socket(domain, type, protocol)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return Socket(result), ERROR_NONE
+}
+
+bind :: proc(sd: Socket, addr: ^SOCKADDR) -> (Errno) {
+	result := _unix_bind(int(sd), addr, size_of(addr^))
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+connect :: proc(sd: Socket, addr: ^SOCKADDR) -> (Errno) {
+	result := _unix_connect(int(sd), addr, size_of(addr^))
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
+	result := _unix_accept(int(sd), rawptr(addr), len)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return Socket(result), ERROR_NONE
+}
+
+listen :: proc(sd: Socket, backlog: int) -> (Errno) {
+	result := _unix_listen(int(sd), backlog)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
+	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, size_of(addr^))
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, nil, 0)
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+sendto :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, size_of(addr^))
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), 0, nil, 0)
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+shutdown :: proc(sd: Socket, how: int) -> (Errno) {
+	result := _unix_shutdown(int(sd), how)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
 
 @private
 _stat :: proc(path: string) -> (OS_Stat, Errno) {
