@@ -380,27 +380,45 @@ shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Erro
 
 
 Socket_Option :: enum c.int {
-	// value: win.BOOL
+	// bool: Whether the address that this socket is bound to can be reused by other sockets.
+	//       This allows you to bypass the cooldown period if a program dies while the socket is bound.
 	Reuse_Address = win.SO_REUSEADDR,
+	// bool: Whether other programs will be inhibited from binding the same endpoint as this socket.
 	Exclusive_Addr_Use = win.SO_EXCLUSIVEADDRUSE,
+	// bool: When true, keepalive packets will be automatically be sent for this connection.
+	// TODO: verify this understanding
 	Keep_Alive = win.SO_KEEPALIVE,
+	// bool: When true, client connections will immediately be sent a TCP/IP RST response, rather than
+	//       being accepted.
 	Conditional_Accept = win.SO_CONDITIONAL_ACCEPT,
+	// bool: If true, when the socket is closed, but data is still waiting to be sent, discard that data.
 	Dont_Linger = win.SO_DONTLINGER,
+	// bool: When true, 'out-of-band' data sent over the socket will be read by a normal net.recv() call,
+	//       the same as normal 'in-band' data.
 	Out_Of_Bounds_Data_Inline = win.SO_OOBINLINE,
+	// bool: When true, disables send-coalescing, therefore reducing latency.
 	Tcp_Nodelay = win.TCP_NODELAY,
-
-	// value: win.LINGER
+	// win.LINGER: Customizes how long (if at all) the socket will remain open when there is some remaining data
+	//             waiting to be sent, and net.close() is called.
 	Linger = win.SO_LINGER,
-
-	// value: win.DWORD
+	// win.DWORD: The size, in bytes, of the OS-managed receive-buffer for this socket.
 	Receive_Buffer_Size = win.SO_RCVBUF,
+	// win.DWORD: The size, in bytes, of the OS-managed send-buffer for this socket.
 	Send_Buffer_Size = win.SO_SNDBUF,
+	// win.DWORD: For blocking sockets, the time in milliseconds to wait for incoming data to be received, before giving up and returning .Timeout.
+	//            For non-blocking sockets, ignored.
+	// TODO: verify that value of zero waits forever
 	Receive_Timeout = win.SO_RCVTIMEO,
+	// win.DWORD: For blocking sockets, the time in milliseconds to wait for outgoing data to be sent, before giving up and returning .Timeout.
+	//            For non-blocking sockets, ignored.
+	// TODO: verify that value of zero waits forever
 	Send_Timeout = win.SO_SNDTIMEO,
 }
 
 Socket_Option_Error :: enum c.int {
+	// The value is not of the correct type for the given socket option.
 	Incorrect_Type,
+	// The given socket option is unrecognised.
 	Unknown_Option,
 
 	Offline = win.WSAENETDOWN,
