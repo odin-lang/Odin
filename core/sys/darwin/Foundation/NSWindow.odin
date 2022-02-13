@@ -2,6 +2,11 @@ package objc_Foundation
 
 import NS "core:sys/darwin/Foundation"
 
+Rect :: struct {
+	x, y: f64,
+	width, height: f64,
+}
+
 @(objc_class="CALayer")
 Layer :: struct { using _: NS.Object }
 
@@ -19,6 +24,19 @@ Window_contentView :: proc(self: ^Window) -> ^View {
 	return msgSend(^View, self, "contentView")
 }
 
+@(objc_type=Window, objc_name="frame")
+Window_frame :: proc(self: ^Window) -> Rect {
+	return msgSend(Rect, self, "frame")
+}
+
+@(objc_type=Window, objc_name="setFrame")
+Window_setFrame :: proc(self: ^Window, frame: Rect) {
+	msgSend(nil, self, "setFrame:", frame)
+}
+
+
+
+
 @(objc_type=View, objc_name="layer")
 View_layer :: proc(self: ^View) -> ^Layer {
 	return msgSend(^Layer, self, "layer")
@@ -28,7 +46,6 @@ View_layer :: proc(self: ^View) -> ^Layer {
 View_setLayer :: proc(self: ^View, layer: ^Layer) {
 	msgSend(nil, self, "setLayer:", layer)
 }
-
 
 @(objc_type=View, objc_name="wantsLayer")
 View_wantsLayer :: proc(self: ^View) -> BOOL {

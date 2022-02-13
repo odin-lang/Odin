@@ -2666,8 +2666,8 @@ RenderPassColorAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^Rende
 RenderPassColorAttachmentDescriptorArray_init :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray) -> ^RenderPassColorAttachmentDescriptorArray {
 	return msgSend(^RenderPassColorAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-RenderPassColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassColorAttachmentDescriptor {
+@(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="object")
+RenderPassColorAttachmentDescriptorArray_object :: #force_inline proc(self: ^RenderPassColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassColorAttachmentDescriptor {
 	return msgSend(^RenderPassColorAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="setObject")
@@ -5375,8 +5375,8 @@ CommandBuffer_GPUStartTime :: #force_inline proc(self: ^CommandBuffer) -> CFTime
 	return msgSend(CFTimeInterval, self, "GPUStartTime")
 }
 @(objc_type=CommandBuffer, objc_name="accelerationStructureCommandEncoder")
-CommandBuffer_accelerationStructureCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "accelerationStructureCommandEncoder")
+CommandBuffer_accelerationStructureCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^AccelerationStructureCommandEncoder {
+	return msgSend(^AccelerationStructureCommandEncoder, self, "accelerationStructureCommandEncoder")
 }
 @(objc_type=CommandBuffer, objc_name="addCompletedHandler")
 CommandBuffer_addCompletedHandler :: #force_inline proc(self: ^CommandBuffer, block: CommandBufferHandler) {
@@ -5387,32 +5387,32 @@ CommandBuffer_addScheduledHandler :: #force_inline proc(self: ^CommandBuffer, bl
 	msgSend(nil, self, "addScheduledHandler:", block)
 }
 @(objc_type=CommandBuffer, objc_name="blitCommandEncoder")
-CommandBuffer_blitCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "blitCommandEncoder")
+CommandBuffer_blitCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^BlitCommandEncoder {
+	return msgSend(^BlitCommandEncoder, self, "blitCommandEncoder")
 }
 @(objc_type=CommandBuffer, objc_name="blitCommandEncoderWithDescriptor")
-CommandBuffer_blitCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, blitPassDescriptor: ^BlitPassDescriptor) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "blitCommandEncoderWithDescriptor:", blitPassDescriptor)
+CommandBuffer_blitCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, blitPassDescriptor: ^BlitPassDescriptor) -> ^BlitCommandEncoder {
+	return msgSend(^BlitCommandEncoder, self, "blitCommandEncoderWithDescriptor:", blitPassDescriptor)
 }
 @(objc_type=CommandBuffer, objc_name="commandQueue")
-CommandBuffer_commandQueue :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "commandQueue")
+CommandBuffer_commandQueue :: #force_inline proc(self: ^CommandBuffer) -> ^CommandQueue {
+	return msgSend(^CommandQueue, self, "commandQueue")
 }
 @(objc_type=CommandBuffer, objc_name="commit")
 CommandBuffer_commit :: #force_inline proc(self: ^CommandBuffer) {
 	msgSend(nil, self, "commit")
 }
 @(objc_type=CommandBuffer, objc_name="computeCommandEncoder")
-CommandBuffer_computeCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "computeCommandEncoder")
+CommandBuffer_computeCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^CommandEncoder {
+	return msgSend(^CommandEncoder, self, "computeCommandEncoder")
 }
 @(objc_type=CommandBuffer, objc_name="computeCommandEncoderWithDescriptor")
-CommandBuffer_computeCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, computePassDescriptor: ^ComputePassDescriptor) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "computeCommandEncoderWithDescriptor:", computePassDescriptor)
+CommandBuffer_computeCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, computePassDescriptor: ^ComputePassDescriptor) -> ^CommandEncoder {
+	return msgSend(^CommandEncoder, self, "computeCommandEncoderWithDescriptor:", computePassDescriptor)
 }
 @(objc_type=CommandBuffer, objc_name="computeCommandEncoderWithDispatchType")
-CommandBuffer_computeCommandEncoderWithDispatchType :: #force_inline proc(self: ^CommandBuffer, dispatchType: DispatchType) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "computeCommandEncoderWithDispatchType:", dispatchType)
+CommandBuffer_computeCommandEncoderWithDispatchType :: #force_inline proc(self: ^CommandBuffer, dispatchType: DispatchType) -> ^CommandEncoder {
+	return msgSend(^CommandEncoder, self, "computeCommandEncoderWithDispatchType:", dispatchType)
 }
 @(objc_type=CommandBuffer, objc_name="device")
 CommandBuffer_device :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
@@ -5451,12 +5451,12 @@ CommandBuffer_label :: #force_inline proc(self: ^CommandBuffer) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=CommandBuffer, objc_name="logs")
-CommandBuffer_logs :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "logs")
+CommandBuffer_logs :: #force_inline proc(self: ^CommandBuffer) -> id {
+	return msgSend(id, self, "logs")
 }
 @(objc_type=CommandBuffer, objc_name="parallelRenderCommandEncoderWithDescriptor")
-CommandBuffer_parallelRenderCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, renderPassDescriptor: ^RenderPassDescriptor) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "parallelRenderCommandEncoderWithDescriptor:", renderPassDescriptor)
+CommandBuffer_parallelRenderCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, renderPassDescriptor: ^RenderPassDescriptor) -> ^ParallelRenderCommandEncoder {
+	return msgSend(^ParallelRenderCommandEncoder, self, "parallelRenderCommandEncoderWithDescriptor:", renderPassDescriptor)
 }
 @(objc_type=CommandBuffer, objc_name="popDebugGroup")
 CommandBuffer_popDebugGroup :: #force_inline proc(self: ^CommandBuffer) {
@@ -5479,16 +5479,16 @@ CommandBuffer_pushDebugGroup :: #force_inline proc(self: ^CommandBuffer, string:
 	msgSend(nil, self, "pushDebugGroup:", string)
 }
 @(objc_type=CommandBuffer, objc_name="renderCommandEncoderWithDescriptor")
-CommandBuffer_renderCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, renderPassDescriptor: ^RenderPassDescriptor) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "renderCommandEncoderWithDescriptor:", renderPassDescriptor)
+CommandBuffer_renderCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, renderPassDescriptor: ^RenderPassDescriptor) -> ^RenderCommandEncoder {
+	return msgSend(^RenderCommandEncoder, self, "renderCommandEncoderWithDescriptor:", renderPassDescriptor)
 }
 @(objc_type=CommandBuffer, objc_name="resourceStateCommandEncoder")
 CommandBuffer_resourceStateCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
 	return msgSend(^CommandBuffer, self, "resourceStateCommandEncoder")
 }
 @(objc_type=CommandBuffer, objc_name="resourceStateCommandEncoderWithDescriptor")
-CommandBuffer_resourceStateCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, resourceStatePassDescriptor: ^ResourceStatePassDescriptor) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "resourceStateCommandEncoderWithDescriptor:", resourceStatePassDescriptor)
+CommandBuffer_resourceStateCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, resourceStatePassDescriptor: ^ResourceStatePassDescriptor) -> ^ResourceStateCommandEncoder {
+	return msgSend(^ResourceStateCommandEncoder, self, "resourceStateCommandEncoderWithDescriptor:", resourceStatePassDescriptor)
 }
 @(objc_type=CommandBuffer, objc_name="retainedReferences")
 CommandBuffer_retainedReferences :: #force_inline proc(self: ^CommandBuffer) -> BOOL {
@@ -5604,8 +5604,8 @@ Methods:
 CommandQueue :: struct { using _: NS.Object }
 
 @(objc_type=CommandQueue, objc_name="commandBuffer")
-CommandQueue_commandBuffer :: #force_inline proc(self: ^CommandQueue) -> ^CommandQueue {
-	return msgSend(^CommandQueue, self, "commandBuffer")
+CommandQueue_commandBuffer :: #force_inline proc(self: ^CommandQueue) -> ^CommandBuffer {
+	return msgSend(^CommandBuffer, self, "commandBuffer")
 }
 @(objc_type=CommandQueue, objc_name="commandBufferWithDescriptor")
 CommandQueue_commandBufferWithDescriptor :: #force_inline proc(self: ^CommandQueue, descriptor: ^CommandBufferDescriptor) -> ^CommandQueue {
@@ -5616,8 +5616,8 @@ CommandQueue_commandBufferWithUnretainedReferences :: #force_inline proc(self: ^
 	return msgSend(^CommandQueue, self, "commandBufferWithUnretainedReferences")
 }
 @(objc_type=CommandQueue, objc_name="device")
-CommandQueue_device :: #force_inline proc(self: ^CommandQueue) -> ^CommandQueue {
-	return msgSend(^CommandQueue, self, "device")
+CommandQueue_device :: #force_inline proc(self: ^CommandQueue) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=CommandQueue, objc_name="insertDebugCaptureBoundary")
 CommandQueue_insertDebugCaptureBoundary :: #force_inline proc(self: ^CommandQueue) {
@@ -6195,41 +6195,41 @@ Device_name :: #force_inline proc(self: ^Device) -> ^NS.String {
 	return msgSend(^NS.String, self, "name")
 }
 @(objc_type=Device, objc_name="newAccelerationStructureWithDescriptor")
-Device_newAccelerationStructureWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^AccelerationStructureDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newAccelerationStructureWithDescriptor:", descriptor)
+Device_newAccelerationStructureWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^AccelerationStructureDescriptor) -> ^AccelerationStructure {
+	return msgSend(^AccelerationStructure, self, "newAccelerationStructureWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newAccelerationStructureWithSize")
-Device_newAccelerationStructureWithSize :: #force_inline proc(self: ^Device, size: NS.UInteger) -> ^Device {
-	return msgSend(^Device, self, "newAccelerationStructureWithSize:", size)
+Device_newAccelerationStructureWithSize :: #force_inline proc(self: ^Device, size: NS.UInteger) -> ^AccelerationStructure {
+	return msgSend(^AccelerationStructure, self, "newAccelerationStructureWithSize:", size)
 }
 @(objc_type=Device, objc_name="newArgumentEncoderWithArguments")
-Device_newArgumentEncoderWithArguments :: #force_inline proc(self: ^Device, arguments: ^NS.Array) -> ^Device {
-	return msgSend(^Device, self, "newArgumentEncoderWithArguments:", arguments)
+Device_newArgumentEncoderWithArguments :: #force_inline proc(self: ^Device, arguments: ^NS.Array) -> ^ArgumentEncoder {
+	return msgSend(^ArgumentEncoder, self, "newArgumentEncoderWithArguments:", arguments)
 }
 @(objc_type=Device, objc_name="newBinaryArchiveWithDescriptor")
-Device_newBinaryArchiveWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^BinaryArchiveDescriptor) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newBinaryArchiveWithDescriptor:error:", descriptor, &error)
+Device_newBinaryArchiveWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^BinaryArchiveDescriptor) -> (res: ^BinaryArchive, error: ^NS.Error) {
+	res = msgSend(^BinaryArchive, self, "newBinaryArchiveWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=Device, objc_name="newBufferWithBytes")
-Device_newBufferWithBytes :: #force_inline proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions) -> ^Device {
-	return msgSend(^Device, self, "newBufferWithBytes:length:options:", pointer, length, options)
+Device_newBufferWithBytes :: #force_inline proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
+	return msgSend(^Buffer, self, "newBufferWithBytes:length:options:", pointer, length, options)
 }
 @(objc_type=Device, objc_name="newBufferWithBytesNoCopy")
-Device_newBufferWithBytesNoCopy :: #force_inline proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions, deallocator: rawptr) -> ^Device {
-	return msgSend(^Device, self, "newBufferWithBytesNoCopy:length:options:deallocator:", pointer, length, options, deallocator)
+Device_newBufferWithBytesNoCopy :: #force_inline proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
+	return msgSend(^Buffer, self, "newBufferWithBytesNoCopy:length:options:deallocator:", pointer, length, options, deallocator)
 }
 @(objc_type=Device, objc_name="newBufferWithLength")
-Device_newBufferWithLength :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Device {
-	return msgSend(^Device, self, "newBufferWithLength:options:", length, options)
+Device_newBufferWithLength :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
+	return msgSend(^Buffer, self, "newBufferWithLength:options:", length, options)
 }
 @(objc_type=Device, objc_name="newCommandQueue")
-Device_newCommandQueue :: #force_inline proc(self: ^Device) -> ^Device {
-	return msgSend(^Device, self, "newCommandQueue")
+Device_newCommandQueue :: #force_inline proc(self: ^Device) -> ^CommandQueue {
+	return msgSend(^CommandQueue, self, "newCommandQueue")
 }
 @(objc_type=Device, objc_name="newCommandQueueWithMaxCommandBufferCount")
-Device_newCommandQueueWithMaxCommandBufferCount :: #force_inline proc(self: ^Device, maxCommandBufferCount: NS.UInteger) -> ^Device {
-	return msgSend(^Device, self, "newCommandQueueWithMaxCommandBufferCount:", maxCommandBufferCount)
+Device_newCommandQueueWithMaxCommandBufferCount :: #force_inline proc(self: ^Device, maxCommandBufferCount: NS.UInteger) -> ^CommandQueue {
+	return msgSend(^CommandQueue, self, "newCommandQueueWithMaxCommandBufferCount:", maxCommandBufferCount)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithDescriptorWithCompletionHandler")
 Device_newComputePipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
@@ -6245,8 +6245,8 @@ Device_newComputePipelineStateWithFunctionWithCompletionHandler :: #force_inline
 	msgSend(nil, self, "newComputePipelineStateWithFunction:completionHandler:", computeFunction, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunction")
-Device_newComputePipelineStateWithFunction :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newComputePipelineStateWithFunction:error:", computeFunction, &error)
+Device_newComputePipelineStateWithFunction :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (res: ^Device, error: ^NS.Error) {
+	res = msgSend(^Device, self, "newComputePipelineStateWithFunction:error:", computeFunction, &error)
 	return
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler")
@@ -6264,79 +6264,79 @@ Device_newCounterSampleBufferWithDescriptor :: #force_inline proc(self: ^Device,
 	return
 }
 @(objc_type=Device, objc_name="newDefaultLibrary")
-Device_newDefaultLibrary :: #force_inline proc(self: ^Device) -> ^Device {
-	return msgSend(^Device, self, "newDefaultLibrary")
+Device_newDefaultLibrary :: #force_inline proc(self: ^Device) -> ^Library {
+	return msgSend(^Library, self, "newDefaultLibrary")
 }
 @(objc_type=Device, objc_name="newDefaultLibraryWithBundle")
-Device_newDefaultLibraryWithBundle :: #force_inline proc(self: ^Device, bundle: ^NS.Bundle) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newDefaultLibraryWithBundle:error:", bundle, &error)
+Device_newDefaultLibraryWithBundle :: #force_inline proc(self: ^Device, bundle: ^NS.Bundle) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newDefaultLibraryWithBundle:error:", bundle, &error)
 	return
 }
 @(objc_type=Device, objc_name="newDepthStencilStateWithDescriptor")
-Device_newDepthStencilStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^DepthStencilDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newDepthStencilStateWithDescriptor:", descriptor)
+Device_newDepthStencilStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^DepthStencilDescriptor) -> ^DepthStencilState {
+	return msgSend(^DepthStencilState, self, "newDepthStencilStateWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newDynamicLibrary")
-Device_newDynamicLibrary :: #force_inline proc(self: ^Device, library: ^Library) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newDynamicLibrary:error:", library, &error)
+Device_newDynamicLibrary :: #force_inline proc(self: ^Device, library: ^Library) -> (dyn_library: ^DynamicLibrary, error: ^NS.Error) {
+	dyn_library = msgSend(^DynamicLibrary, self, "newDynamicLibrary:error:", library, &error)
 	return
 }
 @(objc_type=Device, objc_name="newDynamicLibraryWithURL")
-Device_newDynamicLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newDynamicLibraryWithURL:error:", url, &error)
+Device_newDynamicLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (dyn_library: ^DynamicLibrary, error: ^NS.Error) {
+	dyn_library = msgSend(^DynamicLibrary, self, "newDynamicLibraryWithURL:error:", url, &error)
 	return
 }
 @(objc_type=Device, objc_name="newEvent")
-Device_newEvent :: #force_inline proc(self: ^Device) -> ^Device {
-	return msgSend(^Device, self, "newEvent")
+Device_newEvent :: #force_inline proc(self: ^Device) -> ^Event {
+	return msgSend(^Event, self, "newEvent")
 }
 @(objc_type=Device, objc_name="newFence")
-Device_newFence :: #force_inline proc(self: ^Device) -> ^Device {
-	return msgSend(^Device, self, "newFence")
+Device_newFence :: #force_inline proc(self: ^Device) -> ^Fence {
+	return msgSend(^Fence, self, "newFence")
 }
 @(objc_type=Device, objc_name="newHeapWithDescriptor")
-Device_newHeapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^HeapDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newHeapWithDescriptor:", descriptor)
+Device_newHeapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^HeapDescriptor) -> ^Heap {
+	return msgSend(^Heap, self, "newHeapWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newIndirectCommandBufferWithDescriptor")
-Device_newIndirectCommandBufferWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^IndirectCommandBufferDescriptor, maxCount: NS.UInteger, options: ResourceOptions) -> ^Device {
-	return msgSend(^Device, self, "newIndirectCommandBufferWithDescriptor:maxCommandCount:options:", descriptor, maxCount, options)
+Device_newIndirectCommandBufferWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^IndirectCommandBufferDescriptor, maxCount: NS.UInteger, options: ResourceOptions) -> ^IndirectCommandBuffer {
+	return msgSend(^IndirectCommandBuffer, self, "newIndirectCommandBufferWithDescriptor:maxCommandCount:options:", descriptor, maxCount, options)
 }
 @(objc_type=Device, objc_name="newLibraryWithData")
-Device_newLibraryWithData :: #force_inline proc(self: ^Device, data: dispatch_data_t) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newLibraryWithData:error:", data, &error)
+Device_newLibraryWithData :: #force_inline proc(self: ^Device, data: dispatch_data_t) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newLibraryWithData:error:", data, &error)
 	return
 }
 @(objc_type=Device, objc_name="newLibraryWithFile")
-Device_newLibraryWithFile :: #force_inline proc(self: ^Device, filepath: ^NS.String) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newLibraryWithFile:error:", filepath, &error)
+Device_newLibraryWithFile :: #force_inline proc(self: ^Device, filepath: ^NS.String) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newLibraryWithFile:error:", filepath, &error)
 	return
 }
 @(objc_type=Device, objc_name="newLibraryWithSourceWithCompletionHandler")
-Device_newLibraryWithSourceWithCompletionHandler :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions, completionHandler: NewLibraryCompletionHandler) {
-	msgSend(nil, self, "newLibraryWithSource:options:completionHandler:", source, options, completionHandler)
+Device_newLibraryWithSourceWithCompletionHandler :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions, completionHandler: NewLibraryCompletionHandler) -> ^Library {
+	return msgSend(^Library, self, "newLibraryWithSource:options:completionHandler:", source, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newLibraryWithSource")
-Device_newLibraryWithSource :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newLibraryWithSource:options:error:", source, options, &error)
+Device_newLibraryWithSource :: #force_inline proc(self: ^Device, source: ^NS.String, options: ^CompileOptions) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newLibraryWithSource:options:error:", source, options, &error)
 	return
 }
 @(objc_type=Device, objc_name="newLibraryWithURL")
-Device_newLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newLibraryWithURL:error:", url, &error)
+Device_newLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (library: ^Library, error: ^NS.Error) {
+	library = msgSend(^Library, self, "newLibraryWithURL:error:", url, &error)
 	return
 }
 @(objc_type=Device, objc_name="newRasterizationRateMapWithDescriptor")
-Device_newRasterizationRateMapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RasterizationRateMapDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newRasterizationRateMapWithDescriptor:", descriptor)
+Device_newRasterizationRateMapWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RasterizationRateMapDescriptor) -> ^RasterizationRateMap {
+	return msgSend(^RasterizationRateMap, self, "newRasterizationRateMapWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithCompletionHandler")
 Device_newRenderPipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, completionHandler: NewRenderPipelineStateCompletionHandler) {
 	msgSend(nil, self, "newRenderPipelineStateWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor")
-Device_newRenderPipelineStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:error:", descriptor, &error)
+Device_newRenderPipelineStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (pipeline: ^RenderPipelineState, error: ^NS.Error) {
+	pipeline = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithOptionsAndCompletionHandler")
@@ -6344,8 +6344,8 @@ Device_newRenderPipelineStateWithDescriptorWithOptionsAndCompletionHandler :: #f
 	msgSend(nil, self, "newRenderPipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithReflection")
-Device_newRenderPipelineStateWithDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newRenderPipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
+Device_newRenderPipelineStateWithDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (pipeline: ^RenderPipelineState, error: ^NS.Error) {
+	pipeline = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptorWithCompletionHandler")
@@ -6353,37 +6353,37 @@ Device_newRenderPipelineStateWithTileDescriptorWithCompletionHandler :: #force_i
 	msgSend(nil, self, "newRenderPipelineStateWithTileDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithTileDescriptorWithReflection")
-Device_newRenderPipelineStateWithTileDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
+Device_newRenderPipelineStateWithTileDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^TileRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (pipeline: ^RenderPipelineState, error: ^NS.Error) {
+	pipeline = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
 @(objc_type=Device, objc_name="newSamplerState")
-Device_newSamplerState :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newSamplerState:", descriptor)
+Device_newSamplerState :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^SamplerState {
+	return msgSend(^SamplerState, self, "newSamplerState:", descriptor)
 }
 @(objc_type=Device, objc_name="newSharedEvent")
-Device_newSharedEvent :: #force_inline proc(self: ^Device) -> ^Device {
-	return msgSend(^Device, self, "newSharedEvent")
+Device_newSharedEvent :: #force_inline proc(self: ^Device) -> ^SharedEvent {
+	return msgSend(^SharedEvent, self, "newSharedEvent")
 }
 @(objc_type=Device, objc_name="newSharedEventWithHandle")
-Device_newSharedEventWithHandle :: #force_inline proc(self: ^Device, sharedEventHandle: ^SharedEventHandle) -> ^Device {
-	return msgSend(^Device, self, "newSharedEventWithHandle:", sharedEventHandle)
+Device_newSharedEventWithHandle :: #force_inline proc(self: ^Device, sharedEventHandle: ^SharedEventHandle) -> ^SharedEvent {
+	return msgSend(^SharedEvent, self, "newSharedEventWithHandle:", sharedEventHandle)
 }
 @(objc_type=Device, objc_name="newSharedTextureWithDescriptor")
-Device_newSharedTextureWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newSharedTextureWithDescriptor:", descriptor)
+Device_newSharedTextureWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor) -> ^SharedEvent {
+	return msgSend(^SharedEvent, self, "newSharedTextureWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newSharedTextureWithHandle")
-Device_newSharedTextureWithHandle :: #force_inline proc(self: ^Device, sharedHandle: ^SharedTextureHandle) -> ^Device {
-	return msgSend(^Device, self, "newSharedTextureWithHandle:", sharedHandle)
+Device_newSharedTextureWithHandle :: #force_inline proc(self: ^Device, sharedHandle: ^SharedTextureHandle) -> ^SharedEvent {
+	return msgSend(^SharedEvent, self, "newSharedTextureWithHandle:", sharedHandle)
 }
 @(objc_type=Device, objc_name="newTextureWithDescriptor")
-Device_newTextureWithDescriptor :: #force_inline proc(self: ^Device, desc: ^TextureDescriptor) -> ^Device {
-	return msgSend(^Device, self, "newTextureWithDescriptor:", desc)
+Device_newTextureWithDescriptor :: #force_inline proc(self: ^Device, desc: ^TextureDescriptor) -> ^SharedEvent {
+	return msgSend(^SharedEvent, self, "newTextureWithDescriptor:", desc)
 }
 @(objc_type=Device, objc_name="newTextureWithDescriptorWithIOSurface")
-Device_newTextureWithDescriptorWithIOSurface :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: NS.UInteger) -> ^Device {
-	return msgSend(^Device, self, "newTextureWithDescriptor:iosurface:plane:", descriptor, iosurface, plane)
+Device_newTextureWithDescriptorWithIOSurface :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: NS.UInteger) -> ^Texture {
+	return msgSend(^Texture, self, "newTextureWithDescriptor:iosurface:plane:", descriptor, iosurface, plane)
 }
 @(objc_type=Device, objc_name="peerCount")
 Device_peerCount :: #force_inline proc(self: ^Device) -> u32 {
