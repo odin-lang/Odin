@@ -153,6 +153,24 @@ EHWPOISON: 		Errno : 133	/* Memory page has hardware error */
 
 ADDR_NO_RANDOMIZE :: 0x40000
 
+AF_UNSPEC    :: 0
+AF_UNIX      :: 1
+AF_LOCAL     :: AF_UNIX
+AF_INET      :: 2
+AF_INET6     :: 10
+AF_PACKET    :: 17
+AF_BLUETOOTH :: 31
+
+SOCK_STREAM    :: 1
+SOCK_DGRAM     :: 2
+SOCK_RAW       :: 3
+SOCK_RDM       :: 4
+SOCK_SEQPACKET :: 5
+SOCK_PACKET    :: 10
+
+INADDR_ANY :: 0
+
+
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001
 O_RDWR     :: 0x00002
@@ -397,6 +415,26 @@ _unix_mkdir :: proc(path: cstring, mode: u32) -> int {
 	} else { // NOTE: arm64 does not have mkdir
 		return int(intrinsics.syscall(unix.SYS_mkdirat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode)))
 	}
+}
+
+_unix_socket :: proc(domain: int, type: int, protocol: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_socket, uintptr(domain), uintptr(type), uintptr(protocol)))
+}
+
+_unix_bind :: proc(fd: int, addr: rawptr, len: i32) -> int {
+	return int(intrinsics.syscall(unix.SYS_bind, uintptr(fd), uintptr(addr), uintptr(len)))
+}
+
+_unix_recvfrom :: proc(fd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
+	return i64(intrinsics.syscall(unix.SYS_recvfrom, uintptr(fd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+_unix_sendto :: proc(fd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
+	return i64(intrinsics.syscall(unix.SYS_sendto, uintptr(fd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+_unix_connect :: proc(fd: int, addr: rawptr, len i32) -> int {
+	return int(intrinsics.syscall(unix.SYS_connect, uintptr(fd), uintptr(addr), uintptr(len))
 }
 
 foreign libc {
