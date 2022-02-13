@@ -31,6 +31,9 @@ copy :: proc(self: ^Copying($T)) -> ^T where intrinsics.type_is_subtype_of(T, Ob
 	return msgSend(^T, self, "copy")
 }
 
+new :: proc($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
+	return init(alloc(T))
+}
 
 @(objc_type=Object, objc_name="retain")
 retain :: proc(self: ^Object) {
