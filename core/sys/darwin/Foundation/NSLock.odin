@@ -13,7 +13,7 @@ Locking_unlock :: proc(self: ^Locking($T)) {
 Condition :: struct {using _: Locking(Condition) }
 
 
-@(objc_type=Condition, objc_class_name="alloc")
+@(objc_type=Condition, objc_name="alloc", objc_is_class_method=true)
 Condition_alloc :: proc() -> ^Condition {
 	return msgSend(^Condition, Condition, "alloc")
 }

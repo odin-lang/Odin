@@ -3,7 +3,7 @@ package objc_Foundation
 @(objc_class="NSData")
 Data :: struct {using _: Copying(Data)}
 
-@(objc_type=Data, objc_class_name="alloc")
+@(objc_type=Data, objc_name="alloc", objc_is_class_method=true)
 Data_alloc :: proc() -> ^Data {
 	return msgSend(^Data, Data, "alloc")
 }

@@ -19,7 +19,7 @@ Enumerator :: struct($T: typeid) where intrinsics.type_is_pointer(T), intrinsics
 }
 
 
-@(objc_type=FastEnumeration, objc_class_name="alloc")
+@(objc_type=FastEnumeration, objc_name="alloc", objc_is_class_method=true)
 FastEnumeration_alloc :: proc() -> ^FastEnumeration {
 	return msgSend(^FastEnumeration, FastEnumeration, "alloc")
 }

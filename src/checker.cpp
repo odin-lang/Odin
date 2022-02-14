@@ -3059,16 +3059,12 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
-	} else if (name == "objc_class_name") {
+	} else if (name == "objc_is_class_method") {
 		ExactValue ev = check_decl_attribute_value(c, value);
-		if (ev.kind == ExactValue_String) {
-			if (string_is_valid_identifier(ev.value_string)) {
-				ac->objc_class_name = ev.value_string;
-			} else {
-				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
-			}
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_class_method = ev.value_bool;
 		} else {
-			error(elem, "Expected a string value for '%.*s'", LIT(name));
+			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
 		}
 		return true;
 	} else if (name == "objc_type") {

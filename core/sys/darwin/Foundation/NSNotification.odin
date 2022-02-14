@@ -4,7 +4,7 @@ package objc_Foundation
 Notification :: struct{using _: Object}
 
 
-@(objc_type=Notification, objc_class_name="alloc")
+@(objc_type=Notification, objc_name="alloc", objc_is_class_method=true)
 Notification_alloc :: proc() -> ^Notification {
 	return msgSend(^Notification, Notification, "alloc")
 }

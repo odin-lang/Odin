@@ -7,7 +7,7 @@ Array :: struct {
 	using _: Copying(Array),
 }
 
-@(objc_type=Array, objc_class_name="alloc")
+@(objc_type=Array, objc_name="alloc", objc_is_class_method=true)
 Array_alloc :: proc() -> ^Array {
 	return msgSend(^Array, Array, "alloc")
 }

@@ -24,7 +24,7 @@ Methods:
 @(objc_class="MTLAccelerationStructureBoundingBoxGeometryDescriptor")
 AccelerationStructureBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureBoundingBoxGeometryDescriptor), using _: AccelerationStructureDescriptor  }
 
-@(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_class_name="alloc")
+@(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="alloc", objc_is_class_method=true)
 AccelerationStructureBoundingBoxGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureBoundingBoxGeometryDescriptor {
 	return msgSend(^AccelerationStructureBoundingBoxGeometryDescriptor, AccelerationStructureBoundingBoxGeometryDescriptor, "alloc")
 }
@@ -48,7 +48,7 @@ AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxCount :: #force_in
 AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxStride :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "boundingBoxStride")
 }
-@(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_class_name="descriptor")
+@(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="descriptor", objc_is_class_method=true)
 AccelerationStructureBoundingBoxGeometryDescriptor_descriptor :: #force_inline proc() -> ^AccelerationStructureBoundingBoxGeometryDescriptor {
 	return msgSend(^AccelerationStructureBoundingBoxGeometryDescriptor, AccelerationStructureBoundingBoxGeometryDescriptor, "descriptor")
 }
@@ -88,31 +88,31 @@ Methods:
 @(objc_class="MTLMotionKeyframeData")
 MotionKeyframeData :: struct { using _: NS.Object }
 
-@(objc_type=MotionKeyframeData, objc_class_name="alloc")
+@(objc_type=MotionKeyframeData, objc_name="alloc", objc_is_class_method=true)
 MotionKeyframeData_alloc :: #force_inline proc() -> ^MotionKeyframeData {
 	return msgSend(^MotionKeyframeData, MotionKeyframeData, "alloc")
 }
-@(objc_type=MotionKeyframeData, objc_class_name="data")
+@(objc_type=MotionKeyframeData, objc_name="data", objc_is_class_method=true)
 MotionKeyframeData_data :: #force_inline proc() -> ^MotionKeyframeData {
 	return msgSend(^MotionKeyframeData, MotionKeyframeData, "data")
 }
-@(objc_type=MotionKeyframeData, objc_class_name="init")
+@(objc_type=MotionKeyframeData, objc_name="init", objc_is_class_method=true)
 MotionKeyframeData_init :: #force_inline proc(self: ^MotionKeyframeData) -> ^MotionKeyframeData {
 	return msgSend(^MotionKeyframeData, self, "init")
 }
-@(objc_type=MotionKeyframeData, objc_class_name="buffer")
+@(objc_type=MotionKeyframeData, objc_name="buffer", objc_is_class_method=true)
 MotionKeyframeData_buffer :: #force_inline proc(self: ^MotionKeyframeData) -> ^Buffer {
 	return msgSend(^Buffer, self, "buffer")
 }
-@(objc_type=MotionKeyframeData, objc_class_name="setBuffer")
+@(objc_type=MotionKeyframeData, objc_name="setBuffer", objc_is_class_method=true)
 MotionKeyframeData_setBuffer :: #force_inline proc(self: ^MotionKeyframeData, buffer: ^Buffer) {
 	msgSend(nil, self, "setBuffer:", buffer)
 }
-@(objc_type=MotionKeyframeData, objc_class_name="offset")
+@(objc_type=MotionKeyframeData, objc_name="offset", objc_is_class_method=true)
 MotionKeyframeData_offset :: #force_inline proc(self: ^MotionKeyframeData) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "offset")
 }
-@(objc_type=MotionKeyframeData, objc_class_name="setOffset")
+@(objc_type=MotionKeyframeData, objc_name="setOffset", objc_is_class_method=true)
 MotionKeyframeData_setOffset :: #force_inline proc(self: ^MotionKeyframeData, offset: NS.UInteger) {
 	msgSend(nil, self, "setOffset:", offset)
 }
@@ -127,7 +127,7 @@ Class:
 @(objc_class="MTLAccelerationStructureMotionTriangleGeometryDescriptor")
 AccelerationStructureMotionTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureMotionTriangleGeometryDescriptor), using _: AccelerationStructureGeometryDescriptor }
 
-@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_class_name="alloc")
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="alloc", objc_is_class_method=true)
 AccelerationStructureMotionTriangleGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureMotionTriangleGeometryDescriptor {
 	return msgSend(^AccelerationStructureMotionTriangleGeometryDescriptor, AccelerationStructureMotionTriangleGeometryDescriptor, "alloc")
 }
@@ -202,7 +202,7 @@ Class:
 @(objc_class="MTLAccelerationStructureMotionBoundingBoxGeometryDescriptor")
 AccelerationStructureMotionBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureMotionBoundingBoxGeometryDescriptor), using _: AccelerationStructureGeometryDescriptor }
 
-@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_class_name="alloc")
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="alloc", objc_is_class_method=true)
 AccelerationStructureMotionBoundingBoxGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureMotionBoundingBoxGeometryDescriptor {
 	return msgSend(^AccelerationStructureMotionBoundingBoxGeometryDescriptor, AccelerationStructureMotionBoundingBoxGeometryDescriptor, "alloc")
 }
@@ -211,7 +211,7 @@ AccelerationStructureMotionBoundingBoxGeometryDescriptor_init :: #force_inline p
 	return msgSend(^AccelerationStructureMotionBoundingBoxGeometryDescriptor, self, "init")
 }
 
-@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_class_name="descriptor")
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="descriptor", objc_is_class_method=true)
 AccelerationStructureMotionBoundingBoxGeometryDescriptor_descriptor :: #force_inline proc() -> ^AccelerationStructureMotionBoundingBoxGeometryDescriptor {
 	return msgSend(^AccelerationStructureMotionBoundingBoxGeometryDescriptor, AccelerationStructureMotionBoundingBoxGeometryDescriptor, "descriptor")
 }
@@ -264,7 +264,7 @@ Methods:
 @(objc_class="MTLAccelerationStructureDescriptor")
 AccelerationStructureDescriptor :: struct { using _: NS.Copying(AccelerationStructureDescriptor) }
 
-@(objc_type=AccelerationStructureDescriptor, objc_class_name="alloc")
+@(objc_type=AccelerationStructureDescriptor, objc_name="alloc", objc_is_class_method=true)
 AccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureDescriptor {
 	return msgSend(^AccelerationStructureDescriptor, AccelerationStructureDescriptor, "alloc")
 }
@@ -300,7 +300,7 @@ Methods:
 @(objc_class="MTLAccelerationStructureGeometryDescriptor")
 AccelerationStructureGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureGeometryDescriptor) }
 
-@(objc_type=AccelerationStructureGeometryDescriptor, objc_class_name="alloc")
+@(objc_type=AccelerationStructureGeometryDescriptor, objc_name="alloc", objc_is_class_method=true)
 AccelerationStructureGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureGeometryDescriptor {
 	return msgSend(^AccelerationStructureGeometryDescriptor, AccelerationStructureGeometryDescriptor, "alloc")
 }
@@ -361,7 +361,7 @@ Methods:
 @(objc_class="MTLAccelerationStructureTriangleGeometryDescriptor")
 AccelerationStructureTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureTriangleGeometryDescriptor), using _: AccelerationStructureDescriptor  }
 
-@(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_class_name="alloc")
+@(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="alloc", objc_is_class_method=true)
 AccelerationStructureTriangleGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureTriangleGeometryDescriptor {
 	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, AccelerationStructureTriangleGeometryDescriptor, "alloc")
 }
@@ -369,7 +369,7 @@ AccelerationStructureTriangleGeometryDescriptor_alloc :: #force_inline proc() ->
 AccelerationStructureTriangleGeometryDescriptor_init :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> ^AccelerationStructureTriangleGeometryDescriptor {
 	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, self, "init")
 }
-@(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_class_name="descriptor")
+@(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="descriptor", objc_is_class_method=true)
 AccelerationStructureTriangleGeometryDescriptor_descriptor :: #force_inline proc() -> ^AccelerationStructureTriangleGeometryDescriptor {
 	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, AccelerationStructureTriangleGeometryDescriptor, "descriptor")
 }
@@ -459,7 +459,7 @@ Methods:
 @(objc_class="MTLArgument")
 Argument :: struct { using _: NS.Object }
 
-@(objc_type=Argument, objc_class_name="alloc")
+@(objc_type=Argument, objc_name="alloc", objc_is_class_method=true)
 Argument_alloc :: #force_inline proc() -> ^Argument {
 	return msgSend(^Argument, Argument, "alloc")
 }
@@ -558,7 +558,7 @@ Methods:
 @(objc_class="MTLArgumentDescriptor")
 ArgumentDescriptor :: struct { using _: NS.Copying(ArgumentDescriptor) }
 
-@(objc_type=ArgumentDescriptor, objc_class_name="alloc")
+@(objc_type=ArgumentDescriptor, objc_name="alloc", objc_is_class_method=true)
 ArgumentDescriptor_alloc :: #force_inline proc() -> ^ArgumentDescriptor {
 	return msgSend(^ArgumentDescriptor, ArgumentDescriptor, "alloc")
 }
@@ -570,7 +570,7 @@ ArgumentDescriptor_init :: #force_inline proc(self: ^ArgumentDescriptor) -> ^Arg
 ArgumentDescriptor_access :: #force_inline proc(self: ^ArgumentDescriptor) -> ArgumentAccess {
 	return msgSend(ArgumentAccess, self, "access")
 }
-@(objc_type=ArgumentDescriptor, objc_class_name="argumentDescriptor")
+@(objc_type=ArgumentDescriptor, objc_name="argumentDescriptor", objc_is_class_method=true)
 ArgumentDescriptor_argumentDescriptor :: #force_inline proc() -> ^ArgumentDescriptor {
 	return msgSend(^ArgumentDescriptor, ArgumentDescriptor, "argumentDescriptor")
 }
@@ -640,7 +640,7 @@ Methods:
 @(objc_class="MTLArrayType")
 ArrayType :: struct { using _: Type }
 
-@(objc_type=ArrayType, objc_class_name="alloc")
+@(objc_type=ArrayType, objc_name="alloc", objc_is_class_method=true)
 ArrayType_alloc :: #force_inline proc() -> ^ArrayType {
 	return msgSend(^ArrayType, ArrayType, "alloc")
 }
@@ -700,7 +700,7 @@ Methods:
 @(objc_class="MTLAttribute")
 Attribute :: struct { using _: NS.Object }
 
-@(objc_type=Attribute, objc_class_name="alloc")
+@(objc_type=Attribute, objc_name="alloc", objc_is_class_method=true)
 Attribute_alloc :: #force_inline proc() -> ^Attribute {
 	return msgSend(^Attribute, Attribute, "alloc")
 }
@@ -752,7 +752,7 @@ Methods:
 @(objc_class="MTLAttributeDescriptor")
 AttributeDescriptor :: struct { using _: NS.Copying(AttributeDescriptor) }
 
-@(objc_type=AttributeDescriptor, objc_class_name="alloc")
+@(objc_type=AttributeDescriptor, objc_name="alloc", objc_is_class_method=true)
 AttributeDescriptor_alloc :: #force_inline proc() -> ^AttributeDescriptor {
 	return msgSend(^AttributeDescriptor, AttributeDescriptor, "alloc")
 }
@@ -800,7 +800,7 @@ Methods:
 @(objc_class="MTLAttributeDescriptorArray")
 AttributeDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=AttributeDescriptorArray, objc_class_name="alloc")
+@(objc_type=AttributeDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 AttributeDescriptorArray_alloc :: #force_inline proc() -> ^AttributeDescriptorArray {
 	return msgSend(^AttributeDescriptorArray, AttributeDescriptorArray, "alloc")
 }
@@ -832,7 +832,7 @@ Methods:
 @(objc_class="MTLBinaryArchiveDescriptor")
 BinaryArchiveDescriptor :: struct { using _: NS.Copying(BinaryArchiveDescriptor) }
 
-@(objc_type=BinaryArchiveDescriptor, objc_class_name="alloc")
+@(objc_type=BinaryArchiveDescriptor, objc_name="alloc", objc_is_class_method=true)
 BinaryArchiveDescriptor_alloc :: #force_inline proc() -> ^BinaryArchiveDescriptor {
 	return msgSend(^BinaryArchiveDescriptor, BinaryArchiveDescriptor, "alloc")
 }
@@ -864,7 +864,7 @@ Methods:
 @(objc_class="MTLBlitPassDescriptor")
 BlitPassDescriptor :: struct { using _: NS.Copying(BlitPassDescriptor) }
 
-@(objc_type=BlitPassDescriptor, objc_class_name="alloc")
+@(objc_type=BlitPassDescriptor, objc_name="alloc", objc_is_class_method=true)
 BlitPassDescriptor_alloc :: #force_inline proc() -> ^BlitPassDescriptor {
 	return msgSend(^BlitPassDescriptor, BlitPassDescriptor, "alloc")
 }
@@ -872,7 +872,7 @@ BlitPassDescriptor_alloc :: #force_inline proc() -> ^BlitPassDescriptor {
 BlitPassDescriptor_init :: #force_inline proc(self: ^BlitPassDescriptor) -> ^BlitPassDescriptor {
 	return msgSend(^BlitPassDescriptor, self, "init")
 }
-@(objc_type=BlitPassDescriptor, objc_class_name="blitPassDescriptor")
+@(objc_type=BlitPassDescriptor, objc_name="blitPassDescriptor", objc_is_class_method=true)
 BlitPassDescriptor_blitPassDescriptor :: #force_inline proc() -> ^BlitPassDescriptor {
 	return msgSend(^BlitPassDescriptor, BlitPassDescriptor, "blitPassDescriptor")
 }
@@ -900,7 +900,7 @@ Methods:
 @(objc_class="MTLBlitPassSampleBufferAttachmentDescriptor")
 BlitPassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(BlitPassSampleBufferAttachmentDescriptor) }
 
-@(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 BlitPassSampleBufferAttachmentDescriptor_alloc :: #force_inline proc() -> ^BlitPassSampleBufferAttachmentDescriptor {
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptor, BlitPassSampleBufferAttachmentDescriptor, "alloc")
 }
@@ -948,7 +948,7 @@ Methods:
 @(objc_class="MTLBlitPassSampleBufferAttachmentDescriptorArray")
 BlitPassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 BlitPassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^BlitPassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptorArray, BlitPassSampleBufferAttachmentDescriptorArray, "alloc")
 }
@@ -984,7 +984,7 @@ Methods:
 @(objc_class="MTLBufferLayoutDescriptor")
 BufferLayoutDescriptor :: struct { using _: NS.Copying(BufferLayoutDescriptor) }
 
-@(objc_type=BufferLayoutDescriptor, objc_class_name="alloc")
+@(objc_type=BufferLayoutDescriptor, objc_name="alloc", objc_is_class_method=true)
 BufferLayoutDescriptor_alloc :: #force_inline proc() -> ^BufferLayoutDescriptor {
 	return msgSend(^BufferLayoutDescriptor, BufferLayoutDescriptor, "alloc")
 }
@@ -1032,7 +1032,7 @@ Methods:
 @(objc_class="MTLBufferLayoutDescriptorArray")
 BufferLayoutDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=BufferLayoutDescriptorArray, objc_class_name="alloc")
+@(objc_type=BufferLayoutDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 BufferLayoutDescriptorArray_alloc :: #force_inline proc() -> ^BufferLayoutDescriptorArray {
 	return msgSend(^BufferLayoutDescriptorArray, BufferLayoutDescriptorArray, "alloc")
 }
@@ -1068,7 +1068,7 @@ Methods:
 @(objc_class="MTLCaptureDescriptor")
 CaptureDescriptor :: struct { using _: NS.Copying(CaptureDescriptor) }
 
-@(objc_type=CaptureDescriptor, objc_class_name="alloc")
+@(objc_type=CaptureDescriptor, objc_name="alloc", objc_is_class_method=true)
 CaptureDescriptor_alloc :: #force_inline proc() -> ^CaptureDescriptor {
 	return msgSend(^CaptureDescriptor, CaptureDescriptor, "alloc")
 }
@@ -1126,7 +1126,7 @@ Methods:
 @(objc_class="MTLCaptureManager")
 CaptureManager :: struct { using _: NS.Object }
 
-@(objc_type=CaptureManager, objc_class_name="alloc")
+@(objc_type=CaptureManager, objc_name="alloc", objc_is_class_method=true)
 CaptureManager_alloc :: #force_inline proc() -> ^CaptureManager {
 	return msgSend(^CaptureManager, CaptureManager, "alloc")
 }
@@ -1154,7 +1154,7 @@ CaptureManager_newCaptureScopeWithDevice :: #force_inline proc(self: ^CaptureMan
 CaptureManager_setDefaultCaptureScope :: #force_inline proc(self: ^CaptureManager, defaultCaptureScope: ^CaptureScope) {
 	msgSend(nil, self, "setDefaultCaptureScope:", defaultCaptureScope)
 }
-@(objc_type=CaptureManager, objc_class_name="sharedCaptureManager")
+@(objc_type=CaptureManager, objc_name="sharedCaptureManager", objc_is_class_method=true)
 CaptureManager_sharedCaptureManager :: #force_inline proc() -> ^CaptureManager {
 	return msgSend(^CaptureManager, CaptureManager, "sharedCaptureManager")
 }
@@ -1201,7 +1201,7 @@ Methods:
 @(objc_class="MTLCommandBufferDescriptor")
 CommandBufferDescriptor :: struct { using _: NS.Copying(CommandBufferDescriptor) }
 
-@(objc_type=CommandBufferDescriptor, objc_class_name="alloc")
+@(objc_type=CommandBufferDescriptor, objc_name="alloc", objc_is_class_method=true)
 CommandBufferDescriptor_alloc :: #force_inline proc() -> ^CommandBufferDescriptor {
 	return msgSend(^CommandBufferDescriptor, CommandBufferDescriptor, "alloc")
 }
@@ -1253,7 +1253,7 @@ Methods:
 @(objc_class="MTLCompileOptions")
 CompileOptions :: struct { using _: NS.Copying(CompileOptions) }
 
-@(objc_type=CompileOptions, objc_class_name="alloc")
+@(objc_type=CompileOptions, objc_name="alloc", objc_is_class_method=true)
 CompileOptions_alloc :: #force_inline proc() -> ^CompileOptions {
 	return msgSend(^CompileOptions, CompileOptions, "alloc")
 }
@@ -1335,7 +1335,7 @@ Methods:
 @(objc_class="MTLComputePassDescriptor")
 ComputePassDescriptor :: struct { using _: NS.Copying(ComputePassDescriptor) }
 
-@(objc_type=ComputePassDescriptor, objc_class_name="alloc")
+@(objc_type=ComputePassDescriptor, objc_name="alloc", objc_is_class_method=true)
 ComputePassDescriptor_alloc :: #force_inline proc() -> ^ComputePassDescriptor {
 	return msgSend(^ComputePassDescriptor, ComputePassDescriptor, "alloc")
 }
@@ -1343,7 +1343,7 @@ ComputePassDescriptor_alloc :: #force_inline proc() -> ^ComputePassDescriptor {
 ComputePassDescriptor_init :: #force_inline proc(self: ^ComputePassDescriptor) -> ^ComputePassDescriptor {
 	return msgSend(^ComputePassDescriptor, self, "init")
 }
-@(objc_type=ComputePassDescriptor, objc_class_name="computePassDescriptor")
+@(objc_type=ComputePassDescriptor, objc_name="computePassDescriptor", objc_is_class_method=true)
 ComputePassDescriptor_computePassDescriptor :: #force_inline proc() -> ^ComputePassDescriptor {
 	return msgSend(^ComputePassDescriptor, ComputePassDescriptor, "computePassDescriptor")
 }
@@ -1379,7 +1379,7 @@ Methods:
 @(objc_class="MTLComputePassSampleBufferAttachmentDescriptor")
 ComputePassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(ComputePassSampleBufferAttachmentDescriptor) }
 
-@(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 ComputePassSampleBufferAttachmentDescriptor_alloc :: #force_inline proc() -> ^ComputePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptor, ComputePassSampleBufferAttachmentDescriptor, "alloc")
 }
@@ -1427,7 +1427,7 @@ Methods:
 @(objc_class="MTLComputePassSampleBufferAttachmentDescriptorArray")
 ComputePassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 ComputePassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^ComputePassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptorArray, ComputePassSampleBufferAttachmentDescriptorArray, "alloc")
 }
@@ -1481,7 +1481,7 @@ Methods:
 @(objc_class="MTLComputePipelineDescriptor")
 ComputePipelineDescriptor :: struct { using _: NS.Copying(ComputePipelineDescriptor) }
 
-@(objc_type=ComputePipelineDescriptor, objc_class_name="alloc")
+@(objc_type=ComputePipelineDescriptor, objc_name="alloc", objc_is_class_method=true)
 ComputePipelineDescriptor_alloc :: #force_inline proc() -> ^ComputePipelineDescriptor {
 	return msgSend(^ComputePipelineDescriptor, ComputePipelineDescriptor, "alloc")
 }
@@ -1600,7 +1600,7 @@ Methods:
 @(objc_class="MTLComputePipelineReflection")
 ComputePipelineReflection :: struct { using _: NS.Object }
 
-@(objc_type=ComputePipelineReflection, objc_class_name="alloc")
+@(objc_type=ComputePipelineReflection, objc_name="alloc", objc_is_class_method=true)
 ComputePipelineReflection_alloc :: #force_inline proc() -> ^ComputePipelineReflection {
 	return msgSend(^ComputePipelineReflection, ComputePipelineReflection, "alloc")
 }
@@ -1634,7 +1634,7 @@ Methods:
 @(objc_class="MTLCounterSampleBufferDescriptor")
 CounterSampleBufferDescriptor :: struct { using _: NS.Copying(CounterSampleBufferDescriptor) }
 
-@(objc_type=CounterSampleBufferDescriptor, objc_class_name="alloc")
+@(objc_type=CounterSampleBufferDescriptor, objc_name="alloc", objc_is_class_method=true)
 CounterSampleBufferDescriptor_alloc :: #force_inline proc() -> ^CounterSampleBufferDescriptor {
 	return msgSend(^CounterSampleBufferDescriptor, CounterSampleBufferDescriptor, "alloc")
 }
@@ -1698,7 +1698,7 @@ Methods:
 @(objc_class="MTLDepthStencilDescriptor")
 DepthStencilDescriptor :: struct { using _: NS.Copying(DepthStencilDescriptor) }
 
-@(objc_type=DepthStencilDescriptor, objc_class_name="alloc")
+@(objc_type=DepthStencilDescriptor, objc_name="alloc", objc_is_class_method=true)
 DepthStencilDescriptor_alloc :: #force_inline proc() -> ^DepthStencilDescriptor {
 	return msgSend(^DepthStencilDescriptor, DepthStencilDescriptor, "alloc")
 }
@@ -1764,7 +1764,7 @@ Methods:
 @(objc_class="MTLFunctionConstant")
 FunctionConstant :: struct { using _: NS.Copying(FunctionConstant) }
 
-@(objc_type=FunctionConstant, objc_class_name="alloc")
+@(objc_type=FunctionConstant, objc_name="alloc", objc_is_class_method=true)
 FunctionConstant_alloc :: #force_inline proc() -> ^FunctionConstant {
 	return msgSend(^FunctionConstant, FunctionConstant, "alloc")
 }
@@ -1806,7 +1806,7 @@ Methods:
 @(objc_class="MTLFunctionConstantValues")
 FunctionConstantValues :: struct { using _: NS.Copying(FunctionConstantValues) }
 
-@(objc_type=FunctionConstantValues, objc_class_name="alloc")
+@(objc_type=FunctionConstantValues, objc_name="alloc", objc_is_class_method=true)
 FunctionConstantValues_alloc :: #force_inline proc() -> ^FunctionConstantValues {
 	return msgSend(^FunctionConstantValues, FunctionConstantValues, "alloc")
 }
@@ -1853,7 +1853,7 @@ Methods:
 @(objc_class="MTLFunctionDescriptor")
 FunctionDescriptor :: struct { using _: NS.Copying(FunctionDescriptor) }
 
-@(objc_type=FunctionDescriptor, objc_class_name="alloc")
+@(objc_type=FunctionDescriptor, objc_name="alloc", objc_is_class_method=true)
 FunctionDescriptor_alloc :: #force_inline proc() -> ^FunctionDescriptor {
 	return msgSend(^FunctionDescriptor, FunctionDescriptor, "alloc")
 }
@@ -1865,7 +1865,7 @@ FunctionDescriptor_init :: #force_inline proc(self: ^FunctionDescriptor) -> ^Fun
 FunctionDescriptor_constantValues :: #force_inline proc(self: ^FunctionDescriptor) -> ^FunctionConstantValues {
 	return msgSend(^FunctionConstantValues, self, "constantValues")
 }
-@(objc_type=FunctionDescriptor, objc_class_name="functionDescriptor")
+@(objc_type=FunctionDescriptor, objc_name="functionDescriptor", objc_is_class_method=true)
 FunctionDescriptor_functionDescriptor :: #force_inline proc() -> ^FunctionDescriptor {
 	return msgSend(^FunctionDescriptor, FunctionDescriptor, "functionDescriptor")
 }
@@ -1911,7 +1911,7 @@ Methods:
 @(objc_class="MTLIntersectionFunctionDescriptor")
 IntersectionFunctionDescriptor :: struct { using _: NS.Copying(IntersectionFunctionDescriptor) }
 
-@(objc_type=IntersectionFunctionDescriptor, objc_class_name="alloc")
+@(objc_type=IntersectionFunctionDescriptor, objc_name="alloc", objc_is_class_method=true)
 IntersectionFunctionDescriptor_alloc :: #force_inline proc() -> ^IntersectionFunctionDescriptor {
 	return msgSend(^IntersectionFunctionDescriptor, IntersectionFunctionDescriptor, "alloc")
 }
@@ -1945,7 +1945,7 @@ Methods:
 @(objc_class="MTLHeapDescriptor")
 HeapDescriptor :: struct { using _: NS.Copying(HeapDescriptor) }
 
-@(objc_type=HeapDescriptor, objc_class_name="alloc")
+@(objc_type=HeapDescriptor, objc_name="alloc", objc_is_class_method=true)
 HeapDescriptor_alloc :: #force_inline proc() -> ^HeapDescriptor {
 	return msgSend(^HeapDescriptor, HeapDescriptor, "alloc")
 }
@@ -2027,7 +2027,7 @@ Methods:
 @(objc_class="MTLIndirectCommandBufferDescriptor")
 IndirectCommandBufferDescriptor :: struct { using _: NS.Copying(IndirectCommandBufferDescriptor) }
 
-@(objc_type=IndirectCommandBufferDescriptor, objc_class_name="alloc")
+@(objc_type=IndirectCommandBufferDescriptor, objc_name="alloc", objc_is_class_method=true)
 IndirectCommandBufferDescriptor_alloc :: #force_inline proc() -> ^IndirectCommandBufferDescriptor {
 	return msgSend(^IndirectCommandBufferDescriptor, IndirectCommandBufferDescriptor, "alloc")
 }
@@ -2108,7 +2108,7 @@ Methods:
 @(objc_class="MTLInstanceAccelerationStructureDescriptor")
 InstanceAccelerationStructureDescriptor :: struct { using _: NS.Copying(InstanceAccelerationStructureDescriptor), using _: AccelerationStructureDescriptor  }
 
-@(objc_type=InstanceAccelerationStructureDescriptor, objc_class_name="alloc")
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="alloc", objc_is_class_method=true)
 InstanceAccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^InstanceAccelerationStructureDescriptor {
 	return msgSend(^InstanceAccelerationStructureDescriptor, InstanceAccelerationStructureDescriptor, "alloc")
 }
@@ -2116,7 +2116,7 @@ InstanceAccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^Instan
 InstanceAccelerationStructureDescriptor_init :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> ^InstanceAccelerationStructureDescriptor {
 	return msgSend(^InstanceAccelerationStructureDescriptor, self, "init")
 }
-@(objc_type=InstanceAccelerationStructureDescriptor, objc_class_name="descriptor")
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="descriptor", objc_is_class_method=true)
 InstanceAccelerationStructureDescriptor_descriptor :: #force_inline proc() -> ^InstanceAccelerationStructureDescriptor {
 	return msgSend(^InstanceAccelerationStructureDescriptor, InstanceAccelerationStructureDescriptor, "descriptor")
 }
@@ -2217,7 +2217,7 @@ Methods:
 @(objc_class="MTLIntersectionFunctionTableDescriptor")
 IntersectionFunctionTableDescriptor :: struct { using _: NS.Copying(IntersectionFunctionTableDescriptor) }
 
-@(objc_type=IntersectionFunctionTableDescriptor, objc_class_name="alloc")
+@(objc_type=IntersectionFunctionTableDescriptor, objc_name="alloc", objc_is_class_method=true)
 IntersectionFunctionTableDescriptor_alloc :: #force_inline proc() -> ^IntersectionFunctionTableDescriptor {
 	return msgSend(^IntersectionFunctionTableDescriptor, IntersectionFunctionTableDescriptor, "alloc")
 }
@@ -2229,7 +2229,7 @@ IntersectionFunctionTableDescriptor_init :: #force_inline proc(self: ^Intersecti
 IntersectionFunctionTableDescriptor_functionCount :: #force_inline proc(self: ^IntersectionFunctionTableDescriptor) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "functionCount")
 }
-@(objc_type=IntersectionFunctionTableDescriptor, objc_class_name="intersectionFunctionTableDescriptor")
+@(objc_type=IntersectionFunctionTableDescriptor, objc_name="intersectionFunctionTableDescriptor", objc_is_class_method=true)
 IntersectionFunctionTableDescriptor_intersectionFunctionTableDescriptor :: #force_inline proc() -> ^IntersectionFunctionTableDescriptor {
 	return msgSend(^IntersectionFunctionTableDescriptor, IntersectionFunctionTableDescriptor, "intersectionFunctionTableDescriptor")
 }
@@ -2258,7 +2258,7 @@ Methods:
 @(objc_class="MTLLinkedFunctions")
 LinkedFunctions :: struct { using _: NS.Copying(LinkedFunctions) }
 
-@(objc_type=LinkedFunctions, objc_class_name="alloc")
+@(objc_type=LinkedFunctions, objc_name="alloc", objc_is_class_method=true)
 LinkedFunctions_alloc :: #force_inline proc() -> ^LinkedFunctions {
 	return msgSend(^LinkedFunctions, LinkedFunctions, "alloc")
 }
@@ -2278,7 +2278,7 @@ LinkedFunctions_functions :: #force_inline proc(self: ^LinkedFunctions) -> ^NS.A
 LinkedFunctions_groups :: #force_inline proc(self: ^LinkedFunctions) -> ^NS.Dictionary {
 	return msgSend(^NS.Dictionary, self, "groups")
 }
-@(objc_type=LinkedFunctions, objc_class_name="linkedFunctions")
+@(objc_type=LinkedFunctions, objc_name="linkedFunctions", objc_is_class_method=true)
 LinkedFunctions_linkedFunctions :: #force_inline proc() -> ^LinkedFunctions {
 	return msgSend(^LinkedFunctions, LinkedFunctions, "linkedFunctions")
 }
@@ -2310,7 +2310,7 @@ Methods:
 @(objc_class="MTLPipelineBufferDescriptor")
 PipelineBufferDescriptor :: struct { using _: NS.Copying(PipelineBufferDescriptor) }
 
-@(objc_type=PipelineBufferDescriptor, objc_class_name="alloc")
+@(objc_type=PipelineBufferDescriptor, objc_name="alloc", objc_is_class_method=true)
 PipelineBufferDescriptor_alloc :: #force_inline proc() -> ^PipelineBufferDescriptor {
 	return msgSend(^PipelineBufferDescriptor, PipelineBufferDescriptor, "alloc")
 }
@@ -2342,7 +2342,7 @@ Methods:
 @(objc_class="MTLPipelineBufferDescriptorArray")
 PipelineBufferDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=PipelineBufferDescriptorArray, objc_class_name="alloc")
+@(objc_type=PipelineBufferDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 PipelineBufferDescriptorArray_alloc :: #force_inline proc() -> ^PipelineBufferDescriptorArray {
 	return msgSend(^PipelineBufferDescriptorArray, PipelineBufferDescriptorArray, "alloc")
 }
@@ -2379,7 +2379,7 @@ Methods:
 @(objc_class="MTLPointerType")
 PointerType :: struct { using _: Type }
 
-@(objc_type=PointerType, objc_class_name="alloc")
+@(objc_type=PointerType, objc_name="alloc", objc_is_class_method=true)
 PointerType_alloc :: #force_inline proc() -> ^PointerType {
 	return msgSend(^PointerType, PointerType, "alloc")
 }
@@ -2432,7 +2432,7 @@ Methods:
 @(objc_class="MTLPrimitiveAccelerationStructureDescriptor")
 PrimitiveAccelerationStructureDescriptor :: struct { using _: NS.Copying(PrimitiveAccelerationStructureDescriptor), using _: AccelerationStructureDescriptor }
 
-@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_class_name="alloc")
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="alloc", objc_is_class_method=true)
 PrimitiveAccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^PrimitiveAccelerationStructureDescriptor {
 	return msgSend(^PrimitiveAccelerationStructureDescriptor, PrimitiveAccelerationStructureDescriptor, "alloc")
 }
@@ -2440,7 +2440,7 @@ PrimitiveAccelerationStructureDescriptor_alloc :: #force_inline proc() -> ^Primi
 PrimitiveAccelerationStructureDescriptor_init :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor) -> ^PrimitiveAccelerationStructureDescriptor {
 	return msgSend(^PrimitiveAccelerationStructureDescriptor, self, "init")
 }
-@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_class_name="descriptor")
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="descriptor", objc_is_class_method=true)
 PrimitiveAccelerationStructureDescriptor_descriptor :: #force_inline proc() -> ^PrimitiveAccelerationStructureDescriptor {
 	return msgSend(^PrimitiveAccelerationStructureDescriptor, PrimitiveAccelerationStructureDescriptor, "descriptor")
 }
@@ -2516,7 +2516,7 @@ Methods:
 @(objc_class="MTLRasterizationRateLayerArray")
 RasterizationRateLayerArray :: struct { using _: NS.Object }
 
-@(objc_type=RasterizationRateLayerArray, objc_class_name="alloc")
+@(objc_type=RasterizationRateLayerArray, objc_name="alloc", objc_is_class_method=true)
 RasterizationRateLayerArray_alloc :: #force_inline proc() -> ^RasterizationRateLayerArray {
 	return msgSend(^RasterizationRateLayerArray, RasterizationRateLayerArray, "alloc")
 }
@@ -2553,7 +2553,7 @@ Methods:
 @(objc_class="MTLRasterizationRateLayerDescriptor")
 RasterizationRateLayerDescriptor :: struct { using _: NS.Copying(RasterizationRateLayerDescriptor) }
 
-@(objc_type=RasterizationRateLayerDescriptor, objc_class_name="alloc")
+@(objc_type=RasterizationRateLayerDescriptor, objc_name="alloc", objc_is_class_method=true)
 RasterizationRateLayerDescriptor_alloc :: #force_inline proc() -> ^RasterizationRateLayerDescriptor {
 	return msgSend(^RasterizationRateLayerDescriptor, RasterizationRateLayerDescriptor, "alloc")
 }
@@ -2614,7 +2614,7 @@ Methods:
 @(objc_class="MTLRasterizationRateMapDescriptor")
 RasterizationRateMapDescriptor :: struct { using _: NS.Copying(RasterizationRateMapDescriptor) }
 
-@(objc_type=RasterizationRateMapDescriptor, objc_class_name="alloc")
+@(objc_type=RasterizationRateMapDescriptor, objc_name="alloc", objc_is_class_method=true)
 RasterizationRateMapDescriptor_alloc :: #force_inline proc() -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "alloc")
 }
@@ -2638,15 +2638,15 @@ RasterizationRateMapDescriptor_layerCount :: #force_inline proc(self: ^Rasteriza
 RasterizationRateMapDescriptor_layers :: #force_inline proc(self: ^RasterizationRateMapDescriptor) -> ^RasterizationRateLayerArray {
 	return msgSend(^RasterizationRateLayerArray, self, "layers")
 }
-@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSize")
+@(objc_type=RasterizationRateMapDescriptor, objc_name="rasterizationRateMapDescriptorWithScreenSize", objc_is_class_method=true)
 RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSize :: #force_inline proc(screenSize: Size) -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "rasterizationRateMapDescriptorWithScreenSize:", screenSize)
 }
-@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSizeWithLayer")
+@(objc_type=RasterizationRateMapDescriptor, objc_name="rasterizationRateMapDescriptorWithScreenSizeWithLayer", objc_is_class_method=true)
 RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSizeWithLayer :: #force_inline proc(screenSize: Size, layer: ^RasterizationRateLayerDescriptor) -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "rasterizationRateMapDescriptorWithScreenSize:layer:", screenSize, layer)
 }
-@(objc_type=RasterizationRateMapDescriptor, objc_class_name="rasterizationRateMapDescriptorWithScreenSizeWithLayers")
+@(objc_type=RasterizationRateMapDescriptor, objc_name="rasterizationRateMapDescriptorWithScreenSizeWithLayers", objc_is_class_method=true)
 RasterizationRateMapDescriptor_rasterizationRateMapDescriptorWithScreenSizeWithLayers :: #force_inline proc(screenSize: Size, layers: []^RasterizationRateLayerDescriptor) -> ^RasterizationRateMapDescriptor {
 	return msgSend(^RasterizationRateMapDescriptor, RasterizationRateMapDescriptor, "rasterizationRateMapDescriptorWithScreenSize:layerCount:layers:", screenSize, NS.UInteger(len(layers)), layers)
 }
@@ -2682,7 +2682,7 @@ Methods:
 @(objc_class="MTLRasterizationRateSampleArray")
 RasterizationRateSampleArray :: struct { using _: NS.Object }
 
-@(objc_type=RasterizationRateSampleArray, objc_class_name="alloc")
+@(objc_type=RasterizationRateSampleArray, objc_name="alloc", objc_is_class_method=true)
 RasterizationRateSampleArray_alloc :: #force_inline proc() -> ^RasterizationRateSampleArray {
 	return msgSend(^RasterizationRateSampleArray, RasterizationRateSampleArray, "alloc")
 }
@@ -2734,7 +2734,7 @@ Methods:
 @(objc_class="MTLRenderPassAttachmentDescriptor")
 RenderPassAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassAttachmentDescriptor) }
 
-@(objc_type=RenderPassAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPassAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPassAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassAttachmentDescriptor {
 	return msgSend(^RenderPassAttachmentDescriptor, RenderPassAttachmentDescriptor, "alloc")
 }
@@ -2846,7 +2846,7 @@ Methods:
 @(objc_class="MTLRenderPassColorAttachmentDescriptor")
 RenderPassColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassColorAttachmentDescriptor), using _: RenderPassAttachmentDescriptor  }
 
-@(objc_type=RenderPassColorAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPassColorAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPassColorAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassColorAttachmentDescriptor {
 	return msgSend(^RenderPassColorAttachmentDescriptor, RenderPassColorAttachmentDescriptor, "alloc")
 }
@@ -2878,7 +2878,7 @@ Methods:
 @(objc_class="MTLRenderPassColorAttachmentDescriptorArray")
 RenderPassColorAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=RenderPassColorAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 RenderPassColorAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^RenderPassColorAttachmentDescriptorArray {
 	return msgSend(^RenderPassColorAttachmentDescriptorArray, RenderPassColorAttachmentDescriptorArray, "alloc")
 }
@@ -2912,7 +2912,7 @@ Methods:
 @(objc_class="MTLRenderPassDepthAttachmentDescriptor")
 RenderPassDepthAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassDepthAttachmentDescriptor), using _: RenderPassAttachmentDescriptor }
 
-@(objc_type=RenderPassDepthAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPassDepthAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPassDepthAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassDepthAttachmentDescriptor {
 	return msgSend(^RenderPassDepthAttachmentDescriptor, RenderPassDepthAttachmentDescriptor, "alloc")
 }
@@ -2979,7 +2979,7 @@ Methods:
 @(objc_class="MTLRenderPassDescriptor")
 RenderPassDescriptor :: struct { using _: NS.Copying(RenderPassDescriptor), using _: AccelerationStructureDescriptor  }
 
-@(objc_type=RenderPassDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPassDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPassDescriptor_alloc :: #force_inline proc() -> ^RenderPassDescriptor {
 	return msgSend(^RenderPassDescriptor, RenderPassDescriptor, "alloc")
 }
@@ -3011,7 +3011,7 @@ RenderPassDescriptor_imageblockSampleLength :: #force_inline proc(self: ^RenderP
 RenderPassDescriptor_rasterizationRateMap :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RasterizationRateMap {
 	return msgSend(^RasterizationRateMap, self, "rasterizationRateMap")
 }
-@(objc_type=RenderPassDescriptor, objc_class_name="renderPassDescriptor")
+@(objc_type=RenderPassDescriptor, objc_name="renderPassDescriptor", objc_is_class_method=true)
 RenderPassDescriptor_renderPassDescriptor :: #force_inline proc() -> ^RenderPassDescriptor {
 	return msgSend(^RenderPassDescriptor, RenderPassDescriptor, "renderPassDescriptor")
 }
@@ -3127,7 +3127,7 @@ Methods:
 @(objc_class="MTLRenderPassSampleBufferAttachmentDescriptor")
 RenderPassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassSampleBufferAttachmentDescriptor) }
 
-@(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPassSampleBufferAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassSampleBufferAttachmentDescriptor {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptor, RenderPassSampleBufferAttachmentDescriptor, "alloc")
 }
@@ -3191,7 +3191,7 @@ Methods:
 @(objc_class="MTLRenderPassSampleBufferAttachmentDescriptorArray")
 RenderPassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 RenderPassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^RenderPassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptorArray, RenderPassSampleBufferAttachmentDescriptorArray, "alloc")
 }
@@ -3225,7 +3225,7 @@ Methods:
 @(objc_class="MTLRenderPassStencilAttachmentDescriptor")
 RenderPassStencilAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassStencilAttachmentDescriptor) }
 
-@(objc_type=RenderPassStencilAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPassStencilAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPassStencilAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPassStencilAttachmentDescriptor {
 	return msgSend(^RenderPassStencilAttachmentDescriptor, RenderPassStencilAttachmentDescriptor, "alloc")
 }
@@ -3281,7 +3281,7 @@ Methods:
 @(objc_class="MTLRenderPipelineColorAttachmentDescriptor")
 RenderPipelineColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPipelineColorAttachmentDescriptor), using _: RenderPassAttachmentDescriptor }
 
-@(objc_type=RenderPipelineColorAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPipelineColorAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPipelineColorAttachmentDescriptor_alloc :: #force_inline proc() -> ^RenderPipelineColorAttachmentDescriptor {
 	return msgSend(^RenderPipelineColorAttachmentDescriptor, RenderPipelineColorAttachmentDescriptor, "alloc")
 }
@@ -3377,7 +3377,7 @@ Methods:
 @(objc_class="MTLRenderPipelineColorAttachmentDescriptorArray")
 RenderPipelineColorAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 RenderPipelineColorAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^RenderPipelineColorAttachmentDescriptorArray {
 	return msgSend(^RenderPipelineColorAttachmentDescriptorArray, RenderPipelineColorAttachmentDescriptorArray, "alloc")
 }
@@ -3455,7 +3455,7 @@ Methods:
 @(objc_class="MTLRenderPipelineDescriptor")
 RenderPipelineDescriptor :: struct { using _: NS.Copying(RenderPipelineDescriptor) }
 
-@(objc_type=RenderPipelineDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPipelineDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPipelineDescriptor_alloc :: #force_inline proc() -> ^RenderPipelineDescriptor {
 	return msgSend(^RenderPipelineDescriptor, RenderPipelineDescriptor, "alloc")
 }
@@ -3672,7 +3672,7 @@ Methods:
 @(objc_class="MTLRenderPipelineReflection")
 RenderPipelineReflection :: struct { using _: NS.Object }
 
-@(objc_type=RenderPipelineReflection, objc_class_name="alloc")
+@(objc_type=RenderPipelineReflection, objc_name="alloc", objc_is_class_method=true)
 RenderPipelineReflection_alloc :: #force_inline proc() -> ^RenderPipelineReflection {
 	return msgSend(^RenderPipelineReflection, RenderPipelineReflection, "alloc")
 }
@@ -3708,7 +3708,7 @@ Methods:
 @(objc_class="MTLResourceStatePassDescriptor")
 ResourceStatePassDescriptor :: struct { using _: NS.Copying(ResourceStatePassDescriptor) }
 
-@(objc_type=ResourceStatePassDescriptor, objc_class_name="alloc")
+@(objc_type=ResourceStatePassDescriptor, objc_name="alloc", objc_is_class_method=true)
 ResourceStatePassDescriptor_alloc :: #force_inline proc() -> ^ResourceStatePassDescriptor {
 	return msgSend(^ResourceStatePassDescriptor, ResourceStatePassDescriptor, "alloc")
 }
@@ -3716,7 +3716,7 @@ ResourceStatePassDescriptor_alloc :: #force_inline proc() -> ^ResourceStatePassD
 ResourceStatePassDescriptor_init :: #force_inline proc(self: ^ResourceStatePassDescriptor) -> ^ResourceStatePassDescriptor {
 	return msgSend(^ResourceStatePassDescriptor, self, "init")
 }
-@(objc_type=ResourceStatePassDescriptor, objc_class_name="resourceStatePassDescriptor")
+@(objc_type=ResourceStatePassDescriptor, objc_name="resourceStatePassDescriptor", objc_is_class_method=true)
 ResourceStatePassDescriptor_resourceStatePassDescriptor :: #force_inline proc() -> ^ResourceStatePassDescriptor {
 	return msgSend(^ResourceStatePassDescriptor, ResourceStatePassDescriptor, "resourceStatePassDescriptor")
 }
@@ -3744,7 +3744,7 @@ Methods:
 @(objc_class="MTLResourceStatePassSampleBufferAttachmentDescriptor")
 ResourceStatePassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(ResourceStatePassSampleBufferAttachmentDescriptor) }
 
-@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 ResourceStatePassSampleBufferAttachmentDescriptor_alloc :: #force_inline proc() -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptor, ResourceStatePassSampleBufferAttachmentDescriptor, "alloc")
 }
@@ -3792,7 +3792,7 @@ Methods:
 @(objc_class="MTLResourceStatePassSampleBufferAttachmentDescriptorArray")
 ResourceStatePassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 ResourceStatePassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^ResourceStatePassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptorArray, ResourceStatePassSampleBufferAttachmentDescriptorArray, "alloc")
 }
@@ -3852,7 +3852,7 @@ Methods:
 @(objc_class="MTLSamplerDescriptor")
 SamplerDescriptor :: struct { using _: NS.Copying(SamplerDescriptor) }
 
-@(objc_type=SamplerDescriptor, objc_class_name="alloc")
+@(objc_type=SamplerDescriptor, objc_name="alloc", objc_is_class_method=true)
 SamplerDescriptor_alloc :: #force_inline proc() -> ^SamplerDescriptor {
 	return msgSend(^SamplerDescriptor, SamplerDescriptor, "alloc")
 }
@@ -3995,7 +3995,7 @@ Methods:
 @(objc_class="MTLSharedEventHandle")
 SharedEventHandle :: struct { using _: NS.Object }
 
-@(objc_type=SharedEventHandle, objc_class_name="alloc")
+@(objc_type=SharedEventHandle, objc_name="alloc", objc_is_class_method=true)
 SharedEventHandle_alloc :: #force_inline proc() -> ^SharedEventHandle {
 	return msgSend(^SharedEventHandle, SharedEventHandle, "alloc")
 }
@@ -4023,7 +4023,7 @@ Methods:
 @(objc_class="MTLSharedEventListener")
 SharedEventListener :: struct { using _: NS.Object }
 
-@(objc_type=SharedEventListener, objc_class_name="alloc")
+@(objc_type=SharedEventListener, objc_name="alloc", objc_is_class_method=true)
 SharedEventListener_alloc :: #force_inline proc() -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, SharedEventListener, "alloc")
 }
@@ -4055,7 +4055,7 @@ Methods:
 @(objc_class="MTLSharedTextureHandle")
 SharedTextureHandle :: struct { using _: NS.Object }
 
-@(objc_type=SharedTextureHandle, objc_class_name="alloc")
+@(objc_type=SharedTextureHandle, objc_name="alloc", objc_is_class_method=true)
 SharedTextureHandle_alloc :: #force_inline proc() -> ^SharedTextureHandle {
 	return msgSend(^SharedTextureHandle, SharedTextureHandle, "alloc")
 }
@@ -4093,7 +4093,7 @@ Methods:
 @(objc_class="MTLStageInputOutputDescriptor")
 StageInputOutputDescriptor :: struct { using _: NS.Copying(StageInputOutputDescriptor) }
 
-@(objc_type=StageInputOutputDescriptor, objc_class_name="alloc")
+@(objc_type=StageInputOutputDescriptor, objc_name="alloc", objc_is_class_method=true)
 StageInputOutputDescriptor_alloc :: #force_inline proc() -> ^StageInputOutputDescriptor {
 	return msgSend(^StageInputOutputDescriptor, StageInputOutputDescriptor, "alloc")
 }
@@ -4129,7 +4129,7 @@ StageInputOutputDescriptor_setIndexBufferIndex :: #force_inline proc(self: ^Stag
 StageInputOutputDescriptor_setIndexType :: #force_inline proc(self: ^StageInputOutputDescriptor, indexType: IndexType) {
 	msgSend(nil, self, "setIndexType:", indexType)
 }
-@(objc_type=StageInputOutputDescriptor, objc_class_name="stageInputOutputDescriptor")
+@(objc_type=StageInputOutputDescriptor, objc_name="stageInputOutputDescriptor", objc_is_class_method=true)
 StageInputOutputDescriptor_stageInputOutputDescriptor :: #force_inline proc() -> ^StageInputOutputDescriptor {
 	return msgSend(^StageInputOutputDescriptor, StageInputOutputDescriptor, "stageInputOutputDescriptor")
 }
@@ -4159,7 +4159,7 @@ Methods:
 @(objc_class="MTLStencilDescriptor")
 StencilDescriptor :: struct { using _: NS.Copying(StencilDescriptor) }
 
-@(objc_type=StencilDescriptor, objc_class_name="alloc")
+@(objc_type=StencilDescriptor, objc_name="alloc", objc_is_class_method=true)
 StencilDescriptor_alloc :: #force_inline proc() -> ^StencilDescriptor {
 	return msgSend(^StencilDescriptor, StencilDescriptor, "alloc")
 }
@@ -4237,7 +4237,7 @@ Methods:
 @(objc_class="MTLStructMember")
 StructMember :: struct { using _: NS.Object }
 
-@(objc_type=StructMember, objc_class_name="alloc")
+@(objc_type=StructMember, objc_name="alloc", objc_is_class_method=true)
 StructMember_alloc :: #force_inline proc() -> ^StructMember {
 	return msgSend(^StructMember, StructMember, "alloc")
 }
@@ -4293,7 +4293,7 @@ Methods:
 @(objc_class="MTLStructType")
 StructType :: struct { using _: Type }
 
-@(objc_type=StructType, objc_class_name="alloc")
+@(objc_type=StructType, objc_name="alloc", objc_is_class_method=true)
 StructType_alloc :: #force_inline proc() -> ^StructType {
 	return msgSend(^StructType, StructType, "alloc")
 }
@@ -4356,7 +4356,7 @@ Methods:
 @(objc_class="MTLTextureDescriptor")
 TextureDescriptor :: struct { using _: NS.Copying(TextureDescriptor) }
 
-@(objc_type=TextureDescriptor, objc_class_name="alloc")
+@(objc_type=TextureDescriptor, objc_name="alloc", objc_is_class_method=true)
 TextureDescriptor_alloc :: #force_inline proc() -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "alloc")
 }
@@ -4472,15 +4472,15 @@ TextureDescriptor_storageMode :: #force_inline proc(self: ^TextureDescriptor) ->
 TextureDescriptor_swizzle :: #force_inline proc(self: ^TextureDescriptor) -> TextureSwizzleChannels {
 	return msgSend(TextureSwizzleChannels, self, "swizzle")
 }
-@(objc_type=TextureDescriptor, objc_class_name="texture2DDescriptor")
+@(objc_type=TextureDescriptor, objc_name="texture2DDescriptor", objc_is_class_method=true)
 TextureDescriptor_texture2DDescriptor :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, height: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", pixelFormat, width, height, mipmapped)
 }
-@(objc_type=TextureDescriptor, objc_class_name="textureBufferDescriptor")
+@(objc_type=TextureDescriptor, objc_name="textureBufferDescriptor", objc_is_class_method=true)
 TextureDescriptor_textureBufferDescriptor :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureBufferDescriptorWithPixelFormat:width:resourceOptions:usage:", pixelFormat, width, resourceOptions, usage)
 }
-@(objc_type=TextureDescriptor, objc_class_name="textureCubeDescriptor")
+@(objc_type=TextureDescriptor, objc_name="textureCubeDescriptor", objc_is_class_method=true)
 TextureDescriptor_textureCubeDescriptor :: #force_inline proc(pixelFormat: PixelFormat, size: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureCubeDescriptorWithPixelFormat:size:mipmapped:", pixelFormat, size, mipmapped)
 }
@@ -4514,7 +4514,7 @@ Methods:
 @(objc_class="MTLTextureReferenceType")
 TextureReferenceType :: struct { using _: Type }
 
-@(objc_type=TextureReferenceType, objc_class_name="alloc")
+@(objc_type=TextureReferenceType, objc_name="alloc", objc_is_class_method=true)
 TextureReferenceType_alloc :: #force_inline proc() -> ^TextureReferenceType {
 	return msgSend(^TextureReferenceType, TextureReferenceType, "alloc")
 }
@@ -4554,7 +4554,7 @@ Methods:
 @(objc_class="MTLTileRenderPipelineColorAttachmentDescriptor")
 TileRenderPipelineColorAttachmentDescriptor :: struct { using _: NS.Copying(TileRenderPipelineColorAttachmentDescriptor) }
 
-@(objc_type=TileRenderPipelineColorAttachmentDescriptor, objc_class_name="alloc")
+@(objc_type=TileRenderPipelineColorAttachmentDescriptor, objc_name="alloc", objc_is_class_method=true)
 TileRenderPipelineColorAttachmentDescriptor_alloc :: #force_inline proc() -> ^TileRenderPipelineColorAttachmentDescriptor {
 	return msgSend(^TileRenderPipelineColorAttachmentDescriptor, TileRenderPipelineColorAttachmentDescriptor, "alloc")
 }
@@ -4586,7 +4586,7 @@ Methods:
 @(objc_class="MTLTileRenderPipelineColorAttachmentDescriptorArray")
 TileRenderPipelineColorAttachmentDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_class_name="alloc")
+@(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 TileRenderPipelineColorAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^TileRenderPipelineColorAttachmentDescriptorArray {
 	return msgSend(^TileRenderPipelineColorAttachmentDescriptorArray, TileRenderPipelineColorAttachmentDescriptorArray, "alloc")
 }
@@ -4631,7 +4631,7 @@ Methods:
 @(objc_class="MTLTileRenderPipelineDescriptor")
 TileRenderPipelineDescriptor :: struct { using _: NS.Copying(TileRenderPipelineDescriptor) }
 
-@(objc_type=TileRenderPipelineDescriptor, objc_class_name="alloc")
+@(objc_type=TileRenderPipelineDescriptor, objc_name="alloc", objc_is_class_method=true)
 TileRenderPipelineDescriptor_alloc :: #force_inline proc() -> ^TileRenderPipelineDescriptor {
 	return msgSend(^TileRenderPipelineDescriptor, TileRenderPipelineDescriptor, "alloc")
 }
@@ -4714,7 +4714,7 @@ Methods:
 @(objc_class="MTLType")
 Type :: struct { using _: NS.Object }
 
-@(objc_type=Type, objc_class_name="alloc")
+@(objc_type=Type, objc_name="alloc", objc_is_class_method=true)
 Type_alloc :: #force_inline proc() -> ^Type {
 	return msgSend(^Type, Type, "alloc")
 }
@@ -4746,7 +4746,7 @@ Methods:
 @(objc_class="MTLVertexAttribute")
 VertexAttribute :: struct { using _: NS.Object }
 
-@(objc_type=VertexAttribute, objc_class_name="alloc")
+@(objc_type=VertexAttribute, objc_name="alloc", objc_is_class_method=true)
 VertexAttribute_alloc :: #force_inline proc() -> ^VertexAttribute {
 	return msgSend(^VertexAttribute, VertexAttribute, "alloc")
 }
@@ -4798,7 +4798,7 @@ Methods:
 @(objc_class="MTLVertexAttributeDescriptor")
 VertexAttributeDescriptor :: struct { using _: NS.Copying(VertexAttributeDescriptor) }
 
-@(objc_type=VertexAttributeDescriptor, objc_class_name="alloc")
+@(objc_type=VertexAttributeDescriptor, objc_name="alloc", objc_is_class_method=true)
 VertexAttributeDescriptor_alloc :: #force_inline proc() -> ^VertexAttributeDescriptor {
 	return msgSend(^VertexAttributeDescriptor, VertexAttributeDescriptor, "alloc")
 }
@@ -4846,7 +4846,7 @@ Methods:
 @(objc_class="MTLVertexAttributeDescriptorArray")
 VertexAttributeDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=VertexAttributeDescriptorArray, objc_class_name="alloc")
+@(objc_type=VertexAttributeDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 VertexAttributeDescriptorArray_alloc :: #force_inline proc() -> ^VertexAttributeDescriptorArray {
 	return msgSend(^VertexAttributeDescriptorArray, VertexAttributeDescriptorArray, "alloc")
 }
@@ -4882,7 +4882,7 @@ Methods:
 @(objc_class="MTLVertexBufferLayoutDescriptor")
 VertexBufferLayoutDescriptor :: struct { using _: NS.Copying(VertexBufferLayoutDescriptor) }
 
-@(objc_type=VertexBufferLayoutDescriptor, objc_class_name="alloc")
+@(objc_type=VertexBufferLayoutDescriptor, objc_name="alloc", objc_is_class_method=true)
 VertexBufferLayoutDescriptor_alloc :: #force_inline proc() -> ^VertexBufferLayoutDescriptor {
 	return msgSend(^VertexBufferLayoutDescriptor, VertexBufferLayoutDescriptor, "alloc")
 }
@@ -4930,7 +4930,7 @@ Methods:
 @(objc_class="MTLVertexBufferLayoutDescriptorArray")
 VertexBufferLayoutDescriptorArray :: struct { using _: NS.Object }
 
-@(objc_type=VertexBufferLayoutDescriptorArray, objc_class_name="alloc")
+@(objc_type=VertexBufferLayoutDescriptorArray, objc_name="alloc", objc_is_class_method=true)
 VertexBufferLayoutDescriptorArray_alloc :: #force_inline proc() -> ^VertexBufferLayoutDescriptorArray {
 	return msgSend(^VertexBufferLayoutDescriptorArray, VertexBufferLayoutDescriptorArray, "alloc")
 }
@@ -4964,7 +4964,7 @@ Methods:
 @(objc_class="MTLVertexDescriptor")
 VertexDescriptor :: struct { using _: NS.Copying(VertexDescriptor) }
 
-@(objc_type=VertexDescriptor, objc_class_name="alloc")
+@(objc_type=VertexDescriptor, objc_name="alloc", objc_is_class_method=true)
 VertexDescriptor_alloc :: #force_inline proc() -> ^VertexDescriptor {
 	return msgSend(^VertexDescriptor, VertexDescriptor, "alloc")
 }
@@ -4984,7 +4984,7 @@ VertexDescriptor_layouts :: #force_inline proc(self: ^VertexDescriptor) -> ^Vert
 VertexDescriptor_reset :: #force_inline proc(self: ^VertexDescriptor) {
 	msgSend(nil, self, "reset")
 }
-@(objc_type=VertexDescriptor, objc_class_name="vertexDescriptor")
+@(objc_type=VertexDescriptor, objc_name="vertexDescriptor", objc_is_class_method=true)
 VertexDescriptor_vertexDescriptor :: #force_inline proc() -> ^VertexDescriptor {
 	return msgSend(^VertexDescriptor, VertexDescriptor, "vertexDescriptor")
 }
@@ -5005,7 +5005,7 @@ Methods:
 @(objc_class="MTLVisibleFunctionTableDescriptor")
 VisibleFunctionTableDescriptor :: struct { using _: NS.Copying(VisibleFunctionTableDescriptor) }
 
-@(objc_type=VisibleFunctionTableDescriptor, objc_class_name="alloc")
+@(objc_type=VisibleFunctionTableDescriptor, objc_name="alloc", objc_is_class_method=true)
 VisibleFunctionTableDescriptor_alloc :: #force_inline proc() -> ^VisibleFunctionTableDescriptor {
 	return msgSend(^VisibleFunctionTableDescriptor, VisibleFunctionTableDescriptor, "alloc")
 }
@@ -5021,7 +5021,7 @@ VisibleFunctionTableDescriptor_functionCount :: #force_inline proc(self: ^Visibl
 VisibleFunctionTableDescriptor_setFunctionCount :: #force_inline proc(self: ^VisibleFunctionTableDescriptor, functionCount: NS.UInteger) {
 	msgSend(nil, self, "setFunctionCount:", functionCount)
 }
-@(objc_type=VisibleFunctionTableDescriptor, objc_class_name="visibleFunctionTableDescriptor")
+@(objc_type=VisibleFunctionTableDescriptor, objc_name="visibleFunctionTableDescriptor", objc_is_class_method=true)
 VisibleFunctionTableDescriptor_visibleFunctionTableDescriptor :: #force_inline proc() -> ^VisibleFunctionTableDescriptor {
 	return msgSend(^VisibleFunctionTableDescriptor, VisibleFunctionTableDescriptor, "visibleFunctionTableDescriptor")
 }
@@ -7976,7 +7976,7 @@ Class:
 @(objc_class="MTLRenderPipelineFunctionsDescriptor")
 RenderPipelineFunctionsDescriptor :: struct { using _: NS.Copying(RenderPipelineFunctionsDescriptor) }
 
-@(objc_type=RenderPipelineFunctionsDescriptor, objc_class_name="alloc")
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="alloc", objc_is_class_method=true)
 RenderPipelineFunctionsDescriptor_alloc :: #force_inline proc() -> ^RenderPipelineFunctionsDescriptor {
 	return msgSend(^RenderPipelineFunctionsDescriptor, RenderPipelineFunctionsDescriptor, "alloc")
 }

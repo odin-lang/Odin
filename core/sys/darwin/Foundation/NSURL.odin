@@ -4,7 +4,7 @@ package objc_Foundation
 URL :: struct{using _: Copying(URL)}
 
 
-@(objc_type=URL, objc_class_name="alloc")
+@(objc_type=URL, objc_name="alloc", objc_is_class_method=true)
 URL_alloc :: proc() -> ^URL {
 	return msgSend(^URL, URL, "alloc")
 }

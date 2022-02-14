@@ -3,7 +3,7 @@ package objc_Foundation
 @(objc_class="NSDate")
 Date :: struct {using _: Copying(Date)}
 
-@(objc_type=Date, objc_class_name="alloc")
+@(objc_type=Date, objc_name="alloc", objc_is_class_method=true)
 Date_alloc :: proc() -> ^Date {
 	return msgSend(^Date, Date, "alloc")
 }

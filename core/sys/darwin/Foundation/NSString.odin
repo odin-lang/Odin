@@ -59,7 +59,7 @@ MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
 }
 
 
-@(objc_type=String, objc_class_name="alloc")
+@(objc_type=String, objc_name="alloc", objc_is_class_method=true)
 String_alloc :: proc() -> ^String {
 	return msgSend(^String, String, "alloc")
 }
