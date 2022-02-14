@@ -5366,32 +5366,32 @@ Methods:
 @(objc_class="MTLBlitCommandEncoder")
 BlitCommandEncoder :: struct { using _: CommandEncoder }
 
-@(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_")
+@(objc_type=BlitCommandEncoder, objc_name="copyFromBufferEx")
 BlitCommandEncoder_copyFromBufferEx :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:", sourceBuffer, sourceOffset, sourceBytesPerRow, sourceBytesPerImage, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_sourceBytesPerRow_sourceBytesPerImage_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_options_")
+@(objc_type=BlitCommandEncoder, objc_name="copyFromBufferExWithOptions")
 BlitCommandEncoder_copyFromBufferExWithOptions :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, sourceBytesPerRow: NS.UInteger, sourceBytesPerImage: NS.UInteger, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin, options: BlitOption) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:options:", sourceBuffer, sourceOffset, sourceBytesPerRow, sourceBytesPerImage, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin, options)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer_sourceOffset_toBuffer_destinationOffset_size_")
-BlitCommandEncoder_copyFromBuffer_sourceOffset_toBuffer_destinationOffset_size_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, size: NS.UInteger) {
+@(objc_type=BlitCommandEncoder, objc_name="copyFromBuffer")
+BlitCommandEncoder_copyFromBuffer :: #force_inline proc(self: ^BlitCommandEncoder, sourceBuffer: ^Buffer, sourceOffset: NS.UInteger, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, size: NS.UInteger) {
 	msgSend(nil, self, "copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:", sourceBuffer, sourceOffset, destinationBuffer, destinationOffset, size)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, destinationBytesPerRow: NS.UInteger, destinationBytesPerImage: NS.UInteger) {
+@(objc_type=BlitCommandEncoder, objc_name="copyFromTextureEx")
+BlitCommandEncoder_copyFromTextureEx :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, destinationBytesPerRow: NS.UInteger, destinationBytesPerImage: NS.UInteger) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:", sourceTexture, sourceSlice, sourceLevel, sourceOrigin, sourceSize, destinationBuffer, destinationOffset, destinationBytesPerRow, destinationBytesPerImage)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_options_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toBuffer_destinationOffset_destinationBytesPerRow_destinationBytesPerImage_options_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, destinationBytesPerRow: NS.UInteger, destinationBytesPerImage: NS.UInteger, options: BlitOption) {
+@(objc_type=BlitCommandEncoder, objc_name="copyFromTextureExWithOptions")
+BlitCommandEncoder_copyFromTextureExWithOptions :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationBuffer: ^Buffer, destinationOffset: NS.UInteger, destinationBytesPerRow: NS.UInteger, destinationBytesPerImage: NS.UInteger, options: BlitOption) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:options:", sourceTexture, sourceSlice, sourceLevel, sourceOrigin, sourceSize, destinationBuffer, destinationOffset, destinationBytesPerRow, destinationBytesPerImage, options)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_sourceOrigin_sourceSize_toTexture_destinationSlice_destinationLevel_destinationOrigin_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
+@(objc_type=BlitCommandEncoder, objc_name="copyFromTextureWithDestinationOrigin")
+BlitCommandEncoder_copyFromTextureWithDestinationOrigin :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, sourceOrigin: Origin, sourceSize: Size, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, destinationOrigin: Origin) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:", sourceTexture, sourceSlice, sourceLevel, sourceOrigin, sourceSize, destinationTexture, destinationSlice, destinationLevel, destinationOrigin)
 }
-@(objc_type=BlitCommandEncoder, objc_name="copyFromTexture_sourceSlice_sourceLevel_toTexture_destinationSlice_destinationLevel_sliceCount_levelCount_")
-BlitCommandEncoder_copyFromTexture_sourceSlice_sourceLevel_toTexture_destinationSlice_destinationLevel_sliceCount_levelCount_ :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, sliceCount: NS.UInteger, levelCount: NS.UInteger) {
+@(objc_type=BlitCommandEncoder, objc_name="copyFromTextureWithCounts")
+BlitCommandEncoder_copyFromTextureWithCounts :: #force_inline proc(self: ^BlitCommandEncoder, sourceTexture: ^Texture, sourceSlice: NS.UInteger, sourceLevel: NS.UInteger, destinationTexture: ^Texture, destinationSlice: NS.UInteger, destinationLevel: NS.UInteger, sliceCount: NS.UInteger, levelCount: NS.UInteger) {
 	msgSend(nil, self, "copyFromTexture:sourceSlice:sourceLevel:toTexture:destinationSlice:destinationLevel:sliceCount:levelCount:", sourceTexture, sourceSlice, sourceLevel, destinationTexture, destinationSlice, destinationLevel, sliceCount, levelCount)
 }
 @(objc_type=BlitCommandEncoder, objc_name="copyFromTexture")
