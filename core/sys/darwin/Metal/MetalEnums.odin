@@ -17,6 +17,17 @@ AccelerationStructureInstanceOption :: enum u32 {
 	NonOpaque                                  = 3,
 }
 
+MotionBorderMode :: enum u32 {
+	Clamp  = 0,
+	Vanish = 1,
+}
+
+AccelerationStructureInstanceDescriptorType :: enum NS.UInteger {
+	Default = 0,
+	UserID  = 1,
+	Motion  = 2,
+};
+
 
 DataType :: enum NS.UInteger {
 	None                           = 0,

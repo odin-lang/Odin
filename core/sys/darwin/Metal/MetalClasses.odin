@@ -33,8 +33,8 @@ AccelerationStructureBoundingBoxGeometryDescriptor_init :: #force_inline proc(se
 	return msgSend(^AccelerationStructureBoundingBoxGeometryDescriptor, self, "init")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="boundingBoxBuffer")
-AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxBuffer :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> ^AccelerationStructureBoundingBoxGeometryDescriptor {
-	return msgSend(^AccelerationStructureBoundingBoxGeometryDescriptor, self, "boundingBoxBuffer")
+AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxBuffer :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "boundingBoxBuffer")
 }
 @(objc_type=AccelerationStructureBoundingBoxGeometryDescriptor, objc_name="boundingBoxBufferOffset")
 AccelerationStructureBoundingBoxGeometryDescriptor_boundingBoxBufferOffset :: #force_inline proc(self: ^AccelerationStructureBoundingBoxGeometryDescriptor) -> NS.UInteger {
@@ -116,6 +116,138 @@ MotionKeyframeData_offset :: #force_inline proc(self: ^MotionKeyframeData) -> NS
 MotionKeyframeData_setOffset :: #force_inline proc(self: ^MotionKeyframeData, offset: NS.UInteger) {
 	msgSend(nil, self, "setOffset:", offset)
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+/*
+Class:
+	AccelerationStructureMotionTriangleGeometryDescriptor
+*/
+
+@(objc_class="MTLAccelerationStructureMotionTriangleGeometryDescriptor")
+AccelerationStructureMotionTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureMotionTriangleGeometryDescriptor), using _: AccelerationStructureGeometryDescriptor }
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_class_name="alloc")
+AccelerationStructureMotionTriangleGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureMotionTriangleGeometryDescriptor {
+	return msgSend(^AccelerationStructureMotionTriangleGeometryDescriptor, AccelerationStructureMotionTriangleGeometryDescriptor, "alloc")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="init")
+AccelerationStructureMotionTriangleGeometryDescriptor_init :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> ^AccelerationStructureMotionTriangleGeometryDescriptor {
+	return msgSend(^AccelerationStructureMotionTriangleGeometryDescriptor, self, "init")
+}
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="vertexBuffers")
+AccelerationStructureMotionTriangleGeometryDescriptor_vertexBuffers :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> ^NS.Array {
+	return msgSend(^NS.Array, self, "vertexBuffers")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="setVertexBuffers")
+AccelerationStructureMotionTriangleGeometryDescriptor_setVertexBuffers :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor, buffers: ^NS.Array) {
+	msgSend(nil, self, "setVertexBuffers:", buffers)
+}
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="vertexStride")
+AccelerationStructureMotionTriangleGeometryDescriptor_vertexStride :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "vertexStride")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="setVertexStride")
+AccelerationStructureMotionTriangleGeometryDescriptor_setVertexStride :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor, stride: NS.UInteger) {
+	msgSend(nil, self, "setVertexStride:", stride)
+}
+
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="indexBuffer")
+AccelerationStructureMotionTriangleGeometryDescriptor_indexBuffer :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "indexBuffer")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="setIndexBuffer")
+AccelerationStructureMotionTriangleGeometryDescriptor_setIndexBuffer :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor, buffer: ^Buffer) {
+	msgSend(nil, self, "setIndexBuffer:", buffer)
+}
+
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="indexBufferOffset")
+AccelerationStructureMotionTriangleGeometryDescriptor_indexBufferOffset :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "indexBufferOffset")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="setIndexBufferOffset")
+AccelerationStructureMotionTriangleGeometryDescriptor_setIndexBufferOffset :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor, offset: NS.UInteger) {
+	msgSend(nil, self, "setIndexBufferOffset:", offset)
+}
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="indexType")
+AccelerationStructureMotionTriangleGeometryDescriptor_indexType :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> IndexType {
+	return msgSend(IndexType, self, "indexType")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="setIndexType")
+AccelerationStructureMotionTriangleGeometryDescriptor_setIndexType :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor, indexType: IndexType) {
+	msgSend(nil, self, "setIndexType:", indexType)
+}
+
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="triangleCount")
+AccelerationStructureMotionTriangleGeometryDescriptor_triangleCount :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "triangleCount")
+}
+@(objc_type=AccelerationStructureMotionTriangleGeometryDescriptor, objc_name="setTriangleCount")
+AccelerationStructureMotionTriangleGeometryDescriptor_setTriangleCount :: #force_inline proc(self: ^AccelerationStructureMotionTriangleGeometryDescriptor, count: NS.UInteger) {
+	msgSend(nil, self, "setTriangleCount:", count)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/*
+Class:
+	AccelerationStructureMotionBoundingBoxGeometryDescriptor
+*/
+
+@(objc_class="MTLAccelerationStructureMotionBoundingBoxGeometryDescriptor")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureMotionBoundingBoxGeometryDescriptor), using _: AccelerationStructureGeometryDescriptor }
+
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_class_name="alloc")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_alloc :: #force_inline proc() -> ^AccelerationStructureMotionBoundingBoxGeometryDescriptor {
+	return msgSend(^AccelerationStructureMotionBoundingBoxGeometryDescriptor, AccelerationStructureMotionBoundingBoxGeometryDescriptor, "alloc")
+}
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="init")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_init :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor) -> ^AccelerationStructureMotionBoundingBoxGeometryDescriptor {
+	return msgSend(^AccelerationStructureMotionBoundingBoxGeometryDescriptor, self, "init")
+}
+
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_class_name="descriptor")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_descriptor :: #force_inline proc() -> ^AccelerationStructureMotionBoundingBoxGeometryDescriptor {
+	return msgSend(^AccelerationStructureMotionBoundingBoxGeometryDescriptor, AccelerationStructureMotionBoundingBoxGeometryDescriptor, "descriptor")
+}
+
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="boundingBoxBuffers")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_boundingBoxBuffers :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor) -> ^NS.Array {
+	return msgSend(^NS.Array, self, "boundingBoxBuffers")
+}
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="setBoundBoxBuffers")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_setBoundBoxBuffers :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor, buffers: ^NS.Array) {
+	msgSend(nil, self, "setBoundBoxBuffers:", buffers)
+}
+
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="boundingBoxStride")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_boundingBoxStride :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "boundingBoxStride")
+}
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="setBoundingBoxStride")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_setBoundingBoxStride :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor, stride: NS.UInteger) {
+	msgSend(nil, self, "setBoundingBoxStride:", stride)
+}
+
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="boundingBoxCount")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_boundingBoxCount :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "boundingBoxCount")
+}
+@(objc_type=AccelerationStructureMotionBoundingBoxGeometryDescriptor, objc_name="setBoundingBoxCount")
+AccelerationStructureMotionBoundingBoxGeometryDescriptor_setBoundingBoxCount :: #force_inline proc(self: ^AccelerationStructureMotionBoundingBoxGeometryDescriptor, offset: NS.UInteger) {
+	msgSend(nil, self, "setBoundingBoxCount:", offset)
+}
+
+
+
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -242,8 +374,8 @@ AccelerationStructureTriangleGeometryDescriptor_descriptor :: #force_inline proc
 	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, AccelerationStructureTriangleGeometryDescriptor, "descriptor")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="indexBuffer")
-AccelerationStructureTriangleGeometryDescriptor_indexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> ^AccelerationStructureTriangleGeometryDescriptor {
-	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, self, "indexBuffer")
+AccelerationStructureTriangleGeometryDescriptor_indexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "indexBuffer")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="indexBufferOffset")
 AccelerationStructureTriangleGeometryDescriptor_indexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.UInteger {
@@ -286,8 +418,8 @@ AccelerationStructureTriangleGeometryDescriptor_triangleCount :: #force_inline p
 	return msgSend(NS.UInteger, self, "triangleCount")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="vertexBuffer")
-AccelerationStructureTriangleGeometryDescriptor_vertexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> ^AccelerationStructureTriangleGeometryDescriptor {
-	return msgSend(^AccelerationStructureTriangleGeometryDescriptor, self, "vertexBuffer")
+AccelerationStructureTriangleGeometryDescriptor_vertexBuffer :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "vertexBuffer")
 }
 @(objc_type=AccelerationStructureTriangleGeometryDescriptor, objc_name="vertexBufferOffset")
 AccelerationStructureTriangleGeometryDescriptor_vertexBufferOffset :: #force_inline proc(self: ^AccelerationStructureTriangleGeometryDescriptor) -> NS.UInteger {
@@ -781,8 +913,8 @@ BlitPassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inlin
 	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-BlitPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> ^BlitPassSampleBufferAttachmentDescriptor {
-	return msgSend(^BlitPassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
+BlitPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "sampleBuffer")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
 BlitPassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
@@ -1260,8 +1392,8 @@ ComputePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_in
 	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-ComputePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> ^ComputePassSampleBufferAttachmentDescriptor {
-	return msgSend(^ComputePassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
+ComputePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "sampleBuffer")
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
 ComputePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
@@ -1993,8 +2125,8 @@ InstanceAccelerationStructureDescriptor_instanceCount :: #force_inline proc(self
 	return msgSend(NS.UInteger, self, "instanceCount")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceDescriptorBuffer")
-InstanceAccelerationStructureDescriptor_instanceDescriptorBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> ^InstanceAccelerationStructureDescriptor {
-	return msgSend(^InstanceAccelerationStructureDescriptor, self, "instanceDescriptorBuffer")
+InstanceAccelerationStructureDescriptor_instanceDescriptorBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "instanceDescriptorBuffer")
 }
 @(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceDescriptorBufferOffset")
 InstanceAccelerationStructureDescriptor_instanceDescriptorBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.UInteger {
@@ -2028,6 +2160,46 @@ InstanceAccelerationStructureDescriptor_setInstanceDescriptorStride :: #force_in
 InstanceAccelerationStructureDescriptor_setInstancedAccelerationStructures :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, instancedAccelerationStructures: ^NS.Array) {
 	msgSend(nil, self, "setInstancedAccelerationStructures:", instancedAccelerationStructures)
 }
+
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="instanceDescriptorType")
+InstanceAccelerationStructureDescriptor_instanceDescriptorType :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> AccelerationStructureInstanceDescriptorType {
+	return msgSend(AccelerationStructureInstanceDescriptorType, self, "instanceDescriptorType")
+}
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setInstanceDescriptorType")
+InstanceAccelerationStructureDescriptor_setInstanceDescriptorType :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, buffer: AccelerationStructureInstanceDescriptorType) {
+	msgSend(nil, self, "setInstanceDescriptorType:", buffer)
+}
+
+
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="motionTransformBuffer")
+InstanceAccelerationStructureDescriptor_motionTransformBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "motionTransformBuffer")
+}
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setMotionTransformBuffer")
+InstanceAccelerationStructureDescriptor_setMotionTransformBuffer :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, buffer: ^Buffer) {
+	msgSend(nil, self, "setMotionTransformBuffer:", buffer)
+}
+
+
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="motionTransformBufferOffset")
+InstanceAccelerationStructureDescriptor_motionTransformBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "motionTransformBufferOffset")
+}
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setMotionTransformBufferOffset")
+InstanceAccelerationStructureDescriptor_setMotionTransformBufferOffset :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, offset: NS.UInteger) {
+	msgSend(nil, self, "setMotionTransformBufferOffset:", offset)
+}
+
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="motionTransformCount")
+InstanceAccelerationStructureDescriptor_motionTransformCount :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "motionTransformCount")
+}
+@(objc_type=InstanceAccelerationStructureDescriptor, objc_name="setMotionTransformCount")
+InstanceAccelerationStructureDescriptor_setMotionTransformCount :: #force_inline proc(self: ^InstanceAccelerationStructureDescriptor, offset: NS.UInteger) {
+	msgSend(nil, self, "setMotionTransformCount:", offset)
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2280,6 +2452,54 @@ PrimitiveAccelerationStructureDescriptor_geometryDescriptors :: #force_inline pr
 PrimitiveAccelerationStructureDescriptor_setGeometryDescriptors :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor, geometryDescriptors: ^NS.Array) {
 	msgSend(nil, self, "setGeometryDescriptors:", geometryDescriptors)
 }
+
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="motionStartBorderMode")
+PrimitiveAccelerationStructureDescriptor_motionStartBorderMode :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor) -> MotionBorderMode {
+	return msgSend(MotionBorderMode, self, "motionStartBorderMode")
+}
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="setMotionStartBorderMode")
+PrimitiveAccelerationStructureDescriptor_setMotionStartBorderMode :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor, motionStartBorderMode: MotionBorderMode) {
+	msgSend(nil, self, "setMotionStartBorderMode:", motionStartBorderMode)
+}
+
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="motionEndBorderMode")
+PrimitiveAccelerationStructureDescriptor_motionEndBorderMode :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor) -> MotionBorderMode {
+	return msgSend(MotionBorderMode, self, "motionEndBorderMode")
+}
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="setMotionEndBorderMode")
+PrimitiveAccelerationStructureDescriptor_setMotionEndBorderMode :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor, motionEndBorderMode: MotionBorderMode) {
+	msgSend(nil, self, "setMotionEndBorderMode:", motionEndBorderMode)
+}
+
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="motionStartTime")
+PrimitiveAccelerationStructureDescriptor_motionStartTime :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor) -> f32 {
+	return msgSend(f32, self, "motionStartTime")
+}
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="setMotionStartTime")
+PrimitiveAccelerationStructureDescriptor_setMotionStartTime :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor, motionStartTime: f32) {
+	msgSend(nil, self, "setMotionStartTime:", motionStartTime)
+}
+
+
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="motionEndTime")
+PrimitiveAccelerationStructureDescriptor_motionEndTime :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor) -> f32 {
+	return msgSend(f32, self, "motionEndTime")
+}
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="setMotionEndTime")
+PrimitiveAccelerationStructureDescriptor_setMotionEndTime :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor, motionEndTime: f32) {
+	msgSend(nil, self, "setMotionEndTime:", motionEndTime)
+}
+
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="motionKeyframeCount")
+PrimitiveAccelerationStructureDescriptor_motionKeyframeCount :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "motionKeyframeCount")
+}
+@(objc_type=PrimitiveAccelerationStructureDescriptor, objc_name="setMotionKeyframeCount")
+PrimitiveAccelerationStructureDescriptor_setMotionKeyframeCount :: #force_inline proc(self: ^PrimitiveAccelerationStructureDescriptor, motionKeyframeCount: NS.UInteger) {
+	msgSend(nil, self, "setMotionKeyframeCount:", motionKeyframeCount)
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2880,8 +3100,8 @@ RenderPassDescriptor_tileWidth :: #force_inline proc(self: ^RenderPassDescriptor
 	return msgSend(NS.UInteger, self, "tileWidth")
 }
 @(objc_type=RenderPassDescriptor, objc_name="visibilityResultBuffer")
-RenderPassDescriptor_visibilityResultBuffer :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RenderPassDescriptor {
-	return msgSend(^RenderPassDescriptor, self, "visibilityResultBuffer")
+RenderPassDescriptor_visibilityResultBuffer :: #force_inline proc(self: ^RenderPassDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "visibilityResultBuffer")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2924,8 +3144,8 @@ RenderPassSampleBufferAttachmentDescriptor_endOfVertexSampleIndex :: #force_inli
 	return msgSend(NS.UInteger, self, "endOfVertexSampleIndex")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-RenderPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> ^RenderPassSampleBufferAttachmentDescriptor {
-	return msgSend(^RenderPassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
+RenderPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "sampleBuffer")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setEndOfFragmentSampleIndex")
 RenderPassSampleBufferAttachmentDescriptor_setEndOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, endOfFragmentSampleIndex: NS.UInteger) {
@@ -3537,8 +3757,8 @@ ResourceStatePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #fo
 	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-ResourceStatePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
-	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptor, self, "sampleBuffer")
+ResourceStatePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> ^Buffer {
+	return msgSend(^Buffer, self, "sampleBuffer")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
 ResourceStatePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
@@ -4985,11 +5205,11 @@ ArgumentEncoder_setComputePipelineStates :: #force_inline proc(self: ^ArgumentEn
 	msgSend(nil, self, "setComputePipelineStates:withRange:", pipelines, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIndirectCommandBuffer")
-ArgumentEncoder_setIndirectCommandBuffer :: #force_inline proc(self: ^ArgumentEncoder, indirectCommandBuffer: ^Buffer, index: NS.UInteger) {
+ArgumentEncoder_setIndirectCommandBuffer :: #force_inline proc(self: ^ArgumentEncoder, indirectCommandBuffer: ^IndirectCommandBuffer, index: NS.UInteger) {
 	msgSend(nil, self, "setIndirectCommandBuffer:atIndex:", indirectCommandBuffer, index)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIndirectCommandBuffers")
-ArgumentEncoder_setIndirectCommandBuffers :: #force_inline proc(self: ^ArgumentEncoder, buffers: [^]^Buffer, range: NS.Range) {
+ArgumentEncoder_setIndirectCommandBuffers :: #force_inline proc(self: ^ArgumentEncoder, buffers: [^]^IndirectCommandBuffer, range: NS.Range) {
 	msgSend(nil, self, "setIndirectCommandBuffers:withRange:", buffers, range)
 }
 @(objc_type=ArgumentEncoder, objc_name="setIntersectionFunctionTable")
@@ -7980,8 +8200,8 @@ Texture_arrayLength :: #force_inline proc(self: ^Texture) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "arrayLength")
 }
 @(objc_type=Texture, objc_name="buffer")
-Texture_buffer :: #force_inline proc(self: ^Texture) -> ^Texture {
-	return msgSend(^Texture, self, "buffer")
+Texture_buffer :: #force_inline proc(self: ^Texture) -> ^Buffer {
+	return msgSend(^Buffer, self, "buffer")
 }
 @(objc_type=Texture, objc_name="bufferBytesPerRow")
 Texture_bufferBytesPerRow :: #force_inline proc(self: ^Texture) -> NS.UInteger {
