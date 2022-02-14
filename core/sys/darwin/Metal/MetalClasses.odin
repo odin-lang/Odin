@@ -6599,9 +6599,9 @@ Device_newRenderPipelineStateWithTileDescriptorWithReflection :: #force_inline p
 	pipeline = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
-@(objc_type=Device, objc_name="newSamplerState")
+@(objc_type=Device, objc_name="newSamplerStateWithDescriptor")
 Device_newSamplerState :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^SamplerState {
-	return msgSend(^SamplerState, self, "newSamplerState:", descriptor)
+	return msgSend(^SamplerState, self, "newSamplerStateWithDescriptor:", descriptor)
 }
 @(objc_type=Device, objc_name="newSharedEvent")
 Device_newSharedEvent :: #force_inline proc(self: ^Device) -> ^SharedEvent {
