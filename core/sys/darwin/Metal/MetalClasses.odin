@@ -7434,8 +7434,8 @@ Methods:
 ParallelRenderCommandEncoder :: struct { using _: CommandEncoder }
 
 @(objc_type=ParallelRenderCommandEncoder, objc_name="renderCommandEncoder")
-ParallelRenderCommandEncoder_renderCommandEncoder :: #force_inline proc(self: ^ParallelRenderCommandEncoder) -> ^ParallelRenderCommandEncoder {
-	return msgSend(^ParallelRenderCommandEncoder, self, "renderCommandEncoder")
+ParallelRenderCommandEncoder_renderCommandEncoder :: #force_inline proc(self: ^ParallelRenderCommandEncoder) -> ^RenderCommandEncoder {
+	return msgSend(^RenderCommandEncoder, self, "renderCommandEncoder")
 }
 @(objc_type=ParallelRenderCommandEncoder, objc_name="setColorStoreAction")
 ParallelRenderCommandEncoder_setColorStoreAction :: #force_inline proc(self: ^ParallelRenderCommandEncoder, storeAction: StoreAction, colorAttachmentIndex: NS.UInteger) {
