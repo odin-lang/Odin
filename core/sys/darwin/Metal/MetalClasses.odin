@@ -5491,8 +5491,14 @@ Buffer_addDebugMarker :: #force_inline proc(self: ^Buffer, marker: ^NS.String, r
 	msgSend(nil, self, "addDebugMarker:range:", marker, range)
 }
 @(objc_type=Buffer, objc_name="contents")
-Buffer_contents :: #force_inline proc(self: ^Buffer) -> rawptr {
-	return msgSend(rawptr, self, "contents")
+Buffer_contents :: #force_inline proc(self: ^Buffer) -> []byte {
+	contents := msgSend([^]byte, self, "contents")
+	length := Buffer_length(self)
+	return contents[:length]
+}
+@(objc_type=Buffer, objc_name="contentsPointer")
+Buffer_contentsPointer :: #force_inline proc(self: ^Buffer) -> rawptr {
+	return msgSend([^]byte, self, "contents")
 }
 @(objc_type=Buffer, objc_name="didModifyRange")
 Buffer_didModifyRange :: #force_inline proc(self: ^Buffer, range: NS.Range) {
@@ -5517,6 +5523,11 @@ Buffer_remoteStorageBuffer :: #force_inline proc(self: ^Buffer) -> ^Buffer {
 @(objc_type=Buffer, objc_name="removeAllDebugMarkers")
 Buffer_removeAllDebugMarkers :: #force_inline proc(self: ^Buffer) {
 	msgSend(nil, self, "removeAllDebugMarkers")
+}
+
+@(objc_type=Buffer, objc_name="newTexture")
+Buffer_newTexture :: #force_inline proc(self: ^Buffer, descriptor: ^TextureDescriptor, offset: NS.UInteger, bytesPerRow: NS.UInteger) -> ^Texture {
+	return msgSend(^Texture, self, "newTextureWithDescriptor:offset:bytesPerRow:")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
