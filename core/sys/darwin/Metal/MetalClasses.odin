@@ -5184,7 +5184,7 @@ ArgumentEncoder_setAccelerationStructure :: #force_inline proc(self: ^ArgumentEn
 ArgumentEncoder_setArgumentBufferWithOffset :: #force_inline proc(self: ^ArgumentEncoder, argumentBuffer: ^Buffer, offset: NS.UInteger) {
 	msgSend(nil, self, "setArgumentBuffer:offset:", argumentBuffer, offset)
 }
-@(objc_type=ArgumentEncoder, objc_name="setArgumentBuffer_startOffsetWithStartOffset")
+@(objc_type=ArgumentEncoder, objc_name="setArgumentBufferWithStartOffset")
 ArgumentEncoder_setArgumentBuffer_startOffsetWithStartOffset :: #force_inline proc(self: ^ArgumentEncoder, argumentBuffer: ^Buffer, startOffset: NS.UInteger, arrayElement: NS.UInteger) {
 	msgSend(nil, self, "setArgumentBuffer:startOffset:arrayElement:", argumentBuffer, startOffset, arrayElement)
 }
@@ -5998,7 +5998,7 @@ ComputeCommandEncoder_setIntersectionFunctionTables :: #force_inline proc(self: 
 ComputeCommandEncoder_setSamplerState :: #force_inline proc(self: ^ComputeCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) {
 	msgSend(nil, self, "setSamplerState:atIndex:", sampler, index)
 }
-@(objc_type=ComputeCommandEncoder, objc_name="setSamplerState_lodMinClamp_lodMaxClamp")
+@(objc_type=ComputeCommandEncoder, objc_name="setSamplerStateWithLod")
 ComputeCommandEncoder_setSamplerState_lodMinClamp_lodMaxClamp :: #force_inline proc(self: ^ComputeCommandEncoder, sampler: ^SamplerState, lodMinClamp: f32, lodMaxClamp: f32, index: NS.UInteger) {
 	msgSend(nil, self, "setSamplerState:lodMinClamp:lodMaxClamp:atIndex:", sampler, lodMinClamp, lodMaxClamp, index)
 }
