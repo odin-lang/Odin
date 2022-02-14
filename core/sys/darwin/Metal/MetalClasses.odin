@@ -676,8 +676,8 @@ AttributeDescriptorArray_alloc :: #force_inline proc() -> ^AttributeDescriptorAr
 AttributeDescriptorArray_init :: #force_inline proc(self: ^AttributeDescriptorArray) -> ^AttributeDescriptorArray {
 	return msgSend(^AttributeDescriptorArray, self, "init")
 }
-@(objc_type=AttributeDescriptorArray, objc_name="objectAtIndexedSubscript")
-AttributeDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^AttributeDescriptorArray, index: NS.UInteger) -> ^AttributeDescriptor {
+@(objc_type=AttributeDescriptorArray, objc_name="object")
+AttributeDescriptorArray_object :: #force_inline proc(self: ^AttributeDescriptorArray, index: NS.UInteger) -> ^AttributeDescriptor {
 	return msgSend(^AttributeDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=AttributeDescriptorArray, objc_name="setObject")
@@ -824,8 +824,8 @@ BlitPassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^
 BlitPassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray) -> ^BlitPassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-BlitPassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^BlitPassSampleBufferAttachmentDescriptor {
+@(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="object")
+BlitPassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^BlitPassSampleBufferAttachmentDescriptor {
 	return msgSend(^BlitPassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
@@ -908,8 +908,8 @@ BufferLayoutDescriptorArray_alloc :: #force_inline proc() -> ^BufferLayoutDescri
 BufferLayoutDescriptorArray_init :: #force_inline proc(self: ^BufferLayoutDescriptorArray) -> ^BufferLayoutDescriptorArray {
 	return msgSend(^BufferLayoutDescriptorArray, self, "init")
 }
-@(objc_type=BufferLayoutDescriptorArray, objc_name="objectAtIndexedSubscript")
-BufferLayoutDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^BufferLayoutDescriptorArray, index: NS.UInteger) -> ^BufferLayoutDescriptor {
+@(objc_type=BufferLayoutDescriptorArray, objc_name="object")
+BufferLayoutDescriptorArray_object :: #force_inline proc(self: ^BufferLayoutDescriptorArray, index: NS.UInteger) -> ^BufferLayoutDescriptor {
 	return msgSend(^BufferLayoutDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=BufferLayoutDescriptorArray, objc_name="setObject")
@@ -1303,8 +1303,8 @@ ComputePassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() -
 ComputePassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray) -> ^ComputePassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-ComputePassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ComputePassSampleBufferAttachmentDescriptor {
+@(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="object")
+ComputePassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc(self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ComputePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ComputePassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
@@ -2178,8 +2178,8 @@ PipelineBufferDescriptorArray_alloc :: #force_inline proc() -> ^PipelineBufferDe
 PipelineBufferDescriptorArray_init :: #force_inline proc(self: ^PipelineBufferDescriptorArray) -> ^PipelineBufferDescriptorArray {
 	return msgSend(^PipelineBufferDescriptorArray, self, "init")
 }
-@(objc_type=PipelineBufferDescriptorArray, objc_name="objectAtIndexedSubscript")
-PipelineBufferDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^PipelineBufferDescriptorArray, bufferIndex: NS.UInteger) -> ^PipelineBufferDescriptor {
+@(objc_type=PipelineBufferDescriptorArray, objc_name="object")
+PipelineBufferDescriptorArray_object :: #force_inline proc(self: ^PipelineBufferDescriptorArray, bufferIndex: NS.UInteger) -> ^PipelineBufferDescriptor {
 	return msgSend(^PipelineBufferDescriptor, self, "objectAtIndexedSubscript:", bufferIndex)
 }
 @(objc_type=PipelineBufferDescriptorArray, objc_name="setObject")
@@ -2304,8 +2304,8 @@ RasterizationRateLayerArray_alloc :: #force_inline proc() -> ^RasterizationRateL
 RasterizationRateLayerArray_init :: #force_inline proc(self: ^RasterizationRateLayerArray) -> ^RasterizationRateLayerArray {
 	return msgSend(^RasterizationRateLayerArray, self, "init")
 }
-@(objc_type=RasterizationRateLayerArray, objc_name="objectAtIndexedSubscript")
-RasterizationRateLayerArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RasterizationRateLayerArray, layerIndex: NS.UInteger) -> ^RasterizationRateLayerDescriptor {
+@(objc_type=RasterizationRateLayerArray, objc_name="object")
+RasterizationRateLayerArray_object :: #force_inline proc(self: ^RasterizationRateLayerArray, layerIndex: NS.UInteger) -> ^RasterizationRateLayerDescriptor {
 	return msgSend(^RasterizationRateLayerDescriptor, self, "objectAtIndexedSubscript:", layerIndex)
 }
 @(objc_type=RasterizationRateLayerArray, objc_name="setObject")
@@ -2470,8 +2470,8 @@ RasterizationRateSampleArray_alloc :: #force_inline proc() -> ^RasterizationRate
 RasterizationRateSampleArray_init :: #force_inline proc(self: ^RasterizationRateSampleArray) -> ^RasterizationRateSampleArray {
 	return msgSend(^RasterizationRateSampleArray, self, "init")
 }
-@(objc_type=RasterizationRateSampleArray, objc_name="objectAtIndexedSubscript")
-RasterizationRateSampleArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RasterizationRateSampleArray, index: NS.UInteger) -> NS.UInteger {
+@(objc_type=RasterizationRateSampleArray, objc_name="object")
+RasterizationRateSampleArray_object :: #force_inline proc(self: ^RasterizationRateSampleArray, index: NS.UInteger) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=RasterizationRateSampleArray, objc_name="setObject")
@@ -2979,8 +2979,8 @@ RenderPassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline proc() ->
 RenderPassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray) -> ^RenderPassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-RenderPassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassSampleBufferAttachmentDescriptor {
+@(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="object")
+RenderPassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassSampleBufferAttachmentDescriptor {
 	return msgSend(^RenderPassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
@@ -3165,8 +3165,8 @@ RenderPipelineColorAttachmentDescriptorArray_alloc :: #force_inline proc() -> ^R
 RenderPipelineColorAttachmentDescriptorArray_init :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray) -> ^RenderPipelineColorAttachmentDescriptorArray {
 	return msgSend(^RenderPipelineColorAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-RenderPipelineColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPipelineColorAttachmentDescriptor {
+@(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="object")
+RenderPipelineColorAttachmentDescriptorArray_object :: #force_inline proc(self: ^RenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPipelineColorAttachmentDescriptor {
 	return msgSend(^RenderPipelineColorAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="setObject")
@@ -3580,8 +3580,8 @@ ResourceStatePassSampleBufferAttachmentDescriptorArray_alloc :: #force_inline pr
 ResourceStatePassSampleBufferAttachmentDescriptorArray_init :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray) -> ^ResourceStatePassSampleBufferAttachmentDescriptorArray {
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-ResourceStatePassSampleBufferAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
+@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="object")
+ResourceStatePassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
 	return msgSend(^ResourceStatePassSampleBufferAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="setObject")
@@ -4374,8 +4374,8 @@ TileRenderPipelineColorAttachmentDescriptorArray_alloc :: #force_inline proc() -
 TileRenderPipelineColorAttachmentDescriptorArray_init :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray) -> ^TileRenderPipelineColorAttachmentDescriptorArray {
 	return msgSend(^TileRenderPipelineColorAttachmentDescriptorArray, self, "init")
 }
-@(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="objectAtIndexedSubscript")
-TileRenderPipelineColorAttachmentDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^TileRenderPipelineColorAttachmentDescriptor {
+@(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="object")
+TileRenderPipelineColorAttachmentDescriptorArray_object :: #force_inline proc(self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^TileRenderPipelineColorAttachmentDescriptor {
 	return msgSend(^TileRenderPipelineColorAttachmentDescriptor, self, "objectAtIndexedSubscript:", attachmentIndex)
 }
 @(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="setObject")
@@ -4634,8 +4634,8 @@ VertexAttributeDescriptorArray_alloc :: #force_inline proc() -> ^VertexAttribute
 VertexAttributeDescriptorArray_init :: #force_inline proc(self: ^VertexAttributeDescriptorArray) -> ^VertexAttributeDescriptorArray {
 	return msgSend(^VertexAttributeDescriptorArray, self, "init")
 }
-@(objc_type=VertexAttributeDescriptorArray, objc_name="objectAtIndexedSubscript")
-VertexAttributeDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^VertexAttributeDescriptorArray, index: NS.UInteger) -> ^VertexAttributeDescriptor {
+@(objc_type=VertexAttributeDescriptorArray, objc_name="object")
+VertexAttributeDescriptorArray_object :: #force_inline proc(self: ^VertexAttributeDescriptorArray, index: NS.UInteger) -> ^VertexAttributeDescriptor {
 	return msgSend(^VertexAttributeDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=VertexAttributeDescriptorArray, objc_name="setObject")
@@ -4718,8 +4718,8 @@ VertexBufferLayoutDescriptorArray_alloc :: #force_inline proc() -> ^VertexBuffer
 VertexBufferLayoutDescriptorArray_init :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray) -> ^VertexBufferLayoutDescriptorArray {
 	return msgSend(^VertexBufferLayoutDescriptorArray, self, "init")
 }
-@(objc_type=VertexBufferLayoutDescriptorArray, objc_name="objectAtIndexedSubscript")
-VertexBufferLayoutDescriptorArray_objectAtIndexedSubscript :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray, index: NS.UInteger) -> ^VertexBufferLayoutDescriptor {
+@(objc_type=VertexBufferLayoutDescriptorArray, objc_name="object")
+VertexBufferLayoutDescriptorArray_object :: #force_inline proc(self: ^VertexBufferLayoutDescriptorArray, index: NS.UInteger) -> ^VertexBufferLayoutDescriptor {
 	return msgSend(^VertexBufferLayoutDescriptor, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=VertexBufferLayoutDescriptorArray, objc_name="setObject")
@@ -7007,7 +7007,7 @@ IndirectRenderCommand_drawPatches :: #force_inline proc(self: ^IndirectRenderCom
 	msgSend(nil, self, "drawPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:instanceCount:baseInstance:tessellationFactorBuffer:tessellationFactorBufferOffset:tessellationFactorBufferInstanceStride:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, instanceCount, baseInstance, buffer, offset, instanceStride)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawPrimitives")
-IndirectRenderCommand_drawPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
+IndirectRenderCommand_drawPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger = 0, baseInstance: NS.UInteger = 0) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:", primitiveType, vertexStart, vertexCount, instanceCount, baseInstance)
 }
 @(objc_type=IndirectRenderCommand, objc_name="reset")
@@ -7104,8 +7104,8 @@ Methods:
 Library :: struct { using _: NS.Object }
 
 @(objc_type=Library, objc_name="device")
-Library_device :: #force_inline proc(self: ^Library) -> ^Library {
-	return msgSend(^Library, self, "device")
+Library_device :: #force_inline proc(self: ^Library) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=Library, objc_name="functionNames")
 Library_functionNames :: #force_inline proc(self: ^Library) -> ^NS.Array {
@@ -7120,34 +7120,34 @@ Library_label :: #force_inline proc(self: ^Library) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=Library, objc_name="newFunctionWithDescriptorWithCompletionHandler")
-Library_newFunctionWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor, completionHandler: rawptr) {
-	msgSend(nil, self, "newFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
+Library_newFunctionWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor, completionHandler: rawptr) -> ^Function {
+	return msgSend(^Function, self, "newFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
 @(objc_type=Library, objc_name="newFunctionWithDescriptor")
-Library_newFunctionWithDescriptor :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
-	library = msgSend(^Library, self, "newFunctionWithDescriptor:error:", descriptor, &error)
+Library_newFunctionWithDescriptor :: #force_inline proc(self: ^Library, descriptor: ^FunctionDescriptor) -> (function: ^Function, error: ^NS.Error) {
+	function = msgSend(^Function, self, "newFunctionWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=Library, objc_name="newFunctionWithName")
-Library_newFunctionWithName :: #force_inline proc(self: ^Library, functionName: ^NS.String) -> ^Library {
-	return msgSend(^Library, self, "newFunctionWithName:", functionName)
+Library_newFunctionWithName :: #force_inline proc(self: ^Library, functionName: ^NS.String) -> ^Function {
+	return msgSend(^Function, self, "newFunctionWithName:", functionName)
 }
 @(objc_type=Library, objc_name="newFunctionWithNameWithConstantValuesAndCompletionHandler")
-Library_newFunctionWithNameWithConstantValuesAndCompletionHandler :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues, completionHandler: rawptr) {
-	msgSend(nil, self, "newFunctionWithName:constantValues:completionHandler:", name, constantValues, completionHandler)
+Library_newFunctionWithNameWithConstantValuesAndCompletionHandler :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues, completionHandler: rawptr) -> ^Function {
+	return msgSend(^Function, self, "newFunctionWithName:constantValues:completionHandler:", name, constantValues, completionHandler)
 }
 @(objc_type=Library, objc_name="newFunctionWithNameWithConstantValues")
-Library_newFunctionWithNameWithConstantValues :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues) -> (library: ^Library, error: ^NS.Error) {
-	library = msgSend(^Library, self, "newFunctionWithName:constantValues:error:", name, constantValues, &error)
+Library_newFunctionWithNameWithConstantValues :: #force_inline proc(self: ^Library, name: ^NS.String, constantValues: ^FunctionConstantValues) -> (function: ^Function, error: ^NS.Error) {
+	function = msgSend(^Function, self, "newFunctionWithName:constantValues:error:", name, constantValues, &error)
 	return
 }
 @(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptorWithCompletionHandler")
-Library_newIntersectionFunctionWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor, completionHandler: rawptr) {
-	msgSend(nil, self, "newIntersectionFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
+Library_newIntersectionFunctionWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor, completionHandler: rawptr) -> ^Function {
+	return msgSend(^Function, self, "newIntersectionFunctionWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
 @(objc_type=Library, objc_name="newIntersectionFunctionWithDescriptor")
-Library_newIntersectionFunctionWithDescriptor :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor) -> (library: ^Library, error: ^NS.Error) {
-	library = msgSend(^Library, self, "newIntersectionFunctionWithDescriptor:error:", descriptor, &error)
+Library_newIntersectionFunctionWithDescriptor :: #force_inline proc(self: ^Library, descriptor: ^IntersectionFunctionDescriptor) -> (function: ^Function, error: ^NS.Error) {
+	function = msgSend(^Function, self, "newIntersectionFunctionWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=Library, objc_name="setLabel")
