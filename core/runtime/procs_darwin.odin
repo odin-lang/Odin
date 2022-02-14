@@ -12,6 +12,7 @@ objc_SEL :: ^intrinsics.objc_selector
 foreign Foundation {
 	objc_lookUpClass :: proc "c" (name: cstring) -> objc_Class ---
 	sel_registerName :: proc "c" (name: cstring) -> objc_SEL ---
+	objc_allocateClassPair :: proc "c" (superclass: objc_Class, name: cstring, extraBytes: uint) ---
 
 	objc_msgSend        :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) ---
 	objc_msgSend_fpret  :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> f64 ---

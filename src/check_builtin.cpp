@@ -225,6 +225,7 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 
 	add_package_dependency(c, "runtime", "objc_lookUpClass");
 	add_package_dependency(c, "runtime", "sel_registerName");
+	add_package_dependency(c, "runtime", "objc_allocateClassPair");
 
 	add_package_dependency(c, "runtime", "objc_msgSend");
 	add_package_dependency(c, "runtime", "objc_msgSend_fpret");
