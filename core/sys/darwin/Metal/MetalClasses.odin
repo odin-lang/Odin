@@ -913,15 +913,15 @@ BlitPassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #force_inlin
 	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-BlitPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> ^Buffer {
-	return msgSend(^Buffer, self, "sampleBuffer")
+BlitPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor) -> ^CounterSampleBuffer {
+	return msgSend(^CounterSampleBuffer, self, "sampleBuffer")
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
 BlitPassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfEncoderSampleIndex:", endOfEncoderSampleIndex)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-BlitPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
+BlitPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^BlitPassSampleBufferAttachmentDescriptor, sampleBuffer: ^CounterSampleBuffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=BlitPassSampleBufferAttachmentDescriptor, objc_name="setStartOfEncoderSampleIndex")
