@@ -1823,7 +1823,101 @@ void lb_set_wasm_export_attributes(LLVMValueRef value, String export_name) {
 
 lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name);
 
-lbValue lb_handle_obj_id(lbProcedure *p, Ast *expr) {
+
+lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
+	lbAddr *found = string_map_get(&p->module->objc_selectors, name);
+	if (found) {
+		return *found;
+	} else {
+		lbModule *default_module = &p->module->gen->default_module;
+		Entity *e = nullptr;
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
+
+		lbValue ptr = lb_find_value_from_entity(p->module, e);
+		lbAddr local_addr = lb_addr(ptr);
+
+		string_map_set(&default_module->objc_selectors, name, default_addr);
+		if (default_module != p->module) {
+			string_map_set(&p->module->objc_selectors, name, local_addr);
+		}
+		return local_addr;
+	}
+}
+
+lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	return lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, name));
+}
+
+lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+	lbModule *m = p->module;
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	lbAddr dst = lb_handle_objc_find_or_register_selector(p, name);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 1);
+	args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+	lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
+	lb_addr_store(p, dst, ptr);
+
+	return lb_addr_load(p, dst);
+}
+
+lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
+	lbAddr *found = string_map_get(&p->module->objc_classes, name);
+	if (found) {
+		return *found;
+	} else {
+		lbModule *default_module = &p->module->gen->default_module;
+		Entity *e = nullptr;
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
+
+		lbValue ptr = lb_find_value_from_entity(p->module, e);
+		lbAddr local_addr = lb_addr(ptr);
+
+		string_map_set(&default_module->objc_classes, name, default_addr);
+		if (default_module != p->module) {
+			string_map_set(&p->module->objc_classes, name, local_addr);
+		}
+		return local_addr;
+	}
+}
+
+lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name));
+}
+
+lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+	lbModule *m = p->module;
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	lbAddr dst = lb_handle_objc_find_or_register_class(p, name);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 1);
+	args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+	lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
+	lb_addr_store(p, dst, ptr);
+
+	return lb_addr_load(p, dst);
+}
+
+
+lbValue lb_handle_objc_id(lbProcedure *p, Ast *expr) {
 	TypeAndValue const &tav = type_and_value_of_expr(expr);
 	if (tav.mode == Addressing_Type) {
 		Type *type = tav.type;
@@ -1854,29 +1948,7 @@ lbValue lb_handle_obj_id(lbProcedure *p, Ast *expr) {
 	return lb_build_expr(p, expr);
 }
 
-
-lbValue lb_handle_obj_selector(lbProcedure *p, String const &name) {
-	lbAddr *found = string_map_get(&p->module->objc_selectors, name);
-	if (found) {
-		return lb_addr_load(p, *found);
-	} else {
-		lbModule *default_module = &p->module->gen->default_module;
-		Entity *e = nullptr;
-		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
-
-		lbValue ptr = lb_find_value_from_entity(p->module, e);
-		lbAddr local_addr = lb_addr(ptr);
-
-		string_map_set(&default_module->objc_selectors, name, default_addr);
-		if (default_module != p->module) {
-			string_map_set(&p->module->objc_selectors, name, local_addr);
-		}
-		return lb_addr_load(p, local_addr);
-	}
-}
-
-
-lbValue lb_handle_obj_send(lbProcedure *p, Ast *expr) {
+lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
 	lbModule *m = p->module;
@@ -1887,10 +1959,10 @@ lbValue lb_handle_obj_send(lbProcedure *p, Ast *expr) {
 	GB_ASSERT(ce->args.count >= 3);
 	auto args = array_make<lbValue>(permanent_allocator(), 0, ce->args.count-1);
 
-	lbValue id = lb_handle_obj_id(p, ce->args[1]);
+	lbValue id = lb_handle_objc_id(p, ce->args[1]);
 	Ast *sel_expr = ce->args[2];
 	GB_ASSERT(sel_expr->tav.value.kind == ExactValue_String);
-	lbValue sel = lb_handle_obj_selector(p, sel_expr->tav.value.value_string);
+	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, sel_expr->tav.value.value_string));
 
 	array_add(&args, id);
 	array_add(&args, sel);
@@ -1917,12 +1989,3 @@ lbValue lb_handle_obj_send(lbProcedure *p, Ast *expr) {
 }
 
 
-lbValue lb_handle_obj_selector_name(lbProcedure *p, Ast *expr) {
-	ast_node(ce, CallExpr, expr);
-
-	auto tav = ce->args[0]->tav;
-	GB_ASSERT(tav.value.kind == ExactValue_String);
-	String name = tav.value.value_string;
-	return lb_handle_obj_selector(p, name);
-
-}

@@ -348,13 +348,27 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		return true;
 	} break;
 
-	case BuiltinProc_objc_selector_name: {
+	case BuiltinProc_objc_find_selector: 
+	case BuiltinProc_objc_find_class: 
+	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_register_class: 
+	{
 		String sel_name = {};
 		if (!is_constant_string(c, builtin_name, ce->args[0], &sel_name)) {
 			return false;
 		}
 
-		operand->type = t_objc_SEL;
+		switch (id) {
+		case BuiltinProc_objc_find_selector: 
+		case BuiltinProc_objc_register_selector: 
+			operand->type = t_objc_SEL;
+			break;
+		case BuiltinProc_objc_find_class: 
+		case BuiltinProc_objc_register_class: 
+			operand->type = t_objc_Class;
+			break;
+
+		}
 		operand->mode = Addressing_Value;
 		return true;
 	} break;
@@ -398,7 +412,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_max:
 	case BuiltinProc_type_is_subtype_of:
 	case BuiltinProc_objc_send:
-	case BuiltinProc_objc_selector_name:
+	case BuiltinProc_objc_find_selector: 
+	case BuiltinProc_objc_find_class: 
+	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_register_class: 
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -440,7 +457,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_objc_send:
-	case BuiltinProc_objc_selector_name:
+	case BuiltinProc_objc_find_selector: 
+	case BuiltinProc_objc_find_class: 
+	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_register_class: 
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
