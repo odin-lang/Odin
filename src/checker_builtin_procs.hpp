@@ -253,7 +253,10 @@ BuiltinProc__type_end,
 	BuiltinProc___entry_point,
 
 	BuiltinProc_objc_send,
-	BuiltinProc_objc_selector_name,
+	BuiltinProc_objc_find_selector,
+	BuiltinProc_objc_find_class,
+	BuiltinProc_objc_register_selector,
+	BuiltinProc_objc_register_class,
 
 	BuiltinProc_COUNT,
 };
@@ -509,5 +512,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("objc_send"),   3, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("objc_selector_name"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("objc_find_selector"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_find_class"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };

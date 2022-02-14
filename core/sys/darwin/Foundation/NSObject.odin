@@ -70,7 +70,7 @@ description :: proc(self: ^Object) -> ^String {
 
 @(objc_type=Object, objc_name="debugDescription")
 debugDescription :: proc(self: ^Object) -> ^String {
-	if msgSendSafeCheck(self, intrinsics.objc_selector_name("debugDescription")) {
+	if msgSendSafeCheck(self, intrinsics.objc_find_selector("debugDescription")) {
 		return msgSend(^String, self, "debugDescription")
 	}
 	return nil

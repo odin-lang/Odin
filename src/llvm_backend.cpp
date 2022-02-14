@@ -672,12 +672,14 @@ void lb_finalize_objc_names(lbProcedure *p) {
 	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
+
+	auto args = array_make<lbValue>(permanent_allocator(), 1);
+
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_begin_procedure_body(p);
 	for_array(i, m->objc_classes.entries) {
 		auto const &entry = m->objc_classes.entries[i];
 		String name = entry.key.string;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
 		lb_addr_store(p, entry.value, ptr);
@@ -686,7 +688,6 @@ void lb_finalize_objc_names(lbProcedure *p) {
 	for_array(i, m->objc_selectors.entries) {
 		auto const &entry = m->objc_selectors.entries[i];
 		String name = entry.key.string;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
 		lb_addr_store(p, entry.value, ptr);
