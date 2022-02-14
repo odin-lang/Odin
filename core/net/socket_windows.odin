@@ -110,19 +110,6 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Err
 	return
 }
 
-
-
-// This type of socket becomes bound when you try to send data.
-// This is likely what you want if you want to send data unsolicited.
-//
-// This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Network_Error) {
-	sock := create_socket(family, .Udp) or_return
-	skt = sock.(Udp_Socket)
-	return
-}
-
-
 Bind_Error :: enum c.int {
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = win.WSAEADDRINUSE,
@@ -138,6 +125,27 @@ Bind_Error :: enum c.int {
 	No_Ports_Available = win.WSAENOBUFS,
 }
 
+bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+	sockaddr, addrsize := address_to_sockaddr(ep.address, ep.port)
+	s := any_socket_to_socket(skt)
+	res := win.bind(win.SOCKET(s), (^win.SOCKADDR)(&sockaddr), addrsize)
+	if res < 0 {
+		err = Bind_Error(win.WSAGetLastError())
+	}
+	return
+}
+
+
+// This type of socket becomes bound when you try to send data.
+// This is likely what you want if you want to send data unsolicited.
+//
+// This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
+make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Network_Error) {
+	sock := create_socket(family, .Udp) or_return
+	skt = sock.(Udp_Socket)
+	return
+}
+
 // This type of socket is bound immediately, which enables it to receive data on the port.
 // Since it's UDP, it's also able to send data without receiving any first.
 //
@@ -146,14 +154,7 @@ Bind_Error :: enum c.int {
 // The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Network_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
-
-	sockaddr, addrsize := address_to_sockaddr(bound_address, port)
-	res := win.bind(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), addrsize)
-	if res < 0 {
-		err = Bind_Error(win.WSAGetLastError())
-		return
-	}
-
+	bind(skt, {bound_address, port}) or_return
 	return
 }
 
@@ -180,14 +181,9 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 	// prevent hijacking of the server's endpoint by other applications.
 	set_option(skt, .Exclusive_Addr_Use, true) or_return
 
-	sockaddr, addrsize := address_to_sockaddr(local_addr, port)
-	res := win.bind(win.SOCKET(skt), cast(^win.SOCKADDR) &sockaddr, addrsize)
-	if res == win.SOCKET_ERROR {
-		err = Listen_Error(win.WSAGetLastError())
-		return
-	}
+	bind(sock, {local_addr, port}) or_return
 
-	res = win.listen(win.SOCKET(skt), i32(backlog))
+	res := win.listen(win.SOCKET(skt), i32(backlog))
 	if res == win.SOCKET_ERROR {
 		err = Listen_Error(win.WSAGetLastError())
 		return
