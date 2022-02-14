@@ -1077,8 +1077,8 @@ CaptureDescriptor_init :: #force_inline proc(self: ^CaptureDescriptor) -> ^Captu
 	return msgSend(^CaptureDescriptor, self, "init")
 }
 @(objc_type=CaptureDescriptor, objc_name="captureObject")
-CaptureDescriptor_captureObject :: #force_inline proc(self: ^CaptureDescriptor) -> ^CaptureDescriptor {
-	return msgSend(^CaptureDescriptor, self, "captureObject")
+CaptureDescriptor_captureObject :: #force_inline proc(self: ^CaptureDescriptor) -> id {
+	return msgSend(id, self, "captureObject")
 }
 @(objc_type=CaptureDescriptor, objc_name="destination")
 CaptureDescriptor_destination :: #force_inline proc(self: ^CaptureDescriptor) -> CaptureDestination {
@@ -1143,12 +1143,12 @@ CaptureManager_isCapturing :: #force_inline proc(self: ^CaptureManager) -> BOOL 
 	return msgSend(BOOL, self, "isCapturing")
 }
 @(objc_type=CaptureManager, objc_name="newCaptureScopeWithCommandQueue")
-CaptureManager_newCaptureScopeWithCommandQueue :: #force_inline proc(self: ^CaptureManager, commandQueue: ^CommandQueue) -> ^CaptureManager {
-	return msgSend(^CaptureManager, self, "newCaptureScopeWithCommandQueue:", commandQueue)
+CaptureManager_newCaptureScopeWithCommandQueue :: #force_inline proc(self: ^CaptureManager, commandQueue: ^CommandQueue) -> ^CaptureScope {
+	return msgSend(^CaptureScope, self, "newCaptureScopeWithCommandQueue:", commandQueue)
 }
 @(objc_type=CaptureManager, objc_name="newCaptureScopeWithDevice")
-CaptureManager_newCaptureScopeWithDevice :: #force_inline proc(self: ^CaptureManager, device: ^Device) -> ^CaptureManager {
-	return msgSend(^CaptureManager, self, "newCaptureScopeWithDevice:", device)
+CaptureManager_newCaptureScopeWithDevice :: #force_inline proc(self: ^CaptureManager, device: ^Device) -> ^CaptureScope {
+	return msgSend(^CaptureScope, self, "newCaptureScopeWithDevice:", device)
 }
 @(objc_type=CaptureManager, objc_name="setDefaultCaptureScope")
 CaptureManager_setDefaultCaptureScope :: #force_inline proc(self: ^CaptureManager, defaultCaptureScope: ^CaptureScope) {
