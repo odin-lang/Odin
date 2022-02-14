@@ -3757,15 +3757,15 @@ ResourceStatePassSampleBufferAttachmentDescriptor_endOfEncoderSampleIndex :: #fo
 	return msgSend(NS.UInteger, self, "endOfEncoderSampleIndex")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-ResourceStatePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> ^Buffer {
-	return msgSend(^Buffer, self, "sampleBuffer")
+ResourceStatePassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor) -> ^CounterSampleBuffer {
+	return msgSend(^CounterSampleBuffer, self, "sampleBuffer")
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setEndOfEncoderSampleIndex")
 ResourceStatePassSampleBufferAttachmentDescriptor_setEndOfEncoderSampleIndex :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, endOfEncoderSampleIndex: NS.UInteger) {
 	msgSend(nil, self, "setEndOfEncoderSampleIndex:", endOfEncoderSampleIndex)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-ResourceStatePassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
+ResourceStatePassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^ResourceStatePassSampleBufferAttachmentDescriptor, sampleBuffer: ^CounterSampleBuffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=ResourceStatePassSampleBufferAttachmentDescriptor, objc_name="setStartOfEncoderSampleIndex")
@@ -4472,16 +4472,16 @@ TextureDescriptor_storageMode :: #force_inline proc(self: ^TextureDescriptor) ->
 TextureDescriptor_swizzle :: #force_inline proc(self: ^TextureDescriptor) -> TextureSwizzleChannels {
 	return msgSend(TextureSwizzleChannels, self, "swizzle")
 }
-@(objc_type=TextureDescriptor, objc_class_name="texture2DDescriptorWithPixelFormat")
-TextureDescriptor_texture2DDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, height: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
+@(objc_type=TextureDescriptor, objc_class_name="texture2DDescriptor")
+TextureDescriptor_texture2DDescriptor :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, height: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", pixelFormat, width, height, mipmapped)
 }
-@(objc_type=TextureDescriptor, objc_class_name="textureBufferDescriptorWithPixelFormat")
-TextureDescriptor_textureBufferDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
+@(objc_type=TextureDescriptor, objc_class_name="textureBufferDescriptor")
+TextureDescriptor_textureBufferDescriptor :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureBufferDescriptorWithPixelFormat:width:resourceOptions:usage:", pixelFormat, width, resourceOptions, usage)
 }
-@(objc_type=TextureDescriptor, objc_class_name="textureCubeDescriptorWithPixelFormat")
-TextureDescriptor_textureCubeDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, size: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
+@(objc_type=TextureDescriptor, objc_class_name="textureCubeDescriptor")
+TextureDescriptor_textureCubeDescriptor :: #force_inline proc(pixelFormat: PixelFormat, size: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureCubeDescriptorWithPixelFormat:size:mipmapped:", pixelFormat, size, mipmapped)
 }
 @(objc_type=TextureDescriptor, objc_name="textureType")
@@ -8322,12 +8322,12 @@ Texture_depth :: #force_inline proc(self: ^Texture) -> NS.UInteger {
 Texture_firstMipmapInTail :: #force_inline proc(self: ^Texture) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "firstMipmapInTail")
 }
-@(objc_type=Texture, objc_name="getBytes_bytesPerRow_bytesPerImage_fromRegion_mipmapLevel_slice_")
-Texture_getBytes_bytesPerRow_bytesPerImage_fromRegion_mipmapLevel_slice_ :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: NS.UInteger, bytesPerImage: NS.UInteger, region: Region, level: NS.UInteger, slice: NS.UInteger) {
+@(objc_type=Texture, objc_name="getBytesWithLevel")
+Texture_getBytesWithLevel :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: NS.UInteger, bytesPerImage: NS.UInteger, region: Region, level: NS.UInteger, slice: NS.UInteger) {
 	msgSend(nil, self, "getBytes:bytesPerRow:bytesPerImage:fromRegion:mipmapLevel:slice:", pixelBytes, bytesPerRow, bytesPerImage, region, level, slice)
 }
-@(objc_type=Texture, objc_name="getBytes_bytesPerRow_fromRegion_mipmapLevel_")
-Texture_getBytes_bytesPerRow_fromRegion_mipmapLevel_ :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: NS.UInteger, region: Region, level: NS.UInteger) {
+@(objc_type=Texture, objc_name="getBytes")
+Texture_getBytes :: #force_inline proc(self: ^Texture, pixelBytes: rawptr, bytesPerRow: NS.UInteger, region: Region, level: NS.UInteger) {
 	msgSend(nil, self, "getBytes:bytesPerRow:fromRegion:mipmapLevel:", pixelBytes, bytesPerRow, region, level)
 }
 @(objc_type=Texture, objc_name="height")
@@ -8366,16 +8366,16 @@ Texture_newRemoteTextureViewForDevice :: #force_inline proc(self: ^Texture, devi
 Texture_newSharedTextureHandle :: #force_inline proc(self: ^Texture) -> ^SharedTextureHandle {
 	return msgSend(^SharedTextureHandle, self, "newSharedTextureHandle")
 }
-@(objc_type=Texture, objc_name="newTextureViewWithPixelFormat")
-Texture_newTextureViewWithPixelFormat :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat) -> ^Texture {
+@(objc_type=Texture, objc_name="newTextureView")
+Texture_newTextureView :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat) -> ^Texture {
 	return msgSend(^Texture, self, "newTextureViewWithPixelFormat:", pixelFormat)
 }
-@(objc_type=Texture, objc_name="newTextureViewWithPixelFormat_textureType_levels_slices_")
-Texture_newTextureViewWithPixelFormat_textureType_levels_slices_ :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat, textureType: TextureType, levelRange: NS.Range, sliceRange: NS.Range) -> ^Texture {
+@(objc_type=Texture, objc_name="newTextureViewWithLevels")
+Texture_newTextureViewWithLevels :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat, textureType: TextureType, levelRange: NS.Range, sliceRange: NS.Range) -> ^Texture {
 	return msgSend(^Texture, self, "newTextureViewWithPixelFormat:textureType:levels:slices:", pixelFormat, textureType, levelRange, sliceRange)
 }
-@(objc_type=Texture, objc_name="newTextureViewWithPixelFormat_textureType_levels_slices_swizzle_")
-Texture_newTextureViewWithPixelFormat_textureType_levels_slices_swizzle_ :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat, textureType: TextureType, levelRange: NS.Range, sliceRange: NS.Range, swizzle: TextureSwizzleChannels) -> ^Texture {
+@(objc_type=Texture, objc_name="newTextureViewWithLevelsAndSwizzle")
+Texture_newTextureViewWithLevelsAndSwizzle :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat, textureType: TextureType, levelRange: NS.Range, sliceRange: NS.Range, swizzle: TextureSwizzleChannels) -> ^Texture {
 	return msgSend(^Texture, self, "newTextureViewWithPixelFormat:textureType:levels:slices:swizzle:", pixelFormat, textureType, levelRange, sliceRange, swizzle)
 }
 @(objc_type=Texture, objc_name="parentRelativeLevel")
@@ -8398,17 +8398,17 @@ Texture_pixelFormat :: #force_inline proc(self: ^Texture) -> PixelFormat {
 Texture_remoteStorageTexture :: #force_inline proc(self: ^Texture) -> ^Texture {
 	return msgSend(^Texture, self, "remoteStorageTexture")
 }
-@(objc_type=Texture, objc_name="replaceRegion_mipmapLevel_slice_withBytes_bytesPerRow_bytesPerImage_")
-Texture_replaceRegion_mipmapLevel_slice_withBytes_bytesPerRow_bytesPerImage_ :: #force_inline proc(self: ^Texture, region: Region, level: NS.UInteger, slice: NS.UInteger, pixelBytes: rawptr, bytesPerRow: NS.UInteger, bytesPerImage: NS.UInteger) {
+@(objc_type=Texture, objc_name="replaceRegionWithLevel")
+Texture_replaceRegionWithLevel :: #force_inline proc(self: ^Texture, region: Region, level: NS.UInteger, slice: NS.UInteger, pixelBytes: rawptr, bytesPerRow: NS.UInteger, bytesPerImage: NS.UInteger) {
 	msgSend(nil, self, "replaceRegion:mipmapLevel:slice:withBytes:bytesPerRow:bytesPerImage:", region, level, slice, pixelBytes, bytesPerRow, bytesPerImage)
 }
-@(objc_type=Texture, objc_name="replaceRegion_mipmapLevel_withBytes_bytesPerRow_")
-Texture_replaceRegion_mipmapLevel_withBytes_bytesPerRow_ :: #force_inline proc(self: ^Texture, region: Region, level: NS.UInteger, pixelBytes: rawptr, bytesPerRow: NS.UInteger) {
+@(objc_type=Texture, objc_name="replaceRegion")
+Texture_replaceRegion :: #force_inline proc(self: ^Texture, region: Region, level: NS.UInteger, pixelBytes: rawptr, bytesPerRow: NS.UInteger) {
 	msgSend(nil, self, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", region, level, pixelBytes, bytesPerRow)
 }
 @(objc_type=Texture, objc_name="rootResource")
-Texture_rootResource :: #force_inline proc(self: ^Texture) -> ^Texture {
-	return msgSend(^Texture, self, "rootResource")
+Texture_rootResource :: #force_inline proc(self: ^Texture) -> ^Resource {
+	return msgSend(^Resource, self, "rootResource")
 }
 @(objc_type=Texture, objc_name="sampleCount")
 Texture_sampleCount :: #force_inline proc(self: ^Texture) -> NS.UInteger {
