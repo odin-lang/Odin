@@ -6221,8 +6221,8 @@ Methods:
 DepthStencilState :: struct { using _: NS.Object }
 
 @(objc_type=DepthStencilState, objc_name="device")
-DepthStencilState_device :: #force_inline proc(self: ^DepthStencilState) -> ^DepthStencilState {
-	return msgSend(^DepthStencilState, self, "device")
+DepthStencilState_device :: #force_inline proc(self: ^DepthStencilState) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=DepthStencilState, objc_name="label")
 DepthStencilState_label :: #force_inline proc(self: ^DepthStencilState) -> ^NS.String {
