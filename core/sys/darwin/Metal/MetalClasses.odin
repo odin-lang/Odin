@@ -2767,8 +2767,8 @@ RenderPassAttachmentDescriptor_resolveSlice :: #force_inline proc(self: ^RenderP
 	return msgSend(NS.UInteger, self, "resolveSlice")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="resolveTexture")
-RenderPassAttachmentDescriptor_resolveTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> ^RenderPassAttachmentDescriptor {
-	return msgSend(^RenderPassAttachmentDescriptor, self, "resolveTexture")
+RenderPassAttachmentDescriptor_resolveTexture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> ^Texture {
+	return msgSend(^Texture, self, "resolveTexture")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="setDepthPlane")
 RenderPassAttachmentDescriptor_setDepthPlane :: #force_inline proc(self: ^RenderPassAttachmentDescriptor, depthPlane: NS.UInteger) {
@@ -2827,8 +2827,8 @@ RenderPassAttachmentDescriptor_storeActionOptions :: #force_inline proc(self: ^R
 	return msgSend(StoreActionOptions, self, "storeActionOptions")
 }
 @(objc_type=RenderPassAttachmentDescriptor, objc_name="texture")
-RenderPassAttachmentDescriptor_texture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> ^RenderPassAttachmentDescriptor {
-	return msgSend(^RenderPassAttachmentDescriptor, self, "texture")
+RenderPassAttachmentDescriptor_texture :: #force_inline proc(self: ^RenderPassAttachmentDescriptor) -> ^Texture {
+	return msgSend(^Texture, self, "texture")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3000,16 +3000,16 @@ RenderPassDescriptor_depthAttachment :: #force_inline proc(self: ^RenderPassDesc
 	return msgSend(^RenderPassDepthAttachmentDescriptor, self, "depthAttachment")
 }
 @(objc_type=RenderPassDescriptor, objc_name="getSamplePositions")
-RenderPassDescriptor_getSamplePositions :: #force_inline proc(self: ^RenderPassDescriptor, positions: []SamplePosition) -> ^RenderPassDescriptor {
-	return msgSend(^RenderPassDescriptor, self, "getSamplePositions:count:", raw_data(positions), NS.UInteger(len(positions)))
+RenderPassDescriptor_getSamplePositions :: #force_inline proc(self: ^RenderPassDescriptor, positions: []SamplePosition) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "getSamplePositions:count:", raw_data(positions), NS.UInteger(len(positions)))
 }
 @(objc_type=RenderPassDescriptor, objc_name="imageblockSampleLength")
 RenderPassDescriptor_imageblockSampleLength :: #force_inline proc(self: ^RenderPassDescriptor) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "imageblockSampleLength")
 }
 @(objc_type=RenderPassDescriptor, objc_name="rasterizationRateMap")
-RenderPassDescriptor_rasterizationRateMap :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RenderPassDescriptor {
-	return msgSend(^RenderPassDescriptor, self, "rasterizationRateMap")
+RenderPassDescriptor_rasterizationRateMap :: #force_inline proc(self: ^RenderPassDescriptor) -> ^RasterizationRateMap {
+	return msgSend(^RasterizationRateMap, self, "rasterizationRateMap")
 }
 @(objc_type=RenderPassDescriptor, objc_class_name="renderPassDescriptor")
 RenderPassDescriptor_renderPassDescriptor :: #force_inline proc() -> ^RenderPassDescriptor {
@@ -3144,8 +3144,8 @@ RenderPassSampleBufferAttachmentDescriptor_endOfVertexSampleIndex :: #force_inli
 	return msgSend(NS.UInteger, self, "endOfVertexSampleIndex")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="sampleBuffer")
-RenderPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> ^Buffer {
-	return msgSend(^Buffer, self, "sampleBuffer")
+RenderPassSampleBufferAttachmentDescriptor_sampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor) -> ^CounterSampleBuffer {
+	return msgSend(^CounterSampleBuffer, self, "sampleBuffer")
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setEndOfFragmentSampleIndex")
 RenderPassSampleBufferAttachmentDescriptor_setEndOfFragmentSampleIndex :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, endOfFragmentSampleIndex: NS.UInteger) {
@@ -3156,7 +3156,7 @@ RenderPassSampleBufferAttachmentDescriptor_setEndOfVertexSampleIndex :: #force_i
 	msgSend(nil, self, "setEndOfVertexSampleIndex:", endOfVertexSampleIndex)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setSampleBuffer")
-RenderPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, sampleBuffer: ^Buffer) {
+RenderPassSampleBufferAttachmentDescriptor_setSampleBuffer :: #force_inline proc(self: ^RenderPassSampleBufferAttachmentDescriptor, sampleBuffer: ^CounterSampleBuffer) {
 	msgSend(nil, self, "setSampleBuffer:", sampleBuffer)
 }
 @(objc_type=RenderPassSampleBufferAttachmentDescriptor, objc_name="setStartOfFragmentSampleIndex")
