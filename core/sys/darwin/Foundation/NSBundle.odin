@@ -3,23 +3,23 @@ package objc_Foundation
 @(objc_class="NSBundle")
 Bundle :: struct { using _: Object }
 
-@(objc_type=Bundle, objc_class_name="mainBundle")
+@(objc_type=Bundle, objc_name="mainBundle", objc_is_class_method=true)
 Bundle_mainBundle :: proc() -> ^Bundle {
 	return msgSend(^Bundle, Bundle, "mainBundle")
 }
 
-@(objc_type=Bundle, objc_class_name="bundleWithPath")
+@(objc_type=Bundle, objc_name="bundleWithPath", objc_is_class_method=true)
 Bundle_bundleWithPath :: proc(path: ^String) -> ^Bundle {
 	return msgSend(^Bundle, Bundle, "bundleWithPath:", path)
 }
 
-@(objc_type=Bundle, objc_class_name="bundleWithURL")
+@(objc_type=Bundle, objc_name="bundleWithURL", objc_is_class_method=true)
 Bundle_bundleWithURL :: proc(url: ^URL) -> ^Bundle {
 	return msgSend(^Bundle, Bundle, "bundleWithUrl:", url)
 }
 
 
-@(objc_type=Bundle, objc_class_name="alloc")
+@(objc_type=Bundle, objc_name="alloc", objc_is_class_method=true)
 Bundle_alloc :: proc() -> ^Bundle {
 	return msgSend(^Bundle, Bundle, "alloc")
 }

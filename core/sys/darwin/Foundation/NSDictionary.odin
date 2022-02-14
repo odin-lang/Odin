@@ -3,23 +3,23 @@ package objc_Foundation
 @(objc_class="NSDictionary")
 Dictionary :: struct {using _: Copying(Dictionary)}
 
-@(objc_type=Dictionary, objc_class_name="dictionary")
+@(objc_type=Dictionary, objc_name="dictionary", objc_is_class_method=true)
 Dictionary_dictionary :: proc() -> ^Dictionary {
 	return msgSend(^Dictionary, Dictionary, "dictionary")
 }
 
-@(objc_type=Dictionary, objc_class_name="dictionaryWithObject")
+@(objc_type=Dictionary, objc_name="dictionaryWithObject", objc_is_class_method=true)
 Dictionary_dictionaryWithObject :: proc(object: ^Object, forKey: ^Object) -> ^Dictionary {
 	return msgSend(^Dictionary, Dictionary, "dictionaryWithObject:forKey:", object, forKey)
 }
 
-@(objc_type=Dictionary, objc_class_name="dictionaryWithObjects")
+@(objc_type=Dictionary, objc_name="dictionaryWithObjects", objc_is_class_method=true)
 Dictionary_dictionaryWithObjects :: proc(objects: [^]^Object, forKeys: [^]^Object, count: UInteger) -> ^Dictionary {
 	return msgSend(^Dictionary, Dictionary, "dictionaryWithObjects:forKeys:count", objects, forKeys, count)
 }
 
 
-@(objc_type=Dictionary, objc_class_name="alloc")
+@(objc_type=Dictionary, objc_name="alloc", objc_is_class_method=true)
 Dictionary_alloc :: proc() -> ^Dictionary {
 	return msgSend(^Dictionary, Dictionary, "alloc")
 }

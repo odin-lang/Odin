@@ -32,7 +32,7 @@ foreign Foundation {
 Error :: struct { using _: Copying(Error) }
 
 
-@(objc_type=Error, objc_class_name="alloc")
+@(objc_type=Error, objc_name="alloc", objc_is_class_method=true)
 Error_alloc :: proc() -> ^Error {
 	return msgSend(^Error, Error, "alloc")
 }
@@ -42,7 +42,7 @@ Error_init :: proc(self: ^Error) -> ^Error {
 	return msgSend(^Error, self, "init")
 }
 
-@(objc_type=Error, objc_class_name="errorWithDomain")
+@(objc_type=Error, objc_name="errorWithDomain", objc_is_class_method=true)
 Error_errorWithDomain :: proc(domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
 	return msgSend(^Error, Error, "errorWithDomain:code:userInfo:", domain, code, userInfo)
 }

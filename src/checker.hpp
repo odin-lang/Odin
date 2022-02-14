@@ -121,7 +121,7 @@ struct AttributeContext {
 
 	String  objc_class;
 	String  objc_name;
-	String  objc_class_name;
+	bool    objc_is_class_method;
 	Type *  objc_type;
 };
 

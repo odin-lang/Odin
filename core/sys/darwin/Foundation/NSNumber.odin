@@ -8,7 +8,7 @@ import "core:c"
 @(objc_class="NSValue")
 Value :: struct{using _: Copying(Value)}
 
-@(objc_type=Value, objc_class_name="alloc")
+@(objc_type=Value, objc_name="alloc", objc_is_class_method=true)
 Value_alloc :: proc() -> ^Value {
 	return msgSend(^Value, Value, "alloc")
 }
@@ -18,12 +18,12 @@ Value_init :: proc(self: ^Value) -> ^Value {
 	return msgSend(^Value, self, "init")
 }
 
-@(objc_type=Value, objc_class_name="valueWithBytes")
+@(objc_type=Value, objc_name="valueWithBytes", objc_is_class_method=true)
 Value_valueWithBytes :: proc(value: rawptr, type: cstring) -> ^Value {
 	return msgSend(^Value, Value, "valueWithBytes:objCType:", value, type)
 }
 
-@(objc_type=Value, objc_class_name="valueWithPointer")
+@(objc_type=Value, objc_name="valueWithPointer", objc_is_class_method=true)
 Value_valueWithPointer :: proc(pointer: rawptr) -> ^Value {
 	return msgSend(^Value, Value, "valueWithPointer:", pointer)
 }
@@ -64,7 +64,7 @@ Value_pointerValue :: proc(self: ^Value) -> rawptr {
 Number :: struct{using _: Copying(Number), using _: Value}
 
 
-@(objc_type=Number, objc_class_name="alloc")
+@(objc_type=Number, objc_name="alloc", objc_is_class_method=true)
 Number_alloc :: proc() -> ^Number {
 	return msgSend(^Number, Number, "alloc")
 }
@@ -74,19 +74,19 @@ Number_init :: proc(self: ^Number) -> ^Number {
 	return msgSend(^Number, self, "init")
 }
 
-@(objc_type=Number, objc_class_name="numberWithI8")   Number_numberWithI8   :: proc(value: i8)   -> ^Number { return msgSend(^Number, Number, "numberWithChar:",             value) }
-@(objc_type=Number, objc_class_name="numberWithU8")   Number_numberWithU8   :: proc(value: u8)   -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedChar:",     value) }
-@(objc_type=Number, objc_class_name="numberWithI16")  Number_numberWithI16  :: proc(value: i16)  -> ^Number { return msgSend(^Number, Number, "numberWithShort:",            value) }
-@(objc_type=Number, objc_class_name="numberWithU16")  Number_numberWithU16  :: proc(value: u16)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedShort:",    value) }
-@(objc_type=Number, objc_class_name="numberWithI32")  Number_numberWithI32  :: proc(value: i32)  -> ^Number { return msgSend(^Number, Number, "numberWithInt:",              value) }
-@(objc_type=Number, objc_class_name="numberWithU32")  Number_numberWithU32  :: proc(value: u32)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedInt:",      value) }
-@(objc_type=Number, objc_class_name="numberWithInt")  Number_numberWithInt  :: proc(value: int)  -> ^Number { return msgSend(^Number, Number, "numberWithLong:",             value) }
-@(objc_type=Number, objc_class_name="numberWithUint") Number_numberWithUint :: proc(value: uint) -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLong:",     value) }
-@(objc_type=Number, objc_class_name="numberWithU64")  Number_numberWithU64  :: proc(value: u64)  -> ^Number { return msgSend(^Number, Number, "numberWithLongLong:",         value) }
-@(objc_type=Number, objc_class_name="numberWithI64")  Number_numberWithI64  :: proc(value: i64)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLongLong:", value) }
-@(objc_type=Number, objc_class_name="numberWithF32")  Number_numberWithF32  :: proc(value: f32)  -> ^Number { return msgSend(^Number, Number, "numberWithFloat:",            value) }
-@(objc_type=Number, objc_class_name="numberWithF64")  Number_numberWithF64  :: proc(value: f64)  -> ^Number { return msgSend(^Number, Number, "numberWithDouble:",           value) }
-@(objc_type=Number, objc_class_name="numberWithBool") Number_numberWithBool :: proc(value: BOOL) -> ^Number { return msgSend(^Number, Number, "numberWithBool:",             value) }
+@(objc_type=Number, objc_name="numberWithI8",   objc_is_class_method=true)   Number_numberWithI8   :: proc(value: i8)   -> ^Number { return msgSend(^Number, Number, "numberWithChar:",             value) }
+@(objc_type=Number, objc_name="numberWithU8",   objc_is_class_method=true)   Number_numberWithU8   :: proc(value: u8)   -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedChar:",     value) }
+@(objc_type=Number, objc_name="numberWithI16",  objc_is_class_method=true)  Number_numberWithI16  :: proc(value: i16)  -> ^Number { return msgSend(^Number, Number, "numberWithShort:",            value) }
+@(objc_type=Number, objc_name="numberWithU16",  objc_is_class_method=true)  Number_numberWithU16  :: proc(value: u16)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedShort:",    value) }
+@(objc_type=Number, objc_name="numberWithI32",  objc_is_class_method=true)  Number_numberWithI32  :: proc(value: i32)  -> ^Number { return msgSend(^Number, Number, "numberWithInt:",              value) }
+@(objc_type=Number, objc_name="numberWithU32",  objc_is_class_method=true)  Number_numberWithU32  :: proc(value: u32)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedInt:",      value) }
+@(objc_type=Number, objc_name="numberWithInt",  objc_is_class_method=true)  Number_numberWithInt  :: proc(value: int)  -> ^Number { return msgSend(^Number, Number, "numberWithLong:",             value) }
+@(objc_type=Number, objc_name="numberWithUint", objc_is_class_method=true) Number_numberWithUint :: proc(value: uint) -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLong:",     value) }
+@(objc_type=Number, objc_name="numberWithU64",  objc_is_class_method=true)  Number_numberWithU64  :: proc(value: u64)  -> ^Number { return msgSend(^Number, Number, "numberWithLongLong:",         value) }
+@(objc_type=Number, objc_name="numberWithI64",  objc_is_class_method=true)  Number_numberWithI64  :: proc(value: i64)  -> ^Number { return msgSend(^Number, Number, "numberWithUnsignedLongLong:", value) }
+@(objc_type=Number, objc_name="numberWithF32",  objc_is_class_method=true)  Number_numberWithF32  :: proc(value: f32)  -> ^Number { return msgSend(^Number, Number, "numberWithFloat:",            value) }
+@(objc_type=Number, objc_name="numberWithF64",  objc_is_class_method=true)  Number_numberWithF64  :: proc(value: f64)  -> ^Number { return msgSend(^Number, Number, "numberWithDouble:",           value) }
+@(objc_type=Number, objc_name="numberWithBool", objc_is_class_method=true) Number_numberWithBool :: proc(value: BOOL) -> ^Number { return msgSend(^Number, Number, "numberWithBool:",             value) }
 
 Number_number :: proc{
 	Number_numberWithI8,

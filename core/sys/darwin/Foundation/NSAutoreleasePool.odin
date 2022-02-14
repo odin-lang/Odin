@@ -3,7 +3,7 @@ package objc_Foundation
 @(objc_class="NSAutoreleasePool")
 AutoreleasePool :: struct {using _: Object}
 
-@(objc_type=AutoreleasePool, objc_class_name="alloc")
+@(objc_type=AutoreleasePool, objc_name="alloc", objc_is_class_method=true)
 AutoreleasePool_alloc :: proc() -> ^AutoreleasePool {
 	return msgSend(^AutoreleasePool, AutoreleasePool, "alloc")
 }

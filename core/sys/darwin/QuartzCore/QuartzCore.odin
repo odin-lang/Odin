@@ -10,7 +10,7 @@ msgSend :: intrinsics.objc_send
 @(objc_class="CAMetalLayer")
 MetalLayer :: struct{ using _: NS.Layer}
 
-@(objc_type=MetalLayer, objc_class_name="layer")
+@(objc_type=MetalLayer, objc_name="layer", objc_is_class_method=true)
 MetalLayer_layer :: proc() -> ^MetalLayer {
 	return msgSend(^MetalLayer, MetalLayer, "layer")
 }
