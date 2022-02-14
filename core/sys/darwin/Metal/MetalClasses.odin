@@ -5071,11 +5071,11 @@ AccelerationStructureCommandEncoder_buildAccelerationStructure :: #force_inline 
 	msgSend(nil, self, "buildAccelerationStructure:descriptor:scratchBuffer:scratchBufferOffset:", accelerationStructure, descriptor, scratchBuffer, scratchBufferOffset)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="copyAccelerationStructure")
-AccelerationStructureCommandEncoder_copyAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^AccelerationStructure, destinationAccelerationStructure: ^AccelerationStructure) {
+AccelerationStructureCommandEncoder_copyAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure, destinationAccelerationStructure: ^AccelerationStructure) {
 	msgSend(nil, self, "copyAccelerationStructure:toAccelerationStructure:", sourceAccelerationStructure, destinationAccelerationStructure)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="copyAndCompactAccelerationStructure")
-AccelerationStructureCommandEncoder_copyAndCompactAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure: ^AccelerationStructure, destinationAccelerationStructure: ^AccelerationStructure) {
+AccelerationStructureCommandEncoder_copyAndCompactAccelerationStructure :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, sourceAccelerationStructure, destinationAccelerationStructure: ^AccelerationStructure) {
 	msgSend(nil, self, "copyAndCompactAccelerationStructure:toAccelerationStructure:", sourceAccelerationStructure, destinationAccelerationStructure)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="refitAccelerationStructure")
@@ -5095,16 +5095,16 @@ AccelerationStructureCommandEncoder_useHeap :: #force_inline proc(self: ^Acceler
 	msgSend(nil, self, "useHeap:", heap)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useHeaps")
-AccelerationStructureCommandEncoder_useHeaps :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, heaps: [^]^Heap, count: NS.UInteger) {
-	msgSend(nil, self, "useHeaps:count:", heaps, count)
+AccelerationStructureCommandEncoder_useHeaps :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, heaps: []^Heap) {
+	msgSend(nil, self, "useHeaps:count:", raw_data(heaps), NS.UInteger(len(heaps)))
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useResource")
 AccelerationStructureCommandEncoder_useResource :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resource: ^Resource, usage: ResourceUsage) {
 	msgSend(nil, self, "useResource:usage:", resource, usage)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="useResources")
-AccelerationStructureCommandEncoder_useResources :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resources: [^]^Resource, count: NS.UInteger, usage: ResourceUsage) {
-	msgSend(nil, self, "useResources:count:usage:", resources, count, usage)
+AccelerationStructureCommandEncoder_useResources :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, resources: []^Resource, usage: ResourceUsage) {
+	msgSend(nil, self, "useResources:count:usage:", resources, NS.UInteger(len(resources)), usage)
 }
 @(objc_type=AccelerationStructureCommandEncoder, objc_name="waitForFence")
 AccelerationStructureCommandEncoder_waitForFence :: #force_inline proc(self: ^AccelerationStructureCommandEncoder, fence: ^Fence) {
