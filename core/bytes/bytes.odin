@@ -218,8 +218,8 @@ split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) ->
 
 
 @private
-_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save, n: int) -> (res: []byte, ok: bool) {
-	if sep == "" {
+_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte, ok: bool) {
+	if len(sep) == 0 {
 		res = s[:]
 		ok = true
 		s^ = s[len(s):]
@@ -230,7 +230,7 @@ _split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save, n: int) -> (res: []by
 	if m < 0 {
 		// not found
 		res = s[:]
-		ok = res != ""
+		ok = len(res) != 0
 		s^ = s[len(s):]
 	} else {
 		res = s[:m+sep_save]
@@ -242,11 +242,11 @@ _split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save, n: int) -> (res: []by
 
 
 split_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
-	return _split_iterator(s, sep, 0, -1)
+	return _split_iterator(s, sep, 0)
 }
 
 split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
-	return _split_iterator(s, sep, len(sep), -1)
+	return _split_iterator(s, sep, len(sep))
 }
 
 
