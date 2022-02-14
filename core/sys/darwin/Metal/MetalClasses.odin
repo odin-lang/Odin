@@ -4064,8 +4064,8 @@ SharedTextureHandle_init :: #force_inline proc(self: ^SharedTextureHandle) -> ^S
 	return msgSend(^SharedTextureHandle, self, "init")
 }
 @(objc_type=SharedTextureHandle, objc_name="device")
-SharedTextureHandle_device :: #force_inline proc(self: ^SharedTextureHandle) -> ^SharedTextureHandle {
-	return msgSend(^SharedTextureHandle, self, "device")
+SharedTextureHandle_device :: #force_inline proc(self: ^SharedTextureHandle) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=SharedTextureHandle, objc_name="label")
 SharedTextureHandle_label :: #force_inline proc(self: ^SharedTextureHandle) -> ^NS.String {
@@ -6169,8 +6169,8 @@ Methods:
 CounterSampleBuffer :: struct { using _: NS.Object }
 
 @(objc_type=CounterSampleBuffer, objc_name="device")
-CounterSampleBuffer_device :: #force_inline proc(self: ^CounterSampleBuffer) -> ^CounterSampleBuffer {
-	return msgSend(^CounterSampleBuffer, self, "device")
+CounterSampleBuffer_device :: #force_inline proc(self: ^CounterSampleBuffer) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=CounterSampleBuffer, objc_name="label")
 CounterSampleBuffer_label :: #force_inline proc(self: ^CounterSampleBuffer) -> ^NS.String {
@@ -6792,8 +6792,8 @@ Methods:
 DynamicLibrary :: struct { using _: NS.Object }
 
 @(objc_type=DynamicLibrary, objc_name="device")
-DynamicLibrary_device :: #force_inline proc(self: ^DynamicLibrary) -> ^DynamicLibrary {
-	return msgSend(^DynamicLibrary, self, "device")
+DynamicLibrary_device :: #force_inline proc(self: ^DynamicLibrary) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=DynamicLibrary, objc_name="installName")
 DynamicLibrary_installName :: #force_inline proc(self: ^DynamicLibrary) -> ^NS.String {
@@ -6828,8 +6828,8 @@ Methods:
 Event :: struct { using _: NS.Object }
 
 @(objc_type=Event, objc_name="device")
-Event_device :: #force_inline proc(self: ^Event) -> ^Event {
-	return msgSend(^Event, self, "device")
+Event_device :: #force_inline proc(self: ^Event) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=Event, objc_name="label")
 Event_label :: #force_inline proc(self: ^Event) -> ^NS.String {
@@ -6855,8 +6855,8 @@ Methods:
 Fence :: struct { using _: NS.Object }
 
 @(objc_type=Fence, objc_name="device")
-Fence_device :: #force_inline proc(self: ^Fence) -> ^Fence {
-	return msgSend(^Fence, self, "device")
+Fence_device :: #force_inline proc(self: ^Fence) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=Fence, objc_name="label")
 Fence_label :: #force_inline proc(self: ^Fence) -> ^NS.String {
@@ -6892,8 +6892,8 @@ Methods:
 Function :: struct { using _: NS.Object }
 
 @(objc_type=Function, objc_name="device")
-Function_device :: #force_inline proc(self: ^Function) -> ^Function {
-	return msgSend(^Function, self, "device")
+Function_device :: #force_inline proc(self: ^Function) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=Function, objc_name="functionConstantsDictionary")
 Function_functionConstantsDictionary :: #force_inline proc(self: ^Function) -> ^NS.Dictionary {
@@ -6959,8 +6959,8 @@ Methods:
 FunctionHandle :: struct { using _: NS.Object }
 
 @(objc_type=FunctionHandle, objc_name="device")
-FunctionHandle_device :: #force_inline proc(self: ^FunctionHandle) -> ^FunctionHandle {
-	return msgSend(^FunctionHandle, self, "device")
+FunctionHandle_device :: #force_inline proc(self: ^FunctionHandle) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=FunctionHandle, objc_name="functionType")
 FunctionHandle_functionType :: #force_inline proc(self: ^FunctionHandle) -> FunctionType {
@@ -7082,8 +7082,8 @@ Heap_currentAllocatedSize :: #force_inline proc(self: ^Heap) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "currentAllocatedSize")
 }
 @(objc_type=Heap, objc_name="device")
-Heap_device :: #force_inline proc(self: ^Heap) -> ^Heap {
-	return msgSend(^Heap, self, "device")
+Heap_device :: #force_inline proc(self: ^Heap) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=Heap, objc_name="hazardTrackingMode")
 Heap_hazardTrackingMode :: #force_inline proc(self: ^Heap) -> HazardTrackingMode {
@@ -7493,8 +7493,8 @@ RasterizationRateMap_copyParameterDataToBuffer :: #force_inline proc(self: ^Rast
 	msgSend(nil, self, "copyParameterDataToBuffer:offset:", buffer, offset)
 }
 @(objc_type=RasterizationRateMap, objc_name="device")
-RasterizationRateMap_device :: #force_inline proc(self: ^RasterizationRateMap) -> ^RasterizationRateMap {
-	return msgSend(^RasterizationRateMap, self, "device")
+RasterizationRateMap_device :: #force_inline proc(self: ^RasterizationRateMap) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=RasterizationRateMap, objc_name="label")
 RasterizationRateMap_label :: #force_inline proc(self: ^RasterizationRateMap) -> ^NS.String {
@@ -7991,8 +7991,8 @@ Methods:
 RenderPipelineState :: struct { using _: NS.Object }
 
 @(objc_type=RenderPipelineState, objc_name="device")
-RenderPipelineState_device :: #force_inline proc(self: ^RenderPipelineState) -> ^RenderPipelineState {
-	return msgSend(^RenderPipelineState, self, "device")
+RenderPipelineState_device :: #force_inline proc(self: ^RenderPipelineState) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=RenderPipelineState, objc_name="imageblockMemoryLengthForDimensions")
 RenderPipelineState_imageblockMemoryLengthForDimensions :: #force_inline proc(self: ^RenderPipelineState, imageblockDimensions: Size) -> ^RenderPipelineState {
@@ -8052,8 +8052,8 @@ Resource_cpuCacheMode :: #force_inline proc(self: ^Resource) -> CPUCacheMode {
 	return msgSend(CPUCacheMode, self, "cpuCacheMode")
 }
 @(objc_type=Resource, objc_name="device")
-Resource_device :: #force_inline proc(self: ^Resource) -> ^Resource {
-	return msgSend(^Resource, self, "device")
+Resource_device :: #force_inline proc(self: ^Resource) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=Resource, objc_name="hazardTrackingMode")
 Resource_hazardTrackingMode :: #force_inline proc(self: ^Resource) -> HazardTrackingMode {
@@ -8147,8 +8147,8 @@ Methods:
 SamplerState :: struct { using _: NS.Object }
 
 @(objc_type=SamplerState, objc_name="device")
-SamplerState_device :: #force_inline proc(self: ^SamplerState) -> ^SamplerState {
-	return msgSend(^SamplerState, self, "device")
+SamplerState_device :: #force_inline proc(self: ^SamplerState) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=SamplerState, objc_name="label")
 SamplerState_label :: #force_inline proc(self: ^SamplerState) -> ^NS.String {
