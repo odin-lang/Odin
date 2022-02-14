@@ -147,8 +147,8 @@ Size :: struct {
 }
 
 SizeAndAlign :: struct {
-	size:  NS.Integer,
-	align: NS.Integer,
+	size:  NS.UInteger,
+	align: NS.UInteger,
 }
 
 StageInRegionIndirectArguments :: struct {
