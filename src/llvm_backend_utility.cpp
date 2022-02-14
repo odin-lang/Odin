@@ -1908,9 +1908,11 @@ lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
 	String name = tav.value.value_string;
 	lbAddr dst = lb_handle_objc_find_or_register_class(p, name);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 1);
-	args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
-	lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
+	auto args = array_make<lbValue>(permanent_allocator(), 3);
+	args[0] = lb_const_nil(m, t_objc_Class);
+	args[1] = lb_const_nil(m, t_objc_Class);
+	args[2] = lb_const_int(m, t_uint, 0);
+	lbValue ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
 	lb_addr_store(p, dst, ptr);
 
 	return lb_addr_load(p, dst);
