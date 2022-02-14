@@ -2562,8 +2562,8 @@ RasterizationRateLayerDescriptor_horizontal :: #force_inline proc(self: ^Rasteri
 	return msgSend(^RasterizationRateSampleArray, self, "horizontal")
 }
 @(objc_type=RasterizationRateLayerDescriptor, objc_name="horizontalSampleStorage")
-RasterizationRateLayerDescriptor_horizontalSampleStorage :: #force_inline proc(self: ^RasterizationRateLayerDescriptor) -> ^f32 {
-	return msgSend(^f32, self, "horizontalSampleStorage")
+RasterizationRateLayerDescriptor_horizontalSampleStorage :: #force_inline proc(self: ^RasterizationRateLayerDescriptor) -> [^]f32 { // TODO: how could this be made into a slice?
+	return msgSend([^]f32, self, "horizontalSampleStorage")
 }
 @(objc_type=RasterizationRateLayerDescriptor, objc_name="init")
 RasterizationRateLayerDescriptor_init :: #force_inline proc(self: ^RasterizationRateLayerDescriptor) -> ^RasterizationRateLayerDescriptor {
@@ -2574,8 +2574,8 @@ RasterizationRateLayerDescriptor_initWithSampleCount :: #force_inline proc(self:
 	return msgSend(^RasterizationRateLayerDescriptor, self, "initWithSampleCount:", sampleCount)
 }
 @(objc_type=RasterizationRateLayerDescriptor, objc_name="initWithSampleCountWithDimensions")
-RasterizationRateLayerDescriptor_initWithSampleCountWithDimensions :: #force_inline proc(self: ^RasterizationRateLayerDescriptor, sampleCount: Size, horizontal: ^f32, vertical: ^f32) -> ^RasterizationRateLayerDescriptor {
-	return msgSend(^RasterizationRateLayerDescriptor, self, "initWithSampleCount:horizontal:vertical:", sampleCount, horizontal, vertical)
+RasterizationRateLayerDescriptor_initWithSampleCountWithDimensions :: #force_inline proc(self: ^RasterizationRateLayerDescriptor, sampleCount: Size, horizontal: []f32, vertical: []f32) -> ^RasterizationRateLayerDescriptor {
+	return msgSend(^RasterizationRateLayerDescriptor, self, "initWithSampleCount:horizontal:vertical:", sampleCount, raw_data(horizontal), raw_data(vertical))
 }
 @(objc_type=RasterizationRateLayerDescriptor, objc_name="sampleCount")
 RasterizationRateLayerDescriptor_sampleCount :: #force_inline proc(self: ^RasterizationRateLayerDescriptor) -> Size {
@@ -2586,8 +2586,8 @@ RasterizationRateLayerDescriptor_vertical :: #force_inline proc(self: ^Rasteriza
 	return msgSend(^RasterizationRateSampleArray, self, "vertical")
 }
 @(objc_type=RasterizationRateLayerDescriptor, objc_name="verticalSampleStorage")
-RasterizationRateLayerDescriptor_verticalSampleStorage :: #force_inline proc(self: ^RasterizationRateLayerDescriptor) -> ^f32 {
-	return msgSend(^f32, self, "verticalSampleStorage")
+RasterizationRateLayerDescriptor_verticalSampleStorage :: #force_inline proc(self: ^RasterizationRateLayerDescriptor) -> [^]f32 { // TODO: how could this be made into a slice?
+	return msgSend([^]f32, self, "verticalSampleStorage")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2691,11 +2691,11 @@ RasterizationRateSampleArray_init :: #force_inline proc(self: ^RasterizationRate
 	return msgSend(^RasterizationRateSampleArray, self, "init")
 }
 @(objc_type=RasterizationRateSampleArray, objc_name="object")
-RasterizationRateSampleArray_object :: #force_inline proc(self: ^RasterizationRateSampleArray, index: NS.UInteger) -> NS.UInteger {
-	return msgSend(NS.UInteger, self, "objectAtIndexedSubscript:", index)
+RasterizationRateSampleArray_object :: #force_inline proc(self: ^RasterizationRateSampleArray, index: NS.UInteger) -> ^NS.Number {
+	return msgSend(^NS.Number, self, "objectAtIndexedSubscript:", index)
 }
 @(objc_type=RasterizationRateSampleArray, objc_name="setObject")
-RasterizationRateSampleArray_setObject :: #force_inline proc(self: ^RasterizationRateSampleArray, value: NS.UInteger, index: NS.UInteger) {
+RasterizationRateSampleArray_setObject :: #force_inline proc(self: ^RasterizationRateSampleArray, value: ^NS.Number, index: NS.UInteger) {
 	msgSend(nil, self, "setObject:atIndexedSubscript:", value, index)
 }
 
@@ -7153,12 +7153,12 @@ Methods:
 IndirectCommandBuffer :: struct { using _: Resource }
 
 @(objc_type=IndirectCommandBuffer, objc_name="indirectComputeCommand")
-IndirectCommandBuffer_indirectComputeCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectComputeBuffer {
-	return msgSend(^IndirectComputeBuffer, self, "indirectComputeCommandAtIndex:", commandIndex)
+IndirectCommandBuffer_indirectComputeCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectComputeCommand {
+	return msgSend(^IndirectComputeCommand, self, "indirectComputeCommandAtIndex:", commandIndex)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="indirectRenderCommand")
-IndirectCommandBuffer_indirectRenderCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectRenderBuffer {
-	return msgSend(^IndirectRenderBuffer, self, "indirectRenderCommandAtIndex:", commandIndex)
+IndirectCommandBuffer_indirectRenderCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectRenderCommand {
+	return msgSend(^IndirectRenderCommand, self, "indirectRenderCommandAtIndex:", commandIndex)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="resetWithRange")
 IndirectCommandBuffer_resetWithRange :: #force_inline proc(self: ^IndirectCommandBuffer, range: NS.Range) {
