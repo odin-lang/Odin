@@ -1643,8 +1643,8 @@ CounterSampleBufferDescriptor_init :: #force_inline proc(self: ^CounterSampleBuf
 	return msgSend(^CounterSampleBufferDescriptor, self, "init")
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="counterSet")
-CounterSampleBufferDescriptor_counterSet :: #force_inline proc(self: ^CounterSampleBufferDescriptor) -> ^CounterSampleBufferDescriptor {
-	return msgSend(^CounterSampleBufferDescriptor, self, "counterSet")
+CounterSampleBufferDescriptor_counterSet :: #force_inline proc(self: ^CounterSampleBufferDescriptor) -> ^CounterSet {
+	return msgSend(^CounterSet, self, "counterSet")
 }
 @(objc_type=CounterSampleBufferDescriptor, objc_name="label")
 CounterSampleBufferDescriptor_label :: #force_inline proc(self: ^CounterSampleBufferDescriptor) -> ^NS.String {
