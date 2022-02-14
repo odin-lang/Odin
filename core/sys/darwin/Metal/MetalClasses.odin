@@ -6906,13 +6906,13 @@ Function_label :: #force_inline proc(self: ^Function) -> ^NS.String {
 Function_name :: #force_inline proc(self: ^Function) -> ^NS.String {
 	return msgSend(^NS.String, self, "name")
 }
-@(objc_type=Function, objc_name="newArgumentEncoderWithBufferIndex")
-Function_newArgumentEncoderWithBufferIndex :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger) -> ^Function {
-	return msgSend(^Function, self, "newArgumentEncoderWithBufferIndex:", bufferIndex)
+@(objc_type=Function, objc_name="newArgumentEncoder")
+Function_newArgumentEncoder :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger) -> ^ArgumentEncoder {
+	return msgSend(^ArgumentEncoder, self, "newArgumentEncoderWithBufferIndex:", bufferIndex)
 }
-@(objc_type=Function, objc_name="newArgumentEncoderWithBufferIndexWithReflection")
-Function_newArgumentEncoderWithBufferIndexWithReflection :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger, reflection: ^AutoreleasedArgument) -> ^Function {
-	return msgSend(^Function, self, "newArgumentEncoderWithBufferIndex:reflection:", bufferIndex, reflection)
+@(objc_type=Function, objc_name="newArgumentEncoderWithReflection")
+Function_newArgumentEncoderWithReflection :: #force_inline proc(self: ^Function, bufferIndex: NS.UInteger, reflection: ^AutoreleasedArgument) -> ^ArgumentEncoder {
+	return msgSend(^ArgumentEncoder, self, "newArgumentEncoderWithBufferIndex:reflection:", bufferIndex, reflection)
 }
 @(objc_type=Function, objc_name="options")
 Function_options :: #force_inline proc(self: ^Function) -> FunctionOptions {
