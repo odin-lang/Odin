@@ -7153,12 +7153,12 @@ Methods:
 IndirectCommandBuffer :: struct { using _: Resource }
 
 @(objc_type=IndirectCommandBuffer, objc_name="indirectComputeCommand")
-IndirectCommandBuffer_indirectComputeCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectCommandBuffer {
-	return msgSend(^IndirectCommandBuffer, self, "indirectComputeCommandAtIndex:", commandIndex)
+IndirectCommandBuffer_indirectComputeCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectComputeBuffer {
+	return msgSend(^IndirectComputeBuffer, self, "indirectComputeCommandAtIndex:", commandIndex)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="indirectRenderCommand")
-IndirectCommandBuffer_indirectRenderCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectCommandBuffer {
-	return msgSend(^IndirectCommandBuffer, self, "indirectRenderCommandAtIndex:", commandIndex)
+IndirectCommandBuffer_indirectRenderCommand :: #force_inline proc(self: ^IndirectCommandBuffer, commandIndex: NS.UInteger) -> ^IndirectRenderBuffer {
+	return msgSend(^IndirectRenderBuffer, self, "indirectRenderCommandAtIndex:", commandIndex)
 }
 @(objc_type=IndirectCommandBuffer, objc_name="resetWithRange")
 IndirectCommandBuffer_resetWithRange :: #force_inline proc(self: ^IndirectCommandBuffer, range: NS.Range) {
@@ -7251,7 +7251,7 @@ Methods:
 IndirectRenderCommand :: struct { using _: NS.Object }
 
 @(objc_type=IndirectRenderCommand, objc_name="drawIndexedPatches")
-IndirectRenderCommand_drawIndexedPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
+IndirectRenderCommand_drawIndexedPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: NS.UInteger, patchStart, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:instanceCount:baseInstance:tessellationFactorBuffer:tessellationFactorBufferOffset:tessellationFactorBufferInstanceStride:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, controlPointIndexBuffer, controlPointIndexBufferOffset, instanceCount, baseInstance, buffer, offset, instanceStride)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawIndexedPrimitives")
@@ -7259,7 +7259,7 @@ IndirectRenderCommand_drawIndexedPrimitives :: #force_inline proc(self: ^Indirec
 	msgSend(nil, self, "drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:instanceCount:baseVertex:baseInstance:", primitiveType, indexCount, indexType, indexBuffer, indexBufferOffset, instanceCount, baseVertex, baseInstance)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawPatches")
-IndirectRenderCommand_drawPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
+IndirectRenderCommand_drawPatches :: #force_inline proc(self: ^IndirectRenderCommand, numberOfPatchControlPoints: NS.UInteger, patchStart, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger, buffer: ^Buffer, offset: NS.UInteger, instanceStride: NS.UInteger) {
 	msgSend(nil, self, "drawPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:instanceCount:baseInstance:tessellationFactorBuffer:tessellationFactorBufferOffset:tessellationFactorBufferInstanceStride:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, instanceCount, baseInstance, buffer, offset, instanceStride)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawPrimitives")
@@ -7631,7 +7631,7 @@ RenderCommandEncoder_drawIndexedPatches_patchIndexBuffer_patchIndexBufferOffset_
 	msgSend(nil, self, "drawIndexedPatches:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:indirectBuffer:indirectBufferOffset:", numberOfPatchControlPoints, patchIndexBuffer, patchIndexBufferOffset, controlPointIndexBuffer, controlPointIndexBufferOffset, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_instanceCount_baseInstance_")
-RenderCommandEncoder_drawIndexedPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
+RenderCommandEncoder_drawIndexedPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchStart, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawIndexedPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:instanceCount:baseInstance:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, controlPointIndexBuffer, controlPointIndexBufferOffset, instanceCount, baseInstance)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawIndexedPrimitives_indexCount_indexType_indexBuffer_indexBufferOffset_")
@@ -7655,7 +7655,7 @@ RenderCommandEncoder_drawPatches_patchIndexBuffer_patchIndexBufferOffset_indirec
 	msgSend(nil, self, "drawPatches:patchIndexBuffer:patchIndexBufferOffset:indirectBuffer:indirectBufferOffset:", numberOfPatchControlPoints, patchIndexBuffer, patchIndexBufferOffset, indirectBuffer, indirectBufferOffset)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_instanceCount_baseInstance_")
-RenderCommandEncoder_drawPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchStart: NS.UInteger, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
+RenderCommandEncoder_drawPatches_patchStart_patchCount_patchIndexBuffer_patchIndexBufferOffset_instanceCount_baseInstance_ :: #force_inline proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchStart, patchCount: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:instanceCount:baseInstance:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, instanceCount, baseInstance)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPrimitives_indirectBuffer_indirectBufferOffset_")
