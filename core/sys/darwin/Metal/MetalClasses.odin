@@ -1163,7 +1163,7 @@ CaptureManager_startCaptureWithCommandQueue :: #force_inline proc(self: ^Capture
 	msgSend(nil, self, "startCaptureWithCommandQueue:", commandQueue)
 }
 @(objc_type=CaptureManager, objc_name="startCaptureWithDescriptor")
-CaptureManager_startCaptureWithDescriptor :: #force_inline proc(self: ^CaptureManager, descriptor: ^CaptureDescriptor) -> (ok: bool, error: ^NS.Error) {
+CaptureManager_startCaptureWithDescriptor :: #force_inline proc(self: ^CaptureManager, descriptor: ^CaptureDescriptor) -> (ok: BOOL, error: ^NS.Error) {
 	ok = msgSend(BOOL, self, "startCaptureWithDescriptor:error:", descriptor, &error)
 	return
 }
@@ -5291,36 +5291,43 @@ Methods:
 BinaryArchive :: struct { using _: NS.Copying(BinaryArchive) }
 
 @(objc_type=BinaryArchive, objc_name="addComputePipelineFunctionsWithDescriptor")
-BinaryArchive_addComputePipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^ComputePipelineDescriptor) -> (ok: bool, error: ^NS.Error) {
+BinaryArchive_addComputePipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^ComputePipelineDescriptor) -> (ok: BOOL, error: ^NS.Error) {
 	ok = msgSend(BOOL, self, "addComputePipelineFunctionsWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=BinaryArchive, objc_name="addRenderPipelineFunctionsWithDescriptor")
-BinaryArchive_addRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^RenderPipelineDescriptor) -> (ok: bool, error: ^NS.Error) {
+BinaryArchive_addRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^RenderPipelineDescriptor) -> (ok: BOOL, error: ^NS.Error) {
 	ok = msgSend(BOOL, self, "addRenderPipelineFunctionsWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=BinaryArchive, objc_name="addTileRenderPipelineFunctionsWithDescriptor")
-BinaryArchive_addTileRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^TileRenderPipelineDescriptor) -> (ok: bool, error: ^NS.Error) {
+BinaryArchive_addTileRenderPipelineFunctionsWithDescriptor :: #force_inline proc(self: ^BinaryArchive, descriptor: ^TileRenderPipelineDescriptor) -> (ok: BOOL, error: ^NS.Error) {
 	ok = msgSend(BOOL, self, "addTileRenderPipelineFunctionsWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=BinaryArchive, objc_name="device")
-BinaryArchive_device :: #force_inline proc(self: ^BinaryArchive) -> ^BinaryArchive {
-	return msgSend(^BinaryArchive, self, "device")
+BinaryArchive_device :: #force_inline proc(self: ^BinaryArchive) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=BinaryArchive, objc_name="label")
 BinaryArchive_label :: #force_inline proc(self: ^BinaryArchive) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=BinaryArchive, objc_name="serializeToURL")
-BinaryArchive_serializeToURL :: #force_inline proc(self: ^BinaryArchive, url: ^NS.URL) -> (ok: bool, error: ^NS.Error) {
+BinaryArchive_serializeToURL :: #force_inline proc(self: ^BinaryArchive, url: ^NS.URL) -> (ok: BOOL, error: ^NS.Error) {
 	ok = msgSend(BOOL, self, "serializeToURL:error:", url, &error)
 	return
 }
 @(objc_type=BinaryArchive, objc_name="setLabel")
 BinaryArchive_setLabel :: #force_inline proc(self: ^BinaryArchive, label: ^NS.String) {
 	msgSend(nil, self, "setLabel:", label)
+}
+
+
+@(objc_type=BinaryArchive, objc_name="addFunction")
+BinaryArchive_addFunction :: #force_inline proc(self: ^BinaryArchive, descriptor: ^FunctionDescriptor, library: ^Library) -> (ok: BOOL, error: ^NS.Error) {
+	ok = msgSend(BOOL, self, "addFunction:", descriptor, library, &error)
+	return
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6788,7 +6795,7 @@ DynamicLibrary_label :: #force_inline proc(self: ^DynamicLibrary) -> ^NS.String 
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=DynamicLibrary, objc_name="serializeToURL")
-DynamicLibrary_serializeToURL :: #force_inline proc(self: ^DynamicLibrary, url: ^NS.URL) -> (ok: bool, error: ^NS.Error) {
+DynamicLibrary_serializeToURL :: #force_inline proc(self: ^DynamicLibrary, url: ^NS.URL) -> (ok: BOOL, error: ^NS.Error) {
 	ok = msgSend(BOOL, self, "serializeToURL:error:", url, &error)
 	return
 }
