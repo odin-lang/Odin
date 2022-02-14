@@ -3480,8 +3480,8 @@ RenderPipelineDescriptor_fragmentBuffers :: #force_inline proc(self: ^RenderPipe
 	return msgSend(^PipelineBufferDescriptorArray, self, "fragmentBuffers")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="fragmentFunction")
-RenderPipelineDescriptor_fragmentFunction :: #force_inline proc(self: ^RenderPipelineDescriptor) -> ^RenderPipelineDescriptor {
-	return msgSend(^RenderPipelineDescriptor, self, "fragmentFunction")
+RenderPipelineDescriptor_fragmentFunction :: #force_inline proc(self: ^RenderPipelineDescriptor) -> ^Function {
+	return msgSend(^Function, self, "fragmentFunction")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="inputPrimitiveTopology")
 RenderPipelineDescriptor_inputPrimitiveTopology :: #force_inline proc(self: ^RenderPipelineDescriptor) -> PrimitiveTopologyClass {
@@ -3652,8 +3652,8 @@ RenderPipelineDescriptor_vertexDescriptor :: #force_inline proc(self: ^RenderPip
 	return msgSend(^VertexDescriptor, self, "vertexDescriptor")
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="vertexFunction")
-RenderPipelineDescriptor_vertexFunction :: #force_inline proc(self: ^RenderPipelineDescriptor) -> ^RenderPipelineDescriptor {
-	return msgSend(^RenderPipelineDescriptor, self, "vertexFunction")
+RenderPipelineDescriptor_vertexFunction :: #force_inline proc(self: ^RenderPipelineDescriptor) -> ^Function {
+	return msgSend(^Function, self, "vertexFunction")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -7971,6 +7971,51 @@ RenderCommandEncoder_waitForFence :: #force_inline proc(self: ^RenderCommandEnco
 
 /*
 Class:
+	RenderPipelineFunctionsDescriptor
+*/
+@(objc_class="MTLRenderPipelineFunctionsDescriptor")
+RenderPipelineFunctionsDescriptor :: struct { using _: NS.Copying(RenderPipelineFunctionsDescriptor) }
+
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_class_name="alloc")
+RenderPipelineFunctionsDescriptor_alloc :: #force_inline proc() -> ^RenderPipelineFunctionsDescriptor {
+	return msgSend(^RenderPipelineFunctionsDescriptor, RenderPipelineFunctionsDescriptor, "alloc")
+}
+
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="init")
+RenderPipelineFunctionsDescriptor_init :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor) -> ^RenderPipelineFunctionsDescriptor {
+	return msgSend(^RenderPipelineFunctionsDescriptor, self, "init")
+}
+
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="vertexAdditionalBinaryFunctions")
+RenderPipelineFunctionsDescriptor_vertexAdditionalBinaryFunctions :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor) -> ^NS.Array {
+	return msgSend(^NS.Array, self, "vertexAdditionalBinaryFunctions")
+}
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="fragmentAdditionalBinaryFunctions")
+RenderPipelineFunctionsDescriptor_fragmentAdditionalBinaryFunctions :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor) -> ^NS.Array {
+	return msgSend(^NS.Array, self, "fragmentAdditionalBinaryFunctions")
+}
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="tileAdditionalBinaryFunctions")
+RenderPipelineFunctionsDescriptor_tileAdditionalBinaryFunctions :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor) -> ^NS.Array {
+	return msgSend(^NS.Array, self, "tileAdditionalBinaryFunctions")
+}
+
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="setVertexAdditionalBinaryFunctions")
+RenderPipelineFunctionsDescriptor_setVertexAdditionalBinaryFunctions :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor, binaryFunctions: ^NS.Array) {
+	msgSend(nil, self, "setVertexAdditionalBinaryFunctions:", binaryFunctions)
+}
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="setFragmentAdditionalBinaryFunctions")
+RenderPipelineFunctionsDescriptor_setFragmentAdditionalBinaryFunctions :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor, binaryFunctions: ^NS.Array) {
+	msgSend(nil, self, "setFragmentAdditionalBinaryFunctions:", binaryFunctions)
+}
+@(objc_type=RenderPipelineFunctionsDescriptor, objc_name="setTileAdditionalBinaryFunctions")
+RenderPipelineFunctionsDescriptor_setTileAdditionalBinaryFunctions :: #force_inline proc(self: ^RenderPipelineFunctionsDescriptor, binaryFunctions: ^NS.Array) {
+	msgSend(nil, self, "tileAdditionalBinaryFunctions:", binaryFunctions)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/*
+Class:
 	RenderPipelineState
 Class Methods:
 Methods:
@@ -7990,8 +8035,8 @@ RenderPipelineState_device :: #force_inline proc(self: ^RenderPipelineState) -> 
 	return msgSend(^Device, self, "device")
 }
 @(objc_type=RenderPipelineState, objc_name="imageblockMemoryLengthForDimensions")
-RenderPipelineState_imageblockMemoryLengthForDimensions :: #force_inline proc(self: ^RenderPipelineState, imageblockDimensions: Size) -> ^RenderPipelineState {
-	return msgSend(^RenderPipelineState, self, "imageblockMemoryLengthForDimensions:", imageblockDimensions)
+RenderPipelineState_imageblockMemoryLengthForDimensions :: #force_inline proc(self: ^RenderPipelineState, imageblockDimensions: Size) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "imageblockMemoryLengthForDimensions:", imageblockDimensions)
 }
 @(objc_type=RenderPipelineState, objc_name="imageblockSampleLength")
 RenderPipelineState_imageblockSampleLength :: #force_inline proc(self: ^RenderPipelineState) -> NS.UInteger {
@@ -8012,6 +8057,27 @@ RenderPipelineState_supportIndirectCommandBuffers :: #force_inline proc(self: ^R
 @(objc_type=RenderPipelineState, objc_name="threadgroupSizeMatchesTileSize")
 RenderPipelineState_threadgroupSizeMatchesTileSize :: #force_inline proc(self: ^RenderPipelineState) -> BOOL {
 	return msgSend(BOOL, self, "threadgroupSizeMatchesTileSize")
+}
+
+@(objc_type=RenderPipelineState, objc_name="functionHandle")
+RenderPipelineState_functionHandle :: #force_inline proc(self: ^RenderPipelineState, function: ^Function, stage: RenderStages) -> ^FunctionHandle {
+	return msgSend(^FunctionHandle, self, "functionHandleWithFunction:stage:", function, stage)
+}
+
+@(objc_type=RenderPipelineState, objc_name="newVisibleFunctionTable")
+RenderPipelineState_newVisibleFunctionTable :: #force_inline proc(self: ^RenderPipelineState, descriptor: ^VisibleFunctionTableDescriptor, stage: RenderStages) -> ^VisibleFunctionTable {
+	return msgSend(^VisibleFunctionTable, self, "newVisibleFunctionTableWithDescriptor:stage:", descriptor, stage)
+}
+
+@(objc_type=RenderPipelineState, objc_name="newIntersectionFunctionTable")
+RenderPipelineState_newIntersectionFunctionTable :: #force_inline proc(self: ^RenderPipelineState, descriptor: ^IntersectionFunctionTableDescriptor, stage: RenderStages) -> ^IntersectionFunctionTable {
+	return msgSend(^IntersectionFunctionTable, self, "newIntersectionFunctionTable:stage:", descriptor, stage)
+}
+
+@(objc_type=RenderPipelineState, objc_name="newRenderPipelineState")
+RenderPipelineState_newRenderPipelineState :: #force_inline proc(self: ^RenderPipelineState, additionalBinaryFunctions: ^RenderPipelineFunctionsDescriptor) -> (state: ^RenderPipelineState, error: ^NS.Error) {
+	state = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithAdditionalBinaryFunctions:error:", additionalBinaryFunctions, &error)
+	return
 }
 
 ////////////////////////////////////////////////////////////////////////////////
