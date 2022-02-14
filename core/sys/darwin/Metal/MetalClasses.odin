@@ -5552,12 +5552,12 @@ CaptureScope_beginScope :: #force_inline proc(self: ^CaptureScope) {
 	msgSend(nil, self, "beginScope")
 }
 @(objc_type=CaptureScope, objc_name="commandQueue")
-CaptureScope_commandQueue :: #force_inline proc(self: ^CaptureScope) -> ^CaptureScope {
-	return msgSend(^CaptureScope, self, "commandQueue")
+CaptureScope_commandQueue :: #force_inline proc(self: ^CaptureScope) -> ^CommandQueue {
+	return msgSend(^CommandQueue, self, "commandQueue")
 }
 @(objc_type=CaptureScope, objc_name="device")
-CaptureScope_device :: #force_inline proc(self: ^CaptureScope) -> ^CaptureScope {
-	return msgSend(^CaptureScope, self, "device")
+CaptureScope_device :: #force_inline proc(self: ^CaptureScope) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=CaptureScope, objc_name="endScope")
 CaptureScope_endScope :: #force_inline proc(self: ^CaptureScope) {
