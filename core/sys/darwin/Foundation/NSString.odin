@@ -100,8 +100,8 @@ String_length :: proc(self: ^String) -> UInteger {
 	return msgSend(UInteger, self, "length")
 }
 
-@(objc_type=String, objc_name="cStringUsingEncoding")
-String_cStringUsingEncoding :: proc(self: ^String, encoding: StringEncoding) -> cstring {
+@(objc_type=String, objc_name="cstringUsingEncoding")
+String_cstringUsingEncoding :: proc(self: ^String, encoding: StringEncoding) -> cstring {
 	return msgSend(cstring, self, "cStringUsingEncoding:", encoding)
 }
 
@@ -110,8 +110,8 @@ String_UTF8String :: proc(self: ^String) -> cstring {
 	return msgSend(cstring, self, "UTF8String")
 }
 
-@(objc_type=String, objc_name="OdinString")
-String_OdinString :: proc(self: ^String) -> string {
+@(objc_type=String, objc_name="odinString")
+String_odinString :: proc(self: ^String) -> string {
 	return string(String_UTF8String(self))
 }
 
