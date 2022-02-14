@@ -5810,8 +5810,8 @@ Methods:
 CommandEncoder :: struct { using _: NS.Object }
 
 @(objc_type=CommandEncoder, objc_name="device")
-CommandEncoder_device :: #force_inline proc(self: ^CommandEncoder) -> ^CommandEncoder {
-	return msgSend(^CommandEncoder, self, "device")
+CommandEncoder_device :: #force_inline proc(self: ^CommandEncoder) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=CommandEncoder, objc_name="endEncoding")
 CommandEncoder_endEncoding :: #force_inline proc(self: ^CommandEncoder) {
