@@ -5656,20 +5656,20 @@ CommandBuffer_commit :: #force_inline proc(self: ^CommandBuffer) {
 	msgSend(nil, self, "commit")
 }
 @(objc_type=CommandBuffer, objc_name="computeCommandEncoder")
-CommandBuffer_computeCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^CommandEncoder {
-	return msgSend(^CommandEncoder, self, "computeCommandEncoder")
+CommandBuffer_computeCommandEncoder :: #force_inline proc(self: ^CommandBuffer) -> ^ComputeCommandEncoder {
+	return msgSend(^ComputeCommandEncoder, self, "computeCommandEncoder")
 }
 @(objc_type=CommandBuffer, objc_name="computeCommandEncoderWithDescriptor")
-CommandBuffer_computeCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, computePassDescriptor: ^ComputePassDescriptor) -> ^CommandEncoder {
-	return msgSend(^CommandEncoder, self, "computeCommandEncoderWithDescriptor:", computePassDescriptor)
+CommandBuffer_computeCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, computePassDescriptor: ^ComputePassDescriptor) -> ^ComputeCommandEncoder {
+	return msgSend(^ComputeCommandEncoder, self, "computeCommandEncoderWithDescriptor:", computePassDescriptor)
 }
 @(objc_type=CommandBuffer, objc_name="computeCommandEncoderWithDispatchType")
-CommandBuffer_computeCommandEncoderWithDispatchType :: #force_inline proc(self: ^CommandBuffer, dispatchType: DispatchType) -> ^CommandEncoder {
-	return msgSend(^CommandEncoder, self, "computeCommandEncoderWithDispatchType:", dispatchType)
+CommandBuffer_computeCommandEncoderWithDispatchType :: #force_inline proc(self: ^CommandBuffer, dispatchType: DispatchType) -> ^ComputeCommandEncoder {
+	return msgSend(^ComputeCommandEncoder, self, "computeCommandEncoderWithDispatchType:", dispatchType)
 }
 @(objc_type=CommandBuffer, objc_name="device")
-CommandBuffer_device :: #force_inline proc(self: ^CommandBuffer) -> ^CommandBuffer {
-	return msgSend(^CommandBuffer, self, "device")
+CommandBuffer_device :: #force_inline proc(self: ^CommandBuffer) -> ^Device {
+	return msgSend(^Device, self, "device")
 }
 @(objc_type=CommandBuffer, objc_name="encodeSignalEvent")
 CommandBuffer_encodeSignalEvent :: #force_inline proc(self: ^CommandBuffer, event: ^Event, value: u64) {
@@ -5704,8 +5704,8 @@ CommandBuffer_label :: #force_inline proc(self: ^CommandBuffer) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=CommandBuffer, objc_name="logs")
-CommandBuffer_logs :: #force_inline proc(self: ^CommandBuffer) -> id {
-	return msgSend(id, self, "logs")
+CommandBuffer_logs :: #force_inline proc(self: ^CommandBuffer) -> ^LogContainer {
+	return msgSend(^LogContainer, self, "logs")
 }
 @(objc_type=CommandBuffer, objc_name="parallelRenderCommandEncoderWithDescriptor")
 CommandBuffer_parallelRenderCommandEncoderWithDescriptor :: #force_inline proc(self: ^CommandBuffer, renderPassDescriptor: ^RenderPassDescriptor) -> ^ParallelRenderCommandEncoder {
@@ -6972,6 +6972,16 @@ FunctionHandle_functionType :: #force_inline proc(self: ^FunctionHandle) -> Func
 FunctionHandle_name :: #force_inline proc(self: ^FunctionHandle) -> ^NS.String {
 	return msgSend(^NS.String, self, "name")
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+/*
+Class:
+	LogContainer
+*/
+
+@(objc_class="MTLLogContainer")
+LogContainer :: struct { using _: NS.FastEnumeration }
 
 ////////////////////////////////////////////////////////////////////////////////
 
