@@ -4696,8 +4696,8 @@ TileRenderPipelineDescriptor_tileBuffers :: #force_inline proc(self: ^TileRender
 	return msgSend(^PipelineBufferDescriptorArray, self, "tileBuffers")
 }
 @(objc_type=TileRenderPipelineDescriptor, objc_name="tileFunction")
-TileRenderPipelineDescriptor_tileFunction :: #force_inline proc(self: ^TileRenderPipelineDescriptor) -> ^TileRenderPipelineDescriptor {
-	return msgSend(^TileRenderPipelineDescriptor, self, "tileFunction")
+TileRenderPipelineDescriptor_tileFunction :: #force_inline proc(self: ^TileRenderPipelineDescriptor) -> ^Function {
+	return msgSend(^Function, self, "tileFunction")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -8121,8 +8121,8 @@ Resource_hazardTrackingMode :: #force_inline proc(self: ^Resource) -> HazardTrac
 	return msgSend(HazardTrackingMode, self, "hazardTrackingMode")
 }
 @(objc_type=Resource, objc_name="heap")
-Resource_heap :: #force_inline proc(self: ^Resource) -> ^Resource {
-	return msgSend(^Resource, self, "heap")
+Resource_heap :: #force_inline proc(self: ^Resource) -> ^Heap {
+	return msgSend(^Heap, self, "heap")
 }
 @(objc_type=Resource, objc_name="heapOffset")
 Resource_heapOffset :: #force_inline proc(self: ^Resource) -> NS.UInteger {
@@ -8186,8 +8186,8 @@ ResourceStateCommandEncoder_updateTextureMapping :: #force_inline proc(self: ^Re
 	msgSend(nil, self, "updateTextureMapping:mode:region:mipLevel:slice:", texture, mode, region, mipLevel, slice)
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMappings")
-ResourceStateCommandEncoder_updateTextureMappings :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, regions: ^Region, mipLevels: NS.UInteger, slices: NS.UInteger, numRegions: NS.UInteger) {
-	msgSend(nil, self, "updateTextureMappings:mode:regions:mipLevels:slices:numRegions:", texture, mode, regions, mipLevels, slices, numRegions)
+ResourceStateCommandEncoder_updateTextureMappings :: #force_inline proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, regions: []Region, mipLevels: []NS.UInteger, slices: NS.UInteger) {
+	msgSend(nil, self, "updateTextureMappings:mode:regions:mipLevels:slices:numRegions:", texture, mode, raw_data(regions), raw_data(mipLevels), slices, NS.UInteger(len(regions)))
 }
 @(objc_type=ResourceStateCommandEncoder, objc_name="waitForFence")
 ResourceStateCommandEncoder_waitForFence :: #force_inline proc(self: ^ResourceStateCommandEncoder, fence: ^Fence) {
