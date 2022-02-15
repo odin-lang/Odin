@@ -95,8 +95,8 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Err
 	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
-	sockaddr, addrsize := address_to_sockaddr(addr, port)
-	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), addrsize)
+	sockaddr := address_to_sockaddr(addr, port)
+	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
 		return
@@ -122,9 +122,9 @@ Bind_Error :: enum c.int {
 }
 
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
-	sockaddr, addrsize := address_to_sockaddr(ep.address, ep.port)
+	sockaddr := address_to_sockaddr(ep.address, ep.port)
 	s := any_socket_to_socket(skt)
-	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), addrsize)
+	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
 	if res != os.ERROR_NONE {
 		err = Bind_Error(res)
 	}
@@ -307,11 +307,11 @@ Udp_Send_Error :: enum c.int {
 }
 
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
-	toaddr, toaddrsize := address_to_sockaddr(to.address, to.port)
+	toaddr := address_to_sockaddr(to.address, to.port)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, ok := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR) &toaddr, toaddrsize)
+		res, ok := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
 		if ok != os.ERROR_NONE {
 			err = Udp_Send_Error(ok)
 			return
