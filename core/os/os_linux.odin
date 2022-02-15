@@ -787,16 +787,16 @@ socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
 	return Socket(result), ERROR_NONE
 }
 
-bind :: proc(sd: Socket, addr: ^SOCKADDR) -> (Errno) {
-	result := _unix_bind(int(sd), addr, size_of(addr^))
+bind :: proc(sd: Socket, addr: ^SOCKADDR, addr_size: int) -> (Errno) {
+	result := _unix_bind(int(sd), addr, c.int(addr_size))
 	if result < 0 {
 		return _get_errno(result)
 	}
 	return ERROR_NONE
 }
 
-connect :: proc(sd: Socket, addr: ^SOCKADDR) -> (Errno) {
-	result := _unix_connect(int(sd), addr, size_of(addr^))
+connect :: proc(sd: Socket, addr: ^SOCKADDR, addr_size: int) -> (Errno) {
+	result := _unix_connect(int(sd), addr, c.int(addr_size))
 	if result < 0 {
 		return _get_errno(result)
 	}
