@@ -105,7 +105,6 @@ Bundle_sharedFrameworksURL :: proc(self: ^Bundle) -> ^URL {
 	return msgSend(^URL, self, "sharedFrameworksURL")
 }
 
-
 @(objc_type=Bundle, objc_name="sharedSupportURL")
 Bundle_sharedSupportURL :: proc(self: ^Bundle) -> ^URL {
 	return msgSend(^URL, self, "sharedSupportURL")
@@ -120,9 +119,6 @@ Bundle_builtInPlugInsURL :: proc(self: ^Bundle) -> ^URL {
 Bundle_appStoreReceiptURL :: proc(self: ^Bundle) -> ^URL {
 	return msgSend(^URL, self, "appStoreReceiptURL")
 }
-
-
-
 
 @(objc_type=Bundle, objc_name="bundlePath")
 Bundle_bundlePath :: proc(self: ^Bundle) -> ^String {
@@ -154,7 +150,6 @@ Bundle_sharedFrameworksPath :: proc(self: ^Bundle) -> ^String {
 	return msgSend(^String, self, "sharedFrameworksPath")
 }
 
-
 @(objc_type=Bundle, objc_name="sharedSupportPath")
 Bundle_sharedSupportPath :: proc(self: ^Bundle) -> ^String {
 	return msgSend(^String, self, "sharedSupportPath")
@@ -174,7 +169,6 @@ Bundle_appStoreReceiptPath :: proc(self: ^Bundle) -> ^String {
 Bundle_bundleIdentifier :: proc(self: ^Bundle) -> ^String {
 	return msgSend(^String, self, "bundleIdentifier")
 }
-
 
 @(objc_type=Bundle, objc_name="infoDictionary")
 Bundle_infoDictionary :: proc(self: ^Bundle) -> ^Dictionary {

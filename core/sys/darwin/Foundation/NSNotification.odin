@@ -14,7 +14,6 @@ Notification_init :: proc(self: ^Notification) -> ^Notification {
 	return msgSend(^Notification, self, "init")
 }
 
-
 @(objc_type=Notification, objc_name="name")
 Notification_name :: proc(self: ^Notification) -> ^String {
 	return msgSend(^String, self, "name")

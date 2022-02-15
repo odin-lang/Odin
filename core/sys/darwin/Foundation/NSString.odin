@@ -49,12 +49,12 @@ StringCompareOption :: enum UInteger {
 
 unichar :: distinct u16
 
-foreign Foundation {
-	__CFStringMakeConstantString :: proc "c" (c: cstring) -> ^String ---
-}
 
 AT :: MakeConstantString
 MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
+	foreign Foundation {
+		__CFStringMakeConstantString :: proc "c" (c: cstring) -> ^String ---
+	}
 	return __CFStringMakeConstantString(c)
 }
 

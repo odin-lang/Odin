@@ -29,7 +29,6 @@ Dictionary_init :: proc(self: ^Dictionary) -> ^Dictionary {
 	return msgSend(^Dictionary, self, "init")
 }
 
-
 @(objc_type=Dictionary, objc_name="initWithObjects")
 Dictionary_initWithObjects :: proc(self: ^Dictionary, objects: [^]^Object, forKeys: [^]^Object, count: UInteger) -> ^Dictionary {
 	return msgSend(^Dictionary, self, "initWithObjects:forKeys:count", objects, forKeys, count)
