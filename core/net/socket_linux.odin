@@ -2,6 +2,7 @@ package net
 
 import "core:c"
 import "core:os"
+import "core:intrinsics"
 
 import "core:fmt"
 
@@ -378,47 +379,39 @@ Socket_Option_Error :: enum c.int {
 	Not_Socket = c.int(os.ENOTSOCK),
 }
 
-// Socket must be bound.
-set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_Error {
+set_option :: proc(s: Any_Socket, $option: Socket_Option, value: $V) -> Network_Error {
 	level := os.SOL_SOCKET if option != .Tcp_Nodelay else os.IPPROTO_TCP
 
-	switch option {
-	case
-		.Reuse_Address,
-		.Keep_Alive,
-		.Out_Of_Bounds_Data_Inline,
-		.Tcp_Nodelay:
-			switch in value {
-			case bool:
-				// okay
-			case:
-				return .Incorrect_Value_Type
+	when
+		option == .Reuse_Address ||
+		option == .Keep_Alive ||
+		option == .Out_Of_Bounds_Data_Inline ||
+		option == .Tcp_Nodelay {
+			when intrinsics.type_is_boolean(V) {
+				// NOTE(tetra, 2022-02-15): On Linux, you cannot merely give a single byte for a bool;
+				//  it _has_ to be a b32.
+				//  I haven't tested if you can give more than that.
+				v := b32(value)
+			} else {
+				#panic("set_option() value must be a boolean here")
 			}
-	case
-		.Receive_Buffer_Size,
-		.Send_Buffer_Size,
-		.Receive_Timeout,
-		.Send_Timeout:
-			switch in value {
-			case os.Timeval:
-				// okay
-			case:
-				return .Incorrect_Value_Type
+	} else when
+		option == .Receive_Buffer_Size ||
+		option == .Send_Buffer_Size ||
+		option == .Receive_Timeout ||
+		option == .Send_Timeout {
+			when intrinsics.type_is_integer(V) {
+				v := i32(value)
+			} else {
+				#panic("set_option() value must be an integer here")
 			}
-	case .Linger:
-		switch in value {
-		case os.Linger:
-			// okay
-		case:
-			return .Incorrect_Value_Type
-		}
-	case:
-		return .Unknown_Option
+	} else {
+		#panic("unhandled option is net.set_option(); this is an oversight in core:net")
 	}
 
 
-	ptr := value.data
-	len := c.int(type_info_of(value.id).size)
+	ptr := &v
+	len := c.int(size_of(v))
 
 	skt := any_socket_to_socket(s)
 	res := os.setsockopt(os.Socket(skt), int(level), int(option), ptr, len)
