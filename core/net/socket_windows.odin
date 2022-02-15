@@ -444,11 +444,11 @@ Socket_Option :: enum c.int {
 	Send_Buffer_Size = win.SO_SNDBUF,
 	// win.DWORD: For blocking sockets, the time in milliseconds to wait for incoming data to be received, before giving up and returning .Timeout.
 	//            For non-blocking sockets, ignored.
-	// TODO: verify that value of zero waits forever
+	//            Use a value of zero to potentially wait forever.
 	Receive_Timeout = win.SO_RCVTIMEO,
 	// win.DWORD: For blocking sockets, the time in milliseconds to wait for outgoing data to be sent, before giving up and returning .Timeout.
 	//            For non-blocking sockets, ignored.
-	// TODO: verify that value of zero waits forever
+	//            Use a value of zero to potentially wait forever.
 	Send_Timeout = win.SO_SNDTIMEO,
 	// bool: Allow sending to, receiving from, and binding to, a broadcast address.
 	Broadcast = win.SO_BROADCAST,
