@@ -72,7 +72,7 @@ PERMISSION_OTHER_ALL :: Permission{.PERMISSION_OTHER_READ, .PERMISSION_OTHER_WRI
 PERMISSION_ALL_ALL   :: PERMISSION_OWNER_ALL | PERMISSION_GROUP_ALL | PERMISSION_OTHER_ALL
 
 _sys_permission_mode :: #force_inline proc (mode: Permission) -> u32 {
-	cflags: u32 = 0;
+	cflags: u32 = 0
 
 	cflags |= PERMISSION_MASK_IRUSR * u32(Permission.PERMISSION_OWNER_READ in mode)
 	cflags |= PERMISSION_MASK_IWUSR * u32(Permission.PERMISSION_OWNER_WRITE in mode)
@@ -89,9 +89,9 @@ _sys_permission_mode :: #force_inline proc (mode: Permission) -> u32 {
 
 sys_open :: proc(path: string, oflag: Open_Flags, mode: Permission) -> (c.int, bool) {
 	
-	cmode: u32 = 0;
-	cflags: u32 = 0;
-	cpath: cstring = strings.clone_to_cstring(path);
+	cmode: u32 = 0
+	cflags: u32 = 0
+	cpath: cstring = strings.clone_to_cstring(path)
 	defer delete(cpath)
 
 	cflags = _sys_permission_mode(mode)
@@ -167,7 +167,7 @@ sys_lseek :: proc(fd: c.int, offset: i64, whence: Offset_From) -> i64 {
 sys_chmod :: proc(path: string, mode: Permission) -> bool {
 	cpath: cstring = strings.clone_to_cstring(path)
 	defer delete(cpath)
-	cmode := _sys_permission_mode(mode);
+	cmode := _sys_permission_mode(mode)
 	return syscall_chmod(cpath, cmode) != -1
 }
 
