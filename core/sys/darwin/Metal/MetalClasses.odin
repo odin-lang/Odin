@@ -1,6 +1,7 @@
 package objc_Metal
 
 import NS "core:sys/darwin/Foundation"
+import "core:mem"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -6465,6 +6466,16 @@ Device_newBufferWithBytes :: #force_inline proc(self: ^Device, bytes: []byte, op
 Device_newBufferWithBytesNoCopy :: #force_inline proc(self: ^Device, bytes: []byte, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
 	return msgSend(^Buffer, self, "newBufferWithBytesNoCopy:length:options:deallocator:", raw_data(bytes), NS.UInteger(len(bytes)), options, deallocator)
 }
+
+@(objc_type=Device, objc_name="newBufferWithSlice")
+Device_newBufferWithSlice :: #force_inline proc(self: ^Device, slice: $S/[]$E, options: ResourceOptions) -> ^Buffer {
+	return Device_newBufferWithBytes(self, mem.slice_to_bytes(slice), options)
+}
+@(objc_type=Device, objc_name="newBufferWithSliceNoCopy")
+Device_newBufferWithSliceNoCopy :: #force_inline proc(self: ^Device, slice: $S/[]$E, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
+	return Device_newBufferWithBytesNotCopy(self, mem.slice_to_bytes(slice), options, deallocator)
+}
+
 @(objc_type=Device, objc_name="newBuffer")
 Device_newBuffer :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
 	return msgSend(^Buffer, self, "newBufferWithLength:options:", length, options)
@@ -7263,7 +7274,7 @@ IndirectRenderCommand_drawPatches :: #force_inline proc(self: ^IndirectRenderCom
 	msgSend(nil, self, "drawPatches:patchStart:patchCount:patchIndexBuffer:patchIndexBufferOffset:instanceCount:baseInstance:tessellationFactorBuffer:tessellationFactorBufferOffset:tessellationFactorBufferInstanceStride:", numberOfPatchControlPoints, patchStart, patchCount, patchIndexBuffer, patchIndexBufferOffset, instanceCount, baseInstance, buffer, offset, instanceStride)
 }
 @(objc_type=IndirectRenderCommand, objc_name="drawPrimitives")
-IndirectRenderCommand_drawPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger = 0, baseInstance: NS.UInteger = 0) {
+IndirectRenderCommand_drawPrimitives :: #force_inline proc(self: ^IndirectRenderCommand, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger = 0) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:", primitiveType, vertexStart, vertexCount, instanceCount, baseInstance)
 }
 @(objc_type=IndirectRenderCommand, objc_name="reset")
