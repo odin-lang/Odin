@@ -66,7 +66,8 @@ OS :: enum u8 {
 	_Unknown     = 14,
 	Unknown      = 255,
 }
-OS_Name :: #partial [OS]string{
+OS_Name :: #sparse[OS]string{
+	._Unknown     = "",
 	.FAT          = "FAT",
 	.Amiga        = "Amiga",
 	.VMS          = "VMS/OpenVMS",

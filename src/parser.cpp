@@ -183,6 +183,11 @@ Ast *clone_ast(Ast *node) {
 		n->FieldValue.value = clone_ast(n->FieldValue.value);
 		break;
 
+	case Ast_EnumFieldValue:
+		n->EnumFieldValue.name = clone_ast(n->EnumFieldValue.name);
+		n->EnumFieldValue.value = clone_ast(n->EnumFieldValue.value);
+		break;
+
 	case Ast_TernaryIfExpr:
 		n->TernaryIfExpr.x    = clone_ast(n->TernaryIfExpr.x);
 		n->TernaryIfExpr.cond = clone_ast(n->TernaryIfExpr.cond);
@@ -693,6 +698,16 @@ Ast *ast_field_value(AstFile *f, Ast *field, Ast *value, Token eq) {
 	return result;
 }
 
+
+Ast *ast_enum_field_value(AstFile *f, Ast *name, Ast *value, CommentGroup *docs, CommentGroup *comment) {
+	Ast *result = alloc_ast_node(f, Ast_EnumFieldValue);
+	result->EnumFieldValue.name = name;
+	result->EnumFieldValue.value = value;
+	result->EnumFieldValue.docs = docs;
+	result->EnumFieldValue.comment = comment;
+	return result;
+}
+
 Ast *ast_compound_lit(AstFile *f, Ast *type, Array<Ast *> const &elems, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_CompoundLit);
 	result->CompoundLit.type = type;
@@ -944,7 +959,7 @@ Ast *ast_field(AstFile *f, Array<Ast *> const &names, Ast *type, Ast *default_va
 	result->Field.default_value = default_value;
 	result->Field.flags         = flags;
 	result->Field.tag           = tag;
-	result->Field.docs = docs;
+	result->Field.docs          = docs;
 	result->Field.comment       = comment;
 	return result;
 }
@@ -1234,7 +1249,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	return comments;
 }
 
-void comsume_comment_groups(AstFile *f, Token prev) {
+void consume_comment_groups(AstFile *f, Token prev) {
 	if (f->curr_token.kind == Token_Comment) {
 		CommentGroup *comment = nullptr;
 		isize end_line = 0;
@@ -1278,7 +1293,7 @@ Token advance_token(AstFile *f) {
 	if (ok) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
-			comsume_comment_groups(f, prev);
+			consume_comment_groups(f, prev);
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -1689,6 +1704,46 @@ Array<Ast *> parse_element_list(AstFile *f) {
 
 	return elems;
 }
+CommentGroup *consume_line_comment(AstFile *f) {
+	CommentGroup *comment = f->line_comment;
+	if (f->line_comment == f->lead_comment) {
+		f->lead_comment = nullptr;
+	}
+	f->line_comment = nullptr;
+	return comment;
+
+}
+
+Array<Ast *> parse_enum_field_list(AstFile *f) {
+	auto elems = array_make<Ast *>(heap_allocator());
+
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		CommentGroup *docs = f->lead_comment;
+		CommentGroup *comment = nullptr;
+		Ast *name = parse_value(f);
+		Ast *value = nullptr;
+		if (f->curr_token.kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+			value = parse_value(f);
+		}
+
+		comment = consume_line_comment(f);
+
+		Ast *elem = ast_enum_field_value(f, name, value, docs, comment);
+		array_add(&elems, elem);
+
+		if (!allow_token(f, Token_Comma)) {
+			break;
+		}
+
+		if (!elem->EnumFieldValue.comment) {
+			elem->EnumFieldValue.comment = consume_line_comment(f);
+		}
+	}
+
+	return elems;
+}
 
 Ast *parse_literal_value(AstFile *f, Ast *type) {
 	Array<Ast *> elems = {};
@@ -1793,6 +1848,8 @@ void parse_proc_tags(AstFile *f, u64 *tags) {
 		ELSE_IF_ADD_TAG(require_results)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)
+		ELSE_IF_ADD_TAG(type_assert)
+		ELSE_IF_ADD_TAG(no_type_assert)
 		else {
 			syntax_error(tag_expr, "Unknown procedure type tag #%.*s", LIT(tag_name));
 		}
@@ -1802,6 +1859,10 @@ void parse_proc_tags(AstFile *f, u64 *tags) {
 
 	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
 		syntax_error(f->curr_token, "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
+	}
+
+	if ((*tags & ProcTag_type_assert) && (*tags & ProcTag_no_type_assert)) {
+		syntax_error(f->curr_token, "You cannot apply both #type_assert and #no_type_assert to a procedure");
 	}
 }
 
@@ -1950,11 +2011,23 @@ Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 sta
 			syntax_error(tag_token, "#bounds_check and #no_bounds_check cannot be applied together");
 		}
 		break;
+	case StateFlag_type_assert:
+		if ((s->state_flags & StateFlag_no_type_assert) != 0) {
+			syntax_error(tag_token, "#type_assert and #no_type_assert cannot be applied together");
+		}
+		break;
+	case StateFlag_no_type_assert:
+		if ((s->state_flags & StateFlag_type_assert) != 0) {
+			syntax_error(tag_token, "#type_assert and #no_type_assert cannot be applied together");
+		}
+		break;
 	}
 
 	switch (state_flag) {
 	case StateFlag_bounds_check:
 	case StateFlag_no_bounds_check:
+	case StateFlag_type_assert:
+	case StateFlag_no_type_assert:
 		switch (s->kind) {
 		case Ast_BlockStmt:
 		case Ast_IfStmt:
@@ -2063,6 +2136,22 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return original_type;
 		} else if (name.string == "partial") {
 			Ast *tag = ast_basic_directive(f, token, name);
+			Ast *original_expr = parse_expr(f, lhs);
+			Ast *expr = unparen_expr(original_expr);
+			switch (expr->kind) {
+			case Ast_ArrayType:
+				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
+				break;
+			case Ast_CompoundLit:
+				expr->CompoundLit.tag = tag;
+				break;
+			default:
+				syntax_error(expr, "Expected a compound literal after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[expr->kind]));
+				break;
+			}
+			return original_expr;
+		} else if (name.string == "sparse") {
+			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
 			switch (type->kind) {
@@ -2078,6 +2167,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "no_bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
 			return parse_check_directive_for_statement(operand, name, StateFlag_no_bounds_check);
+		} else if (name.string == "type_assert") {
+			Ast *operand = parse_expr(f, lhs);
+			return parse_check_directive_for_statement(operand, name, StateFlag_type_assert);
+		} else if (name.string == "no_type_assert") {
+			Ast *operand = parse_expr(f, lhs);
+			return parse_check_directive_for_statement(operand, name, StateFlag_no_type_assert);
 		} else if (name.string == "relative") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			tag = parse_call_expr(f, tag);
@@ -2173,6 +2268,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 			if (tags & ProcTag_bounds_check) {
 				body->state_flags |= StateFlag_bounds_check;
+			}
+			if (tags & ProcTag_no_type_assert) {
+				body->state_flags |= StateFlag_no_type_assert;
+			}
+			if (tags & ProcTag_type_assert) {
+				body->state_flags |= StateFlag_type_assert;
 			}
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
@@ -2449,7 +2550,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 
-		Array<Ast *> values = parse_element_list(f);
+		Array<Ast *> values = parse_enum_field_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_enum_type(f, token, base_type, values);
@@ -4561,6 +4662,12 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
 			return parse_check_directive_for_statement(s, name, StateFlag_no_bounds_check);
+		} else if (tag == "type_assert") {
+			s = parse_stmt(f);
+			return parse_check_directive_for_statement(s, name, StateFlag_type_assert);
+		} else if (tag == "no_type_assert") {
+			s = parse_stmt(f);
+			return parse_check_directive_for_statement(s, name, StateFlag_no_type_assert);
 		} else if (tag == "partial") {
 			s = parse_stmt(f);
 			switch (s->kind) {
@@ -5398,7 +5505,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
 	if (f->curr_token.kind == Token_Comment) {
-		comsume_comment_groups(f, f->prev_token);
+		consume_comment_groups(f, f->prev_token);
 	}
 
 	CommentGroup *docs = f->lead_comment;
@@ -5444,8 +5551,17 @@ bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
-					} else if (lc == "+private") {
-						f->flags |= AstFile_IsPrivate;
+					} else if (string_starts_with(lc, str_lit("+private"))) {
+						f->flags |= AstFile_IsPrivatePkg;
+						String command = string_trim_starts_with(lc, str_lit("+private "));
+						command = string_trim_whitespace(command);
+						if (lc == "+private") {
+							f->flags |= AstFile_IsPrivatePkg;
+						} else if (command == "package") {
+							f->flags |= AstFile_IsPrivatePkg;
+						} else if (command == "file") {
+							f->flags |= AstFile_IsPrivateFile;
+						}
 					} else if (lc == "+lazy") {
 						if (build_context.ignore_lazy) {
 							// Ignore

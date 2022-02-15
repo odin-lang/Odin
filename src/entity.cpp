@@ -161,6 +161,8 @@ struct Entity {
 			ParameterValue param_value;
 			u32 flags;
 			i32 field_group_index;
+			CommentGroup *docs;
+			CommentGroup *comment;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
@@ -175,6 +177,8 @@ struct Entity {
 			String     link_name;
 			String     link_prefix;
 			String     link_section;
+			CommentGroup *docs;
+			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 		} Variable;
@@ -241,7 +245,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
-	if (e->file != nullptr && (e->file->flags & AstFile_IsPrivate) != 0) {
+	if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) != 0) {
 		return false;
 	}
 

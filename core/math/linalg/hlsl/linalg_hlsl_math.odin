@@ -26,7 +26,9 @@ log10_float       :: proc "c" (x: float)    -> float { return math.log(x, 10) }
 exp2_float        :: proc "c" (x: float)    -> float { return math.pow(float(2), x) }
 sign_float        :: proc "c" (x: float)    -> float { return math.sign(x) }
 floor_float       :: proc "c" (x: float)    -> float { return math.floor(x) }
+round_float       :: proc "c" (x: float)    -> float { return math.round(x) }
 ceil_float        :: proc "c" (x: float)    -> float { return math.ceil(x) }
+isnan_float       :: proc "c" (x: float)    -> bool  { return math.classify(x) == .NaN}
 fmod_float        :: proc "c" (x, y: float) -> float { return math.mod(x, y) }
 frac_float :: proc "c" (x: float) -> float {
 	if x >= 0 {
@@ -34,6 +36,7 @@ frac_float :: proc "c" (x: float) -> float {
 	}
 	return math.trunc(-x) + x
 }
+
 
 cos_double         :: proc "c" (x: double)    -> double { return math.cos(x) }
 sin_double         :: proc "c" (x: double)    -> double { return math.sin(x) }
@@ -59,7 +62,9 @@ log10_double       :: proc "c" (x: double)    -> double { return math.log(x, 10)
 exp2_double        :: proc "c" (x: double)    -> double { return math.pow(double(2), x) }
 sign_double        :: proc "c" (x: double)    -> double { return math.sign(x) }
 floor_double       :: proc "c" (x: double)    -> double { return math.floor(x) }
+round_double       :: proc "c" (x: double)    -> double { return math.round(x) }
 ceil_double        :: proc "c" (x: double)    -> double { return math.ceil(x) }
+isnan_double       :: proc "c" (x: double)    -> bool   { return math.classify(x) == .NaN}
 fmod_double        :: proc "c" (x, y: double) -> double { return math.mod(x, y) }
 frac_double :: proc "c" (x: double) -> double {
 	if x >= 0 {

@@ -472,6 +472,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		write_type(w, info.elem,             &n) or_return
 
 	case Type_Info_Enumerated_Array:
+		if info.is_sparse {
+			io.write_string(w, "#sparse", &n) or_return
+		}
 		io.write_string(w, "[",   &n) or_return
 		write_type(w, info.index, &n) or_return
 		io.write_string(w, "]",   &n) or_return
