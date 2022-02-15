@@ -3,6 +3,7 @@ package net
 import "core:c"
 import "core:intrinsics"
 import win "core:sys/windows"
+import "core:time"
 
 import "core:fmt"
 
@@ -456,10 +457,9 @@ Socket_Option :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
-	// The value is not of the correct type for the given socket option.
-	Incorrect_Value_Type,
-	// The given socket option is unrecognised.
-	Unknown_Option,
+	Linger_Only_Supports_Whole_Seconds,
+	// The given value is too big or small to be given to the OS.
+	Value_Out_Of_Range,
 
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Timeout_When_Keepalive_Set = win.WSAENETRESET,
@@ -487,7 +487,15 @@ set_option :: proc(s: Any_Socket, $option: Socket_Option, value: $V) -> Network_
 				#panic("set_option() value must be a boolean here")
 			}
 	} else when option == .Linger {
-		#panic(".Linger unimplented")
+		when V != time.Duration {
+			#panic("set_option() value must be a time.Duration here")
+		}
+		num_secs := i64(time.duration_seconds(value))
+		if time.Duration(num_secs * 1e9) != value  do return .Linger_Only_Supports_Whole_Seconds
+		if num_secs > i64(max(u16)) do return .Value_Out_Of_Range
+		v: win.LINGER
+		v.l_onoff = 1
+		v.l_linger = c.ushort(num_secs)
 	} else when
 		option == .Receive_Buffer_Size ||
 		option == .Send_Buffer_Size ||
