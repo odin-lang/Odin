@@ -827,8 +827,8 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 	return ERROR_NONE
 }
 
-recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR) -> (u32, Errno) {
-	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, size_of(addr^))
+recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: int) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, uintptr(addr_size))
 	if result < 0 {
 		return 0, _get_errno(int(result))
 	}
@@ -843,8 +843,8 @@ recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
 	return u32(result), ERROR_NONE
 }
 
-sendto :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR) -> (u32, Errno) {
-	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, size_of(addr^))
+sendto :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: int) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, uintptr(addr_size))
 	if result < 0 {
 		return 0, _get_errno(int(result))
 	}
