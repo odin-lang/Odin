@@ -6396,10 +6396,10 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		return builtin_procs[id].kind;
 	}
 
-	Entity *e = entity_of_node(operand->expr);
+	Entity *initial_entity = entity_of_node(operand->expr);
 
-	if (e != nullptr && e->kind == Entity_Procedure) {
-		if (e->Procedure.deferred_procedure.entity != nullptr) {
+	if (initial_entity != nullptr && initial_entity->kind == Entity_Procedure) {
+		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 		}
 	}
