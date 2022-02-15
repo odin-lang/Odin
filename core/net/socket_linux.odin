@@ -274,7 +274,7 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 
 	from: os.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from)
+	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, int(fromsize))
 	if ok != os.ERROR_NONE {
 		err = Udp_Recv_Error(ok)
 		return
@@ -325,7 +325,7 @@ send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 	toaddr, toaddrsize := address_to_sockaddr(to.address, to.port)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
-		res, ok := os.sendto(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr)
+		res, ok := os.sendto(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, int(toaddrsize))
 		if ok != os.ERROR_NONE {
 			err = Udp_Send_Error(ok)
 			return
