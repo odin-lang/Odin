@@ -1,7 +1,6 @@
 package net
 
 import "core:c"
-import "core:intrinsics"
 import win "core:sys/windows"
 import "core:time"
 
@@ -468,51 +467,71 @@ Socket_Option_Error :: enum c.int {
 	Not_Socket = win.WSAENOTSOCK,
 }
 
-set_option :: proc(s: Any_Socket, $option: Socket_Option, value: $V) -> Network_Error {
+set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
 	level := win.SOL_SOCKET if option != .Tcp_Nodelay else win.IPPROTO_TCP
 
-	when
-		option == .Reuse_Address ||
-		option == .Exclusive_Addr_Use ||
-		option == .Keep_Alive ||
-		option == .Out_Of_Bounds_Data_Inline ||
-		option == .Tcp_Nodelay ||
-		option == .Broadcast {
-			when intrinsics.type_is_boolean(V) {
-				// NOTE(tetra, 2022-02-15): On Linux, you cannot merely give a single byte for a bool;
-				//  it _has_ to be a b32.
-				//  I haven't tested if you can give more than that.
-				v := b32(value)
-			} else {
-				#panic("set_option() value must be a boolean here")
+	bool_value: b32
+	int_value: i32
+	linger_value: win.LINGER
+
+	ptr: rawptr
+	len: c.int
+
+	switch option {
+	case
+		.Reuse_Address,
+		.Exclusive_Addr_Use,
+		.Keep_Alive,
+		.Out_Of_Bounds_Data_Inline,
+		.Tcp_Nodelay,
+		.Broadcast,
+		.Conditional_Accept,
+		.Dont_Linger:
+			switch x in value {
+			case bool, b8:
+				x2 := x
+				bool_value = b32((^bool)(&x2)^)
+			case b16:
+				bool_value = b32(x)
+			case b32:
+				bool_value = b32(x)
+			case b64:
+				bool_value = b32(x)
+			case:
+				panic("set_option() value must be a boolean here", loc)
 			}
-	} else when option == .Linger {
-		when V != time.Duration {
-			#panic("set_option() value must be a time.Duration here")
-		}
-		num_secs := i64(time.duration_seconds(value))
-		if time.Duration(num_secs * 1e9) != value  do return .Linger_Only_Supports_Whole_Seconds
+			ptr = &bool_value
+			len = size_of(bool_value)
+	case .Linger:
+		t, ok := value.(time.Duration)
+		if !ok do panic("set_option() value must be a time.Duration here", loc)
+
+		num_secs := i64(time.duration_seconds(t))
+		if time.Duration(num_secs * 1e9) != t do return .Linger_Only_Supports_Whole_Seconds
 		if num_secs > i64(max(u16)) do return .Value_Out_Of_Range
-		v: win.LINGER
-		v.l_onoff = 1
-		v.l_linger = c.ushort(num_secs)
-	} else when
-		option == .Receive_Buffer_Size ||
-		option == .Send_Buffer_Size ||
-		option == .Receive_Timeout ||
-		option == .Send_Timeout {
-			when intrinsics.type_is_integer(V) {
-				v := i32(value)
-			} else {
-				#panic("set_option() value must be an integer here")
+		linger_value.l_onoff = 1
+		linger_value.l_linger = c.ushort(num_secs)
+
+		ptr = &linger_value
+		len = size_of(linger_value)
+	case
+		.Receive_Buffer_Size,
+		.Send_Buffer_Size,
+		.Receive_Timeout,
+		.Send_Timeout:
+			switch i in value {
+			case i8, u8:   i2 := i; int_value = c.int((^u8)(&i2)^)
+			case i16, u16: i2 := i; int_value = c.int((^u16)(&i2)^)
+			case i32, u32: i2 := i; int_value = c.int((^u32)(&i2)^)
+			case i64, u64: i2 := i; int_value = c.int((^u64)(&i2)^)
+			case i128, u128: i2 := i; int_value = c.int((^u128)(&i2)^)
+			case int, uint: i2 := i; int_value = c.int((^uint)(&i2)^)
+			case:
+				panic("set_option() value must be an integer here", loc)
 			}
-	} else {
-		#panic("unhandled option is net.set_option(); this is an oversight in core:net")
+			ptr = &int_value
+			len = size_of(int_value)
 	}
-
-
-	ptr := &v
-	len := c.int(size_of(v))
 
 	skt := any_socket_to_socket(s)
 	res := win.setsockopt(win.SOCKET(skt), c.int(level), c.int(option), ptr, len)
