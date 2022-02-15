@@ -206,23 +206,7 @@ accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, e
 		return
 	}
 	client = Tcp_Socket(client_sock)
-
-	source_address: Address
-	port: int
-	switch sockaddrlen {
-	case size_of(os.sockaddr_in):
-		p := cast(^os.sockaddr_in) &sockaddr
-		source_address = transmute(Ipv4_Address) p.sin_addr.s_addr
-		port = int(p.sin_port)
-	case size_of(os.sockaddr_in6):
-		p := cast(^os.sockaddr_in6) &sockaddr
-		source_address = transmute(Ipv6_Address) p.sin6_addr.s6_addr
-		port = int(p.sin6_port)
-	case:
-		unreachable()
-	}
-
-	source = { source_address, port }
+	source = sockaddr_to_endpoint(&sockaddr, sockaddrlen)
 	return
 }
 
