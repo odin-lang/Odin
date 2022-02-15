@@ -119,6 +119,7 @@ _ :: bit_array
 _ :: priority_queue
 _ :: queue
 _ :: small_array
+_ :: lru
 _ :: crypto
 _ :: blake
 _ :: blake2b
