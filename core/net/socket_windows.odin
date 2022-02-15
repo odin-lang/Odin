@@ -101,7 +101,7 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Err
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := endpoint_to_sockaddr({addr, port})
-	res := win.connect(win.SOCKET(skt), (^win.SOCKADDR)(&sockaddr), size_of(sockaddr))
+	res := win.connect(win.SOCKET(skt), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Dial_Error(win.WSAGetLastError())
 		return
@@ -128,7 +128,7 @@ Bind_Error :: enum c.int {
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
-	res := win.bind(win.SOCKET(s), (^win.SOCKADDR)(&sockaddr), size_of(sockaddr))
+	res := win.bind(win.SOCKET(s), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Bind_Error(win.WSAGetLastError())
 	}
@@ -207,7 +207,7 @@ Accept_Error :: enum c.int {
 accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: win.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
-	client_sock := win.accept(win.SOCKET(sock), cast(^win.SOCKADDR) &sockaddr, &sockaddrlen)
+	client_sock := win.accept(win.SOCKET(sock), &sockaddr, &sockaddrlen)
 	if int(client_sock) == win.SOCKET_ERROR {
 		err = Accept_Error(win.WSAGetLastError())
 		return
@@ -285,7 +285,7 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 
 	from: win.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-	res := win.recvfrom(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0, cast(^win.SOCKADDR) &from, &fromsize)
+	res := win.recvfrom(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0, &from, &fromsize)
 	if res < 0 {
 		err = Udp_Recv_Error(win.WSAGetLastError())
 		return
@@ -374,7 +374,7 @@ send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:]
-		res := win.sendto(win.SOCKET(skt), raw_data(remaining), c.int(limit), 0, cast(^win.SOCKADDR) &toaddr, size_of(toaddr))
+		res := win.sendto(win.SOCKET(skt), raw_data(remaining), c.int(limit), 0, &toaddr, size_of(toaddr))
 		if res < 0 {
 			err = Udp_Send_Error(win.WSAGetLastError())
 			return
