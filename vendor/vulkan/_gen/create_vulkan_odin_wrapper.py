@@ -591,7 +591,7 @@ MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
         f.write("""
 import "core:c"
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 \timport win32 "core:sys/windows"
 
 \tHINSTANCE           :: win32.HINSTANCE

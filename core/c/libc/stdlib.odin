@@ -2,15 +2,15 @@ package libc
 
 // 7.22 General utilities
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
-} else when ODIN_OS == "darwin" {
+} else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	RAND_MAX :: 0x7fff
 
 	@(private="file")
@@ -24,7 +24,7 @@ when ODIN_OS == "windows" {
 	}
 }
 
-when ODIN_OS == "linux" {
+when ODIN_OS == .Linux {
 	RAND_MAX :: 0x7fffffff
 
 	// GLIBC and MUSL only
@@ -40,7 +40,7 @@ when ODIN_OS == "linux" {
 }
 
 
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	RAND_MAX :: 0x7fffffff
 
 	// GLIBC and MUSL only

@@ -8,7 +8,7 @@ import "core:strings"
 is_separator :: proc(c: byte) -> bool {
 	switch c {
 	case '/':  return true
-	case '\\': return ODIN_OS == "windows"
+	case '\\': return ODIN_OS == .Windows
 	}
 	return false
 }
@@ -32,7 +32,7 @@ volume_name :: proc(path: string) -> string {
 }
 
 volume_name_len :: proc(path: string) -> int {
-	if ODIN_OS == "windows" {
+	if ODIN_OS == .Windows {
 		if len(path) < 2 {
 			return 0
 		}

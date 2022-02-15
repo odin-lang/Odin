@@ -2,7 +2,7 @@ package raylib
 
 import "core:c"
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import lib {
 		"raylib.lib",
 		"system:Winmm.lib",
@@ -11,8 +11,8 @@ when ODIN_OS == "windows" {
 		"system:Shell32.lib",
 	}
 }
-when ODIN_OS == "linux"  { foreign import lib "linux/libraylib.a" }
-when ODIN_OS == "darwin" { foreign import lib "macos/libraylib.a" }
+when ODIN_OS == .Linux  { foreign import lib "linux/libraylib.a" }
+when ODIN_OS == .Darwin { foreign import lib "macos/libraylib.a" }
 
 GRAPHICS_API_OPENGL_11  :: false
 GRAPHICS_API_OPENGL_21  :: true

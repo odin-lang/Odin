@@ -2,8 +2,8 @@ package stb_image
 
 import c "core:c/libc"
 
-when ODIN_OS == "windows" { foreign import lib "../lib/stb_image_resize.lib" }
-when ODIN_OS == "linux"   { foreign import lib "../lib/stb_image_resize.a"   }
+when ODIN_OS == .Windows { foreign import lib "../lib/stb_image_resize.lib" }
+when ODIN_OS == .Linux   { foreign import lib "../lib/stb_image_resize.a"   }
 
 //////////////////////////////////////////////////////////////////////////////
 //
