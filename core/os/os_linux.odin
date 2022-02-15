@@ -77,13 +77,6 @@ SO_SNDTIMEO_NEW: int : 67
 TCP_NODELAY: int : 1
 TCP_CORK:    int : 3
 
-DNS_TYPE_A     :: 0x1
-DNS_TYPE_NS    :: 0x2
-DNS_TYPE_CNAME :: 0x5
-DNS_TYPE_MX    :: 0xf
-DNS_TYPE_AAAA  :: 0x1c
-DNS_TYPE_TEXT  :: 0x10
-DNS_TYPE_SRV   :: 0x21
 
 ERROR_NONE:     Errno : 0
 EPERM:          Errno : 1
