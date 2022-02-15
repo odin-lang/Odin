@@ -28,16 +28,16 @@ address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: union{win.so
 }
 
 @private
-sockaddr_to_endpoint :: proc(native_addr: ^win.SOCKADDR_STORAGE_LH, auto_cast addr_size: int) -> (ep: Endpoint) {
-	switch addr_size {
-	case size_of(win.sockaddr_in):
+sockaddr_to_endpoint :: proc(native_addr: ^win.SOCKADDR_STORAGE_LH) -> (ep: Endpoint) {
+	switch native_addr.ss_family {
+	case u16(win.AF_INET):
 		addr := cast(^win.sockaddr_in) native_addr
 		port := int(addr.sin_port)
 		ep = Endpoint {
 			address = Ipv4_Address(transmute([4]byte) addr.sin_addr),
 			port = port,
 		}
-	case size_of(win.sockaddr_in6):
+	case u16(win.AF_INET6):
 		addr := cast(^win.sockaddr_in6) native_addr
 		port := int(addr.sin6_port)
 		ep = Endpoint {
@@ -45,7 +45,7 @@ sockaddr_to_endpoint :: proc(native_addr: ^win.SOCKADDR_STORAGE_LH, auto_cast ad
 			port = port,
 		}
 	case:
-		panic("addr_size must be size_of(sockaddr_in) or size_of(sockaddr_in6)")
+		panic("native_addr is neither IPv4 or IPv6 address")
 	}
 	return
 }
