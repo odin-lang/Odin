@@ -111,9 +111,9 @@ ZFAST_MASK :: ((1 << ZFAST_BITS) - 1)
 */
 Huffman_Table :: struct {
 	fast:        [1 << ZFAST_BITS]u16,
-	firstcode:   [16]u16,
+	firstcode:   [17]u16,
 	maxcode:     [17]int,
-	firstsymbol: [16]u16,
+	firstsymbol: [17]u16,
 	size:        [288]u8,
 	value:       [288]u16,
 }
@@ -244,7 +244,7 @@ allocate_huffman_table :: proc(allocator := context.allocator) -> (z: ^Huffman_T
 @(optimization_mode="speed")
 build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	sizes:     [HUFFMAN_MAX_BITS+1]int
-	next_code: [HUFFMAN_MAX_BITS]int
+	next_code: [HUFFMAN_MAX_BITS+1]int
 
 	k := int(0)
 
@@ -256,14 +256,14 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 	}
 	sizes[0] = 0
 
-	for i in 1..<(HUFFMAN_MAX_BITS+1) {
+	for i in 1 ..< HUFFMAN_MAX_BITS {
 		if sizes[i] > (1 << uint(i)) {
 			return E_Deflate.Huffman_Bad_Sizes
 		}
 	}
 	code := int(0)
 
-	for i in 1..<HUFFMAN_MAX_BITS {
+	for i in 1 ..= HUFFMAN_MAX_BITS {
 		next_code[i]     = code
 		z.firstcode[i]   = u16(code)
 		z.firstsymbol[i] = u16(k)
@@ -538,19 +538,20 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 		final = compress.read_bits_lsb(z, 1)
 		type  = compress.read_bits_lsb(z, 2)
 
-		// fmt.printf("Final: %v | Type: %v\n", final, type);
+		// fmt.printf("Final: %v | Type: %v\n", final, type)
 
 		switch type {
 		case 0:
+			// fmt.printf("Method 0: STORED\n")
 			// Uncompressed block
 
 			// Discard bits until next byte boundary
 			compress.discard_to_next_byte_lsb(z)
 
-			uncompressed_len := i16(compress.read_bits_lsb(z, 16))
-			length_check     := i16(compress.read_bits_lsb(z, 16))
+			uncompressed_len := u16(compress.read_bits_lsb(z, 16))
+			length_check     := u16(compress.read_bits_lsb(z, 16))
 
-			// fmt.printf("LEN: %v, ~LEN: %v, NLEN: %v, ~NLEN: %v\n", uncompressed_len, ~uncompressed_len, length_check, ~length_check);
+			// fmt.printf("LEN: %v, ~LEN: %v, NLEN: %v, ~NLEN: %v\n", uncompressed_len, ~uncompressed_len, length_check, ~length_check)
 
 
 			if ~uncompressed_len != length_check {
@@ -567,10 +568,12 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 				write_byte(z, u8(lit))
 				uncompressed_len -= 1
 			}
+			assert(uncompressed_len == 0)
+
 		case 3:
 			return E_Deflate.BType_3
 		case:
-			// log.debugf("Err: %v | Final: %v | Type: %v\n", err, final, type);
+			// fmt.printf("Err: %v | Final: %v | Type: %v\n", err, final, type)
 			if type == 1 {
 				// Use fixed code lengths.
 				build_huffman(z_repeat, Z_FIXED_LENGTH[:]) or_return

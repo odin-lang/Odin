@@ -238,6 +238,51 @@ isize total_attribute_count(DeclInfo *decl) {
 	return attribute_count;
 }
 
+Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
+	// NOTE(bill, 2022-02-05): Stupid edge case for `distinct` declarations
+	//
+	//         X :: enum {A, B, C}
+	//         Y :: distinct X
+	//
+	// To make Y be just like X, it will need to copy the elements of X and change their type
+	// so that they match Y rather than X.
+	GB_ASSERT(original_enum_type != nullptr);
+	GB_ASSERT(named_type != nullptr);
+	GB_ASSERT(original_enum_type->kind == Type_Enum);
+	GB_ASSERT(named_type->kind == Type_Named);
+
+	Scope *parent = original_enum_type->Enum.scope->parent;
+	Scope *scope = create_scope(nullptr, parent);
+
+
+	Type *et = alloc_type_enum();
+	et->Enum.base_type = original_enum_type->Enum.base_type;
+	et->Enum.min_value = original_enum_type->Enum.min_value;
+	et->Enum.max_value = original_enum_type->Enum.max_value;
+	et->Enum.min_value_index = original_enum_type->Enum.min_value_index;
+	et->Enum.max_value_index = original_enum_type->Enum.max_value_index;
+	et->Enum.scope = scope;
+
+	auto fields = array_make<Entity *>(permanent_allocator(), original_enum_type->Enum.fields.count);
+	for_array(i, fields) {
+		Entity *old = original_enum_type->Enum.fields[i];
+
+		Entity *e = alloc_entity_constant(scope, old->token, named_type, old->Constant.value);
+		e->file = old->file;
+		e->identifier = clone_ast(old->identifier);
+		e->flags |= EntityFlag_Visited;
+		e->state = EntityState_Resolved;
+		e->Constant.flags = old->Constant.flags;
+		e->Constant.docs = old->Constant.docs;
+		e->Constant.comment = old->Constant.comment;
+
+		fields[i] = e;
+		add_entity(ctx, scope, nullptr, e);
+		add_entity_use(ctx, e->identifier, e);
+	}
+	et->Enum.fields = fields;
+	return et;
+}
 
 void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
@@ -258,7 +303,11 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
 
-	named->Named.base = base_type(bt);
+	Type *base = base_type(bt);
+	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+		base = clone_enum_type(ctx, base, named);
+	}
+	named->Named.base = base;
 
 	if (is_distinct && is_type_typeid(e->type)) {
 		error(init_expr, "'distinct' cannot be applied to 'typeid'");
@@ -385,7 +434,45 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 	Operand operand = {};
 
 	if (init != nullptr) {
-		Entity *entity = nullptr;
+		Entity *entity = check_entity_from_ident_or_selector(ctx, init, false);
+		if (entity != nullptr && entity->kind == Entity_TypeName) {
+			// @TypeAliasingProblem
+			// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
+			// being "confused" as constants
+			//
+			//         A :: B
+			//         C :: proc "c" (^A)
+			//         B :: struct {x: C}
+			//
+			//     A gets evaluated first, and then checks B.
+			//     B then checks C.
+			//     C then tries to check A which is unresolved but thought to be a constant.
+			//     Therefore within C's check, A errs as "not a type".
+			//
+			// This is because a const declaration may or may not be a type and this cannot
+			// be determined from a syntactical standpoint.
+			// This check allows the compiler to override the entity to be checked as a type.
+			//
+			// There is no problem if B is prefixed with the `#type` helper enforcing at
+			// both a syntax and semantic level that B must be a type.
+			//
+			//         A :: #type B
+			//
+			// This approach is not fool proof and can fail in case such as:
+			//
+			//         X :: type_of(x)
+			//         X :: Foo(int).Type
+			//
+			// Since even these kind of declarations may cause weird checking cycles.
+			// For the time being, these are going to be treated as an unfortunate error
+			// until there is a proper delaying system to try declaration again if they
+			// have failed.
+
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
+		entity = nullptr;
 		if (init->kind == Ast_Ident) {
 			entity = check_ident(ctx, &operand, init, nullptr, e->type, true);
 		} else if (init->kind == Ast_SelectorExpr) {

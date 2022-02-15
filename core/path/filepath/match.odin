@@ -227,11 +227,10 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 		return m[:], .None
 	}
 
-	temp_buf: [8]byte
-
 	dir, file := split(pattern)
 	volume_len := 0
 	when ODIN_OS == .Windows {
+		temp_buf: [8]byte
 		volume_len, dir = clean_glob_path_windows(dir, temp_buf[:])
 	} else {
 		dir = clean_glob_path(dir)

@@ -221,6 +221,7 @@ struct TypeProc {
 		ExactValue *max_value;                            \
 		i64 count;                                        \
 		TokenKind op;                                     \
+		bool is_sparse;                                   \
 	})                                                        \
 	TYPE_KIND(Slice,   struct { Type *elem; })                \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })           \
@@ -362,6 +363,7 @@ enum TypeInfoFlag : u32 {
 enum : int {
 	MATRIX_ELEMENT_COUNT_MIN = 1,
 	MATRIX_ELEMENT_COUNT_MAX = 16,
+	MATRIX_ELEMENT_MAX_SIZE = MATRIX_ELEMENT_COUNT_MAX * (2 * 8), // complex128
 };
 
 
@@ -1582,6 +1584,24 @@ Type *core_array_type(Type *t) {
 	}
 }
 
+i32 type_math_rank(Type *t) {
+	i32 rank = 0;
+	for (;;) {
+		t = base_type(t);
+		switch (t->kind) {
+		case Type_Array:
+			rank += 1;
+			t = t->Array.elem;
+			break;
+		case Type_Matrix:
+			rank += 2;
+			t = t->Matrix.elem;
+			break;
+		default:
+			return rank;
+		}
+	}
+}
 
 
 Type *base_complex_elem_type(Type *t) {
@@ -3830,6 +3850,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_EnumeratedArray:
+		if (type->EnumeratedArray.is_sparse) {
+			str = gb_string_appendc(str, "#sparse");
+		}
 		str = gb_string_append_rune(str, '[');
 		str = write_type_to_string(str, type->EnumeratedArray.index);
 		str = gb_string_append_rune(str, ']');

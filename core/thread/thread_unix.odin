@@ -167,8 +167,6 @@ _join_multiple :: proc(threads: ..^Thread) {
 
 _destroy :: proc(t: ^Thread) {
 	_join(t)
-	sync.condition_destroy(&t.start_gate)
-	sync.mutex_destroy(&t.start_mutex)
 	t.unix_thread = {}
 	free(t, t.creation_allocator)
 }

@@ -95,6 +95,7 @@ Type_Info_Enumerated_Array :: struct {
 	count:     int,
 	min_value: Type_Info_Enum_Value,
 	max_value: Type_Info_Enum_Value,
+	is_sparse: bool,
 }
 Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
 Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}

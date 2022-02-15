@@ -172,7 +172,7 @@ Error :: enum int {
 	Unimplemented           = 127,
 }
 
-Error_String :: #partial [Error]string{
+Error_String :: #sparse[Error]string{
 	.Okay                    = "Okay",
 	.Out_Of_Memory           = "Out of memory",
 	.Invalid_Pointer         = "Invalid pointer",
@@ -182,6 +182,7 @@ Error_String :: #partial [Error]string{
 	.Max_Iterations_Reached  = "Max iterations reached",
 	.Buffer_Overflow         = "Buffer overflow",
 	.Integer_Overflow        = "Integer overflow",
+	.Integer_Underflow       = "Integer underflow",
 
 	.Division_by_Zero        = "Division by zero",
 	.Math_Domain_Error       = "Math domain error",

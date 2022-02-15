@@ -78,9 +78,11 @@ struct ImportedFile {
 };
 
 enum AstFileFlag : u32 {
-	AstFile_IsPrivate = 1<<0,
-	AstFile_IsTest    = 1<<1,
-	AstFile_IsLazy    = 1<<2,
+	AstFile_IsPrivatePkg = 1<<0,
+	AstFile_IsPrivateFile = 1<<1,
+
+	AstFile_IsTest    = 1<<3,
+	AstFile_IsLazy    = 1<<4,
 };
 
 enum AstDelayQueueKind {
@@ -226,6 +228,8 @@ enum ProcInlining {
 enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
+	ProcTag_type_assert     = 1<<2,
+	ProcTag_no_type_assert  = 1<<3,
 
 	ProcTag_require_results = 1<<4,
 	ProcTag_optional_ok     = 1<<5,
@@ -258,6 +262,8 @@ ProcCallingConvention default_calling_convention(void) {
 enum StateFlag : u8 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
+	StateFlag_type_assert     = 1<<2,
+	StateFlag_no_type_assert  = 1<<3,
 
 	StateFlag_BeenHandled = 1<<7,
 };
@@ -344,6 +350,7 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Slice<Ast *> elems; \
 		Token open, close; \
 		i64 max_count; \
+		Ast *tag; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
@@ -383,6 +390,12 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		void *sce_temp_data; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
+	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
+		Ast *name;          \
+		Ast *value;         \
+		CommentGroup *docs; \
+		CommentGroup *comment; \
+	}) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(OrElseExpr,      "or_else expression",       struct { Ast *x; Token token; Ast *y; }) \

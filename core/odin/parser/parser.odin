@@ -2276,6 +2276,24 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			tag.tok = tok
 			tag.name = name.text
+			original_expr := parse_expr(p, lhs)
+			expr := ast.unparen_expr(original_expr)
+			switch t in &expr.derived {
+			case ast.Comp_Lit:
+				t.tag = tag
+			case ast.Array_Type:
+				t.tag = tag
+				error(p, tok.pos, "#%s has been replaced with #sparse for non-contiguous enumerated array types", name.text)
+			case:
+				error(p, tok.pos, "expected a compound literal after #%s", name.text)
+
+			}
+			return original_expr
+
+		case "sparse":
+			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
+			tag.tok = tok
+			tag.name = name.text
 			original_type := parse_type(p)
 			type := ast.unparen_expr(original_type)
 			switch t in &type.derived {
@@ -2319,7 +2337,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return rt
 
 		case "force_inline", "force_no_inline":
-			return parse_inlining_operand(p, lhs, tok)
+			return parse_inlining_operand(p, lhs, name)
 		case:
 			expr := parse_expr(p, lhs)
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos)

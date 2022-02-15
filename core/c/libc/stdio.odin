@@ -149,7 +149,7 @@ foreign libc {
 	putchar   :: proc() -> int ---
 	puts      :: proc(s: cstring) -> int ---
 	ungetc    :: proc(c: int, stream: ^FILE) -> int ---
-	fread     :: proc(ptr: rawptr, size: size_t, stream: ^FILE) -> size_t ---
+	fread     :: proc(ptr: rawptr, size: size_t, nmemb: size_t, stream: ^FILE) -> size_t ---
 	fwrite    :: proc(ptr: rawptr, size: size_t, nmemb: size_t, stream: ^FILE) -> size_t ---
 
 	// 7.21.9 File positioning functions
