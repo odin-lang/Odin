@@ -376,9 +376,6 @@ Socket_Option :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
-	Incorrect_Value_Type,
-	Unknown_Option,
-
 	Offline = c.int(os.ENETDOWN),
 	Timeout_When_Keepalive_Set = c.int(os.ENETRESET),
 	Invalid_Option_For_Socket = c.int(os.ENOPROTOOPT),
