@@ -382,7 +382,7 @@ Socket_Option :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
-	Incorrect_Type,
+	Incorrect_Value_Type,
 	Unknown_Option,
 
 	Offline = c.int(os.ENETDOWN),
@@ -406,7 +406,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_
 			case bool:
 				// okay
 			case:
-				return .Incorrect_Type
+				return .Incorrect_Value_Type
 			}
 	case
 		.Receive_Buffer_Size,
@@ -417,14 +417,14 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_
 			case os.Timeval:
 				// okay
 			case:
-				return .Incorrect_Type
+				return .Incorrect_Value_Type
 			}
 	case .Linger:
 		switch in value {
 		case os.Linger:
 			// okay
 		case:
-			return .Incorrect_Type
+			return .Incorrect_Value_Type
 		}
 	case:
 		return .Unknown_Option
