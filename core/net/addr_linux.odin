@@ -9,7 +9,7 @@ get_network_interfaces :: proc() -> []Address {
 }
 
 @private
-address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: union{os.sockaddr_in, os.sockaddr_in6}, addrsize: i32) {
+address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: union{os.sockaddr_in, os.sockaddr_in6}, addrsize: int) {
 	switch a in addr {
 	case Ipv4_Address:
 		return os.sockaddr_in {
