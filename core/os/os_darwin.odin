@@ -320,7 +320,7 @@ foreign libc {
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
 
-when ODIN_ARCH != "arm64" {
+when ODIN_ARCH != .arm64 {
 	_unix_fdopendir :: proc {_unix_fdopendir_amd64}
 	_unix_readdir_r :: proc {_unix_readdir_r_amd64}
 } else {
