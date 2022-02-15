@@ -467,7 +467,6 @@ Socket_Option_Error :: enum c.int {
 	Not_Socket = win.WSAENOTSOCK,
 }
 
-// Socket must be bound.
 set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_Error {
 	level := win.SOL_SOCKET if option != .Tcp_Nodelay else win.IPPROTO_TCP
 
@@ -493,7 +492,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_
 		.Receive_Timeout,
 		.Send_Timeout:
 			switch in value {
-			case win.DWORD:
+			case int:
 				// okay
 			case:
 				return .Incorrect_Type
