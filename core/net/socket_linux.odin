@@ -307,7 +307,8 @@ Tcp_Send_Error :: enum c.int {
 send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
-		res, ok := os.send(os.Socket(skt), buf, 0)
+		remaining := buf[bytes_written:][:limit]
+		res, ok := os.send(os.Socket(skt), remaining, 0)
 		if ok != os.ERROR_NONE {
 			err = Tcp_Send_Error(ok)
 			return
@@ -325,7 +326,8 @@ send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 	toaddr, toaddrsize := address_to_sockaddr(to.address, to.port)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
-		res, ok := os.sendto(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, int(toaddrsize))
+		remaining := buf[bytes_written:][:limit]
+		res, ok := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR) &toaddr, int(toaddrsize))
 		if ok != os.ERROR_NONE {
 			err = Udp_Send_Error(ok)
 			return
