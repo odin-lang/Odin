@@ -10,10 +10,10 @@ LOCK_NB :: 4 /* don't block when locking */
 LOCK_UN :: 8 /* unlock */
 
 /* sys/unistd.h for access */
-F_OK  :: c.int(0);         /* test for existence of file */
-X_OK  :: c.int((1 << 0));  /* test for execute or search permission */
-W_OK  :: c.int((1 << 1));  /* test for write permission */
-R_OK  :: c.int((1 << 2));  /* test for read permission */
+F_OK  :: c.int(0)         /* test for existence of file */
+X_OK  :: c.int((1 << 0))  /* test for execute or search permission */
+W_OK  :: c.int((1 << 1))  /* test for write permission */
+R_OK  :: c.int((1 << 2))  /* test for read permission */
 
 /* copyfile flags */
 COPYFILE_ACL   :: (1 << 0)
@@ -26,37 +26,37 @@ COPYFILE_METADATA :: (COPYFILE_SECURITY | COPYFILE_XATTR)
 COPYFILE_ALL	  :: (COPYFILE_METADATA | COPYFILE_DATA)
 
 /* syslimits.h */
-PATH_MAX	:: 1024;	/* max bytes in pathname */
+PATH_MAX	:: 1024	/* max bytes in pathname */
 
 /* param.h */
-MAXPATHLEN :: PATH_MAX;
+MAXPATHLEN :: PATH_MAX
 
 /* proc_info.h */
-DARWIN_PROC_PIDPATHINFO_SIZE :: MAXPATHLEN;
-DARWIN_PROC_PIDPATHINFO :: 11;
+DARWIN_PROC_PIDPATHINFO_SIZE :: MAXPATHLEN
+DARWIN_PROC_PIDPATHINFO :: 11
 
-DARWIN_PROC_ALL_PIDS  :: c.int(1);
-DARWIN_PROC_PGRP_ONLY :: c.int(2);
-DARWIN_PROC_TTY_ONLY  :: c.int(3);
-DARWIN_PROC_UID_ONLY  :: c.int(4);
-DARWIN_PROC_RUID_ONLY :: c.int(5);
-DARWIN_PROC_PPID_ONLY :: c.int(6);
-DARWIN_PROC_KDBG_ONLY :: c.int(7);
+DARWIN_PROC_ALL_PIDS  :: c.int(1)
+DARWIN_PROC_PGRP_ONLY :: c.int(2)
+DARWIN_PROC_TTY_ONLY  :: c.int(3)
+DARWIN_PROC_UID_ONLY  :: c.int(4)
+DARWIN_PROC_RUID_ONLY :: c.int(5)
+DARWIN_PROC_PPID_ONLY :: c.int(6)
+DARWIN_PROC_KDBG_ONLY :: c.int(7)
 
-DARWIN_PROC_INFO_CALL_LISTPIDS          :: c.int(0x1);
-DARWIN_PROC_INFO_CALL_PIDINFO           :: c.int(0x2);
-DARWIN_PROC_INFO_CALL_PIDFDINFO         :: c.int(0x3);
-DARWIN_PROC_INFO_CALL_KERNMSGBUF        :: c.int(0x4);
-DARWIN_PROC_INFO_CALL_SETCONTROL        :: c.int(0x5);
-DARWIN_PROC_INFO_CALL_PIDFILEPORTINFO   :: c.int(0x6);
-DARWIN_PROC_INFO_CALL_TERMINATE         :: c.int(0x7);
-DARWIN_PROC_INFO_CALL_DIRTYCONTROL      :: c.int(0x8);
-DARWIN_PROC_INFO_CALL_PIDRUSAGE         :: c.int(0x9);
-DARWIN_PROC_INFO_CALL_PIDORIGINATORINFO :: c.int(0xa);
-DARWIN_PROC_INFO_CALL_LISTCOALITIONS    :: c.int(0xb);
-DARWIN_PROC_INFO_CALL_CANUSEFGHW        :: c.int(0xc);
-DARWIN_PROC_INFO_CALL_PIDDYNKQUEUEINFO  :: c.int(0xd);
-DARWIN_PROC_INFO_CALL_UDATA_INFO        :: c.int(0xe);
+DARWIN_PROC_INFO_CALL_LISTPIDS          :: c.int(0x1)
+DARWIN_PROC_INFO_CALL_PIDINFO           :: c.int(0x2)
+DARWIN_PROC_INFO_CALL_PIDFDINFO         :: c.int(0x3)
+DARWIN_PROC_INFO_CALL_KERNMSGBUF        :: c.int(0x4)
+DARWIN_PROC_INFO_CALL_SETCONTROL        :: c.int(0x5)
+DARWIN_PROC_INFO_CALL_PIDFILEPORTINFO   :: c.int(0x6)
+DARWIN_PROC_INFO_CALL_TERMINATE         :: c.int(0x7)
+DARWIN_PROC_INFO_CALL_DIRTYCONTROL      :: c.int(0x8)
+DARWIN_PROC_INFO_CALL_PIDRUSAGE         :: c.int(0x9)
+DARWIN_PROC_INFO_CALL_PIDORIGINATORINFO :: c.int(0xa)
+DARWIN_PROC_INFO_CALL_LISTCOALITIONS    :: c.int(0xb)
+DARWIN_PROC_INFO_CALL_CANUSEFGHW        :: c.int(0xc)
+DARWIN_PROC_INFO_CALL_PIDDYNKQUEUEINFO  :: c.int(0xd)
+DARWIN_PROC_INFO_CALL_UDATA_INFO        :: c.int(0xe)
 
 /* mmap flags */
 MAP_ANONYMOUS    :: 0x1000 /* allocated from memory, swap space */
@@ -120,7 +120,7 @@ OPEN_FLAG_CLOEXEC      :: 0x01000000 /* causes the descriptor to be closed if yo
 OPEN_FLAG_NOFOLLOW_ANY :: 0x20000000 /* no symlinks allowed in path */
 
 /* bsd/sys/param.h */
-DARWIN_MAXCOMLEN :: 16;
+DARWIN_MAXCOMLEN :: 16
 
 /*--==========================================================================--*/
 
@@ -184,7 +184,7 @@ __DARWIN_STRUCT_STAT64 :: struct {
 _STRUCT_TIMEVAL :: struct {
 	tv_sec: __darwin_time_t, /* seconds */
 	tv_usec: __darwin_suseconds_t, /* microseconds */
-};
+}
 
 /* pwd.h */
 _Password_Entry :: struct {
@@ -199,7 +199,7 @@ _Password_Entry :: struct {
     pw_shell: cstring, /* shell program */
 	pw_expire: u64,     /* account expiration */
 	pw_fields: i32,     /* filled fields */
-};
+}
 
 /* processinfo.h */
 _Proc_Bsdinfo :: struct {
@@ -225,7 +225,7 @@ _Proc_Bsdinfo :: struct {
   pbi_nice: i32,
   pbi_start_tvsec: u64,
   pbi_start_tvusec: u64,
-};
+}
 
 /*--==========================================================================--*/
 
