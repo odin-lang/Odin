@@ -9,18 +9,18 @@ get_network_interfaces :: proc() -> []Address {
 }
 
 @private
-address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: win.SOCKADDR_STORAGE_LH) {
-	switch a in addr {
+endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: win.SOCKADDR_STORAGE_LH) {
+	switch a in ep.address {
 	case Ipv4_Address:
 		(^win.sockaddr_in)(&sockaddr)^ = win.sockaddr_in {
-			sin_port = u16be(win.USHORT(port)),
+			sin_port = u16be(win.USHORT(ep.port)),
 			sin_addr = transmute(win.in_addr) a,
 			sin_family = u16(win.AF_INET),
 		}
 		return
 	case Ipv6_Address:
 		(^win.sockaddr_in6)(&sockaddr)^ = win.sockaddr_in6 {
-			sin6_port = u16be(win.USHORT(port)),
+			sin6_port = u16be(win.USHORT(ep.port)),
 			sin6_addr = transmute(win.in6_addr) a,
 			sin6_family = u16(win.AF_INET6),
 		}
