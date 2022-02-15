@@ -1851,6 +1851,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
 	} else if (command == "run") {
 		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
+		print_usage_line(1, "          append an empty flag and then the args, '-- <args>', to specify args for the output.");
 	} else if (command == "check") {
 		print_usage_line(1, "check     parse and type check .odin file(s)");
 	} else if (command == "test") {
