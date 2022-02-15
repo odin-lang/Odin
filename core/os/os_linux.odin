@@ -11,6 +11,7 @@ import "core:intrinsics"
 import "core:sys/unix"
 
 Handle    :: distinct i32
+Pid       :: distinct i32
 File_Time :: distinct u64
 Errno     :: distinct i32
 
@@ -150,6 +151,8 @@ ERFKILL: 		Errno : 132	/* Operation not possible due to RF-kill */
 
 EHWPOISON: 		Errno : 133	/* Memory page has hardware error */
 
+ADDR_NO_RANDOMIZE :: 0x40000
+
 O_RDONLY   :: 0x00000
 O_WRONLY   :: 0x00001
 O_RDWR     :: 0x00002
@@ -269,6 +272,15 @@ R_OK :: 4 // Test for read permission
 AT_FDCWD            :: -100
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
+
+_unix_personality :: proc(persona: u64) -> int {
+	return int(intrinsics.syscall(unix.SYS_personality, uintptr(persona)))
+}
+
+_unix_fork :: proc() -> Pid {
+	res := int(intrinsics.syscall(unix.SYS_fork))
+	return -1 if res < 0 else Pid(res)
+}
 
 _unix_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> Handle {
 	when ODIN_ARCH != .arm64 {
@@ -429,6 +441,22 @@ _get_errno :: proc(res: int) -> Errno {
 // get errno from libc
 get_last_error :: proc() -> int {
 	return __errno_location()^
+}
+
+personality :: proc(persona: u64) -> (Errno) {
+	res := _unix_personality(persona)
+	if res == -1 {
+		return _get_errno(res)
+	}
+	return ERROR_NONE
+}
+
+fork :: proc() -> (Pid, Errno) {
+	pid := _unix_fork()
+	if pid == -1 {
+		return -1, _get_errno(int(pid))
+	}
+	return pid, ERROR_NONE
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
