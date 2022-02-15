@@ -273,8 +273,8 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	}
 
 	from: os.SOCKADDR_STORAGE_LH
-	fromsize := c.int(size_of(from))
-	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, int(fromsize))
+	fromsize := size_of(from)
+	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, fromsize)
 	if ok != os.ERROR_NONE {
 		err = Udp_Recv_Error(ok)
 		return
