@@ -1819,3 +1819,175 @@ void lb_set_wasm_export_attributes(LLVMValueRef value, String export_name) {
 	LLVMSetVisibility(value, LLVMDefaultVisibility);
 	LLVMAddTargetDependentFunctionAttr(value, "wasm-export-name",   alloc_cstring(permanent_allocator(), export_name));
 }
+
+
+lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name);
+
+
+lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
+	lbAddr *found = string_map_get(&p->module->objc_selectors, name);
+	if (found) {
+		return *found;
+	} else {
+		lbModule *default_module = &p->module->gen->default_module;
+		Entity *e = nullptr;
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
+
+		lbValue ptr = lb_find_value_from_entity(p->module, e);
+		lbAddr local_addr = lb_addr(ptr);
+
+		string_map_set(&default_module->objc_selectors, name, default_addr);
+		if (default_module != p->module) {
+			string_map_set(&p->module->objc_selectors, name, local_addr);
+		}
+		return local_addr;
+	}
+}
+
+lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	return lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, name));
+}
+
+lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+	lbModule *m = p->module;
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	lbAddr dst = lb_handle_objc_find_or_register_selector(p, name);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 1);
+	args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+	lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
+	lb_addr_store(p, dst, ptr);
+
+	return lb_addr_load(p, dst);
+}
+
+lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
+	lbAddr *found = string_map_get(&p->module->objc_classes, name);
+	if (found) {
+		return *found;
+	} else {
+		lbModule *default_module = &p->module->gen->default_module;
+		Entity *e = nullptr;
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
+
+		lbValue ptr = lb_find_value_from_entity(p->module, e);
+		lbAddr local_addr = lb_addr(ptr);
+
+		string_map_set(&default_module->objc_classes, name, default_addr);
+		if (default_module != p->module) {
+			string_map_set(&p->module->objc_classes, name, local_addr);
+		}
+		return local_addr;
+	}
+}
+
+lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name));
+}
+
+lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+	lbModule *m = p->module;
+
+	auto tav = ce->args[0]->tav;
+	GB_ASSERT(tav.value.kind == ExactValue_String);
+	String name = tav.value.value_string;
+	lbAddr dst = lb_handle_objc_find_or_register_class(p, name);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 3);
+	args[0] = lb_const_nil(m, t_objc_Class);
+	args[1] = lb_const_nil(m, t_objc_Class);
+	args[2] = lb_const_int(m, t_uint, 0);
+	lbValue ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
+	lb_addr_store(p, dst, ptr);
+
+	return lb_addr_load(p, dst);
+}
+
+
+lbValue lb_handle_objc_id(lbProcedure *p, Ast *expr) {
+	TypeAndValue const &tav = type_and_value_of_expr(expr);
+	if (tav.mode == Addressing_Type) {
+		Type *type = tav.type;
+		GB_ASSERT_MSG(type->kind == Type_Named, "%s", type_to_string(type));
+		Entity *e = type->Named.type_name;
+		GB_ASSERT(e->kind == Entity_TypeName);
+		String name = e->TypeName.objc_class_name;
+
+		lbAddr *found = string_map_get(&p->module->objc_classes, name);
+		if (found) {
+			return lb_addr_load(p, *found);
+		} else {
+			lbModule *default_module = &p->module->gen->default_module;
+			Entity *e = nullptr;
+			lbAddr default_addr = lb_add_global_generated(default_module, t_objc_Class, {}, &e);
+
+			lbValue ptr = lb_find_value_from_entity(p->module, e);
+			lbAddr local_addr = lb_addr(ptr);
+
+			string_map_set(&default_module->objc_classes, name, default_addr);
+			if (default_module != p->module) {
+				string_map_set(&p->module->objc_classes, name, local_addr);
+			}
+			return lb_addr_load(p, local_addr);
+		}
+	}
+
+	return lb_build_expr(p, expr);
+}
+
+lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+
+	lbModule *m = p->module;
+	CheckerInfo *info = m->info;
+	ObjcMsgData data = map_must_get(&info->objc_msgSend_types, expr);
+	GB_ASSERT(data.proc_type != nullptr);
+
+	GB_ASSERT(ce->args.count >= 3);
+	auto args = array_make<lbValue>(permanent_allocator(), 0, ce->args.count-1);
+
+	lbValue id = lb_handle_objc_id(p, ce->args[1]);
+	Ast *sel_expr = ce->args[2];
+	GB_ASSERT(sel_expr->tav.value.kind == ExactValue_String);
+	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, sel_expr->tav.value.value_string));
+
+	array_add(&args, id);
+	array_add(&args, sel);
+	for (isize i = 3; i < ce->args.count; i++) {
+		lbValue arg = lb_build_expr(p, ce->args[i]);
+		array_add(&args, arg);
+	}
+
+
+	lbValue the_proc = {};
+	switch (data.kind) {
+	default:
+		GB_PANIC("unhandled ObjcMsgKind %u", data.kind);
+		break;
+	case ObjcMsg_normal: the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend"));        break;
+	case ObjcMsg_fpret:  the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend_fpret"));  break;
+	case ObjcMsg_fp2ret: the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend_fp2ret")); break;
+	case ObjcMsg_stret:  the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend_stret"));  break;
+	}
+
+	the_proc = lb_emit_conv(p, the_proc, data.proc_type);
+
+	return lb_emit_call(p, the_proc, args);
+}
+
+

@@ -2106,6 +2106,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.type = t_uintptr;
 			return res;
 		}
+
+	case BuiltinProc_objc_send:
+		return lb_handle_objc_send(p, expr);
+
+	case BuiltinProc_objc_find_selector:     return lb_handle_objc_find_selector(p, expr);
+	case BuiltinProc_objc_find_class:        return lb_handle_objc_find_class(p, expr);
+	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
+	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));
