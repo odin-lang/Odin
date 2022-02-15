@@ -206,7 +206,7 @@ accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, e
 		return
 	}
 	client = Tcp_Socket(client_sock)
-	source = sockaddr_to_endpoint(&sockaddr, sockaddrlen)
+	source = sockaddr_to_endpoint(&sockaddr)
 	return
 }
 
@@ -265,7 +265,7 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	}
 
 	bytes_read = int(res)
-	remote_endpoint = sockaddr_to_endpoint(&from, fromsize)
+	remote_endpoint = sockaddr_to_endpoint(&from)
 	return
 }
 
