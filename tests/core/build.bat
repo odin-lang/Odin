@@ -36,3 +36,8 @@ echo ---
 echo Running core:encoding tests
 echo ---
 %PATH_TO_ODIN% run encoding %COMMON%
+
+echo ---
+echo Running core:math/noise tests
+echo ---
+%PATH_TO_ODIN% run math/noise %COMMON%

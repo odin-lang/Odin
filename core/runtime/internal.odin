@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @(private="file")
-IS_WASM :: ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64"
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64
 
 @(private)
 RUNTIME_LINKAGE :: "strong" when (
@@ -37,10 +37,8 @@ bswap_64 :: proc "contextless" (x: u64) -> u64 {
 
 bswap_128 :: proc "contextless" (x: u128) -> u128 {
 	z := transmute([4]u32)x
-	z[0] = bswap_32(z[3])
-	z[1] = bswap_32(z[2])
-	z[2] = bswap_32(z[1])
-	z[3] = bswap_32(z[0])
+	z[0], z[3] = bswap_32(z[3]), bswap_32(z[0])
+	z[1], z[2] = bswap_32(z[2]), bswap_32(z[1])
 	return transmute(u128)z
 }
 

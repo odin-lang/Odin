@@ -143,6 +143,238 @@ void check_or_return_split_types(CheckerContext *c, Operand *x, String const &na
 }
 
 
+bool does_require_msgSend_stret(Type *return_type) {
+	if (return_type == nullptr) {
+		return false;
+	}
+	if (build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64) {
+		i64 struct_limit = type_size_of(t_uintptr) << 1;
+		return type_size_of(return_type) > struct_limit;
+	}
+	if (build_context.metrics.arch == TargetArch_arm64) {
+		return false;
+	}
+
+	// if (build_context.metrics.arch == TargetArch_arm32) {
+	// 	i64 struct_limit = type_size_of(t_uintptr);
+	// 	// NOTE(bill): This is technically wrong
+	// 	return is_type_struct(return_type) && !is_type_raw_union(return_type) && type_size_of(return_type) > struct_limit;
+	// }
+	GB_PANIC("unsupported architecture");
+	return false;
+}
+
+ObjcMsgKind get_objc_proc_kind(Type *return_type) {
+	if (return_type == nullptr) {
+		return ObjcMsg_normal;
+	}
+
+	if (build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64) {
+		if (is_type_float(return_type)) {
+			return ObjcMsg_fpret;
+		}
+		if (build_context.metrics.arch == TargetArch_amd64) {
+			if (is_type_complex(return_type)) {
+				// URL: https://github.com/opensource-apple/objc4/blob/cd5e62a5597ea7a31dccef089317abb3a661c154/runtime/message.h#L143-L159
+				return ObjcMsg_fpret;
+			}
+		}
+	}
+	if (build_context.metrics.arch != TargetArch_arm64) {
+		if (does_require_msgSend_stret(return_type)) {
+			return ObjcMsg_stret;
+		}
+	}
+	return ObjcMsg_normal;
+}
+
+void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types) {
+	ObjcMsgKind kind = get_objc_proc_kind(return_type);
+
+	Scope *scope = create_scope(c->info, nullptr);
+
+	// NOTE(bill, 2022-02-08): the backend's ABI handling should handle this correctly, I hope
+	Type *params = alloc_type_tuple();
+	{
+		auto variables = array_make<Entity *>(permanent_allocator(), 0, param_types.count);
+
+		for_array(i, param_types)  {
+			Type *type = param_types[i];
+			Entity *param = alloc_entity_param(scope, blank_token, type, false, true);
+			array_add(&variables, param);
+		}
+		params->Tuple.variables = slice_from_array(variables);
+	}
+
+	Type *results = alloc_type_tuple();
+	if (return_type) {
+		auto variables = array_make<Entity *>(permanent_allocator(), 1);
+		results->Tuple.variables = slice_from_array(variables);
+		Entity *param = alloc_entity_param(scope, blank_token, return_type, false, true);
+		results->Tuple.variables[0] = param;
+	}
+
+
+	ObjcMsgData data = {};
+	data.kind = kind;
+	data.proc_type = alloc_type_proc(scope, params, param_types.count, results, results->Tuple.variables.count, false, ProcCC_CDecl);
+
+	mutex_lock(&c->info->objc_types_mutex);
+	map_set(&c->info->objc_msgSend_types, call, data);
+	mutex_unlock(&c->info->objc_types_mutex);
+
+	add_package_dependency(c, "runtime", "objc_lookUpClass");
+	add_package_dependency(c, "runtime", "sel_registerName");
+	add_package_dependency(c, "runtime", "objc_allocateClassPair");
+
+	add_package_dependency(c, "runtime", "objc_msgSend");
+	add_package_dependency(c, "runtime", "objc_msgSend_fpret");
+	add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
+	add_package_dependency(c, "runtime", "objc_msgSend_stret");
+}
+
+bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+	auto const is_constant_string = [](CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) -> bool {
+		Operand op = {};
+		check_expr(c, &op, expr);
+		if (op.mode == Addressing_Constant && op.value.kind == ExactValue_String) {
+			if (name_) *name_ = op.value.value_string;
+			return true;
+		}
+		gbString e = expr_to_string(op.expr);
+		gbString t = type_to_string(op.type);
+		error(op.expr, "'%.*s' expected a constant string value, got %s of type %s", LIT(builtin_name), e, t);
+		gb_string_free(t);
+		gb_string_free(e);
+		return false;
+	};
+	String builtin_name = builtin_procs[id].name;
+
+	if (build_context.metrics.os != TargetOs_darwin) {
+		error(call, "'%.*s' only works on darwin", LIT(builtin_name));
+		return false;
+	}
+
+
+	ast_node(ce, CallExpr, call);
+	switch (id) {
+	default:
+		GB_PANIC("Implement objective built-in procedure: %.*s", LIT(builtin_name));
+		return false;
+
+	case BuiltinProc_objc_send: {
+		Type *return_type = nullptr;
+
+		Operand rt = {};
+		check_expr_or_type(c, &rt, ce->args[0]);
+		if (rt.mode == Addressing_Type) {
+			return_type = rt.type;
+		} else if (is_operand_nil(rt)) {
+			return_type = nullptr;
+		} else {
+			gbString e = expr_to_string(rt.expr);
+			error(rt.expr, "'%.*s' expected a type or nil to define the return type of the Objective-C call, got %s", LIT(builtin_name), e);
+			gb_string_free(e);
+			return false;
+		}
+
+		operand->type = return_type;
+		operand->mode = return_type ? Addressing_Value : Addressing_NoValue;
+
+		String class_name = {};
+		String sel_name = {};
+
+		Type *sel_type = t_objc_SEL;
+		Operand self = {};
+		check_expr_or_type(c, &self, ce->args[1]);
+		if (self.mode == Addressing_Type) {
+			if (!is_type_objc_object(self.type)) {
+				gbString t = type_to_string(self.type);
+				error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got type %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			if (!has_type_got_objc_class_attribute(self.type)) {
+				gbString t = type_to_string(self.type);
+				error(self.expr, "'%.*s' expected a named type with the attribute @(obj_class=<string>) , got type %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			sel_type = t_objc_Class;
+		} else if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
+			gbString e = expr_to_string(self.expr);
+			gbString t = type_to_string(self.type);
+			error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s %d", LIT(builtin_name), e, t, self.type->kind);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		} else if (!is_type_pointer(self.type)) {
+			gbString e = expr_to_string(self.expr);
+			gbString t = type_to_string(self.type);
+			error(self.expr, "'%.*s' expected a pointer of a value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		} else {
+			Type *type = type_deref(self.type);
+			if (!(type->kind == Type_Named &&
+			      type->Named.type_name != nullptr &&
+			      type->Named.type_name->TypeName.objc_class_name != "")) {
+				gbString t = type_to_string(type);
+				error(self.expr, "'%.*s' expected a named type with the attribute @(obj_class=<string>) , got type %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+		}
+
+
+		if (!is_constant_string(c, builtin_name, ce->args[2], &sel_name)) {
+			return false;
+		}
+
+		isize const arg_offset = 1;
+		auto param_types = slice_make<Type *>(permanent_allocator(), ce->args.count-arg_offset);
+		param_types[0] = t_objc_id;
+		param_types[1] = sel_type;
+
+		for (isize i = 2+arg_offset; i < ce->args.count; i++) {
+			Operand x = {};
+			check_expr(c, &x, ce->args[i]);
+			param_types[i-arg_offset] = x.type;
+		}
+
+		add_objc_proc_type(c, call, return_type, param_types);
+
+		return true;
+	} break;
+
+	case BuiltinProc_objc_find_selector: 
+	case BuiltinProc_objc_find_class: 
+	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_register_class: 
+	{
+		String sel_name = {};
+		if (!is_constant_string(c, builtin_name, ce->args[0], &sel_name)) {
+			return false;
+		}
+
+		switch (id) {
+		case BuiltinProc_objc_find_selector: 
+		case BuiltinProc_objc_register_selector: 
+			operand->type = t_objc_SEL;
+			break;
+		case BuiltinProc_objc_find_class: 
+		case BuiltinProc_objc_register_class: 
+			operand->type = t_objc_Class;
+			break;
+
+		}
+		operand->mode = Addressing_Value;
+		return true;
+	} break;
+	}
+}
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
@@ -179,6 +411,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_len:
 	case BuiltinProc_min:
 	case BuiltinProc_max:
+	case BuiltinProc_type_is_subtype_of:
+	case BuiltinProc_objc_send:
+	case BuiltinProc_objc_find_selector: 
+	case BuiltinProc_objc_find_class: 
+	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_register_class: 
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -202,7 +440,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
-	String builtin_name = builtin_procs[id].name;;
+	String builtin_name = builtin_procs[id].name;
 
 
 	if (ce->args.count > 0) {
@@ -218,6 +456,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	default:
 		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_name));
 		break;
+
+	case BuiltinProc_objc_send:
+	case BuiltinProc_objc_find_selector: 
+	case BuiltinProc_objc_find_class: 
+	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_register_class: 
+		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
 		operand->mode = Addressing_NoValue;
@@ -2183,9 +2428,43 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		
 		operand->mode = Addressing_Value;
-		if (is_type_array(t)) {
+		if (t->kind == Type_Array) {
+			i32 rank = type_math_rank(t);
 			// Do nothing
-			operand->type = x.type;			
+			operand->type = x.type;
+			if (rank > 2) {
+				gbString s = type_to_string(x.type);
+				error(call, "'%.*s' expects a matrix or array with a rank of 2, got %s of rank %d", LIT(builtin_name), s, rank);
+				gb_string_free(s);
+				return false;
+			} else if (rank == 2) {
+				Type *inner = base_type(t->Array.elem);
+				GB_ASSERT(inner->kind == Type_Array);
+				Type *elem = inner->Array.elem;
+				Type *array_inner = alloc_type_array(elem, t->Array.count);
+				Type *array_outer = alloc_type_array(array_inner, inner->Array.count);
+				operand->type = array_outer;
+
+				i64 elements = t->Array.count*inner->Array.count;
+				i64 size = type_size_of(operand->type);
+				if (!is_type_valid_for_matrix_elems(elem)) {
+					gbString s = type_to_string(x.type);
+					error(call, "'%.*s' expects a matrix or array with a base element type of an integer, float, or complex number, got %s", LIT(builtin_name), s);
+					gb_string_free(s);
+				} else if (elements > MATRIX_ELEMENT_COUNT_MAX) {
+					gbString s = type_to_string(x.type);
+					error(call, "'%.*s' expects a matrix or array with a maximum of %d elements, got %s with %lld elements", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s, elements);
+					gb_string_free(s);
+				} else if (elements > MATRIX_ELEMENT_COUNT_MAX) {
+					gbString s = type_to_string(x.type);
+					error(call, "'%.*s' expects a matrix or array with non-zero elements, got %s", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s);
+					gb_string_free(s);
+				} else if (size > MATRIX_ELEMENT_MAX_SIZE) {
+					gbString s = type_to_string(x.type);
+					error(call, "Too large of a type for '%.*s', got %s of size %lld, maximum size %d", LIT(builtin_name), s, cast(long long)size, MATRIX_ELEMENT_MAX_SIZE);
+					gb_string_free(s);
+				}
+			}
 		} else {
 			GB_ASSERT(t->kind == Type_Matrix);
 			operand->type = alloc_type_matrix(t->Matrix.elem, t->Matrix.column_count, t->Matrix.row_count);
@@ -3310,9 +3589,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_simple_compare:
 	case BuiltinProc_type_is_dereferenceable:
 	case BuiltinProc_type_is_valid_map_key:
+	case BuiltinProc_type_is_valid_matrix_elements:
 	case BuiltinProc_type_is_named:
 	case BuiltinProc_type_is_pointer:
 	case BuiltinProc_type_is_array:
+	case BuiltinProc_type_is_enumerated_array:
 	case BuiltinProc_type_is_slice:
 	case BuiltinProc_type_is_dynamic_array:
 	case BuiltinProc_type_is_map:
@@ -3320,10 +3601,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_union:
 	case BuiltinProc_type_is_enum:
 	case BuiltinProc_type_is_proc:
-	case BuiltinProc_type_is_bit_field:
-	case BuiltinProc_type_is_bit_field_value:
 	case BuiltinProc_type_is_bit_set:
 	case BuiltinProc_type_is_simd_vector:
+	case BuiltinProc_type_is_matrix:
 	case BuiltinProc_type_is_specialized_polymorphic_record:
 	case BuiltinProc_type_is_unspecialized_polymorphic_record:
 	case BuiltinProc_type_has_nil:
@@ -3691,6 +3971,31 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		break;
 
+	case BuiltinProc_type_is_subtype_of:
+		{
+			Operand op_src = {};
+			Operand op_dst = {};
+
+			check_expr_or_type(c, &op_src, ce->args[0]);
+			if (op_src.mode != Addressing_Type) {
+				gbString e = expr_to_string(op_src.expr);
+				error(op_src.expr, "'%.*s' expects a type, got %s", LIT(builtin_name), e);
+				gb_string_free(e);
+				return false;
+			}
+			check_expr_or_type(c, &op_dst, ce->args[1]);
+			if (op_dst.mode != Addressing_Type) {
+				gbString e = expr_to_string(op_dst.expr);
+				error(op_dst.expr, "'%.*s' expects a type, got %s", LIT(builtin_name), e);
+				gb_string_free(e);
+				return false;
+			}
+
+			operand->value = exact_value_bool(is_type_subtype_of(op_src.type, op_dst.type));
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+		} break;
+
 	case BuiltinProc_type_field_index_of:
 		{
 			Operand op = {};
@@ -3780,6 +4085,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_hasher_proc;
 			break;
 		}
+
+
 	}
 
 	return true;

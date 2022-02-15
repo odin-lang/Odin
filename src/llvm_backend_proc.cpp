@@ -61,7 +61,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
 	if (!entity->Procedure.is_foreign) {
-		GB_ASSERT(entity->flags & EntityFlag_ProcBodyChecked);
+		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s", LIT(entity->token.string), type_to_string(entity->type));
 	}
 
 	String link_name = {};
@@ -473,6 +473,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				}
 
 				lbArgType *arg_type = &ft->args[param_index];
+				defer (param_index += 1);
+
 				if (arg_type->kind == lbArg_Ignore) {
 					continue;
 				} else if (arg_type->kind == lbArg_Direct) {
@@ -487,18 +489,19 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						param.type = e->type;
 
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
+						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
 						lb_add_entity(p->module, e, ptr);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						lbValue ptr = {};
 						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
 						ptr.type = alloc_type_pointer(e->type);
-
 						lb_add_entity(p->module, e, ptr);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
 					}
 				}
-				param_index += 1;
 			}
 		}
 
@@ -2103,6 +2106,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.type = t_uintptr;
 			return res;
 		}
+
+	case BuiltinProc_objc_send:
+		return lb_handle_objc_send(p, expr);
+
+	case BuiltinProc_objc_find_selector:     return lb_handle_objc_find_selector(p, expr);
+	case BuiltinProc_objc_find_class:        return lb_handle_objc_find_class(p, expr);
+	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
+	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

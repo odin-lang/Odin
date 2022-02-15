@@ -72,6 +72,9 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	map_init(&m->debug_values, a);
 	array_init(&m->debug_incomplete_types, a, 0, 1024);
+
+	string_map_init(&m->objc_classes, a);
+	string_map_init(&m->objc_selectors, a);
 }
 
 bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -271,6 +274,10 @@ lbAddr lb_addr(lbValue addr) {
 
 
 lbAddr lb_addr_map(lbValue addr, lbValue map_key, Type *map_type, Type *map_result) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *mt = type_deref(addr.type);
+	GB_ASSERT(is_type_map(mt));
+
 	lbAddr v = {lbAddr_Map, addr};
 	v.map.key    = map_key;
 	v.map.type   = map_type;
@@ -1598,8 +1605,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 						return llvm_type;
 					}
 					llvm_type = LLVMStructCreateNamed(ctx, name);
+					LLVMTypeRef found_val = *found;
 					map_set(&m->types, type, llvm_type);
-					lb_clone_struct_type(llvm_type, *found);
+					lb_clone_struct_type(llvm_type, found_val);
 					return llvm_type;
 				}
 			}
@@ -2445,7 +2453,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	return {};
 }
 
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value, Entity **entity_) {
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
@@ -2471,6 +2479,9 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 
 	lb_add_entity(m, e, g);
 	lb_add_member(m, name, g);
+
+	if (entity_) *entity_ = e;
+
 	return lb_addr(g);
 }
 

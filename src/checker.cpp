@@ -4,7 +4,7 @@
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
-
+Type *check_type(CheckerContext *ctx, Ast *e);
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -504,6 +504,7 @@ enum VettedEntityKind {
 
 	VettedEntity_Unused,
 	VettedEntity_Shadowed,
+	VettedEntity_Shadowed_And_Unused,
 };
 struct VettedEntity {
 	VettedEntityKind kind;
@@ -625,12 +626,18 @@ void check_scope_usage(Checker *c, Scope *scope) {
 	MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
 		Entity *e = scope->elements.entries[i].value;
 		if (e == nullptr) continue;
-		VettedEntity ve = {};
-		if (vet_unused && check_vet_unused(c, e, &ve)) {
-			array_add(&vetted_entities, ve);
-		}
-		if (vet_shadowing && check_vet_shadowing(c, e, &ve)) {
-			array_add(&vetted_entities, ve);
+		VettedEntity ve_unused = {};
+		VettedEntity ve_shadowed = {};
+		bool is_unused = vet_unused && check_vet_unused(c, e, &ve_unused);
+		bool is_shadowed = vet_shadowing && check_vet_shadowing(c, e, &ve_shadowed);
+		if (is_unused && is_shadowed) {
+			VettedEntity ve_both = ve_shadowed;
+			ve_both.kind = VettedEntity_Shadowed_And_Unused;
+			array_add(&vetted_entities, ve_both);
+		} else if (is_unused) {
+			array_add(&vetted_entities, ve_unused);
+		} else if (is_shadowed) {
+			array_add(&vetted_entities, ve_shadowed);
 		}
 	}
 
@@ -642,16 +649,18 @@ void check_scope_usage(Checker *c, Scope *scope) {
 		Entity *other = ve.other;
 		String name = e->token.string;
 
-		if (build_context.vet) {
+		if (ve.kind == VettedEntity_Shadowed_And_Unused) {
+			error(e->token, "'%.*s' declared but not used, possibly shadows declaration at line %d", LIT(name), other->token.pos.line);
+		} else if (build_context.vet) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
 				error(e->token, "'%.*s' declared but not used", LIT(name));
 				break;
 			case VettedEntity_Shadowed:
 				if (e->flags&EntityFlag_Using) {
-					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				} else {
-					error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+					error(e->token, "Declaration of '%.*s' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				}
 				break;
 			default:
@@ -688,12 +697,17 @@ void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
 	ptr_set_add(&d->deps, e);
 	mutex_unlock(&info->deps_mutex);
 }
-void add_type_info_dependency(DeclInfo *d, Type *type) {
+void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type, bool require_mutex) {
 	if (d == nullptr) {
 		return;
 	}
-	// NOTE(bill): no mutex is required here because the only procedure calling it is wrapped in a mutex already
+	if (require_mutex) {
+		mutex_lock(&info->deps_mutex);
+	}
 	ptr_set_add(&d->type_info_deps, type);
+	if (require_mutex) {
+		mutex_unlock(&info->deps_mutex);
+	}
 }
 
 AstPackage *get_core_package(CheckerInfo *info, String name) {
@@ -827,6 +841,17 @@ void add_global_enum_constant(Slice<Entity *> const &fields, char const *name, i
 	GB_PANIC("Unfound enum value for global constant: %s %lld", name, cast(long long)value);
 }
 
+Type *add_global_type_name(Scope *scope, String const &type_name, Type *backing_type) {
+	Entity *e = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+	Type *named_type = alloc_type_named(type_name, backing_type, e);
+	e->type = named_type;
+	set_base_type(named_type, backing_type);
+	if (scope_insert(scope, e)) {
+		compiler_error("double declaration of %.*s", LIT(e->token.string));
+	}
+	return named_type;
+}
+
 
 void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -856,11 +881,42 @@ void init_universal(void) {
 	add_global_bool_constant("false", false);
 
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant("ODIN_OS",      bc->ODIN_OS);
-	add_global_string_constant("ODIN_ARCH",    bc->ODIN_ARCH);
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+
+	{
+		GlobalEnumValue values[TargetOs_COUNT] = {
+			{"Unknown",      TargetOs_Invalid},
+			{"Windows",      TargetOs_windows},
+			{"Darwin",       TargetOs_darwin},
+			{"Linux",        TargetOs_linux},
+			{"Essence",      TargetOs_essence},
+			{"FreeBSD",      TargetOs_freebsd},
+			{"WASI",         TargetOs_wasi},
+			{"JS",           TargetOs_js},
+			{"Freestanding", TargetOs_freestanding},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_OS_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_OS", bc->metrics.os);
+		add_global_string_constant("ODIN_OS_STRING", target_os_names[bc->metrics.os]);
+	}
+
+	{
+		GlobalEnumValue values[TargetArch_COUNT] = {
+			{"Unknown", TargetArch_Invalid},
+			{"amd64",   TargetArch_amd64},
+			{"i386",    TargetArch_i386},
+			{"arm64",   TargetArch_arm64},
+			{"wasm32",  TargetArch_wasm32},
+			{"wasm64",  TargetArch_wasm64},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Arch_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_ARCH", bc->metrics.arch);
+		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
+	}
 	
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
@@ -875,7 +931,6 @@ void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_BUILD_MODE", bc->build_mode);
 	}
 
-	add_global_string_constant("ODIN_ENDIAN_STRING", target_endian_names[target_endians[bc->metrics.arch]]);
 	{
 		GlobalEnumValue values[TargetEndian_COUNT] = {
 			{"Unknown", TargetEndian_Invalid},
@@ -886,6 +941,17 @@ void init_universal(void) {
 
 		auto fields = add_global_enum_type(str_lit("Odin_Endian_Type"), values, gb_count_of(values));
 		add_global_enum_constant(fields, "ODIN_ENDIAN", target_endians[bc->metrics.arch]);
+		add_global_string_constant("ODIN_ENDIAN_STRING", target_endian_names[target_endians[bc->metrics.arch]]);
+	}
+
+	{
+		GlobalEnumValue values[ErrorPosStyle_COUNT] = {
+			{"Default", ErrorPosStyle_Default},
+			{"Unix",    ErrorPosStyle_Unix},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Error_Pos_Style_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_ERROR_POS_STYLE", build_context.ODIN_ERROR_POS_STYLE);
 	}
 
 
@@ -961,6 +1027,17 @@ void init_universal(void) {
 	t_f64_ptr      = alloc_type_pointer(t_f64);
 	t_u8_slice     = alloc_type_slice(t_u8);
 	t_string_slice = alloc_type_slice(t_string);
+
+	// intrinsics types for objective-c stuff
+	{
+		t_objc_object   = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_object"),   alloc_type_struct());
+		t_objc_selector = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_selector"), alloc_type_struct());
+		t_objc_class    = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_class"),    alloc_type_struct());
+
+		t_objc_id       = alloc_type_pointer(t_objc_object);
+		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
+		t_objc_Class    = alloc_type_pointer(t_objc_class);
+	}
 }
 
 
@@ -1017,6 +1094,9 @@ void init_checker_info(CheckerInfo *i) {
 	semaphore_init(&i->collect_semaphore);
 
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
+
+	mutex_init(&i->objc_types_mutex);
+	map_init(&i->objc_msgSend_types, a);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -1049,6 +1129,9 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->type_and_value_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
 	mutex_destroy(&i->foreign_mutex);
+
+	mutex_destroy(&i->objc_types_mutex);
+	map_destroy(&i->objc_msgSend_types);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -1589,7 +1672,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		return;
 	}
 
-	add_type_info_dependency(c->decl, t);
+	add_type_info_dependency(c->info, c->decl, t, false);
 
 	auto found = map_get(&c->info->type_info_map, t);
 	if (found != nullptr) {
@@ -1718,6 +1801,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		} else {
 			add_type_info_type_internal(c, t_type_info_ptr);
 		}
+		add_type_info_type_internal(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_type_info_type_internal(c, bt->Union.variants[i]);
 		}
@@ -1741,6 +1825,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 				}
 			}
 		}
+		add_type_info_type_internal(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type_internal(c, f->type);
@@ -1934,6 +2019,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		} else {
 			add_min_dep_type_info(c, t_type_info_ptr);
 		}
+		add_min_dep_type_info(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_min_dep_type_info(c, bt->Union.variants[i]);
 		}
@@ -1957,6 +2043,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 				}
 			}
 		}
+		add_min_dep_type_info(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_min_dep_type_info(c, f->type);
@@ -2684,6 +2771,14 @@ ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
 	return ev;
 }
 
+Type *check_decl_attribute_type(CheckerContext *c, Ast *value) {
+	if (value != nullptr) {
+		return check_type(c, value);
+	}
+	return nullptr;
+}
+
+
 #define ATTRIBUTE_USER_TAG_NAME "tag"
 
 
@@ -2983,6 +3078,42 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "objc_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_name = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_is_class_method") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_class_method = ev.value_bool;
+		} else {
+			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_type") {
+		if (value == nullptr) {
+			error(elem, "Expected a type for '%.*s'", LIT(name));
+		} else {
+			Type *objc_type = check_type(c, value);
+			if (objc_type != nullptr) {
+				if (!has_type_got_objc_class_attribute(objc_type)) {
+					gbString t = type_to_string(objc_type);
+					error(value, "'%.*s' expected a named type with the attribute @(obj_class=<string>), got type %s", LIT(name), t);
+					gb_string_free(t);
+				} else {
+					ac->objc_type = objc_type;
+				}
+			}
+		}
+		return true;
 	}
 	return false;
 }
@@ -3132,6 +3263,14 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 		return true;
 	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "objc_class") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String || ev.value_string == "") {
+			error(elem, "Expected a non-empty string value for '%.*s'", LIT(name));
+		} else {
+			ac->objc_class = ev.value_string;
+		}
 		return true;
 	}
 	return false;
@@ -3448,9 +3587,12 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 	if (entity_visibility_kind == EntityVisiblity_Public &&
 	    (c->scope->flags&ScopeFlag_File) &&
-	    c->scope->file &&
-	    (c->scope->file->flags & AstFile_IsPrivate)) {
-		entity_visibility_kind = EntityVisiblity_PrivateToPackage;
+	    c->scope->file) {
+	    	if (c->scope->file->flags & AstFile_IsPrivateFile) {
+			entity_visibility_kind = EntityVisiblity_PrivateToFile;
+		} else if (c->scope->file->flags & AstFile_IsPrivatePkg) {
+			entity_visibility_kind = EntityVisiblity_PrivateToPackage;
+	    	}
 	}
 
 	if (entity_visibility_kind != EntityVisiblity_Public && !(c->scope->flags&ScopeFlag_File)) {
@@ -3541,9 +3683,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
-				// if (vd->type != nullptr) {
-				// 	error(name, "A type declaration cannot have an type parameter");
-				// }
 			} else if (init->kind == Ast_ProcLit) {
 				if (c->scope->flags&ScopeFlag_Type) {
 					error(name, "Procedure declarations are not allowed within a struct");
@@ -3646,6 +3785,59 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	check_collect_entities(&c, block->stmts);
 }
 
+bool correct_single_type_alias(CheckerContext *c, Entity *e) {
+	if (e->kind == Entity_Constant) {
+		DeclInfo *d = e->decl_info;
+		if (d != nullptr && d->init_expr != nullptr) {
+			Ast *init = d->init_expr;
+			Entity *alias_of = check_entity_from_ident_or_selector(c, init, true);
+			if (alias_of != nullptr && alias_of->kind == Entity_TypeName) {
+				e->kind = Entity_TypeName;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
+	isize n = s->elements.entries.count;
+	bool correction = false;
+	for (isize i = n-1; i >= 0; i--) {
+		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	}
+	return correction;
+}
+bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
+	isize n = s->elements.entries.count;
+	bool correction = false;
+	for (isize i = 0; i < n; i++) {
+		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
+	}
+	return correction;
+}
+
+
+void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
+	// NOTE(bill, 2022-02-04): This is used to solve the problem caused by type aliases
+	// of type aliases being "confused" as constants
+	//
+	//         A :: C
+	//         B :: A
+	//         C :: struct {b: ^B}
+	//
+	// See @TypeAliasingProblem for more information
+	for (;;) {
+		bool corrections = false;
+		corrections |= correct_type_alias_in_scope_backwards(c, s);
+		corrections |= correct_type_alias_in_scope_forwards(c, s);
+		if (!corrections) {
+			return;
+		}
+	}
+}
+
+
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	AstFile *curr_file = nullptr;
@@ -3717,6 +3909,7 @@ void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 		}
 	}
 
+	// correct_type_aliases(c);
 
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
@@ -4362,10 +4555,11 @@ bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 
 	for_array(i, decls) {
 		if (collect_file_decl(ctx, decls[i])) {
+			correct_type_aliases_in_scope(ctx, ctx->scope);
 			return true;
 		}
 	}
-
+	correct_type_aliases_in_scope(ctx, ctx->scope);
 	return false;
 }
 
@@ -4635,6 +4829,15 @@ void check_import_entities(Checker *c) {
 			}
 			add_untyped_expressions(ctx.info, &untyped);
 		}
+
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			reset_checker_context(&ctx, f, &untyped);
+			ctx.collect_delayed_decls = false;
+
+			correct_type_aliases_in_scope(&ctx, pkg->scope);
+		}
+
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
@@ -4856,6 +5059,9 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
+	bool type_assert    = (pi->tags & ProcTag_type_assert)    != 0;
+	bool no_type_assert = (pi->tags & ProcTag_no_type_assert) != 0;
+
 	if (bounds_check) {
 		ctx.state_flags |= StateFlag_bounds_check;
 		ctx.state_flags &= ~StateFlag_no_bounds_check;
@@ -4863,6 +5069,15 @@ bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, Proc
 		ctx.state_flags |= StateFlag_no_bounds_check;
 		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
+
+	if (type_assert) {
+		ctx.state_flags |= StateFlag_type_assert;
+		ctx.state_flags &= ~StateFlag_no_type_assert;
+	} else if (no_type_assert) {
+		ctx.state_flags |= StateFlag_no_type_assert;
+		ctx.state_flags &= ~StateFlag_type_assert;
+	}
+
 	if (pi->body != nullptr && e != nullptr) {
 		GB_ASSERT((e->flags & EntityFlag_ProcBodyChecked) == 0);
 	}
@@ -5276,12 +5491,18 @@ void check_unique_package_names(Checker *c) {
 			string_map_set(&pkgs, key, pkg);
 			continue;
 		}
+		auto *curr = pkg->files[0]->pkg_decl;
+		auto *prev = (*found)->files[0]->pkg_decl;
+		if (curr == prev) {
+			// NOTE(bill): A false positive was found, ignore it
+			continue;
+		}
 
-		error(pkg->files[0]->pkg_decl, "Duplicate declaration of 'package %.*s'", LIT(name));
+		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
 		error_line("\tA package name must be unique\n"
 		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
 		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
-		error((*found)->files[0]->pkg_decl, "found at previous location");
+		error(prev, "found at previous location");
 	}
 }
 
@@ -5473,9 +5694,6 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("calculate global init order");
 	calculate_global_init_order(c);
 
-	TIME_SECTION("generate minimum dependency set");
-	generate_minimum_dependency_set(c, c->info.entry_point);
-
 	TIME_SECTION("check test procedures");
 	check_test_procedures(c);
 
@@ -5485,6 +5703,9 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("add type info for type definitions");
 	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("generate minimum dependency set");
+	generate_minimum_dependency_set(c, c->info.entry_point);
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {

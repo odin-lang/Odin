@@ -118,6 +118,11 @@ struct AttributeContext {
 	bool    init                : 1;
 	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
+
+	String  objc_class;
+	String  objc_name;
+	bool    objc_is_class_method;
+	Type *  objc_type;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
@@ -267,6 +272,17 @@ struct UntypedExprInfo {
 typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
 typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
+enum ObjcMsgKind : u32 {
+	ObjcMsg_normal,
+	ObjcMsg_fpret,
+	ObjcMsg_fp2ret,
+	ObjcMsg_stret,
+};
+struct ObjcMsgData {
+	ObjcMsgKind kind;
+	Type *proc_type;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -340,7 +356,8 @@ struct CheckerInfo {
 
 	MPMCQueue<Ast *> intrinsics_entry_point_usage;
 
-
+	BlockingMutex objc_types_mutex;
+	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
 };
 
 struct CheckerContext {

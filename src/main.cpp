@@ -485,7 +485,7 @@ i32 linker_stage(lbGenerator *gen) {
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 				//       make sure to also change the 'mtriple' param passed to 'opt'
 				#if defined(GB_CPU_ARM)
-				" -mmacosx-version-min=11.0.0 "
+				" -mmacosx-version-min=12.0.0 "
 				#else
 				" -mmacosx-version-min=10.8.0 "
 				#endif
@@ -583,37 +583,6 @@ void usage(String argv0) {
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, use -help after the command name");
 	print_usage_line(1, "e.g. odin build -help");
-}
-
-
-bool string_is_valid_identifier(String str) {
-	if (str.len <= 0) return false;
-
-	isize rune_count = 0;
-
-	isize w = 0;
-	isize offset = 0;
-	while (offset < str.len) {
-		Rune r = 0;
-		w = utf8_decode(str.text, str.len, &r);
-		if (r == GB_RUNE_INVALID) {
-			return false;
-		}
-
-		if (rune_count == 0) {
-			if (!rune_is_letter(r)) {
-				return false;
-			}
-		} else {
-			if (!rune_is_letter(r) && !rune_is_digit(r)) {
-				return false;
-			}
-		}
-		rune_count += 1;
-		offset += w;
-	}
-
-	return true;
 }
 
 enum BuildFlagKind {
@@ -1851,6 +1820,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
 	} else if (command == "run") {
 		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
+		print_usage_line(1, "          append an empty flag and then the args, '-- <args>', to specify args for the output.");
 	} else if (command == "check") {
 		print_usage_line(1, "check     parse and type check .odin file(s)");
 	} else if (command == "test") {
@@ -2447,6 +2417,7 @@ int main(int arg_count, char const **arg_ptr) {
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
 	mutex_init(&hash_exact_value_mutex);
+	mutex_init(&global_type_name_objc_metadata_mutex);
 
 	init_string_buffer_memory();
 	init_string_interner();

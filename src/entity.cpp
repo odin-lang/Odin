@@ -122,6 +122,28 @@ enum ProcedureOptimizationMode : u32 {
 	ProcedureOptimizationMode_Speed,
 };
 
+
+BlockingMutex global_type_name_objc_metadata_mutex;
+
+struct TypeNameObjCMetadataEntry {
+	String name;
+	Entity *entity;
+};
+struct TypeNameObjCMetadata {
+	BlockingMutex *mutex;
+	Array<TypeNameObjCMetadataEntry> type_entries;
+	Array<TypeNameObjCMetadataEntry> value_entries;
+};
+
+TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
+	TypeNameObjCMetadata *md = gb_alloc_item(permanent_allocator(), TypeNameObjCMetadata);
+	md->mutex = gb_alloc_item(permanent_allocator(), BlockingMutex);
+	mutex_init(md->mutex);
+	array_init(&md->type_entries,  heap_allocator());
+	array_init(&md->value_entries, heap_allocator());
+	return md;
+}
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
@@ -161,6 +183,8 @@ struct Entity {
 			ParameterValue param_value;
 			u32 flags;
 			i32 field_group_index;
+			CommentGroup *docs;
+			CommentGroup *comment;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
@@ -175,6 +199,8 @@ struct Entity {
 			String     link_name;
 			String     link_prefix;
 			String     link_section;
+			CommentGroup *docs;
+			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 		} Variable;
@@ -182,6 +208,8 @@ struct Entity {
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
 			bool   is_type_alias;
+			String objc_class_name;
+			TypeNameObjCMetadata *objc_metadata;
 		} TypeName;
 		struct {
 			u64     tags;
@@ -241,7 +269,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
-	if (e->file != nullptr && (e->file->flags & AstFile_IsPrivate) != 0) {
+	if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) != 0) {
 		return false;
 	}
 

@@ -143,11 +143,21 @@ print_int     :: proc "contextless" (x: int)     { print_i64(i64(x)) }
 
 print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
 	print_string(file_path)
-	print_byte('(')
-	print_u64(u64(line))
-	print_byte(':')
-	print_u64(u64(column))
-	print_byte(')')
+	when ODIN_ERROR_POS_STYLE == .Default {
+		print_byte('(')
+		print_u64(u64(line))
+		print_byte(':')
+		print_u64(u64(column))
+		print_byte(')')
+	} else when ODIN_ERROR_POS_STYLE == .Unix {
+		print_byte(':')
+		print_u64(u64(line))
+		print_byte(':')
+		print_u64(u64(column))
+		print_byte(':')
+	} else {
+		#panic("unhandled ODIN_ERROR_POS_STYLE")
+	}
 }
 print_typeid :: proc "contextless" (id: typeid) {
 	if id == nil {
@@ -250,6 +260,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_type(info.elem)
 
 	case Type_Info_Enumerated_Array:
+		if info.is_sparse {
+			print_string("#sparse")
+		}
 		print_byte('[')
 		print_type(info.index)
 		print_byte(']')

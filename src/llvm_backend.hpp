@@ -144,6 +144,9 @@ struct lbModule {
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
+
+	StringMap<lbAddr> objc_classes;
+	StringMap<lbAddr> objc_selectors;
 };
 
 struct lbGenerator {
@@ -232,6 +235,7 @@ struct lbTargetList {
 
 enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
+	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
 struct lbCopyElisionHint {
@@ -292,7 +296,6 @@ struct lbProcedure {
 
 
 bool lb_init_generator(lbGenerator *gen, Checker *c);
-void lb_generate_module(lbGenerator *gen);
 
 String lb_mangle_name(lbModule *m, Entity *e);
 String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
@@ -365,7 +368,7 @@ lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p);
 
 
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={}, Entity **entity_=nullptr);
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0, bool force_no_init=false);
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);

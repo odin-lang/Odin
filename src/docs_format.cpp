@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 2
-#define OdinDocVersionType_Patch 3
+#define OdinDocVersionType_Patch 4
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -154,6 +154,7 @@ enum OdinDocEntityKind : u32 {
 	OdinDocEntity_ProcGroup   = 5,
 	OdinDocEntity_ImportName  = 6,
 	OdinDocEntity_LibraryName = 7,
+	OdinDocEntity_Builtin     = 8,
 };
 
 enum OdinDocEntityFlag : u64 {
@@ -170,6 +171,9 @@ enum OdinDocEntityFlag : u64 {
 
 	OdinDocEntityFlag_Type_Alias = 1ull<<20,
 
+	OdinDocEntityFlag_Builtin_Pkg_Builtin    = 1ull<<30,
+	OdinDocEntityFlag_Builtin_Pkg_Intrinsics = 1ull<<31,
+
 	OdinDocEntityFlag_Var_Thread_Local = 1ull<<40,
 	OdinDocEntityFlag_Var_Static       = 1ull<<41,
 
@@ -185,8 +189,8 @@ struct OdinDocEntity {
 	OdinDocTypeIndex   type;
 	OdinDocString      init_string;
 	u32                reserved_for_init;
-	OdinDocString      comment;
-	OdinDocString      docs;
+	OdinDocString      comment; // line comment
+	OdinDocString      docs; // preceding comment
 	i32                field_group_index;
 	OdinDocEntityIndex foreign_library;
 	OdinDocString      link_name;
@@ -201,14 +205,20 @@ enum OdinDocPkgFlags : u32 {
 	OdinDocPkgFlag_Init    = 1<<2,
 };
 
+struct OdinDocScopeEntry {
+	OdinDocString      name;
+	OdinDocEntityIndex entity;
+};
+
 struct OdinDocPkg {
 	OdinDocString fullpath;
 	OdinDocString name;
 	u32           flags;
 	OdinDocString docs;
-	OdinDocArray<OdinDocFileIndex>   files;
-	OdinDocArray<OdinDocEntityIndex> entities;
+	OdinDocArray<OdinDocFileIndex>  files;
+	OdinDocArray<OdinDocScopeEntry> entries;
 };
+
 
 struct OdinDocHeader {
 	OdinDocHeaderBase base;

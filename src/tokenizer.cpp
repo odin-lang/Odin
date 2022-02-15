@@ -201,14 +201,6 @@ struct TokenPos {
 	i32 column; // starting at 1
 };
 
-// temporary
-char *token_pos_to_string(TokenPos const &pos) {
-	gbString s = gb_string_make_reserve(temporary_allocator(), 128);
-	String file = get_file_path_string(pos.file_id);
-	s = gb_string_append_fmt(s, "%.*s(%d:%d)", LIT(file), pos.line, pos.column);
-	return s;
-}
-
 i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
 	if (a.offset != b.offset) {
 		return (a.offset < b.offset) ? -1 : +1;

@@ -270,6 +270,7 @@ AT_FDCWD            :: -100
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
 
+
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
 
@@ -610,6 +611,8 @@ heap_alloc :: proc(size: int) -> rawptr {
 }
 
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
+	// POSIX platforms. Ensure your caller takes this into account.
 	return _unix_realloc(ptr, c.size_t(new_size))
 }
 

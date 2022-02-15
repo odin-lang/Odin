@@ -428,9 +428,21 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
-	return expect_token(p, .Close_Brace)
+	expect_brace := expect_token(p, .Close_Brace)
+
+	if expect_brace.kind != .Close_Brace {
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
+			advance_token(p)
+		}
+		return p.curr_tok
+	} 
+
+	return expect_brace
 }
 
+is_non_inserted_semicolon :: proc(tok: tokenizer.Token) -> bool {
+	return tok.kind == .Semicolon && tok.text != "\n"
+}
 
 is_blank_ident :: proc{
 	is_blank_ident_string,
@@ -1312,7 +1324,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		}
 
 		results: [dynamic]^ast.Expr
-		for p.curr_tok.kind != .Semicolon {
+		for p.curr_tok.kind != .Semicolon && p.curr_tok.kind != .Close_Brace {
 			result := parse_expr(p, false)
 			append(&results, result)
 			if p.curr_tok.kind != .Comma ||
@@ -2276,6 +2288,24 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			tag.tok = tok
 			tag.name = name.text
+			original_expr := parse_expr(p, lhs)
+			expr := ast.unparen_expr(original_expr)
+			switch t in &expr.derived {
+			case ast.Comp_Lit:
+				t.tag = tag
+			case ast.Array_Type:
+				t.tag = tag
+				error(p, tok.pos, "#%s has been replaced with #sparse for non-contiguous enumerated array types", name.text)
+			case:
+				error(p, tok.pos, "expected a compound literal after #%s", name.text)
+
+			}
+			return original_expr
+
+		case "sparse":
+			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
+			tag.tok = tok
+			tag.name = name.text
 			original_type := parse_type(p)
 			type := ast.unparen_expr(original_type)
 			switch t in &type.derived {
@@ -2319,7 +2349,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return rt
 
 		case "force_inline", "force_no_inline":
-			return parse_inlining_operand(p, lhs, tok)
+			return parse_inlining_operand(p, lhs, name)
 		case:
 			expr := parse_expr(p, lhs)
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos)

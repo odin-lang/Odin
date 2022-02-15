@@ -490,6 +490,14 @@ void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 			out &= ~StateFlag_no_bounds_check;
 		}
 
+		if (in & StateFlag_no_type_assert) {
+			out |= StateFlag_no_type_assert;
+			out &= ~StateFlag_type_assert;
+		} else if (in & StateFlag_type_assert) {
+			out |= StateFlag_type_assert;
+			out &= ~StateFlag_no_type_assert;
+		}
+
 		ctx->state_flags = out;
 	}
 
@@ -687,54 +695,6 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 	}
 
 	return true;
-}
-
-
-struct TypeAndToken {
-	Type *type;
-	Token token;
-};
-
-
-void add_constant_switch_case(CheckerContext *ctx, PtrMap<uintptr, TypeAndToken> *seen, Operand operand, bool use_expr = true) {
-	if (operand.mode != Addressing_Constant) {
-		return;
-	}
-	if (operand.value.kind == ExactValue_Invalid) {
-		return;
-	}
-	
-	uintptr key = hash_exact_value(operand.value);
-	TypeAndToken *found = map_get(seen, key);
-	if (found != nullptr) {
-		isize count = multi_map_count(seen, key);
-		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
-
-		multi_map_get_all(seen, key, taps);
-		for (isize i = 0; i < count; i++) {
-			TypeAndToken tap = taps[i];
-			if (!are_types_identical(operand.type, tap.type)) {
-				continue;
-			}
-
-			TokenPos pos = tap.token.pos;
-			if (use_expr) {
-				gbString expr_str = expr_to_string(operand.expr);
-				error(operand.expr,
-				      "Duplicate case '%s'\n"
-				      "\tprevious case at %s",
-				      expr_str,
-				      token_pos_to_string(pos));
-				gb_string_free(expr_str);
-			} else {
-				error(operand.expr, "Duplicate case found with previous case at %s", token_pos_to_string(pos));
-			}
-			return;
-		}
-	}
-
-	TypeAndToken tap = {operand.type, ast_token(operand.expr)};
-	multi_map_insert(seen, key, tap);
 }
 
 void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
@@ -961,7 +921,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 	}
 
-	PtrMap<uintptr, TypeAndToken> seen = {}; // NOTE(bill): Multimap, Key: ExactValue
+	SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
 	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
@@ -1001,9 +961,9 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 				TokenKind upper_op = Token_Invalid;
 				switch (be->op.kind) {
-				case Token_Ellipsis:  upper_op = Token_GtEq; break;
-				case Token_RangeFull: upper_op = Token_GtEq; break;
-				case Token_RangeHalf: upper_op = Token_Gt;   break;
+				case Token_Ellipsis:  upper_op = Token_LtEq; break;
+				case Token_RangeFull: upper_op = Token_LtEq; break;
+				case Token_RangeHalf: upper_op = Token_Lt;   break;
 				default: GB_PANIC("Invalid range operator"); break;
 				}
 
@@ -1024,45 +984,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				Operand b1 = rhs;
 				check_comparison(ctx, &a1, &b1, Token_LtEq);
 
-				if (is_type_enum(x.type)) {
-					// TODO(bill): Fix this logic so it's fast!!!
-
-					i64 v0 = exact_value_to_i64(lhs.value);
-					i64 v1 = exact_value_to_i64(rhs.value);
-					Operand v = {};
-					v.mode = Addressing_Constant;
-					v.type = x.type;
-					v.expr = x.expr;
-
-					Type *bt = base_type(x.type);
-					GB_ASSERT(bt->kind == Type_Enum);
-					for (i64 vi = v0; vi <= v1; vi++) {
-						if (upper_op != Token_GtEq && vi == v1) {
-							break;
-						}
-
-						bool found = false;
-						for_array(j, bt->Enum.fields) {
-							Entity *f = bt->Enum.fields[j];
-							GB_ASSERT(f->kind == Entity_Constant);
-
-							i64 fv = exact_value_to_i64(f->Constant.value);
-							if (fv == vi) {
-								found = true;
-								break;
-							}
-						}
-						if (found) {
-							v.value = exact_value_i64(vi);
-							add_constant_switch_case(ctx, &seen, v);
-						}
-					}
-				} else {
-					add_constant_switch_case(ctx, &seen, lhs);
-					if (upper_op == Token_GtEq) {
-						add_constant_switch_case(ctx, &seen, rhs);
-					}
-				}
+				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
 
 				if (is_type_string(x.type)) {
 					// NOTE(bill): Force dependency for strings here
@@ -1107,7 +1029,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 						continue;
 					}
 					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
-					add_constant_switch_case(ctx, &seen, y);
+					add_to_seen_map(ctx, &seen, y);
 				}
 			}
 		}
@@ -1143,7 +1065,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (unhandled.count == 1) {
 				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
 			} else {
-				error_no_newline(node, "Unhandled switch cases: ");
+				error(node, "Unhandled switch cases:");
 				for_array(i, unhandled) {
 					Entity *f = unhandled[i];
 					error_line("\t%.*s\n", LIT(f->token.string));

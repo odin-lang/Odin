@@ -1,7 +1,7 @@
 package ENet
 
-when ODIN_OS == "windows" {
-	when ODIN_ARCH == "amd64" {
+when ODIN_OS == .Windows {
+	when ODIN_ARCH == .amd64 {
 		foreign import ENet {
 			"lib/enet64.lib",
 			"system:Ws2_32.lib",

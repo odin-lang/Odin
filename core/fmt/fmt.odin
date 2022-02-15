@@ -11,6 +11,7 @@ import "core:time"
 import "core:unicode/utf8"
 import "core:intrinsics"
 
+// Internal data structure that stores the required information for formatted printing
 Info :: struct {
 	minus:     bool,
 	plus:      bool,
@@ -46,9 +47,13 @@ Register_User_Formatter_Error :: enum {
 // it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
 _user_formatters: ^map[typeid]User_Formatter
 
+// set_user_formatters assigns m to a global value allowing the user have custom print formatting for specific
+// types
 set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
 	_user_formatters = m
 }
+// register_user_formatter assigns a formatter to a specific typeid. set_user_formatters must be called
+// before any use of this procedure.
 register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Register_User_Formatter_Error {
 	if _user_formatters == nil {
 		return .No_User_Formatter
@@ -61,7 +66,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 }
 
 
-// aprint* procedures return a string that was allocated with the current context
+// aprint procedure return a string that was allocated with the current context
 // They must be freed accordingly
 aprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
@@ -69,12 +74,16 @@ aprint :: proc(args: ..any, sep := " ") -> string {
 	sbprint(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
+// aprintln procedure return a string that was allocated with the current context
+// They must be freed accordingly
 aprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.init_builder(&str)
 	sbprintln(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
+// aprintf procedure return a string that was allocated with the current context
+// They must be freed accordingly
 aprintf :: proc(fmt: string, args: ..any) -> string {
 	str: strings.Builder
 	strings.init_builder(&str)
@@ -83,19 +92,21 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 }
 
 
-// tprint* procedures return a string that was allocated with the current context's temporary allocator
+// tprint procedure return a string that was allocated with the current context's temporary allocator
 tprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.init_builder(&str, context.temp_allocator)
 	sbprint(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
+// tprintln procedure return a string that was allocated with the current context's temporary allocator
 tprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.init_builder(&str, context.temp_allocator)
 	sbprintln(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
+// tprintf procedure return a string that was allocated with the current context's temporary allocator
 tprintf :: proc(fmt: string, args: ..any) -> string {
 	str: strings.Builder
 	strings.init_builder(&str, context.temp_allocator)
@@ -104,21 +115,24 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 }
 
 
-// bprint* procedures return a string using a buffer from an array
+// bprint procedures return a string using a buffer from an array
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_slice(buf[0:len(buf)])
 	return sbprint(buf=&sb, args=args, sep=sep)
 }
+// bprintln procedures return a string using a buffer from an array
 bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_slice(buf[0:len(buf)])
 	return sbprintln(buf=&sb, args=args, sep=sep)
 }
+// bprintf procedures return a string using a buffer from an array
 bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 	sb := strings.builder_from_slice(buf[0:len(buf)])
 	return sbprintf(&sb, fmt, ..args)
 }
 
 
+// formatted assert
 assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) -> bool {
 	if !condition {
 		p := context.assertion_failure_proc
@@ -131,6 +145,7 @@ assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_locati
 	return condition
 }
 
+// formatted panic
 panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc
 	if p == nil {
@@ -142,24 +157,26 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 
 
 
-
-
+// sbprint formats using the default print settings and writes to buf
 sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	wprint(w=strings.to_writer(buf), args=args, sep=sep)
 	return strings.to_string(buf^)
 }
 
+// sbprintln formats using the default print settings and writes to buf
 sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	wprintln(w=strings.to_writer(buf), args=args, sep=sep)
 	return strings.to_string(buf^)
 }
 
+// sbprintf formats according to the specififed format string and writes to buf
 sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any) -> string {
 	wprintf(w=strings.to_writer(buf), fmt=fmt, args=args)
 	return strings.to_string(buf^)
 }
 
 
+// wprint formats using the default print settings and writes to w
 wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	fi: Info
 	fi.writer = w
@@ -194,6 +211,7 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	return int(size1 - size0)
 }
 
+// wprintln formats using the default print settings and writes to w
 wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	fi: Info
 	fi.writer = w
@@ -214,6 +232,7 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	return int(size1 - size0)
 }
 
+// wprintf formats according to the specififed format string and writes to w
 wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	fi: Info
 	arg_index: int = 0
@@ -493,11 +512,13 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	return int(size1 - size0)
 }
 
+// wprint_type is a utility procedure to write a ^runtime.Type_Info value to w
 wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info) -> (int, io.Error) {
 	n, err := reflect.write_type(w, info)
 	io.flush(auto_cast w)
 	return n, err
 }
+// wprint_typeid is a utility procedure to write a typeid value to w
 wprint_typeid :: proc(w: io.Writer, id: typeid) -> (int, io.Error) {
 	n, err := reflect.write_type(w, type_info_of(id))
 	io.flush(auto_cast w)
@@ -829,7 +850,7 @@ _pad :: proc(fi: ^Info, s: string) {
 
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
-	case 'f', 'F', 'v':
+	case 'f', 'F', 'g', 'G', 'v':
 		prec: int = 3
 		if fi.prec_set {
 			prec = fi.prec
@@ -1044,11 +1065,13 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 		case 'i', 'd', 'f':
 			fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, verb)
 		case 's', 'v':
-			str, ok := enum_value_to_string(v)
-			if !ok {
-				str = "%!(BAD ENUM VALUE)"
+			if str, ok := enum_value_to_string(v); ok {
+				io.write_string(fi.writer, str)
+			} else {
+				io.write_string(fi.writer, "%!(BAD ENUM VALUE=")
+				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
+				io.write_string(fi.writer, ")")
 			}
-			io.write_string(fi.writer, str)
 		}
 	}
 }

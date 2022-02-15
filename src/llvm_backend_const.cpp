@@ -115,8 +115,8 @@ LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 
 
 lbValue lb_const_ptr_cast(lbModule *m, lbValue value, Type *t) {
-	GB_ASSERT(is_type_pointer(value.type));
-	GB_ASSERT(is_type_pointer(t));
+	GB_ASSERT(is_type_internally_pointer_like(value.type));
+	GB_ASSERT(is_type_internally_pointer_like(t));
 	GB_ASSERT(lb_is_const(value));
 
 	lbValue res = {};
@@ -175,7 +175,7 @@ LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *values, isize
 }
 
 LLVMValueRef llvm_const_slice(lbModule *m, lbValue data, lbValue len) {
-	GB_ASSERT(is_type_pointer(data.type));
+	GB_ASSERT(is_type_pointer(data.type) || is_type_multi_pointer(data.type));
 	GB_ASSERT(are_types_identical(len.type, t_int));
 	LLVMValueRef vals[2] = {
 		data.value,
@@ -568,7 +568,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		}
 
 	case ExactValue_Integer:
-		if (is_type_pointer(type)) {
+		if (is_type_pointer(type) || is_type_multi_pointer(type)) {
 			LLVMTypeRef t = lb_type(m, original_type);
 			LLVMValueRef i = lb_big_int_to_llvm(m, t_uintptr, &value.value_integer);
 			res.value = LLVMConstIntToPtr(i, t);

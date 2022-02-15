@@ -3,7 +3,7 @@ package portmidi
 import "core:c"
 import "core:strings"
 
-when ODIN_OS == "windows" { 
+when ODIN_OS == .Windows {
 	foreign import lib {
 		"portmidi_s.lib",
 		"system:Winmm.lib",

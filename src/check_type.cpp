@@ -120,6 +120,8 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 		ast_node(p, Field, param);
 		Ast *type_expr = p->type;
 		Type *type = nullptr;
+		CommentGroup *docs = p->docs;
+		CommentGroup *comment = p->comment;
 
 		if (type_expr != nullptr) {
 			type = check_type_expr(ctx, type_expr, nullptr);
@@ -156,6 +158,14 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx, ctx->scope, name, field);
 			field->Variable.field_group_index = field_group_index;
+
+			if (j == 0) {
+				field->Variable.docs = docs;
+			}
+			if (j+1 == p->names.count) {
+				field->Variable.comment = comment;
+			}
+
 			array_add(&fields_array, field);
 			String tag = p->tag.string;
 			if (tag.len != 0 && !unquote_string(permanent_allocator(), &tag, 0, tag.text[0] == '`')) {
@@ -313,6 +323,10 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 	}
 
 	named_type->Named.type_name = e;
+	GB_ASSERT(original_type->kind == Type_Named);
+	e->TypeName.objc_class_name = original_type->Named.type_name->TypeName.objc_class_name;
+	// TODO(bill): Is this even correct? Or should the metadata be copied?
+	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
 	mutex_lock(&ctx->info->gen_types_mutex);
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
@@ -722,20 +736,19 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		Ast *ident = nullptr;
 		Ast *init = nullptr;
 		u32 entity_flags = 0;
-		if (field->kind == Ast_FieldValue) {
-			ast_node(fv, FieldValue, field);
-			if (fv->field == nullptr || fv->field->kind != Ast_Ident) {
-				error(field, "An enum field's name must be an identifier");
-				continue;
-			}
-			ident = fv->field;
-			init = fv->value;
-		} else if (field->kind == Ast_Ident) {
-			ident = field;
-		} else {
+		if (field->kind != Ast_EnumFieldValue) {
 			error(field, "An enum field's name must be an identifier");
 			continue;
 		}
+		ident = field->EnumFieldValue.name;
+		init = field->EnumFieldValue.value;
+		if (ident == nullptr || ident->kind != Ast_Ident) {
+			error(field, "An enum field's name must be an identifier");
+			continue;
+		}
+		CommentGroup *docs    = field->EnumFieldValue.docs;
+		CommentGroup *comment = field->EnumFieldValue.comment;
+
 		String name = ident->Ident.token.string;
 
 		if (init != nullptr) {
@@ -793,6 +806,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
 		e->Constant.flags |= entity_flags;
+		e->Constant.docs = docs;
+		e->Constant.comment = comment;
 
 		if (scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
@@ -2702,29 +2717,30 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, Token_Invalid);
 
-				bool is_partial = false;
+				bool is_sparse = false;
 				if (at->tag != nullptr) {
 					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
 					String name = at->tag->BasicDirective.name.string;
-					if (name == "partial") {
-						is_partial = true;
+					if (name == "sparse") {
+						is_sparse = true;
 					} else {
 						error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
 					}
 				}
 
-				if (!is_partial && t->EnumeratedArray.count > bt->Enum.fields.count) {
+				if (!is_sparse && t->EnumeratedArray.count > bt->Enum.fields.count) {
 					error(e, "Non-contiguous enumeration used as an index in an enumerated array");
 					long long ea_count   = cast(long long)t->EnumeratedArray.count;
 					long long enum_count = cast(long long)bt->Enum.fields.count;
 					error_line("\tenumerated array length: %lld\n", ea_count);
 					error_line("\tenum field count: %lld\n", enum_count);
-					error_line("\tSuggestion: prepend #partial to the enumerated array to allow for non-named elements\n");
+					error_line("\tSuggestion: prepend #sparse to the enumerated array to allow for non-contiguous elements\n");
 					if (2*enum_count < ea_count) {
 						error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
-						error_line("\t         this warning will be removed if #partial is applied\n");
+						error_line("\t         this warning will be removed if #sparse is applied\n");
 					}
 				}
+				t->EnumeratedArray.is_sparse = is_sparse;
 
 				*type = t;
 
