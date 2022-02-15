@@ -174,6 +174,13 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 	sock := create_socket(family, .Tcp) or_return
 	skt = sock.(Tcp_Socket)
 
+	// NOTE(tetra): This is so that if we crash while the socket is open, we can
+	// bypass the cooldown period, and allow the next run of the program to
+	// use the same address immediately.
+	//
+	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
+	set_option(sock, .Reuse_Address, true) or_return
+
 	bind(sock, {local_addr, port}) or_return
 
 	res := os.listen(os.Socket(skt), backlog)
