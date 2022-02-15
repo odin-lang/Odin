@@ -4,7 +4,7 @@
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
-
+Type *check_type(CheckerContext *ctx, Ast *e);
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -841,6 +841,17 @@ void add_global_enum_constant(Slice<Entity *> const &fields, char const *name, i
 	GB_PANIC("Unfound enum value for global constant: %s %lld", name, cast(long long)value);
 }
 
+Type *add_global_type_name(Scope *scope, String const &type_name, Type *backing_type) {
+	Entity *e = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+	Type *named_type = alloc_type_named(type_name, backing_type, e);
+	e->type = named_type;
+	set_base_type(named_type, backing_type);
+	if (scope_insert(scope, e)) {
+		compiler_error("double declaration of %.*s", LIT(e->token.string));
+	}
+	return named_type;
+}
+
 
 void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -985,6 +996,17 @@ void init_universal(void) {
 	t_f64_ptr      = alloc_type_pointer(t_f64);
 	t_u8_slice     = alloc_type_slice(t_u8);
 	t_string_slice = alloc_type_slice(t_string);
+
+	// intrinsics types for objective-c stuff
+	{
+		t_objc_object   = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_object"),   alloc_type_struct());
+		t_objc_selector = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_selector"), alloc_type_struct());
+		t_objc_class    = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_class"),    alloc_type_struct());
+
+		t_objc_id       = alloc_type_pointer(t_objc_object);
+		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
+		t_objc_Class    = alloc_type_pointer(t_objc_class);
+	}
 }
 
 
@@ -1041,6 +1063,9 @@ void init_checker_info(CheckerInfo *i) {
 	semaphore_init(&i->collect_semaphore);
 
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
+
+	mutex_init(&i->objc_types_mutex);
+	map_init(&i->objc_msgSend_types, a);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -1073,6 +1098,9 @@ void destroy_checker_info(CheckerInfo *i) {
 	mutex_destroy(&i->type_and_value_mutex);
 	mutex_destroy(&i->identifier_uses_mutex);
 	mutex_destroy(&i->foreign_mutex);
+
+	mutex_destroy(&i->objc_types_mutex);
+	map_destroy(&i->objc_msgSend_types);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -2712,6 +2740,14 @@ ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
 	return ev;
 }
 
+Type *check_decl_attribute_type(CheckerContext *c, Ast *value) {
+	if (value != nullptr) {
+		return check_type(c, value);
+	}
+	return nullptr;
+}
+
+
 #define ATTRIBUTE_USER_TAG_NAME "tag"
 
 
@@ -3011,6 +3047,42 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "objc_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_name = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_is_class_method") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_class_method = ev.value_bool;
+		} else {
+			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_type") {
+		if (value == nullptr) {
+			error(elem, "Expected a type for '%.*s'", LIT(name));
+		} else {
+			Type *objc_type = check_type(c, value);
+			if (objc_type != nullptr) {
+				if (!has_type_got_objc_class_attribute(objc_type)) {
+					gbString t = type_to_string(objc_type);
+					error(value, "'%.*s' expected a named type with the attribute @(obj_class=<string>), got type %s", LIT(name), t);
+					gb_string_free(t);
+				} else {
+					ac->objc_type = objc_type;
+				}
+			}
+		}
+		return true;
 	}
 	return false;
 }
@@ -3160,6 +3232,14 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 		return true;
 	} else if (name == "private") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "objc_class") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String || ev.value_string == "") {
+			error(elem, "Expected a non-empty string value for '%.*s'", LIT(name));
+		} else {
+			ac->objc_class = ev.value_string;
+		}
 		return true;
 	}
 	return false;
