@@ -63,7 +63,6 @@ Value_pointerValue :: proc(self: ^Value) -> rawptr {
 @(objc_class="NSNumber")
 Number :: struct{using _: Copying(Number), using _: Value}
 
-
 @(objc_type=Number, objc_name="alloc", objc_is_class_method=true)
 Number_alloc :: proc() -> ^Number {
 	return msgSend(^Number, Number, "alloc")

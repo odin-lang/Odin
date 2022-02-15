@@ -13,7 +13,6 @@ Date_init :: proc(self: ^Date) -> ^Date {
 	return msgSend(^Date, self, "init")
 }
 
-
 @(objc_type=Date, objc_name="dateWithTimeIntervalSinceNow")
 Date_dateWithTimeIntervalSinceNow :: proc(secs: TimeInterval) -> ^Date {
 	return msgSend(^Date, Date, "dateWithTimeIntervalSinceNow:", secs)

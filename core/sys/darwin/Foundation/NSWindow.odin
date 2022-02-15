@@ -23,7 +23,6 @@ View :: struct {using _: Responder}
 View_layer :: proc(self: ^View) -> ^Layer {
 	return msgSend(^Layer, self, "layer")
 }
-
 @(objc_type=View, objc_name="setLayer")
 View_setLayer :: proc(self: ^View, layer: ^Layer) {
 	msgSend(nil, self, "setLayer:", layer)
@@ -32,13 +31,10 @@ View_setLayer :: proc(self: ^View, layer: ^Layer) {
 View_setSubLayer :: proc(self: ^View, layer: ^Layer) {
 	msgSend(nil, self, "setSubLayer:", layer)
 }
-
-
 @(objc_type=View, objc_name="wantsLayer")
 View_wantsLayer :: proc(self: ^View) -> BOOL {
 	return msgSend(BOOL, self, "wantsLayer")
 }
-
 @(objc_type=View, objc_name="setWantsLayer")
 View_setWantsLayer :: proc(self: ^View, wantsLayer: BOOL) {
 	msgSend(nil, self, "setWantsLayer:", wantsLayer)
@@ -52,7 +48,6 @@ Window :: struct {using _: Responder}
 Window_contentView :: proc(self: ^Window) -> ^View {
 	return msgSend(^View, self, "contentView")
 }
-
 @(objc_type=Window, objc_name="frame")
 Window_frame :: proc(self: ^Window) -> Rect {
 	return msgSend(Rect, self, "frame")
@@ -61,7 +56,6 @@ Window_frame :: proc(self: ^Window) -> Rect {
 Window_setFrame :: proc(self: ^Window, frame: Rect) {
 	msgSend(nil, self, "setFrame:", frame)
 }
-
 @(objc_type=Window, objc_name="opaque")
 Window_opaque :: proc(self: ^Window) -> NS.BOOL {
 	return msgSend(NS.BOOL, self, "opaque")
@@ -70,7 +64,6 @@ Window_opaque :: proc(self: ^Window) -> NS.BOOL {
 Window_setOpaque :: proc(self: ^Window, ok: NS.BOOL) {
 	msgSend(nil, self, "setOpaque:", ok)
 }
-
 @(objc_type=Window, objc_name="backgroundColor")
 Window_backgroundColor :: proc(self: ^Window) -> ^NS.Color {
 	return msgSend(^NS.Color, self, "backgroundColor")
