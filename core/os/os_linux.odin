@@ -271,7 +271,7 @@ AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
 
 _unix_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> Handle {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		res := int(intrinsics.syscall(unix.SYS_open, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
 	} else { // NOTE: arm64 does not have open
 		res := int(intrinsics.syscall(unix.SYS_openat, uintptr(AT_FDCWD), uintptr(rawptr(path), uintptr(flags), uintptr(mode))))
@@ -292,7 +292,7 @@ _unix_write :: proc(fd: Handle, buf: rawptr, size: uint) -> int {
 }
 
 _unix_seek :: proc(fd: Handle, offset: i64, whence: int) -> i64 {
-	when ODIN_ARCH == "amd64" || ODIN_ARCH == "arm64" {
+	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
 		return i64(intrinsics.syscall(unix.SYS_lseek, uintptr(fd), uintptr(offset), uintptr(whence)))
 	} else {
 		low := uintptr(offset & 0xFFFFFFFF)
@@ -304,9 +304,9 @@ _unix_seek :: proc(fd: Handle, offset: i64, whence: int) -> i64 {
 }
 
 _unix_stat :: proc(path: cstring, stat: ^OS_Stat) -> int {
-	when ODIN_ARCH == "amd64" {
+	when ODIN_ARCH == .amd64 {
 		return int(intrinsics.syscall(unix.SYS_stat, uintptr(rawptr(path)), uintptr(stat)))
-	} else when ODIN_ARCH != "arm64" {
+	} else when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_stat64, uintptr(rawptr(path)), uintptr(stat)))
 	} else { // NOTE: arm64 does not have stat
 		return int(intrinsics.syscall(unix.SYS_fstatat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(stat), 0))
@@ -314,7 +314,7 @@ _unix_stat :: proc(path: cstring, stat: ^OS_Stat) -> int {
 }
 
 _unix_fstat :: proc(fd: Handle, stat: ^OS_Stat) -> int {
-	when ODIN_ARCH == "amd64" || ODIN_ARCH == "arm64" {
+	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
 		return int(intrinsics.syscall(unix.SYS_fstat, uintptr(fd), uintptr(stat)))
 	} else {
 		return int(intrinsics.syscall(unix.SYS_fstat64, uintptr(fd), uintptr(stat)))
@@ -322,9 +322,9 @@ _unix_fstat :: proc(fd: Handle, stat: ^OS_Stat) -> int {
 }
 
 _unix_lstat :: proc(path: cstring, stat: ^OS_Stat) -> int {
-	when ODIN_ARCH == "amd64" {
+	when ODIN_ARCH == .amd64 {
 		return int(intrinsics.syscall(unix.SYS_lstat, uintptr(rawptr(path)), uintptr(stat)))
-	} else when ODIN_ARCH != "arm64" {
+	} else when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_lstat64, uintptr(rawptr(path)), uintptr(stat)))
 	} else { // NOTE: arm64 does not have any lstat
 		return int(intrinsics.syscall(unix.SYS_fstatat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(stat), AT_SYMLINK_NOFOLLOW))
@@ -332,7 +332,7 @@ _unix_lstat :: proc(path: cstring, stat: ^OS_Stat) -> int {
 }
 
 _unix_readlink :: proc(path: cstring, buf: rawptr, bufsiz: uint) -> int {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_readlink, uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
 	} else { // NOTE: arm64 does not have readlink
 		return int(intrinsics.syscall(unix.SYS_readlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
@@ -340,7 +340,7 @@ _unix_readlink :: proc(path: cstring, buf: rawptr, bufsiz: uint) -> int {
 }
 
 _unix_access :: proc(path: cstring, mask: int) -> int {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_access, uintptr(rawptr(path)), uintptr(mask)))
 	} else { // NOTE: arm64 does not have access
 		return int(intrinsics.syscall(unix.SYS_faccessat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mask)))
@@ -356,7 +356,7 @@ _unix_chdir :: proc(path: cstring) -> int {
 }
 
 _unix_rename :: proc(old, new: cstring) -> int {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_rename, uintptr(rawptr(old)), uintptr(rawptr(new))))
 	} else { // NOTE: arm64 does not have rename
 		return int(intrinsics.syscall(unix.SYS_renameat, uintptr(AT_FDCWD), uintptr(rawptr(old)), uintptr(rawptr(new))))
@@ -364,7 +364,7 @@ _unix_rename :: proc(old, new: cstring) -> int {
 }
 
 _unix_unlink :: proc(path: cstring) -> int {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_unlink, uintptr(rawptr(path))))
 	} else { // NOTE: arm64 does not have unlink
 		return int(intrinsics.syscall(unix.SYS_unlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path), 0)))
@@ -372,7 +372,7 @@ _unix_unlink :: proc(path: cstring) -> int {
 }
 
 _unix_rmdir :: proc(path: cstring) -> int {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_rmdir, uintptr(rawptr(path))))
 	} else { // NOTE: arm64 does not have rmdir
 		return int(intrinsics.syscall(unix.SYS_unlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path)), AT_REMOVEDIR))
@@ -380,7 +380,7 @@ _unix_rmdir :: proc(path: cstring) -> int {
 }
 
 _unix_mkdir :: proc(path: cstring, mode: u32) -> int {
-	when ODIN_ARCH != "arm64" {
+	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_mkdir, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have mkdir
 		return int(intrinsics.syscall(unix.SYS_mkdirat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode)))

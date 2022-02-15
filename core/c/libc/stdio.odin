@@ -1,8 +1,8 @@
 package libc
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
-} else when ODIN_OS == "darwin" {
+} else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
@@ -13,7 +13,7 @@ when ODIN_OS == "windows" {
 FILE :: struct {}
 
 // MSVCRT compatible.
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	_IOFBF       :: 0x0000
 	_IONBF       :: 0x0004
 	_IOLBF       :: 0x0040
@@ -48,7 +48,7 @@ when ODIN_OS == "windows" {
 }
 
 // GLIBC and MUSL compatible.
-when ODIN_OS == "linux" {
+when ODIN_OS == .Linux {
 	fpos_t        :: struct #raw_union { _: [16]char, _: longlong, _: double, }
 
 	_IOFBF        :: 0
@@ -78,7 +78,7 @@ when ODIN_OS == "linux" {
 	}
 }
 
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	fpos_t :: distinct i64
 	
 	_IOFBF        :: 0

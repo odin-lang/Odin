@@ -89,7 +89,7 @@ scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
 	scan_loop: for i = 0; i < len(pattern); i += 1 {
 		switch pattern[i] {
 		case '\\':
-			when ODIN_OS != "windows" {
+			when ODIN_OS != .Windows {
 				if i+1 < len(pattern) {
 					i += 1
 				}
@@ -161,7 +161,7 @@ match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Match_Err
 			chunk = chunk[1:]
 
 		case '\\':
-			when ODIN_OS != "windows" {
+			when ODIN_OS != .Windows {
 				chunk = chunk[1:]
 				if len(chunk) == 0 {
 					err = .Syntax_Error
@@ -188,7 +188,7 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 		return
 	}
 	chunk := chunk
-	if chunk[0] == '\\' && ODIN_OS != "windows" {
+	if chunk[0] == '\\' && ODIN_OS != .Windows {
 		chunk = chunk[1:]
 		if len(chunk) == 0 {
 			err = .Syntax_Error
@@ -229,7 +229,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 
 	dir, file := split(pattern)
 	volume_len := 0
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		temp_buf: [8]byte
 		volume_len, dir = clean_glob_path_windows(dir, temp_buf[:])
 	} else {
@@ -307,7 +307,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 
 @(private)
 has_meta :: proc(path: string) -> bool {
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		CHARS :: `*?[`
 	} else {
 		CHARS :: `*?[\`

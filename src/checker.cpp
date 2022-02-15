@@ -881,11 +881,42 @@ void init_universal(void) {
 	add_global_bool_constant("false", false);
 
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant("ODIN_OS",      bc->ODIN_OS);
-	add_global_string_constant("ODIN_ARCH",    bc->ODIN_ARCH);
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+
+	{
+		GlobalEnumValue values[TargetOs_COUNT] = {
+			{"Unknown",      TargetOs_Invalid},
+			{"Windows",      TargetOs_windows},
+			{"Darwin",       TargetOs_darwin},
+			{"Linux",        TargetOs_linux},
+			{"Essence",      TargetOs_essence},
+			{"FreeBSD",      TargetOs_freebsd},
+			{"WASI",         TargetOs_wasi},
+			{"JS",           TargetOs_js},
+			{"Freestanding", TargetOs_freestanding},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_OS_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_OS", bc->metrics.os);
+		add_global_string_constant("ODIN_OS_STRING", target_os_names[bc->metrics.os]);
+	}
+
+	{
+		GlobalEnumValue values[TargetArch_COUNT] = {
+			{"Unknown", TargetArch_Invalid},
+			{"amd64",   TargetArch_amd64},
+			{"i386",    TargetArch_i386},
+			{"arm64",   TargetArch_arm64},
+			{"wasm32",  TargetArch_wasm32},
+			{"wasm64",  TargetArch_wasm64},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Arch_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_ARCH", bc->metrics.arch);
+		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
+	}
 	
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
@@ -900,7 +931,6 @@ void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_BUILD_MODE", bc->build_mode);
 	}
 
-	add_global_string_constant("ODIN_ENDIAN_STRING", target_endian_names[target_endians[bc->metrics.arch]]);
 	{
 		GlobalEnumValue values[TargetEndian_COUNT] = {
 			{"Unknown", TargetEndian_Invalid},
@@ -911,6 +941,7 @@ void init_universal(void) {
 
 		auto fields = add_global_enum_type(str_lit("Odin_Endian_Type"), values, gb_count_of(values));
 		add_global_enum_constant(fields, "ODIN_ENDIAN", target_endians[bc->metrics.arch]);
+		add_global_string_constant("ODIN_ENDIAN_STRING", target_endian_names[target_endians[bc->metrics.arch]]);
 	}
 
 	{
