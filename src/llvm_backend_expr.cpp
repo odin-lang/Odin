@@ -3303,9 +3303,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		Ast *sel = unparen_expr(se->selector);
-		if (sel->kind == Ast_Ident) {
-			String selector = sel->Ident.token.string;
+		Ast *sel_node = unparen_expr(se->selector);
+		if (sel_node->kind == Ast_Ident) {
+			String selector = sel_node->Ident.token.string;
 			TypeAndValue tav = type_and_value_of_expr(se->expr);
 
 			if (tav.mode == Addressing_Invalid) {
@@ -3354,7 +3354,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			GB_ASSERT(sel.entity != nullptr);
 			if (sel.pseudo_field) {
 				GB_ASSERT(sel.entity->kind == Entity_Procedure);
-				return lb_addr(lb_find_value_from_entity(p->module, sel.entity));
+				Entity *e = entity_of_node(sel_node);
+				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
 			{
