@@ -456,7 +456,7 @@ Socket_Option :: enum c.int {
 
 Socket_Option_Error :: enum c.int {
 	// The value is not of the correct type for the given socket option.
-	Incorrect_Type,
+	Incorrect_Value_Type,
 	// The given socket option is unrecognised.
 	Unknown_Option,
 
@@ -484,7 +484,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_
 			case bool:
 				// okay
 			case:
-				return .Incorrect_Type
+				return .Incorrect_Value_Type
 			}
 	case
 		.Receive_Buffer_Size,
@@ -495,14 +495,14 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any) -> Network_
 			case int:
 				// okay
 			case:
-				return .Incorrect_Type
+				return .Incorrect_Value_Type
 			}
 	case .Linger:
 		switch in value {
 		case win.LINGER:
 			// okay
 		case:
-			return .Incorrect_Type
+			return .Incorrect_Value_Type
 		}
 	case:
 		return .Unknown_Option
