@@ -9,20 +9,22 @@ get_network_interfaces :: proc() -> []Address {
 }
 
 @private
-address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: union{os.sockaddr_in, os.sockaddr_in6}, addrsize: int) {
+address_to_sockaddr :: proc(addr: Address, port: int) -> (sockaddr: os.SOCKADDR_STORAGE_LH) {
 	switch a in addr {
 	case Ipv4_Address:
-		return os.sockaddr_in {
+		(^os.sockaddr_in)(&sockaddr)^ = os.sockaddr_in {
 			sin_port = u16be(port),
 			sin_addr = transmute(os.in_addr) a,
 			sin_family = u16(os.AF_INET),
-		}, size_of(os.sockaddr_in)
+		}
+		return
 	case Ipv6_Address:
-		return os.sockaddr_in6 {
+		(^os.sockaddr_in6)(&sockaddr)^ = os.sockaddr_in6 {
 			sin6_port = u16be(port),
 			sin6_addr = transmute(os.in6_addr) a,
 			sin6_family = u16(os.AF_INET6),
-		}, size_of(os.sockaddr_in6)
+		}
+		return
 	}
 	unreachable()
 }
