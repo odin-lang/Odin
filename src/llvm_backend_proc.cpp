@@ -480,9 +480,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				} else if (arg_type->kind == lbArg_Direct) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						LLVMTypeRef param_type = lb_type(p->module, e->type);
-						LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
-
-						value = OdinLLVMBuildTransmute(p, value, param_type);
+						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
+						LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
 
 						lbValue param = {};
 						param.value = value;
@@ -491,8 +490,16 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
 						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
 						lb_add_entity(p->module, e, ptr);
-						// lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
-						lb_add_debug_param_variable(p, value, e->type, e->token, param_index+1);
+
+						lbBlock *block = p->decl_block;
+						if (original_value != value) {
+							block = p->curr_block;
+						}
+						LLVMValueRef debug_storage_value = value;
+						if (original_value != value && LLVMIsALoadInst(value)) {
+							debug_storage_value = ptr.value;
+						}
+						lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block);
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
@@ -500,7 +507,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
 						ptr.type = alloc_type_pointer(e->type);
 						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block);
 					}
 				}
 			}
