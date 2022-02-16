@@ -611,7 +611,8 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 	cstr := strings.clone_to_cstring(path)
 	defer delete(cstr)
 
-	s: OS_Stat
+	// deliberately uninitialized; the syscall fills this buffer for us
+	s: OS_Stat = ---
 	result := _unix_stat(cstr, &s)
 	if result < 0 {
 		return s, _get_errno(result)
@@ -624,7 +625,8 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	cstr := strings.clone_to_cstring(path)
 	defer delete(cstr)
 
-	s: OS_Stat
+	// deliberately uninitialized; the syscall fills this buffer for us
+	s: OS_Stat = ---
 	result := _unix_lstat(cstr, &s)
 	if result < 0 {
 		return s, _get_errno(result)
@@ -634,7 +636,8 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 
 @private
 _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
-	s: OS_Stat
+	// deliberately uninitialized; the syscall fills this buffer for us
+	s: OS_Stat = ---
 	result := _unix_fstat(fd, &s)
 	if result < 0 {
 		return s, _get_errno(result)
