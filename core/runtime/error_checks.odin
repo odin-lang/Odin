@@ -25,7 +25,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: i32, index
 		print_caller_location(Source_Code_Location{file, line, column, ""})
 		print_string(" Index ")
 		print_i64(i64(index))
-		print_string(" is out of bounds range 0:")
+		print_string(" is out of range 0..<")
 		print_i64(i64(count))
 		print_byte('\n')
 		bounds_trap()
@@ -35,11 +35,11 @@ bounds_check_error :: proc "contextless" (file: string, line, column: i32, index
 
 slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) -> ! {
 	print_caller_location(Source_Code_Location{file, line, column, ""})
-	print_string(" Invalid slice indices: ")
+	print_string(" Invalid slice indices ")
 	print_i64(i64(lo))
 	print_string(":")
 	print_i64(i64(hi))
-	print_string(":")
+	print_string(" is out of range 0..<")
 	print_i64(i64(len))
 	print_byte('\n')
 	bounds_trap()
@@ -47,7 +47,7 @@ slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, h
 
 multi_pointer_slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int) -> ! {
 	print_caller_location(Source_Code_Location{file, line, column, ""})
-	print_string(" Invalid slice indices: ")
+	print_string(" Invalid slice indices ")
 	print_i64(i64(lo))
 	print_string(":")
 	print_i64(i64(hi))
@@ -83,11 +83,11 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 	}
 	handle_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
-		print_string(" Invalid dynamic array values: ")
+		print_string(" Invalid dynamic array indices ")
 		print_i64(i64(low))
 		print_string(":")
 		print_i64(i64(high))
-		print_string(":")
+		print_string(" is out of range 0..<")
 		print_i64(i64(max))
 		print_byte('\n')
 		bounds_trap()
@@ -107,7 +107,7 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 		print_i64(i64(row_index))
 		print_string(", ")
 		print_i64(i64(column_index))
-		print_string(" is out of bounds range [0..<")
+		print_string(" is out of range [0..<")
 		print_i64(i64(row_count))
 		print_string(", 0..<")
 		print_i64(i64(column_count))
