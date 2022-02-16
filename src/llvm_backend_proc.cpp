@@ -497,7 +497,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						}
 						LLVMValueRef debug_storage_value = value;
 						if (original_value != value && LLVMIsALoadInst(value)) {
-							debug_storage_value = ptr.value;
+							debug_storage_value = LLVMGetOperand(value, 0);
 						}
 						lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block);
 					}

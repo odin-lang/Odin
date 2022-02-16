@@ -33,6 +33,11 @@ Calling_Convention :: enum u8 {
 
 	None        = 6,
 	Naked       = 7,
+
+	_           = 8, // reserved
+
+	Win64       = 9,
+	SysV        = 10,
 }
 
 Type_Info_Enum_Value :: distinct i64
