@@ -9774,6 +9774,9 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		if (f->flags&FieldFlag_const) {
 			str = gb_string_appendc(str, "#const ");
 		}
+		if (f->flags&FieldFlag_subtype) {
+			str = gb_string_appendc(str, "#subtype ");
+		}
 
 		for_array(i, f->names) {
 			Ast *name = f->names[i];
