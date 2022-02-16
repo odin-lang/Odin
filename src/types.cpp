@@ -2334,7 +2334,7 @@ String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
 	GB_ASSERT(is_type_struct(src) || is_type_union(src));
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
-		if (f->kind == Entity_Variable && f->flags & EntityFlag_Using) {
+		if (f->kind == Entity_Variable && f->flags & EntityFlags_IsSubtype) {
 			if (are_types_identical(dst, f->type)) {
 				return f->token.string;
 			}
@@ -2343,7 +2343,7 @@ String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
 					return f->token.string;
 				}
 			}
-			if (is_type_struct(f->type)) {
+			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(f->type)) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					return name;
@@ -2489,9 +2489,9 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 					if (xf->token.string != yf->token.string) {
 						return false;
 					}
-					bool xf_is_using = (xf->flags&EntityFlag_Using) != 0;
-					bool yf_is_using = (yf->flags&EntityFlag_Using) != 0;
-					if (xf_is_using ^ yf_is_using) {
+					u64 xf_flags = (xf->flags&EntityFlags_IsSubtype);
+					u64 yf_flags = (yf->flags&EntityFlags_IsSubtype);
+					if (xf_flags != yf_flags) {
 						return false;
 					}
 				}
@@ -3813,7 +3813,7 @@ isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0
 
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
-		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
+		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
 			continue;
 		}
 
