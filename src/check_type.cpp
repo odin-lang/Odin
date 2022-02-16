@@ -1928,6 +1928,25 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 		c->scope->flags &= ~ScopeFlag_ContextDefined;
 	}
 
+	TargetArchKind arch = build_context.metrics.arch;
+	switch (cc) {
+	case ProcCC_StdCall:
+	case ProcCC_FastCall:
+		if (arch != TargetArch_i386 || arch != TargetArch_amd64) {
+			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected either i386 or amd64, got %.*s",
+			      proc_calling_convention_strings[cc], LIT(target_arch_names[arch]));
+		}
+		break;
+	case ProcCC_Win64:
+	case ProcCC_SysV:
+		if (arch != TargetArch_amd64) {
+			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected amd64, got %.*s",
+			      proc_calling_convention_strings[cc], LIT(target_arch_names[arch]));
+		}
+		break;
+	}
+
+
 	bool variadic = false;
 	isize variadic_index = -1;
 	bool success = true;

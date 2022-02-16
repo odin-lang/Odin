@@ -683,40 +683,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			types[1] = odin_doc_type(w, type->Proc.results);
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 
-			String calling_convention = {};
-			switch (type->Proc.calling_convention) {
-			case ProcCC_Invalid:
-				// no need
-				break;
-			case ProcCC_Odin:
-				if (default_calling_convention() != ProcCC_Odin) {
-					calling_convention = str_lit("odin");
-				}
-				break;
-			case ProcCC_Contextless:
-				if (default_calling_convention() != ProcCC_Contextless) {
-					calling_convention = str_lit("contextless");
-				}
-				break;
-			case ProcCC_CDecl:
-				calling_convention = str_lit("cdecl");
-				break;
-			case ProcCC_StdCall:
-				calling_convention = str_lit("stdcall");
-				break;
-			case ProcCC_FastCall:
-				calling_convention = str_lit("fastcall");
-				break;
-			case ProcCC_None:
-				calling_convention = str_lit("none");
-				break;
-			case ProcCC_Naked:
-				calling_convention = str_lit("naked");
-				break;
-			case ProcCC_InlineAsm:
-				calling_convention = str_lit("inline-assembly");
-				break;
-			}
+			String calling_convention = make_string_c(proc_calling_convention_strings[type->Proc.calling_convention]);
 			doc_type.calling_convention = odin_doc_write_string(w, calling_convention);
 		}
 		break;

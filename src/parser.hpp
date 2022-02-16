@@ -249,10 +249,28 @@ enum ProcCallingConvention : i32 {
 
 	ProcCC_InlineAsm   = 8,
 
+	ProcCC_Win64       = 9,
+	ProcCC_SysV        = 10,
+
+
 	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
+};
+
+char const *proc_calling_convention_strings[ProcCC_MAX] = {
+	"",
+	"odin",
+	"contextless",
+	"cdecl",
+	"stdcall",
+	"fastcall",
+	"none",
+	"naked",
+	"inlineasm",
+	"win64",
+	"sysv",
 };
 
 ProcCallingConvention default_calling_convention(void) {

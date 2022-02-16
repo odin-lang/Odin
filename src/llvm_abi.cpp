@@ -1184,6 +1184,12 @@ LB_ABI_INFO(lb_get_abi_info) {
 			ft->calling_convention = calling_convention;
 			return ft;
 		}
+	case ProcCC_Win64:
+		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
+		return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+	case ProcCC_SysV:
+		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
+		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	}
 
 	switch (build_context.metrics.arch) {
