@@ -25,9 +25,11 @@ Copying :: struct($T: typeid) {using _: Object}
 alloc :: proc($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, T, "alloc")
 }
+@(objc_type=Object, objc_name="init")
 init :: proc(self: ^$T) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "init")
 }
+@(objc_type=Object, objc_name="copy")
 copy :: proc(self: ^Copying($T)) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "copy")
 }
