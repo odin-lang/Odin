@@ -1,8 +1,9 @@
 //+build darwin
 package objc_Metal
 
-import NS "core:sys/darwin/Foundation"
+import NS "vendor:darwin/Foundation"
 import "core:mem"
+_ :: mem
 
 ////////////////////////////////////////////////////////////////////////////////
 

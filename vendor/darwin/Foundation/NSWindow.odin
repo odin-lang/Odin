@@ -1,7 +1,7 @@
 //+build darwin
 package objc_Foundation
 
-import NS "core:sys/darwin/Foundation"
+import NS "vendor:darwin/Foundation"
 
 Rect :: struct {
 	x, y: f64,

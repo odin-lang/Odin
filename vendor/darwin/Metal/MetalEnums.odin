@@ -1,7 +1,7 @@
 //+build darwin
 package objc_Metal
 
-import NS "core:sys/darwin/Foundation"
+import NS "vendor:darwin/Foundation"
 
 AccelerationStructureUsage :: distinct bit_set[AccelerationStructureUsageFlag; NS.UInteger]
 AccelerationStructureUsageFlag :: enum NS.UInteger {
