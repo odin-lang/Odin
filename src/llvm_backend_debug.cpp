@@ -1050,5 +1050,10 @@ void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
 	token.string = str_lit("context");
 	token.pos = pos;
 
-	lb_add_debug_local_variable(p, ctx.addr.value, t_context, token);
+	LLVMValueRef ptr = ctx.addr.value;
+	while (LLVMIsABitCastInst(ptr)) {
+		ptr = LLVMGetOperand(ptr, 0);
+	}
+
+	lb_add_debug_local_variable(p, ptr, t_context, token);
 }
