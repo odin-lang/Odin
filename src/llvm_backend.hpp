@@ -548,6 +548,10 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 	lbCallingConvention_C,            // ProcCC_None,
 	lbCallingConvention_C,            // ProcCC_Naked,
 	lbCallingConvention_C,            // ProcCC_InlineAsm,
+
+	lbCallingConvention_Win64,        // ProcCC_Win64,
+	lbCallingConvention_X86_64_SysV,  // ProcCC_SysV,
+
 };
 
 enum : LLVMDWARFTypeEncoding {
