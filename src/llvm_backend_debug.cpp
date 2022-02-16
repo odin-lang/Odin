@@ -966,7 +966,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 }
 
 
-void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number) {
+void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
 	if (p->debug_info == nullptr) {
 		return;
 	}
@@ -1020,7 +1020,6 @@ void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	);
 
 	LLVMValueRef storage = ptr;
-	LLVMBasicBlockRef block = p->decl_block->block;
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
@@ -1028,7 +1027,7 @@ void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
 	// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
 	// instruction "before" it.
-	LLVMDIBuilderInsertDbgValueAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
+	LLVMDIBuilderInsertDbgValueAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block->block);
 }
 
 
