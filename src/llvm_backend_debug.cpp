@@ -962,7 +962,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
-	LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
+	LLVMDIBuilderInsertDbgValueBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
 }
 
 
@@ -1026,12 +1026,12 @@ void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
 	if (LLVMIsAAllocaInst(instr)) {
-		LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
+		LLVMDIBuilderInsertDbgValueBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
 	} else {
 		// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
 		// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
 		// instruction "before" it.
-		LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
+		LLVMDIBuilderInsertDbgValueAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
 	}
 }
 
