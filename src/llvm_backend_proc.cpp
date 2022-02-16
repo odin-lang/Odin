@@ -491,7 +491,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
 						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
 						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
+						// lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
+						lb_add_debug_param_variable(p, value, e->type, e->token, param_index+1);
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
