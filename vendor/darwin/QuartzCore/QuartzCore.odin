@@ -1,8 +1,8 @@
 //+build darwin
 package objc_QuartzCore
 
-import NS "core:sys/darwin/Foundation"
-import MTL "core:sys/darwin/Metal"
+import NS "vendor:darwin/Foundation"
+import MTL "vendor:darwin/Metal"
 import "core:intrinsics"
 
 @(private)
