@@ -4,7 +4,6 @@ import "core:strings"
 import "core:strconv"
 import "core:unicode/utf8"
 import "core:mem"
-import "core:encoding/base64"
 
 split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
 	s := url

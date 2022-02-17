@@ -35,10 +35,11 @@ parse_ipv4_address :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Addres
 
 	#assert(len(addr) == 4)
 
+	n: uint
 	for part, i in parts {
 		if part == "" do return // NOTE(tetra): All elements required.
 		if strings.contains(part, ":") do return
-		n, ok := strconv.parse_uint(part, 10)
+		n, ok = strconv.parse_uint(part, 10)
 		if !ok do return // NOTE(tetra): Not all of it was an integer.
 		if n > uint(max(u8)) do return
 		addr[i] = byte(n)
@@ -79,6 +80,7 @@ parse_ipv6_address :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Addres
 		addr[i] = u16be(u16(n))
 	}
 
+	n: uint
 	if double_colon {
 		loop: for _, i in parts {
 			part := parts[len(parts)-1-i]
@@ -86,7 +88,7 @@ parse_ipv6_address :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Addres
 			case 3: return
 			case 0: break loop // NOTE(tetra): Zero means '::' - only one of these is allowed.
 			}
-			n, ok := strconv.parse_uint(part, 16)
+			n, ok = strconv.parse_uint(part, 16)
 			if !ok do return // NOTE(tetra): Not all of this part was digits.
 			if n > uint(max(u16)) do return
 			addr[len(addr)-1-i] = u16be(u16(n))
