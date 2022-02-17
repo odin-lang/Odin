@@ -1694,6 +1694,11 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (build_context.command_kind == Command_test && !already_has_entry_point) {
+		TIME_SECTION("LLVM main");
+		lb_create_main_procedure(default_module, startup_runtime);
+	}
+
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
 		for_array(i, m->missing_procedures_to_check) {
