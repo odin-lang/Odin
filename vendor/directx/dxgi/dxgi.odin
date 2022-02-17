@@ -437,7 +437,8 @@ SWAP_CHAIN_DESC :: struct {
 }
 
 
-IObject_UUID :: "AEC22FB8-76F3-4639-9BE0-28EB43A67A2E"
+IObject_UUID_STRING :: "AEC22FB8-76F3-4639-9BE0-28EB43A67A2E"
+IObject_UUID := &IID{0xAEC22FB8, 0x76F3, 0x4639, {0x9B, 0xE0, 0x28, 0xEB, 0x43, 0xA6, 0x7A, 0x2E}}
 IObject :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using vtable: ^IObject_VTable,
@@ -450,7 +451,8 @@ IObject_VTable :: struct {
 	GetParent:               proc "stdcall" (this: ^IObject, riid: ^IID, ppParent: ^rawptr) -> HRESULT,
 }
 
-IDeviceSubObject_UUID :: "3D3E0379-F9DE-4D58-BB6C-18D62992F1A6"
+IDeviceSubObject_UUID_STRING :: "3D3E0379-F9DE-4D58-BB6C-18D62992F1A6"
+IDeviceSubObject_UUID := &IID{0x3D3E0379, 0xF9DE, 0x4D58, {0xBB, 0x6C, 0x18, 0xD6, 0x29, 0x92, 0xF1, 0xA6}}
 IDeviceSubObject :: struct #raw_union {
 	#subtype idxgiobject: IObject,
 	using idxgidevicesubobject_vtable: ^IDeviceSubObject_VTable,
@@ -460,7 +462,8 @@ IDeviceSubObject_VTable :: struct {
 	GetDevice: proc "stdcall" (this: ^IDeviceSubObject, riid: ^IID, ppDevice: ^rawptr) -> HRESULT,
 }
 
-IResource_UUID :: "035F3AB4-482E-4E50-B41F-8A7F8BD8960B"
+IResource_UUID_STRING :: "035F3AB4-482E-4E50-B41F-8A7F8BD8960B"
+IResource_UUID := &IID{0x035F3AB4, 0x482E, 0x4E50, {0xB4, 0x1F, 0x8A, 0x7F, 0x8B, 0xD8, 0x96, 0x0B}}
 IResource :: struct #raw_union {
 	#subtype idxgidevicesubobject: IDeviceSubObject,
 	using idxgiresource_vtable: ^IResource_VTable,
@@ -473,7 +476,8 @@ IResource_VTable :: struct {
 	GetEvictionPriority: proc "stdcall" (this: ^IResource, pEvictionPriority: ^u32) -> HRESULT,
 }
 
-IKeyedMutex_UUID :: "9D8E1289-D7B3-465F-8126-250E349AF85D"
+IKeyedMutex_UUID_STRING :: "9D8E1289-D7B3-465F-8126-250E349AF85D"
+IKeyedMutex_UUID := &IID{0x9D8E1289, 0xD7B3, 0x465F, {0x81, 0x26, 0x25, 0x0E, 0x34, 0x9A, 0xF8, 0x5D}}
 IKeyedMutex :: struct #raw_union {
 	#subtype idxgidevicesubobject: IDeviceSubObject,
 	using idxgikeyedmutex_vtable: ^IKeyedMutex_VTable,
@@ -484,7 +488,8 @@ IKeyedMutex_VTable :: struct {
 	ReleaseSync: proc "stdcall" (this: ^IKeyedMutex, Key: u64) -> HRESULT,
 }
 
-ISurface_UUID :: "CAFCB56C-6AC3-4889-BF47-9E23BBD260EC"
+ISurface_UUID_STRING :: "CAFCB56C-6AC3-4889-BF47-9E23BBD260EC"
+ISurface_UUID := &IID{0xCAFCB56C, 0x6AC3, 0x4889, {0xBF, 0x47, 0x9E, 0x23, 0xBB, 0xD2, 0x60, 0xEC}}
 ISurface :: struct #raw_union {
 	#subtype idxgidevicesubobject: IDeviceSubObject,
 	using idxgisurface_vtable: ^ISurface_VTable,
@@ -496,7 +501,8 @@ ISurface_VTable :: struct {
 	Unmap:   proc "stdcall" (this: ^ISurface) -> HRESULT,
 }
 
-ISurface1_UUID :: "4AE63092-6327-4C1B-80AE-BFE12EA32B86"
+ISurface1_UUID_STRING :: "4AE63092-6327-4C1B-80AE-BFE12EA32B86"
+ISurface1_UUID := &IID{0x4AE63092, 0x6327, 0x4C1B, {0x80, 0xAE, 0xBF, 0xE1, 0x2E, 0xA3, 0x2B, 0x86}}
 ISurface1 :: struct #raw_union {
 	#subtype idxgisurface: ISurface,
 	using idxgisurface1_vtable: ^ISurface1_VTable,
@@ -507,7 +513,8 @@ ISurface1_VTable :: struct {
 	ReleaseDC: proc "stdcall" (this: ^ISurface1, pDirtyRect: ^RECT) -> HRESULT,
 }
 
-IAdapter_UUID :: "2411E7E1-12AC-4CCF-BD14-9798E8534DC0"
+IAdapter_UUID_STRING :: "2411E7E1-12AC-4CCF-BD14-9798E8534DC0"
+IAdapter_UUID := &IID{0x2411E7E1, 0x12AC, 0x4CCF, {0xBD, 0x14, 0x97, 0x98, 0xE8, 0x53, 0x4D, 0xC0}}
 IAdapter :: struct #raw_union {
 	#subtype idxgiobject: IObject,
 	using idxgiadapter_vtable: ^IAdapter_VTable,
@@ -519,7 +526,8 @@ IAdapter_VTable :: struct {
 	CheckInterfaceSupport: proc "stdcall" (this: ^IAdapter, InterfaceName: ^GUID, pUMDVersion: ^LARGE_INTEGER) -> HRESULT,
 }
 
-IOutput_UUID :: "AE02EEDB-C735-4690-8D52-5A8DC20213AA"
+IOutput_UUID_STRING :: "AE02EEDB-C735-4690-8D52-5A8DC20213AA"
+IOutput_UUID := &IID{0xAE02EEDB, 0xC735, 0x4690, {0x8D, 0x52, 0x5A, 0x8D, 0xC2, 0x02, 0x13, 0xAA}}
 IOutput :: struct #raw_union {
 	#subtype idxgiobject: IObject,
 	using idxgioutput_vtable: ^IOutput_VTable,
@@ -540,7 +548,8 @@ IOutput_VTable :: struct {
 	GetFrameStatistics:          proc "stdcall" (this: ^IOutput, pStats: ^FRAME_STATISTICS) -> HRESULT,
 }
 
-ISwapChain_UUID :: "310D36A0-D2E7-4C0A-AA04-6A9D23B8886A"
+ISwapChain_UUID_STRING :: "310D36A0-D2E7-4C0A-AA04-6A9D23B8886A"
+ISwapChain_UUID := &IID{0x310D36A0, 0xD2E7, 0x4C0A, {0xAA, 0x04, 0x6A, 0x9D, 0x23, 0xB8, 0x88, 0x6A}}
 ISwapChain :: struct #raw_union {
 	#subtype idxgidevicesubobject: IDeviceSubObject,
 	using idxgiswapchain_vtable: ^ISwapChain_VTable,
@@ -559,7 +568,8 @@ ISwapChain_VTable :: struct {
 	GetLastPresentCount: proc "stdcall" (this: ^ISwapChain, pLastPresentCount: ^u32) -> HRESULT,
 }
 
-IFactory_UUID :: "7B7166EC-21C7-44AE-B21A-C9AE321AE369"
+IFactory_UUID_STRING :: "7B7166EC-21C7-44AE-B21A-C9AE321AE369"
+IFactory_UUID := &IID{0x7B7166EC, 0x21C7, 0x44AE, {0xB2, 0x1A, 0xC9, 0xAE, 0x32, 0x1A, 0xE3, 0x69}}
 IFactory :: struct #raw_union {
 	#subtype idxgiobject: IObject,
 	using idxgifactory_vtable: ^IFactory_VTable,
@@ -572,7 +582,8 @@ IFactory_VTable :: struct {
 	CreateSwapChain:       proc "stdcall" (this: ^IFactory, pDevice: ^IUnknown, pDesc: ^SWAP_CHAIN_DESC, ppSwapChain: ^^ISwapChain) -> HRESULT,
 	CreateSoftwareAdapter: proc "stdcall" (this: ^IFactory, Module: HMODULE, ppAdapter: ^^IAdapter) -> HRESULT,
 }
-IDevice_UUID :: "54EC77FA-1377-44E6-8C32-88FD5F44C84C"
+IDevice_UUID_STRING :: "54EC77FA-1377-44E6-8C32-88FD5F44C84C"
+IDevice_UUID := &IID{0x54EC77FA, 0x1377, 0x44E6, {0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C}}
 IDevice :: struct #raw_union {
 	#subtype idxgiobject: IObject,
 	using idxgidevice_vtable: ^IDevice_VTable,
@@ -611,7 +622,8 @@ DISPLAY_COLOR_SPACE :: struct {
 }
 
 
-IFactory1_UUID :: "770AAE78-F26F-4DBA-A829-253C83D1B387"
+IFactory1_UUID_STRING :: "770AAE78-F26F-4DBA-A829-253C83D1B387"
+IFactory1_UUID := &IID{0x770AAE78, 0xF26F, 0x4DBA, {0xA8, 0x29, 0x25, 0x3C, 0x83, 0xD1, 0xB3, 0x87}}
 IFactory1 :: struct #raw_union {
 	#subtype idxgifactory: IFactory,
 	using idxgifactory1_vtable: ^IFactory1_VTable,
@@ -622,7 +634,8 @@ IFactory1_VTable :: struct {
 	IsCurrent:     proc "stdcall" (this: ^IFactory1) -> BOOL,
 }
 
-IAdapter1_UUID :: "29038F61-3839-4626-91FD-086879011A05"
+IAdapter1_UUID_STRING :: "29038F61-3839-4626-91FD-086879011A05"
+IAdapter1_UUID := &IID{0x29038F61, 0x3839, 0x4626, {0x91, 0xFD, 0x08, 0x68, 0x79, 0x01, 0x1A, 0x05}}
 IAdapter1 :: struct #raw_union {
 	#subtype idxgiadapter: IAdapter,
 	using idxgiadapter1_vtable: ^IAdapter1_VTable,
@@ -632,7 +645,8 @@ IAdapter1_VTable :: struct {
 	GetDesc1: proc "stdcall" (this: ^IAdapter1, pDesc: ^ADAPTER_DESC1) -> HRESULT,
 }
 
-IDevice1_UUID :: "77DB970F-6276-48BA-BA28-070143B4392C"
+IDevice1_UUID_STRING :: "77DB970F-6276-48BA-BA28-070143B4392C"
+IDevice1_UUID := &IID{0x77DB970F, 0x6276, 0x48BA, {0xBA, 0x28, 0x07, 0x01, 0x43, 0xB4, 0x39, 0x2C}}
 IDevice1 :: struct #raw_union {
 	#subtype idxgidevice: IDevice,
 	using idxgidevice1_vtable: ^IDevice1_VTable,
@@ -643,7 +657,8 @@ IDevice1_VTable :: struct {
 	GetMaximumFrameLatency: proc "stdcall" (this: ^IDevice1, pMaxLatency: ^u32) -> HRESULT,
 }
 
-IDisplayControl_UUID :: "EA9DBF1A-C88E-4486-854A-98AA0138F30C"
+IDisplayControl_UUID_STRING :: "EA9DBF1A-C88E-4486-854A-98AA0138F30C"
+IDisplayControl_UUID := &IID{0xEA9DBF1A, 0xC88E, 0x4486, {0x85, 0x4A, 0x98, 0xAA, 0x01, 0x38, 0xF3, 0x0C}}
 IDisplayControl :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using idxgidisplaycontrol_vtable: ^IDisplayControl_VTable,
@@ -695,7 +710,8 @@ OUTDUPL_FRAME_INFO :: struct {
 }
 
 
-IOutputDuplication_UUID :: "191CFAC3-A341-470D-B26E-A864F428319C"
+IOutputDuplication_UUID_STRING :: "191CFAC3-A341-470D-B26E-A864F428319C"
+IOutputDuplication_UUID := &IID{0x191CFAC3, 0xA341, 0x470D, {0xB2, 0x6E, 0xA8, 0x64, 0xF4, 0x28, 0x31, 0x9C}}
 IOutputDuplication :: struct #raw_union {
 	#subtype idxgiobject: IObject,
 	using idxgioutputduplication_vtable: ^IOutputDuplication_VTable,
@@ -720,7 +736,8 @@ ALPHA_MODE :: enum i32 {
 }
 
 
-ISurface2_UUID :: "ABA496DD-B617-4CB8-A866-BC44D7EB1FA2"
+ISurface2_UUID_STRING :: "ABA496DD-B617-4CB8-A866-BC44D7EB1FA2"
+ISurface2_UUID := &IID{0xABA496DD, 0xB617, 0x4CB8, {0xA8, 0x66, 0xBC, 0x44, 0xD7, 0xEB, 0x1F, 0xA2}}
 ISurface2 :: struct #raw_union {
 	#subtype idxgisurface1: ISurface1,
 	using idxgisurface2_vtable: ^ISurface2_VTable,
@@ -730,7 +747,8 @@ ISurface2_VTable :: struct {
 	GetResource: proc "stdcall" (this: ^ISurface2, riid: ^IID, ppParentResource: ^rawptr, pSubresourceIndex: ^u32) -> HRESULT,
 }
 
-IResource1_UUID :: "30961379-4609-4A41-998E-54FE567EE0C1"
+IResource1_UUID_STRING :: "30961379-4609-4A41-998E-54FE567EE0C1"
+IResource1_UUID := &IID{0x30961379, 0x4609, 0x4A41, {0x99, 0x8E, 0x54, 0xFE, 0x56, 0x7E, 0xE0, 0xC1}}
 IResource1 :: struct #raw_union {
 	#subtype idxgiresource: IResource,
 	using idxgiresource1_vtable: ^IResource1_VTable,
@@ -747,7 +765,8 @@ OFFER_RESOURCE_PRIORITY :: enum i32 {
 }
 
 
-IDevice2_UUID :: "05008617-FBFD-4051-A790-144884B4F6A9"
+IDevice2_UUID_STRING :: "05008617-FBFD-4051-A790-144884B4F6A9"
+IDevice2_UUID := &IID{0x05008617, 0xFBFD, 0x4051, {0xA7, 0x90, 0x14, 0x48, 0x84, 0xB4, 0xF6, 0xA9}}
 IDevice2 :: struct #raw_union {
 	#subtype idxgidevice1: IDevice1,
 	using idxgidevice2_vtable: ^IDevice2_VTable,
@@ -804,7 +823,8 @@ PRESENT_PARAMETERS :: struct {
 }
 
 
-ISwapChain1_UUID :: "790A45F7-0D42-4876-983A-0A55CFE6F4AA"
+ISwapChain1_UUID_STRING :: "790A45F7-0D42-4876-983A-0A55CFE6F4AA"
+ISwapChain1_UUID := &IID{0x790A45F7, 0x0D42, 0x4876, {0x98, 0x3A, 0x0A, 0x55, 0xCF, 0xE6, 0xF4, 0xAA}}
 ISwapChain1 :: struct #raw_union {
 	#subtype idxgiswapchain: ISwapChain,
 	using idxgiswapchain1_vtable: ^ISwapChain1_VTable,
@@ -824,7 +844,8 @@ ISwapChain1_VTable :: struct {
 	GetRotation:              proc "stdcall" (this: ^ISwapChain1, pRotation: ^MODE_ROTATION) -> HRESULT,
 }
 
-IFactory2_UUID :: "50C83A1C-E072-4C48-87B0-3630FA36A6D0"
+IFactory2_UUID_STRING :: "50C83A1C-E072-4C48-87B0-3630FA36A6D0"
+IFactory2_UUID := &IID{0x50C83A1C, 0xE072, 0x4C48, {0x87, 0xB0, 0x36, 0x30, 0xFA, 0x36, 0xA6, 0xD0}}
 IFactory2 :: struct #raw_union {
 	#subtype idxgifactory1: IFactory1,
 	using idxgifactory2_vtable: ^IFactory2_VTable,
@@ -875,7 +896,8 @@ ADAPTER_DESC2 :: struct {
 }
 
 
-IAdapter2_UUID :: "0AA1AE0A-FA0E-4B84-8644-E05FF8E5ACB5"
+IAdapter2_UUID_STRING :: "0AA1AE0A-FA0E-4B84-8644-E05FF8E5ACB5"
+IAdapter2_UUID := &IID{0x0AA1AE0A, 0xFA0E, 0x4B84, {0x86, 0x44, 0xE0, 0x5F, 0xF8, 0xE5, 0xAC, 0xB5}}
 IAdapter2 :: struct #raw_union {
 	#subtype idxgiadapter1: IAdapter1,
 	using idxgiadapter2_vtable: ^IAdapter2_VTable,
@@ -885,7 +907,8 @@ IAdapter2_VTable :: struct {
 	GetDesc2: proc "stdcall" (this: ^IAdapter2, pDesc: ^ADAPTER_DESC2) -> HRESULT,
 }
 
-IOutput1_UUID :: "00CDDEA8-939B-4B83-A340-A685226666CC"
+IOutput1_UUID_STRING :: "00CDDEA8-939B-4B83-A340-A685226666CC"
+IOutput1_UUID := &IID{0x00CDDEA8, 0x939B, 0x4B83, {0xA3, 0x40, 0xA6, 0x85, 0x22, 0x66, 0x66, 0xCC}}
 IOutput1 :: struct #raw_union {
 	#subtype idxgioutput: IOutput,
 	using idxgioutput1_vtable: ^IOutput1_VTable,
@@ -897,7 +920,8 @@ IOutput1_VTable :: struct {
 	GetDisplaySurfaceData1:   proc "stdcall" (this: ^IOutput1, pDestination: ^IResource) -> HRESULT,
 	DuplicateOutput:          proc "stdcall" (this: ^IOutput1, pDevice: ^IUnknown, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
 }
-IDevice3_UUID :: "6007896C-3244-4AFD-BF18-A6D3BEDA5023"
+IDevice3_UUID_STRING :: "6007896C-3244-4AFD-BF18-A6D3BEDA5023"
+IDevice3_UUID := &IID{0x6007896C, 0x3244, 0x4AFD, {0xBF, 0x18, 0xA6, 0xD3, 0xBE, 0xDA, 0x50, 0x23}}
 IDevice3 :: struct #raw_union {
 	#subtype idxgidevice2: IDevice2,
 	using idxgidevice3_vtable: ^IDevice3_VTable,
@@ -916,7 +940,8 @@ MATRIX_3X2_F :: struct {
 }
 
 
-ISwapChain2_UUID :: "A8BE2AC4-199F-4946-B331-79599FB98DE7"
+ISwapChain2_UUID_STRING :: "A8BE2AC4-199F-4946-B331-79599FB98DE7"
+ISwapChain2_UUID := &IID{0xA8BE2AC4, 0x199F, 0x4946, {0xB3, 0x31, 0x79, 0x59, 0x9F, 0xB9, 0x8D, 0xE7}}
 ISwapChain2 :: struct #raw_union {
 	#subtype idxgiswapchain1: ISwapChain1,
 	using idxgiswapchain2_vtable: ^ISwapChain2_VTable,
@@ -932,7 +957,8 @@ ISwapChain2_VTable :: struct {
 	GetMatrixTransform:            proc "stdcall" (this: ^ISwapChain2, pMatrix: ^MATRIX_3X2_F) -> HRESULT,
 }
 
-IOutput2_UUID :: "595E39D1-2724-4663-99B1-DA969DE28364"
+IOutput2_UUID_STRING :: "595E39D1-2724-4663-99B1-DA969DE28364"
+IOutput2_UUID := &IID{0x595E39D1, 0x2724, 0x4663, {0x99, 0xB1, 0xDA, 0x96, 0x9D, 0xE2, 0x83, 0x64}}
 IOutput2 :: struct #raw_union {
 	#subtype idxgioutput1: IOutput1,
 	using idxgioutput2_vtable: ^IOutput2_VTable,
@@ -942,7 +968,8 @@ IOutput2_VTable :: struct {
 	SupportsOverlays: proc "stdcall" (this: ^IOutput2) -> BOOL,
 }
 
-IFactory3_UUID :: "25483823-CD46-4C7D-86CA-47AA95B837BD"
+IFactory3_UUID_STRING :: "25483823-CD46-4C7D-86CA-47AA95B837BD"
+IFactory3_UUID := &IID{0x25483823, 0xCD46, 0x4C7D, {0x86, 0xCA, 0x47, 0xAA, 0x95, 0xB8, 0x37, 0xBD}}
 IFactory3 :: struct #raw_union {
 	#subtype idxgifactory2: IFactory2,
 	using idxgifactory3_vtable: ^IFactory3_VTable,
@@ -962,7 +989,8 @@ MULTIPLANE_OVERLAY_YCbCr_FLAGS :: enum u32 { // TODO: convert to bit_set
 }
 
 
-IDecodeSwapChain_UUID :: "2633066B-4514-4C7A-8FD8-12EA98059D18"
+IDecodeSwapChain_UUID_STRING :: "2633066B-4514-4C7A-8FD8-12EA98059D18"
+IDecodeSwapChain_UUID := &IID{0x2633066B, 0x4514, 0x4C7A, {0x8F, 0xD8, 0x12, 0xEA, 0x98, 0x05, 0x9D, 0x18}}
 IDecodeSwapChain :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using idxgidecodeswapchain_vtable: ^IDecodeSwapChain_VTable,
@@ -980,7 +1008,8 @@ IDecodeSwapChain_VTable :: struct {
 	GetColorSpace: proc "stdcall" (this: ^IDecodeSwapChain) -> MULTIPLANE_OVERLAY_YCbCr_FLAGS,
 }
 
-IFactoryMedia_UUID :: "41E7D1F2-A591-4F7B-A2E5-FA9C843E1C12"
+IFactoryMedia_UUID_STRING :: "41E7D1F2-A591-4F7B-A2E5-FA9C843E1C12"
+IFactoryMedia_UUID := &IID{0x41E7D1F2, 0xA591, 0x4F7B, {0xA2, 0xE5, 0xFA, 0x9C, 0x84, 0x3E, 0x1C, 0x12}}
 IFactoryMedia :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using idxgifactorymedia_vtable: ^IFactoryMedia_VTable,
@@ -1008,7 +1037,8 @@ FRAME_STATISTICS_MEDIA :: struct {
 }
 
 
-ISwapChainMedia_UUID :: "DD95B90B-F05F-4F6A-BD65-25BFB264BD84"
+ISwapChainMedia_UUID_STRING :: "DD95B90B-F05F-4F6A-BD65-25BFB264BD84"
+ISwapChainMedia_UUID := &IID{0xDD95B90B, 0xF05F, 0x4F6A, {0xBD, 0x65, 0x25, 0xBF, 0xB2, 0x64, 0xBD, 0x84}}
 ISwapChainMedia :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using idxgiswapchainmedia_vtable: ^ISwapChainMedia_VTable,
@@ -1025,7 +1055,8 @@ OVERLAY_SUPPORT_FLAG :: enum u32 { // TODO: convert to bit_set
 }
 
 
-IOutput3_UUID :: "8A6BB301-7E7E-41F4-A8E0-5B32F7F99B18"
+IOutput3_UUID_STRING :: "8A6BB301-7E7E-41F4-A8E0-5B32F7F99B18"
+IOutput3_UUID := &IID{0x8A6BB301, 0x7E7E, 0x41F4, {0xA8, 0xE0, 0x5B, 0x32, 0xF7, 0xF9, 0x9B, 0x18}}
 IOutput3 :: struct #raw_union {
 	#subtype idxgioutput2: IOutput2,
 	using idxgioutput3_vtable: ^IOutput3_VTable,
@@ -1040,7 +1071,8 @@ SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG :: enum u32 { // TODO: convert to bit_set
 }
 
 
-ISwapChain3_UUID :: "94D99BDB-F1F8-4AB0-B236-7DA0170EDAB1"
+ISwapChain3_UUID_STRING :: "94D99BDB-F1F8-4AB0-B236-7DA0170EDAB1"
+ISwapChain3_UUID := &IID{0x94D99BDB, 0xF1F8, 0x4AB0, {0xB2, 0x36, 0x7D, 0xA0, 0x17, 0x0E, 0xDA, 0xB1}}
 ISwapChain3 :: struct #raw_union {
 	#subtype idxgiswapchain2: ISwapChain2,
 	using idxgiswapchain3_vtable: ^ISwapChain3_VTable,
@@ -1057,7 +1089,8 @@ OVERLAY_COLOR_SPACE_SUPPORT_FLAG :: enum u32 { // TODO: convert to bit_set
 }
 
 
-IOutput4_UUID :: "DC7DCA35-2196-414D-9F53-617884032A60"
+IOutput4_UUID_STRING :: "DC7DCA35-2196-414D-9F53-617884032A60"
+IOutput4_UUID := &IID{0xDC7DCA35, 0x2196, 0x414D, {0x9F, 0x53, 0x61, 0x78, 0x84, 0x03, 0x2A, 0x60}}
 IOutput4 :: struct #raw_union {
 	#subtype idxgioutput3: IOutput3,
 	using idxgioutput4_vtable: ^IOutput4_VTable,
@@ -1067,7 +1100,8 @@ IOutput4_VTable :: struct {
 	CheckOverlayColorSpaceSupport: proc "stdcall" (this: ^IOutput4, Format: FORMAT, ColorSpace: COLOR_SPACE_TYPE, pConcernedDevice: ^IUnknown, pFlags: ^u32) -> HRESULT,
 }
 
-IFactory4_UUID :: "1BC6EA02-EF36-464F-BF0C-21CA39E5168A"
+IFactory4_UUID_STRING :: "1BC6EA02-EF36-464F-BF0C-21CA39E5168A"
+IFactory4_UUID := &IID{0x1BC6EA02, 0xEF36, 0x464F, {0xBF, 0x0C, 0x21, 0xCA, 0x39, 0xE5, 0x16, 0x8A}}
 IFactory4 :: struct #raw_union {
 	#subtype idxgifactory3: IFactory3,
 	using idxgifactory4_vtable: ^IFactory4_VTable,
@@ -1090,7 +1124,8 @@ QUERY_VIDEO_MEMORY_INFO :: struct {
 }
 
 
-IAdapter3_UUID :: "645967A4-1392-4310-A798-8053CE3E93FD"
+IAdapter3_UUID_STRING :: "645967A4-1392-4310-A798-8053CE3E93FD"
+IAdapter3_UUID := &IID{0x645967A4, 0x1392, 0x4310, {0xA7, 0x98, 0x80, 0x53, 0xCE, 0x3E, 0x93, 0xFD}}
 IAdapter3 :: struct #raw_union {
 	#subtype idxgiadapter2: IAdapter2,
 	using idxgiadapter3_vtable: ^IAdapter3_VTable,
