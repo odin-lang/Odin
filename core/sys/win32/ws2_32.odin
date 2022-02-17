@@ -1,7 +1,5 @@
 package win32
 
-foreign import "system:Ws2_32.lib"
-
 // TODO: Delete this file; use sys/windows instead!
 
 import "core:c"
