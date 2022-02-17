@@ -1,7 +1,6 @@
 package net
 
 import "core:mem"
-import "core:os"
 
 DNS_TYPE_A     :: 0x1
 DNS_TYPE_NS    :: 0x2
