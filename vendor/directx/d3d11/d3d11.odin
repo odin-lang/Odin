@@ -29,7 +29,7 @@ foreign d3d11 {
 		pAdapter:           ^dxgi.IAdapter,
 		DriverType:         DRIVER_TYPE,
 		Software:           HMODULE,
-		Flags:              CREATE_DEVICE_FLAG,
+		Flags:              CREATE_DEVICE_FLAGS,
 		pFeatureLevels:     ^FEATURE_LEVEL,
 		FeatureLevels:      u32,
 		SDKVersion:         u32,
@@ -684,7 +684,8 @@ SRV_DIMENSION :: enum i32 {
 PFN_DESTRUCTION_CALLBACK :: #type proc "c" (a0: rawptr)
 
 
-ID3DDestructionNotifier_UUID :: "A06EB39A-50DA-425B-8C31-4EECD6C270F3"
+ID3DDestructionNotifier_UUID_STRING :: "A06EB39A-50DA-425B-8C31-4EECD6C270F3"
+ID3DDestructionNotifier_UUID := &IID{0xA06EB39A, 0x50DA, 0x425B, {0x8C, 0x31, 0x4E, 0xEC, 0xD6, 0xC2, 0x70, 0xF3}}
 ID3DDestructionNotifier :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3ddestructionnotifier_vtable: ^ID3DDestructionNotifier_VTable,
@@ -1100,7 +1101,8 @@ CBOX :: struct {
 }
 
 
-IDeviceChild_UUID :: "1841E5C8-16B0-489B-BCC8-44CFB0D5DEAE"
+IDeviceChild_UUID_STRING :: "1841E5C8-16B0-489B-BCC8-44CFB0D5DEAE"
+IDeviceChild_UUID := &IID{0x1841E5C8, 0x16B0, 0x489B, {0xBC, 0xC8, 0x44, 0xCF, 0xB0, 0xD5, 0xDE, 0xAE}}
 IDeviceChild :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11devicechild_vtable: ^IDeviceChild_VTable,
@@ -1164,7 +1166,8 @@ CDEPTH_STENCIL_DESC :: struct {
 }
 
 
-IDepthStencilState_UUID :: "03823EFB-8D8F-4E1C-9AA2-F64BB2CBFDF1"
+IDepthStencilState_UUID_STRING :: "03823EFB-8D8F-4E1C-9AA2-F64BB2CBFDF1"
+IDepthStencilState_UUID := &IID{0x03823EFB, 0x8D8F, 0x4E1C, {0x9A, 0xA2, 0xF6, 0x4B, 0xB2, 0xCB, 0xFD, 0xF1}}
 IDepthStencilState :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11depthstencilstate_vtable: ^IDepthStencilState_VTable,
@@ -1233,7 +1236,8 @@ CBLEND_DESC :: struct {
 }
 
 
-IBlendState_UUID :: "75B68FAA-347D-4159-8F45-A0640F01CD9A"
+IBlendState_UUID_STRING :: "75B68FAA-347D-4159-8F45-A0640F01CD9A"
+IBlendState_UUID := &IID{0x75B68FAA, 0x347D, 0x4159, {0x8F, 0x45, 0xA0, 0x64, 0x0F, 0x01, 0xCD, 0x9A}}
 IBlendState :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11blendstate_vtable: ^IBlendState_VTable,
@@ -1262,7 +1266,8 @@ CRASTERIZER_DESC :: struct {
 }
 
 
-IRasterizerState_UUID :: "9BB4AB81-AB1A-4D8F-B506-FC04200B6EE7"
+IRasterizerState_UUID_STRING :: "9BB4AB81-AB1A-4D8F-B506-FC04200B6EE7"
+IRasterizerState_UUID := &IID{0x9BB4AB81, 0xAB1A, 0x4D8F, {0xB5, 0x06, 0xFC, 0x04, 0x20, 0x0B, 0x6E, 0xE7}}
 IRasterizerState :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11rasterizerstate_vtable: ^IRasterizerState_VTable,
@@ -1286,7 +1291,8 @@ MAPPED_SUBRESOURCE :: struct {
 }
 
 
-IResource_UUID :: "DC8E63F3-D12B-4952-B47B-5E45026A862D"
+IResource_UUID_STRING :: "DC8E63F3-D12B-4952-B47B-5E45026A862D"
+IResource_UUID := &IID{0xDC8E63F3, 0xD12B, 0x4952, {0xB4, 0x7B, 0x5E, 0x45, 0x02, 0x6A, 0x86, 0x2D}}
 IResource :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11resource_vtable: ^IResource_VTable,
@@ -1313,7 +1319,8 @@ CBUFFER_DESC :: struct {
 }
 
 
-IBuffer_UUID :: "48570B85-D1EE-4FCD-A250-EB350722B037"
+IBuffer_UUID_STRING :: "48570B85-D1EE-4FCD-A250-EB350722B037"
+IBuffer_UUID := &IID{0x48570B85, 0xD1EE, 0x4FCD, {0xA2, 0x50, 0xEB, 0x35, 0x07, 0x22, 0xB0, 0x37}}
 IBuffer :: struct #raw_union {
 	#subtype id3d11resource: IResource,
 	using id3d11buffer_vtable: ^IBuffer_VTable,
@@ -1340,7 +1347,8 @@ CTEXTURE1D_DESC :: struct {
 }
 
 
-ITexture1D_UUID :: "F8FB5C27-C6B3-4F75-A4C8-439AF2EF564C"
+ITexture1D_UUID_STRING :: "F8FB5C27-C6B3-4F75-A4C8-439AF2EF564C"
+ITexture1D_UUID := &IID{0xF8FB5C27, 0xC6B3, 0x4F75, {0xA4, 0xC8, 0x43, 0x9A, 0xF2, 0xEF, 0x56, 0x4C}}
 ITexture1D :: struct #raw_union {
 	#subtype id3d11resource: IResource,
 	using id3d11texture1d_vtable: ^ITexture1D_VTable,
@@ -1369,7 +1377,8 @@ CTEXTURE2D_DESC :: struct {
 }
 
 
-ITexture2D_UUID :: "6F15AAF2-D208-4E89-9AB4-489535D34F9C"
+ITexture2D_UUID_STRING :: "6F15AAF2-D208-4E89-9AB4-489535D34F9C"
+ITexture2D_UUID := &IID{0x6F15AAF2, 0xD208, 0x4E89, {0x9A, 0xB4, 0x48, 0x95, 0x35, 0xD3, 0x4F, 0x9C}}
 ITexture2D :: struct #raw_union {
 	#subtype id3d11resource: IResource,
 	using id3d11texture2d_vtable: ^ITexture2D_VTable,
@@ -1397,7 +1406,8 @@ CTEXTURE3D_DESC :: struct {
 }
 
 
-ITexture3D_UUID :: "037E866E-F56D-4357-A8AF-9DABBE6E250E"
+ITexture3D_UUID_STRING :: "037E866E-F56D-4357-A8AF-9DABBE6E250E"
+ITexture3D_UUID := &IID{0x037E866E, 0xF56D, 0x4357, {0xA8, 0xAF, 0x9D, 0xAB, 0xBE, 0x6E, 0x25, 0x0E}}
 ITexture3D :: struct #raw_union {
 	#subtype id3d11resource: IResource,
 	using id3d11texture3d_vtable: ^ITexture3D_VTable,
@@ -1418,7 +1428,8 @@ TEXTURECUBE_FACE :: enum i32 {
 }
 
 
-IView_UUID :: "839D1216-BB2E-412B-B7F4-A9DBEBE08ED1"
+IView_UUID_STRING :: "839D1216-BB2E-412B-B7F4-A9DBEBE08ED1"
+IView_UUID := &IID{0x839D1216, 0xBB2E, 0x412B, {0xB7, 0xF4, 0xA9, 0xDB, 0xEB, 0xE0, 0x8E, 0xD1}}
 IView :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11view_vtable: ^IView_VTable,
@@ -1523,7 +1534,8 @@ CSHADER_RESOURCE_VIEW_DESC :: struct {
 }
 
 
-IShaderResourceView_UUID :: "B0E06FE0-8192-4E1A-B1CA-36D7414710B2"
+IShaderResourceView_UUID_STRING :: "B0E06FE0-8192-4E1A-B1CA-36D7414710B2"
+IShaderResourceView_UUID := &IID{0xB0E06FE0, 0x8192, 0x4E1A, {0xB1, 0xCA, 0x36, 0xD7, 0x41, 0x47, 0x10, 0xB2}}
 IShaderResourceView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11shaderresourceview_vtable: ^IShaderResourceView_VTable,
@@ -1600,7 +1612,8 @@ CRENDER_TARGET_VIEW_DESC :: struct {
 }
 
 
-IRenderTargetView_UUID :: "DFDBA067-0B8D-4865-875B-D7B4516CC164"
+IRenderTargetView_UUID_STRING :: "DFDBA067-0B8D-4865-875B-D7B4516CC164"
+IRenderTargetView_UUID := &IID{0xDFDBA067, 0x0B8D, 0x4865, {0x87, 0x5B, 0xD7, 0xB4, 0x51, 0x6C, 0xC1, 0x64}}
 IRenderTargetView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11rendertargetview_vtable: ^IRenderTargetView_VTable,
@@ -1668,7 +1681,8 @@ CDEPTH_STENCIL_VIEW_DESC :: struct {
 }
 
 
-IDepthStencilView_UUID :: "9FDAC92A-1876-48C3-AFAD-25B94F84A9B6"
+IDepthStencilView_UUID_STRING :: "9FDAC92A-1876-48C3-AFAD-25B94F84A9B6"
+IDepthStencilView_UUID := &IID{0x9FDAC92A, 0x1876, 0x48C3, {0xAF, 0xAD, 0x25, 0xB9, 0x4F, 0x84, 0xA9, 0xB6}}
 IDepthStencilView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11depthstencilview_vtable: ^IDepthStencilView_VTable,
@@ -1735,7 +1749,8 @@ CUNORDERED_ACCESS_VIEW_DESC :: struct {
 }
 
 
-IUnorderedAccessView_UUID :: "28ACF509-7F5C-48F6-8611-F316010A6380"
+IUnorderedAccessView_UUID_STRING :: "28ACF509-7F5C-48F6-8611-F316010A6380"
+IUnorderedAccessView_UUID := &IID{0x28ACF509, 0x7F5C, 0x48F6, {0x86, 0x11, 0xF3, 0x16, 0x01, 0x0A, 0x63, 0x80}}
 IUnorderedAccessView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11unorderedaccessview_vtable: ^IUnorderedAccessView_VTable,
@@ -1747,43 +1762,50 @@ IUnorderedAccessView_VTable :: struct {
 
 
 
-IVertexShader_UUID :: "3B301D64-D678-4289-8897-22F8928B72F3"
+IVertexShader_UUID_STRING :: "3B301D64-D678-4289-8897-22F8928B72F3"
+IVertexShader_UUID := &IID{0x3B301D64, 0xD678, 0x4289, {0x88, 0x97, 0x22, 0xF8, 0x92, 0x8B, 0x72, 0xF3}}
 IVertexShader :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
 
 
-IHullShader_UUID :: "8E5C6061-628A-4C8E-8264-BBE45CB3D5DD"
+IHullShader_UUID_STRING :: "8E5C6061-628A-4C8E-8264-BBE45CB3D5DD"
+IHullShader_UUID := &IID{0x8E5C6061, 0x628A, 0x4C8E, {0x82, 0x64, 0xBB, 0xE4, 0x5C, 0xB3, 0xD5, 0xDD}}
 IHullShader :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
 
 
-IDomainShader_UUID :: "F582C508-0F36-490C-9977-31EECE268CFA"
+IDomainShader_UUID_STRING :: "F582C508-0F36-490C-9977-31EECE268CFA"
+IDomainShader_UUID := &IID{0xF582C508, 0x0F36, 0x490C, {0x99, 0x77, 0x31, 0xEE, 0xCE, 0x26, 0x8C, 0xFA}}
 IDomainShader :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
 
 
-IGeometryShader_UUID :: "38325B96-EFFB-4022-BA02-2E795B70275C"
+IGeometryShader_UUID_STRING :: "38325B96-EFFB-4022-BA02-2E795B70275C"
+IGeometryShader_UUID := &IID{0x38325B96, 0xEFFB, 0x4022, {0xBA, 0x02, 0x2E, 0x79, 0x5B, 0x70, 0x27, 0x5C}}
 IGeometryShader :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
 
 
-IPixelShader_UUID :: "EA82E40D-51DC-4F33-93D4-DB7C9125AE8C"
+IPixelShader_UUID_STRING :: "EA82E40D-51DC-4F33-93D4-DB7C9125AE8C"
+IPixelShader_UUID := &IID{0xEA82E40D, 0x51DC, 0x4F33, {0x93, 0xD4, 0xDB, 0x7C, 0x91, 0x25, 0xAE, 0x8C}}
 IPixelShader :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
 
 
-IComputeShader_UUID :: "4F5B196E-C2BD-495E-BD01-1FDED38E4969"
+IComputeShader_UUID_STRING :: "4F5B196E-C2BD-495E-BD01-1FDED38E4969"
+IComputeShader_UUID := &IID{0x4F5B196E, 0xC2BD, 0x495E, {0xBD, 0x01, 0x1F, 0xDE, 0xD3, 0x8E, 0x49, 0x69}}
 IComputeShader :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
 
 
-IInputLayout_UUID :: "E4819DDC-4CF0-4025-BD26-5DE82A3E07B7"
+IInputLayout_UUID_STRING :: "E4819DDC-4CF0-4025-BD26-5DE82A3E07B7"
+IInputLayout_UUID := &IID{0xE4819DDC, 0x4CF0, 0x4025, {0xBD, 0x26, 0x5D, 0xE8, 0x2A, 0x3E, 0x07, 0xB7}}
 IInputLayout :: struct {
 	using id3d11devicechild: IDeviceChild,
 }
@@ -1865,7 +1887,8 @@ CSAMPLER_DESC :: struct {
 }
 
 
-ISamplerState_UUID :: "DA6FEA51-564C-4487-9810-F0D0F9B4E3A5"
+ISamplerState_UUID_STRING :: "DA6FEA51-564C-4487-9810-F0D0F9B4E3A5"
+ISamplerState_UUID := &IID{0xDA6FEA51, 0x564C, 0x4487, {0x98, 0x10, 0xF0, 0xD0, 0xF9, 0xB4, 0xE3, 0xA5}}
 ISamplerState :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11samplerstate_vtable: ^ISamplerState_VTable,
@@ -1926,7 +1949,8 @@ FORMAT_SUPPORT2 :: enum i32 { // TODO: make bit_set
 }
 
 
-IAsynchronous_UUID :: "4B35D0CD-1E15-4258-9C98-1B1333F6DD3B"
+IAsynchronous_UUID_STRING :: "4B35D0CD-1E15-4258-9C98-1B1333F6DD3B"
+IAsynchronous_UUID := &IID{0x4B35D0CD, 0x1E15, 0x4258, {0x9C, 0x98, 0x1B, 0x13, 0x33, 0xF6, 0xDD, 0x3B}}
 IAsynchronous :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11asynchronous_vtable: ^IAsynchronous_VTable,
@@ -1974,7 +1998,8 @@ CQUERY_DESC :: struct {
 }
 
 
-IQuery_UUID :: "D6C00747-87B7-425E-B84D-44D108560AFD"
+IQuery_UUID_STRING :: "D6C00747-87B7-425E-B84D-44D108560AFD"
+IQuery_UUID := &IID{0xD6C00747, 0x87B7, 0x425E, {0xB8, 0x4D, 0x44, 0xD1, 0x08, 0x56, 0x0A, 0xFD}}
 IQuery :: struct #raw_union {
 	#subtype id3d11asynchronous: IAsynchronous,
 	using id3d11query_vtable: ^IQuery_VTable,
@@ -1986,7 +2011,8 @@ IQuery_VTable :: struct {
 
 
 
-IPredicate_UUID :: "9EB576DD-9F77-4D86-81AA-8BAB5FE490E2"
+IPredicate_UUID_STRING :: "9EB576DD-9F77-4D86-81AA-8BAB5FE490E2"
+IPredicate_UUID := &IID{0x9EB576DD, 0x9F77, 0x4D86, {0x81, 0xAA, 0x8B, 0xAB, 0x5F, 0xE4, 0x90, 0xE2}}
 IPredicate :: struct {
 	using id3d11query: IQuery,
 }
@@ -2042,7 +2068,8 @@ COUNTER_INFO :: struct {
 }
 
 
-ICounter_UUID :: "6E8C49FB-A371-4770-B440-29086022B741"
+ICounter_UUID_STRING :: "6E8C49FB-A371-4770-B440-29086022B741"
+ICounter_UUID := &IID{0x6E8C49FB, 0xA371, 0x4770, {0xB4, 0x40, 0x29, 0x08, 0x60, 0x22, 0xB7, 0x41}}
 ICounter :: struct #raw_union {
 	#subtype id3d11asynchronous: IAsynchronous,
 	using id3d11counter_vtable: ^ICounter_VTable,
@@ -2075,7 +2102,8 @@ CLASS_INSTANCE_DESC :: struct {
 }
 
 
-IClassInstance_UUID :: "A6CD7FAA-B0B7-4A2F-9436-8662A65797CB"
+IClassInstance_UUID_STRING :: "A6CD7FAA-B0B7-4A2F-9436-8662A65797CB"
+IClassInstance_UUID := &IID{0xA6CD7FAA, 0xB0B7, 0x4A2F, {0x94, 0x36, 0x86, 0x62, 0xA6, 0x57, 0x97, 0xCB}}
 IClassInstance :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11classinstance_vtable: ^IClassInstance_VTable,
@@ -2090,7 +2118,8 @@ IClassInstance_VTable :: struct {
 
 
 
-IClassLinkage_UUID :: "DDF57CBA-9543-46E4-A12B-F207A0FE7FED"
+IClassLinkage_UUID_STRING :: "DDF57CBA-9543-46E4-A12B-F207A0FE7FED"
+IClassLinkage_UUID := &IID{0xDDF57CBA, 0x9543, 0x46E4, {0xA1, 0x2B, 0xF2, 0x07, 0xA0, 0xFE, 0x7F, 0xED}}
 IClassLinkage :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11classlinkage_vtable: ^IClassLinkage_VTable,
@@ -2103,7 +2132,8 @@ IClassLinkage_VTable :: struct {
 
 
 
-ICommandList_UUID :: "A24BC4D1-769E-43F7-8013-98FF566C18E2"
+ICommandList_UUID_STRING :: "A24BC4D1-769E-43F7-8013-98FF566C18E2"
+ICommandList_UUID := &IID{0xA24BC4D1, 0x769E, 0x43F7, {0x80, 0x13, 0x98, 0xFF, 0x56, 0x6C, 0x18, 0xE2}}
 ICommandList :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11commandlist_vtable: ^ICommandList_VTable,
@@ -2277,7 +2307,8 @@ FEATURE_DATA_OPTIONS5 :: struct {
 }
 
 
-IDeviceContext_UUID :: "C0BFA96C-E089-44FB-8EAF-26F8796190DA"
+IDeviceContext_UUID_STRING :: "C0BFA96C-E089-44FB-8EAF-26F8796190DA"
+IDeviceContext_UUID := &IID{0xC0BFA96C, 0xE089, 0x44FB, {0x8E, 0xAF, 0x26, 0xF8, 0x79, 0x61, 0x90, 0xDA}}
 IDeviceContext :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11devicecontext_vtable: ^IDeviceContext_VTable,
@@ -2484,7 +2515,8 @@ VIDEO_DECODER_EXTENSION :: struct {
 }
 
 
-IVideoDecoder_UUID :: "3C9C5B51-995D-48D1-9B8D-FA5CAEDED65C"
+IVideoDecoder_UUID_STRING :: "3C9C5B51-995D-48D1-9B8D-FA5CAEDED65C"
+IVideoDecoder_UUID := &IID{0x3C9C5B51, 0x995D, 0x48D1, {0x9B, 0x8D, 0xFA, 0x5C, 0xAE, 0xDE, 0xD6, 0x5C}}
 IVideoDecoder :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11videodecoder_vtable: ^IVideoDecoder_VTable,
@@ -2679,7 +2711,8 @@ VIDEO_PROCESSOR_CONTENT_DESC :: struct {
 }
 
 
-IVideoProcessorEnumerator_UUID :: "31627037-53AB-4200-9061-05FAA9AB45F9"
+IVideoProcessorEnumerator_UUID_STRING :: "31627037-53AB-4200-9061-05FAA9AB45F9"
+IVideoProcessorEnumerator_UUID := &IID{0x31627037, 0x53AB, 0x4200, {0x90, 0x61, 0x05, 0xFA, 0xA9, 0xAB, 0x45, 0xF9}}
 IVideoProcessorEnumerator :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11videoprocessorenumerator_vtable: ^IVideoProcessorEnumerator_VTable,
@@ -2789,7 +2822,8 @@ VIDEO_PROCESSOR_STREAM :: struct {
 }
 
 
-IVideoProcessor_UUID :: "1D7B0652-185F-41C6-85CE-0C5BE3D4AE6C"
+IVideoProcessor_UUID_STRING :: "1D7B0652-185F-41C6-85CE-0C5BE3D4AE6C"
+IVideoProcessor_UUID := &IID{0x1D7B0652, 0x185F, 0x41C6, {0x85, 0xCE, 0x0C, 0x5B, 0xE3, 0xD4, 0xAE, 0x6C}}
 IVideoProcessor :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11videoprocessor_vtable: ^IVideoProcessor_VTable,
@@ -2812,7 +2846,8 @@ AUTHENTICATED_CHANNEL_TYPE :: enum i32 {
 }
 
 
-IAuthenticatedChannel_UUID :: "3015A308-DCBD-47AA-A747-192486D14D4A"
+IAuthenticatedChannel_UUID_STRING :: "3015A308-DCBD-47AA-A747-192486D14D4A"
+IAuthenticatedChannel_UUID := &IID{0x3015A308, 0xDCBD, 0x47AA, {0xA7, 0x47, 0x19, 0x24, 0x86, 0xD1, 0x4D, 0x4A}}
 IAuthenticatedChannel :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11authenticatedchannel_vtable: ^IAuthenticatedChannel_VTable,
@@ -3020,7 +3055,8 @@ AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT :: struct {
 
 
 
-ICryptoSession_UUID :: "9B32F9AD-BDCC-40A6-A39D-D5C865845720"
+ICryptoSession_UUID_STRING :: "9B32F9AD-BDCC-40A6-A39D-D5C865845720"
+ICryptoSession_UUID := &IID{0x9B32F9AD, 0xBDCC, 0x40A6, {0xA3, 0x9D, 0xD5, 0xC8, 0x65, 0x84, 0x57, 0x20}}
 ICryptoSession :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11cryptosession_vtable: ^ICryptoSession_VTable,
@@ -3053,7 +3089,8 @@ VIDEO_DECODER_OUTPUT_VIEW_DESC :: struct {
 }
 
 
-IVideoDecoderOutputView_UUID :: "C2931AEA-2A85-4F20-860F-FBA1FD256E18"
+IVideoDecoderOutputView_UUID_STRING :: "C2931AEA-2A85-4F20-860F-FBA1FD256E18"
+IVideoDecoderOutputView_UUID := &IID{0xC2931AEA, 0x2A85, 0x4F20, {0x86, 0x0F, 0xFB, 0xA1, 0xFD, 0x25, 0x6E, 0x18}}
 IVideoDecoderOutputView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11videodecoderoutputview_vtable: ^IVideoDecoderOutputView_VTable,
@@ -3083,7 +3120,8 @@ VIDEO_PROCESSOR_INPUT_VIEW_DESC :: struct {
 }
 
 
-IVideoProcessorInputView_UUID :: "11EC5A5F-51DC-4945-AB34-6E8C21300EA5"
+IVideoProcessorInputView_UUID_STRING :: "11EC5A5F-51DC-4945-AB34-6E8C21300EA5"
+IVideoProcessorInputView_UUID := &IID{0x11EC5A5F, 0x51DC, 0x4945, {0xAB, 0x34, 0x6E, 0x8C, 0x21, 0x30, 0x0E, 0xA5}}
 IVideoProcessorInputView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11videoprocessorinputview_vtable: ^IVideoProcessorInputView_VTable,
@@ -3119,7 +3157,8 @@ VIDEO_PROCESSOR_OUTPUT_VIEW_DESC :: struct {
 }
 
 
-IVideoProcessorOutputView_UUID :: "A048285E-25A9-4527-BD93-D68B68C44254"
+IVideoProcessorOutputView_UUID_STRING :: "A048285E-25A9-4527-BD93-D68B68C44254"
+IVideoProcessorOutputView_UUID := &IID{0xA048285E, 0x25A9, 0x4527, {0xBD, 0x93, 0xD6, 0x8B, 0x68, 0xC4, 0x42, 0x54}}
 IVideoProcessorOutputView :: struct #raw_union {
 	#subtype id3d11view: IView,
 	using id3d11videoprocessoroutputview_vtable: ^IVideoProcessorOutputView_VTable,
@@ -3131,7 +3170,8 @@ IVideoProcessorOutputView_VTable :: struct {
 
 
 
-IVideoContext_UUID :: "61F21C45-3C0E-4A74-9CEA-67100D9AD5E4"
+IVideoContext_UUID_STRING :: "61F21C45-3C0E-4A74-9CEA-67100D9AD5E4"
+IVideoContext_UUID := &IID{0x61F21C45, 0x3C0E, 0x4A74, {0x9C, 0xEA, 0x67, 0x10, 0x0D, 0x9A, 0xD5, 0xE4}}
 IVideoContext :: struct #raw_union {
 	#subtype id3d11devicechild: IDeviceChild,
 	using id3d11videocontext_vtable: ^IVideoContext_VTable,
@@ -3200,7 +3240,8 @@ IVideoContext_VTable :: struct {
 
 
 
-IVideoDevice_UUID :: "10EC4D5B-975A-4689-B9E4-D0AAC30FE333"
+IVideoDevice_UUID_STRING :: "10EC4D5B-975A-4689-B9E4-D0AAC30FE333"
+IVideoDevice_UUID := &IID{0x10EC4D5B, 0x975A, 0x4689, {0xB9, 0xE4, 0xD0, 0xAA, 0xC3, 0x0F, 0xE3, 0x33}}
 IVideoDevice :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11videodevice_vtable: ^IVideoDevice_VTable,
@@ -3228,7 +3269,8 @@ IVideoDevice_VTable :: struct {
 
 
 
-IDevice_UUID :: "DB6F6DDB-AC77-4E88-8253-819DF9BBF140"
+IDevice_UUID_STRING :: "DB6F6DDB-AC77-4E88-8253-819DF9BBF140"
+IDevice_UUID := &IID{0xDB6F6DDB, 0xAC77, 0x4E88, {0x82, 0x53, 0x81, 0x9D, 0xF9, 0xBB, 0xF1, 0x40}}
 IDevice :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11device_vtable: ^IDevice_VTable,
@@ -3278,16 +3320,17 @@ IDevice_VTable :: struct {
 }
 
 
+CREATE_DEVICE_FLAGS :: distinct bit_set[CREATE_DEVICE_FLAG; u32]
 CREATE_DEVICE_FLAG :: enum u32 { // TODO: make bit_set
-	SINGLETHREADED                                = 0x1,
-	DEBUG                                         = 0x2,
-	SWITCH_TO_REF                                 = 0x4,
-	PREVENT_INTERNAL_THREADING_OPTIMIZATIONS      = 0x8,
-	BGRA_SUPPORT                                  = 0x20,
-	DEBUGGABLE                                    = 0x40,
-	PREVENT_ALTERING_LAYER_SETTINGS_FROM_REGISTRY = 0x80,
-	DISABLE_GPU_TIMEOUT                           = 0x100,
-	VIDEO_SUPPORT                                 = 0x800,
+	SINGLETHREADED                                = 0,
+	DEBUG                                         = 1,
+	SWITCH_TO_REF                                 = 2,
+	PREVENT_INTERNAL_THREADING_OPTIMIZATIONS      = 3,
+	BGRA_SUPPORT                                  = 5,
+	DEBUGGABLE                                    = 6,
+	PREVENT_ALTERING_LAYER_SETTINGS_FROM_REGISTRY = 7,
+	DISABLE_GPU_TIMEOUT                           = 8,
+	VIDEO_SUPPORT                                 = 12,
 }
 
 PFN_CREATE_DEVICE :: #type proc "c" (a0: ^dxgi.IAdapter, a1: DRIVER_TYPE, a2: HMODULE, a3: u32, a4: ^FEATURE_LEVEL, a5: u32, a6: u32, a7: ^^IDevice, a8: ^FEATURE_LEVEL, a9: ^^IDeviceContext) -> HRESULT
