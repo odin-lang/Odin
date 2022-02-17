@@ -252,13 +252,23 @@ recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network
 	return int(res), nil
 }
 
-// TODO
 Udp_Recv_Error :: enum c.int {
+	// The buffer is too small to fit the entire message, and the message was truncated.
 	Truncated = c.int(os.EMSGSIZE),
-	Reset = c.int(os.ECONNRESET),
+	// The so-called socket is not an open socket.
 	Not_Socket = c.int(os.ENOTSOCK),
-	Socket_Not_Bound = c.int(os.EINVAL), // .. or unknown flag specified; or MSG_OOB specified with SO_OOBINLINE enabled
+	// The so-called socket is, in fact, not even a valid descriptor.
+	Not_Descriptor = c.int(os.EBADF),
+	// The buffer did not point to a valid location in memory.
+	Bad_Buffer = c.int(os.EFAULT),
+	// A signal occurred before any data was transmitted.
+	// See signal(7).
+	Interrupted = c.int(os.EINTR),
+	// The send timeout duration passed before all data was sent.
+	// See Socket_Option.Send_Timeout.
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
+	// The socket must be bound for this operation, but isn't.
+	Socket_Not_Bound = c.int(os.EINVAL),
 }
 
 recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
@@ -283,15 +293,25 @@ recv :: proc{recv_tcp, recv_udp}
 
 
 
+// TODO
 Tcp_Send_Error :: enum c.int {
-	Aborted = c.int(os.ECONNABORTED),
+	Aborted = c.int(os.ECONNABORTED), // TODO: merge with Connection_Broken?
+	Connection_Broken = c.int(os.ECONNRESET),
 	Not_Connected = c.int(os.ENOTCONN),
 	Shutdown = c.int(os.ESHUTDOWN),
-	Reset = c.int(os.ECONNRESET),
+	// The send queue was full.
+	// This is usually a transient issue.
+	//
+	// This also shouldn't normally happen on Linux, as data is dropped if it
+	// doesn't fit in the send queue.
 	No_Buffer_Space_Available = c.int(os.ENOBUFS),
 	Offline = c.int(os.ENETDOWN),
 	Host_Unreachable = c.int(os.EHOSTUNREACH),
+	// A signal occurred before any data was transmitted.
+	// See signal(7).
 	Interrupted = c.int(os.EINTR),
+	// The send timeout duration passed before all data was sent.
+	// See Socket_Option.Send_Timeout.
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
@@ -314,8 +334,32 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 
 // TODO
 Udp_Send_Error :: enum c.int {
+	// The message is too big. No data was sent.
 	Truncated = c.int(os.EMSGSIZE),
+	// TODO: not sure what the exact circumstances for this is yet
+	Network_Unreachable = c.int(os.ENETUNREACH),
+	// There are no more emphemeral outbound ports available to bind the socket to, in order to send.
+	No_Outbound_Ports_Available = c.int(os.EAGAIN),
+	// The send timeout duration passed before all data was sent.
+	// See Socket_Option.Send_Timeout.
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
+	// The so-called socket is not an open socket.
+	Not_Socket = c.int(os.ENOTSOCK),
+	// The so-called socket is, in fact, not even a valid descriptor.
+	Not_Descriptor = c.int(os.EBADF),
+	// The buffer did not point to a valid location in memory.
+	Bad_Buffer = c.int(os.EFAULT),
+	// A signal occurred before any data was transmitted.
+	// See signal(7).
+	Interrupted = c.int(os.EINTR),
+	// The send queue was full.
+	// This is usually a transient issue.
+	//
+	// This also shouldn't normally happen on Linux, as data is dropped if it
+	// doesn't fit in the send queue.
+	No_Buffer_Space_Available = c.int(os.ENOBUFS),
+	// No memory was available to properly manage the send queue.
+	No_Memory_Available = c.int(os.ENOMEM),
 }
 
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
