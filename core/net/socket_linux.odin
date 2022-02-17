@@ -237,7 +237,7 @@ Tcp_Recv_Error :: enum c.int {
 	Offline = c.int(os.ENETDOWN),
 	Host_Unreachable = c.int(os.EHOSTUNREACH),
 	Interrupted = c.int(os.EINTR),
-	Timeout = c.int(os.ETIMEDOUT),
+	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
 recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
@@ -252,11 +252,13 @@ recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network
 	return int(res), nil
 }
 
+// TODO
 Udp_Recv_Error :: enum c.int {
 	Truncated = c.int(os.EMSGSIZE),
 	Reset = c.int(os.ECONNRESET),
 	Not_Socket = c.int(os.ENOTSOCK),
 	Socket_Not_Bound = c.int(os.EINVAL), // .. or unknown flag specified; or MSG_OOB specified with SO_OOBINLINE enabled
+	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
 recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
@@ -290,7 +292,7 @@ Tcp_Send_Error :: enum c.int {
 	Offline = c.int(os.ENETDOWN),
 	Host_Unreachable = c.int(os.EHOSTUNREACH),
 	Interrupted = c.int(os.EINTR),
-	Timeout = c.int(os.ETIMEDOUT),
+	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
 // Repeatedly sends data until the entire buffer is sent.
@@ -310,8 +312,10 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 	return
 }
 
+// TODO
 Udp_Send_Error :: enum c.int {
 	Truncated = c.int(os.EMSGSIZE),
+	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
