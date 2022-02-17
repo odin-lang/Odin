@@ -223,31 +223,28 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_types_mutex);
 
-	add_package_dependency(c, "runtime", "objc_lookUpClass");
-	add_package_dependency(c, "runtime", "sel_registerName");
-	add_package_dependency(c, "runtime", "objc_allocateClassPair");
-
 	add_package_dependency(c, "runtime", "objc_msgSend");
 	add_package_dependency(c, "runtime", "objc_msgSend_fpret");
 	add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
 	add_package_dependency(c, "runtime", "objc_msgSend_stret");
 }
 
+bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) {
+	Operand op = {};
+	check_expr(c, &op, expr);
+	if (op.mode == Addressing_Constant && op.value.kind == ExactValue_String) {
+		if (name_) *name_ = op.value.value_string;
+		return true;
+	}
+	gbString e = expr_to_string(op.expr);
+	gbString t = type_to_string(op.type);
+	error(op.expr, "'%.*s' expected a constant string value, got %s of type %s", LIT(builtin_name), e, t);
+	gb_string_free(t);
+	gb_string_free(e);
+	return false;
+}
+
 bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
-	auto const is_constant_string = [](CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) -> bool {
-		Operand op = {};
-		check_expr(c, &op, expr);
-		if (op.mode == Addressing_Constant && op.value.kind == ExactValue_String) {
-			if (name_) *name_ = op.value.value_string;
-			return true;
-		}
-		gbString e = expr_to_string(op.expr);
-		gbString t = type_to_string(op.type);
-		error(op.expr, "'%.*s' expected a constant string value, got %s of type %s", LIT(builtin_name), e, t);
-		gb_string_free(t);
-		gb_string_free(e);
-		return false;
-	};
 	String builtin_name = builtin_procs[id].name;
 
 	if (build_context.metrics.os != TargetOs_darwin) {
@@ -371,6 +368,10 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 
 		}
 		operand->mode = Addressing_Value;
+
+		add_package_dependency(c, "runtime", "objc_lookUpClass");
+		add_package_dependency(c, "runtime", "sel_registerName");
+		add_package_dependency(c, "runtime", "objc_allocateClassPair");
 		return true;
 	} break;
 	}
@@ -4083,6 +4084,18 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			operand->mode = Addressing_Value;
 			operand->type = t_hasher_proc;
+			break;
+		}
+
+	case BuiltinProc_constant_utf16_cstring:
+		{
+			String value = {};
+			if (!is_constant_string(c, builtin_name, ce->args[0], &value)) {
+				return false;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = alloc_type_multi_pointer(t_u16);
+			operand->value = {};
 			break;
 		}
 

@@ -258,6 +258,9 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_register_selector,
 	BuiltinProc_objc_register_class,
 
+	BuiltinProc_constant_utf16_cstring,
+
+
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
@@ -517,4 +520,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_find_class"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 };
