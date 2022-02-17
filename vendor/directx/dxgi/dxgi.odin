@@ -8,8 +8,8 @@ foreign import dxgi {
 
 import win32 "core:sys/windows"
 
-IID                 :: win32.LUID
 LUID                :: win32.LUID
+IID                 :: win32.GUID
 UUID                :: win32.GUID
 GUID                :: win32.GUID
 HANDLE              :: win32.HANDLE
@@ -43,25 +43,6 @@ foreign dxgi {
 	CreateDXGIFactory2     :: proc(Flags: u32, riid: ^IID, ppFactory: rawptr) -> HRESULT ---
 	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: rawptr) -> HRESULT ---
 }
-
-CreateDXGIFactoryEx :: proc "stdcall" (riid: IID, ppFactory: rawptr) -> HRESULT {
-	riid := riid
-	return CreateDXGIFactory(&riid, ppFactory)
-}
-CreateDXGIFactory1Ex :: proc "stdcall" (riid: IID, ppFactory: rawptr) -> HRESULT {
-	riid := riid
-	return CreateDXGIFactory1(&riid, ppFactory)
-}
-CreateDXGIFactory2Ex :: proc "stdcall" (Flags: u32, riid: IID, ppFactory: rawptr) -> HRESULT {
-	riid := riid
-	return CreateDXGIFactory2(Flags, &riid, ppFactory)
-}
-DXGIGetDebugInterface1Ex :: proc "stdcall" (Flags: u32, riid: IID, pDebug: rawptr) -> HRESULT {
-	riid := riid
-	return DXGIGetDebugInterface1(Flags, &riid, pDebug)
-}
-
-
 
 STANDARD_MULTISAMPLE_QUALITY_PATTERN :: 0xffffffff
 CENTER_MULTISAMPLE_QUALITY_PATTERN :: 0xfffffffe
@@ -127,9 +108,9 @@ MWA :: enum u32 { // TODO: convert to bit_set
 	VALID             = 0x7,
 }
 
-SHARED_RESOURCE_READ :: 0x80000000
+SHARED_RESOURCE_READ  :: 0x80000000
 SHARED_RESOURCE_WRITE :: 1
-CREATE_FACTORY_DEBUG :: 0x1
+CREATE_FACTORY_DEBUG  :: 0x1
 
 RATIONAL :: struct {
 	Numerator:   u32,
