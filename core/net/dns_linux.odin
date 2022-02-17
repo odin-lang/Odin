@@ -3,7 +3,7 @@ package net
 import "core:strings"
 import "core:bytes"
 import "core:mem"
-
+import "core:time"
 import "core:os"
 import "core:fmt"
 
@@ -15,18 +15,9 @@ import "core:fmt"
 	TODO(cloin): How do we cache resolv.conf in a threadsafe way?
 
 	TODO(cloin): Handle more record types
-
-	TODO(cloin): Add short recvfrom timeout per DNS server so we aren't waiting 
-	forever on networks with bad nameservers / no internet
-
-	TODO(cloin): Does decode_hostname *have* to be that gross?
-
-	TODO(cloin): Short circuit hostname lookup if the hostname is an IP?
-
-	TODO(cloin): Hostnames should be validated, they can't contain certain characters, need to look
-	at the RFCs so sort it all out
 */
 
+name_max  :: 255
 
 @private
 _pack_dns_header :: proc(hdr: Dns_Header) -> (id: u16be, bits: u16be) {
@@ -98,10 +89,11 @@ _load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []str
 	return _dns_servers[:], true
 }
 
+/*
+	www.google.com -> 3www6google3com0
+*/
 @private
-_encode_hostname :: proc(hostname: string, allocator := context.allocator) -> (encoded_name: []u8, ok: bool) {
-	encoded_name = make([]u8, len(hostname) + 2)
-	b := strings.builder_from_slice(encoded_name)
+_encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := context.allocator) -> (ok: bool) {
 	
 	label_max :: 63
 	
@@ -111,65 +103,136 @@ _encode_hostname :: proc(hostname: string, allocator := context.allocator) -> (e
 			return
 		}
 
-		strings.write_byte(&b, u8(len(section)))
-		strings.write_string(&b, section)
+		strings.write_byte(b, u8(len(section)))
+		strings.write_string(b, section)
 	}
-	strings.write_byte(&b, 0)
+	strings.write_byte(b, 0)
 
-	return encoded_name, true
+	return true
 }
 
 @private
 _decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.allocator) -> (hostname: string, encode_size: int, ok: bool) {
-	b := strings.make_builder()
-	defer strings.destroy_builder(&b)
+	output := [name_max]u8{}
+	b := strings.builder_from_slice(output[:])
 
-	encoded_name := packet[start_idx:]
+	// If you're on level 0, update out_bytes, everything through a pointer
+	// doesn't count towards this hostname's packet length
 
-	cur_off := 0
-	for ;; {
-		name_chunk: []u8
+	// Evaluate tokens to generate the hostname
+	out_size := 0
+	level := 0
+	print_size := 0
+	cur_idx := start_idx
+	iteration_max := 0
+	for cur_idx < len(packet) {
+		if packet[cur_idx] == 0 {
 
-		// Branch and pull in name fragment
-		if encoded_name[cur_off] == 0xC0 {
-			offset := encoded_name[cur_off + 1] 
-			name_chunk = packet[offset:]
-		} else {
-			name_chunk = encoded_name[cur_off:]
-		}
+			if (level == 0) {
+				out_size += 1
+			}
 
-		length := name_chunk[0]
-		if length == 0 {
-			cur_off += 1
 			break
 		}
-		if length > 63 {
+
+		if iteration_max > 255 {
+			fmt.printf("Taking too long, not bothering\n")
 			return
 		}
 
-		strings.write_bytes(&b, name_chunk[1:length + 1])
-
-		if encoded_name[cur_off] == 0xC0 {
-			cur_off += 2
-			break
-		} else {
-			cur_off += int(length) + 1
+		if packet[cur_idx] > 63 && packet[cur_idx] != 0xC0 {
+			fmt.printf("Can't handle this token!\n")
+			return
 		}
 
-		if cur_off + 1 == len(encoded_name) {
-			break
-		}
+		switch packet[cur_idx] {
 
-		strings.write_byte(&b, '.')
+		// This is a offset to more data in the packet, jump to it
+		case 0xC0:
+			pkt := packet[cur_idx:cur_idx+2]
+			val := (^u16be)(raw_data(pkt))^
+			offset := int(val & 0x3FFF)
+			if offset > len(packet) {
+				fmt.printf("Packet offset invalid\n")
+				return
+			}
+
+			cur_idx = offset
+
+			if (level == 0) {
+				out_size += 2
+				level += 1
+			}
+
+		// This is a label, insert it into the hostname
+		case:
+			label_size := int(packet[cur_idx])
+			idx2 := cur_idx + label_size + 1
+			if idx2 < cur_idx + 1 || idx2 > len(packet) {
+				fmt.printf("Invalid index for hostname!\n")
+				return
+			}
+
+			if print_size + label_size + 1 > name_max {
+				fmt.printf("label too large for hostname!\n")
+				return
+			}
+
+			strings.write_byte(&b, '.')
+			strings.write_bytes(&b, packet[cur_idx+1:idx2])
+			print_size += label_size + 1
+
+			cur_idx = idx2
+
+			if (level == 0) {
+				out_size += label_size + 1
+			}
+		}
+		
+		iteration_max += 1
 	}
 
-	return strings.to_string(b), cur_off, true
+	if start_idx + out_size > len(packet) {
+		fmt.printf("not enough bytes in packet for hostname!\n")
+		return
+	}
+
+	return strings.clone(strings.to_string(b)), out_size, true
+}
+
+// Uses RFC 952 & RFC 1123
+@private
+_validate_hostname :: proc(hostname: string) -> (ok: bool) {
+	if len(hostname) > 255 || len(hostname) == 0 {
+		return
+	}
+
+	if hostname[0] == '-' {
+		return
+	}
+
+	_hostname := hostname
+	for label in strings.split_iterator(&_hostname, ".") {
+		if len(label) > 63 || len(label) == 0 {
+			return
+		}
+
+		for ch in label {
+			switch ch {
+			case:
+				return
+			case 'a'..'z', 'A'..'Z', '0'..'9', '-':
+				continue
+			}
+		}
+	}
+
+	return true
 }
 
 @private
-_parse_record :: proc(packet: []u8, cur_off: ^int) -> (record: Dns_Record, ok: bool) {
+_parse_record :: proc(packet: []u8, cur_off: ^int, filter: Dns_Record_Type = nil) -> (record: Dns_Record, ok: bool) {
 	record_buf := packet[cur_off^:]
-
 	hostname, hn_sz := _decode_hostname(packet, cur_off^) or_return
 
 	ahdr_sz := size_of(Dns_Record_Header)
@@ -184,6 +247,11 @@ _parse_record :: proc(packet: []u8, cur_off: ^int) -> (record: Dns_Record, ok: b
 	data_off := cur_off^ + int(hn_sz) + int(ahdr_sz);
 	data := packet[data_off:data_off+int(data_sz)]
 	cur_off^ += int(hn_sz) + int(ahdr_sz) + int(data_sz)
+
+	// nil == aggregate *everything*
+	if filter == nil || u16be(filter) != record_hdr.type {
+		return nil, true
+	}
 
 	_record: Dns_Record
 	#partial switch Dns_Record_Type(record_hdr.type) {
@@ -203,6 +271,38 @@ _parse_record :: proc(packet: []u8, cur_off: ^int) -> (record: Dns_Record, ok: b
 			addr_val: u128be = mem.slice_data_cast([]u128be, data)[0]
 			addr := Ipv6_Address(transmute([8]u16be)addr_val)
 			_record = Dns_Record_Ipv6(addr)
+		case .Cname:
+			hostname, _ := _decode_hostname(packet, data_off) or_return
+			_record = Dns_Record_Cname(hostname)
+		case .Ns:
+			name, _ := _decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
+			_record = Dns_Record_Ns(name)
+		case .Srv:
+			if len(data) <= 6 {
+				return
+			}
+
+			priority: u16be = mem.slice_data_cast([]u16be, data)[0]
+			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
+			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
+			name, _ := _decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
+			_record = Dns_Record_Srv{
+				priority = int(priority),
+				weight   = int(weight),
+				port     = int(port),
+				service_name = name,
+			}
+		case .Mx:
+			if len(data) <= 2 {
+				return
+			}
+
+			preference: u16be = mem.slice_data_cast([]u16be, data)[0]
+			hostname, _ := _decode_hostname(packet, data_off + size_of(u16be)) or_return
+			_record = Dns_Record_Mx{
+				host       = hostname,
+				preference = int(preference),
+			}
 		case:
 			fmt.printf("ignoring %d\n", record_hdr.type)
 			return
@@ -212,8 +312,31 @@ _parse_record :: proc(packet: []u8, cur_off: ^int) -> (record: Dns_Record, ok: b
 	return _record, true
 }
 
+/*
+	DNS Query Response Format:
+	- Dns_Header (packed)
+	- Query Count
+	- Answer Count
+	- Authority Count
+	- Additional Count
+	- Query[]
+		- Hostname -- encoded
+		- Type
+		- Class
+	- Answer[]
+		- DNS Record Data
+	- Authority[]
+		- DNS Record Data
+	- Additional[]
+		- DNS Record Data
+
+	DNS Record Data:
+	- Dns_Record_Header
+	- Data[]
+*/
+
 @private
-_parse_response :: proc(response: []u8, allocator := context.allocator) -> (records: [dynamic]Dns_Record, ok: bool) {
+_parse_response :: proc(response: []u8, filter: Dns_Record_Type = nil, allocator := context.allocator) -> (records: []Dns_Record, ok: bool) {
 	header_size_bytes :: 12
 	if len(response) < header_size_bytes {
 		return
@@ -242,11 +365,11 @@ _parse_response :: proc(response: []u8, allocator := context.allocator) -> (reco
 			continue
 		}
 
-		
+		dq_sz :: 4
 		hostname, hn_sz := _decode_hostname(response, cur_idx) or_return
-		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+4])
+		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
-		cur_idx += hn_sz + 4
+		cur_idx += hn_sz + dq_sz
 	}
 
 	for i := 0; i < answer_count; i += 1 {
@@ -254,27 +377,41 @@ _parse_response :: proc(response: []u8, allocator := context.allocator) -> (reco
 			continue
 		}
 
-		rec := _parse_record(response, &cur_idx) or_return
+		rec := _parse_record(response, &cur_idx, filter) or_return
+		if rec == nil {
+			continue
+		}
+
 		append(&_records, rec)
 	}
+
 	for i := 0; i < authority_count; i += 1 {
 		if cur_idx == len(response) {
 			continue
 		}
 
-		rec := _parse_record(response, &cur_idx) or_return
+		rec := _parse_record(response, &cur_idx, filter) or_return
+		if rec == nil {
+			continue
+		}
+
 		append(&_records, rec)
 	}
+
 	for i := 0; i < additional_count; i += 1 {
 		if cur_idx == len(response) {
 			continue
 		}
 
-		rec := _parse_record(response, &cur_idx) or_return
+		rec := _parse_record(response, &cur_idx, filter) or_return
+		if rec == nil {
+			continue
+		}
+
 		append(&_records, rec)
 	}
 	
-	return _records, true
+	return _records[:], true
 }
 
 // Performs a recursive DNS query for records of a particular type for the hostname.
@@ -283,7 +420,6 @@ _parse_response :: proc(response: []u8, allocator := context.allocator) -> (reco
 // meaning that DNS queries for a hostname will resolve through CNAME records until an
 // IP address is reached.
 //
-// TODO(cloin): Doesn't use the type information to form queries yet
 get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.allocator) -> (records: []Dns_Record, ok: bool) {
 	context.allocator = allocator
 
@@ -292,6 +428,8 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	if len(dns_servers) == 0 {
 		return
 	}
+
+	_validate_hostname(hostname) or_return
 
 	hdr := Dns_Header{
 		id = 0, 
@@ -305,23 +443,21 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	}
 
 	id, bits := _pack_dns_header(hdr)
-
-	b := strings.make_builder()
-	defer strings.destroy_builder(&b)
-
 	dns_hdr := [6]u16be{}
 	dns_hdr[0] = id
 	dns_hdr[1] = bits
 	dns_hdr[2] = 1
 
-	encoded_name := _encode_hostname(hostname) or_return
 	dns_query := [2]u16be{ u16be(type), 1 }
 
+	output := [(size_of(u16be) * 6) + name_max + (size_of(u16be) * 2)]u8{}
+	b := strings.builder_from_slice(output[:])
+
 	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
-	strings.write_bytes(&b, encoded_name)
+	_encode_hostname(&b, hostname) or_return
 	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
 
-	dns_packet := transmute([]u8)strings.to_string(b)
+	dns_packet := output[:strings.builder_len(b)]
 
 	dns_response_buf := [4096]u8{}
 	dns_response: []u8
@@ -331,40 +467,51 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 			return
 		}
 
-		skaddr := endpoint_to_sockaddr({addr, 53})
-		sksize := os.socklen_t(size_of(skaddr))
+		conn, sock_err := make_unbound_udp_socket(family_from_address(addr))
+		if sock_err != nil {
+			fmt.printf("here\n")
+			return
+		}
+		defer close(conn)
 
-		conn, err1 := os.socket(os.AF_INET, os.SOCK_DGRAM, os.IPPROTO_UDP)
-		if err1 != os.ERROR_NONE {
+		dns_addr := Endpoint{addr, 53}
+		send_sz, send_err := send(conn, dns_packet[:], dns_addr)
+		if send_err != nil {
+			fmt.printf("here2\n")
+			continue
+		}
+
+		set_err := set_option(conn, .Receive_Timeout, time.Second * 1)
+		if set_err != nil {
+			fmt.printf("here3\n")
 			return
 		}
 
-		send_sz, err2 := os.sendto(conn, dns_packet[:], 0, cast(^os.SOCKADDR)&skaddr, sksize)
-		if err2 != os.ERROR_NONE {
-			return
+		recv_sz, recv_addr, recv_err := recv_udp(conn, dns_response_buf[:])
+		if recv_err == Udp_Recv_Error.Timeout {
+			fmt.printf("DNS Server response timed out\n")
+			continue
+		} else if recv_err != nil {
+			fmt.printf("here4\n")
+			continue
 		}
-
-		recv_sz, err3 := os.recvfrom(conn, dns_response_buf[:], 0, cast(^os.SOCKADDR)&skaddr, &sksize)
-		if err3 != os.ERROR_NONE {
-			fmt.printf("recv error: %d\n", err3)
-			return
-		}
-
-		dns_response = dns_response_buf[:recv_sz]
-		os.close(os.Handle(conn))
 
 		if recv_sz == 0 {
 			continue
 		}
 
-		rsp, _ok := _parse_response(dns_response)
+		dns_response = dns_response_buf[:recv_sz]
+
+		rsp, _ok := _parse_response(dns_response, type)
 		if !_ok {
 			return
 		}
 
-		if len(rsp) > 0 {
-			return rsp[:], true
+		if len(rsp) == 0 {
+			continue
 		}
+
+		return rsp[:], true
 	}
 
 	return
@@ -372,5 +519,23 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 
 destroy_dns_records :: proc(records: []Dns_Record, allocator := context.allocator) {
 	context.allocator = allocator
+
+	for rec in records {
+		switch r in rec {
+		case Dns_Record_Ipv4:  // nothing to do
+		case Dns_Record_Ipv6:  // nothing to do
+		case Dns_Record_Cname:
+			delete(string(r))
+		case Dns_Record_Text:
+			delete(string(r))
+		case Dns_Record_Ns:
+			delete(string(r))
+		case Dns_Record_Mx:
+			delete(r.host)
+		case Dns_Record_Srv:
+			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
+		}
+	}
+
 	delete(records)
 }
