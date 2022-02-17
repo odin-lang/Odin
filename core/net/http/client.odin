@@ -79,7 +79,6 @@ client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response
 
 client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
 	loop: for {
-		done: bool;
 		response, status = client_check_for_response(c, id);
 		switch status {
 		case .Unknown:
@@ -112,7 +111,7 @@ client_process_requests :: proc(using c: ^Client) {
 		s^ = {};
 	}
 
-	for id, req in &requests {
+	for _, req in &requests {
 		sync.ticket_mutex_lock(&lock);
 		defer sync.ticket_mutex_unlock(&lock);
 
