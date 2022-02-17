@@ -2361,7 +2361,7 @@ IDeviceContext_VTable :: struct {
 	ClearRenderTargetView:                     proc "stdcall" (this: ^IDeviceContext, pRenderTargetView: ^IRenderTargetView, ColorRGBA: ^[4]f32),
 	ClearUnorderedAccessViewUint:              proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]u32),
 	ClearUnorderedAccessViewFloat:             proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]f32),
-	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: u32, Depth: f32, Stencil: u8),
+	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAG, Depth: f32, Stencil: u8),
 	GenerateMips:                              proc "stdcall" (this: ^IDeviceContext, pShaderResourceView: ^IShaderResourceView),
 	SetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, MinLOD: f32),
 	GetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource) -> f32,

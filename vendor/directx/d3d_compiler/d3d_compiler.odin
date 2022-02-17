@@ -111,7 +111,7 @@ SHADER_MACRO :: struct {
 
 ID3D10Blob_UUID_STRING :: "8BA5FB08-5195-40E2-AC58-0D989C3A0102"
 ID3D10Blob_UUID := &IID{0x8BA5FB08, 0x5195, 0x40E2, {0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02}}
-ID3D10Blob :: struct {
+ID3D10Blob :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d10blob_vtable: ^ID3D10Blob_VTable,
 }
@@ -143,7 +143,7 @@ ID3DInclude_VTable :: struct {
 }
 
 
-ID3D11Module :: struct {
+ID3D11Module :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11module_vtable: ^ID3D11Module_VTable,
 }
@@ -153,7 +153,7 @@ ID3D11Module_VTable :: struct {
 }
 
 
-ID3D11ModuleInstance :: struct {
+ID3D11ModuleInstance :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11moduleinstance_vtable: ^ID3D11ModuleInstance_VTable,
 }
@@ -172,7 +172,7 @@ ID3D11ModuleInstance_VTable :: struct {
 }
 
 
-ID3D11Linker :: struct {
+ID3D11Linker :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11linker_vtable: ^ID3D11Linker_VTable,
 }
