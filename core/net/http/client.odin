@@ -1,8 +1,6 @@
 package http
 
 import "core:net"
-import "core:fmt"
-import "core:mem"
 import "core:sync"
 
 Request_Status :: enum {
@@ -29,117 +27,117 @@ Client :: struct {
 }
 
 client_init :: proc(using c: ^Client, allocator := context.allocator) {
-	sync.ticket_mutex_init(&lock);
-	next_id = 0;
+	sync.ticket_mutex_init(&lock)
+	next_id = 0
 }
 
 client_destroy :: proc(using c: ^Client) {
 	for _, cr in c.requests {
-		request_destroy(cr.request);
+		request_destroy(cr.request)
 	}
-	delete(requests);
-	c^ = {};
+	delete(requests)
+	c^ = {}
 }
 
 
-Request_Id :: distinct int;
+Request_Id :: distinct int
 
 client_submit_request :: proc(using c: ^Client, req: Request) -> Request_Id {
 	cr := Client_Request{
 		request = req,
 		response = {},
 		status = .Need_Send,
-	};
+	}
 
 	{
-		sync.ticket_mutex_lock(&lock);
-		defer sync.ticket_mutex_unlock(&lock);
-		id := next_id;
-		next_id += 1;
-		requests[id] = cr;
-		return Request_Id(id);
+		sync.ticket_mutex_lock(&lock)
+		defer sync.ticket_mutex_unlock(&lock)
+		id := next_id
+		next_id += 1
+		requests[id] = cr
+		return Request_Id(id)
 	}
 }
 
 client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
-	cr: Client_Request;
-	ok: bool;
+	cr: Client_Request
+	ok: bool
 	{
-		sync.ticket_mutex_lock(&lock);
-		defer sync.ticket_mutex_unlock(&lock);
-		cr, ok = requests[id];
+		sync.ticket_mutex_lock(&lock)
+		defer sync.ticket_mutex_unlock(&lock)
+		cr, ok = requests[id]
 	}
 
 	if !ok {
-		status = .Unknown;
-		return;
+		status = .Unknown
+		return
 	}
-	return cr.response, cr.status;
+	return cr.response, cr.status
 }
 
 client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
 	loop: for {
-		response, status = client_check_for_response(c, id);
+		response, status = client_check_for_response(c, id)
 		switch status {
 		case .Unknown:
-			return; // NOTE: ID did not exist!
+			return // NOTE: ID did not exist!
 		case .Done, .Send_Failed, .Recv_Failed:
-			break loop;
+			break loop
 		case .Need_Send, .Wait_Reply:
 			// NOTE: gotta wait - might as well use the current thread to advance the requests
 			// TODO: block until there's stuff to process rather than spinning
-			client_process_requests(c);
+			client_process_requests(c)
 		}
 	}
 
-	sync.ticket_mutex_lock(&lock);
-	defer sync.ticket_mutex_unlock(&lock);
-	delete_key(&requests, id);
-	return;
+	sync.ticket_mutex_lock(&lock)
+	defer sync.ticket_mutex_unlock(&lock)
+	delete_key(&requests, id)
+	return
 }
 
 client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
-	id := client_submit_request(c, req);
+	id := client_submit_request(c, req)
 	// return client_wait_for_response(c, id);
-	response, status = client_wait_for_response(c, id);
-	return;
+	response, status = client_wait_for_response(c, id)
+	return
 }
 
 client_process_requests :: proc(using c: ^Client) {
 	close_socket :: proc(s: ^net.Tcp_Socket) {
-		net.close(s^);
-		s^ = {};
+		net.close(s^)
+		s^ = {}
 	}
 
 	for _, req in &requests {
-		sync.ticket_mutex_lock(&lock);
-		defer sync.ticket_mutex_unlock(&lock);
+		sync.ticket_mutex_lock(&lock)
+		defer sync.ticket_mutex_unlock(&lock)
 
 		switch req.status {
 		case .Need_Send:
-			skt, ok := send_request(req.request);
+			skt, ok := send_request(req.request)
 			if ok {
-				req.socket = skt;
-				req.status = .Wait_Reply;
+				req.socket = skt
+				req.status = .Wait_Reply
 			} else {
-				req.status = .Send_Failed;
-				close_socket(&req.socket);
+				req.status = .Send_Failed
+				close_socket(&req.socket)
 			}
 		case .Wait_Reply:
-			resp, ok := recv_response(req.socket);
+			resp, ok := recv_response(req.socket)
 			if ok {
-				req.response = resp;
-				req.status = .Done;
+				req.response = resp
+				req.status = .Done
 			} else {
-				req.status = .Recv_Failed;
+				req.status = .Recv_Failed
 			}
-			close_socket(&req.socket);
+			close_socket(&req.socket)
 		case .Done, .Send_Failed, .Recv_Failed:
 			// do nothing.
 			// it'll be removed from the list when user code
 			// asks for it.
 		case .Unknown:
-			unreachable();
+			unreachable()
 		}
 	}
 }
