@@ -515,10 +515,18 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 		ptr = &linger_value
 		len = size_of(linger_value)
 	case
-		.Receive_Buffer_Size,
-		.Send_Buffer_Size,
 		.Receive_Timeout,
 		.Send_Timeout:
+			t, ok := value.(time.Duration)
+			if !ok do panic("set_option() value must be a time.Duration here", loc)
+
+			int_value = i32(time.duration_milliseconds(t))
+			ptr = &int_value
+			len = size_of(int_value)
+
+	case
+		.Receive_Buffer_Size,
+		.Send_Buffer_Size:
 			switch i in value {
 			case i8, u8:   i2 := i; int_value = c.int((^u8)(&i2)^)
 			case i16, u16: i2 := i; int_value = c.int((^u16)(&i2)^)
