@@ -74,6 +74,7 @@ enum EntityFlag : u64 {
 
 	EntityFlag_Test          = 1ull<<30,
 	EntityFlag_Init          = 1ull<<31,
+	EntityFlag_Subtype       = 1ull<<32,
 	
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,
@@ -84,6 +85,10 @@ enum EntityFlag : u64 {
 	EntityFlag_Require = 1ull<<50,
 
 	EntityFlag_Overridden    = 1ull<<63,
+};
+
+enum : u64 {
+	EntityFlags_IsSubtype = EntityFlag_Using|EntityFlag_Subtype,
 };
 
 enum EntityState : u32 {

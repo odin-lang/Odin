@@ -376,6 +376,9 @@ FILE_TYPE_DISK :: 0x0001
 FILE_TYPE_CHAR :: 0x0002
 FILE_TYPE_PIPE :: 0x0003
 
+RECT  :: struct {left, top, right, bottom: LONG}
+POINT :: struct {x, y: LONG}
+
 
 when size_of(uintptr) == 4 {
 	WSADATA :: struct {
