@@ -300,6 +300,7 @@ enum FieldFlag : u32 {
 	FieldFlag_auto_cast = 1<<4,
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
+	FieldFlag_subtype   = 1<<7,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<10,
@@ -307,7 +308,7 @@ enum FieldFlag : u32 {
 
 	// Parameter List Restrictions
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int,
-	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {

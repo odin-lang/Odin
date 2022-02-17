@@ -3510,12 +3510,13 @@ enum FieldPrefixKind : i32 {
 	FieldPrefix_Unknown = -1,
 	FieldPrefix_Invalid = 0,
 
-	FieldPrefix_using,
+	FieldPrefix_using, // implies #subtype
 	FieldPrefix_const,
 	FieldPrefix_no_alias,
 	FieldPrefix_c_vararg,
 	FieldPrefix_auto_cast,
 	FieldPrefix_any_int,
+	FieldPrefix_subtype, // does not imply `using` semantics
 };
 
 struct ParseFieldPrefixMapping {
@@ -3532,6 +3533,7 @@ gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
 	{str_lit("c_vararg"),   Token_Hash,      FieldPrefix_c_vararg,  FieldFlag_c_vararg},
 	{str_lit("const"),      Token_Hash,      FieldPrefix_const,     FieldFlag_const},
 	{str_lit("any_int"),    Token_Hash,      FieldPrefix_any_int,   FieldFlag_any_int},
+	{str_lit("subtype"),    Token_Hash,      FieldPrefix_subtype,   FieldFlag_subtype},
 };
 
 
