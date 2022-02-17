@@ -4,9 +4,6 @@ import "core:c"
 import win "core:sys/windows"
 import "core:time"
 
-import "core:fmt"
-
-
 Socket :: distinct win.SOCKET
 
 General_Error :: enum {
