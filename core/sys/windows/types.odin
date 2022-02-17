@@ -191,44 +191,8 @@ WIN32_FIND_DATAW :: struct {
 	cAlternateFileName: [14]wchar_t,
 }
 
-WSA_FLAG_OVERLAPPED: DWORD : 0x01
-WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
-
-WSADESCRIPTION_LEN :: 256
-WSASYS_STATUS_LEN :: 128
-WSAPROTOCOL_LEN: DWORD : 255
-INVALID_SOCKET :: ~SOCKET(0)
 
 
-WSAEINTR: c_int : 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
-WSAEACCES: c_int : 10013
-WSAEFAULT : c_int : 10014
-WSAEINVAL: c_int : 10022
-WSAEMFILE: c_int : 10024
-WSAEWOULDBLOCK: c_int : 10035
-WSAEALREADY: c_int : 10037 // Operation already in progress.
-WSAENOTSOCK: c_int : 10038
-WSAEMSGSIZE: c_int : 10040 // Message was truncated because it exceeded max datagram size.
-WSAEPROTOTYPE: c_int : 10041
-WSAENOPROTOOPT: c_int : 10042
-WSAEPROTONOSUPPORT: c_int : 10043
-WSAESOCKTNOSUPPORT: c_int : 10044
-WSAEOPNOTSUPP: c_int : 10045
-WSAEAFNOSUPPORT: c_int : 10047
-WSAEADDRINUSE: c_int : 10048
-WSAEADDRNOTAVAIL: c_int : 10049
-WSAENETDOWN: c_int : 10050
-WSAENETUNREACH: c_int : 10051
-WSAENETRESET : c_int : 10052
-WSAECONNABORTED: c_int : 10053
-WSAECONNRESET: c_int : 10054
-WSAENOBUFS: c_int : 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
-WSAEISCONN: c_int : 10056
-WSAENOTCONN: c_int : 10057
-WSAESHUTDOWN: c_int : 10058
-WSAETIMEDOUT: c_int : 10060
-WSAECONNREFUSED: c_int : 10061
-WSAEHOSTUNREACH: c_int : 10065
 
 
 MAX_PROTOCOL_CHAIN: DWORD : 7
@@ -278,7 +242,6 @@ E_NOTIMPL :: HRESULT(-0x7fff_bfff) // 0x8000_4001
 
 INVALID_HANDLE :: HANDLE(~uintptr(0))
 INVALID_HANDLE_VALUE :: INVALID_HANDLE
-SOCKET_ERROR   :: -1
 
 FACILITY_NT_BIT: DWORD : 0x1000_0000
 
@@ -304,48 +267,142 @@ CREATE_NEW_PROCESS_GROUP: DWORD : 0x00000200
 CREATE_UNICODE_ENVIRONMENT: DWORD : 0x00000400
 STARTF_USESTDHANDLES: DWORD : 0x00000100
 
-AF_INET: c_int : 2
-AF_INET6: c_int : 23
-SD_BOTH: c_int : 2
-SD_RECEIVE: c_int : 0
-SD_SEND: c_int : 1
-SOCK_DGRAM: c_int : 2
-SOCK_STREAM: c_int : 1
-SOL_SOCKET: c_int : 0xffff
-SO_ACCEPTCONN: c_int : 0x0002
-SO_REUSEADDR: c_int : 0x0004
-SO_KEEPALIVE: c_int : 0x0008
-SO_SNDTIMEO: c_int : 0x1005
-SO_RCVTIMEO: c_int : 0x1006
-SO_EXCLUSIVEADDRUSE: c_int : ~SO_REUSEADDR
-SO_CONDITIONAL_ACCEPT: c_int : 0x3002
-SO_DONTLINGER: c_int : ~SO_LINGER
-SO_OOBINLINE: c_int : 0x0100
-SO_LINGER: c_int : 0x0080
-SO_RCVBUF: c_int : 0x1002
-SO_SNDBUF: c_int : 0x1001
-IPPROTO_IP: c_int : 0
-IPPROTO_TCP: c_int : 6
-IPPROTO_UDP: c_int : 17
-IPPROTO_IPV6: c_int : 41
-TCP_NODELAY: c_int : 0x0001
+
+
+
+//
+// Networking
+//
+
+WSA_FLAG_OVERLAPPED             :: 1
+WSA_FLAG_MULTIPOINT_C_ROOT      :: 2
+WSA_FLAG_MULTIPOINT_C_LEAF      :: 4
+WSA_FLAG_MULTIPOINT_D_ROOT      :: 8
+WSA_FLAG_MULTIPOINT_D_LEAF      :: 16
+WSA_FLAG_ACCESS_SYSTEM_SECURITY :: 32
+WSA_FLAG_NO_HANDLE_INHERIT      :: 128
+
+WSADESCRIPTION_LEN :: 256
+WSASYS_STATUS_LEN  :: 128
+WSAPROTOCOL_LEN    :: 255
+
+INVALID_SOCKET :: ~SOCKET(0)
+
+SOMAXCONN    :: 128 // The number of messages that can be queued in memory after being received; use 2-4 for Bluetooth.
+                    // This is for the 'backlog' parameter to listen().
+SOCKET_ERROR :: -1
+
+// Networking errors
+WSAEINTR               :: 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
+WSAEACCES              :: 10013 // If you try to bind a Udp socket to the broadcast address without the socket option set.
+WSAEFAULT              :: 10014 // A pointer that was passed to a WSA function is invalid, such as a buffer size is smaller than you said it was
+WSAEINVAL              :: 10022 // Invalid argument supplied
+WSAEMFILE              :: 10024 // SOCKET handles exhausted
+WSAEWOULDBLOCK         :: 10035 // No data is ready yet
+WSAENOTSOCK            :: 10038 // Not a socket.
+WSAEINPROGRESS         :: 10036 // WS1.1 call is in progress or callback function is still being processed
+WSAEALREADY            :: 10037 // Already connecting in parallel.
+WSAEMSGSIZE            :: 10040 // Message was truncated because it exceeded max datagram size.
+WSAEPROTOTYPE          :: 10041 // Wrong protocol for the provided socket
+WSAENOPROTOOPT         :: 10042 // TODO
+WSAEPROTONOSUPPORT     :: 10043 // Protocol not supported
+WSAESOCKTNOSUPPORT     :: 10044 // Socket type not supported in the given address family
+WSAEAFNOSUPPORT        :: 10047 // Address family not supported
+WSAEOPNOTSUPP          :: 10045 // Attempt to accept on non-stream socket, etc.
+WSAEADDRINUSE          :: 10048 // Endpoint being bound is in use by another socket.
+WSAEADDRNOTAVAIL       :: 10049 // Not a valid local IP address on this computer.
+WSAENETDOWN            :: 10050 // Network subsystem failure on the local machine.
+WSAENETUNREACH         :: 10051 // The local machine is not connected to the network.
+WSAENETRESET           :: 10052 // Keepalive failure detected, or TTL exceeded when receiving UDP packets.
+WSAECONNABORTED        :: 10053 // Connection has been aborted by software in the host machine.
+WSAECONNRESET          :: 10054 // The connection was reset while trying to accept, read or write.
+WSAENOBUFS             :: 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
+WSAEISCONN             :: 10056 // The socket is already connected.
+WSAENOTCONN            :: 10057 // The socket is not connected yet, or no address was supplied to sendto.
+WSAESHUTDOWN           :: 10058 // The socket has been shutdown in the direction required.
+WSAETIMEDOUT           :: 10060 // The timeout duration was reached before any data was received / before all data was sent.
+WSAECONNREFUSED        :: 10061 // The remote machine is not listening on that endpoint.
+WSAEHOSTDOWN           :: 10064 // Destination host was down.
+WSAEHOSTUNREACH        :: 10065 // The remote machine is not connected to the network.
+WSAENOTINITIALISED     :: 10093 // Needs WSAStartup call
+WSAEINVALIDPROCTABLE   :: 10104 // Invalid or incomplete procedure table was returned
+WSAEINVALIDPROVIDER    :: 10105 // Service provider version is not 2.2
+WSAEPROVIDERFAILEDINIT :: 10106 // Service provider failed to initialize
+
+// Address families
+AF_UNSPEC : c_int : 0  // Unspecified
+AF_INET   : c_int : 2  // IPv4
+AF_INET6  : c_int : 23 // IPv6
+AF_IRDA   : c_int : 26 // Infrared
+AF_BTH    : c_int : 32 // Bluetooth
+
+// Socket types
+SOCK_STREAM    : c_int : 1 // TCP
+SOCK_DGRAM     : c_int : 2 // UDP
+SOCK_RAW       : c_int : 3 // Requires options IP_HDRINCL for v4, IPV6_HDRINCL for v6, on the socket
+SOCK_RDM       : c_int : 4 // Requires "Reliable Multicast Protocol" to be installed - see WSAEnumProtocols
+SOCK_SEQPACKET : c_int : 5 // Provides psuedo-stream packet based on DGRAMs.
+
+// Protocols
+IPPROTO_IP      : c_int : 0
+IPPROTO_ICMP    : c_int : 1   // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW | not specified
+IPPROTO_IGMP    : c_int : 2   // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW | not specified
+BTHPROTO_RFCOMM : c_int : 3   // Bluetooth: AF_BTH + SOCK_STREAM
+IPPROTO_TCP     : c_int : 6   // (AF_INET, AF_INET6) + SOCK_STREAM
+IPPROTO_UDP     : c_int : 17  // (AF_INET, AF_INET6) + SOCK_DGRAM
+IPPROTO_ICMPV6  : c_int : 58  // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW
+IPPROTO_RM      : c_int : 113 // AF_INET + SOCK_RDM [requires "Reliable Multicast Protocol" to be installed - see WSAEnumProtocols]
+
+// Shutdown manners
+SD_RECEIVE : c_int : 0
+SD_SEND    : c_int : 1
+SD_BOTH    : c_int : 2
+
+// Socket 'levels'
+SOL_SOCKET   : c_int : 0xffff // Socket options for any socket.
+IPPROTO_IPV6 : c_int : 41     // Socket options for IPV6.
+
+// Options for any sockets
+SO_ACCEPTCONN         : c_int : 0x0002
+SO_REUSEADDR          : c_int : 0x0004
+SO_KEEPALIVE          : c_int : 0x0008
+SO_SNDTIMEO           : c_int : 0x1005
+SO_RCVTIMEO           : c_int : 0x1006
+SO_EXCLUSIVEADDRUSE   : c_int : ~SO_REUSEADDR
+SO_CONDITIONAL_ACCEPT : c_int : 0x3002
+SO_DONTLINGER         : c_int : ~SO_LINGER
+SO_OOBINLINE          : c_int : 0x0100
+SO_LINGER             : c_int : 0x0080
+SO_RCVBUF             : c_int : 0x1002
+SO_SNDBUF             : c_int : 0x1001
+SO_ERROR              : c_int : 0x1007
+SO_BROADCAST          : c_int : 0x0020
+
+// Options for IP sockets.
 IP_TTL: c_int : 4
-IPV6_V6ONLY: c_int : 27
-SO_ERROR: c_int : 0x1007
-SO_BROADCAST: c_int : 0x0020
 IP_MULTICAST_LOOP: c_int : 11
-IPV6_MULTICAST_LOOP: c_int : 11
 IP_MULTICAST_TTL: c_int : 10
 IP_ADD_MEMBERSHIP: c_int : 12
 IP_DROP_MEMBERSHIP: c_int : 13
+
+// Options for IPV6 sockets.
+IPV6_V6ONLY: c_int : 27
+IPV6_MULTICAST_LOOP: c_int : 11
 IPV6_ADD_MEMBERSHIP: c_int : 12
 IPV6_DROP_MEMBERSHIP: c_int : 13
-MSG_PEEK: c_int : 0x2
 
+// Options for TCP sockets.
+TCP_NODELAY: c_int : 0x0001
+
+// Used with the SO_LINGER socket option to setsockopt().
 LINGER :: struct {
 	l_onoff: c.ushort,
 	l_linger: c.ushort,
 }
+
+// Send/Receive flags.
+MSG_OOB  : c_int : 1 // `send`/`recv` should process out-of-band data.
+MSG_PEEK : c_int : 2 // `recv` should not remove the data from the buffer. Only valid for non-overlapped operations.
 
 ip_mreq :: struct {
 	imr_multiaddr: in_addr,
@@ -356,6 +413,61 @@ ipv6_mreq :: struct {
 	ipv6mr_multiaddr: in6_addr,
 	ipv6mr_interface: c_uint,
 }
+
+when size_of(uintptr) == 4 {
+	WSADATA :: struct {
+		wVersion: WORD,
+		wHighVersion: WORD,
+		szDescription: [WSADESCRIPTION_LEN + 1]u8,
+		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
+		iMaxSockets: u16,
+		iMaxUdpDg: u16,
+		lpVendorInfo: ^u8,
+	}
+} else when size_of(uintptr) == 8 {
+	WSADATA :: struct {
+		wVersion: WORD,
+		wHighVersion: WORD,
+		iMaxSockets: u16,
+		iMaxUdpDg: u16,
+		lpVendorInfo: ^u8,
+		szDescription: [WSADESCRIPTION_LEN + 1]u8,
+		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
+	}
+} else {
+	#panic("unknown word size")
+}
+
+WSABUF :: struct {
+	len: ULONG,
+	buf: ^CHAR,
+}
+
+WSAPROTOCOL_INFO :: struct {
+	dwServiceFlags1: DWORD,
+	dwServiceFlags2: DWORD,
+	dwServiceFlags3: DWORD,
+	dwServiceFlags4: DWORD,
+	dwProviderFlags: DWORD,
+	ProviderId: GUID,
+	dwCatalogEntryId: DWORD,
+	ProtocolChain: WSAPROTOCOLCHAIN,
+	iVersion: c_int,
+	iAddressFamily: c_int,
+	iMaxSockAddr: c_int,
+	iMinSockAddr: c_int,
+	iSocketType: c_int,
+	iProtocol: c_int,
+	iProtocolMaxOffset: c_int,
+	iNetworkByteOrder: c_int,
+	iSecurityScheme: c_int,
+	dwMessageSize: DWORD,
+	dwProviderReserved: DWORD,
+	szProtocol: [WSAPROTOCOL_LEN + 1]u16,
+}
+
+
+
 
 VOLUME_NAME_DOS: DWORD : 0x0
 MOVEFILE_REPLACE_EXISTING: DWORD : 1
@@ -410,62 +522,6 @@ INVALID_FILE_ATTRIBUTES  :: -1
 FILE_TYPE_DISK :: 0x0001
 FILE_TYPE_CHAR :: 0x0002
 FILE_TYPE_PIPE :: 0x0003
-
-RECT  :: struct {left, top, right, bottom: LONG}
-POINT :: struct {x, y: LONG}
-
-
-when size_of(uintptr) == 4 {
-	WSADATA :: struct {
-		wVersion: WORD,
-		wHighVersion: WORD,
-		szDescription: [WSADESCRIPTION_LEN + 1]u8,
-		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
-		iMaxSockets: u16,
-		iMaxUdpDg: u16,
-		lpVendorInfo: ^u8,
-	}
-} else when size_of(uintptr) == 8 {
-	WSADATA :: struct {
-		wVersion: WORD,
-		wHighVersion: WORD,
-		iMaxSockets: u16,
-		iMaxUdpDg: u16,
-		lpVendorInfo: ^u8,
-		szDescription: [WSADESCRIPTION_LEN + 1]u8,
-		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
-	}
-} else {
-	#panic("unknown word size")
-}
-
-WSABUF :: struct {
-	len: ULONG,
-	buf: ^CHAR,
-}
-
-WSAPROTOCOL_INFO :: struct {
-	dwServiceFlags1: DWORD,
-	dwServiceFlags2: DWORD,
-	dwServiceFlags3: DWORD,
-	dwServiceFlags4: DWORD,
-	dwProviderFlags: DWORD,
-	ProviderId: GUID,
-	dwCatalogEntryId: DWORD,
-	ProtocolChain: WSAPROTOCOLCHAIN,
-	iVersion: c_int,
-	iAddressFamily: c_int,
-	iMaxSockAddr: c_int,
-	iMinSockAddr: c_int,
-	iSocketType: c_int,
-	iProtocol: c_int,
-	iProtocolMaxOffset: c_int,
-	iNetworkByteOrder: c_int,
-	iSecurityScheme: c_int,
-	dwMessageSize: DWORD,
-	dwProviderReserved: DWORD,
-	szProtocol: [WSAPROTOCOL_LEN + 1]u16,
-}
 
 WIN32_FILE_ATTRIBUTE_DATA :: struct {
 	dwFileAttributes: DWORD,
