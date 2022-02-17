@@ -2,9 +2,7 @@ package http
 
 import "core:net"
 import "core:strings"
-import "core:os"
 import "core:strconv"
-import "core:mem"
 import "core:fmt" // for panicf
 
 Status_Code :: enum {
