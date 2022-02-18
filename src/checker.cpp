@@ -225,8 +225,8 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, permanent_allocator(), init_elements_capacity);
-	ptr_set_init(&s->imported, permanent_allocator(), 0);
+	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
+	ptr_set_init(&s->imported, heap_allocator(), 0);
 	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
