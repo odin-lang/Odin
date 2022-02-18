@@ -26,7 +26,7 @@ AccelerationStructureInstanceDescriptorType :: enum NS.UInteger {
 	Default = 0,
 	UserID  = 1,
 	Motion  = 2,
-};
+}
 
 
 DataType :: enum NS.UInteger {
