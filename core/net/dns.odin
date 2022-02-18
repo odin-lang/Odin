@@ -1,3 +1,18 @@
+/*
+	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
+	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
+	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Tetralux:        Initial implementation
+		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
+		Jeroen van Rijn: Cross platform unification, code style, documentation
+*/
+
+/*
+	package net implements cross-platform Berkeley Sockets and associated procedures.
+*/
 package net
 
 import "core:mem"
@@ -113,36 +128,36 @@ Dns_Record_Header :: struct #packed {
 }
 
 /*
-   Resolves a hostname to exactly one IPv4 and IPv6 address.
-   It's then up to you which one you use.
-   Note that which address you pass to `dial` determines the type of the socket you get.
+	Resolves a hostname to exactly one IPv4 and IPv6 address.
+	It's then up to you which one you use.
+	Note that which address you pass to `dial` determines the type of the socket you get.
   
-   Returns `ok = false` if the host name could not be resolved to any addresses.
+	Returns `ok = false` if the host name could not be resolved to any addresses.
   
   
-   If hostname is actually a string representation of an IP address, this function
-   just parses that address and returns it.
-   This allows you to pass a generic endpoint string (i.e: hostname or address) to this function end reliably get
-   back the endpoint's IP address.
-   e.g:
-   ```
-   	// Maybe you got this from a config file, so you
-  	// don't know if it's a hostname or address.
-  	ep_string := "localhost:9000";
+	If hostname is actually a string representation of an IP address, this function
+	just parses that address and returns it.
+	This allows you to pass a generic endpoint string (i.e: hostname or address) to this function end reliably get
+	back the endpoint's IP address.
+	e.g:
+	```
+		// Maybe you got this from a config file, so you
+	// don't know if it's a hostname or address.
+	ep_string := "localhost:9000";
   
-  	addr_or_host, port, split_ok := net.split_port(ep_string);
-  	assert(split_ok);
-  	port = (port == 0) ? 9000 : port; // returns zero if no port in the string.
+	addr_or_host, port, split_ok := net.split_port(ep_string);
+	assert(split_ok);
+	port = (port == 0) ? 9000 : port; // returns zero if no port in the string.
   
-  	// Resolving an address just returns the address.
-  	addr4, addr6, resolve_ok := net.resolve(addr_or_host);
-  	if !resolve_ok {
-  		printf("error: cannot resolve %v\n", addr_or_host);
-  		return;
-  	}
-  	addr := addr4 != nil ? addr4 : addr6; // preferring ipv4.
-  	assert(addr != nil); // If resolve_ok, we'll have at least one address.
-   ```
+	// Resolving an address just returns the address.
+	addr4, addr6, resolve_ok := net.resolve(addr_or_host);
+	if !resolve_ok {
+		printf("error: cannot resolve %v\n", addr_or_host);
+		return;
+	}
+	addr := addr4 != nil ? addr4 : addr6; // preferring ipv4.
+	assert(addr != nil); // If resolve_ok, we'll have at least one address.
+	```
 */
 
 resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (addr4, addr6: Address, ok: bool) {
