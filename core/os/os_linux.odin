@@ -20,13 +20,6 @@ socklen_t :: c.int
 
 INVALID_HANDLE :: ~Handle(0)
 
-
-AI_PASSIVE:     int : 0x00000001 // get address to use bind()
-AI_CANONNAME:   int : 0x00000002 // fill ai_canonname
-AI_NUMERICHOST: int : 0x00000004 // prevent name resolution
-AI_NUMERICSERV: int : 0x00000008 // don't use name resolution.
-
-
 AF_UNSPEC:    int : 0
 AF_UNIX:      int : 1
 AF_LOCAL:     int : AF_UNIX
@@ -255,17 +248,6 @@ SOCKADDR_STORAGE_LH :: struct #packed {
 	__ss_pad2: [112]c.char,
 }
 
-ADDRINFOA :: struct #packed {
-	ai_flags: c.int,
-	ai_family: c.int,
-	ai_socktype: c.int,
-	ai_protocol: c.int,
-	ai_addrlen: c.size_t,
-	ai_canonname: ^c.char,
-	ai_addr: ^SOCKADDR,
-	ai_next: ^ADDRINFOA,
-}
-
 sockaddr_in :: struct #packed {
 	sin_family: ADDRESS_FAMILY,
 	sin_port: u16be,
@@ -287,17 +269,6 @@ in_addr :: struct #packed {
 
 in6_addr :: struct #packed {
 	s6_addr: [16]u8,
-}
-
-Addrinfo :: struct #packed {
-	flags: int,
-	family: int,
-	socktype: int,
-	protocol: int,
-	addrlen: socklen_t,
-	addr: ^SOCKADDR,
-	name: cstring,
-	next: ^Addrinfo,
 }
 
 // "Argv" arguments converted to Odin strings
