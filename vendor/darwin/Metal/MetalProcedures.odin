@@ -1,4 +1,3 @@
-//+build darwin
 package objc_Metal
 
 import NS "vendor:darwin/Foundation"
