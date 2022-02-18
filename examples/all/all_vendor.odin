@@ -1,7 +1,6 @@
 //+build windows
 package all
 
-
 import botan     "vendor:botan"
 import ENet      "vendor:ENet"
 import gl        "vendor:OpenGL"
@@ -25,6 +24,15 @@ import stb_vorbis    "vendor:stb/vorbis"
 
 import vk "vendor:vulkan"
 
+import D3D11 "vendor:directx/d3d11"
+import D3D12 "vendor:directx/d3d12"
+import DXGI  "vendor:directx/dxgi"
+
+// note these are technicaly darwin only but they are added to aid with documentation generation
+import NS  "vendor:darwin/Foundation"
+import MTL "vendor:darwin/Metal"
+import CA  "vendor:darwin/QuartzCore"
+
 
 _ :: botan
 _ :: ENet
@@ -45,3 +53,9 @@ _ :: stbrp
 _ :: stbtt
 _ :: stb_vorbis
 _ :: vk
+_ :: D3D11
+_ :: D3D12
+_ :: DXGI
+_ :: NS
+_ :: MTL
+_ :: CA

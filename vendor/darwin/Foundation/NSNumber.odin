@@ -1,10 +1,11 @@
-//+build darwin
 package objc_Foundation
 
 import "core:c"
 
-#assert(size_of(c.long)  == size_of(int))
-#assert(size_of(c.ulong) == size_of(uint))
+when ODIN_OS == .Darwin {
+	#assert(size_of(c.long)  == size_of(int))
+	#assert(size_of(c.ulong) == size_of(uint))
+}
 
 @(objc_class="NSValue")
 Value :: struct{using _: Copying(Value)}
