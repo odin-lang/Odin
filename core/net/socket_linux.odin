@@ -86,7 +86,7 @@ Dial_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Error) {
+dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (skt: Tcp_Socket, err: Network_Error) {
 	family := family_from_address(addr)
 	sock := create_socket(family, .Tcp) or_return
 	skt = sock.(Tcp_Socket)
@@ -101,6 +101,10 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Err
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
 		return
+	}
+
+	if options.no_delay {
+		_ = set_option(sock, .Tcp_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
 
 	return
@@ -204,7 +208,7 @@ Accept_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, err: Network_Error) {
+accept_tcp :: proc(sock: Tcp_Socket, options := default_tcp_options) -> (client: Tcp_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: os.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 
@@ -215,6 +219,9 @@ accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, e
 	}
 	client = Tcp_Socket(client_sock)
 	source = sockaddr_to_endpoint(&sockaddr)
+	if options.no_delay {
+		_ = set_option(client, .Tcp_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
+	}
 	return
 }
 
