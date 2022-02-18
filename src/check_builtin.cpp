@@ -223,10 +223,10 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_types_mutex);
 
-	add_package_dependency(c, "runtime", "objc_msgSend");
-	add_package_dependency(c, "runtime", "objc_msgSend_fpret");
-	add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
-	add_package_dependency(c, "runtime", "objc_msgSend_stret");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend_stret");
 }
 
 bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) {
@@ -371,9 +371,9 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		}
 		operand->mode = Addressing_Value;
 
-		add_package_dependency(c, "runtime", "objc_lookUpClass");
-		add_package_dependency(c, "runtime", "sel_registerName");
-		add_package_dependency(c, "runtime", "objc_allocateClassPair");
+		try_to_add_package_dependency(c, "runtime", "objc_lookUpClass");
+		try_to_add_package_dependency(c, "runtime", "sel_registerName");
+		try_to_add_package_dependency(c, "runtime", "objc_allocateClassPair");
 		return true;
 	} break;
 	}
