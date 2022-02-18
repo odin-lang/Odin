@@ -249,7 +249,7 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 
 	if (build_context.metrics.os != TargetOs_darwin) {
 		// allow on doc generation (e.g. Metal stuff)
-		if (!build_context.command_kind == Command_doc && !builtin_name.command_kind == Command_check) {
+		if (build_context.command_kind != Command_doc && build_context.command_kind != Command_check) {
 			error(call, "'%.*s' only works on darwin", LIT(builtin_name));
 		}
 	}
