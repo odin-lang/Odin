@@ -1,3 +1,18 @@
+/*
+	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
+	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
+	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Tetralux:        Initial implementation
+		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
+		Jeroen van Rijn: Cross platform unification, code style, documentation
+*/
+
+/*
+	package net implements cross-platform Berkeley Sockets and associated procedures.
+*/
 package net
 
 import "core:os"
