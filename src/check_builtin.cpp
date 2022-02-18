@@ -248,7 +248,8 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 	String builtin_name = builtin_procs[id].name;
 
 	if (build_context.metrics.os != TargetOs_darwin) {
-		if (!build_context.generate_docs) { // allow on doc generation (e.g. Metal stuff)
+		// allow on doc generation (e.g. Metal stuff)
+		if (!build_context.command_kind == Command_doc && !builtin_name.command_kind == Command_check) {
 			error(call, "'%.*s' only works on darwin", LIT(builtin_name));
 		}
 	}
