@@ -11,7 +11,8 @@
 */
 
 /*
-	package http implements the HTTP 1.x protocol using the cross-platform sockets from package net.
+	Package http implements the HTTP 1.x protocol using the cross-platform sockets from package net.
+	For other protocols, see their respective subdirectories of the net package.
 */
 package http
 
