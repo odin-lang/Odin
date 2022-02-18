@@ -1,3 +1,18 @@
+/*
+	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
+	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
+	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Tetralux:        Initial implementation
+		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
+		Jeroen van Rijn: Cross platform unification, code style, documentation
+*/
+
+/*
+	package net implements cross-platform Berkeley Sockets and associated procedures.
+*/
 package net
 
 //
@@ -8,27 +23,27 @@ Tcp_Socket :: distinct Socket
 Udp_Socket :: distinct Socket
 
 Socket_Protocol :: enum {
-    Tcp,
-    Udp,
+	Tcp,
+	Udp,
 }
 
 Address_Family :: enum {
-    IPv4,
-    IPv6,
+	IPv4,
+	IPv6,
 }
 
 Any_Socket :: union {
-    Tcp_Socket,
-    Udp_Socket,
+	Tcp_Socket,
+	Udp_Socket,
 }
 
 any_socket_to_socket :: proc(any_socket: Any_Socket) -> Socket {
-    switch s in any_socket {
-    case Tcp_Socket:  return Socket(s)
-    case Udp_Socket:  return Socket(s)
-    case:
-        unreachable()
-    }
+	switch s in any_socket {
+	case Tcp_Socket:  return Socket(s)
+	case Udp_Socket:  return Socket(s)
+	case:
+		unreachable()
+	}
 }
 
 /*
@@ -53,8 +68,8 @@ any_socket_to_socket :: proc(any_socket: Any_Socket) -> Socket {
 ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 
 Tcp_Options :: struct {
-    no_delay: bool,
+	no_delay: bool,
 }
 default_tcp_options := Tcp_Options {
-    no_delay = ODIN_NET_TCP_NODELAY_DEFAULT,
+	no_delay = ODIN_NET_TCP_NODELAY_DEFAULT,
 }
