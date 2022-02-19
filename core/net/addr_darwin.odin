@@ -18,7 +18,7 @@ package net
 
 import "core:os"
 
-// Returns an address for each interface that can be bound to.
+// Returns an Address for each interface that can be bound to.
 get_network_interfaces :: proc() -> []Address {
 	// TODO
 	return nil
@@ -26,8 +26,8 @@ get_network_interfaces :: proc() -> []Address {
 
 @private
 endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH) {
-	switch a in ep.address {
-	case Ipv4_Address:
+	switch a in ep.Address {
+	case IPv4_Address:
 		(^os.sockaddr_in)(&sockaddr)^ = os.sockaddr_in {
 			sin_port = u16be(ep.port),
 			sin_addr = transmute(os.in_addr) a,
@@ -35,7 +35,7 @@ endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH)
 			sin_len = size_of(os.sockaddr_in),
 		}
 		return
-	case Ipv6_Address:
+	case IPv6_Address:
 		(^os.sockaddr_in6)(&sockaddr)^ = os.sockaddr_in6 {
 			sin6_port = u16be(ep.port),
 			sin6_addr = transmute(os.in6_addr) a,
@@ -54,18 +54,18 @@ sockaddr_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endpo
 		addr := cast(^os.sockaddr_in) native_addr
 		port := int(addr.sin_port)
 		ep = Endpoint {
-			address = Ipv4_Address(transmute([4]byte) addr.sin_addr),
+			Address = IPv4_Address(transmute([4]byte) addr.sin_addr),
 			port = port,
 		}
 	case u8(os.AF_INET6):
 		addr := cast(^os.sockaddr_in6) native_addr
 		port := int(addr.sin6_port)
 		ep = Endpoint {
-			address = Ipv6_Address(transmute([8]u16be) addr.sin6_addr),
+			Address = IPv6_Address(transmute([8]u16be) addr.sin6_addr),
 			port = port,
 		}
 	case:
-		panic("native_addr is neither IPv4 or IPv6 address")
+		panic("native_addr is neither IPv4 or IPv6 Address")
 	}
 	return
 }

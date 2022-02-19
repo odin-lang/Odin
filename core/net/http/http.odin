@@ -114,7 +114,7 @@ request_destroy :: proc(using req: Request) {
 
 
 
-send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.Tcp_Socket, ok: bool) {
+send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.TCP_Socket, ok: bool) {
 	if r.scheme != "http" {
 		fmt.panicf("%v is not a supported scheme at this time", r.scheme)
 	}
@@ -142,7 +142,7 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 }
 
 // TODO(tetra): Ideally, we'd have a nice way to read from a slice too.
-recv_response :: proc(skt: net.Tcp_Socket, allocator := context.allocator) -> (resp: Response, ok: bool) {
+recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	using strings
 
 	context.allocator = allocator
