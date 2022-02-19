@@ -390,18 +390,23 @@ Udp_Send_Error :: enum c.int {
 	Timeout = win.WSAETIMEDOUT,
 }
 
+// Sends a single UDP datagram packet.
+//
+// Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
+// UDP packets are not guarenteed to be received in order.
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
-	toaddr := endpoint_to_sockaddr(to)
-	for bytes_written < len(buf) {
-		limit := min(1<<31, len(buf) - bytes_written)
-		remaining := buf[bytes_written:]
-		res := win.sendto(win.SOCKET(skt), raw_data(remaining), c.int(limit), 0, &toaddr, size_of(toaddr))
-		if res < 0 {
-			err = Udp_Send_Error(win.WSAGetLastError())
-			return
-		}
-		bytes_written += int(res)
+	if len(buf) > int(max(c.int)) {
+		// NOTE(tetra): If we don't guard this, we'll return (0, nil) instead, which is misleading.
+		err = .Message_Too_Long
+		return
 	}
+	toaddr := endpoint_to_sockaddr(to)
+	res := win.sendto(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0, &toaddr, size_of(toaddr))
+	if res < 0 {
+		err = Udp_Send_Error(win.WSAGetLastError())
+		return
+	}
+	bytes_written = int(res)
 	return
 }
 
