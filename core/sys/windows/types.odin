@@ -191,12 +191,6 @@ WIN32_FIND_DATAW :: struct {
 	cAlternateFileName: [14]wchar_t,
 }
 
-
-
-
-
-MAX_PROTOCOL_CHAIN: DWORD : 7
-
 MAXIMUM_REPARSE_DATA_BUFFER_SIZE :: 16 * 1024
 FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
@@ -267,13 +261,9 @@ CREATE_NEW_PROCESS_GROUP: DWORD : 0x00000200
 CREATE_UNICODE_ENVIRONMENT: DWORD : 0x00000400
 STARTF_USESTDHANDLES: DWORD : 0x00000100
 
-
-
-
 //
 // Networking
 //
-
 WSA_FLAG_OVERLAPPED             :: 1
 WSA_FLAG_MULTIPOINT_C_ROOT      :: 2
 WSA_FLAG_MULTIPOINT_C_LEAF      :: 4
@@ -281,13 +271,10 @@ WSA_FLAG_MULTIPOINT_D_ROOT      :: 8
 WSA_FLAG_MULTIPOINT_D_LEAF      :: 16
 WSA_FLAG_ACCESS_SYSTEM_SECURITY :: 32
 WSA_FLAG_NO_HANDLE_INHERIT      :: 128
-
 WSADESCRIPTION_LEN :: 256
 WSASYS_STATUS_LEN  :: 128
 WSAPROTOCOL_LEN    :: 255
-
 INVALID_SOCKET :: ~SOCKET(0)
-
 SOMAXCONN    :: 128 // The number of messages that can be queued in memory after being received; use 2-4 for Bluetooth.
                     // This is for the 'backlog' parameter to listen().
 SOCKET_ERROR :: -1
@@ -378,28 +365,24 @@ SO_SNDBUF             : c_int : 0x1001
 SO_ERROR              : c_int : 0x1007
 SO_BROADCAST          : c_int : 0x0020
 
-// Options for IP sockets.
+TCP_NODELAY: c_int : 0x0001
 IP_TTL: c_int : 4
+IPV6_V6ONLY: c_int : 27
 IP_MULTICAST_LOOP: c_int : 11
+IPV6_MULTICAST_LOOP: c_int : 11
 IP_MULTICAST_TTL: c_int : 10
 IP_ADD_MEMBERSHIP: c_int : 12
-IP_DROP_MEMBERSHIP: c_int : 13
 
-// Options for IPV6 sockets.
-IPV6_V6ONLY: c_int : 27
-IPV6_MULTICAST_LOOP: c_int : 11
 IPV6_ADD_MEMBERSHIP: c_int : 12
 IPV6_DROP_MEMBERSHIP: c_int : 13
 
-// Options for TCP sockets.
-TCP_NODELAY: c_int : 0x0001
+MAX_PROTOCOL_CHAIN: DWORD : 7
 
 // Used with the SO_LINGER socket option to setsockopt().
 LINGER :: struct {
 	l_onoff: c.ushort,
 	l_linger: c.ushort,
 }
-
 // Send/Receive flags.
 MSG_OOB  : c_int : 1 // `send`/`recv` should process out-of-band data.
 MSG_PEEK : c_int : 2 // `recv` should not remove the data from the buffer. Only valid for non-overlapped operations.
@@ -413,61 +396,6 @@ ipv6_mreq :: struct {
 	ipv6mr_multiaddr: in6_addr,
 	ipv6mr_interface: c_uint,
 }
-
-when size_of(uintptr) == 4 {
-	WSADATA :: struct {
-		wVersion: WORD,
-		wHighVersion: WORD,
-		szDescription: [WSADESCRIPTION_LEN + 1]u8,
-		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
-		iMaxSockets: u16,
-		iMaxUdpDg: u16,
-		lpVendorInfo: ^u8,
-	}
-} else when size_of(uintptr) == 8 {
-	WSADATA :: struct {
-		wVersion: WORD,
-		wHighVersion: WORD,
-		iMaxSockets: u16,
-		iMaxUdpDg: u16,
-		lpVendorInfo: ^u8,
-		szDescription: [WSADESCRIPTION_LEN + 1]u8,
-		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
-	}
-} else {
-	#panic("unknown word size")
-}
-
-WSABUF :: struct {
-	len: ULONG,
-	buf: ^CHAR,
-}
-
-WSAPROTOCOL_INFO :: struct {
-	dwServiceFlags1: DWORD,
-	dwServiceFlags2: DWORD,
-	dwServiceFlags3: DWORD,
-	dwServiceFlags4: DWORD,
-	dwProviderFlags: DWORD,
-	ProviderId: GUID,
-	dwCatalogEntryId: DWORD,
-	ProtocolChain: WSAPROTOCOLCHAIN,
-	iVersion: c_int,
-	iAddressFamily: c_int,
-	iMaxSockAddr: c_int,
-	iMinSockAddr: c_int,
-	iSocketType: c_int,
-	iProtocol: c_int,
-	iProtocolMaxOffset: c_int,
-	iNetworkByteOrder: c_int,
-	iSecurityScheme: c_int,
-	dwMessageSize: DWORD,
-	dwProviderReserved: DWORD,
-	szProtocol: [WSAPROTOCOL_LEN + 1]u16,
-}
-
-
-
 
 VOLUME_NAME_DOS: DWORD : 0x0
 MOVEFILE_REPLACE_EXISTING: DWORD : 1
@@ -522,6 +450,62 @@ INVALID_FILE_ATTRIBUTES  :: -1
 FILE_TYPE_DISK :: 0x0001
 FILE_TYPE_CHAR :: 0x0002
 FILE_TYPE_PIPE :: 0x0003
+
+RECT  :: struct {left, top, right, bottom: LONG}
+POINT :: struct {x, y: LONG}
+
+
+when size_of(uintptr) == 4 {
+	WSADATA :: struct {
+		wVersion: WORD,
+		wHighVersion: WORD,
+		szDescription: [WSADESCRIPTION_LEN + 1]u8,
+		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
+		iMaxSockets: u16,
+		iMaxUdpDg: u16,
+		lpVendorInfo: ^u8,
+	}
+} else when size_of(uintptr) == 8 {
+	WSADATA :: struct {
+		wVersion: WORD,
+		wHighVersion: WORD,
+		iMaxSockets: u16,
+		iMaxUdpDg: u16,
+		lpVendorInfo: ^u8,
+		szDescription: [WSADESCRIPTION_LEN + 1]u8,
+		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
+	}
+} else {
+	#panic("unknown word size")
+}
+
+WSABUF :: struct {
+	len: ULONG,
+	buf: ^CHAR,
+}
+
+WSAPROTOCOL_INFO :: struct {
+	dwServiceFlags1: DWORD,
+	dwServiceFlags2: DWORD,
+	dwServiceFlags3: DWORD,
+	dwServiceFlags4: DWORD,
+	dwProviderFlags: DWORD,
+	ProviderId: GUID,
+	dwCatalogEntryId: DWORD,
+	ProtocolChain: WSAPROTOCOLCHAIN,
+	iVersion: c_int,
+	iAddressFamily: c_int,
+	iMaxSockAddr: c_int,
+	iMinSockAddr: c_int,
+	iSocketType: c_int,
+	iProtocol: c_int,
+	iProtocolMaxOffset: c_int,
+	iNetworkByteOrder: c_int,
+	iSecurityScheme: c_int,
+	dwMessageSize: DWORD,
+	dwProviderReserved: DWORD,
+	szProtocol: [WSAPROTOCOL_LEN + 1]u16,
+}
 
 WIN32_FILE_ATTRIBUTE_DATA :: struct {
 	dwFileAttributes: DWORD,
@@ -744,7 +728,6 @@ sockaddr_in :: struct {
 	sin_addr: in_addr,
 	sin_zero: [8]CHAR,
 }
-
 sockaddr_in6 :: struct {
 	sin6_family: ADDRESS_FAMILY,
 	sin6_port: u16be,
@@ -761,8 +744,8 @@ in6_addr :: struct {
 	s6_addr: [16]u8,
 }
 
-DNS_STATUS :: distinct DWORD // zero is success
 
+DNS_STATUS :: distinct DWORD // zero is success
 DNS_INFO_NO_RECORDS :: 9501
 DNS_QUERY_NO_RECURSION :: 0x00000004
 
@@ -797,7 +780,6 @@ DNS_MX_DATAA :: struct {
     wPreference: WORD, // lower values preferred
     _: WORD, // padding.
 }
-
 DNS_SRV_DATAA :: struct {
 	pNameTarget: cstring,
 	wPriority: u16be,
