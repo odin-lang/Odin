@@ -31,7 +31,7 @@ Request_Status :: enum {
 Client_Request :: struct {
 	request:   Request,
 	response:  Response,
-	socket:    net.Tcp_Socket, // only valid if status == .Wait_Reply
+	socket:    net.TCP_Socket, // only valid if status == .Wait_Reply
 	status:    Request_Status,
 }
 
@@ -120,7 +120,7 @@ client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Res
 }
 
 client_process_requests :: proc(using c: ^Client) {
-	close_socket :: proc(s: ^net.Tcp_Socket) {
+	close_socket :: proc(s: ^net.TCP_Socket) {
 		net.close(s^)
 		s^ = {}
 	}
