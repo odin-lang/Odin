@@ -287,8 +287,8 @@ Udp_Recv_Error :: enum c.int {
 	// A signal occurred before any data was transmitted.
 	// See signal(7).
 	Interrupted = c.int(os.EINTR),
-	// The send timeout duration passed before all data was sent.
-	// See Socket_Option.Send_Timeout.
+	// The send timeout duration passed before all data was received.
+	// See Socket_Option.Receive_Timeout.
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 	// The socket must be bound for this operation, but isn't.
 	Socket_Not_Bound = c.int(os.EINVAL),
