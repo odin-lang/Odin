@@ -36,7 +36,7 @@ import "core:fmt"
 name_max  :: 255
 
 @private
-_pack_dns_header :: proc(hdr: Dns_Header) -> (id: u16be, bits: u16be) {
+_pack_dns_header :: proc(hdr: DNS_Header) -> (id: u16be, bits: u16be) {
 	id = hdr.id
 	bits = hdr.opcode << 1 | u16be(hdr.response_code)
 	if hdr.is_response {
@@ -59,7 +59,7 @@ _pack_dns_header :: proc(hdr: Dns_Header) -> (id: u16be, bits: u16be) {
 }
 
 @private
-_unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: Dns_Header) {
+_unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: DNS_Header) {
 	hdr.id = id
 	hdr.is_response            = (bits & (1 << 15)) != 0
 	hdr.opcode                 = (bits >> 11) & 0xF
@@ -67,7 +67,7 @@ _unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: Dns_Header) {
 	hdr.is_truncated           = (bits & (1 <<  9)) != 0
 	hdr.is_recursion_desired   = (bits & (1 <<  8)) != 0
 	hdr.is_recursion_available = (bits & (1 <<  7)) != 0
-	hdr.response_code = Dns_Response_Code(bits & 0xF)
+	hdr.response_code = DNS_Response_Code(bits & 0xF)
 
 	return hdr
 }
@@ -106,7 +106,7 @@ _load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []str
 }
 
 @private
-_load_hosts :: proc(allocator := context.allocator) -> (hosts: []Dns_Host_Entry, ok: bool) {
+_load_hosts :: proc(allocator := context.allocator) -> (hosts: []DNS_Host_Entry, ok: bool) {
 	context.allocator = allocator
 
 	res, success := os.read_entire_file_from_filename("/etc/hosts", allocator)
@@ -115,7 +115,7 @@ _load_hosts :: proc(allocator := context.allocator) -> (hosts: []Dns_Host_Entry,
 	}
 	defer delete(res)
 
-	_hosts := make([dynamic]Dns_Host_Entry, 0, allocator)
+	_hosts := make([dynamic]DNS_Host_Entry, 0, allocator)
 	hosts_str := string(res)
 	for line in strings.split_lines_iterator(&hosts_str) {
 		if len(line) == 0 || line[0] == '#' {
@@ -136,7 +136,7 @@ _load_hosts :: proc(allocator := context.allocator) -> (hosts: []Dns_Host_Entry,
 			continue
 		}
 
-		append(&_hosts, Dns_Host_Entry{name_str, addr})
+		append(&_hosts, DNS_Host_Entry{name_str, addr})
 	}
 
 	return _hosts[:], true
@@ -284,17 +284,17 @@ _validate_hostname :: proc(hostname: string) -> (ok: bool) {
 }
 
 @private
-_parse_record :: proc(packet: []u8, cur_off: ^int, filter: Dns_Record_Type = nil) -> (record: Dns_Record, ok: bool) {
+_parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil) -> (record: DNS_Record, ok: bool) {
 	record_buf := packet[cur_off^:]
 	hostname, hn_sz := _decode_hostname(packet, cur_off^) or_return
 
-	ahdr_sz := size_of(Dns_Record_Header)
+	ahdr_sz := size_of(DNS_Record_Header)
 	if len(record_buf) - hn_sz < ahdr_sz {
 		return
 	}
 
 	record_hdr_bytes := record_buf[hn_sz:hn_sz+ahdr_sz]
-	record_hdr := cast(^Dns_Record_Header)raw_data(record_hdr_bytes)
+	record_hdr := cast(^DNS_Record_Header)raw_data(record_hdr_bytes)
 
 	data_sz := record_hdr.length
 	data_off := cur_off^ + int(hn_sz) + int(ahdr_sz);
@@ -306,31 +306,31 @@ _parse_record :: proc(packet: []u8, cur_off: ^int, filter: Dns_Record_Type = nil
 		return nil, true
 	}
 
-	_record: Dns_Record
-	#partial switch Dns_Record_Type(record_hdr.type) {
-		case .Ipv4:
+	_record: DNS_Record
+	#partial switch DNS_Record_Type(record_hdr.type) {
+		case .IPv4:
 			if len(data) != 4 {
 				return
 			}
 
 			addr_val: u32be = mem.slice_data_cast([]u32be, data)[0]
-			addr := Ipv4_Address(transmute([4]u8)addr_val)
-			_record = Dns_Record_Ipv4(addr)
-		case .Ipv6:
+			addr := IPv4_Address(transmute([4]u8)addr_val)
+			_record = DNS_Record_IPv4(addr)
+		case .IPv6:
 			if len(data) != 16 {
 				return
 			}
 
 			addr_val: u128be = mem.slice_data_cast([]u128be, data)[0]
-			addr := Ipv6_Address(transmute([8]u16be)addr_val)
-			_record = Dns_Record_Ipv6(addr)
-		case .Cname:
+			addr := IPv6_Address(transmute([8]u16be)addr_val)
+			_record = DNS_Record_IPv6(addr)
+		case .CNAME:
 			hostname, _ := _decode_hostname(packet, data_off) or_return
-			_record = Dns_Record_Cname(hostname)
-		case .Ns:
+			_record = DNS_Record_CNAME(hostname)
+		case .NS:
 			name, _ := _decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
-			_record = Dns_Record_Ns(name)
-		case .Srv:
+			_record = DNS_Record_NS(name)
+		case .SRV:
 			if len(data) <= 6 {
 				return
 			}
@@ -339,20 +339,20 @@ _parse_record :: proc(packet: []u8, cur_off: ^int, filter: Dns_Record_Type = nil
 			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
 			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
 			name, _ := _decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
-			_record = Dns_Record_Srv{
+			_record = DNS_Record_SRV{
 				priority = int(priority),
 				weight   = int(weight),
 				port     = int(port),
 				service_name = name,
 			}
-		case .Mx:
+		case .MX:
 			if len(data) <= 2 {
 				return
 			}
 
 			preference: u16be = mem.slice_data_cast([]u16be, data)[0]
 			hostname, _ := _decode_hostname(packet, data_off + size_of(u16be)) or_return
-			_record = Dns_Record_Mx{
+			_record = DNS_Record_MX{
 				host       = hostname,
 				preference = int(preference),
 			}
@@ -367,7 +367,7 @@ _parse_record :: proc(packet: []u8, cur_off: ^int, filter: Dns_Record_Type = nil
 
 /*
 	DNS Query Response Format:
-	- Dns_Header (packed)
+	- DNS_Header (packed)
 	- Query Count
 	- Answer Count
 	- Authority Count
@@ -384,18 +384,18 @@ _parse_record :: proc(packet: []u8, cur_off: ^int, filter: Dns_Record_Type = nil
 		- DNS Record Data
 
 	DNS Record Data:
-	- Dns_Record_Header
+	- DNS_Record_Header
 	- Data[]
 */
 
 @private
-_parse_response :: proc(response: []u8, filter: Dns_Record_Type = nil, allocator := context.allocator) -> (records: []Dns_Record, ok: bool) {
+_parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	header_size_bytes :: 12
 	if len(response) < header_size_bytes {
 		return
 	}
 
-	_records := make([dynamic]Dns_Record, 0) 
+	_records := make([dynamic]DNS_Record, 0) 
 
 	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:header_size_bytes]) 
 	hdr := _unpack_dns_header(dns_hdr_chunks[0], dns_hdr_chunks[1])
@@ -420,7 +420,7 @@ _parse_response :: proc(response: []u8, filter: Dns_Record_Type = nil, allocator
 
 		dq_sz :: 4
 		hostname, hn_sz := _decode_hostname(response, cur_idx) or_return
-		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
+		DNS_Query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
 	}
@@ -471,9 +471,9 @@ _parse_response :: proc(response: []u8, filter: Dns_Record_Type = nil, allocator
 //
 // NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
 // meaning that DNS queries for a hostname will resolve through CNAME records until an
-// IP address is reached.
+// IP Address is reached.
 //
-get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.allocator) -> (records: []Dns_Record, ok: bool) {
+get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
 
 	dns_servers := _load_resolv_conf() or_return
@@ -488,14 +488,14 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 		return
 	}
 
-	host_records := make([dynamic]Dns_Record, 0)
+	host_records := make([dynamic]DNS_Record, 0)
 	for host in hosts {
 		if strings.compare(host.name, hostname) == 0 {
-			if type == .Ipv4 && family_from_address(host.addr) == .IPv4 {
-				addr4 := cast(Dns_Record_Ipv4)host.addr.(Ipv4_Address)
+			if type == .IPv4 && family_from_address(host.addr) == .IPv4 {
+				addr4 := cast(DNS_Record_IPv4)host.addr.(IPv4_Address)
 				append(&host_records, addr4)
-			} else if type == .Ipv6 && family_from_address(host.addr) == .IPv6 {
-				addr6 := cast(Dns_Record_Ipv6)host.addr.(Ipv6_Address)
+			} else if type == .IPv6 && family_from_address(host.addr) == .IPv6 {
+				addr6 := cast(DNS_Record_IPv6)host.addr.(IPv6_Address)
 				append(&host_records, addr6)
 			}
 		}
@@ -506,7 +506,7 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 
 	_validate_hostname(hostname) or_return
 
-	hdr := Dns_Header{
+	hdr := DNS_Header{
 		id = 0, 
 		is_response = false, 
 		opcode = 0, 
@@ -514,7 +514,7 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 		is_truncated = false,
 		is_recursion_desired = true,
 		is_recursion_available = false,
-		response_code = Dns_Response_Code.No_Error,
+		response_code = DNS_Response_Code.No_Error,
 	}
 
 	id, bits := _pack_dns_header(hdr)
@@ -523,14 +523,14 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	dns_hdr[1] = bits
 	dns_hdr[2] = 1
 
-	dns_query := [2]u16be{ u16be(type), 1 }
+	DNS_Query := [2]u16be{ u16be(type), 1 }
 
 	output := [(size_of(u16be) * 6) + name_max + (size_of(u16be) * 2)]u8{}
 	b := strings.builder_from_slice(output[:])
 
 	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
 	_encode_hostname(&b, hostname) or_return
-	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, DNS_Query[:]))
 
 	dns_packet := output[:strings.builder_len(b)]
 
@@ -563,7 +563,7 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 		}
 
 		recv_sz, recv_addr, recv_err := recv_udp(conn, dns_response_buf[:])
-		if recv_err == Udp_Recv_Error.Timeout {
+		if recv_err == UDP_Recv_Error.Timeout {
 			fmt.printf("DNS Server response timed out\n")
 			continue
 		} else if recv_err != nil {
@@ -592,22 +592,22 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	return
 }
 
-destroy_dns_records :: proc(records: []Dns_Record, allocator := context.allocator) {
+destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
 	context.allocator = allocator
 
 	for rec in records {
 		switch r in rec {
-		case Dns_Record_Ipv4:  // nothing to do
-		case Dns_Record_Ipv6:  // nothing to do
-		case Dns_Record_Cname:
+		case DNS_Record_IPv4:  // nothing to do
+		case DNS_Record_IPv6:  // nothing to do
+		case DNS_Record_CNAME:
 			delete(string(r))
-		case Dns_Record_Text:
+		case DNS_Record_Text:
 			delete(string(r))
-		case Dns_Record_Ns:
+		case DNS_Record_NS:
 			delete(string(r))
-		case Dns_Record_Mx:
+		case DNS_Record_MX:
 			delete(r.host)
-		case Dns_Record_Srv:
+		case DNS_Record_SRV:
 			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
 		}
 	}

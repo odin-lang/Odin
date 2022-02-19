@@ -23,26 +23,7 @@ import "core:time"
 import "core:fmt"
 
 
-Socket :: distinct os.Socket
-
-General_Error :: enum {
-}
-
-Network_Error :: union {
-	General_Error,
-	Create_Socket_Error,
-	Dial_Error,
-	Listen_Error,
-	Accept_Error,
-	Bind_Error,
-	Tcp_Send_Error,
-	Udp_Send_Error,
-	Tcp_Recv_Error,
-	Udp_Recv_Error,
-	Shutdown_Error,
-	Socket_Option_Error,
-}
-
+Socket :: os.Socket
 
 Create_Socket_Error :: enum c.int {
 	Family_Not_Supported_For_This_Socket = c.int(os.EAFNOSUPPORT),
@@ -65,8 +46,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 
 	switch protocol {
-	case .Tcp:  c_type = os.SOCK_STREAM; c_protocol = os.IPPROTO_TCP
-	case .Udp:  c_type = os.SOCK_DGRAM;  c_protocol = os.IPPROTO_UDP
+	case .TCP:  c_type = os.SOCK_STREAM; c_protocol = os.IPPROTO_TCP
+	case .UDP:  c_type = os.SOCK_DGRAM;  c_protocol = os.IPPROTO_UDP
 	case:
 		unreachable()
 	}
@@ -78,8 +59,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 
 	switch protocol {
-	case .Tcp:  return Tcp_Socket(sock), nil
-	case .Udp:  return Udp_Socket(sock), nil
+	case .TCP:  return TCP_Socket(sock), nil
+	case .UDP:  return UDP_Socket(sock), nil
 	case:
 		unreachable()
 	}
@@ -102,18 +83,18 @@ Dial_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Error) {
+dial_tcp :: proc(addr: Address, port: int) -> (skt: TCP_Socket, err: Network_Error) {
 	family := family_from_address(addr)
-	sock := create_socket(family, .Tcp) or_return
-	skt = sock.(Tcp_Socket)
+	sock := create_socket(family, .TCP) or_return
+	skt = sock.(TCP_Socket)
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same address immediately.
+	// use the same Address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := endpoint_to_sockaddr({addr, port})
-	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
+	res := os.connect(Platform_Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
 		return
@@ -126,13 +107,13 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Err
 Bind_Error :: enum c.int {
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = c.int(os.EADDRINUSE),
-	// The address is not a local address on this machine.
+	// The Address is not a local Address on this machine.
 	Given_Nonlocal_Address = c.int(os.EADDRNOTAVAIL),
-	// To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
+	// To bind a UDP socket to the broadcast Address, the appropriate socket option must be set.
 	Broadcast_Disabled = c.int(os.EACCES),
-	// The address family of the address does not match that of the socket.
+	// The Address family of the Address does not match that of the socket.
 	Address_Family_Mismatch = c.int(os.EFAULT),
-	// The socket is already bound to an address.
+	// The socket is already bound to an Address.
 	Already_Bound = c.int(os.EINVAL),
 	// There are not enough ephemeral ports available.
 	No_Ports_Available = c.int(os.ENOBUFS),
@@ -141,7 +122,7 @@ Bind_Error :: enum c.int {
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
-	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
+	res := os.bind(Platform_Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
 		err = Bind_Error(res)
 	}
@@ -153,9 +134,9 @@ bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 // This is likely what you want if you want to send data unsolicited.
 //
 // This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Network_Error) {
-	sock := create_socket(family, .Udp) or_return
-	skt = sock.(Udp_Socket)
+make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: UDP_Socket, err: Network_Error) {
+	sock := create_socket(family, .UDP) or_return
+	skt = sock.(UDP_Socket)
 	return
 }
 
@@ -164,8 +145,8 @@ make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err
 //
 // This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
-// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
-make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Network_Error) {
+// The bound_address is the Address of the network interface that you want to use, or a loopback Address if you don't care which to use.
+make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_Socket, err: Network_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 	bind(skt, {bound_address, port}) or_return
 	return
@@ -183,23 +164,23 @@ Listen_Error :: enum c.int {
 	Listening_Not_Supported_For_This_Socket = c.int(os.EOPNOTSUPP),
 }
 
-listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp_Socket, err: Network_Error) {
+listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
 	family := family_from_address(local_addr)
-	sock := create_socket(family, .Tcp) or_return
-	skt = sock.(Tcp_Socket)
+	sock := create_socket(family, .TCP) or_return
+	skt = sock.(TCP_Socket)
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same address immediately.
+	// use the same Address immediately.
 	//
-	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
+	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the Address!
 	set_option(sock, .Reuse_Address, true) or_return
 
 	bind(sock, {local_addr, port}) or_return
 
-	res := os.listen(os.Socket(skt), backlog)
+	res := os.listen(Platform_Socket(skt), backlog)
 	if res != os.ERROR_NONE {
 		err = Listen_Error(res)
 		return
@@ -220,16 +201,16 @@ Accept_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, err: Network_Error) {
+accept_tcp :: proc(sock: TCP_Socket) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: os.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 
-	client_sock, ok := os.accept(os.Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
+	client_sock, ok := os.accept(Platform_Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
 	if ok != os.ERROR_NONE {
 		err = Accept_Error(ok)
 		return
 	}
-	client = Tcp_Socket(client_sock)
+	client = TCP_Socket(client_sock)
 	source = sockaddr_to_endpoint(&sockaddr)
 	return
 }
@@ -238,12 +219,12 @@ accept_tcp :: proc(sock: Tcp_Socket) -> (client: Tcp_Socket, source: Endpoint, e
 
 close :: proc(skt: Any_Socket) {
 	s := any_socket_to_socket(skt)
-	os.close(os.Handle(os.Socket(s)))
+	os.close(os.Handle(Platform_Socket(s)))
 }
 
 
 
-Tcp_Recv_Error :: enum c.int {
+TCP_Recv_Error :: enum c.int {
 	Shutdown = c.int(os.ESHUTDOWN),
 	Not_Connected = c.int(os.ENOTCONN),
 	Connection_Broken = c.int(os.ENETRESET),
@@ -256,19 +237,19 @@ Tcp_Recv_Error :: enum c.int {
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
-recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
-	res, ok := os.recv(os.Socket(skt), buf, 0)
+	res, ok := os.recv(Platform_Socket(skt), buf, 0)
 	if ok != os.ERROR_NONE {
-		err = Tcp_Recv_Error(ok)
+		err = TCP_Recv_Error(ok)
 		return
 	}
 	return int(res), nil
 }
 
-Udp_Recv_Error :: enum c.int {
+UDP_Recv_Error :: enum c.int {
 	// The buffer is too small to fit the entire message, and the message was truncated.
 	Truncated = c.int(os.EMSGSIZE),
 	// The so-called socket is not an open socket.
@@ -287,16 +268,16 @@ Udp_Recv_Error :: enum c.int {
 	Socket_Not_Bound = c.int(os.EINVAL),
 }
 
-recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
 
 	from: os.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
+	res, ok := os.recvfrom(Platform_Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
 	if ok != os.ERROR_NONE {
-		err = Udp_Recv_Error(ok)
+		err = UDP_Recv_Error(ok)
 		return
 	}
 
@@ -310,7 +291,7 @@ recv :: proc{recv_tcp, recv_udp}
 
 
 // TODO
-Tcp_Send_Error :: enum c.int {
+TCP_Send_Error :: enum c.int {
 	Aborted = c.int(os.ECONNABORTED), // TODO: merge with Connection_Broken?
 	Connection_Broken = c.int(os.ECONNRESET),
 	Not_Connected = c.int(os.ENOTCONN),
@@ -334,13 +315,13 @@ Tcp_Send_Error :: enum c.int {
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
-send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, ok := os.send(os.Socket(skt), remaining, 0)
+		res, ok := os.send(Platform_Socket(skt), remaining, 0)
 		if ok != os.ERROR_NONE {
-			err = Tcp_Send_Error(ok)
+			err = TCP_Send_Error(ok)
 			return
 		}
 		bytes_written += int(res)
@@ -349,7 +330,7 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 }
 
 // TODO
-Udp_Send_Error :: enum c.int {
+UDP_Send_Error :: enum c.int {
 	// The message is too big. No data was sent.
 	Truncated = c.int(os.EMSGSIZE),
 	// TODO: not sure what the exact circumstances for this is yet
@@ -378,14 +359,14 @@ Udp_Send_Error :: enum c.int {
 	No_Memory_Available = c.int(os.ENOMEM),
 }
 
-send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	toaddr := endpoint_to_sockaddr(to)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, ok := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
+		res, ok := os.sendto(Platform_Socket(skt), remaining, 0, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
 		if ok != os.ERROR_NONE {
-			err = Udp_Send_Error(ok)
+			err = UDP_Send_Error(ok)
 			return
 		}
 		bytes_written += int(res)
@@ -415,7 +396,7 @@ Shutdown_Error :: enum c.int {
 
 shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
-	res := os.shutdown(os.Socket(s), int(manner))
+	res := os.shutdown(Platform_Socket(s), int(manner))
 	if res != os.ERROR_NONE {
 		return Shutdown_Error(res)
 	}
@@ -517,7 +498,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 	}
 
 	skt := any_socket_to_socket(s)
-	res := os.setsockopt(os.Socket(skt), int(level), int(option), ptr, len)
+	res := os.setsockopt(Platform_Socket(skt), int(level), int(option), ptr, len)
 	if res != os.ERROR_NONE {
 		return Socket_Option_Error(res)
 	}

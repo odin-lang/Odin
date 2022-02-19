@@ -21,23 +21,7 @@ import "core:strings"
 import "core:fmt"
 import "core:mem"
 
- // TODO(tetra): Bluetooth addresses not currently supported!
-Ipv4_Address :: distinct [4]u8
-Ipv6_Address :: distinct [8]u16be
-Address :: union {Ipv4_Address, Ipv6_Address}
-
-Addr_Type :: enum {
-	Ipv4,
-	Ipv6,
-}
-
-Ipv4_Loopback := Ipv4_Address{127, 0, 0, 1}
-Ipv6_Loopback := Ipv6_Address{0, 0, 0, 0, 0, 0, 0, 1}
-
-Ipv4_Any := Ipv4_Address{}
-Ipv6_Any := Ipv6_Address{}
-
-parse_ipv4_address :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, ok: bool) {
+parse_ipv4_address :: proc(address_and_maybe_port: string) -> (addr: IPv4_Address, ok: bool) {
 	buf: [1024]byte
 	arena: mem.Arena
 	mem.init_arena(&arena, buf[:])
@@ -66,7 +50,7 @@ parse_ipv4_address :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Addres
 }
 
 // TODO(tetra): Scopeid?
-parse_ipv6_address :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, ok: bool) {
+parse_ipv6_address :: proc(address_and_maybe_port: string) -> (addr: IPv6_Address, ok: bool) {
 	// Rule 1: If the high-byte of any block is zero, it can be omitted. (00XX => XX)
 	// Rule 2: Two or more all-zero blocks in a row can be replaced with '::' (FF00:0000:0000:XXXX => FF00::XXXX)
 	//         but this can only happen _once_.
@@ -122,21 +106,14 @@ parse_address :: proc(address_and_maybe_port: string) -> Address {
 	return nil
 }
 
-
-
-Endpoint :: struct {
-	address: Address,
-	port: int,
-}
-
-parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
-	addr_str, port, split_ok := split_port(address)
+parse_endpoint :: proc(Address: string) -> (ep: Endpoint, ok: bool) {
+	addr_str, port, split_ok := split_port(Address)
 	if !split_ok do return
 
 	addr := parse_address(addr_str)
 	if addr == nil do return
 
-	ep = Endpoint { address = addr, port = port }
+	ep = Endpoint { Address = addr, port = port }
 	ok = true
 	return
 }
@@ -145,7 +122,7 @@ parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
 // Takes an endpoint string and returns its parts.
 // Returns ok=false if port is not a number.
 split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok: bool) {
-	// Ipv6 [addr_or_host]:port
+	// IPv6 [addr_or_host]:port
 	if i := strings.last_index(endpoint_str, "]:"); i != -1 {
 		addr_or_host = endpoint_str[1:i]
 		port, ok = strconv.parse_int(endpoint_str[i+2:], 10)
@@ -153,7 +130,7 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 	}
 
 	if n := strings.count(endpoint_str, ":"); n == 1 {
-		// Ipv4 addr_or_host:port
+		// IPv4 addr_or_host:port
 		i := strings.last_index(endpoint_str, ":")
 		assert(i != -1)
 
@@ -161,7 +138,7 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 		port, ok = strconv.parse_int(endpoint_str[i+1:], 10)
 		return
 	} else if n > 1 {
-		// Ipv6 address without port
+		// IPv6 Address without port
 	}
 
 	// No port
@@ -171,7 +148,7 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 	return
 }
 
-// Joins an address or hostname with a port.
+// Joins an Address or hostname with a port.
 join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host)
 	if !ok do return addr_or_host
@@ -184,9 +161,9 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.alloc
 		fmt.sbprintf(&b, "%v:%v", addr_or_host, port)
 	} else {
 		switch in addr {
-		case Ipv4_Address:
+		case IPv4_Address:
 			fmt.sbprintf(&b, "%v:%v", address_to_string(addr), port)
-		case Ipv6_Address:
+		case IPv6_Address:
 			fmt.sbprintf(&b, "[%v]:%v", address_to_string(addr), port)
 		}
 	}
@@ -197,25 +174,25 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.alloc
 
 // TODO(tetra): Do we need this?
 map_to_ipv6 :: proc(addr: Address) -> Address {
-	if addr6, ok := addr.(Ipv6_Address); ok {
+	if addr6, ok := addr.(IPv6_Address); ok {
 		return addr6
 	}
-	addr4 := addr.(Ipv4_Address)
+	addr4 := addr.(IPv4_Address)
 	addr4_u16 := transmute([2]u16be) addr4
-	addr6: Ipv6_Address
+	addr6: IPv6_Address
 	addr6[4] = 0xffff
 	copy(addr6[5:], addr4_u16[:])
 	return addr6
 }
 
 
-// Returns a temporarily-allocated string representation of the address.
+// Returns a temporarily-allocated string representation of the Address.
 address_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
 	b := strings.make_builder(allocator)
 	switch v in addr {
-	case Ipv4_Address:
+	case IPv4_Address:
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
-	case Ipv6_Address:
+	case IPv6_Address:
 		i := 0
 		seen_double_colon := false
 		for i < len(v) {
@@ -240,14 +217,14 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 }
 
 // Returns a temporarily-allocated string representation of the endpoint.
-// If there's a port, uses the `[address]:port` format.
+// If there's a port, uses the `[Address]:port` format.
 endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> (s: string) {
-	s = address_to_string(ep.address, allocator)
+	s = address_to_string(ep.Address, allocator)
 	if ep.port != 0 {
 		b := strings.make_builder(allocator)
-		switch a in ep.address {
-		case Ipv4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
-		case Ipv6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
+		switch a in ep.Address {
+		case IPv4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
+		case IPv6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
 		}
 		s = strings.to_string(b)
 	}
@@ -259,8 +236,8 @@ to_string :: proc{address_to_string, endpoint_to_string}
 
 family_from_address :: proc(addr: Address) -> Address_Family {
 	switch in addr {
-	case Ipv4_Address: return .IPv4
-	case Ipv6_Address: return .IPv6
+	case IPv4_Address: return .IPv4
+	case IPv6_Address: return .IPv6
 	case:
 		unreachable()
 	}
