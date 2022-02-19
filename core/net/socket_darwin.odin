@@ -113,7 +113,7 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: Tcp_Socket, err: Network_Err
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := endpoint_to_sockaddr({addr, port})
-	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
+	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
 		return
@@ -141,7 +141,7 @@ Bind_Error :: enum c.int {
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
-	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
+	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
 		err = Bind_Error(res)
 	}
