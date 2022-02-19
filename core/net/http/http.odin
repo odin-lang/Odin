@@ -21,12 +21,25 @@ import "core:strings"
 import "core:strconv"
 import "core:fmt" // for panicf
 
+/*
+	By default we allow a generous 10 redirects, which the programmer can override at runtime and compile-time.
+	We limit it to a maximum of 50 to prevent accidental misconfiguration causing a DOS.
+
+	If you have a legitmate reason to require more than this amount of redirects,
+	feel free to clone `get` and `execute_request` into your project.
+*/
+ODIN_HTTP_MAX_REDIRECTS :: #config(ODIN_HTTP_MAX_REDIRECTS, 10)
+#assert(ODIN_HTTP_MAX_REDIRECTS > 0 && ODIN_HTTP_MAX_REDIRECTS <= 50)
+
+
 Status_Code :: enum {
 	Unknown = 0,
 
 	// NOTE(tetra): Only produced by recv_request.
 	Bad_Response_Header = -1,
 	Bad_Status_Code = -2,
+
+	Too_Many_Redirects = -3,
 
 	Ok = 200,
 	Bad_Request = 400,
@@ -49,20 +62,20 @@ Status_Code :: enum {
 }
 
 Method :: enum u8 {
-	Get,
-	Post,
+	GET,
+	POST,
 }
 
 
 
-get :: proc(url: string, allocator := context.allocator) -> (resp: Response, ok: bool) {
+get :: proc(url: string, max_redirects := ODIN_HTTP_MAX_REDIRECTS, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	r: Request
-	request_init(&r, .Get, url, allocator)
+	request_init(&r, .GET, url, allocator)
 	defer request_destroy(r)
 
 	r.headers["Connection"] = "close"
 
-	resp, ok = execute_request(r, allocator)
+	resp, ok = execute_request(r, max_redirects, allocator)
 
 	return
 }
@@ -266,36 +279,59 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 // Executes an HTTP 1.1 request.
 // Follows 301 redirects.
 // If ok=true, you should call response_destroy on the response.
-execute_request :: proc(r: Request, allocator := context.allocator) -> (response: Response, ok: bool) {
+execute_request :: proc(r: Request, max_redirects := ODIN_HTTP_MAX_REDIRECTS, allocator := context.allocator) -> (response: Response, ok: bool) {
 	r := r
-	resp: Response
+	max_redirects := max_redirects
 
+	resp: Response
 	context.allocator = allocator
 
+	redirect_count := 0
+	max_redirects   = min(max_redirects, ODIN_HTTP_MAX_REDIRECTS)
+
+	location: string
 	for {
 		skt := send_request(r) or_return
 		defer net.close(skt)
 
+		/*
+			Free the location string from the previous request, which is a no-op for the initial request.
+			In later requests in case of a redirect, this will be the cloned location which we only
+			needed for `send_request`. There's no need to carry around a stack of previous addresses.
+		*/
+		delete(location)
+
 		resp = recv_response(skt) or_return
 
+		/*
+			Not a redirect, we're done.
+		*/
 		if resp.status_code != .Moved_Permanently {
-			break
-		} else {
-			location := resp.headers["Location"] or_return
-
-			r2 := r
-			request_init(&r2, .Get, location)
-			r2.headers = r.headers
-			r2.queries = r.queries
-			r = r2
-
-			response_destroy(resp)
+			return resp, true
 		}
-	}
 
-	response = resp
-	ok = true
-	return
+		redirect_count += 1
+		if redirect_count > max_redirects {
+			response = resp
+			response.status_code = .Too_Many_Redirects
+			return
+		}
+
+		/*
+			We're about to free the old response but need the newly given Location. Clone it.
+		*/
+		location  = resp.headers["Location"] or_return
+		location  = strings.clone(location)
+
+		r2 := r
+		request_init(&r2, .GET, location)
+		r2.headers = r.headers
+		r2.queries = r.queries
+		r = r2
+
+		response_destroy(resp)
+	}
+	unreachable()
 }
 
 request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
@@ -305,7 +341,7 @@ request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
 	grow_builder(&b, 8192)
 	if b.buf == nil do return nil
 
-	assert(r.method == .Get, "only GET requests are supported at this time")
+	assert(r.method == .GET, "only GET requests are supported at this time")
 	write_string(&b, "GET ")
 
 	write_string(&b, r.path)
