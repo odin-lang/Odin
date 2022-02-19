@@ -385,18 +385,18 @@ Udp_Send_Error :: enum c.int {
 	No_Memory_Available = c.int(os.ENOMEM),
 }
 
+// Sends a single UDP datagram packet.
+//
+// Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
+// UDP packets are not guarenteed to be received in order.
 send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	toaddr := endpoint_to_sockaddr(to)
-	for bytes_written < len(buf) {
-		limit := min(1<<31, len(buf) - bytes_written)
-		remaining := buf[bytes_written:][:limit]
-		res, ok := os.sendto(os.Socket(skt), remaining, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
-		if ok != os.ERROR_NONE {
-			err = Udp_Send_Error(ok)
-			return
-		}
-		bytes_written += int(res)
+	res, os_err := os.sendto(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
+	if os_err != os.ERROR_NONE {
+		err = Udp_Send_Error(os_err)
+		return
 	}
+	bytes_written = int(res)
 	return
 }
 
