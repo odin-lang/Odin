@@ -128,6 +128,11 @@ Dns_Record_Header :: struct #packed {
 	length: u16be,
 }
 
+Dns_Host_Entry :: struct {
+	name: string,
+	addr: Address,
+}
+
 /*
 	Resolves a hostname to exactly one IPv4 and IPv6 address.
 	It's then up to you which one you use.
