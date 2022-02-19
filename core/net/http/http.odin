@@ -294,12 +294,15 @@ execute_request :: proc(r: Request, max_redirects := ODIN_HTTP_MAX_REDIRECTS, al
 		skt := send_request(r) or_return
 		defer net.close(skt)
 
-		/*
-			Free the location string from the previous request, which is a no-op for the initial request.
-			In later requests in case of a redirect, this will be the cloned location which we only
-			needed for `send_request`. There's no need to carry around a stack of previous addresses.
-		*/
-		delete(location)
+		if redirect_count > 0 {
+			/*
+				Free the location string from the previous request, which is a no-op for the initial request.
+				In later requests in case of a redirect, this will be the cloned location which we only
+				needed for `send_request`. There's no need to carry around a stack of previous addresses.
+			*/
+			delete(location)			
+		}
+
 
 		resp = recv_response(skt) or_return
 
