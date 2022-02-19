@@ -20,26 +20,7 @@ import "core:c"
 import win "core:sys/windows"
 import "core:time"
 
-Socket :: distinct win.SOCKET
-
-General_Error :: enum {
-}
-
-Network_Error :: union {
-	General_Error,
-	Create_Socket_Error,
-	Dial_Error,
-	Listen_Error,
-	Accept_Error,
-	Bind_Error,
-	Tcp_Send_Error,
-	Udp_Send_Error,
-	Tcp_Recv_Error,
-	Udp_Recv_Error,
-	Shutdown_Error,
-	Socket_Option_Error,
-}
-
+Platform_Socket :: win.SOCKET
 
 Create_Socket_Error :: enum c.int {
 	Network_Subsystem_Failure = win.WSAENETDOWN,
@@ -67,8 +48,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 
 	switch protocol {
-	case .Tcp:  c_type = win.SOCK_STREAM; c_protocol = win.IPPROTO_TCP
-	case .Udp:  c_type = win.SOCK_DGRAM;  c_protocol = win.IPPROTO_UDP
+	case .TCP:  c_type = win.SOCK_STREAM; c_protocol = win.IPPROTO_TCP
+	case .UDP:  c_type = win.SOCK_DGRAM;  c_protocol = win.IPPROTO_UDP
 	case:
 		unreachable()
 	}
@@ -80,8 +61,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 
 	switch protocol {
-	case .Tcp:  return Tcp_Socket(sock), nil
-	case .Udp:  return Udp_Socket(sock), nil
+	case .TCP:  return TCP_Socket(sock), nil
+	case .UDP:  return UDP_Socket(sock), nil
 	case:
 		unreachable()
 	}
@@ -104,18 +85,18 @@ Dial_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK, // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (skt: Tcp_Socket, err: Network_Error) {
+dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
 	family := family_from_address(addr)
-	sock := create_socket(family, .Tcp) or_return
-	skt = sock.(Tcp_Socket)
+	sock := create_socket(family, .TCP) or_return
+	skt = sock.(TCP_Socket)
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same address immediately.
+	// use the same Address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := endpoint_to_sockaddr({addr, port})
-	res := win.connect(win.SOCKET(skt), &sockaddr, size_of(sockaddr))
+	res := win.connect(Platform_Socket(skt), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Dial_Error(win.WSAGetLastError())
 		return
@@ -131,13 +112,13 @@ dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (s
 Bind_Error :: enum c.int {
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = win.WSAEADDRINUSE,
-	// The address is not a local address on this machine.
+	// The Address is not a local Address on this machine.
 	Given_Nonlocal_Address = win.WSAEADDRNOTAVAIL,
-	// To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
+	// To bind a UDP socket to the broadcast Address, the appropriate socket option must be set.
 	Broadcast_Disabled = win.WSAEACCES,
-	// The address family of the address does not match that of the socket.
+	// The Address family of the Address does not match that of the socket.
 	Address_Family_Mismatch = win.WSAEFAULT,
-	// The socket is already bound to an address.
+	// The socket is already bound to an Address.
 	Already_Bound = win.WSAEINVAL,
 	// There are not enough ephemeral ports available.
 	No_Ports_Available = win.WSAENOBUFS,
@@ -146,7 +127,7 @@ Bind_Error :: enum c.int {
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
-	res := win.bind(win.SOCKET(s), &sockaddr, size_of(sockaddr))
+	res := win.bind(Platform_Socket(s), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Bind_Error(win.WSAGetLastError())
 	}
@@ -158,9 +139,9 @@ bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 // This is likely what you want if you want to send data unsolicited.
 //
 // This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err: Network_Error) {
-	sock := create_socket(family, .Udp) or_return
-	skt = sock.(Udp_Socket)
+make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: UDP_Socket, err: Network_Error) {
+	sock := create_socket(family, .UDP) or_return
+	skt = sock.(UDP_Socket)
 	return
 }
 
@@ -169,8 +150,8 @@ make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: Udp_Socket, err
 //
 // This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
-// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
-make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: Udp_Socket, err: Network_Error) {
+// The bound_address is the Address of the network interface that you want to use, or a loopback Address if you don't care which to use.
+make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_Socket, err: Network_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 	bind(skt, {bound_address, port}) or_return
 	return
@@ -188,12 +169,12 @@ Listen_Error :: enum c.int {
 	Listening_Not_Supported_For_This_Socket = win.WSAEOPNOTSUPP,
 }
 
-listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp_Socket, err: Network_Error) {
+listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
 	family := family_from_address(local_addr)
-	sock := create_socket(family, .Tcp) or_return
-	skt = sock.(Tcp_Socket)
+	sock := create_socket(family, .TCP) or_return
+	skt = sock.(TCP_Socket)
 
 	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
 	// prevent hijacking of the server's endpoint by other applications.
@@ -201,7 +182,7 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: Tcp
 
 	bind(sock, {local_addr, port}) or_return
 
-	res := win.listen(win.SOCKET(skt), i32(backlog))
+	res := win.listen(Platform_Socket(skt), i32(backlog))
 	if res == win.SOCKET_ERROR {
 		err = Listen_Error(win.WSAGetLastError())
 		return
@@ -222,15 +203,15 @@ Accept_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK, // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-accept_tcp :: proc(sock: Tcp_Socket, options := default_tcp_options) -> (client: Tcp_Socket, source: Endpoint, err: Network_Error) {
+accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: win.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
-	client_sock := win.accept(win.SOCKET(sock), &sockaddr, &sockaddrlen)
+	client_sock := win.accept(Platform_Socket(sock), &sockaddr, &sockaddrlen)
 	if int(client_sock) == win.SOCKET_ERROR {
 		err = Accept_Error(win.WSAGetLastError())
 		return
 	}
-	client = Tcp_Socket(client_sock)
+	client = TCP_Socket(client_sock)
 	source = sockaddr_to_endpoint(&sockaddr)
 	if options.no_delay {
 		_ = set_option(client, .Tcp_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
@@ -242,12 +223,12 @@ accept_tcp :: proc(sock: Tcp_Socket, options := default_tcp_options) -> (client:
 
 close :: proc(skt: Any_Socket) {
 	s := any_socket_to_socket(skt)
-	win.closesocket(win.SOCKET(s))
+	win.closesocket(Platform_Socket(s))
 }
 
 
 
-Tcp_Recv_Error :: enum c.int {
+TCP_Recv_Error :: enum c.int {
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Not_Connected = win.WSAENOTCONN,
 	Bad_Buffer = win.WSAEFAULT,
@@ -261,19 +242,19 @@ Tcp_Recv_Error :: enum c.int {
 	Host_Unreachable = win.WSAEHOSTUNREACH, // TODO: verify can actually happen
 }
 
-recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
-	res := win.recv(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0)
+	res := win.recv(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0)
 	if res < 0 {
-		err = Tcp_Recv_Error(win.WSAGetLastError())
+		err = TCP_Recv_Error(win.WSAGetLastError())
 		return
 	}
 	return int(res), nil
 }
 
-Udp_Recv_Error :: enum c.int {
+UDP_Recv_Error :: enum c.int {
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	// UDP packets are limited in size, and the length of the incoming message exceeded it.
@@ -281,7 +262,7 @@ Udp_Recv_Error :: enum c.int {
 	// The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
 	Remote_Not_Listening = win.WSAECONNRESET,
 	Shutdown = win.WSAESHUTDOWN,
-	// A broadcast address was specified, but the .Broadcast socket option isn't set.
+	// A broadcast Address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled = win.WSAEACCES,
 	Bad_Buffer = win.WSAEFAULT,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
@@ -299,16 +280,16 @@ Udp_Recv_Error :: enum c.int {
 	TTL_Expired = win.WSAENETRESET,
 }
 
-recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
 
 	from: win.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-	res := win.recvfrom(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0, &from, &fromsize)
+	res := win.recvfrom(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0, &from, &fromsize)
 	if res < 0 {
-		err = Udp_Recv_Error(win.WSAGetLastError())
+		err = UDP_Recv_Error(win.WSAGetLastError())
 		return
 	}
 
@@ -325,7 +306,7 @@ recv :: proc{recv_tcp, recv_udp}
 // TODO: verify once more what errors to actually expose
 //
 
-Tcp_Send_Error :: enum c.int {
+TCP_Send_Error :: enum c.int {
 	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	Not_Connected = win.WSAENOTCONN,
 	Shutdown = win.WSAESHUTDOWN,
@@ -335,7 +316,7 @@ Tcp_Send_Error :: enum c.int {
 	Host_Unreachable = win.WSAEHOSTUNREACH,
 	Offline = win.WSAENETUNREACH, // TODO: verify possible, as not mentioned in docs
 	Timeout = win.WSAETIMEDOUT,
-	// A broadcast address was specified, but the .Broadcast socket option isn't set.
+	// A broadcast Address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled = win.WSAEACCES,
 	Bad_Buffer = win.WSAEFAULT,
 	// Connection is broken due to keepalive activity detecting a failure during the operation.
@@ -345,13 +326,13 @@ Tcp_Send_Error :: enum c.int {
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
-send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:]
-		res := win.send(win.SOCKET(skt), raw_data(remaining), c.int(limit), 0)
+		res := win.send(Platform_Socket(skt), raw_data(remaining), c.int(limit), 0)
 		if res < 0 {
-			err = Tcp_Send_Error(win.WSAGetLastError())
+			err = TCP_Send_Error(win.WSAGetLastError())
 			return
 		}
 		bytes_written += int(res)
@@ -359,7 +340,7 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 	return
 }
 
-Udp_Send_Error :: enum c.int {
+UDP_Send_Error :: enum c.int {
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	// UDP packets are limited in size, and len(buf) exceeded it.
@@ -367,7 +348,7 @@ Udp_Send_Error :: enum c.int {
 	// The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
 	Remote_Not_Listening = win.WSAECONNRESET,
 	Shutdown = win.WSAESHUTDOWN,
-	// A broadcast address was specified, but the .Broadcast socket option isn't set.
+	// A broadcast Address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled = win.WSAEACCES,
 	Bad_Buffer = win.WSAEFAULT,
 	// Connection is broken due to keepalive activity detecting a failure during the operation.
@@ -381,9 +362,9 @@ Udp_Send_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK,
 	// The remote host cannot be reached from this host at this time.
 	Host_Unreachable = win.WSAEHOSTUNREACH,
-	// Attempt to send to the Any address.
+	// Attempt to send to the Any Address.
 	Cannot_Use_Any_Address = win.WSAEADDRNOTAVAIL,
-	// The address is of an incorrect address family for this socket.
+	// The Address is of an incorrect Address family for this socket.
 	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	// The network cannot be reached from this host at this time.
 	Offline = win.WSAENETUNREACH,
@@ -394,16 +375,16 @@ Udp_Send_Error :: enum c.int {
 //
 // Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
 // UDP packets are not guarenteed to be received in order.
-send_udp :: proc(skt: Udp_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	if len(buf) > int(max(c.int)) {
 		// NOTE(tetra): If we don't guard this, we'll return (0, nil) instead, which is misleading.
 		err = .Message_Too_Long
 		return
 	}
 	toaddr := endpoint_to_sockaddr(to)
-	res := win.sendto(win.SOCKET(skt), raw_data(buf), c.int(len(buf)), 0, &toaddr, size_of(toaddr))
+	res := win.sendto(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0, &toaddr, size_of(toaddr))
 	if res < 0 {
-		err = Udp_Send_Error(win.WSAGetLastError())
+		err = UDP_Send_Error(win.WSAGetLastError())
 		return
 	}
 	bytes_written = int(res)
@@ -432,7 +413,7 @@ Shutdown_Error :: enum c.int {
 
 shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
-	res := win.shutdown(win.SOCKET(s), c.int(manner))
+	res := win.shutdown(Platform_Socket(s), c.int(manner))
 	if res < 0 {
 		return Shutdown_Error(win.WSAGetLastError())
 	}
@@ -443,7 +424,7 @@ shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Erro
 
 
 Socket_Option :: enum c.int {
-	// bool: Whether the address that this socket is bound to can be reused by other sockets.
+	// bool: Whether the Address that this socket is bound to can be reused by other sockets.
 	//       This allows you to bypass the cooldown period if a program dies while the socket is bound.
 	Reuse_Address = win.SO_REUSEADDR,
 	// bool: Whether other programs will be inhibited from binding the same endpoint as this socket.
@@ -476,7 +457,7 @@ Socket_Option :: enum c.int {
 	//            For non-blocking sockets, ignored.
 	//            Use a value of zero to potentially wait forever.
 	Send_Timeout = win.SO_SNDTIMEO,
-	// bool: Allow sending to, receiving from, and binding to, a broadcast address.
+	// bool: Allow sending to, receiving from, and binding to, a broadcast Address.
 	Broadcast = win.SO_BROADCAST,
 }
 
@@ -567,7 +548,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 	}
 
 	skt := any_socket_to_socket(s)
-	res := win.setsockopt(win.SOCKET(skt), c.int(level), c.int(option), ptr, len)
+	res := win.setsockopt(Platform_Socket(skt), c.int(level), c.int(option), ptr, len)
 	if res < 0 {
 		return Socket_Option_Error(win.WSAGetLastError())
 	}
