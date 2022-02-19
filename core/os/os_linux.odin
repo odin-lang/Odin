@@ -70,6 +70,10 @@ SO_SNDTIMEO_NEW: int : 67
 TCP_NODELAY: int : 1
 TCP_CORK:    int : 3
 
+MSG_PEEK  : int : 0x02
+MSG_TRUNC : int : 0x20
+
+
 
 ERROR_NONE:     Errno : 0
 EPERM:          Errno : 1
