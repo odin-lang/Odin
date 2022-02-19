@@ -501,11 +501,13 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	s, err := _fstat(fd)
-	if err != ERROR_NONE {
-		return 0, err
-	}
-	return max(s.size, 0), ERROR_NONE
+    // deliberately uninitialized; the syscall fills this buffer for us
+    s: OS_Stat = ---
+    result := _unix_fstat(fd, &s)
+    if result < 0 {
+        return 0, _get_errno(result)
+    }
+    return max(s.size, 0), ERROR_NONE
 }
 
 rename :: proc(old_path, new_path: string) -> Errno {
