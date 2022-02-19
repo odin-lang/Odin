@@ -105,6 +105,43 @@ _load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []str
 	return _dns_servers[:], true
 }
 
+@private
+_load_hosts :: proc(allocator := context.allocator) -> (hosts: []Dns_Host_Entry, ok: bool) {
+	context.allocator = allocator
+
+	res, success := os.read_entire_file_from_filename("/etc/hosts", allocator)
+	if !success {
+		return
+	}
+	defer delete(res)
+
+	_hosts := make([dynamic]Dns_Host_Entry, 0, allocator)
+	hosts_str := string(res)
+	for line in strings.split_lines_iterator(&hosts_str) {
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+
+		splits := strings.fields(line)
+		defer delete(splits)
+
+		ip_str := splits[0]
+		addr := parse_address(ip_str)
+		if addr == nil {
+			continue
+		}
+
+		name_str := splits[1]
+		if len(name_str) == 0 {
+			continue
+		}
+
+		append(&_hosts, Dns_Host_Entry{name_str, addr})
+	}
+
+	return _hosts[:], true
+}
+
 /*
 	www.google.com -> 3www6google3com0
 */
@@ -443,6 +480,28 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	defer delete(dns_servers)
 	if len(dns_servers) == 0 {
 		return
+	}
+
+	hosts := _load_hosts() or_return
+	defer delete(hosts)
+	if len(hosts) == 0 {
+		return
+	}
+
+	host_records := make([dynamic]Dns_Record, 0)
+	for host in hosts {
+		if strings.compare(host.name, hostname) == 0 {
+			if type == .Ipv4 && family_from_address(host.addr) == .IPv4 {
+				addr4 := cast(Dns_Record_Ipv4)host.addr.(Ipv4_Address)
+				append(&host_records, addr4)
+			} else if type == .Ipv6 && family_from_address(host.addr) == .IPv6 {
+				addr6 := cast(Dns_Record_Ipv6)host.addr.(Ipv6_Address)
+				append(&host_records, addr6)
+			}
+		}
+	}
+	if len(host_records) > 0 {
+		return host_records[:], true
 	}
 
 	_validate_hostname(hostname) or_return
