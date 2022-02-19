@@ -358,7 +358,7 @@ send_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 // TODO
 Udp_Send_Error :: enum c.int {
 	// The message is too big. No data was sent.
-	Truncated = c.int(os.EMSGSIZE),
+	Message_Too_Long = c.int(os.EMSGSIZE),
 	// TODO: not sure what the exact circumstances for this is yet
 	Network_Unreachable = c.int(os.ENETUNREACH),
 	// There are no more emphemeral outbound ports available to bind the socket to, in order to send.
