@@ -277,7 +277,8 @@ recv_tcp :: proc(skt: Tcp_Socket, buf: []byte) -> (bytes_read: int, err: Network
 
 Udp_Recv_Error :: enum c.int {
 	// The buffer is too small to fit the entire message, and the message was truncated.
-	Truncated = c.int(os.EMSGSIZE),
+	// When this happens, the rest of message is lost.
+	Buffer_Too_Small = c.int(os.EMSGSIZE),
 	// The so-called socket is not an open socket.
 	Not_Socket = c.int(os.ENOTSOCK),
 	// The so-called socket is, in fact, not even a valid descriptor.
@@ -299,9 +300,14 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 		return
 	}
 
-	from: os.SOCKADDR_STORAGE_LH
+	from: os.SOCKADDR_STORAGE_LH = ---
 	fromsize := c.int(size_of(from))
-	res, ok := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
+
+	// NOTE(tetra): On Linux, if the buffer is too small to fit the entire datagram payload, the rest is silently discarded,
+	// and no error is returned.
+	// However, if you pass MSG_TRUNC here, 'res' will be the size of the incoming message, rather than how much was read.
+	// We can use this fact to detect this condition and return .Buffer_Too_Small.
+	res, ok := os.recvfrom(os.Socket(skt), buf, os.MSG_TRUNC, cast(^os.SOCKADDR) &from, &fromsize)
 	if ok != os.ERROR_NONE {
 		err = Udp_Recv_Error(ok)
 		return
@@ -309,6 +315,13 @@ recv_udp :: proc(skt: Udp_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 
 	bytes_read = int(res)
 	remote_endpoint = sockaddr_to_endpoint(&from)
+
+	if bytes_read > len(buf) {
+		// NOTE(tetra): The buffer has been filled, with a partial message.
+		bytes_read = len(buf)
+		err = .Buffer_Too_Small
+	}
+
 	return
 }
 
