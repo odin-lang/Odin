@@ -47,6 +47,10 @@ import "core:runtime"
 ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 
 /*
+	See also top of `dns.odin` for DNS configuration.
+*/
+
+/*
 	COMMON DEFINITIONS
 */
 
@@ -124,7 +128,7 @@ IPv6_Any := IPv6_Address{}
 
 Endpoint :: struct {
 	address: Address,
-	port: int,
+	port:    int,
 }
 
 Address_Family :: enum {
@@ -135,6 +139,18 @@ Address_Family :: enum {
 /*
 	DNS DEFINITIONS
 */
+
+DNS_Configuration :: struct {
+	/*
+		Configuration files.
+	*/
+	resolv_conf: string,
+	hosts_file:  string,
+
+	// TODO: Allow loading these up with `reload_configuration()` call or the like so we don't have to do it each call.
+	name_servers:       []Endpoint,
+	hosts_file_entries: []DNS_Record,
+}
 
 DNS_TYPE_A     :: 0x1
 DNS_TYPE_NS    :: 0x2
