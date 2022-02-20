@@ -625,6 +625,8 @@ enum BuildFlagKind {
 	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 
+	BuildFlag_RelocMode,
+
 	BuildFlag_TestName,
 
 	BuildFlag_DisallowDo,
@@ -778,6 +780,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,    str_lit("extra-linker-flags"),            BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags, str_lit("extra-assembler-flags"),         BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_RelocMode,        str_lit("reloc-mode"),                       BuildFlagParam_String, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
 
@@ -1337,6 +1341,28 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
 							string_to_lower(&build_context.microarch);
+							break;
+						}
+						case BuildFlag_RelocMode: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String v = value.value_string;
+							if (v == "default") {
+								build_context.reloc_mode = RelocMode_Default;
+							} else if (v == "static") {
+								build_context.reloc_mode = RelocMode_Static;
+							} else if (v == "pic") {
+								build_context.reloc_mode = RelocMode_PIC;
+							} else if (v == "dynamic-no-pic") {
+								build_context.reloc_mode = RelocMode_DynamicNoPIC;
+							} else {
+								gb_printf_err("-reloc-mode flag expected one of the following\n");
+								gb_printf_err("\tdefault\n");
+								gb_printf_err("\tstatic\n");
+								gb_printf_err("\tpic\n");
+								gb_printf_err("\tdynamic-no-pic\n");
+								bad_flags = true;
+							}
+
 							break;
 						}
 						case BuildFlag_TestName: {
