@@ -115,11 +115,6 @@ IPv4_Address :: distinct [4]u8
 IPv6_Address :: distinct [8]u16be
 Address :: union {IPv4_Address, IPv6_Address}
 
-Addr_Type :: enum {
-	IPv4,
-	IPv6,
-}
-
 IPv4_Loopback := IPv4_Address{127, 0, 0, 1}
 IPv6_Loopback := IPv6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 
