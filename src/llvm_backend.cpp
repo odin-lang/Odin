@@ -1308,6 +1308,20 @@ void lb_generate_code(lbGenerator *gen) {
 		reloc_mode = LLVMRelocPIC;
 	}
 
+	switch (build_context.reloc_mode) {
+	case RelocMode_Default:
+		break;
+	case RelocMode_Static:
+		reloc_mode = LLVMRelocStatic;
+		break;
+	case RelocMode_PIC:
+		reloc_mode = LLVMRelocPIC;
+		break;
+	case RelocMode_DynamicNoPIC:
+		reloc_mode = LLVMRelocDynamicNoPic;
+		break;
+	}
+
 	for_array(i, gen->modules.entries) {
 		target_machines[i] = LLVMCreateTargetMachine(
 			target, target_triple, llvm_cpu,

@@ -189,6 +189,13 @@ enum ErrorPosStyle {
 	ErrorPosStyle_COUNT
 };
 
+enum RelocMode {
+	RelocMode_Default,
+	RelocMode_Static,
+	RelocMode_PIC,
+	RelocMode_DynamicNoPIC,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -269,6 +276,8 @@ struct BuildContext {
 	bool show_debug_messages;
 	
 	bool copy_file_contents;
+
+	RelocMode reloc_mode;
 
 
 	u32 cmd_doc_flags;
