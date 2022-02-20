@@ -236,7 +236,6 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	fi: Info
 	arg_index: int = 0
-	ret: int = 0
 	end := len(fmt)
 	was_prev_index := false
 
@@ -250,8 +249,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 			i += 1
 		}
 		if i > prev_i {
-			ret, _ = io.write_string(fi.writer, fmt[prev_i:i])
-			total_size += ret
+			io.write_string(fi.writer, fmt[prev_i:i], &total_size)
 		}
 		if i >= end {
 			break loop
@@ -266,15 +264,13 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 				// Skip extra one
 				i += 1
 			}
-			io.write_byte(fi.writer, char)
-			total_size += 1
+			io.write_byte(fi.writer, char, &total_size)
 			continue loop
 		} else if char == '{' {
 			if i < end && fmt[i] == char {
 				// Skip extra one
 				i += 1
-				io.write_byte(fi.writer, char)
-				total_size += 1
+				io.write_byte(fi.writer, char, &total_size)
 				continue loop
 			}
 		}
@@ -305,8 +301,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 				i += 1
 				fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index)
 				if !fi.width_set {
-					ret, _ = io.write_string(w, "%!(BAD WIDTH)")
-					total_size += ret
+					io.write_string(w, "%!(BAD WIDTH)", &total_size)
 				}
 
 				if fi.width < 0 {
@@ -337,8 +332,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 						fi.prec_set = false
 					}
 					if !fi.prec_set {
-						ret, _ = io.write_string(fi.writer, "%!(BAD PRECISION)")
-						total_size += ret
+						io.write_string(fi.writer, "%!(BAD PRECISION)", &total_size)
 					}
 					was_prev_index = false
 				} else {
@@ -351,8 +345,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 			}
 
 			if i >= end {
-				ret, _ = io.write_string(fi.writer, "%!(NO VERB)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(NO VERB)", &total_size)
 				break loop
 			}
 
@@ -361,14 +354,11 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 
 			switch {
 			case verb == '%':
-				io.write_byte(fi.writer, '%')
-				total_size += 1
+				io.write_byte(fi.writer, '%', &total_size)
 			case !fi.good_arg_index:
-				ret, _ = io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER)", &total_size)
 			case arg_index >= len(args):
-				ret, _ = io.write_string(fi.writer, "%!(MISSING ARGUMENT)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(MISSING ARGUMENT)", &total_size)
 			case:
 				fmt_arg(&fi, args[arg_index], verb)
 				arg_index += 1
@@ -384,16 +374,14 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 					arg_index = new_arg_index
 					i = new_i
 				} else {
-					ret, _ = io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER ")
-					total_size += ret
+					io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER ", &total_size)
 					// Skip over the bad argument
 					start_index := i
 					for i < end && fmt[i] != '}' && fmt[i] != ':' {
 						i += 1
 					}
 					fmt_arg(&fi, fmt[start_index:i], 'v')
-					ret, _ = io.write_string(fi.writer, ")")
-					total_size += ret
+					io.write_string(fi.writer, ")", &total_size)
 				}
 			}
 
@@ -426,8 +414,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 					i += 1
 					fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index)
 					if !fi.width_set {
-						ret, _ = io.write_string(fi.writer, "%!(BAD WIDTH)")
-						total_size += ret
+						io.write_string(fi.writer, "%!(BAD WIDTH)", &total_size)
 					}
 
 					if fi.width < 0 {
@@ -458,8 +445,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 							fi.prec_set = false
 						}
 						if !fi.prec_set {
-							ret, _ = io.write_string(fi.writer, "%!(BAD PRECISION)")
-							total_size += ret
+							io.write_string(fi.writer, "%!(BAD PRECISION)", &total_size)
 						}
 						was_prev_index = false
 					} else {
@@ -473,8 +459,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 
 
 				if i >= end {
-					ret, _ = io.write_string(fi.writer, "%!(NO VERB)")
-					total_size += ret
+					io.write_string(fi.writer, "%!(NO VERB)", &total_size)
 					break loop
 				}
 
@@ -484,8 +469,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 			}
 
 			if i >= end {
-				ret, _ = io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)", &total_size)
 				break loop
 			}
 
@@ -494,14 +478,11 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 
 			switch {
 			case brace != '}':
-				ret, _ = io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)", &total_size)
 			case !fi.good_arg_index:
-				ret, _ = io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER)", &total_size)
 			case arg_index >= len(args):
-				ret, _ = io.write_string(fi.writer, "%!(MISSING ARGUMENT)")
-				total_size += ret
+				io.write_string(fi.writer, "%!(MISSING ARGUMENT)", &total_size)
 			case:
 				fmt_arg(&fi, args[arg_index], verb)
 				arg_index += 1
@@ -510,23 +491,19 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	}
 
 	if !fi.reordered && arg_index < len(args) {
-		ret, _ = io.write_string(fi.writer, "%!(EXTRA ")
-		total_size += ret
+		io.write_string(fi.writer, "%!(EXTRA ", &total_size)
 		for arg, index in args[arg_index:] {
 			if index > 0 {
-				ret, _ = io.write_string(fi.writer, ", ")
-				total_size += ret
+				io.write_string(fi.writer, ", ", &total_size)
 			}
 
 			if arg == nil {
-				ret, _ = io.write_string(fi.writer, "<nil>")
-				total_size += ret
+				io.write_string(fi.writer, "<nil>", &total_size)
 			} else {
 				fmt_arg(&fi, args[index], 'v')
 			}
 		}
-		ret, _ = io.write_string(fi.writer, ")")
-		total_size += ret
+		io.write_string(fi.writer, ")", &total_size)
 	}
 
 	io.flush(auto_cast w)
