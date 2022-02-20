@@ -25,7 +25,7 @@ import win "core:sys/windows"
 //
 // NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
 // meaning that DNS queries for a hostname will resolve through CNAME records until an
-// IP Address is reached.
+// IP address is reached.
 //
 // WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
 // See `destroy_records`.

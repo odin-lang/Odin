@@ -106,14 +106,14 @@ parse_address :: proc(address_and_maybe_port: string) -> Address {
 	return nil
 }
 
-parse_endpoint :: proc(Address: string) -> (ep: Endpoint, ok: bool) {
-	addr_str, port, split_ok := split_port(Address)
+parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
+	addr_str, port, split_ok := split_port(address)
 	if !split_ok do return
 
 	addr := parse_address(addr_str)
 	if addr == nil do return
 
-	ep = Endpoint { Address = addr, port = port }
+	ep = Endpoint { address = addr, port = port }
 	ok = true
 	return
 }
@@ -138,7 +138,7 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 		port, ok = strconv.parse_int(endpoint_str[i+1:], 10)
 		return
 	} else if n > 1 {
-		// IPv6 Address without port
+		// IPv6 address without port
 	}
 
 	// No port
@@ -148,7 +148,7 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 	return
 }
 
-// Joins an Address or hostname with a port.
+// Joins an address or hostname with a port.
 join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host)
 	if !ok do return addr_or_host
@@ -186,7 +186,7 @@ map_to_ipv6 :: proc(addr: Address) -> Address {
 }
 
 
-// Returns a temporarily-allocated string representation of the Address.
+// Returns a temporarily-allocated string representation of the address.
 address_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
 	b := strings.make_builder(allocator)
 	switch v in addr {
@@ -217,12 +217,12 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 }
 
 // Returns a temporarily-allocated string representation of the endpoint.
-// If there's a port, uses the `[Address]:port` format.
+// If there's a port, uses the `[address]:port` format.
 endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> (s: string) {
-	s = address_to_string(ep.Address, allocator)
+	s = address_to_string(ep.address, allocator)
 	if ep.port != 0 {
 		b := strings.make_builder(allocator)
-		switch a in ep.Address {
+		switch a in ep.address {
 		case IPv4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
 		case IPv6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
 		}
