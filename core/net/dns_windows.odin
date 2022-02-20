@@ -1,3 +1,4 @@
+//+build windows
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -29,7 +30,7 @@ import win "core:sys/windows"
 //
 // WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
 // See `destroy_records`.
-get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
 
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator)
@@ -135,28 +136,4 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 	records = recs[:]
 	ok = true
 	return
-}
-
-// `records` slice is also destroyed.
-destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
-	context.allocator = allocator
-
-	for rec in records {
-		switch r in rec {
-		case DNS_Record_IPv4:  // nothing to do
-		case DNS_Record_IPv6:  // nothing to do
-		case DNS_Record_CNAME:
-			delete(string(r))
-		case DNS_Record_Text:
-			delete(string(r))
-		case DNS_Record_NS:
-			delete(string(r))
-		case DNS_Record_MX:
-			delete(r.host)
-		case DNS_Record_SRV:
-			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
-		}
-	}
-
-	delete(records)
 }
