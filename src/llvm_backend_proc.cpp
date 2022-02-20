@@ -57,6 +57,7 @@ void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbVal
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
 
+
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
@@ -163,14 +164,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		break;
 	}
 
-
-
-	// lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// // TODO(bill): Clean up this logic
-	// if (build_context.metrics.os != TargetOs_js)  {
-	// 	cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-	// }
-	// LLVMSetFunctionCallConv(p->value, cc_kind);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
 	lb_add_member(m, p->name, proc_value);
