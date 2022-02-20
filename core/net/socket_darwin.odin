@@ -90,7 +90,7 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: TCP_Socket, err: Network_Err
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same Address immediately.
+	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := endpoint_to_sockaddr({addr, port})
@@ -107,13 +107,13 @@ dial_tcp :: proc(addr: Address, port: int) -> (skt: TCP_Socket, err: Network_Err
 Bind_Error :: enum c.int {
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = c.int(os.EADDRINUSE),
-	// The Address is not a local Address on this machine.
+	// The address is not a local address on this machine.
 	Given_Nonlocal_Address = c.int(os.EADDRNOTAVAIL),
-	// To bind a UDP socket to the broadcast Address, the appropriate socket option must be set.
+	// To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
 	Broadcast_Disabled = c.int(os.EACCES),
-	// The Address family of the Address does not match that of the socket.
+	// The address family of the address does not match that of the socket.
 	Address_Family_Mismatch = c.int(os.EFAULT),
-	// The socket is already bound to an Address.
+	// The socket is already bound to an address.
 	Already_Bound = c.int(os.EINVAL),
 	// There are not enough ephemeral ports available.
 	No_Ports_Available = c.int(os.ENOBUFS),
@@ -145,7 +145,7 @@ make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: UDP_Socket, err
 //
 // This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
-// The bound_address is the Address of the network interface that you want to use, or a loopback Address if you don't care which to use.
+// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_Socket, err: Network_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 	bind(skt, {bound_address, port}) or_return
@@ -173,9 +173,9 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: TCP
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same Address immediately.
+	// use the same address immediately.
 	//
-	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the Address!
+	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
 	set_option(sock, .Reuse_Address, true) or_return
 
 	bind(sock, {local_addr, port}) or_return

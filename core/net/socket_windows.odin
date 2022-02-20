@@ -92,7 +92,7 @@ dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (s
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
-	// use the same Address immediately.
+	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := endpoint_to_sockaddr({addr, port})
@@ -112,13 +112,13 @@ dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (s
 Bind_Error :: enum c.int {
 	// Another application is currently bound to this endpoint.
 	Address_In_Use = win.WSAEADDRINUSE,
-	// The Address is not a local Address on this machine.
+	// The address is not a local address on this machine.
 	Given_Nonlocal_Address = win.WSAEADDRNOTAVAIL,
-	// To bind a UDP socket to the broadcast Address, the appropriate socket option must be set.
+	// To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
 	Broadcast_Disabled = win.WSAEACCES,
-	// The Address family of the Address does not match that of the socket.
+	// The address family of the address does not match that of the socket.
 	Address_Family_Mismatch = win.WSAEFAULT,
-	// The socket is already bound to an Address.
+	// The socket is already bound to an address.
 	Already_Bound = win.WSAEINVAL,
 	// There are not enough ephemeral ports available.
 	No_Ports_Available = win.WSAENOBUFS,
@@ -150,7 +150,7 @@ make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: UDP_Socket, err
 //
 // This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 //
-// The bound_address is the Address of the network interface that you want to use, or a loopback Address if you don't care which to use.
+// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_Socket, err: Network_Error) {
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 	bind(skt, {bound_address, port}) or_return
@@ -262,7 +262,7 @@ UDP_Recv_Error :: enum c.int {
 	// The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
 	Remote_Not_Listening = win.WSAECONNRESET,
 	Shutdown = win.WSAESHUTDOWN,
-	// A broadcast Address was specified, but the .Broadcast socket option isn't set.
+	// A broadcast address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled = win.WSAEACCES,
 	Bad_Buffer = win.WSAEFAULT,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
@@ -316,7 +316,7 @@ TCP_Send_Error :: enum c.int {
 	Host_Unreachable = win.WSAEHOSTUNREACH,
 	Offline = win.WSAENETUNREACH, // TODO: verify possible, as not mentioned in docs
 	Timeout = win.WSAETIMEDOUT,
-	// A broadcast Address was specified, but the .Broadcast socket option isn't set.
+	// A broadcast address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled = win.WSAEACCES,
 	Bad_Buffer = win.WSAEFAULT,
 	// Connection is broken due to keepalive activity detecting a failure during the operation.
@@ -348,7 +348,7 @@ UDP_Send_Error :: enum c.int {
 	// The machine at the remote endpoint doesn't have the given port open to receiving UDP data.
 	Remote_Not_Listening = win.WSAECONNRESET,
 	Shutdown = win.WSAESHUTDOWN,
-	// A broadcast Address was specified, but the .Broadcast socket option isn't set.
+	// A broadcast address was specified, but the .Broadcast socket option isn't set.
 	Broadcast_Disabled = win.WSAEACCES,
 	Bad_Buffer = win.WSAEFAULT,
 	// Connection is broken due to keepalive activity detecting a failure during the operation.
@@ -362,9 +362,9 @@ UDP_Send_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK,
 	// The remote host cannot be reached from this host at this time.
 	Host_Unreachable = win.WSAEHOSTUNREACH,
-	// Attempt to send to the Any Address.
+	// Attempt to send to the Any address.
 	Cannot_Use_Any_Address = win.WSAEADDRNOTAVAIL,
-	// The Address is of an incorrect Address family for this socket.
+	// The address is of an incorrect address family for this socket.
 	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	// The network cannot be reached from this host at this time.
 	Offline = win.WSAENETUNREACH,
@@ -424,7 +424,7 @@ shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Erro
 
 
 Socket_Option :: enum c.int {
-	// bool: Whether the Address that this socket is bound to can be reused by other sockets.
+	// bool: Whether the address that this socket is bound to can be reused by other sockets.
 	//       This allows you to bypass the cooldown period if a program dies while the socket is bound.
 	Reuse_Address = win.SO_REUSEADDR,
 	// bool: Whether other programs will be inhibited from binding the same endpoint as this socket.
@@ -457,7 +457,7 @@ Socket_Option :: enum c.int {
 	//            For non-blocking sockets, ignored.
 	//            Use a value of zero to potentially wait forever.
 	Send_Timeout = win.SO_SNDTIMEO,
-	// bool: Allow sending to, receiving from, and binding to, a broadcast Address.
+	// bool: Allow sending to, receiving from, and binding to, a broadcast address.
 	Broadcast = win.SO_BROADCAST,
 }
 

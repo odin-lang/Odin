@@ -383,7 +383,7 @@ _parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator
 
 		dq_sz :: 4
 		hostname, hn_sz := _decode_hostname(response, cur_idx) or_return
-		DNS_Query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
+		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
 	}
@@ -434,7 +434,7 @@ _parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator
 //
 // NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
 // meaning that DNS queries for a hostname will resolve through CNAME records until an
-// IP Address is reached.
+// IP address is reached.
 //
 get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
@@ -464,14 +464,14 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 	dns_hdr[1] = bits
 	dns_hdr[2] = 1
 
-	DNS_Query := [2]u16be{ u16be(type), 1 }
+	dns_query := [2]u16be{ u16be(type), 1 }
 
 	output := [(size_of(u16be) * 6) + name_max + (size_of(u16be) * 2)]u8{}
 	b := strings.builder_from_slice(output[:])
 
 	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
 	_encode_hostname(&b, hostname) or_return
-	strings.write_bytes(&b, mem.slice_data_cast([]u8, DNS_Query[:]))
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
 
 	dns_packet := output[:strings.builder_len(b)]
 
