@@ -289,7 +289,6 @@ execute_request :: proc(r: Request, max_redirects := ODIN_HTTP_MAX_REDIRECTS, al
 
 	location: string
 	for {
-		fmt.printf("Redirect # %v\n", redirect_count)
 		skt := send_request(r) or_return
 		defer net.close(skt)
 
