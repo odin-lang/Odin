@@ -996,6 +996,19 @@ String lb_filepath_obj_for_module(lbModule *m) {
 			case TargetOs_essence:
 				ext = STR_LIT(".o");
 				break;
+
+			case TargetOs_freestanding:
+				switch (build_context.metrics.abi) {
+				default:
+				case TargetABI_Default:
+				case TargetABI_GNU:
+					ext = STR_LIT(".o");
+					break;
+				case TargetABI_MSVC:
+					ext = STR_LIT(".obj");
+					break;
+				}
+				break;
 			}
 		}
 	}

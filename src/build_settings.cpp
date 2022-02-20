@@ -8,7 +8,7 @@
 // #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
-enum TargetOsKind {
+enum TargetOsKind : u16 {
 	TargetOs_Invalid,
 
 	TargetOs_windows,
@@ -25,7 +25,7 @@ enum TargetOsKind {
 	TargetOs_COUNT,
 };
 
-enum TargetArchKind {
+enum TargetArchKind : u16 {
 	TargetArch_Invalid,
 
 	TargetArch_amd64,
@@ -37,7 +37,7 @@ enum TargetArchKind {
 	TargetArch_COUNT,
 };
 
-enum TargetEndianKind {
+enum TargetEndianKind : u8 {
 	TargetEndian_Invalid,
 
 	TargetEndian_Little,
@@ -45,6 +45,16 @@ enum TargetEndianKind {
 
 	TargetEndian_COUNT,
 };
+
+enum TargetABIKind : u16 {
+	TargetABI_Default,
+
+	TargetABI_MSVC,
+	TargetABI_GNU,
+
+	TargetABI_COUNT,
+};
+
 
 String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
@@ -75,6 +85,12 @@ String target_endian_names[TargetEndian_COUNT] = {
 	str_lit("big"),
 };
 
+String target_abi_names[TargetABI_COUNT] = {
+	str_lit(""),
+	str_lit("win64"),
+	str_lit("sysv"),
+};
+
 TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
 	TargetEndian_Little,
@@ -98,6 +114,7 @@ struct TargetMetrics {
 	isize          max_align;
 	String         target_triplet;
 	String         target_data_layout;
+	TargetABIKind  abi;
 };
 
 
@@ -399,6 +416,16 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 // 	str_lit(""),
 // };
 
+gb_global TargetMetrics target_freestanding_amd64_gnu = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-pc-none-gnu"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	TargetABI_GNU,
+};
+
 
 
 struct NamedTargetMetrics {
@@ -420,7 +447,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+
+	{ str_lit("freestanding_amd64_gnu"), &target_freestanding_amd64_gnu },
 };
 
 NamedTargetMetrics *selected_target_metrics;
