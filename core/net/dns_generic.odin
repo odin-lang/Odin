@@ -28,7 +28,7 @@ import "core:fmt"
 	or is that what recursion desired does? Do we need to handle recursion unavailable?
 	How do we deal with is_authoritative / is_truncated?
 
-	TODO(cloin): How do we cache resolv.conf in a threadsafe way?
+	TODO(cloin): How do we cache resolv.conf and hosts in a threadsafe way?
 
 	TODO(cloin): Handle more record types
 */
@@ -103,6 +103,44 @@ _load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []str
 	}
 
 	return _dns_servers[:], true
+}
+
+@private
+_load_hosts :: proc(allocator := context.allocator) -> (hosts: []DNS_Host_Entry, ok: bool) {
+	context.allocator = allocator
+
+	res, success := os.read_entire_file_from_filename("/etc/hosts", allocator)
+	if !success {
+		return
+	}
+	defer delete(res)
+
+	_hosts := make([dynamic]DNS_Host_Entry, 0, allocator)
+	hosts_str := string(res)
+	for line in strings.split_lines_iterator(&hosts_str) {
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+
+		splits := strings.fields(line)
+		defer delete(splits)
+
+		ip_str := splits[0]
+		addr := parse_address(ip_str)
+		if addr == nil {
+			continue
+		}
+
+		for hostname in splits[1:] {
+			if len(hostname) == 0 {
+				continue
+			}
+
+			append(&_hosts, DNS_Host_Entry{hostname, addr})
+		}
+	}
+
+	return _hosts[:], true
 }
 
 /*
@@ -443,6 +481,28 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 	defer delete(dns_servers)
 	if len(dns_servers) == 0 {
 		return
+	}
+
+	hosts := _load_hosts() or_return
+	defer delete(hosts)
+	if len(hosts) == 0 {
+		return
+	}
+
+	host_records := make([dynamic]DNS_Record, 0)
+	for host in hosts {
+		if strings.compare(host.name, hostname) == 0 {
+			if type == .IPv4 && family_from_address(host.addr) == .IPv4 {
+				addr4 := cast(DNS_Record_IPv4)host.addr.(IPv4_Address)
+				append(&host_records, addr4)
+			} else if type == .IPv6 && family_from_address(host.addr) == .IPv6 {
+				addr6 := cast(DNS_Record_IPv6)host.addr.(IPv6_Address)
+				append(&host_records, addr6)
+			}
+		}
+	}
+	if len(host_records) > 0 {
+		return host_records[:], true
 	}
 
 	_validate_hostname(hostname) or_return
