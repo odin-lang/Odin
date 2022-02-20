@@ -20,9 +20,6 @@ import "core:c"
 import "core:os"
 import "core:time"
 
-import "core:fmt"
-
-
 Platform_Socket :: os.Socket
 
 Create_Socket_Error :: enum c.int {
