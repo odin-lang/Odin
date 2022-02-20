@@ -148,8 +148,7 @@ set_dns_configuration :: proc(configuration: DNS_Configuration) -> (ok: bool) {
 */
 
 // TODO: Rewrite this to work with OS resolver or custom name servers.
-
-resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6}) -> (addr4, addr6: Address, ok: bool) {
+resolve :: proc(hostname: string, families_to_resolve: bit_set[Address_Family] = {.IPv4, .IPv6}) -> (addr4, addr6: Address, ok: bool) {
 	if addr := parse_address(hostname); addr != nil {
 		switch a in addr {
 		case IPv4_Address: addr4 = addr
@@ -174,14 +173,14 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6
 	mem.init_arena(&arena, buf[:])
 	allocator := mem.arena_allocator(&arena)
 
-	if .IPv4 in addr_types {
+	if .IPv4 in families_to_resolve {
 		recs, _ := get_dns_records_from_os(hostname, .IPv4, allocator)
 		if len(recs) > 0 {
 			addr4 = cast(IPv4_Address) recs[0].(DNS_Record_IPv4) // address is copied
 		}
 	}
 
-	if .IPv6 in addr_types {
+	if .IPv6 in families_to_resolve {
 		recs, _ := get_dns_records_from_os(hostname, .IPv6, allocator)
 		if len(recs) > 0 {
 			addr6 = cast(IPv6_Address) recs[0].(DNS_Record_IPv6) // address is copied
@@ -217,10 +216,10 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	validate_hostname(hostname) or_return
 
 	hdr := DNS_Header{
-		id = 0, 
-		is_response = false, 
-		opcode = 0, 
-		is_authoritative = false, 
+		id = 0,
+		is_response = false,
+		opcode = 0,
+		is_authoritative = false,
 		is_truncated = false,
 		is_recursion_desired = true,
 		is_recursion_available = false,
@@ -444,9 +443,9 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 	www.google.com -> 3www6google3com0
 */
 encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := context.allocator) -> (ok: bool) {
-	
+
 	label_max :: 63
-	
+
 	_hostname := hostname
 	for section in strings.split_iterator(&_hostname, ".") {
 		if len(section) > label_max {
@@ -537,7 +536,7 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 				out_size += label_size + 1
 			}
 		}
-		
+
 		iteration_max += 1
 	}
 
@@ -688,9 +687,9 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		return
 	}
 
-	_records := make([dynamic]DNS_Record, 0) 
+	_records := make([dynamic]DNS_Record, 0)
 
-	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:header_size_bytes]) 
+	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:header_size_bytes])
 	hdr := unpack_dns_header(dns_hdr_chunks[0], dns_hdr_chunks[1])
 	if !hdr.is_response {
 		return
@@ -756,6 +755,6 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 
 		append(&_records, rec)
 	}
-	
+
 	return _records[:], true
 }
