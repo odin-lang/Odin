@@ -77,16 +77,14 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6
 	allocator := mem.arena_allocator(&arena)
 
 	if .IPv4 in addr_types {
-		recs, rec_ok := get_dns_records(hostname, .IPv4, allocator)
-		if !rec_ok do return
+		recs, _ := get_dns_records(hostname, .IPv4, allocator)
 		if len(recs) > 0 {
 			addr4 = cast(IPv4_Address) recs[0].(DNS_Record_IPv4) // address is copied
 		}
 	}
 
 	if .IPv6 in addr_types {
-		recs, rec_ok := get_dns_records(hostname, .IPv6, allocator)
-		if !rec_ok do return
+		recs, _ := get_dns_records(hostname, .IPv6, allocator)
 		if len(recs) > 0 {
 			addr6 = cast(IPv6_Address) recs[0].(DNS_Record_IPv6) // address is copied
 		}
@@ -94,4 +92,36 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6
 
 	ok = addr4 != nil || addr6 != nil
 	return
+}
+
+when ODIN_OS == .Windows {
+	get_dns_records :: get_dns_records_windows
+} else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
+	get_dns_records :: get_dns_records_unix
+} else {
+	#panic("get_dns_records not implemented on this OS")
+}
+
+// `records` slice is also destroyed.
+destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
+	context.allocator = allocator
+
+	for rec in records {
+		switch r in rec {
+		case DNS_Record_IPv4:  // nothing to do
+		case DNS_Record_IPv6:  // nothing to do
+		case DNS_Record_CNAME:
+			delete(string(r))
+		case DNS_Record_Text:
+			delete(string(r))
+		case DNS_Record_NS:
+			delete(string(r))
+		case DNS_Record_MX:
+			delete(r.host)
+		case DNS_Record_SRV:
+			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
+		}
+	}
+
+	delete(records)
 }

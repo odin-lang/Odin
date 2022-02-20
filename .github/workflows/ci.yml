@@ -26,7 +26,7 @@ jobs:
         run: ./odin run examples/demo -debug
         timeout-minutes: 10
       - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style
+        run: ./odin check examples/all -vet -strict-style
         timeout-minutes: 10
       - name: Core library tests
         run: |
@@ -66,7 +66,7 @@ jobs:
         run: ./odin run examples/demo -debug
         timeout-minutes: 10
       - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style
+        run: ./odin check examples/all -vet -strict-style
         timeout-minutes: 10
       - name: Core library tests
         run: |
@@ -115,7 +115,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin check examples/all -strict-style
+          odin check examples/all -vet -strict-style
         timeout-minutes: 10
       - name: Core library tests
         shell: cmd

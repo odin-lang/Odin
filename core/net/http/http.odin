@@ -74,7 +74,6 @@ get :: proc(url: string, max_redirects := ODIN_HTTP_MAX_REDIRECTS, allocator := 
 	defer request_destroy(r)
 
 	r.headers["Connection"] = "close"
-
 	resp, ok = execute_request(r, max_redirects, allocator)
 
 	return
@@ -150,7 +149,6 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 
 	_, write_err := net.send(skt, bytes)
 	if write_err != nil do return
-
 	return skt, true
 }
 
@@ -252,7 +250,7 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 				was_blank = true
 				continue
 			}
-			fmt.printf("committing chunk with %v bytes: %v\n", len(chunk), chunk if len(chunk) <= 16 else "<...>")
+			// fmt.printf("committing chunk with %v bytes: %v\n", len(chunk), chunk if len(chunk) <= 16 else "<...>")
 			write_bytes(&body_buf, transmute([]byte) trim_right_space(chunk))
 			expect_count = true
 		}
@@ -291,6 +289,7 @@ execute_request :: proc(r: Request, max_redirects := ODIN_HTTP_MAX_REDIRECTS, al
 
 	location: string
 	for {
+		fmt.printf("Redirect # %v\n", redirect_count)
 		skt := send_request(r) or_return
 		defer net.close(skt)
 
@@ -309,7 +308,7 @@ execute_request :: proc(r: Request, max_redirects := ODIN_HTTP_MAX_REDIRECTS, al
 		/*
 			Not a redirect, we're done.
 		*/
-		if resp.status_code != .Moved_Permanently {
+		if resp.status_code != .Moved_Permanently && resp.status_code != .Moved_Temporarily {
 			return resp, true
 		}
 
@@ -323,8 +322,8 @@ execute_request :: proc(r: Request, max_redirects := ODIN_HTTP_MAX_REDIRECTS, al
 		/*
 			We're about to free the old response but need the newly given Location. Clone it.
 		*/
-		location  = resp.headers["Location"] or_return
-		location  = strings.clone(location)
+		location = resp.headers["Location"] or_return
+		location = strings.clone(location)
 
 		r2 := r
 		request_init(&r2, .GET, location)
