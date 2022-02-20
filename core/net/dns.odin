@@ -17,6 +17,9 @@
 package net
 
 import "core:mem"
+import "core:strings"
+import "core:fmt"
+import "core:time"
 
 /*
 	Resolves a hostname to exactly one IPv4 and IPv6 address.
@@ -51,6 +54,8 @@ import "core:mem"
 	```
 */
 
+// TODO: Rewrite this to work with OS resolver or custom name servers.
+
 resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6}) -> (addr4, addr6: Address, ok: bool) {
 	if addr := parse_address(hostname); addr != nil {
 		switch a in addr {
@@ -77,14 +82,14 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6
 	allocator := mem.arena_allocator(&arena)
 
 	if .IPv4 in addr_types {
-		recs, _ := get_dns_records(hostname, .IPv4, allocator)
+		recs, _ := get_dns_records_from_os(hostname, .IPv4, allocator)
 		if len(recs) > 0 {
 			addr4 = cast(IPv4_Address) recs[0].(DNS_Record_IPv4) // address is copied
 		}
 	}
 
 	if .IPv6 in addr_types {
-		recs, _ := get_dns_records(hostname, .IPv6, allocator)
+		recs, _ := get_dns_records_from_os(hostname, .IPv6, allocator)
 		if len(recs) > 0 {
 			addr6 = cast(IPv6_Address) recs[0].(DNS_Record_IPv6) // address is copied
 		}
@@ -94,12 +99,102 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.IPv4, .IPv6
 	return
 }
 
+/*
+	`get_dns_records` uses OS-specific methods to query DNS records.
+*/
 when ODIN_OS == .Windows {
-	get_dns_records :: get_dns_records_windows
+	get_dns_records_from_os :: get_dns_records_windows
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
-	get_dns_records :: get_dns_records_unix
+	get_dns_records_from_os :: get_dns_records_unix
 } else {
-	#panic("get_dns_records not implemented on this OS")
+	#panic("get_dns_records_from_os not implemented on this OS")
+}
+
+/*
+	A generic DNS client usable on any platform.
+*/
+get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+	context.allocator = allocator
+
+	_validate_hostname(hostname) or_return
+
+	hdr := DNS_Header{
+		id = 0, 
+		is_response = false, 
+		opcode = 0, 
+		is_authoritative = false, 
+		is_truncated = false,
+		is_recursion_desired = true,
+		is_recursion_available = false,
+		response_code = DNS_Response_Code.No_Error,
+	}
+
+	id, bits := _pack_dns_header(hdr)
+	dns_hdr := [6]u16be{}
+	dns_hdr[0] = id
+	dns_hdr[1] = bits
+	dns_hdr[2] = 1
+
+	dns_query := [2]u16be{ u16be(type), 1 }
+
+	output := [(size_of(u16be) * 6) + name_max + (size_of(u16be) * 2)]u8{}
+	b := strings.builder_from_slice(output[:])
+
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
+	_encode_hostname(&b, hostname) or_return
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
+
+	dns_packet := output[:strings.builder_len(b)]
+
+	dns_response_buf := [4096]u8{}
+	dns_response: []u8
+	for name_server in name_servers {
+		conn, sock_err := make_unbound_udp_socket(family_from_address(name_server.address))
+		if sock_err != nil {
+			fmt.printf("here\n")
+			return
+		}
+		defer close(conn)
+
+		_, send_err := send(conn, dns_packet[:], name_server)
+		if send_err != nil {
+			fmt.printf("here2\n")
+			continue
+		}
+
+		set_err := set_option(conn, .Receive_Timeout, time.Second * 1)
+		if set_err != nil {
+			fmt.printf("here3\n")
+			return
+		}
+
+		recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
+		if recv_err == UDP_Recv_Error.Timeout {
+			fmt.printf("DNS Server response timed out\n")
+			continue
+		} else if recv_err != nil {
+			fmt.printf("here4\n")
+			continue
+		}
+
+		if recv_sz == 0 {
+			continue
+		}
+
+		dns_response = dns_response_buf[:recv_sz]
+
+		rsp, _ok := _parse_response(dns_response, type)
+		if !_ok {
+			return
+		}
+
+		if len(rsp) == 0 {
+			continue
+		}
+
+		return rsp[:], true
+	}
+	return
 }
 
 // `records` slice is also destroyed.

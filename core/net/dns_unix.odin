@@ -19,7 +19,6 @@ package net
 
 import "core:strings"
 import "core:mem"
-import "core:time"
 import "core:os"
 import "core:fmt"
 
@@ -73,7 +72,7 @@ _unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: DNS_Header) {
 }
 
 @private
-_load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []string, ok: bool) {
+_load_resolv_conf :: proc(allocator := context.allocator) -> (name_servers: []Endpoint, ok: bool) {
 	context.allocator = allocator
 
 	res, success := os.read_entire_file_from_filename("/etc/resolv.conf", allocator)
@@ -81,9 +80,9 @@ _load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []str
 		return
 	}
 	defer delete(res)
-
-	_dns_servers := make([dynamic]string, 0, allocator)
 	resolv_str := string(res)
+
+	_name_servers := make([dynamic]Endpoint, 0, allocator)
 	for line in strings.split_lines_iterator(&resolv_str) {
 		if len(line) == 0 || line[0] == '#' {
 			continue
@@ -99,10 +98,15 @@ _load_resolv_conf :: proc(allocator := context.allocator) -> (dns_servers: []str
 			continue
 		}
 
-		append(&_dns_servers, server_ip_str)
+		addr := parse_address(server_ip_str)
+		endpoint := Endpoint{
+			addr,
+			53,
+		}
+		append(&_name_servers, endpoint)
 	}
 
-	return _dns_servers[:], true
+	return _name_servers[:], true
 }
 
 @private
@@ -477,9 +481,11 @@ _parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator
 get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
 
-	dns_servers := _load_resolv_conf() or_return
-	defer delete(dns_servers)
-	if len(dns_servers) == 0 {
+	_validate_hostname(hostname) or_return
+
+	name_servers := _load_resolv_conf() or_return
+	defer delete(name_servers)
+	if len(name_servers) == 0 {
 		return
 	}
 
@@ -489,107 +495,22 @@ get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator 
 		return
 	}
 
-	host_records := make([dynamic]DNS_Record, 0)
+	host_overrides := make([dynamic]DNS_Record, 0)
 	for host in hosts {
 		if strings.compare(host.name, hostname) == 0 {
 			if type == .IPv4 && family_from_address(host.addr) == .IPv4 {
 				addr4 := cast(DNS_Record_IPv4)host.addr.(IPv4_Address)
-				append(&host_records, addr4)
+				append(&host_overrides, addr4)
 			} else if type == .IPv6 && family_from_address(host.addr) == .IPv6 {
 				addr6 := cast(DNS_Record_IPv6)host.addr.(IPv6_Address)
-				append(&host_records, addr6)
+				append(&host_overrides, addr6)
 			}
 		}
 	}
 
-	if len(host_records) > 0 {
-		return host_records[:], true
+	if len(host_overrides) > 0 {
+		return host_overrides[:], true
 	}
 
-	_validate_hostname(hostname) or_return
-
-	hdr := DNS_Header{
-		id = 0, 
-		is_response = false, 
-		opcode = 0, 
-		is_authoritative = false, 
-		is_truncated = false,
-		is_recursion_desired = true,
-		is_recursion_available = false,
-		response_code = DNS_Response_Code.No_Error,
-	}
-
-	id, bits := _pack_dns_header(hdr)
-	dns_hdr := [6]u16be{}
-	dns_hdr[0] = id
-	dns_hdr[1] = bits
-	dns_hdr[2] = 1
-
-	dns_query := [2]u16be{ u16be(type), 1 }
-
-	output := [(size_of(u16be) * 6) + name_max + (size_of(u16be) * 2)]u8{}
-	b := strings.builder_from_slice(output[:])
-
-	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
-	_encode_hostname(&b, hostname) or_return
-	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
-
-	dns_packet := output[:strings.builder_len(b)]
-
-	dns_response_buf := [4096]u8{}
-	dns_response: []u8
-	for dns_server in dns_servers {
-		addr := parse_address(dns_server)
-		if addr == nil {
-			return
-		}
-
-		conn, sock_err := make_unbound_udp_socket(family_from_address(addr))
-		if sock_err != nil {
-			fmt.printf("here\n")
-			return
-		}
-		defer close(conn)
-
-		dns_addr := Endpoint{addr, 53}
-		_, send_err := send(conn, dns_packet[:], dns_addr)
-		if send_err != nil {
-			fmt.printf("here2\n")
-			continue
-		}
-
-		set_err := set_option(conn, .Receive_Timeout, time.Second * 1)
-		if set_err != nil {
-			fmt.printf("here3\n")
-			return
-		}
-
-		recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
-		if recv_err == UDP_Recv_Error.Timeout {
-			fmt.printf("DNS Server response timed out\n")
-			continue
-		} else if recv_err != nil {
-			fmt.printf("here4\n")
-			continue
-		}
-
-		if recv_sz == 0 {
-			continue
-		}
-
-		dns_response = dns_response_buf[:recv_sz]
-
-		rsp, _ok := _parse_response(dns_response, type)
-		if !_ok {
-			return
-		}
-
-		if len(rsp) == 0 {
-			continue
-		}
-
-		return rsp[:], true
-	}
-
-	return
+	return get_dns_records_from_nameservers(hostname, type, name_servers, host_overrides[:])
 }
