@@ -632,6 +632,7 @@ enum BuildFlagKind {
 	BuildFlag_InsertSemicolon,
 	BuildFlag_StrictStyle,
 	BuildFlag_StrictStyleInitOnly,
+	BuildFlag_ForeignErrorProcedures,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -785,9 +786,12 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InsertSemicolon,       str_lit("insert-semicolon"),         BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,           str_lit("strict-style"),             BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,   str_lit("strict-style-init-only"),   BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures, str_lit("foreign-error-procedures"), BuildFlagParam_None, Command__does_check);
+
 	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
+
 
 	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
@@ -1355,6 +1359,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
+							break;
+						case BuildFlag_ForeignErrorProcedures:
+							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
 						case BuildFlag_InsertSemicolon: {
 							gb_printf_err("-insert-semicolon flag is not required any more\n");
@@ -2084,6 +2091,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-verbose-errors");
 		print_usage_line(2, "Prints verbose error messages showing the code on that line and the location in that line");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-foreign-error-procedures");
+		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
+		print_usage_line(0, "");
+
 	}
 
 	if (run_or_build) {
