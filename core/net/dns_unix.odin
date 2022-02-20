@@ -1,3 +1,4 @@
+//+build linux, darwin, freebsd, !windows
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -17,7 +18,6 @@
 package net
 
 import "core:strings"
-import "core:bytes"
 import "core:mem"
 import "core:time"
 import "core:os"
@@ -287,7 +287,7 @@ _validate_hostname :: proc(hostname: string) -> (ok: bool) {
 @private
 _parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil) -> (record: DNS_Record, ok: bool) {
 	record_buf := packet[cur_off^:]
-	hostname, hn_sz := _decode_hostname(packet, cur_off^) or_return
+	_, hn_sz := _decode_hostname(packet, cur_off^) or_return
 
 	ahdr_sz := size_of(DNS_Record_Header)
 	if len(record_buf) - hn_sz < ahdr_sz {
@@ -298,7 +298,7 @@ _parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil
 	record_hdr := cast(^DNS_Record_Header)raw_data(record_hdr_bytes)
 
 	data_sz := record_hdr.length
-	data_off := cur_off^ + int(hn_sz) + int(ahdr_sz);
+	data_off := cur_off^ + int(hn_sz) + int(ahdr_sz)
 	data := packet[data_off:data_off+int(data_sz)]
 	cur_off^ += int(hn_sz) + int(ahdr_sz) + int(data_sz)
 
@@ -474,7 +474,7 @@ _parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator
 // meaning that DNS queries for a hostname will resolve through CNAME records until an
 // IP address is reached.
 //
-get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
 
 	dns_servers := _load_resolv_conf() or_return
@@ -501,6 +501,7 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 			}
 		}
 	}
+
 	if len(host_records) > 0 {
 		return host_records[:], true
 	}
@@ -551,7 +552,7 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 		defer close(conn)
 
 		dns_addr := Endpoint{addr, 53}
-		send_sz, send_err := send(conn, dns_packet[:], dns_addr)
+		_, send_err := send(conn, dns_packet[:], dns_addr)
 		if send_err != nil {
 			fmt.printf("here2\n")
 			continue
@@ -563,7 +564,7 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 			return
 		}
 
-		recv_sz, recv_addr, recv_err := recv_udp(conn, dns_response_buf[:])
+		recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
 		if recv_err == UDP_Recv_Error.Timeout {
 			fmt.printf("DNS Server response timed out\n")
 			continue
@@ -591,27 +592,4 @@ get_dns_records :: proc(hostname: string, type: DNS_Record_Type, allocator := co
 	}
 
 	return
-}
-
-destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
-	context.allocator = allocator
-
-	for rec in records {
-		switch r in rec {
-		case DNS_Record_IPv4:  // nothing to do
-		case DNS_Record_IPv6:  // nothing to do
-		case DNS_Record_CNAME:
-			delete(string(r))
-		case DNS_Record_Text:
-			delete(string(r))
-		case DNS_Record_NS:
-			delete(string(r))
-		case DNS_Record_MX:
-			delete(r.host)
-		case DNS_Record_SRV:
-			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
-		}
-	}
-
-	delete(records)
 }
