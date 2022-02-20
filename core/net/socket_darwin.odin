@@ -23,7 +23,7 @@ import "core:time"
 import "core:fmt"
 
 
-Socket :: os.Socket
+Platform_Socket :: os.Socket
 
 Create_Socket_Error :: enum c.int {
 	Family_Not_Supported_For_This_Socket = c.int(os.EAFNOSUPPORT),
@@ -410,7 +410,7 @@ Socket_Option :: enum c.int {
 	Reuse_Address = c.int(os.SO_REUSEADDR),
 	Keep_Alive = c.int(os.SO_KEEPALIVE),
 	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
-	Tcp_Nodelay = c.int(os.TCP_NODELAY),
+	TCP_Nodelay = c.int(os.TCP_NODELAY),
 
 	Linger = c.int(os.SO_LINGER),
 
@@ -429,7 +429,7 @@ Socket_Option_Error :: enum c.int {
 }
 
 set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
-	level := os.SOL_SOCKET if option != .Tcp_Nodelay else os.IPPROTO_TCP
+	level := os.SOL_SOCKET if option != .TCP_Nodelay else os.IPPROTO_TCP
 
 	// NOTE(tetra, 2022-02-15): On Linux, you cannot merely give a single byte for a bool;
 	//  it _has_ to be a b32.
@@ -446,7 +446,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 		.Reuse_Address,
 		.Keep_Alive,
 		.Out_Of_Bounds_Data_Inline,
-		.Tcp_Nodelay:
+		.TCP_Nodelay:
 		// TODO: verify whether these are options or not on Linux
 		// .Broadcast,
 		// .Conditional_Accept,

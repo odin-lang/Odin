@@ -103,7 +103,7 @@ dial_tcp :: proc(addr: Address, port: int, options := default_tcp_options) -> (s
 	}
 
 	if options.no_delay {
-		_ = set_option(sock, .Tcp_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
+		_ = set_option(sock, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
 
 	return
@@ -214,7 +214,7 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 	client = TCP_Socket(client_sock)
 	source = sockaddr_to_endpoint(&sockaddr)
 	if options.no_delay {
-		_ = set_option(client, .Tcp_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
+		_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
 	return
 }
@@ -441,7 +441,7 @@ Socket_Option :: enum c.int {
 	//       the same as normal 'in-band' data.
 	Out_Of_Bounds_Data_Inline = win.SO_OOBINLINE,
 	// bool: When true, disables send-coalescing, therefore reducing latency.
-	Tcp_Nodelay = win.TCP_NODELAY,
+	TCP_Nodelay = win.TCP_NODELAY,
 	// win.LINGER: Customizes how long (if at all) the socket will remain open when there is some remaining data
 	//             waiting to be sent, and net.close() is called.
 	Linger = win.SO_LINGER,
@@ -474,7 +474,7 @@ Socket_Option_Error :: enum c.int {
 }
 
 set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
-	level := win.SOL_SOCKET if option != .Tcp_Nodelay else win.IPPROTO_TCP
+	level := win.SOL_SOCKET if option != .TCP_Nodelay else win.IPPROTO_TCP
 
 	bool_value: b32
 	int_value: i32
@@ -489,7 +489,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 		.Exclusive_Addr_Use,
 		.Keep_Alive,
 		.Out_Of_Bounds_Data_Inline,
-		.Tcp_Nodelay,
+		.TCP_Nodelay,
 		.Broadcast,
 		.Conditional_Accept,
 		.Dont_Linger:
