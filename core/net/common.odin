@@ -123,7 +123,7 @@ IPv4_Any := IPv4_Address{}
 IPv6_Any := IPv6_Address{}
 
 Endpoint :: struct {
-	Address: Address,
+	address: Address,
 	port: int,
 }
 
@@ -146,8 +146,8 @@ DNS_TYPE_SRV   :: 0x21
 
 // TODO: Support SRV records.
 DNS_Record_Type :: enum u16 {
-	IPv4  = DNS_TYPE_A,     // IPv4 Address.
-	IPv6  = DNS_TYPE_AAAA,  // IPv6 Address.
+	IPv4  = DNS_TYPE_A,     // IPv4 address.
+	IPv6  = DNS_TYPE_AAAA,  // IPv6 address.
 	CNAME = DNS_TYPE_CNAME, // Another host name.
 	TXT   = DNS_TYPE_TEXT,  // Arbitrary binary data or text.
 	NS    = DNS_TYPE_NS,    // Address of a name (DNS) server.
@@ -155,16 +155,16 @@ DNS_Record_Type :: enum u16 {
 	SRV   = DNS_TYPE_SRV,   // Address, port, priority, and weight of a host that provides a particular service.
 }
 
-// An IPv4 Address that the domain name maps to.
+// An IPv4 address that the domain name maps to.
 // There can be any number of these.
 DNS_Record_IPv4 :: distinct IPv4_Address
 
-// An IPv6 Address that the domain name maps to.
+// An IPv6 address that the domain name maps to.
 // There can be any number of these.
 DNS_Record_IPv6 :: distinct IPv6_Address
 
 // Another domain name that the domain name maps to.
-// Domains can be pointed to another domain instead of directly to an IP Address.
+// Domains can be pointed to another domain instead of directly to an IP address.
 // `get_dns_records` will recursively follow these if you request this type of record.
 DNS_Record_CNAME :: distinct string
 
