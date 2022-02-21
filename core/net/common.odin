@@ -205,11 +205,21 @@ DNS_Record_MX :: struct {
 //
 // The host may be "." to indicate that it is "decidedly not available" on this domain.
 DNS_Record_SRV :: struct {
-	_entire_name_buffer: string, // NOTE(tetra): service_name, protocol_name, and host_name are all substrings of this string.
-	service_name, protocol_name, host_name: string,
+	// The full name of this record.
+	// e.g: _sip._tls.example.com
+	record_name: string,
+	// The hostname or address where this service can be found.
+	target: string,
+	// The port on which this service can be found.
 	port: int,
-	priority: int, // lower is higher priority
-	weight: int, // relative weight of this host compared to other of same priority; the chance of using this host should be proporitional to this weight.
+	service_name, protocol_name: string, // NOTE(tetra): These are substrings of 'record_name'
+	// Lower is higher priority
+	priority: int,
+	// Relative weight of this host compared to other of same priority; the chance of using this host should be proporitional to this weight.
+	// The number of seconds that it will take to update the record.
+	weight: int,
+	// The time in seconds that this service will take to update, after the record is updated.
+	ttl_seconds: int,
 }
 
 DNS_Record :: union {
