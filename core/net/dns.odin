@@ -586,7 +586,7 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil) -> (record: DNS_Record, ok: bool) {
 	record_buf := packet[cur_off^:]
 
-	srv_record_name, hn_sz := decode_hostname(packet, cur_off^) or_return
+	srv_record_name, hn_sz := decode_hostname(packet, cur_off^, context.temp_allocator) or_return
 	// TODO(tetra): Not sure what we should call this.
 	// Is it really only used in SRVs?
 	// Maybe some refactoring is required?
@@ -647,6 +647,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
 			target, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 
+			srv_record_name := strings.clone(srv_record_name)
 			parts := strings.split_n(srv_record_name, ".", 3, context.temp_allocator)
 			if len(parts) != 3 {
 				return
@@ -737,8 +738,11 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			continue
 		}
 
+		// TODO: What are we meant to be doing here?
+		// Is this just trying to skip over this hostname?
+		// If so, do we want a skip_hostname() procedure?
 		dq_sz :: 4
-		hostname, hn_sz := decode_hostname(response, cur_idx) or_return
+		_, hn_sz := decode_hostname(response, cur_idx, context.temp_allocator) or_return
 		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
