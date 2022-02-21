@@ -100,7 +100,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			host := string(r.Data.MX.pNameExchange)
 			preference := int(r.Data.MX.wPreference)
 			new_rec := DNS_Record_MX {
-				host       = strings.clone(host),
+				host_name  = strings.clone(host),
 				preference = preference }
 			append(&recs, new_rec)
 
@@ -126,12 +126,12 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 
 			append(&recs, DNS_Record_SRV {
 				entire_name_buffer = name,
-				service_name = service_name,
-				protocol     = protocol_name,
-				host         = host_name,
-				priority     = priority,
-				weight       = weight,
-				port         = port,
+				service_name  = service_name,
+				protocol_name = protocol_name,
+				host_name     = host_name,
+				priority      = priority,
+				weight        = weight,
+				port          = port,
 			})
 		}
 	}
