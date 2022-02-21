@@ -205,7 +205,7 @@ DNS_Record_MX :: struct {
 //
 // The host may be "." to indicate that it is "decidedly not available" on this domain.
 DNS_Record_SRV :: struct {
-	entire_name_buffer: string, // NOTE(tetra): service_name, protocol_name, and host_name are all substrings of this string.
+	_entire_name_buffer: string, // NOTE(tetra): service_name, protocol_name, and host_name are all substrings of this string.
 	service_name, protocol_name, host_name: string,
 	port: int,
 	priority: int, // lower is higher priority
