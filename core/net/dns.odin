@@ -545,7 +545,7 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 		return
 	}
 
-	return strings.clone(strings.to_string(b)), out_size, true
+	return strings.clone(strings.to_string(b), allocator), out_size, true
 }
 
 // Uses RFC 952 & RFC 1123
