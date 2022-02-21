@@ -328,7 +328,8 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 	TODO(cloin): Handle more record types
 */
 
-NAME_MAX :: 255
+NAME_MAX  :: 255
+LABEL_MAX :: 63
 
 pack_dns_header :: proc(hdr: DNS_Header) -> (id: u16be, bits: u16be) {
 	id = hdr.id
@@ -443,12 +444,9 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 	www.google.com -> 3www6google3com0
 */
 encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := context.allocator) -> (ok: bool) {
-
-	label_max :: 63
-
 	_hostname := hostname
 	for section in strings.split_iterator(&_hostname, ".") {
-		if len(section) > label_max {
+		if len(section) > LABEL_MAX {
 			return
 		}
 
@@ -609,6 +607,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			addr_val: u32be = mem.slice_data_cast([]u32be, data)[0]
 			addr := IPv4_Address(transmute([4]u8)addr_val)
 			_record = DNS_Record_IPv4(addr)
+
 		case .IPv6:
 			if len(data) != 16 {
 				return
@@ -617,12 +616,15 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			addr_val: u128be = mem.slice_data_cast([]u128be, data)[0]
 			addr := IPv6_Address(transmute([8]u16be)addr_val)
 			_record = DNS_Record_IPv6(addr)
+
 		case .CNAME:
 			hostname, _ := decode_hostname(packet, data_off) or_return
 			_record = DNS_Record_CNAME(hostname)
+
 		case .NS:
 			name, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 			_record = DNS_Record_NS(name)
+
 		case .SRV:
 			if len(data) <= 6 {
 				return
@@ -638,12 +640,6 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				return
 			}
 			service_name, protocol_name, host_name := parts[0], parts[1], parts[2]
-			if service_name[0] == '_' {
-				service_name = service_name[1:]
-			}
-			if protocol_name[0] == '_' {
-				protocol_name = protocol_name[1:]
-			}
 
 			_record = DNS_Record_SRV{
 				_entire_name_buffer = name,
@@ -654,6 +650,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				weight        = int(weight),
 				port          = int(port),
 			}
+
 		case .MX:
 			if len(data) <= 2 {
 				return
@@ -665,6 +662,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				host_name  = hostname,
 				preference = int(preference),
 			}
+
 		case:
 			fmt.printf("ignoring %d\n", record_hdr.type)
 			return
