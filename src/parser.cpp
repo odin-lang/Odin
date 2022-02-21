@@ -57,6 +57,9 @@ isize ast_node_size(AstKind kind) {
 	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
 
 }
+
+gb_global std::atomic<isize> global_total_node_memory_allocated;
+
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	gbAllocator a = ast_allocator(f);
@@ -66,6 +69,9 @@ Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	Ast *node = cast(Ast *)gb_alloc(a, size);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
+
+	global_total_node_memory_allocated += size;
+
 	return node;
 }
 
@@ -3412,12 +3418,18 @@ ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "fast")        return ProcCC_FastCall;
 	if (s == "none")        return ProcCC_None;
 	if (s == "naked")       return ProcCC_Naked;
+
+	if (s == "win64")	return ProcCC_Win64;
+	if (s == "sysv")        return ProcCC_SysV;
+
 	if (s == "system") {
 		if (build_context.metrics.os == TargetOs_windows) {
 			return ProcCC_StdCall;
 		}
 		return ProcCC_CDecl;
 	}
+
+
 	return ProcCC_Invalid;
 }
 
@@ -3504,12 +3516,13 @@ enum FieldPrefixKind : i32 {
 	FieldPrefix_Unknown = -1,
 	FieldPrefix_Invalid = 0,
 
-	FieldPrefix_using,
+	FieldPrefix_using, // implies #subtype
 	FieldPrefix_const,
 	FieldPrefix_no_alias,
 	FieldPrefix_c_vararg,
 	FieldPrefix_auto_cast,
 	FieldPrefix_any_int,
+	FieldPrefix_subtype, // does not imply `using` semantics
 };
 
 struct ParseFieldPrefixMapping {
@@ -3526,6 +3539,7 @@ gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
 	{str_lit("c_vararg"),   Token_Hash,      FieldPrefix_c_vararg,  FieldFlag_c_vararg},
 	{str_lit("const"),      Token_Hash,      FieldPrefix_const,     FieldFlag_const},
 	{str_lit("any_int"),    Token_Hash,      FieldPrefix_any_int,   FieldFlag_any_int},
+	{str_lit("subtype"),    Token_Hash,      FieldPrefix_subtype,   FieldFlag_subtype},
 };
 
 
@@ -4842,12 +4856,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	f->curr_token_index = 0;
 	f->prev_token = f->tokens[f->prev_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
-
-	isize const page_size = 4*1024;
-	isize block_size = 2*f->tokens.count*gb_size_of(Ast);
-	block_size = ((block_size + page_size-1)/page_size) * page_size;
-	block_size = gb_clamp(block_size, page_size, DEFAULT_MINIMUM_BLOCK_SIZE);
-	f->arena.minimum_block_size = block_size;
 
 	array_init(&f->comments, heap_allocator(), 0, 0);
 	array_init(&f->imports,  heap_allocator(), 0, 0);

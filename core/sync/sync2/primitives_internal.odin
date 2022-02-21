@@ -93,7 +93,7 @@ when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 }
 
 
-when ODIN_OS != "windows" {
+when ODIN_OS != .Windows {
 	RW_Mutex_State :: distinct uint
 	RW_Mutex_State_Half_Width :: size_of(RW_Mutex_State)*8/2
 	RW_Mutex_State_Is_Writing :: RW_Mutex_State(1)

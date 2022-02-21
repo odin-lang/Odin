@@ -2,8 +2,8 @@ package miniaudio
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "lib/miniaudio.lib" }
-when ODIN_OS == "linux"   { foreign import lib "lib/miniaudio.a" }
+when ODIN_OS == .Windows { foreign import lib "lib/miniaudio.lib" }
+when ODIN_OS == .Linux   { foreign import lib "lib/miniaudio.a" }
 
 waveform_type :: enum c.int {
 	sine,

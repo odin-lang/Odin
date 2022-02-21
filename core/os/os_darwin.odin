@@ -320,7 +320,7 @@ foreign libc {
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
 
-when ODIN_ARCH != "arm64" {
+when ODIN_ARCH != .arm64 {
 	_unix_fdopendir :: proc {_unix_fdopendir_amd64}
 	_unix_readdir_r :: proc {_unix_readdir_r_amd64}
 } else {
@@ -351,7 +351,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		return INVALID_HANDLE, 1
 	}
 
-when  ODIN_OS == "darwin" && ODIN_ARCH == "arm64" {
+when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	if mode != 0 {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {

@@ -15,7 +15,7 @@ import "core:intrinsics"
 //  386: arch/x86/entry/syscalls/sycall_32.tbl
 //  arm: arch/arm/tools/syscall.tbl
 
-when ODIN_ARCH == "amd64" {
+when ODIN_ARCH == .amd64 {
 	SYS_read : uintptr : 0
 	SYS_write : uintptr : 1
 	SYS_open : uintptr : 2
@@ -374,7 +374,7 @@ when ODIN_ARCH == "amd64" {
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
 	SYS_memfd_secret : uintptr : 447
-} else when ODIN_ARCH == "arm64" {
+} else when ODIN_ARCH == .arm64 {
 	SYS_io_setup : uintptr : 0
 	SYS_io_destroy : uintptr : 1
 	SYS_io_submit : uintptr : 2
@@ -675,7 +675,7 @@ when ODIN_ARCH == "amd64" {
 	SYS_landlock_create_ruleset : uintptr : 444
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
-} else when ODIN_ARCH == "i386" {
+} else when ODIN_ARCH == .i386 {
 	SYS_restart_syscall : uintptr : 0
 	SYS_exit : uintptr : 1
 	SYS_fork : uintptr : 2
@@ -1112,7 +1112,7 @@ when ODIN_ARCH == "amd64" {
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
 	SYS_memfd_secret : uintptr : 447
-} else when ODIN_ARCH == "arm" {
+} else when false /*ODIN_ARCH == .arm*/ { // TODO
 	SYS_restart_syscall : uintptr : 0
 	SYS_exit : uintptr : 1
 	SYS_fork : uintptr : 2

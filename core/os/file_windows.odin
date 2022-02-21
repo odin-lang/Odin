@@ -399,7 +399,7 @@ is_abs :: proc(path: string) -> bool {
 	if len(path) > 0 && path[0] == '/' {
 		return true
 	}
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		if len(path) > 2 {
 			switch path[0] {
 			case 'A'..='Z', 'a'..='z':

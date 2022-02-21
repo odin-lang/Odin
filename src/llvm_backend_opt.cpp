@@ -56,7 +56,7 @@ LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data
 #endif
 
 void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
-	if (optimization_level == 0 && build_context.ODIN_DEBUG) {
+	if (false && optimization_level == 0 && build_context.ODIN_DEBUG) {
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 	} else {
 		LLVMAddPromoteMemoryToRegisterPass(fpm);

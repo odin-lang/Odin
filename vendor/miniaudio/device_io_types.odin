@@ -2,21 +2,21 @@ package miniaudio
 
 import "core:c"
 
-SUPPORT_WASAPI     :: ODIN_OS == "windows"
-SUPPORT_DSOUND     :: ODIN_OS == "windows"
-SUPPORT_WINMM      :: ODIN_OS == "windows"
-SUPPORT_COREAUDIO  :: ODIN_OS == "darwin"
-SUPPORT_SNDIO      :: ODIN_OS == "openbsd"
-SUPPORT_AUDIO4     :: ODIN_OS == "openbsd" || ODIN_OS == "netbsd"
-SUPPORT_OSS        :: ODIN_OS == "freebsd"
-SUPPORT_PULSEAUDIO :: ODIN_OS == "linux"
-SUPPORT_ALSA       :: ODIN_OS == "linux"
-SUPPORT_JACK       :: ODIN_OS == "windows"
-SUPPORT_AAUDIO     :: ODIN_OS == "android"
-SUPPORT_OPENSL     :: ODIN_OS == "android"
-SUPPORT_WEBAUDIO   :: ODIN_OS == "emscripten"
+SUPPORT_WASAPI     :: ODIN_OS == .Windows
+SUPPORT_DSOUND     :: ODIN_OS == .Windows
+SUPPORT_WINMM      :: ODIN_OS == .Windows
+SUPPORT_COREAUDIO  :: ODIN_OS == .Darwin
+SUPPORT_SNDIO      :: false // ODIN_OS == .OpenBSD
+SUPPORT_AUDIO4     :: false // ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD
+SUPPORT_OSS        :: ODIN_OS == .FreeBSD
+SUPPORT_PULSEAUDIO :: ODIN_OS == .Linux
+SUPPORT_ALSA       :: ODIN_OS == .Linux
+SUPPORT_JACK       :: ODIN_OS == .Windows
+SUPPORT_AAUDIO     :: false // ODIN_OS == .Android
+SUPPORT_OPENSL     :: false // ODIN_OS == .Android
+SUPPORT_WEBAUDIO   :: false // ODIN_OS == .Emscripten
 SUPPORT_CUSTOM     :: true
-SUPPORT_NULL       :: ODIN_OS != "emscripten"
+SUPPORT_NULL       :: true // ODIN_OS != .Emscripten
 
 STATE_UNINITIALIZED :: 0
 STATE_STOPPED       :: 1   /* The device's default state after initialization. */
@@ -895,7 +895,7 @@ context_type :: struct {
 			RegOpenKeyExA:               proc "system" (),
 			RegCloseKey:                 proc "system" (),
 			RegQueryValueExA:            proc "system" (),
-		} when ODIN_OS == "windows" else struct {}),
+		} when ODIN_OS == .Windows else struct {}),
 		
 		posix: (struct {
 			pthreadSO:                   handle,
@@ -914,7 +914,7 @@ context_type :: struct {
 			pthread_attr_setschedpolicy: proc "system" (),
 			pthread_attr_getschedparam:  proc "system" (),
 			pthread_attr_setschedparam:  proc "system" (),
-		} when ODIN_OS != "windows" else struct {}),
+		} when ODIN_OS != .Windows else struct {}),
 		
 		_unused: c.int,
 	},

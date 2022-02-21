@@ -781,3 +781,34 @@ i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_carriage_retu
 	return 2;
 }
 
+
+
+bool string_is_valid_identifier(String str) {
+	if (str.len <= 0) return false;
+
+	isize rune_count = 0;
+
+	isize w = 0;
+	isize offset = 0;
+	while (offset < str.len) {
+		Rune r = 0;
+		w = utf8_decode(str.text, str.len, &r);
+		if (r == GB_RUNE_INVALID) {
+			return false;
+		}
+
+		if (rune_count == 0) {
+			if (!rune_is_letter(r)) {
+				return false;
+			}
+		} else {
+			if (!rune_is_letter(r) && !rune_is_digit(r)) {
+				return false;
+			}
+		}
+		rune_count += 1;
+		offset += w;
+	}
+
+	return true;
+}
