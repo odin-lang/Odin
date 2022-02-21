@@ -125,7 +125,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			}
 
 			append(&recs, DNS_Record_SRV {
-				entire_name_buffer = name,
+				_entire_name_buffer = name,
 				service_name  = service_name,
 				protocol_name = protocol_name,
 				host_name     = host_name,

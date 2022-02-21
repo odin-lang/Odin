@@ -311,7 +311,7 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 		case DNS_Record_MX:
 			delete(r.host_name)
 		case DNS_Record_SRV:
-			delete(r.entire_name_buffer)
+			delete(r._entire_name_buffer)
 		}
 	}
 
@@ -646,7 +646,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			}
 
 			_record = DNS_Record_SRV{
-				entire_name_buffer = name,
+				_entire_name_buffer = name,
 				service_name  = service_name,
 				protocol_name = protocol_name,
 				host_name     = host_name,
