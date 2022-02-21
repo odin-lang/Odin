@@ -246,7 +246,7 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	dns_response_buf := [4096]u8{}
 	dns_response: []u8
 	for name_server in name_servers {
-		conn, sock_err := make_unbound_udp_socket(family_from_address(name_server.address))
+		conn, sock_err := make_unbound_udp_socket(family_from_endpoint(name_server))
 		if sock_err != nil {
 			fmt.printf("here\n")
 			return
