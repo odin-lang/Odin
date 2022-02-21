@@ -22,7 +22,11 @@ import "core:strings"
 get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
 
-	validate_hostname(hostname) or_return
+	if type != .SRV {
+		// NOTE(tetra): 'hostname' can contain underscores when querying SRV records
+		validate_hostname(hostname) or_return
+	}
+
 
 	dns_config := get_dns_configuration() or_return
 

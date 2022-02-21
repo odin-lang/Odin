@@ -213,7 +213,10 @@ when ODIN_OS == .Windows {
 get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
 	context.allocator = allocator
 
-	validate_hostname(hostname) or_return
+	if type != .SRV {
+		// NOTE(tetra): 'hostname' can contain underscores when querying SRV records
+		validate_hostname(hostname) or_return
+	}
 
 	hdr := DNS_Header{
 		id = 0,
@@ -472,6 +475,7 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 	print_size := 0
 	cur_idx := start_idx
 	iteration_max := 0
+	labels_added := 0
 	for cur_idx < len(packet) {
 		if packet[cur_idx] == 0 {
 
@@ -525,9 +529,12 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 				return
 			}
 
-			strings.write_byte(&b, '.')
+			if labels_added > 0 {
+				strings.write_byte(&b, '.')
+			}
 			strings.write_bytes(&b, packet[cur_idx+1:idx2])
 			print_size += label_size + 1
+			labels_added += 1
 
 			cur_idx = idx2
 
@@ -578,7 +585,11 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 
 parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil) -> (record: DNS_Record, ok: bool) {
 	record_buf := packet[cur_off^:]
-	_, hn_sz := decode_hostname(packet, cur_off^) or_return
+
+	srv_record_name, hn_sz := decode_hostname(packet, cur_off^) or_return
+	// TODO(tetra): Not sure what we should call this.
+	// Is it really only used in SRVs?
+	// Maybe some refactoring is required?
 
 	ahdr_sz := size_of(DNS_Record_Header)
 	if len(record_buf) - hn_sz < ahdr_sz {
@@ -634,23 +645,23 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			priority: u16be = mem.slice_data_cast([]u16be, data)[0]
 			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
 			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
-			record_name, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
+			target, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 
-
-			parts := strings.split_n(record_name, ".", 3)
+			parts := strings.split_n(srv_record_name, ".", 3, context.temp_allocator)
 			if len(parts) != 3 {
 				return
 			}
 			service_name, protocol_name := parts[0], parts[1]
 
 			_record = DNS_Record_SRV{
-				record_name   = record_name,
-				target        = strings.clone("((TODO))"), // TODO
+				record_name   = srv_record_name,
+				target        = target,
 				service_name  = service_name,
 				protocol_name = protocol_name,
 				priority      = int(priority),
 				weight        = int(weight),
 				port          = int(port),
+				ttl_seconds   = int(record_hdr.ttl),
 			}
 
 		case .MX:
