@@ -100,7 +100,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			host := string(r.Data.MX.pNameExchange)
 			preference := int(r.Data.MX.wPreference)
 			new_rec := DNS_Record_MX {
-				host       = strings.clone(host),
+				host_name  = strings.clone(host),
 				preference = preference }
 			append(&recs, new_rec)
 
@@ -110,25 +110,28 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			weight := int(r.Data.SRV.wWeight)
 			port := int(r.Data.SRV.wPort)
 
-			parts := strings.split(name, ".", context.temp_allocator)
-			defer delete(parts)
-			assert(len(parts) == 3, "Srv record name should be of the form _servicename._protocol.domain")
-			service_name, protocol, host := parts[0], parts[1], parts[2]
+			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
+			parts := strings.split_n(name, ".", 3, context.temp_allocator)
+			if len(parts) != 3 {
+				continue
+			}
+			service_name, protocol_name, host_name := parts[0], parts[1], parts[2]
 
 			if service_name[0] == '_' {
 				service_name = service_name[1:]
 			}
-			if protocol[0] == '_' {
-				protocol = protocol[1:]
+			if protocol_name[0] == '_' {
+				protocol_name = protocol_name[1:]
 			}
 
 			append(&recs, DNS_Record_SRV {
-				service_name = service_name,
-				protocol     = protocol,
-				host         = host,
-				priority     = priority,
-				weight       = weight,
-				port         = port,
+				_entire_name_buffer = name,
+				service_name  = service_name,
+				protocol_name = protocol_name,
+				host_name     = host_name,
+				priority      = priority,
+				weight        = weight,
+				port          = port,
 			})
 		}
 	}
