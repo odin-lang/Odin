@@ -61,7 +61,6 @@ write_encoded_rune :: proc(fd: Handle, r: rune) -> (n: int, err: Error) {
 	return
 }
 
-
 write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (n: int, err: Error) {
 	s := transmute([]byte)mem.Raw_Slice{data, len}
 	return write(fd, s)
@@ -73,35 +72,62 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (n: int, err: Error) {
 }
 
 
-
-read_entire_file :: proc(name: string, allocator := context.allocator) -> ([]byte, Error) {
-	f, ferr := open(name)
-	if ferr != nil {
-		return nil, ferr
+read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Error) {
+	if len(buf) < min {
+		return 0, .Short_Buffer
 	}
-	defer close(f)
-
-	size: int
-	if size64, err := file_size(f); err == nil {
-		if i64(int(size64)) != size64 {
-			size = int(size64)
-		}
+	for n < min && err == nil {
+		nn: int
+		nn, err = read(fd, buf[n:])
+		n += nn
 	}
-	size += 1 // for EOF
-
-	// TODO(bill): Is this correct logic?
-	total: int
-	data := make([]byte, size, allocator)
-	for {
-		n, err := read(f, data[total:])
-		total += n
-		if err != nil {
-			if err == .EOF {
-				err = nil
-			}
-			return data[:total], err
-		}
+	if n >= min {
+		err = nil
 	}
+	return
+}
+
+read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Error) {
+	return read_at_least(fd, buf, len(buf))
+}
+
+file_size_from_path :: proc(path: string) -> (length: i64, err: Error) {
+	fd := open(path, O_RDONLY, 0) or_return
+	defer close(fd)
+	return file_size(fd)
+}
+
+read_entire_file :: proc{
+	read_entire_file_from_path,
+	read_entire_file_from_handle,
+}
+
+read_entire_file_from_path :: proc(name: string, allocator := context.allocator) -> (data: []byte, err: Error) {
+	fd := open(name, {.Read}) or_return
+	defer close(fd)
+	return read_entire_file_from_handle(fd, allocator)
+}
+
+read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator) -> (data: []byte, err: Error) {
+	length := file_size(fd) or_return
+	if length <= 0 {
+		return nil, nil
+	}
+
+	if i64(int(length)) != length {
+		return nil, .Short_Buffer
+	}
+
+	data = make([]byte, int(length), allocator)
+	if data == nil {
+		return nil, .Short_Buffer
+	}
+	defer if err != nil {
+		delete(data, allocator)
+	}
+
+	bytes_read := read_full(fd, data) or_return
+	return data[:bytes_read], nil
 }
 
 write_entire_file :: proc(name: string, data: []byte, perm: File_Mode, truncate := true) -> Error {
@@ -109,11 +135,9 @@ write_entire_file :: proc(name: string, data: []byte, perm: File_Mode, truncate 
 	if truncate {
 		flags |= O_TRUNC
 	}
-	f, err := open_file(name, flags, perm)
-	if err != nil {
-		return err
-	}
-	_, err = write(f, data)
+	f := open(name, flags, perm) or_return
+
+	_, err := write(f, data)
 	if cerr := close(f); cerr != nil && err == nil {
 		err = cerr
 	}

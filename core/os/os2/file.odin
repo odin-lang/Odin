@@ -5,6 +5,8 @@ import "core:time"
 
 Handle :: distinct uintptr
 
+INVALID_HANDLE :: ~Handle(0)
+
 Seek_From :: enum {
 	Start   = 0, // seek relative to the origin of the file
 	Current = 1, // seek relative to the current offset
@@ -27,6 +29,7 @@ File_Flag :: enum u32 {
 	Excl   = 4,
 	Sync   = 5,
 	Trunc  = 6,
+	Close_On_Exec = 7,
 }
 File_Flags :: distinct bit_set[File_Flag; u32]
 
@@ -38,24 +41,32 @@ O_CREATE :: File_Flags{.Create}
 O_EXCL   :: File_Flags{.Excl}
 O_SYNC   :: File_Flags{.Sync}
 O_TRUNC  :: File_Flags{.Trunc}
+O_CLOEXEC :: File_Flags{.Close_On_Exec}
 
-
-
-stdin:  Handle = 0 // OS-Specific
-stdout: Handle = 1 // OS-Specific
-stderr: Handle = 2 // OS-Specific
-
-
-create :: proc(name: string) -> (Handle, Error) {
-	return _create(name)
+Std_Handle_Kind :: enum u8 {
+	stdin  = 0,
+	stdout = 1,
+	stderr = 2,
 }
 
-open :: proc(name: string) -> (Handle, Error) {
-	return _open(name)
+stdin:  Handle = std_handle(.stdin)
+stdout: Handle = std_handle(.stdout)
+stderr: Handle = std_handle(.stderr)
+
+std_handle :: proc(kind: Std_Handle_Kind) -> Handle {
+	return _std_handle(kind)
 }
 
-open_file :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
-	return _open_file(name, flags, perm)
+create :: proc(name: string, perm: File_Mode = 0) -> (Handle, Error) {
+	return open(name, {.Read, .Write, .Create}, perm)
+}
+
+open :: proc(name: string, flags := File_Flags{.Read}, perm: File_Mode = 0) -> (Handle, Error) {
+	flags := flags
+	if .Write not_in flags {
+		flags += {.Read}
+	}
+	return _open(name, flags, perm)
 }
 
 close :: proc(fd: Handle) -> Error {
@@ -107,30 +118,35 @@ flush :: proc(fd: Handle) -> Error {
 	return _flush(fd)
 }
 
-truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
+truncate :: proc(fd: Handle, size: i64) -> Error {
 	return _truncate(fd, size)
 }
 
-remove :: proc(name: string) -> Maybe(Path_Error) {
+remove :: proc(name: string) -> Error {
 	return _remove(name)
 }
 
-rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
+rename :: proc(old_path, new_path: string) -> Error {
 	return _rename(old_path, new_path)
 }
 
 
-link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+link :: proc(old_name, new_name: string) -> Error {
 	return _link(old_name, new_name)
 }
 
-symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+symlink :: proc(old_name, new_name: string) -> Error {
 	return _symlink(old_name, new_name)
 }
 
-read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
+read_link :: proc(name: string) -> (string, Error) {
 	return _read_link(name)
 }
+
+unlink :: proc(path: string) -> Error {
+	return _unlink(path)
+}
+
 
 
 chdir :: proc(fd: Handle) -> Error {
@@ -151,7 +167,7 @@ lchown :: proc(name: string, uid, gid: int) -> Error {
 }
 
 
-chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
+chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	return _chtimes(name, atime, mtime)
 }
 
@@ -159,11 +175,11 @@ exists :: proc(path: string) -> bool {
 	return _exists(path)
 }
 
-is_file :: proc(path: string) -> bool {
-	return _is_file(path)
+is_file :: proc(fd: Handle) -> bool {
+	return _is_file(fd)
 }
 
-is_dir :: proc(path: string) -> bool {
-	return _is_dir(path)
+is_dir :: proc(fd: Handle) -> bool {
+	return _is_dir(fd)
 }
 

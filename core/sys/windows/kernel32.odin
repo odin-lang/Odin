@@ -53,6 +53,7 @@ foreign kernel32 {
 	LeaveCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	DeleteCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 
+	PathFileExistsW :: proc(lpPathName: LPCWSTR) -> BOOL ---
 	RemoveDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
 	SetFileAttributesW :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
 	SetLastError :: proc(dwErrCode: DWORD) ---
