@@ -218,17 +218,18 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 
 // Returns a temporarily-allocated string representation of the endpoint.
 // If there's a port, uses the `[address]:port` format.
-endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> (s: string) {
-	s = address_to_string(ep.address, allocator)
+endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> string {
 	if ep.port != 0 {
+		return address_to_string(ep.address, allocator)
+	} else {
+		s := address_to_string(ep.address, context.temp_allocator)
 		b := strings.make_builder(allocator)
 		switch a in ep.address {
 		case IPv4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
 		case IPv6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
 		}
-		s = strings.to_string(b)
+		return strings.to_string(b)
 	}
-	return
 }
 
 to_string :: proc{address_to_string, endpoint_to_string}
@@ -241,4 +242,7 @@ family_from_address :: proc(addr: Address) -> Address_Family {
 	case:
 		unreachable()
 	}
+}
+family_from_endpoint :: proc(ep: Endpoint) -> Address_Family {
+	return family_from_address(ep.address)
 }
