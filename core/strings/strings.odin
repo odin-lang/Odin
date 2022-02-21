@@ -281,28 +281,28 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 }
 
 /*
- * Splits a string into parts, based on a separator.
- * Returned strings are substrings of 's'.
- * ```
- * s := "aaa.bbb.ccc.ddd.eee" // 5 parts
- * ss := split(s, ".")
- * fmt.println(ss)            // [aaa, bbb, ccc, ddd, eee]
- * ```
- */
+	Splits a string into parts, based on a separator.
+	Returned strings are substrings of 's'.
+	```
+	s := "aaa.bbb.ccc.ddd.eee" // 5 parts
+	ss := split(s, ".")
+	fmt.println(ss)            // [aaa, bbb, ccc, ddd, eee]
+	```
+*/
 split :: proc(s, sep: string, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, -1, allocator)
 }
 
 /*
- * Splits a string into a total of 'n' parts, based on a separator.
- * Returns fewer parts if there wasn't enough occurrences of the separator.
- * Returned strings are substrings of 's'.
- * ```
- * s := "aaa.bbb.ccc.ddd.eee" // 5 parts present
- * ss := split_n(s, ".", 3)   // total of 3 wanted
- * fmt.println(ss)            // [aaa, bbb, ccc.ddd.eee]
- * ```
- */
+	Splits a string into a total of 'n' parts, based on a separator.
+	Returns fewer parts if there wasn't enough occurrences of the separator.
+	Returned strings are substrings of 's'.
+	```
+	s := "aaa.bbb.ccc.ddd.eee" // 5 parts present
+	ss := split_n(s, ".", 3)   // total of 3 wanted
+	fmt.println(ss)            // [aaa, bbb, ccc.ddd.eee]
+	```
+*/
 split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, n, allocator)
 }
