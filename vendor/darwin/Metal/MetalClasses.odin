@@ -5508,8 +5508,8 @@ Buffer_newRemoteBufferViewForDevice :: #force_inline proc(self: ^Buffer, device:
 	return msgSend(^Buffer, self, "newRemoteBufferViewForDevice:", device)
 }
 @(objc_type=Buffer, objc_name="newTexture")
-Buffer_newTexture :: #force_inline proc(self: ^Buffer, descriptor: ^TextureDescriptor, offset: NS.UInteger, bytesPerRow: NS.UInteger) -> ^Buffer {
-	return msgSend(^Buffer, self, "newTextureWithDescriptor:offset:bytesPerRow:", descriptor, offset, bytesPerRow)
+Buffer_newTexture :: #force_inline proc(self: ^Buffer, descriptor: ^TextureDescriptor, offset: NS.UInteger, bytesPerRow: NS.UInteger) -> ^Texture {
+	return msgSend(^Texture, self, "newTextureWithDescriptor:offset:bytesPerRow:", descriptor, offset, bytesPerRow)
 }
 @(objc_type=Buffer, objc_name="remoteStorageBuffer")
 Buffer_remoteStorageBuffer :: #force_inline proc(self: ^Buffer) -> ^Buffer {
@@ -6636,8 +6636,8 @@ Device_newSharedTextureWithHandle :: #force_inline proc(self: ^Device, sharedHan
 	return msgSend(^SharedEvent, self, "newSharedTextureWithHandle:", sharedHandle)
 }
 @(objc_type=Device, objc_name="newTexture")
-Device_newTexture :: #force_inline proc(self: ^Device, desc: ^TextureDescriptor) -> ^SharedEvent {
-	return msgSend(^SharedEvent, self, "newTextureWithDescriptor:", desc)
+Device_newTexture :: #force_inline proc(self: ^Device, desc: ^TextureDescriptor) -> ^Texture {
+	return msgSend(^Texture, self, "newTextureWithDescriptor:", desc)
 }
 @(objc_type=Device, objc_name="newTextureWithIOSurface")
 Device_newTextureWithIOSurface :: #force_inline proc(self: ^Device, descriptor: ^TextureDescriptor, iosurface: IOSurfaceRef, plane: NS.UInteger) -> ^Texture {
@@ -7101,24 +7101,24 @@ Heap_label :: #force_inline proc(self: ^Heap) -> ^NS.String {
 	return msgSend(^NS.String, self, "label")
 }
 @(objc_type=Heap, objc_name="maxAvailableSizeWithAlignment")
-Heap_maxAvailableSizeWithAlignment :: #force_inline proc(self: ^Heap, alignment: NS.UInteger) -> ^Heap {
-	return msgSend(^Heap, self, "maxAvailableSizeWithAlignment:", alignment)
+Heap_maxAvailableSizeWithAlignment :: #force_inline proc(self: ^Heap, alignment: NS.UInteger) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxAvailableSizeWithAlignment:", alignment)
 }
 @(objc_type=Heap, objc_name="newBuffer")
-Heap_newBuffer :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions) -> ^Heap {
-	return msgSend(^Heap, self, "newBufferWithLength:options:", length, options)
+Heap_newBuffer :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
+	return msgSend(^Buffer, self, "newBufferWithLength:options:", length, options)
 }
 @(objc_type=Heap, objc_name="newBufferWithOptions")
-Heap_newBufferWithOptions :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions, offset: NS.UInteger) -> ^Heap {
-	return msgSend(^Heap, self, "newBufferWithLength:options:offset:", length, options, offset)
+Heap_newBufferWithOptions :: #force_inline proc(self: ^Heap, length: NS.UInteger, options: ResourceOptions, offset: NS.UInteger) -> ^Buffer {
+	return msgSend(^Buffer, self, "newBufferWithLength:options:offset:", length, options, offset)
 }
 @(objc_type=Heap, objc_name="newTexture")
-Heap_newTexture :: #force_inline proc(self: ^Heap, desc: ^TextureDescriptor) -> ^Heap {
-	return msgSend(^Heap, self, "newTextureWithDescriptor:", desc)
+Heap_newTexture :: #force_inline proc(self: ^Heap, desc: ^TextureDescriptor) -> ^Texture {
+	return msgSend(^Texture, self, "newTextureWithDescriptor:", desc)
 }
 @(objc_type=Heap, objc_name="newTextureWithOffset")
-Heap_newTextureWithOffset :: #force_inline proc(self: ^Heap, descriptor: ^TextureDescriptor, offset: NS.UInteger) -> ^Heap {
-	return msgSend(^Heap, self, "newTextureWithDescriptor:offset:", descriptor, offset)
+Heap_newTextureWithOffset :: #force_inline proc(self: ^Heap, descriptor: ^TextureDescriptor, offset: NS.UInteger) -> ^Texture {
+	return msgSend(^Texture, self, "newTextureWithDescriptor:offset:", descriptor, offset)
 }
 @(objc_type=Heap, objc_name="resourceOptions")
 Heap_resourceOptions :: #force_inline proc(self: ^Heap) -> ResourceOptions {
