@@ -12,7 +12,7 @@ _open :: proc(name: string) -> (Handle, Error) {
 	return 0, nil
 }
 
-_open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
+_open_file :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
 	return 0, nil
 }
 
