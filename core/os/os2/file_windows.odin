@@ -15,6 +15,10 @@ _get_platform_error :: proc() -> Error {
 	return Platform_Error{i32(err)}
 }
 
+_ok_or_error :: proc(ok: win32.BOOL) -> Error {
+	return nil if ok else _get_platform_error()
+}
+
 _std_handle :: proc(kind: Std_Handle_Kind) -> Handle {
 	get_handle :: proc(h: win32.DWORD) -> Handle {
 		fd := win32.GetStdHandle(h)
@@ -88,17 +92,13 @@ _close :: proc(fd: Handle) -> Error {
 	hnd := win32.HANDLE(fd)
 
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
-	if ok := win32.GetFileInformationByHandle(hnd, &file_info); !ok {
-		return _get_platform_error()
-	}
+	_ok_or_error(win32.GetFileInformationByHandle(hnd, &file_info)) or_return
+
 	if file_info.dwFileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
 		return nil
 	}
 
-	if ok := win32.CloseHandle(hnd); !ok {
-		return _get_platform_error()
-	}
-	return nil
+	return _ok_or_error(win32.CloseHandle(hnd))
 }
 
 _name :: proc(fd: Handle, allocator := context.allocator) -> string {
@@ -145,10 +145,7 @@ _read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		max_read := u32(min(BUF_SIZE, len(b)/4))
 
 		single_read_length: u32
-		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
-		if !ok {
-			err = _get_platform_error()
-		}
+		err = _ok_or_error(win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil))
 
 		buf8_len := utf16.decode_to_utf8(buf8[:], buf16[:single_read_length])
 		src := buf8[:buf8_len]
@@ -245,9 +242,7 @@ _pread :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
-	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
-		_get_platform_error() or_return
-	}
+	_ok_or_error(win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o)) or_return
 	return int(done), nil
 }
 
@@ -267,9 +262,7 @@ _pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
-	if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
-		_get_platform_error() or_return
-	}
+	_ok_or_error(win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o)) or_return
 	return int(done), nil
 }
 
@@ -298,9 +291,7 @@ _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
 
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
-	if !win32.GetFileSizeEx(win32.HANDLE(fd), &length) {
-		err = _get_platform_error()
-	}
+	err = _ok_or_error(win32.GetFileSizeEx(win32.HANDLE(fd), &length))
 	return i64(length), err
 }
 
@@ -310,34 +301,24 @@ _sync :: proc(fd: Handle) -> Error {
 }
 
 _flush :: proc(fd: Handle) -> Error {
-	if !win32.FlushFileBuffers(win32.HANDLE(fd)) {
-		return _get_platform_error()
-	}
-	return nil
+	return _ok_or_error(win32.FlushFileBuffers(win32.HANDLE(fd)))
 }
 
 _truncate :: proc(fd: Handle, size: i64) -> Error {
 	offset := seek(fd, size, .Start) or_return
 	defer seek(fd, offset, .Start)
 
-	if !win32.SetEndOfFile(win32.HANDLE(fd)) {
-		return _get_platform_error()
-	}
-	return nil
+	return _ok_or_error(win32.SetEndOfFile(win32.HANDLE(fd)))
 }
 
 _remove :: proc(name: string) -> Error {
 	p := win32.utf8_to_wstring(_fix_long_path(name))
-	err, err1: Error
-	if !win32.DeleteFileW(p) {
-		err = _get_platform_error()
-	}
+
+	err := _ok_or_error(win32.DeleteFileW(p))
 	if err == nil {
 		return nil
 	}
-	if !win32.RemoveDirectoryW(p) {
-		err1 = _get_platform_error()
-	}
+	err1 := _ok_or_error(win32.RemoveDirectoryW(p))
 	if err1 == nil {
 		return nil
 	}
@@ -351,10 +332,7 @@ _remove :: proc(name: string) -> Error {
 				err = err1
 			} else if a & win32.FILE_ATTRIBUTE_READONLY != 0 {
 				if win32.SetFileAttributesW(p, a &~ win32.FILE_ATTRIBUTE_READONLY) {
-					err = nil
-					if !win32.DeleteFileW(p) {
-						err = _get_platform_error()
-					}
+					err = _ok_or_error(win32.DeleteFileW(p))
 				}
 			}
 		}
@@ -366,20 +344,14 @@ _remove :: proc(name: string) -> Error {
 _rename :: proc(old_path, new_path: string) -> Error {
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
-	if !win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
-		return _get_platform_error()
-	}
-	return nil
+	return _ok_or_error(win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING))
 }
 
 
 _link :: proc(old_name, new_name: string) -> Error {
 	n := win32.utf8_to_wstring(_fix_long_path(new_name))
 	o := win32.utf8_to_wstring(_fix_long_path(old_name))
-	if !win32.CreateHardLinkW(n, o, nil) {
-		return _get_platform_error()
-	}
-	return nil
+	return _ok_or_error(win32.CreateHardLinkW(n, o, nil))
 }
 
 _symlink :: proc(old_name, new_name: string) -> Error {
@@ -392,10 +364,7 @@ _read_link :: proc(name: string) -> (string, Error) {
 
 _unlink :: proc(path: string) -> Error {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	if !win32.DeleteFileW(wpath) {
-		return _get_platform_error()
-	}
-	return nil
+	return _ok_or_error(win32.DeleteFileW(wpath))
 }
 
 
