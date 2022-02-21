@@ -191,7 +191,7 @@ DNS_Record_NS :: distinct string
 // Domain names for email servers that are associated with the domain name.
 // These records also have values which ranks them in the order they should be preferred. Lower is more-preferred.
 DNS_Record_MX :: struct {
-	host: string,
+	host_name: string,
 	preference: int,
 }
 
@@ -205,8 +205,8 @@ DNS_Record_MX :: struct {
 //
 // The host may be "." to indicate that it is "decidedly not available" on this domain.
 DNS_Record_SRV :: struct {
-	entire_name_buffer: string, // NOTE(tetra): service_name, protocol, and host are all substrings of this string.
-	service_name, protocol, host: string,
+	entire_name_buffer: string, // NOTE(tetra): service_name, protocol_name, and host_name are all substrings of this string.
+	service_name, protocol_name, host_name: string,
 	port: int,
 	priority: int, // lower is higher priority
 	weight: int, // relative weight of this host compared to other of same priority; the chance of using this host should be proporitional to this weight.
