@@ -8,16 +8,16 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == '\\' || c == '/'
 }
 
-_mkdir :: proc(name: string, perm: File_Mode) -> Maybe(Path_Error) {
+_mkdir :: proc(name: string, perm: File_Mode) -> Error {
 	return nil
 }
 
-_mkdir_all :: proc(path: string, perm: File_Mode) -> Maybe(Path_Error) {
+_mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	// TODO(bill): _mkdir_all for windows
 	return nil
 }
 
-_remove_all :: proc(path: string) -> Maybe(Path_Error) {
+_remove_all :: proc(path: string) -> Error {
 	// TODO(bill): _remove_all for windows
 	return nil
 }

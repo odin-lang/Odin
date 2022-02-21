@@ -4,9 +4,9 @@ package os2
 import "core:time"
 import win32 "core:sys/windows"
 
-_fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+_fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Error) {
 	if fd == 0 {
-		return {}, Path_Error{err = .Invalid_Argument}
+		return {}, .Invalid_Argument
 	}
 	context.allocator = allocator
 
@@ -27,10 +27,10 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(
 
 	return _file_info_from_get_file_information_by_handle(path, h)
 }
-_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
 	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS)
 }
-_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
 	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS|win32.FILE_FLAG_OPEN_REPARSE_POINT)
 }
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
@@ -38,13 +38,7 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
 }
 
 
-
-_stat_errno :: proc(errno: win32.DWORD) -> Path_Error {
-	return Path_Error{err = Platform_Error{i32(errno)}}
-}
-
-
-full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Maybe(Path_Error)) {
+full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Error) {
 	context.allocator = allocator
 	
 	name := name
@@ -57,7 +51,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
 		if n == 0 {
 			delete(buf)
-			return "", _stat_errno(win32.GetLastError())
+			return "", _get_platform_error()
 		}
 		if n <= u32(len(buf)) {
 			return win32.utf16_to_utf8(buf[:n]), nil
@@ -69,9 +63,9 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 }
 
 
-internal_stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Maybe(Path_Error)) {
+internal_stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Error) {
 	if len(name) == 0 {
-		return {}, Path_Error{err = .Not_Exist}
+		return {}, .Not_Exist
 	}
 
 	context.allocator = allocator
@@ -91,7 +85,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 		fd: win32.WIN32_FIND_DATAW
 		sh := win32.FindFirstFileW(wname, &fd)
 		if sh == win32.INVALID_HANDLE_VALUE {
-			e = Path_Error{err = Platform_Error{i32(win32.GetLastError())}}
+			e = _get_platform_error()
 			return
 		}
 		win32.FindClose(sh)
@@ -101,7 +95,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 
 	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil)
 	if h == win32.INVALID_HANDLE_VALUE {
-		e = Path_Error{err = Platform_Error{i32(win32.GetLastError())}}
+		e = _get_platform_error()
 		return
 	}
 	defer win32.CloseHandle(h)
@@ -130,9 +124,9 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 }
 
 
-_cleanpath_from_handle :: proc(fd: Handle) -> (string, Maybe(Path_Error)) {
+_cleanpath_from_handle :: proc(fd: Handle) -> (string, Error) {
 	if fd == 0 {
-		return "", Path_Error{err = .Invalid_Argument}
+		return "", .Invalid_Argument
 	}
 	h := win32.HANDLE(fd)
 
@@ -143,7 +137,7 @@ _cleanpath_from_handle :: proc(fd: Handle) -> (string, Maybe(Path_Error)) {
 		err := win32.GetFinalPathNameByHandleW(h, raw_data(buf), MAX_PATH, 0)
 		switch err {
 		case win32.ERROR_PATH_NOT_FOUND, win32.ERROR_INVALID_PARAMETER:
-			return "", _stat_errno(err)
+			return "", Platform_Error{i32(err)}
 		case win32.ERROR_NOT_ENOUGH_MEMORY:
 			MAX_PATH = MAX_PATH*2 + 1
 			continue
@@ -153,9 +147,9 @@ _cleanpath_from_handle :: proc(fd: Handle) -> (string, Maybe(Path_Error)) {
 	return _cleanpath_from_buf(buf), nil
 }
 
-_cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Maybe(Path_Error)) {
+_cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Error) {
 	if fd == 0 {
-		return nil, Path_Error{err = .Invalid_Argument}
+		return nil, .Invalid_Argument
 	}
 	h := win32.HANDLE(fd)
 
@@ -166,7 +160,7 @@ _cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Maybe(Path_Error)) {
 		err := win32.GetFinalPathNameByHandleW(h, raw_data(buf), MAX_PATH, 0)
 		switch err {
 		case win32.ERROR_PATH_NOT_FOUND, win32.ERROR_INVALID_PARAMETER:
-			return nil, _stat_errno(err)
+			return nil, Platform_Error{i32(err)}
 		case win32.ERROR_NOT_ENOUGH_MEMORY:
 			MAX_PATH = MAX_PATH*2 + 1
 			continue
@@ -251,7 +245,7 @@ _file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HA
 }
 
 
-_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Maybe(Path_Error)) {
+_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
@@ -268,7 +262,7 @@ _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE
 }
 
 
-_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Maybe(Path_Error)) {
+_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
@@ -285,10 +279,10 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 }
 
 
-_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Maybe(Path_Error)) {
+_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Error) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
-		return {}, _stat_errno(win32.GetLastError())
+		return {}, _get_platform_error()
 
 	}
 
@@ -296,7 +290,7 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	if !win32.GetFileInformationByHandleEx(h, .FileAttributeTagInfo, &ti, size_of(ti)) {
 		err := win32.GetLastError()
 		if err != win32.ERROR_INVALID_PARAMETER {
-			return {}, _stat_errno(err)
+			return {}, Platform_Error{i32(err)}
 		}
 		// Indicate this is a symlink on FAT file systems
 		ti.ReparseTag = 0
