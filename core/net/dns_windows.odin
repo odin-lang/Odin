@@ -105,26 +105,30 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			append(&recs, new_rec)
 
 		case .SRV:
-			name := strings.clone(string(r.Data.SRV.pNameTarget))
+			record_name := strings.clone(string(r.pName)) // The name of the record in the DNS entry
+			target := strings.clone(string(r.Data.SRV.pNameTarget)) // The target hostname/address that the service can be found on
 			priority := int(r.Data.SRV.wPriority)
 			weight := int(r.Data.SRV.wWeight)
 			port := int(r.Data.SRV.wPort)
 
 			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
-			parts := strings.split_n(name, ".", 3, context.temp_allocator)
+			// The record name is the name of the record.
+			// Not to be confused with the _target_ of the record, which is--in combination with the port--what we're looking up
+			// by making this request in the first place.
+			parts := strings.split_n(record_name, ".", 3, context.temp_allocator)
 			if len(parts) != 3 {
 				continue
 			}
-			service_name, protocol_name, host_name := parts[0], parts[1], parts[2]
+			service_name, protocol_name := parts[0], parts[1]
 
 			append(&recs, DNS_Record_SRV {
-				_entire_name_buffer = name,
+				record_name   = record_name,
+				target        = target,
+				port          = port,
 				service_name  = service_name,
 				protocol_name = protocol_name,
-				host_name     = host_name,
 				priority      = priority,
 				weight        = weight,
-				port          = port,
 			})
 		}
 	}
