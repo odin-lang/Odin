@@ -19,14 +19,25 @@ File_Mode_Char_Device :: File_Mode(1<<19)
 File_Mode_Sym_Link    :: File_Mode(1<<20)
 
 
-O_RDONLY :: int( 0)
-O_WRONLY :: int( 1)
-O_RDWR   :: int( 2)
-O_APPEND :: int( 4)
-O_CREATE :: int( 8)
-O_EXCL   :: int(16)
-O_SYNC   :: int(32)
-O_TRUNC  :: int(64)
+File_Flag :: enum u32 {
+	Read   = 0,
+	Write  = 1,
+	Append = 2,
+	Create = 3,
+	Excl   = 4,
+	Sync   = 5,
+	Trunc  = 6,
+}
+File_Flags :: distinct bit_set[File_Flag; u32]
+
+O_RDONLY :: File_Flags{.Read}
+O_WRONLY :: File_Flags{.Write}
+O_RDWR   :: File_Flags{.Read, .Write}
+O_APPEND :: File_Flags{.Append}
+O_CREATE :: File_Flags{.Create}
+O_EXCL   :: File_Flags{.Excl}
+O_SYNC   :: File_Flags{.Sync}
+O_TRUNC  :: File_Flags{.Trunc}
 
 
 
@@ -43,8 +54,8 @@ open :: proc(name: string) -> (Handle, Error) {
 	return _open(name)
 }
 
-open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
-	return _open_file(name, flag, perm)
+open_file :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
+	return _open_file(name, flags, perm)
 }
 
 close :: proc(fd: Handle) -> Error {
