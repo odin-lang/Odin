@@ -782,9 +782,9 @@ DNS_MX_DATAA :: struct {
 }
 DNS_SRV_DATAA :: struct {
 	pNameTarget: cstring,
-	wPriority: u16be,
-	wWeight: u16be,
-	wPort: u16be,
+	wPriority: u16,
+	wWeight: u16,
+	wPort: u16,
 	_: WORD, // padding
 }
 
