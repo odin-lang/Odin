@@ -311,7 +311,7 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 		case DNS_Record_MX:
 			delete(r.host)
 		case DNS_Record_SRV:
-			delete(r.service_name) // NOTE(tetra): the three strings are substrings; the service name is the start of that string.
+			delete(r.entire_name_buffer)
 		}
 	}
 
@@ -632,11 +632,27 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
 			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
 			name, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
+
+			parts := strings.split_n(name, ".", 3)
+			if len(parts) != 3 {
+				return
+			}
+			service_name, protocol_name, host_name := parts[0], parts[1], parts[2]
+			if service_name[0] == '_' {
+				service_name = service_name[1:]
+			}
+			if protocol_name[0] == '_' {
+				protocol_name = protocol_name[1:]
+			}
+
 			_record = DNS_Record_SRV{
-				priority = int(priority),
-				weight   = int(weight),
-				port     = int(port),
-				service_name = name,
+				entire_name_buffer = name,
+				service_name = service_name,
+				protocol     = protocol_name,
+				host         = host_name,
+				priority     = int(priority),
+				weight       = int(weight),
+				port         = int(port),
 			}
 		case .MX:
 			if len(data) <= 2 {
