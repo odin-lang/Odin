@@ -117,13 +117,6 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			}
 			service_name, protocol_name, host_name := parts[0], parts[1], parts[2]
 
-			if service_name[0] == '_' {
-				service_name = service_name[1:]
-			}
-			if protocol_name[0] == '_' {
-				protocol_name = protocol_name[1:]
-			}
-
 			append(&recs, DNS_Record_SRV {
 				_entire_name_buffer = name,
 				service_name  = service_name,
