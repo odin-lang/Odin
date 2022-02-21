@@ -5,7 +5,7 @@ package vulkan
 
 import "core:c"
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	import win32 "core:sys/windows"
 
 	HINSTANCE           :: win32.HINSTANCE

@@ -74,6 +74,7 @@ enum EntityFlag : u64 {
 
 	EntityFlag_Test          = 1ull<<30,
 	EntityFlag_Init          = 1ull<<31,
+	EntityFlag_Subtype       = 1ull<<32,
 	
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,
@@ -84,6 +85,10 @@ enum EntityFlag : u64 {
 	EntityFlag_Require = 1ull<<50,
 
 	EntityFlag_Overridden    = 1ull<<63,
+};
+
+enum : u64 {
+	EntityFlags_IsSubtype = EntityFlag_Using|EntityFlag_Subtype,
 };
 
 enum EntityState : u32 {
@@ -121,6 +126,28 @@ enum ProcedureOptimizationMode : u32 {
 	ProcedureOptimizationMode_Size,
 	ProcedureOptimizationMode_Speed,
 };
+
+
+BlockingMutex global_type_name_objc_metadata_mutex;
+
+struct TypeNameObjCMetadataEntry {
+	String name;
+	Entity *entity;
+};
+struct TypeNameObjCMetadata {
+	BlockingMutex *mutex;
+	Array<TypeNameObjCMetadataEntry> type_entries;
+	Array<TypeNameObjCMetadataEntry> value_entries;
+};
+
+TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
+	TypeNameObjCMetadata *md = gb_alloc_item(permanent_allocator(), TypeNameObjCMetadata);
+	md->mutex = gb_alloc_item(permanent_allocator(), BlockingMutex);
+	mutex_init(md->mutex);
+	array_init(&md->type_entries,  heap_allocator());
+	array_init(&md->value_entries, heap_allocator());
+	return md;
+}
 
 // An Entity is a named "thing" in the language
 struct Entity {
@@ -186,6 +213,8 @@ struct Entity {
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
 			bool   is_type_alias;
+			String objc_class_name;
+			TypeNameObjCMetadata *objc_metadata;
 		} TypeName;
 		struct {
 			u64     tags;

@@ -4,8 +4,8 @@ import c "core:c/libc"
 
 #assert(size_of(c.int) == size_of(b32))
 
-when ODIN_OS == "windows" { foreign import stbi "../lib/stb_image.lib" }
-when ODIN_OS == "linux"   { foreign import stbi "../lib/stb_image.a"   }
+when ODIN_OS == .Windows { foreign import stbi "../lib/stb_image.lib" }
+when ODIN_OS == .Linux   { foreign import stbi "../lib/stb_image.a"   }
 
 #assert(size_of(b32) == size_of(c.int))
 

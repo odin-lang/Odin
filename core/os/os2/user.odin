@@ -3,13 +3,13 @@ package os2
 import "core:strings"
 
 user_cache_dir :: proc(allocator := context.allocator) -> (dir: string, is_defined: bool) {
-	switch ODIN_OS {
-	case "windows":
+	#partial switch ODIN_OS {
+	case .Windows:
 		dir = get_env("LocalAppData")
 		if dir != "" {
 			dir = strings.clone(dir, allocator)
 		}
-	case "darwin":
+	case .Darwin:
 		dir = get_env("HOME")
 		if dir != "" {
 			dir = strings.concatenate({dir, "/Library/Caches"}, allocator)
@@ -29,13 +29,13 @@ user_cache_dir :: proc(allocator := context.allocator) -> (dir: string, is_defin
 }
 
 user_config_dir :: proc(allocator := context.allocator) -> (dir: string, is_defined: bool) {
-	switch ODIN_OS {
-	case "windows":
+	#partial switch ODIN_OS {
+	case .Windows:
 		dir = get_env("AppData")
 		if dir != "" {
 			dir = strings.clone(dir, allocator)
 		}
-	case "darwin":
+	case .Darwin:
 		dir = get_env("HOME")
 		if dir != "" {
 			dir = strings.concatenate({dir, "/Library/Application Support"}, allocator)
@@ -56,8 +56,8 @@ user_config_dir :: proc(allocator := context.allocator) -> (dir: string, is_defi
 
 user_home_dir :: proc() -> (dir: string, is_defined: bool) {
 	env := "HOME"
-	switch ODIN_OS {
-	case "windows":
+	#partial switch ODIN_OS {
+	case .Windows:
 		env = "USERPROFILE"
 	}
 	if v := get_env(env); v != "" {

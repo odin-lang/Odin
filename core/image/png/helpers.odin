@@ -443,7 +443,7 @@ when false {
 		}
 
 		mode: int = 0
-		when ODIN_OS == "linux" || ODIN_OS == "darwin" {
+		when ODIN_OS == .Linux || ODIN_OS == .Darwin {
 			// NOTE(justasd): 644 (owner read, write; group read; others read)
 			mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 		}

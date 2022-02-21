@@ -7,7 +7,7 @@ package portmidi
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "portmidi_s.lib" }
+when ODIN_OS == .Windows { foreign import lib "portmidi_s.lib" }
 
 
 Queue :: distinct rawptr
