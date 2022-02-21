@@ -110,6 +110,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 			priority := int(r.Data.SRV.wPriority)
 			weight := int(r.Data.SRV.wWeight)
 			port := int(r.Data.SRV.wPort)
+			ttl := int(r.dwTtl)
 
 			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
 			// The record name is the name of the record.
@@ -129,6 +130,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 				protocol_name = protocol_name,
 				priority      = priority,
 				weight        = weight,
+				ttl_seconds   = ttl,
 			})
 		}
 	}
