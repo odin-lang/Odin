@@ -243,3 +243,6 @@ family_from_address :: proc(addr: Address) -> Address_Family {
 		unreachable()
 	}
 }
+family_from_endpoint :: proc(ep: Endpoint) -> Address_Family {
+	return family_from_address(ep.address)
+}
