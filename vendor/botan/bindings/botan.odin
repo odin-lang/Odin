@@ -99,6 +99,10 @@ MAC_HMAC_SHA_384 :: "HMAC(SHA-384)"
 MAC_HMAC_SHA_512 :: "HMAC(SHA-512)"
 MAC_HMAC_MD5     :: "HMAC(MD5)"
 
+MAC_SIPHASH_1_3  :: "SipHash(1,3)"
+MAC_SIPHASH_2_4  :: "SipHash(2,4)"
+MAC_SIPHASH_4_8  :: "SipHash(4,8)"
+
 hash_struct          :: struct{}
 hash_t               :: ^hash_struct
 rng_struct           :: struct{}
