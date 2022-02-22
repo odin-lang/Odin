@@ -127,8 +127,12 @@ request_destroy :: proc(using req: Request) {
 
 
 send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.TCP_Socket, ok: bool) {
-	if r.scheme != "http" {
-		fmt.panicf("%v is not a supported scheme at this time", r.scheme)
+	scheme := r.scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+	if scheme != "http" {
+		fmt.panicf("%v is not a supported scheme at this time", scheme)
 	}
 
 	host, port, port_ok := net.split_port(r.host)
