@@ -57,10 +57,17 @@ ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 Maybe :: runtime.Maybe
 
 General_Error :: enum {
+	Unable_To_Enumerate_Network_Interfaces,
 }
+
+/*
+	`Platform_Error` is used to wrap errors returned by the different platforms that defy translation into a common error.
+*/
+Platform_Error :: enum u32 {}
 
 Network_Error :: union {
 	General_Error,
+	Platform_Error,
 	Create_Socket_Error,
 	Dial_Error,
 	Listen_Error,
@@ -108,7 +115,7 @@ Any_Socket :: union {
 }
 
 /*
-	Address DEFINITIONS
+	ADDRESS DEFINITIONS
 */
 
 IPv4_Address :: distinct [4]u8
@@ -129,6 +136,92 @@ Endpoint :: struct {
 Address_Family :: enum {
 	IPv4,
 	IPv6,
+}
+
+/*
+	INTERFACE / LINK STATE
+*/
+
+Network_Interface :: struct {
+	adapter_name:  string, // On Windows this is a GUID that we could parse back into its u128 for more compact storage.
+	friendly_name: string,
+
+	mtu:       u32,
+
+	unicast:   []Lease,
+	multicast: []Endpoint,
+	anycast:   []Endpoint,
+
+	gateways:  []Endpoint,
+	dhcp_v4:   Endpoint,
+	dhcp_v6:   Endpoint,
+
+	link: struct {
+		state:          Link_State,
+		transmit_speed: u64,
+		receive_speed:  u64,
+	},
+}
+
+Link_State :: enum i32 {
+	Unknown          = 0,
+	Up               = 1,
+	Down             = 2,
+	Testing          = 3,
+	Dormant          = 4,
+	Not_Present      = 5,
+	Lower_Layer_Down = 6,
+}
+
+Lease :: struct {
+	address:  Endpoint,
+	lifetime: struct {
+		valid:     u32,
+		preferred: u32,
+		lease:     u32,
+	},
+	origin: struct {
+		prefix: Prefix_Origin,
+		suffix: Suffix_Origin,
+	},
+	address_duplication: Address_Duplication,
+}
+
+Tunnel_Type :: enum i32 {
+	None         = 0,
+	Other        = 1,
+	Direct       = 2,
+	IPv4_To_IPv6 = 11,
+	ISA_TAP      = 13,
+	Teredo       = 14,
+	IP_HTTPS     = 15,
+}
+
+Prefix_Origin :: enum i32 {
+	Other                = 0,
+	Manual               = 1,
+	Well_Known           = 2,
+	DHCP                 = 3,
+	Router_Advertisement = 4,
+	Unchanged            = 16,
+}
+
+Suffix_Origin :: enum i32 {
+	Other                = 0,
+	Manual               = 1,
+	Well_Known           = 2,
+	DHCP                 = 3,
+	Link_Layer_Address   = 4,
+	Random               = 5,
+	Unchanged            = 16,
+}
+
+Address_Duplication :: enum i32 {
+	Invalid    = 0,
+	Tentative  = 1,
+	Duplicate  = 2,
+	Deprecated = 3,
+	Preferred  = 4,
 }
 
 /*
