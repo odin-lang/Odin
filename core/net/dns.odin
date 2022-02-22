@@ -307,7 +307,7 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 		}
 	}
 
-	delete(records)
+	delete(records, allocator)
 }
 
 /*
