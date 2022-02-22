@@ -3013,69 +3013,6 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	return 0;
 }
 
-// Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
-// 	Ast *expr = parse_unary_expr(f, lhs);
-// 	for (i32 prec = token_precedence(f, f->curr_token.kind); prec >= prec_in; prec--) {
-// 		for (;;) {
-// 			Token op = f->curr_token;
-// 			i32 op_prec = token_precedence(f, op.kind);
-// 			if (op_prec != prec) {
-// 				// NOTE(bill): This will also catch operators that are not valid "binary" operators
-// 				break;
-// 			}
-// 			Token prev = f->prev_token;
-// 			switch (op.kind) {
-// 			case Token_if:
-// 			case Token_when:
-// 				if (prev.pos.line < op.pos.line) {
-// 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-// 					goto loop_end;
-// 				}
-// 				break;
-// 			}
-// 			expect_operator(f); // NOTE(bill): error checks too
-
-// 			if (op.kind == Token_Question) {
-// 				Ast *cond = expr;
-// 				// Token_Question
-// 				Ast *x = parse_expr(f, lhs);
-// 				Token token_c = expect_token(f, Token_Colon);
-// 				Ast *y = parse_expr(f, lhs);
-// 				expr = ast_ternary_if_expr(f, x, cond, y);
-// 			} else if (op.kind == Token_if || op.kind == Token_when) {
-// 				Ast *x = expr;
-// 				Ast *cond = parse_expr(f, lhs);
-// 				Token tok_else = expect_token(f, Token_else);
-// 				Ast *y = parse_expr(f, lhs);
-
-// 				switch (op.kind) {
-// 				case Token_if:
-// 					expr = ast_ternary_if_expr(f, x, cond, y);
-// 					break;
-// 				case Token_when:
-// 					expr = ast_ternary_when_expr(f, x, cond, y);
-// 					break;
-// 				}
-// 			} else {
-// 				Ast *right = parse_binary_expr(f, false, prec+1);
-// 				if (right == nullptr) {
-// 					syntax_error(op, "Expected expression on the right-hand side of the binary operator '%.*s'", LIT(op.string));
-// 				}
-// 				if (op.kind == Token_or_else) {
-// 					// NOTE(bill): easier to handle its logic different with its own AST kind
-// 					expr = ast_or_else_expr(f, expr, op, right);
-// 				} else {
-// 					expr = ast_binary_expr(f, op, expr, right);
-// 				}
-// 			}
-
-// 			lhs = false;
-// 		}
-// 		loop_end:;
-// 	}
-// 	return expr;
-// }
-
 Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 	Ast *expr = parse_unary_expr(f, lhs);
 	for (;;) {
