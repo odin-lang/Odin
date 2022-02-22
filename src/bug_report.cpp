@@ -473,11 +473,11 @@ void print_bug_report_help() {
 
 	#elif defined(GB_SYSTEM_LINUX)
 		/*
-			Try to parse `/usr/lib/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
+			Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
 		*/
 		gbAllocator a = heap_allocator();
 
-		gbFileContents release = gb_file_read_contents(a, 1, "/usr/lib/os-release");
+		gbFileContents release = gb_file_read_contents(a, 1, "/etc/os-release");
 		defer (gb_file_free_contents(&release));
 
 		b32 found = 0;
