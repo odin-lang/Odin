@@ -36,6 +36,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator)
 	rec: ^win.DNS_RECORD
 	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil)
+
 	switch u32(res) {
 	case 0:
 		// okay
@@ -62,75 +63,101 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 	for r := rec; r != nil; r = r.pNext {
 		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
 
+		base_record := DNS_Record_Base{
+			record_name = strings.clone(string(r.pName)),
+			ttl_seconds = r.dwTtl,
+		}
+
 		switch DNS_Record_Type(r.wType) {
 		case .IPv4:
-			addr := IPv4_Address(transmute([4]u8) r.Data.A)
-			new_rec := DNS_Record_IPv4(addr) // NOTE(tetra): value copy
-			append(&recs, new_rec)
+			addr := IPv4_Address(transmute([4]u8)r.Data.A)
+			record := DNS_Record_IPv4{
+				base    = base_record,
+				address = addr,
+			}
+			append(&recs, record)
 
 		case .IPv6:
 			addr := IPv6_Address(transmute([8]u16be) r.Data.AAAA)
-			new_rec := DNS_Record_IPv6(addr) // NOTE(tetra): value copy
-			append(&recs, new_rec)
+			record := DNS_Record_IPv6{
+				base    = base_record,
+				address = addr,
+			}
+			append(&recs, record)
 
 		case .CNAME:
-			host := string(r.Data.CNAME)
-			new_rec := DNS_Record_CNAME(strings.clone(host))
-			append(&recs, new_rec)
+
+			hostname := strings.clone(string(r.Data.CNAME))
+			record := DNS_Record_CNAME{
+				base      = base_record,
+				host_name = hostname,
+			}
+			append(&recs, record)
 
 		case .TXT:
 			n := r.Data.TXT.dwStringCount
 			ptr := &r.Data.TXT.pStringArray
 			c_strs := mem.slice_ptr(ptr, int(n))
+
 			for cstr in c_strs {
-				s := string(cstr)
-				new_rec := DNS_Record_Text(strings.clone(s))
-				append(&recs, new_rec)
+				record := DNS_Record_TXT{
+					base  = base_record,
+					value = strings.clone(string(cstr)),
+				}
+				append(&recs, record)
 			}
 
 		case .NS:
-			host := string(r.Data.NS)
-			new_rec := DNS_Record_NS(strings.clone(host))
-			append(&recs, new_rec)
+			hostname := strings.clone(string(r.Data.NS))
+			record := DNS_Record_NS{
+				base      = base_record,
+				host_name = hostname,
+			}
+			append(&recs, record)
 
 		case .MX:
-			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
-			// Or maybe not because you're supposed to just use the first one that works
-			// and which order they're in changes every few calls.
-			host := string(r.Data.MX.pNameExchange)
-			preference := int(r.Data.MX.wPreference)
-			new_rec := DNS_Record_MX {
-				host_name  = strings.clone(host),
-				preference = preference }
-			append(&recs, new_rec)
+			/*
+				TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
+				Or maybe not because you're supposed to just use the first one that works
+				and which order they're in changes every few calls.
+			*/
+
+			record := DNS_Record_MX{
+				base       = base_record,
+				host_name  = strings.clone(string(r.Data.MX.pNameExchange)),
+				preference = int(r.Data.MX.wPreference),
+			}
+			append(&recs, record)
 
 		case .SRV:
-			record_name := strings.clone(string(r.pName)) // The name of the record in the DNS entry
-			target := strings.clone(string(r.Data.SRV.pNameTarget)) // The target hostname/address that the service can be found on
+			target   := strings.clone(string(r.Data.SRV.pNameTarget)) // The target hostname/address that the service can be found on
 			priority := int(r.Data.SRV.wPriority)
-			weight := int(r.Data.SRV.wWeight)
-			port := int(r.Data.SRV.wPort)
-			ttl := int(r.dwTtl)
+			weight   := int(r.Data.SRV.wWeight)
+			port     := int(r.Data.SRV.wPort)
 
 			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
 			// The record name is the name of the record.
 			// Not to be confused with the _target_ of the record, which is--in combination with the port--what we're looking up
 			// by making this request in the first place.
-			parts := strings.split_n(record_name, ".", 3, context.temp_allocator)
+
+			// NOTE(Jeroen): Service Name and Protocol Name can probably just be string slices into the record name.
+			// It's already cloned, after all. I wouldn't put them on the temp allocator like this.
+
+			parts := strings.split_n(base_record.record_name, ".", 3, context.temp_allocator)
 			if len(parts) != 3 {
 				continue
 			}
 			service_name, protocol_name := parts[0], parts[1]
 
 			append(&recs, DNS_Record_SRV {
-				record_name   = record_name,
+				base          = base_record,
 				target        = target,
 				port          = port,
 				service_name  = service_name,
 				protocol_name = protocol_name,
 				priority      = priority,
 				weight        = weight,
-				ttl_seconds   = ttl,
+
 			})
 		}
 	}

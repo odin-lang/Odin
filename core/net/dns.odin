@@ -33,8 +33,6 @@ when ODIN_OS == .Windows {
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "",
 		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
-		name_servers       = nil,
-		hosts_file_entries = nil,
 	}
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
 	getenv :: proc(key: string) -> (val: string) {
@@ -45,23 +43,26 @@ when ODIN_OS == .Windows {
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "/etc/resolv.conf",
 		hosts_file         = "/etc/hosts",
-		name_servers       = nil,
-		hosts_file_entries = nil,
 	}
 } else {
 	#panic("Please add a configuration for this OS.")
 }
 
 @(init)
-reload_dns_configuration :: proc() {
+init_dns_configuration :: proc() {
 	/*
-		The idea is that we can use this to parse resolve and hosts files so we don't need to look them up on each resolve.
-
-		Also resolve %ENVIRONMENT% placeholders in their paths.
+		Resolve %ENVIRONMENT% placeholders in their paths.
 	*/
-	_dns_configuration.resolv_conf, _ = replace_environment_path(_dns_configuration.resolv_conf)
-	_dns_configuration.hosts_file,  _ = replace_environment_path(_dns_configuration.hosts_file)
+	dns_configuration.resolv_conf, _ = replace_environment_path(dns_configuration.resolv_conf)
+	dns_configuration.hosts_file,  _ = replace_environment_path(dns_configuration.hosts_file)
 }
+
+destroy_dns_configuration :: proc() {
+	delete(dns_configuration.resolv_conf)
+	delete(dns_configuration.hosts_file)
+}
+
+dns_configuration := DEFAULT_DNS_CONFIGURATION
 
 /*
 	Always allocates for consistency.
@@ -87,31 +88,6 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1)
 
 	return res, true
-}
-
-destroy_dns_configuration :: proc() {
-	delete(_dns_configuration.resolv_conf)
-	delete(_dns_configuration.hosts_file)
-	delete(_dns_configuration.name_servers)
-	delete(_dns_configuration.hosts_file_entries)
-}
-
-@(private)
-_dns_configuration := DEFAULT_DNS_CONFIGURATION
-
-/*
-	TODO: Wrap this in a mutex.
-*/
-get_dns_configuration :: proc() -> (configuration: DNS_Configuration, ok: bool) {
-	return _dns_configuration, true
-}
-
-/*
-	TODO: Wrap this in a mutex.
-*/
-set_dns_configuration :: proc(configuration: DNS_Configuration) -> (ok: bool) {
-	_dns_configuration = configuration
-	return true
 }
 
 /*
@@ -176,14 +152,14 @@ resolve :: proc(hostname: string, families_to_resolve: bit_set[Address_Family] =
 	if .IPv4 in families_to_resolve {
 		recs, _ := get_dns_records_from_os(hostname, .IPv4, allocator)
 		if len(recs) > 0 {
-			addr4 = cast(IPv4_Address) recs[0].(DNS_Record_IPv4) // address is copied
+			addr4 = recs[0].(DNS_Record_IPv4).address // address is copied
 		}
 	}
 
 	if .IPv6 in families_to_resolve {
 		recs, _ := get_dns_records_from_os(hostname, .IPv6, allocator)
 		if len(recs) > 0 {
-			addr6 = cast(IPv6_Address) recs[0].(DNS_Record_IPv6) // address is copied
+			addr6 = recs[0].(DNS_Record_IPv6).address // address is copied
 		}
 	}
 
@@ -303,16 +279,28 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 
 	for rec in records {
 		switch r in rec {
-		case DNS_Record_IPv4:  // nothing to do
-		case DNS_Record_IPv6:  // nothing to do
+		case DNS_Record_IPv4:
+			delete(r.base.record_name)
+
+		case DNS_Record_IPv6:
+			delete(r.base.record_name)
+
 		case DNS_Record_CNAME:
-			delete(string(r))
-		case DNS_Record_Text:
-			delete(string(r))
-		case DNS_Record_NS:
-			delete(string(r))
-		case DNS_Record_MX:
+			delete(r.base.record_name)
 			delete(r.host_name)
+
+		case DNS_Record_TXT:
+			delete(r.base.record_name)
+			delete(r.value)
+
+		case DNS_Record_NS:
+			delete(r.base.record_name)
+			delete(r.host_name)
+
+		case DNS_Record_MX:
+			delete(r.base.record_name)
+			delete(r.host_name)
+
 		case DNS_Record_SRV:
 			delete(r.record_name)
 			delete(r.target)
@@ -604,8 +592,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 	data := packet[data_off:data_off+int(data_sz)]
 	cur_off^ += int(hn_sz) + int(ahdr_sz) + int(data_sz)
 
-	// nil == aggregate *everything*
-	if filter == nil || u16be(filter) != record_hdr.type {
+	if u16be(filter) != record_hdr.type {
 		return nil, true
 	}
 
@@ -616,26 +603,61 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				return
 			}
 
-			addr_val: u32be = mem.slice_data_cast([]u32be, data)[0]
-			addr := IPv4_Address(transmute([4]u8)addr_val)
-			_record = DNS_Record_IPv4(addr)
+			addr := (^IPv4_Address)(raw_data(data))^
+
+			_record = DNS_Record_IPv4{
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
+				address = addr,
+			}
 
 		case .IPv6:
 			if len(data) != 16 {
 				return
 			}
 
-			addr_val: u128be = mem.slice_data_cast([]u128be, data)[0]
-			addr := IPv6_Address(transmute([8]u16be)addr_val)
-			_record = DNS_Record_IPv6(addr)
+			addr := (^IPv6_Address)(raw_data(data))^
+
+			_record = DNS_Record_IPv6{
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
+				address = addr,
+			}
 
 		case .CNAME:
 			hostname, _ := decode_hostname(packet, data_off) or_return
-			_record = DNS_Record_CNAME(hostname)
+
+			_record = DNS_Record_CNAME{
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
+				host_name = hostname,
+			}
+
+		case .TXT:
+			_record = DNS_Record_TXT{
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
+				value = strings.clone(string(data)),
+			}
 
 		case .NS:
-			name, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
-			_record = DNS_Record_NS(name)
+			name, _ := decode_hostname(packet, data_off) or_return
+
+			_record = DNS_Record_NS{
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
+				host_name = name,
+			}
 
 		case .SRV:
 			if len(data) <= 6 {
@@ -647,7 +669,14 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
 			target, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 
-			srv_record_name := strings.clone(srv_record_name)
+			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
+			// The record name is the name of the record.
+			// Not to be confused with the _target_ of the record, which is--in combination with the port--what we're looking up
+			// by making this request in the first place.
+
+			// NOTE(Jeroen): Service Name and Protocol Name can probably just be string slices into the record name.
+			// It's already cloned, after all. I wouldn't put them on the temp allocator like this.
+
 			parts := strings.split_n(srv_record_name, ".", 3, context.temp_allocator)
 			if len(parts) != 3 {
 				return
@@ -655,14 +684,16 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			service_name, protocol_name := parts[0], parts[1]
 
 			_record = DNS_Record_SRV{
-				record_name   = srv_record_name,
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
 				target        = target,
 				service_name  = service_name,
 				protocol_name = protocol_name,
 				priority      = int(priority),
 				weight        = int(weight),
 				port          = int(port),
-				ttl_seconds   = int(record_hdr.ttl),
 			}
 
 		case .MX:
@@ -672,7 +703,12 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 
 			preference: u16be = mem.slice_data_cast([]u16be, data)[0]
 			hostname, _ := decode_hostname(packet, data_off + size_of(u16be)) or_return
+
 			_record = DNS_Record_MX{
+				base = DNS_Record_Base{
+					record_name = strings.clone(srv_record_name),
+					ttl_seconds = u32(record_hdr.ttl),
+				},
 				host_name  = hostname,
 				preference = int(preference),
 			}
