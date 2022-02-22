@@ -6093,6 +6093,7 @@ gbFileContents gb_file_read_contents(gbAllocator a, b32 zero_terminate, char con
 }
 
 void gb_file_free_contents(gbFileContents *fc) {
+    if (fc == NULL || fc->size == 0) return;
 	GB_ASSERT_NOT_NULL(fc->data);
 	gb_free(fc->allocator, fc->data);
 	fc->data = NULL;
