@@ -147,51 +147,82 @@ DNS_Configuration :: struct {
 	hosts_file_entries: []DNS_Record,
 }
 
-DNS_TYPE_A     :: 0x1
-DNS_TYPE_NS    :: 0x2
-DNS_TYPE_CNAME :: 0x5
-DNS_TYPE_MX    :: 0xf
-DNS_TYPE_AAAA  :: 0x1c
-DNS_TYPE_TEXT  :: 0x10
-DNS_TYPE_SRV   :: 0x21
-
-// TODO: Support SRV records.
 DNS_Record_Type :: enum u16 {
-	IPv4  = DNS_TYPE_A,     // IPv4 address.
-	IPv6  = DNS_TYPE_AAAA,  // IPv6 address.
-	CNAME = DNS_TYPE_CNAME, // Another host name.
-	TXT   = DNS_TYPE_TEXT,  // Arbitrary binary data or text.
-	NS    = DNS_TYPE_NS,    // Address of a name (DNS) server.
-	MX    = DNS_TYPE_MX,    // Address and preference priority of a mail exchange server.
-	SRV   = DNS_TYPE_SRV,   // Address, port, priority, and weight of a host that provides a particular service.
+	DNS_TYPE_A     = 0x1,  // IPv4 address.
+	DNS_TYPE_NS    = 0x2,  // IPv6 address.
+	DNS_TYPE_CNAME = 0x5,  // Another host name.
+	DNS_TYPE_MX    = 0xf,  // Arbitrary binary data or text.
+	DNS_TYPE_AAAA  = 0x1c, // Address of a name (DNS) server.
+	DNS_TYPE_TEXT  = 0x10, // Address and preference priority of a mail exchange server.
+	DNS_TYPE_SRV   = 0x21, // Address, port, priority, and weight of a host that provides a particular service.
+
+	IPv4           = DNS_TYPE_A,
+	IPv6           = DNS_TYPE_AAAA,
+	CNAME          = DNS_TYPE_CNAME,
+	TXT            = DNS_TYPE_TEXT,
+	NS             = DNS_TYPE_NS,
+	MX             = DNS_TYPE_MX,
+	SRV            = DNS_TYPE_SRV,
 }
 
-// An IPv4 address that the domain name maps to.
-// There can be any number of these.
-DNS_Record_IPv4 :: distinct IPv4_Address
+/*
+	Base DNS Record. All DNS responses will carry a hostname and TTL (time to live) field.
+*/
+DNS_Record_Base :: struct {
+	record_name: string,
+	ttl_seconds: u32,    	// The time in seconds that this service will take to update, after the record is updated.
+}
 
-// An IPv6 address that the domain name maps to.
-// There can be any number of these.
-DNS_Record_IPv6 :: distinct IPv6_Address
+/*
+	An IPv4 address that the domain name maps to. There can be any number of these.
+*/
+DNS_Record_IPv4 :: struct {
+	using base: DNS_Record_Base,
+	address:    IPv4_Address,
+}
 
-// Another domain name that the domain name maps to.
-// Domains can be pointed to another domain instead of directly to an IP address.
-// `get_dns_records` will recursively follow these if you request this type of record.
-DNS_Record_CNAME :: distinct string
+/*
+	An IPv6 address that the domain name maps to. There can be any number of these.
+*/
+DNS_Record_IPv6 :: struct {
+	using base: DNS_Record_Base,
+	address:    IPv6_Address,
+}
 
-// Arbitrary string data that is associated with the domain name.
-// Commonly of the form `key=value` to be parsed, though there is no specific format for them.
-// These can be used for any purpose.
-DNS_Record_Text :: distinct string
+/*
+	Another domain name that the domain name maps to.
+	Domains can be pointed to another domain instead of directly to an IP address.
+	`get_dns_records` will recursively follow these if you request this type of record.
+*/
+DNS_Record_CNAME :: struct {
+	using base: DNS_Record_Base,
+	host_name:  string,
+}
 
-// Domain names of other DNS servers that are associated with the domain name.
-// TODO(tetra): Expand on what these records are used for, and when you should use pay attention to these.
-DNS_Record_NS :: distinct string
+/*
+	Arbitrary string data that is associated with the domain name.
+	Commonly of the form `key=value` to be parsed, though there is no specific format for them.
+	These can be used for any purpose.
+*/
+DNS_Record_TXT :: struct {
+	using base: DNS_Record_Base,
+	value:      string,
+}
+
+/*
+	Domain names of other DNS servers that are associated with the domain name.
+	TODO(tetra): Expand on what these records are used for, and when you should use pay attention to these.
+*/
+DNS_Record_NS :: struct {
+	using base: DNS_Record_Base,
+	host_name:  string,
+}
 
 // Domain names for email servers that are associated with the domain name.
 // These records also have values which ranks them in the order they should be preferred. Lower is more-preferred.
 DNS_Record_MX :: struct {
-	host_name: string,
+	using base: DNS_Record_Base,
+	host_name:  string,
 	preference: int,
 }
 
@@ -205,28 +236,30 @@ DNS_Record_MX :: struct {
 //
 // The host may be "." to indicate that it is "decidedly not available" on this domain.
 DNS_Record_SRV :: struct {
-	// The full name of this record.
+	// base contains the full name of this record.
 	// e.g: _sip._tls.example.com
-	record_name: string,
+	using base: DNS_Record_Base,
+
 	// The hostname or address where this service can be found.
-	target: string,
+	target:        string,
 	// The port on which this service can be found.
-	port: int,
-	service_name, protocol_name: string, // NOTE(tetra): These are substrings of 'record_name'
+	port:          int,
+
+	service_name:  string, // NOTE(tetra): These are substrings of 'record_name'
+	protocol_name: string, // NOTE(tetra): These are substrings of 'record_name'
+
 	// Lower is higher priority
-	priority: int,
+	priority:      int,
 	// Relative weight of this host compared to other of same priority; the chance of using this host should be proporitional to this weight.
 	// The number of seconds that it will take to update the record.
-	weight: int,
-	// The time in seconds that this service will take to update, after the record is updated.
-	ttl_seconds: int,
+	weight:        int,
 }
 
 DNS_Record :: union {
 	DNS_Record_IPv4,
 	DNS_Record_IPv6,
 	DNS_Record_CNAME,
-	DNS_Record_Text,
+	DNS_Record_TXT,
 	DNS_Record_NS,
 	DNS_Record_MX,
 	DNS_Record_SRV,
@@ -242,23 +275,23 @@ DNS_Response_Code :: enum u16be {
 }
 
 DNS_Query :: enum u16be {
-	Host_Address = 1,
+	Host_Address              = 1,
 	Authoritative_Name_Server = 2,
-	Mail_Destination = 3,
-	Mail_Forwarder = 4,
-	CNAME = 5,
-	All = 255,
+	Mail_Destination          = 3,
+	Mail_Forwarder            = 4,
+	CNAME                     = 5,
+	All                       = 255,
 }
 
 DNS_Header :: struct {
-	id: u16be,
-	is_response: bool,
-	opcode: u16be,
-	is_authoritative: bool,
-	is_truncated: bool,
-	is_recursion_desired: bool,
+	id:                     u16be,
+	is_response:            bool,
+	opcode:                 u16be,
+	is_authoritative:       bool,
+	is_truncated:           bool,
+	is_recursion_desired:   bool,
 	is_recursion_available: bool,
-	response_code: DNS_Response_Code,
+	response_code:          DNS_Response_Code,
 }
 
 DNS_Record_Header :: struct #packed {

@@ -27,16 +27,13 @@ get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator 
 		validate_hostname(hostname) or_return
 	}
 
-
-	dns_config := get_dns_configuration() or_return
-
-	name_servers := load_resolv_conf(dns_config.resolv_conf) or_return
+	name_servers := load_resolv_conf(dns_configuration.resolv_conf) or_return
 	defer delete(name_servers)
 	if len(name_servers) == 0 {
 		return
 	}
 
-	hosts := load_hosts(dns_config.hosts_file) or_return
+	hosts := load_hosts(dns_configuration.hosts_file) or_return
 	defer delete(hosts)
 	if len(hosts) == 0 {
 		return
@@ -46,11 +43,23 @@ get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator 
 	for host in hosts {
 		if strings.compare(host.name, hostname) == 0 {
 			if type == .IPv4 && family_from_address(host.addr) == .IPv4 {
-				addr4 := cast(DNS_Record_IPv4)host.addr.(IPv4_Address)
-				append(&host_overrides, addr4)
+				record := DNS_Record_IPv4{
+					base = {
+						record_name = strings.clone(hostname),
+						ttl_seconds = 0,
+					},
+					address = host.addr.(IPv4_Address),
+				}
+				append(&host_overrides, record)
 			} else if type == .IPv6 && family_from_address(host.addr) == .IPv6 {
-				addr6 := cast(DNS_Record_IPv6)host.addr.(IPv6_Address)
-				append(&host_overrides, addr6)
+				record := DNS_Record_IPv6{
+					base = {
+						record_name = strings.clone(hostname),
+						ttl_seconds = 0,
+					},
+					address = host.addr.(IPv6_Address),
+				}
+				append(&host_overrides, record)
 			}
 		}
 	}
