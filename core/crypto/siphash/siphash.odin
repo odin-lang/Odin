@@ -8,6 +8,8 @@ package siphash
         zhibog:  Initial implementation.
 
     Implementation of the SipHash hashing algorithm, as defined at <https://github.com/veorq/SipHash> and <https://www.aumasson.jp/siphash/siphash.pdf>
+
+    Use the specific procedures for a certain setup. The generic procdedures will default to Siphash 2-4
 */
 
 import "core:crypto"
@@ -116,6 +118,17 @@ sum_2_4 :: proc {
     sum_bytes_to_buffer_2_4,
 }
 
+sum_string           :: sum_string_2_4
+sum_bytes            :: sum_bytes_2_4
+sum_string_to_buffer :: sum_string_to_buffer_2_4
+sum_bytes_to_buffer  :: sum_bytes_to_buffer_2_4
+sum :: proc {
+    sum_string,
+    sum_bytes,
+    sum_string_to_buffer,
+    sum_bytes_to_buffer,
+}
+
 // verify_u64_2_4 will check if the supplied tag matches with the output you 
 // will get from the provided message and key
 verify_u64_2_4 :: proc (tag: u64 msg, key: []byte) -> bool {
@@ -133,6 +146,13 @@ verify_bytes_2_4 :: proc (tag, msg, key: []byte) -> bool {
 verify_2_4 :: proc {
     verify_bytes_2_4,
     verify_u64_2_4,
+}
+
+verify_bytes :: verify_bytes_2_4
+verify_u64   :: verify_u64_2_4
+verify :: proc {
+    verify_bytes,
+    verify_u64,
 }
 
 // sum_string_4_8 will hash the given message with the key and return
