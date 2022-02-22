@@ -50,9 +50,9 @@ struct ExactValue {
 	union {
 		bool           value_bool;
 		String         value_string;
-		BigInt         value_integer; // NOTE(bill): This must be an integer and not a pointer
+		BigInt         value_integer;
 		f64            value_float;
-		i64            value_pointer;
+		i64            value_pointer; // NOTE(bill): This must be an integer and not a pointer
 		Complex128    *value_complex;
 		Quaternion256 *value_quaternion;
 		Ast *          value_compound;
