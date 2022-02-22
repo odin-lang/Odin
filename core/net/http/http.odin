@@ -135,16 +135,8 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 		fmt.panicf("%v is not a supported scheme at this time", scheme)
 	}
 
-	host, port, port_ok := net.split_port(r.host)
-	if !port_ok do return
-	if port == 0 do port = 80
-
-	addr4, addr6, resolve_ok := net.resolve(host)
-	if !resolve_ok do return
-	addr := addr4 != nil ? addr4 : addr6
-
 	// TODO(tetra): SSL/TLS.
-	skt, err := net.dial_tcp(addr, port)
+	skt, err := net.dial_tcp(r.host, 80)
 	if err != nil do return
 
 	bytes := request_to_bytes(r, allocator)

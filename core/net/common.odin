@@ -70,6 +70,7 @@ Network_Error :: union {
 	Platform_Error,
 	Create_Socket_Error,
 	Dial_Error,
+	Dial_String_Error,
 	Listen_Error,
 	Accept_Error,
 	Bind_Error,

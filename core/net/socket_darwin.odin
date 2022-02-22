@@ -80,7 +80,7 @@ Dial_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-dial_tcp :: proc(addr: Address, port: int) -> (skt: TCP_Socket, err: Network_Error) {
+dial_tcp_from_endpoint :: proc(addr: Address, port: int, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
 	family := family_from_address(addr)
 	sock := create_socket(family, .TCP) or_return
 	skt = sock.(TCP_Socket)
