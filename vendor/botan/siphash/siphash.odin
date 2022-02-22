@@ -243,7 +243,7 @@ update :: proc "contextless" (ctx: ^botan.mac_t, data: []byte) {
     botan.mac_update(ctx^, len(data) == 0 ? nil : &data[0], uint(len(data)))
 }
 
-final :: proc "contextless" (ctx: ^botan.mac_t, dst: []byte) {
+final :: proc(ctx: ^botan.mac_t, dst: []byte) {
     botan.mac_final(ctx^, &dst[0])
     reset(ctx)
 }
