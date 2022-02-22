@@ -630,6 +630,9 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 	case ExactValue_Bool:
 	case ExactValue_String:
 	case ExactValue_Quaternion:
+	case ExactValue_Pointer:
+	case ExactValue_Procedure:
+	case ExactValue_Typeid:
 		return;
 
 	case ExactValue_Integer:
@@ -671,9 +674,6 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 			return;
 		}
 		break;
-
-	case ExactValue_Procedure:
-		return;
 	}
 
 	compiler_error("match_exact_values: How'd you get here? Invalid ExactValueKind %d", x->kind);
@@ -930,6 +930,17 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		case Token_GtEq:  return a >= b;
 		}
 		break;
+	}
+
+	case ExactValue_Pointer: {
+		switch (op) {
+		case Token_CmpEq: return x.value_pointer == y.value_pointer;
+		case Token_NotEq: return x.value_pointer != y.value_pointer;
+		case Token_Lt:    return x.value_pointer <  y.value_pointer;
+		case Token_LtEq:  return x.value_pointer <= y.value_pointer;
+		case Token_Gt:    return x.value_pointer >  y.value_pointer;
+		case Token_GtEq:  return x.value_pointer >= y.value_pointer;
+		}
 	}
 
 	case ExactValue_Typeid:
