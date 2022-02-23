@@ -1194,9 +1194,9 @@ LB_ABI_INFO(lb_get_abi_info) {
 
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64:
-		if (build_context.metrics.os == TargetOs_windows || build_context.metrics.abi == TargetABI_MSVC) {
+		if (build_context.metrics.os == TargetOs_windows || build_context.metrics.abi == TargetABI_Win64) {
 			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
-		} else if (build_context.metrics.abi == TargetABI_GNU) {
+		} else if (build_context.metrics.abi == TargetABI_SysV) {
 			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 		} else {
 			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);

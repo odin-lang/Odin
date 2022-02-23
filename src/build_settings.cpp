@@ -49,8 +49,8 @@ enum TargetEndianKind : u8 {
 enum TargetABIKind : u16 {
 	TargetABI_Default,
 
-	TargetABI_MSVC,
-	TargetABI_GNU,
+	TargetABI_Win64,
+	TargetABI_SysV,
 
 	TargetABI_COUNT,
 };
@@ -428,14 +428,14 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 // 	str_lit(""),
 // };
 
-gb_global TargetMetrics target_freestanding_amd64_gnu = {
+gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
 	8,
 	16,
 	str_lit("x86_64-pc-none-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
-	TargetABI_GNU,
+	TargetABI_SysV,
 };
 
 
@@ -460,7 +460,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
 
-	{ str_lit("freestanding_amd64_gnu"), &target_freestanding_amd64_gnu },
+	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
 
 NamedTargetMetrics *selected_target_metrics;
