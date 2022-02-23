@@ -195,7 +195,7 @@ clear :: proc(q: ^$Q/Queue($T)) {
 }
 
 
-// Internal growinh procedure
+// Internal growing procedure
 _grow :: proc(q: ^$Q/Queue($T), min_capacity: uint = 0) -> bool {
 	new_capacity := max(min_capacity, uint(8), uint(builtin.len(q.data))*2)
 	n := uint(builtin.len(q.data))

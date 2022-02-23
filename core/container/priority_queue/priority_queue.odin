@@ -17,6 +17,7 @@ default_swap_proc :: proc($T: typeid) -> proc(q: []T, i, j: int) {
 	}
 }
 
+// Initialises a `Priority_Queue` with a given type and comparison procedure.
 init :: proc(pq: ^$Q/Priority_Queue($T), less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int), capacity := DEFAULT_CAPACITY, allocator := context.allocator) {
 	if pq.queue.allocator.procedure == nil {
 		pq.queue.allocator = allocator
@@ -26,6 +27,7 @@ init :: proc(pq: ^$Q/Priority_Queue($T), less: proc(a, b: T) -> bool, swap: proc
 	pq.swap = swap
 }
 
+// Initialises a `Priority_Queue` from a `[dynamic]T` with a given type and comparison procedure.
 init_from_dynamic_array :: proc(pq: ^$Q/Priority_Queue($T), queue: [dynamic]T, less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int)) {
 	pq.queue = queue
 	pq.less = less
@@ -36,20 +38,25 @@ init_from_dynamic_array :: proc(pq: ^$Q/Priority_Queue($T), queue: [dynamic]T, l
 	}
 }
 
+// Clears and deallocates the queue.
 destroy :: proc(pq: ^$Q/Priority_Queue($T)) {
 	clear(pq)
 	delete(pq.queue)
 }
 
+// Reserves a certain amount of capacity for the internal buffer.
 reserve :: proc(pq: ^$Q/Priority_Queue($T), capacity: int) {
 	builtin.reserve(&pq.queue, capacity)
 }
+// Clears the internal buffer of all elements.
 clear :: proc(pq: ^$Q/Priority_Queue($T)) {
 	builtin.clear(&pq.queue)
 }
+// Returns the number of elements currently in the queue.
 len :: proc(pq: $Q/Priority_Queue($T)) -> int {
 	return builtin.len(pq.queue)
 }
+// Returns the current capacity of the internal buffer.
 cap :: proc(pq: $Q/Priority_Queue($T)) -> int {
 	return builtin.cap(pq.queue)
 }
@@ -104,11 +111,13 @@ fix :: proc(pq: ^$Q/Priority_Queue($T), i: int) {
 	}
 }
 
+// Pushes an element into the queue, placing it in the appropriate position based on its priority.
 push :: proc(pq: ^$Q/Priority_Queue($T), value: T) {
 	append(&pq.queue, value)
 	_shift_up(pq, builtin.len(pq.queue)-1)
 }
 
+// Pops off the front of the queue and returns the value.
 pop :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T) {
 	assert(condition=builtin.len(pq.queue)>0, loc=loc)
 	
@@ -118,6 +127,7 @@ pop :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T) {
 	return builtin.pop(&pq.queue)
 }
 
+// Safely pops off the front of the queue and returns the value.
 pop_safe :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T, ok: bool) {
 	if builtin.len(pq.queue) > 0 {
 		n := builtin.len(pq.queue)-1
