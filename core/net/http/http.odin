@@ -225,7 +225,7 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 		for len(remaining) > 0 {
 			if has_suffix(to_string(body_buf), "\r\n\r\n") do break
 			chunk := remaining[0]
-			write_bytes(&body_buf, transmute([]byte) trim_right_space(chunk))
+			write_string(&body_buf, trim_right_space(chunk))
 			remaining = remaining[1:]
 		}
 	case explicit_encoding == "chunked":
@@ -249,19 +249,9 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 				was_blank = true
 				continue
 			}
-			// fmt.printf("committing chunk with %v bytes: %v\n", len(chunk), chunk if len(chunk) <= 16 else "<...>")
-			write_bytes(&body_buf, transmute([]byte) trim_right_space(chunk))
+			write_string(&body_buf, trim_right_space(chunk))
 			expect_count = true
 		}
-		// for len(remaining) > 0 {
-		// 	if len(remaining) < 3 do break;
-		// 	size_part := remaining[0];
-		// 	chunk := remaining[1];
-		// 	empty := remaining[2];
-		// 	assert(empty == "");
-		// 	remaining = remaining[3:];
-		// 	write_bytes(&body_buf, transmute([]byte) chunk);
-		// }
 	case:
 		return
 	}
