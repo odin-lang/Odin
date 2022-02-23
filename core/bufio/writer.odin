@@ -5,7 +5,7 @@ import "core:mem"
 import "core:unicode/utf8"
 // import "core:bytes"
 
-// Writer is a buffered wrapper for an io.Writer
+// `Writer` is a buffered wrapper for an `io.Writer`.
 Writer :: struct {
 	buf:            []byte,
 	buf_allocator:  mem.Allocator,
@@ -33,13 +33,13 @@ writer_init_with_buf :: proc(b: ^Writer, wr: io.Writer, buf: []byte) {
 	b.buf = buf
 }
 
-// writer_destroy destroys the underlying buffer with its associated allocator IFF that allocator has been set
+// `writer_destroy` destroys the underlying buffer with its associated allocator if and only if that allocator has been set.
 writer_destroy :: proc(b: ^Writer) {
 	delete(b.buf, b.buf_allocator)
 	b^ = {}
 }
 
-// writer_size returns the size of underlying buffer in bytes
+// `writer_size` returns the size of underlying buffer in bytes.
 writer_size :: proc(b: ^Writer) -> int {
 	return len(b.buf)
 }
@@ -51,7 +51,7 @@ writer_reset :: proc(b: ^Writer, w: io.Writer) {
 }
 
 
-// writer_flush writes any buffered data into the underlying io.Writer
+// `writer_flush` writes any buffered data into the underlying `io.Writer`.
 writer_flush :: proc(b: ^Writer) -> io.Error {
 	if b.err != nil {
 		return b.err
@@ -76,19 +76,20 @@ writer_flush :: proc(b: ^Writer) -> io.Error {
 	return nil
 }
 
-// writer_available returns how many bytes are unused in the buffer
+// `writer_available` returns how many bytes are unused in the buffer.
 writer_available :: proc(b: ^Writer) -> int {
 	return len(b.buf) - b.n
 }
 
-// writer_buffered returns the number of bytes that have been writted into the current buffer
+// `writer_buffered` returns the number of bytes that have been written into the current buffer.
 writer_buffered :: proc(b: ^Writer) -> int {
 	return b.n
 }
 
-// writer_write writes the contents of p into the buffer
-// It returns the number of bytes written
-// If n < len(p), it will return an error explaining why the write is short
+// `writer_write` writes the contents of `p` into the buffer.
+//
+// It returns the number of bytes written.
+// If `n < len(p)`, it will return an error explaining why the write is short.
 writer_write :: proc(b: ^Writer, p: []byte) -> (n: int, err: io.Error) {
 	p := p
 	for len(p) > writer_available(b) && b.err == nil {
@@ -112,7 +113,7 @@ writer_write :: proc(b: ^Writer, p: []byte) -> (n: int, err: io.Error) {
 	return m, nil
 }
 
-// writer_write_byte writes a single byte
+// `writer_write_byte` writes a single byte.
 writer_write_byte :: proc(b: ^Writer, c: byte) -> io.Error {
 	if b.err != nil {
 		return b.err
@@ -125,7 +126,7 @@ writer_write_byte :: proc(b: ^Writer, c: byte) -> io.Error {
 	return nil
 }
 
-// writer_write_rune writes a single unicode code point, and returns the number of bytes written with any error
+// `writer_write_rune` writes a single unicode code point, and returns the number of bytes written with any error.
 writer_write_rune :: proc(b: ^Writer, r: rune) -> (size: int, err: io.Error) {
 	if r < utf8.RUNE_SELF {
 		err = writer_write_byte(b, byte(r))
@@ -159,16 +160,18 @@ writer_write_rune :: proc(b: ^Writer, r: rune) -> (size: int, err: io.Error) {
 	return
 }
 
-// writer_write writes a string into the buffer
-// It returns the number of bytes written
-// If n < len(p), it will return an error explaining why the write is short
+// `writer_write` writes a string into the buffer.
+//
+// It returns the number of bytes written.
+// If `n < len(p)`, it will return an error explaining why the write is short.
 writer_write_string :: proc(b: ^Writer, s: string) -> (int, io.Error) {
 	return writer_write(b, transmute([]byte)s)
 }
 
-// writer_read_from is to support io.Reader_From types
-// If the underlying writer supports the io,read_from, and b has no buffered data yet,
-// this procedure calls the underlying read_from implementation without buffering
+// `writer_read_from` is to support `io.Reader_From` types.
+//
+// If the underlying writer supports the `io.read_from`, and `b` has no buffered data yet,
+// this procedure calls the underlying `read_from` implementation without buffering.
 writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 	if b.err != nil {
 		return 0, b.err
@@ -220,7 +223,7 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 
 
 
-// writer_to_stream converts a Writer into an io.Stream
+// `writer_to_stream` converts a `Writer` into an `io.Stream`
 writer_to_stream :: proc(b: ^Writer) -> (s: io.Stream) {
 	s.stream_data = b
 	s.stream_vtable = _writer_vtable

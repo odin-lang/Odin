@@ -2,7 +2,7 @@ package bufio
 
 import "core:io"
 
-// Read_Writer stores pointers to a Reader and a Writer
+// `Read_Writer` stores pointers to a `Reader` and a `Writer`.
 Read_Writer :: struct {
 	r: ^Reader,
 	w: ^Writer,
