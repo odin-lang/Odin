@@ -3,7 +3,7 @@ package dynamic_bit_array
 import "core:intrinsics"
 
 /*
-	Note that these constants are dependent on the backing being a u64.
+Note that these constants are dependent on the backing being a u64.
 */
 @(private="file")
 INDEX_SHIFT :: 6
@@ -27,25 +27,24 @@ Bit_Array_Iterator :: struct {
 }
 
 /*
-	In:
-		- ba:   ^Bit_Array - the array to iterate over
+In: <br>
+- `ba`: the array to iterate over <br>
 
-	Out:
-		- it:   ^Bit_Array_Iterator - the iterator that holds iteration state
+Out: <br>
+- `it`: the iterator that holds iteration state <br>
 */
 make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
 	return Bit_Array_Iterator { array = ba }
 }
 
 /*
-	In:
-		- it:    ^Bit_Array_Iterator - the iterator struct that holds the state.
+In: <br>
+- `it`: the iterator struct that holds the state. <br>
 
-	Out:
-		- set:    bool - the state of the bit at `index`
-		- index:  int - the next bit of the Bit_Array referenced by `it`.
-		- ok:	  bool - `true` if the iterator returned a valid index,
-			  `false` if there were no more bits
+Out: <br>
+- `set`: the state of the bit at `index` <br>
+- `index`: the next bit of the `Bit_Array` referenced by `it`. <br>
+- `ok`:	`true` if the iterator returned a valid index, `false` if there were no more bits <br>
 */
 iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
 	index = it.word_idx * NUM_BITS + int(it.bit_idx) + it.array.bias
@@ -64,26 +63,24 @@ iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: 
 }
 
 /*
-	In:
-		- it:     ^Bit_Array_Iterator - the iterator struct that holds the state.
+In: <br>
+- `it`: the iterator struct that holds the state. <br>
 
-	Out:
-		- index:  int - the next set bit of the Bit_Array referenced by `it`.
-		- ok:	  bool - `true` if the iterator returned a valid index,
-			  `false` if there were no more bits set
+Out: <br>
+- `index`: the next set bit of the `Bit_Array` referenced by `it`. <br>
+- `ok`:	`true` if the iterator returned a valid index, `false` if there were no more bits set <br>
 */
 iterate_by_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, true)
 }
 
 /*
-	In:
-		- it:	  ^Bit_Array_Iterator - the iterator struct that holds the state.
+In: <br>
+- `it`:	the iterator struct that holds the state. <br>
 
-	Out:
-		- index:  int - the next unset bit of the Bit_Array referenced by `it`.
-		- ok:	  bool - `true` if the iterator returned a valid index,
-			  `false` if there were no more unset bits
+Out: <br>
+- `index`: the next unset bit of the `Bit_Array` referenced by `it`. <br>
+- `ok`:	`true` if the iterator returned a valid index, `false` if there were no more unset bits <br>
 */
 iterate_by_unset:: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, false)
@@ -125,15 +122,15 @@ iterate_internal_ :: proc (it: ^Bit_Array_Iterator, $ITERATE_SET_BITS: bool) -> 
 
 
 /*
-	In:
-		- ba:    ^Bit_Array - a pointer to the Bit Array
-		- index: The bit index. Can be an enum member.
+In: <br>
+- `ba`: a pointer to the `Bit_Array` <br>
+- `index`: The bit index. Can be an enum member. <br>
 
-	Out:
-		- res:   The bit you're interested in.
-		- ok:    Whether the index was valid. Returns `false` if the index is smaller than the bias.
+Out: <br>
+- `res`: The bit you're interested in. <br>
+- `ok`: Whether the index was valid. Returns `false` if the index is smaller than the bias. <br>
 
-	The `ok` return value may be ignored.
+The `ok` return value may be ignored.
 */
 get :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator) -> (res: bool, ok: bool) {
 	idx := int(index) - ba.bias
@@ -157,14 +154,14 @@ get :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 }
 
 /*
-	In:
-		- ba:    ^Bit_Array - a pointer to the Bit Array
-		- index: The bit index. Can be an enum member.
+In: <br>
+- `ba`: a pointer to the `Bit_Array` <br>
+- `index`: The bit index. Can be an enum member. <br>
 
-	Out:
-		- ok:    Whether or not we managed to set requested bit.
+Out: <br>
+- `ok`: Whether or not we managed to set requested bit. <br>
 
-	`set` automatically resizes the Bit Array to accommodate the requested index if needed.
+`set` automatically resizes the `Bit_Array` to accommodate the requested index if needed.
 */
 set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator) -> (ok: bool) {
 
@@ -184,7 +181,7 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 }
 
 /*
-	A helper function to create a Bit Array with optional bias, in case your smallest index is non-zero (including negative).
+A helper function to create a `Bit_Array` with optional bias, in case your smallest index is non-zero (including negative).
 */
 create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -> (res: Bit_Array, ok: bool) #optional_ok {
 	context.allocator = allocator
@@ -202,7 +199,7 @@ create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -
 }
 
 /*
-	Sets all bits to `false`.
+Sets all bits to `false`.
 */
 clear :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
@@ -210,7 +207,7 @@ clear :: proc(ba: ^Bit_Array) {
 }
 
 /*
-	Releases the memory used by the Bit Array.
+Releases the memory used by the `Bit_Array`.
 */
 destroy :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
@@ -218,8 +215,8 @@ destroy :: proc(ba: ^Bit_Array) {
 }
 
 /*
-	Resizes the Bit Array. For internal use.
-	If you want to reserve the memory for a given-sized Bit Array up front, you can use `create`.
+Resizes the `Bit_Array`. For internal use.
+If you want to reserve the memory for a given-sized `Bit_Array` up front, you can use `create`.
 */
 @(private="file")
 resize_if_needed :: proc(ba: ^Bit_Array, legs: int, allocator := context.allocator) -> (ok: bool) {
