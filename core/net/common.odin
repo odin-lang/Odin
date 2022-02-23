@@ -146,18 +146,23 @@ Address_Family :: enum {
 */
 
 Network_Interface :: struct {
-	adapter_name:  string, // On Windows this is a GUID that we could parse back into its u128 for more compact storage.
-	friendly_name: string,
+	adapter_name:     string, // On Windows this is a GUID that we could parse back into its u128 for more compact storage.
+	friendly_name:    string,
+	description:      string,
+	dns_suffix:       string,
 
-	mtu:       u32,
+	physical_address: string, // MAC address, etc.
+	mtu:              u32,
 
-	unicast:   []Lease,
-	multicast: []Endpoint,
-	anycast:   []Endpoint,
+	unicast:          []Lease,
+	multicast:        []Endpoint,
+	anycast:          []Endpoint,
 
-	gateways:  []Endpoint,
-	dhcp_v4:   Endpoint,
-	dhcp_v6:   Endpoint,
+	gateways:         []Endpoint,
+	dhcp_v4:          Endpoint,
+	dhcp_v6:          Endpoint,
+
+	tunnel_type:      Tunnel_Type,
 
 	link: struct {
 		state:          Link_State,
