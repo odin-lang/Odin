@@ -31,7 +31,7 @@ any_socket_to_socket :: proc(any_socket: Any_Socket) -> Socket {
 
 /*
     Expects both hostname and port to be present in the `hostname_and_port` parameter, either as:
-    `a.host.name:9999`, or as `1.2.3.4:9999`, or IPv6 equivalent.
+    `a.host.name:9999`, or as `1.2.3.4:9999`, or IP6 equivalent.
 
     Calls `parse_hostname_or_endpoint` and `resolve`, then `dial_tcp_from_endpoint`.
 */

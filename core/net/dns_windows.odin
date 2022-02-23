@@ -69,17 +69,17 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 		}
 
 		switch DNS_Record_Type(r.wType) {
-		case .IPv4:
-			addr := IPv4_Address(transmute([4]u8)r.Data.A)
-			record := DNS_Record_IPv4{
+		case .IP4:
+			addr := IP4_Address(transmute([4]u8)r.Data.A)
+			record := DNS_Record_IP4{
 				base    = base_record,
 				address = addr,
 			}
 			append(&recs, record)
 
-		case .IPv6:
-			addr := IPv6_Address(transmute([8]u16be) r.Data.AAAA)
-			record := DNS_Record_IPv6{
+		case .IP6:
+			addr := IP6_Address(transmute([8]u16be) r.Data.AAAA)
+			record := DNS_Record_IP6{
 				base    = base_record,
 				address = addr,
 			}

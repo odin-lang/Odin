@@ -41,8 +41,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	c_type, c_protocol, c_family: c.int
 
 	switch family {
-	case .IPv4:  c_family = win.AF_INET
-	case .IPv6:  c_family = win.AF_INET6
+	case .IP4:  c_family = win.AF_INET
+	case .IP6:  c_family = win.AF_INET6
 	case:
 		unreachable()
 	}
