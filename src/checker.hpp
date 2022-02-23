@@ -117,7 +117,6 @@ struct AttributeContext {
 	bool    test                : 1;
 	bool    init                : 1;
 	bool    set_cold            : 1;
-	bool    no_red_zone         : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 
 	String  objc_class;

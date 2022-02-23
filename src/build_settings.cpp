@@ -278,6 +278,7 @@ struct BuildContext {
 	bool copy_file_contents;
 
 	RelocMode reloc_mode;
+	bool disable_red_zone;
 
 
 	u32 cmd_doc_flags;
@@ -1001,6 +1002,13 @@ void init_build_context(TargetMetrics *cross_target) {
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
 	bc->threaded_checker = true;
 	#endif
+
+	if (bc->disable_red_zone) {
+		if (!(bc->metrics.os == TargetOs_freestanding && !is_arch_wasm())) {
+			gb_printf_err("-disable-red-zone is not support for this target");
+			gb_exit(1);
+		}
+	}
 
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
