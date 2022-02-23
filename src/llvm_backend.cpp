@@ -1001,10 +1001,10 @@ String lb_filepath_obj_for_module(lbModule *m) {
 				switch (build_context.metrics.abi) {
 				default:
 				case TargetABI_Default:
-				case TargetABI_GNU:
+				case TargetABI_SysV:
 					ext = STR_LIT(".o");
 					break;
-				case TargetABI_MSVC:
+				case TargetABI_Win64:
 					ext = STR_LIT(".obj");
 					break;
 				}
