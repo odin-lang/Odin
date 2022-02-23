@@ -189,7 +189,7 @@ enum ErrorPosStyle {
 	ErrorPosStyle_COUNT
 };
 
-enum RelocMode {
+enum RelocMode : u8 {
 	RelocMode_Default,
 	RelocMode_Static,
 	RelocMode_PIC,

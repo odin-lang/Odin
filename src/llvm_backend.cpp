@@ -1261,6 +1261,8 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
+	} else if (build_context.metrics.os == TargetOs_freestanding) {
+		code_mode = LLVMCodeModelKernel;
 	}
 
 	char const *host_cpu_name = LLVMGetHostCPUName();
