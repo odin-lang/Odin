@@ -65,12 +65,12 @@ General_Error :: enum {
 */
 Platform_Error :: enum u32 {}
 
+// NOTE(tetra): Enums in Network_Error cannot have a named zero value, else or_return breaks.
 Network_Error :: union {
 	General_Error,
 	Platform_Error,
 	Create_Socket_Error,
 	Dial_Error,
-	Dial_String_Error,
 	Listen_Error,
 	Accept_Error,
 	Bind_Error,
@@ -80,6 +80,8 @@ Network_Error :: union {
 	UDP_Recv_Error,
 	Shutdown_Error,
 	Socket_Option_Error,
+	Parse_Endpoint_Error,
+	Resolve_Error,
 }
 
 /*

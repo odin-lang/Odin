@@ -123,48 +123,82 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 	```
 */
 
+Resolve_Error :: enum {
+	Unable_To_Resolve = 1,
+}
+
 // TODO: Rewrite this to work with OS resolver or custom name servers.
-resolve :: proc(hostname: string, families_to_resolve: bit_set[Address_Family] = {.IPv4, .IPv6}) -> (addr4, addr6: Address, ok: bool) {
-	if addr := parse_address(hostname); addr != nil {
-		switch a in addr {
-		case IPv4_Address: addr4 = addr
-		case IPv6_Address: addr6 = addr
+resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Network_Error) {
+	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
+	switch t in target {
+	case Endpoint:
+		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
+		switch in t.address {
+		case IPv4_Address: ep4 = t
+		case IPv6_Address: ep6 = t
+		case:              unreachable()
 		}
-		ok = true
+		return
+
+	case Host:
+		ep4 = resolve_ip4(t.hostname) or_return
+		ep6 = resolve_ip6(t.hostname) or_return
 		return
 	}
+	unreachable()
+}
 
-	//
-	// DEBUG: Why is 1024 bytes not enough when the entire map in get_dns_records is only 256 bytes?
-	//
-
-	// NOTE(tetra): We might not have used temporary storage yet,
-	// and get_dns_records uses it by default.
-	// Rather than require the user initialize it manually first,
-	// we just use a stack-arena here instead.
-	// We can do this because the addresses we return are returned by value,
-	// so we don't return data from within this arena.
-	buf: [4096]byte
-	arena: mem.Arena
-	mem.init_arena(&arena, buf[:])
-	allocator := mem.arena_allocator(&arena)
-
-	if .IPv4 in families_to_resolve {
-		recs, _ := get_dns_records_from_os(hostname, .IPv4, allocator)
-		if len(recs) > 0 {
-			addr4 = recs[0].(DNS_Record_IPv4).address // address is copied
+resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Network_Error) {
+	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
+	switch t in target {
+	case Endpoint:
+		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
+		switch in t.address {
+		case IPv4_Address:
+			return t, nil
+		case IPv6_Address:
+			err = .Unable_To_Resolve
+			return
 		}
-	}
-
-	if .IPv6 in families_to_resolve {
-		recs, _ := get_dns_records_from_os(hostname, .IPv6, allocator)
-		if len(recs) > 0 {
-			addr6 = recs[0].(DNS_Record_IPv6).address // address is copied
+	case Host:
+		recs, _ := get_dns_records_from_os(t.hostname, .IPv4, context.temp_allocator)
+		if len(recs) == 0 {
+			err = .Unable_To_Resolve
+			return
 		}
+		ep4 = {
+			address = recs[0].(DNS_Record_IPv4).address,
+			port = t.port,
+		}
+		return
 	}
-
-	ok = addr4 != nil || addr6 != nil
-	return
+	unreachable()
+}
+resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Network_Error) {
+	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
+	switch t in target {
+	case Endpoint:
+		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
+		switch in t.address {
+		case IPv4_Address:
+			err = .Unable_To_Resolve
+			return
+		case IPv6_Address:
+			return t, nil
+		}
+	case Host:
+		recs, _ := get_dns_records_from_os(t.hostname, .IPv6, context.temp_allocator)
+		if len(recs) == 0 {
+			err = .Unable_To_Resolve
+			return
+		}
+		ep6 = {
+			address = recs[0].(DNS_Record_IPv6).address,
+			port = t.port,
+		}
+		return
+	}
+	unreachable()
 }
 
 /*

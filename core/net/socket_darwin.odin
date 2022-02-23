@@ -65,6 +65,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 
 
 Dial_Error :: enum c.int {
+	Port_Required = -1,
+
 	Address_In_Use = c.int(os.EADDRINUSE),
 	In_Progress = c.int(os.EINPROGRESS),
 	Cannot_Use_Any_Address = c.int(os.EADDRNOTAVAIL),
@@ -81,6 +83,10 @@ Dial_Error :: enum c.int {
 }
 
 dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+	if endpoint.port == 0 {
+		return nil, .Port_Required
+	}
+
 	family := family_from_endpoint(endpoint)
 	sock := create_socket(family, .TCP) or_return
 	skt = sock.(TCP_Socket)
