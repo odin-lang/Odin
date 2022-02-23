@@ -2623,6 +2623,17 @@ i64 union_tag_size(Type *u) {
 
 	// TODO(bill): Is this an okay approach?
 	i64 max_align = 1;
+
+	if (u->Union.variants.count < 1ull<<8) {
+		max_align = 1;
+	} else if (u->Union.variants.count < 1ull<<16) {
+		max_align = 2;
+	} else if (u->Union.variants.count < 1ull<<32) {
+		max_align = 4;
+	} else {
+		GB_PANIC("how many variants do you have?!");
+	}
+
 	for_array(i, u->Union.variants) {
 		Type *variant_type = u->Union.variants[i];
 		i64 align = type_align_of(variant_type);

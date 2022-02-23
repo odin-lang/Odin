@@ -132,6 +132,62 @@ void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	}
 }
 
+void populate_check_did_you_mean_objc_entity(StringSet *set, Entity *e, bool is_type) {
+	if (e->kind != Entity_TypeName) {
+		return;
+	}
+	if (e->TypeName.objc_metadata == nullptr) {
+		return;
+	}
+	TypeNameObjCMetadata *objc_metadata = e->TypeName.objc_metadata;
+	Type *t = base_type(e->type);
+	GB_ASSERT(t->kind == Type_Struct);
+
+	if (is_type) {
+		for_array(i, objc_metadata->type_entries) {
+			String name = objc_metadata->type_entries[i].name;
+			string_set_add(set, name);
+		}
+	} else {
+		for_array(i, objc_metadata->value_entries) {
+			String name = objc_metadata->value_entries[i].name;
+			string_set_add(set, name);
+		}
+	}
+
+	for_array(i, t->Struct.fields) {
+		Entity *f = t->Struct.fields[i];
+		if (f->flags & EntityFlag_Using && f->type != nullptr) {
+			if (f->type->kind == Type_Named && f->type->Named.type_name) {
+				populate_check_did_you_mean_objc_entity(set, f->type->Named.type_name, is_type);
+			}
+		}
+	}
+}
+
+
+void check_did_you_mean_objc_entity(String const &name, Entity *e, bool is_type, char const *prefix = "") {
+	ERROR_BLOCK();
+	GB_ASSERT(e->kind == Entity_TypeName);
+	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
+	auto *objc_metadata = e->TypeName.objc_metadata;
+	mutex_lock(objc_metadata->mutex);
+	defer (mutex_unlock(objc_metadata->mutex));
+
+	StringSet set = {};
+	string_set_init(&set, heap_allocator());
+	defer (string_set_destroy(&set));
+	populate_check_did_you_mean_objc_entity(&set, e, is_type);
+
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), set.entries.count, name);
+	defer (did_you_mean_destroy(&d));
+	for_array(i, set.entries) {
+		did_you_mean_append(&d, set.entries[i].value);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
 void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, char const *prefix = "") {
 	ERROR_BLOCK();
 
@@ -143,6 +199,7 @@ void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, 
 	}
 	check_did_you_mean_print(&d, prefix);
 }
+
 
 void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields, char const *prefix = "") {
 	ERROR_BLOCK();
@@ -4420,7 +4477,12 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		if (operand->type != nullptr && selector->kind == Ast_Ident) {
 			String const &name = selector->Ident.token.string;
 			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
+			if (operand->type->kind == Type_Named &&
+			    operand->type->Named.type_name &&
+			    operand->type->Named.type_name->kind == Entity_TypeName &&
+			    operand->type->Named.type_name->TypeName.objc_metadata) {
+				check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
+			} else if (bt->kind == Type_Struct) {
 				check_did_you_mean_type(name, bt->Struct.fields);
 			} else if (bt->kind == Type_Enum) {
 				check_did_you_mean_type(name, bt->Enum.fields);
