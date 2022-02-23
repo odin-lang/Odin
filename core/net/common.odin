@@ -121,15 +121,15 @@ Any_Socket :: union {
 	ADDRESS DEFINITIONS
 */
 
-IPv4_Address :: distinct [4]u8
-IPv6_Address :: distinct [8]u16be
-Address :: union {IPv4_Address, IPv6_Address}
+IP4_Address :: distinct [4]u8
+IP6_Address :: distinct [8]u16be
+Address :: union {IP4_Address, IP6_Address}
 
-IPv4_Loopback := IPv4_Address{127, 0, 0, 1}
-IPv6_Loopback := IPv6_Address{0, 0, 0, 0, 0, 0, 0, 1}
+IP4_Loopback := IP4_Address{127, 0, 0, 1}
+IP6_Loopback := IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 
-IPv4_Any := IPv4_Address{}
-IPv6_Any := IPv6_Address{}
+IP4_Any := IP4_Address{}
+IP6_Any := IP6_Address{}
 
 Endpoint :: struct {
 	address: Address,
@@ -137,8 +137,8 @@ Endpoint :: struct {
 }
 
 Address_Family :: enum {
-	IPv4,
-	IPv6,
+	IP4,
+	IP6,
 }
 
 /*
@@ -244,16 +244,16 @@ DNS_Configuration :: struct {
 }
 
 DNS_Record_Type :: enum u16 {
-	DNS_TYPE_A     = 0x1,  // IPv4 address.
-	DNS_TYPE_NS    = 0x2,  // IPv6 address.
+	DNS_TYPE_A     = 0x1,  // IP4 address.
+	DNS_TYPE_NS    = 0x2,  // IP6 address.
 	DNS_TYPE_CNAME = 0x5,  // Another host name.
 	DNS_TYPE_MX    = 0xf,  // Arbitrary binary data or text.
 	DNS_TYPE_AAAA  = 0x1c, // Address of a name (DNS) server.
 	DNS_TYPE_TEXT  = 0x10, // Address and preference priority of a mail exchange server.
 	DNS_TYPE_SRV   = 0x21, // Address, port, priority, and weight of a host that provides a particular service.
 
-	IPv4           = DNS_TYPE_A,
-	IPv6           = DNS_TYPE_AAAA,
+	IP4            = DNS_TYPE_A,
+	IP6            = DNS_TYPE_AAAA,
 	CNAME          = DNS_TYPE_CNAME,
 	TXT            = DNS_TYPE_TEXT,
 	NS             = DNS_TYPE_NS,
@@ -270,19 +270,19 @@ DNS_Record_Base :: struct {
 }
 
 /*
-	An IPv4 address that the domain name maps to. There can be any number of these.
+	An IP4 address that the domain name maps to. There can be any number of these.
 */
-DNS_Record_IPv4 :: struct {
+DNS_Record_IP4 :: struct {
 	using base: DNS_Record_Base,
-	address:    IPv4_Address,
+	address:    IP4_Address,
 }
 
 /*
 	An IPv6 address that the domain name maps to. There can be any number of these.
 */
-DNS_Record_IPv6 :: struct {
+DNS_Record_IP6 :: struct {
 	using base: DNS_Record_Base,
-	address:    IPv6_Address,
+	address:    IP6_Address,
 }
 
 /*
@@ -352,8 +352,8 @@ DNS_Record_SRV :: struct {
 }
 
 DNS_Record :: union {
-	DNS_Record_IPv4,
-	DNS_Record_IPv6,
+	DNS_Record_IP4,
+	DNS_Record_IP6,
 	DNS_Record_CNAME,
 	DNS_Record_TXT,
 	DNS_Record_NS,

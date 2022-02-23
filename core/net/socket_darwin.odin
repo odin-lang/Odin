@@ -36,8 +36,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	c_type, c_protocol, c_family: int
 
 	switch family {
-	case .IPv4:  c_family = os.AF_INET
-	case .IPv6:  c_family = os.AF_INET6
+	case .IP4:  c_family = os.AF_INET
+	case .IP6:  c_family = os.AF_INET6
 	case:
 		unreachable()
 	}
@@ -84,7 +84,7 @@ Dial_Error :: enum c.int {
 
 dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
 	if endpoint.port == 0 {
-		return nil, .Port_Required
+		return 0, .Port_Required
 	}
 
 	family := family_from_endpoint(endpoint)

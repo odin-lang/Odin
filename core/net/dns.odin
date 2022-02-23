@@ -91,7 +91,7 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 }
 
 /*
-	Resolves a hostname to exactly one IPv4 and IPv6 address.
+	Resolves a hostname to exactly one IP4 and IP6 address.
 	It's then up to you which one you use.
 	Note that which address you pass to `dial` determines the type of the socket you get.
   
@@ -118,7 +118,7 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 		printf("error: cannot resolve %v\n", addr_or_host);
 		return;
 	}
-	addr := addr4 != nil ? addr4 : addr6; // preferring IPv4.
+	addr := addr4 != nil ? addr4 : addr6; // preferring IP4.
 	assert(addr != nil); // If resolve_ok, we'll have at least one address.
 	```
 */
@@ -134,9 +134,9 @@ resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Ne
 	case Endpoint:
 		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
 		switch in t.address {
-		case IPv4_Address: ep4 = t
-		case IPv6_Address: ep6 = t
-		case:              unreachable()
+		case IP4_Address: ep4 = t
+		case IP6_Address: ep6 = t
+		case:             unreachable()
 		}
 		return
 
@@ -154,20 +154,20 @@ resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Net
 	case Endpoint:
 		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
 		switch in t.address {
-		case IPv4_Address:
+		case IP4_Address:
 			return t, nil
-		case IPv6_Address:
+		case IP6_Address:
 			err = .Unable_To_Resolve
 			return
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IPv4, context.temp_allocator)
+		recs, _ := get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
 		}
 		ep4 = {
-			address = recs[0].(DNS_Record_IPv4).address,
+			address = recs[0].(DNS_Record_IP4).address,
 			port = t.port,
 		}
 		return
@@ -180,20 +180,20 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	case Endpoint:
 		// NOTE(tetra): The hostname was actually an IP address; nothing to resolve, so just return it.
 		switch in t.address {
-		case IPv4_Address:
+		case IP4_Address:
 			err = .Unable_To_Resolve
 			return
-		case IPv6_Address:
+		case IP6_Address:
 			return t, nil
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IPv6, context.temp_allocator)
+		recs, _ := get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
 		}
 		ep6 = {
-			address = recs[0].(DNS_Record_IPv6).address,
+			address = recs[0].(DNS_Record_IP6).address,
 			port = t.port,
 		}
 		return
@@ -313,10 +313,10 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 
 	for rec in records {
 		switch r in rec {
-		case DNS_Record_IPv4:
+		case DNS_Record_IP4:
 			delete(r.base.record_name)
 
-		case DNS_Record_IPv6:
+		case DNS_Record_IP6:
 			delete(r.base.record_name)
 
 		case DNS_Record_CNAME:
@@ -632,14 +632,14 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 
 	_record: DNS_Record
 	#partial switch DNS_Record_Type(record_hdr.type) {
-		case .IPv4:
+		case .IP4:
 			if len(data) != 4 {
 				return
 			}
 
-			addr := (^IPv4_Address)(raw_data(data))^
+			addr := (^IP4_Address)(raw_data(data))^
 
-			_record = DNS_Record_IPv4{
+			_record = DNS_Record_IP4{
 				base = DNS_Record_Base{
 					record_name = strings.clone(srv_record_name),
 					ttl_seconds = u32(record_hdr.ttl),
@@ -647,14 +647,14 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				address = addr,
 			}
 
-		case .IPv6:
+		case .IP6:
 			if len(data) != 16 {
 				return
 			}
 
-			addr := (^IPv6_Address)(raw_data(data))^
+			addr := (^IP6_Address)(raw_data(data))^
 
-			_record = DNS_Record_IPv6{
+			_record = DNS_Record_IP6{
 				base = DNS_Record_Base{
 					record_name = strings.clone(srv_record_name),
 					ttl_seconds = u32(record_hdr.ttl),

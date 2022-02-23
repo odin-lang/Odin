@@ -24,7 +24,7 @@ import strings "core:strings"
 MAX_INTERFACE_ENUMERATION_TRIES :: 3
 
 DEFAULT_INTERFACE_ENUMERATION_FLAGS :: sys.GAA_Flags{
-	.Include_Prefix,               // (XP SP1+) Return a list of IP address prefixes on this adapter. When this flag is set, IP address prefixes are returned for both IPv6 and IPv4 addresses.
+	.Include_Prefix,               // (XP SP1+) Return a list of IP address prefixes on this adapter. When this flag is set, IP address prefixes are returned for both IP6 and IP4 addresses.
 	.Include_Gateways,             // (Vista+) Return the addresses of default gateways.
 	.Include_Tunnel_Binding_Order, // (Vista+) Return the adapter addresses sorted in tunnel binding order.
 }
@@ -43,7 +43,7 @@ enumerate_interfaces :: proc(flags := DEFAULT_INTERFACE_ENUMERATION_FLAGS, alloc
 
  	gaa: for _ in 1..=MAX_INTERFACE_ENUMERATION_TRIES {
  	 	res = sys.get_adapters_addresses(
- 			.Unspecified, // Return both IPv4 and IPv6 adapters.
+ 			.Unspecified, // Return both IP4 and IP6 adapters.
  			flags,        // Flags,
  			nil,          // Reserved
  			(^sys.IP_Adapter_Addresses)(raw_data(buf)),
@@ -187,7 +187,7 @@ parse_socket_address :: proc(addr_in: sys.SOCKET_ADDRESS) -> (addr: Endpoint) {
 		win_addr := cast(^sys.sockaddr_in)addr_in.lpSockaddr
 		port     := int(win_addr.sin_port)
 		return Endpoint {
-			address = IPv4_Address(transmute([4]byte)win_addr.sin_addr),
+			address = IP4_Address(transmute([4]byte)win_addr.sin_addr),
 			port    = port,
 		}
 
@@ -195,7 +195,7 @@ parse_socket_address :: proc(addr_in: sys.SOCKET_ADDRESS) -> (addr: Endpoint) {
 		win_addr := cast(^sys.sockaddr_in6)addr_in.lpSockaddr
 		port     := int(win_addr.sin6_port)
 		return Endpoint {
-			address = IPv6_Address(transmute([8]u16be)win_addr.sin6_addr),
+			address = IP6_Address(transmute([8]u16be)win_addr.sin6_addr),
 			port = port,
 		}
 
