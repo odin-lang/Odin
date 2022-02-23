@@ -626,6 +626,7 @@ enum BuildFlagKind {
 	BuildFlag_Microarch,
 
 	BuildFlag_RelocMode,
+	BuildFlag_DisableRedZone,
 
 	BuildFlag_TestName,
 
@@ -782,6 +783,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,        str_lit("reloc-mode"),                       BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_DisableRedZone,   str_lit("disable-red-zone"),                 BuildFlagParam_None, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
 
@@ -1365,6 +1367,9 @@ bool parse_build_flags(Array<String> args) {
 
 							break;
 						}
+						case BuildFlag_DisableRedZone:
+							build_context.disable_red_zone = true;
+							break;
 						case BuildFlag_TestName: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							{
@@ -2096,6 +2101,9 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "pic");
 		print_usage_line(3, "dynamic-no-pic");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-disable-red-zone");
+		print_usage_line(2, "Disable red zone on a supported freestanding target");
 	}
 
 	if (check) {
