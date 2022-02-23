@@ -135,8 +135,16 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 		fmt.panicf("%v is not a supported scheme at this time", scheme)
 	}
 
+	// NOTE(tetra): The host string may or may not have a port,
+	// but dial needs one.
+	// This means we have to resolve it ourselves.
+	host, port := net.split_port(r.host) or_return
+	if port == 0 {
+		port = 80
+	}
+
 	// TODO(tetra): SSL/TLS.
-	skt, err := net.dial_tcp(r.host, 80)
+	skt, err := net.dial_tcp(host, port)
 	if err != nil do return
 
 	bytes := request_to_bytes(r, allocator)
