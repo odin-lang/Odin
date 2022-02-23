@@ -15,6 +15,7 @@ reserved_names := [?]string{
 	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 }
 
+// `is_reserved_name` will return `true` if `path` is reserved on the current operating system.
 is_reserved_name :: proc(path: string) -> bool {
 	if len(path) == 0 {
 		return false
@@ -31,7 +32,11 @@ is_UNC :: proc(path: string) -> bool {
 	return volume_name_len(path) > 2
 }
 
-
+// `is_abs` checks whether the path is absolute.
+//
+// Examples: <br>
+//     `"/usr/bin/hello"` will return `true` <br>
+//     `"./bin/hello"` will return `false` <br>
 is_abs :: proc(path: string) -> bool {
 	if is_reserved_name(path) {
 		return true
@@ -77,7 +82,7 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
 }
 
 
-
+// `abs` converts a relative path to an absolute path.
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	full_path, err := temp_full_path(path)
 	if err != 0 {
@@ -87,7 +92,11 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	return p, true
 }
 
-
+// `join` joins numerous path elements into a single path.
+//
+// Examples: <br>
+//     `["path", "to", "something"]` will produce `"path/to/something"` <br>
+//     `["/", "path", "to", "something"]` will produce `"/path/to/something"` <br>
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {

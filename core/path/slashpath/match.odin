@@ -27,7 +27,7 @@ Match_Error :: enum {
 //		lo '-' hi       matches character c for lo <= c <= hi
 //
 // `match` requires that the pattern matches the entirety of the name, not just a substring.
-// The only possible error returned is `.Syntax_Error`
+// The only possible error returned is `.Syntax_Error`.
 //
 match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
 	pattern, name := pattern, name

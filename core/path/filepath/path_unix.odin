@@ -13,14 +13,21 @@ SEPARATOR :: '/'
 SEPARATOR_STRING :: `/`
 LIST_SEPARATOR :: ':'
 
+// `is_reserved_name` will return `true` if `path` is reserved on the current operating system.
 is_reserved_name :: proc(path: string) -> bool {
 	return false
 }
 
+// `is_abs` checks whether the path is absolute.
+//
+// Examples: <br>
+//     `"/usr/bin/hello"` will return `true` <br>
+//     `"./bin/hello"` will return `false` <br>
 is_abs :: proc(path: string) -> bool {
 	return strings.has_prefix(path, "/")
 }
 
+// `abs` converts a relative path to an absolute path.
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	rel := path
 	if rel == "" {
@@ -38,6 +45,11 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	return path_str, true
 }
 
+// `join` joins numerous path elements into a single path.
+//
+// Examples: <br>
+//     `["path", "to", "something"]` will produce `"path/to/something"` <br>
+//     `["/", "path", "to", "something"]` will produce `"/path/to/something"` <br>
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {

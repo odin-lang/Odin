@@ -10,7 +10,8 @@ Match_Error :: enum {
 	Syntax_Error,
 }
 
-// match states whether "name" matches the shell pattern
+// `match` states whether `name` matches the shell pattern.
+//
 // Pattern syntax is:
 //	pattern:
 //		{term}
@@ -27,10 +28,10 @@ Match_Error :: enum {
 //		'\\' c          matches character c
 //		lo '-' hi       matches character c for lo <= c <= hi
 //
-// match requires that the pattern matches the entirety of the name, not just a substring
-// The only possible error returned is .Syntax_Error
+// `match` requires that the pattern matches the entirety of the name, not just a substring.
+// The only possible error returned is `.Syntax_Error`.
 //
-// NOTE(bill): This is effectively the shell pattern matching system found
+// NOTE(bill): This is effectively the shell pattern matching system found.
 //
 match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
 	pattern, name := pattern, name
@@ -212,13 +213,13 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 
 
 
-// glob returns the names of all files matching pattern or nil if there are no matching files
-// The syntax of patterns is the same as "match".
-// The pattern may describe hierarchical names such as /usr/*/bin (assuming '/' is a separator)
+// `glob` returns the names of all files matching `pattern` or `nil` if there are no matching files.
 //
-// glob ignores file system errors
+// The syntax of patterns is the same as `match`.
+// The pattern may describe hierarchical names such as `/usr/*/bin` (assuming '/' is a separator).
 //
-
+// `glob` ignores file system errors.
+//
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Match_Error) {
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error

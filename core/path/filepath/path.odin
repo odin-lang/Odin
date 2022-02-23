@@ -1,10 +1,12 @@
-// The path/filepath package uses either forward slashes or backslashes depending on the operating system
-// To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
+// The `path/filepath` package uses either forward slashes or backslashes depending on the operating system.
+// To process paths usch as URLs that depend on forward slashes regardless of the OS, use the `path/slashpath` package.
 package filepath
 
 import "core:strings"
 
-// is_separator checks whether the byte is a valid separator character
+// `is_separator` checks whether the byte is a valid separator character.
+//
+// Valid separator characters are: `/`, `\`.
 is_separator :: proc(c: byte) -> bool {
 	switch c {
 	case '/':  return true
@@ -18,6 +20,16 @@ is_slash :: proc(c: byte) -> bool {
 	return c == '\\' || c == '/'
 }
 
+// `split` splits the path immediately following the last separator,
+// separating it into a directory and file name component.
+//
+// The returned values have the property that `path = dir+file`.
+//
+// Examples: <br>
+//     `""` will produce `dir="", file=""` <br>
+//     `"abc"` will produce `dir="", file="abc"` <br>
+//     `"abc/"` will produce `dir="abc/", file=""` <br>
+//     `"/path/to/something"` will produce `dir="/path/to/", file="something"` <br>
 split :: proc(path: string) -> (dir, file: string) {
 	vol := volume_name(path)
 	i := len(path) - 1
@@ -27,10 +39,26 @@ split :: proc(path: string) -> (dir, file: string) {
 	return path[:i+1], path[i+1:]
 }
 
+// `volume_name` returns the name of the volume (on Windows, if it exists) or an empty string (on other operating systems).
+//
+// See also: <a href="https://docs.microsoft.com/en-gb/windows/win32/fileio/naming-a-volume">Microsoft Docs: Naming a volume</a>
+//
+// Examples: <br>
+//     `C:\some\path\` will produce `"C:"` <br>
+//     `"\\?\Volume{26a21bda-a627-11d7-9931-806e6f6e6963}\some\path\"` will produce `"\\?\Volume{26a21bda-a627-11d7-9931-806e6f6e6963}\"` <br>
+//     `"/home/name/some/linux/path/"` will produce `""` <br>
 volume_name :: proc(path: string) -> string {
 	return path[:volume_name_len(path)]
 }
 
+// `volume_name_len` returns the length of the volume name (on Windows, if it exists) or `0` (on other operating systems).
+//
+// See also: <a href="https://docs.microsoft.com/en-gb/windows/win32/fileio/naming-a-volume">Microsoft Docs: Naming a volume</a>
+//
+// Examples: <br>
+//     `C:\some\path\` will produce `2` <br>
+//     `"\\?\Volume{26a21bda-a627-11d7-9931-806e6f6e6963}\some\path\"` will produce `48` <br>
+//     `"/home/name/some/linux/path/"` will produce `0` <br>
 volume_name_len :: proc(path: string) -> int {
 	if ODIN_OS == .Windows {
 		if len(path) < 2 {
@@ -45,6 +73,7 @@ volume_name_len :: proc(path: string) -> int {
 		}
 
 		// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+		// URL: https://docs.microsoft.com/en-gb/windows/win32/fileio/naming-a-volume
 		if l := len(path); l >= 5 && is_slash(path[0]) && is_slash(path[1]) &&
 			!is_slash(path[2]) && path[2] != '.' {
 			for n := 3; n < l-1; n += 1 {
@@ -69,6 +98,18 @@ volume_name_len :: proc(path: string) -> int {
 	return 0
 }
 
+// `base` returns the last element of path.
+// Trailing slashes are removed.
+//
+// If `new` is `true`, a new string will be allocated and returned.
+// Otherwise, a slice into the original string will be returned.
+//
+// Examples: <br>
+//     `""` will produce `"."` <br>
+//     `"//////"` (all slashes) will produce `"/"` (on Unix) or `"\"` (on Windows) <br>
+//     `"/path/to/something/"` will produce `"something"` <br>
+//     `"/path/to/something.exe"` will produce `"something.exe"` <br>
+//     `"C:\Users\something.exe"` will produce `"something.exe"` (on Windows) <br>
 base :: proc(path: string) -> string {
 	if path == "" {
 		return "."
@@ -94,7 +135,14 @@ base :: proc(path: string) -> string {
 	return path
 }
 
-
+// `clean` returns the shortest path name equivalent to `path` through lexical analysis only.
+//
+// It applies the following rules iteratively until done: <br>
+// 1) replace multiple slashes with one (`"/path//to///something"` becomes `"/path/to/something"`) <br>
+// 2) remove each `.` path name element (`"/path/./to/././something"` becomes `"/path/to/something"`) <br>
+// 3) remove inner `..` path name element (`"/path/to/../something"` becomes `"/path/something"`) <br>
+// 4) remove `..` that begins a rooted path (`"/.."` becomes `"/"`) <br>
+//
 clean :: proc(path: string, allocator := context.allocator) -> string {
 	context.allocator = allocator
 
@@ -175,6 +223,11 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	return cleaned
 }
 
+// `from_slash` returns the filepath version of a slashpath for the current OS.
+//
+// If the current OS uses forward slashes, the original path is returned and
+// `new_allocation` is set to `false`. Otherwise, a new path is allocated with
+// backslashes and `new_allocation` is set to `true`.
 from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
 	if SEPARATOR == '/' {
 		return path, false
@@ -182,6 +235,11 @@ from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: s
 	return strings.replace_all(path, "/", SEPARATOR_STRING, allocator)
 }
 
+// `from_slash` returns the slashpath version of a filepath from the current OS.
+//
+// If the current OS uses forward slashes, the original path is returned and
+// `new_allocation` is set to `false`. Otherwise, a new path is allocated with
+// forward slashes and `new_allocation` is set to `true`.
 to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
 	if SEPARATOR == '/' {
 		return path, false
@@ -189,6 +247,14 @@ to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: str
 	return strings.replace_all(path, SEPARATOR_STRING, "/", allocator)
 }
 
+// `ext` returns the file name extension used by `path`.
+//
+// The extension is the suffix beginning at (and including) the dot in the last slash-separated element of `path`.
+//
+// Examples: <br>
+//     `""` will produce `""` <br>
+//     `"/path/to/something"` will produce `""` <br>
+//     `"/path/to/something.exe"` will produce `".exe"` <br>
 ext :: proc(path: string) -> string {
 	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
 		if path[i] == '.' {
@@ -205,6 +271,13 @@ Relative_Error :: enum {
 	Cannot_Relate,
 }
 
+// `rel` transforms `target_path` to be relative to `base_path` if possible, otherwise it returns `.Cannot_Relate`.
+//
+// Examples: <br>
+//     `base_path="/some/path/", target_path="/some/path/"` will produce `".", .None` <br>
+//     `base_path="/some/path/", target_path="/some/path/plus/extra/"` will produce `"plus/extra", .None` <br>
+//     `base_path="/some/path/", target_path="/some/other/path/"` will produce `"../other/path", .None` <br>
+//     `base_path="/some/path/", target_path="path/"` will produce `"", .Cannot_Relate` <br>
 rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
 	context.allocator = allocator
 	base_clean, target_clean := clean(base_path), clean(target_path)
@@ -283,6 +356,15 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 	return target[t0:], .None
 }
 
+// `dir` returns all but the last element of the path, typically the path's directory.
+// After removing the final element, the path is cleaned and trailing slashes are removed.
+//
+// Examples: <br>
+//     `""` will produce `"."` <br>
+//     `"//////"` (all slashes) will produce `"/"` <br>
+//     `"/abc"` will produce `"/"` <br>
+//     `"/path/to/something/"` will produce `"path/to/something"` <br>
+//     `"/path/to/something.exe"` will produce `"path/to"` <br>
 dir :: proc(path: string, allocator := context.allocator) -> string {
         context.allocator = allocator
 	vol := volume_name(path)
@@ -299,7 +381,15 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 }
 
 
-
+// `split_list` will parse a path list into its component strings.
+//
+// NOTE: A trailing separator character is required in the input path in order for the last path component to be recognised.
+//
+// On Windows, the list separator is `';'`. Example: <br>
+//     `path=C:\Odin;C:\Visual Studio;"C:\Some Other";` will produce `["C:\Odin", "C:\Visual Studio", "C:\Some Other"]`
+//
+// On Unix-like systems, the list separator is `':'`. Example: <br>
+//     `path=/opt/hello:~/Odin:/usr/local/sbin;` will produce `["/opt/hello", "~/Odin", "/usr/local/sbin"]`
 split_list :: proc(path: string, allocator := context.allocator) -> []string {
 	if path == "" {
 		return nil
