@@ -118,6 +118,36 @@ parse_endpoint :: proc(endpoint_str: string) -> (ep: Endpoint, ok: bool) {
 	return
 }
 
+Host :: struct {
+	hostname: string,
+	port:     int,
+}
+Host_Or_Endpoint :: union {
+	Host,
+	Endpoint,
+}
+Parse_Endpoint_Error :: enum {
+	Bad_Port = 1,
+	Bad_Address,
+	Bad_Hostname,
+}
+
+// Takes a string consisting of a hostname or IP address, and an optional port,
+// and return the component parts in a useful form.
+parse_hostname_or_endpoint :: proc(endpoint_str: string) -> (target: Host_Or_Endpoint, err: Network_Error) {
+	host, port, port_ok := split_port(endpoint_str)
+	if !port_ok {
+		return nil, .Bad_Port
+	}
+	if addr := parse_address(host); addr != nil {
+		return Endpoint{addr, port}, nil
+	}
+	if !validate_hostname(host) {
+		return nil, .Bad_Hostname
+	}
+	return Host{host, port}, nil
+}
+
 
 // Takes an endpoint string and returns its parts.
 // Returns ok=false if port is not a number.

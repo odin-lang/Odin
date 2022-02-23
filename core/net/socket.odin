@@ -29,42 +29,59 @@ any_socket_to_socket :: proc(any_socket: Any_Socket) -> Socket {
 	}
 }
 
-Dial_String_Error :: enum {
-	Bad_Port,
-	Port_Required,
-	Resolve_Failure,
-}
+/*
+    Expects both hostname and port to be present in the `hostname_and_port` parameter, either as:
+    `a.host.name:9999`, or as `1.2.3.4:9999`, or IPv6 equivalent.
 
+    Calls `parse_hostname_or_endpoint` and `resolve`, then `dial_tcp_from_endpoint`.
+*/
 dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
-	host, port, port_ok := split_port(hostname_and_port)
-	if !port_ok {
-		return 0, .Bad_Port
+	target := parse_hostname_or_endpoint(hostname_and_port) or_return
+	switch t in target {
+	case Endpoint:
+		return dial_tcp_from_endpoint(t, options)
+	case Host:
+		if t.port == 0 {
+			return 0, .Port_Required
+		}
+		ep4, ep6 := resolve(t.hostname) or_return
+		ep := ep4 if ep4.address != nil else ep6 // NOTE(tetra): We don't know what family the server uses, so we just default to IP4.
+		ep.port = t.port
+		return dial_tcp_from_endpoint(ep, options)
 	}
-	if port == 0 {
-		return 0, .Port_Required
-	}
-	addr4, addr6, ok := resolve(host)
-	if !ok {
-		return 0, .Resolve_Failure  // TODO: replace with Resolve_Error when that's a thing
-	}
-	addr := addr4 if addr4 != nil else addr6 // NOTE(tetra): We don't know what family the server uses, so we just default to IPv4.
-	return dial_tcp_from_endpoint({addr, port}, options)
+	unreachable()
 }
 
+/*
+    Expects the `hostname` as a string and `port` as a `int`.
+    `parse_hostname_or_endpoint` is called and the `hostname` will be resolved into an IP.
+
+    If a `hostname` of form `a.host.name:9999` is given, the port will be ignored in favor of the explicit `port` param.
+*/
 dial_tcp_from_hostname_string_and_explicit_port :: proc(hostname: string, port: int, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
-	if port == 0 {
-		return 0, .Port_Required
+	target := parse_hostname_or_endpoint(hostname) or_return
+	switch t in target {
+	case Endpoint:
+		return dial_tcp_from_endpoint({t.address, port}, options)
+	case Host:
+		if port == 0 {
+			return 0, .Port_Required
+		}
+		ep4, ep6 := resolve(t.hostname) or_return
+		ep := ep4 if ep4.address != nil else ep6 // NOTE(tetra): We don't know what family the server uses, so we just default to IP4.
+		ep.port = port
+		return dial_tcp_from_endpoint(ep, options)
 	}
-	addr4, addr6, ok := resolve(hostname)
-	if !ok {
-		return 0, .Resolve_Failure  // TODO: replace with Resolve_Error when that's a thing
-	}
-	addr := addr4 if addr4 != nil else addr6 // NOTE(tetra): We don't know what family the server uses, so we just default to IPv4.
-	return dial_tcp_from_endpoint({addr, port}, options)
+	unreachable()
+}
+
+dial_tcp_from_address_and_port :: proc(address: Address, port: int, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+	return dial_tcp_from_endpoint({address, port}, options)
 }
 
 dial_tcp :: proc{
 	dial_tcp_from_endpoint,
+	dial_tcp_from_address_and_port,
 	dial_tcp_from_hostname_and_port_string,
 	dial_tcp_from_hostname_string_and_explicit_port,
 }
