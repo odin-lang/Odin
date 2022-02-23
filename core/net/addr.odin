@@ -106,8 +106,8 @@ parse_address :: proc(address_and_maybe_port: string) -> Address {
 	return nil
 }
 
-parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
-	addr_str, port, split_ok := split_port(address)
+parse_endpoint :: proc(endpoint_str: string) -> (ep: Endpoint, ok: bool) {
+	addr_str, port, split_ok := split_port(endpoint_str)
 	if !split_ok do return
 
 	addr := parse_address(addr_str)
