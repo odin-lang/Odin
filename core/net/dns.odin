@@ -90,44 +90,25 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 	return res, true
 }
 
-/*
-	Resolves a hostname to exactly one IP4 and IP6 address.
-	It's then up to you which one you use.
-	Note that which address you pass to `dial` determines the type of the socket you get.
-  
-	Returns `ok = false` if the host name could not be resolved to any addresses.
-  
-  
-	If hostname is actually a string representation of an IP address, this function
-	just parses that address and returns it.
-	This allows you to pass a generic endpoint string (i.e: hostname or address) to this function end reliably get
-	back the endpoint's IP address.
-	e.g:
-	```
-		// Maybe you got this from a config file, so you
-	// don't know if it's a hostname or address.
-	ep_string := "localhost:9000";
-  
-	addr_or_host, port, split_ok := net.split_port(ep_string);
-	assert(split_ok);
-	port = (port == 0) ? 9000 : port; // returns zero if no port in the string.
-  
-	// Resolving an address just returns the address.
-	addr4, addr6, resolve_ok := net.resolve(addr_or_host);
-	if !resolve_ok {
-		printf("error: cannot resolve %v\n", addr_or_host);
-		return;
-	}
-	addr := addr4 != nil ? addr4 : addr6; // preferring IP4.
-	assert(addr != nil); // If resolve_ok, we'll have at least one address.
-	```
-*/
 
 Resolve_Error :: enum {
 	Unable_To_Resolve = 1,
 }
 
-// TODO: Rewrite this to work with OS resolver or custom name servers.
+/*
+	Resolves a hostname to exactly one IP4 and IP6 endpoint.
+	It's then up to you which one you use.
+	Note that which address you use to open a socket, determines the type of the socket you get.
+
+	Returns `ok=false` if the host name could not be resolved to any endpoints.
+
+	Returned endpoints have the same port as provided in the string, or 0 if absent.
+	If you want to use a specific port, just modify the field after the call to this procedure.
+
+	If the hostname part of the endpoint is actually a string representation of an IP address, DNS resolution will be skipped.
+	This allows you to pass both strings like "example.com:9000" and "1.2.3.4:9000" to this function end reliably get
+	back an endpoint in both cases.
+*/
 resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
 	switch t in target {
@@ -147,7 +128,6 @@ resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Ne
 	}
 	unreachable()
 }
-
 resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
 	switch t in target {
