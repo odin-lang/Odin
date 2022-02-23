@@ -30,7 +30,7 @@ import win "core:sys/windows"
 //
 // WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
 // See `destroy_records`.
-get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
 	context.allocator = allocator
 
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator)
@@ -41,12 +41,11 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 	case 0:
 		// okay
 	case win.ERROR_INVALID_NAME:
-		return
+		return nil, .Invalid_Hostname_Error
 	case win.DNS_INFO_NO_RECORDS:
-		ok = true
 		return
 	case:
-		return
+		return nil, .System_Error
 	}
 	defer win.DnsRecordListFree(rec, 1) // 1 means that we're freeing a list... because the proc name isn't enough.
 
@@ -58,7 +57,7 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 
 
 	recs := make([dynamic]DNS_Record, 0, count)
-	if recs == nil do return // return no results if OOM.
+	if recs == nil do return nil, .System_Error // return no results if OOM.
 
 	for r := rec; r != nil; r = r.pNext {
 		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
@@ -163,6 +162,5 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 	}
 
 	records = recs[:]
-	ok = true
 	return
 }
