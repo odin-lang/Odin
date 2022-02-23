@@ -1,4 +1,4 @@
-//+private
+//+ignore
 package gzip
 
 /*
