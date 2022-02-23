@@ -80,8 +80,8 @@ Dial_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-dial_tcp_from_endpoint :: proc(addr: Address, port: int, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
-	family := family_from_address(addr)
+dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+	family := family_from_endpoint(endpoint)
 	sock := create_socket(family, .TCP) or_return
 	skt = sock.(TCP_Socket)
 
@@ -90,7 +90,7 @@ dial_tcp_from_endpoint :: proc(addr: Address, port: int, options := default_tcp_
 	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
-	sockaddr := endpoint_to_sockaddr({addr, port})
+	sockaddr := endpoint_to_sockaddr(endpoint)
 	res := os.connect(Platform_Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
@@ -161,10 +161,10 @@ Listen_Error :: enum c.int {
 	Listening_Not_Supported_For_This_Socket = c.int(os.EOPNOTSUPP),
 }
 
-listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
+listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
-	family := family_from_address(local_addr)
+	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
 	skt = sock.(TCP_Socket)
 
@@ -175,7 +175,7 @@ listen_tcp :: proc(local_addr: Address, port: int, backlog := 1000) -> (skt: TCP
 	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
 	set_option(sock, .Reuse_Address, true) or_return
 
-	bind(sock, {local_addr, port}) or_return
+	bind(sock, interface_endpoint) or_return
 
 	res := os.listen(Platform_Socket(skt), backlog)
 	if res != os.ERROR_NONE {
