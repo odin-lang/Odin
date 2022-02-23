@@ -20,7 +20,6 @@ import "core:mem"
 import "core:strings"
 import "core:time"
 import "core:os"
-import "core:fmt"
 
 /*
 	Default configuration for DNS resolution.
