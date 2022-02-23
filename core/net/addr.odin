@@ -249,7 +249,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 // Returns a temporarily-allocated string representation of the endpoint.
 // If there's a port, uses the `[address]:port` format.
 endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> string {
-	if ep.port != 0 {
+	if ep.port == 0 {
 		return address_to_string(ep.address, allocator)
 	} else {
 		s := address_to_string(ep.address, context.temp_allocator)
