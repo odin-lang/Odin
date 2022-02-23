@@ -82,7 +82,12 @@ send_response :: proc(skt: net.TCP_Socket, msg: []u8) -> (ok: bool) {
 parse_request :: proc(buffer: []u8) -> (req: Request, status_code: Status_Code) {
 	read_str := string(buffer[:])
 
-	line, line_err := strings.split_lines_iterator(&read_str)
+	line, line_ok := strings.split_lines_iterator(&read_str)
+	if !line_ok {
+		status_code = .Bad_Request
+		return
+	}
+
 	hdr_elems := strings.fields(line)
 	if len(hdr_elems) != 3 {
 		status_code = .Bad_Request
@@ -140,14 +145,14 @@ parse_request :: proc(buffer: []u8) -> (req: Request, status_code: Status_Code) 
 
 // serve "project/static/*"
 serve_files :: proc(dir_path: string, port: int) -> () {
-	skt, err := net.listen_tcp(net.IPv6_Any, port)
+	skt, err := net.listen_tcp({net.IP6_Any, port})
 	if err != nil {
 		fmt.printf("Failed to bind to port!\n")
 		return
 	}
 
 	for ;; {
-		client, src_addr, accept_err := net.accept_tcp(skt)
+		client, _, accept_err := net.accept_tcp(skt)
 		if accept_err != nil {
 			fmt.printf("Failed to listen for client?\n")
 			return
@@ -155,7 +160,7 @@ serve_files :: proc(dir_path: string, port: int) -> () {
 		defer net.close(client)
 
 		read_buf := [4096]u8{}
-		size, recv_err := net.recv_tcp(client, read_buf[:])
+		_, recv_err := net.recv_tcp(client, read_buf[:])
 		if recv_err != nil {
 			fmt.printf("Failed to get data from client!\n")
 			return
