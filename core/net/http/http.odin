@@ -160,8 +160,6 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 	incoming := make_builder(0, 8192)
 	defer destroy_builder(&incoming)
 	for {
-		// if has_suffix(to_string(incoming), "\r\n\r\n") do break;
-
 		n, read_err := net.recv(skt, read_buf[:])
 		if read_err != nil do return
 		if n == 0 do break
@@ -170,10 +168,15 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 	}
 
 	resp_parts := split(to_string(incoming), "\n", context.temp_allocator)
-	assert(len(resp_parts) >= 1)
+	if len(resp_parts) < 1 {
+		return
+	}
 
 	status_parts := split(resp_parts[0], " ", context.temp_allocator)
-	assert(len(status_parts) >= 3) // NOTE(tetra): 3 for OK, more if status text is more than one word.
+	// NOTE(tetra): 3 for OK, more if status text is more than one word.
+	if len(status_parts) < 3 {
+		return
+	}
 
 	status_code, _ := strconv.parse_int(status_parts[1])
 	resp.status_code = Status_Code(status_code)
