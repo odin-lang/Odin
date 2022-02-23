@@ -64,8 +64,9 @@ Status_Code :: enum {
 Method :: enum u8 {
 	GET,
 	POST,
+	PUT,
+	HEAD,
 }
-
 
 
 get :: proc(url: string, max_redirects := ODIN_HTTP_MAX_REDIRECTS, allocator := context.allocator) -> (resp: Response, ok: bool) {
@@ -143,9 +144,11 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 		port = 80
 	}
 
+
 	// TODO(tetra): SSL/TLS.
 	skt, err := net.dial_tcp(host, port)
 	if err != nil do return
+
 
 	bytes := request_to_bytes(r, allocator)
 	if bytes == nil do return
