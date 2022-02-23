@@ -23,16 +23,10 @@ import strings "core:strings"
 
 MAX_INTERFACE_ENUMERATION_TRIES :: 3
 
-DEFAULT_INTERFACE_ENUMERATION_FLAGS :: sys.GAA_Flags{
-	.Include_Prefix,               // (XP SP1+) Return a list of IP address prefixes on this adapter. When this flag is set, IP address prefixes are returned for both IP6 and IP4 addresses.
-	.Include_Gateways,             // (Vista+) Return the addresses of default gateways.
-	.Include_Tunnel_Binding_Order, // (Vista+) Return the adapter addresses sorted in tunnel binding order.
-}
-
 /*
 	`enumerate_interfaces` retrieves a list of network interfaces with their associated properties.
 */
-enumerate_interfaces :: proc(flags := DEFAULT_INTERFACE_ENUMERATION_FLAGS, allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
 	context.allocator = allocator
 
  	buf:      []u8
@@ -43,8 +37,12 @@ enumerate_interfaces :: proc(flags := DEFAULT_INTERFACE_ENUMERATION_FLAGS, alloc
 
  	gaa: for _ in 1..=MAX_INTERFACE_ENUMERATION_TRIES {
  	 	res = sys.get_adapters_addresses(
- 			.Unspecified, // Return both IP4 and IP6 adapters.
- 			flags,        // Flags,
+ 			.Unspecified, // Return both IPv4 and IPv6 adapters.
+			sys.GAA_Flags{
+				.Include_Prefix,               // (XP SP1+) Return a list of IP address prefixes on this adapter. When this flag is set, IP address prefixes are returned for both IPv6 and IPv4 addresses.
+				.Include_Gateways,             // (Vista+) Return the addresses of default gateways.
+				.Include_Tunnel_Binding_Order, // (Vista+) Return the adapter addresses sorted in tunnel binding order.
+			},
  			nil,          // Reserved
  			(^sys.IP_Adapter_Addresses)(raw_data(buf)),
  			&buf_size,
@@ -71,6 +69,8 @@ enumerate_interfaces :: proc(flags := DEFAULT_INTERFACE_ENUMERATION_FLAGS, alloc
 		interface := Network_Interface{
 			adapter_name  = strings.clone(string(adapter.AdapterName)),
  			friendly_name = wstring_to_string(adapter.FriendlyName),
+ 			description   = wstring_to_string(adapter.Description),
+ 			dns_suffix    = wstring_to_string(adapter.DnsSuffix),
 
  			mtu  = adapter.MTU,
 
@@ -78,6 +78,10 @@ enumerate_interfaces :: proc(flags := DEFAULT_INTERFACE_ENUMERATION_FLAGS, alloc
 				transmit_speed = adapter.TransmitLinkSpeed,
 				receive_speed  = adapter.ReceiveLinkSpeed,
  			},
+ 		}
+
+ 		if adapter.PhysicalAddressLength > 0 && adapter.PhysicalAddressLength <= len(adapter.PhysicalAddress) {
+ 			interface.physical_address = physical_address_to_string(adapter.PhysicalAddress[:adapter.PhysicalAddressLength])
  		}
 
  		unicast: [dynamic]Lease
@@ -137,31 +141,12 @@ enumerate_interfaces :: proc(flags := DEFAULT_INTERFACE_ENUMERATION_FLAGS, alloc
  		case:                 interface.link.state = .Unknown
  		}
 
+ 		interface.tunnel_type = Tunnel_Type(adapter.TunnelType)
 
  		append(&_interfaces, interface)
  	}
 
 	return _interfaces[:], {}
-}
-
-
-
-/*
-	`destroy_interfaces` cleans up a list of network interfaces retrieved by e.g. `enumerate_interfaces`.
-*/
-destroy_interfaces :: proc(interfaces: []Network_Interface, allocator := context.allocator) {
-	context.allocator = allocator
-
-	for i in interfaces {
-		delete(i.adapter_name)
-		delete(i.friendly_name)
-
-		delete(i.unicast)
-		delete(i.multicast)
-		delete(i.anycast)
-		delete(i.gateways)
-	}
-	delete(interfaces, allocator)
 }
 
 /*
