@@ -3128,6 +3128,13 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "no_red_zone") {
+		if (value != nullptr) {
+			error(elem, "Expected no value for '%.*s'", LIT(name));
+		} else {
+			ac->no_red_zone = true;
+		}
+		return true;
 	}
 	return false;
 }
