@@ -42,22 +42,22 @@ get_dns_records_unix :: proc(hostname: string, type: DNS_Record_Type, allocator 
 	host_overrides := make([dynamic]DNS_Record, 0)
 	for host in hosts {
 		if strings.compare(host.name, hostname) == 0 {
-			if type == .IPv4 && family_from_address(host.addr) == .IPv4 {
-				record := DNS_Record_IPv4{
+			if type == .IP4 && family_from_address(host.addr) == .IP4 {
+				record := DNS_Record_IP4{
 					base = {
 						record_name = strings.clone(hostname),
 						ttl_seconds = 0,
 					},
-					address = host.addr.(IPv4_Address),
+					address = host.addr.(IP4_Address),
 				}
 				append(&host_overrides, record)
-			} else if type == .IPv6 && family_from_address(host.addr) == .IPv6 {
-				record := DNS_Record_IPv6{
+			} else if type == .IP6 && family_from_address(host.addr) == .IP6 {
+				record := DNS_Record_IP6{
 					base = {
 						record_name = strings.clone(hostname),
 						ttl_seconds = 0,
 					},
-					address = host.addr.(IPv6_Address),
+					address = host.addr.(IP6_Address),
 				}
 				append(&host_overrides, record)
 			}
