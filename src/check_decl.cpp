@@ -826,6 +826,14 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
 
+	if (ac.no_red_zone) {
+		if (!is_arch_wasm()) {
+			e->Procedure.no_red_zone = true;
+		} else {
+			error(e->token, "@(no_red_zone) is not supported on this target architecture");
+		}
+	}
+
 	if (ac.objc_name.len || ac.objc_is_class_method || ac.objc_type) {
 		if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
 			error(e->token, "@(objc_name) is required with @(objc_is_class_method)");

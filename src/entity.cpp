@@ -226,6 +226,7 @@ struct Entity {
 			bool    is_foreign;
 			bool    is_export;
 			bool    generated_from_polymorphic;
+			bool    no_red_zone;
 			ProcedureOptimizationMode optimization_mode;
 		} Procedure;
 		struct {
