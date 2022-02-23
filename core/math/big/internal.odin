@@ -26,7 +26,7 @@
 */
 
 
-//+ignore
+//+private
 package math_big
 
 import "core:mem"
