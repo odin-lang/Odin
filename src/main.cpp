@@ -2087,6 +2087,15 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-microarch:sandybridge");
 		print_usage_line(3, "-microarch:native");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-reloc-mode:<string>");
+		print_usage_line(2, "Specifies the reloc mode");
+		print_usage_line(2, "Options:");
+		print_usage_line(3, "default");
+		print_usage_line(3, "static");
+		print_usage_line(3, "pic");
+		print_usage_line(3, "dynamic-no-pic");
+		print_usage_line(0, "");
 	}
 
 	if (check) {
