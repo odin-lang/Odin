@@ -70,6 +70,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 
 
 Dial_Error :: enum c.int {
+	Port_Required = -1,
+
 	Address_In_Use = win.WSAEADDRINUSE,
 	In_Progress = win.WSAEALREADY,
 	Cannot_Use_Any_Address = win.WSAEADDRNOTAVAIL,
@@ -86,6 +88,11 @@ Dial_Error :: enum c.int {
 }
 
 dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+	if endpoint.port == 0 {
+		err = .Port_Required
+		return
+	}
+
 	family := family_from_endpoint(endpoint)
 	sock := create_socket(family, .TCP) or_return
 	skt = sock.(TCP_Socket)
