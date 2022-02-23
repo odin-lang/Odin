@@ -84,6 +84,15 @@ Network_Error :: union {
 	Resolve_Error,
 }
 
+DNS_Error :: enum {
+	Invalid_Hostname_Error,
+	Invalid_Hosts_Config_Error,
+	Invalid_Resolv_Config_Error,
+	Connection_Error,
+	Server_Error,
+	System_Error,
+}
+
 /*
 	SOCKET OPTIONS & DEFINITIONS
 */

@@ -20,7 +20,6 @@ import "core:mem"
 import "core:strings"
 import "core:time"
 import "core:os"
-import "core:fmt"
 
 /*
 	Default configuration for DNS resolution.
@@ -200,12 +199,15 @@ when ODIN_OS == .Windows {
 	meaning that DNS queries for a hostname will resolve through CNAME records until an
 	IP address is reached.
 */
-get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
 	context.allocator = allocator
 
 	if type != .SRV {
 		// NOTE(tetra): 'hostname' can contain underscores when querying SRV records
-		validate_hostname(hostname) or_return
+		ok := validate_hostname(hostname)
+		if !ok {
+			return nil, .Invalid_Hostname_Error
+		}
 	}
 
 	hdr := DNS_Header{
@@ -231,7 +233,10 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	b := strings.builder_from_slice(output[:])
 
 	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
-	encode_hostname(&b, hostname) or_return
+	ok := encode_hostname(&b, hostname)
+	if !ok {
+		return nil, .Invalid_Hostname_Error
+	}
 	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
 
 	dns_packet := output[:strings.builder_len(b)]
@@ -241,29 +246,24 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	for name_server in name_servers {
 		conn, sock_err := make_unbound_udp_socket(family_from_endpoint(name_server))
 		if sock_err != nil {
-			fmt.printf("here\n")
-			return
+			return nil, .Connection_Error
 		}
 		defer close(conn)
 
 		_, send_err := send(conn, dns_packet[:], name_server)
 		if send_err != nil {
-			fmt.printf("here2\n")
 			continue
 		}
 
 		set_err := set_option(conn, .Receive_Timeout, time.Second * 1)
 		if set_err != nil {
-			fmt.printf("here3\n")
-			return
+			return nil, .Connection_Error
 		}
 
 		recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
 		if recv_err == UDP_Recv_Error.Timeout {
-			fmt.printf("DNS Server response timed out\n")
 			continue
 		} else if recv_err != nil {
-			fmt.printf("here4\n")
 			continue
 		}
 
@@ -275,15 +275,16 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 
 		rsp, _ok := parse_response(dns_response, type)
 		if !_ok {
-			return
+			return nil, .Server_Error
 		}
 
 		if len(rsp) == 0 {
 			continue
 		}
 
-		return rsp[:], true
+		return rsp[:], nil
 	}
+
 	return
 }
 
@@ -328,10 +329,6 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 	TODO(cloin): Does the DNS Resolver need to recursively hop through CNAMEs to get the IP
 	or is that what recursion desired does? Do we need to handle recursion unavailable?
 	How do we deal with is_authoritative / is_truncated?
-
-	TODO(cloin): How do we cache resolv.conf and hosts in a threadsafe way?
-
-	TODO(cloin): Handle more record types
 */
 
 NAME_MAX  :: 255
@@ -464,6 +461,51 @@ encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := cont
 	return true
 }
 
+skip_hostname :: proc(packet: []u8, start_idx: int, allocator := context.allocator) -> (encode_size: int, ok: bool) {
+	out_size := 0
+
+	cur_idx := start_idx
+	iteration_max := 0
+	top: for cur_idx < len(packet) {
+		if packet[cur_idx] == 0 {
+			out_size += 1
+			break
+		}
+
+		if iteration_max > 255 {
+			return
+		}
+
+		if packet[cur_idx] > 63 && packet[cur_idx] != 0xC0 {
+			return
+		}
+
+		switch packet[cur_idx] {
+		case 0xC0:
+			out_size += 2
+			break top
+		case:
+			label_size := int(packet[cur_idx]) + 1
+			idx2 := cur_idx + label_size
+
+			if idx2 < cur_idx + 1 || idx2 > len(packet) {
+				return
+			}
+
+			out_size += label_size
+			cur_idx = idx2
+		}
+
+		iteration_max += 1
+	}
+
+	if start_idx + out_size > len(packet) {
+		return
+	}
+
+	return out_size, true
+}
+
 decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.allocator) -> (hostname: string, encode_size: int, ok: bool) {
 	output := [NAME_MAX]u8{}
 	b := strings.builder_from_slice(output[:])
@@ -489,12 +531,10 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 		}
 
 		if iteration_max > 255 {
-			fmt.printf("Taking too long, not bothering\n")
 			return
 		}
 
 		if packet[cur_idx] > 63 && packet[cur_idx] != 0xC0 {
-			fmt.printf("Can't handle this token!\n")
 			return
 		}
 
@@ -506,7 +546,6 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 			val := (^u16be)(raw_data(pkt))^
 			offset := int(val & 0x3FFF)
 			if offset > len(packet) {
-				fmt.printf("Packet offset invalid\n")
 				return
 			}
 
@@ -522,12 +561,10 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 			label_size := int(packet[cur_idx])
 			idx2 := cur_idx + label_size + 1
 			if idx2 < cur_idx + 1 || idx2 > len(packet) {
-				fmt.printf("Invalid index for hostname!\n")
 				return
 			}
 
 			if print_size + label_size + 1 > NAME_MAX {
-				fmt.printf("label too large for hostname!\n")
 				return
 			}
 
@@ -549,7 +586,6 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 	}
 
 	if start_idx + out_size > len(packet) {
-		fmt.printf("not enough bytes in packet for hostname!\n")
 		return
 	}
 
@@ -728,7 +764,6 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 			}
 
 		case:
-			fmt.printf("ignoring %d\n", record_hdr.type)
 			return
 
 	}
@@ -788,11 +823,8 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			continue
 		}
 
-		// TODO: What are we meant to be doing here?
-		// Is this just trying to skip over this hostname?
-		// If so, do we want a skip_hostname() procedure?
 		dq_sz :: 4
-		_, hn_sz := decode_hostname(response, cur_idx, context.temp_allocator) or_return
+		hn_sz := skip_hostname(response, cur_idx, context.temp_allocator) or_return
 		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
