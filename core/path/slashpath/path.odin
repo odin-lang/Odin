@@ -1,28 +1,41 @@
 // The slashpath package is only to be used for paths separated by forward slashes,
-// e.g. paths in URLs
+// e.g. paths in URLs.
 //
-// This package does not deal with Windows/NT paths with volume letters or backslashes
-// To manipulate operating system specific paths, use the path/filepath package
+// This package does not deal with Windows/NT paths with volume letters or backslashes.
+// To manipulate operating system specific paths, use the path/filepath package.
 package slashpath
 
 import "core:strings"
 
-// is_separator checks whether the byte is a valid separator character
+// `is_separator` checks whether the byte is a valid separator character.
+//
+// Valid separator characters are: `/`.
 is_separator :: proc(c: byte) -> bool {
 	return c == '/'
 }
 
 
-// is_abs checks whether the path is absolute
+// `is_abs` checks whether the path is absolute.
+//
+// Examples: <br>
+//     `"/usr/bin/hello"` will return `true` <br>
+//     `"./bin/hello"` will return `false` <br>
 is_abs :: proc(path: string) -> bool {
 	return len(path) > 0 && path[0] == '/'
 }
 
 
-// base returns the last element of path
-// Trailing slashes are removed
-// If the path is empty, it returns ".".
-// If the path is all slashes, it returns "/"
+// `base` returns the last element of path.
+// Trailing slashes are removed.
+//
+// If `new` is `true`, a new string will be allocated and returned.
+// Otherwise, a slice into the original string will be returned.
+//
+// Examples: <br>
+//     `""` will produce `"."` <br>
+//     `"//////"` (all slashes) will produce `"/"` <br>
+//     `"/path/to/something/"` will produce `"something"` <br>
+//     `"/path/to/something.exe"` will produce `"something.exe"` <br>
 base :: proc(path: string, new := false, allocator := context.allocator) -> (last_element: string) {
 	defer if new {
 		last_element = strings.clone(last_element, allocator)
@@ -51,38 +64,53 @@ base :: proc(path: string, new := false, allocator := context.allocator) -> (las
 	return
 }
 
-// dir returns all but the last element of path, typically the path's directory.
-// After dropping the final element using it, the path is cleaned and trailing slashes are removed
-// If the path is empty, it returns "."
-// If the path consists entirely of slashes followed by non-slash bytes, it returns a single slash
-// In any other case, the returned path does not end in a slash
+// `dir` returns all but the last element of the path, typically the path's directory.
+// After removing the final element, the path is cleaned and trailing slashes are removed.
+//
+// Examples: <br>
+//     `""` will produce `"."` <br>
+//     `"//////"` (all slashes) will produce `"/"` <br>
+//     `"/abc"` will produce `"/"` <br>
+//     `"/path/to/something/"` will produce `"path/to/something"` <br>
+//     `"/path/to/something.exe"` will produce `"path/to"` <br>
 dir :: proc(path: string, allocator := context.allocator) -> string {
 	directory, _ := split(path)
 	return clean(directory, allocator)
 }
 
 
-// split splits path immediately following the last slash,
+// `split` splits the path immediately following the last slash,
 // separating it into a directory and file name component.
-// If there is no slash in path, it returns an empty dir and file set to path
-// The returned values have the property that path = dir+file
+//
+// The returned values have the property that `path = dir+file`.
+//
+// Examples: <br>
+//     `""` will produce `dir="", file=""` <br>
+//     `"abc"` will produce `dir="", file="abc"` <br>
+//     `"abc/"` will produce `dir="abc/", file=""` <br>
+//     `"/path/to/something"` will produce `dir="/path/to/", file="something"` <br>
 split :: proc(path: string) -> (dir, file: string) {
 	i := strings.last_index(path, "/")
 	return path[:i+1], path[i+1:]
 }
 
-// split_elements splits the path elements into slices of the original path string
+// `split_elements` splits the path elements into slices of the original path string.
+//
+// Examples: <br>
+//     `""` will produce `[""]` <br>
+//     `"abc"` will produce `["abc"]` <br>
+//     `"/path/to/something"` will produce `["", "path", "to", "something"]` <br>
 split_elements :: proc(path: string, allocator := context.allocator) -> []string {
 	return strings.split(path, "/", allocator)
 }
 
-// clean returns the shortest path name equivalent to path through lexical analysis only
-// It applies the following rules iterative until done:
+// `clean` returns the shortest path name equivalent to `path` through lexical analysis only.
 //
-//	1) replace multiple slashes with one
-//	2) remove each . path name element
-//	3) remove inner .. path name element
-//	4) remove .. that  begin a rooted path ("/.." becomes "/")
+// It applies the following rules iteratively until done: <br>
+// 1) replace multiple slashes with one (`"/path//to///something"` becomes `"/path/to/something"`) <br>
+// 2) remove each `.` path name element (`"/path/./to/././something"` becomes `"/path/to/something"`) <br>
+// 3) remove inner `..` path name element (`"/path/to/../something"` becomes `"/path/something"`) <br>
+// 4) remove `..` that begins a rooted path (`"/.."` becomes `"/"`) <br>
 //
 clean :: proc(path: string, allocator := context.allocator) -> string {
 	context.allocator = allocator
@@ -145,7 +173,11 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	return lazy_buffer_string(out)
 }
 
-// join joins numerous path elements into a single path
+// `join` joins numerous path elements into a single path.
+//
+// Examples: <br>
+//     `["path", "to", "something"]` will produce `"path/to/something"` <br>
+//     `["/", "path", "to", "something"]` will produce `"/path/to/something"` <br>
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	for elem, i in elems {
@@ -157,9 +189,17 @@ join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	return ""
 }
 
-// ext returns the file name extension used by "path"
-// The extension is the suffix beginning at the file fot in the last slash separated element of "path"
-// The path is empty if there is no dot
+// `ext` returns the file name extension used by `path`.
+//
+// The extension is the suffix beginning at (and including) the dot in the last slash-separated element of `path`.
+//
+// If `new` is `true`, a new string will be allocated and returned.
+// Otherwise, a slice into the original string will be returned.
+//
+// Examples: <br>
+//     `""` will produce `""` <br>
+//     `"/path/to/something"` will produce `""` <br>
+//     `"/path/to/something.exe"` will produce `".exe"` <br>
 ext :: proc(path: string, new := false, allocator := context.allocator) -> string {
 	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
 		if path[i] == '.' {
@@ -173,7 +213,15 @@ ext :: proc(path: string, new := false, allocator := context.allocator) -> strin
 	return ""
 }
 
-// name returns the file without the base and without the extension
+// `name` returns the file without the base and without the extension.
+//
+// If `new` is `true`, a new string will be allocated and returned.
+// Otherwise, a slice into the original string will be returned.
+//
+// Examples: <br>
+//     `""` will produce `""` <br>
+//     `"/path/to/something"` will produce `"something"` <br>
+//     `"/path/to/something.exe"` will produce `"something"` <br>
 name :: proc(path: string, new := false, allocator := context.allocator) -> (name: string) {
 	_, file := split(path)
 	name = file
