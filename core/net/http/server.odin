@@ -191,7 +191,7 @@ serve_files :: proc(dir_path: string, port: int, allocator := context.allocator)
 			continue
 		}
 
-		out_headers := make([dynamic]string, 0)
+		out_headers := make([dynamic]string)
 		defer delete(out_headers)
 
 		#partial switch req.method {
@@ -219,6 +219,7 @@ serve_files :: proc(dir_path: string, port: int, allocator := context.allocator)
 					continue
 				}
 			}
+			defer delete(out_path)
 
 			file_blob, file_ok := os.read_entire_file_from_filename(out_path)
 			if !file_ok {
