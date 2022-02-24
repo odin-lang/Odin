@@ -20,6 +20,7 @@ import "core:net"
 import "core:strings"
 import "core:strconv"
 import "core:fmt" // for panicf
+import "core:time"
 
 /*
 	By default we allow a generous 10 redirects, which the programmer can override at runtime and compile-time.
@@ -73,10 +74,7 @@ get :: proc(url: string, max_redirects := ODIN_HTTP_MAX_REDIRECTS, allocator := 
 	r: Request
 	request_init(&r, .GET, url, allocator)
 	defer request_destroy(r)
-
-	r.headers["Connection"] = "close"
 	resp, ok = execute_request(r, max_redirects, allocator)
-
 	return
 }
 
@@ -144,11 +142,13 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 		port = 80
 	}
 
-
 	// TODO(tetra): SSL/TLS.
 	skt, err := net.dial_tcp(host, port)
 	if err != nil do return
 
+	// TODO(tetra): Make this configurable?
+	net.set_option(skt, .Send_Timeout, time.Second * 5)
+	net.set_option(skt, .Receive_Timeout, time.Second * 5)
 
 	bytes := request_to_bytes(r, allocator)
 	if bytes == nil do return
@@ -359,16 +359,11 @@ request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
 	}
 	write_string(&b, " HTTP/1.1\r\n")
 
-	if _, ok := r.headers["Host"]; !ok {
-		write_string(&b, "Host: ")
-		write_string(&b, r.host)
-		write_string(&b, "\r\n")
-	}
-	for name, value in r.headers {
-		write_string(&b, name)
-		write_string(&b, ": ")
-		write_string(&b, value)
-		write_string(&b, "\r\n")
+	write_header_or_default(&b, r.headers, "Host",       r.host)
+	write_header_or_default(&b, r.headers, "Connection", "close")
+
+	for name in r.headers {
+		write_header_or_default(&b, r.headers, name, "")
 	}
 
 	if r.body != "" {
@@ -378,4 +373,16 @@ request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
 
 	write_string(&b, "\r\n")
 	return b.buf[:]
+
+
+	write_header_or_default :: proc(b: ^strings.Builder, headers: map[string]string, key, default_value: string) {
+		write_string(b, key)
+		write_string(b, ": ")
+		if v, ok := headers[key]; !ok {
+			write_string(b, default_value)
+		} else {
+			write_string(b, v)
+		}
+		write_string(b, "\r\n")
+	}
 }
