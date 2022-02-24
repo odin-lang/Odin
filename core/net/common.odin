@@ -164,6 +164,8 @@ Address_Family :: enum {
 	IP6,
 }
 
+Netmask :: distinct Address
+
 /*
 	INTERFACE / LINK STATE
 */
@@ -177,13 +179,13 @@ Network_Interface :: struct {
 	physical_address: string, // MAC address, etc.
 	mtu:              u32,
 
-	unicast:          []Lease,
-	multicast:        []Endpoint,
-	anycast:          []Endpoint,
+	unicast:          [dynamic]Lease,
+	multicast:        [dynamic]Address,
+	anycast:          [dynamic]Address,
 
-	gateways:         []Endpoint,
-	dhcp_v4:          Endpoint,
-	dhcp_v6:          Endpoint,
+	gateways:         [dynamic]Address,
+	dhcp_v4:          Address,
+	dhcp_v6:          Address,
 
 	tunnel_type:      Tunnel_Type,
 
@@ -194,18 +196,23 @@ Network_Interface :: struct {
 	},
 }
 
-Link_State :: enum i32 {
-	Unknown          = 0,
+/*
+	Empty bit set is unknown state.
+*/
+Link_States :: enum u32 {
 	Up               = 1,
 	Down             = 2,
 	Testing          = 3,
 	Dormant          = 4,
 	Not_Present      = 5,
 	Lower_Layer_Down = 6,
+	Loopback         = 7,
 }
+Link_State :: bit_set[Link_States; u32]
 
 Lease :: struct {
-	address:  Endpoint,
+	address:  Address,
+	netmask:  Netmask,
 	lifetime: struct {
 		valid:     u32,
 		preferred: u32,

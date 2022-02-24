@@ -275,6 +275,67 @@ in6_addr :: struct #packed {
 	s6_addr: [16]u8,
 }
 
+rtnl_link_stats :: struct #packed {
+	rx_packets:          u32,
+	tx_packets:          u32,
+	rx_bytes:            u32,
+	tx_bytes:            u32,
+	rx_errors:           u32,
+	tx_errors:           u32,
+	rx_dropped:          u32,
+	tx_dropped:          u32,
+	multicast:           u32,
+	collisions:          u32,
+	rx_length_errors:    u32,
+	rx_over_errors:      u32,
+	rx_crc_errors:       u32,
+	rx_frame_errors:     u32,
+	rx_fifo_errors:      u32,
+	rx_missed_errors:    u32,
+	tx_aborted_errors:   u32,
+	tx_carrier_errors:   u32,
+	tx_fifo_errors:      u32,
+	tx_heartbeat_errors: u32,
+	tx_window_errors:    u32,
+	rx_compressed:       u32,
+	tx_compressed:       u32,
+	rx_nohandler:        u32,
+}
+
+SIOCGIFFLAG :: enum c.int {
+	UP             = 0,  /* Interface is up.  */
+	BROADCAST      = 1,  /* Broadcast address valid.  */
+	DEBUG          = 2,  /* Turn on debugging.  */
+	LOOPBACK       = 3,  /* Is a loopback net.  */
+	POINT_TO_POINT = 4,  /* Interface is point-to-point link.  */
+	NO_TRAILERS    = 5,  /* Avoid use of trailers.  */
+	RUNNING        = 6,  /* Resources allocated.  */
+	NOARP          = 7,  /* No address resolution protocol.  */
+	PROMISC        = 8,  /* Receive all packets.  */
+	ALL_MULTI      = 9,  /* Receive all multicast packets. Unimplemented. */
+	MASTER         = 10, /* Master of a load balancer.  */
+	SLAVE          = 11, /* Slave of a load balancer.  */
+	MULTICAST      = 12, /* Supports multicast.  */
+	PORTSEL        = 13, /* Can set media type.  */
+	AUTOMEDIA      = 14, /* Auto media select active.  */
+	DYNAMIC        = 15, /* Dialup device with changing addresses.  */
+        LOWER_UP       = 16,
+        DORMANT        = 17,
+        ECHO           = 18,
+}
+SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
+
+ifaddrs :: struct {
+	next:              ^ifaddrs,
+	name:              cstring,
+	flags:             SIOCGIFFLAGS,
+	address:           ^SOCKADDR,
+	netmask:           ^SOCKADDR,
+	broadcast_or_dest: ^SOCKADDR,  // Broadcast or Point-to-Point address
+	data:              rawptr,     // Address-specific data.
+
+}
+
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
@@ -563,6 +624,9 @@ foreign dl {
 	@(link_name="dlsym")            _unix_dlsym         :: proc(handle: rawptr, symbol: cstring) -> rawptr ---
 	@(link_name="dlclose")          _unix_dlclose       :: proc(handle: rawptr) -> c.int ---
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---
+
+	@(link_name="getifaddrs")       _getifaddrs         :: proc(ifap: ^^ifaddrs) -> (c.int) ---
+	@(link_name="freeifaddrs")      _freeifaddrs        :: proc(ifa: ^ifaddrs) ---
 }
 
 is_path_separator :: proc(r: rune) -> bool {

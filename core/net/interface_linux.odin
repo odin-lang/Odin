@@ -23,54 +23,8 @@ package net
 	TODO: When we have raw sockets, split off into its own file for Linux so we can use the NETLINK protocol and bypass libc.
 */
 
-import "core:c"
 import "core:os"
-import "core:fmt"
 import "core:strings"
-
-foreign import libc "system:c"
-
-SIOCGIFFLAG :: enum c.int {
-	UP             = 0,  /* Interface is up.  */
-	BROADCAST      = 1,  /* Broadcast address valid.  */
-	DEBUG          = 2,  /* Turn on debugging.  */
-	LOOPBACK       = 3,  /* Is a loopback net.  */
-	POINT_TO_POINT = 4,  /* Interface is point-to-point link.  */
-	NO_TRAILERS    = 5,  /* Avoid use of trailers.  */
-	RUNNING        = 6,  /* Resources allocated.  */
-	NOARP          = 7,  /* No address resolution protocol.  */
-	PROMISC        = 8,  /* Receive all packets.  */
-	ALL_MULTI      = 9,  /* Receive all multicast packets.  */
-	MASTER         = 10, /* Master of a load balancer.  */
-	SLAVE          = 11, /* Slave of a load balancer.  */
-	MULTICAST      = 12, /* Supports multicast.  */
-	PORTSEL        = 13, /* Can set media type.  */
-	AUTOMEDIA      = 14, /* Auto media select active.  */
-	DYNAMIC        = 15, /* Dialup device with changing addresses.  */
-        LOWER_UP       = 16,
-        DORMANT        = 17,
-        ECHO           = 18,
-
-}
-SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
-
-ifaddrs :: struct #packed {
-	next:              ^ifaddrs,
-	name:              cstring,
-	flags:             SIOCGIFFLAGS,
-	address:           ^os.SOCKADDR,
-	netmask:           ^os.SOCKADDR,
-	broadcast_or_dest: ^os.SOCKADDR,  // Broadcast or Point-to-Point address
-	data:              rawptr,        // Address-specific data.
-
-}
-
-foreign libc {
-	getifaddrs  :: proc "c" (ifap: ^^ifaddrs) -> (c.int) ---
-	freeifaddrs :: proc "c" (ifa: ^ifaddrs) ---
-}
-
-
 
 /*
 	`enumerate_interfaces` retrieves a list of network interfaces with their associated properties.
@@ -78,9 +32,9 @@ foreign libc {
 enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
 	context.allocator = allocator
 
-	head: ^ifaddrs
+	head: ^os.ifaddrs
 
-	if res := getifaddrs(&head); res < 0 {
+	if res := os._getifaddrs(&head); res < 0 {
 		return {}, .Unable_To_Enumerate_Network_Interfaces
 	}
 
@@ -92,9 +46,8 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 	ifaces: map[string]^Network_Interface
 	defer delete(ifaces)
 
-	for ifaddr := head; ifaddr.next != nil; ifaddr = ifaddr.next {
+	for ifaddr := head; ifaddr != nil; ifaddr = ifaddr.next {
 		adapter_name := string(ifaddr.name)
-		fmt.printf("IF: %v\n", adapter_name)
 
 		/*
 			Check if we have seen this interface name before so we can reuse the `Network_Interface`.
@@ -106,14 +59,80 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 		}
 		iface := ifaces[adapter_name]
 
+		address: Address
+		netmask: Netmask
 
+		if ifaddr.address != nil {
+			switch int(ifaddr.address.sa_family) {
+			case os.AF_INET, os.AF_INET6:
+				address = sockaddr_to_endpoint(ifaddr.address).address
 
+			case os.AF_PACKET:
+				/*
+					For some obscure reason the 64-bit `getifaddrs` calls returns a pointer to a
+					32-bit `RTNL_LINK_STATS` structure, which of course means that tx/rx byte count
+					is truncated beyond usefulness.
+
+					We're not going to retrieve stats now. Instead this serves as a reminder to use
+					the NETLINK protocol for this purpose.
+
+					But in case you were curious:
+						stats := transmute(^os.rtnl_link_stats)ifaddr.data
+						fmt.println(stats)
+				*/
+			case:
+			}
+		}
+
+		if ifaddr.netmask != nil {
+			switch int(ifaddr.netmask.sa_family) {
+			case os.AF_INET, os.AF_INET6:
+			 	netmask = Netmask(sockaddr_to_endpoint(ifaddr.netmask).address)
+			case:
+			}
+		}
+
+		if ifaddr.broadcast_or_dest != nil && .BROADCAST in ifaddr.flags {
+			switch int(ifaddr.broadcast_or_dest.sa_family) {
+			case os.AF_INET, os.AF_INET6:
+			 	broadcast := sockaddr_to_endpoint(ifaddr.broadcast_or_dest).address
+			 	append(&iface.multicast, broadcast)
+			case:
+			}
+		}
+
+		if address != nil {
+			lease := Lease{
+				address = address,
+				netmask = netmask,
+			}
+			append(&iface.unicast, lease)
+		}
+
+		/*
+			TODO: Refine this based on the type of adapter.
+		*/
+ 		state := Link_State{}
+
+ 		if .UP in ifaddr.flags {
+ 			state |= {.Up}
+ 		}
+
+ 		if .DORMANT in ifaddr.flags {
+ 			state |= {.Dormant}
+ 		}
+
+ 		if .LOOPBACK in ifaddr.flags {
+ 			state |= {.Loopback}
+ 		}
+
+		iface.link.state = state
 	}
 
 	/*
 		Free the OS structures.
 	*/
-	freeifaddrs(head)
+	os._freeifaddrs(head)
 
 	/*
 		Turn the map into a slice to return.

@@ -45,8 +45,7 @@ endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH)
 	unreachable()
 }
 
-@private
-sockaddr_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endpoint) {
+sockaddr_storage_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endpoint) {
 	switch native_addr.ss_family {
 	case u16(os.AF_INET):
 		addr := cast(^os.sockaddr_in) native_addr
@@ -67,3 +66,28 @@ sockaddr_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endpo
 	}
 	return
 }
+
+sockaddr_basic_to_endpoint :: proc(native_addr: ^os.SOCKADDR) -> (ep: Endpoint) {
+	switch native_addr.sa_family {
+	case u16(os.AF_INET):
+		addr := cast(^os.sockaddr_in) native_addr
+		port := int(addr.sin_port)
+		ep = Endpoint {
+			address = IP4_Address(transmute([4]byte) addr.sin_addr),
+			port = port,
+		}
+	case u16(os.AF_INET6):
+		addr := cast(^os.sockaddr_in6) native_addr
+		port := int(addr.sin6_port)
+		ep = Endpoint {
+			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
+			port = port,
+		}
+	case:
+		//panic("native_addr is neither IP4 or IP6 address")
+		return {}
+	}
+	return
+}
+
+sockaddr_to_endpoint :: proc { sockaddr_basic_to_endpoint, sockaddr_storage_to_endpoint }
