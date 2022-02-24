@@ -8,7 +8,7 @@
 
 	An example of how to use `load`.
 */
-//+ignore
+//+build ignore
 package png
 
 import "core:image"

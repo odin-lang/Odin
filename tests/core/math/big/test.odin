@@ -1,4 +1,4 @@
-//+ignore
+//+build ignore
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
