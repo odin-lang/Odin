@@ -267,9 +267,8 @@ get_last_error :: proc() -> int {
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.clone_to_cstring(path);
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
 	handle := _unix_open(cstr, c.int(flags), c.int(mode));
-	delete(cstr);
 	if handle == -1 {
 		return INVALID_HANDLE, Errno(get_last_error());
 	}
@@ -342,9 +341,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 }
 
 stat :: proc(path: string) -> (OS_Stat, Errno) {
-	cstr := strings.clone_to_cstring(path);
-	defer delete(cstr);
-
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
 	s: OS_Stat;
 	result := _unix_stat(cstr, &s);
 	if result == -1 {
@@ -363,8 +360,7 @@ fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 }
 
 access :: proc(path: string, mask: int) -> (bool, Errno) {
-	cstr := strings.clone_to_cstring(path);
-	defer delete(cstr);
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
 	result := _unix_access(cstr, c.int(mask));
 	if result == -1 {
 		return false, Errno(get_last_error());
@@ -388,8 +384,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name);
-	defer delete(path_str);
+	path_str := strings.clone_to_cstring(name, context.temp_allocator);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
 		return "", false;
@@ -432,15 +427,13 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.clone_to_cstring(filename);
-	defer delete(cstr);
+	cstr := strings.clone_to_cstring(filename, context.temp_allocator);
 	handle := _unix_dlopen(cstr, c.int(flags));
 	return handle;
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
-	cstr := strings.clone_to_cstring(symbol);
-	defer delete(cstr);
+	cstr := strings.clone_to_cstring(symbol, context.temp_allocator);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
