@@ -14,11 +14,13 @@ main :: proc() {
 	port, ok := strconv.parse_int(os.args[2])
 	if !ok {
 		fmt.printf("Unable to parse port!\n")
+		os.exit(1);
 	}
 
 	dir := os.args[1]
 	if !os.is_dir(dir) {
 		fmt.printf("Doc path is invalid!\n")
+		os.exit(1);
 	}
 
 	fmt.printf("Spinning up docs @ %s on port %d\n", dir, port)
