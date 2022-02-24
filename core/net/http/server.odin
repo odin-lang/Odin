@@ -213,7 +213,7 @@ serve_files :: proc(dir_path: string, port: int, allocator := context.allocator)
 				req_path = strings.to_string(b)
 				out_path, found_ok = find_file(req_path, dir_path)
 				if !found_ok {
-					resp := build_response(.Bad_Request, out_headers[:])
+					resp := build_response(.Not_Found, out_headers[:])
 					send_response(client, transmute([]u8)resp)
 					delete(resp)
 					continue
@@ -223,7 +223,7 @@ serve_files :: proc(dir_path: string, port: int, allocator := context.allocator)
 
 			file_blob, file_ok := os.read_entire_file_from_filename(out_path)
 			if !file_ok {
-				resp := build_response(.Bad_Request, out_headers[:])
+				resp := build_response(.Not_Found, out_headers[:])
 				send_response(client, transmute([]u8)resp)
 				delete(resp)
 				continue
