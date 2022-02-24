@@ -5578,6 +5578,8 @@ bool parse_file(Parser *p, AstFile *f) {
 						} else {
 							f->flags |= AstFile_IsLazy;
 						}
+					} else {
+						warning(tok, "Ignoring unknown tag '%.*s'", LIT(lc));
 					}
 				}
 			}
