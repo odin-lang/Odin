@@ -70,9 +70,9 @@ Method :: enum u8 {
 }
 
 
-get :: proc(url: string, max_redirects := ODIN_HTTP_MAX_REDIRECTS, allocator := context.allocator) -> (resp: Response, ok: bool) {
+get :: proc(url: string, max_redirects := ODIN_HTTP_MAX_REDIRECTS, options := default_request_options, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	r: Request
-	request_init(&r, .GET, url, allocator)
+	request_init(&r, .GET, url, options, allocator)
 	defer request_destroy(r)
 	resp, ok = execute_request(r, max_redirects, allocator)
 	return
@@ -98,15 +98,26 @@ response_destroy :: proc(using r: Response) {
 }
 
 
-
-Request :: struct {
-	method: Method,
-	scheme, host, path: string, // NOTE: _NOT_ percent encoded.
-	headers, queries: map[string]string,
-	body: string,
+ODIN_HTTP_DEFAULT_SEND_TIMEOUT_MILLISECONDS    :: #config(ODIN_HTTP_DEFAULT_SEND_TIMEOUT_MILLISECONDS,    5000)
+ODIN_HTTP_DEFAULT_RECEIVE_TIMEOUT_MILLISECONDS :: #config(ODIN_HTTP_DEFAULT_RECEIVE_TIMEOUT_MILLISECONDS, 5000)
+Request_Options :: struct {
+	send_timeout: time.Duration,
+	recv_timeout: time.Duration,
+}
+default_request_options := Request_Options {
+	send_timeout = time.Millisecond * ODIN_HTTP_DEFAULT_SEND_TIMEOUT_MILLISECONDS,
+	recv_timeout = time.Millisecond * ODIN_HTTP_DEFAULT_RECEIVE_TIMEOUT_MILLISECONDS,
 }
 
-request_init :: proc(req: ^Request, method: Method, url: string, allocator := context.allocator) {
+Request :: struct {
+	method:             Method,
+	scheme, host, path: string, // NOTE: _NOT_ percent encoded.
+	headers, queries:   map[string]string,
+	body:               string,
+	options:            Request_Options, // TODO(tetra): Consider if we actually want these 16 bytes to be in every request
+}
+
+request_init :: proc(req: ^Request, method: Method, url: string, options := default_request_options, allocator := context.allocator) {
 	scheme, host, path, queries := net.split_url(url, allocator)
 	req^ = Request {
 		method = method,
@@ -114,6 +125,7 @@ request_init :: proc(req: ^Request, method: Method, url: string, allocator := co
 		host = host,
 		path = path,
 		queries = queries,
+		options = options,
 	}
 	req.headers.allocator = allocator
 }
@@ -145,9 +157,8 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 	skt, err := net.dial_tcp(host, port)
 	if err != nil do return
 
-	// TODO(tetra): Make this configurable?
-	net.set_option(skt, .Send_Timeout, time.Second * 5)
-	net.set_option(skt, .Receive_Timeout, time.Second * 5)
+	net.set_option(skt, .Send_Timeout, r.options.send_timeout)
+	net.set_option(skt, .Receive_Timeout, r.options.recv_timeout)
 
 	bytes := request_to_bytes(r, allocator)
 	if bytes == nil do return
