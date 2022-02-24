@@ -20,6 +20,7 @@ import "core:net"
 import "core:strings"
 import "core:strconv"
 import "core:fmt" // for panicf
+import "core:time"
 
 /*
 	By default we allow a generous 10 redirects, which the programmer can override at runtime and compile-time.
@@ -144,11 +145,13 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 		port = 80
 	}
 
-
 	// TODO(tetra): SSL/TLS.
 	skt, err := net.dial_tcp(host, port)
 	if err != nil do return
 
+	// TODO(tetra): Make this configurable?
+	net.set_option(skt, .Send_Timeout, time.Second * 5)
+	net.set_option(skt, .Receive_Timeout, time.Second * 5)
 
 	bytes := request_to_bytes(r, allocator)
 	if bytes == nil do return
