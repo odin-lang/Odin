@@ -144,7 +144,9 @@ parse_request :: proc(buffer: []u8) -> (req: Request, status_code: Status_Code) 
 }
 
 // serve "project/static/*"
-serve_files :: proc(dir_path: string, port: int) -> () {
+serve_files :: proc(dir_path: string, port: int, allocator := context.allocator) -> () {
+	context.allocator = allocator
+
 	skt, err := net.listen_tcp({net.IP6_Any, port})
 	if err != nil {
 		fmt.printf("Failed to bind to port!\n")
@@ -175,23 +177,40 @@ serve_files :: proc(dir_path: string, port: int) -> () {
 			continue
 		}
 
-		out_headers := make([dynamic]string, 0)
+		out_headers := make([dynamic]string)
 		defer delete(out_headers)
 
 		#partial switch req.method {
 		case .GET:
-			req_path := req.path
-			if req_path == "/" {
-				req_path = "/index.html"
-			}
+			b := strings.make_builder(allocator)
+			defer strings.destroy_builder(&b)
+
+			strings.write_string(&b, req.path)
+			req_path := strings.to_string(b)
+
+			path_buf := [4096]u8{}
 
 			//TODO(cloin): This should be sanitized to remove ".." and "*"
-			path_buf := [4096]u8{}
 			file_path := fmt.bprintf(path_buf[:], "%s%s", dir_path, req_path)
+			if os.is_dir(file_path) {
+				if req.path[len(req.path)-1] != '/' {
+					strings.write_string(&b, "/")
+				}
+				strings.write_string(&b, "index.html")
+				req_path = strings.to_string(b)
+
+				file_path = fmt.bprintf(path_buf[:], "%s%s", dir_path, req_path)
+				if !os.is_file(file_path) {
+					resp := build_response(.Not_Found, out_headers[:])
+					send_response(client, transmute([]u8)resp)
+					delete(resp)
+					continue
+				}
+			}
 
 			file_blob, file_ok := os.read_entire_file_from_filename(file_path)
 			if !file_ok {
-				resp := build_response(.Bad_Request, out_headers[:])
+				resp := build_response(.Not_Found, out_headers[:])
 				send_response(client, transmute([]u8)resp)
 				delete(resp)
 				continue
