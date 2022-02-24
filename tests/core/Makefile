@@ -1,7 +1,7 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
 
-all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test
+all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test net_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -23,3 +23,6 @@ crypto_test:
 
 noise_test:
 	$(ODIN) run math/noise -out=test_noise
+
+net_test:
+	$(ODIN) run net -out=test_net

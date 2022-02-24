@@ -21,6 +21,14 @@ import "core:strings"
 import "core:fmt"
 import "core:mem"
 
+/*
+	Aliases for convenience to those used to their C equivalents:
+	- inet_ntop
+	- inet_pton
+*/
+ntop :: address_to_string
+pton :: parse_address
+
 parse_ip4_address :: proc(address_and_maybe_port: string) -> (addr: IP4_Address, ok: bool) {
 	buf: [1024]byte
 	arena: mem.Arena
@@ -223,10 +231,11 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 	case IP4_Address:
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
 	case IP6_Address:
+		// fmt.printf("Converting: %v\n", v)
 		i := 0
 		seen_double_colon := false
 		for i < len(v) {
-			if !seen_double_colon && v[i] == 0 && v[i+1] == 0 {
+			if !seen_double_colon && v[i] == 0 && i < len(v) - 1 && v[i+1] == 0 {
 				seen_double_colon = true
 				for i < len(v) && v[i] == 0 {
 					i += 1
@@ -240,6 +249,10 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 				fmt.sbprintf(&b, "%x", v[i])
 				i += 1
 			}
+		}
+		if !seen_double_colon && v[7] == 0 {
+			// turn single trailing zero into ::
+			b.buf[len(b.buf) - 1] = ':'
 		}
 	}
 
