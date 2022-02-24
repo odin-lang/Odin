@@ -136,7 +136,6 @@ send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net
 
 	// NOTE(tetra): The host string may or may not have a port,
 	// but dial needs one.
-	// This means we have to resolve it ourselves.
 	host, port := net.split_port(r.host) or_return
 	if port == 0 {
 		port = 80
