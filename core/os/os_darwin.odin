@@ -313,6 +313,7 @@ foreign libc {
 	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
+	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u32) -> c.int ---
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
@@ -664,6 +665,15 @@ get_current_directory :: proc() -> string {
 set_current_directory :: proc(path: string) -> (err: Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
 		return Errno(get_last_error())
 	}
