@@ -44,7 +44,7 @@ main :: proc() {
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
 
-	pton_test(t)
+	address_parsing_test(t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	for _, v in track.allocation_map {
@@ -56,17 +56,41 @@ main :: proc() {
 }
 
 @test
-pton_test :: proc(t: ^testing.T) {
+address_parsing_test :: proc(t: ^testing.T) {
 	for vector in IP_Address_Parsing_Test_Vectors {
-		fmt.printf("Parsing -> %v <-\n", vector.textual)
+		kind := ""
+		if      vector.family == .IP6 { kind = "IPv6 address" }
+		else if vector.family == .IP4 {
+			if vector.non_decimal_ipv4 {
+				kind = "non-decimal IPv4 address"
+			} else {
+				kind = "decimal IPv4 address"
+			}
+		}
+
+		fmt.printf("Parsing %v as %v\n", vector.textual, kind)
 
 		msg := "-set a proper message-"
 		switch vector.family {
 		case .IP4:
 			/*
-				Do `net.parse_ip4_address` think we parsed the address properly?
+				Does `net.parse_ip4_address` think we parsed the address properly?
 			*/
-			parsed, parsed_ok := net.parse_ip4_address(vector.textual)
+			any_addr  := net.parse_address(vector.textual, vector.non_decimal_ipv4)
+			parsed_ok := any_addr != nil
+			parsed:   net.IP4_Address
+
+			/*
+				Ensure that `parse_address` doesn't parse IPv4 addresses into IPv6 addreses by mistake.
+			*/
+			switch addr in any_addr {
+			case net.IP4_Address:
+				parsed = addr
+			case net.IP6_Address:
+				parsed_ok = false
+				msg = fmt.tprintf("parse_address mistook %v as IPv6 address %v", vector.textual, addr)
+				expect(t, false, msg)
+			}
 
 			if !parsed_ok && vector.should_parse {
 				msg = fmt.tprintf("parse_ip4_address failed to parse %v, expected %v", vector.textual, binstr_to_address(vector.binstr))
@@ -168,35 +192,67 @@ IP_Address_Parsing_Test_Vector :: struct {
 	binstr:           string,
 	should_parse:     bool,   // We expect this to be parsed.
 	should_roundtrip: bool,   // We expect this to roundtrip faithfully.
+	non_decimal_ipv4: bool,   // IPv4 inet_aton type address
 }
 
 IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	// dotted-decimal notation
-	{ .IP4, "0.0.0.0",           "00000000", true, true },
-	{ .IP4, "127.0.0.1",         "7f000001", true, true },
-	{ .IP4, "10.0.128.31",       "0a00801f", true, true },
-	{ .IP4, "255.255.255.255",   "ffffffff", true, true },
+	{ .IP4, "0.0.0.0",                 "00000000", true,  true,  false },
+	{ .IP4, "127.0.0.1",               "7f000001", true,  true,  false },
+	{ .IP4, "10.0.128.31",             "0a00801f", true,  true,  false },
+	{ .IP4, "255.255.255.255",         "ffffffff", true,  true,  false },
+
+	// Odin custom: Address + port, valid
+	{ .IP4, "0.0.0.0:80",              "00000000", true,  false, false },
+	{ .IP4, "127.0.0.1:80",            "7f000001", true,  false, false },
+	{ .IP4, "10.0.128.31:80",          "0a00801f", true,  false, false },
+	{ .IP4, "255.255.255.255:80",      "ffffffff", true,  false, false },
+
+	{ .IP4, "[0.0.0.0]:80",            "00000000", true,  false, false },
+	{ .IP4, "[127.0.0.1]:80",          "7f000001", true,  false, false },
+	{ .IP4, "[10.0.128.31]:80",        "0a00801f", true,  false, false },
+	{ .IP4, "[255.255.255.255]:80",    "ffffffff", true,  false, false },
+
+	// Odin custom: Address + port, invalid
+	{ .IP4, "[]:80",                   "00000000", false, false, false },
+	{ .IP4, "[0.0.0.0]",               "00000000", false, false, false },
+	{ .IP4, "[127.0.0.1]:",            "7f000001", false, false, false },
+	{ .IP4, "[10.0.128.31] :80",       "0a00801f", false, false, false },
+	{ .IP4, "[255.255.255.255]:65536", "ffffffff", false, false, false },
+
 
 	// numbers-and-dots notation, but not dotted-decimal
 	// IMPORTANT: enable when we support `aton`-like addresses
-	// { .IP4, "1.2.03.4",          "01020304", true, false },
+	{ .IP4, "1.2.03.4",                "01020304", true,  false, true  },
 	// { .IP4, "1.2.0x33.4",        "01023304", true, false },
 	// { .IP4, "1.2.0XAB.4",        "0102ab04", true, false },
 	// { .IP4, "1.2.0xabcd",        "0102abcd", true, false },
 	// { .IP4, "1.0xabcdef",        "01abcdef", true, false },
 	// { .IP4, "00377.0x0ff.65534", "fffffffe", true, false },
 
-	// invalid, expect a `parse_ip4_address` to return false
-	{ .IP4, ".1.2.3",            "ffffffff", false, false },
-	{ .IP4, "1..2.3",            "ffffffff", false, false },
-	{ .IP4, "1.2.3.",            "ffffffff", false, false },
-	{ .IP4, "1.2.3.4.5",         "ffffffff", false, false },
-	{ .IP4, "1.2.3.a",           "ffffffff", false, false },
-	{ .IP4, "1.256.2.3",         "ffffffff", false, false },
-	{ .IP4, "1.2.4294967296.3",  "ffffffff", false, false },
-	{ .IP4, "1.2.-4294967295.3", "ffffffff", false, false },
-	{ .IP4, "1.2. 3.4",          "ffffffff", false, false },
+	// invalid as decimal address
+	{ .IP4, ".1.2.3",                  "ffffffff", false, false, false },
+	{ .IP4, "1..2.3",                  "ffffffff", false, false, false },
+	{ .IP4, "1.2.3.",                  "ffffffff", false, false, false },
+	{ .IP4, "1.2.3.4.5",               "ffffffff", false, false, false },
+	{ .IP4, "1.2.3.a",                 "ffffffff", false, false, false },
+	{ .IP4, "1.256.2.3",               "ffffffff", false, false, false },
+	{ .IP4, "1.2.4294967296.3",        "ffffffff", false, false, false },
+	{ .IP4, "1.2.-4294967295.3",       "ffffffff", false, false, false },
+	{ .IP4, "1.2. 3.4",                "ffffffff", false, false, false },
 
+	// invalid as non-decimal address
+	{ .IP4, ".1.2.3",                  "ffffffff", false, false, true },
+	{ .IP4, "1..2.3",                  "ffffffff", false, false, true },
+	{ .IP4, "1.2.3.",                  "ffffffff", false, false, true },
+	{ .IP4, "1.2.3.4.5",               "ffffffff", false, false, true },
+	{ .IP4, "1.2.3.a",                 "ffffffff", false, false, true },
+	{ .IP4, "1.256.2.3",               "ffffffff", false, false, true },
+	{ .IP4, "1.2.4294967296.3",        "ffffffff", false, false, true },
+	{ .IP4, "1.2.-4294967295.3",       "ffffffff", false, false, true },
+	{ .IP4, "1.2. 3.4",                "ffffffff", false, false, true },
+
+/*
 	// ipv6
 	{ .IP6, ":",                       "",                                 false, false },
 	{ .IP6, "::",                      "00000000000000000000000000000000", true,  true  },
@@ -229,4 +285,5 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	{ .IP6, "0::ffff:c0a8:5e4",        "00000000000000000000ffffc0a805e4", true,  true  },
 	{ .IP6, "::0::ffff:c0a8:5e4",      "",                                 false, false },
 	{ .IP6, "c0a8",                    "",                                 false, false },
+*/
 }
