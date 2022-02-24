@@ -84,12 +84,11 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
  			interface.physical_address = physical_address_to_string(adapter.PhysicalAddress[:adapter.PhysicalAddressLength])
  		}
 
- 		unicast: [dynamic]Lease
  		for u_addr := (^sys.IP_ADAPTER_UNICAST_ADDRESS_LH)(adapter.FirstUnicastAddress); u_addr != nil; u_addr = u_addr.Next {
  			win_addr := parse_socket_address(u_addr.Address)
 
  			lease := Lease{
- 				address = win_addr,
+ 				address = win_addr.address,
  				origin  = {
  					prefix = Prefix_Origin(u_addr.PrefixOrigin),
  					suffix = Suffix_Origin(u_addr.SuffixOrigin),
@@ -101,44 +100,36 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
  				},
  				address_duplication = Address_Duplication(u_addr.DadState),
  			}
- 			append(&unicast, lease)
+ 			append(&interface.unicast, lease)
  		}
-		interface.unicast = unicast[:]
 
- 		anycast: [dynamic]Endpoint
  		for a_addr := (^sys.IP_ADAPTER_ANYCAST_ADDRESS_XP)(adapter.FirstAnycastAddress); a_addr != nil; a_addr = a_addr.Next {
- 			ep := parse_socket_address(a_addr.Address)
- 			append(&anycast, ep)
+ 			addr := parse_socket_address(a_addr.Address)
+ 			append(&interface.anycast, addr.address)
  		}
-		interface.anycast = anycast[:]
 
- 		multicast: [dynamic]Endpoint
  		for m_addr := (^sys.IP_ADAPTER_MULTICAST_ADDRESS_XP)(adapter.FirstMulticastAddress); m_addr != nil; m_addr = m_addr.Next {
- 			ep := parse_socket_address(m_addr.Address)
- 			append(&multicast, ep)
+ 			addr := parse_socket_address(m_addr.Address)
+ 			append(&interface.multicast, addr.address)
  		}
-		interface.multicast = multicast[:]
 
- 		gateways: [dynamic]Endpoint
  		for g_addr := (^sys.IP_ADAPTER_GATEWAY_ADDRESS_LH)(adapter.FirstGatewayAddress); g_addr != nil; g_addr = g_addr.Next {
- 			ep := parse_socket_address(g_addr.Address)
- 			append(&gateways, ep)
+ 			addr := parse_socket_address(g_addr.Address)
+ 			append(&interface.gateways, addr.address)
  		}
-		interface.gateways = gateways[:]
 
-		interface.dhcp_v4 = parse_socket_address(adapter.Dhcpv4Server)
-		interface.dhcp_v6 = parse_socket_address(adapter.Dhcpv6Server)
-
+		interface.dhcp_v4 = parse_socket_address(adapter.Dhcpv4Server).address
+		interface.dhcp_v6 = parse_socket_address(adapter.Dhcpv6Server).address
 
  		switch adapter.OperStatus {
- 		case .Up:             interface.link.state = .Up
- 		case .Down:           interface.link.state = .Down
- 		case .Testing:        interface.link.state = .Testing
- 		case .Dormant:        interface.link.state = .Dormant
- 		case .NotPresent:     interface.link.state = .Not_Present
- 		case .LowerLayerDown: interface.link.state = .Lower_Layer_Down
+ 		case .Up:             interface.link.state = {.Up}
+ 		case .Down:           interface.link.state = {.Down}
+ 		case .Testing:        interface.link.state = {.Testing}
+ 		case .Dormant:        interface.link.state = {.Dormant}
+ 		case .NotPresent:     interface.link.state = {.Not_Present}
+ 		case .LowerLayerDown: interface.link.state = {.Lower_Layer_Down}
  		case .Unknown:        fallthrough
- 		case:                 interface.link.state = .Unknown
+ 		case:                 interface.link.state = {}
  		}
 
  		interface.tunnel_type = Tunnel_Type(adapter.TunnelType)
