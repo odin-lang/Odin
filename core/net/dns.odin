@@ -121,8 +121,12 @@ resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Ne
 		return
 
 	case Host:
-		ep4 = resolve_ip4(t.hostname) or_return
-		ep6 = resolve_ip6(t.hostname) or_return
+		err4, err6: Network_Error = ---, ---
+		ep4, err4 = resolve_ip4(t.hostname)
+		ep6, err6 = resolve_ip6(t.hostname)
+		if err4 != nil && err6 != nil {
+			err = err4
+		}
 		return
 	}
 	unreachable()
