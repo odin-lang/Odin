@@ -143,20 +143,6 @@ parse_request :: proc(buffer: []u8) -> (req: Request, status_code: Status_Code) 
 	return
 }
 
-find_file :: proc(path: string, dir: string) -> (filepath: string, ok: bool) {
-	//TODO(cloin): This should be sanitized to remove ".." and "*"
-
-	path_buf := make([dynamic]u8, 4096)
-	file_path := fmt.bprintf(path_buf[:], "%s%s", dir, path)
-
-	if !os.is_file(file_path) {
-		delete(path_buf)
-		return "", false
-	}
-
-	return file_path, true
-}
-
 // serve "project/static/*"
 serve_files :: proc(dir_path: string, port: int, allocator := context.allocator) -> () {
 	context.allocator = allocator
@@ -202,26 +188,27 @@ serve_files :: proc(dir_path: string, port: int, allocator := context.allocator)
 			strings.write_string(&b, req.path)
 			req_path := strings.to_string(b)
 
-			out_path, found_ok := find_file(req_path, dir_path)
-			if !found_ok {
-				// is this a directory?
+			path_buf := [4096]u8{}
+
+			//TODO(cloin): This should be sanitized to remove ".." and "*"
+			file_path := fmt.bprintf(path_buf[:], "%s%s", dir_path, req_path)
+			if os.is_dir(file_path) {
 				if req.path[len(req.path)-1] != '/' {
 					strings.write_string(&b, "/")
 				}
 				strings.write_string(&b, "index.html")
-
 				req_path = strings.to_string(b)
-				out_path, found_ok = find_file(req_path, dir_path)
-				if !found_ok {
+
+				file_path = fmt.bprintf(path_buf[:], "%s%s", dir_path, req_path)
+				if !os.is_file(file_path) {
 					resp := build_response(.Not_Found, out_headers[:])
 					send_response(client, transmute([]u8)resp)
 					delete(resp)
 					continue
 				}
 			}
-			defer delete(out_path)
 
-			file_blob, file_ok := os.read_entire_file_from_filename(out_path)
+			file_blob, file_ok := os.read_entire_file_from_filename(file_path)
 			if !file_ok {
 				resp := build_response(.Not_Found, out_headers[:])
 				send_response(client, transmute([]u8)resp)
@@ -230,7 +217,7 @@ serve_files :: proc(dir_path: string, port: int, allocator := context.allocator)
 			}
 
 			mime_buf := [1024]u8{}
-			mime_hdr := fmt.bprintf(mime_buf[:], "\nContent-Type: %s", guess_mime(out_path))
+			mime_hdr := fmt.bprintf(mime_buf[:], "\nContent-Type: %s", guess_mime(file_path))
 			append(&out_headers, mime_hdr)
 
 			resp := build_response(.Ok, out_headers[:], string(file_blob))
