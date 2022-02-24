@@ -345,9 +345,8 @@ get_last_error_string :: proc() -> string {
 }
 
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.clone_to_cstring(path)
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
-	delete(cstr)
 	if handle == -1 {
 		return INVALID_HANDLE, 1
 	}
