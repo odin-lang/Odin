@@ -90,10 +90,6 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 }
 
 
-Resolve_Error :: enum {
-	Unable_To_Resolve = 1,
-}
-
 /*
 	Resolves a hostname to exactly one IP4 and IP6 endpoint.
 	It's then up to you which one you use.

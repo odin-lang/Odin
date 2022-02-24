@@ -469,7 +469,7 @@ Socket_Option :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
-	Linger_Only_Supports_Whole_Seconds,
+	Linger_Only_Supports_Whole_Seconds = 1,
 	// The given value is too big or small to be given to the OS.
 	Value_Out_Of_Range,
 
