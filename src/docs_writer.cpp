@@ -684,7 +684,9 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 
 			String calling_convention = make_string_c(proc_calling_convention_strings[type->Proc.calling_convention]);
-			doc_type.calling_convention = odin_doc_write_string(w, calling_convention);
+			if (calling_convention != "odin") {
+				doc_type.calling_convention = odin_doc_write_string(w, calling_convention);
+			}
 		}
 		break;
 	case Type_BitSet:
