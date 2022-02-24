@@ -22,39 +22,94 @@ import "core:fmt"
 import "core:mem"
 
 /*
-	Aliases for convenience to those used to their C equivalents:
-	- inet_ntop
-	- inet_pton
+	Parses an IP address in alternate `inet_aton` form.
+	See `parse_ip4_address` comment.
 */
-ntop :: address_to_string
-pton :: parse_address
+aton :: proc(address_and_maybe_port: string, family: Address_Family) -> (addr: Address, ok: bool) {
+	switch family {
+	case .IP4: return parse_ip4_address(address_and_maybe_port, true)
+	case .IP6: return parse_ip6_address(address_and_maybe_port)
+	case: return nil, false
+	}
+}
 
-parse_ip4_address :: proc(address_and_maybe_port: string) -> (addr: IP4_Address, ok: bool) {
-	buf: [1024]byte
-	arena: mem.Arena
-	mem.init_arena(&arena, buf[:])
-	context.allocator = mem.arena_allocator(&arena)
+/*
+	Expects an IPv4 address with no leading or trailing whitespace:
+	- a.b.c.d
+	- a.b.c.d:port
+	- [a.b.c.d]:port
 
-	addr_str, _, split_ok := split_port(address_and_maybe_port)
-	if !split_ok do return
+	If the IP address is bracketed, the port must be present and valid (though it will be ignored):
+	- [a.b.c.d] will be treated as a parsing failure.
 
-	parts := strings.split(addr_str, ".")
-	if len(parts) != 4 do return
-
-	#assert(len(addr) == 4)
-
-	n: uint
-	for part, i in parts {
-		if part == "" do return // NOTE(tetra): All elements required.
-		if strings.contains(part, ":") do return
-		n, ok = strconv.parse_uint(part, 10)
-		if !ok do return // NOTE(tetra): Not all of it was an integer.
-		if n > uint(max(u8)) do return
-		addr[i] = byte(n)
+	If `non_decimal_address` is true, then the address is interpreted as `inet_aton` would in C:
+	e.g."00377.0x0ff.65534" = 255.255.255.254
+		00377 = 255 in octal
+		0x0ff = 255 in hexadecimal
+		This leaves 16 bits worth of address
+		.65534 then accounts for the last two digits
+*/
+parse_ip4_address :: proc(address_and_maybe_port: string, non_decimal_address := false) -> (addr: IP4_Address, ok: bool) {
+	/*
+		There is no valid address shorter than `0.0.0.0`.
+	*/
+	if len(address_and_maybe_port) < 7 {
+		return {}, false
 	}
 
-	ok = true
-	return
+	address, _ := split_port(address_and_maybe_port) or_return // This call doesn't allocate
+
+	parts: [4]int
+	part := 0
+
+	base             := 10
+	is_leading_digit := true
+
+	// fmt.println("\t", address, "non-decimal:", non_decimal_address)
+
+	for ch in address {
+		switch ch {
+		case '0':
+			// Could be a leading zero of a new octal or hex number.
+			parts[part] = parts[part] * base
+			is_leading_digit = false
+
+		case '1'..'9':
+			parts[part] = parts[part] * base + int(ch - '0')
+			is_leading_digit = false
+
+		case '.':
+			if is_leading_digit {
+				// We're expecting a digit, not a dot
+				return {}, false
+			}
+
+			part += 1
+			if part > 3 {
+				// Can't have an IPv4 address with 4 dots.
+				return {}, false
+			}
+
+			is_leading_digit = true
+
+		case:
+			return {}, false
+		}
+
+		if parts[part] > 255 {
+			return {}, false
+		}
+	}
+
+	/*
+		Can't end expecting a leading digit.
+	*/
+	if is_leading_digit {
+		return {}, false
+	}
+
+	// fmt.printf("Input: %v, Parsed: %v\n", address_and_maybe_port, parts)
+	return {u8(parts[0]), u8(parts[1]), u8(parts[2]), u8(parts[3])}, true
 }
 
 // TODO(tetra): Scopeid?
@@ -106,10 +161,14 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 	return
 }
 
-parse_address :: proc(address_and_maybe_port: string) -> Address {
+/*
+	Try parsing as an IPv6 address.
+	If it's determined not to be, try as an IPv4 address, optionally in non-decimal format.
+*/
+parse_address :: proc(address_and_maybe_port: string, non_decimal_address := false) -> Address {
 	addr6, ok6 := parse_ip6_address(address_and_maybe_port)
 	if ok6 do return addr6
-	addr4, ok4 := parse_ip4_address(address_and_maybe_port)
+	addr4, ok4 := parse_ip4_address(address_and_maybe_port, non_decimal_address)
 	if ok4 do return addr4
 	return nil
 }
@@ -164,6 +223,10 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 	if i := strings.last_index(endpoint_str, "]:"); i != -1 {
 		addr_or_host = endpoint_str[1:i]
 		port, ok = strconv.parse_int(endpoint_str[i+2:], 10)
+
+		if port > 65535 {
+			ok = false
+		}
 		return
 	}
 
@@ -174,6 +237,10 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 
 		addr_or_host = endpoint_str[:i]
 		port, ok = strconv.parse_int(endpoint_str[i+1:], 10)
+
+		if port > 65535 {
+			ok = false
+		}
 		return
 	} else if n > 1 {
 		// IP6 address without port
@@ -224,7 +291,11 @@ map_to_ip6 :: proc(addr: Address) -> Address {
 }
 
 
-// Returns a temporarily-allocated string representation of the address.
+/*
+	Returns a temporarily-allocated string representation of the address.
+
+	See RFC 5952 section 4 for IPv6 representation recommendations.
+*/
 address_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
 	b := strings.make_builder(allocator)
 	switch v in addr {
