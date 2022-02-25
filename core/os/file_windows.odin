@@ -130,7 +130,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 			b[n] = x
 			n += 1
 		}
-		if ctrl_z || single_read_length <= max_read {
+		if ctrl_z || single_read_length < max_read {
 			break
 		}
 	}
