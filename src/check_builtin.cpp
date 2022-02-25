@@ -3506,6 +3506,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			case TargetOs_linux:
 			case TargetOs_essence:
 			case TargetOs_freebsd:
+			case TargetOs_openbsd:
 				switch (build_context.metrics.arch) {
 				case TargetArch_i386:
 				case TargetArch_amd64:
