@@ -17,7 +17,7 @@
 package http
 
 import "core:net"
-import "core:sync"
+import sync "core:sync/sync2"
 
 Request_Status :: enum {
 	Unknown, // NOTE: ID does not exist
@@ -29,23 +29,23 @@ Request_Status :: enum {
 }
 
 Client_Request :: struct {
-	request:   Request,  // Memory mananged externally
-	response:  Response, // Memory mananged externally
-	socket:    net.TCP_Socket, // only valid if status == .Wait_Reply
-	status:    Request_Status,
-	processing: bool, // Atomically updated in client_process_requests()
+	request:         Request,  // Memory mananged externally
+	response:        Response, // Memory mananged externally
+	socket:          net.TCP_Socket, // only valid if status == .Wait_Reply
+	status:          Request_Status,
+	being_processed: bool, // Atomically updated in client_process_one_request()
 }
 
 
 Client :: struct {
-	next_id:      Request_Id,
-	requests:     map[Request_Id]Client_Request,
-	request_lock: sync.Ticket_Mutex,
+	next_id:        Request_Id,
+	requests:       map[Request_Id]Client_Request,
+	request_lock:   sync.Mutex,
+	work_submitted: sync.Sema,
 }
 
 client_init :: proc(c: ^Client, allocator := context.allocator) {
 	c^ = {}
-	sync.ticket_mutex_init(&c.request_lock)
 	c.requests.allocator = allocator
 }
 
@@ -67,9 +67,11 @@ client_submit_request :: proc(c: ^Client, req: Request) -> Request_Id {
 		status = .Need_Send,
 	}
 
+	defer sync.sema_post(&c.work_submitted, 1)
+
 	{
-		sync.ticket_mutex_lock(&c.request_lock)
-		defer sync.ticket_mutex_unlock(&c.request_lock)
+		sync.mutex_lock(&c.request_lock)
+		defer sync.mutex_unlock(&c.request_lock)
 		id := c.next_id
 		c.next_id += 1
 		c.requests[id] = cr
@@ -81,8 +83,8 @@ client_check_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Resp
 	cr: Client_Request
 	ok: bool
 	{
-		sync.ticket_mutex_lock(&c.request_lock)
-		defer sync.ticket_mutex_unlock(&c.request_lock)
+		sync.mutex_lock(&c.request_lock)
+		defer sync.mutex_unlock(&c.request_lock)
 		cr, ok = c.requests[id]
 	}
 
@@ -104,12 +106,12 @@ client_wait_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Respo
 		case .Need_Send, .Wait_Reply:
 			// NOTE: gotta wait - might as well use the current thread to advance the requests
 			// TODO: block until there's stuff to process rather than spinning
-			client_process_requests(c)
+			client_process_one_request(c)
 		}
 	}
 
-	sync.ticket_mutex_lock(&c.request_lock)
-	defer sync.ticket_mutex_unlock(&c.request_lock)
+	sync.mutex_lock(&c.request_lock)
+	defer sync.mutex_unlock(&c.request_lock)
 	delete_key(&c.requests, id)
 	return
 }
@@ -120,45 +122,77 @@ client_execute_request :: proc(c: ^Client, req: Request) -> (response: Response,
 	return
 }
 
-client_process_requests :: proc(c: ^Client) {
+client_process_one_request :: proc(c: ^Client) {
+	//
+	// Fetch a request that isn't being processed yet
+	//
+
+	sync.sema_wait(&c.work_submitted)
+
+	id_to_process: Request_Id = ---
+	req_copy: Client_Request = ---
+	block: {
+		sync.mutex_lock(&c.request_lock)
+		defer sync.mutex_unlock(&c.request_lock)
+
+		for id, req in &c.requests {
+			if req.being_processed || req.status == .Done {
+				continue
+			} else {
+				req.being_processed = true
+				id_to_process = id
+				req_copy = req
+				break block
+			}
+		}
+
+		return // NOTE(tetra): Nothing to do, or all requests are being processed already.
+	}
+	req_copy.being_processed = false
+
+	//
+	// Process the one we grabbed
+	//
+
 	close_socket :: proc(s: ^net.TCP_Socket) {
 		net.close(s^)
 		s^ = {}
 	}
 
-	for _, req in &c.requests {
-		if old := sync.atomic_swap(&req.processing, true, .Sequentially_Consistent); old {
-			continue // NOTE(tetra): Someone is already processing this request
+	switch req_copy.status {
+	case .Need_Send:
+		skt, ok := send_request(req_copy.request)
+		if ok {
+			req_copy.socket = skt
+			req_copy.status = .Wait_Reply
+		} else {
+			req_copy.status = .Send_Failed
+			close_socket(&req_copy.socket)
 		}
-		defer sync.atomic_store(&req.processing, false, .Sequentially_Consistent)
-
-		switch req.status {
-		case .Need_Send:
-			skt, ok := send_request(req.request)
-			if ok {
-				req.socket = skt
-				req.status = .Wait_Reply
-			} else {
-				req.status = .Send_Failed
-				close_socket(&req.socket)
-			}
-		case .Wait_Reply:
-			resp, ok := recv_response(req.socket)
-			if ok {
-				req.response = resp
-				req.status = .Done
-			} else {
-				req.status = .Recv_Failed
-			}
-			close_socket(&req.socket)
-		case .Done, .Send_Failed, .Recv_Failed:
-			// do nothing.
-			// it'll be removed from the list when user code
-			// asks for it.
-		case .Unknown:
-			unreachable()
+	case .Wait_Reply:
+		resp, ok := recv_response(req_copy.socket)
+		if ok {
+			req_copy.response = resp
+			req_copy.status = .Done
+		} else {
+			req_copy.status = .Recv_Failed
 		}
+		close_socket(&req_copy.socket)
+	case .Done, .Send_Failed, .Recv_Failed:
+		// do nothing.
+		// it'll be removed from the list when user code
+		// asks for it.
+	case .Unknown:
+		unreachable()
 	}
+
+	//
+	// Store the updated request back into the map
+	//
+
+	sync.mutex_lock(&c.request_lock)
+	defer sync.mutex_unlock(&c.request_lock)
+	c.requests[id_to_process] = req_copy
 }
 
 /*
