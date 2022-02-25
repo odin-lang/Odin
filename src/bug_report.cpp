@@ -18,6 +18,7 @@
 #endif
 
 #if defined(GB_SYSTEM_OPENBSD)
+	#include <sys/sysctl.h>
 	#include <sys/utsname.h>
 #endif
 
@@ -243,6 +244,14 @@ void report_ram_info() {
 		size_t   val_size = sizeof(ram_amount);
 
 		int sysctls[] = { CTL_HW, HW_MEMSIZE };
+		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
+			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
+		}
+	#elif defined(GB_SYSTEM_OPENBSD)
+		uint64_t ram_amount;
+		size_t   val_size = sizeof(ram_amount);
+
+		int sysctls[] = { CTL_HW, HW_PHYSMEM64 };
 		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
