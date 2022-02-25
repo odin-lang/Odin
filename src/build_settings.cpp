@@ -738,7 +738,7 @@ String internal_odin_root_dir(void) {
 		// XXX OpenBSD
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
 #endif
-		if(len == 0) {
+		if(len == 0 || len == -1) {
 			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
