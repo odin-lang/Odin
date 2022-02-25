@@ -29,22 +29,43 @@ Request_Status :: enum {
 	Done,
 }
 
+Request_ID :: distinct int
+
 Client_Request :: struct {
-	request:         Request,  // Memory mananged externally
-	response:        Response, // Memory mananged externally
+	request:         Request,        // Memory managed by user
+	response:        Response,       // Memory managed by user after request is completed
 	socket:          net.TCP_Socket, // only valid if status == .Wait_Reply
 	status:          Request_Status,
-	being_processed: bool, // Updated in client_process_one_request()
+	being_processed: bool,           // Updated in client_process_one_request()
 }
 
+/*
+	Provides a mechanism to easily run multiple HTTP requests at once.
 
+	This can be done using worker threads, or by manually calling client_process_one_request() or client_wait_for_response().
+
+	client_submit_request() can be used to add a pending request to the queue, which gives you a Request_ID that can be used to determine
+	when that request is done, or has failed.
+
+	There are two ways to retreive the result of a request:
+	- client_check_for_response() to poll the status of a request, and to retrieve the final result, without blocking.
+	- client_wait_for_response() to block until a request is done, temporarily donating the current thread to processing pending requests.
+
+	Forward progress is accomplished via calls to client_process_one_request(), which makes progress with a single
+	request in a blocking manner.
+	Worker threads, if created, will do this automatically, but if you ask for there to be no worker threads,
+	you will either have to call client_process_one_request() manually, as appropriate, or call client_wait_for_response(), which will
+	call through to it if the current request is not yet completed.
+
+	With the exception of client_init() and client_destroy(), all procedures are thread-safe.
+*/
 Client :: struct {
-	next_id:         Request_Id,
-	requests:        map[Request_Id]Client_Request,
+	next_id:         Request_ID,                    // NOTE(tetra): Updated under request_lock
+	requests:        map[Request_ID]Client_Request, // NOTE(tetra): Updated under request_lock
 	request_lock:    sync.Mutex,
 	work_available:  sync.Sema,
 	workers:         []^thread.Thread,
-	workers_running: bool,
+	workers_running: bool,                          // NOTE(tetra): Updated atomically
 }
 
 client_init :: proc(c: ^Client, worker_count: int, allocator := context.allocator) {
@@ -87,9 +108,15 @@ client_destroy :: proc(c: ^Client) {
 }
 
 
-Request_Id :: distinct int
+/*
+	Adds a pending HTTP request to the queue.
 
-client_submit_request :: proc(c: ^Client, req: Request) -> Request_Id {
+	It is up to the caller to ensure that the Request remains valid for the duration of the request.
+
+	A request is considered completed when client_check_for_response() or client_wait_for_response() returns a status of Done
+	for a particular ID.
+*/
+client_submit_request :: proc(c: ^Client, req: Request) -> Request_ID {
 	cr := Client_Request{
 		request = req,
 		response = {},
@@ -104,11 +131,20 @@ client_submit_request :: proc(c: ^Client, req: Request) -> Request_Id {
 		id := c.next_id
 		c.next_id += 1
 		c.requests[id] = cr
-		return Request_Id(id)
+		return Request_ID(id)
 	}
 }
 
-client_check_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+/*
+	Checks what the status of the request corresponding to the given ID is.
+
+	The request is removed from the queue if it is completed, otherwise it is
+	left in the queue.
+
+	When this procedure returns a status of Done, the returned Response is now managed by the caller
+	and needs to be destroyed as appropriate.
+*/
+client_check_for_response :: proc(c: ^Client, id: Request_ID) -> (response: Response, status: Request_Status) {
 	cr: Client_Request
 	ok: bool
 	{
@@ -127,7 +163,16 @@ client_check_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Resp
 	return cr.response, cr.status
 }
 
-client_wait_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+/*
+	Waits for the request with the corresponding ID to be completed, or to fail.
+
+	When this procedure returns a status of Done, the returned Response is now managed by the caller
+	and needs to be destroyed as appropriate.
+
+	If the request is not finished, and hasn't failed, the current thread will be utilised to process pending requests with
+	calls to client_process_one_request().
+*/
+client_wait_for_response :: proc(c: ^Client, id: Request_ID) -> (response: Response, status: Request_Status) {
 	loop: for {
 		response, status = client_check_for_response(c, id)
 		switch status {
@@ -144,12 +189,25 @@ client_wait_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Respo
 	return
 }
 
+/*
+	Adds a request to the queue and blocks until it has completed.
+
+	This procedure just calls client_submit_request() and client_wait_for_response() internally.
+*/
 client_execute_request :: proc(c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
 	id := client_submit_request(c, req)
 	response, status = client_wait_for_response(c, id)
 	return
 }
 
+/*
+	Waits for pending work to be available, and then makes progress to exactly one pending request.
+
+	This procedure is called by any worker threads you've asked for, calls to client_wait_for_response() when the desired
+	request isn't finished yet, or manually at your leisure.
+
+	If this procedure is not called anywhere, no requests will make progress.
+*/
 client_process_one_request :: proc(c: ^Client) {
 	//
 	// Fetch a request that isn't being processed yet
@@ -157,7 +215,7 @@ client_process_one_request :: proc(c: ^Client) {
 
 	sync.sema_wait(&c.work_available)
 
-	id_to_process: Request_Id = ---
+	id_to_process: Request_ID = ---
 	req_copy: Client_Request = ---
 	block: {
 		sync.mutex_lock(&c.request_lock)
