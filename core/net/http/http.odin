@@ -220,8 +220,8 @@ recv_response :: proc(skt: net.TCP_Socket, allocator := context.allocator) -> (r
 			return
 		}
 		// the header parts are currently in `read_buf` (temporary memory), but we want to return them.
-		name  := clone(trim_space(trimmed_part[:idx]))
-		value := clone(trim_space(trimmed_part[idx+1:]))
+		name  := clone(trim_space(trimmed_part[:idx]), resp.headers.allocator)
+		value := clone(trim_space(trimmed_part[idx+1:]), resp.headers.allocator)
 		resp.headers[name] = value
 
 	}
