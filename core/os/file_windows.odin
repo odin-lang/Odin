@@ -2,6 +2,7 @@ package os
 
 import win32 "core:sys/windows"
 import "core:intrinsics"
+import "core:runtime"
 import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
@@ -106,10 +107,13 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 	BUF_SIZE :: 386
 	buf16: [BUF_SIZE]u16
 	buf8: [4*BUF_SIZE]u8
-	
+
 	for n < len(b) && err == 0 {
-		min_read := max(min(len(b), 4), len(b)/4)
+		min_read := max(len(b)/4, 1 if len(b) > 0 else 0)
 		max_read := u32(min(BUF_SIZE, min_read))
+		if max_read == 0 {
+			break
+		}
 
 		single_read_length: u32
 		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
@@ -133,6 +137,13 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 		if ctrl_z || single_read_length < max_read {
 			break
 		}
+
+		// NOTE(bill): if the last two values were a newline, then it is expected that
+		// this is the end of the input
+		if n >= 2 && single_read_length == max_read && string(b[n-2:n]) == "\r\n" {
+			break
+		}
+
 	}
 	
 	return
