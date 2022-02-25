@@ -86,6 +86,9 @@ client_check_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Resp
 		sync.mutex_lock(&c.request_lock)
 		defer sync.mutex_unlock(&c.request_lock)
 		cr, ok = c.requests[id]
+		if ok && cr.status == .Done {
+			delete_key(&c.requests, id)
+		}
 	}
 
 	if !ok {
@@ -109,10 +112,6 @@ client_wait_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Respo
 			client_process_one_request(c)
 		}
 	}
-
-	sync.mutex_lock(&c.request_lock)
-	defer sync.mutex_unlock(&c.request_lock)
-	delete_key(&c.requests, id)
 	return
 }
 
