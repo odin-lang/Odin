@@ -108,7 +108,8 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 	buf8: [4*BUF_SIZE]u8
 	
 	for n < len(b) && err == 0 {
-		max_read := u32(min(BUF_SIZE, len(b)/4))
+		min_read := max(min(len(b), 4), len(b)/4)
+		max_read := u32(min(BUF_SIZE, min_read))
 		
 		single_read_length: u32
 		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
@@ -129,7 +130,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 			b[n] = x
 			n += 1
 		}
-		if ctrl_z || single_read_length < len(buf16) {
+		if ctrl_z || single_read_length < max_read {
 			break
 		}
 	}
