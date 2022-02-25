@@ -39,20 +39,27 @@ when ODIN_TEST {
     }
 }
 
+_tracking_allocator := mem.Tracking_Allocator{}
+
+print_tracking_allocator_report :: proc() {
+	for _, leak in _tracking_allocator.allocation_map {
+		fmt.printf("%v leaked %v bytes\n", leak.location, leak.size)
+	}
+
+	for bf in _tracking_allocator.bad_free_array {
+		fmt.printf("%v allocation %p was freed badly\n", bf.location, bf.memory)
+	}
+}
+
 main :: proc() {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	context.allocator = mem.tracking_allocator(&track)
+	mem.tracking_allocator_init(&_tracking_allocator, context.allocator)
+	context.allocator = mem.tracking_allocator(&_tracking_allocator)
 
 	address_parsing_test(t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	for _, v in track.allocation_map {
-		fmt.printf("%v leaked %v bytes\n", v.location, v.size)
-	}
-	for bf in track.bad_free_array {
-		fmt.printf("%v allocation %p was freed badly\n", bf.location, bf.memory)
-	}
+
+	print_tracking_allocator_report()
 }
 
 @test
@@ -224,11 +231,12 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	// numbers-and-dots notation, but not dotted-decimal
 	// IMPORTANT: enable when we support `aton`-like addresses
 	{ .IP4, "1.2.03.4",                "01020304", true,  false, true  },
-	// { .IP4, "1.2.0x33.4",        "01023304", true, false },
-	// { .IP4, "1.2.0XAB.4",        "0102ab04", true, false },
-	// { .IP4, "1.2.0xabcd",        "0102abcd", true, false },
-	// { .IP4, "1.0xabcdef",        "01abcdef", true, false },
-	// { .IP4, "00377.0x0ff.65534", "fffffffe", true, false },
+	{ .IP4, "1.2.0x33.4",              "01023304", true,  false, true  },
+	{ .IP4, "1.2.0XAB.4",              "0102ab04", true,  false, true  },
+	{ .IP4, "1.2.0xabcd",              "0102abcd", true,  false, true  },
+	{ .IP4, "1.0xabcdef",              "01abcdef", true,  false, true  },
+	{ .IP4, "0x01abcdef",              "01abcdef", true,  false, true  },
+	{ .IP4, "00377.0x0ff.65534",       "fffffffe", true,  false, true  },
 
 	// invalid as decimal address
 	{ .IP4, ".1.2.3",                  "ffffffff", false, false, false },
