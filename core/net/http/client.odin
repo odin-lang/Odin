@@ -18,6 +18,7 @@ package http
 
 import "core:net"
 import sync "core:sync/sync2"
+import "core:thread"
 
 Request_Status :: enum {
 	Unknown, // NOTE: ID does not exist
@@ -33,27 +34,55 @@ Client_Request :: struct {
 	response:        Response, // Memory mananged externally
 	socket:          net.TCP_Socket, // only valid if status == .Wait_Reply
 	status:          Request_Status,
-	being_processed: bool, // Atomically updated in client_process_one_request()
+	being_processed: bool, // Updated in client_process_one_request()
 }
 
 
 Client :: struct {
-	next_id:        Request_Id,
-	requests:       map[Request_Id]Client_Request,
-	request_lock:   sync.Mutex,
-	work_submitted: sync.Sema,
+	next_id:         Request_Id,
+	requests:        map[Request_Id]Client_Request,
+	request_lock:    sync.Mutex,
+	work_available:  sync.Sema,
+	workers:         []^thread.Thread,
+	workers_running: bool,
 }
 
-client_init :: proc(c: ^Client, allocator := context.allocator) {
+client_init :: proc(c: ^Client, worker_count: int, allocator := context.allocator) {
+	context.allocator = allocator
+
 	c^ = {}
 	c.requests.allocator = allocator
+
+	if worker_count > 0 {
+		c.workers = make([]^thread.Thread, worker_count)
+		c.workers_running = true
+
+		for _, i in c.workers {
+			c.workers[i] = thread.create_and_start_with_data(c, proc(data: rawptr) {
+				c := cast(^Client) data
+				for sync.atomic_load(&c.workers_running) {
+					client_process_one_request(c)
+				}
+			})
+		}
+	}
 }
 
 client_destroy :: proc(c: ^Client) {
+	sync.atomic_store(&c.workers_running, false)
+	sync.sema_post(&c.work_available, len(c.workers))
+	for w in c.workers {
+		thread.destroy(w)
+	}
+	delete(c.workers, c.requests.allocator)
+
 	for _, cr in c.requests {
-		net.close(cr.socket)
+		if cr.status == .Wait_Reply {
+			net.close(cr.socket)
+		}
 	}
 	delete(c.requests)
+
 	c^ = {}
 }
 
@@ -67,7 +96,7 @@ client_submit_request :: proc(c: ^Client, req: Request) -> Request_Id {
 		status = .Need_Send,
 	}
 
-	defer sync.sema_post(&c.work_submitted, 1)
+	defer sync.sema_post(&c.work_available)
 
 	{
 		sync.mutex_lock(&c.request_lock)
@@ -126,7 +155,7 @@ client_process_one_request :: proc(c: ^Client) {
 	// Fetch a request that isn't being processed yet
 	//
 
-	sync.sema_wait(&c.work_submitted)
+	sync.sema_wait(&c.work_available)
 
 	id_to_process: Request_Id = ---
 	req_copy: Client_Request = ---
@@ -164,6 +193,7 @@ client_process_one_request :: proc(c: ^Client) {
 		if ok {
 			req_copy.socket = skt
 			req_copy.status = .Wait_Reply
+			sync.sema_post(&c.work_available)
 		} else {
 			req_copy.status = .Send_Failed
 			close_socket(&req_copy.socket)
