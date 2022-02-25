@@ -2,7 +2,6 @@ package os
 
 import win32 "core:sys/windows"
 import "core:intrinsics"
-import "core:runtime"
 import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
