@@ -243,9 +243,6 @@ extern "C" {
 	#include <stdio.h>
 	#include <pthread_np.h>
 	#define lseek64 lseek
-
-	// XXX OpenBSD
-	#define sendfile(out, in, offset, count) (-1)
 #endif
     
 #if defined(GB_SYSTEM_UNIX)
@@ -6069,7 +6066,7 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filename, b32 fail_if_exists) {
 #if defined(GB_SYSTEM_OSX)
 	return copyfile(existing_filename, new_filename, NULL, COPYFILE_DATA) == 0;
-#else
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD)
 	isize size;
 	int existing_fd = open(existing_filename, O_RDONLY, 0);
 	int new_fd      = open(new_filename, O_WRONLY|O_CREAT, 0666);
@@ -6085,6 +6082,49 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 	close(new_fd);
 	close(existing_fd);
 
+	return size == stat_existing.st_size;
+#else
+	int new_flags = O_WRONLY | O_CREAT;
+	if (fail_if_exists) {
+		new_flags |= O_EXCL;
+	}
+	int existing_fd = open(existing_filename, O_RDONLY, 0);
+	int new_fd      = open(new_filename, new_flags, 0666);
+
+	struct stat stat_existing;
+	if (fstat(existing_fd, &stat_existing) == -1) {
+		return 0;
+	}
+
+	size_t bsize = stat_existing.st_blksize > BUFSIZ ? stat_existing.st_blksize : BUFSIZ;
+	char *buf = (char *)malloc(bsize);
+	if (buf == NULL) {
+		close(new_fd);
+		close(existing_fd);
+		return 0;
+	}
+
+	isize size = 0;
+	ssize_t nread, nwrite, offset;
+	while ((nread = read(existing_fd, buf, bsize)) != -1 && nread != 0) {
+		for (offset = 0; nread; nread -= nwrite, offset += nwrite) {
+			if ((nwrite = write(new_fd, buf + offset, nread)) == -1 || nwrite == 0) {
+				free(buf);
+				close(new_fd);
+				close(existing_fd);
+				return 0;
+			}
+			size += nwrite;
+		}
+	}
+	
+	free(buf);
+	close(new_fd);
+	close(existing_fd);
+
+	if (nread == -1) {
+		return 0;
+	}
 	return size == stat_existing.st_size;
 #endif
 }
