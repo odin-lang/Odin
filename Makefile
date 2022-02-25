@@ -58,6 +58,12 @@ ifeq ($(OS), Linux)
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
 endif
+ifeq ($(OS), OpenBSD)
+    LLVM_CONFIG=/usr/local/bin/llvm-config
+
+    CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+    LDFLAGS:=$(LDFLAGS) -liconv $(shell $(LLVM_CONFIG) --libs core native --system-libs)
+endif
 
 all: debug demo
 

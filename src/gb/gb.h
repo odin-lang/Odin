@@ -79,6 +79,10 @@ extern "C" {
 		#ifndef GB_SYSTEM_FREEBSD
 		#define GB_SYSTEM_FREEBSD 1
 		#endif
+	#elif defined(__OpenBSD__)
+		#ifndef GB_SYSTEM_OPENBSD
+		#define GB_SYSTEM_OPENBSD 1
+		#endif
 	#else
 		#error This UNIX operating system is not supported
 	#endif
@@ -199,7 +203,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -235,6 +239,15 @@ extern "C" {
 	#define sendfile(out, in, offset, count) sendfile(out, in, offset, count, NULL, NULL, 0)
 #endif
 
+#if defined(GB_SYSTEM_OPENBSD)
+	#include <stdio.h>
+	#include <pthread_np.h>
+	#define lseek64 lseek
+
+	// XXX OpenBSD
+	#define sendfile(out, in, offset, count) (-1)
+#endif
+    
 #if defined(GB_SYSTEM_UNIX)
 	#include <semaphore.h>
 #endif
@@ -779,6 +792,13 @@ typedef struct gbAffinity {
 #elif defined(GB_SYSTEM_FREEBSD)
 typedef struct gbAffinity {
 	b32 is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
+#elif defined(GB_SYSTEM_OPENBSD)
+typedef struct gbAffinity {
+	b32   is_accurate;
 	isize core_count;
 	isize thread_count;
 	isize threads_per_core;
@@ -3661,6 +3681,30 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 
 #elif defined(GB_SYSTEM_LINUX)
 #include <stdio.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+	a->is_accurate      = a->core_count > 0;
+	a->core_count       = a->is_accurate ? a->core_count : 1;
+	a->thread_count     = a->core_count;
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(0 <= core && core < a->core_count);
+	return a->threads_per_core;
+}
+
+#elif defined(GB_SYSTEM_OPENBSD)
+#include <unistd.h>
 
 void gb_affinity_init(gbAffinity *a) {
 	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
