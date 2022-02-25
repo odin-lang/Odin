@@ -94,7 +94,7 @@ response_destroy :: proc(using r: Response) {
 		delete(v, headers.allocator)
 	}
 	delete(headers)
-	delete(body)
+	delete(body, headers.allocator)
 }
 
 
