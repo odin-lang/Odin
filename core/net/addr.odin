@@ -22,15 +22,213 @@ import "core:fmt"
 import "core:mem"
 
 /*
-	Parses an IP address in alternate `inet_aton` form.
-	See `parse_ip4_address` comment.
+	Parses an IP address in non-decimal `inet_aton` form.
+
+	e.g."00377.0x0ff.65534" = 255.255.255.254
+		00377 = 255 in octal
+		0x0ff = 255 in hexadecimal
+		This leaves 16 bits worth of address
+		.65534 then accounts for the last two digits
+
+	For the address part the allowed forms are:
+		a.b.c.d - where each part represents a byte
+		a.b.c   - where `a` & `b` represent a byte and `c` a u16
+		a.b     - where `a` represents a byte and `b` supplies the trailing 24 bits
+		a       - where `a` gives the entire 32-bit value
+
+	The port, if present, is required to be a base 10 number in the range 0-65535, inclusive.
 */
 aton :: proc(address_and_maybe_port: string, family: Address_Family) -> (addr: Address, ok: bool) {
 	switch family {
-	case .IP4: return parse_ip4_address(address_and_maybe_port, true)
-	case .IP6: return parse_ip6_address(address_and_maybe_port)
-	case: return nil, false
+	case .IP4:
+		/*
+			There is no valid address shorter than `0.0.0.0`.
+		*/
+		if len(address_and_maybe_port) < 7 {
+			return {}, false
+		}
+
+		address, _ := split_port(address_and_maybe_port) or_return // This call doesn't allocate
+
+		buf: [4]u64 = {}
+		i := 0
+
+		for len(address) > 0 {
+			if i == 4 {
+				return {}, false
+			}
+
+			number, consumed, number_ok := parse_ip_component(address)
+			if !number_ok || consumed == 0 {
+				return {}, false
+			}
+
+			buf[i] = number
+
+			address = address[consumed:]
+
+			if len(address) > 0 && address[0] == '.' {
+				address = address[1:]
+			}
+			i += 1
+		}
+
+		/*
+			Distribute parts.
+		*/
+		switch i {
+		case 1:
+			buf[1] = buf[0] & 0xffffff
+			buf[0] >>= 24
+			fallthrough
+		case 2:
+			buf[2] = buf[1] & 0xffff
+			buf[1] >>= 16
+			fallthrough
+		case 3:
+			buf[3] = buf[2] & 0xff
+			buf[2] >>= 8
+		}
+
+		a: [4]u8 = ---
+		for v, i in buf {
+			if v > 255 { return {}, false }
+			a[i] = u8(v)
+		}
+		return IP4_Address(a), true
+
+	case .IP6:
+		return parse_ip6_address(address_and_maybe_port)
+
+	case:
+		return nil, false
 	}
+}
+
+Digit_Parse_Base :: enum u8 {
+	Dec = 0,
+	Oct = 1,
+	Hex = 2,
+}
+Digit_Parse_Bases :: bit_set[Digit_Parse_Base; u8]
+
+DEFAULT_DIGIT_BASES :: Digit_Parse_Bases{.Dec, .Oct, .Hex}
+
+/*
+	Parses a single unsigned number in requested `bases` from `input`.
+	`max_value` represents the maximum allowed value for this number.
+
+	Returns the `value`, the `bytes_consumed` so far, and `ok` to signal success or failure.
+
+	An out-of-range or invalid number will return the accumulated value so far (which can be out of range),
+	the number of bytes consumed leading up the error, and `ok = false`.
+
+	When `.` or `:` are encountered, they'll be considered valid separators and will stop parsing,
+	returning the valid number leading up to it.
+
+	Other non-digit characters are treated as an error.
+
+	Octal numbers are expected to have a leading zero, with no 'o' format specifier.
+	Hexadecimal numbers are expected to be preceded by '0x' or '0X'.
+	Numbers will otherwise be considered to be in base 10.
+*/
+parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := DEFAULT_DIGIT_BASES) -> (value: u64, bytes_consumed: int, ok: bool) {
+	/*
+		Default to base 10
+	*/
+	base         := u64(10)
+	input        := input
+
+	/*
+		We keep track of the number of prefix bytes and digit bytes separately.
+		This way if a prefix is consumed and we encounter a separator or the end of the string,
+		the number is only considered valid if at least 1 digit byte has been consumed and the value is within range.
+	*/
+	prefix_bytes := 0
+	digit_bytes  := 0
+
+	/*
+		Scan for and consume prefix, if applicable.
+	*/
+	if len(input) >= 2 && input[0] == '0' {
+		if .Hex in bases && (input[1] == 'x' || input[1] == 'X') {
+			base         = 16
+			input        = input[2:]
+			prefix_bytes = 2
+		}
+		if prefix_bytes == 0 && .Oct in bases {
+			base         = 8
+			input        = input[1:]
+			prefix_bytes = 1
+		}
+	}
+
+	parse_loop: for ch in input {
+		switch ch {
+		case '0'..'7':
+			digit_bytes += 1
+			value = value * base + u64(ch - '0')
+
+		case '8'..'9':
+			digit_bytes += 1
+
+			if base == 8 {
+				/*
+					Out of range for octal numbers.
+				*/
+				return value, digit_bytes + prefix_bytes, false
+			}
+			value = value * base + u64(ch - '0')
+
+		case 'a'..'f':
+			digit_bytes += 1
+
+			if base == 8 || base == 10 {
+				/*
+					Out of range for octal and decimal numbers.
+				*/
+				return value, digit_bytes + prefix_bytes, false
+			}
+			value = value * base + (u64(ch - 'a') + 10)
+
+		case 'A'..'F':
+			digit_bytes += 1
+
+			if base == 8 || base == 10 {
+				/*
+					Out of range for octal and decimal numbers.
+				*/
+				return value, digit_bytes + prefix_bytes, false
+			}
+			value = value * base + (u64(ch - 'A') + 10)
+
+		case '.', ':':
+			/*
+				Number separator. Return early.
+				We don't need to check if the number is in range.
+				We do that each time through the loop.
+			*/
+			break parse_loop
+
+		case:
+			/*
+				Invalid character encountered.
+			*/
+			return value, digit_bytes + prefix_bytes, false
+		}
+
+		if value > max_value {
+			/*
+				Out-of-range number.
+			*/
+			return value, digit_bytes + prefix_bytes, false
+		}
+	}
+
+	/*
+		If we consumed at least 1 digit byte, `value` *should* continue a valid number in an appropriate base in the allowable range.
+	*/
+	return value, digit_bytes + prefix_bytes, digit_bytes >= 1
 }
 
 /*
@@ -42,14 +240,19 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family) -> (addr: A
 	If the IP address is bracketed, the port must be present and valid (though it will be ignored):
 	- [a.b.c.d] will be treated as a parsing failure.
 
-	If `non_decimal_address` is true, then the address is interpreted as `inet_aton` would in C:
-	e.g."00377.0x0ff.65534" = 255.255.255.254
-		00377 = 255 in octal
-		0x0ff = 255 in hexadecimal
-		This leaves 16 bits worth of address
-		.65534 then accounts for the last two digits
+	The port, if present, is required to be a base 10 number in the range 0-65535, inclusive.
+
+	If `non_decimal_address` is true, `aton` is called.
 */
 parse_ip4_address :: proc(address_and_maybe_port: string, non_decimal_address := false) -> (addr: IP4_Address, ok: bool) {
+	if non_decimal_address {
+		res, res_ok := aton(address_and_maybe_port, .IP4)
+		if ip4, ip4_ok := res.(IP4_Address); ip4_ok {
+			return ip4, res_ok
+		}
+		return {}, false
+	}
+
 	/*
 		There is no valid address shorter than `0.0.0.0`.
 	*/
@@ -59,23 +262,20 @@ parse_ip4_address :: proc(address_and_maybe_port: string, non_decimal_address :=
 
 	address, _ := split_port(address_and_maybe_port) or_return // This call doesn't allocate
 
-	parts: [4]int
+	// base 64 so this works on 32-bit platforms as well.
+	parts: [4]u64
 	part := 0
 
-	base             := 10
 	is_leading_digit := true
-
-	// fmt.println("\t", address, "non-decimal:", non_decimal_address)
 
 	for ch in address {
 		switch ch {
 		case '0':
-			// Could be a leading zero of a new octal or hex number.
-			parts[part] = parts[part] * base
+			parts[part] = parts[part] * 10
 			is_leading_digit = false
 
 		case '1'..'9':
-			parts[part] = parts[part] * base + int(ch - '0')
+			parts[part] = parts[part] * 10 + u64(ch - '0')
 			is_leading_digit = false
 
 		case '.':
