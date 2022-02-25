@@ -29,36 +29,38 @@ Request_Status :: enum {
 }
 
 Client_Request :: struct {
-	request:   Request,
-	response:  Response,
+	request:   Request,  // Memory mananged externally
+	response:  Response, // Memory mananged externally
 	socket:    net.TCP_Socket, // only valid if status == .Wait_Reply
 	status:    Request_Status,
+	processing: bool, // Atomically updated in client_process_requests()
 }
 
 
 Client :: struct {
-	next_id:  Request_Id,
-	requests: map[Request_Id]Client_Request,
-	lock:     sync.Ticket_Mutex,
+	next_id:      Request_Id,
+	requests:     map[Request_Id]Client_Request,
+	request_lock: sync.Ticket_Mutex,
 }
 
-client_init :: proc(using c: ^Client, allocator := context.allocator) {
-	sync.ticket_mutex_init(&lock)
-	next_id = 0
+client_init :: proc(c: ^Client, allocator := context.allocator) {
+	c^ = {}
+	sync.ticket_mutex_init(&c.request_lock)
+	c.requests.allocator = allocator
 }
 
-client_destroy :: proc(using c: ^Client) {
+client_destroy :: proc(c: ^Client) {
 	for _, cr in c.requests {
-		request_destroy(cr.request)
+		net.close(cr.socket)
 	}
-	delete(requests)
+	delete(c.requests)
 	c^ = {}
 }
 
 
 Request_Id :: distinct int
 
-client_submit_request :: proc(using c: ^Client, req: Request) -> Request_Id {
+client_submit_request :: proc(c: ^Client, req: Request) -> Request_Id {
 	cr := Client_Request{
 		request = req,
 		response = {},
@@ -66,22 +68,22 @@ client_submit_request :: proc(using c: ^Client, req: Request) -> Request_Id {
 	}
 
 	{
-		sync.ticket_mutex_lock(&lock)
-		defer sync.ticket_mutex_unlock(&lock)
-		id := next_id
-		next_id += 1
-		requests[id] = cr
+		sync.ticket_mutex_lock(&c.request_lock)
+		defer sync.ticket_mutex_unlock(&c.request_lock)
+		id := c.next_id
+		c.next_id += 1
+		c.requests[id] = cr
 		return Request_Id(id)
 	}
 }
 
-client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+client_check_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
 	cr: Client_Request
 	ok: bool
 	{
-		sync.ticket_mutex_lock(&lock)
-		defer sync.ticket_mutex_unlock(&lock)
-		cr, ok = requests[id]
+		sync.ticket_mutex_lock(&c.request_lock)
+		defer sync.ticket_mutex_unlock(&c.request_lock)
+		cr, ok = c.requests[id]
 	}
 
 	if !ok {
@@ -91,7 +93,7 @@ client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response
 	return cr.response, cr.status
 }
 
-client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+client_wait_for_response :: proc(c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
 	loop: for {
 		response, status = client_check_for_response(c, id)
 		switch status {
@@ -106,28 +108,29 @@ client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response:
 		}
 	}
 
-	sync.ticket_mutex_lock(&lock)
-	defer sync.ticket_mutex_unlock(&lock)
-	delete_key(&requests, id)
+	sync.ticket_mutex_lock(&c.request_lock)
+	defer sync.ticket_mutex_unlock(&c.request_lock)
+	delete_key(&c.requests, id)
 	return
 }
 
-client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
+client_execute_request :: proc(c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
 	id := client_submit_request(c, req)
-	// return client_wait_for_response(c, id);
 	response, status = client_wait_for_response(c, id)
 	return
 }
 
-client_process_requests :: proc(using c: ^Client) {
+client_process_requests :: proc(c: ^Client) {
 	close_socket :: proc(s: ^net.TCP_Socket) {
 		net.close(s^)
 		s^ = {}
 	}
 
-	for _, req in &requests {
-		sync.ticket_mutex_lock(&lock)
-		defer sync.ticket_mutex_unlock(&lock)
+	for _, req in &c.requests {
+		if old := sync.atomic_swap(&req.processing, true, .Sequentially_Consistent); old {
+			continue // NOTE(tetra): Someone is already processing this request
+		}
+		defer sync.atomic_store(&req.processing, false, .Sequentially_Consistent)
 
 		switch req.status {
 		case .Need_Send:
