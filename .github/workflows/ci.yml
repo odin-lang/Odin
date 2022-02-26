@@ -38,6 +38,9 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin check examples/all for OpenBSD amd64
+        run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
+        timeout-minutes: 10
   build_macOS:
     runs-on: macos-latest
     steps:
