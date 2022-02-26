@@ -7,7 +7,7 @@
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
-		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Jeroen van Rijn: Cross platform unification, code style, IPv4 + IPv6 parsers, documentation.
 */
 
 /*
@@ -339,8 +339,6 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		num_skipped = 0
 	}
 
-	// fmt.println("Pieces:", pieces, before_skip, num_skipped, after_skip)
-
 	/*
 		Now try to parse the pieces into a 8 16-bit pieces.
 	*/
@@ -385,8 +383,6 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 	if after_skip > 0 {
 		for _ in 0..<after_skip {
-			// fmt.printf("idx: %v, val_idx: %v\n", idx, val_idx)
-
 			/*
 				An empty piece is the default zero. Otherwise, try to parse as an IPv6 hex piece.
 				If we have an IPv4 address, stop on the penultimate index.
@@ -396,7 +392,6 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 			}
 
 			piece := pieces[idx]
-			// fmt.println("Piece to parse:", piece)
 
 			/*
 				An IPv6 piece can at most contain 4 hex digits.
@@ -426,8 +421,6 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		val |= u16(ipv4[3])
 		piece_values[7] = u16be(val)
 	}
-
-	// fmt.printf("Parsed: %04x\n", piece_values)
 
 	return transmute(IP6_Address)piece_values, true
 }
@@ -573,7 +566,6 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 	case IP4_Address:
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
 	case IP6_Address:
-		// fmt.printf("Converting: %v\n", v)
 		i := 0
 		seen_double_colon := false
 		for i < len(v) {
@@ -591,10 +583,6 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 				fmt.sbprintf(&b, "%x", v[i])
 				i += 1
 			}
-		}
-		if !seen_double_colon && v[7] == 0 {
-			// turn single trailing zero into ::
-			b.buf[len(b.buf) - 1] = ':'
 		}
 	}
 
