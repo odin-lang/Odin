@@ -1,4 +1,4 @@
-#if defined(GB_SYSTEM_FREEBSD)
+#if defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
@@ -734,9 +734,36 @@ String internal_odin_root_dir(void) {
 		len = readlink("/proc/curproc/exe", &path_buf[0], path_buf.count);
 #elif defined(GB_SYSTEM_DRAGONFLYBSD)
 		len = readlink("/proc/curproc/file", &path_buf[0], path_buf.count);
-#else
-		// XXX OpenBSD
+#elif defined(GB_SYSTEM_LINUX)
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
+#elif defined(GB_SYSTEM_OPENBSD)
+		int error;
+		int mib[] = {
+			CTL_KERN,
+			KERN_PROC_ARGS,
+			getpid(),
+			KERN_PROC_ARGV,
+		};
+		// get argv size
+		error = sysctl(mib, 4, NULL, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			return make_string(nullptr, 0);
+		}
+		// get argv
+		char **argv = (char **)gb_malloc(len);
+		error = sysctl(mib, 4, argv, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			gb_mfree(argv);
+			return make_string(nullptr, 0);
+		}
+		// copy argv[0] to path_buf
+		len = gb_strlen(argv[0]);
+		if(len < path_buf.count) {
+			gb_memmove(&path_buf[0], argv[0], len);
+		}
+		gb_mfree(argv);
 #endif
 		if(len == 0 || len == -1) {
 			return make_string(nullptr, 0);
